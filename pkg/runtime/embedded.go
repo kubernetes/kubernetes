@@ -51,7 +51,7 @@ func NewSerializedConversions(serializer Serializer) *conversion.ConversionFuncs
 			if err != nil {
 				return err
 			}
-			obj, _, err := serializer.Decode(in.RawJSON, &unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version})
+			obj, _, err := serializer.Decode(in.RawJSON, &unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version}, nil)
 			if err != nil {
 				return err
 			}
@@ -98,7 +98,7 @@ func NewSerializedConversions(serializer Serializer) *conversion.ConversionFuncs
 					return err
 				}
 				data := src[i].RawJSON
-				obj, _, err := serializer.Decode(data, &unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version})
+				obj, _, err := serializer.Decode(data, &unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version}, nil)
 				if err == nil {
 					dest[i] = obj
 				} else {

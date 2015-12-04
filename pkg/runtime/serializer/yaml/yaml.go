@@ -36,11 +36,11 @@ func NewDecodingSerializer(jsonSerializer runtime.Serializer) runtime.Serializer
 	return &yamlSerializer{jsonSerializer}
 }
 
-func (c yamlSerializer) Decode(data []byte, gvk *unversioned.GroupVersionKind) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (c yamlSerializer) Decode(data []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
 	out, err := yaml.ToJSON(data)
 	if err != nil {
 		return nil, nil, err
 	}
 	data = out
-	return c.Serializer.Decode(data, gvk)
+	return c.Serializer.Decode(data, gvk, into)
 }

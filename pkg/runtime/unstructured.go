@@ -27,19 +27,13 @@ import (
 // UnstructuredJSONScheme is capable of converting JSON data into the Unstructured
 // type, which can be used for generic access to objects without a predefined scheme.
 // TODO: move into serializer/json.
-var UnstructuredJSONScheme ObjectDecoder = unstructuredJSONScheme{}
+var UnstructuredJSONScheme Decoder = unstructuredJSONScheme{}
 
 type unstructuredJSONScheme struct{}
 
 var _ Codec = unstructuredJSONScheme{}
 
-// Recognizes returns true for any version or kind that is specified (internal
-// versions are specifically excluded).
-func (unstructuredJSONScheme) Recognizes(version, kind string) bool {
-	return len(version) > 0 && len(kind) > 0
-}
-
-func (s unstructuredJSONScheme) Decode(data []byte, _ *unversioned.GroupVersionKind) (Object, *unversioned.GroupVersionKind, error) {
+func (s unstructuredJSONScheme) Decode(data []byte, _ *unversioned.GroupVersionKind, _ Object) (Object, *unversioned.GroupVersionKind, error) {
 	unstruct := &Unstructured{}
 
 	m := make(map[string]interface{})

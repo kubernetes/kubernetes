@@ -74,6 +74,7 @@ import (
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
@@ -493,7 +494,7 @@ func New(c *Config) *Master {
 	} else {
 		mux := http.NewServeMux()
 		m.mux = mux
-		handlerContainer = NewHandlerContainer(mux)
+		handlerContainer = NewHandlerContainer(mux, latest.Codecs)
 	}
 	m.handlerContainer = handlerContainer
 	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
@@ -525,10 +526,10 @@ func (m *Master) HandleFuncWithAuth(pattern string, handler func(http.ResponseWr
 	m.muxHelper.HandleFunc(pattern, handler)
 }
 
-func NewHandlerContainer(mux *http.ServeMux) *restful.Container {
+func NewHandlerContainer(mux *http.ServeMux, s apiserver.NegotiatedSerializer) *restful.Container {
 	container := restful.NewContainer()
 	container.ServeMux = mux
-	apiserver.InstallRecoverHandler(container)
+	apiserver.InstallRecoverHandler(s, container)
 	return container
 }
 
@@ -875,6 +876,8 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 
 		Mapper: latest.GroupOrDie("").RESTMapper,
 
+		ParameterCodec: runtime.NewParameterCodec(api.Scheme),
+
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
@@ -1034,6 +1037,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 
 		Mapper:             thirdpartyresourcedata.NewMapper(latest.GroupOrDie("extensions").RESTMapper, kind, version, group),
 		Codec:              thirdpartyresourcedata.NewCodec(latest.GroupOrDie("extensions").Codec, kind),
+		ParameterCodec:     runtime.NewParameterCodec(api.Scheme),
 		Linker:             latest.GroupOrDie("extensions").SelfLinker,
 		Storage:            storage,
 		ServerGroupVersion: &serverGroupVersion,

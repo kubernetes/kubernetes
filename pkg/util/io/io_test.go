@@ -15,38 +15,3 @@ limitations under the License.
 */
 
 package io_test
-
-import (
-	"fmt"
-	"os"
-	"testing"
-
-	"github.com/pborman/uuid"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/util/io"
-	"k8s.io/kubernetes/pkg/volume"
-)
-
-func TestSavePodToFile(t *testing.T) {
-	pod := volume.NewPersistentVolumeRecyclerPodTemplate()
-
-	// sets all default values on a pod for equality comparison after decoding from file
-	encoded, err := latest.GroupOrDie("").Codec.Encode(pod)
-	latest.GroupOrDie("").Codec.DecodeInto(encoded, pod)
-
-	path := fmt.Sprintf("/tmp/kube-io-test-%s", uuid.New())
-	defer os.Remove(path)
-
-	if err := io.SavePodToFile(pod, path, 777); err != nil {
-		t.Fatalf("failed to save pod to file: %v", err)
-	}
-
-	podFromFile, err := io.LoadPodFromFile(path)
-	if err != nil {
-		t.Fatalf("failed to load pod from file: %v", err)
-	}
-	if !api.Semantic.DeepEqual(pod, podFromFile) {
-		t.Errorf("\nexpected %#v\ngot	%#v\n", pod, podFromFile)
-	}
-}

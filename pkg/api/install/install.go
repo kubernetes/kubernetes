@@ -24,16 +24,14 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/util/sets"
-
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	_ "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // userResources is a group of resources mostly used by a kubectl user
@@ -57,6 +55,7 @@ func init() {
 	// Use the first API version in the list of registered versions as the latest.
 	registeredGroupVersions := registered.GroupVersionsForGroup("")
 	groupVersion := registeredGroupVersions[0]
+	// HACK: this is a bad idea
 	*groupMeta = latest.GroupMeta{
 		GroupVersion: groupVersion.String(),
 		Group:        groupVersion.Group,
@@ -103,7 +102,8 @@ func init() {
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
 	groupMeta.InterfacesFor = interfacesFor
 
-	v1Codec := versioning.NewCodec()
+	// this codec allows restmapper to decode objects in the known formats into the internal form.
+	v1Codec = runtime.NoopEncoder{latest.Codecs.UniversalDecoder(unversioned.GroupVersion{Group: groupMeta.Group, Version: runtime.APIVersionInternal})}
 }
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version

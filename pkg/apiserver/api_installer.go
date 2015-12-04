@@ -64,7 +64,13 @@ var errEmptyName = errors.NewBadRequest("name must be provided")
 func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversioned.APIResource, errors []error) {
 	errors = make([]error, 0)
 
-	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info})
+	proxyHandler := (&ProxyHandler{
+		prefix:              a.prefix + "/proxy/",
+		storage:             a.group.Storage,
+		serializer:          a.group.Serializer,
+		context:             a.group.Context,
+		requestInfoResolver: a.info,
+	})
 
 	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
 	paths := make([]string, len(a.group.Storage))
@@ -220,10 +226,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		versionedGetOptions runtime.Object
 		getOptionsKind      string
 		getSubpath          bool
-		getSubpathKey       string
 	)
 	if isGetterWithOptions {
-		getOptions, getSubpath, getSubpathKey = getterWithOptions.NewGetOptions()
+		getOptions, getSubpath, _ = getterWithOptions.NewGetOptions()
 		_, getOptionsKind, err = a.group.Typer.ObjectVersionAndKind(getOptions)
 		if err != nil {
 			return nil, err
@@ -240,10 +245,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		versionedConnectOptions runtime.Object
 		connectOptionsKind      string
 		connectSubpath          bool
-		connectSubpathKey       string
 	)
 	if isConnecter {
-		connectOptions, connectSubpath, connectSubpathKey = connecter.NewConnectOptions()
+		connectOptions, connectSubpath, _ = connecter.NewConnectOptions()
 		if connectOptions != nil {
 			_, connectOptionsKind, err = a.group.Typer.ObjectVersionAndKind(connectOptions)
 			if err != nil {
@@ -380,10 +384,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	reqScope := RequestScope{
 		ContextFunc: ctxFn,
-		Creater:     a.group.Creater,
-		Convertor:   a.group.Convertor,
-		Codec:       mapping.Codec,
-		APIVersion:  a.group.GroupVersion.String(),
+
+		Serializer:     a.group.Serializer,
+		ParameterCodec: a.group.ParameterCodec,
+		Creater:        a.group.Creater,
+		Convertor:      a.group.Convertor,
+
+		APIVersion: a.group.GroupVersion.String(),
 		// TODO, this internal version needs to plumbed through from the caller
 		// this works in all the cases we have now
 		InternalVersion:  unversioned.GroupVersion{Group: a.group.GroupVersion.Group},
@@ -403,7 +410,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
 			if isGetterWithOptions {
-				handler = GetResourceWithOptions(getterWithOptions, reqScope, getOptionsKind, getSubpath, getSubpathKey)
+				handler = GetResourceWithOptions(getterWithOptions, reqScope)
 			} else {
 				handler = GetResource(getter, reqScope)
 			}
@@ -584,7 +591,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					doc = "connect " + method + " requests to " + subresource + " of " + kind
 				}
 				route := ws.Method(method).Path(action.Path).
-					To(ConnectResource(connecter, reqScope, admit, connectOptionsKind, path, connectSubpath, connectSubpathKey)).
+					To(ConnectResource(connecter, reqScope, admit, path)).
 					Filter(m).
 					Doc(doc).
 					Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource)).

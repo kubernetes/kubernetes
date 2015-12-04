@@ -25,25 +25,26 @@ import (
 	"github.com/ugorji/go/codec"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
+	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 )
 
 // NewSerializer creates a JSON serializer that handles encoding versioned objects into the proper JSON form. If typer
 // is not nil, the object has the group, version, and kind fields set.
-func NewSerializer(meta conversion.MetaFactory, creater runtime.ObjectCreater, typer runtime.Typer) runtime.Serializer {
+func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.Typer, pretty bool) runtime.Serializer {
 	return &Serializer{
 		meta:    meta,
 		creater: creater,
 		typer:   typer,
 		yaml:    false,
+		pretty:  pretty,
 	}
 }
 
 // NewYAMLSerializer creates a YAML serializer that handles encoding versioned objects into the proper YAML form. If typer
 // is not nil, the object has the group, version, and kind fields set. This serializer supports only the subset of YAML that
 // matches JSON, and will error if constructs are used that do not serialize to JSON.
-func NewYAMLSerializer(meta conversion.MetaFactory, creater runtime.ObjectCreater, typer runtime.Typer) runtime.Serializer {
+func NewYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.Typer) runtime.Serializer {
 	return &Serializer{
 		meta:    meta,
 		creater: creater,
@@ -53,13 +54,14 @@ func NewYAMLSerializer(meta conversion.MetaFactory, creater runtime.ObjectCreate
 }
 
 type Serializer struct {
-	meta    conversion.MetaFactory
+	meta    MetaFactory
 	creater runtime.ObjectCreater
 	typer   runtime.Typer
 	yaml    bool
+	pretty  bool
 }
 
-func (s *Serializer) Decode(data []byte, gvk *unversioned.GroupVersionKind) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (s *Serializer) Decode(data []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
 	version, kind, err := s.meta.Interpret(data)
 	if err != nil {
 		return nil, nil, err
@@ -85,10 +87,12 @@ func (s *Serializer) Decode(data []byte, gvk *unversioned.GroupVersionKind) (run
 		}
 	}
 
-	obj, err := s.creater.New(actual.GroupVersion().String(), actual.Kind)
+	// use the target if necessary
+	obj, err := runtime.UseOrCreateObject(s.typer, s.creater, *actual, into)
 	if err != nil {
 		return nil, actual, err
 	}
+
 	if s.yaml {
 		altered, err := yaml.YAMLToJSON(data)
 		if err != nil {
@@ -127,6 +131,19 @@ func (s *Serializer) EncodeToStream(obj runtime.Object, w io.Writer) error {
 		return err
 	}
 
+	if s.pretty {
+		data, err := json.MarshalIndent(obj, "", "  ")
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(data)
+		return err
+	}
 	encoder := json.NewEncoder(w)
 	return encoder.Encode(obj)
+}
+
+func (s *Serializer) RecognizesData(peek io.Reader) (bool, error) {
+	_, ok := utilyaml.GuessJSONStream(peek, 2048)
+	return ok, nil
 }

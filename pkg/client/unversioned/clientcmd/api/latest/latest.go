@@ -16,6 +16,14 @@ limitations under the License.
 
 package latest
 
+import (
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/json"
+	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
+)
+
 // Version is the string that represents the current external default version.
 const Version = "v1"
 
@@ -28,3 +36,10 @@ const OldestVersion = "v1"
 // choose to prefer the latter items in the list over the former items when presented
 // with a set of versions to choose.
 var Versions = []string{"v1"}
+
+var Codec = versioning.NewCodecForScheme(
+	api.Scheme,
+	json.NewYAMLSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme)),
+	[]unversioned.GroupVersion{{Version: Version}},
+	[]unversioned.GroupVersion{{Version: runtime.APIVersionInternal}},
+)

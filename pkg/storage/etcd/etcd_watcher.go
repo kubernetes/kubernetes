@@ -232,7 +232,7 @@ func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
 		return obj, nil
 	}
 
-	obj, err := w.encoding.Decode([]byte(node.Value))
+	obj, _, err := w.encoding.Decode([]byte(node.Value), nil, nil)
 	if err != nil {
 		return nil, err
 	}

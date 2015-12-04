@@ -49,7 +49,7 @@ type decoder struct {
 	blind       []runtime.Decoder
 }
 
-func (d *decoder) Decode(data []byte, gvk *unversioned.GroupVersionKind) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (d *decoder) Decode(data []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
 	var lastErr error
 	for _, r := range d.recognizing {
 		buf := bytes.NewBuffer(data)
@@ -61,10 +61,10 @@ func (d *decoder) Decode(data []byte, gvk *unversioned.GroupVersionKind) (runtim
 		if !ok {
 			continue
 		}
-		return r.Decode(data, gvk)
+		return r.Decode(data, gvk, into)
 	}
 	for _, d := range d.blind {
-		out, actual, err := d.Decode(data, gvk)
+		out, actual, err := d.Decode(data, gvk, into)
 		if err != nil {
 			lastErr = err
 			continue

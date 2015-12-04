@@ -32,6 +32,17 @@ type ExtensibleConvertor interface {
 	WithConversions(fns *conversion.ConversionFuncs) runtime.ObjectConvertor
 }
 
+// NewCodecForScheme is a convenience method for callers that are using a scheme.
+func NewCodecForScheme(
+	// TODO: I should be a scheme interface?
+	scheme *runtime.Scheme,
+	serializer runtime.Serializer,
+	encodeVersion []unversioned.GroupVersion,
+	decodeVersion []unversioned.GroupVersion,
+) runtime.Codec {
+	return NewCodec(scheme, serializer, scheme, runtime.ObjectTyperToTyper(scheme), encodeVersion, decodeVersion)
+}
+
 // NewCodec takes objects in their internal versions and converts them to external versions before
 // serializing them. It assumes the serializer provided to it only deals with external versions.
 // This class is also a serializer, but is generally used with a specific version.
@@ -40,20 +51,29 @@ func NewCodec(
 	serializer runtime.Serializer,
 	creater runtime.ObjectCreater,
 	typer runtime.Typer,
-	encodeVersion map[string]unversioned.GroupVersion,
-	decodeVersion map[string]unversioned.GroupVersion,
+	encodeVersion []unversioned.GroupVersion,
+	decodeVersion []unversioned.GroupVersion,
 ) runtime.Codec {
 	internal := &codec{
 		serializer: serializer,
 		creater:    creater,
 		typer:      typer,
-
-		encodeVersion: encodeVersion,
-		decodeVersion: decodeVersion,
 	}
 	// when we perform conversions of runtime.Object -> []byte, use this serializer to encode and decode the
 	// objects
 	internal.convertor = extensibleConvertor.WithConversions(runtime.NewSerializedConversions(internal))
+	if encodeVersion != nil {
+		internal.encodeVersion = make(map[string]unversioned.GroupVersion)
+		for _, v := range encodeVersion {
+			internal.encodeVersion[v.Group] = v
+		}
+	}
+	if decodeVersion != nil {
+		internal.decodeVersion = make(map[string]unversioned.GroupVersion)
+		for _, v := range decodeVersion {
+			internal.decodeVersion[v.Group] = v
+		}
+	}
 
 	return internal
 }
@@ -69,16 +89,26 @@ type codec struct {
 }
 
 // Decode attempts a decode of the object, then tries to convert it to the internal version.
-func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind) (runtime.Object, *unversioned.GroupVersionKind, error) {
-	obj, gvk, err := c.serializer.Decode(data, defaultGVK)
+func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+	obj, gvk, err := c.serializer.Decode(data, defaultGVK, into)
 	if err != nil {
 		return nil, gvk, err
 	}
 
+	// if we specify a target, use generic conversion.
+	if into != nil {
+		if err := c.convertor.Convert(obj, into); err != nil {
+			return nil, gvk, err
+		}
+		return into, gvk, nil
+	}
+
+	// if there are no decodes possible, this is a wrapper to the serializer
 	if c.decodeVersion == nil {
 		return obj, gvk, nil
 	}
 
+	// invoke a version conversion
 	group := gvk.Group
 	if defaultGVK != nil {
 		group = defaultGVK.Group
@@ -136,8 +166,8 @@ type enforcingDecoder struct {
 	runtime.Codec
 }
 
-func (c enforcingDecoder) Decode(data []byte, requestedGVK *unversioned.GroupVersionKind) (runtime.Object, *unversioned.GroupVersionKind, error) {
-	out, gvk, err := c.Codec.Decode(data, requestedGVK)
+func (c enforcingDecoder) Decode(data []byte, requestedGVK *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+	out, gvk, err := c.Codec.Decode(data, requestedGVK, into)
 	if err != nil {
 		return nil, gvk, err
 	}

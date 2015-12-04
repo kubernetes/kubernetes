@@ -19,7 +19,6 @@ package kubectl
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -198,6 +197,8 @@ func (p *VersionedPrinter) HandledResources() []string {
 
 // NamePrinter is an implementation of ResourcePrinter which outputs "resource/name" pair of an object.
 type NamePrinter struct {
+	Decoder runtime.Decoder
+	Typer   runtime.Typer
 }
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which decodes the object
@@ -205,11 +206,9 @@ type NamePrinter struct {
 // TODO: NamePrinter needs to take ObjectTyper, RESTMapper, and a list of decoders
 //   in order to do what it needs to do.
 func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	// TODO: this is wrong, it should be using an ObjectTyper and a RESTMapper
-	objvalue := reflect.ValueOf(obj).Elem()
-	kind := objvalue.FieldByName("Kind")
-	if !kind.IsValid() {
-		kind = reflect.ValueOf("<unknown>")
+	kind := "<unknown>"
+	if gvk, err := p.Typer.ObjectVersionAndKind(obj); err == nil {
+		kind = gvk.Kind
 	}
 
 	// TODO: this code is wrong and should not expected to be processing lists (because
@@ -220,7 +219,7 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 			return err
 		}
 		// TODO: this is wrong, should access all metadata schemes.
-		if errs := runtime.DecodeList(items, runtime.UnstructuredJSONScheme, api.Scheme); len(errs) > 0 {
+		if errs := runtime.DecodeList(items, runtime.UnstructuredJSONScheme, p.Decoder); len(errs) > 0 {
 			return utilerrors.NewAggregate(errs)
 		}
 		for _, obj := range items {
@@ -232,12 +231,16 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	}
 
 	// TODO: this is wrong, runtime.Unknown and runtime.Unstructured are not handled properly here.
-	name := meta.Accessor(obj).Name()
-	if len(name) == 0 {
-		name = "<unknown>"
+
+	name := "<unknown>"
+	if acc, err := meta.Accessor(obj); err == nil {
+		if n := acc.Name(); len(n) > 0 {
+			name = n
+		}
 	}
+
 	// TODO: this is wrong, it assumes that meta knows about all Kinds
-	_, resource := meta.KindToResource(kind.String(), false)
+	_, resource := meta.KindToResource(kind, false)
 
 	fmt.Fprintf(w, "%s/%s\n", resource, name)
 

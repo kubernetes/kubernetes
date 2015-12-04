@@ -20,9 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/yaml"
@@ -45,25 +43,18 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 		return nil, fmt.Errorf("unable to parse %q: %v", source, err)
 	}
 	data = json
-	version, kind, err := runtime.UnstructuredJSONScheme.DataVersionAndKind(data)
+	unknown, gvk, err := runtime.UnstructuredJSONScheme.Decode(data, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from %q: %v", source, err)
 	}
-	gv, err := unversioned.ParseGroupVersion(version)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse group/version from %q: %v", version, err)
+	if gvk == nil {
+		return nil, fmt.Errorf("unable to get type info from %q: no apiVersion or kind set", source)
 	}
-	if ok := registered.IsRegisteredAPIGroupVersion(gv); !ok {
-		return nil, fmt.Errorf("API version %q in %q isn't supported, only supports API versions %q", version, source, registered.RegisteredGroupVersions)
-	}
-	if kind == "" {
-		return nil, fmt.Errorf("kind not set in %q", source)
-	}
-	mapping, err := m.RESTMapping(unversioned.GroupKind{Group: gv.Group, Kind: kind}, gv.Version)
+	mapping, err := m.RESTMapping(unversioned.GroupKind{Group: gvk.Group, Kind: gvk.Kind}, gvk.Version)
 	if err != nil {
 		return nil, fmt.Errorf("unable to recognize %q: %v", source, err)
 	}
-	obj, err := mapping.Codec.Decode(data)
+	obj, _, err := mapping.Codec.Decode(data, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load %q: %v", source, err)
 	}
@@ -76,18 +67,13 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
 	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)
 
-	var versionedObject interface{}
-
-	if vo, _, _, err := api.Scheme.Raw().DecodeToVersionedObject(data); err == nil {
-		versionedObject = vo
-	}
 	return &Info{
 		Mapping:         mapping,
 		Client:          client,
 		Namespace:       namespace,
 		Name:            name,
 		Source:          source,
-		VersionedObject: versionedObject,
+		VersionedObject: unknown,
 		Object:          obj,
 		ResourceVersion: resourceVersion,
 	}, nil

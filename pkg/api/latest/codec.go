@@ -19,18 +19,19 @@ package latest
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
 	"k8s.io/kubernetes/pkg/runtime/serializer/recognizer"
+	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 )
 
 var (
 	Codecs                CodecFactory
 	UniversalDeserializer runtime.Decoder
 
-	jsonSerializer = json.NewSerializer(conversion.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme))
-	yamlSerializer = json.NewYAMLSerializer(conversion.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme))
+	jsonSerializer       = json.NewSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), false)
+	jsonPrettySerializer = json.NewSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), true)
+	yamlSerializer       = json.NewYAMLSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme))
 )
 
 type serializerType struct {
@@ -38,6 +39,7 @@ type serializerType struct {
 	ContentType        string
 	FileExtensions     []string
 	Serializer         runtime.Serializer
+	PrettySerializer   runtime.Serializer
 }
 
 // allows other codecs to be enabled with compile time flags in their own files
@@ -47,6 +49,7 @@ var serializers = []serializerType{
 		ContentType:        "application/json",
 		FileExtensions:     []string{"json"},
 		Serializer:         jsonSerializer,
+		PrettySerializer:   jsonPrettySerializer,
 	},
 	{
 		AcceptContentTypes: []string{"application/yaml"},
@@ -79,25 +82,26 @@ type CodecFactory struct {
 // versions of objects to return - by default, runtime.APIVersionInternal is used. If any versions are specified,
 // unrecognized groups will be returned in the version they are encoded as (no conversion).
 func (f CodecFactory) UniversalDecoder(versions ...unversioned.GroupVersion) runtime.Decoder {
-	return f.CodecForVersions(runtime.NoopEncoder{UniversalDeserializer}, versions...)
+	return f.CodecForVersions(runtime.NoopEncoder{UniversalDeserializer}, nil, versions)
 }
 
-// CodecFor creates a codec with the provided serializer. If versions are specified, objects are converted to
-// those versions in each group, or left unchanged if not recognized. If no versions are specified,
-// runtime.APIVersionInternal is used.
-func (CodecFactory) CodecForVersions(serializer runtime.Serializer, versions ...unversioned.GroupVersion) runtime.Codec {
-	return nil
+// CodecFor creates a codec with the provided serializer. If an object is decoded and its group is not in the list,
+// it will default to runtiem.APIVersionInternal. If encode is not specified for an object's group, the object is not
+// converted. If encode or decode are nil, no conversion is performed.
+func (CodecFactory) CodecForVersions(serializer runtime.Serializer, encode []unversioned.GroupVersion, decode []unversioned.GroupVersion) runtime.Codec {
+	return versioning.NewCodec(api.Scheme, serializer, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), encode, decode)
 }
 
-// SerializerForContentTypes returns the first serializer that matches thet provided RFC2046 media types (in order), or
-// false if no serializer matched.
-func (f CodecFactory) SerializerForContentTypes(mediaTypes ...string) (runtime.Serializer, bool) {
+// SerializerForMediaType returns a serializer that matches the provided RFC2046 mediaType, or false if no such
+// serializer exists
+func (f CodecFactory) SerializerForMediaType(mediaType string, options map[string]string) (runtime.Serializer, bool) {
 	for _, s := range f.serializers {
-		for _, accept := range s.AcceptContentTypes {
-			for _, expect := range mediaTypes {
-				if expect == accept {
-					return s.Serializer, true
+		for _, accepted := range s.AcceptContentTypes {
+			if accepted == mediaType {
+				if _, ok := options["pretty"]; ok && s.PrettySerializer != nil {
+					return s.PrettySerializer, true
 				}
+				return s.Serializer, true
 			}
 		}
 	}

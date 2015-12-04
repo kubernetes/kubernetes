@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type debugError interface {
@@ -136,7 +137,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool) ([]byte, error
 			return nil, err
 		}
 
-		modified, err = info.Mapping.Codec.Encode(info.Object)
+		modified, err = runtime.Encode(info.Mapping.Codec, info.Object)
 		if err != nil {
 			return nil, err
 		}
@@ -147,7 +148,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool) ([]byte, error
 				return nil, err
 			}
 
-			modified, err = info.Mapping.Codec.Encode(info.Object)
+			modified, err = runtime.Encode(info.Mapping.Codec, info.Object)
 			if err != nil {
 				return nil, err
 			}

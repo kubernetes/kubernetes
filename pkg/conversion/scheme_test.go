@@ -122,28 +122,7 @@ func GetTestScheme() *Scheme {
 	s.AddKnownTypeWithName(externalGV.WithKind("TestType2"), &ExternalTestType2{})
 	s.AddKnownTypeWithName(internalGV.WithKind("TestType3"), &TestType1{})
 	s.AddKnownTypeWithName(externalGV.WithKind("TestType3"), &ExternalTestType1{})
-	s.MetaFactory = testMetaFactory{}
 	return s
-}
-
-type testMetaFactory struct{}
-
-func (testMetaFactory) Interpret(data []byte) (version, kind string, err error) {
-	findKind := struct {
-		APIVersion string `json:"myVersionKey,omitempty"`
-		ObjectKind string `json:"myKindKey,omitempty"`
-	}{}
-	// yaml is a superset of json, so we use it to decode here. That way,
-	// we understand both.
-	err = yaml.Unmarshal(data, &findKind)
-	if err != nil {
-		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
-	}
-	return findKind.APIVersion, findKind.ObjectKind, nil
-}
-
-func (testMetaFactory) Update(version, kind string, obj interface{}) error {
-	return UpdateVersionAndKind(nil, "APIVersion", version, "ObjectKind", kind, obj)
 }
 
 func objDiff(a, b interface{}) string {

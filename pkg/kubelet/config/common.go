@@ -90,7 +90,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *a
 	if err != nil {
 		return false, nil, err
 	}
-	obj, err := api.Scheme.Decode(json)
+	obj, _, err := latest.Codecs.UniversalDecoder().Decode(json, nil, nil)
 	if err != nil {
 		return false, pod, err
 	}
@@ -112,11 +112,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *a
 }
 
 func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods api.PodList, err error) {
-	json, err := utilyaml.ToJSON(data)
-	if err != nil {
-		return false, api.PodList{}, err
-	}
-	obj, err := api.Scheme.Decode(json)
+	obj, _, err := latest.Codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		return false, pods, err
 	}

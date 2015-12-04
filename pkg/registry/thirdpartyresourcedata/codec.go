@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/url"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -148,36 +147,19 @@ func (t *thirdPartyResourceDataCodec) populateFromObject(objIn *extensions.Third
 	return nil
 }
 
-func (t *thirdPartyResourceDataCodec) Decode(data []byte) (runtime.Object, error) {
-	result := &extensions.ThirdPartyResourceData{}
-	if err := t.populate(result, data); err != nil {
-		return nil, err
+func (t *thirdPartyResourceDataCodec) Decode(data []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+	obj := &extensions.ThirdPartyResourceData{}
+	if err := t.populate(obj, data); err != nil {
+		return nil, nil, err
 	}
-	return result, nil
-}
-
-func (t *thirdPartyResourceDataCodec) DecodeToVersion(data []byte, gv unversioned.GroupVersion) (runtime.Object, error) {
-	// TODO: this is hacky, there must be a better way...
-	obj, err := t.Decode(data)
+	objData, err := runtime.Encode(t.delegate, obj)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	objData, err := t.delegate.Encode(obj)
-	if err != nil {
-		return nil, err
-	}
-	return t.delegate.DecodeToVersion(objData, gv)
+	return t.delegate.Decode(objData, gvk, into)
 }
 
-func (t *thirdPartyResourceDataCodec) DecodeInto(data []byte, obj runtime.Object) error {
-	thirdParty, ok := obj.(*extensions.ThirdPartyResourceData)
-	if !ok {
-		return fmt.Errorf("unexpected object: %#v", obj)
-	}
-	return t.populate(thirdParty, data)
-}
-
-func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []byte, obj runtime.Object, gvk unversioned.GroupVersionKind) error {
+/*func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []byte, obj runtime.Object, gvk unversioned.GroupVersionKind) error {
 	thirdParty, ok := obj.(*extensions.ThirdPartyResourceData)
 	if !ok {
 		return fmt.Errorf("unexpected object: %#v", obj)
@@ -222,11 +204,7 @@ func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []
 		return err
 	}
 	return nil
-}
-
-func (t *thirdPartyResourceDataCodec) DecodeParametersInto(parameters url.Values, obj runtime.Object) error {
-	return t.delegate.DecodeParametersInto(parameters, obj)
-}
+}*/
 
 const template = `{
   "kind": "%s",
@@ -245,14 +223,6 @@ func encodeToJSON(obj *extensions.ThirdPartyResourceData, stream io.Writer) erro
 	objMap["metadata"] = obj.ObjectMeta
 	encoder := json.NewEncoder(stream)
 	return encoder.Encode(objMap)
-}
-
-func (t *thirdPartyResourceDataCodec) Encode(obj runtime.Object) ([]byte, error) {
-	buff := &bytes.Buffer{}
-	if err := t.EncodeToStream(obj, buff); err != nil {
-		return nil, err
-	}
-	return buff.Bytes(), nil
 }
 
 func (t *thirdPartyResourceDataCodec) EncodeToStream(obj runtime.Object, stream io.Writer) (err error) {

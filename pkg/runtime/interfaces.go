@@ -43,8 +43,10 @@ type Encoder interface {
 type Decoder interface {
 	// Decode attempts to deserialize the provided data using either the innate typing of the scheme or the
 	// default kind, group, and version provided. It returns a decoded object as well as the actual kind, group, and
-	// version decoded, or an error.
-	Decode(data []byte, gvk *unversioned.GroupVersionKind) (Object, *unversioned.GroupVersionKind, error)
+	// version decoded, or an error. If into is non-nil, it will be used as the target type and implementations
+	// may choose to use it rather than reallocating an object. However, the object is not guaranteed to be
+	// populated. The returned object type is not guaranteed to match into.
+	Decode(data []byte, gvk *unversioned.GroupVersionKind, into Object) (Object, *unversioned.GroupVersionKind, error)
 }
 
 // Serializer is the core interface for transforming objects into a serialized format and back.
@@ -59,24 +61,15 @@ type Serializer interface {
 // they receive.
 type Codec Serializer
 
-// ParameterCodec defines methods for serializing and deserializing API objects to url.Values
-type ParameterSerializer interface {
-	DecodeParameters(parameters url.Values, gvk unversioned.GroupVersionKind) (Object, error)
-	EncodeParameters(Object) (url.Values, error)
-}
-
-type ParameterCodec ParameterSerializer
-
-// ObjectDecoder is a convenience interface for identifying serialized versions of objects
-// and transforming them into Objects. It intentionally overlaps with ObjectTyper and
-// Decoder for use in decode only paths.
-// TODO: Consider removing this interface?
-type ObjectDecoder interface {
-	// Identical to Serializer#Decode
-	Decode(data []byte, gvk *unversioned.GroupVersionKind) (Object, *unversioned.GroupVersionKind, error)
-	// Recognizes returns true if the scheme is able to handle the provided version and kind
-	// of an object.
-	Recognizes(version, kind string) bool
+// ParameterCodec defines methods for serializing and deserializing API objects to url.Values and
+// performing any necessary conversion. Unlike the normal Codec, query parameters are not self describing
+// and the desired version must be specified.
+type ParameterCodec interface {
+	// DecodeParameters takes the given url.Values in the specified group version and decodes them
+	// into the provided object, or returns an error.
+	DecodeParameters(parameters url.Values, from unversioned.GroupVersion, into Object) error
+	// EncodeParameters encodes the provided object as query parameters or returns an error.
+	EncodeParameters(obj Object, to unversioned.GroupVersion) (url.Values, error)
 }
 
 ///////////////////////////////////////////////////////////////////////////////

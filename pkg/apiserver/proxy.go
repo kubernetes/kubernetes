@@ -29,9 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/httplog"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	proxyutil "k8s.io/kubernetes/pkg/util/proxy"
@@ -44,7 +44,7 @@ import (
 type ProxyHandler struct {
 	prefix              string
 	storage             map[string]rest.Storage
-	codec               runtime.Codec
+	serializer          NegotiatedSerializer
 	context             api.RequestContextMapper
 	requestInfoResolver *RequestInfoResolver
 }
@@ -98,20 +98,19 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	apiResource = resource
 
+	gv := unversioned.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+
 	redirector, ok := storage.(rest.Redirector)
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resource)
-		httpCode = errorJSON(errors.NewMethodNotSupported(resource, "proxy"), r.codec, w)
+		httpCode = errorNegotiated(errors.NewMethodNotSupported(resource, "proxy"), r.serializer, gv, w, req)
 		return
 	}
 
 	location, roundTripper, err := redirector.ResourceLocation(ctx, id)
 	if err != nil {
 		httplog.LogOf(req, w).Addf("Error getting ResourceLocation: %v", err)
-		status := errToAPIStatus(err)
-		code := int(status.Code)
-		writeJSON(code, r.codec, status, w, true)
-		httpCode = code
+		httpCode = errorNegotiated(err, r.serializer, gv, w, req)
 		return
 	}
 	if location == nil {
@@ -144,11 +143,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	newReq, err := http.NewRequest(req.Method, location.String(), req.Body)
 	if err != nil {
-		status := errToAPIStatus(err)
-		code := int(status.Code)
-		writeJSON(code, r.codec, status, w, true)
-		notFound(w, req)
-		httpCode = code
+		httpCode = errorNegotiated(err, r.serializer, gv, w, req)
 		return
 	}
 	httpCode = http.StatusOK
@@ -157,7 +152,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// TODO convert this entire proxy to an UpgradeAwareProxy similar to
 	// https://github.com/openshift/origin/blob/master/pkg/util/httpproxy/upgradeawareproxy.go.
 	// That proxy needs to be modified to support multiple backends, not just 1.
-	if r.tryUpgrade(w, req, newReq, location, roundTripper) {
+	if r.tryUpgrade(w, req, newReq, location, roundTripper, gv) {
 		return
 	}
 
@@ -206,15 +201,13 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 // tryUpgrade returns true if the request was handled.
-func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Request, location *url.URL, transport http.RoundTripper) bool {
+func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Request, location *url.URL, transport http.RoundTripper, gv unversioned.GroupVersion) bool {
 	if !httpstream.IsUpgradeRequest(req) {
 		return false
 	}
 	backendConn, err := proxyutil.DialURL(location, transport)
 	if err != nil {
-		status := errToAPIStatus(err)
-		code := int(status.Code)
-		writeJSON(code, r.codec, status, w, true)
+		errorNegotiated(err, r.serializer, gv, w, req)
 		return true
 	}
 	defer backendConn.Close()
@@ -224,17 +217,13 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 	// hijack, just for reference...
 	requestHijackedConn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
-		status := errToAPIStatus(err)
-		code := int(status.Code)
-		writeJSON(code, r.codec, status, w, true)
+		errorNegotiated(err, r.serializer, gv, w, req)
 		return true
 	}
 	defer requestHijackedConn.Close()
 
 	if err = newReq.Write(backendConn); err != nil {
-		status := errToAPIStatus(err)
-		code := int(status.Code)
-		writeJSON(code, r.codec, status, w, true)
+		errorNegotiated(err, r.serializer, gv, w, req)
 		return true
 	}
 

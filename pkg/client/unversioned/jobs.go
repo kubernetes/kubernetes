@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
@@ -86,15 +85,7 @@ func (c *jobs) Update(job *extensions.Job) (result *extensions.Job, err error) {
 
 // Delete deletes a job, returns error if one occurs.
 func (c *jobs) Delete(name string, options *api.DeleteOptions) (err error) {
-	if options == nil {
-		return c.r.Delete().Namespace(c.ns).Resource("jobs").Name(name).Do().Error()
-	}
-
-	body, err := api.Scheme.EncodeToVersion(options, latest.GroupOrDie("").GroupVersion)
-	if err != nil {
-		return err
-	}
-	return c.r.Delete().Namespace(c.ns).Resource("jobs").Name(name).Body(body).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource("jobs").Name(name).Body(options).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested jobs.

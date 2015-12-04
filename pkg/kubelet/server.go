@@ -50,6 +50,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/portforward"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
@@ -489,7 +490,15 @@ func encodePods(pods []*api.Pod) (data []byte, err error) {
 	for _, pod := range pods {
 		podList.Items = append(podList.Items, *pod)
 	}
-	return latest.GroupOrDie("").Codec.Encode(podList)
+	// TODO: this needs to be parameterized to the kubelet, not hardcoded. Depends on Kubelet
+	//   as API server refactor.
+	serializer, ok := latest.Codecs.SerializerForFileExtension("json")
+	if !ok {
+		return nil, fmt.Errorf("no JSON serializer defined")
+	}
+	// TODO: Locked to v1, needs to be made generic
+	codec := latest.Codecs.CodecForVersions(serializer, []unversioned.GroupVersion{{Group: "", Version: "v1"}}, nil)
+	return runtime.Encode(codec, podList)
 }
 
 // getPods returns a list of pods bound to the Kubelet and their spec.

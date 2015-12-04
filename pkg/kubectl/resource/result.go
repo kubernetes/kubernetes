@@ -245,7 +245,7 @@ func AsVersionedObjects(infos []*Info, version string) ([]runtime.Object, error)
 		if len(version) > 0 {
 			if _, _, err := api.Scheme.ObjectVersionAndKind(info.Object); runtime.IsNotRegisteredError(err) {
 				// TODO: ideally this would encode to version, but we don't expose multiple codecs here.
-				data, err := info.Mapping.Codec.Encode(info.Object)
+				data, err := runtime.Encode(info.Mapping.Codec, info.Object)
 				if err != nil {
 					return nil, err
 				}

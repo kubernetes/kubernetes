@@ -31,6 +31,7 @@ import (
 
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	clientcmdlatest "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
+	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
@@ -263,8 +264,7 @@ func Load(data []byte) (*clientcmdapi.Config, error) {
 	if len(data) == 0 {
 		return config, nil
 	}
-
-	if err := clientcmdlatest.Codec.DecodeInto(data, config); err != nil {
+	if _, _, err := clientcmdlatest.Codec.Decode(data, nil, config); err != nil {
 		return nil, err
 	}
 	return config, nil
@@ -292,7 +292,7 @@ func WriteToFile(config clientcmdapi.Config, filename string) error {
 // Write serializes the config to yaml.
 // Encapsulates serialization without assuming the destination is a file.
 func Write(config clientcmdapi.Config) ([]byte, error) {
-	json, err := clientcmdlatest.Codec.Encode(&config)
+	json, err := runtime.Encode(clientcmdlatest.Codec, &config)
 	if err != nil {
 		return nil, err
 	}

@@ -229,7 +229,11 @@ func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 	}
 	// Codec used for unversioned types
 	if api.Scheme.Recognizes("", kind) {
-		return api.Codec, nil
+		serializer, ok := latest.Codecs.SerializerForFileExtension("json")
+		if !ok {
+			return nil, fmt.Errorf("no serializer registered for json")
+		}
+		return serializer, nil
 	}
 	return nil, fmt.Errorf("unexpected kind: %v", kind)
 }

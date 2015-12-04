@@ -19,7 +19,7 @@ package io
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
+	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -37,22 +37,13 @@ func LoadPodFromFile(filePath string) (*api.Pod, error) {
 	if len(podDef) == 0 {
 		return nil, fmt.Errorf("file was empty: %s", filePath)
 	}
-	pod := &api.Pod{}
-
-	if err := latest.GroupOrDie("").Codec.DecodeInto(podDef, pod); err != nil {
+	obj, _, err := latest.Codecs.UniversalDecoder().Decode(podDef, nil, nil)
+	if err != nil {
 		return nil, fmt.Errorf("failed decoding file: %v", err)
 	}
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		return nil, fmt.Errorf("expected pod, got %v", reflect.TypeOf(pod))
+	}
 	return pod, nil
-}
-
-// SavePodToFile will encode and save a pod to a given path & permissions
-func SavePodToFile(pod *api.Pod, filePath string, perm os.FileMode) error {
-	if filePath == "" {
-		return fmt.Errorf("file path not specified")
-	}
-	data, err := latest.GroupOrDie("").Codec.Encode(pod)
-	if err != nil {
-		return fmt.Errorf("failed encoding pod: %v", err)
-	}
-	return ioutil.WriteFile(filePath, data, perm)
 }

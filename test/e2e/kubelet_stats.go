@@ -499,7 +499,7 @@ func getKubeletMetricsThroughNode(nodeName string) (string, error) {
 // pods/containers), but do not contain the full spec.
 func GetKubeletPods(c *client.Client, node string) (*api.PodList, error) {
 	result := &api.PodList{}
-	if err := nodeProxyRequest(c, node, "runningpods").Into(result); err != nil {
+	if err := nodeProxyRequest(c, node, "runningpods").Into(api.Scheme, result); err != nil {
 		return &api.PodList{}, err
 	}
 	return result, nil

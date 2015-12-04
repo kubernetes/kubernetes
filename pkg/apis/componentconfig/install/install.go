@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	_ "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -38,6 +38,8 @@ import (
 const importPrefix = "k8s.io/kubernetes/pkg/apis/componentconfig"
 
 var accessor = meta.NewAccessor()
+
+var v1alpha1Codec runtime.Codec
 
 func init() {
 	groupMeta, err := latest.RegisterGroup("componentconfig")
@@ -76,6 +78,9 @@ func init() {
 	groupMeta.RESTMapper = api.NewDefaultRESTMapper(worstToBestGroupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
 	groupMeta.InterfacesFor = interfacesFor
+
+	// this codec allows restmapper to decode objects in the known formats into the internal form.
+	v1alpha1Codec = runtime.NoopEncoder{latest.Codecs.UniversalDecoder(unversioned.GroupVersion{Group: groupMeta.Group, Version: runtime.APIVersionInternal})}
 }
 
 // interfacesFor returns the default Codec and ResourceVersioner for a given version
@@ -84,7 +89,7 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 	switch version {
 	case "componentconfig/v1alpha1":
 		return &meta.VersionInterfaces{
-			Codec:            v1alpha1.Codec,
+			Codec:            v1alpha1Codec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil

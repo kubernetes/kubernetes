@@ -499,7 +499,7 @@ func (r *Request) Body(obj interface{}) *Request {
 	case io.Reader:
 		r.body = t
 	case runtime.Object:
-		data, err := r.codec.Encode(t)
+		data, err := runtime.Encode(r.codec, t)
 		if err != nil {
 			r.err = err
 			return r
@@ -507,6 +507,7 @@ func (r *Request) Body(obj interface{}) *Request {
 		glog.V(8).Infof("Request Body: %s", string(data))
 		r.body = bytes.NewBuffer(data)
 		r.SetHeader("Content-Type", "application/json")
+	case nil:
 	default:
 		r.err = fmt.Errorf("unknown type used for body: %+v", obj)
 	}
@@ -658,7 +659,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 			return nil, fmt.Errorf("%v while accessing %v", resp.Status, url)
 		}
 
-		if runtimeObject, err := r.codec.Decode(bodyBytes); err == nil {
+		if runtimeObject, _, err := r.codec.Decode(bodyBytes, nil, nil); err == nil {
 			statusError := errors.FromObject(runtimeObject)
 
 			if _, ok := statusError.(APIStatus); ok {
@@ -780,8 +781,10 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 
 	// Did the server give us a status response?
 	isStatusResponse := false
-	var status unversioned.Status
-	if err := r.codec.DecodeInto(body, &status); err == nil && status.Status != "" {
+	var status *unversioned.Status
+	result, _, err := r.codec.Decode(body, nil, nil)
+	if out, ok := result.(*unversioned.Status); err == nil && ok && len(out.Status) > 0 {
+		status = out
 		isStatusResponse = true
 	}
 
@@ -792,14 +795,14 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		if !isStatusResponse {
 			return Result{err: r.transformUnstructuredResponseError(resp, req, body)}
 		}
-		return Result{err: errors.FromObject(&status)}
+		return Result{err: errors.FromObject(status)}
 	}
 
 	// If the server gave us a status back, look at what it was.
 	success := resp.StatusCode >= http.StatusOK && resp.StatusCode <= http.StatusPartialContent
 	if isStatusResponse && (status.Status != unversioned.StatusSuccess && !success) {
 		// "Failed" requests are clearly just an error and it makes sense to return them as such.
-		return Result{err: errors.FromObject(&status)}
+		return Result{err: errors.FromObject(status)}
 	}
 
 	return Result{
@@ -899,7 +902,8 @@ func (r Result) Get() (runtime.Object, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	return r.codec.Decode(r.body)
+	obj, _, err := r.codec.Decode(r.body, nil, nil)
+	return obj, err
 }
 
 // StatusCode returns the HTTP status code of the request. (Only valid if no
@@ -914,7 +918,8 @@ func (r Result) Into(obj runtime.Object) error {
 	if r.err != nil {
 		return r.err
 	}
-	return r.codec.DecodeInto(r.body, obj)
+	_, err := runtime.DecodeInto(r.codec, r.body, nil, obj)
+	return err
 }
 
 // WasCreated updates the provided bool pointer to whether the server returned
