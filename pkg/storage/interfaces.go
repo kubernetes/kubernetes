@@ -97,13 +97,13 @@ type Interface interface {
 	// and any items passing 'filter' are sent down to returned watch.Interface.
 	// resourceVersion may be used to specify what version to begin watching
 	// (e.g. reconnecting without missing any updates).
-	Watch(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error)
+	Watch(ctx context.Context, key string, resourceVersion string, filter FilterFunc) (watch.Interface, error)
 
 	// WatchList begins watching the specified key's items. Items are decoded into API
 	// objects and any item passing 'filter' are sent down to returned watch.Interface.
 	// resourceVersion may be used to specify what version to begin watching
 	// (e.g. reconnecting without missing any updates).
-	WatchList(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error)
+	WatchList(ctx context.Context, key string, resourceVersion string, filter FilterFunc) (watch.Interface, error)
 
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
 	// return a zero object of the requested type, or an error, depending on ignoreNotFound.
@@ -118,7 +118,7 @@ type Interface interface {
 	// into *List api object (an object that satisfies runtime.IsList definition).
 	// The returned contents may be delayed, but it is guaranteed that they will
 	// be have at least 'resourceVersion'.
-	List(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc, listObj runtime.Object) error
+	List(ctx context.Context, key string, resourceVersion string, filter FilterFunc, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.

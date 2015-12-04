@@ -223,7 +223,12 @@ func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object) err
 }
 
 // Implements storage.Interface.
-func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
+func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, filter FilterFunc) (watch.Interface, error) {
+	watchRV, err := ParseWatchResourceVersion(resourceVersion)
+	if err != nil {
+		return nil, err
+	}
+
 	// Do NOT allow Watch to start when the underlying structures are not propagated.
 	c.usable.RLock()
 	defer c.usable.RUnlock()
@@ -235,7 +240,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion uint64, 
 	// underlying watchCache is calling processEvent under its lock.
 	c.watchCache.RLock()
 	defer c.watchCache.RUnlock()
-	initEvents, err := c.watchCache.GetAllEventsSinceThreadUnsafe(resourceVersion)
+	initEvents, err := c.watchCache.GetAllEventsSinceThreadUnsafe(watchRV)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +254,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion uint64, 
 }
 
 // Implements storage.Interface.
-func (c *Cacher) WatchList(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
+func (c *Cacher) WatchList(ctx context.Context, key string, resourceVersion string, filter FilterFunc) (watch.Interface, error) {
 	return c.Watch(ctx, key, resourceVersion, filter)
 }
 
@@ -264,9 +269,14 @@ func (c *Cacher) GetToList(ctx context.Context, key string, filter FilterFunc, l
 }
 
 // Implements storage.Interface.
-func (c *Cacher) List(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc, listObj runtime.Object) error {
+func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, filter FilterFunc, listObj runtime.Object) error {
 	if !c.ListFromCache {
 		return c.storage.List(ctx, key, resourceVersion, filter, listObj)
+	}
+
+	listRV, err := ParseListResourceVersion(resourceVersion)
+	if err != nil {
+		return err
 	}
 
 	// To avoid situation when List is proceesed before the underlying
@@ -277,7 +287,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion uint64, f
 	c.usable.RLock()
 	c.usable.RUnlock()
 
-	// List elements from cache, with at least 'resourceVersion'.
+	// List elements from cache, with at least 'listRV'.
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -288,7 +298,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion uint64, f
 	}
 	filterFunc := filterFunction(key, c.keyFunc, filter)
 
-	objs, resourceVersion := c.watchCache.WaitUntilFreshAndList(resourceVersion)
+	objs, readResourceVersion := c.watchCache.WaitUntilFreshAndList(listRV)
 	for _, obj := range objs {
 		object, ok := obj.(runtime.Object)
 		if !ok {
@@ -299,7 +309,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion uint64, f
 		}
 	}
 	if c.versioner != nil {
-		if err := c.versioner.UpdateList(listObj, resourceVersion); err != nil {
+		if err := c.versioner.UpdateList(listObj, readResourceVersion); err != nil {
 			return err
 		}
 	}
@@ -389,7 +399,7 @@ func newCacherListerWatcher(storage Interface, resourcePrefix string, newListFun
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) List() (runtime.Object, error) {
 	list := lw.newListFunc()
-	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, 0, Everything, list); err != nil {
+	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, "", Everything, list); err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -397,11 +407,7 @@ func (lw *cacherListerWatcher) List() (runtime.Object, error) {
 
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) Watch(options unversioned.ListOptions) (watch.Interface, error) {
-	version, err := ParseWatchResourceVersion(options.ResourceVersion, lw.resourcePrefix)
-	if err != nil {
-		return nil, err
-	}
-	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, version, Everything)
+	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, options.ResourceVersion, Everything)
 }
 
 // cacherWatch implements watch.Interface
