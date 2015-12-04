@@ -91,11 +91,15 @@ func (c *Client) Setup(t *testing.T) *Client {
 	return c
 }
 
+func (c *Client) ServerURL() string {
+	return c.server.URL
+}
+
 func (c *Client) Validate(t *testing.T, received runtime.Object, err error) {
 	c.ValidateCommon(t, err)
 
 	if c.Response.Body != nil && !api.Semantic.DeepDerivative(c.Response.Body, received) {
-		t.Errorf("bad response for request %#v: expected %#v, got %#v", c.Request, c.Response.Body, received)
+		t.Errorf("bad response for request %#v: \nexpected %#v\ngot %#v\n", c.Request, c.Response.Body, received)
 	}
 }
 
@@ -199,23 +203,14 @@ func body(t *testing.T, obj runtime.Object, raw *string) *string {
 		if err != nil {
 			t.Errorf("unexpected encoding error: %v", err)
 		}
-		// TODO: caesarxuchao: we should detect which group an object belongs to
-		// by using the version returned by Schem.ObjectVersionAndKind() once we
-		// split the schemes for internal objects.
-		// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
 		var bs []byte
-		if api.Scheme.Recognizes(testapi.Default.GroupVersion().WithKind(fqKind.Kind)) {
-			bs, err = testapi.Default.Codec().Encode(obj)
-			if err != nil {
-				t.Errorf("unexpected encoding error: %v", err)
-			}
-		} else if api.Scheme.Recognizes(testapi.Extensions.GroupVersion().WithKind(fqKind.Kind)) {
-			bs, err = testapi.Extensions.Codec().Encode(obj)
-			if err != nil {
-				t.Errorf("unexpected encoding error: %v", err)
-			}
-		} else {
-			t.Errorf("unexpected kind: %v", fqKind.Kind)
+		g, found := testapi.Groups[fqKind.GroupVersion().Group]
+		if !found {
+			t.Errorf("Group %s is not registered in testapi", fqKind.GroupVersion().Group)
+		}
+		bs, err = g.Codec().Encode(obj)
+		if err != nil {
+			t.Errorf("unexpected encoding error: %v", err)
 		}
 		body := string(bs)
 		return &body

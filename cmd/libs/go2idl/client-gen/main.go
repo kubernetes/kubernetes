@@ -22,24 +22,42 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators"
 
 	"github.com/golang/glog"
+	flag "github.com/spf13/pflag"
 )
+
+var test = flag.BoolP("test", "t", false, "set this flag to generate the client code for the testdata")
 
 func main() {
 	arguments := args.Default()
-
-	// Override defaults. These are Kubernetes specific input and output
-	// locations.
-	arguments.InputDirs = []string{
-		"k8s.io/kubernetes/pkg/api",
-		"k8s.io/kubernetes/pkg/apis/extensions",
-		"k8s.io/kubernetes/pkg/fields",
-		"k8s.io/kubernetes/pkg/labels",
-		"k8s.io/kubernetes/pkg/watch",
-		"k8s.io/kubernetes/pkg/client/unversioned",
-		"k8s.io/kubernetes/pkg/api/latest",
+	flag.Parse()
+	if *test {
+		// Override defaults. These are Kubernetes specific input and output
+		// locations.
+		arguments.InputDirs = []string{
+			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup",
+			"k8s.io/kubernetes/pkg/fields",
+			"k8s.io/kubernetes/pkg/labels",
+			"k8s.io/kubernetes/pkg/watch",
+			"k8s.io/kubernetes/pkg/client/unversioned",
+			"k8s.io/kubernetes/pkg/api/latest",
+		}
+		// We may change the output path later.
+		arguments.OutputPackagePath = "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput"
+	} else {
+		// Override defaults. These are Kubernetes specific input and output
+		// locations.
+		arguments.InputDirs = []string{
+			"k8s.io/kubernetes/pkg/api",
+			"k8s.io/kubernetes/pkg/apis/extensions",
+			"k8s.io/kubernetes/pkg/fields",
+			"k8s.io/kubernetes/pkg/labels",
+			"k8s.io/kubernetes/pkg/watch",
+			"k8s.io/kubernetes/pkg/client/unversioned",
+			"k8s.io/kubernetes/pkg/api/latest",
+		}
+		// We may change the output path later.
+		arguments.OutputPackagePath = "k8s.io/kubernetes/pkg/client/clientset/unversioned"
 	}
-	// We may change the output path later.
-	arguments.OutputPackagePath = "k8s.io/kubernetes/pkg/client/clientset/unversioned"
 
 	if err := arguments.Execute(
 		generators.NameSystems(),
