@@ -49,6 +49,7 @@ Documentation for other releases can be found at
    * [PHP](https://github.com/maclof/kubernetes-client)
    * [Node.js](https://github.com/tenxcloud/node-kubernetes-client)
    * [Perl](https://metacpan.org/pod/Net::Kubernetes)
+   * [Clojure](https://github.com/yanatan16/clj-kubernetes-api)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
