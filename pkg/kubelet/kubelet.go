@@ -2955,29 +2955,33 @@ func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 	succeeded := 0
 	unknown := 0
 	for _, container := range spec.Containers {
-		if containerStatus, ok := api.GetContainerStatus(info, container.Name); ok {
-			if containerStatus.State.Running != nil {
-				running++
-			} else if containerStatus.State.Terminated != nil {
-				stopped++
-				if containerStatus.State.Terminated.ExitCode == 0 {
-					succeeded++
-				} else {
-					failed++
-				}
-			} else if containerStatus.State.Waiting != nil {
-				if containerStatus.LastTerminationState.Terminated != nil {
-					stopped++
-				} else {
-					waiting++
-				}
+		containerStatus, ok := api.GetContainerStatus(info, container.Name)
+		if !ok {
+			unknown++
+			continue
+		}
+
+		switch {
+		case containerStatus.State.Running != nil:
+			running++
+		case containerStatus.State.Terminated != nil:
+			stopped++
+			if containerStatus.State.Terminated.ExitCode == 0 {
+				succeeded++
 			} else {
-				unknown++
+				failed++
 			}
-		} else {
+		case containerStatus.State.Waiting != nil:
+			if containerStatus.LastTerminationState.Terminated != nil {
+				stopped++
+			} else {
+				waiting++
+			}
+		default:
 			unknown++
 		}
 	}
+
 	switch {
 	case waiting > 0:
 		glog.V(5).Infof("pod waiting > 0, pending")
