@@ -699,6 +699,20 @@ func TestCheckPod(t *testing.T) {
 		{
 			pod: api.Pod{
 				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
+				Spec:       api.PodSpec{NodeName: "older"},
+			},
+			prune: true,
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
+				Spec:       api.PodSpec{NodeName: "oldest"},
+			},
+			prune: true,
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
 				Spec:       api.PodSpec{NodeName: ""},
 			},
 			prune: true,
@@ -731,6 +745,26 @@ func TestCheckPod(t *testing.T) {
 		Status: api.NodeStatus{
 			NodeInfo: api.NodeSystemInfo{
 				KubeletVersion: "v1.0.0",
+			},
+		},
+	})
+	nc.nodeStore.Store.Add(&api.Node{
+		ObjectMeta: api.ObjectMeta{
+			Name: "older",
+		},
+		Status: api.NodeStatus{
+			NodeInfo: api.NodeSystemInfo{
+				KubeletVersion: "v0.21.4",
+			},
+		},
+	})
+	nc.nodeStore.Store.Add(&api.Node{
+		ObjectMeta: api.ObjectMeta{
+			Name: "oldest",
+		},
+		Status: api.NodeStatus{
+			NodeInfo: api.NodeSystemInfo{
+				KubeletVersion: "v0.19.3",
 			},
 		},
 	})
