@@ -57,34 +57,27 @@ It should be possible to represent that a volume does not have any idempotency c
 
 ### Refreshable volume plugins
 
-Some volume plugins are designed to refresh, like the downward API volume plugin.  In order to
-decouple the implementation of refresh and SetUp logic, there should be a Refresh() method that
-plugins can implement and proper machinery to ensure that only plugins that want this need to
-implement it.
+Some volume plugins are designed to refresh, like the downward API volume plugin.  These volume
+plugins can be implemented by having a nop idempotence check; ie, setup always runs.  Ownership
+management should be triggered when SetUp() does work for these plugins.
 
 ### Volume plugins that wrap one another
 
-Some volume plugins wrap others:
-
-1.  Secrets, downward API, git repo are based on EmptyDir
-2.  PV claim plugin instantiates instances of the underlying volume plugin
-
-In order to correctly externalize idempotency management, the Kubelet must handle nested calls to
-`SetUp`; plugins must be able to invoke the externalized flow correctly for plugins they use
-transitively.
+Some volume plugins wrap others; secrets, downward API, git repo are all based on the EmptyDir
+plugin.  In order to correctly externalize idempotency management, the Kubelet must handle nested
+calls to `SetUp`; plugins must be able to invoke the externalized flow correctly for plugins they
+use transitively.
 
 ## Ownership management and idempotency
 
-Ownership management of volumes must be idempotent for non-refreshable volumes.  It should run once
-and only once after `Setup` has run correctly.  If a volume that uses the 'check for a mountpoint'
-type of idempotency check, and the volume must be remounted, the ownership management should be
-reapplied.
-
-### Ownership management and refreshable volumes
+Ownership management should always happen when `SetUp` makes changes in volumes.  For volumes like
+block devices, this means running once and only once after `Setup` has run correctly.  If a volume
+that uses the 'check for a mountpoint' type of idempotency check, and the volume must be remounted,
+the ownership management should be reapplied.
 
 For volume plugins that are refreshable, ownership management must be reapplied if the refresh logic
 makes changes to the state of the volume.  For example, if data changes in the downward API volume,
-the ownership management must be re-applied to that volume.
+ownership management must be re-applied to that volume.
 
 ## Proposed implementation
 
@@ -94,12 +87,9 @@ Summarizing the requirements for correct idempotency management:
 2.  It must be possible to express that a volume plugin uses either a mountpoint check or marker
     file
 3.  Marker file volumes must have the marker file created after `SetUp` runs successfully
-4.  Refresh logic for refreshable plugins must be factored out of `SetUp`, and be run only if
-    `SetUp` has run successfully.
-5.  Ownership management must run once for each time `Setup` is invoked or refresh logic changes
-    the state of a volume
-6.  Volume plugins must be able to trigger the externalized Setup flow to support correct composition
-    of plugins
+4.  Ownership management must run once for each time `Setup` performs work
+5.  Volume plugins must be able to trigger the externalized Setup flow to support correct
+    composition of plugins
 
 The volume `Attributes` structure is the appropriate place to store information the properties we
 discuss here:
@@ -110,8 +100,8 @@ package volume
 type Attributes struct {
 	// other fields omitted
 
+    // IdempotencyStrategy controls the strategy used to manage idempotency for the volume.
 	IdempotencyStrategy IdempotencyStrategy
-	Refreshable          bool
 }
 
 type IdempotencyStrategyType string
@@ -135,16 +125,20 @@ type IdempotencyStrategy interface {
 }
 ```
 
-Refreshable plugins are represented by a new interface:
+The volume `Builder` interface's `SetUp` method changes signature to return `(bool, error)` to
+indicate whether work was done.  Ownership management is performed for supported volumes whenever
+`SetUp` does work.
 
 ```go
 package volume
 
-type RefreshableBuilder {
-    Builder
+type Builder interface {
+    // other methods omitted
 
-    // Refresh returns (did-state-change, error)
-    Refresh(dir string) (bool, error)
+    // SetUp prepares and mounts/unpacks the volume to a self-determined
+    // directory path and returns whether work was done and an error.
+    // SetUp will be called multiple times for volumes that select IdempotencyStrategyNone.
+    SetUp() (bool, error)
 }
 ```
 
@@ -174,31 +168,12 @@ func mountExternalVolumes(pod) error {
             return errUnsupportedVolumeType
         }
 
-        ranSetup, err := runSetup(builder)
+        didWork, err := runSetup(builder)
         if err != nil {
             return nil
         }
 
-        runOwnershipManagement := false
-        if ranSetup {
-            runOwnershipManagement = true
-        } else if builder.GetAttributes().Refreshable {
-            refreshable, ok := builder.(RefreshablePlugin)
-            if !ok {
-                return errNotRefreshable
-            }
-
-            didRefresh, err := refreshable.Refresh()
-            if err != nil {
-                return err
-            }
-
-            if didRefresh {
-                runOwnershipManagement = true
-            }
-        }
-
-        if runOwnershipManagement &&
+        if didWork &&
             hasFSGroup &&
             builder.GetAttributes().Managed &&
             builder.GetAttributes().SupportsOwnershipManagement {
@@ -212,24 +187,29 @@ func mountExternalVolumes(pod) error {
     return nil
 }
 
+// runSetup calls the SetUp method on a builder if idempotency strategy determines that it should
+// be called and returns a boolean indicating whether work was done and an error.
 func runSetup(builder) (bool, error) {
-    idempotencyStrategy := makeIdempotencyStrategy(builder.GetAttributes().IdempotencyStrategy)
-    runSetup, err := idempotencyStrategy.ShouldRun()
-    if err != nil {
-        return false, err
-    }
+    strategyName := builder.GetAttributes().IdempotencyStrategyName
+    if strategy == IdempotencyStrategyNone {
+        idempotencyStrategy := makeIdempotencyStrategy(strategy)
+        runSetup, err := idempotencyStrategy.ShouldRun()
+        if err != nil {
+            return false, err
+        }
 
-    if !runSetup {
-        return false, nil
+        if !runSetup {
+            return false, nil
+        }
     }
-
-    err = builder.SetUp()
+    
+    didWork, err = builder.SetUp()
     if err != nil {
         return false, err
         idempotencyStrategy.Mark()
     }
 
-    return true, nil
+    return didWork, nil
 }
 ```
 
@@ -242,7 +222,7 @@ package volume
 type Host interface {
     // other methods omitted
 
-    SetUp(builder Builder) error
+    SetUp(builder Builder) (bool, error)
 }
 ```
 
