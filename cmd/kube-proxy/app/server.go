@@ -181,6 +181,7 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 		dbus := utildbus.New()
 		IptInterface := utiliptables.New(execer, dbus, protocol)
 		return &ProxyServer{
+			Config:       config,
 			IptInterface: IptInterface,
 		}, nil
 	}
