@@ -1447,6 +1447,7 @@ func (config *RCConfig) create() error {
 							Ports:   []api.ContainerPort{{ContainerPort: 80}},
 						},
 					},
+					DNSPolicy: api.DNSDefault,
 				},
 			},
 		},
