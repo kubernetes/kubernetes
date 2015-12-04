@@ -29,10 +29,16 @@ type Aggregate interface {
 // is itself an implementation of the error interface.  If the slice is empty,
 // this returns nil.
 func NewAggregate(errlist []error) Aggregate {
-	if len(errlist) == 0 {
+	errs := []error{}
+	for _, err := range errlist {
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) == 0 {
 		return nil
 	}
-	return aggregate(errlist)
+	return aggregate(errs)
 }
 
 // This helper implements the error and Errors interfaces.  Keeping it private
