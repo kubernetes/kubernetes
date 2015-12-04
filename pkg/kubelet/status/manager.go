@@ -342,6 +342,10 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		// TODO: handle conflict as a retry, make that easier too.
 		pod, err = m.kubeClient.Pods(pod.Namespace).UpdateStatus(pod)
 		if err == nil {
+			if !isStatusEqual(&pod.Status, &status.status) {
+				glog.Warningf("Status for pod %q returned from apiserver differs from status sent: %+v",
+					format.Pod(pod), util.ObjectDiff(&pod.Status, &status.status))
+			}
 			glog.V(3).Infof("Status for pod %q updated successfully: %+v", format.Pod(pod), status)
 			m.apiStatusVersions[pod.UID] = status.version
 
@@ -361,7 +365,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	}
 
 	// We failed to update status, wait for periodic sync to retry.
-	glog.Warningf("Failed to updated status for pod %q: %v", format.Pod(pod), err)
+	glog.Warningf("Failed to update status for pod %q: %v", format.Pod(pod), err)
 }
 
 // needsUpdate returns whether the status is stale for the given pod UID.
