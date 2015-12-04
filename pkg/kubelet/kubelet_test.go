@@ -514,6 +514,7 @@ func TestGetPodVolumesFromDisk(t *testing.T) {
 
 type stubVolume struct {
 	path string
+	volume.MetricsNil
 }
 
 func (f *stubVolume) GetPath() string {
@@ -559,9 +560,9 @@ func TestMakeVolumeMounts(t *testing.T) {
 	}
 
 	podVolumes := kubecontainer.VolumeMap{
-		"disk":  kubecontainer.VolumeInfo{Builder: &stubVolume{"/mnt/disk"}},
-		"disk4": kubecontainer.VolumeInfo{Builder: &stubVolume{"/mnt/host"}},
-		"disk5": kubecontainer.VolumeInfo{Builder: &stubVolume{"/var/lib/kubelet/podID/volumes/empty/disk5"}},
+		"disk":  kubecontainer.VolumeInfo{Builder: &stubVolume{path: "/mnt/disk"}},
+		"disk4": kubecontainer.VolumeInfo{Builder: &stubVolume{path: "/mnt/host"}},
+		"disk5": kubecontainer.VolumeInfo{Builder: &stubVolume{path: "/var/lib/kubelet/podID/volumes/empty/disk5"}},
 	}
 
 	pod := api.Pod{

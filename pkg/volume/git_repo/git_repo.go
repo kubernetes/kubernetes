@@ -89,6 +89,7 @@ type gitRepoVolume struct {
 	volName string
 	podUID  types.UID
 	plugin  *gitRepoPlugin
+	volume.MetricsNil
 }
 
 var _ volume.Volume = &gitRepoVolume{}

@@ -149,6 +149,7 @@ type fcDisk struct {
 	manager diskManager
 	// io handler interface
 	io ioHandler
+	volume.MetricsNil
 }
 
 func (fc *fcDisk) GetPath() string {
