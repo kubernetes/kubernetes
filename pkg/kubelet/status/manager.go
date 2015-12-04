@@ -147,8 +147,93 @@ func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
+	m.updateStatusInternal(pod, status)
+}
+
+func (m *manager) SetContainerReadiness(pod *api.Pod, containerID kubecontainer.ContainerID, ready bool) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	oldStatus, found := m.podStatuses[pod.UID]
+	if !found {
+		glog.Warningf("Container readiness changed before pod has synced: %q - %q",
+			format.Pod(pod), containerID.String())
+		return
+	}
+
+	// Find the container to update.
+	containerIndex := -1
+	for i, c := range oldStatus.status.ContainerStatuses {
+		if c.ContainerID == containerID.String() {
+			containerIndex = i
+			break
+		}
+	}
+	if containerIndex == -1 {
+		glog.Warningf("Container readiness changed for unknown container: %q - %q",
+			format.Pod(pod), containerID.String())
+		return
+	}
+
+	if oldStatus.status.ContainerStatuses[containerIndex].Ready == ready {
+		glog.V(4).Infof("Container readiness unchanged (%v): %q - %q", ready,
+			format.Pod(pod), containerID.String())
+		return
+	}
+
+	// Make sure we're not updating the cached version.
+	clone, err := api.Scheme.DeepCopy(&oldStatus.status)
+	if err != nil {
+		glog.Errorf("Failed to clone status %+v: %v", oldStatus.status, err)
+		return
+	}
+	status := *clone.(*api.PodStatus)
+	status.ContainerStatuses[containerIndex].Ready = ready
+
+	// Update pod condition.
+	readyConditionIndex := -1
+	for i, condition := range status.Conditions {
+		if condition.Type == api.PodReady {
+			readyConditionIndex = i
+			break
+		}
+	}
+	readyCondition := GeneratePodReadyCondition(&pod.Spec, status.ContainerStatuses, status.Phase)
+	if readyConditionIndex != -1 {
+		status.Conditions[readyConditionIndex] = readyCondition
+	} else {
+		glog.Warningf("PodStatus missing PodReady condition: %+v", status)
+		status.Conditions = append(status.Conditions, readyCondition)
+	}
+
+	m.updateStatusInternal(pod, status)
+}
+
+func (m *manager) TerminatePods(pods []*api.Pod) bool {
+	allSent := true
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+	for _, pod := range pods {
+		for i := range pod.Status.ContainerStatuses {
+			pod.Status.ContainerStatuses[i].State = api.ContainerState{
+				Terminated: &api.ContainerStateTerminated{},
+			}
+		}
+		if sent := m.updateStatusInternal(pod, pod.Status); !sent {
+			glog.V(4).Infof("Termination notice for %q was dropped because the status channel is full", format.Pod(pod))
+			allSent = false
+		}
+	}
+	return allSent
+}
+
+// updateStatusInternal updates the internal status cache, and queues an update to the api server if
+// necessary. Returns whether an update was triggered.
+// This method IS NOT THREAD SAFE and must be called from a locked function.
+func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus) bool {
 	var oldStatus api.PodStatus
-	if cachedStatus, ok := m.podStatuses[pod.UID]; ok {
+	cachedStatus, isCached := m.podStatuses[pod.UID]
+	if isCached {
 		oldStatus = cachedStatus.status
 	} else if mirrorPod, ok := m.podManager.GetMirrorPodByPod(pod); ok {
 		oldStatus = mirrorPod.Status
@@ -176,81 +261,16 @@ func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 		status.StartTime = &now
 	}
 
-	m.updateStatusInternal(pod, status)
-}
-
-func (m *manager) SetContainerReadiness(pod *api.Pod, containerID kubecontainer.ContainerID, ready bool) {
-	m.podStatusesLock.Lock()
-	defer m.podStatusesLock.Unlock()
-
-	oldStatus, found := m.podStatuses[pod.UID]
-	if !found {
-		glog.Warningf("Container readiness changed before pod has synced: %q - %q",
-			format.Pod(pod), containerID.String())
-		return
-	}
-	status := oldStatus.status
-
-	// Find the container to update.
-	containerIndex := -1
-	for i, c := range status.ContainerStatuses {
-		if c.ContainerID == containerID.String() {
-			containerIndex = i
-			break
-		}
-	}
-	if containerIndex == -1 {
-		glog.Warningf("Container readiness changed for unknown container: %q - %q",
-			format.Pod(pod), containerID.String())
-		return
-	}
-
-	if status.ContainerStatuses[containerIndex].Ready == ready {
-		glog.V(4).Infof("Container readiness unchanged (%v): %q - %q", ready,
-			format.Pod(pod), containerID.String())
-		return
-	}
-
-	// Make sure we're not updating the cached version.
-	status.ContainerStatuses = make([]api.ContainerStatus, len(status.ContainerStatuses))
-	copy(status.ContainerStatuses, oldStatus.status.ContainerStatuses)
-	status.ContainerStatuses[containerIndex].Ready = ready
-	m.updateStatusInternal(pod, status)
-}
-
-func (m *manager) TerminatePods(pods []*api.Pod) bool {
-	allSent := true
-	m.podStatusesLock.Lock()
-	defer m.podStatusesLock.Unlock()
-	for _, pod := range pods {
-		for i := range pod.Status.ContainerStatuses {
-			pod.Status.ContainerStatuses[i].State = api.ContainerState{
-				Terminated: &api.ContainerStateTerminated{},
-			}
-		}
-		if sent := m.updateStatusInternal(pod, pod.Status); !sent {
-			glog.V(4).Infof("Termination notice for %q was dropped because the status channel is full", format.Pod(pod))
-			allSent = false
-		}
-	}
-	return allSent
-}
-
-// updateStatusInternal updates the internal status cache, and queues an update to the api server if
-// necessary. Returns whether an update was triggered.
-// This method IS NOT THREAD SAFE and must be called from a locked function.
-func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus) bool {
 	// The intent here is to prevent concurrent updates to a pod's status from
 	// clobbering each other so the phase of a pod progresses monotonically.
-	oldStatus, found := m.podStatuses[pod.UID]
-	if found && isStatusEqual(&oldStatus.status, &status) && pod.DeletionTimestamp == nil {
+	if isCached && isStatusEqual(&cachedStatus.status, &status) && pod.DeletionTimestamp == nil {
 		glog.V(3).Infof("Ignoring same status for pod %q, status: %+v", format.Pod(pod), status)
 		return false // No new status.
 	}
 
 	newStatus := versionedPodStatus{
 		status:       status,
-		version:      oldStatus.version + 1,
+		version:      cachedStatus.version + 1,
 		podName:      pod.Name,
 		podNamespace: pod.Namespace,
 	}
@@ -361,7 +381,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	}
 
 	// We failed to update status, wait for periodic sync to retry.
-	glog.Warningf("Failed to updated status for pod %q: %v", format.Pod(pod), err)
+	glog.Warningf("Failed to update status for pod %q: %v", format.Pod(pod), err)
 }
 
 // needsUpdate returns whether the status is stale for the given pod UID.

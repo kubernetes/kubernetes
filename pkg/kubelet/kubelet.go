@@ -3012,59 +3012,6 @@ func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 	}
 }
 
-func readyPodCondition(isPodReady bool, reason, message string) []api.PodCondition {
-	condition := api.PodCondition{
-		Type: api.PodReady,
-	}
-	if isPodReady {
-		condition.Status = api.ConditionTrue
-	} else {
-		condition.Status = api.ConditionFalse
-	}
-	condition.Reason = reason
-	condition.Message = message
-	return []api.PodCondition{condition}
-}
-
-// getPodReadyCondition returns ready condition if all containers in a pod are ready, else it returns an unready condition.
-func getPodReadyCondition(spec *api.PodSpec, containerStatuses []api.ContainerStatus, podPhase api.PodPhase) []api.PodCondition {
-	// Find if all containers are ready or not.
-	if containerStatuses == nil {
-		return readyPodCondition(false, "UnknownContainerStatuses", "")
-	}
-	unknownContainers := []string{}
-	unreadyContainers := []string{}
-	for _, container := range spec.Containers {
-		if containerStatus, ok := api.GetContainerStatus(containerStatuses, container.Name); ok {
-			if !containerStatus.Ready {
-				unreadyContainers = append(unreadyContainers, container.Name)
-			}
-		} else {
-			unknownContainers = append(unknownContainers, container.Name)
-		}
-	}
-
-	// In case of unexist unknowContainers, If pod has derminated successed and it has unreadyContainers, just return PodCompleted
-	if podPhase == api.PodSucceeded && len(unknownContainers) == 0 {
-		return readyPodCondition(false, fmt.Sprint("PodCompleted"), "")
-	}
-
-	unreadyMessages := []string{}
-	if len(unknownContainers) > 0 {
-		unreadyMessages = append(unreadyMessages, fmt.Sprintf("containers with unknown status: %s", unknownContainers))
-	}
-	if len(unreadyContainers) > 0 {
-		unreadyMessages = append(unreadyMessages, fmt.Sprintf("containers with unready status: %s", unreadyContainers))
-	}
-	unreadyMessage := strings.Join(unreadyMessages, ", ")
-	if unreadyMessage != "" {
-		// return unready status.
-		return readyPodCondition(false, "ContainersNotReady", unreadyMessage)
-	}
-	// return ready status.
-	return readyPodCondition(true, "", "")
-}
-
 // By passing the pod directly, this method avoids pod lookup, which requires
 // grabbing a lock.
 func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
@@ -3110,7 +3057,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	podStatus.Phase = GetPhase(spec, podStatus.ContainerStatuses)
 	kl.probeManager.UpdatePodStatus(pod.UID, podStatus)
 
-	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses, podStatus.Phase)...)
+	podStatus.Conditions = append(podStatus.Conditions, status.GeneratePodReadyCondition(spec, podStatus.ContainerStatuses, podStatus.Phase))
 
 	if !kl.standaloneMode {
 		hostIP, err := kl.GetHostIP()
