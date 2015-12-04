@@ -23,7 +23,11 @@ spec:
       - name: kube-ui
         image: gcr.io/google_containers/kube-ui:v4
         resources:
+          # keep request = limit to keep this container in guaranteed class
           limits:
+            cpu: 100m
+            memory: 50Mi
+          requests:
             cpu: 100m
             memory: 50Mi
         ports:

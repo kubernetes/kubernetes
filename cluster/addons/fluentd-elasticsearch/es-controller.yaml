@@ -23,7 +23,10 @@ spec:
       - image: gcr.io/google_containers/elasticsearch:1.8
         name: elasticsearch-logging         
         resources:
+          # keep request = limit to keep this container in guaranteed class
           limits:
+            cpu: 100m
+          requests:
             cpu: 100m
         ports:
         - containerPort: 9200

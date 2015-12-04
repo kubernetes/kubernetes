@@ -23,7 +23,11 @@ spec:
       - name: etcd
         image: gcr.io/google_containers/etcd:2.0.9
         resources:
+          # keep request = limit to keep this container in guaranteed class
           limits:
+            cpu: 100m
+            memory: 50Mi
+          requests:
             cpu: 100m
             memory: 50Mi
         command:
@@ -42,7 +46,11 @@ spec:
       - name: kube2sky
         image: gcr.io/google_containers/kube2sky:1.12
         resources:
+          # keep request = limit to keep this container in guaranteed class
           limits:
+            cpu: 100m
+            memory: 50Mi
+          requests:
             cpu: 100m
             memory: 50Mi
         args:
@@ -51,7 +59,11 @@ spec:
       - name: skydns
         image: gcr.io/google_containers/skydns:2015-10-13-8c72f8c
         resources:
+          # keep request = limit to keep this container in guaranteed class
           limits:
+            cpu: 100m
+            memory: 50Mi
+          requests:
             cpu: 100m
             memory: 50Mi
         args:
@@ -84,7 +96,11 @@ spec:
       - name: healthz
         image: gcr.io/google_containers/exechealthz:1.0
         resources:
+          # keep request = limit to keep this container in guaranteed class
           limits:
+            cpu: 10m
+            memory: 20Mi
+          requests:
             cpu: 10m
             memory: 20Mi
         args:
