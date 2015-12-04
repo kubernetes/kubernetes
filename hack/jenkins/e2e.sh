@@ -751,12 +751,12 @@ case ${JOB_NAME} in
     ;;
 
   kubernetes-e2e-aws-release-1.1)
-    : ${E2E_PUBLISH_GREEN_VERSION=true}
-    : ${E2E_CLUSTER_NAME="e2e-aws-1-1"}
-    : ${E2E_NETWORK="e2e-aws-1-1"}
-    : ${E2E_ZONE="us-west-2a"}
-    : ${ZONE="us-west-2a"}
-    : ${JENKINS_PUBLISHED_VERSION="ci/latest-1.1"}
+    : ${E2E_PUBLISH_GREEN_VERSION:=true}
+    : ${E2E_CLUSTER_NAME:="e2e-aws-1-1"}
+    : ${E2E_NETWORK:="e2e-aws-1-1"}
+    : ${E2E_ZONE:="us-west-2a"}
+    : ${ZONE:="us-west-2a"}
+    : ${JENKINS_PUBLISHED_VERSION:="ci/latest-1.1"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
@@ -764,11 +764,11 @@ case ${JOB_NAME} in
           ${AWS_REQUIRED_SKIP_TESTS[@]:+${AWS_REQUIRED_SKIP_TESTS[@]}} \
           )"}
 
-    : ${AWS_CONFIG_FILE=/var/lib/jenkins/.aws/credentials}
-    : ${AWS_SSH_KEY=/var/lib/jenkins/.ssh/kube_aws_rsa}
-    : ${KUBE_SSH_USER=ubuntu}
+    : ${AWS_CONFIG_FILE:='/var/lib/jenkins/.aws/credentials'}
+    : ${AWS_SSH_KEY:='/var/lib/jenkins/.ssh/kube_aws_rsa'}
+    : ${KUBE_SSH_USER:='ubuntu'}
     # Needed to be able to create PD from the e2e test
-    : ${AWS_SHARED_CREDENTIALS_FILE=/var/lib/jenkins/.aws/credentials}
+    : ${AWS_SHARED_CREDENTIALS_FILE:='/var/lib/jenkins/.aws/credentials'}
     ;;
 
   # kubernetes-upgrade-gke-1.1-master
