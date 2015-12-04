@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"regexp"
 	"strconv"
@@ -135,7 +136,6 @@ func networkStatsFromProc(rootFs string, pid int) ([]info.InterfaceStats, error)
 
 var (
 	ignoredDevicePrefixes = []string{"lo", "veth", "docker"}
-	netStatLineRE         = regexp.MustCompile("[  ]*(.+):([  ]+[0-9]+){16}")
 )
 
 func isIgnoredDevice(ifName string) bool {
@@ -147,6 +147,8 @@ func isIgnoredDevice(ifName string) bool {
 	return false
 }
 
+const netstatsLine = `%s %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d`
+
 func scanInterfaceStats(netStatsFile string) ([]info.InterfaceStats, error) {
 	var (
 		bkt uint64
@@ -154,34 +156,26 @@ func scanInterfaceStats(netStatsFile string) ([]info.InterfaceStats, error) {
 
 	stats := []info.InterfaceStats{}
 
-	data, err := ioutil.ReadFile(netStatsFile)
+	file, err := os.Open(netStatsFile)
 	if err != nil {
 		return stats, fmt.Errorf("failure opening %s: %v", netStatsFile, err)
 	}
+	defer file.Close()
 
-	reader := strings.NewReader(string(data))
-	scanner := bufio.NewScanner(reader)
-
-	scanner.Split(bufio.ScanLines)
+	scanner := bufio.NewScanner(file)
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		if netStatLineRE.MatchString(line) {
-			line = strings.Replace(line, ":", "", -1)
+		line = strings.Replace(line, ":", "", -1)
 
-			i := info.InterfaceStats{}
+		i := info.InterfaceStats{}
 
-			_, err := fmt.Sscanf(line, "%s %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
-				&i.Name, &i.RxBytes, &i.RxPackets, &i.RxErrors, &i.RxDropped, &bkt, &bkt, &bkt,
-				&bkt, &i.TxBytes, &i.TxPackets, &i.TxErrors, &i.TxDropped, &bkt, &bkt, &bkt, &bkt)
+		_, err := fmt.Sscanf(line, netstatsLine,
+			&i.Name, &i.RxBytes, &i.RxPackets, &i.RxErrors, &i.RxDropped, &bkt, &bkt, &bkt,
+			&bkt, &i.TxBytes, &i.TxPackets, &i.TxErrors, &i.TxDropped, &bkt, &bkt, &bkt, &bkt)
 
-			if err != nil {
-				return stats, fmt.Errorf("failure opening %s: %v", netStatsFile, err)
-			}
-
-			if !isIgnoredDevice(i.Name) {
-				stats = append(stats, i)
-			}
+		if err == nil && !isIgnoredDevice(i.Name) {
+			stats = append(stats, i)
 		}
 	}
 

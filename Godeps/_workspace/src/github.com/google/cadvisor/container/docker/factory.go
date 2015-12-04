@@ -46,6 +46,8 @@ var dockerRunDir = flag.String("docker_run", "/var/run/docker", "Absolute path t
 // --cgroup-parent have another prefix than 'docker'
 var dockerCgroupRegexp = regexp.MustCompile(`.+-([a-z0-9]{64})\.scope$`)
 
+var noSystemd = flag.Bool("nosystemd", false, "Explicitly disable systemd support for Docker containers")
+
 // TODO(vmarmol): Export run dir too for newer Dockers.
 // Directory holding Docker container state information.
 func DockerStateDir() string {
@@ -53,13 +55,14 @@ func DockerStateDir() string {
 }
 
 // Whether the system is using Systemd.
-var useSystemd bool
+var useSystemd = false
 var check = sync.Once{}
 
 func UseSystemd() bool {
 	check.Do(func() {
-		useSystemd = false
-
+		if *noSystemd {
+			return
+		}
 		// Check for system.slice in systemd and cpu cgroup.
 		for _, cgroupType := range []string{"name=systemd", "cpu"} {
 			mnt, err := cgroups.FindCgroupMountpoint(cgroupType)
