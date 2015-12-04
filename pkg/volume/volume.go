@@ -28,6 +28,22 @@ import (
 type Volume interface {
 	// GetPath returns the directory path the volume is mounted to.
 	GetPath() string
+
+	Accountable
+}
+
+type VolumeDefaults struct {
+	AccountingNil
+}
+
+type Accountable interface {
+	GetAccounting() (*Accounting, error)
+}
+
+const unknownSize = -1
+
+type Accounting struct {
+	BytesUsed int
 }
 
 // Attributes represents the attributes of this builder.

@@ -78,7 +78,7 @@ func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod
 	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.Volume.EmptyDir.Medium
 	}
-	return &emptyDir{
+	ed := &emptyDir{
 		pod:           pod,
 		volName:       spec.Name(),
 		medium:        medium,
@@ -86,7 +86,9 @@ func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod
 		mountDetector: mountDetector,
 		plugin:        plugin,
 		rootContext:   opts.RootContext,
-	}, nil
+	}
+	ed.AccountingDu.Init(ed.GetPath())
+	return ed, nil
 }
 
 func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
@@ -103,6 +105,7 @@ func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UI
 		mountDetector: mountDetector,
 		plugin:        plugin,
 	}
+	ed.AccountingDu.Init(ed.GetPath())
 	return ed, nil
 }
 
@@ -133,6 +136,7 @@ type emptyDir struct {
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
 	rootContext   string
+	volume.AccountingDu
 }
 
 func (ed *emptyDir) GetAttributes() volume.Attributes {

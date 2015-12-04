@@ -142,6 +142,7 @@ type glusterfs struct {
 	pod     *api.Pod
 	mounter mount.Interface
 	plugin  *glusterfsPlugin
+	volume.VolumeDefaults
 }
 
 type glusterfsBuilder struct {
