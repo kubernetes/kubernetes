@@ -370,6 +370,8 @@ func (c *containerData) housekeeping() {
 	for {
 		select {
 		case <-c.stop:
+			// Cleanup container resources before stopping housekeeping.
+			c.handler.Cleanup()
 			// Stop housekeeping when signaled.
 			return
 		default:

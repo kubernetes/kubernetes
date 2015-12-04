@@ -50,6 +50,8 @@ func (self *MockContainerHandler) ContainerReference() (info.ContainerReference,
 	return args.Get(0).(info.ContainerReference), args.Error(1)
 }
 
+func (self *MockContainerHandler) Cleanup() {}
+
 func (self *MockContainerHandler) GetSpec() (info.ContainerSpec, error) {
 	args := self.Called()
 	return args.Get(0).(info.ContainerSpec), args.Error(1)
