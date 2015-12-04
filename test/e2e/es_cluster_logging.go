@@ -145,6 +145,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	// Now assume we really are talking to an Elasticsearch instance.
 	// Check the cluster health.
 	By("Checking health of Elasticsearch service.")
+	healthy := false
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
 		body, err = f.Client.Get().
 			Namespace(api.NamespaceSystem).
@@ -154,21 +155,30 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 			Suffix("_cluster/health").
 			Param("health", "pretty").
 			DoRaw()
-		if err == nil {
+		if err != nil {
+			continue
+		}
+		health, err := bodyToJSON(body)
+		if err != nil {
+			continue
+		}
+		statusIntf, ok := health["status"]
+		if !ok {
+			Logf("No status field found in cluster health response: %v", health)
+			continue
+		}
+		status := statusIntf.(string)
+		if status != "green" && status != "yellow" {
+			Logf("Cluster health has bad status: %s", status)
+			continue
+		}
+		if err == nil && ok {
+			healthy = true
 			break
 		}
 	}
-	Expect(err).NotTo(HaveOccurred())
-
-	health, err := bodyToJSON(body)
-	Expect(err).NotTo(HaveOccurred())
-	statusIntf, ok := health["status"]
-	if !ok {
-		Failf("No status field found in cluster health response: %v", health)
-	}
-	status := statusIntf.(string)
-	if status != "green" && status != "yellow" {
-		Failf("Cluster health has bad status: %s", status)
+	if !healthy {
+		Failf("After %v elasticsearch cluster is not healthy", graceTime)
 	}
 
 	// Obtain a list of nodes so we can place one synthetic logger on each node.
@@ -201,7 +211,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	// Form a unique name to taint log lines to be collected.
 	// Replace '-' characters with '_' to prevent the analyzer from breaking apart names.
 	taintName := strings.Replace(ns+name, "-", "_", -1)
-
+	Logf("Tainting log lines with %v", taintName)
 	// podNames records the names of the synthetic logging pods that are created in the
 	// loop below.
 	var podNames []string
@@ -253,8 +263,9 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 
 	// Make several attempts to observe the logs ingested into Elasticsearch.
 	By("Checking all the log lines were ingested into Elasticsearch")
-	missing := 0
+	totalMissing := 0
 	expected := nodeCount * countTo
+	missingPerNode := []int{}
 	for start := time.Now(); time.Since(start) < ingestionTimeout; time.Sleep(10 * time.Second) {
 
 		// Debugging code to report the status of the elasticsearch logging endpoints.
@@ -304,9 +315,8 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 			continue
 		}
 		total := int(totalF)
-		if total < expected {
-			Logf("After %v expecting to find %d log lines but saw only %d", time.Since(start), expected, total)
-			continue
+		if total != expected {
+			Logf("After %v expecting to find %d log lines but saw %d", time.Since(start), expected, total)
 		}
 		h, ok := hits["hits"].([]interface{})
 		if !ok {
@@ -354,23 +364,30 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 			observed[n][index]++
 		}
 		// Make sure we correctly observed the expected log lines from each node.
-		missing = 0
+		totalMissing = 0
+		missingPerNode = make([]int, nodeCount)
 		for n := range observed {
 			for i, c := range observed[n] {
 				if c == 0 {
-					missing++
+					totalMissing++
+					missingPerNode[n]++
 				}
 				if c < 0 || c > 1 {
 					Failf("Got incorrect count for node %d index %d: %d", n, i, c)
 				}
 			}
 		}
-		if missing != 0 {
-			Logf("After %v still missing %d log lines", time.Since(start), missing)
+		if totalMissing != 0 {
+			Logf("After %v still missing %d log lines", time.Since(start), totalMissing)
 			continue
 		}
 		Logf("After %s found all %d log lines", time.Since(start), expected)
 		return
+	}
+	for n := range missingPerNode {
+		if missingPerNode[n] > 0 {
+			Logf("Node %d is missing %d logs", n, missingPerNode[n])
+		}
 	}
 	Failf("Failed to find all %d log lines", expected)
 }
