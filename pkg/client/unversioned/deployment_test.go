@@ -56,6 +56,7 @@ func TestDeploymentCreate(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).Deployments(ns).Create(&deployment)
+	defer c.Close()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -81,6 +82,7 @@ func TestDeploymentGet(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).Deployments(ns).Get("abc")
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -106,6 +108,7 @@ func TestDeploymentList(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: deploymentList},
 	}
 	response, err := c.Setup(t).Deployments(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -127,6 +130,7 @@ func TestDeploymentUpdate(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: deployment},
 	}
 	response, err := c.Setup(t).Deployments(ns).Update(deployment)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -148,6 +152,7 @@ func TestDeploymentUpdateStatus(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: deployment},
 	}
 	response, err := c.Setup(t).Deployments(ns).UpdateStatus(deployment)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -162,6 +167,7 @@ func TestDeploymentDelete(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Deployments(ns).Delete("foo", nil)
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -175,6 +181,7 @@ func TestDeploymentWatch(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	_, err := c.Setup(t).Deployments(api.NamespaceAll).Watch(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -203,6 +210,7 @@ func TestListDeploymentsLabels(t *testing.T) {
 		},
 	}
 	c.Setup(t)
+	defer c.Close()
 	c.QueryValidator[labelSelectorQueryParamName] = simple.ValidateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
 	options := api.ListOptions{LabelSelector: selector}

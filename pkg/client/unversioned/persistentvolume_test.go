@@ -60,6 +60,7 @@ func TestPersistentVolumeCreate(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).PersistentVolumes().Create(pv)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -89,6 +90,7 @@ func TestPersistentVolumeGet(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).PersistentVolumes().Get("abc")
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -110,6 +112,7 @@ func TestPersistentVolumeList(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: persistentVolumeList},
 	}
 	response, err := c.Setup(t).PersistentVolumes().List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -133,6 +136,7 @@ func TestPersistentVolumeUpdate(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: persistentVolume},
 	}
 	response, err := c.Setup(t).PersistentVolumes().Update(persistentVolume)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -163,6 +167,7 @@ func TestPersistentVolumeStatusUpdate(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: persistentVolume},
 	}
 	response, err := c.Setup(t).PersistentVolumes().UpdateStatus(persistentVolume)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -172,6 +177,7 @@ func TestPersistentVolumeDelete(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).PersistentVolumes().Delete("foo")
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -184,5 +190,6 @@ func TestPersistentVolumeWatch(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	_, err := c.Setup(t).PersistentVolumes().Watch(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, nil, err)
 }

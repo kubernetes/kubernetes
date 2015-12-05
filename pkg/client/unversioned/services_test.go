@@ -60,6 +60,7 @@ func TestListServices(t *testing.T) {
 		},
 	}
 	receivedServiceList, err := c.Setup(t).Services(ns).List(api.ListOptions{})
+	defer c.Close()
 	t.Logf("received services: %v %#v", err, receivedServiceList)
 	c.Validate(t, receivedServiceList, err)
 }
@@ -94,6 +95,7 @@ func TestListServicesLabels(t *testing.T) {
 		},
 	}
 	c.Setup(t)
+	defer c.Close()
 	c.QueryValidator[labelSelectorQueryParamName] = simple.ValidateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
 	options := api.ListOptions{LabelSelector: selector}
@@ -111,6 +113,7 @@ func TestGetService(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
 	}
 	response, err := c.Setup(t).Services(ns).Get("1")
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -118,6 +121,7 @@ func TestGetServiceWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{Error: true}
 	receivedPod, err := c.Setup(t).Services(ns).Get("")
+	defer c.Close()
 	if (err != nil) && (err.Error() != simple.NameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
 	}
@@ -136,6 +140,7 @@ func TestCreateService(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
 	}
 	response, err := c.Setup(t).Services(ns).Create(&api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}})
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -147,6 +152,7 @@ func TestUpdateService(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: svc},
 	}
 	response, err := c.Setup(t).Services(ns).Update(svc)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -157,6 +163,7 @@ func TestDeleteService(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Services(ns).Delete("1")
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -172,6 +179,7 @@ func TestServiceProxyGet(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, RawBody: &body},
 	}
 	response, err := c.Setup(t).Services(ns).ProxyGet("", "service-1", "", "foo", map[string]string{"param-name": "param-value"}).DoRaw()
+	defer c.Close()
 	c.ValidateRaw(t, response, err)
 
 	// With scheme and port specified
@@ -184,5 +192,6 @@ func TestServiceProxyGet(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, RawBody: &body},
 	}
 	response, err = c.Setup(t).Services(ns).ProxyGet("https", "service-1", "my-port", "foo", map[string]string{"param-name": "param-value"}).DoRaw()
+	defer c.Close()
 	c.ValidateRaw(t, response, err)
 }

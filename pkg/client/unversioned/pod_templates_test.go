@@ -53,6 +53,7 @@ func TestPodTemplateCreate(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).PodTemplates(ns).Create(&podTemplate)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -76,6 +77,7 @@ func TestPodTemplateGet(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).PodTemplates(ns).Get("abc")
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -101,6 +103,7 @@ func TestPodTemplateList(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: podTemplateList},
 	}
 	response, err := c.Setup(t).PodTemplates(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -119,6 +122,7 @@ func TestPodTemplateUpdate(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: podTemplate},
 	}
 	response, err := c.Setup(t).PodTemplates(ns).Update(podTemplate)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -129,6 +133,7 @@ func TestPodTemplateDelete(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).PodTemplates(ns).Delete("foo", nil)
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -141,5 +146,6 @@ func TestPodTemplateWatch(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	_, err := c.Setup(t).PodTemplates(api.NamespaceAll).Watch(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
