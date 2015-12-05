@@ -38,8 +38,6 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/httpstream"
@@ -56,7 +54,6 @@ type fakeKubelet struct {
 	runningPodsFunc                    func() ([]*api.Pod, error)
 	logFunc                            func(w http.ResponseWriter, req *http.Request)
 	runFunc                            func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
-	containerVersionFunc               func() (kubecontainer.Version, error)
 	execFunc                           func(pod string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	attachFunc                         func(pod string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	portForwardFunc                    func(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
@@ -85,10 +82,6 @@ func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, conta
 
 func (fk *fakeKubelet) GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return fk.rawInfoFunc(req)
-}
-
-func (fk *fakeKubelet) GetContainerRuntimeVersion() (kubecontainer.Version, error) {
-	return fk.containerVersionFunc()
 }
 
 func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) {
@@ -161,9 +154,6 @@ type serverTestFramework struct {
 func newServerTest() *serverTestFramework {
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
-		containerVersionFunc: func() (kubecontainer.Version, error) {
-			return dockertools.NewVersion("1.18")
-		},
 		hostnameFunc: func() string {
 			return "127.0.0.1"
 		},
@@ -505,9 +495,6 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 
 func TestHealthCheck(t *testing.T) {
 	fw := newServerTest()
-	fw.fakeKubelet.containerVersionFunc = func() (kubecontainer.Version, error) {
-		return dockertools.NewVersion("1.18")
-	}
 	fw.fakeKubelet.hostnameFunc = func() string {
 		return "127.0.0.1"
 	}
@@ -520,13 +507,6 @@ func TestHealthCheck(t *testing.T) {
 		return "fake"
 	}
 	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")
-
-	//Test with old container runtime version
-	fw.fakeKubelet.containerVersionFunc = func() (kubecontainer.Version, error) {
-		return dockertools.NewVersion("1.16")
-	}
-
-	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusInternalServerError)
 }
 
 func assertHealthFails(t *testing.T, httpURL string, expectedErrorCode int) {
@@ -714,9 +694,6 @@ func TestAuthorizationSuccess(t *testing.T) {
 
 func TestSyncLoopCheck(t *testing.T) {
 	fw := newServerTest()
-	fw.fakeKubelet.containerVersionFunc = func() (kubecontainer.Version, error) {
-		return dockertools.NewVersion("1.18")
-	}
 	fw.fakeKubelet.hostnameFunc = func() string {
 		return "127.0.0.1"
 	}
