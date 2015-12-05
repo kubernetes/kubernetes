@@ -287,17 +287,17 @@ kube::util::group-version-to-pkg-path() {
   # moving the results to pkg/apis/api.
   case "${group_version}" in
     # both group and version are "", this occurs when we generate deep copies for internal objects of the legacy v1 API.
-    /)
+    /__internal)
       echo "api"
       ;;
-    v1)
+    /v1)
       echo "api/v1"
       ;;
     unversioned)
       echo "api/unversioned"
       ;;
     *)
-      echo "apis/${group_version}"
+      echo "apis/${group_version%__internal}"
       ;;
   esac
 }

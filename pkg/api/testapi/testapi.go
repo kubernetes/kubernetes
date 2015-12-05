@@ -51,13 +51,16 @@ type TestGroup struct {
 
 func init() {
 	kubeTestAPI := os.Getenv("KUBE_TEST_API")
-	if kubeTestAPI != "" {
+	if len(kubeTestAPI) != 0 {
 		testGroupVersions := strings.Split(kubeTestAPI, ",")
 		for _, groupVersion := range testGroupVersions {
 			// TODO: caesarxuchao: the apiutil package is hacky, it will be replaced
 			// by a following PR.
-			Groups[apiutil.GetGroup(groupVersion)] =
-				TestGroup{apiutil.GetGroup(groupVersion), apiutil.GetVersion(groupVersion), groupVersion}
+			Groups[apiutil.GetGroup(groupVersion)] = TestGroup{
+				Group:                 apiutil.GetGroup(groupVersion),
+				VersionUnderTest:      apiutil.GetVersion(groupVersion),
+				GroupVersionUnderTest: groupVersion,
+			}
 		}
 	}
 
@@ -66,10 +69,18 @@ func init() {
 	if _, ok := Groups[""]; !ok {
 		// TODO: The second latest.GroupOrDie("").Version will be latest.GroupVersion after we
 		// have multiple group support
-		Groups[""] = TestGroup{"", latest.GroupOrDie("").Version, latest.GroupOrDie("").GroupVersion}
+		Groups[""] = TestGroup{
+			Group:                 "",
+			VersionUnderTest:      latest.GroupOrDie("").Version,
+			GroupVersionUnderTest: latest.GroupOrDie("").GroupVersion,
+		}
 	}
 	if _, ok := Groups["extensions"]; !ok {
-		Groups["extensions"] = TestGroup{"extensions", latest.GroupOrDie("extensions").Version, latest.GroupOrDie("extensions").GroupVersion}
+		Groups["extensions"] = TestGroup{
+			Group:                 "extensions",
+			VersionUnderTest:      latest.GroupOrDie("extensions").Version,
+			GroupVersionUnderTest: latest.GroupOrDie("extensions").GroupVersion,
+		}
 	}
 
 	Default = Groups[""]
@@ -95,7 +106,7 @@ func (g TestGroup) GroupVersion() *unversioned.GroupVersion {
 // InternalGroupVersion returns the group,version used to identify the internal
 // types for this API
 func (g TestGroup) InternalGroupVersion() unversioned.GroupVersion {
-	return unversioned.GroupVersion{Group: g.Group}
+	return unversioned.GroupVersion{Group: g.Group, Version: runtime.APIVersionInternal}
 }
 
 // Codec returns the codec for the API version to test against, as set by the

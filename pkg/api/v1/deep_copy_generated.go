@@ -2354,6 +2354,13 @@ func deepCopy_runtime_RawExtension(in runtime.RawExtension, out *runtime.RawExte
 	} else {
 		out.RawJSON = nil
 	}
+	if newVal, err := c.DeepCopy(in.Object); err != nil {
+		return err
+	} else if newVal == nil {
+		out.Object = nil
+	} else {
+		out.Object = newVal.(runtime.Object)
+	}
 	return nil
 }
 

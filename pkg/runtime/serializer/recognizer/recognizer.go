@@ -18,6 +18,7 @@ package recognizer
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -70,6 +71,9 @@ func (d *decoder) Decode(data []byte, gvk *unversioned.GroupVersionKind, into ru
 			continue
 		}
 		return out, actual, nil
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no serialization format matched the provided data")
 	}
 	return nil, nil, lastErr
 }

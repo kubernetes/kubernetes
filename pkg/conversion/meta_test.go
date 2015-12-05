@@ -16,13 +16,7 @@ limitations under the License.
 
 package conversion
 
-import (
-	"fmt"
-	"reflect"
-	"testing"
-
-	"k8s.io/kubernetes/pkg/api/unversioned"
-)
+import "testing"
 
 func TestInvalidPtrValueKind(t *testing.T) {
 	var simple interface{}
