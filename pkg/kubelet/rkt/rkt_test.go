@@ -144,3 +144,56 @@ func TestCheckVersion(t *testing.T) {
 		fs.CleanCalls()
 	}
 }
+
+func TestListImages(t *testing.T) {
+	fr := newFakeRktInterface()
+	fs := newFakeSystemd()
+	r := &Runtime{apisvc: fr, systemd: fs}
+
+	tests := []struct {
+		images []*rktapi.Image
+	}{
+		{},
+		{
+			[]*rktapi.Image{
+				{
+					Id:      "sha512-a2fb8f390702",
+					Name:    "quay.io/coreos/alpine-sh",
+					Version: "latest",
+				},
+			},
+		},
+		{
+			[]*rktapi.Image{
+				{
+					Id:      "sha512-a2fb8f390702",
+					Name:    "quay.io/coreos/alpine-sh",
+					Version: "latest",
+				},
+				{
+					Id:      "sha512-c6b597f42816",
+					Name:    "coreos.com/rkt/stage1-coreos",
+					Version: "0.10.0",
+				},
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		fr.images = tt.images
+
+		images, err := r.ListImages()
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+		assert.Equal(t, len(images), len(tt.images), fmt.Sprintf("test case %d: mismatched number of images", i))
+		for i, image := range images {
+			assert.Equal(t, image.ID, tt.images[i].Id, fmt.Sprintf("test case %d: mismatched image IDs", i))
+			assert.Equal(t, []string{tt.images[i].Name}, image.Tags, fmt.Sprintf("test case %d: mismatched image tags", i))
+		}
+
+		assert.Equal(t, fr.called, []string{"ListImages"}, fmt.Sprintf("test case %d: unexpected called list", i))
+
+		fr.CleanCalls()
+	}
+}
