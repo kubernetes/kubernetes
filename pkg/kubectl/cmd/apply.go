@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
@@ -139,7 +140,7 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 		}
 
 		// Serialize the current configuration of the object from the server.
-		current, err := info.Mapping.Codec.Encode(info.Object)
+		current, err := runtime.Encode(info.Mapping.Codec, info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("serializing current configuration from:\n%v\nfor:", info), info.Source, err)
 		}

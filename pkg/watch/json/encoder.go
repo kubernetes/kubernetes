@@ -30,11 +30,11 @@ import (
 type Encoder struct {
 	w       io.Writer
 	encoder *json.Encoder
-	codec   runtime.Codec
+	codec   runtime.Encoder
 }
 
 // NewEncoder creates an Encoder for the given writer and codec
-func NewEncoder(w io.Writer, codec runtime.Codec) *Encoder {
+func NewEncoder(w io.Writer, codec runtime.Encoder) *Encoder {
 	return &Encoder{
 		w:       w,
 		encoder: json.NewEncoder(w),

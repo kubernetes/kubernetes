@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -65,23 +66,33 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 }
 
 // serveWatch handles serving requests to the server
-func serveWatch(watcher watch.Interface, scope RequestScope, w http.ResponseWriter, req *restful.Request, timeout time.Duration) {
-	watchServer := &WatchServer{watcher, scope.Codec, func(obj runtime.Object) {
+func serveWatch(watcher watch.Interface, scope RequestScope, req *restful.Request, res *restful.Response, timeout time.Duration) {
+	s, mediaType, err := negotiateOutputSerializer(req.Request, scope.Serializer)
+	if err != nil {
+		scope.err(err, req, res)
+		return
+	}
+	if mediaType != "application/json" {
+		writeRawJSON(http.StatusNotAcceptable, nil, res.ResponseWriter)
+		return
+	}
+	encoder := scope.Serializer.EncoderForVersion(s, unversioned.ParseGroupVersionOrDie(scope.APIVersion))
+	watchServer := &WatchServer{watcher, encoder, func(obj runtime.Object) {
 		if err := setSelfLink(obj, req, scope.Namer); err != nil {
 			glog.V(5).Infof("Failed to set self link for object %v: %v", reflect.TypeOf(obj), err)
 		}
 	}, &realTimeoutFactory{timeout}}
 	if isWebsocketRequest(req.Request) {
-		websocket.Handler(watchServer.HandleWS).ServeHTTP(httplog.Unlogged(w), req.Request)
+		websocket.Handler(watchServer.HandleWS).ServeHTTP(httplog.Unlogged(res.ResponseWriter), req.Request)
 	} else {
-		watchServer.ServeHTTP(w, req.Request)
+		watchServer.ServeHTTP(res.ResponseWriter, req.Request)
 	}
 }
 
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
 type WatchServer struct {
 	watching watch.Interface
-	codec    runtime.Codec
+	encoder  runtime.Encoder
 	fixup    func(runtime.Object)
 	t        timeoutFactory
 }
@@ -107,7 +118,7 @@ func (w *WatchServer) HandleWS(ws *websocket.Conn) {
 				return
 			}
 			w.fixup(event.Object)
-			obj, err := watchjson.Object(w.codec, &event)
+			obj, err := watchjson.Object(w.encoder, &event)
 			if err != nil {
 				// Client disconnect.
 				w.watching.Stop()
@@ -146,7 +157,7 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
-	encoder := watchjson.NewEncoder(w, self.codec)
+	encoder := watchjson.NewEncoder(w, self.encoder)
 	for {
 		select {
 		case <-cn.CloseNotify():

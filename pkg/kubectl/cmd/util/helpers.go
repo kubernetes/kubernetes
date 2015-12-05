@@ -369,7 +369,7 @@ func Merge(dst runtime.Object, fragment, kind string) (runtime.Object, error) {
 	}
 
 	// encode dst into versioned json and apply fragment directly too it
-	target, err := i.Codec.Encode(dst)
+	target, err := runtime.Encode(i.Codec, dst)
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +377,7 @@ func Merge(dst runtime.Object, fragment, kind string) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	out, err := i.Codec.Decode(patched)
+	out, _, err := i.Codec.Decode(patched, nil, nil)
 	if err != nil {
 		return nil, err
 	}

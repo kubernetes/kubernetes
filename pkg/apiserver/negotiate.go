@@ -37,7 +37,7 @@ type NegotiatedSerializer interface {
 	DecoderToVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Decoder
 }
 
-func negotiateResponseSerializer(req *http.Request, s NegotiatedSerializer) (runtime.Serializer, string, error) {
+func negotiateOutputSerializer(req *http.Request, s NegotiatedSerializer) (runtime.Serializer, string, error) {
 	accept := goautoneg.ParseAccept(req.Header.Get("Accept"))
 	pretty := isPrettyPrint(req)
 	for _, t := range accept {

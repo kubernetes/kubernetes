@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
+	gruntime "runtime"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/jsonmerge"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/util/yaml"
@@ -94,7 +95,7 @@ func NewCmdEdit(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
 	cmd.Flags().StringP("output", "o", "yaml", "Output format. One of: yaml|json.")
 	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")
-	cmd.Flags().Bool("windows-line-endings", runtime.GOOS == "windows", "Use Windows line-endings (default Unix line-endings)")
+	cmd.Flags().Bool("windows-line-endings", gruntime.GOOS == "windows", "Use Windows line-endings (default Unix line-endings)")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	return cmd
 }
@@ -226,7 +227,7 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				return preservedFile(err, file, out)
 			}
 			// encode updates back to "edited" since we'll only generate patch from "edited"
-			if edited, err = updates.Mapping.Codec.Encode(updates.Object); err != nil {
+			if edited, err = runtime.Encode(updates.Mapping.Codec, updates.Object); err != nil {
 				return preservedFile(err, file, out)
 			}
 

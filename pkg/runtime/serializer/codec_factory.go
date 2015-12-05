@@ -14,10 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package latest
+package serializer
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
@@ -26,12 +25,7 @@ import (
 )
 
 var (
-	Codecs                CodecFactory
 	UniversalDeserializer runtime.Decoder
-
-	jsonSerializer       = json.NewSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), false)
-	jsonPrettySerializer = json.NewSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), true)
-	yamlSerializer       = json.NewYAMLSerializer(json.DefaultMetaFactory, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme))
 )
 
 type serializerType struct {
@@ -42,38 +36,58 @@ type serializerType struct {
 	PrettySerializer   runtime.Serializer
 }
 
-// allows other codecs to be enabled with compile time flags in their own files
-var serializers = []serializerType{
-	{
-		AcceptContentTypes: []string{"application/json"},
-		ContentType:        "application/json",
-		FileExtensions:     []string{"json"},
-		Serializer:         jsonSerializer,
-		PrettySerializer:   jsonPrettySerializer,
-	},
-	{
-		AcceptContentTypes: []string{"application/yaml"},
-		ContentType:        "application/yaml",
-		FileExtensions:     []string{"yaml"},
-		Serializer:         yamlSerializer,
-	},
-}
-
-func init() {
-	Codecs = CodecFactory{
-		scheme:      api.Scheme,
-		serializers: serializers,
+// NewCodecFactory enables the standard serializers to be enabled for a given scheme, performing transformation
+// of input and output into the wire formats supported.
+// TODO: allow other codecs to be compiled in?
+func NewCodecFactory(scheme *runtime.Scheme) CodecFactory {
+	jsonSerializer := json.NewSerializer(json.DefaultMetaFactory, scheme, runtime.ObjectTyperToTyper(scheme), false)
+	jsonPrettySerializer := json.NewSerializer(json.DefaultMetaFactory, scheme, runtime.ObjectTyperToTyper(scheme), true)
+	yamlSerializer := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme, runtime.ObjectTyperToTyper(scheme))
+	serializers := []serializerType{
+		{
+			AcceptContentTypes: []string{"application/json"},
+			ContentType:        "application/json",
+			FileExtensions:     []string{"json"},
+			Serializer:         jsonSerializer,
+			PrettySerializer:   jsonPrettySerializer,
+		},
+		{
+			AcceptContentTypes: []string{"application/yaml"},
+			ContentType:        "application/yaml",
+			FileExtensions:     []string{"yaml"},
+			Serializer:         yamlSerializer,
+		},
 	}
 	decoders := make([]runtime.Decoder, 0, len(serializers))
+	accepts := []string{}
+	alreadyAccepted := make(map[string]struct{})
 	for _, d := range serializers {
 		decoders = append(decoders, d.Serializer)
+		for _, mediaType := range d.AcceptContentTypes {
+			if _, ok := alreadyAccepted[mediaType]; ok {
+				continue
+			}
+			alreadyAccepted[mediaType] = struct{}{}
+			accepts = append(accepts, mediaType)
+		}
 	}
-	UniversalDeserializer = recognizer.NewDecoder(decoders...)
+	return CodecFactory{
+		scheme:      scheme,
+		serializers: serializers,
+		universal:   recognizer.NewDecoder(decoders...),
+		accepts:     accepts,
+	}
 }
 
 type CodecFactory struct {
 	scheme      *runtime.Scheme
 	serializers []serializerType
+	universal   runtime.Decoder
+	accepts     []string
+}
+
+func (f CodecFactory) SupportedMediaTypes() []string {
+	return f.accepts
 }
 
 // UniversalDecoder returns a runtime.Decoder capable of decoding all known API objects in all known formats. Used
@@ -82,14 +96,22 @@ type CodecFactory struct {
 // versions of objects to return - by default, runtime.APIVersionInternal is used. If any versions are specified,
 // unrecognized groups will be returned in the version they are encoded as (no conversion).
 func (f CodecFactory) UniversalDecoder(versions ...unversioned.GroupVersion) runtime.Decoder {
-	return f.CodecForVersions(runtime.NoopEncoder{UniversalDeserializer}, nil, versions)
+	return f.CodecForVersions(runtime.NoopEncoder{f.universal}, nil, versions)
 }
 
 // CodecFor creates a codec with the provided serializer. If an object is decoded and its group is not in the list,
 // it will default to runtiem.APIVersionInternal. If encode is not specified for an object's group, the object is not
 // converted. If encode or decode are nil, no conversion is performed.
-func (CodecFactory) CodecForVersions(serializer runtime.Serializer, encode []unversioned.GroupVersion, decode []unversioned.GroupVersion) runtime.Codec {
-	return versioning.NewCodec(api.Scheme, serializer, api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), encode, decode)
+func (f CodecFactory) CodecForVersions(serializer runtime.Serializer, encode []unversioned.GroupVersion, decode []unversioned.GroupVersion) runtime.Codec {
+	return versioning.NewCodec(f.scheme, serializer, f.scheme, runtime.ObjectTyperToTyper(f.scheme), encode, decode)
+}
+
+func (f CodecFactory) DecoderToVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Decoder {
+	return f.CodecForVersions(serializer, nil, []unversioned.GroupVersion{gv})
+}
+
+func (f CodecFactory) EncoderForVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Encoder {
+	return f.CodecForVersions(serializer, []unversioned.GroupVersion{gv}, nil)
 }
 
 // SerializerForMediaType returns a serializer that matches the provided RFC2046 mediaType, or false if no such

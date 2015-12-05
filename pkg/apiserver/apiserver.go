@@ -386,7 +386,7 @@ func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w htt
 
 // writeNegotiated renders an object in the content type negotiated by the client
 func writeNegotiated(s NegotiatedSerializer, gv unversioned.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
-	serializer, contentType, err := negotiateResponseSerializer(req, s)
+	serializer, contentType, err := negotiateOutputSerializer(req, s)
 	if err != nil {
 		writeRawJSON(http.StatusNotAcceptable, err, w)
 		return

@@ -21,9 +21,11 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
 var (
@@ -40,6 +42,9 @@ var (
 	// IsRegistered is a shortcut to allGroups.IsRegistered.
 	IsRegistered = allGroups.IsRegistered
 )
+
+// Codecs provides access to encoding and decoding for the scheme
+var Codecs = serializer.NewCodecFactory(api.Scheme)
 
 // GroupMetaMap is a map between group names and their metadata.
 type GroupMetaMap map[string]*GroupMeta

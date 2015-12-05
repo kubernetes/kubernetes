@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/json"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -492,7 +493,7 @@ func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cac
 }
 
 func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
-	version, kind, err := runtime.UnstructuredJSONScheme.DataVersionAndKind(data)
+	version, kind, err := json.DefaultMetaFactory.Interpret(data)
 	if err != nil {
 		return err
 	}

@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
-	"k8s.io/kubernetes/pkg/api/v1"
 	expapi "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
@@ -649,8 +648,8 @@ func (m *Master) init(c *Config) {
 	}
 
 	apiserver.InstallSupport(m.muxHelper, m.rootWebService, c.EnableProfiling, healthzChecks...)
-	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
-	apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newRequestInfoResolver(), apiVersions)
+	apiserver.AddApiWebService(latest.Codecs, m.handlerContainer, c.APIPrefix, apiVersions)
+	apiserver.InstallServiceErrorHandler(latest.Codecs, m.handlerContainer, m.newRequestInfoResolver(), apiVersions)
 
 	// allGroups records all supported groups at /apis
 	allGroups := []unversioned.APIGroup{}
@@ -683,14 +682,14 @@ func (m *Master) init(c *Config) {
 			Versions:         expAPIVersions,
 			PreferredVersion: unversioned.GroupVersionForDiscovery{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
 		}
-		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("extensions").Group, group)
+		apiserver.AddGroupWebService(latest.Codecs, m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("extensions").Group, group)
 		allGroups = append(allGroups, group)
-		apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newRequestInfoResolver(), []string{expVersion.GroupVersion.String()})
+		apiserver.InstallServiceErrorHandler(latest.Codecs, m.handlerContainer, m.newRequestInfoResolver(), []string{expVersion.GroupVersion.String()})
 	}
 
 	// This should be done after all groups are registered
 	// TODO: replace the hardcoded "apis".
-	apiserver.AddApisWebService(m.handlerContainer, "/apis", allGroups)
+	apiserver.AddApisWebService(latest.Codecs, m.handlerContainer, "/apis", allGroups)
 
 	// Register root handler.
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
@@ -899,7 +898,7 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 	version := m.defaultAPIGroupVersion()
 	version.Storage = storage
 	version.GroupVersion = unversioned.GroupVersion{Version: "v1"}
-	version.Codec = v1.Codec
+	version.Serializer = latest.Codecs
 	return version
 }
 
@@ -1009,9 +1008,9 @@ func (m *Master) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) erro
 		Name:     group,
 		Versions: []unversioned.GroupVersionForDiscovery{groupVersion},
 	}
-	apiserver.AddGroupWebService(m.handlerContainer, path, apiGroup)
+	apiserver.AddGroupWebService(latest.Codecs, m.handlerContainer, path, apiGroup)
 	m.addThirdPartyResourceStorage(path, thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST))
-	apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newRequestInfoResolver(), []string{thirdparty.GroupVersion.String()})
+	apiserver.InstallServiceErrorHandler(latest.Codecs, m.handlerContainer, m.newRequestInfoResolver(), []string{thirdparty.GroupVersion.String()})
 	return nil
 }
 
@@ -1035,8 +1034,9 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:             thirdpartyresourcedata.NewMapper(latest.GroupOrDie("extensions").RESTMapper, kind, version, group),
-		Codec:              thirdpartyresourcedata.NewCodec(latest.GroupOrDie("extensions").Codec, kind),
+		Mapper: thirdpartyresourcedata.NewMapper(latest.GroupOrDie("extensions").RESTMapper, kind, version, group),
+		// TODO: bring back
+		//Serializer:         thirdpartyresourcedata.NewCodec(latest.GroupOrDie("extensions").Codec, kind),
 		ParameterCodec:     runtime.NewParameterCodec(api.Scheme),
 		Linker:             latest.GroupOrDie("extensions").SelfLinker,
 		Storage:            storage,
@@ -1126,7 +1126,8 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		Typer:     api.Scheme,
 
 		Mapper:             extensionsGroup.RESTMapper,
-		Codec:              extensionsGroup.Codec,
+		Serializer:         latest.Codecs,
+		ParameterCodec:     runtime.NewParameterCodec(api.Scheme),
 		Linker:             extensionsGroup.SelfLinker,
 		Storage:            storage,
 		GroupVersion:       unversioned.ParseGroupVersionOrDie(extensionsGroup.GroupVersion),

@@ -284,7 +284,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			if timeout == 0 && minRequestTimeout > 0 {
 				timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
 			}
-			serveWatch(watcher, scope, w, req, timeout)
+			serveWatch(watcher, scope, req, res, timeout)
 			return
 		}
 
@@ -448,7 +448,21 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 			return
 		}
 
-		result, err := patchResource(ctx, timeout, versionedObj, r, name, patchType, patchJS, scope.Namer, scope.Serializer)
+		s, ok := scope.Serializer.SerializerForMediaType("application/json", nil)
+		if !ok {
+			scope.err(fmt.Errorf("no serializer defined for JSON"), req, res)
+			return
+		}
+		gv := unversioned.ParseGroupVersionOrDie(scope.APIVersion)
+		codec := struct {
+			runtime.Decoder
+			runtime.Encoder
+		}{
+			scope.Serializer.DecoderToVersion(s, unversioned.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}),
+			scope.Serializer.EncoderForVersion(s, gv),
+		}
+
+		result, err := patchResource(ctx, timeout, versionedObj, r, name, patchType, patchJS, scope.Namer, codec)
 		if err != nil {
 			scope.err(err, req, res)
 			return
@@ -465,7 +479,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 }
 
 // patchResource divides PatchResource for easier unit testing
-func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.Object, patcher rest.Patcher, name string, patchType api.PatchType, patchJS []byte, namer ScopeNamer, s runtime.Serializer) (runtime.Object, error) {
+func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.Object, patcher rest.Patcher, name string, patchType api.PatchType, patchJS []byte, namer ScopeNamer, codec runtime.Codec) (runtime.Object, error) {
 	namespace := api.NamespaceValue(ctx)
 
 	original, err := patcher.Get(ctx, name)
@@ -574,8 +588,13 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 
+		s, err := negotiateInputSerializer(req.Request, scope.Serializer)
+		if err != nil {
+			scope.err(err, req, res)
+			return
+		}
 		defaultGVK := unversioned.ParseGroupVersionOrDie(scope.APIVersion).WithKind(scope.Kind)
-		obj, gvk, err := scope.Serializer.Decode(body, &defaultGVK, r.New())
+		obj, gvk, err := scope.Serializer.DecoderToVersion(s, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, r.New())
 		if err != nil {
 			err = transformDecodeError(typer, err, obj, gvk)
 			scope.err(err, req, res)
@@ -618,7 +637,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		if wasCreated {
 			status = http.StatusCreated
 		}
-		writeJSON(status, scope.Serializer, result, w, isPrettyPrint(req.Request))
+		write(status, scope.APIVersion, scope.Serializer, result, w, req.Request)
 	}
 }
 
@@ -646,7 +665,13 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 				return
 			}
 			if len(body) > 0 {
-				if _, err := runtime.DecodeInto(scope.Serializer, body, nil, options); err != nil {
+				s, err := negotiateInputSerializer(req.Request, scope.Serializer)
+				if err != nil {
+					scope.err(err, req, res)
+					return
+				}
+				defaultGVK := unversioned.ParseGroupVersionOrDie(scope.APIVersion).WithKind("DeleteOptions")
+				if _, err := runtime.DecodeInto(scope.Serializer.DecoderToVersion(s, defaultGVK.GroupVersion()), body, &defaultGVK, options); err != nil {
 					scope.err(err, req, res)
 					return
 				}
