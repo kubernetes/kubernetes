@@ -97,7 +97,7 @@ func (s *KubeletExecutorServer) runExecutor(
 				return nil, fmt.Errorf("PodStatucFunc called before kubelet is initialized")
 			}
 
-			status, err := s.klet.GetRuntime().GetPodStatus(pod)
+			status, err := s.klet.GetRuntime().GetAPIPodStatus(pod)
 			if err != nil {
 				return nil, err
 			}

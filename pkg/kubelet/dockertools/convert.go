@@ -21,6 +21,8 @@ import (
 	"strings"
 
 	docker "github.com/fsouza/go-dockerclient"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -28,16 +30,16 @@ import (
 // This file contains helper functions to convert docker API types to runtime
 // (kubecontainer) types.
 
-func mapStatus(status string) kubecontainer.ContainerStatus {
-	// Parse the status string in docker.APIContainers. This could break when
+func mapState(state string) kubecontainer.ContainerState {
+	// Parse the state string in docker.APIContainers. This could break when
 	// we upgrade docker.
 	switch {
-	case strings.HasPrefix(status, "Up"):
-		return kubecontainer.ContainerStatusRunning
-	case strings.HasPrefix(status, "Exited"):
-		return kubecontainer.ContainerStatusExited
+	case strings.HasPrefix(state, "Up"):
+		return kubecontainer.ContainerStateRunning
+	case strings.HasPrefix(state, "Exited"):
+		return kubecontainer.ContainerStateExited
 	default:
-		return kubecontainer.ContainerStatusUnknown
+		return kubecontainer.ContainerStateUnknown
 	}
 }
 
@@ -58,7 +60,11 @@ func toRuntimeContainer(c *docker.APIContainers) (*kubecontainer.Container, erro
 		Image:   c.Image,
 		Hash:    hash,
 		Created: c.Created,
-		Status:  mapStatus(c.Status),
+		// (random-liu) docker uses status to indicate whether a container is running or exited.
+		// However, in kubernetes we usually use state to indicate whether a container is running or exited,
+		// while use status to indicate the comprehensive status of the container. So we have different naming
+		// norm here.
+		State: mapState(c.Status),
 	}, nil
 }
 
@@ -73,4 +79,32 @@ func toRuntimeImage(image *docker.APIImages) (*kubecontainer.Image, error) {
 		Tags: image.RepoTags,
 		Size: image.VirtualSize,
 	}, nil
+}
+
+// convert ContainerStatus to api.ContainerStatus.
+func containerStatusToAPIContainerStatus(containerStatus *kubecontainer.ContainerStatus) *api.ContainerStatus {
+	containerID := DockerPrefix + containerStatus.ID.ID
+	status := api.ContainerStatus{
+		Name:         containerStatus.Name,
+		RestartCount: containerStatus.RestartCount,
+		Image:        containerStatus.Image,
+		ImageID:      containerStatus.ImageID,
+		ContainerID:  containerID,
+	}
+	switch containerStatus.State {
+	case kubecontainer.ContainerStateRunning:
+		status.State.Running = &api.ContainerStateRunning{StartedAt: unversioned.NewTime(containerStatus.StartedAt)}
+	case kubecontainer.ContainerStateExited:
+		status.State.Terminated = &api.ContainerStateTerminated{
+			ExitCode:    containerStatus.ExitCode,
+			Reason:      containerStatus.Reason,
+			Message:     containerStatus.Message,
+			StartedAt:   unversioned.NewTime(containerStatus.StartedAt),
+			FinishedAt:  unversioned.NewTime(containerStatus.FinishedAt),
+			ContainerID: containerID,
+		}
+	default:
+		status.State.Waiting = &api.ContainerStateWaiting{}
+	}
+	return &status
 }

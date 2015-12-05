@@ -53,8 +53,8 @@ type GenericPLEG struct {
 }
 
 type containerInfo struct {
-	podID  types.UID
-	status kubecontainer.ContainerStatus
+	podID types.UID
+	state kubecontainer.ContainerState
 }
 
 func NewGenericPLEG(runtime kubecontainer.Runtime, channelCapacity int,
@@ -79,20 +79,20 @@ func (g *GenericPLEG) Start() {
 	go util.Until(g.relist, g.relistPeriod, util.NeverStop)
 }
 
-func generateEvent(podID types.UID, cid string, oldStatus, newStatus kubecontainer.ContainerStatus) *PodLifecycleEvent {
-	if newStatus == oldStatus {
+func generateEvent(podID types.UID, cid string, oldState, newState kubecontainer.ContainerState) *PodLifecycleEvent {
+	if newState == oldState {
 		return nil
 	}
-	switch newStatus {
-	case kubecontainer.ContainerStatusRunning:
+	switch newState {
+	case kubecontainer.ContainerStateRunning:
 		return &PodLifecycleEvent{ID: podID, Type: ContainerStarted, Data: cid}
-	case kubecontainer.ContainerStatusExited:
+	case kubecontainer.ContainerStateExited:
 		return &PodLifecycleEvent{ID: podID, Type: ContainerDied, Data: cid}
-	case kubecontainer.ContainerStatusUnknown:
+	case kubecontainer.ContainerStateUnknown:
 		// Don't generate any event if the status is unknown.
 		return nil
 	default:
-		panic(fmt.Sprintf("unrecognized container status: %v", newStatus))
+		panic(fmt.Sprintf("unrecognized container state: %v", newState))
 	}
 	return nil
 }
@@ -115,18 +115,18 @@ func (g *GenericPLEG) relist() {
 	for _, p := range pods {
 		for _, c := range p.Containers {
 			cid := c.ID.ID
-			// Get the of existing container info. Defaults to status unknown.
-			oldStatus := kubecontainer.ContainerStatusUnknown
+			// Get the of existing container info. Defaults to state unknown.
+			oldState := kubecontainer.ContainerStateUnknown
 			if info, ok := g.containers[cid]; ok {
-				oldStatus = info.status
+				oldState = info.state
 			}
 			// Generate an event if required.
-			glog.V(7).Infof("GenericPLEG: %v/%v: %v -> %v", p.ID, cid, oldStatus, c.Status)
-			if e := generateEvent(p.ID, cid, oldStatus, c.Status); e != nil {
+			glog.V(7).Infof("GenericPLEG: %v/%v: %v -> %v", p.ID, cid, oldState, c.State)
+			if e := generateEvent(p.ID, cid, oldState, c.State); e != nil {
 				events = append(events, e)
 			}
 			// Write to the new cache.
-			containers[cid] = containerInfo{podID: p.ID, status: c.Status}
+			containers[cid] = containerInfo{podID: p.ID, state: c.State}
 		}
 	}
 

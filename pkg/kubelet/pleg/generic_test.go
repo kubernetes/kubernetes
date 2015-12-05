@@ -57,10 +57,10 @@ func getEventsFromChannel(ch <-chan *PodLifecycleEvent) []*PodLifecycleEvent {
 	return events
 }
 
-func createTestContainer(ID string, status kubecontainer.ContainerStatus) *kubecontainer.Container {
+func createTestContainer(ID string, state kubecontainer.ContainerState) *kubecontainer.Container {
 	return &kubecontainer.Container{
-		ID:     kubecontainer.ContainerID{Type: testContainerRuntimeType, ID: ID},
-		Status: status,
+		ID:    kubecontainer.ContainerID{Type: testContainerRuntimeType, ID: ID},
+		State: state,
 	}
 }
 
@@ -93,15 +93,15 @@ func TestRelisting(t *testing.T) {
 		{
 			ID: "1234",
 			Containers: []*kubecontainer.Container{
-				createTestContainer("c1", kubecontainer.ContainerStatusExited),
-				createTestContainer("c2", kubecontainer.ContainerStatusRunning),
-				createTestContainer("c3", kubecontainer.ContainerStatusUnknown),
+				createTestContainer("c1", kubecontainer.ContainerStateExited),
+				createTestContainer("c2", kubecontainer.ContainerStateRunning),
+				createTestContainer("c3", kubecontainer.ContainerStateUnknown),
 			},
 		},
 		{
 			ID: "4567",
 			Containers: []*kubecontainer.Container{
-				createTestContainer("c1", kubecontainer.ContainerStatusExited),
+				createTestContainer("c1", kubecontainer.ContainerStateExited),
 			},
 		},
 	}
@@ -124,14 +124,14 @@ func TestRelisting(t *testing.T) {
 		{
 			ID: "1234",
 			Containers: []*kubecontainer.Container{
-				createTestContainer("c2", kubecontainer.ContainerStatusExited),
-				createTestContainer("c3", kubecontainer.ContainerStatusRunning),
+				createTestContainer("c2", kubecontainer.ContainerStateExited),
+				createTestContainer("c3", kubecontainer.ContainerStateRunning),
 			},
 		},
 		{
 			ID: "4567",
 			Containers: []*kubecontainer.Container{
-				createTestContainer("c4", kubecontainer.ContainerStatusRunning),
+				createTestContainer("c4", kubecontainer.ContainerStateRunning),
 			},
 		},
 	}
