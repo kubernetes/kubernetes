@@ -596,10 +596,10 @@ func RunKubelet(kcfg *KubeletConfig) error {
 		if _, err := k.RunOnce(podCfg.Updates()); err != nil {
 			return fmt.Errorf("runonce failed: %v", err)
 		}
-		glog.Infof("Started kubelet as runonce")
+		glog.Info("Started kubelet as runonce")
 	} else {
 		startKubelet(k, podCfg, kcfg)
-		glog.Infof("Started kubelet")
+		glog.Info("Started kubelet")
 	}
 	return nil
 }
