@@ -61,11 +61,17 @@ const (
 
 	// The remaining types are included for completeness, but are not well
 	// supported.
-	Array       Kind = "Array" // Array is just like slice, but has a fixed length.
-	Chan        Kind = "Chan"
-	Func        Kind = "Func"
-	Unknown     Kind = ""
-	Unsupported Kind = "Unsupported"
+	Array Kind = "Array" // Array is just like slice, but has a fixed length.
+	Chan  Kind = "Chan"
+	Func  Kind = "Func"
+
+	// DeclarationOf is different from other Kinds; it indicates that instead of
+	// representing an actual Type, the type is a declaration of an instance of
+	// a type. E.g., a top-level function, variable, or constant. See the
+	// comment for Type.Name for more detail.
+	DeclarationOf Kind = "DeclarationOf"
+	Unknown       Kind = ""
+	Unsupported   Kind = "Unsupported"
 )
 
 // Package holds package-level information.
@@ -84,6 +90,14 @@ type Package struct {
 	// package name).
 	Types map[string]*Type
 
+	// Functions within this package, indexed by their name (*not* including
+	// package name).
+	Functions map[string]*Type
+
+	// Global variables within this package, indexed by their name (*not* including
+	// package name).
+	Variables map[string]*Type
+
 	// Packages imported by this package, indexed by (canonicalized)
 	// package path.
 	Imports map[string]*Package
@@ -96,7 +110,7 @@ func (p *Package) Has(name string) bool {
 }
 
 // Get (or add) the given type
-func (p *Package) Get(typeName string) *Type {
+func (p *Package) Type(typeName string) *Type {
 	if t, ok := p.Types[typeName]; ok {
 		return t
 	}
@@ -109,6 +123,32 @@ func (p *Package) Get(typeName string) *Type {
 	}
 	t := &Type{Name: Name{Package: p.Path, Name: typeName}}
 	p.Types[typeName] = t
+	return t
+}
+
+// Get (or add) the given function. If a function is added, it's the caller's
+// responsibility to finish construction of the function by setting Underlying
+// to the correct type.
+func (p *Package) Function(funcName string) *Type {
+	if t, ok := p.Functions[funcName]; ok {
+		return t
+	}
+	t := &Type{Name: Name{Package: p.Path, Name: funcName}}
+	t.Kind = DeclarationOf
+	p.Functions[funcName] = t
+	return t
+}
+
+// Get (or add) the given varaible. If a variable is added, it's the caller's
+// responsibility to finish construction of the variable by setting Underlying
+// to the correct type.
+func (p *Package) Variable(varName string) *Type {
+	if t, ok := p.Variables[varName]; ok {
+		return t
+	}
+	t := &Type{Name: Name{Package: p.Path, Name: varName}}
+	t.Kind = DeclarationOf
+	p.Variables[varName] = t
 	return t
 }
 
@@ -127,8 +167,24 @@ type Universe map[string]*Package
 // types will always be found, even if they haven't been explicitly added to
 // the map. If a non-existing type is requested, u will create (a marker for)
 // it.
-func (u Universe) Get(n Name) *Type {
-	return u.Package(n.Package).Get(n.Name)
+func (u Universe) Type(n Name) *Type {
+	return u.Package(n.Package).Type(n.Name)
+}
+
+// Function returns the canonical function for the given fully-qualified name.
+// If a non-existing function is requested, u will create (a marker for) it.
+// If a marker is created, it's the caller's responsibility to finish
+// construction of the function by setting Underlying to the correct type.
+func (u Universe) Function(n Name) *Type {
+	return u.Package(n.Package).Function(n.Name)
+}
+
+// Variable returns the canonical variable for the given fully-qualified name.
+// If a non-existing variable is requested, u will create (a marker for) it.
+// If a marker is created, it's the caller's responsibility to finish
+// construction of the variable by setting Underlying to the correct type.
+func (u Universe) Variable(n Name) *Type {
+	return u.Package(n.Package).Variable(n.Name)
 }
 
 // AddImports registers import lines for packageName. May be called multiple times.
@@ -146,9 +202,11 @@ func (u Universe) Package(packagePath string) *Package {
 		return p
 	}
 	p := &Package{
-		Path:    packagePath,
-		Types:   map[string]*Type{},
-		Imports: map[string]*Package{},
+		Path:      packagePath,
+		Types:     map[string]*Type{},
+		Functions: map[string]*Type{},
+		Variables: map[string]*Type{},
+		Imports:   map[string]*Package{},
 	}
 	u[packagePath] = p
 	return p
@@ -159,6 +217,11 @@ type Type struct {
 	// There are two general categories of types, those explicitly named
 	// and those anonymous. Named ones will have a non-empty package in the
 	// name field.
+	//
+	// An exception: If Kind == DeclarationOf, then this name is the name of a
+	// top-level function, variable, or const, and the type can be found in Underlying.
+	// We do this to allow the naming system to work against these objects, even
+	// though they aren't strictly speaking types.
 	Name Name
 
 	// The general kind of this type.
@@ -178,6 +241,7 @@ type Type struct {
 	Key *Type
 
 	// If Kind == Alias, this is the underlying type.
+	// If Kind == DeclarationOf, this is the type of the declaration.
 	Underlying *Type
 
 	// If Kind == Interface, this is the list of all required functions.
