@@ -788,14 +788,14 @@ func (r *Runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	var pods []*kubecontainer.Pod
 	for _, u := range units {
 		if strings.HasPrefix(u.Name, kubernetesUnitPrefix) {
-			var status kubecontainer.ContainerStatus
+			var state kubecontainer.ContainerState
 			switch {
 			case u.SubState == "running":
-				status = kubecontainer.ContainerStatusRunning
+				state = kubecontainer.ContainerStateRunning
 			default:
-				status = kubecontainer.ContainerStatusExited
+				state = kubecontainer.ContainerStateExited
 			}
-			if !all && status != kubecontainer.ContainerStatusRunning {
+			if !all && state != kubecontainer.ContainerStateRunning {
 				continue
 			}
 			pod, _, err := r.readServiceFile(u.Name)
@@ -804,7 +804,7 @@ func (r *Runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 				continue
 			}
 			for _, c := range pod.Containers {
-				c.Status = status
+				c.State = state
 			}
 			pods = append(pods, pod)
 		}
@@ -839,9 +839,9 @@ func (r *Runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 	return nil
 }
 
-// getPodStatus reads the service file and invokes 'rkt status $UUID' to get the
+// getAPIPodStatus reads the service file and invokes 'rkt status $UUID' to get the
 // pod's status.
-func (r *Runtime) getPodStatus(serviceName string) (*api.PodStatus, error) {
+func (r *Runtime) getAPIPodStatus(serviceName string) (*api.PodStatus, error) {
 	var status api.PodStatus
 
 	// TODO(yifan): Get rkt uuid from the service file name.
@@ -865,10 +865,10 @@ func (r *Runtime) getPodStatus(serviceName string) (*api.PodStatus, error) {
 	return &status, nil
 }
 
-// GetPodStatus returns the status of the given pod.
-func (r *Runtime) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
+// GetAPIPodStatus returns the status of the given pod.
+func (r *Runtime) GetAPIPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	serviceName := makePodServiceFileName(pod.UID)
-	return r.getPodStatus(serviceName)
+	return r.getAPIPodStatus(serviceName)
 }
 
 func (r *Runtime) Type() string {
@@ -988,7 +988,7 @@ func (r *Runtime) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
 }
 
 // SyncPod syncs the running pod to match the specified desired pod.
-func (r *Runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error {
+func (r *Runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus, _ *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error {
 	podFullName := format.Pod(pod)
 
 	// Add references to all containers.
@@ -1003,7 +1003,7 @@ func (r *Runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 
 		c := runningPod.FindContainerByName(container.Name)
 		if c == nil {
-			if kubecontainer.ShouldContainerBeRestarted(&container, pod, &podStatus) {
+			if kubecontainer.ShouldContainerBeRestartedOldVersion(&container, pod, &podStatus) {
 				glog.V(3).Infof("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
 				// TODO(yifan): Containers in one pod are fate-sharing at this moment, see:
 				// https://github.com/appc/spec/issues/276.
@@ -1383,10 +1383,16 @@ func (r *Runtime) RemoveImage(image kubecontainer.ImageSpec) error {
 	return nil
 }
 
-func (r *Runtime) GetRawPodStatus(uid types.UID, name, namespace string) (*kubecontainer.RawPodStatus, error) {
+func (r *Runtime) GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
 	return nil, fmt.Errorf("Not implemented yet")
 }
 
-func (r *Runtime) ConvertRawToPodStatus(_ *api.Pod, _ *kubecontainer.RawPodStatus) (*api.PodStatus, error) {
+func (r *Runtime) ConvertPodStatusToAPIPodStatus(_ *api.Pod, _ *kubecontainer.PodStatus) (*api.PodStatus, error) {
 	return nil, fmt.Errorf("Not implemented yet")
+}
+
+func (r *Runtime) GetPodStatusAndAPIPodStatus(pod *api.Pod) (*kubecontainer.PodStatus, *api.PodStatus, error) {
+	podStatus, err := r.GetAPIPodStatus(pod)
+	return nil, podStatus, err
+
 }
