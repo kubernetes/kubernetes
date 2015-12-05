@@ -4026,7 +4026,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 			},
 			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
 			expectResetCIDRs: []string{"2.3.4.5/32", "5.6.7.8/32"},
-			expectedCalls:    []string{"GetPodStatus"},
+			expectedCalls:    []string{"GetAPIPodStatus"},
 			name:             "pod running",
 		},
 		{
@@ -4077,7 +4077,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 			},
 			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
 			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectedCalls:    []string{"GetPodStatus"},
+			expectedCalls:    []string{"GetAPIPodStatus"},
 			name:             "pod not running",
 		},
 		{
@@ -4135,7 +4135,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 
 		testKube := newTestKubelet(t)
 		testKube.kubelet.shaper = shaper
-		testKube.fakeRuntime.PodStatus = *test.status
+		testKube.fakeRuntime.APIPodStatus = *test.status
 
 		if test.cacheStatus {
 			for _, pod := range test.pods {

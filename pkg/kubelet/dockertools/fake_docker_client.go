@@ -250,7 +250,7 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 	// Docker likes to add a '/', so copy that behavior.
 	name := "/" + c.Name
 	f.Created = append(f.Created, name)
-	// The newest container should be in front, because we assume so in GetPodStatus()
+	// The newest container should be in front, because we assume so in GetAPIPodStatus()
 	f.ContainerList = append([]docker.APIContainers{
 		{ID: name, Names: []string{name}, Image: c.Config.Image, Labels: c.Config.Labels},
 	}, f.ContainerList...)
@@ -299,7 +299,7 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	var newList []docker.APIContainers
 	for _, container := range f.ContainerList {
 		if container.ID == id {
-			// The newest exited container should be in front. Because we assume so in GetPodStatus()
+			// The newest exited container should be in front. Because we assume so in GetAPIPodStatus()
 			f.ExitedContainerList = append([]docker.APIContainers{container}, f.ExitedContainerList...)
 			continue
 		}
