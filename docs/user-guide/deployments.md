@@ -402,7 +402,6 @@ at any time during the update is at most 130% of desired pods.
 minimum number of seconds for which a newly created pod should be ready
 without any of its containers crashing, for it to be considered available.
 This defaults to 0 (the pod will be considered available as soon as it is ready).
-__Note: This is not implemented yet__.
 
 ## Alternative to Deployments
 

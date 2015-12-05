@@ -19,6 +19,7 @@ package deployment
 import (
 	"fmt"
 	"hash/adler32"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -132,19 +133,36 @@ func GetReplicaCountForRCs(replicationControllers []*api.ReplicationController) 
 }
 
 // Returns the number of available pods corresponding to the given RCs.
-func GetAvailablePodsForRCs(c client.Interface, rcs []*api.ReplicationController) (int, error) {
-	// TODO: Use MinReadySeconds once https://github.com/kubernetes/kubernetes/pull/12894 is merged.
+func GetAvailablePodsForRCs(c client.Interface, rcs []*api.ReplicationController, minReadySeconds int) (int, error) {
 	allPods, err := getPodsForRCs(c, rcs)
 	if err != nil {
 		return 0, err
 	}
+	return getReadyPodsCount(allPods, minReadySeconds), nil
+}
+
+func getReadyPodsCount(pods []api.Pod, minReadySeconds int) int {
 	readyPodCount := 0
-	for _, pod := range allPods {
+	for _, pod := range pods {
 		if api.IsPodReady(&pod) {
-			readyPodCount++
+			// Check if we've passed minReadySeconds since LastTransitionTime
+			// If so, this pod is ready
+			for _, c := range pod.Status.Conditions {
+				// we only care about pod ready conditions
+				if c.Type == api.PodReady {
+					// 2 cases that this ready condition is valid (passed minReadySeconds, i.e. the pod is ready):
+					// 1. minReadySeconds <= 0
+					// 2. LastTransitionTime (is set) + minReadySeconds (>0) < current time
+					minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
+					if minReadySeconds <= 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(time.Now()) {
+						readyPodCount++
+						break
+					}
+				}
+			}
 		}
 	}
-	return readyPodCount, nil
+	return readyPodCount
 }
 
 func getPodsForRCs(c client.Interface, replicationControllers []*api.ReplicationController) ([]api.Pod, error) {

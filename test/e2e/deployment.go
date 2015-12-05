@@ -170,7 +170,7 @@ func testRollingUpdateDeployment(f *Framework) {
 		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
 	}()
 
-	err = waitForDeploymentStatus(c, ns, deploymentName, 3, 2, 4)
+	err = waitForDeploymentStatus(c, ns, deploymentName, 3, 2, 4, 0)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -251,7 +251,7 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
 	}()
 
-	err = waitForDeploymentStatus(c, ns, deploymentName, 1, 0, 2)
+	err = waitForDeploymentStatus(c, ns, deploymentName, 1, 0, 2, 0)
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the pods were scaled up and down as expected. We use events to verify that.
 	deployment, err := c.Deployments(ns).Get(deploymentName)

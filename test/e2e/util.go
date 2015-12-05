@@ -1843,7 +1843,7 @@ func waitForRCPodsGone(c *client.Client, rc *api.ReplicationController) error {
 
 // Waits for the deployment to reach desired state.
 // Returns an error if minAvailable or maxCreated is broken at any times.
-func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desiredUpdatedReplicas, minAvailable, maxCreated int) error {
+func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desiredUpdatedReplicas, minAvailable, maxCreated, minReadySeconds int) error {
 	return wait.Poll(poll, 5*time.Minute, func() (bool, error) {
 
 		deployment, err := c.Deployments(ns).Get(deploymentName)
@@ -1864,7 +1864,7 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 		}
 		allRCs := append(oldRCs, newRC)
 		totalCreated := deploymentutil.GetReplicaCountForRCs(allRCs)
-		totalAvailable, err := deploymentutil.GetAvailablePodsForRCs(c, allRCs)
+		totalAvailable, err := deploymentutil.GetAvailablePodsForRCs(c, allRCs, minReadySeconds)
 		if err != nil {
 			return false, err
 		}
