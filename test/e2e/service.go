@@ -394,8 +394,10 @@ var _ = Describe("Services", func() {
 		ip := pickNodeIP(c)
 		testReachable(ip, nodePort)
 
+		By("verifying the node port is locked")
 		hostExec := LaunchHostExecPod(f.Client, f.Namespace.Name, "hostexec")
-		cmd := fmt.Sprintf(`ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
+		// Loop a bit because we see transient flakes.
+		cmd := fmt.Sprintf(`for i in $(seq 1 10); do if ss -ant46 'sport = :%d' | grep ^LISTEN; then exit 0; fi; sleep 0.1; done; exit 1`, nodePort)
 		stdout, err := RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 		if err != nil {
 			Failf("expected node port (%d) to be in use, stdout: %v", nodePort, stdout)
