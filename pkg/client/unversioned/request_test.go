@@ -241,6 +241,7 @@ func TestRequestBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create temp file")
 	}
+	defer f.Close()
 	os.Remove(f.Name())
 	r = (&Request{}).Body(f.Name())
 	if r.err == nil || r.body != nil {
@@ -943,6 +944,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	defer file.Close()
 
 	_, err = file.Write(reqBodyExpected)
 	if err != nil {
