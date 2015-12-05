@@ -357,7 +357,7 @@ GCE_SLOW_TESTS=(
 
 # Tests which are not able to be run in parallel.
 GCE_PARALLEL_SKIP_TESTS=(
-    "GCE\sL7\sLoadBalancer\sController" # TODO: This cannot run in parallel with other L4 tests till quota has been bumped up.
+    "GCE\sL7\sLoadBalancer\sController" # namespaced watch flakes, issue: #17805
     "Nodes\sNetwork"
     "MaxPods"
     "Resource\susage\sof\ssystem\scontainers"

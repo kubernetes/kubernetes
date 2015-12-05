@@ -5,7 +5,7 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: glbc
-    version: v0.5
+    version: v0.5.1
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "GLBC"
 spec:
@@ -13,12 +13,12 @@ spec:
   replicas: 1
   selector:
     k8s-app: glbc
-    version: v0.5
+    version: v0.5.1
   template:
     metadata:
       labels:
         k8s-app: glbc
-        version: v0.5
+        version: v0.5.1
         name: glbc
         kubernetes.io/cluster-service: "true"
     spec:
@@ -45,13 +45,15 @@ spec:
           requests:
             cpu: 10m
             memory: 20Mi
-      - image: gcr.io/google_containers/glbc:0.5
+      - image: gcr.io/google_containers/glbc:0.5.1
         livenessProbe:
           httpGet:
             path: /healthz
             port: 8081
             scheme: HTTP
           initialDelaySeconds: 30
+          # healthz reaches out to GCE
+          periodSeconds: 30
           timeoutSeconds: 5
         name: l7-lb-controller
         resources:
