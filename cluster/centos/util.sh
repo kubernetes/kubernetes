@@ -293,7 +293,7 @@ function kube-scp() {
 #   KUBE_USER
 #   KUBE_PASSWORD
 function get-password {
-  get-kubeconfig-basicauth
+  load-or-gen-kube-basicauth
   if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
     KUBE_USER=admin
     KUBE_PASSWORD=$(python -c 'import string,random; \
