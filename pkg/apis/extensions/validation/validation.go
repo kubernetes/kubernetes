@@ -188,14 +188,14 @@ func ValidateDaemonSetTemplateUpdate(podTemplate, oldPodTemplate *api.PodTemplat
 func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec, fldPath *validation.FieldPath) validation.ErrorList {
 	allErrs := validation.ErrorList{}
 
-	allErrs = append(allErrs, ValidatePodSelector(spec.Selector, fldPath.Child("selector"))...)
+	allErrs = append(allErrs, ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
 
 	if spec.Template == nil {
 		allErrs = append(allErrs, validation.NewRequiredError(fldPath.Child("template")))
 		return allErrs
 	}
 
-	selector, err := extensions.PodSelectorAsSelector(spec.Selector)
+	selector, err := extensions.LabelSelectorAsSelector(spec.Selector)
 	if err == nil && !selector.Matches(labels.Set(spec.Template.Labels)) {
 		allErrs = append(allErrs, validation.NewInvalidError(fldPath.Child("template", "metadata", "labels"), spec.Template.Labels, "selector does not match template"))
 	}
@@ -349,10 +349,10 @@ func ValidateJobSpec(spec *extensions.JobSpec, fldPath *validation.FieldPath) va
 	if spec.Selector == nil {
 		allErrs = append(allErrs, validation.NewRequiredError(fldPath.Child("selector")))
 	} else {
-		allErrs = append(allErrs, ValidatePodSelector(spec.Selector, fldPath.Child("selector"))...)
+		allErrs = append(allErrs, ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
 	}
 
-	if selector, err := extensions.PodSelectorAsSelector(spec.Selector); err == nil {
+	if selector, err := extensions.LabelSelectorAsSelector(spec.Selector); err == nil {
 		labels := labels.Set(spec.Template.Labels)
 		if !selector.Matches(labels) {
 			allErrs = append(allErrs, validation.NewInvalidError(fldPath.Child("template", "metadata", "labels"), spec.Template.Labels, "selector does not match template"))
@@ -567,26 +567,26 @@ func ValidateClusterAutoscaler(autoscaler *extensions.ClusterAutoscaler) validat
 	return allErrs
 }
 
-func ValidatePodSelector(ps *extensions.PodSelector, fldPath *validation.FieldPath) validation.ErrorList {
+func ValidateLabelSelector(ps *extensions.LabelSelector, fldPath *validation.FieldPath) validation.ErrorList {
 	allErrs := validation.ErrorList{}
 	if ps == nil {
 		return allErrs
 	}
 	allErrs = append(allErrs, apivalidation.ValidateLabels(ps.MatchLabels, fldPath.Child("matchLabels"))...)
 	for i, expr := range ps.MatchExpressions {
-		allErrs = append(allErrs, ValidatePodSelectorRequirement(expr, fldPath.Child("matchExpressions").Index(i))...)
+		allErrs = append(allErrs, ValidateLabelSelectorRequirement(expr, fldPath.Child("matchExpressions").Index(i))...)
 	}
 	return allErrs
 }
 
-func ValidatePodSelectorRequirement(sr extensions.PodSelectorRequirement, fldPath *validation.FieldPath) validation.ErrorList {
+func ValidateLabelSelectorRequirement(sr extensions.LabelSelectorRequirement, fldPath *validation.FieldPath) validation.ErrorList {
 	allErrs := validation.ErrorList{}
 	switch sr.Operator {
-	case extensions.PodSelectorOpIn, extensions.PodSelectorOpNotIn:
+	case extensions.LabelSelectorOpIn, extensions.LabelSelectorOpNotIn:
 		if len(sr.Values) == 0 {
 			allErrs = append(allErrs, validation.NewInvalidError(fldPath.Child("values"), sr.Values, "must be non-empty when operator is In or NotIn"))
 		}
-	case extensions.PodSelectorOpExists, extensions.PodSelectorOpDoesNotExist:
+	case extensions.LabelSelectorOpExists, extensions.LabelSelectorOpDoesNotExist:
 		if len(sr.Values) > 0 {
 			allErrs = append(allErrs, validation.NewInvalidError(fldPath.Child("values"), sr.Values, "must be empty when operator is Exists or DoesNotExist"))
 		}

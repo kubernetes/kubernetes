@@ -55,7 +55,7 @@ func newDaemonSet(name string) *extensions.DaemonSet {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: extensions.DaemonSetSpec{
-			Selector: &extensions.PodSelector{MatchLabels: simpleDaemonSetLabel},
+			Selector: &extensions.LabelSelector{MatchLabels: simpleDaemonSetLabel},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: simpleDaemonSetLabel,

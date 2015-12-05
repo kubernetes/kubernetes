@@ -250,7 +250,7 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 		return err
 	}
 	// at this point only dead pods are left, that should be removed
-	selector, _ := extensions.PodSelectorAsSelector(job.Spec.Selector)
+	selector, _ := extensions.LabelSelectorAsSelector(job.Spec.Selector)
 	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
 	podList, err := pods.List(options)
 	if err != nil {
