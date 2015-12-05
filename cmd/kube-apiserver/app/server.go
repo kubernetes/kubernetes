@@ -23,6 +23,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -211,9 +212,18 @@ func Run(s *options.APIServer) error {
 				installSSH = instances.AddSSHKeyToAllInstances
 			}
 		}
-
+		if s.KubeletConfig.Port == 0 {
+			glog.Fatalf("Must enable kubelet port if proxy ssh-tunneling is specified.")
+		}
 		// Set up the tunneler
-		tunneler = master.NewSSHTunneler(s.SSHUser, s.SSHKeyfile, installSSH)
+		// TODO(cjcullen): If we want this to handle per-kubelet ports or other
+		// kubelet listen-addresses, we need to plumb through options.
+		healthCheckPath := &url.URL{
+			Scheme: "https",
+			Host:   net.JoinHostPort("127.0.0.1", strconv.FormatUint(uint64(s.KubeletConfig.Port), 10)),
+			Path:   "healthz",
+		}
+		tunneler = master.NewSSHTunneler(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSH)
 
 		// Use the tunneler's dialer to connect to the kubelet
 		s.KubeletConfig.Dial = tunneler.Dial

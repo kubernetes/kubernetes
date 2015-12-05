@@ -66,19 +66,6 @@ func TestSecondsSinceSync(t *testing.T) {
 	assert.Equal(int64(-2678400), tunneler.SecondsSinceSync())
 }
 
-// TestRefreshTunnels verifies that the function errors when no addresses
-// are associated with nodes
-func TestRefreshTunnels(t *testing.T) {
-	tunneler := &SSHTunneler{}
-	tunneler.getAddresses = func() ([]string, error) { return []string{}, nil }
-	assert := assert.New(t)
-
-	// Fail case (no addresses associated with nodes)
-	assert.Error(tunneler.refreshTunnels("test", "/somepath/undefined"))
-
-	// TODO: pass case without needing actual connections?
-}
-
 // TestIsTunnelSyncHealthy verifies that the 600 second lag test
 // is honored.
 func TestIsTunnelSyncHealthy(t *testing.T) {
@@ -108,7 +95,6 @@ func generateTempFilePath(prefix string) string {
 // TestGenerateSSHKey verifies that SSH key generation does indeed
 // generate keys even with keys already exist.
 func TestGenerateSSHKey(t *testing.T) {
-	tunneler := &SSHTunneler{}
 	assert := assert.New(t)
 
 	privateKey := generateTempFilePath("private")
@@ -119,17 +105,17 @@ func TestGenerateSSHKey(t *testing.T) {
 	os.Remove(publicKey)
 
 	// Pass case: Sunny day case
-	err := tunneler.generateSSHKey("unused", privateKey, publicKey)
+	err := generateSSHKey(privateKey, publicKey)
 	assert.NoError(err, "generateSSHKey should not have retuend an error: %s", err)
 
 	// Pass case: PrivateKey exists test case
 	os.Remove(publicKey)
-	err = tunneler.generateSSHKey("unused", privateKey, publicKey)
+	err = generateSSHKey(privateKey, publicKey)
 	assert.NoError(err, "generateSSHKey should not have retuend an error: %s", err)
 
 	// Pass case: PublicKey exists test case
 	os.Remove(privateKey)
-	err = tunneler.generateSSHKey("unused", privateKey, publicKey)
+	err = generateSSHKey(privateKey, publicKey)
 	assert.NoError(err, "generateSSHKey should not have retuend an error: %s", err)
 
 	// Make sure we have no test keys laying around
