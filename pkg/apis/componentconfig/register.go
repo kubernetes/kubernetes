@@ -19,6 +19,7 @@ package componentconfig
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
@@ -26,7 +27,7 @@ func init() {
 }
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: "componentconfig", Version: ""}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "componentconfig", Version: runtime.APIVersionInternal}
 
 func addKnownTypes() {
 	// TODO this will get cleaned up with the scheme types are fixed

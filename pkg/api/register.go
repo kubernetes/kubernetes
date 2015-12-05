@@ -25,7 +25,8 @@ import (
 var Scheme = runtime.NewScheme()
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: ""}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
+var Unversioned = unversioned.GroupVersion{Group: "unversioned", Version: runtime.APIVersionUnversioned}
 
 func init() {
 	Scheme.AddKnownTypes(SchemeGroupVersion,
@@ -71,14 +72,15 @@ func init() {
 		&RangeAllocation{},
 	)
 
-	// Register Unversioned types
-	// TODO this should not be done here
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.ListOptions{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.Status{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIVersions{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIGroupList{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIGroup{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIResourceList{})
+	// Register Unversioned types under their own special group
+	Scheme.AddKnownTypes(Unversioned,
+		&unversioned.ListOptions{},
+		&unversioned.Status{},
+		&unversioned.APIVersions{},
+		&unversioned.APIGroupList{},
+		&unversioned.APIGroup{},
+		&unversioned.APIResourceList{},
+	)
 }
 
 func (*Pod) IsAnAPIObject()                       {}

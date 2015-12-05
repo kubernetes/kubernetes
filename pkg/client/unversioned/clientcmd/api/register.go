@@ -26,7 +26,7 @@ var Scheme = runtime.NewScheme()
 
 // SchemeGroupVersion is group version used to register these objects
 // TODO this should be in the "kubeconfig" group
-var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: ""}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
 
 func init() {
 	Scheme.AddKnownTypes(SchemeGroupVersion,

@@ -20,8 +20,6 @@ import (
 	"net/url"
 	"reflect"
 	"testing"
-
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type namedString string
@@ -83,7 +81,7 @@ func validateResult(t *testing.T, input interface{}, actual, expected url.Values
 
 func TestConvert(t *testing.T) {
 	tests := []struct {
-		input    runtime.Object
+		input    interface{}
 		expected url.Values
 	}{
 		{

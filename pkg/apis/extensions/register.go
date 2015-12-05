@@ -19,10 +19,11 @@ package extensions
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: "extensions", Version: ""}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "extensions", Version: runtime.APIVersionInternal}
 
 func init() {
 	// Register the API.
