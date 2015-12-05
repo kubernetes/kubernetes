@@ -1679,7 +1679,9 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	// state of a newly started container with the apiserver before the kubelet restarted, so
 	// it's OK to pretend like the kubelet started them after it restarted.
 
-	var podStatus api.PodStatus
+	var apiPodStatus api.PodStatus
+	var podStatus *kubecontainer.PodStatus
+
 	if updateType == kubetypes.SyncPodCreate {
 		// This is the first time we are syncing the pod. Record the latency
 		// since kubelet first saw the pod if firstSeenTime is set.
@@ -1687,20 +1689,23 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 			metrics.PodWorkerStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
 		}
 
-		podStatus = pod.Status
-		podStatus.StartTime = &unversioned.Time{Time: start}
-		kl.statusManager.SetPodStatus(pod, podStatus)
+		apiPodStatus = pod.Status
+		apiPodStatus.StartTime = &unversioned.Time{Time: start}
+		kl.statusManager.SetPodStatus(pod, apiPodStatus)
+		podStatus = &kubecontainer.PodStatus{
+			ID:        pod.UID,
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+		}
 		glog.V(3).Infof("Not generating pod status for new pod %q", podFullName)
 	} else {
-		var err error
-		podStatus, err = kl.generatePodStatus(pod)
-		// TODO (random-liu) It's strange that generatePodStatus generates some podStatus in
-		// the phase Failed, Pending etc, even with empty ContainerStatuses but still keep going
-		// on. Maybe need refactor here.
+		podStatusPtr, apiPodStatusPtr, err := kl.containerRuntime.GetPodStatusAndAPIPodStatus(pod)
 		if err != nil {
 			glog.Errorf("Unable to get status for pod %q (uid %q): %v", podFullName, uid, err)
 			return err
 		}
+		apiPodStatus = *apiPodStatusPtr
+		podStatus = podStatusPtr
 	}
 
 	pullSecrets, err := kl.getPullSecretsForPod(pod)
@@ -1709,7 +1714,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		return err
 	}
 
-	err = kl.containerRuntime.SyncPod(pod, runningPod, podStatus, pullSecrets, kl.backOff)
+	err = kl.containerRuntime.SyncPod(pod, runningPod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
 	if err != nil {
 		return err
 	}
@@ -1724,7 +1729,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		} else if kl.shaper != nil {
 			status, found := kl.statusManager.GetPodStatus(pod.UID)
 			if !found {
-				statusPtr, err := kl.containerRuntime.GetPodStatus(pod)
+				statusPtr, err := kl.containerRuntime.GetAPIPodStatus(pod)
 				if err != nil {
 					glog.Errorf("Error getting pod for bandwidth shaping")
 					return err
@@ -1831,7 +1836,7 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 		}
 		status, found := kl.statusManager.GetPodStatus(pod.UID)
 		if !found {
-			statusPtr, err := kl.containerRuntime.GetPodStatus(pod)
+			statusPtr, err := kl.containerRuntime.GetAPIPodStatus(pod)
 			if err != nil {
 				return err
 			}
@@ -3067,6 +3072,8 @@ func getPodReadyCondition(spec *api.PodSpec, containerStatuses []api.ContainerSt
 
 // By passing the pod directly, this method avoids pod lookup, which requires
 // grabbing a lock.
+// TODO (random-liu) api.PodStatus is named as podStatus, this maybe confusing, this may happen in other functions
+// after refactoring, modify them later.
 func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 
 	start := time.Now()
@@ -3088,7 +3095,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	}
 
 	spec := &pod.Spec
-	podStatus, err := kl.containerRuntime.GetPodStatus(pod)
+	podStatus, err := kl.containerRuntime.GetAPIPodStatus(pod)
 
 	if err != nil {
 		// Error handling
