@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: gcefirewallserver
+  name: gce-firewall-service
+  namespace: default
+spec:
+  ports:
+  - port: 8080
+  type: ClusterIP

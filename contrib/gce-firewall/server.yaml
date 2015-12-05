@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: gcefirewallserverpod
+spec:
+  replicas: 1
+  selector:
+    name: gcefirewallserver
+  template:
+    metadata:
+      labels:
+        name: gcefirewallserver
+    spec:
+      containers:
+      - name: gcefirewallservercontainer
+        image: artfulcoder/gce-firewall:1.1
+        imagePullPolicy: Always
+        command: [ "/server", "-port", "8080" ]
+        volumeMounts:
+        - name: etcssl
+          mountPath: /etc/ssl
+      volumes:
+      - name: etcssl
+        hostPath:
+          path: /etc/ssl
