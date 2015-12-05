@@ -48,17 +48,25 @@ func TestBearerAuthRoundTripper(t *testing.T) {
 }
 
 func TestBasicAuthRoundTripper(t *testing.T) {
-	rt := &testRoundTripper{}
-	req := &http.Request{}
-	newBasicAuthRoundTripper("user", "pass", rt).RoundTrip(req)
-	if rt.Request == nil {
-		t.Fatalf("unexpected nil request: %v", rt)
-	}
-	if rt.Request == req {
-		t.Fatalf("round tripper should have copied request object: %#v", rt.Request)
-	}
-	if user, pass, found := rt.Request.BasicAuth(); !found || user != "user" || pass != "pass" {
-		t.Errorf("unexpected authorization header: %#v", rt.Request)
+	for n, tc := range map[string]struct {
+		user string
+		pass string
+	}{
+		"basic":   {user: "user", pass: "pass"},
+		"no pass": {user: "user"},
+	} {
+		rt := &testRoundTripper{}
+		req := &http.Request{}
+		newBasicAuthRoundTripper(tc.user, tc.pass, rt).RoundTrip(req)
+		if rt.Request == nil {
+			t.Fatalf("%s: unexpected nil request: %v", n, rt)
+		}
+		if rt.Request == req {
+			t.Fatalf("%s: round tripper should have copied request object: %#v", n, rt.Request)
+		}
+		if user, pass, found := rt.Request.BasicAuth(); !found || user != tc.user || pass != tc.pass {
+			t.Errorf("%s: unexpected authorization header: %#v", n, rt.Request)
+		}
 	}
 }
 
