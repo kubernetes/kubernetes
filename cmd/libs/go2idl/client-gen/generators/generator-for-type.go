@@ -54,9 +54,9 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"type":             t,
 		"package":          pkg,
 		"Package":          namer.IC(pkg),
-		"watchInterface":   c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
-		"apiDeleteOptions": c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
-		"unvListOptions":   c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/api/unversioned", Name: "ListOptions"}),
+		"watchInterface":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
+		"apiDeleteOptions": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
+		"unvListOptions":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/unversioned", Name: "ListOptions"}),
 	}
 	sw.Do(namespacerTemplate, m)
 	sw.Do(interfaceTemplate, m)
