@@ -20,7 +20,7 @@ refer to the docs that go with that version.
 
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/proposals/config_data.md).
+[here](http://releases.k8s.io/release-1.1/docs/proposals/configmap.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -35,7 +35,7 @@ Documentation for other releases can be found at
 
 ## Abstract
 
-This proposal proposes a new API resource, `ConfigData`, that stores data used for the configuration
+This proposal proposes a new API resource, `ConfigMap`, that stores data used for the configuration
 of applications deployed on `Kubernetes`.
 
 The main focus points of this proposal are:
@@ -50,9 +50,9 @@ A `Secret`-like API resource is needed to store configuration data that pods can
 
 Goals of this design:
 
-1.  Describe a `ConfigData` API resource
-2.  Describe the semantics of consuming `ConfigData` as environment variables
-3.  Describe the semantics of consuming `ConfigData` as files in a volume
+1.  Describe a `ConfigMap` API resource
+2.  Describe the semantics of consuming `ConfigMap` as environment variables
+3.  Describe the semantics of consuming `ConfigMap` as files in a volume
 
 ## Use Cases
 
@@ -61,48 +61,48 @@ Goals of this design:
 3. As a user, I want my view of configuration data in files to be eventually consistent with changes
    to the data
 
-### Consuming `ConfigData` as Environment Variables
+### Consuming `ConfigMap` as Environment Variables
 
-Many programs read their configuration from environment variables.  `ConfigData` should be possible
-to consume in environment variables.  The rough series of events for consuming `ConfigData` this way
+Many programs read their configuration from environment variables.  `ConfigMap` should be possible
+to consume in environment variables.  The rough series of events for consuming `ConfigMap` this way
 is:
 
-1. A `ConfigData` object is created
+1. A `ConfigMap` object is created
 2. A pod that consumes the configuration data via environment variables is created
 3. The pod is scheduled onto a node
-4. The kubelet retrieves the `ConfigData` resource(s) referenced by the pod and starts the container
+4. The kubelet retrieves the `ConfigMap` resource(s) referenced by the pod and starts the container
    processes with the appropriate data in environment variables
 
-### Consuming `ConfigData` in Volumes
+### Consuming `ConfigMap` in Volumes
 
-Many programs read their configuration from configuration files.  `ConfigData` should be possible
-to consume in a volume.  The rough series of events for consuming `ConfigData` this way
+Many programs read their configuration from configuration files.  `ConfigMap` should be possible
+to consume in a volume.  The rough series of events for consuming `ConfigMap` this way
 is:
 
-1. A `ConfigData` object is created
-2. A new pod using the `ConfigData` via the volume plugin is created
+1. A `ConfigMap` object is created
+2. A new pod using the `ConfigMap` via the volume plugin is created
 3. The pod is scheduled onto a node
 4. The Kubelet creates an instance of the volume plugin and calls its `Setup()` method
-5. The volume plugin retrieves the `ConfigData` resource(s) referenced by the pod and projects
+5. The volume plugin retrieves the `ConfigMap` resource(s) referenced by the pod and projects
    the appropriate data into the volume
 
-### Consuming `ConfigData`  Updates
+### Consuming `ConfigMap`  Updates
 
 Any long-running system has configuration that is mutated over time.  Changes made to configuration
 data must be made visible to pods consuming data in volumes so that they can respond to those
 changes.
 
-The `resourceVersion` of the `ConfigData` object will be updated by the API server every time the
+The `resourceVersion` of the `ConfigMap` object will be updated by the API server every time the
 object is modified.  After an update, modifications will be made visible to the consumer container:
 
-1. A `ConfigData` object is created
-2. A new pod using the `ConfigData` via the volume plugin is created
+1. A `ConfigMap` object is created
+2. A new pod using the `ConfigMap` via the volume plugin is created
 3. The pod is scheduled onto a node
 4. During the sync loop, the Kubelet creates an instance of the volume plugin and calls its
    `Setup()` method
-5. The volume plugin retrieves the `ConfigData` resource(s) referenced by the pod and projects
+5. The volume plugin retrieves the `ConfigMap` resource(s) referenced by the pod and projects
    the appropriate data into the volume
-6. The `ConfigData` referenced by the pod is updated
+6. The `ConfigMap` referenced by the pod is updated
 7. During the next iteration of the `syncLoop`, the Kubelet creates an instance of the volume plugin
    and calls its `Setup()` method
 8. The volume plugin projects the updated data into the volume atomically
@@ -122,13 +122,13 @@ consumed in environment variables will not be updated.
 
 ### API Resource
 
-The `ConfigData` resource will be added to the `extensions` API Group:
+The `ConfigMap` resource will be added to the `extensions` API Group:
 
 ```go
 package api
 
-// ConfigData holds configuration data for pods to consume.
-type ConfigData struct {
+// ConfigMap holds configuration data for pods to consume.
+type ConfigMap struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
@@ -137,19 +137,19 @@ type ConfigData struct {
 	Data map[string]string `json:"data,omitempty"`
 }
 
-type ConfigDataList struct {
+type ConfigMapList struct {
 	TypeMeta `json:",inline"`
 	ListMeta `json:"metadata,omitempty"`
 
-	Items []ConfigData `json:"items"`
+	Items []ConfigMap `json:"items"`
 }
 ```
 
-A `Registry` implementation for `ConfigData` will be added to `pkg/registry/configdata`.
+A `Registry` implementation for `ConfigMap` will be added to `pkg/registry/configmap`.
 
 ### Environment Variables
 
-The `EnvVarSource` will be extended with a new selector for config data:
+The `EnvVarSource` will be extended with a new selector for `ConfigMap`:
 
 ```go
 package api
@@ -158,22 +158,22 @@ package api
 type EnvVarSource struct {
   // other fields omitted
 
-  // Specifies a ConfigData key
-  ConfigData *ConfigDataSelector `json:"configData,omitempty"`
+  // Specifies a ConfigMap key
+  ConfigMap *ConfigMapSelector `json:"configMap,omitempty"`
 }
 
-// ConfigDataSelector selects a key of a ConfigData.
-type ConfigDataSelector struct {
-  // The name of the ConfigData to select a key from.
-  ConfigDataName string `json:"configDataName"`
-  // The key of the ConfigData to select.
+// ConfigMapSelector selects a key of a ConfigMap.
+type ConfigMapSelector struct {
+  // The name of the ConfigMap to select a key from.
+  ConfigMapName string `json:"configMapName"`
+  // The key of the ConfigMap to select.
   Key string `json:"key"`
 }
 ```
 
 ### Volume Source
 
-A new `ConfigDataVolumeSource` type of volume source containing the `ConfigData` object will be
+A new `ConfigMapVolumeSource` type of volume source containing the `ConfigMap` object will be
 added to the `VolumeSource` struct in the API:
 
 ```go
@@ -181,18 +181,18 @@ package api
 
 type VolumeSource struct {
   // other fields omitted
-  ConfigData *ConfigDataVolumeSource `json:"configData,omitempty"`
+  ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty"`
 }
 
-// ConfigDataVolumeSource represents a volume that holds configuration data
-type ConfigDataVolumeSource struct {
-  // A list of config data keys to project into the volume in files
-  Files []ConfigDataVolumeFile `json:"files"`
+// ConfigMapVolumeSource represents a volume that holds configuration data
+type ConfigMapVolumeSource struct {
+  // A list of configuration data keys to project into the volume in files
+  Files []ConfigMapVolumeFile `json:"files"`
 }
 
-// ConfigDataVolumeFile represents a single file containing config data
-type ConfigDataVolumeFile struct {
-  ConfigDataSelector `json:",inline"`
+// ConfigMapVolumeFile represents a single file containing configuration data
+type ConfigMapVolumeFile struct {
+  ConfigMapSelector `json:",inline"`
 
   // The relative path name of the file to be created.
   // Must not be absolute or contain the '..' path. Must be utf-8 encoded.
@@ -202,15 +202,15 @@ type ConfigDataVolumeFile struct {
 ```
 
 **Note:** The update logic used in the downward API volume plug-in will be extracted and re-used in
-the volume plug-in for `ConfigData`.
+the volume plug-in for `ConfigMap`.
 
 ## Examples
 
-#### Consuming `ConfigData` as Environment Variables
+#### Consuming `ConfigMap` as Environment Variables
 
 ```yaml
 apiVersion: extensions/v1beta1
-kind: ConfigData
+kind: ConfigMap
 metadata:
   name: etcd-env-config
 data:
@@ -222,7 +222,7 @@ data:
   etcdctl_peers: http://etcd:2379
 ```
 
-This pod consumes the `ConfigData` as environment variables:
+This pod consumes the `ConfigMap` as environment variables:
 
 ```yaml
 apiVersion: v1
@@ -241,38 +241,38 @@ spec:
     env:
     - name: ETCD_NUM_MEMBERS
       valueFrom:
-        configData:
-          configDataName: etcd-env-config
+        configMap:
+          configMapName: etcd-env-config
           key: number_of_members
     - name: ETCD_INITIAL_CLUSTER_STATE
       valueFrom:
-        configData:
-          configDataName: etcd-env-config
+        configMap:
+          configMapName: etcd-env-config
           key: initial_cluster_state
     - name: ETCD_DISCOVERY_TOKEN
       valueFrom:
-        configData:
-          configDataName: etcd-env-config
+        configMap:
+          configMapName: etcd-env-config
           key: discovery_token
     - name: ETCD_DISCOVERY_URL
       valueFrom:
-        configData:
-          configDataName: etcd-env-config
+        configMap:
+          configMapName: etcd-env-config
           key: discovery_url
     - name: ETCDCTL_PEERS
       valueFrom:
-        configData:
-          configDataName: etcd-env-config
+        configMap:
+          configMapName: etcd-env-config
           key: etcdctl_peers
 ```
 
-### Consuming `ConfigData` as Volumes
+### Consuming `ConfigMap` as Volumes
 
 `redis-volume-config` is intended to be used as a volume containing a config file:
 
 ```yaml
 apiVersion: extensions/v1beta1
-kind: ConfigData
+kind: ConfigMap
 metadata:
   name: redis-volume-config
 data:
@@ -290,18 +290,18 @@ spec:
   containers:
     - name: redis
       image: kubernetes/redis
-      command: "redis-server /mnt/config-data/etc/redis.conf"
+      command: "redis-server /mnt/config-map/etc/redis.conf"
       ports:
         - containerPort: 6379
       volumeMounts:
-        - name: config-data-volume
-          mountPath: /mnt/config-data
+        - name: config-map-volume
+          mountPath: /mnt/config-map
   volumes:
-  - name: config-data-volume
-    configData:
+  - name: config-map-volume
+    configMap:
       files:
         - path: "etc/redis.conf"
-          configDataName: redis-volume-config
+          configMapName: redis-volume-config
           key: redis.conf
 ```
 
@@ -311,5 +311,5 @@ In the future, we may add the ability to specify an init-container that can watc
 contents for updates and respond to changes when they occur.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/config_data.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/configmap.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
