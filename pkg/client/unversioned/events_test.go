@@ -56,6 +56,7 @@ func TestEventSearch(t *testing.T) {
 			},
 		},
 	)
+	defer c.Close()
 	c.Validate(t, eventList, err)
 }
 
@@ -89,6 +90,7 @@ func TestEventCreate(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).Events(api.NamespaceDefault).Create(event)
+	defer c.Close()
 
 	if err != nil {
 		t.Fatalf("%v should be nil.", err)
@@ -129,6 +131,7 @@ func TestEventGet(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).Events("other").Get("1")
+	defer c.Close()
 
 	if err != nil {
 		t.Fatalf("%v should be nil.", err)
@@ -170,6 +173,7 @@ func TestEventList(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: eventList},
 	}
 	response, err := c.Setup(t).Events(ns).List(api.ListOptions{})
+	defer c.Close()
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)
@@ -196,5 +200,6 @@ func TestEventDelete(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Events(ns).Delete("foo")
+	defer c.Close()
 	c.Validate(t, nil, err)
 }

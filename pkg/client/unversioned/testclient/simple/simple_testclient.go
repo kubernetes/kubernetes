@@ -91,6 +91,12 @@ func (c *Client) Setup(t *testing.T) *Client {
 	return c
 }
 
+func (c *Client) Close() {
+	if c.server != nil {
+		c.server.Close()
+	}
+}
+
 func (c *Client) ServerURL() string {
 	return c.server.URL
 }
@@ -112,8 +118,6 @@ func (c *Client) ValidateRaw(t *testing.T, received []byte, err error) {
 }
 
 func (c *Client) ValidateCommon(t *testing.T, err error) {
-	defer c.server.Close()
-
 	if c.Error {
 		if err == nil {
 			t.Errorf("error expected for %#v, got none", c.Request)
