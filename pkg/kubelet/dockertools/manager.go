@@ -74,6 +74,10 @@ const (
 	minimumGracePeriodInSeconds = 2
 
 	DockerNetnsFmt = "/proc/%v/ns/net"
+
+	containerNeedToStart  = 1
+	containerNeedToKeep   = 2
+	containerChangeUnknow = 3
 )
 
 // DockerManager implements the Runtime interface.
@@ -1679,89 +1683,33 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 		metrics.ContainerManagerLatency.WithLabelValues("computePodContainerChanges").Observe(metrics.SinceInMicroseconds(start))
 	}()
 
-	podFullName := kubecontainer.GetPodFullName(pod)
-	uid := pod.UID
-	glog.V(4).Infof("Syncing Pod %+v, podFullName: %q, uid: %q", pod, podFullName, uid)
-
 	containersToStart := make(map[int]string)
 	containersToKeep := make(map[kubetypes.DockerID]int)
 
-	var err error
-	var podInfraContainerID kubetypes.DockerID
-	var changed bool
-	podInfraContainer := runningPod.FindContainerByName(PodInfraContainerName)
-	if podInfraContainer != nil {
-		glog.V(4).Infof("Found pod infra container for %q", podFullName)
-		changed, err = dm.podInfraContainerChanged(pod, podInfraContainer)
-		if err != nil {
-			return PodContainerChangesSpec{}, err
-		}
+	// step1: computer infrapod need created or need changed
+	createPodInfraContainer, changed, podInfraContainerID, err := dm.checkPodInfraContainerCreate(pod, runningPod)
+	if err != nil {
+		return PodContainerChangesSpec{}, err
 	}
-
-	createPodInfraContainer := true
-	if podInfraContainer == nil {
-		glog.V(2).Infof("Need to restart pod infra container for %q because it is not found", podFullName)
-	} else if changed {
-		glog.V(2).Infof("Need to restart pod infra container for %q because it is changed", podFullName)
-	} else {
-		glog.V(4).Infof("Pod infra container looks good, keep it %q", podFullName)
-		createPodInfraContainer = false
-		podInfraContainerID = kubetypes.DockerID(podInfraContainer.ID.ID)
+	if !createPodInfraContainer {
 		containersToKeep[podInfraContainerID] = -1
 	}
 
+	// step2: check container in pod need create or keep
 	for index, container := range pod.Spec.Containers {
-		expectedHash := kubecontainer.HashContainer(&container)
-
-		c := runningPod.FindContainerByName(container.Name)
-		if c == nil {
-			if kubecontainer.ShouldContainerBeRestarted(&container, pod, &podStatus) {
-				// If we are here it means that the container is dead and should be restarted, or never existed and should
-				// be created. We may be inserting this ID again if the container has changed and it has
-				// RestartPolicy::Always, but it's not a big deal.
-				message := fmt.Sprintf("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
-				glog.V(3).Info(message)
-				containersToStart[index] = message
-			}
+		containerChangeType, message, containerID, err := dm.computeOneContainerChanges(pod, runningPod, &container, podStatus, createPodInfraContainer)
+		if err != nil {
+			glog.Errorf("computeOneContainerChanges return fail, err: %v", err)
 			continue
 		}
-
-		containerID := kubetypes.DockerID(c.ID.ID)
-		hash := c.Hash
-		glog.V(3).Infof("pod %q container %q exists as %v", podFullName, container.Name, containerID)
-
-		if createPodInfraContainer {
-			// createPodInfraContainer == true and Container exists
-			// If we're creating infra container everything will be killed anyway
-			// If RestartPolicy is Always or OnFailure we restart containers that were running before we
-			// killed them when restarting Infra Container.
-			if pod.Spec.RestartPolicy != api.RestartPolicyNever {
-				message := fmt.Sprintf("Infra Container is being recreated. %q will be restarted.", container.Name)
-				glog.V(1).Info(message)
-				containersToStart[index] = message
-			}
-			continue
-		}
-
-		// At this point, the container is running and pod infra container is good.
-		// We will look for changes and check healthiness for the container.
-		containerChanged := hash != 0 && hash != expectedHash
-		if containerChanged {
-			message := fmt.Sprintf("pod %q container %q hash changed (%d vs %d), it will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
+		switch containerChangeType {
+		case containerNeedToStart:
 			glog.Info(message)
 			containersToStart[index] = message
-			continue
-		}
-
-		liveness, found := dm.livenessManager.Get(c.ID)
-		if !found || liveness == proberesults.Success {
+		case containerNeedToKeep:
 			containersToKeep[containerID] = index
-			continue
-		}
-		if pod.Spec.RestartPolicy != api.RestartPolicyNever {
-			message := fmt.Sprintf("pod %q container %q is unhealthy, it will be killed and re-created.", podFullName, container.Name)
-			glog.Info(message)
-			containersToStart[index] = message
+		default:
+			glog.Errorf("compute one container change return unvaliable type: %d", containerChangeType)
 		}
 	}
 
@@ -1769,7 +1717,6 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 	// - createPodInfraContainer is true and containersToKeep is empty.
 	// (In fact, when createPodInfraContainer is false, containersToKeep will not be touched).
 	// - createPodInfraContainer is false and containersToKeep contains at least ID of Infra Container
-
 	// If Infra container is the last running one, we don't want to keep it.
 	if !createPodInfraContainer && len(containersToStart) == 0 && len(containersToKeep) == 1 {
 		containersToKeep = make(map[kubetypes.DockerID]int)
@@ -1782,6 +1729,77 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 		ContainersToStart:   containersToStart,
 		ContainersToKeep:    containersToKeep,
 	}, nil
+}
+
+func (dm *DockerManager) checkPodInfraContainerCreate(pod *api.Pod, runningPod kubecontainer.Pod) (bool, bool, kubetypes.DockerID, error) {
+	var podInfraContainerID kubetypes.DockerID
+	podFullName := kubecontainer.GetPodFullName(pod)
+	glog.V(4).Infof("Syncing Pod checkPodInfraContainer %+v, podFullName: %q, uid: %q", pod, podFullName, pod.UID)
+
+	podInfraContainer := runningPod.FindContainerByName(PodInfraContainerName)
+	if podInfraContainer == nil {
+		return true, false, podInfraContainerID, nil
+	} else {
+		glog.V(4).Infof("Found pod infra container for %q", podFullName)
+		podInfraContainerID = kubetypes.DockerID(podInfraContainer.ID.ID)
+		changed, err := dm.podInfraContainerChanged(pod, podInfraContainer)
+		if err != nil {
+			glog.Errorf("check podInfraContainerChanged fail for %q , err: %v", podFullName, err)
+			return false, false, podInfraContainerID, err
+		}
+		if changed {
+			glog.V(2).Infof("Need to restart pod infra container for %q because it is changed", podFullName)
+			return true, true, podInfraContainerID, nil
+		}
+	}
+	glog.V(4).Infof("Pod infra container looks good, keep it %q", podFullName)
+	return false, false, podInfraContainerID, nil
+}
+
+func (dm *DockerManager) computeOneContainerChanges(pod *api.Pod, runningPod kubecontainer.Pod, container *api.Container,
+	podStatus api.PodStatus, createPodInfraContainer bool) (int, string, kubetypes.DockerID, error) {
+	var message string
+	var containerID kubetypes.DockerID
+	expectedHash := kubecontainer.HashContainer(container)
+	podFullName := kubecontainer.GetPodFullName(pod)
+	c := runningPod.FindContainerByName(container.Name)
+	if c == nil {
+		if kubecontainer.ShouldContainerBeRestarted(container, pod, &podStatus) {
+			// If we are here it means that the container is dead and should be restarted, or never existed and should
+			// be created. We may be inserting this ID again if the container has changed and it has
+			// RestartPolicy::Always, but it's not a big deal.
+			message = fmt.Sprintf("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
+			return containerNeedToStart, message, containerID, nil
+		}
+		return containerChangeUnknow, message, containerID, fmt.Errorf("cannot find cantainer, name: %s", container.Name)
+	}
+
+	containerID = kubetypes.DockerID(c.ID.ID)
+	glog.V(3).Infof("pod %q container %q exists as %v", podFullName, container.Name, containerID)
+
+	// createPodInfraContainer == true and Container exists
+	// If we're creating infra container everything will be killed anyway
+	// If RestartPolicy is Always or OnFailure we restart containers that were running before we
+	// killed them when restarting Infra Container.
+	if createPodInfraContainer && pod.Spec.RestartPolicy != api.RestartPolicyNever {
+		message = fmt.Sprintf("Infra Container is being recreated. %q will be restarted.", container.Name)
+		return containerNeedToStart, message, containerID, nil
+	}
+
+	// At this point, the container is running and pod infra container is good.
+	// We will look for changes and check healthiness for the container.
+	containerChanged := c.Hash != 0 && c.Hash != expectedHash
+	if containerChanged {
+		message = fmt.Sprintf("pod %q container %q hash changed (%d vs %d), it will be killed and re-created.", podFullName, container.Name, c.Hash, expectedHash)
+		return containerNeedToStart, message, containerID, nil
+	}
+
+	liveness, found := dm.livenessManager.Get(c.ID)
+	if found && liveness != proberesults.Success && pod.Spec.RestartPolicy != api.RestartPolicyNever {
+		message = fmt.Sprintf("pod %q container %q is unhealthy, it will be killed and re-created.", podFullName, container.Name)
+		return containerNeedToStart, message, containerID, nil
+	}
+	return containerNeedToKeep, message, containerID, nil
 }
 
 // updateReasonCache updates the failure reason based on the latest error.
