@@ -984,6 +984,7 @@ func TestList(t *testing.T) {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
 		}
+		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, testCase.url, http.StatusOK, resp)
 			body, err := ioutil.ReadAll(resp.Body)
