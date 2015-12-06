@@ -199,7 +199,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						},
 						Spec: api.PodSpec{
 							NodeName:        hostname,
-							Containers:      []api.Container{{Name: "2", Image: "bar", ImagePullPolicy: ""}},
+							Containers:      []api.Container{{Name: "2", Image: "bar:bartag", ImagePullPolicy: ""}},
 							SecurityContext: &api.PodSecurityContext{},
 						},
 					},
@@ -247,7 +247,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 
 						Containers: []api.Container{{
 							Name:  "2",
-							Image: "bar",
+							Image: "bar:bartag",
 							TerminationMessagePath: "/dev/termination-log",
 							ImagePullPolicy:        "IfNotPresent",
 						}},
