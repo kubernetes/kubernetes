@@ -102,8 +102,8 @@ func init() {
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
 	groupMeta.InterfacesFor = interfacesFor
 
-	// this codec allows restmapper to decode objects in the known formats into the internal form.
-	v1Codec = runtime.NoopEncoder{latest.Codecs.UniversalDecoder(unversioned.GroupVersion{Group: groupMeta.Group, Version: runtime.APIVersionInternal})}
+	// TODO: restmapper should be capable of negotiation
+	v1Codec = latest.Codecs.LegacyCodec(registeredGroupVersions[0])
 }
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version

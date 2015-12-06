@@ -42,7 +42,7 @@ func TestDecodeUnstructured(t *testing.T) {
 	if pod, ok := pl.Items[1].(*runtime.Unstructured); !ok || pod.Object["kind"] != "Pod" || pod.Object["metadata"].(map[string]interface{})["name"] != "test" {
 		t.Errorf("object not converted: %#v", pl.Items[1])
 	}
-	if _, ok := pl.Items[2].(*runtime.Unknown); !ok {
-		t.Errorf("object should not have been converted: %#v", pl.Items[2])
+	if pod, ok := pl.Items[2].(*runtime.Unstructured); !ok || pod.Object["kind"] != "Pod" || pod.Object["metadata"].(map[string]interface{})["name"] != "test" {
+		t.Errorf("object not converted: %#v", pl.Items[2])
 	}
 }

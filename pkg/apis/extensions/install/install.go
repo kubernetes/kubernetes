@@ -78,6 +78,9 @@ func init() {
 	groupMeta.RESTMapper = api.NewDefaultRESTMapper(worstToBestGroupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
 	groupMeta.InterfacesFor = interfacesFor
+
+	// TODO: restmapper should be capable of negotiation
+	v1beta1Codec = latest.Codecs.LegacyCodec(registeredGroupVersions[0])
 }
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version

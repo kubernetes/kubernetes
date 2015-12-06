@@ -19,12 +19,13 @@ package runtime_test
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -62,25 +63,26 @@ func (*EmbeddedTest) IsAnAPIObject()         {}
 func (*EmbeddedTestExternal) IsAnAPIObject() {}
 
 func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
 	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "v1test"}
 	externalGVK := externalGV.WithKind("ObjectTest")
 
 	s := runtime.NewScheme()
-	s.AddInternalGroupVersion(internalGV)
 	s.AddKnownTypes(internalGV, &ObjectTest{})
 	s.AddKnownTypeWithName(externalGVK, &ObjectTestExternal{})
 
-	obj, err := s.Decode([]byte(`{"kind":"` + externalGVK.Kind + `","apiVersion":"` + externalGV.String() + `","items":[{}]}`))
+	codec := serializer.NewCodecFactory(s).LegacyCodec(externalGV)
+
+	obj, _, err := codec.Decode([]byte(`{"kind":"`+externalGVK.Kind+`","apiVersion":"`+externalGV.String()+`","items":[{}]}`), nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	test := obj.(*ObjectTest)
-	if unk, ok := test.Items[0].(*runtime.Unknown); !ok || unk.Kind != "" || unk.APIVersion != "" || string(unk.RawJSON) != "{}" {
+	if unk, ok := test.Items[0].(*runtime.Unknown); !ok || unk.Kind != "" || unk.APIVersion != externalGV.String() || string(unk.RawJSON) != "{}" {
 		t.Fatalf("unexpected object: %#v", test.Items[0])
 	}
 
-	obj, err = s.Decode([]byte(`{"kind":"` + externalGVK.Kind + `","apiVersion":"` + externalGV.String() + `","items":[{"kind":"Other","apiVersion":"v1"}]}`))
+	obj, _, err = codec.Decode([]byte(`{"kind":"`+externalGVK.Kind+`","apiVersion":"`+externalGV.String()+`","items":[{"kind":"Other","apiVersion":"v1"}]}`), nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -91,15 +93,16 @@ func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 }
 
 func TestArrayOfRuntimeObject(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
 	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "v1test"}
 
 	s := runtime.NewScheme()
-	s.AddInternalGroupVersion(internalGV)
 	s.AddKnownTypes(internalGV, &EmbeddedTest{})
 	s.AddKnownTypeWithName(externalGV.WithKind("EmbeddedTest"), &EmbeddedTestExternal{})
 	s.AddKnownTypes(internalGV, &ObjectTest{})
 	s.AddKnownTypeWithName(externalGV.WithKind("ObjectTest"), &ObjectTestExternal{})
+
+	codec := serializer.NewCodecFactory(s).LegacyCodec(externalGV)
 
 	internal := &ObjectTest{
 		Items: []runtime.Object{
@@ -114,7 +117,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 			},
 		},
 	}
-	wire, err := s.EncodeToVersion(internal, externalGV.String())
+	wire, err := runtime.Encode(codec, internal)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -126,7 +129,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 	}
 	t.Logf("exact wire is: %s", string(obj.Items[0].RawJSON))
 
-	decoded, err := s.Decode(wire)
+	decoded, _, err := codec.Decode(wire, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -134,7 +137,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if errs := runtime.DecodeList(list, s); len(errs) > 0 {
+	if errs := runtime.DecodeList(list, codec); len(errs) > 0 {
 		t.Fatalf("unexpected error: %v", errs)
 	}
 
@@ -142,27 +145,29 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if errs := runtime.DecodeList(list2, s); len(errs) > 0 {
+	if errs := runtime.DecodeList(list2, codec); len(errs) > 0 {
 		t.Fatalf("unexpected error: %v", errs)
 	}
 	if err := meta.SetList(list[3], list2); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	internal.Items[2].(*runtime.Unknown).Kind = "OtherTest"
-	internal.Items[2].(*runtime.Unknown).APIVersion = "unknown"
+	internal.Items[0].(*EmbeddedTest).TypeMeta = runtime.TypeMeta{Kind: "EmbeddedTest", APIVersion: "test.group/v1test"}
+	internal.Items[1].(*EmbeddedTest).TypeMeta = runtime.TypeMeta{Kind: "EmbeddedTest", APIVersion: "test.group/v1test"}
+	internal.Items[2].(*runtime.Unknown).TypeMeta = runtime.TypeMeta{Kind: "OtherTest", APIVersion: "unknown"}
+	internal.Items[3].(*ObjectTest).TypeMeta = runtime.TypeMeta{Kind: "ObjectTest", APIVersion: "test.group/v1test"}
+	internal.Items[3].(*ObjectTest).Items[0].(*EmbeddedTest).TypeMeta = runtime.TypeMeta{Kind: "EmbeddedTest", APIVersion: "test.group/v1test"}
 	if e, a := internal.Items, list; !reflect.DeepEqual(e, a) {
-		t.Errorf("mismatched decoded: %s", util.ObjectDiff(e, a))
+		t.Errorf("mismatched decoded: %s", util.ObjectGoPrintSideBySide(e, a))
 	}
 }
 
 func TestEmbeddedObject(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
 	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "v1test"}
 	embeddedTestExternalGVK := externalGV.WithKind("EmbeddedTest")
 
 	s := runtime.NewScheme()
-	s.AddInternalGroupVersion(internalGV)
 	s.AddKnownTypes(internalGV, &EmbeddedTest{})
 	s.AddKnownTypeWithName(embeddedTestExternalGVK, &EmbeddedTestExternal{})
 
@@ -173,17 +178,22 @@ func TestEmbeddedObject(t *testing.T) {
 		},
 	}
 
-	wire, err := s.EncodeToVersion(outer, externalGV.String())
+	codec := serializer.NewCodecFactory(s).LegacyCodec(externalGV)
+
+	wire, err := runtime.Encode(codec, outer)
 	if err != nil {
 		t.Fatalf("Unexpected encode error '%v'", err)
 	}
 
 	t.Logf("Wire format is:\n%v\n", string(wire))
 
-	decoded, err := s.Decode(wire)
+	decoded, _, err := codec.Decode(wire, nil, nil)
 	if err != nil {
 		t.Fatalf("Unexpected decode error %v", err)
 	}
+
+	outer.TypeMeta = runtime.TypeMeta{Kind: "EmbeddedTest", APIVersion: externalGV.String()}
+	outer.Object.(*EmbeddedTest).TypeMeta = outer.TypeMeta
 
 	if e, a := outer, decoded; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected: %#v but got %#v", e, a)
@@ -209,46 +219,45 @@ func TestEmbeddedObject(t *testing.T) {
 	// the external representation
 	var decodedViaJSON EmbeddedTest
 	err = json.Unmarshal(wire, &decodedViaJSON)
-	if err != nil {
+	if err == nil || !strings.Contains(err.Error(), "unmarshal object into Go value of type runtime.Object") {
 		t.Fatalf("Unexpected decode error %v", err)
 	}
-	if a := decodedViaJSON; a.Object.Object != nil || a.EmptyObject.Object != nil {
+	if a := decodedViaJSON; a.Object != nil || a.EmptyObject != nil {
 		t.Errorf("Expected embedded objects to be nil: %#v", a)
 	}
 }
 
 // TestDeepCopyOfEmbeddedObject checks to make sure that EmbeddedObject's can be passed through DeepCopy with fidelity
 func TestDeepCopyOfEmbeddedObject(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
 	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "v1test"}
 	embeddedTestExternalGVK := externalGV.WithKind("EmbeddedTest")
 
 	s := runtime.NewScheme()
-	s.AddInternalGroupVersion(internalGV)
 	s.AddKnownTypes(internalGV, &EmbeddedTest{})
 	s.AddKnownTypeWithName(embeddedTestExternalGVK, &EmbeddedTestExternal{})
 
 	original := &EmbeddedTest{
 		ID: "outer",
-		Object: runtime.EmbeddedObject{
-			Object: &EmbeddedTest{
-				ID: "inner",
-			},
+		Object: &EmbeddedTest{
+			ID: "inner",
 		},
 	}
 
-	originalData, err := s.EncodeToVersion(original, externalGV.String())
+	codec := serializer.NewCodecFactory(s).LegacyCodec(externalGV)
+
+	originalData, err := runtime.Encode(codec, original)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	t.Logf("originalRole = %v\n", string(originalData))
 
-	copyOfOriginal, err := api.Scheme.DeepCopy(original)
+	copyOfOriginal, err := s.DeepCopy(original)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	copiedData, err := s.EncodeToVersion(copyOfOriginal.(runtime.Object), externalGV.String())
+	copiedData, err := runtime.Encode(codec, copyOfOriginal.(runtime.Object))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

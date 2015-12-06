@@ -67,20 +67,26 @@ func NewScheme() *Scheme {
 	return s
 }
 
-// AddInternalGroupVersion registers an internal GroupVersion with the scheme.  This can later be
-// used to lookup the internal GroupVersion for a given Group.
-func (s *Scheme) AddInternalGroupVersion(internalGroupVersions ...unversioned.GroupVersion) {
-	s.raw.AddInternalGroupVersion(internalGroupVersions...)
+// AddKnownTypes registers the types of the arguments to the marshaller of the package api.
+func (s *Scheme) AddUnversionedTypes(gv unversioned.GroupVersion, types ...Object) {
+	interfaces := make([]interface{}, len(types))
+	for i := range types {
+		interfaces[i] = types[i]
+	}
+	s.raw.AddUnversionedTypes(gv, interfaces...)
 }
 
 // AddKnownTypes registers the types of the arguments to the marshaller of the package api.
-// Encode() refuses the object unless its type is registered with AddKnownTypes.
 func (s *Scheme) AddKnownTypes(gv unversioned.GroupVersion, types ...Object) {
 	interfaces := make([]interface{}, len(types))
 	for i := range types {
 		interfaces[i] = types[i]
 	}
 	s.raw.AddKnownTypes(gv, interfaces...)
+}
+
+func (s *Scheme) AddIgnoredConversionType(from, to interface{}) error {
+	return s.raw.AddIgnoredConversionType(from, to)
 }
 
 // AddKnownTypeWithName is like AddKnownTypes, but it lets you specify what this type should
@@ -198,14 +204,14 @@ func (s *Scheme) DeepCopy(src interface{}) (interface{}, error) {
 	return s.raw.DeepCopy(src)
 }
 
-// ObjectVersioner returns an interface that performs conversions with the additionl provided
+// ObjectVersioner returns an interface that performs conversions with the additional provided
 // functions.
 func (s *Scheme) WithConversions(fns *conversion.ConversionFuncs) ObjectConvertor {
 	if fns == nil {
 		return s
 	}
 	copied := *s
-	copied.raw = s.raw.WithConversions(fns)
+	copied.raw = s.raw.WithConversions(*fns)
 	return &copied
 }
 
@@ -235,6 +241,10 @@ func (s *Scheme) ConvertFieldLabel(version, kind, label, value string) (string, 
 // return an error if the conversion does not result in a valid Object being
 // returned. The serializer handles loading/serializing nested objects.
 func (s *Scheme) ConvertToVersion(in Object, outVersion string) (Object, error) {
+	switch in.(type) {
+	case *Unknown, *Unstructured:
+		return in, nil
+	}
 	unknown, err := s.raw.ConvertToVersion(in, outVersion)
 	if err != nil {
 		return nil, err

@@ -103,7 +103,6 @@ func (s *Serializer) Decode(data []byte, gvk *unversioned.GroupVersionKind, into
 	if err := codec.NewDecoderBytes(data, new(codec.JsonHandle)).Decode(obj); err != nil {
 		return nil, actual, err
 	}
-
 	return obj, actual, nil
 }
 

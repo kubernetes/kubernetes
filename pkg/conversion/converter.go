@@ -43,6 +43,9 @@ type Converter struct {
 	conversionFuncs          ConversionFuncs
 	generatedConversionFuncs ConversionFuncs
 
+	// Set of conversions that should be treated as a no-op
+	ignoredConversions map[typePair]struct{}
+
 	// This is a map from a source field type and name, to a list of destination
 	// field type and name.
 	structFieldDests map[typeNamePair][]typeNamePair
@@ -78,35 +81,29 @@ func NewConverter() *Converter {
 	c := &Converter{
 		conversionFuncs:          NewConversionFuncs(),
 		generatedConversionFuncs: NewConversionFuncs(),
-		defaultingFuncs:          map[reflect.Type]reflect.Value{},
-		defaultingInterfaces:     map[reflect.Type]interface{}{},
+		ignoredConversions:       make(map[typePair]struct{}),
+		defaultingFuncs:          make(map[reflect.Type]reflect.Value),
+		defaultingInterfaces:     make(map[reflect.Type]interface{}),
 		nameFunc:                 func(t reflect.Type) string { return t.Name() },
-		structFieldDests:         map[typeNamePair][]typeNamePair{},
-		structFieldSources:       map[typeNamePair][]typeNamePair{},
+		structFieldDests:         make(map[typeNamePair][]typeNamePair),
+		structFieldSources:       make(map[typeNamePair][]typeNamePair),
 
-		inputFieldMappingFuncs: map[reflect.Type]FieldMappingFunc{},
-		inputDefaultFlags:      map[reflect.Type]FieldMatchingFlags{},
+		inputFieldMappingFuncs: make(map[reflect.Type]FieldMappingFunc),
+		inputDefaultFlags:      make(map[reflect.Type]FieldMatchingFlags),
 	}
 	c.RegisterConversionFunc(byteSliceCopy)
 	return c
 }
 
-// WithConversions returns a Converter with all conversions defined on the
-// base converter and the passed conversion functions.
-func (c *Converter) WithConversions(fns *ConversionFuncs) *Converter {
-	merged := NewConversionFuncs()
-	for k, v := range c.conversionFuncs.fns {
-		merged.fns[k] = v
-	}
-	for k, v := range fns.fns {
-		merged.fns[k] = v
-	}
+// WithConversions returns a Converter that is a copy of c but with the additional
+// fns merged on top.
+func (c *Converter) WithConversions(fns ConversionFuncs) *Converter {
 	copied := *c
-	copied.conversionFuncs = merged
+	copied.conversionFuncs = c.conversionFuncs.Merge(fns)
 	return &copied
 }
 
-// Prevent recursing into every byte...
+// byteSliceCopy prevents recursing into every byte
 func byteSliceCopy(in *[]byte, out *[]byte, s Scope) error {
 	*out = make([]byte, len(*in))
 	copy(*out, *in)
@@ -153,7 +150,7 @@ type ConversionFuncs struct {
 	fns map[typePair]reflect.Value
 }
 
-func (c *ConversionFuncs) Register(fns ...interface{}) error {
+func (c ConversionFuncs) Register(fns ...interface{}) error {
 	for _, fn := range fns {
 		fv := reflect.ValueOf(fn)
 		ft := fv.Type()
@@ -163,6 +160,19 @@ func (c *ConversionFuncs) Register(fns ...interface{}) error {
 		c.fns[typePair{ft.In(0).Elem(), ft.In(1).Elem()}] = fv
 	}
 	return nil
+}
+
+// Merge returns a new ConversionFuncs that contains all conversions from
+// both other and c, with other conversions taking precedence.
+func (c ConversionFuncs) Merge(other ConversionFuncs) ConversionFuncs {
+	merged := NewConversionFuncs()
+	for k, v := range c.fns {
+		merged.fns[k] = v
+	}
+	for k, v := range other.fns {
+		merged.fns[k] = v
+	}
+	return merged
 }
 
 // Meta is supplied by Scheme, when it calls Convert.
@@ -338,6 +348,21 @@ func (c *Converter) RegisterConversionFunc(conversionFunc interface{}) error {
 // automatically generated.
 func (c *Converter) RegisterGeneratedConversionFunc(conversionFunc interface{}) error {
 	return c.generatedConversionFuncs.Register(conversionFunc)
+}
+
+// RegisterIgnoredConversion registers a "no-op" for conversion, where any requested
+// conversion between from and to is ignored.
+func (c *Converter) RegisterIgnoredConversion(from, to interface{}) error {
+	typeFrom := reflect.TypeOf(from)
+	typeTo := reflect.TypeOf(to)
+	if reflect.TypeOf(from).Kind() != reflect.Ptr {
+		return fmt.Errorf("expected pointer arg for 'from' param 0, got: %v", typeFrom)
+	}
+	if typeTo.Kind() != reflect.Ptr {
+		return fmt.Errorf("expected pointer arg for 'to' param 1, got: %v", typeTo)
+	}
+	c.ignoredConversions[typePair{typeFrom.Elem(), typeTo.Elem()}] = struct{}{}
+	return nil
 }
 
 func (c *Converter) HasConversionFunc(inType, outType reflect.Type) bool {
@@ -527,16 +552,26 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 		fv.Call(args)
 	}
 
+	pair := typePair{st, dt}
+
+	// ignore conversions of this type
+	if _, ok := c.ignoredConversions[pair]; ok {
+		if c.Debug != nil {
+			c.Debug.Logf("Ignoring conversion of '%v' to '%v'", st, dt)
+		}
+		return nil
+	}
+
 	// Convert sv to dv.
-	if fv, ok := c.conversionFuncs.fns[typePair{st, dt}]; ok {
+	if fv, ok := c.conversionFuncs.fns[pair]; ok {
 		if c.Debug != nil {
 			c.Debug.Logf("Calling custom conversion of '%v' to '%v'", st, dt)
 		}
 		return c.callCustom(sv, dv, fv, scope)
 	}
-	if fv, ok := c.generatedConversionFuncs.fns[typePair{st, dt}]; ok {
+	if fv, ok := c.generatedConversionFuncs.fns[pair]; ok {
 		if c.Debug != nil {
-			c.Debug.Logf("Calling custom conversion of '%v' to '%v'", st, dt)
+			c.Debug.Logf("Calling generated conversion of '%v' to '%v'", st, dt)
 		}
 		return c.callCustom(sv, dv, fv, scope)
 	}

@@ -55,6 +55,8 @@ func fuzzInternalObject(t *testing.T, forVersion string, item runtime.Object, se
 }
 
 func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
+	t.Logf("codec: %#v", codec)
+
 	printer := spew.ConfigState{DisableMethods: true}
 
 	name := reflect.TypeOf(item).Elem().Name()
@@ -89,7 +91,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
 	set := sets.NewString(except...)
 	seed := rand.Int63()
-	fuzzInternalObject(t, "", item, seed)
+	fuzzInternalObject(t, api.SchemeGroupVersion.String(), item, seed)
 
 	codec, err := testapi.GetCodecForObject(item)
 	if err != nil {
@@ -109,7 +111,7 @@ func TestSpecificKind(t *testing.T) {
 	api.Scheme.Log(t)
 	defer api.Scheme.Log(nil)
 
-	kind := "Pod"
+	kind := "List"
 	for i := 0; i < *fuzzIters; i++ {
 		doRoundTripTest(kind, t)
 		if t.Failed() {
@@ -123,7 +125,7 @@ func TestList(t *testing.T) {
 	defer api.Scheme.Log(nil)
 
 	kind := "List"
-	item, err := api.Scheme.New("", kind)
+	item, err := api.Scheme.New(api.SchemeGroupVersion.String(), kind)
 	if err != nil {
 		t.Errorf("Couldn't make a %v? %v", kind, err)
 		return
@@ -154,7 +156,7 @@ func TestRoundTripTypes(t *testing.T) {
 }
 
 func doRoundTripTest(kind string, t *testing.T) {
-	item, err := api.Scheme.New("", kind)
+	item, err := api.Scheme.New(api.SchemeGroupVersion.String(), kind)
 	if err != nil {
 		t.Fatalf("Couldn't make a %v? %v", kind, err)
 	}

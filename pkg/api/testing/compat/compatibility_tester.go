@@ -26,7 +26,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation"
 
@@ -48,8 +49,8 @@ func TestCompatibility(
 ) {
 
 	// Decode
-	codec := runtime.CodecFor(api.Scheme, version)
-	obj, err := codec.Decode(input)
+	codec := latest.Codecs.LegacyCodec(unversioned.ParseGroupVersionOrDie(version))
+	obj, _, err := codec.Decode(input, nil, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -61,7 +62,7 @@ func TestCompatibility(
 	}
 
 	// Encode
-	output, err := codec.Encode(obj)
+	output, err := runtime.Encode(codec, obj)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

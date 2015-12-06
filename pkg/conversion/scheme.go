@@ -33,6 +33,9 @@ type Scheme struct {
 	// The reflect.Type we index by should *not* be a pointer.
 	typeToGVK map[reflect.Type][]unversioned.GroupVersionKind
 
+	// unversionedTypes are transformed without conversion in ConvertToVersion.
+	unversionedTypes map[reflect.Type]unversioned.GroupVersionKind
+
 	// converter stores all registered conversion functions. It also has
 	// default coverting behavior.
 	converter *Converter
@@ -56,23 +59,14 @@ type Scheme struct {
 // NewScheme manufactures a new scheme.
 func NewScheme() *Scheme {
 	s := &Scheme{
-		gvkToType: map[unversioned.GroupVersionKind]reflect.Type{},
-		typeToGVK: map[reflect.Type][]unversioned.GroupVersionKind{},
-		converter: NewConverter(),
-		cloner:    NewCloner(),
+		gvkToType:        map[unversioned.GroupVersionKind]reflect.Type{},
+		typeToGVK:        map[reflect.Type][]unversioned.GroupVersionKind{},
+		unversionedTypes: map[reflect.Type]unversioned.GroupVersionKind{},
+		converter:        NewConverter(),
+		cloner:           NewCloner(),
 	}
 	s.converter.nameFunc = s.nameFunc
 	return s
-}
-
-// AddInternalGroupVersion registers an internal version to the scheme
-func (s *Scheme) AddInternalGroupVersion(internalVersions ...unversioned.GroupVersion) {
-	if s.internalVersions == nil {
-		s.internalVersions = make(map[string]unversioned.GroupVersion)
-	}
-	for _, gv := range internalVersions {
-		s.internalVersions[gv.Group] = gv
-	}
 }
 
 // Log sets a logger on the scheme. For test purposes only
@@ -90,11 +84,8 @@ func (s *Scheme) nameFunc(t reflect.Type) string {
 	}
 
 	for _, gvk := range gvks {
-		internalGV, exists := s.internalVersions[gvk.Group]
-		if !exists {
-			internalGV := gvk.GroupVersion()
-			internalGV.Version = ""
-		}
+		internalGV := gvk.GroupVersion()
+		internalGV.Version = "__internal" // this is hacky and maybe should be passed in
 		internalGVK := internalGV.WithKind(gvk.Kind)
 
 		if internalType, exists := s.gvkToType[internalGVK]; exists {
@@ -105,8 +96,20 @@ func (s *Scheme) nameFunc(t reflect.Type) string {
 	return gvks[0].Kind
 }
 
+// AddUnversionedTypes registers all types passed in 'types' as being members of version 'version',
+// and marks them as being convertible to all API versions.
+// All objects passed to types should be pointers to structs. The name that go reports for
+// the struct becomes the "kind" field when encoding.
+func (s *Scheme) AddUnversionedTypes(gv unversioned.GroupVersion, types ...interface{}) {
+	s.AddKnownTypes(gv, types...)
+	for _, obj := range types {
+		t := reflect.TypeOf(obj).Elem()
+		gvk := gv.WithKind(t.Name())
+		s.unversionedTypes[t] = gvk
+	}
+}
+
 // AddKnownTypes registers all types passed in 'types' as being members of version 'version'.
-// Encode() will refuse objects unless their type has been registered with AddKnownTypes.
 // All objects passed to types should be pointers to structs. The name that go reports for
 // the struct becomes the "kind" field when encoding.
 func (s *Scheme) AddKnownTypes(gv unversioned.GroupVersion, types ...interface{}) {
@@ -231,6 +234,10 @@ func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) err
 	return nil
 }
 
+func (s *Scheme) AddIgnoredConversionType(from, to interface{}) error {
+	return s.converter.RegisterIgnoredConversion(from, to)
+}
+
 // AddDeepCopyFuncs adds functions to the list of deep copy functions.
 // Note that to copy sub-objects, you can use the conversion.Cloner object that
 // will be passed to your deep-copy function.
@@ -351,6 +358,11 @@ func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{
 		return nil, fmt.Errorf("only pointers to struct types may be converted: %v", t)
 	}
 
+	if _, ok := s.unversionedTypes[t]; ok {
+		// TODO: should we set GVK here?
+		return in, nil
+	}
+
 	gvks, ok := s.typeToGVK[t]
 	if !ok {
 		return nil, fmt.Errorf("%v is not a registered type and cannot be converted into version %q", t, outVersion)
@@ -372,6 +384,8 @@ func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{
 		return nil, err
 	}
 
+	// TODO: final decision on setting GVK here.
+
 	return out, nil
 }
 
@@ -381,7 +395,7 @@ func (s *Scheme) Converter() *Converter {
 }
 
 // WithConversions returns a scheme with additional conversion functions
-func (s *Scheme) WithConversions(fns *ConversionFuncs) *Scheme {
+func (s *Scheme) WithConversions(fns ConversionFuncs) *Scheme {
 	c := s.converter.WithConversions(fns)
 	copied := *s
 	copied.converter = c

@@ -21,18 +21,38 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 )
 
+func defaultGVForScope(s conversion.Scope) *unversioned.GroupVersionKind {
+	dest := s.Meta().SrcVersion
+	if gv, err := unversioned.ParseGroupVersion(dest); err == nil {
+		return &unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version}
+	}
+	return nil
+}
+
 // NewSerializedConversions handles the conversion between Object and RawExtension given
 // a supplied serializer. If conversion is desired, the caller provide a serializer
 // that performs opinionated conversions.
 func NewSerializedConversions(serializer Serializer) *conversion.ConversionFuncs {
 	fns := conversion.NewConversionFuncs()
-	fns.Register(
-		func(in Object, out *RawExtension, s conversion.Scope) error {
+	err := fns.Register(
+		func(in *Object, out *RawExtension, s conversion.Scope) error {
 			if in == nil {
 				out.RawJSON = []byte("null")
 				return nil
 			}
-			data, err := Encode(serializer, in)
+			obj := *in
+			if unk, ok := obj.(*Unknown); ok {
+				if out.RawJSON != nil {
+					out.RawJSON = unk.RawJSON
+					return nil
+				}
+				obj = out.Object
+			}
+			if obj == nil {
+				out.RawJSON = []byte("null")
+				return nil
+			}
+			data, err := Encode(serializer, obj)
 			if err != nil {
 				return err
 			}
@@ -41,21 +61,24 @@ func NewSerializedConversions(serializer Serializer) *conversion.ConversionFuncs
 		},
 
 		func(in *RawExtension, out *Object, s conversion.Scope) error {
-			if len(in.RawJSON) == 0 || (len(in.RawJSON) == 4 && string(in.RawJSON) == "null") {
+			data := in.RawJSON
+			if len(data) == 0 || (len(data) == 4 && string(data) == "null") {
 				*out = nil
 				return nil
 			}
-			// Figure out the type and kind of the output object.
-			outVersion := s.Meta().DestVersion
-			gv, err := unversioned.ParseGroupVersion(outVersion)
-			if err != nil {
-				return err
+			obj, gvk, err := serializer.Decode(data, defaultGVForScope(s), nil)
+			if err == nil {
+				*out = obj
+			} else {
+				unk := &Unknown{
+					RawJSON: data,
+				}
+				if gvk != nil {
+					unk.TypeMeta.Kind = gvk.Kind
+					unk.TypeMeta.APIVersion = gvk.GroupVersion().String()
+				}
+				*out = unk
 			}
-			obj, _, err := serializer.Decode(in.RawJSON, &unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version}, nil)
-			if err != nil {
-				return err
-			}
-			*out = obj
 			return nil
 		},
 
@@ -91,25 +114,27 @@ func NewSerializedConversions(serializer Serializer) *conversion.ConversionFuncs
 			dest := make([]Object, len(src))
 
 			for i := range src {
-				// Figure out the type and kind of the output object.
-				outVersion := s.Meta().DestVersion
-				gv, err := unversioned.ParseGroupVersion(outVersion)
-				if err != nil {
-					return err
-				}
 				data := src[i].RawJSON
-				obj, _, err := serializer.Decode(data, &unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version}, nil)
+				obj, gvk, err := serializer.Decode(data, defaultGVForScope(s), nil)
 				if err == nil {
 					dest[i] = obj
 				} else {
-					dest[i] = &Unknown{
+					unk := &Unknown{
 						RawJSON: data,
 					}
+					if gvk != nil {
+						unk.TypeMeta.Kind = gvk.Kind
+						unk.TypeMeta.APIVersion = gvk.GroupVersion().String()
+					}
+					dest[i] = unk
 				}
 			}
 			*out = dest
 			return nil
 		},
 	)
+	if err != nil {
+		panic(err)
+	}
 	return &fns
 }

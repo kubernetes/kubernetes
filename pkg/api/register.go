@@ -26,9 +26,12 @@ var Scheme = runtime.NewScheme()
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
-var Unversioned = unversioned.GroupVersion{Group: "unversioned", Version: runtime.APIVersionUnversioned}
+var Unversioned = unversioned.GroupVersion{Group: "", Version: "v1"}
 
 func init() {
+	if err := Scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
+		panic(err)
+	}
 	Scheme.AddKnownTypes(SchemeGroupVersion,
 		&Pod{},
 		&PodList{},
@@ -73,7 +76,7 @@ func init() {
 	)
 
 	// Register Unversioned types under their own special group
-	Scheme.AddKnownTypes(Unversioned,
+	Scheme.AddUnversionedTypes(Unversioned,
 		&unversioned.ListOptions{},
 		&unversioned.Status{},
 		&unversioned.APIVersions{},

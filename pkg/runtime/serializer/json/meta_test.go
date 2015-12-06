@@ -21,8 +21,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ghodss/yaml"
+
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestSimpleMetaFactoryInterpret(t *testing.T) {
@@ -126,11 +129,10 @@ func TestMetaValues(t *testing.T) {
 		Kind       string `json:"kind,omitempty"`
 		TestString string `json:"testString"`
 	}
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
 	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "externalVersion"}
 
-	s := NewScheme()
-	s.InternalVersions[internalGV.Group] = internalGV
+	s := conversion.NewScheme()
 	s.AddKnownTypeWithName(internalGV.WithKind("Simple"), &InternalSimple{})
 	s.AddKnownTypeWithName(externalGV.WithKind("Simple"), &ExternalSimple{})
 
@@ -139,7 +141,7 @@ func TestMetaValues(t *testing.T) {
 
 	// Register functions to verify that scope.Meta() gets set correctly.
 	err := s.AddConversionFuncs(
-		func(in *InternalSimple, out *ExternalSimple, scope Scope) error {
+		func(in *InternalSimple, out *ExternalSimple, scope conversion.Scope) error {
 			t.Logf("internal -> external")
 			if e, a := internalGV.String(), scope.Meta().SrcVersion; e != a {
 				t.Fatalf("Expected '%v', got '%v'", e, a)
@@ -151,7 +153,7 @@ func TestMetaValues(t *testing.T) {
 			internalToExternalCalls++
 			return nil
 		},
-		func(in *ExternalSimple, out *InternalSimple, scope Scope) error {
+		func(in *ExternalSimple, out *InternalSimple, scope conversion.Scope) error {
 			t.Logf("external -> internal")
 			if e, a := externalGV.String(), scope.Meta().SrcVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
@@ -173,48 +175,24 @@ func TestMetaValues(t *testing.T) {
 
 	s.Log(t)
 
-	// Test Encode, Decode, and DecodeInto
-	data, err := s.EncodeToVersion(simple, externalGV.String())
+	out, err := s.ConvertToVersion(simple, externalGV.String())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	t.Logf(string(data))
-	obj2, err := s.Decode(data)
+	internal, err := s.ConvertToVersion(out, internalGV.String())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := obj2.(*InternalSimple); !ok {
-		t.Fatalf("Got wrong type")
-	}
-	if e, a := simple, obj2; !reflect.DeepEqual(e, a) {
+
+	if e, a := simple, internal; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
 	}
 
-	obj3 := &InternalSimple{}
-	if err := s.DecodeInto(data, obj3); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if e, a := simple, obj3; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
-	}
-
-	// Test Convert
-	external := &ExternalSimple{}
-	err = s.Convert(simple, external)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if e, a := simple.TestString, external.TestString; e != a {
+	if e, a := 1, internalToExternalCalls; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
-
-	// Encode and Convert should each have caused an increment.
-	if e, a := 2, internalToExternalCalls; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	// Decode and DecodeInto should each have caused an increment.
-	if e, a := 2, externalToInternalCalls; e != a {
+	if e, a := 1, externalToInternalCalls; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 }
@@ -230,14 +208,14 @@ func TestMetaValuesUnregisteredConvert(t *testing.T) {
 		Kind       string `json:"kind,omitempty"`
 		TestString string `json:"testString"`
 	}
-	s := NewScheme()
+	s := conversion.NewScheme()
 	// We deliberately don't register the types.
 
 	internalToExternalCalls := 0
 
 	// Register functions to verify that scope.Meta() gets set correctly.
 	err := s.AddConversionFuncs(
-		func(in *InternalSimple, out *ExternalSimple, scope Scope) error {
+		func(in *InternalSimple, out *ExternalSimple, scope conversion.Scope) error {
 			if e, a := "unknown", scope.Meta().SrcVersion; e != a {
 				t.Fatalf("Expected '%v', got '%v'", e, a)
 			}

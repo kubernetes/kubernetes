@@ -76,6 +76,9 @@ var Semantic = conversion.EqualitiesOrDie(
 	func(a, b fields.Selector) bool {
 		return a.String() == b.String()
 	},
+	func(a, b unversioned.TypeMeta) bool {
+		return true
+	},
 )
 
 var standardResources = sets.NewString(

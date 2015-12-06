@@ -76,6 +76,8 @@ func NewCodecFactory(scheme *runtime.Scheme) CodecFactory {
 		serializers: serializers,
 		universal:   recognizer.NewDecoder(decoders...),
 		accepts:     accepts,
+
+		legacySerializer: jsonSerializer,
 	}
 }
 
@@ -84,10 +86,26 @@ type CodecFactory struct {
 	serializers []serializerType
 	universal   runtime.Decoder
 	accepts     []string
+
+	legacySerializer runtime.Serializer
+}
+
+type codec struct {
+	runtime.Encoder
+	runtime.Decoder
 }
 
 func (f CodecFactory) SupportedMediaTypes() []string {
 	return f.accepts
+}
+
+// LegacyCodec encodes output to a given API version, and decodes output into the internal form from
+// any recognized source. The returned codec will always encode output to JSON.
+//
+// This method is deprecated - clients and servers should negotiate a serializer by mime-type and
+// invoke CodecForVersions. Callers that need only to read data should use UniversalDecoder().
+func (f CodecFactory) LegacyCodec(version unversioned.GroupVersion) runtime.Codec {
+	return f.CodecForVersions(codec{f.legacySerializer, f.universal}, []unversioned.GroupVersion{version}, nil)
 }
 
 // UniversalDecoder returns a runtime.Decoder capable of decoding all known API objects in all known formats. Used

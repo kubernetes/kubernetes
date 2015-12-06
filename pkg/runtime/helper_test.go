@@ -32,7 +32,7 @@ func TestDecodeList(t *testing.T) {
 			&runtime.Unstructured{TypeMeta: runtime.TypeMeta{Kind: "Foo", APIVersion: "Bar"}, Object: map[string]interface{}{"test": "value"}},
 		},
 	}
-	if errs := runtime.DecodeList(pl.Items, api.Scheme); len(errs) != 0 {
+	if errs := runtime.DecodeList(pl.Items, testapi.Default.Codec()); len(errs) != 0 {
 		t.Fatalf("unexpected error %v", errs)
 	}
 	if pod, ok := pl.Items[1].(*api.Pod); !ok || pod.Name != "test" {

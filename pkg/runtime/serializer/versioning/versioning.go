@@ -103,19 +103,23 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 		return into, gvk, nil
 	}
 
-	// if there are no decodes possible, this is a wrapper to the serializer
-	if c.decodeVersion == nil {
-		return obj, gvk, nil
-	}
-
 	// invoke a version conversion
 	group := gvk.Group
 	if defaultGVK != nil {
 		group = defaultGVK.Group
 	}
-	targetGV, ok := c.decodeVersion[group]
-	if !ok {
-		return obj, gvk, nil
+	var targetGV unversioned.GroupVersion
+	if c.decodeVersion == nil {
+		// convert to internal by default
+		targetGV.Group = group
+		targetGV.Version = runtime.APIVersionInternal
+	} else {
+		gv, ok := c.decodeVersion[group]
+		if !ok {
+			// unknown objects are left in their original version
+			return obj, gvk, nil
+		}
+		targetGV = gv
 	}
 
 	if gvk.GroupVersion() == targetGV {
