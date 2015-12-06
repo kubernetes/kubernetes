@@ -60,7 +60,16 @@ type Serializer struct {
 	pretty  bool
 }
 
-func (s *Serializer) Decode(data []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+	data := originalData
+	if s.yaml {
+		altered, err := yaml.YAMLToJSON(data)
+		if err != nil {
+			return nil, nil, err
+		}
+		data = altered
+	}
+
 	version, kind, err := s.meta.Interpret(data)
 	if err != nil {
 		return nil, nil, err
@@ -103,6 +112,12 @@ func (s *Serializer) Decode(data []byte, gvk *unversioned.GroupVersionKind, into
 			}
 		}
 	}
+	if len(actual.Kind) == 0 {
+		return nil, actual, runtime.NewMissingKindErr(string(originalData))
+	}
+	if len(actual.Version) == 0 {
+		return nil, actual, runtime.NewMissingVersionErr(string(originalData))
+	}
 
 	// use the target if necessary
 	obj, err := runtime.UseOrCreateObject(s.typer, s.creater, *actual, into)
@@ -110,13 +125,6 @@ func (s *Serializer) Decode(data []byte, gvk *unversioned.GroupVersionKind, into
 		return nil, actual, err
 	}
 
-	if s.yaml {
-		altered, err := yaml.YAMLToJSON(data)
-		if err != nil {
-			return nil, actual, err
-		}
-		data = altered
-	}
 	if err := codec.NewDecoderBytes(data, new(codec.JsonHandle)).Decode(obj); err != nil {
 		return nil, actual, err
 	}
@@ -161,5 +169,8 @@ func (s *Serializer) EncodeToStream(obj runtime.Object, w io.Writer) error {
 
 func (s *Serializer) RecognizesData(peek io.Reader) (bool, error) {
 	_, ok := utilyaml.GuessJSONStream(peek, 2048)
+	if s.yaml {
+		return !ok, nil
+	}
 	return ok, nil
 }

@@ -40,9 +40,14 @@ type serializerType struct {
 // of input and output into the wire formats supported.
 // TODO: allow other codecs to be compiled in?
 func NewCodecFactory(scheme *runtime.Scheme) CodecFactory {
-	jsonSerializer := json.NewSerializer(json.DefaultMetaFactory, scheme, runtime.ObjectTyperToTyper(scheme), false)
-	jsonPrettySerializer := json.NewSerializer(json.DefaultMetaFactory, scheme, runtime.ObjectTyperToTyper(scheme), true)
-	yamlSerializer := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme, runtime.ObjectTyperToTyper(scheme))
+	return newCodecFactory(scheme, json.DefaultMetaFactory)
+}
+
+// newCodecFactory is a helper for testing that allows a different metafactory to be specified.
+func newCodecFactory(scheme *runtime.Scheme, mf json.MetaFactory) CodecFactory {
+	jsonSerializer := json.NewSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme), false)
+	jsonPrettySerializer := json.NewSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme), true)
+	yamlSerializer := json.NewYAMLSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme))
 	serializers := []serializerType{
 		{
 			AcceptContentTypes: []string{"application/json"},

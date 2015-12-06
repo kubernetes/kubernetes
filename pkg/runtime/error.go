@@ -41,3 +41,7 @@ func IsMissingVersion(err error) bool {
 func NewMissingKindErr(data string) error {
 	return conversion.NewMissingKindErr(data)
 }
+
+func NewMissingVersionErr(data string) error {
+	return conversion.NewMissingVersionErr(data)
+}

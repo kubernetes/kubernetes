@@ -31,7 +31,7 @@ func TestDecodeJSON(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if gvk != nil {
+	if (*gvk != unversioned.GroupVersionKind{}) {
 		t.Fatalf("unexpected gvk: %#v", gvk)
 	}
 	if obj != nil {

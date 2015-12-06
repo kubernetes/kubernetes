@@ -189,7 +189,6 @@ func TestApi_v1(t *testing.T) {
 
 	version := master.api_v1()
 	assert.Equal(unversioned.GroupVersion{Version: "v1"}, version.GroupVersion, "Version was not v1: %s", version.GroupVersion)
-	assert.Equal(v1.Codec, version.Codec, "version.Codec was not for v1: %s", version.Codec)
 	for k, v := range master.storage {
 		assert.Contains(version.Storage, v, "Value %s not found (key: %s)", k, v)
 	}
@@ -259,7 +258,7 @@ func TestControllerServicePorts(t *testing.T) {
 func TestNewHandlerContainer(t *testing.T) {
 	assert := assert.New(t)
 	mux := http.NewServeMux()
-	container := NewHandlerContainer(mux)
+	container := NewHandlerContainer(mux, latest.Codecs)
 	assert.Equal(mux, container.ServeMux, "ServerMux's do not match")
 }
 
@@ -298,7 +297,7 @@ func TestInstallSwaggerAPI(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	mux := http.NewServeMux()
-	master.handlerContainer = NewHandlerContainer(mux)
+	master.handlerContainer = NewHandlerContainer(mux, latest.Codecs)
 
 	// Ensure swagger isn't installed without the call
 	ws := master.handlerContainer.RegisteredWebServices()
@@ -352,7 +351,8 @@ func TestExpapi(t *testing.T) {
 	expAPIGroup := master.experimental(&config)
 	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix)
 	assert.Equal(expAPIGroup.Mapper, extensionsGroupMeta.RESTMapper)
-	assert.Equal(expAPIGroup.Codec, extensionsGroupMeta.Codec)
+	assert.Equal(expAPIGroup.Serializer, latest.Codecs)
+	assert.Equal(expAPIGroup.ParameterCodec, latest.ParameterCodec)
 	assert.Equal(expAPIGroup.Linker, extensionsGroupMeta.SelfLinker)
 	assert.Equal(expAPIGroup.GroupVersion, unversioned.GroupVersion{Group: extensionsGroupMeta.Group, Version: extensionsGroupMeta.Version})
 }
