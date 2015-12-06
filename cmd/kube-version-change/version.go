@@ -86,7 +86,7 @@ func main() {
 			log.Fatalf("Failed to convert YAML to JSON: %q", err)
 		}
 	}
-	obj, err := api.Scheme.Decode(data)
+	obj, err := latest.Codecs.UniversalDecoder().Decode(data)
 	if err != nil {
 		log.Fatalf("Couldn't decode input: %q", err)
 	}

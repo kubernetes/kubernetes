@@ -62,7 +62,7 @@ func TestSplitYAMLDocument(t *testing.T) {
 }
 
 func TestGuessJSON(t *testing.T) {
-	if r, isJSON := guessJSONStream(bytes.NewReader([]byte(" \n{}")), 100); !isJSON {
+	if r, isJSON := GuessJSONStream(bytes.NewReader([]byte(" \n{}")), 100); !isJSON {
 		t.Fatalf("expected stream to be JSON")
 	} else {
 		b := make([]byte, 30)

@@ -210,7 +210,7 @@ func TestCreatePods(t *testing.T) {
 		Spec: controllerSpec.Spec.Template.Spec,
 	}
 	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath("pods", api.NamespaceDefault, ""), "POST", nil)
-	actualPod, err := client.Codec.Decode([]byte(fakeHandler.RequestBody))
+	actualPod, _, err := client.Codec.Decode([]byte(fakeHandler.RequestBody), nil, nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}

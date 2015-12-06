@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
 	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	_ "k8s.io/kubernetes/plugin/pkg/scheduler/api/v1"
 )
 
 // Version is the string that represents the current external default version.

@@ -262,7 +262,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: error in versioning the pods: %s", testCase.desc, err)
 		}
-		data, err := testapi.Default.Codec().Encode(versionedPods)
+		data, err := runtime.Encode(testapi.Default.Codec(), versionedPods)
 		if err != nil {
 			t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
 		}

@@ -18,7 +18,6 @@ package json
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 
 	"github.com/ghodss/yaml"
@@ -76,14 +75,32 @@ func (s *Serializer) Decode(data []byte, gvk *unversioned.GroupVersionKind, into
 	// apply kind and version defaulting
 	if len(actual.Kind) == 0 || len(actual.Version) == 0 {
 		if gvk == nil {
-			return nil, nil, fmt.Errorf("unable to find version and kind in '%s'", string(data))
-		}
-		if len(actual.Kind) == 0 && len(gvk.Kind) > 0 {
-			actual.Kind = gvk.Kind
-		}
-		if len(actual.Version) == 0 && len(gvk.Version) > 0 {
-			actual.Group = gvk.Group
-			actual.Version = gvk.Version
+			if into != nil {
+				// try to default the missing value from into
+				if typed, err := s.typer.ObjectVersionAndKind(into); err == nil {
+					if len(actual.Kind) == 0 {
+						actual.Kind = typed.Kind
+					}
+					if len(actual.Version) == 0 {
+						actual.Version = typed.Version
+					}
+				}
+				// if we are still incomplete, and into is available, decode it directly
+				if len(actual.Kind) == 0 || len(actual.Version) == 0 {
+					if err := json.Unmarshal(data, into); err != nil {
+						return nil, actual, err
+					}
+					return into, actual, nil
+				}
+			}
+		} else {
+			if len(actual.Kind) == 0 {
+				actual.Kind = gvk.Kind
+			}
+			if len(actual.Version) == 0 && len(gvk.Version) > 0 {
+				actual.Group = gvk.Group
+				actual.Version = gvk.Version
+			}
 		}
 	}
 

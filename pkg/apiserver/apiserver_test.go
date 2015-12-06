@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -65,11 +66,11 @@ var prefix = "apis"
 
 var grouplessGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
 var grouplessPrefix = "api"
-var grouplessCodec = runtime.CodecFor(api.Scheme, grouplessGroupVersion.String())
+var grouplessCodec = latest.Codecs.LegacyCodec(grouplessGroupVersion)
 
 var groupVersions = []unversioned.GroupVersion{grouplessGroupVersion, testGroupVersion, newGroupVersion}
-var codec = runtime.CodecFor(api.Scheme, testGroupVersion.String())
-var newCodec = runtime.CodecFor(api.Scheme, newGroupVersion.String())
+var codec = latest.Codecs.LegacyCodec(testGroupVersion)
+var newCodec = latest.Codecs.LegacyCodec(newGroupVersion)
 
 var accessor = meta.NewAccessor()
 var versioner runtime.ResourceVersioner = accessor
@@ -237,7 +238,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.Root = "/" + grouplessPrefix
 		group.GroupVersion = grouplessGroupVersion
 		group.ServerGroupVersion = &grouplessGroupVersion
-		group.Codec = grouplessCodec
+		group.Serializer = latest.Codecs
 		if err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
@@ -249,7 +250,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.Root = "/" + prefix
 		group.GroupVersion = testGroupVersion
 		group.ServerGroupVersion = &testGroupVersion
-		group.Codec = codec
+		group.Serializer = latest.Codecs
 		if err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
@@ -261,7 +262,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.Root = "/" + prefix
 		group.GroupVersion = newGroupVersion
 		group.ServerGroupVersion = &newGroupVersion
-		group.Codec = newCodec
+		group.Serializer = latest.Codecs
 		if err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
@@ -275,11 +276,11 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 
 func TestSimpleSetupRight(t *testing.T) {
 	s := &apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: "aName"}}
-	wire, err := codec.Encode(s)
+	wire, err := runtime.Encode(codec, s)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s2, err := codec.Decode(wire)
+	s2, _, err := codec.Decode(wire, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,11 +291,11 @@ func TestSimpleSetupRight(t *testing.T) {
 
 func TestSimpleOptionsSetupRight(t *testing.T) {
 	s := &apiservertesting.SimpleGetOptions{}
-	wire, err := codec.Encode(s)
+	wire, err := runtime.Encode(codec, s)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s2, err := codec.Decode(wire)
+	s2, _, err := codec.Decode(wire, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -389,7 +390,11 @@ func (storage *SimpleRESTStorage) Get(ctx api.Context, id string) (runtime.Objec
 	if id == "binary" {
 		return storage.stream, storage.errors["get"]
 	}
-	return api.Scheme.CopyOrDie(&storage.item), storage.errors["get"]
+	copied, err := api.Scheme.Copy(storage.item)
+	if err != nil {
+		panic(err)
+	}
+	return copied, storage.errors["get"]
 }
 
 func (storage *SimpleRESTStorage) checkContext(ctx api.Context) {
@@ -604,7 +609,11 @@ func (storage *SimpleTypedStorage) New() runtime.Object {
 
 func (storage *SimpleTypedStorage) Get(ctx api.Context, id string) (runtime.Object, error) {
 	storage.checkContext(ctx)
-	return api.Scheme.CopyOrDie(storage.item), storage.errors["get"]
+	copied, err := api.Scheme.Copy(storage.item)
+	if err != nil {
+		panic(err)
+	}
+	return copied, storage.errors["get"]
 }
 
 func (storage *SimpleTypedStorage) checkContext(ctx api.Context) {
@@ -617,7 +626,7 @@ func extractBody(response *http.Response, object runtime.Object) (string, error)
 	if err != nil {
 		return string(body), err
 	}
-	err = codec.DecodeInto(body, object)
+	_, err = runtime.DecodeInto(codec, body, nil, object)
 	return string(body), err
 }
 
@@ -1512,7 +1521,7 @@ func TestConnectResponderObject(t *testing.T) {
 	if connectStorage.receivedID != itemID {
 		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
 	}
-	obj, err := codec.Decode(body)
+	obj, _, err := codec.Decode(body, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1553,7 +1562,7 @@ func TestConnectResponderError(t *testing.T) {
 	if connectStorage.receivedID != itemID {
 		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
 	}
-	obj, err := codec.Decode(body)
+	obj, _, err := codec.Decode(body, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1723,7 +1732,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	item := &api.DeleteOptions{
 		GracePeriodSeconds: &grace,
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1787,7 +1796,7 @@ func TestLegacyDeleteIgnoresOptions(t *testing.T) {
 	defer server.Close()
 
 	item := api.NewDeleteOptions(300)
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1940,7 +1949,7 @@ func TestUpdate(t *testing.T) {
 		},
 		Other: "bar",
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		// The following cases will fail, so die now
 		t.Fatalf("unexpected error: %v", err)
@@ -1977,7 +1986,7 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 		},
 		Other: "bar",
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		// The following cases will fail, so die now
 		t.Fatalf("unexpected error: %v", err)
@@ -2006,7 +2015,7 @@ func TestUpdateRequiresMatchingName(t *testing.T) {
 	item := &apiservertesting.Simple{
 		Other: "bar",
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		// The following cases will fail, so die now
 		t.Fatalf("unexpected error: %v", err)
@@ -2038,7 +2047,7 @@ func TestUpdateAllowsMissingNamespace(t *testing.T) {
 		},
 		Other: "bar",
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		// The following cases will fail, so die now
 		t.Fatalf("unexpected error: %v", err)
@@ -2076,7 +2085,7 @@ func TestUpdateAllowsMismatchedNamespaceOnError(t *testing.T) {
 		},
 		Other: "bar",
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		// The following cases will fail, so die now
 		t.Fatalf("unexpected error: %v", err)
@@ -2113,7 +2122,7 @@ func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
 		},
 		Other: "bar",
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		// The following cases will fail, so die now
 		t.Fatalf("unexpected error: %v", err)
@@ -2148,7 +2157,7 @@ func TestUpdateMissing(t *testing.T) {
 		},
 		Other: "bar",
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2177,7 +2186,7 @@ func TestCreateNotFound(t *testing.T) {
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{Other: "foo"}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2203,7 +2212,7 @@ func TestCreateChecksDecode(t *testing.T) {
 	client := http.Client{}
 
 	simple := &api.Pod{}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2245,7 +2254,8 @@ func TestUpdateREST(t *testing.T) {
 
 			GroupVersion:       newGroupVersion,
 			ServerGroupVersion: &newGroupVersion,
-			Codec:              newCodec,
+			Serializer:         latest.Codecs,
+			ParameterCodec:     latest.ParameterCodec,
 		}
 	}
 
@@ -2327,7 +2337,8 @@ func TestParentResourceIsRequired(t *testing.T) {
 
 		GroupVersion:       newGroupVersion,
 		ServerGroupVersion: &newGroupVersion,
-		Codec:              newCodec,
+		Serializer:         latest.Codecs,
+		ParameterCodec:     latest.ParameterCodec,
 	}
 	container := restful.NewContainer()
 	if err := group.InstallREST(container); err == nil {
@@ -2356,7 +2367,8 @@ func TestParentResourceIsRequired(t *testing.T) {
 
 		GroupVersion:       newGroupVersion,
 		ServerGroupVersion: &newGroupVersion,
-		Codec:              newCodec,
+		Serializer:         latest.Codecs,
+		ParameterCodec:     latest.ParameterCodec,
 	}
 	container = restful.NewContainer()
 	if err := group.InstallREST(container); err != nil {
@@ -2393,7 +2405,7 @@ func TestCreateWithName(t *testing.T) {
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{Other: "foo"}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2420,7 +2432,7 @@ func TestUpdateChecksDecode(t *testing.T) {
 	client := http.Client{}
 
 	simple := &api.Pod{}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2496,7 +2508,7 @@ func TestCreate(t *testing.T) {
 	simple := &apiservertesting.Simple{
 		Other: "bar",
 	}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2555,7 +2567,7 @@ func TestCreateInNamespace(t *testing.T) {
 	simple := &apiservertesting.Simple{
 		Other: "bar",
 	}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2614,7 +2626,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 	simple := &apiservertesting.Simple{
 		Other: "bar",
 	}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2742,7 +2754,7 @@ func TestCreateTimeout(t *testing.T) {
 	defer server.Close()
 
 	simple := &apiservertesting.Simple{Other: "foo"}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2834,7 +2846,7 @@ func TestCreateChecksAPIVersion(t *testing.T) {
 
 	simple := &apiservertesting.Simple{}
 	//using newCodec and send the request to testVersion URL shall cause a discrepancy in apiVersion
-	data, err := newCodec.Encode(simple)
+	data, err := runtime.Encode(newCodec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2864,7 +2876,7 @@ func TestCreateDefaultsAPIVersion(t *testing.T) {
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2899,7 +2911,7 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}
-	data, err := newCodec.Encode(simple)
+	data, err := runtime.Encode(newCodec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

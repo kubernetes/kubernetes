@@ -23,13 +23,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestCodec(t *testing.T) {
 	daemonSet := componentconfig.KubeProxyConfiguration{}
 	// We do want to use package latest rather than testapi here, because we
 	// want to test if the package install and package latest work as expected.
-	data, err := latest.GroupOrDie("componentconfig").Codec.Encode(&daemonSet)
+	data, err := runtime.Encode(latest.Codecs.LegacyCodec(unversioned.ParseGroupVersionOrDie(latest.GroupOrDie("componentconfig").GroupVersion)), &daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

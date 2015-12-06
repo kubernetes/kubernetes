@@ -108,7 +108,7 @@ func TestValidatesHostParameter(t *testing.T) {
 
 func TestDoRequestBearer(t *testing.T) {
 	status := &unversioned.Status{Status: unversioned.StatusFailure}
-	expectedBody, _ := testapi.Default.Codec().Encode(status)
+	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   400,
 		ResponseBody: string(expectedBody),
@@ -137,7 +137,7 @@ func TestDoRequestBearer(t *testing.T) {
 
 func TestDoRequestWithoutPassword(t *testing.T) {
 	status := &unversioned.Status{Status: unversioned.StatusFailure}
-	expectedBody, _ := testapi.Default.Codec().Encode(status)
+	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   400,
 		ResponseBody: string(expectedBody),
@@ -176,7 +176,7 @@ func TestDoRequestWithoutPassword(t *testing.T) {
 
 func TestDoRequestSuccess(t *testing.T) {
 	status := &unversioned.Status{Status: unversioned.StatusSuccess}
-	expectedBody, _ := testapi.Default.Codec().Encode(status)
+	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -201,7 +201,7 @@ func TestDoRequestSuccess(t *testing.T) {
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", fakeHandler.RequestReceived)
 	}
-	statusOut, err := testapi.Default.Codec().Decode(body)
+	statusOut, _, err := testapi.Default.Codec().Decode(body, nil, nil)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -219,7 +219,7 @@ func TestDoRequestFailed(t *testing.T) {
 		Message: " \"\" not found",
 		Details: &unversioned.StatusDetails{},
 	}
-	expectedBody, _ := testapi.Default.Codec().Encode(status)
+	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   404,
 		ResponseBody: string(expectedBody),
@@ -251,7 +251,7 @@ func TestDoRequestFailed(t *testing.T) {
 
 func TestDoRequestCreated(t *testing.T) {
 	status := &unversioned.Status{Status: unversioned.StatusSuccess}
-	expectedBody, _ := testapi.Default.Codec().Encode(status)
+	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   201,
 		ResponseBody: string(expectedBody),
@@ -277,7 +277,7 @@ func TestDoRequestCreated(t *testing.T) {
 	if !created {
 		t.Errorf("Expected object to be created")
 	}
-	statusOut, err := testapi.Default.Codec().Decode(body)
+	statusOut, _, err := testapi.Default.Codec().Decode(body, nil, nil)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}

@@ -23,7 +23,9 @@ import (
 	"io/ioutil"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func Gzip(pods <-chan *api.Pod) ([]byte, error) {
@@ -31,7 +33,7 @@ func Gzip(pods <-chan *api.Pod) ([]byte, error) {
 }
 
 func gzipList(list *api.PodList) ([]byte, error) {
-	raw, err := v1.Codec.Encode(list)
+	raw, err := runtime.Encode(latest.Codecs.LegacyCodec(v1.SchemeGroupVersion), list)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +69,7 @@ func gunzipList(gzipped []byte) (*api.PodList, error) {
 		return nil, err
 	}
 
-	obj, err := api.Scheme.Decode(raw)
+	obj, _, err := latest.Codecs.UniversalDecoder().Decode(raw, nil, nil)
 	if err != nil {
 		return nil, err
 	}

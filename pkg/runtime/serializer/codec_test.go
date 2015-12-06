@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package serializer
+package serializer_test
 
 import (
 	"encoding/json"
@@ -24,6 +24,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/google/gofuzz"
@@ -106,12 +108,19 @@ var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
 	},
 )
 
+func (MyWeirdCustomEmbeddedVersionKindField) IsAnAPIObject() {}
+func (ExternalTestType1) IsAnAPIObject()                     {}
+func (ExternalInternalSame) IsAnAPIObject()                  {}
+func (ExternalTestType2) IsAnAPIObject()                     {}
+func (TestType2) IsAnAPIObject()                             {}
+func (TestType1) IsAnAPIObject()                             {}
+
 // Returns a new Scheme set up with the test objects.
-func GetTestScheme() *Scheme {
+func GetTestScheme() *runtime.Scheme {
 	internalGV := unversioned.GroupVersion{}
 	externalGV := unversioned.GroupVersion{Version: "v1"}
 
-	s := NewScheme()
+	s := runtime.NewScheme()
 	// Ordinarily, we wouldn't add TestType2, but because this is a test and
 	// both types are from the same package, we need to get it into the system
 	// so that converter will match it with ExternalType2.
@@ -149,6 +158,7 @@ func runTest(t *testing.T, source interface{}) {
 	TestObjectFuzzer.Fuzz(source)
 
 	s := GetTestScheme()
+	codec := serializer.NewCodecFactory(s).LegacyCodec(unversioned.GroupVersion{Version: "v1"})
 	data, err := s.EncodeToVersion(source, "v1")
 	if err != nil {
 		t.Errorf("%v: %v (%#v)", name, err, source)
@@ -190,8 +200,9 @@ func TestTypes(t *testing.T) {
 
 func TestMultipleNames(t *testing.T) {
 	s := GetTestScheme()
+	codec := serializer.NewCodecFactory(s).LegacyCodec(unversioned.GroupVersion{Version: "v1"})
 
-	obj, err := s.Decode([]byte(`{"myKindKey":"TestType3","myVersionKey":"v1","A":"value"}`))
+	obj, _, err := codec.Decode([]byte(`{"myKindKey":"TestType3","myVersionKey":"v1","A":"value"}`), nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -200,7 +211,7 @@ func TestMultipleNames(t *testing.T) {
 		t.Fatalf("unexpected decoded object: %#v", internal)
 	}
 
-	out, err := s.EncodeToVersion(internal, "v1")
+	out, err := runtime.Encode(codec, internal)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -213,7 +224,7 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 	internalGV := unversioned.GroupVersion{}
 	externalGV := unversioned.GroupVersion{Version: "v1"}
 
-	s := NewScheme()
+	s := runtime.NewScheme()
 	// create two names internally, with TestType1 being preferred
 	s.AddKnownTypeWithName(internalGV.WithKind("TestType1"), &TestType1{})
 	s.AddKnownTypeWithName(internalGV.WithKind("OtherType1"), &TestType1{})
@@ -232,7 +243,9 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 	}
 	expect := &TestType1{A: "test"}
 
-	obj, err := s.Decode(data)
+	codec := serializer.NewCodecFactory(s).LegacyCodec(unversioned.GroupVersion{Version: "v1"})
+
+	obj, _, err := codec.Decode(data, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -241,7 +254,7 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 	}
 
 	into := &TestType1{}
-	if err := s.DecodeInto(data, into); err != nil {
+	if err := runtime.DecodeInto(codec, data, nil, into); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !reflect.DeepEqual(expect, obj) {
@@ -251,10 +264,11 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 
 func TestEncode_NonPtr(t *testing.T) {
 	s := GetTestScheme()
+	codec := serializer.NewCodecFactory(s).LegacyCodec(unversioned.GroupVersion{Version: "v1"})
 	tt := TestType1{A: "I'm not a pointer object"}
 	obj := interface{}(tt)
-	data, err := s.EncodeToVersion(obj, "v1")
-	obj2, err2 := s.Decode(data)
+	data, err := runtime.Encode(codec, obj)
+	obj2, _, err2 := codec.Decode(data, nil, nil)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
@@ -268,10 +282,11 @@ func TestEncode_NonPtr(t *testing.T) {
 
 func TestEncode_Ptr(t *testing.T) {
 	s := GetTestScheme()
+	codec := serializer.NewCodecFactory(s).LegacyCodec(unversioned.GroupVersion{Version: "v1"})
 	tt := &TestType1{A: "I am a pointer object"}
 	obj := interface{}(tt)
-	data, err := s.EncodeToVersion(obj, "v1")
-	obj2, err2 := s.Decode(data)
+	data, err := runtime.Encode(codec, obj)
+	obj2, err2 := codec.Decode(data, nil, nil)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
@@ -306,12 +321,13 @@ func TestBadJSONRejection(t *testing.T) {
 
 func TestBadJSONRejectionForSetInternalVersion(t *testing.T) {
 	s := GetTestScheme()
+	codec := serializer.NewCodecFactory(s).LegacyCodec(unversioned.GroupVersion{Version: "v1"})
 	s.InternalVersions[""] = unversioned.GroupVersion{Version: "v1"}
 	badJSONs := [][]byte{
 		[]byte(`{"myKindKey":"TestType1"}`), // Missing version
 	}
 	for _, b := range badJSONs {
-		if _, err := s.Decode(b); err == nil {
+		if _, _, err := codec.Decode(b, nil, nil); err == nil {
 			t.Errorf("Did not reject bad json: %s", string(b))
 		}
 	}
@@ -331,7 +347,7 @@ var status = &unversioned.Status{
 func TestV1EncodeDecodeStatus(t *testing.T) {
 	v1Codec := testapi.Default.Codec()
 
-	encoded, err := v1Codec.Encode(status)
+	encoded, err := runtime.Encode(v1Codec, status)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -345,7 +361,7 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 	if typeMeta.APIVersion != "v1" {
 		t.Errorf("APIVersion is not set to \"v1\". Got %v", string(encoded))
 	}
-	decoded, err := v1Codec.Decode(encoded)
+	decoded, _, err := v1Codec.Decode(encoded, nil, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -359,7 +375,7 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	// moves experimental from v1 to v1beta1 got merged.
 	expCodec := testapi.Extensions.Codec()
 	//expCodec := runtime.CodecFor(api.Scheme, "extensions/v1beta1")
-	encoded, err := expCodec.Encode(status)
+	encoded, err := runtime.Encode(expCodec, status)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -373,7 +389,7 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	if typeMeta.APIVersion != "" {
 		t.Errorf("APIVersion is not set to \"\". Got %s", encoded)
 	}
-	decoded, err := expCodec.Decode(encoded)
+	decoded, _, err := expCodec.Decode(encoded, nil, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

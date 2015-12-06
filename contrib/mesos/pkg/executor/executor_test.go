@@ -172,7 +172,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	assert.Equal(t, nil, err, "must be able to create a task from a pod")
 
 	taskInfo := podTask.BuildTaskInfo(&mesosproto.ExecutorInfo{})
-	data, err := testapi.Default.Codec().Encode(pod)
+	data, err := runtime.Encode(testapi.Default.Codec(), pod)
 	assert.Equal(t, nil, err, "must be able to encode a pod's spec data")
 	taskInfo.Data = data
 	var statusUpdateCalls sync.WaitGroup
@@ -372,7 +372,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 	pod := NewTestPod(1)
 	podTask, _ := podtask.New(api.NewDefaultContext(), "foo", pod)
 	taskInfo := podTask.BuildTaskInfo(&mesosproto.ExecutorInfo{})
-	data, _ := testapi.Default.Codec().Encode(pod)
+	data, _ := runtime.Encode(testapi.Default.Codec(), pod)
 	taskInfo.Data = data
 
 	mockDriver.On(

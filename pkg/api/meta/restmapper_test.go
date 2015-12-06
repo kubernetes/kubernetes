@@ -19,7 +19,6 @@ package meta
 import (
 	"errors"
 	"io"
-	"net/url"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -30,32 +29,12 @@ type fakeCodec struct{}
 
 var _ runtime.Decoder = fakeCodec{}
 
-func (fakeCodec) Encode(runtime.Object) ([]byte, error) {
-	return []byte{}, nil
-}
-
 func (fakeCodec) EncodeToStream(runtime.Object, io.Writer) error {
 	return nil
 }
 
-func (fakeCodec) Decode([]byte) (runtime.Object, error) {
-	return nil, nil
-}
-
-func (fakeCodec) DecodeToVersion([]byte, unversioned.GroupVersion) (runtime.Object, error) {
-	return nil, nil
-}
-
-func (fakeCodec) DecodeInto([]byte, runtime.Object) error {
-	return nil
-}
-
-func (fakeCodec) DecodeIntoWithSpecifiedVersionKind([]byte, runtime.Object, unversioned.GroupVersionKind) error {
-	return nil
-}
-
-func (fakeCodec) DecodeParametersInto(parameters url.Values, obj runtime.Object) error {
-	return nil
+func (fakeCodec) Decode([]byte, *unversioned.GroupVersionKind, runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+	return nil, nil, nil
 }
 
 type fakeConvertor struct{}

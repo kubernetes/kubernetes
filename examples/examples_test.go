@@ -411,7 +411,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 				return
 			}
 			if strings.Contains(name, "scheduler-policy-config") {
-				if err := schedulerapilatest.Codec.DecodeInto(data, expectedType); err != nil {
+				if _, err := runtime.DecodeInto(schedulerapilatest.Codec, data, nil, expectedType); err != nil {
 					t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 					return
 				}
@@ -421,7 +421,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 				if err != nil {
 					t.Errorf("Could not get codec for %s: %s", expectedType, err)
 				}
-				if err := codec.DecodeInto(data, expectedType); err != nil {
+				if _, err := runtime.DecodeInto(codec, data, nil, expectedType); err != nil {
 					t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 					return
 				}
@@ -506,14 +506,14 @@ func TestReadme(t *testing.T) {
 			if err != nil {
 				t.Errorf("%s could not be converted to JSON: %v\n%s", path, err, string(content))
 			}
-			if err := testapi.Default.Codec().DecodeInto(json, expectedType); err != nil {
+			if _, err := runtime.DecodeInto(testapi.Default.Codec(), json, nil, expectedType); err != nil {
 				t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(content))
 				continue
 			}
 			if errors := validateObject(expectedType); len(errors) > 0 {
 				t.Errorf("%s did not validate correctly: %v", path, errors)
 			}
-			_, err = testapi.Default.Codec().Encode(expectedType)
+			_, err = runtime.Encode(testapi.Default.Codec(), expectedType)
 			if err != nil {
 				t.Errorf("Could not encode object: %v", err)
 				continue

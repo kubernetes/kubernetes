@@ -23,6 +23,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
+	"k8s.io/kubernetes/runtime"
 )
 
 func TestCompatibility_v1_Scheduler(t *testing.T) {
@@ -92,16 +93,14 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 
 	for v, tc := range schedulerFiles {
 		policy := schedulerapi.Policy{}
-		err := latestschedulerapi.Codec.DecodeInto([]byte(tc.JSON), &policy)
-		if err != nil {
+		if err := runtime.DecodeInto(latestschedulerapi.Codec, []byte(tc.JSON), nil, &policy); err != nil {
 			t.Errorf("%s: Error decoding: %v", v, err)
 			continue
 		}
 		if !reflect.DeepEqual(policy, tc.ExpectedPolicy) {
 			t.Errorf("%s: Expected:\n\t%#v\nGot:\n\t%#v", v, tc.ExpectedPolicy, policy)
 		}
-		_, err = factory.NewConfigFactory(nil, nil).CreateFromConfig(policy)
-		if err != nil {
+		if _, err := factory.NewConfigFactory(nil, nil).CreateFromConfig(policy); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)
 			continue
 		}

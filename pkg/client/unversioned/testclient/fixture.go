@@ -153,10 +153,7 @@ func NewObjects(scheme ObjectScheme, decoder runtime.Decoder) ObjectRetriever {
 }
 
 func (o objects) Kind(gvk unversioned.GroupVersionKind, name string) (runtime.Object, error) {
-	// TODO our test clients deal in internal versions.  We need to plumb that knowledge down here
-	// we might do this via an extra function to the scheme to allow getting internal group versions
-	// I'm punting for now
-	gvk.Version = ""
+	gvk.Version = runtime.APIVersionInternal
 
 	empty, _ := o.scheme.New(gvk.GroupVersion().String(), gvk.Kind)
 	nilValue := reflect.Zero(reflect.TypeOf(empty)).Interface().(runtime.Object)

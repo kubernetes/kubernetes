@@ -217,12 +217,12 @@ func body(t *testing.T, obj runtime.Object, raw *string) *string {
 		// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
 		var bs []byte
 		if api.Scheme.Recognizes(testapi.Default.GroupAndVersion(), kind) {
-			bs, err = testapi.Default.Codec().Encode(obj)
+			bs, err = runtime.Encode(testapi.Default.Codec(), obj)
 			if err != nil {
 				t.Errorf("unexpected encoding error: %v", err)
 			}
 		} else if api.Scheme.Recognizes(testapi.Extensions.GroupAndVersion(), kind) {
-			bs, err = testapi.Extensions.Codec().Encode(obj)
+			bs, err = runtime.Encode(testapi.Extensions.Codec(), obj)
 			if err != nil {
 				t.Errorf("unexpected encoding error: %v", err)
 			}
@@ -278,7 +278,7 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 		}
 		output, err := json.Marshal(obj)
 		if err != nil {
-			t.Errorf("unexpected encoding error: %v", err)
+			t.Fatalf("unexpected encoding error: %v", err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -289,7 +289,7 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 	// ServerGroups should not return an error even if server returns error at /api and /apis
 	apiGroupList, err := client.Discovery().ServerGroups()
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	groupVersions := ExtractGroupVersions(apiGroupList)
 	if !reflect.DeepEqual(groupVersions, []string{"v1"}) {

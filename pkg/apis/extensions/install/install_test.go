@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestResourceVersioner(t *testing.T) {
@@ -50,7 +51,7 @@ func TestCodec(t *testing.T) {
 	daemonSet := extensions.DaemonSet{}
 	// We do want to use package latest rather than testapi here, because we
 	// want to test if the package install and package latest work as expected.
-	data, err := latest.GroupOrDie("extensions").Codec.Encode(&daemonSet)
+	data, err := runtime.Encode(latest.Codecs.LegacyCodec(unversioned.ParseGroupVersionOrDie(latest.GroupOrDie("extensions").GroupVersion)), &daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

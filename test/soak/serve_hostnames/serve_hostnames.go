@@ -266,7 +266,7 @@ func main() {
 			continue
 		}
 		var r unversioned.Status
-		if err := api.Scheme.DecodeInto(hostname, &r); err != nil {
+		if err := latest.Codecs.UniversalDecoder().DecodeInto(hostname, &r); err != nil {
 			break
 		}
 		if r.Status == unversioned.StatusFailure {

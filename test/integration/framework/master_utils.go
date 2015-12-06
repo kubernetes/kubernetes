@@ -181,7 +181,7 @@ func RCFromManifest(fileName string) *api.ReplicationController {
 		glog.Fatalf("Unexpected error reading rc manifest %v", err)
 	}
 	var controller api.ReplicationController
-	if err := api.Scheme.DecodeInto(data, &controller); err != nil {
+	if err := latest.Codecs.UniversalDecoder().DecodeInto(data, &controller); err != nil {
 		glog.Fatalf("Unexpected error reading rc manifest %v", err)
 	}
 	return &controller

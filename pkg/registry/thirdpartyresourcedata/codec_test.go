@@ -86,13 +86,13 @@ func TestCodec(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		codec := thirdPartyResourceDataCodec{kind: "Foo"}
+		codec := &thirdPartyResourceDataCodec{kind: "Foo"}
 		data, err := json.Marshal(test.obj)
 		if err != nil {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 			continue
 		}
-		obj, err := codec.Decode(data)
+		obj, _, err := codec.Decode(data, nil, nil)
 		if err != nil && !test.expectErr {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 			continue
@@ -120,7 +120,7 @@ func TestCodec(t *testing.T) {
 			t.Errorf("[%s]\nexpected\n%v\nsaw\n%v\n", test.name, test.obj, &output)
 		}
 
-		data, err = codec.Encode(rsrcObj)
+		data, err = runtime.Encode(codec, rsrcObj)
 		if err != nil {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 		}

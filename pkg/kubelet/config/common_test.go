@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 
 	"github.com/ghodss/yaml"
@@ -56,7 +57,7 @@ func TestDecodeSinglePod(t *testing.T) {
 			SecurityContext: &api.PodSecurityContext{},
 		},
 	}
-	json, err := testapi.Default.Codec().Encode(pod)
+	json, err := runtime.Encode(testapi.Default.Codec(), pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -122,7 +123,7 @@ func TestDecodePodList(t *testing.T) {
 	podList := &api.PodList{
 		Items: []api.Pod{*pod},
 	}
-	json, err := testapi.Default.Codec().Encode(podList)
+	json, err := runtime.Encode(testapi.Default.Codec(), podList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

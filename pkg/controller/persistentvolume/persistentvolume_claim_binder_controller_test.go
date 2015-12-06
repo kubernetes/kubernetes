@@ -204,8 +204,9 @@ func TestExampleObjects(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		o := testclient.NewObjects(api.Scheme, api.Scheme)
-		if err := testclient.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/"+name, o, api.Scheme); err != nil {
+		codec := latest.Codecs.UniversalDecoder()
+		o := testclient.NewObjects(api.Scheme, codec)
+		if err := testclient.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/"+name, o, codec); err != nil {
 			t.Fatal(err)
 		}
 
@@ -261,11 +262,12 @@ func TestExampleObjects(t *testing.T) {
 }
 
 func TestBindingWithExamples(t *testing.T) {
-	o := testclient.NewObjects(api.Scheme, api.Scheme)
-	if err := testclient.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/claims/claim-01.yaml", o, api.Scheme); err != nil {
+	codec := latest.Codecs.UniversalDecoder()
+	o := testclient.NewObjects(api.Scheme, codec)
+	if err := testclient.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/claims/claim-01.yaml", o, codec); err != nil {
 		t.Fatal(err)
 	}
-	if err := testclient.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/volumes/local-01.yaml", o, api.Scheme); err != nil {
+	if err := testclient.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/volumes/local-01.yaml", o, codec); err != nil {
 		t.Fatal(err)
 	}
 

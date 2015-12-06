@@ -64,7 +64,7 @@ func newEtcdHelper(client tools.EtcdClient, codec runtime.Codec, prefix string) 
 
 // Returns an encoded version of api.Pod with the given name.
 func getEncodedPod(name string) string {
-	pod, _ := testapi.Default.Codec().Encode(&api.Pod{
+	pod, _ := runtime.Encode(testapi.Default.Codec(), &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: name},
 	})
 	return string(pod)
@@ -261,7 +261,7 @@ func TestCreate(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	_, err = testapi.Default.Codec().Encode(obj)
+	_, err = runtime.Encode(testapi.Default.Codec(), obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -269,7 +269,7 @@ func TestCreate(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	_, err = testapi.Default.Codec().Encode(returnedObj)
+	_, err = runtime.Encode(testapi.Default.Codec(), returnedObj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
