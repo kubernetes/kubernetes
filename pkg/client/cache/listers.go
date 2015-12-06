@@ -336,7 +336,7 @@ func (s *StoreToJobLister) List() (jobs extensions.JobList, err error) {
 	return jobs, nil
 }
 
-// GetPodControllers returns a list of jobs managing a pod. Returns an error only if no matching jobs are found.
+// GetPodJobs returns a list of jobs managing a pod. Returns an error only if no matching jobs are found.
 func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err error) {
 	var selector labels.Selector
 	var job extensions.Job
