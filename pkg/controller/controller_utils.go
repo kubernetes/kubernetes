@@ -61,6 +61,13 @@ func NoResyncPeriodFunc() time.Duration {
 	return 0
 }
 
+// StaticResyncPeriodFunc returns the resync period specified
+func StaticResyncPeriodFunc(resyncPeriod time.Duration) ResyncPeriodFunc {
+	return func() time.Duration {
+		return resyncPeriod
+	}
+}
+
 // Expectations are a way for controllers to tell the controller manager what they expect. eg:
 //	ControllerExpectations: {
 //		controller1: expects  2 adds in 2 minutes
