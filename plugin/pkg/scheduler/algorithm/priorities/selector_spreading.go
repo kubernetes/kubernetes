@@ -25,6 +25,14 @@ import (
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
+// The maximum priority value to give to a node
+// Prioritiy values range from 0-maxPriority
+const maxPriority = 10
+
+// When zone information is present, give 2/3 of the weighting to zone spreading, 1/3 to node spreading
+// TODO: Any way to justify this weighting?
+const zoneWeighting = 2.0 / 3.0
+
 type SelectorSpread struct {
 	serviceLister    algorithm.ServiceLister
 	controllerLister algorithm.ControllerLister
@@ -53,12 +61,18 @@ func getZoneKey(node *api.Node) string {
 		return ""
 	}
 
-	return region + ":" + failureDomain
+	// We include the null character just in case region or failureDomain has a colon
+	// (We do assume there's no null characters in a region or failureDomain)
+	// As a nice side-benefit, the null character is not printed by fmt.Print or glog
+	return region + ":\x00:" + failureDomain
 }
 
-// CalculateSpreadPriority spreads pods by minimizing the number of pods belonging to the same service or replication controller. It counts number of pods that run under
-// Services or RCs as the pod being scheduled and tries to minimize the number of conflicts. I.e. pushes scheduler towards a Node where there's a smallest number of
-// pods which match the same selectors of Services and RCs as current pod.
+// CalculateSpreadPriority spreads pods across hosts and zones, considering pods belonging to the same service or replication controller.
+// When a pod is scheduled, it looks for services or RCs that match the pod, then finds existing pods that match those selectors.
+// It favors nodes that have fewer existing matching pods.
+// i.e. it pushes the scheduler towards a node where there's the smallest number of
+// pods which match the same service selectors or RC selectors as the pod being scheduled.
+// Where zone information is included on the nodes, it favors nodes in zones with fewer existing matching pods.
 func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	var nsPods []*api.Pod
 
@@ -94,36 +108,40 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorit
 		return nil, err
 	}
 
-	maxCountByNodeName := 0
+	// Count similar pods by node
 	countsByNodeName := map[string]int{}
-	if len(nsPods) > 0 {
-		for _, pod := range nsPods {
-			// When we are replacing a failed pod, we often see the previous deleted version
-			// while scheduling the replacement.  Ignore the previous deleted version for spreading
-			// purposes (it can still be considered for resource restrictions etc.)
-			if pod.DeletionTimestamp != nil {
-				glog.V(2).Infof("skipping pending-deleted pod: %s/%s", pod.Namespace, pod.Name)
-				continue
+	for _, pod := range nsPods {
+		// When we are replacing a failed pod, we often see the previous deleted version
+		// while scheduling the replacement.  Ignore the previous deleted version for spreading
+		// purposes (it can still be considered for resource restrictions etc.)
+		if pod.DeletionTimestamp != nil {
+			glog.V(2).Infof("skipping pending-deleted pod: %s/%s", pod.Namespace, pod.Name)
+			continue
+		}
+		matches := false
+		for _, selector := range selectors {
+			if selector.Matches(labels.Set(pod.ObjectMeta.Labels)) {
+				matches = true
+				break
 			}
-			matches := false
-			for _, selector := range selectors {
-				if selector.Matches(labels.Set(pod.ObjectMeta.Labels)) {
-					matches = true
-					break
-				}
-			}
-			if matches {
-				countsByNodeName[pod.Spec.NodeName]++
-				// Compute the maximum number of pods hosted on any node
-				if countsByNodeName[pod.Spec.NodeName] > maxCountByNodeName {
-					maxCountByNodeName = countsByNodeName[pod.Spec.NodeName]
-				}
-			}
+		}
+		if !matches {
+			continue
+		}
+
+		countsByNodeName[pod.Spec.NodeName]++
+	}
+
+	// Aggregate by-node information
+	// Compute the maximum number of pods hosted on any node
+	maxCountByNodeName := 0
+	for _, count := range countsByNodeName {
+		if count > maxCountByNodeName {
+			maxCountByNodeName = count
 		}
 	}
 
-	maxCountByZone := 0
-	haveZones := false
+	// Count similar pods by zone, if zone information is present
 	countsByZone := map[string]int{}
 	for i := range nodes.Items {
 		node := &nodes.Items[i]
@@ -138,35 +156,37 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, podLister algorit
 			continue
 		}
 
-		haveZones = true
 		countsByZone[zoneId] += count
-		// Compute the maximum number of pods hosted in any zone
-		if countsByZone[zoneId] > maxCountByZone {
-			maxCountByZone = countsByZone[zoneId]
+	}
+
+	// Aggregate by-zone information
+	// Compute the maximum number of pods hosted in any zone
+	haveZones := len(countsByZone) != 0
+	maxCountByZone := 0
+	for _, count := range countsByZone {
+		if count > maxCountByZone {
+			maxCountByZone = count
 		}
 	}
 
 	result := []schedulerapi.HostPriority{}
-	//score int - scale of 0-10
-	// 0 being the lowest priority and 10 being the highest
+	//score int - scale of 0-maxPriority
+	// 0 being the lowest priority and maxPriority being the highest
 	for i := range nodes.Items {
 		node := &nodes.Items[i]
-		// initializing to the default/max node score of 10
-		fScore := float32(10)
+		// initializing to the default/max node score of maxPriority
+		fScore := float32(maxPriority)
 		if maxCountByNodeName > 0 {
-			fScore = 10 * (float32(maxCountByNodeName-countsByNodeName[node.Name]) / float32(maxCountByNodeName))
+			fScore = maxPriority * (float32(maxCountByNodeName-countsByNodeName[node.Name]) / float32(maxCountByNodeName))
 		}
 
 		// If there is zone information present, incorporate it
 		if haveZones {
 			zoneId := getZoneKey(node)
 			if zoneId != "" {
-				fScore += 20 * (float32(maxCountByZone-countsByZone[zoneId]) / float32(maxCountByZone))
+				zoneScore := maxPriority * (float32(maxCountByZone-countsByZone[zoneId]) / float32(maxCountByZone))
+				fScore = (fScore * (1.0 - zoneWeighting)) + (zoneWeighting * zoneScore)
 			}
-
-			// Give 2/3 of the weighting to zone spreading, 1/3 to node spreading
-			// TODO: Any way to justify this weighting?
-			fScore /= 3.0
 		}
 
 		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
@@ -241,13 +261,13 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, podLis
 
 	numServicePods := len(nsServicePods)
 	result := []schedulerapi.HostPriority{}
-	//score int - scale of 0-10
-	// 0 being the lowest priority and 10 being the highest
+	//score int - scale of 0-maxPriority
+	// 0 being the lowest priority and maxPriority being the highest
 	for node := range labeledNodes {
-		// initializing to the default/max node score of 10
-		fScore := float32(10)
+		// initializing to the default/max node score of maxPriority
+		fScore := float32(maxPriority)
 		if numServicePods > 0 {
-			fScore = 10 * (float32(numServicePods-podCounts[labeledNodes[node]]) / float32(numServicePods))
+			fScore = maxPriority * (float32(numServicePods-podCounts[labeledNodes[node]]) / float32(numServicePods))
 		}
 		result = append(result, schedulerapi.HostPriority{Host: node, Score: int(fScore)})
 	}
