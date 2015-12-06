@@ -36,7 +36,6 @@ import (
 	appctypes "github.com/appc/spec/schema/types"
 	"github.com/coreos/go-systemd/unit"
 	rktapi "github.com/coreos/rkt/api/v1alpha"
-	"github.com/docker/docker/pkg/parsers"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
@@ -50,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -390,23 +390,12 @@ func setApp(app *appctypes.App, c *api.Container, opts *kubecontainer.RunContain
 	return setIsolators(app, c)
 }
 
-// parseImageName parses a docker image string into two parts: repo and tag.
-// If tag is empty, return the defaultImageTag.
-func parseImageName(image string) (string, string) {
-	repoToPull, tag := parsers.ParseRepositoryTag(image)
-	// If no tag was specified, use the default "latest".
-	if len(tag) == 0 {
-		tag = defaultImageTag
-	}
-	return repoToPull, tag
-}
-
 // getImageManifest invokes 'rkt image cat-manifest' to retrive the image manifest
 // for the image.
 func (r *Runtime) getImageManifest(image string) (*appcschema.ImageManifest, error) {
 	var manifest appcschema.ImageManifest
 
-	repoToPull, tag := parseImageName(image)
+	repoToPull, tag := parsers.ParseImageName(image)
 	imgName, err := appctypes.SanitizeACIdentifier(repoToPull)
 	if err != nil {
 		return nil, err
@@ -930,7 +919,7 @@ func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Sec
 	img := image.Image
 	// TODO(yifan): The credential operation is a copy from dockertools package,
 	// Need to resolve the code duplication.
-	repoToPull, _ := parseImageName(img)
+	repoToPull, _ := parsers.ParseImageName(img)
 	keyring, err := credentialprovider.MakeDockerKeyring(pullSecrets, r.dockerKeyring)
 	if err != nil {
 		return err
@@ -956,7 +945,7 @@ func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Sec
 
 // TODO(yifan): Searching the image via 'rkt images' might not be the most efficient way.
 func (r *Runtime) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
-	repoToPull, tag := parseImageName(image.Image)
+	repoToPull, tag := parsers.ParseImageName(image.Image)
 	// Example output of 'rkt image list --fields=name':
 	//
 	// NAME

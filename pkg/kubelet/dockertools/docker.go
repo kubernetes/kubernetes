@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/docker/docker/pkg/parsers"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -35,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 const (
@@ -115,10 +115,6 @@ func newDockerPuller(client DockerInterface, qps float32, burst int) DockerPulle
 	}
 }
 
-func parseImageName(image string) (string, string) {
-	return parsers.ParseRepositoryTag(image)
-}
-
 func filterHTTPError(err error, image string) error {
 	// docker/docker/pull/11314 prints detailed error info for docker pull.
 	// When it hits 502, it returns a verbose html output including an inline svg,
@@ -136,12 +132,8 @@ func filterHTTPError(err error, image string) error {
 }
 
 func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
-	repoToPull, tag := parseImageName(image)
-
 	// If no tag was specified, use the default "latest".
-	if len(tag) == 0 {
-		tag = "latest"
-	}
+	repoToPull, tag := parsers.ParseImageName(image)
 
 	opts := docker.PullImageOptions{
 		Repository: repoToPull,
