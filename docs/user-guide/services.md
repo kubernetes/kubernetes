@@ -418,9 +418,6 @@ Valid values for the `ServiceType` field are:
      which forwards to the `Service` exposed as a `<NodeIP>:NodePort`
      for each Node.
 
-Note that while `NodePort`s can be TCP or UDP, `LoadBalancer`s only support TCP
-as of Kubernetes 1.0.
-
 ### Type NodePort
 
 If you set the `type` field to `"NodePort"`, the Kubernetes master will
@@ -536,8 +533,6 @@ Using the userspace proxy obscures the source-IP of a packet accessing a `Servic
 This makes some kinds of firewalling impossible.  The iptables proxier does not
 obscure in-cluster source IPs, but it does still impact clients coming through
 a load-balancer or node-port.
-
-LoadBalancers only support TCP, not UDP.
 
 The `Type` field is designed as nested functionality - each level adds to the
 previous.  This is not strictly required on all cloud providers (e.g. Google Compute Engine does
