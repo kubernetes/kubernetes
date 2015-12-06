@@ -378,8 +378,9 @@ func (s *ServiceController) createLoadBalancer(service *api.Service) error {
 		return err
 	}
 	name := s.loadBalancerName(service)
-	// getPortsForLB already verified that the protocol matches for all ports.
-	// The cloud provider will verify the protocol is supported
+	// - Only one protocol supported per service
+	// - Not all cloud providers support all protocols and the next step is expected to return
+	//   an error for unsupported protocols
 	status, err := s.balancer.EnsureLoadBalancer(name, s.zone.Region, net.ParseIP(service.Spec.LoadBalancerIP),
 		ports, hostsFromNodeList(&nodes), service.Spec.SessionAffinity)
 	if err != nil {
@@ -494,6 +495,7 @@ func getPortsForLB(service *api.Service) ([]*api.ServicePort, error) {
 		if protocol == "" {
 			protocol = sp.Protocol
 		} else if protocol != sp.Protocol && wantsLoadBalancer(service) {
+			// TODO:  Convert error messages to use event recorder
 			return nil, fmt.Errorf("mixed protocol external load balancers are not supported.")
 		}
 	}

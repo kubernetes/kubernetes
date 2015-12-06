@@ -825,7 +825,7 @@ var _ = Describe("Services", func() {
 		svc2 := t2.BuildServiceSpec()
 		svc2.Spec.Type = api.ServiceTypeLoadBalancer
 		svc2.Spec.Ports[0].Port = servicePort
-		// Let this one be UDP so that we can test that as well without an additional test
+		// UDP loadbalancing is tested via test NetcatTest
 		svc2.Spec.Ports[0].Protocol = api.ProtocolUDP
 		svc2.Spec.Ports[0].TargetPort = intstr.FromInt(80)
 		svc2.Spec.LoadBalancerIP = loadBalancerIP
@@ -1171,13 +1171,14 @@ func testLoadBalancerReachable(ingress api.LoadBalancerIngress, port int) bool {
 	return testLoadBalancerReachableInTime(ingress, port, podStartTimeout)
 }
 
-func testNetcatLoadBalancerReachable(ingress api.LoadBalancerIngress, port int) {
-	ip := ingress.IP
-	if ip == "" {
-		ip = ingress.Hostname
-	}
+func testNetcatLoadBalancerReachable(ingress api.LoadBalancerIngress, port int) bool {
+	return testNetcatLoadBalancerReachableInTime(ingress, port, podStartTimeout)
+}
 
-	testNetcatReachable(ip, port)
+func conditionFuncDecorator(ip string, port int, fn func(string, int) (bool, error)) wait.ConditionFunc {
+	return func() (bool, error) {
+		return fn(ip, port)
+	}
 }
 
 func testLoadBalancerReachableInTime(ingress api.LoadBalancerIngress, port int, timeout time.Duration) bool {
@@ -1186,7 +1187,17 @@ func testLoadBalancerReachableInTime(ingress api.LoadBalancerIngress, port int, 
 		ip = ingress.Hostname
 	}
 
-	return testReachableInTime(ip, port, timeout)
+	return testReachableInTime(conditionFuncDecorator(ip, port, testReachable), timeout)
+
+}
+
+func testNetcatLoadBalancerReachableInTime(ingress api.LoadBalancerIngress, port int, timeout time.Duration) bool {
+	ip := ingress.IP
+	if ip == "" {
+		ip = ingress.Hostname
+	}
+
+	return testReachableInTime(conditionFuncDecorator(ip, port, testNetcatReachable), timeout)
 }
 
 func testLoadBalancerNotReachable(ingress api.LoadBalancerIngress, port int) {
@@ -1198,72 +1209,83 @@ func testLoadBalancerNotReachable(ingress api.LoadBalancerIngress, port int) {
 	testNotReachable(ip, port)
 }
 
-func testReachable(ip string, port int) bool {
-	return testReachableInTime(ip, port, podStartTimeout)
+func testReachable(ip string, port int) (bool, error) {
+	url := fmt.Sprintf("http://%s:%d", ip, port)
+	if ip == "" {
+		Failf("Got empty IP for reachability check (%s)", url)
+		return false, nil
+	}
+	if port == 0 {
+		Failf("Got port==0 for reachability check (%s)", url)
+		return false, nil
+	}
+
+	Logf("Testing reachability of %v", url)
+
+	resp, err := httpGetNoConnectionPool(url)
+	if err != nil {
+		Logf("Got error waiting for reachability of %s: %v", url, err)
+		return false, nil
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		Logf("Got error reading response from %s: %v", url, err)
+		return false, nil
+	}
+	if resp.StatusCode != 200 {
+		return false, fmt.Errorf("received non-success return status %q trying to access %s; got body: %s", resp.Status, url, string(body))
+	}
+	if !strings.Contains(string(body), "test-webserver") {
+		return false, fmt.Errorf("received response body without expected substring 'test-webserver': %s", string(body))
+	}
+	Logf("Successfully reached %v", url)
+	return true, nil
 }
 
-func testNetcatReachable(ip string, port int) {
+func testNetcatReachable(ip string, port int) (bool, error) {
+	uri := fmt.Sprintf("udp://%s:%d", ip, port)
+	if ip == "" {
+		Failf("Got empty IP for reachability check (%s)", uri)
+		return false, nil
+	}
+	if port == 0 {
+		Failf("Got port==0 for reachability check (%s)", uri)
+		return false, nil
+	}
+
+	Logf("Testing reachability of %v", uri)
+
 	con, err := net.Dial("udp", ip+":"+string(port))
 	if err != nil {
-		Failf("Failed to connect to: %s:%d (%s)", ip, port, err.Error())
+		return false, fmt.Errorf("Failed to connect to: %s:%d (%s)", ip, port, err.Error())
 	}
 
 	_, err = con.Write([]byte("\n"))
 	if err != nil {
-		Failf("Failed to send newline: %s", err.Error())
+		return false, fmt.Errorf("Failed to send newline: %s", err.Error())
 	}
 
 	var buf []byte = make([]byte, len("SUCCESS")+1)
 
 	_, err = con.Read(buf)
 	if err != nil {
-		Failf("Failed to read result: %s", err.Error())
+		return false, fmt.Errorf("Failed to read result: %s", err.Error())
 	}
 
 	if !strings.HasPrefix(string(buf), "SUCCESS") {
-		Failf("Failed to retrieve: \"SUCCESS\"")
+		return false, fmt.Errorf("Failed to retrieve: \"SUCCESS\"")
 	}
 
 	Logf("Successfully retrieved \"SUCCESS\"")
+	return true, nil
 }
 
-func testReachableInTime(ip string, port int, timeout time.Duration) bool {
-	url := fmt.Sprintf("http://%s:%d", ip, port)
-	if ip == "" {
-		Failf("Got empty IP for reachability check (%s)", url)
-		return false
-	}
-	if port == 0 {
-		Failf("Got port==0 for reachability check (%s)", url)
-		return false
-	}
-
-	desc := fmt.Sprintf("the url %s to be reachable", url)
-	By(fmt.Sprintf("Waiting up to %v for %s", timeout, desc))
-	start := time.Now()
-	err := wait.PollImmediate(poll, timeout, func() (bool, error) {
-		resp, err := httpGetNoConnectionPool(url)
-		if err != nil {
-			Logf("Got error waiting for reachability of %s: %v (%v)", url, err, time.Since(start))
-			return false, nil
-		}
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			Logf("Got error reading response from %s: %v", url, err)
-			return false, nil
-		}
-		if resp.StatusCode != 200 {
-			return false, fmt.Errorf("received non-success return status %q trying to access %s; got body: %s", resp.Status, url, string(body))
-		}
-		if !strings.Contains(string(body), "test-webserver") {
-			return false, fmt.Errorf("received response body without expected substring 'test-webserver': %s", string(body))
-		}
-		Logf("Successfully reached %v", url)
-		return true, nil
-	})
+func testReachableInTime(testFunc wait.ConditionFunc, timeout time.Duration) bool {
+	By(fmt.Sprintf("Waiting up to %v", timeout))
+	err := wait.PollImmediate(poll, timeout, testFunc)
 	if err != nil {
-		Expect(err).NotTo(HaveOccurred(), "Error waiting for %s", desc)
+		Expect(err).NotTo(HaveOccurred(), "Error waiting")
 		return false
 	}
 	return true

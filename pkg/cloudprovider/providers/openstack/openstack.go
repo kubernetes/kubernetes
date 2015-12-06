@@ -660,6 +660,7 @@ func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP n
 	}
 
 	// The service controller verified all the protocols match on the ports, just check and use the first one
+	// TODO: Convert all error messages to use an event recorder
 	if ports[0].Protocol != api.ProtocolTCP {
 		return nil, fmt.Errorf("Only TCP LoadBalancer is supported for openstack load balancers")
 	}
