@@ -71,7 +71,7 @@ func (c *podTemplates) Delete(name string, options *api.DeleteOptions) error {
 	if options == nil {
 		return c.r.Delete().Namespace(c.ns).Resource("podTemplates").Name(name).Do().Error()
 	}
-	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion())
+	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion().String())
 	if err != nil {
 		return err
 	}

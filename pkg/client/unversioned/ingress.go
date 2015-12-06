@@ -84,7 +84,7 @@ func (c *ingress) Delete(name string, options *api.DeleteOptions) (err error) {
 		return c.r.Delete().Namespace(c.ns).Resource("ingresses").Name(name).Do().Error()
 	}
 
-	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion())
+	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion().String())
 	if err != nil {
 		return err
 	}

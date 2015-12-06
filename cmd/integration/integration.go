@@ -38,6 +38,7 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
@@ -423,7 +424,7 @@ containers:
 }
 
 func runReplicationControllerTest(c *client.Client) {
-	clientAPIVersion := c.APIVersion()
+	clientAPIVersion := c.APIVersion().String()
 	data, err := ioutil.ReadFile("cmd/integration/" + clientAPIVersion + "-controller.json")
 	if err != nil {
 		glog.Fatalf("Unexpected error: %v", err)
@@ -462,7 +463,7 @@ func runReplicationControllerTest(c *client.Client) {
 
 func runAPIVersionsTest(c *client.Client) {
 	v, err := c.ServerAPIVersions()
-	clientVersion := c.APIVersion()
+	clientVersion := c.APIVersion().String()
 	if err != nil {
 		glog.Fatalf("Failed to get api versions: %v", err)
 	}
@@ -541,7 +542,7 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 func runAtomicPutTest(c *client.Client) {
 	svcBody := api.Service{
 		TypeMeta: unversioned.TypeMeta{
-			APIVersion: c.APIVersion(),
+			APIVersion: c.APIVersion().String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: "atomicservice",
@@ -623,7 +624,7 @@ func runPatchTest(c *client.Client) {
 	resource := "services"
 	svcBody := api.Service{
 		TypeMeta: unversioned.TypeMeta{
-			APIVersion: c.APIVersion(),
+			APIVersion: c.APIVersion().String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:   name,
@@ -647,12 +648,12 @@ func runPatchTest(c *client.Client) {
 		glog.Fatalf("Failed creating patchservice: %v", err)
 	}
 
-	patchBodies := map[string]map[api.PatchType]struct {
+	patchBodies := map[unversioned.GroupVersion]map[api.PatchType]struct {
 		AddLabelBody        []byte
 		RemoveLabelBody     []byte
 		RemoveAllLabelsBody []byte
 	}{
-		"v1": {
+		v1.SchemeGroupVersion: {
 			api.JSONPatchType: {
 				[]byte(`[{"op":"add","path":"/metadata/labels","value":{"foo":"bar","baz":"qux"}}]`),
 				[]byte(`[{"op":"remove","path":"/metadata/labels/foo"}]`),
