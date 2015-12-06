@@ -397,7 +397,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, config.GroupVersion.String(), config.Codec, config.QPS, config.Burst)
+	client := NewRESTClient(baseURL, *config.GroupVersion, config.Codec, config.QPS, config.Burst)
 
 	transport, err := TransportFor(config)
 	if err != nil {
@@ -422,7 +422,7 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, "", config.Codec, config.QPS, config.Burst)
+	client := NewRESTClient(baseURL, unversioned.SchemeGroupVersion, config.Codec, config.QPS, config.Burst)
 
 	transport, err := TransportFor(config)
 	if err != nil {
