@@ -43,5 +43,5 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 
 // MarshalJSON implements the json.Marshaler interface.
 func (d Duration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.String())
+	return json.Marshal(d.Duration.String())
 }
