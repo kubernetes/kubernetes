@@ -238,22 +238,27 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		"label2": "l2",
 		"baz":    "blah",
 	}
-	nodeLabelsZone1 := map[string]string{
-		wellknownlabels.LabelZoneFailureDomain: "zone1",
-	}
-	nodeLabelsZone2 := map[string]string{
-		wellknownlabels.LabelZoneFailureDomain: "zone2",
-	}
-	nodeLabelsZone3 := map[string]string{
-		wellknownlabels.LabelZoneFailureDomain: "zone3",
+
+	const nodeMachine1Zone1 = "machine1.zone1"
+	const nodeMachine1Zone2 = "machine1.zone2"
+	const nodeMachine2Zone2 = "machine2.zone2"
+	const nodeMachine1Zone3 = "machine1.zone3"
+	const nodeMachine2Zone3 = "machine2.zone3"
+	const nodeMachine3Zone3 = "machine3.zone3"
+
+	buildNodeLabels := func(failureDomain string) map[string]string {
+		labels := map[string]string{
+			wellknownlabels.LabelZoneFailureDomain: failureDomain,
+		}
+		return labels
 	}
 	labeledNodes := map[string]map[string]string{
-		"machine1.zone1": nodeLabelsZone1,
-		"machine1.zone2": nodeLabelsZone2,
-		"machine2.zone2": nodeLabelsZone2,
-		"machine1.zone3": nodeLabelsZone3,
-		"machine2.zone3": nodeLabelsZone3,
-		"machine3.zone3": nodeLabelsZone3,
+		nodeMachine1Zone1: buildNodeLabels("zone1"),
+		nodeMachine1Zone2: buildNodeLabels("zone2"),
+		nodeMachine2Zone2: buildNodeLabels("zone2"),
+		nodeMachine1Zone3: buildNodeLabels("zone3"),
+		nodeMachine2Zone3: buildNodeLabels("zone3"),
+		nodeMachine3Zone3: buildNodeLabels("zone3"),
 	}
 
 	buildPod := func(nodeName string, labels map[string]string) *api.Pod {
@@ -273,139 +278,139 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		{
 			pod: new(api.Pod),
 			expectedList: []schedulerapi.HostPriority{
-				{"machine1.zone1", 10},
-				{"machine1.zone2", 10},
-				{"machine2.zone2", 10},
-				{"machine1.zone3", 10},
-				{"machine2.zone3", 10},
-				{"machine3.zone3", 10},
+				{nodeMachine1Zone1, 10},
+				{nodeMachine1Zone2, 10},
+				{nodeMachine2Zone2, 10},
+				{nodeMachine1Zone3, 10},
+				{nodeMachine2Zone3, 10},
+				{nodeMachine3Zone3, 10},
 			},
 			test: "nothing scheduled",
 		},
 		{
 			pod:  buildPod("", labels1),
-			pods: []*api.Pod{buildPod("machine1.zone1", nil)},
+			pods: []*api.Pod{buildPod(nodeMachine1Zone1, nil)},
 			expectedList: []schedulerapi.HostPriority{
-				{"machine1.zone1", 10},
-				{"machine1.zone2", 10},
-				{"machine2.zone2", 10},
-				{"machine1.zone3", 10},
-				{"machine2.zone3", 10},
-				{"machine3.zone3", 10},
+				{nodeMachine1Zone1, 10},
+				{nodeMachine1Zone2, 10},
+				{nodeMachine2Zone2, 10},
+				{nodeMachine1Zone3, 10},
+				{nodeMachine2Zone3, 10},
+				{nodeMachine3Zone3, 10},
 			},
 			test: "no services",
 		},
 		{
 			pod:      buildPod("", labels1),
-			pods:     []*api.Pod{buildPod("machine1.zone1", labels2)},
+			pods:     []*api.Pod{buildPod(nodeMachine1Zone1, labels2)},
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []schedulerapi.HostPriority{
-				{"machine1.zone1", 10},
-				{"machine1.zone2", 10},
-				{"machine2.zone2", 10},
-				{"machine1.zone3", 10},
-				{"machine2.zone3", 10},
-				{"machine3.zone3", 10},
+				{nodeMachine1Zone1, 10},
+				{nodeMachine1Zone2, 10},
+				{nodeMachine2Zone2, 10},
+				{nodeMachine1Zone3, 10},
+				{nodeMachine2Zone3, 10},
+				{nodeMachine3Zone3, 10},
 			},
 			test: "different services",
 		},
 		{
 			pod: buildPod("", labels1),
 			pods: []*api.Pod{
-				buildPod("machine1.zone1", labels2),
-				buildPod("machine1.zone2", labels1),
+				buildPod(nodeMachine1Zone1, labels2),
+				buildPod(nodeMachine1Zone2, labels1),
 			},
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{
-				{"machine1.zone1", 10},
-				{"machine1.zone2", 0}, // Already have pod on machine
-				{"machine2.zone2", 3}, // Already have pod in zone
-				{"machine1.zone3", 10},
-				{"machine2.zone3", 10},
-				{"machine3.zone3", 10},
+				{nodeMachine1Zone1, 10},
+				{nodeMachine1Zone2, 0}, // Already have pod on machine
+				{nodeMachine2Zone2, 3}, // Already have pod in zone
+				{nodeMachine1Zone3, 10},
+				{nodeMachine2Zone3, 10},
+				{nodeMachine3Zone3, 10},
 			},
 			test: "two pods, 1 matching (in z2)",
 		},
 		{
 			pod: buildPod("", labels1),
 			pods: []*api.Pod{
-				buildPod("machine1.zone1", labels2),
-				buildPod("machine1.zone2", labels1),
-				buildPod("machine2.zone2", labels1),
-				buildPod("machine1.zone3", labels2),
-				buildPod("machine2.zone3", labels1),
+				buildPod(nodeMachine1Zone1, labels2),
+				buildPod(nodeMachine1Zone2, labels1),
+				buildPod(nodeMachine2Zone2, labels1),
+				buildPod(nodeMachine1Zone3, labels2),
+				buildPod(nodeMachine2Zone3, labels1),
 			},
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{
-				{"machine1.zone1", 10},
-				{"machine1.zone2", 0}, // Pod on node
-				{"machine2.zone2", 0}, // Pod on node
-				{"machine1.zone3", 6}, // Pod in zone
-				{"machine2.zone3", 3}, // Pod on node
-				{"machine3.zone3", 6}, // Pod in zone
+				{nodeMachine1Zone1, 10},
+				{nodeMachine1Zone2, 0}, // Pod on node
+				{nodeMachine2Zone2, 0}, // Pod on node
+				{nodeMachine1Zone3, 6}, // Pod in zone
+				{nodeMachine2Zone3, 3}, // Pod on node
+				{nodeMachine3Zone3, 6}, // Pod in zone
 			},
 			test: "five pods, 3 matching (z2=2, z3=1)",
 		},
 		{
 			pod: buildPod("", labels1),
 			pods: []*api.Pod{
-				buildPod("machine1.zone1", labels1),
-				buildPod("machine1.zone2", labels1),
-				buildPod("machine2.zone2", labels2),
-				buildPod("machine1.zone3", labels1),
+				buildPod(nodeMachine1Zone1, labels1),
+				buildPod(nodeMachine1Zone2, labels1),
+				buildPod(nodeMachine2Zone2, labels2),
+				buildPod(nodeMachine1Zone3, labels1),
 			},
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{
-				{"machine1.zone1", 0}, // Pod on node
-				{"machine1.zone2", 0}, // Pod on node
-				{"machine2.zone2", 3}, // Pod in zone
-				{"machine1.zone3", 0}, // Pod on node
-				{"machine2.zone3", 3}, // Pod in zone
-				{"machine3.zone3", 3}, // Pod in zone
+				{nodeMachine1Zone1, 0}, // Pod on node
+				{nodeMachine1Zone2, 0}, // Pod on node
+				{nodeMachine2Zone2, 3}, // Pod in zone
+				{nodeMachine1Zone3, 0}, // Pod on node
+				{nodeMachine2Zone3, 3}, // Pod in zone
+				{nodeMachine3Zone3, 3}, // Pod in zone
 			},
 			test: "four pods, 3 matching (z1=1, z2=1, z3=1)",
 		},
 		{
 			pod: buildPod("", labels1),
 			pods: []*api.Pod{
-				buildPod("machine1.zone1", labels1),
-				buildPod("machine1.zone2", labels1),
-				buildPod("machine1.zone3", labels1),
-				buildPod("machine2.zone2", labels2),
+				buildPod(nodeMachine1Zone1, labels1),
+				buildPod(nodeMachine1Zone2, labels1),
+				buildPod(nodeMachine1Zone3, labels1),
+				buildPod(nodeMachine2Zone2, labels2),
 			},
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{
-				{"machine1.zone1", 0}, // Pod on node
-				{"machine1.zone2", 0}, // Pod on node
-				{"machine2.zone2", 3}, // Pod in zone
-				{"machine1.zone3", 0}, // Pod on node
-				{"machine2.zone3", 3}, // Pod in zone
-				{"machine3.zone3", 3}, // Pod in zone
+				{nodeMachine1Zone1, 0}, // Pod on node
+				{nodeMachine1Zone2, 0}, // Pod on node
+				{nodeMachine2Zone2, 3}, // Pod in zone
+				{nodeMachine1Zone3, 0}, // Pod on node
+				{nodeMachine2Zone3, 3}, // Pod in zone
+				{nodeMachine3Zone3, 3}, // Pod in zone
 			},
 			test: "four pods, 3 matching (z1=1, z2=1, z3=1)",
 		},
 		{
 			pod: buildPod("", labels1),
 			pods: []*api.Pod{
-				buildPod("machine1.zone3", labels1),
-				buildPod("machine1.zone2", labels1),
-				buildPod("machine1.zone3", labels1),
+				buildPod(nodeMachine1Zone3, labels1),
+				buildPod(nodeMachine1Zone2, labels1),
+				buildPod(nodeMachine1Zone3, labels1),
 			},
 			rcs: []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{
-				// Note that because we put two pods on the same node (machine1.zone3),
-				// the values here are questionable for zone2, in particular for machine1.zone2.
+				// Note that because we put two pods on the same node (nodeMachine1Zone3),
+				// the values here are questionable for zone2, in particular for nodeMachine1Zone2.
 				// However they kind of make sense; zone1 is still most-highly favored.
 				// zone3 is in general least favored, and m1.z3 particularly low priority.
 				// We would probably prefer to see a bigger gap between putting a second
 				// pod on m1.z2 and putting a pod on m2.z2, but the ordering is correct.
 				// This is also consistent with what we have already.
-				{"machine1.zone1", 10}, // No pods in zone
-				{"machine1.zone2", 5},  // Pod on node
-				{"machine2.zone2", 6},  // Pod in zone
-				{"machine1.zone3", 0},  // Two pods on node
-				{"machine2.zone3", 3},  // Pod in zone
-				{"machine3.zone3", 3},  // Pod in zone
+				{nodeMachine1Zone1, 10}, // No pods in zone
+				{nodeMachine1Zone2, 5},  // Pod on node
+				{nodeMachine2Zone2, 6},  // Pod in zone
+				{nodeMachine1Zone3, 0},  // Two pods on node
+				{nodeMachine2Zone3, 3},  // Pod in zone
+				{nodeMachine3Zone3, 3},  // Pod in zone
 			},
 			test: "Replication controller spreading (z1=0, z2=1, z3=2)",
 		},
