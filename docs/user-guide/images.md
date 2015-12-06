@@ -60,6 +60,9 @@ pull an image if it already exists. If you would like to always force a pull
 you must set a pull image policy of `Always` or specify a `:latest` tag on
 your image.
 
+If you did not specify tag of your image, it will be assumed as `:latest`, with
+pull image policy of `Always` correspondingly.
+
 ## Using a Private Registry
 
 Private registries may require keys to read images from them.
