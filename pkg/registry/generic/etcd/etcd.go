@@ -176,20 +176,15 @@ func (e *Etcd) List(ctx api.Context, options *unversioned.ListOptions) (runtime.
 // ListPredicate returns a list of all the items matching m.
 func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *unversioned.ListOptions) (runtime.Object, error) {
 	list := e.NewListFunc()
-	trace := util.NewTrace("List " + reflect.TypeOf(list).String())
 	filterFunc := e.filterAndDecorateFunction(m)
-	defer trace.LogIfLong(600 * time.Millisecond)
 	if name, ok := m.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
-			trace.Step("About to read single object")
 			err := e.Storage.GetToList(ctx, key, filterFunc, list)
-			trace.Step("Object extracted")
 			return list, etcderr.InterpretListError(err, e.EndpointName)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
-	trace.Step("About to list directory")
 	if options == nil {
 		options = &unversioned.ListOptions{ResourceVersion: "0"}
 	}
@@ -198,7 +193,6 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *unvers
 		return nil, err
 	}
 	err = e.Storage.List(ctx, e.KeyRootFunc(ctx), version, filterFunc, list)
-	trace.Step("List extracted")
 	return list, etcderr.InterpretListError(err, e.EndpointName)
 }
 
