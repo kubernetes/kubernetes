@@ -461,19 +461,20 @@ func runReplicationControllerTest(c *client.Client) {
 }
 
 func runAPIVersionsTest(c *client.Client) {
-	v, err := c.ServerAPIVersions()
-	clientVersion := c.APIVersion()
+	apiGroupList, err := c.Discovery().ServerGroups()
 	if err != nil {
 		glog.Fatalf("Failed to get api versions: %v", err)
 	}
+	serverVersions := client.ExtractGroupVersions(apiGroupList)
+	clientVersion := c.APIVersion()
 	// Verify that the server supports the API version used by the client.
-	for _, version := range v.Versions {
+	for _, version := range serverVersions {
 		if version == clientVersion {
 			glog.Infof("Version test passed")
 			return
 		}
 	}
-	glog.Fatalf("Server does not support APIVersion used by client. Server supported APIVersions: '%v', client APIVersion: '%v'", v.Versions, clientVersion)
+	glog.Fatalf("Server does not support APIVersion used by client. Server supported APIVersions: '%v', client APIVersion: '%v'", serverVersions, clientVersion)
 }
 
 func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {

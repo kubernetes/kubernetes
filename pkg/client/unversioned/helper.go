@@ -247,14 +247,15 @@ func NegotiateVersion(client *Client, c *Config, requestedGV *unversioned.GroupV
 	for _, gv := range clientRegisteredGVs {
 		clientVersions.Insert(gv.String())
 	}
-	apiVersions, err := client.ServerAPIVersions()
+	apiGroupList, err := client.Discovery().ServerGroups()
 	if err != nil {
 		// This is almost always a connection error, and higher level code should treat this as a generic error,
 		// not a negotiation specific error.
 		return nil, err
 	}
+	groupVersions := ExtractGroupVersions(apiGroupList)
 	serverVersions := sets.String{}
-	for _, v := range apiVersions.Versions {
+	for _, v := range groupVersions {
 		serverVersions.Insert(v)
 	}
 
