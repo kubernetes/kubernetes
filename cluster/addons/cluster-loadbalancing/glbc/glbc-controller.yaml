@@ -52,8 +52,6 @@ spec:
             port: 8081
             scheme: HTTP
           initialDelaySeconds: 30
-          # healthz reaches out to GCE
-          periodSeconds: 30
           timeoutSeconds: 5
         name: l7-lb-controller
         resources:
