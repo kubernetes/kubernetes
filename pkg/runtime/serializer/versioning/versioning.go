@@ -97,6 +97,9 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 
 	// if we specify a target, use generic conversion.
 	if into != nil {
+		if into == obj {
+			return into, gvk
+		}
 		if err := c.convertor.Convert(obj, into); err != nil {
 			return nil, gvk, err
 		}
@@ -134,7 +137,7 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 	return out, gvk, nil
 }
 
-// EncodeToVersionStream
+// EncodeToStream ensures the provided object is output in the right scheme
 func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer) error {
 	gvk, err := c.typer.ObjectVersionAndKind(obj)
 	if err != nil {
@@ -147,16 +150,24 @@ func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer) error {
 
 	targetGV, ok := c.encodeVersion[gvk.Group]
 	if !ok {
-		return fmt.Errorf("the codec does not recognize group %s for kind %s and cannot encode it", gvk.Group, gvk.Kind)
+		if len(c.encodeVersion) == 1 {
+			for _, v := range c.encodeVersion {
+				targetGV = v
+			}
+		}
+		//return fmt.Errorf("the codec does not recognize group %q for kind %q and cannot encode it", gvk.Group, gvk.Kind)
 	}
 
 	// Perform a conversion if necessary.
-	if gvk.GroupVersion() != targetGV {
+	if !targetGV.IsEmpty() && gvk.GroupVersion() != targetGV {
 		out, err := c.convertor.ConvertToVersion(obj, targetGV.String())
 		if err != nil {
-			return err
+			if ok {
+				return err
+			}
+		} else {
+			obj = out
 		}
-		obj = out
 	}
 
 	return c.serializer.EncodeToStream(obj, w)

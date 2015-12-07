@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -316,7 +315,7 @@ func TestInstallSwaggerAPI(t *testing.T) {
 
 	// Empty externalHost verification
 	mux = http.NewServeMux()
-	master.handlerContainer = NewHandlerContainer(mux)
+	master.handlerContainer = NewHandlerContainer(mux, latest.Codecs)
 	master.externalHost = ""
 	master.clusterIP = net.IPv4(10, 10, 10, 10)
 	master.publicReadWritePort = 1010
@@ -352,7 +351,7 @@ func TestExpapi(t *testing.T) {
 	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix)
 	assert.Equal(expAPIGroup.Mapper, extensionsGroupMeta.RESTMapper)
 	assert.Equal(expAPIGroup.Serializer, latest.Codecs)
-	assert.Equal(expAPIGroup.ParameterCodec, latest.ParameterCodec)
+	assert.Equal(expAPIGroup.ParameterCodec, api.ParameterCodec)
 	assert.Equal(expAPIGroup.Linker, extensionsGroupMeta.SelfLinker)
 	assert.Equal(expAPIGroup.GroupVersion, unversioned.GroupVersion{Group: extensionsGroupMeta.Group, Version: extensionsGroupMeta.Version})
 }

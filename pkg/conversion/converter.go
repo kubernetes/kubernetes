@@ -585,7 +585,7 @@ func (c *Converter) defaultConvert(sv, dv reflect.Value, scope *scope) error {
 	dt, st := dv.Type(), sv.Type()
 
 	if !dv.CanSet() {
-		return scope.errorf("Cannot set dest. (Tried to deep copy something with unexported fields?)")
+		panic(scope.errorf("Cannot set dest. (Tried to deep copy something with unexported fields?)"))
 	}
 
 	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.nameFunc(dt) != c.nameFunc(st) {

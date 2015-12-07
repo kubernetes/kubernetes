@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -152,7 +152,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	namespace := tc.startingPod.Namespace
 	name := tc.startingPod.Name
 
-	codec := latest.GroupOrDie("").Codec
+	codec := testapi.Default.Codec()
 
 	testPatcher := &testPatcher{}
 	testPatcher.startingPod = tc.startingPod
@@ -176,12 +176,12 @@ func (tc *patchTestCase) Run(t *testing.T) {
 		}
 		t.Logf("Working with patchType %v", patchType)
 
-		originalObjJS, err := codec.Encode(tc.startingPod)
+		originalObjJS, err := runtime.Encode(codec, tc.startingPod)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 			return
 		}
-		changedJS, err := codec.Encode(tc.changedPod)
+		changedJS, err := runtime.Encode(codec, tc.changedPod)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 			return
@@ -231,12 +231,12 @@ func (tc *patchTestCase) Run(t *testing.T) {
 		resultPod := resultObj.(*api.Pod)
 
 		// roundtrip to get defaulting
-		expectedJS, err := codec.Encode(tc.expectedPod)
+		expectedJS, err := runtime.Encode(codec, tc.expectedPod)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 			return
 		}
-		expectedObj, err := codec.Decode(expectedJS)
+		expectedObj, _, err := codec.Decode(expectedJS, nil, nil)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 			return

@@ -278,7 +278,7 @@ func TestGenerateService(t *testing.T) {
 					}
 					defer req.Body.Close()
 					svc := &api.Service{}
-					if err := codec.DecodeInto(data, svc); err != nil {
+					if _, err := runtime.DecodeInto(codec, data, nil, svc); err != nil {
 						t.Errorf("unexpected error: %v", err)
 						t.FailNow()
 					}

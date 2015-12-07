@@ -430,18 +430,11 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 			delete(query, "tailLines")
 		}
 	}
-	// container logs on the kubelet are locked to v1
-	versioned := &v1.PodLogOptions{}
-	if err := api.Scheme.Convert(&query, versioned); err != nil {
+	logOptions := &api.PodLogOptions{}
+	if err := api.ParameterCodec.DecodeParameters(query, v1.SchemeGroupVersion, logOptions); err != nil {
 		response.WriteError(http.StatusBadRequest, fmt.Errorf(`{"message": "Unable to decode query."}`))
 		return
 	}
-	out, err := api.Scheme.ConvertToVersion(versioned, "")
-	if err != nil {
-		response.WriteError(http.StatusBadRequest, fmt.Errorf(`{"message": "Unable to convert request query."}`))
-		return
-	}
-	logOptions := out.(*api.PodLogOptions)
 	logOptions.TypeMeta = unversioned.TypeMeta{}
 	if errs := validation.ValidatePodLogOptions(logOptions); len(errs) > 0 {
 		response.WriteError(apierrs.StatusUnprocessableEntity, fmt.Errorf(`{"message": "Invalid request."}`))

@@ -130,6 +130,28 @@ func init() {
 			*out = in.Selector.String()
 			return nil
 		},
+		func(in, out *unversioned.LabelSelector, s conversion.Scope) error {
+			if in.Selector == nil {
+				return nil
+			}
+			selector, err := labels.Parse(in.Selector.String())
+			if err != nil {
+				return err
+			}
+			*out = unversioned.LabelSelector{Selector: selector}
+			return nil
+		},
+		func(in, out *unversioned.FieldSelector, s conversion.Scope) error {
+			if in.Selector == nil {
+				return nil
+			}
+			selector, err := fields.ParseSelector(in.Selector.String())
+			if err != nil {
+				return err
+			}
+			*out = unversioned.FieldSelector{Selector: selector}
+			return nil
+		},
 		func(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
 			// Cannot deep copy these, because inf.Dec has unexported fields.
 			*out = *in.Copy()

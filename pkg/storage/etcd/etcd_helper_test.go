@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
@@ -43,20 +44,25 @@ import (
 
 const validEtcdVersion = "etcd 2.0.9"
 
-var scheme *runtime.Scheme
-var codec runtime.Codec
-
-func init() {
-	scheme = runtime.NewScheme()
-	scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &storagetesting.TestResource{})
+func testScheme(t *testing.T) (*runtime.Scheme, runtime.Codec) {
+	scheme := runtime.NewScheme()
+	scheme.Log(t)
 	scheme.AddKnownTypes(*testapi.Default.GroupVersion(), &storagetesting.TestResource{})
-	codec = serializer.NewCodecFactory(scheme).LegacyCodec(*testapi.Default.GroupVersion())
-	scheme.AddConversionFuncs(
+	scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &storagetesting.TestResource{})
+	if err := scheme.AddConversionFuncs(
 		func(in *storagetesting.TestResource, out *storagetesting.TestResource, s conversion.Scope) error {
 			*out = *in
 			return nil
 		},
-	)
+		func(in, out *time.Time, s conversion.Scope) error {
+			*out = *in
+			return nil
+		},
+	); err != nil {
+		panic(err)
+	}
+	codec := serializer.NewCodecFactory(scheme).LegacyCodec(*testapi.Default.GroupVersion())
+	return scheme, codec
 }
 
 func newEtcdHelper(client tools.EtcdClient, codec runtime.Codec, prefix string) etcdHelper {
@@ -378,6 +384,7 @@ func TestSetNilOutParam(t *testing.T) {
 }
 
 func TestGuaranteedUpdate(t *testing.T) {
+	_, codec := testScheme(t)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")
@@ -419,6 +426,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 }
 
 func TestGuaranteedUpdateNoChange(t *testing.T) {
+	_, codec := testScheme(t)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")
@@ -448,6 +456,7 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 }
 
 func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
+	_, codec := testScheme(t)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")
@@ -474,6 +483,7 @@ func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
 }
 
 func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
+	_, codec := testScheme(t)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := etcdtest.AddPrefix("/some/key")

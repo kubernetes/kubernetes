@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package latest
+package latest_test
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -27,33 +29,33 @@ import (
 
 func TestAllPreferredGroupVersions(t *testing.T) {
 	testCases := []struct {
-		groupMetaMap GroupMetaMap
+		groupMetaMap latest.GroupMetaMap
 		expect       string
 	}{
 		{
-			groupMetaMap: GroupMetaMap{
-				"group1": &GroupMeta{
+			groupMetaMap: latest.GroupMetaMap{
+				"group1": &latest.GroupMeta{
 					GroupVersion: "group1/v1",
 				},
-				"group2": &GroupMeta{
+				"group2": &latest.GroupMeta{
 					GroupVersion: "group2/v2",
 				},
-				"": &GroupMeta{
+				"": &latest.GroupMeta{
 					GroupVersion: "v1",
 				},
 			},
 			expect: "group1/v1,group2/v2,v1",
 		},
 		{
-			groupMetaMap: GroupMetaMap{
-				"": &GroupMeta{
+			groupMetaMap: latest.GroupMetaMap{
+				"": &latest.GroupMeta{
 					GroupVersion: "v1",
 				},
 			},
 			expect: "v1",
 		},
 		{
-			groupMetaMap: GroupMetaMap{},
+			groupMetaMap: latest.GroupMetaMap{},
 			expect:       "",
 		},
 	}
@@ -107,6 +109,7 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	t.Logf("codec: %#v", expCodec)
 	typeMeta := unversioned.TypeMeta{}
 	if err := json.Unmarshal(encoded, &typeMeta); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -114,7 +117,7 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	if typeMeta.Kind != "Status" {
 		t.Errorf("Kind is not set to \"Status\". Got %s", encoded)
 	}
-	if typeMeta.APIVersion != "" {
+	if typeMeta.APIVersion != "v1" {
 		t.Errorf("APIVersion is not set to \"\". Got %s", encoded)
 	}
 	decoded, _, err := expCodec.Decode(encoded, nil, nil)

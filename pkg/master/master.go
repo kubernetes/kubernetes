@@ -875,7 +875,7 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 
 		Mapper: latest.GroupOrDie("").RESTMapper,
 
-		ParameterCodec: runtime.NewParameterCodec(api.Scheme),
+		ParameterCodec: api.ParameterCodec,
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,

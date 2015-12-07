@@ -59,7 +59,7 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 
 // This creates fake API versions, similar to api/latest.go.
 var testAPIGroup = "test.group"
-var testInternalGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: ""}
+var testInternalGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: runtime.APIVersionInternal}
 var testGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version"}
 var newGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version2"}
 var prefix = "apis"
@@ -137,8 +137,8 @@ func init() {
 	// api.Status is returned in errors
 
 	// "internal" version
-	api.Scheme.AddKnownTypes(
-		testInternalGroupVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+	api.Scheme.AddKnownTypes(testInternalGroupVersion,
+		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
 		&unversioned.ListOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 	addGrouplessTypes()
 	addTestTypes()
@@ -227,6 +227,8 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		Typer:     api.Scheme,
 		Linker:    selfLinker,
 		Mapper:    namespaceMapper,
+
+		ParameterCodec: api.ParameterCodec,
 
 		Admit:   admissionControl,
 		Context: requestContextMapper,
@@ -390,7 +392,7 @@ func (storage *SimpleRESTStorage) Get(ctx api.Context, id string) (runtime.Objec
 	if id == "binary" {
 		return storage.stream, storage.errors["get"]
 	}
-	copied, err := api.Scheme.Copy(storage.item)
+	copied, err := api.Scheme.Copy(&storage.item)
 	if err != nil {
 		panic(err)
 	}
@@ -2255,7 +2257,7 @@ func TestUpdateREST(t *testing.T) {
 			GroupVersion:       newGroupVersion,
 			ServerGroupVersion: &newGroupVersion,
 			Serializer:         latest.Codecs,
-			ParameterCodec:     latest.ParameterCodec,
+			ParameterCodec:     api.ParameterCodec,
 		}
 	}
 
@@ -2338,7 +2340,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		GroupVersion:       newGroupVersion,
 		ServerGroupVersion: &newGroupVersion,
 		Serializer:         latest.Codecs,
-		ParameterCodec:     latest.ParameterCodec,
+		ParameterCodec:     api.ParameterCodec,
 	}
 	container := restful.NewContainer()
 	if err := group.InstallREST(container); err == nil {
@@ -2368,7 +2370,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		GroupVersion:       newGroupVersion,
 		ServerGroupVersion: &newGroupVersion,
 		Serializer:         latest.Codecs,
-		ParameterCodec:     latest.ParameterCodec,
+		ParameterCodec:     api.ParameterCodec,
 	}
 	container = restful.NewContainer()
 	if err := group.InstallREST(container); err != nil {

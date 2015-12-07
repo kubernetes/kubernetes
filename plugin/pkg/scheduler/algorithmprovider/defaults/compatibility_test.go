@@ -20,10 +20,10 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/runtime"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
-	"k8s.io/kubernetes/runtime"
 )
 
 func TestCompatibility_v1_Scheduler(t *testing.T) {
@@ -93,7 +93,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 
 	for v, tc := range schedulerFiles {
 		policy := schedulerapi.Policy{}
-		if err := runtime.DecodeInto(latestschedulerapi.Codec, []byte(tc.JSON), nil, &policy); err != nil {
+		if _, err := runtime.DecodeInto(latestschedulerapi.Codec, []byte(tc.JSON), nil, &policy); err != nil {
 			t.Errorf("%s: Error decoding: %v", v, err)
 			continue
 		}

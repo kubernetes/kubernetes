@@ -108,18 +108,21 @@ type parameterCodec struct {
 var _ ParameterCodec = &parameterCodec{}
 
 func (c *parameterCodec) DecodeParameters(parameters url.Values, from unversioned.GroupVersion, into Object) error {
+	if len(parameters) == 0 {
+		return nil
+	}
 	gvk, err := c.typer.ObjectVersionAndKind(into)
 	if err != nil {
 		return err
 	}
 	if gvk.GroupVersion() == from {
-		return c.convertor.Convert(parameters, into)
+		return c.convertor.Convert(&parameters, into)
 	}
 	input, err := c.creator.New(from.String(), gvk.Kind)
 	if err != nil {
 		return err
 	}
-	if err := c.convertor.Convert(parameters, input); err != nil {
+	if err := c.convertor.Convert(&parameters, input); err != nil {
 		return err
 	}
 	return c.convertor.Convert(input, into)

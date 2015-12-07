@@ -39,6 +39,9 @@ type NegotiatedSerializer interface {
 
 func negotiateOutputSerializer(req *http.Request, s NegotiatedSerializer) (runtime.Serializer, string, error) {
 	accept := goautoneg.ParseAccept(req.Header.Get("Accept"))
+	if len(accept) == 0 {
+		accept = append(accept, goautoneg.Accept{Type: "application", SubType: "json"})
+	}
 	pretty := isPrettyPrint(req)
 	for _, t := range accept {
 		if _, ok := t.Params["pretty"]; !ok && pretty {
@@ -56,8 +59,8 @@ func negotiateOutputSerializer(req *http.Request, s NegotiatedSerializer) (runti
 func negotiateInputSerializer(req *http.Request, s NegotiatedSerializer) (runtime.Serializer, error) {
 	mediaType := req.Header.Get("Content-Type")
 	if len(mediaType) == 0 {
-		// TODO: return the correct http error
-		return nil, errors.NewInternalError(fmt.Errorf("content type is required"))
+		mediaType = "application/json"
+		//return nil, errors.NewInternalError(fmt.Errorf("content type is required"))
 	}
 	mediaType, options, err := mime.ParseMediaType(mediaType)
 	if err != nil {

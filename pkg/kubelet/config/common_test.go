@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -73,15 +74,12 @@ func TestDecodeSinglePod(t *testing.T) {
 	}
 
 	for _, gv := range registered.GroupVersionsForGroup("") {
-		externalPod, err := testapi.Default.Converter().ConvertToVersion(pod, gv.String())
+		s, _ := latest.Codecs.SerializerForExtension("yaml")
+		encoder := latest.Codecs.EncoderToVersion(s, gv)
+		yaml, err := runtime.Encode(encoder, pod)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		yaml, err := yaml.Marshal(externalPod)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-
 		parsed, podOut, err = tryDecodeSinglePod(yaml, noDefault)
 		if !parsed {
 			t.Errorf("expected to have parsed file: (%s)", string(yaml))
@@ -139,11 +137,9 @@ func TestDecodePodList(t *testing.T) {
 	}
 
 	for _, gv := range registered.GroupVersionsForGroup("") {
-		externalPodList, err := testapi.Default.Converter().ConvertToVersion(podList, gv.String())
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		yaml, err := yaml.Marshal(externalPodList)
+		s, _ := latest.Codecs.SerializerForExtension("yaml")
+		encoder := latest.Codecs.EncoderToVersion(s, gv)
+		yaml, err := runtime.Encode(encoder, pod)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
