@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -228,30 +229,18 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
 	jobs := reaper.Extensions().Jobs(namespace)
-	pods := reaper.Pods(namespace)
-	scaler, err := ScalerFor(extensions.Kind("Job"), *reaper)
-	if err != nil {
-		return err
-	}
 	job, err := jobs.Get(name)
 	if err != nil {
 		return err
 	}
-	if timeout == 0 {
-		// we will never have more active pods than job.Spec.Parallelism
-		parallelism := *job.Spec.Parallelism
-		timeout = Timeout + time.Duration(10*parallelism)*time.Second
+	if err := jobs.Delete(name, gracePeriod); err != nil && !apierrors.IsNotFound(err) {
+		return err
 	}
 
 	// TODO: handle overlapping jobs
-	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
-	waitForJobs := NewRetryParams(reaper.pollInterval, timeout)
-	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForJobs); err != nil {
-		return err
-	}
-	// at this point only dead pods are left, that should be removed
 	selector, _ := extensions.LabelSelectorAsSelector(job.Spec.Selector)
 	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	pods := reaper.Pods(namespace)
 	podList, err := pods.List(options)
 	if err != nil {
 		return err
@@ -264,10 +253,6 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 	}
 	if len(errList) > 0 {
 		return utilerrors.NewAggregate(errList)
-	}
-	// once we have all the pods removed we can safely remove the job itself
-	if err := jobs.Delete(name, gracePeriod); err != nil {
-		return err
 	}
 	return nil
 }
