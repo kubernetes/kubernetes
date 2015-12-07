@@ -88,20 +88,20 @@ func expandResourceShortcut(resource string) string {
 	shortForms := map[string]string{
 		// Please keep this alphabetized
 		"cs":     "componentstatuses",
-		"ev":     "events",
+		"ds":     "daemonsets",
 		"ep":     "endpoints",
+		"ev":     "events",
 		"hpa":    "horizontalpodautoscalers",
+		"ing":    "ingresses",
 		"limits": "limitranges",
 		"no":     "nodes",
 		"ns":     "namespaces",
 		"po":     "pods",
-		"pv":     "persistentvolumes",
 		"pvc":    "persistentvolumeclaims",
+		"pv":     "persistentvolumes",
 		"quota":  "resourcequotas",
 		"rc":     "replicationcontrollers",
-		"ds":     "daemonsets",
 		"svc":    "services",
-		"ing":    "ingresses",
 	}
 	if expanded, ok := shortForms[resource]; ok {
 		return expanded
