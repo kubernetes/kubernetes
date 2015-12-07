@@ -319,7 +319,8 @@ GCE_FLAKY_TESTS=(
     "GCE\sL7\sLoadBalancer\sController" # issue: #17518
     "DaemonRestart\sController\sManager" # issue: #17829
     "Resource\susage\sof\ssystem\scontainers" # issue: #13931
-    "NodeOutOfDisk" # issue: 17687
+    "NodeOutOfDisk" # issue: #17687
+    "Cluster\slevel\slogging\susing\sElasticsearch" # issue: #17873
     )
 
 # The following tests are known to be slow running (> 2 min), and are
