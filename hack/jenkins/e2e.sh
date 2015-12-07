@@ -402,8 +402,10 @@ case ${JOB_NAME} in
 
   # Runs all non-flaky, non-slow tests on AWS, sequentially.
   kubernetes-e2e-aws)
+    : ${E2E_PUBLISH_GREEN_VERSION:=true}
     : ${E2E_CLUSTER_NAME:="jenkins-aws-e2e"}
-    : ${E2E_DOWN:="false"}
+    : ${E2E_ZONE:="us-west-2a"}
+    : ${ZONE:="us-west-2a"}
     : ${E2E_NETWORK:="e2e-aws"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
@@ -414,6 +416,11 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-aws"}
     : ${PROJECT:="k8s-jkns-e2e-aws"}
     : ${ENABLE_DEPLOYMENTS:=true}
+    : ${AWS_CONFIG_FILE:='/var/lib/jenkins/.aws/credentials'}
+    : ${AWS_SSH_KEY:='/var/lib/jenkins/.ssh/kube_aws_rsa'}
+    : ${KUBE_SSH_USER:='ubuntu'}
+    # This is needed to be able to create PD from the e2e test
+    : ${AWS_SHARED_CREDENTIALS_FILE:='/var/lib/jenkins/.aws/credentials'}
     ;;
 
   # Runs only the examples tests on GCE.
@@ -1154,6 +1161,10 @@ esac
 # AWS variables
 export KUBE_AWS_INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
 export KUBE_AWS_ZONE=${E2E_ZONE}
+export AWS_CONFIG_FILE=${AWS_CONFIG_FILE}
+export AWS_SSH_KEY=${AWS_SSH_KEY}
+export KUBE_SSH_USER=${KUBE_SSH_USER}
+export AWS_SHARED_CREDENTIALS_FILE=${AWS_SHARED_CREDENTIALS_FILE}
 
 # GCE variables
 export INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
