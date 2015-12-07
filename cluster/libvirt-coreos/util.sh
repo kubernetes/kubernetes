@@ -16,7 +16,7 @@
 
 # A library of helper functions that each provider hosting Kubernetes must implement to use cluster/kube-*.sh scripts.
 
-[ ! -z "$UTIL_SH_DEBUG" ] && set -x
+[ ! -z ${UTIL_SH_DEBUG+x} ] && set -x
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 readonly ROOT=$(dirname "${BASH_SOURCE}")
