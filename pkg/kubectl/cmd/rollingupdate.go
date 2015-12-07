@@ -360,12 +360,12 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	if outputFormat != "" {
 		return f.PrintObject(cmd, newRc, out)
 	}
-	gvk, err := api.Scheme.ObjectKind(newRc)
+	kind, err := api.Scheme.ObjectKind(newRc)
 	if err != nil {
 		return err
 	}
-	_, res := meta.KindToResource(gvk.Kind, false)
-	cmdutil.PrintSuccess(mapper, false, out, res, oldName, message)
+	_, res := meta.KindToResource(kind, false)
+	cmdutil.PrintSuccess(mapper, false, out, res.Resource, oldName, message)
 	return nil
 }
 

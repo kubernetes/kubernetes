@@ -59,7 +59,7 @@ type ObjectScheme interface {
 func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 
 	return func(action Action) (bool, runtime.Object, error) {
-		gvk, err := mapper.KindFor(action.GetResource())
+		kind, err := mapper.KindFor(unversioned.GroupVersionResource{Resource: action.GetResource()})
 		if err != nil {
 			return false, nil, fmt.Errorf("unrecognized action %s: %v", action.GetResource(), err)
 		}
@@ -67,16 +67,16 @@ func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 		// TODO: have mapper return a Kind for a subresource?
 		switch castAction := action.(type) {
 		case ListAction:
-			gvk.Kind += "List"
-			resource, err := o.Kind(gvk, "")
+			kind.Kind += "List"
+			resource, err := o.Kind(kind, "")
 			return true, resource, err
 
 		case GetAction:
-			resource, err := o.Kind(gvk, castAction.GetName())
+			resource, err := o.Kind(kind, castAction.GetName())
 			return true, resource, err
 
 		case DeleteAction:
-			resource, err := o.Kind(gvk, castAction.GetName())
+			resource, err := o.Kind(kind, castAction.GetName())
 			return true, resource, err
 
 		case CreateAction:
@@ -84,7 +84,7 @@ func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 			if err != nil {
 				return true, nil, err
 			}
-			resource, err := o.Kind(gvk, meta.Name)
+			resource, err := o.Kind(kind, meta.Name)
 			return true, resource, err
 
 		case UpdateAction:
@@ -92,7 +92,7 @@ func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 			if err != nil {
 				return true, nil, err
 			}
-			resource, err := o.Kind(gvk, meta.Name)
+			resource, err := o.Kind(kind, meta.Name)
 			return true, resource, err
 
 		default:

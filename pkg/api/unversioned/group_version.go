@@ -29,6 +29,10 @@ type GroupResource struct {
 	Resource string
 }
 
+func (gr GroupResource) WithVersion(version string) GroupVersionResource {
+	return GroupVersionResource{Group: gr.Group, Version: version, Resource: gr.Resource}
+}
+
 func (gr *GroupResource) String() string {
 	return strings.Join([]string{gr.Group, ", Resource=", gr.Resource}, "")
 }

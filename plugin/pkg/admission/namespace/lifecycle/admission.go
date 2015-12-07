@@ -48,17 +48,16 @@ type lifecycle struct {
 }
 
 func (l *lifecycle) Admit(a admission.Attributes) (err error) {
-
 	// prevent deletion of immortal namespaces
 	if a.GetOperation() == admission.Delete && a.GetKind() == api.Kind("Namespace") && l.immortalNamespaces.Has(a.GetName()) {
 		return errors.NewForbidden(a.GetKind().Kind, a.GetName(), fmt.Errorf("this namespace may not be deleted"))
 	}
 
-	gvk, err := api.RESTMapper.KindFor(a.GetResource().Resource)
+	kind, err := api.RESTMapper.KindFor(a.GetResource().WithVersion(""))
 	if err != nil {
 		return errors.NewInternalError(err)
 	}
-	mapping, err := api.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	mapping, err := api.RESTMapper.RESTMapping(kind.GroupKind(), kind.Version)
 	if err != nil {
 		return errors.NewInternalError(err)
 	}
