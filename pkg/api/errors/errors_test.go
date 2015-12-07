@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 func TestErrorNew(t *testing.T) {
@@ -88,11 +88,11 @@ func TestErrorNew(t *testing.T) {
 
 func TestNewInvalid(t *testing.T) {
 	testCases := []struct {
-		Err     *validation.Error
+		Err     *field.Error
 		Details *unversioned.StatusDetails
 	}{
 		{
-			validation.NewDuplicateError(validation.NewFieldPath("field[0].name"), "bar"),
+			field.Duplicate(field.NewPath("field[0].name"), "bar"),
 			&unversioned.StatusDetails{
 				Kind: "kind",
 				Name: "name",
@@ -103,7 +103,7 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			validation.NewInvalidError(validation.NewFieldPath("field[0].name"), "bar", "detail"),
+			field.Invalid(field.NewPath("field[0].name"), "bar", "detail"),
 			&unversioned.StatusDetails{
 				Kind: "kind",
 				Name: "name",
@@ -114,7 +114,7 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			validation.NewNotFoundError(validation.NewFieldPath("field[0].name"), "bar"),
+			field.NotFound(field.NewPath("field[0].name"), "bar"),
 			&unversioned.StatusDetails{
 				Kind: "kind",
 				Name: "name",
@@ -125,7 +125,7 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			validation.NewNotSupportedError(validation.NewFieldPath("field[0].name"), "bar", nil),
+			field.NotSupported(field.NewPath("field[0].name"), "bar", nil),
 			&unversioned.StatusDetails{
 				Kind: "kind",
 				Name: "name",
@@ -136,7 +136,7 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			validation.NewRequiredError(validation.NewFieldPath("field[0].name")),
+			field.Required(field.NewPath("field[0].name")),
 			&unversioned.StatusDetails{
 				Kind: "kind",
 				Name: "name",
@@ -150,7 +150,7 @@ func TestNewInvalid(t *testing.T) {
 	for i, testCase := range testCases {
 		vErr, expected := testCase.Err, testCase.Details
 		expected.Causes[0].Message = vErr.ErrorBody()
-		err := NewInvalid("kind", "name", validation.ErrorList{vErr})
+		err := NewInvalid("kind", "name", field.ErrorList{vErr})
 		status := err.(*StatusError).ErrStatus
 		if status.Code != 422 || status.Reason != unversioned.StatusReasonInvalid {
 			t.Errorf("%d: unexpected status: %#v", i, status)

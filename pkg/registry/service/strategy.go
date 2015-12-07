@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // svcStrategy implements behavior for Services
@@ -58,7 +58,7 @@ func (svcStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new service.
-func (svcStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
+func (svcStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
 	service := obj.(*api.Service)
 	return validation.ValidateService(service)
 }
@@ -71,7 +71,7 @@ func (svcStrategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
-func (svcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
+func (svcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateServiceUpdate(obj.(*api.Service), old.(*api.Service))
 }
 
