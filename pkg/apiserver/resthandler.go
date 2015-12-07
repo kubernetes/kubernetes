@@ -186,7 +186,7 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 			}
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(connectRequest, scope.Kind.Kind, namespace, name, scope.Resource.Resource, scope.Subresource, admission.Connect, userInfo))
+			err = admit.Admit(admission.NewAttributesRecord(connectRequest, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Connect, userInfo))
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -361,7 +361,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		if admit != nil && admit.Handles(admission.Create) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.Kind, namespace, name, scope.Resource.Resource, scope.Subresource, admission.Create, userInfo))
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Create, userInfo))
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -432,7 +432,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 		if admit.Handles(admission.Update) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.Kind, namespace, name, scope.Resource.Resource, scope.Subresource, admission.Update, userInfo))
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Update, userInfo))
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -599,7 +599,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		if admit != nil && admit.Handles(admission.Update) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.Kind, namespace, name, scope.Resource.Resource, scope.Subresource, admission.Update, userInfo))
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Update, userInfo))
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -664,7 +664,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 		if admit != nil && admit.Handles(admission.Delete) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind.Kind, namespace, name, scope.Resource.Resource, scope.Subresource, admission.Delete, userInfo))
+			err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Delete, userInfo))
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
