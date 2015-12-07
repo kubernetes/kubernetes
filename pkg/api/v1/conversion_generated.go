@@ -1443,6 +1443,8 @@ func autoconvert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector(in *api.Objec
 		defaulting.(func(*api.ObjectFieldSelector))(in)
 	}
 	out.APIVersion = in.APIVersion
+	out.Kind = in.Kind
+	out.Name = in.Name
 	out.FieldPath = in.FieldPath
 	return nil
 }
@@ -4497,6 +4499,8 @@ func autoconvert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(in *ObjectFie
 		defaulting.(func(*ObjectFieldSelector))(in)
 	}
 	out.APIVersion = in.APIVersion
+	out.Kind = in.Kind
+	out.Name = in.Name
 	out.FieldPath = in.FieldPath
 	return nil
 }

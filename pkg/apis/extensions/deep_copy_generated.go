@@ -407,6 +407,8 @@ func deepCopy_api_NFSVolumeSource(in api.NFSVolumeSource, out *api.NFSVolumeSour
 
 func deepCopy_api_ObjectFieldSelector(in api.ObjectFieldSelector, out *api.ObjectFieldSelector, c *conversion.Cloner) error {
 	out.APIVersion = in.APIVersion
+	out.Kind = in.Kind
+	out.Name = in.Name
 	out.FieldPath = in.FieldPath
 	return nil
 }

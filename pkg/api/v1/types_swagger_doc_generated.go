@@ -732,6 +732,8 @@ func (NodeSystemInfo) SwaggerDoc() map[string]string {
 var map_ObjectFieldSelector = map[string]string{
 	"":           "ObjectFieldSelector selects an APIVersioned field of an object.",
 	"apiVersion": "Version of the schema the FieldPath is written in terms of, defaults to \"v1\".",
+	"kind":       "The kind of this resource If no value is specified, it will be the kind of the enclosing object.",
+	"name":       "The name of this resource If no value is specified, it will be the kind of the enclosing object.",
 	"fieldPath":  "Path of the field to select in the specified API version.",
 }
 
