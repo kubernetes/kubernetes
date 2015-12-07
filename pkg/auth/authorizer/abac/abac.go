@@ -77,12 +77,12 @@ func NewFromFile(path string) (policyList, error) {
 			continue
 		}
 
-		version, kind, err := api.Scheme.DataVersionAndKind(b)
+		dataKind, err := api.Scheme.DataKind(b)
 		if err != nil {
 			return nil, policyLoadError{path, i, b, err}
 		}
 
-		if version == "" && kind == "" {
+		if dataKind.IsEmpty() {
 			unversionedLines++
 			// Migrate unversioned policy object
 			oldPolicy := &v0.Policy{}

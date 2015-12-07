@@ -122,11 +122,31 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	hasSubresource := len(subresource) > 0
 
 	object := storage.New()
-	_, kind, err := a.group.Typer.ObjectVersionAndKind(object)
+	fqKinds, err := a.group.Typer.ObjectKinds(object)
 	if err != nil {
 		return nil, err
 	}
-	gvk := a.group.GroupVersion.WithKind(kind)
+	// a given go type can have multiple potential fully qualified kinds.  Find the one that corresponds with the group
+	// we're trying to register here
+	fqKindToRegister := unversioned.GroupVersionKind{}
+	for _, fqKind := range fqKinds {
+		if fqKind.Group == a.group.GroupVersion.Group {
+			fqKindToRegister = fqKind
+			break
+		}
+
+		// TODO This keeps it doing what it was doing before, but it doesn't feel right.
+		if fqKind.Group == "extensions" && fqKind.Kind == "ThirdPartyResourceData" {
+			fqKindToRegister = fqKind
+			fqKindToRegister.Group = a.group.GroupVersion.Group
+			fqKindToRegister.Version = a.group.GroupVersion.Version
+		}
+	}
+
+	if fqKindToRegister.IsEmpty() {
+		return nil, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
+	}
+	kind := fqKindToRegister.Kind
 
 	versionedPtr, err := a.group.Creater.New(a.group.GroupVersion.String(), kind)
 	if err != nil {
@@ -134,7 +154,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
 
-	mapping, err := a.group.Mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	mapping, err := a.group.Mapper.RESTMapping(fqKindToRegister.GroupKind(), a.group.GroupVersion.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -146,13 +166,25 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, fmt.Errorf("subresources can only be declared when the parent is also registered: %s needs %s", path, resource)
 		}
 		parentObject := parentStorage.New()
-		_, parentKind, err := a.group.Typer.ObjectVersionAndKind(parentObject)
+
+		parentFQKinds, err := a.group.Typer.ObjectKinds(parentObject)
 		if err != nil {
 			return nil, err
 		}
-		parentGVK := a.group.GroupVersion.WithKind(parentKind)
+		// a given go type can have multiple potential fully qualified kinds.  Find the one that corresponds with the group
+		// we're trying to register here
+		parentFQKindToRegister := unversioned.GroupVersionKind{}
+		for _, fqKind := range parentFQKinds {
+			if fqKind.Group == a.group.GroupVersion.Group {
+				parentFQKindToRegister = fqKind
+				break
+			}
+		}
+		if parentFQKindToRegister.IsEmpty() {
+			return nil, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
+		}
 
-		parentMapping, err := a.group.Mapper.RESTMapping(parentGVK.GroupKind(), parentGVK.Version)
+		parentMapping, err := a.group.Mapper.RESTMapping(parentFQKindToRegister.GroupKind(), a.group.GroupVersion.Version)
 		if err != nil {
 			return nil, err
 		}
@@ -184,8 +216,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var versionedList interface{}
 	if isLister {
 		list := lister.NewList()
-		_, listKind, err := a.group.Typer.ObjectVersionAndKind(list)
-		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion.String(), listKind)
+		listGVK, err := a.group.Typer.ObjectKind(list)
+		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion.String(), listGVK.Kind)
 		if err != nil {
 			return nil, err
 		}
@@ -225,19 +257,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	)
 	if isGetterWithOptions {
 		getOptions, getSubpath, getSubpathKey = getterWithOptions.NewGetOptions()
-		getOptionsGVString, getOptionsKind, err := a.group.Typer.ObjectVersionAndKind(getOptions)
+		getOptionsInternalKind, err = a.group.Typer.ObjectKind(getOptions)
 		if err != nil {
 			return nil, err
 		}
-		gv, err := unversioned.ParseGroupVersion(getOptionsGVString)
-		if err != nil {
-			return nil, err
-		}
-		getOptionsInternalKind = gv.WithKind(getOptionsKind)
 		// TODO this should be a list of all the different external versions we can coerce into the internalKind
-		getOptionsExternalKind = serverGroupVersion.WithKind(getOptionsKind)
+		getOptionsExternalKind = serverGroupVersion.WithKind(getOptionsInternalKind.Kind)
 
-		versionedGetOptions, err = a.group.Creater.New(serverGroupVersion.String(), getOptionsKind)
+		versionedGetOptions, err = a.group.Creater.New(serverGroupVersion.String(), getOptionsInternalKind.Kind)
 		if err != nil {
 			return nil, err
 		}
@@ -255,19 +282,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if isConnecter {
 		connectOptions, connectSubpath, connectSubpathKey = connecter.NewConnectOptions()
 		if connectOptions != nil {
-			connectOptionsGVString, connectOptionsKind, err := a.group.Typer.ObjectVersionAndKind(connectOptions)
+			connectOptionsInternalKind, err = a.group.Typer.ObjectKind(connectOptions)
 			if err != nil {
 				return nil, err
 			}
-			gv, err := unversioned.ParseGroupVersion(connectOptionsGVString)
-			if err != nil {
-				return nil, err
-			}
-			connectOptionsInternalKind = gv.WithKind(connectOptionsKind)
 			// TODO this should be a list of all the different external versions we can coerce into the internalKind
-			connectOptionsExternalKind = serverGroupVersion.WithKind(connectOptionsKind)
+			connectOptionsExternalKind = serverGroupVersion.WithKind(connectOptionsInternalKind.Kind)
 
-			versionedConnectOptions, err = a.group.Creater.New(serverGroupVersion.String(), connectOptionsKind)
+			versionedConnectOptions, err = a.group.Creater.New(serverGroupVersion.String(), connectOptionsInternalKind.Kind)
 		}
 	}
 

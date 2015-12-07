@@ -25,7 +25,6 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -371,24 +370,19 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 	}
 
 	mapper, typer := f.Object()
-	gvString, kind, err := typer.ObjectVersionAndKind(obj)
+	groupVersionKind, err := typer.ObjectKind(obj)
 	if err != nil {
 		return nil, "", nil, nil, err
 	}
-	gv, err := unversioned.ParseGroupVersion(gvString)
-	if err != nil {
-		return nil, "", nil, nil, err
-	}
-	gvk := gv.WithKind(kind)
 
 	if len(overrides) > 0 {
-		obj, err = cmdutil.Merge(obj, overrides, kind)
+		obj, err = cmdutil.Merge(obj, overrides, groupVersionKind.Kind)
 		if err != nil {
 			return nil, "", nil, nil, err
 		}
 	}
 
-	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	mapping, err := mapper.RESTMapping(groupVersionKind.GroupKind(), groupVersionKind.Version)
 	if err != nil {
 		return nil, "", nil, nil, err
 	}
@@ -414,5 +408,5 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 			return nil, "", nil, nil, err
 		}
 	}
-	return obj, kind, mapper, mapping, err
+	return obj, groupVersionKind.Kind, mapper, mapping, err
 }

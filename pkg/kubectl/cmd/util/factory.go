@@ -199,11 +199,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return kubectl.MakeLabels(t.Spec.Selector), nil
 			default:
-				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
+				gvk, err := api.Scheme.ObjectKind(object)
 				if err != nil {
 					return "", err
 				}
-				return "", fmt.Errorf("cannot extract pod selector from %s", kind)
+				return "", fmt.Errorf("cannot extract pod selector from %v", gvk)
 			}
 		},
 		PortsForObject: func(object runtime.Object) ([]string, error) {
@@ -216,11 +216,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			case *api.Service:
 				return getServicePorts(t.Spec), nil
 			default:
-				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
+				gvk, err := api.Scheme.ObjectKind(object)
 				if err != nil {
 					return nil, err
 				}
-				return nil, fmt.Errorf("cannot extract ports from %s", kind)
+				return nil, fmt.Errorf("cannot extract ports from %v", gvk)
 			}
 		},
 		LabelsForObject: func(object runtime.Object) (map[string]string, error) {
@@ -240,11 +240,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return c.Pods(t.Namespace).GetLogs(t.Name, opts), nil
 			default:
-				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
+				gvk, err := api.Scheme.ObjectKind(object)
 				if err != nil {
 					return nil, err
 				}
-				return nil, fmt.Errorf("cannot get the logs from %s", kind)
+				return nil, fmt.Errorf("cannot get the logs from %v", gvk)
 			}
 		},
 		Scaler: func(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
@@ -323,11 +323,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			case *api.Pod:
 				return t, nil
 			default:
-				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
+				gvk, err := api.Scheme.ObjectKind(object)
 				if err != nil {
 					return nil, err
 				}
-				return nil, fmt.Errorf("cannot attach to %s: not implemented", kind)
+				return nil, fmt.Errorf("cannot attach to %v: not implemented", gvk)
 			}
 		},
 		EditorEnvs: func() []string {
@@ -489,29 +489,20 @@ func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cac
 }
 
 func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
-	version, kind, err := runtime.UnstructuredJSONScheme.DataVersionAndKind(data)
+	gvk, err := runtime.UnstructuredJSONScheme.DataKind(data)
 	if err != nil {
 		return err
 	}
-	gv, err := unversioned.ParseGroupVersion(version)
-	if err != nil {
-		return fmt.Errorf("unable to parse group/version from %q: %v", version, err)
-	}
-	if ok := registered.IsRegisteredAPIGroupVersion(gv); !ok {
-		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", version, registered.RegisteredGroupVersions)
-	}
-	resource, _ := meta.KindToResource(kind, false)
-	gvk, err := c.mapper.KindFor(resource)
-	if err != nil {
-		return fmt.Errorf("could not find api group for %s: %v", kind, err)
+	if ok := registered.IsRegisteredAPIGroupVersion(gvk.GroupVersion()); !ok {
+		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", gvk.GroupVersion().String(), registered.RegisteredGroupVersions)
 	}
 	if gvk.Group == "extensions" {
 		if c.c.ExtensionsClient == nil {
 			return errors.New("unable to validate: no experimental client")
 		}
-		return getSchemaAndValidate(c.c.ExtensionsClient.RESTClient, data, "apis/", version, c.cacheDir)
+		return getSchemaAndValidate(c.c.ExtensionsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir)
 	}
-	return getSchemaAndValidate(c.c.RESTClient, data, "api", version, c.cacheDir)
+	return getSchemaAndValidate(c.c.RESTClient, data, "api", gvk.GroupVersion().String(), c.cacheDir)
 }
 
 // DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:
@@ -571,16 +562,12 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 // PrintObject prints an api object given command line flags to modify the output format
 func (f *Factory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Writer) error {
 	mapper, _ := f.Object()
-	gvString, kind, err := api.Scheme.ObjectVersionAndKind(obj)
-	if err != nil {
-		return err
-	}
-	gv, err := unversioned.ParseGroupVersion(gvString)
+	gvk, err := api.Scheme.ObjectKind(obj)
 	if err != nil {
 		return err
 	}
 
-	mapping, err := mapper.RESTMapping(unversioned.GroupKind{Group: gv.Group, Kind: kind})
+	mapping, err := mapper.RESTMapping(gvk.GroupKind())
 	if err != nil {
 		return err
 	}

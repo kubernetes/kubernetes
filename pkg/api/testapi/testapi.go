@@ -214,22 +214,23 @@ func (g TestGroup) RESTMapper() meta.RESTMapper {
 
 // Get codec based on runtime.Object
 func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
-	_, kind, err := api.Scheme.ObjectVersionAndKind(obj)
+	gvk, err := api.Scheme.ObjectKind(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected encoding error: %v", err)
 	}
-	// TODO: caesarxuchao: we should detect which group an object belongs to
-	// by using the version returned by Schem.ObjectVersionAndKind() once we
-	// split the schemes for internal objects.
-	// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
+
 	for _, group := range Groups {
-		if api.Scheme.Recognizes(group.GroupAndVersion(), kind) {
+		if group.GroupVersion().Group != gvk.Group {
+			continue
+		}
+
+		if api.Scheme.Recognizes(gvk) {
 			return group.Codec(), nil
 		}
 	}
 	// Codec used for unversioned types
-	if api.Scheme.Recognizes("", kind) {
+	if api.Scheme.Recognizes(gvk) {
 		return api.Codec, nil
 	}
-	return nil, fmt.Errorf("unexpected kind: %v", kind)
+	return nil, fmt.Errorf("unexpected kind: %v", gvk)
 }

@@ -144,7 +144,7 @@ func TestInvalidObjectValueKind(t *testing.T) {
 	embedded := &runtime.EmbeddedObject{}
 	switch obj := embedded.Object.(type) {
 	default:
-		_, _, err := scheme.ObjectVersionAndKind(obj)
+		_, err := scheme.ObjectKind(obj)
 		if err == nil {
 			t.Errorf("Expected error on invalid kind")
 		}

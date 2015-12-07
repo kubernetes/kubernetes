@@ -208,7 +208,7 @@ func validateFields(a, b string) bool {
 
 func body(t *testing.T, obj runtime.Object, raw *string) *string {
 	if obj != nil {
-		_, kind, err := api.Scheme.ObjectVersionAndKind(obj)
+		fqKind, err := api.Scheme.ObjectKind(obj)
 		if err != nil {
 			t.Errorf("unexpected encoding error: %v", err)
 		}
@@ -217,18 +217,18 @@ func body(t *testing.T, obj runtime.Object, raw *string) *string {
 		// split the schemes for internal objects.
 		// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
 		var bs []byte
-		if api.Scheme.Recognizes(testapi.Default.GroupAndVersion(), kind) {
+		if api.Scheme.Recognizes(testapi.Default.GroupVersion().WithKind(fqKind.Kind)) {
 			bs, err = testapi.Default.Codec().Encode(obj)
 			if err != nil {
 				t.Errorf("unexpected encoding error: %v", err)
 			}
-		} else if api.Scheme.Recognizes(testapi.Extensions.GroupAndVersion(), kind) {
+		} else if api.Scheme.Recognizes(testapi.Extensions.GroupVersion().WithKind(fqKind.Kind)) {
 			bs, err = testapi.Extensions.Codec().Encode(obj)
 			if err != nil {
 				t.Errorf("unexpected encoding error: %v", err)
 			}
 		} else {
-			t.Errorf("unexpected kind: %v", kind)
+			t.Errorf("unexpected kind: %v", fqKind.Kind)
 		}
 		body := string(bs)
 		return &body
