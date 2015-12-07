@@ -254,7 +254,7 @@ func TestReplicationControllerStop(t *testing.T) {
 			continue
 		}
 		for i, verb := range test.ExpectedActions {
-			if actions[i].GetResource() != "replicationcontrollers" {
+			if actions[i].GetResource() != "replicationControllers" {
 				t.Errorf("%s unexpected action: %+v, expected %s-replicationController", test.Name, actions[i], verb)
 			}
 			if actions[i].GetVerb() != verb {
