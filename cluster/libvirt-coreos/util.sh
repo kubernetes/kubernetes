@@ -29,6 +29,8 @@ export ADMISSION_CONTROL=${ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,Ser
 readonly POOL=kubernetes
 readonly POOL_PATH=/var/lib/libvirt/images/kubernetes
 
+[ ! -d "${POOL_PATH}" ] && (echo "$POOL_PATH" does not exist ; exit 1 )
+
 # join <delim> <list...>
 # Concatenates the list elements with the delimiter passed as first parameter
 #
