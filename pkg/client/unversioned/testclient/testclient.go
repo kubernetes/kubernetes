@@ -353,6 +353,10 @@ func (c *FakeExperimental) Ingress(namespace string) client.IngressInterface {
 	return &FakeIngress{Fake: c, Namespace: namespace}
 }
 
+func (c *FakeExperimental) ThirdPartyResources(namespace string) client.ThirdPartyResourceInterface {
+	return &FakeThirdPartyResources{Fake: c, Namespace: namespace}
+}
+
 type FakeDiscovery struct {
 	*Fake
 }
