@@ -65,6 +65,14 @@ type Controller struct {
 	PublicServicePort         int
 	KubernetesServiceNodePort int
 
+	SchedulerIP         net.IP
+	SchedulerPort       int
+	PublicSchedulerPort int
+
+	ControllerManagerIP         net.IP
+	ControllerManagerPort       int
+	PublicControllerManagerPort int
+
 	runner *util.Runner
 }
 
@@ -117,23 +125,68 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 	if err := c.CreateNamespaceIfNeeded(api.NamespaceDefault); err != nil {
 		return err
 	}
+	if err := c.CreateNamespaceIfNeeded(api.NamespaceSystem); err != nil {
+		return err
+	}
 	if c.ServiceIP != nil {
 		servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.KubernetesServiceNodePort, "https", c.ExtraServicePorts)
-		if err := c.CreateOrUpdateMasterServiceIfNeeded("kubernetes", c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
+		if err := c.CreateOrUpdateMasterServiceIfNeeded(
+			"kubernetes",
+			c.ServiceIP,
+			servicePorts,
+			serviceType,
+			reconcile,
+			api.NamespaceDefault,
+			map[string]string{"provider": "kubernetes", "component": "apiserver"},
+		); err != nil {
 			return err
 		}
 		endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
-		if err := c.ReconcileEndpoints("kubernetes", c.PublicIP, endpointPorts, reconcile); err != nil {
+		if err := c.ReconcileEndpoints("kubernetes", c.PublicIP, endpointPorts, reconcile, api.NamespaceDefault); err != nil {
+			return err
+		}
+
+		servicePorts, serviceType = createPortAndServiceSpec(c.SchedulerPort, 0, "https", []api.ServicePort{})
+		if err := c.CreateOrUpdateMasterServiceIfNeeded(
+			"kube-scheduler",
+			c.SchedulerIP,
+			servicePorts,
+			serviceType,
+			reconcile,
+			api.NamespaceSystem,
+			map[string]string{"provider": "kubernetes", "component": "kube-scheduler"},
+		); err != nil {
+			return err
+		}
+		endpointPorts = createEndpointPortSpec(c.PublicSchedulerPort, "https", []api.EndpointPort{})
+		if err := c.ReconcileEndpoints("kube-scheduler", c.PublicIP, endpointPorts, reconcile, api.NamespaceSystem); err != nil {
+			return err
+		}
+
+		servicePorts, serviceType = createPortAndServiceSpec(c.ControllerManagerPort, 0, "https", []api.ServicePort{})
+		if err := c.CreateOrUpdateMasterServiceIfNeeded(
+			"kube-controller-manager",
+			c.ControllerManagerIP,
+			servicePorts,
+			serviceType,
+			reconcile,
+			api.NamespaceSystem,
+			map[string]string{"provider": "kubernetes", "component": "kube-controller-manager"},
+		); err != nil {
+			return err
+		}
+		endpointPorts = createEndpointPortSpec(c.PublicControllerManagerPort, "https", []api.EndpointPort{})
+		if err := c.ReconcileEndpoints("kube-controller-manager", c.PublicIP, endpointPorts, reconcile, api.NamespaceSystem); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// CreateNamespaceIfNeeded will create the namespace that contains the master services if it doesn't already exist
+// CreateNamespaceIfNeeded will create the namespace if it doesn't already exist
 func (c *Controller) CreateNamespaceIfNeeded(ns string) error {
 	ctx := api.NewContext()
-	if _, err := c.NamespaceRegistry.GetNamespace(ctx, api.NamespaceDefault); err == nil {
+	if _, err := c.NamespaceRegistry.GetNamespace(ctx, ns); err == nil {
 		// the namespace already exists
 		return nil
 	}
@@ -184,8 +237,16 @@ func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndp
 
 // CreateMasterServiceIfNeeded will create the specified service if it
 // doesn't already exist.
-func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []api.ServicePort, serviceType api.ServiceType, reconcile bool) error {
-	ctx := api.NewDefaultContext()
+func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(
+	serviceName string,
+	serviceIP net.IP,
+	servicePorts []api.ServicePort,
+	serviceType api.ServiceType,
+	reconcile bool,
+	namespace string,
+	labels map[string]string,
+) error {
+	ctx := api.WithNamespace(api.NewDefaultContext(), namespace)
 	if s, err := c.ServiceRegistry.GetService(ctx, serviceName); err == nil {
 		// The service already exists.
 		if reconcile {
@@ -200,8 +261,8 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:      serviceName,
-			Namespace: api.NamespaceDefault,
-			Labels:    map[string]string{"provider": "kubernetes", "component": "apiserver"},
+			Namespace: namespace,
+			Labels:    labels,
 		},
 		Spec: api.ServiceSpec{
 			Ports: servicePorts,
@@ -236,14 +297,14 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 //      to be running (c.masterCount).
 //  * ReconcileEndpoints is called periodically from all apiservers.
 //
-func (c *Controller) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
-	ctx := api.NewDefaultContext()
+func (c *Controller) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool, namespace string) error {
+	ctx := api.WithNamespace(api.NewDefaultContext(), namespace)
 	e, err := c.EndpointRegistry.GetEndpoints(ctx, serviceName)
 	if err != nil {
 		e = &api.Endpoints{
 			ObjectMeta: api.ObjectMeta{
 				Name:      serviceName,
-				Namespace: api.NamespaceDefault,
+				Namespace: namespace,
 			},
 		}
 	}

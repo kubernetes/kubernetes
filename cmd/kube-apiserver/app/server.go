@@ -72,6 +72,8 @@ type APIServer struct {
 	InsecurePort               int
 	BindAddress                net.IP
 	AdvertiseAddress           net.IP
+	SchedulerIP                net.IP
+	ControllerManagerIP        net.IP
 	SecurePort                 int
 	ExternalHost               string
 	TLSCertFile                string
@@ -128,6 +130,8 @@ func NewAPIServer() *APIServer {
 		InsecurePort:           8080,
 		InsecureBindAddress:    net.ParseIP("127.0.0.1"),
 		BindAddress:            net.ParseIP("0.0.0.0"),
+		SchedulerIP:            net.ParseIP("10.0.0.2"),
+		ControllerManagerIP:    net.ParseIP("10.0.0.3"),
 		SecurePort:             6443,
 		APIPrefix:              "/api",
 		APIGroupPrefix:         "/apis",
@@ -573,6 +577,8 @@ func (s *APIServer) Run(_ []string) error {
 		CorsAllowedOriginList:     s.CorsAllowedOriginList,
 		ReadWritePort:             s.SecurePort,
 		PublicAddress:             s.AdvertiseAddress,
+		SchedulerIP:               net.ParseIP("10.0.0.2"),
+		ControllerManagerIP:       net.ParseIP("10.0.0.3"),
 		Authenticator:             authenticator,
 		SupportsBasicAuth:         len(s.BasicAuthFile) > 0,
 		Authorizer:                authorizer,

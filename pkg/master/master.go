@@ -226,7 +226,9 @@ type Config struct {
 	// PublicAddress is the IP address where members of the cluster (kubelet,
 	// kube-proxy, services, etc.) can reach the master.
 	// If nil or 0.0.0.0, the host's default interface will be used.
-	PublicAddress net.IP
+	PublicAddress       net.IP
+	SchedulerIP         net.IP
+	ControllerManagerIP net.IP
 
 	// Control the interval that pod, node IP, and node heath status caches
 	// expire.
@@ -306,13 +308,19 @@ type Master struct {
 	// External host is the name that should be used in external (public internet) URLs for this master
 	externalHost string
 	// clusterIP is the IP address of the master within the cluster.
-	clusterIP            net.IP
-	publicReadWritePort  int
-	serviceReadWriteIP   net.IP
-	serviceReadWritePort int
-	masterServices       *util.Runner
-	extraServicePorts    []api.ServicePort
-	extraEndpointPorts   []api.EndpointPort
+	clusterIP                   net.IP
+	publicReadWritePort         int
+	serviceReadWriteIP          net.IP
+	serviceReadWritePort        int
+	masterServices              *util.Runner
+	extraServicePorts           []api.ServicePort
+	extraEndpointPorts          []api.EndpointPort
+	schedulerIP                 net.IP
+	schedulerPort               int
+	publicSchedulerPort         int
+	controllerManagerIP         net.IP
+	controllerManagerPort       int
+	publicControllerManagerPort int
 
 	// storage contains the RESTful endpoints exposed by this master
 	storage map[string]rest.Storage
@@ -451,14 +459,22 @@ func New(c *Config) *Master {
 		publicReadWritePort: c.ReadWritePort,
 		serviceReadWriteIP:  c.ServiceReadWriteIP,
 		// TODO: serviceReadWritePort should be passed in as an argument, it may not always be 443
-		serviceReadWritePort: 443,
-		extraServicePorts:    c.ExtraServicePorts,
-		extraEndpointPorts:   c.ExtraEndpointPorts,
+		serviceReadWritePort:        443,
+		extraServicePorts:           c.ExtraServicePorts,
+		extraEndpointPorts:          c.ExtraEndpointPorts,
+		schedulerIP:                 c.SchedulerIP,
+		schedulerPort:               10251,
+		publicSchedulerPort:         10251,
+		controllerManagerIP:         c.ControllerManagerIP,
+		controllerManagerPort:       10252,
+		publicControllerManagerPort: 10252,
 
 		tunneler: c.Tunneler,
 
 		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
 	}
+
+	glog.Infof("got scheduler IP: %v", c.SchedulerIP)
 
 	var handlerContainer *restful.Container
 	if c.RestfulContainer != nil {
@@ -778,6 +794,14 @@ func (m *Master) NewBootstrapController() *Controller {
 		ExtraEndpointPorts:        m.extraEndpointPorts,
 		PublicServicePort:         m.publicReadWritePort,
 		KubernetesServiceNodePort: m.KubernetesServiceNodePort,
+
+		SchedulerIP:         m.schedulerIP,
+		SchedulerPort:       m.schedulerPort,
+		PublicSchedulerPort: m.publicSchedulerPort,
+
+		ControllerManagerIP:         m.controllerManagerIP,
+		ControllerManagerPort:       m.controllerManagerPort,
+		PublicControllerManagerPort: m.publicControllerManagerPort,
 	}
 }
 

@@ -64,7 +64,7 @@ type SchedulerServer struct {
 func NewSchedulerServer() *SchedulerServer {
 	s := SchedulerServer{
 		Port:              ports.SchedulerPort,
-		Address:           net.ParseIP("127.0.0.1"),
+		Address:           net.ParseIP("0.0.0.0"),
 		AlgorithmProvider: factory.DefaultProvider,
 		BindPodsQPS:       50.0,
 		BindPodsBurst:     100,
