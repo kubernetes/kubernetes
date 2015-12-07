@@ -143,20 +143,6 @@ type SyncHandler interface {
 
 type SourcesReadyFn func(sourcesSeen sets.String) bool
 
-// Wait for the container runtime to be up with a timeout.
-func waitUntilRuntimeIsUp(cr kubecontainer.Runtime, timeout time.Duration) error {
-	var err error = nil
-	waitStart := time.Now()
-	for time.Since(waitStart) < timeout {
-		_, err = cr.Version()
-		if err == nil {
-			return nil
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	return err
-}
-
 // New instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
 func NewMainKubelet(
@@ -2583,15 +2569,12 @@ func (kl *Kubelet) GetPodByName(namespace, name string) (*api.Pod, bool) {
 }
 
 func (kl *Kubelet) updateRuntimeUp() {
-	start := time.Now()
-	err := waitUntilRuntimeIsUp(kl.containerRuntime, 100*time.Millisecond)
-	if err == nil {
-		// Errors in initialization will be synchronized internally.
-		kl.oneTimeInitializer.Do(kl.initializeRuntimeDependentModules)
-		kl.runtimeState.setRuntimeSync(time.Now())
-	} else {
-		glog.Errorf("Container runtime sanity check failed after %v, err: %v", time.Since(start), err)
+	if _, err := kl.containerRuntime.Version(); err != nil {
+		glog.Errorf("Container runtime sanity check failed: %v", err)
+		return
 	}
+	kl.oneTimeInitializer.Do(kl.initializeRuntimeDependentModules)
+	kl.runtimeState.setRuntimeSync(time.Now())
 }
 
 func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
