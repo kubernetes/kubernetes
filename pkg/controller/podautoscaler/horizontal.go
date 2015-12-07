@@ -31,30 +31,40 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 )
 
-const (
-	// Usage shoud exceed the tolerance before we start downscale or upscale the pods.
-	// TODO: make it a flag or HPA spec element.
-	tolerance = 0.1
-)
-
 type HorizontalController struct {
-	client        client.Interface
-	metricsClient metrics.MetricsClient
-	eventRecorder record.EventRecorder
+	client                   client.Interface
+	metricsClient            metrics.MetricsClient
+	eventRecorder            record.EventRecorder
+	tolerance                float64
+	downscaleForbiddenWindow time.Duration
+	upscaleForbiddenWindow   time.Duration
 }
 
-var downscaleForbiddenWindow = 5 * time.Minute
-var upscaleForbiddenWindow = 3 * time.Minute
-
-func NewHorizontalController(client client.Interface, metricsClient metrics.MetricsClient) *HorizontalController {
+func NewHorizontalController(client client.Interface, metricsClient metrics.MetricsClient, tol float64, dScale, uScale time.Duration) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(client.Events(""))
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "horizontal-pod-autoscaler"})
 
+	if tol < 0 || tol > 1 {
+		glog.Warningf("Invalid tolerance provided %v using default.", tol)
+		tol = .1
+	}
+	if uScale == 0*time.Second {
+		glog.Warningf("Invalid upscale value provided, %v using default.", uScale)
+		uScale = 3 * time.Minute
+	}
+	if dScale == 0*time.Second {
+		glog.Warningf("Invalid downscale value provided, %v using default.", dScale)
+		dScale = 5 * time.Minute
+	}
+	glog.V(2).Infof("Created Horizontal Controller with downscale %v, upscale %v, and tolerance %v", tol, uScale, dScale)
 	return &HorizontalController{
-		client:        client,
-		metricsClient: metricsClient,
-		eventRecorder: recorder,
+		client:                   client,
+		metricsClient:            metricsClient,
+		eventRecorder:            recorder,
+		tolerance:                tol,
+		downscaleForbiddenWindow: dScale,
+		upscaleForbiddenWindow:   uScale,
 	}
 }
 
@@ -83,7 +93,7 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.H
 	}
 
 	usageRatio := float64(*currentUtilization) / float64(hpa.Spec.CPUUtilization.TargetPercentage)
-	if math.Abs(1.0-usageRatio) > tolerance {
+	if math.Abs(1.0-usageRatio) > a.tolerance {
 		return int(math.Ceil(usageRatio * float64(currentReplicas))), currentUtilization, timestamp, nil
 	} else {
 		return currentReplicas, currentUtilization, timestamp, nil
@@ -125,7 +135,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		// and there was no rescaling in the last downscaleForbiddenWindow.
 		if desiredReplicas < currentReplicas &&
 			(hpa.Status.LastScaleTime == nil ||
-				hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(timestamp)) {
+				hpa.Status.LastScaleTime.Add(a.downscaleForbiddenWindow).Before(timestamp)) {
 			rescale = true
 		}
 
@@ -133,7 +143,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		// and there was no rescaling in the last upscaleForbiddenWindow.
 		if desiredReplicas > currentReplicas &&
 			(hpa.Status.LastScaleTime == nil ||
-				hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(timestamp)) {
+				hpa.Status.LastScaleTime.Add(a.upscaleForbiddenWindow).Before(timestamp)) {
 			rescale = true
 		}
 	}
