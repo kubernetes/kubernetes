@@ -446,3 +446,48 @@ func PortForwardLocation(
 	}
 	return loc, nodeTransport, nil
 }
+
+// DiffLocation returns the diff URL for a pod container. If opts.Container is blank
+// and only one container is present in the pod, that container is used.
+func DiffLocation(
+	getter ResourceGetter,
+	connInfo client.ConnectionInfoGetter,
+	ctx api.Context,
+	name string,
+	opts *api.PodLogOptions,
+) (*url.URL, http.RoundTripper, error) {
+	pod, err := getPod(getter, ctx, name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Try to figure out a container
+	// If a container was provided, it must be valid
+	container := opts.Container
+	if len(container) == 0 {
+		if len(pod.Spec.Containers) == 1 {
+			container = pod.Spec.Containers[0].Name
+		} else {
+			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
+		}
+	} else {
+		if !podHasContainerWithName(pod, container) {
+			return nil, nil, errors.NewBadRequest(fmt.Sprintf("container %s is not valid for pod %s", container, name))
+		}
+	}
+	nodeHost := pod.Spec.NodeName
+	if len(nodeHost) == 0 {
+		// If pod has not been assigned a host, return an empty location
+		return nil, nil, nil
+	}
+	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(ctx, nodeHost)
+	if err != nil {
+		return nil, nil, err
+	}
+	loc := &url.URL{
+		Scheme: nodeScheme,
+		Host:   fmt.Sprintf("%s:%d", nodeHost, nodePort),
+		Path:   fmt.Sprintf("/diff/%s/%s/%s", pod.Namespace, pod.Name, container),
+	}
+	return loc, nodeTransport, nil
+}

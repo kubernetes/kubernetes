@@ -188,3 +188,37 @@ func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.Roun
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler
 }
+
+// DiffREST implements the diff subresource of a pod
+type DiffREST struct {
+	Store       *etcdgeneric.Etcd
+	KubeletConn client.ConnectionInfoGetter
+}
+
+// Implement Connecter
+var _ = rest.Connecter(&DiffREST{})
+
+// New returns an empty pod object
+func (r *DiffREST) New() runtime.Object {
+	return &api.Pod{}
+}
+
+// NewConnectOptions returns nil since diff doesn't take additional parameters
+func (r *DiffREST) NewConnectOptions() (runtime.Object, bool, string) {
+	return nil, false, ""
+}
+
+// ConnectMethods returns the methods supported by diff
+func (r *DiffREST) ConnectMethods() []string {
+	return upgradeableMethods
+}
+
+// Connect returns a handler for the pod portforward proxy
+func (r *DiffREST) Connect(ctx api.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+	// TODO: when not a hack, support other containers, need its own options object
+	location, transport, err := pod.DiffLocation(r.Store, r.KubeletConn, ctx, name, &api.PodLogOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, false, responder), nil
+}

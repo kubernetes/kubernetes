@@ -38,6 +38,8 @@ type PodInterface interface {
 	Bind(binding *api.Binding) error
 	UpdateStatus(pod *api.Pod) (*api.Pod, error)
 	GetLogs(name string, opts *api.PodLogOptions) *Request
+	// TODO: need a podDiffOptions
+	GetDiff(name string, opts *api.PodLogOptions) *Request
 }
 
 // pods implements PodsNamespacer interface
@@ -120,4 +122,9 @@ func (c *pods) UpdateStatus(pod *api.Pod) (result *api.Pod, err error) {
 // Get constructs a request for getting the logs for a pod
 func (c *pods) GetLogs(name string, opts *api.PodLogOptions) *Request {
 	return c.r.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, api.Scheme)
+}
+
+// Get constructs a request for getting the diff for a pod
+func (c *pods) GetDiff(name string, opts *api.PodLogOptions) *Request {
+	return c.r.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("diff").VersionedParams(opts, api.Scheme)
 }

@@ -1105,6 +1105,11 @@ func (r *Runtime) RunInContainer(containerID kubecontainer.ContainerID, cmd []st
 	return result, err
 }
 
+// TODO: do this
+func (r *Runtime) DiffContainer(id kubecontainer.ContainerID) ([]byte, error) {
+	return nil, fmt.Errorf("NOT SUPPORTED")
+}
+
 // rktExitError implemets /pkg/util/exec.ExitError interface.
 type rktExitError struct{ *exec.ExitError }
 

@@ -3186,6 +3186,20 @@ func (kl *Kubelet) findContainer(podFullName string, podUID types.UID, container
 	return pod.FindContainerByName(containerName), nil
 }
 
+// TODO
+func (kl *Kubelet) DiffContainer(podFullName string, podUID types.UID, containerName string) ([]byte, error) {
+	podUID = kl.podManager.TranslatePodUID(podUID)
+	container, err := kl.findContainer(podFullName, podUID, containerName)
+	if err != nil {
+		return nil, err
+	}
+	if container == nil {
+		return nil, fmt.Errorf("container not found (%q)", containerName)
+	}
+
+	return kl.containerRuntime.DiffContainer(container.ID)
+}
+
 // Run a command in a container, returns the combined stdout, stderr as an array of bytes
 func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error) {
 	podUID = kl.podManager.TranslatePodUID(podUID)

@@ -86,6 +86,8 @@ type Factory struct {
 	LabelsForObject func(object runtime.Object) (map[string]string, error)
 	// LogsForObject returns a request for the logs associated with the provided object
 	LogsForObject func(object, options runtime.Object) (*client.Request, error)
+	// DiffForObject returns a request for the diff associated with the provided object
+	DiffForObject func(object, options runtime.Object) (*client.Request, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator func(validate bool, cacheDir string) (validation.Schema, error)
 	// Returns the default namespace to use in cases where no
@@ -239,6 +241,27 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					return nil, errors.New("provided options object is not a PodLogOptions")
 				}
 				return c.Pods(t.Namespace).GetLogs(t.Name, opts), nil
+			default:
+				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
+				if err != nil {
+					return nil, err
+				}
+				return nil, fmt.Errorf("cannot get the logs from %s", kind)
+			}
+		},
+		DiffForObject: func(object, options runtime.Object) (*client.Request, error) {
+			c, err := clients.ClientForVersion("")
+			if err != nil {
+				return nil, err
+			}
+
+			switch t := object.(type) {
+			case *api.Pod:
+				opts, ok := options.(*api.PodLogOptions)
+				if !ok {
+					return nil, errors.New("provided options object is not a PodLogOptions")
+				}
+				return c.Pods(t.Namespace).GetDiff(t.Name, opts), nil
 			default:
 				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
 				if err != nil {

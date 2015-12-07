@@ -159,6 +159,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 
 	cmds.AddCommand(NewCmdNamespace(out))
 	cmds.AddCommand(NewCmdLogs(f, out))
+	cmds.AddCommand(NewCmdDiff(f, out))
 	cmds.AddCommand(NewCmdRollingUpdate(f, out))
 	cmds.AddCommand(NewCmdScale(f, out))
 

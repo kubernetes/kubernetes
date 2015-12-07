@@ -116,3 +116,15 @@ func (c *FakePods) GetLogs(name string, opts *api.PodLogOptions) *client.Request
 	_, _ = c.Fake.Invokes(action, &api.Pod{})
 	return &client.Request{}
 }
+
+func (c *FakePods) GetDiff(name string, opts *api.PodLogOptions) *client.Request {
+	action := GenericActionImpl{}
+	action.Verb = "get"
+	action.Namespace = c.Namespace
+	action.Resource = "pod"
+	action.Subresource = "diff"
+	action.Value = opts
+
+	_, _ = c.Fake.Invokes(action, &api.Pod{})
+	return &client.Request{}
+}

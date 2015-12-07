@@ -1023,6 +1023,19 @@ func (dm *DockerManager) runInContainerUsingNsinit(containerID kubecontainer.Con
 	return c.CombinedOutput()
 }
 
+func (dm *DockerManager) DiffContainer(containerID kubecontainer.ContainerID) ([]byte, error) {
+	changes, err := dm.client.ContainerChanges(containerID.ID)
+	if err != nil {
+		return nil, err
+	}
+	// TODO make this better
+	result := ""
+	for _, change := range changes {
+		result = result + change.String() + "\n"
+	}
+	return []byte(result), nil
+}
+
 // RunInContainer uses nsinit to run the command inside the container identified by containerID
 func (dm *DockerManager) RunInContainer(containerID kubecontainer.ContainerID, cmd []string) ([]byte, error) {
 	// If native exec support does not exist in the local docker daemon use nsinit.
