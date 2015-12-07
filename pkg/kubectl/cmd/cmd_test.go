@@ -253,11 +253,11 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 				}
 				return c.Pods(t.Namespace).GetLogs(t.Name, opts), nil
 			default:
-				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
+				fqKind, err := api.Scheme.ObjectKind(object)
 				if err != nil {
 					return nil, err
 				}
-				return nil, fmt.Errorf("cannot get the logs from %s", kind)
+				return nil, fmt.Errorf("cannot get the logs from %v", fqKind)
 			}
 		},
 	}

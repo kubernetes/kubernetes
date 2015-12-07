@@ -745,14 +745,14 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 
 // transformDecodeError adds additional information when a decode fails.
 func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime.Object, body []byte) error {
-	_, kind, err := typer.ObjectVersionAndKind(into)
+	objectGroupVersionKind, err := typer.ObjectKind(into)
 	if err != nil {
 		return err
 	}
-	if version, dataKind, err := typer.DataVersionAndKind(body); err == nil && len(dataKind) > 0 {
-		return errors.NewBadRequest(fmt.Sprintf("%s in version %s cannot be handled as a %s: %v", dataKind, version, kind, baseErr))
+	if dataGroupVersionKind, err := typer.DataKind(body); err == nil && len(dataGroupVersionKind.Kind) > 0 {
+		return errors.NewBadRequest(fmt.Sprintf("%s in version %v cannot be handled as a %s: %v", dataGroupVersionKind.Kind, dataGroupVersionKind.GroupVersion(), objectGroupVersionKind.Kind, baseErr))
 	}
-	return errors.NewBadRequest(fmt.Sprintf("the object provided is unrecognized (must be of type %s): %v", kind, baseErr))
+	return errors.NewBadRequest(fmt.Sprintf("the object provided is unrecognized (must be of type %s): %v", objectGroupVersionKind.Kind, baseErr))
 }
 
 // setSelfLink sets the self link of an object (or the child items in a list) to the base URL of the request

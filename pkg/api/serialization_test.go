@@ -63,6 +63,9 @@ func fuzzInternalObject(t *testing.T, forVersion string, item runtime.Object, se
 func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 	printer := spew.ConfigState{DisableMethods: true}
 
+	gvk, err := api.Scheme.ObjectKind(item)
+	t.Logf("fully qualified kind for %v is %v with codec %v", reflect.TypeOf(item), gvk, codec)
+
 	name := reflect.TypeOf(item).Elem().Name()
 	data, err := codec.Encode(item)
 	if err != nil {
@@ -96,7 +99,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
 	set := sets.NewString(except...)
 	seed := rand.Int63()
-	fuzzInternalObject(t, "", item, seed)
+	fuzzInternalObject(t, testapi.Default.InternalGroupVersion().String(), item, seed)
 
 	version := testapi.Default.VersionUnderTest
 	codecs := []runtime.Codec{}
@@ -154,6 +157,7 @@ func TestRoundTripTypes(t *testing.T) {
 	// defer api.Scheme.Log(nil)
 
 	for kind := range api.Scheme.KnownTypes(testapi.Default.InternalGroupVersion()) {
+		t.Logf("working on %v in %v", kind, testapi.Default.InternalGroupVersion())
 		if nonRoundTrippableTypes.Has(kind) {
 			continue
 		}
@@ -168,18 +172,18 @@ func TestRoundTripTypes(t *testing.T) {
 }
 
 func doRoundTripTest(kind string, t *testing.T) {
-	item, err := api.Scheme.New("", kind)
+	item, err := api.Scheme.New(testapi.Default.InternalGroupVersion().String(), kind)
 	if err != nil {
 		t.Fatalf("Couldn't make a %v? %v", kind, err)
 	}
 	if _, err := meta.TypeAccessor(item); err != nil {
 		t.Fatalf("%q is not a TypeMeta and cannot be tested - add it to nonRoundTrippableTypes: %v", kind, err)
 	}
-	if api.Scheme.Recognizes(testapi.Default.VersionUnderTest, kind) {
+	if api.Scheme.Recognizes(testapi.Default.GroupVersion().WithKind(kind)) {
 		roundTripSame(t, item, nonRoundTrippableTypesByVersion[kind]...)
 	}
 	if !nonInternalRoundTrippableTypes.Has(kind) {
-		roundTrip(t, api.Codec, fuzzInternalObject(t, "", item, rand.Int63()))
+		roundTrip(t, api.Codec, fuzzInternalObject(t, testapi.Default.InternalGroupVersion().String(), item, rand.Int63()))
 	}
 }
 

@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"io"
 	"path"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // EncodeToVersion turns the given api object into an appropriate JSON string.
@@ -81,33 +83,34 @@ func (s *Scheme) EncodeToVersionStream(obj interface{}, destVersion string, stre
 		return fmt.Errorf("type %v is not registered for %q and it will be impossible to Decode it, therefore Encode will refuse to encode it.", v.Type(), destVersion)
 	}
 
-	objVersion, objKind, err := s.ObjectVersionAndKind(obj)
+	objGVK, err := s.ObjectKind(obj)
 	if err != nil {
 		return err
 	}
 
 	// Perform a conversion if necessary.
-	if objVersion != destVersion {
-		objOut, err := s.NewObject(destVersion, objKind)
+	if objGVK.GroupVersion().String() != destVersion {
+		objOut, err := s.NewObject(destVersion, objGVK.Kind)
 		if err != nil {
 			return err
 		}
-		flags, meta := s.generateConvertMeta(objVersion, destVersion, obj)
+		flags, meta := s.generateConvertMeta(objGVK.GroupVersion(), unversioned.ParseGroupVersionOrDie(destVersion), obj)
 		err = s.converter.Convert(obj, objOut, flags, meta)
 		if err != nil {
 			return err
 		}
 		obj = objOut
-	}
 
-	// ensure the output object name comes from the destination type
-	_, objKind, err = s.ObjectVersionAndKind(obj)
-	if err != nil {
-		return err
+		// ensure the output object name comes from the destination type
+		newGroupVersionKind, err := s.ObjectKind(obj)
+		if err != nil {
+			return err
+		}
+		objGVK.Kind = newGroupVersionKind.Kind
 	}
 
 	// Version and Kind should be set on the wire.
-	err = s.SetVersionAndKind(destVersion, objKind, obj)
+	err = s.SetVersionAndKind(destVersion, objGVK.Kind, obj)
 	if err != nil {
 		return err
 	}
@@ -129,11 +132,11 @@ func (s *Scheme) EncodeToVersionStream(obj interface{}, destVersion string, stre
 }
 
 func (s *Scheme) encodeUnversionedObject(obj interface{}) (data []byte, err error) {
-	_, objKind, err := s.ObjectVersionAndKind(obj)
+	objGVK, err := s.ObjectKind(obj)
 	if err != nil {
 		return nil, err
 	}
-	if err = s.SetVersionAndKind("", objKind, obj); err != nil {
+	if err = s.SetVersionAndKind("", objGVK.Kind, obj); err != nil {
 		return nil, err
 	}
 	data, err = json.Marshal(obj)

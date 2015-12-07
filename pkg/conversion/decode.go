@@ -27,28 +27,27 @@ import (
 )
 
 func (s *Scheme) DecodeToVersionedObject(data []byte) (interface{}, string, string, error) {
-	version, kind, err := s.DataVersionAndKind(data)
+	gvk, err := s.DataKind(data)
 	if err != nil {
 		return nil, "", "", err
 	}
 
-	gv, err := unversioned.ParseGroupVersion(version)
-	if err != nil {
-		return nil, "", "", err
-	}
-
-	internalGV, exists := s.InternalVersions[gv.Group]
+	internalGV, exists := s.InternalVersions[gvk.Group]
 	if !exists {
-		return nil, "", "", fmt.Errorf("no internalVersion specified for %v", gv)
+		return nil, "", "", fmt.Errorf("no internalVersion specified for %v", gvk)
 	}
 
-	if len(gv.Version) == 0 && len(internalGV.Version) != 0 {
+	if len(gvk.Group) == 0 && len(internalGV.Group) != 0 {
+		return nil, "", "", fmt.Errorf("group not set in '%s'", string(data))
+	}
+	if len(gvk.Version) == 0 && len(internalGV.Version) != 0 {
 		return nil, "", "", fmt.Errorf("version not set in '%s'", string(data))
 	}
-	if kind == "" {
+	if gvk.Kind == "" {
 		return nil, "", "", fmt.Errorf("kind not set in '%s'", string(data))
 	}
-	obj, err := s.NewObject(version, kind)
+
+	obj, err := s.NewObject(gvk.GroupVersion().String(), gvk.Kind)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -56,7 +55,7 @@ func (s *Scheme) DecodeToVersionedObject(data []byte) (interface{}, string, stri
 	if err := codec.NewDecoderBytes(data, new(codec.JsonHandle)).Decode(obj); err != nil {
 		return nil, "", "", err
 	}
-	return obj, version, kind, nil
+	return obj, gvk.GroupVersion().String(), gvk.Kind, nil
 }
 
 // Decode converts a JSON string back into a pointer to an api object.
@@ -106,7 +105,7 @@ func (s *Scheme) DecodeToVersion(data []byte, gv unversioned.GroupVersion) (inte
 		if err != nil {
 			return nil, err
 		}
-		flags, meta := s.generateConvertMeta(sourceVersion, gv.String(), obj)
+		flags, meta := s.generateConvertMeta(sourceGV, gv, obj)
 		if err := s.converter.Convert(obj, objOut, flags, meta); err != nil {
 			return nil, err
 		}
@@ -135,46 +134,54 @@ func (s *Scheme) DecodeIntoWithSpecifiedVersionKind(data []byte, obj interface{}
 	if len(data) == 0 {
 		return errors.New("empty input")
 	}
-	dataVersion, dataKind, err := s.DataVersionAndKind(data)
+	dataGVK, err := s.DataKind(data)
 	if err != nil {
 		return err
 	}
-	if dataVersion == "" {
-		dataVersion = requestedGVK.GroupVersion().String()
+	if len(dataGVK.Group) == 0 {
+		dataGVK.Group = requestedGVK.Group
 	}
-	if dataKind == "" {
-		dataKind = requestedGVK.Kind
+	if len(dataGVK.Version) == 0 {
+		dataGVK.Version = requestedGVK.Version
 	}
-	if (len(requestedGVK.Group) > 0 || len(requestedGVK.Version) > 0) && (dataVersion != requestedGVK.GroupVersion().String()) {
-		return errors.New(fmt.Sprintf("The apiVersion in the data (%s) does not match the specified apiVersion(%v)", dataVersion, requestedGVK.GroupVersion()))
-	}
-	if len(requestedGVK.Kind) > 0 && (dataKind != requestedGVK.Kind) {
-		return errors.New(fmt.Sprintf("The kind in the data (%s) does not match the specified kind(%v)", dataKind, requestedGVK))
+	if len(dataGVK.Kind) == 0 {
+		dataGVK.Kind = requestedGVK.Kind
 	}
 
-	objVersion, objKind, err := s.ObjectVersionAndKind(obj)
+	if len(requestedGVK.Group) > 0 && requestedGVK.Group != dataGVK.Group {
+		return errors.New(fmt.Sprintf("The fully qualified kind in the data (%v) does not match the specified apiVersion(%v)", dataGVK, requestedGVK))
+	}
+	if len(requestedGVK.Version) > 0 && requestedGVK.Version != dataGVK.Version {
+		return errors.New(fmt.Sprintf("The fully qualified kind in the data (%v) does not match the specified apiVersion(%v)", dataGVK, requestedGVK))
+	}
+	if len(requestedGVK.Kind) > 0 && requestedGVK.Kind != dataGVK.Kind {
+		return errors.New(fmt.Sprintf("The fully qualified kind in the data (%v) does not match the specified apiVersion(%v)", dataGVK, requestedGVK))
+	}
+
+	objGVK, err := s.ObjectKind(obj)
 	if err != nil {
 		return err
 	}
-	if dataKind == "" {
-		// Assume objects with unset Kind fields are being unmarshalled into the
-		// correct type.
-		dataKind = objKind
+	// Assume objects with unset fields are being unmarshalled into the
+	// correct type.
+	if len(dataGVK.Group) == 0 {
+		dataGVK.Group = objGVK.Group
 	}
-	if dataVersion == "" {
-		// Assume objects with unset Version fields are being unmarshalled into the
-		// correct type.
-		dataVersion = objVersion
+	if len(dataGVK.Version) == 0 {
+		dataGVK.Version = objGVK.Version
+	}
+	if len(dataGVK.Kind) == 0 {
+		dataGVK.Kind = objGVK.Kind
 	}
 
-	external, err := s.NewObject(dataVersion, dataKind)
+	external, err := s.NewObject(dataGVK.GroupVersion().String(), dataGVK.Kind)
 	if err != nil {
 		return err
 	}
 	if err := codec.NewDecoderBytes(data, new(codec.JsonHandle)).Decode(external); err != nil {
 		return err
 	}
-	flags, meta := s.generateConvertMeta(dataVersion, objVersion, external)
+	flags, meta := s.generateConvertMeta(dataGVK.GroupVersion(), objGVK.GroupVersion(), external)
 	if err := s.converter.Convert(external, obj, flags, meta); err != nil {
 		return err
 	}

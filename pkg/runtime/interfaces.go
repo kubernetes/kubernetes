@@ -69,13 +69,13 @@ type ObjectCodec interface {
 // TODO: Consider removing this interface?
 type ObjectDecoder interface {
 	Decoder
-	// DataVersionAndKind returns the version and kind of the provided data, or an error
+	// DataVersionAndKind returns the group,version,kind of the provided data, or an error
 	// if another problem is detected. In many cases this method can be as expensive to
 	// invoke as the Decode method.
-	DataVersionAndKind([]byte) (version, kind string, err error)
-	// Recognizes returns true if the scheme is able to handle the provided version and kind
+	DataKind([]byte) (unversioned.GroupVersionKind, error)
+	// Recognizes returns true if the scheme is able to handle the provided group,version,kind
 	// of an object.
-	Recognizes(version, kind string) bool
+	Recognizes(unversioned.GroupVersionKind) bool
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -91,17 +91,20 @@ type ObjectConvertor interface {
 // ObjectTyper contains methods for extracting the APIVersion and Kind
 // of objects.
 type ObjectTyper interface {
-	// DataVersionAndKind returns the version and kind of the provided data, or an error
+	// DataKind returns the group,version,kind of the provided data, or an error
 	// if another problem is detected. In many cases this method can be as expensive to
 	// invoke as the Decode method.
-	DataVersionAndKind([]byte) (version, kind string, err error)
-	// ObjectVersionAndKind returns the version and kind of the provided object, or an
+	DataKind([]byte) (unversioned.GroupVersionKind, error)
+	// ObjectKind returns the default group,version,kind of the provided object, or an
 	// error if the object is not recognized (IsNotRegisteredError will return true).
-	ObjectVersionAndKind(Object) (version, kind string, err error)
+	ObjectKind(Object) (unversioned.GroupVersionKind, error)
+	// ObjectKinds returns the all possible group,version,kind of the provided object, or an
+	// error if the object is not recognized (IsNotRegisteredError will return true).
+	ObjectKinds(Object) ([]unversioned.GroupVersionKind, error)
 	// Recognizes returns true if the scheme is able to handle the provided version and kind,
 	// or more precisely that the provided version is a possible conversion or decoding
 	// target.
-	Recognizes(version, kind string) bool
+	Recognizes(gvk unversioned.GroupVersionKind) bool
 }
 
 // ObjectCreater contains methods for instantiating an object by kind and version.
