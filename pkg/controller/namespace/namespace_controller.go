@@ -436,17 +436,7 @@ func deletePods(kubeClient client.Interface, ns string, before unversioned.Time)
 }
 
 func deleteEvents(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Events(ns).List(unversioned.ListOptions{})
-	if err != nil {
-		return err
-	}
-	for i := range items.Items {
-		err := kubeClient.Events(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
+	return kubeClient.Events(ns).DeleteCollection(nil, unversioned.ListOptions{})
 }
 
 func deleteSecrets(kubeClient client.Interface, ns string) error {
