@@ -156,7 +156,7 @@ func downwardAPIVolumePod(name string, labels, annotations map[string]string, fi
 				{
 					Name:    "client-container",
 					Image:   "gcr.io/google_containers/mounttest:0.6",
-					Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=10", "--file_content_in_loop=" + filePath},
+					Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      "podinfo",
