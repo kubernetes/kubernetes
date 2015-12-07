@@ -724,9 +724,18 @@ type GitRepoVolumeSource struct {
 // as files using the keys in the Data field as the file names.
 // Secret volumes support ownership management and SELinux relabeling.
 type SecretVolumeSource struct {
-	// SecretName is the name of a secret in the pod's namespace.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets
-	SecretName string `json:"secretName"`
+	// Name of the secret in the pod's namespace to use.  May not be specified if items is specified.
+	SecretName string `json:"secretName,omitempty"`
+	// A list of projections to make into the volume.  May not be specified if SecretName is specified.
+	Items []SecretVolumeFile `json:"items,omitempty"`
+}
+
+// SecretVolumeFile represents a single secret key projected into a file.
+type SecretVolumeFile struct {
+	// A reference to the secret key to project into the volume.
+	SecretKeySelector `json:",inline"`
+	// The path of the key within the volume.  Must be a relative path.  May not contain '..'.
+	Path string `json:"path,omitempty"`
 }
 
 // Represents an NFS mount that lasts the lifetime of a pod.
@@ -847,6 +856,8 @@ type EnvVarSource struct {
 	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty"`
 	// Selects a key of a ConfigMap.
 	ConfigMapKeyRef *ConfigMapKeySelector `json:"configMapKeyRef,omitempty"`
+	// Selects a key of a secret in the pod's namespace
+	SecretKeyRef *SecretKeySelector `json:"secretKeyRef,omitempty"`
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.
@@ -862,6 +873,14 @@ type ConfigMapKeySelector struct {
 	// The ConfigMap to select from.
 	LocalObjectReference `json:",inline"`
 	// The key to select.
+	Key string `json:"key"`
+}
+
+// SecretKeySelector selects a key of a Secret.
+type SecretKeySelector struct {
+	// The name of the secret in the pod's namespace to select from.
+	LocalObjectReference `json:",inline"`
+	// The key of the secret to select from.  Must be a valid secret key.
 	Key string `json:"key"`
 }
 

@@ -63,7 +63,7 @@ func (plugin *secretPlugin) CanSupport(spec *volume.Spec) bool {
 func (plugin *secretPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
 	return &secretVolumeBuilder{
 		secretVolume: &secretVolume{spec.Name(), pod.UID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}},
-		secretName:   spec.Volume.Secret.SecretName,
+		source:       spec.Volume.Secret,
 		pod:          *pod,
 		opts:         &opts}, nil
 }
@@ -92,9 +92,9 @@ func (sv *secretVolume) GetPath() string {
 type secretVolumeBuilder struct {
 	*secretVolume
 
-	secretName string
-	pod        api.Pod
-	opts       *volume.VolumeOptions
+	source *api.SecretVolumeSource
+	pod    api.Pod
+	opts   *volume.VolumeOptions
 }
 
 var _ volume.Builder = &secretVolumeBuilder{}
@@ -145,35 +145,103 @@ func (b *secretVolumeBuilder) SetUpAt(dir string) error {
 		return err
 	}
 
-	kubeClient := b.plugin.host.GetKubeClient()
-	if kubeClient == nil {
-		return fmt.Errorf("Cannot setup secret volume %v because kube client is not configured", b.volName)
+	if len(b.source.SecretName) != 0 {
+		err := b.projectSingleSecretIntoVolume(dir)
+		if err != nil {
+			return err
+		}
+	} else {
+		err := b.projectSecretFilesIntoVolume(dir)
+		if err != nil {
+			return err
+		}
 	}
 
-	secret, err := kubeClient.Secrets(b.pod.Namespace).Get(b.secretName)
+	volumeutil.SetReady(b.getMetaDir())
+
+	return nil
+}
+
+func (b *secretVolumeBuilder) getSecret(secretName string) (*api.Secret, error) {
+	kubeClient := b.plugin.host.GetKubeClient()
+	if kubeClient == nil {
+		return nil, fmt.Errorf("Cannot setup secret volume %v because kube client is not configured", b.volName)
+	}
+
+	secret, err := kubeClient.Secrets(b.pod.Namespace).Get(secretName)
 	if err != nil {
-		glog.Errorf("Couldn't get secret %v/%v", b.pod.Namespace, b.secretName)
-		return err
+		return nil, err
 	} else {
 		totalBytes := totalSecretBytes(secret)
 		glog.V(3).Infof("Received secret %v/%v containing (%v) pieces of data, %v total bytes",
 			b.pod.Namespace,
-			b.secretName,
+			b.source.SecretName,
 			len(secret.Data),
 			totalBytes)
 	}
 
-	for name, data := range secret.Data {
+	return secret, nil
+}
+
+func (b *secretVolumeBuilder) projectSingleSecretIntoVolume(dir string) error {
+	secret, err := b.getSecret(b.source.SecretName)
+
+	for name := range secret.Data {
 		hostFilePath := path.Join(dir, name)
-		glog.V(3).Infof("Writing secret data %v/%v/%v (%v bytes) to host file %v", b.pod.Namespace, b.secretName, name, len(data), hostFilePath)
-		err := b.writer.WriteFile(hostFilePath, data, 0444)
+		err = b.projectSecretIntoFile(secret, name, hostFilePath)
 		if err != nil {
 			glog.Errorf("Error writing secret data to host path: %v, %v", hostFilePath, err)
 			return err
 		}
 	}
 
-	volumeutil.SetReady(b.getMetaDir())
+	return nil
+}
+
+func (b *secretVolumeBuilder) projectSecretFilesIntoVolume(dir string) error {
+	fetchedSecrets := map[string]*api.Secret{}
+	var err error
+
+	for _, secretFile := range b.source.Items {
+		secretName := secretFile.Name
+		secret, ok := fetchedSecrets[secretName]
+		if !ok {
+			secret2, err := b.getSecret(secretName)
+			if err != nil {
+				glog.Errorf("Couldn't get secret %v/%v: %v", b.pod.Namespace, secretName, err)
+				return err
+			}
+			fetchedSecrets[secretName] = secret2
+			secret = secret2
+		}
+
+		filePath := path.Join(dir, secretFile.Path)
+		err = b.projectSecretIntoFile(secret, secretFile.Key, filePath)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (b *secretVolumeBuilder) projectSecretIntoFile(secret *api.Secret, key string, filePath string) error {
+	data, ok := secret.Data[key]
+	if !ok {
+		return fmt.Errorf("Secret key %v/%v/data[%v] does not exist.", b.pod.Namespace, secret.Name, key)
+	}
+
+	targetDir := path.Dir(filePath)
+	err := os.MkdirAll(targetDir, 0660)
+	if err != nil {
+		return fmt.Errorf("Couldn't construct path to file %v: %v", filePath, err)
+	}
+
+	glog.V(3).Infof("Writing secret data %v/%v/%v/data[%v] (%v bytes) to host file %v", b.pod.Namespace, secret.Name, key, len(data), filePath)
+	err = b.writer.WriteFile(filePath, data, 0444)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

@@ -1369,6 +1369,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 	var (
 		tmpEnv      = make(map[string]string)
 		configMaps  = make(map[string]*apiextensions.ConfigMap)
+		secrets     = make(map[string]*api.Secret)
 		mappingFunc = expansion.MappingFuncFor(tmpEnv, serviceEnv)
 	)
 	for _, envVar := range container.Env {
@@ -1405,6 +1406,21 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 				if !ok {
 					return result, fmt.Errorf("Couldn't find key %v in ConfigMap %v/%v", key, pod.Namespace, name)
 				}
+			case envVar.ValueFrom.SecretKeyRef != nil:
+				name := envVar.ValueFrom.SecretKeyRef.Name
+				key := envVar.ValueFrom.SecretKeyRef.Key
+				secret, ok := secrets[name]
+				if !ok {
+					secret, err = kl.kubeClient.Secrets(pod.Namespace).Get(name)
+					if err != nil {
+						return result, err
+					}
+				}
+				runtimeValBytes, ok := secret.Data[key]
+				if !ok {
+					return result, fmt.Errorf("Couldn't find key %v in Secret %v/%v", key, pod.Namespace, name)
+				}
+				runtimeVal = string(runtimeValBytes)
 			}
 		}
 
