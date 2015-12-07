@@ -16,6 +16,8 @@
 
 # A library of helper functions that each provider hosting Kubernetes must implement to use cluster/kube-*.sh scripts.
 
+[ ! -z "$UTIL_SH_DEBUG" ] && set -x
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 readonly ROOT=$(dirname "${BASH_SOURCE}")
 source "$ROOT/${KUBE_CONFIG_FILE:-"config-default.sh"}"
@@ -116,7 +118,6 @@ function initialize-pool {
   if [[ "$ROOT/coreos_production_qemu_image.img.bz2" -nt "$POOL_PATH/coreos_base.img" ]]; then
       bunzip2 -f -k "$ROOT/coreos_production_qemu_image.img.bz2"
       virsh vol-delete coreos_base.img --pool $POOL 2> /dev/null || true
-      mv "$ROOT/coreos_production_qemu_image.img" "$POOL_PATH/coreos_base.img"
   fi
   if ! virsh vol-list $POOL | grep -q coreos_base.img; then
       virsh vol-create-as $POOL coreos_base.img 10G --format qcow2
