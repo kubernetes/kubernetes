@@ -95,7 +95,7 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	}
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	if err := f.CanBeAutoscaled(mapping.GroupVersionKind.Kind); err != nil {
+	if err := f.CanBeAutoscaled(mapping.GroupVersionKind.GroupKind()); err != nil {
 		return err
 	}
 
