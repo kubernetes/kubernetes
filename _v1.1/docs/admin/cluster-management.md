@@ -50,18 +50,7 @@ The node upgrade process is user-initiated and is described in the [GKE document
 
 Upgrades on open source Google Compute Engine (GCE) clusters are controlled by the ```cluster/gce/upgrade.sh``` script.
 
-Its usage is as follows:
-
-{% highlight console %}
-{% raw %}
-cluster/gce/upgrade.sh [-M|-N|-P] -l | <release or continuous integration version> | [latest_stable|latest_release|latest_ci]
-  Upgrades master and nodes by default
-  -M:  Upgrade master only
-  -N:  Upgrade nodes only
-  -P:  Node upgrade prerequisites only (create a new instance template)
-  -l:  Use local(dev) binaries
-{% endraw %}
-{% endhighlight %}
+Get its usage by running `cluster/gce/upgrade.sh -h`.
 
 For example, to upgrade just your master to a specific version (v1.0.2):
 
@@ -75,7 +64,7 @@ Alternatively, to upgrade your entire cluster to the latest stable release:
 
 {% highlight console %}
 {% raw %}
-cluster/gce/upgrade.sh latest_stable
+cluster/gce/upgrade.sh release/stable
 {% endraw %}
 {% endhighlight %}
 
