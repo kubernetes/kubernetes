@@ -1,21 +1,30 @@
+= Kubernetes CoreOS cluster =
 
-Fixed some libvirt volume mess.
+With this tutorial one creates a Kubernetes CoreOS cluster containing of one
+master and three minions (workers) running on `192.168.10.1`-`192.168.10.4`.
 
 For proper working you need to create the directory addressed as `POOL_PATH` in
-`util.sh`
-
-
+`util.sh`:
 ```
-sudo mkdir /var/lib/libvirt/images/kubernetes
+$ sudo mkdir /var/lib/libvirt/images/kubernetes
+$ sudo chown -R $USER:$USER /var/lib/libvirt/images/kubernetes/
 ``` 
 
 Then follow the instructions in the main `kubernetes` directory.
 
-```
-export KUBERNETES_PROVIDER=libvirt-coreos
-cluster/kube-up.sh 
-```
-
 For debugging set `export UTIL_SH_DEBUG=1`.
 
+```
+$ export KUBERNETES_PROVIDER=libvirt-coreos
+$ make release-skip-tests
+$ ./cluster/kube-up.sh
+```
+
+To bring the cluster down again, execute:
+
+```
+$ ./cluster/kube-down.sh
+```
+
 Have fun!
+
