@@ -1,0 +1,9 @@
+- job:
+    name: kubernetes-update-jenkins-jobs
+    description: "Update Jenkins jobs"
+
+    triggers:
+        - timed: "H/15 * * * *"
+
+    builders:
+        - shell: "curl -fsS https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/update-jobs.sh | /bin/bash -"
