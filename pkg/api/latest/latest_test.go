@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -109,7 +110,6 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	t.Logf("codec: %#v", expCodec)
 	typeMeta := unversioned.TypeMeta{}
 	if err := json.Unmarshal(encoded, &typeMeta); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -126,5 +126,16 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	}
 	if !reflect.DeepEqual(status, decoded) {
 		t.Errorf("expected: %v, got: %v", status, decoded)
+	}
+}
+
+func TestUnversioned(t *testing.T) {
+	for _, obj := range []runtime.Object{
+		&unversioned.Status{},
+		&unversioned.ListOptions{},
+	} {
+		if unversioned, ok := api.Scheme.IsUnversioned(obj); !unversioned || !ok {
+			t.Errorf("%v is expected to be unversioned", reflect.TypeOf(obj))
+		}
 	}
 }

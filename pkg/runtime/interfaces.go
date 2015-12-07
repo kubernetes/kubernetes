@@ -32,12 +32,15 @@ const (
 type Typer interface {
 	// ObjectVersionAndKind returns the version and kind of the provided object, or an
 	// error if the object is not recognized (IsNotRegisteredError will return true).
-	ObjectVersionAndKind(Object) (*unversioned.GroupVersionKind, error)
+	// It returns whether the object is considered unversioned at the same time.
+	ObjectVersionAndKind(Object) (*unversioned.GroupVersionKind, bool, error)
 }
 
 type Encoder interface {
-	// EncodeToStream writes an object to a stream.
-	EncodeToStream(obj Object, stream io.Writer) error
+	// EncodeToStream writes an object to a stream. Override versions may be provided for each group
+	// that enforce a certain versioning. Implementations may return errors if the versions are incompatible,
+	// or if no conversion is defined.
+	EncodeToStream(obj Object, stream io.Writer, overrides ...unversioned.GroupVersion) error
 }
 
 type Decoder interface {
@@ -46,7 +49,7 @@ type Decoder interface {
 	// version decoded, or an error. If into is non-nil, it will be used as the target type and implementations
 	// may choose to use it rather than reallocating an object. However, the object is not guaranteed to be
 	// populated. The returned object type is not guaranteed to match into.
-	Decode(data []byte, gvk *unversioned.GroupVersionKind, into Object) (Object, *unversioned.GroupVersionKind, error)
+	Decode(data []byte, defaults *unversioned.GroupVersionKind, into Object) (Object, *unversioned.GroupVersionKind, error)
 }
 
 // Serializer is the core interface for transforming objects into a serialized format and back.
@@ -96,6 +99,10 @@ type ObjectTyper interface {
 	// or more precisely that the provided version is a possible conversion or decoding
 	// target.
 	Recognizes(version, kind string) bool
+	// IsUnversioned returns true if the provided object is considered unversioned and thus
+	// should have Version and Group suppressed in the output. If the object is not recognized
+	// in the scheme, ok is false.
+	IsUnversioned(Object) (unversioned bool, ok bool)
 }
 
 // ObjectCreater contains methods for instantiating an object by kind and version.

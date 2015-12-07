@@ -109,8 +109,8 @@ func (f CodecFactory) SupportedMediaTypes() []string {
 //
 // This method is deprecated - clients and servers should negotiate a serializer by mime-type and
 // invoke CodecForVersions. Callers that need only to read data should use UniversalDecoder().
-func (f CodecFactory) LegacyCodec(version unversioned.GroupVersion) runtime.Codec {
-	return f.CodecForVersions(codec{f.legacySerializer, f.universal}, []unversioned.GroupVersion{version}, nil)
+func (f CodecFactory) LegacyCodec(version ...unversioned.GroupVersion) runtime.Codec {
+	return f.CodecForVersions(codec{f.legacySerializer, f.universal}, version, nil)
 }
 
 // UniversalDecoder returns a runtime.Decoder capable of decoding all known API objects in all known formats. Used

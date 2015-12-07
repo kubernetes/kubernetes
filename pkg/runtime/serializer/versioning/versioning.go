@@ -98,7 +98,7 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 	// if we specify a target, use generic conversion.
 	if into != nil {
 		if into == obj {
-			return into, gvk
+			return into, gvk, nil
 		}
 		if err := c.convertor.Convert(obj, into); err != nil {
 			return nil, gvk, err
@@ -138,28 +138,45 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 }
 
 // EncodeToStream ensures the provided object is output in the right scheme
-func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer) error {
-	gvk, err := c.typer.ObjectVersionAndKind(obj)
+func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
+	gvk, isUnversioned, err := c.typer.ObjectVersionAndKind(obj)
 	if err != nil {
 		return err
 	}
 
-	if c.encodeVersion == nil {
-		return c.serializer.EncodeToStream(obj, w)
+	if c.encodeVersion == nil || isUnversioned {
+		return c.serializer.EncodeToStream(obj, w, overrides...)
 	}
 
 	targetGV, ok := c.encodeVersion[gvk.Group]
-	if !ok {
-		if len(c.encodeVersion) == 1 {
-			for _, v := range c.encodeVersion {
-				targetGV = v
-			}
+	// use override if provided
+	for i, override := range overrides {
+		if override.Group == gvk.Group {
+			ok = true
+			targetGV = override
+			// swap the position of the override
+			overrides[0], overrides[i] = targetGV, overrides[0]
+			break
 		}
-		//return fmt.Errorf("the codec does not recognize group %q for kind %q and cannot encode it", gvk.Group, gvk.Kind)
 	}
 
-	// Perform a conversion if necessary.
-	if !targetGV.IsEmpty() && gvk.GroupVersion() != targetGV {
+	// attempt a conversion to the sole encode version
+	if !ok && len(c.encodeVersion) == 1 {
+		ok = true
+		for _, v := range c.encodeVersion {
+			targetGV = v
+		}
+		// ensure the target override is first
+		overrides = promoteOrPrependGroupVersion(targetGV, overrides)
+	}
+
+	// if no fallback is available, error
+	if !ok {
+		return fmt.Errorf("the codec does not recognize group %q for kind %q and cannot encode it", gvk.Group, gvk.Kind)
+	}
+
+	// Perform a conversion if necessary
+	if gvk.GroupVersion() != targetGV {
 		out, err := c.convertor.ConvertToVersion(obj, targetGV.String())
 		if err != nil {
 			if ok {
@@ -170,7 +187,17 @@ func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer) error {
 		}
 	}
 
-	return c.serializer.EncodeToStream(obj, w)
+	return c.serializer.EncodeToStream(obj, w, overrides...)
+}
+
+func promoteOrPrependGroupVersion(target unversioned.GroupVersion, gvs []unversioned.GroupVersion) []unversioned.GroupVersion {
+	for i, gv := range gvs {
+		if gv.Group == target.Group {
+			gvs[0], gvs[i] = gvs[i], gvs[0]
+			return gvs
+		}
+	}
+	return append([]unversioned.GroupVersion{target}, gvs...)
 }
 
 func NewEnforcingDecoder(codec runtime.Codec) runtime.Codec {
@@ -199,7 +226,7 @@ func (c enforcingDecoder) Decode(data []byte, requestedGVK *unversioned.GroupVer
 
 // DefaultGroupVersionKindForObject calculates the expected outcome type for an object.
 func DefaultGroupVersionKindForObject(typer runtime.Typer, obj runtime.Object, defaults ...unversioned.GroupVersionKind) (*unversioned.GroupVersionKind, error) {
-	gvk, err := typer.ObjectVersionAndKind(obj)
+	gvk, _, err := typer.ObjectVersionAndKind(obj)
 	if err != nil {
 		return gvk, err
 	}

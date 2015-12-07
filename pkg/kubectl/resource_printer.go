@@ -207,7 +207,7 @@ type NamePrinter struct {
 //   in order to do what it needs to do.
 func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	kind := "<unknown>"
-	if gvk, err := p.Typer.ObjectVersionAndKind(obj); err == nil {
+	if gvk, _, err := p.Typer.ObjectVersionAndKind(obj); err == nil {
 		kind = gvk.Kind
 	}
 

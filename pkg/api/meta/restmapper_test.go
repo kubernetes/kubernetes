@@ -29,7 +29,7 @@ type fakeCodec struct{}
 
 var _ runtime.Decoder = fakeCodec{}
 
-func (fakeCodec) EncodeToStream(runtime.Object, io.Writer) error {
+func (fakeCodec) EncodeToStream(runtime.Object, io.Writer, ...unversioned.GroupVersion) error {
 	return nil
 }
 

@@ -113,6 +113,10 @@ func (s *Scheme) Recognizes(version, kind string) bool {
 	return s.raw.Recognizes(version, kind)
 }
 
+func (s *Scheme) IsUnversioned(obj Object) (bool, bool) {
+	return s.raw.IsUnversioned(obj)
+}
+
 // New returns a new API object of the given version ("" for internal
 // representation) and name, or an error if it hasn't been registered.
 func (s *Scheme) New(versionName, typeName string) (Object, error) {

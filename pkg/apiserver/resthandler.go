@@ -340,13 +340,18 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 
 		defaultGVK := gv.WithKind(scope.Kind)
-		obj, gvk, err := decoder.Decode(body, &defaultGVK, r.New())
+		original := r.New()
+		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
-			err = transformDecodeError(typer, err, obj, gvk)
+			err = transformDecodeError(typer, err, original, gvk)
 			scope.err(err, req, res)
 			return
 		}
-		// TODO: enforce gvk is of the same API version
+		if gvk.GroupVersion() != gv {
+			err = errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%v)", gvk.GroupVersion().String(), gv.String()))
+			scope.err(err, req, res)
+			return
+		}
 
 		if admit != nil && admit.Handles(admission.Create) {
 			userInfo, _ := api.UserFrom(ctx)
@@ -593,14 +598,20 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			scope.err(err, req, res)
 			return
 		}
-		defaultGVK := unversioned.ParseGroupVersionOrDie(scope.APIVersion).WithKind(scope.Kind)
-		obj, gvk, err := scope.Serializer.DecoderToVersion(s, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, r.New())
+		gv := unversioned.ParseGroupVersionOrDie(scope.APIVersion)
+		defaultGVK := gv.WithKind(scope.Kind)
+		original := r.New()
+		obj, gvk, err := scope.Serializer.DecoderToVersion(s, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, original)
 		if err != nil {
-			err = transformDecodeError(typer, err, obj, gvk)
+			err = transformDecodeError(typer, err, original, gvk)
 			scope.err(err, req, res)
 			return
 		}
-		// TODO: check gvk
+		if gvk.GroupVersion() != gv {
+			err = errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%v)", gvk.GroupVersion().String(), gv.String()))
+			scope.err(err, req, res)
+			return
+		}
 
 		if err := checkName(obj, name, namespace, scope.Namer); err != nil {
 			scope.err(err, req, res)
@@ -767,7 +778,7 @@ func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime
 		return err
 	}
 	if gvk != nil && len(gvk.Kind) > 0 {
-		return errors.NewBadRequest(fmt.Sprintf("%s in version %s cannot be handled as a %s: %v", gvk.Kind, gvk.Version, kind, baseErr))
+		return errors.NewBadRequest(fmt.Sprintf("%s in version %q cannot be handled as a %s: %v", gvk.Kind, gvk.Version, kind, baseErr))
 	}
 	return errors.NewBadRequest(fmt.Sprintf("the object provided is unrecognized (must be of type %s): %v", kind, baseErr))
 }

@@ -37,10 +37,10 @@ func EncodeOrDie(codec Serializer, obj Object) string {
 }
 
 // Encode is a convenience wrapper for encoding to a []byte from a Serializer
-func Encode(s Encoder, obj Object) ([]byte, error) {
+func Encode(s Encoder, obj Object, overrides ...unversioned.GroupVersion) ([]byte, error) {
 	// TODO: reuse buffer
 	buf := &bytes.Buffer{}
-	if err := s.EncodeToStream(obj, buf); err != nil {
+	if err := s.EncodeToStream(obj, buf, overrides...); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
@@ -48,7 +48,7 @@ func Encode(s Encoder, obj Object) ([]byte, error) {
 
 func UseOrCreateObject(t Typer, c ObjectCreater, gvk unversioned.GroupVersionKind, obj Object) (Object, error) {
 	if obj != nil {
-		into, err := t.ObjectVersionAndKind(obj)
+		into, _, err := t.ObjectVersionAndKind(obj)
 		if err != nil {
 			return nil, err
 		}
@@ -64,7 +64,7 @@ type NoopEncoder struct {
 	Decoder
 }
 
-func (n NoopEncoder) EncodeToStream(obj Object, w io.Writer) error {
+func (n NoopEncoder) EncodeToStream(obj Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
 	return fmt.Errorf("encoding is not allowed for this codec: %v", reflect.TypeOf(n.Decoder))
 }
 
@@ -111,7 +111,7 @@ func (c *parameterCodec) DecodeParameters(parameters url.Values, from unversione
 	if len(parameters) == 0 {
 		return nil
 	}
-	gvk, err := c.typer.ObjectVersionAndKind(into)
+	gvk, _, err := c.typer.ObjectVersionAndKind(into)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (c *parameterCodec) DecodeParameters(parameters url.Values, from unversione
 }
 
 func (c *parameterCodec) EncodeParameters(obj Object, to unversioned.GroupVersion) (url.Values, error) {
-	gvk, err := c.typer.ObjectVersionAndKind(obj)
+	gvk, _, err := c.typer.ObjectVersionAndKind(obj)
 	if err != nil {
 		return nil, err
 	}

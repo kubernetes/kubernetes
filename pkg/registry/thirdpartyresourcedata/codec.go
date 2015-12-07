@@ -225,7 +225,7 @@ func encodeToJSON(obj *extensions.ThirdPartyResourceData, stream io.Writer) erro
 	return encoder.Encode(objMap)
 }
 
-func (t *thirdPartyResourceDataCodec) EncodeToStream(obj runtime.Object, stream io.Writer) (err error) {
+func (t *thirdPartyResourceDataCodec) EncodeToStream(obj runtime.Object, stream io.Writer, overrides ...unversioned.GroupVersion) (err error) {
 	switch obj := obj.(type) {
 	case *extensions.ThirdPartyResourceData:
 		return encodeToJSON(obj, stream)
@@ -243,7 +243,7 @@ func (t *thirdPartyResourceDataCodec) EncodeToStream(obj runtime.Object, stream 
 		fmt.Fprintf(stream, template, t.kind+"List", strings.Join(dataStrings, ","))
 		return nil
 	case *unversioned.Status:
-		return t.delegate.EncodeToStream(obj, stream)
+		return t.delegate.EncodeToStream(obj, stream, overrides...)
 	default:
 		return fmt.Errorf("unexpected object to encode: %#v", obj)
 	}

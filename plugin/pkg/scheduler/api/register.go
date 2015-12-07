@@ -29,6 +29,9 @@ var Scheme = runtime.NewScheme()
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
 
 func init() {
+	if err := Scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
+		panic(err)
+	}
 	Scheme.AddKnownTypes(SchemeGroupVersion,
 		&Policy{},
 	)

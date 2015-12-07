@@ -1035,9 +1035,9 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Typer:     api.Scheme,
 
 		Mapper: thirdpartyresourcedata.NewMapper(latest.GroupOrDie("extensions").RESTMapper, kind, version, group),
-		// TODO: bring back
-		//Serializer:         thirdpartyresourcedata.NewCodec(latest.GroupOrDie("extensions").Codec, kind),
-		ParameterCodec:     runtime.NewParameterCodec(api.Scheme),
+
+		Serializer:         latest.Codecs,
+		ParameterCodec:     api.ParameterCodec,
 		Linker:             latest.GroupOrDie("extensions").SelfLinker,
 		Storage:            storage,
 		ServerGroupVersion: &serverGroupVersion,

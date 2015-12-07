@@ -35,6 +35,8 @@ type Scheme struct {
 
 	// unversionedTypes are transformed without conversion in ConvertToVersion.
 	unversionedTypes map[reflect.Type]unversioned.GroupVersionKind
+	// unversionedKinds are the names of kinds that exist in all versions
+	unversionedKinds map[string]reflect.Type
 
 	// converter stores all registered conversion functions. It also has
 	// default coverting behavior.
@@ -62,6 +64,7 @@ func NewScheme() *Scheme {
 		gvkToType:        map[unversioned.GroupVersionKind]reflect.Type{},
 		typeToGVK:        map[reflect.Type][]unversioned.GroupVersionKind{},
 		unversionedTypes: map[reflect.Type]unversioned.GroupVersionKind{},
+		unversionedKinds: map[string]reflect.Type{},
 		converter:        NewConverter(),
 		cloner:           NewCloner(),
 	}
@@ -106,6 +109,10 @@ func (s *Scheme) AddUnversionedTypes(gv unversioned.GroupVersion, types ...inter
 		t := reflect.TypeOf(obj).Elem()
 		gvk := gv.WithKind(t.Name())
 		s.unversionedTypes[t] = gvk
+		if _, ok := s.unversionedKinds[gvk.Kind]; ok {
+			panic(fmt.Sprintf("%v has already been registered as unversioned kind %q - kind name must be unique", reflect.TypeOf(t), gvk.Kind))
+		}
+		s.unversionedKinds[gvk.Kind] = t
 	}
 }
 
@@ -180,7 +187,9 @@ func (s *Scheme) NewObject(gvString, kind string) (interface{}, error) {
 	if t, exists := s.gvkToType[gvk]; exists {
 		return reflect.New(t).Interface(), nil
 	}
-
+	if t, exists := s.unversionedKinds[gvk.Kind]; exists {
+		return reflect.New(t).Interface(), nil
+	}
 	return nil, &notRegisteredErr{gvk: gvk}
 }
 
@@ -308,6 +317,20 @@ func (s *Scheme) Recognizes(gvString, kind string) bool {
 
 	_, exists := s.gvkToType[gvk]
 	return exists
+}
+
+func (s *Scheme) IsUnversioned(obj interface{}) (bool, bool) {
+	v, err := EnforcePtr(obj)
+	if err != nil {
+		return false, false
+	}
+	t := v.Type()
+
+	if _, ok := s.typeToGVK[t]; !ok {
+		return false, false
+	}
+	_, ok := s.unversionedTypes[t]
+	return ok, true
 }
 
 // RegisterInputDefaults sets the provided field mapping function and field matching

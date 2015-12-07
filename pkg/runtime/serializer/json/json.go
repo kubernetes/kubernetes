@@ -86,7 +86,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKi
 		if gvk == nil {
 			if into != nil {
 				// try to default the missing value from into
-				if typed, err := s.typer.ObjectVersionAndKind(into); err == nil {
+				if typed, _, err := s.typer.ObjectVersionAndKind(into); err == nil {
 					if len(actual.Kind) == 0 {
 						actual.Kind = typed.Kind
 					}
@@ -131,13 +131,38 @@ func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKi
 	return obj, actual, nil
 }
 
-func (s *Serializer) EncodeToStream(obj runtime.Object, w io.Writer) error {
+func (s *Serializer) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
 	if s.typer != nil {
-		gvk, err := s.typer.ObjectVersionAndKind(obj)
+		gvk, isUnversioned, err := s.typer.ObjectVersionAndKind(obj)
 		if err != nil {
 			return err
 		}
-		if err := s.meta.Update(gvk.GroupVersion().String(), gvk.Kind, obj); err != nil {
+
+		// apply appropriate overrides for the group version being targeted
+		var gv unversioned.GroupVersion
+		if isUnversioned {
+			// unversioned types are targeted to the caller's first preferred group version
+			if len(overrides) > 0 {
+				gv = overrides[0]
+			} else {
+				gv = gvk.GroupVersion()
+			}
+		} else {
+			if len(overrides) == 1 {
+				// if only a single override is present, use that as the target version
+				gv = overrides[0]
+			} else {
+				// if multiple or none are present, match to the preferred version
+				gv = gvk.GroupVersion()
+				for _, override := range overrides {
+					if override.Group == gvk.Group {
+						gv = override
+						break
+					}
+				}
+			}
+		}
+		if err := s.meta.Update(gv.String(), gvk.Kind, obj); err != nil {
 			return err
 		}
 	}

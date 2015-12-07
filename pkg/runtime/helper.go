@@ -28,16 +28,17 @@ type objectTyperToTyper struct {
 	ObjectTyper
 }
 
-func (t objectTyperToTyper) ObjectVersionAndKind(obj Object) (*unversioned.GroupVersionKind, error) {
+func (t objectTyperToTyper) ObjectVersionAndKind(obj Object) (*unversioned.GroupVersionKind, bool, error) {
 	version, kind, err := t.ObjectTyper.ObjectVersionAndKind(obj)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	gv, err := unversioned.ParseGroupVersion(version)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return &unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind}, nil
+	unversionedType, _ := t.ObjectTyper.IsUnversioned(obj)
+	return &unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind}, unversionedType, nil
 }
 
 func ObjectTyperToTyper(typer ObjectTyper) Typer {
@@ -115,4 +116,13 @@ func (m MultiObjectTyper) Recognizes(version, kind string) bool {
 		}
 	}
 	return false
+}
+
+func (m MultiObjectTyper) IsUnversioned(obj Object) (bool, bool) {
+	for _, t := range m {
+		if unversioned, ok := t.IsUnversioned(obj); ok {
+			return unversioned, true
+		}
+	}
+	return false, false
 }
