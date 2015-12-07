@@ -190,7 +190,7 @@ function kube-up {
   initialize-pool keep_base_image
   initialize-network
 
-  readonly ssh_keys="$(cat ~/.ssh/id_*.pub | sed 's/^/  - /')"
+  readonly ssh_keys="$(cat ~/.ssh/*.pub | sed 's/^/  - /')"
   readonly kubernetes_dir="$POOL_PATH/kubernetes"
 
   local i
