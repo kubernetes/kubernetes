@@ -205,7 +205,7 @@ function kube-up {
   set_service_accounts
   initialize-network
 
-  readonly ssh_keys="$(cat ~/.ssh/id_*.pub | sed 's/^/  - /')"
+  readonly ssh_keys="$(cat ~/.ssh/*.pub | sed 's/^/  - /')"
   readonly kubernetes_dir="$POOL_PATH/kubernetes"
 
   local i
