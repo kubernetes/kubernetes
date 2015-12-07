@@ -703,6 +703,99 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 	}
 }
 
+// DeleteCollection returns a function that will handle a collection deletion
+func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, admit admission.Interface) restful.RouteFunction {
+	return func(req *restful.Request, res *restful.Response) {
+		w := res.ResponseWriter
+
+		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
+		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
+
+		namespace, err := scope.Namer.Namespace(req)
+		if err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+
+		ctx := scope.ContextFunc(req)
+		ctx = api.WithNamespace(ctx, namespace)
+
+		if admit != nil && admit.Handles(admission.Delete) {
+			userInfo, _ := api.UserFrom(ctx)
+
+			err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind.GroupKind(), namespace, "", scope.Resource.GroupResource(), scope.Subresource, admission.Delete, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
+		}
+
+		listOptions := unversioned.ListOptions{}
+		if err := scope.Codec.DecodeParametersInto(req.Request.URL.Query(), &listOptions); err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+
+		// transform fields
+		// TODO: DecodeParametersInto should do this.
+		if listOptions.FieldSelector.Selector != nil {
+			fn := func(label, value string) (newLabel, newValue string, err error) {
+				return scope.Convertor.ConvertFieldLabel(scope.Kind.GroupVersion().String(), scope.Kind.Kind, label, value)
+			}
+			if listOptions.FieldSelector.Selector, err = listOptions.FieldSelector.Selector.Transform(fn); err != nil {
+				// TODO: allow bad request to set field causes based on query parameters
+				err = errors.NewBadRequest(err.Error())
+				errorJSON(err, scope.Codec, w)
+				return
+			}
+		}
+
+		options := &api.DeleteOptions{}
+		if checkBody {
+			body, err := readBody(req.Request)
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
+			if len(body) > 0 {
+				if err := scope.Codec.DecodeInto(body, options); err != nil {
+					errorJSON(err, scope.Codec, w)
+					return
+				}
+			}
+		}
+
+		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+			return r.DeleteCollection(ctx, options, &listOptions)
+		})
+		if err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+
+		// if the rest.Deleter returns a nil object, fill out a status. Callers may return a valid
+		// object with the response.
+		if result == nil {
+			result = &unversioned.Status{
+				Status: unversioned.StatusSuccess,
+				Code:   http.StatusOK,
+				Details: &unversioned.StatusDetails{
+					Kind: scope.Kind.Kind,
+				},
+			}
+		} else {
+			// when a non-status response is returned, set the self link
+			if _, ok := result.(*unversioned.Status); !ok {
+				if _, err := setListSelfLink(result, req, scope.Namer); err != nil {
+					errorJSON(err, scope.Codec, w)
+					return
+				}
+			}
+		}
+		write(http.StatusOK, scope.Kind.GroupVersion(), scope.Codec, result, w, req.Request)
+	}
+}
+
 // resultFunc is a function that returns a rest result and can be run in a goroutine
 type resultFunc func() (runtime.Object, error)
 
