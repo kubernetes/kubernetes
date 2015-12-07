@@ -24,7 +24,7 @@ source "$KUBE_ROOT/cluster/common.sh"
 export LIBVIRT_DEFAULT_URI=qemu:///system
 
 readonly POOL=kubernetes
-readonly POOL_PATH="$(cd $ROOT && pwd)/libvirt_storage_pool"
+readonly POOL_PATH=/var/lib/libvirt/images/kubernetes
 
 # join <delim> <list...>
 # Concatenates the list elements with the delimiter passed as first parameter
@@ -118,10 +118,10 @@ function initialize-pool {
       virsh vol-delete coreos_base.img --pool $POOL 2> /dev/null || true
       mv "$ROOT/coreos_production_qemu_image.img" "$POOL_PATH/coreos_base.img"
   fi
-  # if ! virsh vol-list $POOL | grep -q coreos_base.img; then
-  #     virsh vol-create-as $POOL coreos_base.img 10G --format qcow2
-  #     virsh vol-upload coreos_base.img "$ROOT/coreos_production_qemu_image.img" --pool $POOL
-  # fi
+  if ! virsh vol-list $POOL | grep -q coreos_base.img; then
+      virsh vol-create-as $POOL coreos_base.img 10G --format qcow2
+      virsh vol-upload coreos_base.img "$ROOT/coreos_production_qemu_image.img" --pool $POOL
+  fi
 
   mkdir -p "$POOL_PATH/kubernetes"
   kube-push-internal
