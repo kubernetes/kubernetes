@@ -33,9 +33,9 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/labels"
@@ -66,7 +66,10 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 	case "yaml":
 		printer = &YAMLPrinter{}
 	case "name":
-		printer = &NamePrinter{}
+		printer = &NamePrinter{
+			Typer:   runtime.ObjectTyperToTyper(api.Scheme),
+			Decoder: latest.Codecs.UniversalDecoder(),
+		}
 	case "template", "go-template":
 		if len(formatArgument) == 0 {
 			return nil, false, fmt.Errorf("template format specified but no template given")
@@ -219,7 +222,7 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 			return err
 		}
 		// TODO: this is wrong, should access all metadata schemes.
-		if errs := runtime.DecodeList(items, runtime.UnstructuredJSONScheme, p.Decoder); len(errs) > 0 {
+		if errs := runtime.DecodeList(items, p.Decoder, runtime.UnstructuredJSONScheme); len(errs) > 0 {
 			return utilerrors.NewAggregate(errs)
 		}
 		for _, obj := range items {
@@ -1684,19 +1687,18 @@ func NewJSONPathPrinter(tmpl string) (*JSONPathPrinter, error) {
 
 // PrintObj formats the obj with the JSONPath Template.
 func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	var queryObj interface{}
-	switch obj.(type) {
-	case *v1.List, *api.List:
-		data, err := json.Marshal(obj)
+	queryObj := obj
+	if meta.IsListType(obj) {
+		list, err := meta.ExtractList(obj)
 		if err != nil {
 			return err
 		}
-		queryObj = map[string]interface{}{}
-		if err := json.Unmarshal(data, &queryObj); err != nil {
+		if err := runtime.DecodeList(list, runtime.UnstructuredJSONScheme); err != nil {
+			return utilerrors.NewAggregate(err)
+		}
+		if err := meta.SetList(obj, list); err != nil {
 			return err
 		}
-	default:
-		queryObj = obj
 	}
 
 	if err := j.JSONPath.Execute(w, queryObj); err != nil {
