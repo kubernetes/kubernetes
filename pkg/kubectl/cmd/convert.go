@@ -90,17 +90,16 @@ type ConvertOptions struct {
 	out     io.Writer
 	printer kubectl.ResourcePrinter
 
-	outputVersion string
+	outputVersion unversioned.GroupVersion
 }
 
 // Complete collects information required to run Convert command from command line.
 func (o *ConvertOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
-	o.outputVersion = cmdutil.OutputVersion(cmd, latest.GroupOrDie("").GroupVersion.Version)
-	outputGV, err := unversioned.ParseGroupVersion(o.outputVersion)
+	o.outputVersion, err = cmdutil.OutputVersion(cmd, &latest.ExternalVersions[0])
 	if err != nil {
-		return fmt.Errorf("unable to parse group/version from %q: %v", o.outputVersion, err)
+		return err
 	}
-	if !registered.IsRegisteredAPIGroupVersion(outputGV) {
+	if !registered.IsRegisteredAPIGroupVersion(o.outputVersion) {
 		cmdutil.UsageError(cmd, "'%s' is not a registered version.", o.outputVersion)
 	}
 
@@ -152,7 +151,7 @@ func (o *ConvertOptions) RunConvert() error {
 		return err
 	}
 
-	objects, err := resource.AsVersionedObject(infos, false, o.outputVersion)
+	objects, err := resource.AsVersionedObject(infos, false, o.outputVersion.String())
 	if err != nil {
 		return err
 	}

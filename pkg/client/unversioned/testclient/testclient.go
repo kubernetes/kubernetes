@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/version"
@@ -306,10 +307,14 @@ func (c *Fake) ComponentStatuses() client.ComponentStatusInterface {
 }
 
 // SwaggerSchema returns an empty swagger.ApiDeclaration for testing
-func (c *Fake) SwaggerSchema(version string) (*swagger.ApiDeclaration, error) {
+func (c *Fake) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
 	action := ActionImpl{}
 	action.Verb = "get"
-	action.Resource = "/swaggerapi/api/" + version
+	if version == v1.SchemeGroupVersion {
+		action.Resource = "/swaggerapi/api/" + version.Version
+	} else {
+		action.Resource = "/swaggerapi/apis/" + version.Group + "/" + version.Version
+	}
 
 	c.Invokes(action, nil)
 	return &swagger.ApiDeclaration{}, nil

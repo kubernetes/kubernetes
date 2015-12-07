@@ -47,14 +47,24 @@ func makeImageList(spec *api.PodSpec) string {
 // correspond to a preferred output version (if feasible)
 type OutputVersionMapper struct {
 	meta.RESTMapper
-	OutputVersion string
+
+	// output versions takes a list of preferred GroupVersions. Only the first
+	// hit for a given group will have effect.  This allows different output versions
+	// depending upon the group of the kind being requested
+	OutputVersions []unversioned.GroupVersion
 }
 
 // RESTMapping implements meta.RESTMapper by prepending the output version to the preferred version list.
 func (m OutputVersionMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*meta.RESTMapping, error) {
-	mapping, err := m.RESTMapper.RESTMapping(gk, m.OutputVersion)
-	if err == nil {
-		return mapping, nil
+	for _, preferredVersion := range m.OutputVersions {
+		if gk.Group == preferredVersion.Group {
+			mapping, err := m.RESTMapper.RESTMapping(gk, preferredVersion.Version)
+			if err == nil {
+				return mapping, nil
+			}
+
+			break
+		}
 	}
 
 	return m.RESTMapper.RESTMapping(gk, versions...)

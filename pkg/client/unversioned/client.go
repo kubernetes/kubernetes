@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -183,12 +184,12 @@ func (c *Client) ValidateComponents() (*api.ComponentStatusList, error) {
 // SwaggerSchemaInterface has a method to retrieve the swagger schema. Used in
 // client.Interface
 type SwaggerSchemaInterface interface {
-	SwaggerSchema(groupVersion string) (*swagger.ApiDeclaration, error)
+	SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error)
 }
 
 // SwaggerSchema retrieves and parses the swagger API schema the server supports.
-func (c *Client) SwaggerSchema(groupVersion string) (*swagger.ApiDeclaration, error) {
-	if groupVersion == "" {
+func (c *Client) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
+	if version.IsEmpty() {
 		return nil, fmt.Errorf("groupVersion cannot be empty")
 	}
 
@@ -198,14 +199,14 @@ func (c *Client) SwaggerSchema(groupVersion string) (*swagger.ApiDeclaration, er
 	}
 	groupVersions := ExtractGroupVersions(groupList)
 	// This check also takes care the case that kubectl is newer than the running endpoint
-	if stringDoesntExistIn(groupVersion, groupVersions) {
-		return nil, fmt.Errorf("API version: %s is not supported by the server. Use one of: %v", groupVersion, groupVersions)
+	if stringDoesntExistIn(version.String(), groupVersions) {
+		return nil, fmt.Errorf("API version: %v is not supported by the server. Use one of: %v", version, groupVersions)
 	}
 	var path string
-	if groupVersion == "v1" {
-		path = "/swaggerapi/api/" + groupVersion
+	if version == v1.SchemeGroupVersion {
+		path = "/swaggerapi/api/" + version.Version
 	} else {
-		path = "/swaggerapi/apis/" + groupVersion
+		path = "/swaggerapi/apis/" + version.Group + "/" + version.Version
 	}
 
 	body, err := c.Get().AbsPath(path).Do().Raw()
