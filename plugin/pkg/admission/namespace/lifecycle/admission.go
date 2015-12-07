@@ -51,11 +51,11 @@ type lifecycle struct {
 func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 
 	// prevent deletion of immortal namespaces
-	if a.GetOperation() == admission.Delete && a.GetKind() == "Namespace" && l.immortalNamespaces.Has(a.GetName()) {
-		return errors.NewForbidden(a.GetKind(), a.GetName(), fmt.Errorf("this namespace may not be deleted"))
+	if a.GetOperation() == admission.Delete && a.GetKind() == api.Kind("Namespace") && l.immortalNamespaces.Has(a.GetName()) {
+		return errors.NewForbidden(a.GetKind().Kind, a.GetName(), fmt.Errorf("this namespace may not be deleted"))
 	}
 
-	gvk, err := api.RESTMapper.KindFor(a.GetResource())
+	gvk, err := api.RESTMapper.KindFor(a.GetResource().Resource)
 	if err != nil {
 		return errors.NewInternalError(err)
 	}

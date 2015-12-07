@@ -75,7 +75,7 @@ func TestAdmission(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image"}},
 		},
 	}
-	err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", pod.Namespace, pod.Name, "pods", "", admission.Create, nil))
+	err := handler.Admit(admission.NewAttributesRecord(&pod, api.Kind("Pod"), pod.Namespace, pod.Name, api.Resource("pods"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler: %v", err)
 	}
@@ -87,47 +87,47 @@ func TestAdmission(t *testing.T) {
 	store.Add(namespaceObj)
 
 	// verify create operations in the namespace cause an error
-	err = handler.Admit(admission.NewAttributesRecord(&pod, "Pod", pod.Namespace, pod.Name, "pods", "", admission.Create, nil))
+	err = handler.Admit(admission.NewAttributesRecord(&pod, api.Kind("Pod"), pod.Namespace, pod.Name, api.Resource("pods"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected error rejecting creates in a namespace when it is terminating")
 	}
 
 	// verify update operations in the namespace can proceed
-	err = handler.Admit(admission.NewAttributesRecord(&pod, "Pod", pod.Namespace, pod.Name, "pods", "", admission.Update, nil))
+	err = handler.Admit(admission.NewAttributesRecord(&pod, api.Kind("Pod"), pod.Namespace, pod.Name, api.Resource("pods"), "", admission.Update, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler: %v", err)
 	}
 
 	// verify delete operations in the namespace can proceed
-	err = handler.Admit(admission.NewAttributesRecord(nil, "Pod", pod.Namespace, pod.Name, "pods", "", admission.Delete, nil))
+	err = handler.Admit(admission.NewAttributesRecord(nil, api.Kind("Pod"), pod.Namespace, pod.Name, api.Resource("pods"), "", admission.Delete, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler: %v", err)
 	}
 
 	// verify delete of namespace default can never proceed
-	err = handler.Admit(admission.NewAttributesRecord(nil, "Namespace", "", api.NamespaceDefault, "namespaces", "", admission.Delete, nil))
+	err = handler.Admit(admission.NewAttributesRecord(nil, api.Kind("Namespace"), "", api.NamespaceDefault, api.Resource("namespaces"), "", admission.Delete, nil))
 	if err == nil {
 		t.Errorf("Expected an error that this namespace can never be deleted")
 	}
 
 	// verify delete of namespace other than default can proceed
-	err = handler.Admit(admission.NewAttributesRecord(nil, "Namespace", "", "other", "namespaces", "", admission.Delete, nil))
+	err = handler.Admit(admission.NewAttributesRecord(nil, api.Kind("Namespace"), "", "other", api.Resource("namespaces"), "", admission.Delete, nil))
 	if err != nil {
 		t.Errorf("Did not expect an error %v", err)
 	}
 
 	// verify create/update/delete of object in non-existant namespace throws error
-	err = handler.Admit(admission.NewAttributesRecord(&badPod, "Pod", badPod.Namespace, badPod.Name, "pods", "", admission.Create, nil))
+	err = handler.Admit(admission.NewAttributesRecord(&badPod, api.Kind("Pod"), badPod.Namespace, badPod.Name, api.Resource("pods"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected an aerror that objects cannot be created in non-existant namespaces", err)
 	}
 
-	err = handler.Admit(admission.NewAttributesRecord(&badPod, "Pod", badPod.Namespace, badPod.Name, "pods", "", admission.Update, nil))
+	err = handler.Admit(admission.NewAttributesRecord(&badPod, api.Kind("Pod"), badPod.Namespace, badPod.Name, api.Resource("pods"), "", admission.Update, nil))
 	if err == nil {
 		t.Errorf("Expected an aerror that objects cannot be updated in non-existant namespaces", err)
 	}
 
-	err = handler.Admit(admission.NewAttributesRecord(&badPod, "Pod", badPod.Namespace, badPod.Name, "pods", "", admission.Delete, nil))
+	err = handler.Admit(admission.NewAttributesRecord(&badPod, api.Kind("Pod"), badPod.Namespace, badPod.Name, api.Resource("pods"), "", admission.Delete, nil))
 	if err == nil {
 		t.Errorf("Expected an aerror that objects cannot be deleted in non-existant namespaces", err)
 	}

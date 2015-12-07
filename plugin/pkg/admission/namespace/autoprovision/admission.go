@@ -46,7 +46,7 @@ type provision struct {
 }
 
 func (p *provision) Admit(a admission.Attributes) (err error) {
-	gvk, err := api.RESTMapper.KindFor(a.GetResource())
+	gvk, err := api.RESTMapper.KindFor(a.GetResource().Resource)
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
