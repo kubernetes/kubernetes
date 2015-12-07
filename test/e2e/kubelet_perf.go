@@ -33,7 +33,7 @@ const (
 	// Interval to poll /stats/container on a node
 	containerStatsPollingPeriod = 10 * time.Second
 	// The monitoring time for one test.
-	monitoringTime = 30 * time.Minute
+	monitoringTime = 20 * time.Minute
 	// The periodic reporting period.
 	reportingPeriod = 5 * time.Minute
 )
@@ -118,7 +118,7 @@ var _ = Describe("Kubelet", func() {
 	})
 
 	Describe("regular resource usage tracking", func() {
-		density := []int{0, 35}
+		density := []int{0, 40}
 		for i := range density {
 			podsPerNode := density[i]
 			name := fmt.Sprintf(
@@ -129,7 +129,7 @@ var _ = Describe("Kubelet", func() {
 		}
 	})
 	Describe("experimental resource usage tracking", func() {
-		density := []int{50}
+		density := []int{100}
 		for i := range density {
 			podsPerNode := density[i]
 			name := fmt.Sprintf(
