@@ -104,7 +104,7 @@ Currently there are two API groups in use:
   `apiVersion: extensions/$VERSION` (e.g. currently `apiVersion: extensions/v1beta1`).
 
 In the future we expect that there will be more API groups, all at REST path `/apis/$API_GROUP` and
-using `apiVersion: $API_GROUP/$VERSION`.  We expect that there will be a way for (third parties to
+using `apiVersion: $API_GROUP/$VERSION`.  We expect that there will be a way for [third parties to
 create their own API groups](design/extending-api.md), and to avoid naming collisions.
 
 ## Enabling resources in the extensions group
