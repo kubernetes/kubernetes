@@ -42,7 +42,7 @@ function gcloud-compute-list() {
   while true; do
     echo "Attempt ${attempt} to list ${resource} in GCE"
     if result=$(gcloud compute ${resource} list --project=${PROJECT} ${@:2} | grep "${GREP_REGEX}"); then
-      echo ${result}
+      echo "${result}"
       return
     fi
     echo -e "${color_yellow}Attempt ${attempt} failed to list ${resource}. Retrying.${color_norm}" >&2
