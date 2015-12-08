@@ -42,6 +42,13 @@ const (
 	procMountsPath = "/proc/mounts"
 )
 
+const (
+	// 'fsck' found errors and corrected them
+	fsckErrorsCorrected = 1
+	// 'fsck' found errors but exited without correcting them
+	fsckErrorsUncorrected = 4
+)
+
 // Mounter provides the default implementation of mount.Interface
 // for the linux platform.  This implementation assumes that the
 // kubelet is running in the host's root mount namespace.
@@ -250,11 +257,11 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 		switch {
 		case err == utilExec.ErrExecutableNotFound:
 			glog.Warningf("'fsck' not found on system; continuing mount without running 'fsck'.")
-		case isExitError && ee.ExitStatus() == 1:
+		case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
 			glog.Infof("Device %s has errors which were corrected by fsck.", source)
-		case isExitError && ee.ExitStatus() == 4:
+		case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
 			return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s.", source, string(out))
-		case isExitError && ee.ExitStatus() > 4:
+		case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
 			glog.Infof("`fsck` error %s", string(out))
 		}
 	}
