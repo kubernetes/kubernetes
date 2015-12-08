@@ -23,8 +23,11 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
+// GroupName is the group name use in this package
+const GroupName = ""
+
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1"}
 
 // Codec encodes internal objects to the v1 scheme
 var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion.String())

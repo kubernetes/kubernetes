@@ -21,8 +21,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
+// GroupName is the group name use in this package
+const GroupName = "extensions"
+
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: "extensions", Version: ""}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: ""}
 
 // Kind takes an unqualified kind and returns back a Group qualified GroupKind
 func Kind(kind string) unversioned.GroupKind {

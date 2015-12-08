@@ -25,7 +25,7 @@ func addDefaultingFuncs() {
 	api.Scheme.AddDefaultingFuncs(
 		func(obj *APIVersion) {
 			if len(obj.APIGroup) == 0 {
-				obj.APIGroup = "extensions"
+				obj.APIGroup = GroupName
 			}
 		},
 		func(obj *DaemonSet) {

@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
-	expapi "k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -635,7 +635,7 @@ func (m *Master) init(c *Config) {
 	allGroups := []unversioned.APIGroup{}
 	// Install extensions unless disabled.
 	if !m.apiGroupVersionOverrides["extensions/v1beta1"].Disable {
-		m.thirdPartyStorage = c.StorageDestinations.APIGroups["extensions"].Default
+		m.thirdPartyStorage = c.StorageDestinations.APIGroups[extensions.GroupName].Default
 		m.thirdPartyResources = map[string]*thirdpartyresourcedataetcd.REST{}
 
 		expVersion := m.experimental(c)
@@ -643,7 +643,7 @@ func (m *Master) init(c *Config) {
 		if err := expVersion.InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
-		g, err := latest.Group("extensions")
+		g, err := latest.Group(extensions.GroupName)
 		if err != nil {
 			glog.Fatalf("Unable to setup experimental api: %v", err)
 		}
@@ -662,7 +662,7 @@ func (m *Master) init(c *Config) {
 			Versions:         expAPIVersions,
 			PreferredVersion: unversioned.GroupVersionForDiscovery{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
 		}
-		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie("extensions").GroupVersion.Group, group)
+		apiserver.AddGroupWebService(m.handlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie(extensions.GroupName).GroupVersion.Group, group)
 		allGroups = append(allGroups, group)
 		apiserver.InstallServiceErrorHandler(m.handlerContainer, m.newRequestInfoResolver(), []string{expVersion.GroupVersion.String()})
 	}
@@ -854,12 +854,12 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 		Root:                m.apiPrefix,
 		RequestInfoResolver: m.newRequestInfoResolver(),
 
-		Mapper: latest.GroupOrDie("").RESTMapper,
+		Mapper: latest.GroupOrDie(api.GroupName).RESTMapper,
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
-		Linker:    latest.GroupOrDie("").SelfLinker,
+		Linker:    latest.GroupOrDie(api.GroupName).SelfLinker,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,
@@ -882,7 +882,7 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 }
 
 // HasThirdPartyResource returns true if a particular third party resource currently installed.
-func (m *Master) HasThirdPartyResource(rsrc *expapi.ThirdPartyResource) (bool, error) {
+func (m *Master) HasThirdPartyResource(rsrc *extensions.ThirdPartyResource) (bool, error) {
 	_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
 	if err != nil {
 		return false, err
@@ -932,7 +932,7 @@ func (m *Master) removeAllThirdPartyResources(registry *thirdpartyresourcedataet
 	if err != nil {
 		return err
 	}
-	list, ok := existingData.(*expapi.ThirdPartyResourceDataList)
+	list, ok := existingData.(*extensions.ThirdPartyResourceDataList)
 	if !ok {
 		return fmt.Errorf("expected a *ThirdPartyResourceDataList, got %#v", list)
 	}
@@ -969,7 +969,7 @@ func (m *Master) addThirdPartyResourceStorage(path string, storage *thirdpartyre
 // For example, if you install a resource ThirdPartyResource{ Name: "foo.company.com", Versions: {"v1"} }
 // then the following RESTful resource is created on the server:
 //   http://<host>/apis/company.com/v1/foos/...
-func (m *Master) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) error {
+func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) error {
 	kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
 	if err != nil {
 		return err
@@ -1002,7 +1002,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		strings.ToLower(kind) + "s": resourceStorage,
 	}
 
-	optionsExternalVersion := latest.GroupOrDie("").GroupVersion
+	optionsExternalVersion := latest.GroupOrDie(api.GroupName).GroupVersion
 
 	return &apiserver.APIGroupVersion{
 		Root:                apiRoot,
@@ -1013,9 +1013,9 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:                 thirdpartyresourcedata.NewMapper(latest.GroupOrDie("extensions").RESTMapper, kind, version, group),
-		Codec:                  thirdpartyresourcedata.NewCodec(latest.GroupOrDie("extensions").Codec, kind),
-		Linker:                 latest.GroupOrDie("extensions").SelfLinker,
+		Mapper:                 thirdpartyresourcedata.NewMapper(latest.GroupOrDie(extensions.GroupName).RESTMapper, kind, version, group),
+		Codec:                  thirdpartyresourcedata.NewCodec(latest.GroupOrDie(extensions.GroupName).Codec, kind),
+		Linker:                 latest.GroupOrDie(extensions.GroupName).SelfLinker,
 		Storage:                storage,
 		OptionsExternalVersion: &optionsExternalVersion,
 
@@ -1040,7 +1040,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	}
 	storageDecorator := c.storageDecorator()
 	dbClient := func(resource string) storage.Interface {
-		return c.StorageDestinations.get("extensions", resource)
+		return c.StorageDestinations.get(extensions.GroupName, resource)
 	}
 
 	storage := map[string]rest.Storage{}
@@ -1091,8 +1091,8 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		storage["ingresses/status"] = ingressStatusStorage
 	}
 
-	extensionsGroup := latest.GroupOrDie("extensions")
-	optionsExternalVersion := latest.GroupOrDie("").GroupVersion
+	extensionsGroup := latest.GroupOrDie(extensions.GroupName)
+	optionsExternalVersion := latest.GroupOrDie(api.GroupName).GroupVersion
 
 	return &apiserver.APIGroupVersion{
 		Root:                m.apiGroupPrefix,
