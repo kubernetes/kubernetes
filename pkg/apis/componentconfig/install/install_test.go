@@ -43,11 +43,11 @@ func TestCodec(t *testing.T) {
 }
 
 func TestInterfacesFor(t *testing.T) {
-	if _, err := latest.GroupOrDie("componentconfig").InterfacesFor(""); err == nil {
+	if _, err := latest.GroupOrDie("componentconfig").InterfacesFor(componentconfig.SchemeGroupVersion); err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
 	}
-	for i, groupVersion := range append([]unversioned.GroupVersion{latest.GroupOrDie("componentconfig").GroupVersion}, latest.GroupOrDie("componentconfig").GroupVersions...) {
-		if vi, err := latest.GroupOrDie("componentconfig").InterfacesFor(groupVersion.String()); err != nil || vi == nil {
+	for i, version := range latest.GroupOrDie("componentconfig").GroupVersions {
+		if vi, err := latest.GroupOrDie("componentconfig").InterfacesFor(version); err != nil || vi == nil {
 			t.Fatalf("%d: unexpected result: %v", i, err)
 		}
 	}
@@ -75,11 +75,11 @@ func TestRESTMapper(t *testing.T) {
 		if mapping.Resource != "kubeproxyconfigurations" {
 			t.Errorf("incorrect resource name: %#v", mapping)
 		}
-		if mapping.GroupVersionKind.GroupVersion() != gv {
+		if mapping.GroupVersionKind.GroupVersion() != version {
 			t.Errorf("incorrect groupVersion: %v", mapping)
 		}
 
-		interfaces, _ := latest.GroupOrDie("componentconfig").InterfacesFor(gv.String())
+		interfaces, _ := latest.GroupOrDie("componentconfig").InterfacesFor(version)
 		if mapping.Codec != interfaces.Codec {
 			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
 		}

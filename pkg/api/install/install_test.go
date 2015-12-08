@@ -63,11 +63,11 @@ func TestCodec(t *testing.T) {
 }
 
 func TestInterfacesFor(t *testing.T) {
-	if _, err := latest.GroupOrDie("").InterfacesFor(""); err == nil {
+	if _, err := latest.GroupOrDie("").InterfacesFor(internal.SchemeGroupVersion); err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
 	}
 	for i, version := range latest.GroupOrDie("").GroupVersions {
-		if vi, err := latest.GroupOrDie("").InterfacesFor(version.Version); err != nil || vi == nil {
+		if vi, err := latest.GroupOrDie("").InterfacesFor(version); err != nil || vi == nil {
 			t.Fatalf("%d: unexpected result: %v", i, err)
 		}
 	}
@@ -99,7 +99,7 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("incorrect version: %v", mapping)
 		}
 
-		interfaces, _ := latest.GroupOrDie("").InterfacesFor(version.String())
+		interfaces, _ := latest.GroupOrDie("").InterfacesFor(version)
 		if mapping.Codec != interfaces.Codec {
 			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
 		}

@@ -376,7 +376,12 @@ func Merge(dst runtime.Object, fragment, kind string) (runtime.Object, error) {
 	if !ok {
 		return nil, fmt.Errorf("apiVersion must be a string")
 	}
-	i, err := latest.GroupOrDie("").InterfacesFor(versionString)
+	groupVersion, err := unversioned.ParseGroupVersion(versionString)
+	if err != nil {
+		return nil, err
+	}
+
+	i, err := latest.GroupOrDie("").InterfacesFor(groupVersion)
 	if err != nil {
 		return nil, err
 	}
