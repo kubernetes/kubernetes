@@ -518,7 +518,7 @@ function create-certs {
 
   # Note: This was heavily cribbed from make-ca-cert.sh
   (cd "${KUBE_TEMP}"
-    curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz > /dev/null 2>&1
+    curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz > /dev/null 2>&1
     tar xzf easy-rsa.tar.gz > /dev/null 2>&1
     cd easy-rsa-master/easyrsa3
     ./easyrsa init-pki > /dev/null 2>&1
