@@ -119,7 +119,7 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods api
 	}
 	// Check whether the object could be converted to list of pods.
 	if _, ok := obj.(*api.PodList); !ok {
-		err = fmt.Errorf("invalid pods list: %+v", obj)
+		err = fmt.Errorf("invalid pods list: %#v", obj)
 		return false, pods, err
 	}
 	newPods := obj.(*api.PodList)

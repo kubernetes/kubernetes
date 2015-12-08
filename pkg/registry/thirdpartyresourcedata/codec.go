@@ -98,6 +98,42 @@ func NewMapper(mapper meta.RESTMapper, kind, version, group string) meta.RESTMap
 	}
 }
 
+type thirdPartyResourceDataCodecFactory struct {
+	runtime.NegotiatedSerializer
+	kind     string
+	encodeGV unversioned.GroupVersion
+	decodeGV unversioned.GroupVersion
+}
+
+type codec struct {
+	runtime.Encoder
+	runtime.Decoder
+}
+
+func NewNegotiatedSerializer(s runtime.NegotiatedSerializer, kind string, encodeGV, decodeGV unversioned.GroupVersion) runtime.NegotiatedSerializer {
+	return &thirdPartyResourceDataCodecFactory{
+		NegotiatedSerializer: s,
+
+		kind:     kind,
+		encodeGV: encodeGV,
+		decodeGV: decodeGV,
+	}
+}
+
+func (t *thirdPartyResourceDataCodecFactory) EncoderForVersion(s runtime.Serializer, gv unversioned.GroupVersion) runtime.Encoder {
+	return NewCodec(codec{
+		t.NegotiatedSerializer.EncoderForVersion(s, gv),
+		t.NegotiatedSerializer.DecoderToVersion(s, t.decodeGV),
+	}, t.kind)
+}
+
+func (t *thirdPartyResourceDataCodecFactory) DecoderToVersion(s runtime.Serializer, gv unversioned.GroupVersion) runtime.Decoder {
+	return NewCodec(codec{
+		t.NegotiatedSerializer.EncoderForVersion(s, t.encodeGV),
+		t.NegotiatedSerializer.DecoderToVersion(s, gv),
+	}, t.kind)
+}
+
 type thirdPartyResourceDataCodec struct {
 	delegate runtime.Codec
 	kind     string
@@ -148,63 +184,77 @@ func (t *thirdPartyResourceDataCodec) populateFromObject(objIn *extensions.Third
 }
 
 func (t *thirdPartyResourceDataCodec) Decode(data []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
-	obj := &extensions.ThirdPartyResourceData{}
-	if err := t.populate(obj, data); err != nil {
-		return nil, nil, err
+	if into == nil {
+		obj := &extensions.ThirdPartyResourceData{}
+		if err := t.populate(obj, data); err != nil {
+			return nil, nil, err
+		}
+		objData, err := runtime.Encode(t.delegate, obj)
+		if err != nil {
+			return nil, nil, err
+		}
+		return t.delegate.Decode(objData, gvk, into)
 	}
-	objData, err := runtime.Encode(t.delegate, obj)
-	if err != nil {
-		return nil, nil, err
-	}
-	return t.delegate.Decode(objData, gvk, into)
-}
 
-/*func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []byte, obj runtime.Object, gvk unversioned.GroupVersionKind) error {
-	thirdParty, ok := obj.(*extensions.ThirdPartyResourceData)
+	thirdParty, ok := into.(*extensions.ThirdPartyResourceData)
 	if !ok {
-		return fmt.Errorf("unexpected object: %#v", obj)
-	}
-
-	if gvk.Kind != "ThirdPartyResourceData" {
-		return fmt.Errorf("unexpeceted kind: %s", gvk.Kind)
+		return nil, nil, fmt.Errorf("unexpected object: %#v", into)
 	}
 
 	var dataObj interface{}
 	if err := json.Unmarshal(data, &dataObj); err != nil {
-		return err
+		return nil, nil, err
 	}
 	mapObj, ok := dataObj.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("unexpcted object: %#v", dataObj)
+		return nil, nil, fmt.Errorf("unexpcted object: %#v", dataObj)
 	}
+	/*if gvk.Kind != "ThirdPartyResourceData" {
+		return nil, nil, fmt.Errorf("unexpected kind: %s", gvk.Kind)
+	}*/
+	actual := &unversioned.GroupVersionKind{}
 	if kindObj, found := mapObj["kind"]; !found {
+		if gvk == nil {
+			return nil, nil, runtime.NewMissingKindErr(string(data))
+		}
 		mapObj["kind"] = gvk.Kind
+		actual.Kind = gvk.Kind
 	} else {
 		kindStr, ok := kindObj.(string)
 		if !ok {
-			return fmt.Errorf("unexpected object for 'kind': %v", kindObj)
+			return nil, nil, fmt.Errorf("unexpected object for 'kind': %v", kindObj)
 		}
 		if kindStr != t.kind {
-			return fmt.Errorf("kind doesn't match, expecting: %s, got %s", gvk.Kind, kindStr)
+			return nil, nil, fmt.Errorf("kind doesn't match, expecting: %s, got %s", gvk.Kind, kindStr)
 		}
+		actual.Kind = t.kind
 	}
 	if versionObj, found := mapObj["apiVersion"]; !found {
+		if gvk == nil {
+			return nil, nil, runtime.NewMissingVersionErr(string(data))
+		}
 		mapObj["apiVersion"] = gvk.GroupVersion().String()
+		actual.Group, actual.Version = gvk.Group, gvk.Version
 	} else {
 		versionStr, ok := versionObj.(string)
 		if !ok {
-			return fmt.Errorf("unexpected object for 'apiVersion': %v", versionObj)
+			return nil, nil, fmt.Errorf("unexpected object for 'apiVersion': %v", versionObj)
 		}
-		if versionStr != gvk.GroupVersion().String() {
-			return fmt.Errorf("version doesn't match, expecting: %v, got %s", gvk.GroupVersion(), versionStr)
+		if gvk != nil && versionStr != gvk.GroupVersion().String() {
+			return nil, nil, fmt.Errorf("version doesn't match, expecting: %v, got %s", gvk.GroupVersion(), versionStr)
 		}
+		gv, err := unversioned.ParseGroupVersion(versionStr)
+		if err != nil {
+			return nil, nil, err
+		}
+		actual.Group, actual.Version = gv.Group, gv.Version
 	}
 
 	if err := t.populate(thirdParty, data); err != nil {
-		return err
+		return nil, actual, err
 	}
-	return nil
-}*/
+	return thirdParty, actual, nil
+}
 
 const template = `{
   "kind": "%s",

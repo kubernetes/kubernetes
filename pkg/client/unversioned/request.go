@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -499,6 +500,10 @@ func (r *Request) Body(obj interface{}) *Request {
 	case io.Reader:
 		r.body = t
 	case runtime.Object:
+		// callers may pass typed interface pointers, therefore we must check with reflection
+		if reflect.ValueOf(t).IsNil() {
+			return r
+		}
 		data, err := runtime.Encode(r.codec, t)
 		if err != nil {
 			r.err = err
@@ -507,7 +512,6 @@ func (r *Request) Body(obj interface{}) *Request {
 		glog.V(8).Infof("Request Body: %s", string(data))
 		r.body = bytes.NewBuffer(data)
 		r.SetHeader("Content-Type", "application/json")
-	case nil:
 	default:
 		r.err = fmt.Errorf("unknown type used for body: %+v", obj)
 	}
@@ -913,13 +917,12 @@ func (r Result) StatusCode(statusCode *int) Result {
 	return r
 }
 
-// Into stores the result into obj, if possible.
+// Into stores the result into obj, if possible. If obj is nil it is ignored.
 func (r Result) Into(obj runtime.Object) error {
 	if r.err != nil {
 		return r.err
 	}
-	err := runtime.DecodeInto(r.codec, r.body, obj)
-	return err
+	return runtime.DecodeInto(r.codec, r.body, obj)
 }
 
 // WasCreated updates the provided bool pointer to whether the server returned

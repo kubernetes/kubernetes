@@ -95,6 +95,8 @@ type CodecFactory struct {
 	legacySerializer runtime.Serializer
 }
 
+var _ runtime.NegotiatedSerializer = &CodecFactory{}
+
 type codec struct {
 	runtime.Encoder
 	runtime.Decoder

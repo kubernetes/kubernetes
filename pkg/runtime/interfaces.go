@@ -75,6 +75,15 @@ type ParameterCodec interface {
 	EncodeParameters(obj Object, to unversioned.GroupVersion) (url.Values, error)
 }
 
+// NegotiatedSerializer is an interface used for obtaining encoders, decoders, and serializers
+// for multiple supported media types.
+type NegotiatedSerializer interface {
+	SupportedMediaTypes() []string
+	SerializerForMediaType(mediaType string, options map[string]string) (Serializer, bool)
+	EncoderForVersion(serializer Serializer, gv unversioned.GroupVersion) Encoder
+	DecoderToVersion(serializer Serializer, gv unversioned.GroupVersion) Decoder
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Non-codec interfaces
 

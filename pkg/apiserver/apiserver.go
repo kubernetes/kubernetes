@@ -93,7 +93,7 @@ type APIGroupVersion struct {
 
 	Mapper meta.RESTMapper
 
-	Serializer     NegotiatedSerializer
+	Serializer     runtime.NegotiatedSerializer
 	ParameterCodec runtime.ParameterCodec
 
 	Typer     runtime.ObjectTyper
@@ -193,14 +193,14 @@ func InstallLogsSupport(mux Mux) {
 }
 
 // TODO: needs to perform response type negotiation, this is probably the wrong way to recover panics
-func InstallRecoverHandler(s NegotiatedSerializer, container *restful.Container) {
+func InstallRecoverHandler(s runtime.NegotiatedSerializer, container *restful.Container) {
 	container.RecoverHandler(func(panicReason interface{}, httpWriter http.ResponseWriter) {
 		logStackOnRecover(s, panicReason, httpWriter)
 	})
 }
 
 //TODO: Unify with RecoverPanics?
-func logStackOnRecover(s NegotiatedSerializer, panicReason interface{}, w http.ResponseWriter) {
+func logStackOnRecover(s runtime.NegotiatedSerializer, panicReason interface{}, w http.ResponseWriter) {
 	var buffer bytes.Buffer
 	buffer.WriteString(fmt.Sprintf("recover from panic situation: - %v\r\n", panicReason))
 	for i := 2; ; i += 1 {
@@ -219,18 +219,18 @@ func logStackOnRecover(s NegotiatedSerializer, panicReason interface{}, w http.R
 	errorNegotiated(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", "", "", "", 0, false), s, unversioned.GroupVersion{}, w, &http.Request{Header: headers})
 }
 
-func InstallServiceErrorHandler(s NegotiatedSerializer, container *restful.Container, requestResolver *RequestInfoResolver, apiVersions []string) {
+func InstallServiceErrorHandler(s runtime.NegotiatedSerializer, container *restful.Container, requestResolver *RequestInfoResolver, apiVersions []string) {
 	container.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
 		serviceErrorHandler(s, requestResolver, apiVersions, serviceErr, request, response)
 	})
 }
 
-func serviceErrorHandler(s NegotiatedSerializer, requestResolver *RequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
+func serviceErrorHandler(s runtime.NegotiatedSerializer, requestResolver *RequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
 	errorNegotiated(apierrors.NewGenericServerResponse(serviceErr.Code, "", "", "", "", 0, false), s, unversioned.GroupVersion{}, response.ResponseWriter, request.Request)
 }
 
 // Adds a service to return the supported api versions at the legacy /api.
-func AddApiWebService(s NegotiatedSerializer, container *restful.Container, apiPrefix string, versions []string) {
+func AddApiWebService(s runtime.NegotiatedSerializer, container *restful.Container, apiPrefix string, versions []string) {
 	// TODO: InstallREST should register each version automatically
 
 	versionHandler := APIVersionHandler(s, versions[:]...)
@@ -246,7 +246,7 @@ func AddApiWebService(s NegotiatedSerializer, container *restful.Container, apiP
 }
 
 // Adds a service to return the supported api versions at /apis.
-func AddApisWebService(s NegotiatedSerializer, container *restful.Container, apiPrefix string, groups []unversioned.APIGroup) {
+func AddApisWebService(s runtime.NegotiatedSerializer, container *restful.Container, apiPrefix string, groups []unversioned.APIGroup) {
 	rootAPIHandler := RootAPIHandler(s, groups)
 	ws := new(restful.WebService)
 	ws.Path(apiPrefix)
@@ -261,7 +261,7 @@ func AddApisWebService(s NegotiatedSerializer, container *restful.Container, api
 
 // Adds a service to return the supported versions, preferred version, and name
 // of a group. E.g., a such web service will be registered at /apis/extensions.
-func AddGroupWebService(s NegotiatedSerializer, container *restful.Container, path string, group unversioned.APIGroup) {
+func AddGroupWebService(s runtime.NegotiatedSerializer, container *restful.Container, path string, group unversioned.APIGroup) {
 	groupHandler := GroupHandler(s, group)
 	ws := new(restful.WebService)
 	ws.Path(path)
@@ -276,7 +276,7 @@ func AddGroupWebService(s NegotiatedSerializer, container *restful.Container, pa
 
 // Adds a service to return the supported resources, E.g., a such web service
 // will be registered at /apis/extensions/v1.
-func AddSupportedResourcesWebService(s NegotiatedSerializer, ws *restful.WebService, groupVersion unversioned.GroupVersion, apiResources []unversioned.APIResource) {
+func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful.WebService, groupVersion unversioned.GroupVersion, apiResources []unversioned.APIResource) {
 	resourceHandler := SupportedResourcesHandler(s, groupVersion, apiResources)
 	ws.Route(ws.GET("/").To(resourceHandler).
 		Doc("get available resources").
@@ -291,14 +291,14 @@ func handleVersion(req *restful.Request, resp *restful.Response) {
 }
 
 // APIVersionHandler returns a handler which will list the provided versions as available.
-func APIVersionHandler(s NegotiatedSerializer, versions ...string) restful.RouteFunction {
+func APIVersionHandler(s runtime.NegotiatedSerializer, versions ...string) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIVersions{Versions: versions})
 	}
 }
 
 // RootAPIHandler returns a handler which will list the provided groups and versions as available.
-func RootAPIHandler(s NegotiatedSerializer, groups []unversioned.APIGroup) restful.RouteFunction {
+func RootAPIHandler(s runtime.NegotiatedSerializer, groups []unversioned.APIGroup) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIGroupList{Groups: groups})
 	}
@@ -306,14 +306,14 @@ func RootAPIHandler(s NegotiatedSerializer, groups []unversioned.APIGroup) restf
 
 // GroupHandler returns a handler which will return the api.GroupAndVersion of
 // the group.
-func GroupHandler(s NegotiatedSerializer, group unversioned.APIGroup) restful.RouteFunction {
+func GroupHandler(s runtime.NegotiatedSerializer, group unversioned.APIGroup) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &group)
 	}
 }
 
 // SupportedResourcesHandler returns a handler which will list the provided resources as available.
-func SupportedResourcesHandler(s NegotiatedSerializer, groupVersion unversioned.GroupVersion, apiResources []unversioned.APIResource) restful.RouteFunction {
+func SupportedResourcesHandler(s runtime.NegotiatedSerializer, groupVersion unversioned.GroupVersion, apiResources []unversioned.APIResource) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIResourceList{GroupVersion: groupVersion.String(), APIResources: apiResources})
 	}
@@ -324,7 +324,7 @@ func SupportedResourcesHandler(s NegotiatedSerializer, groupVersion unversioned.
 // response. The Accept header and current API version will be passed in, and the output will be copied
 // directly to the response body. If content type is returned it is used, otherwise the content type will
 // be "application/octet-stream". All other objects are sent to standard JSON serialization.
-func write(statusCode int, apiVersion string, s NegotiatedSerializer, object runtime.Object, w http.ResponseWriter, req *http.Request) {
+func write(statusCode int, apiVersion string, s runtime.NegotiatedSerializer, object runtime.Object, w http.ResponseWriter, req *http.Request) {
 	gv, err := unversioned.ParseGroupVersion(apiVersion)
 	if err != nil {
 		// use no API version, just report the error
@@ -368,6 +368,7 @@ func write(statusCode int, apiVersion string, s NegotiatedSerializer, object run
 }
 
 // writeJSON renders an object as JSON to the response.
+// DEPRECATED: use writeNegotiated
 func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w http.ResponseWriter, pretty bool) {
 	w.Header().Set("Content-Type", "application/json")
 	// We send the status code before we encode the object, so if we error, the status code stays but there will
@@ -378,14 +379,13 @@ func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w htt
 		prettyJSON(codec, object, w)
 		return
 	}
-	err := codec.EncodeToStream(object, w)
-	if err != nil {
+	if err := codec.EncodeToStream(object, w); err != nil {
 		errorJSONFatal(err, codec, w)
 	}
 }
 
 // writeNegotiated renders an object in the content type negotiated by the client
-func writeNegotiated(s NegotiatedSerializer, gv unversioned.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
+func writeNegotiated(s runtime.NegotiatedSerializer, gv unversioned.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
 	serializer, contentType, err := negotiateOutputSerializer(req, s)
 	if err != nil {
 		writeRawJSON(http.StatusNotAcceptable, err, w)
@@ -415,7 +415,7 @@ func prettyJSON(codec runtime.Codec, object runtime.Object, w http.ResponseWrite
 }
 
 // errorNegotiated renders an error to the response. Returns the HTTP status code of the error.
-func errorNegotiated(err error, s NegotiatedSerializer, gv unversioned.GroupVersion, w http.ResponseWriter, req *http.Request) int {
+func errorNegotiated(err error, s runtime.NegotiatedSerializer, gv unversioned.GroupVersion, w http.ResponseWriter, req *http.Request) int {
 	status := errToAPIStatus(err)
 	code := int(status.Code)
 	writeNegotiated(s, gv, w, req, code, status)

@@ -91,7 +91,7 @@ type NoopDecoder struct {
 	Encoder
 }
 
-func (n NoopDecoder) Decode(data []byte, gvk *unversioned.GroupVersionKind) (Object, *unversioned.GroupVersionKind, error) {
+func (n NoopDecoder) Decode(data []byte, gvk *unversioned.GroupVersionKind, into Object) (Object, *unversioned.GroupVersionKind, error) {
 	return nil, nil, fmt.Errorf("decoding is not allowed for this codec: %v", reflect.TypeOf(n.Encoder))
 }
 

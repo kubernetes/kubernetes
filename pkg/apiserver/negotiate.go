@@ -26,18 +26,10 @@ import (
 	"bitbucket.org/ww/goautoneg"
 
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-type NegotiatedSerializer interface {
-	SupportedMediaTypes() []string
-	SerializerForMediaType(mediaType string, options map[string]string) (runtime.Serializer, bool)
-	EncoderForVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Encoder
-	DecoderToVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Decoder
-}
-
-func negotiateOutputSerializer(req *http.Request, s NegotiatedSerializer) (runtime.Serializer, string, error) {
+func negotiateOutputSerializer(req *http.Request, s runtime.NegotiatedSerializer) (runtime.Serializer, string, error) {
 	accept := goautoneg.ParseAccept(req.Header.Get("Accept"))
 	if len(accept) == 0 {
 		accept = append(accept, goautoneg.Accept{Type: "application", SubType: "json"})
@@ -56,7 +48,7 @@ func negotiateOutputSerializer(req *http.Request, s NegotiatedSerializer) (runti
 	return nil, "", errors.NewInternalError(fmt.Errorf("no supported content type"))
 }
 
-func negotiateInputSerializer(req *http.Request, s NegotiatedSerializer) (runtime.Serializer, error) {
+func negotiateInputSerializer(req *http.Request, s runtime.NegotiatedSerializer) (runtime.Serializer, error) {
 	mediaType := req.Header.Get("Content-Type")
 	if len(mediaType) == 0 {
 		mediaType = "application/json"

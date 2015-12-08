@@ -69,7 +69,7 @@ type ScopeNamer interface {
 type RequestScope struct {
 	Namer ScopeNamer
 	ContextFunc
-	Serializer NegotiatedSerializer
+	Serializer runtime.NegotiatedSerializer
 	runtime.ParameterCodec
 	Creater   runtime.ObjectCreater
 	Convertor runtime.ObjectConvertor

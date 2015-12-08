@@ -139,14 +139,14 @@ func TestDecodePodList(t *testing.T) {
 	for _, gv := range registered.GroupVersionsForGroup("") {
 		s, _ := latest.Codecs.SerializerForFileExtension("yaml")
 		encoder := latest.Codecs.EncoderForVersion(s, gv)
-		yaml, err := runtime.Encode(encoder, pod)
+		yaml, err := runtime.Encode(encoder, podList)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 
 		parsed, podListOut, err = tryDecodePodList(yaml, noDefault)
 		if !parsed {
-			t.Errorf("expected to have parsed file: (%s)", string(yaml))
+			t.Errorf("expected to have parsed file: (%s): %v", string(yaml), err)
 			continue
 		}
 		if err != nil {

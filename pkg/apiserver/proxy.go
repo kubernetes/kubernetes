@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/httplog"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	proxyutil "k8s.io/kubernetes/pkg/util/proxy"
@@ -44,7 +45,7 @@ import (
 type ProxyHandler struct {
 	prefix              string
 	storage             map[string]rest.Storage
-	serializer          NegotiatedSerializer
+	serializer          runtime.NegotiatedSerializer
 	context             api.RequestContextMapper
 	requestInfoResolver *RequestInfoResolver
 }

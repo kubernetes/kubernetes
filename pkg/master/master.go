@@ -525,7 +525,7 @@ func (m *Master) HandleFuncWithAuth(pattern string, handler func(http.ResponseWr
 	m.muxHelper.HandleFunc(pattern, handler)
 }
 
-func NewHandlerContainer(mux *http.ServeMux, s apiserver.NegotiatedSerializer) *restful.Container {
+func NewHandlerContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer) *restful.Container {
 	container := restful.NewContainer()
 	container.ServeMux = mux
 	apiserver.InstallRecoverHandler(s, container)
@@ -1024,10 +1024,11 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 	}
 
 	serverGroupVersion := unversioned.ParseGroupVersionOrDie(latest.GroupOrDie("").GroupVersion)
-
+	gv := unversioned.GroupVersion{Group: group, Version: version}
+	internalGV := unversioned.GroupVersion{Group: group, Version: runtime.APIVersionInternal}
 	return &apiserver.APIGroupVersion{
 		Root:                apiRoot,
-		GroupVersion:        unversioned.GroupVersion{Group: group, Version: version},
+		GroupVersion:        gv,
 		RequestInfoResolver: m.newRequestInfoResolver(),
 
 		Creater:   thirdpartyresourcedata.NewObjectCreator(group, version, api.Scheme),
@@ -1036,7 +1037,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 
 		Mapper: thirdpartyresourcedata.NewMapper(latest.GroupOrDie("extensions").RESTMapper, kind, version, group),
 
-		Serializer:         latest.Codecs,
+		Serializer:         thirdpartyresourcedata.NewNegotiatedSerializer(latest.Codecs, kind, gv, internalGV),
 		ParameterCodec:     api.ParameterCodec,
 		Linker:             latest.GroupOrDie("extensions").SelfLinker,
 		Storage:            storage,

@@ -23,9 +23,11 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -624,7 +626,8 @@ func decodeResponse(resp *http.Response, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-
+	log.SetOutput(os.Stdout)
+	log.Printf("decodeResponse %s", data)
 	if err := json.Unmarshal(data, obj); err != nil {
 		return err
 	}
