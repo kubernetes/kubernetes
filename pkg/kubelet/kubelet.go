@@ -2502,9 +2502,6 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		node.Status.Conditions = append(node.Status.Conditions, *nodeOODCondition)
 	}
 
-	// NOTE(aaronlevy): NodeReady condition needs to be the last in the list of node conditions.
-	// This is due to an issue with version skewed kubelet and master components.
-	// ref: https://github.com/kubernetes/kubernetes/issues/16961
 	var newNodeReadyCondition api.NodeCondition
 	var oldNodeReadyConditionStatus api.ConditionStatus
 	if containerRuntimeUp && networkConfigured && containerRuntimeVersionRequirementMet {
@@ -2568,6 +2565,17 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 			kl.recordNodeStatusEvent("NodeSchedulable")
 		}
 		oldNodeUnschedulable = node.Spec.Unschedulable
+	}
+
+	// NOTE(aaronlevy): NodeReady condition needs to be the last in the list of node conditions.
+	// This is due to an issue with version skewed kubelet and master components.
+	// ref: https://github.com/kubernetes/kubernetes/issues/16961
+	lastIndex := len(node.Status.Conditions) - 1
+	for i := range node.Status.Conditions {
+		if node.Status.Conditions[i].Type == api.NodeReady && i < lastIndex {
+			node.Status.Conditions[i], node.Status.Conditions[lastIndex] = node.Status.Conditions[lastIndex], node.Status.Conditions[i]
+			break
+		}
 	}
 	return nil
 }
