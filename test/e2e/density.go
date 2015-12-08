@@ -145,7 +145,7 @@ var _ = Describe("Density [Skipped]", func() {
 		// Verify scheduler metrics.
 		// TODO: Reset metrics at the beginning of the test.
 		// We should do something similar to how we do it for APIserver.
-		expectNoError(VerifySchedulerLatency())
+		expectNoError(VerifySchedulerLatency(c))
 	})
 
 	// Explicitly put here, to delete namespace at the end of the test
