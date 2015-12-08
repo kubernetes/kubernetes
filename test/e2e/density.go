@@ -74,7 +74,7 @@ func density30AddonResourceVerifier() map[string]resourceConstraint {
 	constraints := make(map[string]resourceConstraint)
 	constraints["fluentd-elasticsearch"] = resourceConstraint{
 		cpuConstraint:    0.1,
-		memoryConstraint: 150 * (1024 * 1024),
+		memoryConstraint: 250 * (1024 * 1024),
 	}
 	constraints["elasticsearch-logging"] = resourceConstraint{
 		cpuConstraint:    2,
@@ -93,7 +93,7 @@ func density30AddonResourceVerifier() map[string]resourceConstraint {
 		memoryConstraint: 20 * (1024 * 1024),
 	}
 	constraints["l7-lb-controller"] = resourceConstraint{
-		cpuConstraint:    0.02,
+		cpuConstraint:    0.05,
 		memoryConstraint: 20 * (1024 * 1024),
 	}
 	constraints["influxdb"] = resourceConstraint{
