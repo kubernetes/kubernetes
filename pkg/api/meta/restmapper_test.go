@@ -210,15 +210,19 @@ func TestRESTMapperResourceSingularizer(t *testing.T) {
 		{Kind: "Status", MixedCase: false, Plural: "statuses", Singular: "status"},
 
 		{Kind: "lowercase", MixedCase: false, Plural: "lowercases", Singular: "lowercase"},
-		// Don't add extra s if the original object is already plural
-		{Kind: "lowercases", MixedCase: false, Plural: "lowercases", Singular: "lowercases"},
+		// TODO this test is broken.  This updates to reflect actual behavior.  Kinds are expected to be singular
+		// old (incorrect), coment: Don't add extra s if the original object is already plural
+		{Kind: "lowercases", MixedCase: false, Plural: "lowercaseses", Singular: "lowercases"},
 	}
 	for i, testCase := range testCases {
 		mapper := NewDefaultRESTMapper([]unversioned.GroupVersion{testGroupVersion}, fakeInterfaces)
 		// create singular/plural mapping
 		mapper.Add(testGroupVersion.WithKind(testCase.Kind), RESTScopeNamespace, testCase.MixedCase)
 
-		singular, _ := mapper.ResourceSingularizer(testCase.Plural)
+		singular, err := mapper.ResourceSingularizer(testCase.Plural)
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+		}
 		if singular != testCase.Singular {
 			t.Errorf("%d: mismatched singular: %s, should be %s", i, singular, testCase.Singular)
 		}
