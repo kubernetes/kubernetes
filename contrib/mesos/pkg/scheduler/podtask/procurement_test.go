@@ -78,6 +78,7 @@ func TestNewPodResourcesProcurement(t *testing.T) {
 		},
 		executor,
 		[]string{"*"},
+		[]string{"*"},
 	)
 
 	procurement := NewPodResourcesProcurement()

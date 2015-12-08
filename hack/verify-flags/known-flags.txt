@@ -194,7 +194,8 @@ mesos-executor-mem
 mesos-launch-grace-period
 mesos-master
 mesos-sandbox-overlay
-mesos-roles
+mesos-framework-roles
+mesos-default-pod-roles
 mesos-user
 minimum-container-ttl-duration
 minion-max-log-age

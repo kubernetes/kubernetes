@@ -75,6 +75,7 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	// lock to this API version, compilation will fail when this becomes unsupported
 	_ "k8s.io/kubernetes/pkg/api/v1"
@@ -83,7 +84,8 @@ import (
 const (
 	defaultMesosMaster           = "localhost:5050"
 	defaultMesosUser             = "root" // should have privs to execute docker and iptables commands
-	defaultMesosRoles            = "*"
+	defaultFrameworkRoles        = "*"
+	defaultPodRoles              = "*"
 	defaultReconcileInterval     = 300 // 5m default task reconciliation interval
 	defaultReconcileCooldown     = 15 * time.Second
 	defaultNodeRelistPeriod      = 5 * time.Minute
@@ -106,7 +108,8 @@ type SchedulerServer struct {
 	proxyPath           string
 	mesosMaster         string
 	mesosUser           string
-	mesosRoles          []string
+	frameworkRoles      []string
+	defaultPodRoles     []string
 	mesosAuthPrincipal  string
 	mesosAuthSecretFile string
 	mesosCgroupPrefix   string
@@ -200,7 +203,8 @@ func NewSchedulerServer() *SchedulerServer {
 		mesosUser:            defaultMesosUser,
 		mesosExecutorCPUs:    defaultExecutorCPUs,
 		mesosExecutorMem:     defaultExecutorMem,
-		mesosRoles:           strings.Split(defaultMesosRoles, ","),
+		frameworkRoles:       strings.Split(defaultFrameworkRoles, ","),
+		defaultPodRoles:      strings.Split(defaultPodRoles, ","),
 		reconcileInterval:    defaultReconcileInterval,
 		reconcileCooldown:    defaultReconcileCooldown,
 		checkpoint:           true,
@@ -239,7 +243,8 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.mesosMaster, "mesos-master", s.mesosMaster, "Location of the Mesos master. The format is a comma-delimited list of of hosts like zk://host1:port,host2:port/mesos. If using ZooKeeper, pay particular attention to the leading zk:// and trailing /mesos! If not using ZooKeeper, standard URLs like http://localhost are also acceptable.")
 	fs.StringVar(&s.mesosUser, "mesos-user", s.mesosUser, "Mesos user for this framework, defaults to root.")
-	fs.StringSliceVar(&s.mesosRoles, "mesos-roles", s.mesosRoles, "Mesos framework roles. The first role will be used to launch pods having no "+meta.RolesKey+" label.")
+	fs.StringSliceVar(&s.frameworkRoles, "mesos-framework-roles", s.frameworkRoles, "Mesos framework roles that the scheduler receives offers for. Currently only \"*\" and optionally one additional role are supported.")
+	fs.StringSliceVar(&s.defaultPodRoles, "mesos-default-pod-roles", s.defaultPodRoles, "Roles that will be used to launch pods having no "+meta.RolesKey+" label.")
 	fs.StringVar(&s.mesosAuthPrincipal, "mesos-authentication-principal", s.mesosAuthPrincipal, "Mesos authentication principal.")
 	fs.StringVar(&s.mesosAuthSecretFile, "mesos-authentication-secret-file", s.mesosAuthSecretFile, "Mesos authentication secret file.")
 	fs.StringVar(&s.mesosAuthProvider, "mesos-authentication-provider", s.mesosAuthProvider, fmt.Sprintf("Authentication provider to use, default is SASL that supports mechanisms: %+v", mech.ListSupported()))
@@ -535,8 +540,14 @@ func (s *SchedulerServer) getDriver() (driver bindings.SchedulerDriver) {
 }
 
 func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
-	if n := len(s.mesosRoles); n == 0 || n > 2 || (n == 2 && s.mesosRoles[0] != "*" && s.mesosRoles[1] != "*") {
+	if n := len(s.frameworkRoles); n == 0 || n > 2 || (n == 2 && s.frameworkRoles[0] != "*" && s.frameworkRoles[1] != "*") {
 		log.Fatalf(`only one custom role allowed in addition to "*"`)
+	}
+
+	fwSet := sets.NewString(s.frameworkRoles...)
+	podSet := sets.NewString(s.defaultPodRoles...)
+	if !fwSet.IsSuperset(podSet) {
+		log.Fatalf("all default pod roles %q must be included in framework roles %q", s.defaultPodRoles, s.frameworkRoles)
 	}
 
 	// get scheduler low-level config
@@ -777,7 +788,8 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		s.mux,
 		lw,
 		eiPrototype,
-		s.mesosRoles,
+		s.frameworkRoles,
+		s.defaultPodRoles,
 		s.defaultContainerCPULimit,
 		s.defaultContainerMemLimit,
 	)
@@ -890,7 +902,7 @@ func (s *SchedulerServer) buildFrameworkInfo() (info *mesos.FrameworkInfo, cred 
 
 	// set the framework's role to the first configured non-star role.
 	// once Mesos supports multiple roles simply set the configured mesos roles slice.
-	for _, role := range s.mesosRoles {
+	for _, role := range s.frameworkRoles {
 		if role != "*" {
 			// mesos currently supports only one role per framework info
 			// The framework will be offered role's resources as well as * resources
