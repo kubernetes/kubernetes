@@ -27,4 +27,4 @@ type TestResource struct {
 	Value                int `json:"value"`
 }
 
-func (*TestResource) IsAnAPIObject() {}
+func (obj *TestResource) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

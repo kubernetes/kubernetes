@@ -140,11 +140,10 @@ type SelfLinker interface {
 	Namespace(obj Object) (string, error)
 }
 
-// All api types must support the Object interface. It's deliberately tiny so that this is not an onerous
-// burden. Implement it with a pointer receiver; this will allow us to use the go compiler to check the
-// one thing about our objects that it's capable of checking for us.
+// All API types registered with Scheme must support the Object interface. Since objects in a scheme are
+// expected to be serialized to the wire, the interface an Object must provide to the Scheme allows
+// serializers to set the kind, version, and group the object is represented as. An Object may choose
+// to return a no-op ObjectKindAccessor in cases where it is not expected to be serialized.
 type Object interface {
-	// This function is used only to enforce membership. It's never called.
-	// TODO: Consider mass rename in the future to make it do something useful.
-	IsAnAPIObject()
+	GetObjectKind() unversioned.ObjectKind
 }

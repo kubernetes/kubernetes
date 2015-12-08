@@ -30,4 +30,4 @@ type TestStruct struct {
 	IntList              []int          `json:"IntList"`
 }
 
-func (ts *TestStruct) IsAnAPIObject() {}
+func (obj *TestStruct) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

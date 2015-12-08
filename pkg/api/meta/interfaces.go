@@ -29,37 +29,48 @@ type VersionInterfaces struct {
 	MetadataAccessor
 }
 
-// Interface lets you work with object and list metadata from any of the versioned or
+type ObjectMetaAccessor interface {
+	GetObjectMeta() Object
+}
+
+// Object lets you work with object metadata from any of the versioned or
 // internal API objects. Attempting to set or retrieve a field on an object that does
 // not support that field (Name, UID, Namespace on lists) will be a no-op and return
 // a default value.
-// TODO: rename to ObjectInterface when we clear up these interfaces.
-type Interface interface {
-	TypeInterface
-
-	Namespace() string
+type Object interface {
+	GetNamespace() string
 	SetNamespace(namespace string)
-	Name() string
+	GetName() string
 	SetName(name string)
-	GenerateName() string
+	GetGenerateName() string
 	SetGenerateName(name string)
-	UID() types.UID
+	GetUID() types.UID
 	SetUID(uid types.UID)
-	ResourceVersion() string
+	GetResourceVersion() string
 	SetResourceVersion(version string)
-	SelfLink() string
+	GetSelfLink() string
 	SetSelfLink(selfLink string)
-	Labels() map[string]string
+	GetLabels() map[string]string
 	SetLabels(labels map[string]string)
-	Annotations() map[string]string
+	GetAnnotations() map[string]string
 	SetAnnotations(annotations map[string]string)
 }
 
-// TypeInterface exposes the type and APIVersion of versioned or internal API objects.
-type TypeInterface interface {
-	APIVersion() string
+// List lets you work with list metadata from any of the versioned or
+// internal API objects. Attempting to set or retrieve a field on an object that does
+// not support that field will be a no-op and return a default value.
+type List interface {
+	GetResourceVersion() string
+	SetResourceVersion(version string)
+	GetSelfLink() string
+	SetSelfLink(selfLink string)
+}
+
+// Type exposes the type and APIVersion of versioned or internal API objects.
+type Type interface {
+	GetAPIVersion() string
 	SetAPIVersion(version string)
-	Kind() string
+	GetKind() string
 	SetKind(kind string)
 }
 

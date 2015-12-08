@@ -39,5 +39,5 @@ func addKnownTypes() {
 		&unversioned.ListOptions{})
 }
 
-func (*TestType) IsAnAPIObject()     {}
-func (*TestTypeList) IsAnAPIObject() {}
+func (obj *TestType) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
+func (obj *TestTypeList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

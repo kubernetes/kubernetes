@@ -85,11 +85,11 @@ type TestPrintType struct {
 	Data string
 }
 
-func (*TestPrintType) IsAnAPIObject() {}
+func (obj *TestPrintType) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
 
 type TestUnknownType struct{}
 
-func (*TestUnknownType) IsAnAPIObject() {}
+func (obj *TestUnknownType) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
 
 func TestPrinter(t *testing.T) {
 	//test inputs

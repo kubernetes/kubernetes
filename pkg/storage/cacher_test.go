@@ -280,7 +280,7 @@ func TestFiltering(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 			return false
 		}
-		return selector.Matches(labels.Set(metadata.Labels()))
+		return selector.Matches(labels.Set(metadata.GetLabels()))
 	}
 	// We want to observe fooCreation too, so need to pass smaller resource version.
 	initialVersion, err := strconv.Atoi(fooCreated.ResourceVersion)

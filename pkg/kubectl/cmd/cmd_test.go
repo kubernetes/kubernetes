@@ -64,9 +64,27 @@ type ExternalType2 struct {
 	Name string `json:"name"`
 }
 
-func (*internalType) IsAnAPIObject()  {}
-func (*externalType) IsAnAPIObject()  {}
-func (*ExternalType2) IsAnAPIObject() {}
+func (obj *internalType) GetObjectKind() unversioned.ObjectKind { return obj }
+func (obj *internalType) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *internalType) GroupVersionKind() *unversioned.GroupVersionKind {
+	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
+func (obj *externalType) GetObjectKind() unversioned.ObjectKind { return obj }
+func (obj *externalType) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *externalType) GroupVersionKind() *unversioned.GroupVersionKind {
+	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
+func (obj *ExternalType2) GetObjectKind() unversioned.ObjectKind { return obj }
+func (obj *ExternalType2) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *ExternalType2) GroupVersionKind() *unversioned.GroupVersionKind {
+	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
 
 var versionErr = errors.New("not a version")
 

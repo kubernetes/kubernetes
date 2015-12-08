@@ -45,7 +45,7 @@ type testPatchSubType struct {
 	StringField string `json:"theField"`
 }
 
-func (*testPatchType) IsAnAPIObject() {}
+func (obj *testPatchType) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 
 func TestPatchAnonymousField(t *testing.T) {
 	originalJS := `{"kind":"testPatchType","theField":"my-value"}`

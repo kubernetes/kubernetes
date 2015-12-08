@@ -30,6 +30,16 @@ type TypeMeta struct {
 	APIVersion string `json:"apiVersion,omitempty"`
 }
 
+// SetGroupVersionKind satisfies the ObjectKind interface for all objects that embed TypeMeta
+func (obj *TypeMeta) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
+
+// GroupVersionKind satisfies the ObjectKind interface for all objects that embed TypeMeta
+func (obj *TypeMeta) GroupVersionKind() *unversioned.GroupVersionKind {
+	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
+
 type InternalSimple struct {
 	TypeMeta   `json:",inline"`
 	TestString string `json:"testString"`
@@ -40,8 +50,14 @@ type ExternalSimple struct {
 	TestString string `json:"testString"`
 }
 
-func (*InternalSimple) IsAnAPIObject() {}
-func (*ExternalSimple) IsAnAPIObject() {}
+func (obj *InternalSimple) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *InternalSimple) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *ExternalSimple) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *ExternalSimple) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
+}
 
 func TestScheme(t *testing.T) {
 	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
@@ -197,12 +213,30 @@ type InternalOptionalExtensionType struct {
 	Extension runtime.EmbeddedObject `json:"extension,omitempty"`
 }
 
-func (*ExtensionA) IsAnAPIObject()                    {}
-func (*ExtensionB) IsAnAPIObject()                    {}
-func (*ExternalExtensionType) IsAnAPIObject()         {}
-func (*InternalExtensionType) IsAnAPIObject()         {}
-func (*ExternalOptionalExtensionType) IsAnAPIObject() {}
-func (*InternalOptionalExtensionType) IsAnAPIObject() {}
+func (obj *ExtensionA) GetObjectKind() unversioned.ObjectKind { return &obj.PluginBase }
+func (obj *ExtensionA) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	_, obj.PluginBase.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *ExtensionB) GetObjectKind() unversioned.ObjectKind { return &obj.PluginBase }
+func (obj *ExtensionB) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	_, obj.PluginBase.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *ExternalExtensionType) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *ExternalExtensionType) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *InternalExtensionType) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *InternalExtensionType) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *ExternalOptionalExtensionType) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *ExternalOptionalExtensionType) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *InternalOptionalExtensionType) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *InternalOptionalExtensionType) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
+}
 
 func TestExternalToInternalMapping(t *testing.T) {
 	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
