@@ -23,12 +23,12 @@ import (
 )
 
 // formatMap formats map[string]string to a string.
-func formatMap(m map[string]string) string {
-	var l string
+func formatMap(m map[string]string) (fmtStr string) {
 	for key, value := range m {
-		l += key + "=" + fmt.Sprintf("%q", value) + "\n"
+		fmtStr += fmt.Sprintf("%v=%q\n", key, value)
 	}
-	return l
+
+	return
 }
 
 // ExtractFieldPathAsString extracts the field from the given object
