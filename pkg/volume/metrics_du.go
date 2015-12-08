@@ -45,7 +45,7 @@ func (cm *MetricsDu) InitMetricsDu(path string) {
 func (cm *MetricsDu) GetCapacityMetrics() (*CapacityMetrics, error) {
 	metrics := &CapacityMetrics{}
 	if cm.path == "" {
-		return metrics, errors.New("no path defined for disk usage capacity metrics.  Must call InitMetricsDu.")
+		return metrics, errors.New("no path defined for disk usage metrics.  Must call InitMetricsDu.")
 	}
 
 	err := cm.runDu(metrics)
@@ -63,7 +63,7 @@ func (cm *MetricsDu) GetCapacityMetrics() (*CapacityMetrics, error) {
 
 // runDu executes the "du" command and writes the results to metrics.VolumeBytesUsed
 func (cm *MetricsDu) runDu(metrics *CapacityMetrics) error {
-	// Uses the same niceness level as ccmvisor.fs does when running du
+	// Uses the same niceness level as cadvisor.fs does when running du
 	// Uses -B 1 to always scale to a blocksize of 1 byte
 	out, err := exec.Command("nice", "-n", "19", "du", "-s", "-B", "1", cm.path).CombinedOutput()
 	if err != nil {
@@ -81,7 +81,7 @@ func (cm *MetricsDu) runDu(metrics *CapacityMetrics) error {
 // and metrics.DeviceBytesAvailable
 // TODO(pwittrock): Consider using a statfs syscall directly to get the data
 func (cm *MetricsDu) runDf(metrics *CapacityMetrics) error {
-	// Uses the same niceness level as ccmvisor.fs does when running du
+	// Uses the same niceness level as cadvisor.fs does when running du
 	// Uses -B 1 to always scale to a blocksize of 1 byte
 	out, err := exec.Command("nice", "-n", "19", "df", "-B", "1", cm.path).CombinedOutput()
 	if err != nil {

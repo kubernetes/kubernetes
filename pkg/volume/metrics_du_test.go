@@ -68,7 +68,7 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 }
 
 // TestMetricsDuRequireInit tests that if MetricsDu is not initialized with a path, GetCapacityMetrics
-// returns and error
+// returns an error
 func TestMetricsDuRequireInit(t *testing.T) {
 	metrics := &MetricsDu{}
 	actual, err := metrics.GetCapacityMetrics()
@@ -78,5 +78,20 @@ func TestMetricsDuRequireInit(t *testing.T) {
 	}
 	if err == nil {
 		t.Errorf("Expected error when calling GetCapacityMetrics on uninitialized MetricsDu, actual nil")
+	}
+}
+
+// TestMetricsDuRealDirectory tests that if MetricsDu is initialized to a non-existent path, GetCapacityMetrics
+// returns an error
+func TestMetricsDuRealDirectory(t *testing.T) {
+	metrics := &MetricsDu{}
+	metrics.InitMetricsDu("/not/a/real/directory")
+	actual, err := metrics.GetCapacityMetrics()
+	expected := &CapacityMetrics{}
+	if *actual != *expected {
+		t.Errorf("Expected empty CapacityMetrics from incorrectly initialized MetricsDu, actual %v", *actual)
+	}
+	if err == nil {
+		t.Errorf("Expected error when calling GetCapacityMetrics on incorrectly initialized MetricsDu, actual nil")
 	}
 }
