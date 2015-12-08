@@ -99,21 +99,21 @@ func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volu
 			hostPath: &hostPath{path: spec.Volume.HostPath.Path},
 			readOnly: false,
 		}
-		e.AccountingDu.Init(e.GetPath())
+		e.CapacityMetricsDu.InitCapacityMetricsDu(e.GetPath())
 		return e, nil
 	} else {
 		e := &hostPathBuilder{
 			hostPath: &hostPath{path: spec.PersistentVolume.Spec.HostPath.Path},
 			readOnly: spec.ReadOnly,
 		}
-		e.AccountingDu.Init(e.GetPath())
+		e.CapacityMetricsDu.InitCapacityMetricsDu(e.GetPath())
 		return e, nil
 	}
 }
 
 func (plugin *hostPathPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	hp := &hostPath{path: ""}
-	hp.AccountingDu.Init(hp.GetPath())
+	hp.CapacityMetricsDu.InitCapacityMetricsDu(hp.GetPath())
 	return &hostPathCleaner{hp}, nil
 }
 
@@ -143,7 +143,7 @@ func newRecycler(spec *volume.Spec, host volume.VolumeHost, config volume.Volume
 		config:  config,
 		timeout: volume.CalculateTimeoutForVolume(config.RecyclerMinimumTimeout, config.RecyclerTimeoutIncrement, spec.PersistentVolume),
 	}
-	e.AccountingDu.Init(e.GetPath())
+	e.CapacityMetricsDu.InitCapacityMetricsDu(e.GetPath())
 	return e, nil
 }
 
@@ -151,8 +151,8 @@ func newDeleter(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, erro
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.HostPath == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
 	}
-	e := &hostPathDeleter{spec.Name(), spec.PersistentVolume.Spec.HostPath.Path, host, volume.AccountingDu{}}
-	e.AccountingDu.Init(e.GetPath())
+	e := &hostPathDeleter{spec.Name(), spec.PersistentVolume.Spec.HostPath.Path, host, volume.CapacityMetricsDu{}}
+	e.CapacityMetricsDu.InitCapacityMetricsDu(e.GetPath())
 	return e, nil
 }
 
@@ -164,7 +164,7 @@ func newCreater(options volume.VolumeOptions, host volume.VolumeHost) (volume.Cr
 // The direct at the specified path will be directly exposed to the container.
 type hostPath struct {
 	path string
-	volume.AccountingDu
+	volume.CapacityMetricsDu
 }
 
 func (hp *hostPath) GetPath() string {
@@ -225,7 +225,7 @@ type hostPathRecycler struct {
 	host    volume.VolumeHost
 	config  volume.VolumeConfig
 	timeout int64
-	volume.AccountingDu
+	volume.CapacityMetricsDu
 }
 
 func (r *hostPathRecycler) GetPath() string {
@@ -292,7 +292,7 @@ type hostPathDeleter struct {
 	name string
 	path string
 	host volume.VolumeHost
-	volume.AccountingDu
+	volume.CapacityMetricsDu
 }
 
 func (r *hostPathDeleter) GetPath() string {

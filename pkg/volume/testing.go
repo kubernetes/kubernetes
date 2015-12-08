@@ -136,19 +136,19 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 }
 
 func (plugin *FakeVolumePlugin) NewBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions) (Builder, error) {
-	return &FakeVolume{pod.UID, spec.Name(), plugin, VolumeDefaults{}}, nil
+	return &FakeVolume{pod.UID, spec.Name(), plugin, CapacityMetricsNil{}}, nil
 }
 
 func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID) (Cleaner, error) {
-	return &FakeVolume{podUID, volName, plugin, VolumeDefaults{}}, nil
+	return &FakeVolume{podUID, volName, plugin, CapacityMetricsNil{}}, nil
 }
 
 func (plugin *FakeVolumePlugin) NewRecycler(spec *Spec) (Recycler, error) {
-	return &fakeRecycler{"/attributesTransferredFromSpec", VolumeDefaults{}}, nil
+	return &fakeRecycler{"/attributesTransferredFromSpec", CapacityMetricsNil{}}, nil
 }
 
 func (plugin *FakeVolumePlugin) NewDeleter(spec *Spec) (Deleter, error) {
-	return &FakeDeleter{"/attributesTransferredFromSpec", VolumeDefaults{}}, nil
+	return &FakeDeleter{"/attributesTransferredFromSpec", CapacityMetricsNil{}}, nil
 }
 
 func (plugin *FakeVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -159,7 +159,7 @@ type FakeVolume struct {
 	PodUID  types.UID
 	VolName string
 	Plugin  *FakeVolumePlugin
-	VolumeDefaults
+	CapacityMetricsNil
 }
 
 func (_ *FakeVolume) GetAttributes() Attributes {
@@ -193,7 +193,7 @@ func (fv *FakeVolume) TearDownAt(dir string) error {
 
 type fakeRecycler struct {
 	path string
-	VolumeDefaults
+	CapacityMetricsNil
 }
 
 func (fr *fakeRecycler) Recycle() error {
@@ -216,7 +216,7 @@ func NewFakeRecycler(spec *Spec, host VolumeHost, config VolumeConfig) (Recycler
 
 type FakeDeleter struct {
 	path string
-	VolumeDefaults
+	CapacityMetricsNil
 }
 
 func (fd *FakeDeleter) Delete() error {

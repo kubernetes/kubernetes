@@ -90,7 +90,7 @@ type downwardAPIVolume struct {
 	pod                     *api.Pod
 	podUID                  types.UID // TODO: remove this redundancy as soon NewCleaner func will have *api.POD and not only types.UID
 	plugin                  *downwardAPIPlugin
-	volume.VolumeDefaults
+	volume.CapacityMetricsNil
 }
 
 // This is the spec for the volume that this plugin wraps.

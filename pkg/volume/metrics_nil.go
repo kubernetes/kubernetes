@@ -16,10 +16,17 @@ limitations under the License.
 
 package volume
 
-var _ Accountable = &AccountingNil{}
+import "errors"
 
-type AccountingNil struct{}
+var _ VolumeMetricsProvider = &CapacityMetricsNil{}
 
-func (*AccountingNil) GetAccounting() (*Accounting, error) {
-	return NewAccounting(), nil
+// CapacityMetricsNil represents a VolumeMetricsProvider that does not support returning
+// CapacityMetrics.  It serves as a placeholder for Volumes that do not yet support
+// reporting capacity.
+type CapacityMetricsNil struct{}
+
+// See VolumeMetricsProvider.GetCapacityMetrics
+// GetCapacityMetrics returns an empty CapacityMetrics and an error.
+func (*CapacityMetricsNil) GetCapacityMetrics() (*CapacityMetrics, error) {
+	return &CapacityMetrics{}, errors.New("metrics are not supported for CapacityMetricsNil Volumes")
 }

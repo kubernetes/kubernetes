@@ -29,31 +29,26 @@ type Volume interface {
 	// GetPath returns the directory path the volume is mounted to.
 	GetPath() string
 
-	Accountable
+	// VolumeMetricsProvider embeds methods for exposing Volume capacity data.
+	VolumeMetricsProvider
 }
 
-type VolumeDefaults struct {
-	AccountingNil
+// VolumeMetricsProvider exposes metrics (e.g. capacity) related to a Volume.
+type VolumeMetricsProvider interface {
+	// GetCapacityMetrics returns the CapacityMetrics for this Volume.  Maybe expensive for some implementations.
+	GetCapacityMetrics() (*CapacityMetrics, error)
 }
 
-type Accountable interface {
-	GetAccounting() (*Accounting, error)
-}
+// CapacityMetrics represents available and consumed capacity for the Volume.
+type CapacityMetrics struct {
+	// VolumeKbUsed represents the total kilobytes used under the directory path that the Volume is mounted.
+	VolumeKbUsed uint64
 
-const unknownSize = -1
+	// FileSystemKbUsed represents the total kilobytes used on the filesystem that the Volume path resides.
+	FileSystemKbUsed uint64
 
-type Accounting struct {
-	PodBytesUsed    int
-	SharedBytesUsed int
-	SharedBytesFree int
-}
-
-func NewAccounting() *Accounting {
-	return &Accounting{
-		PodBytesUsed:    unknownSize,
-		SharedBytesUsed: unknownSize,
-		SharedBytesFree: unknownSize,
-	}
+	// FileSystemKbAvailable represents the total kilobytes free on the filesystem that the Volume path resides.
+	FileSystemKbAvailable uint64
 }
 
 // Attributes represents the attributes of this builder.
