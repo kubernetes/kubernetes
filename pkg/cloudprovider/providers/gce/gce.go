@@ -50,7 +50,7 @@ const (
 	k8sNodeRouteTag = "k8s-node-route"
 
 	// AffinityTypeNone - no session affinity.
-	gceAffinityTypeNone = "None"
+	gceAffinityTypeNone = "NONE"
 	// AffinityTypeClientIP - affinity based on Client IP.
 	gceAffinityTypeClientIP = "CLIENT_IP"
 	// AffinityTypeClientIPProto - affinity based on Client IP and port.
