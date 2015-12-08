@@ -78,6 +78,7 @@ The DaemonSet supports standard API features:
       app: datastore
     name: datastore
   spec:
+    selector: {}
     template:
       metadata:
         labels:
