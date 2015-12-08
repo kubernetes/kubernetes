@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
-	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -119,7 +118,7 @@ func newEtcdWatcher(list bool, include includeFunc, filter storage.FilterFunc, e
 
 // etcdWatch calls etcd's Watch function, and handles any errors. Meant to be called
 // as a goroutine.
-func (w *etcdWatcher) etcdWatch(client tools.EtcdClient, key string, resourceVersion uint64) {
+func (w *etcdWatcher) etcdWatch(client *etcd.Client, key string, resourceVersion uint64) {
 	defer util.HandleCrash()
 	defer close(w.etcdError)
 	if resourceVersion == 0 {
@@ -137,7 +136,7 @@ func (w *etcdWatcher) etcdWatch(client tools.EtcdClient, key string, resourceVer
 }
 
 // etcdGetInitialWatchState turns an etcd Get request into a watch equivalent
-func etcdGetInitialWatchState(client tools.EtcdClient, key string, recursive bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
+func etcdGetInitialWatchState(client *etcd.Client, key string, recursive bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
 	resp, err := client.Get(key, false, recursive)
 	if err != nil {
 		if !etcdutil.IsEtcdNotFound(err) {
