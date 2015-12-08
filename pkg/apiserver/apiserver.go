@@ -228,7 +228,7 @@ func serviceErrorHandler(requestResolver *RequestInfoResolver, apiVersions []str
 		for _, version := range apiVersions {
 			if requestInfo.APIVersion == version {
 				// valid api version.
-				codec = runtime.CodecFor(api.Scheme, requestInfo.APIVersion)
+				codec = runtime.CodecFor(api.Scheme, unversioned.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion})
 				break
 			}
 		}

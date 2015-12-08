@@ -30,7 +30,7 @@ const GroupName = ""
 var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1"}
 
 // Codec encodes internal objects to the v1 scheme
-var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion.String())
+var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion)
 
 func init() {
 	// Check if v1 is in the list of supported API versions.

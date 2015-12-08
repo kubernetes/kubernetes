@@ -19,6 +19,7 @@ package runtime
 import (
 	"io"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/yaml"
 )
 
@@ -41,7 +42,7 @@ func DecodeInto(d Decoder, data []byte, into Object) error {
 }
 
 // CodecFor returns a Codec that invokes Encode with the provided version.
-func CodecFor(codec ObjectCodec, version string) Codec {
+func CodecFor(codec ObjectCodec, version unversioned.GroupVersion) Codec {
 	return &codecWrapper{codec, version}
 }
 
@@ -91,7 +92,7 @@ func EncodeOrDie(codec Codec, obj Object) string {
 // default version for a scheme.
 type codecWrapper struct {
 	ObjectCodec
-	version string
+	version unversioned.GroupVersion
 }
 
 // codecWrapper implements Decoder
@@ -99,11 +100,11 @@ var _ Decoder = &codecWrapper{}
 
 // Encode implements Codec
 func (c *codecWrapper) Encode(obj Object) ([]byte, error) {
-	return c.EncodeToVersion(obj, c.version)
+	return c.EncodeToVersion(obj, c.version.String())
 }
 
 func (c *codecWrapper) EncodeToStream(obj Object, stream io.Writer) error {
-	return c.EncodeToVersionStream(obj, c.version, stream)
+	return c.EncodeToVersionStream(obj, c.version.String(), stream)
 }
 
 // TODO: Make this behaviour default when we move everyone away from

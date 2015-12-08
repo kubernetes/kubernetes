@@ -65,11 +65,11 @@ var prefix = "apis"
 
 var grouplessGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
 var grouplessPrefix = "api"
-var grouplessCodec = runtime.CodecFor(api.Scheme, grouplessGroupVersion.String())
+var grouplessCodec = runtime.CodecFor(api.Scheme, grouplessGroupVersion)
 
 var groupVersions = []unversioned.GroupVersion{grouplessGroupVersion, testGroupVersion, newGroupVersion}
-var codec = runtime.CodecFor(api.Scheme, testGroupVersion.String())
-var newCodec = runtime.CodecFor(api.Scheme, newGroupVersion.String())
+var codec = runtime.CodecFor(api.Scheme, testGroupVersion)
+var newCodec = runtime.CodecFor(api.Scheme, newGroupVersion)
 
 var accessor = meta.NewAccessor()
 var versioner runtime.ResourceVersioner = accessor
