@@ -1,0 +1,33 @@
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {"name":"k8s-etcd"},
+  "spec": {
+    "hostNetwork": true,
+    "containers": [
+      {
+        "name": "etcd",
+        "image": "gcr.io/google_containers/etcd:2.2.1",
+        "command": [
+                "/usr/local/bin/etcd",
+                "--listen-client-urls=http://127.0.0.1:4001",
+                "--advertise-client-urls=http://127.0.0.1:4001",
+                "--data-dir=/var/etcd/data"
+        ],
+        "volumeMounts": [
+          {
+            "name": "varetcd",
+            "mountPath": "/var/etcd",
+            "readOnly": false
+          }
+        ]
+      }
+    ],
+    "volumes":[
+      {
+        "name": "varetcd",
+        "emptyDir": {}
+      }
+    ]
+  }
+}
