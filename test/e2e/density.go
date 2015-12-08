@@ -212,7 +212,7 @@ var _ = Describe("Density [Skipped]", func() {
 		name := fmt.Sprintf("should allow starting %d pods per node", testArg.podsPerNode)
 		if testArg.podsPerNode == 30 {
 			name = "[Performance] " + name
-			framework.addonResourceConstraints = density30AddonResourceVerifier()
+			framework.AddonResourceConstraints = density30AddonResourceVerifier()
 		}
 		itArg := testArg
 		It(name, func() {

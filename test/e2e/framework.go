@@ -45,11 +45,13 @@ type Framework struct {
 	// Constraints that passed to a check which is exectued after data is gathered to
 	// see if 99% of results are within acceptable bounds. It as to be injected in the test,
 	// as expectations vary greatly. Constraints are groupped by the container names.
-	addonResourceConstraints map[string]resourceConstraint
+	AddonResourceConstraints map[string]resourceConstraint
 
 	logsSizeWaitGroup    sync.WaitGroup
 	logsSizeCloseChannel chan bool
 	logsSizeVerifier     *LogsSizeVerifier
+	// Allows to override the initialization of the namespace
+	NsCreateFunc func(string, *client.Client) (*api.Namespace, error)
 }
 
 // NewFramework makes a new framework and sets up a BeforeEach/AfterEach for
@@ -57,12 +59,23 @@ type Framework struct {
 func NewFramework(baseName string) *Framework {
 	f := &Framework{
 		BaseName:                 baseName,
-		addonResourceConstraints: make(map[string]resourceConstraint),
+		AddonResourceConstraints: make(map[string]resourceConstraint),
+		NsCreateFunc:             createTestingNS,
 	}
+	return f.InstallGinkgoHooks()
+}
 
+// InstallGinkgoHooks installs the BeforeEach and AfterEach Ginkgo blocks
+func (f *Framework) InstallGinkgoHooks() *Framework {
 	BeforeEach(f.beforeEach)
 	AfterEach(f.afterEach)
+	return f
+}
 
+// SetNsCreateFunc allows to override the default namespace creation function
+// This function must be called before InstallGinkgoHooks() to take effect.
+func (f *Framework) SetNsCreateFunc(fn func(string, *client.Client) (*api.Namespace, error)) *Framework {
+	f.NsCreateFunc = fn
 	return f
 }
 
@@ -75,9 +88,8 @@ func (f *Framework) beforeEach() {
 	f.Client = c
 
 	By("Building a namespace api object")
-	namespace, err := createTestingNS(f.BaseName, f.Client)
+	namespace, err := f.NsCreateFunc(f.BaseName, f.Client)
 	Expect(err).NotTo(HaveOccurred())
-
 	f.Namespace = namespace
 
 	if testContext.VerifyServiceAccount {
@@ -144,7 +156,7 @@ func (f *Framework) afterEach() {
 	}
 
 	if testContext.GatherKubeSystemResourceUsageData {
-		f.gatherer.stopAndPrintData([]int{50, 90, 99, 100}, f.addonResourceConstraints)
+		f.gatherer.stopAndPrintData([]int{50, 90, 99, 100}, f.AddonResourceConstraints)
 	}
 
 	if testContext.GatherLogsSizes {
