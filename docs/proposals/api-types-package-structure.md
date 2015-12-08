@@ -225,96 +225,46 @@ apis
 ├── group
 │   ├── install
 │   │   └── install_all_versions.go
-│   ├── resource1
-│   │   └── types.go
-│   ├── resource2
-│   │   └── types.go
+│   ├── types.go
 │   ├── v1
+│   │   ├── conversion
+│   │   │   ├── generated_conversion.go
+│   │   │   └── manual_conversion_overrides.go
+│   │   ├── defaulting
+│   │   │   ├── generated_defaulters.go
+│   │   │   └── generated_default_stubs.go
 │   │   ├── install
 │   │   │   └── install_all_resources.go
-│   │   ├── resource1
-│   │   │   ├── conversion
-│   │   │   │   ├── generated_conversion.go
-│   │   │   │   └── manual_conversion_overrides.go
-│   │   │   ├── defaulting
-│   │   │   │   ├── generated_defaulters.go
-│   │   │   │   └── generated_default_stubs.go
-│   │   │   ├── types.go
-│   │   │   └── validation
-│   │   │       ├── generated_validation.go
-│   │   │       └── manual_validation_overrides.go
-│   │   └── resource2
-│   │       ├── conversion
-│   │       │   ├── generated_conversion.go
-│   │       │   └── manual_conversion_overrides.go
-│   │       ├── defaulting
-│   │       │   ├── generated_defaulters.go
-│   │       │   └── generated_default_stubs.go
-│   │       ├── types.go
-│   │       └── validation
-│   │           ├── generated_validation.go
-│   │           └── manual_validation_overrides.go
+│   │   ├── types.go
+│   │   └── validation
+│   │       ├── generated_validation.go
+│   │       └── manual_validation_overrides.go
 │   ├── v1beta1
+│   │   ├── conversion
+│   │   │   ├── generated_conversion.go
+│   │   │   └── manual_conversion_overrides.go
+│   │   ├── defaulting
+│   │   │   ├── generated_defaulters.go
+│   │   │   └── generated_default_stubs.go
 │   │   ├── install
 │   │   │   └── install_all_resources.go
-│   │   ├── resource1
-│   │   │   ├── conversion
-│   │   │   │   ├── generated_conversion.go
-│   │   │   │   └── manual_conversion_overrides.go
-│   │   │   ├── defaulting
-│   │   │   │   ├── generated_defaulters.go
-│   │   │   │   └── generated_default_stubs.go
-│   │   │   ├── types.go
-│   │   │   └── validation
-│   │   │       ├── generated_validation.go
-│   │   │       └── manual_validation_overrides.go
-│   │   └── resource2
-│   │       ├── conversion
-│   │       │   ├── generated_conversion.go
-│   │       │   └── manual_conversion_overrides.go
-│   │       ├── defaulting
-│   │       │   ├── generated_defaulters.go
-│   │       │   └── generated_default_stubs.go
-│   │       ├── types.go
-│   │       └── validation
-│   │           ├── generated_validation.go
-│   │           └── manual_validation_overrides.go
+│   │   ├── types.go
+│   │   └── validation
+│   │       ├── generated_validation.go
+│   │       └── manual_validation_overrides.go
 │   └── v2alpha1
+│       ├── conversion
+│       │   ├── generated_conversion.go
+│       │   └── manual_conversion_overrides.go
+│       ├── defaulting
+│       │   ├── generated_defaulters.go
+│       │   └── generated_default_stubs.go
 │       ├── install
 │       │   └── install_all_resources.go
-│       ├── resource1
-│       │   ├── conversion
-│       │   │   ├── generated_conversion.go
-│       │   │   └── manual_conversion_overrides.go
-│       │   ├── defaulting
-│       │   │   ├── generated_defaulters.go
-│       │   │   └── generated_default_stubs.go
-│       │   ├── types.go
-│       │   └── validation
-│       │       ├── generated_validation.go
-│       │       └── manual_validation_overrides.go
-│       ├── resource2
-│       │   ├── conversion
-│       │   │   ├── generated_conversion.go
-│       │   │   └── manual_conversion_overrides.go
-│       │   ├── defaulting
-│       │   │   ├── generated_defaulters.go
-│       │   │   └── generated_default_stubs.go
-│       │   ├── types.go
-│       │   └── validation
-│       │       ├── generated_validation.go
-│       │       └── manual_validation_overrides.go
-│       └── resource3
-│           ├── conversion
-│           │   ├── generated_conversion.go
-│           │   └── manual_conversion_overrides.go
-│           ├── defaulting
-│           │   ├── generated_defaulters.go
-│           │   └── generated_default_stubs.go
-│           ├── types.go
-│           └── validation
-│               ├── generated_validation.go
-│               └── manual_validation_overrides.go
+│       ├── types.go
+│       └── validation
+│           ├── generated_validation.go
+│           └── manual_validation_overrides.go
 └── unversioned
     ├── meta
     │   └── meta.go
@@ -345,9 +295,10 @@ unversioned package.
 
 Multiple versions live in a group. Each version gets its own subdirectory.
 
-Additionally, a directory for each resource has a types.go file containing an
-"internal" version of the group's objects. These files are used as a
-destination/source for conversion functions.
+A `types.go` file containing an "internal" version of the group's objects also
+lives here.  These types are used as a destination/source for conversion
+functions. There may be types for several different resources in this `types.go`
+file.
 
 ### Package: `apis/group/install`
 
@@ -358,8 +309,8 @@ each nested install/ package.
 
 'v1' is taken to be the current stable version of this api.
 
-Multiple resource directories (we show 'resource1' and 'resource2') each have a
-`types.go`, containing the type definitions for this group/version/resource.
+A `types.go` file containing the v1 version of the group's objects lives here.
+There may be types for several different resources in this `types.go` file.
 
 This package has tightly controlled imports. It's allowed to include the
 Kubernetes unversioned API types (to be moved in/under `pkg/apis/unversioned`)
@@ -373,7 +324,7 @@ resource in this group, its conversion, validation, and defaulting functions.
 We have separate install packages for every version to allow deliberate import
 choices to be made.
 
-### Package: `apis/group/v1/resource1/conversion`
+### Package: `apis/group/v1/conversion`
 
 This package contains conversion functions, and exports a Register() function
 which will register them (but does not register them as a side effect of being
@@ -387,14 +338,14 @@ convert to & from the types in the parent `apis/group/resource1` and
 The allowed imports are constrained; in particular, nothing that would let you
 do RPCs to look up other cluster state is allowed.
 
-### Package: `apis/group/v1/resource1/defaulting`
+### Package: `apis/group/v1/defaulting`
 
 This package contains defaulting functions, and exports a Register() function
 which will register them (but does not register them as a side effect of being
 imported).
 
-The functions apply to only the `group/v1/resource1` types, *not* the parent
-`group/resource1` types.
+The functions apply to only the `group/v1/types.go` types, *not* the parent
+`group/types.go` types.
 
 High-level requirements:
 * Any tags that autogeneration pays attention to (e.g., `// +default: xxxx`)
@@ -411,12 +362,12 @@ do RPCs to look up other cluster state is allowed. Defaulting that requires
 information not contained in the object is not allowed; you must change your
 design until it's not needed.
 
-### Package: `apis/group/v1/resource1/validation`
+### Package: `apis/group/v1/validation`
 
 This package contains validation functions, and if imported, will register them.
 
-The functions apply to only the `group/v1/resource1` types, *not* the parent
-`group/resource1` types.
+The functions apply to only the `group/v1/types.go` types, *not* the parent
+`group/types.go` types.
 
 The allowed imports are constrained; in particular, nothing that would let you
 do RPCs to look up other cluster state is allowed. Validation functions validate
@@ -448,8 +399,8 @@ of the API group, which may lack features.
 ### Package: `apis/group/v2alpha1`
 
 This package layout is the same as `apis/group/v1`, but it is an newer version
-of the API group, which may have extra features. It has `resource3`, for
-example.
+of the API group, which may have extra features. It may have types for an
+additional resource, for example.
 
 It is a rule that a client should never have to pay attention to multiple
 versions of a group at the same time, so v2alpha1 copies all types from v1, even
@@ -476,6 +427,10 @@ and some function to perform the action. So, e.g., `convert.Convert(&in, &out)`,
 `bar := deep.Copy(&foo)`, `default.Apply(&object)`,
 `errs := validate.Check(&object)`.
 
+The current `pkg/api/latest` is a similar central hub for codecs and other
+object version/conversion items. It might be reasonable to place this with the
+other items in this directory, although it's less generally useful.
+
 More detailed descriptions belong in another doc when we hash out the
 particulars of the code generation; the important thing here is just to know
 that we'll supply packages with:
@@ -491,7 +446,9 @@ that we'll supply packages with:
 ## Reusable apiserver infrastructure packages
 
 In the future, it'd be nice if we could generate REST install code based on
-comment annotations in the go types. See #16560 for a problem statement.
+comment annotations in the go types. See
+[#16560](https://github.com/kubernetes/kubernetes/issues/16560) for a problem
+statement.
 
 ## Desired toolchain
 
@@ -501,8 +458,8 @@ generations.
 Ideally, the tool will take the root `apis/` directory, discover the `group`s
 and `version`s, and perform the generations outlined above. We will generate as
 much as possible. The goal is for you to write a `apis/group/types.go` file and
-an `apis/group/v1alpha1` file, push a button, and get the rest of the package
-structure, including tests that check and enforce the package imports.
+an `apis/group/v1alpha1/types.go` file, push a button, and get the rest of the
+package structure, including tests that check and enforce the package imports.
 
 We'll deliver a tool with few enough command line arguments that you won't feel
 compelled to wrap it with a bash script. It will be callable via `go generate`.
