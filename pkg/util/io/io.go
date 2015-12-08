@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // LoadPodFromFile will read, decode, and return a Pod from a file.
@@ -37,7 +38,7 @@ func LoadPodFromFile(filePath string) (*api.Pod, error) {
 	if len(podDef) == 0 {
 		return nil, fmt.Errorf("file was empty: %s", filePath)
 	}
-	obj, _, err := latest.Codecs.UniversalDecoder().Decode(podDef, nil, nil)
+	obj, err := runtime.Decode(latest.Codecs.UniversalDecoder(), podDef)
 	if err != nil {
 		return nil, fmt.Errorf("failed decoding file: %v", err)
 	}

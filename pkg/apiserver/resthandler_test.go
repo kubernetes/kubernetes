@@ -236,7 +236,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 			return
 		}
-		expectedObj, _, err := codec.Decode(expectedJS, nil, nil)
+		expectedObj, err := runtime.Decode(codec, expectedJS)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 			return

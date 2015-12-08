@@ -82,7 +82,7 @@ func TestWatchWebsocket(t *testing.T) {
 		if got.Type != action {
 			t.Errorf("Unexpected type: %v", got.Type)
 		}
-		gotObj, _, err := codec.Decode(got.Object, nil, nil)
+		gotObj, err := runtime.Decode(codec, got.Object)
 		if err != nil {
 			t.Fatalf("Decode error: %v", err)
 		}
@@ -146,7 +146,7 @@ func TestWatchHTTP(t *testing.T) {
 			t.Errorf("%d: Unexpected type: %v", i, got.Type)
 		}
 		t.Logf("obj: %v", string(got.Object))
-		gotObj, _, err := codec.Decode(got.Object, nil, nil)
+		gotObj, err := runtime.Decode(codec, got.Object)
 		if err != nil {
 			t.Fatalf("Decode error: %v", err)
 		}

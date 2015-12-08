@@ -474,7 +474,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 		t.Errorf("unexpected print to default printer")
 	}
 
-	out, _, err := codec.Decode(buf.Bytes(), nil, nil)
+	out, err := runtime.Decode(codec, buf.Bytes())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

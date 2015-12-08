@@ -50,7 +50,7 @@ func TestCompatibility(
 
 	// Decode
 	codec := latest.Codecs.LegacyCodec(unversioned.ParseGroupVersionOrDie(version))
-	obj, _, err := codec.Decode(input, nil, nil)
+	obj, err := runtime.Decode(codec, input)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

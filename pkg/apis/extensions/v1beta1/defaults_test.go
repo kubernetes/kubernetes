@@ -281,7 +281,7 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 		t.Errorf("%v\n %#v", err, obj)
 		return nil
 	}
-	obj2, _, err := latest.Codecs.UniversalDecoder().Decode(data, nil, nil)
+	obj2, err := runtime.Decode(latest.Codecs.UniversalDecoder(), data)
 	if err != nil {
 		t.Errorf("%v\nData: %s\nSource: %#v", err, string(data), obj)
 		return nil

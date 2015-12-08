@@ -659,7 +659,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 			return nil, fmt.Errorf("%v while accessing %v", resp.Status, url)
 		}
 
-		if runtimeObject, _, err := r.codec.Decode(bodyBytes, nil, nil); err == nil {
+		if runtimeObject, err := runtime.Decode(r.codec, bodyBytes); err == nil {
 			statusError := errors.FromObject(runtimeObject)
 
 			if _, ok := statusError.(APIStatus); ok {
@@ -782,7 +782,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 	// Did the server give us a status response?
 	isStatusResponse := false
 	var status *unversioned.Status
-	result, _, err := r.codec.Decode(body, nil, nil)
+	result, err := runtime.Decode(r.codec, body)
 	if out, ok := result.(*unversioned.Status); err == nil && ok && len(out.Status) > 0 {
 		status = out
 		isStatusResponse = true
@@ -902,7 +902,7 @@ func (r Result) Get() (runtime.Object, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	obj, _, err := r.codec.Decode(r.body, nil, nil)
+	obj, err := runtime.Decode(r.codec, r.body)
 	return obj, err
 }
 

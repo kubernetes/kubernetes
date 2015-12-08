@@ -28,22 +28,28 @@ import (
 )
 
 // EncodeOrDie is a version of Encode which will panic instead of returning an error. For tests.
-func EncodeOrDie(codec Serializer, obj Object) string {
-	bytes, err := Encode(codec, obj)
+func EncodeOrDie(e Encoder, obj Object) string {
+	bytes, err := Encode(e, obj)
 	if err != nil {
 		panic(err)
 	}
 	return string(bytes)
 }
 
-// Encode is a convenience wrapper for encoding to a []byte from a Serializer
-func Encode(s Encoder, obj Object, overrides ...unversioned.GroupVersion) ([]byte, error) {
+// Encode is a convenience wrapper for encoding to a []byte from an Encoder
+func Encode(e Encoder, obj Object, overrides ...unversioned.GroupVersion) ([]byte, error) {
 	// TODO: reuse buffer
 	buf := &bytes.Buffer{}
-	if err := s.EncodeToStream(obj, buf, overrides...); err != nil {
+	if err := e.EncodeToStream(obj, buf, overrides...); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// Decode is a convenience wrapper for decoding data into an Object.
+func Decode(d Decoder, data []byte) (Object, error) {
+	obj, _, err := d.Decode(data, nil, nil)
+	return obj, err
 }
 
 func UseOrCreateObject(t Typer, c ObjectCreater, gvk unversioned.GroupVersionKind, obj Object) (Object, error) {

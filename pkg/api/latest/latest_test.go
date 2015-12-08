@@ -92,7 +92,7 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 	if typeMeta.APIVersion != "v1" {
 		t.Errorf("APIVersion is not set to \"v1\". Got %v", string(encoded))
 	}
-	decoded, _, err := v1Codec.Decode(encoded, nil, nil)
+	decoded, err := runtime.Decode(v1Codec, encoded)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	if typeMeta.APIVersion != "v1" {
 		t.Errorf("APIVersion is not set to \"\". Got %s", encoded)
 	}
-	decoded, _, err := expCodec.Decode(encoded, nil, nil)
+	decoded, err := runtime.Decode(expCodec, encoded)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

@@ -288,7 +288,7 @@ func TestSimpleSetupRight(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.TypeMeta = unversioned.TypeMeta{} // Encode no longer guarantees that the input object is not mutated
-	s2, _, err := codec.Decode(wire, nil, nil)
+	s2, err := runtime.Decode(codec, wire)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,7 +304,7 @@ func TestSimpleOptionsSetupRight(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.TypeMeta = unversioned.TypeMeta{} // Encode no longer guarantees that the input object is not mutated
-	s2, _, err := codec.Decode(wire, nil, nil)
+	s2, err := runtime.Decode(codec, wire)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1538,7 +1538,7 @@ func TestConnectResponderObject(t *testing.T) {
 	if connectStorage.receivedID != itemID {
 		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
 	}
-	obj, _, err := codec.Decode(body, nil, nil)
+	obj, err := runtime.Decode(codec, body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1579,7 +1579,7 @@ func TestConnectResponderError(t *testing.T) {
 	if connectStorage.receivedID != itemID {
 		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
 	}
-	obj, _, err := codec.Decode(body, nil, nil)
+	obj, err := runtime.Decode(codec, body)
 	if err != nil {
 		t.Fatal(err)
 	}

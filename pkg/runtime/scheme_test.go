@@ -101,10 +101,10 @@ func TestScheme(t *testing.T) {
 	// Test Encode, Decode, DecodeInto, and DecodeToVersion
 	obj := runtime.Object(simple)
 	data, err := runtime.Encode(codec, obj)
-	obj2, _, err2 := codec.Decode(data, nil, nil)
+	obj2, err2 := runtime.Decode(codec, data)
 	obj3 := &InternalSimple{}
 	_, err3 := runtime.DecodeInto(codec, data, nil, obj3)
-	obj4, _, err4 := jsonserializer.Decode(data, nil, nil)
+	obj4, err4 := runtime.Decode(jsonserializer, data)
 	if err != nil || err2 != nil || err3 != nil || err4 != nil {
 		t.Fatalf("Failure: '%v' '%v' '%v' '%v'", err, err2, err3, err4)
 	}
@@ -161,11 +161,11 @@ func TestBadJSONRejection(t *testing.T) {
 	jsonserializer, _ := codecs.SerializerForFileExtension("json")
 
 	badJSONMissingKind := []byte(`{ }`)
-	if _, _, err := jsonserializer.Decode(badJSONMissingKind, nil, nil); err == nil {
+	if _, err := runtime.Decode(jsonserializer, badJSONMissingKind); err == nil {
 		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
 	}
 	badJSONUnknownType := []byte(`{"kind": "bar"}`)
-	if _, _, err1 := jsonserializer.Decode(badJSONUnknownType, nil, nil); err1 == nil {
+	if _, err1 := runtime.Decode(jsonserializer, badJSONUnknownType); err1 == nil {
 		t.Errorf("Did not reject despite use of unknown type: %s", badJSONUnknownType)
 	}
 	/*badJSONKindMismatch := []byte(`{"kind": "Pod"}`)
@@ -236,7 +236,7 @@ func TestExternalToInternalMapping(t *testing.T) {
 	for i, item := range table {
 		item.obj.(*InternalOptionalExtensionType).TypeMeta = item.meta
 
-		gotDecoded, _, err := codec.Decode([]byte(item.encoded), nil, nil)
+		gotDecoded, err := runtime.Decode(codec, []byte(item.encoded))
 		if err != nil {
 			t.Errorf("unexpected error '%v' (%v)", err, item.encoded)
 		} else if e, a := item.obj, gotDecoded; !reflect.DeepEqual(e, a) {
@@ -314,7 +314,7 @@ func TestExtensionMapping(t *testing.T) {
 			t.Errorf("expected\n%#v\ngot\n%#v\n", e, a)
 		}
 
-		gotDecoded, _, err := codec.Decode([]byte(item.encoded), nil, nil)
+		gotDecoded, err := runtime.Decode(codec, []byte(item.encoded))
 		if err != nil {
 			t.Errorf("unexpected error '%v' (%v)", err, item.encoded)
 		} else if e, a := item.expected, gotDecoded; !reflect.DeepEqual(e, a) {

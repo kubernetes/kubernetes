@@ -377,7 +377,7 @@ func Merge(dst runtime.Object, fragment, kind string) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	out, _, err := i.Codec.Decode(patched, nil, nil)
+	out, err := runtime.Decode(i.Codec, patched)
 	if err != nil {
 		return nil, err
 	}

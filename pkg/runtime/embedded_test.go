@@ -129,7 +129,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 	}
 	t.Logf("exact wire is: %s", string(obj.Items[0].RawJSON))
 
-	decoded, _, err := codec.Decode(wire, nil, nil)
+	decoded, err := runtime.Decode(codec, wire)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestEmbeddedObject(t *testing.T) {
 
 	t.Logf("Wire format is:\n%v\n", string(wire))
 
-	decoded, _, err := codec.Decode(wire, nil, nil)
+	decoded, err := runtime.Decode(codec, wire)
 	if err != nil {
 		t.Fatalf("Unexpected decode error %v", err)
 	}

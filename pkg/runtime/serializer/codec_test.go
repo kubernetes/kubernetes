@@ -196,7 +196,7 @@ func runTest(t *testing.T, source interface{}) {
 		t.Errorf("%v: %v (%#v)", name, err, source)
 		return
 	}
-	obj2, _, err := codec.Decode(data, nil, nil)
+	obj2, err := runtime.Decode(codec, data)
 	if err != nil {
 		t.Errorf("%v: %v (%v)", name, err, string(data))
 		return
@@ -275,7 +275,7 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 
 	codec := newCodecFactory(s, testMetaFactory{}).LegacyCodec(unversioned.GroupVersion{Version: "v1"})
 
-	obj, _, err := codec.Decode(data, nil, nil)
+	obj, err := runtime.Decode(codec, data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -306,7 +306,7 @@ func TestEncode_Ptr(t *testing.T) {
 	_, codec := GetTestScheme()
 	tt := &TestType1{A: "I am a pointer object"}
 	data, err := runtime.Encode(codec, tt)
-	obj2, _, err2 := codec.Decode(data, nil, nil)
+	obj2, err2 := runtime.Decode(codec, data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
@@ -326,7 +326,7 @@ func TestBadJSONRejection(t *testing.T) {
 		[]byte(`{"myVersionKey":"bar","myKindKey":"TestType1"}`), // Unknown version
 	}
 	for _, b := range badJSONs {
-		if _, _, err := codec.Decode(b, nil, nil); err == nil {
+		if _, err := runtime.Decode(codec, b); err == nil {
 			t.Errorf("Did not reject bad json: %s", string(b))
 		}
 	}
@@ -349,7 +349,7 @@ func TestBadJSONRejection(t *testing.T) {
 	if _, _, err := codec.Decode([]byte(``), &unversioned.GroupVersionKind{Kind: "ExternalInternalSame", Version: "v1"}, nil); err != nil {
 		t.Errorf("Gave error for version and kind defaulted")
 	}
-	if _, _, err := codec.Decode([]byte(``), nil, nil); err == nil {
+	if _, err := runtime.Decode(codec, []byte(``)); err == nil {
 		t.Errorf("Did not give error for empty data")
 	}
 }
@@ -360,7 +360,7 @@ func TestBadJSONRejectionForSetInternalVersion(t *testing.T) {
 		[]byte(`{"myKindKey":"TestType1"}`), // Missing version
 	}
 	for _, b := range badJSONs {
-		if _, _, err := codec.Decode(b, nil, nil); err == nil {
+		if _, err := runtime.Decode(codec, b); err == nil {
 			t.Errorf("Did not reject bad json: %s", string(b))
 		}
 	}

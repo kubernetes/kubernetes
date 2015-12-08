@@ -107,7 +107,7 @@ func tryDecodeSinglePod(data []byte) (parsed bool, pod *api.Pod, err error) {
 	if err != nil {
 		return false, nil, err
 	}
-	obj, _, err := latest.Codecs.UniversalDecoder().Decode(json, nil, nil)
+	obj, err := runtime.Decode(latest.Codecs.UniversalDecoder(), json)
 	if err != nil {
 		return false, pod, err
 	}

@@ -66,7 +66,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 		return
 	}
 
-	obj2, _, err := codec.Decode(data, nil, nil)
+	obj2, err := runtime.Decode(codec, data)
 	if err != nil {
 		t.Errorf("0: %v: %v\nCodec: %v\nData: %s\nSource: %#v", name, err, codec, string(data), printer.Sprintf("%#v", item))
 		return
@@ -186,7 +186,7 @@ func TestEncode_Ptr(t *testing.T) {
 	}
 	obj := runtime.Object(pod)
 	data, err := runtime.Encode(testapi.Default.Codec(), obj)
-	obj2, _, err2 := testapi.Default.Codec().Decode(data, nil, nil)
+	obj2, err2 := runtime.Decode(testapi.Default.Codec(), data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
@@ -201,11 +201,11 @@ func TestEncode_Ptr(t *testing.T) {
 
 func TestBadJSONRejection(t *testing.T) {
 	badJSONMissingKind := []byte(`{ }`)
-	if _, _, err := testapi.Default.Codec().Decode(badJSONMissingKind, nil, nil); err == nil {
+	if _, err := runtime.Decode(testapi.Default.Codec(), badJSONMissingKind); err == nil {
 		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
 	}
 	badJSONUnknownType := []byte(`{"kind": "bar"}`)
-	if _, _, err1 := testapi.Default.Codec().Decode(badJSONUnknownType, nil, nil); err1 == nil {
+	if _, err1 := runtime.Decode(testapi.Default.Codec(), badJSONUnknownType); err1 == nil {
 		t.Errorf("Did not reject despite use of unknown type: %s", badJSONUnknownType)
 	}
 	/*badJSONKindMismatch := []byte(`{"kind": "Pod"}`)
@@ -232,7 +232,7 @@ func TestUnversionedTypes(t *testing.T) {
 		}
 
 		// Make sure the versioned codec under test can decode
-		versionDecodedObject, _, err := testapi.Default.Codec().Decode(unversionedJSON, nil, nil)
+		versionDecodedObject, err := runtime.Decode(testapi.Default.Codec(), unversionedJSON)
 		if err != nil {
 			t.Errorf("%v: unexpected error: %v", obj, err)
 			continue

@@ -201,7 +201,7 @@ func TestDoRequestSuccess(t *testing.T) {
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", fakeHandler.RequestReceived)
 	}
-	statusOut, _, err := testapi.Default.Codec().Decode(body, nil, nil)
+	statusOut, err := runtime.Decode(testapi.Default.Codec(), body)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -277,7 +277,7 @@ func TestDoRequestCreated(t *testing.T) {
 	if !created {
 		t.Errorf("Expected object to be created")
 	}
-	statusOut, _, err := testapi.Default.Codec().Decode(body, nil, nil)
+	statusOut, err := runtime.Decode(testapi.Default.Codec(), body)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}

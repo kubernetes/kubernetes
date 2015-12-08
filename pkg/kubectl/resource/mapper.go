@@ -54,7 +54,7 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to recognize %q: %v", source, err)
 	}
-	obj, _, err := mapping.Codec.Decode(data, nil, nil)
+	obj, err := runtime.Decode(mapping.Codec, data)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load %q: %v", source, err)
 	}

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
@@ -90,7 +91,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *a
 	if err != nil {
 		return false, nil, err
 	}
-	obj, _, err := latest.Codecs.UniversalDecoder().Decode(json, nil, nil)
+	obj, err := runtime.Decode(latest.Codecs.UniversalDecoder(), json)
 	if err != nil {
 		return false, pod, err
 	}
@@ -112,7 +113,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *a
 }
 
 func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods api.PodList, err error) {
-	obj, _, err := latest.Codecs.UniversalDecoder().Decode(data, nil, nil)
+	obj, err := runtime.Decode(latest.Codecs.UniversalDecoder(), data)
 	if err != nil {
 		return false, pods, err
 	}

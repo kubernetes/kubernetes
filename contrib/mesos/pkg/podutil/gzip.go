@@ -69,7 +69,7 @@ func gunzipList(gzipped []byte) (*api.PodList, error) {
 		return nil, err
 	}
 
-	obj, _, err := latest.Codecs.UniversalDecoder().Decode(raw, nil, nil)
+	obj, err := runtime.Decode(latest.Codecs.UniversalDecoder(), raw)
 	if err != nil {
 		return nil, err
 	}

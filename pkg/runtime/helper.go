@@ -70,7 +70,7 @@ func FieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 }
 
 // DecodeList alters the list in place, attempting to decode any objects found in
-// the list that have the runtime.Unknown type. Any errors that occur are returned
+// the list that have the Unknown type. Any errors that occur are returned
 // after the entire list is processed. Decoders are tried in order.
 func DecodeList(objects []Object, decoders ...Decoder) []error {
 	errs := []error(nil)
@@ -78,7 +78,7 @@ func DecodeList(objects []Object, decoders ...Decoder) []error {
 		switch t := obj.(type) {
 		case *Unknown:
 			for _, decoder := range decoders {
-				obj, _, err := decoder.Decode(t.RawJSON, nil, nil)
+				obj, err := Decode(decoder, t.RawJSON)
 				if err != nil {
 					if IsNotRegisteredError(err) {
 						continue

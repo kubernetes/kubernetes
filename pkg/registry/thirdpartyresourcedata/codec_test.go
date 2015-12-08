@@ -93,7 +93,7 @@ func TestCodec(t *testing.T) {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 			continue
 		}
-		obj, _, err := codec.Decode(data, nil, nil)
+		obj, err := runtime.Decode(codec, data)
 		if err != nil && !test.expectErr {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 			continue
