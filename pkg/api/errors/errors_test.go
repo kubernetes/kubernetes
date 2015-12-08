@@ -169,7 +169,7 @@ func Test_reasonForError(t *testing.T) {
 
 type TestType struct{}
 
-func (*TestType) IsAnAPIObject() {}
+func (obj *TestType) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
 
 func TestFromObject(t *testing.T) {
 	table := []struct {

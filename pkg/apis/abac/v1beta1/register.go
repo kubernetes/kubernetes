@@ -34,4 +34,4 @@ func init() {
 	)
 }
 
-func (*Policy) IsAnAPIObject() {}
+func (obj *Policy) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

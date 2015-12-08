@@ -302,13 +302,6 @@ const (
 	CauseTypeUnexpectedServerResponse CauseType = "UnexpectedServerResponse"
 )
 
-func (*ListOptions) IsAnAPIObject()     {}
-func (*Status) IsAnAPIObject()          {}
-func (*APIVersions) IsAnAPIObject()     {}
-func (*APIGroupList) IsAnAPIObject()    {}
-func (*APIGroup) IsAnAPIObject()        {}
-func (*APIResourceList) IsAnAPIObject() {}
-
 // APIVersions lists the versions that are available, to allow clients to
 // discover the API at /api, which is the root path of the legacy v1 API.
 //

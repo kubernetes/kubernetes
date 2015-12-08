@@ -25,7 +25,7 @@ package runtime
 //      runtime.TypeMeta    `json:",inline"`
 //      ... // other fields
 // }
-// func (*MyAwesomeAPIObject) IsAnAPIObject() {}
+// func (obj *MyAwesomeAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) { unversioned.UpdateTypeMeta(obj,gvk) }; GroupVersionKind() *GroupVersionKind
 //
 // TypeMeta is provided here for convenience. You may use it directly from this package or define
 // your own with the same fields.
@@ -120,8 +120,6 @@ type Unknown struct {
 	RawJSON []byte
 }
 
-func (*Unknown) IsAnAPIObject() {}
-
 // Unstructured allows objects that do not have Golang structs registered to be manipulated
 // generically. This can be used to deal with the API objects from a plug-in. Unstructured
 // objects still have functioning TypeMeta features-- kind, version, etc.
@@ -133,5 +131,3 @@ type Unstructured struct {
 	// children.
 	Object map[string]interface{}
 }
-
-func (*Unstructured) IsAnAPIObject() {}
