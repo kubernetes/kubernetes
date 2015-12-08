@@ -70,14 +70,18 @@ func (self *Scheme) embeddedObjectToRawExtension(in *EmbeddedObject, out *RawExt
 	}
 
 	// Figure out the type and kind of the output object.
-	_, outVersion, scheme := self.fromScope(s)
-	gvk, err := scheme.raw.ObjectKind(in.Object)
+	_, outGroupVersionString, scheme := self.fromScope(s)
+	objKind, err := scheme.raw.ObjectKind(in.Object)
+	if err != nil {
+		return err
+	}
+	outVersion, err := unversioned.ParseGroupVersion(outGroupVersionString)
 	if err != nil {
 		return err
 	}
 
 	// Manufacture an object of this type and kind.
-	outObj, err := scheme.New(outVersion, gvk.Kind)
+	outObj, err := scheme.New(outVersion.WithKind(objKind.Kind))
 	if err != nil {
 		return err
 	}
@@ -90,7 +94,7 @@ func (self *Scheme) embeddedObjectToRawExtension(in *EmbeddedObject, out *RawExt
 
 	// Copy the kind field into the output object.
 	err = s.Convert(
-		&emptyPlugin{PluginBase: PluginBase{Kind: gvk.Kind}},
+		&emptyPlugin{PluginBase: PluginBase{Kind: objKind.Kind}},
 		outObj,
 		conversion.SourceToDest|conversion.IgnoreMissingFields|conversion.AllowDifferentFieldTypeNames,
 	)
@@ -98,7 +102,7 @@ func (self *Scheme) embeddedObjectToRawExtension(in *EmbeddedObject, out *RawExt
 		return err
 	}
 	// Because we provide the correct version, EncodeToVersion will not attempt a conversion.
-	raw, err := scheme.EncodeToVersion(outObj, outVersion)
+	raw, err := scheme.EncodeToVersion(outObj, outVersion.String())
 	if err != nil {
 		// TODO: if this fails, create an Unknown-- maybe some other
 		// component will understand it.
@@ -117,15 +121,23 @@ func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *Embedded
 		return nil
 	}
 	// Figure out the type and kind of the output object.
-	inVersion, outVersion, scheme := self.fromScope(s)
-	gvk, err := scheme.raw.DataKind(in.RawJSON)
+	inGroupVersionString, outGroupVersionString, scheme := self.fromScope(s)
+	dataKind, err := scheme.raw.DataKind(in.RawJSON)
+	if err != nil {
+		return err
+	}
+	inVersion, err := unversioned.ParseGroupVersion(inGroupVersionString)
+	if err != nil {
+		return err
+	}
+	outVersion, err := unversioned.ParseGroupVersion(outGroupVersionString)
 	if err != nil {
 		return err
 	}
 
 	// We have to make this object ourselves because we don't store the version field for
 	// plugin objects.
-	inObj, err := scheme.New(inVersion, gvk.Kind)
+	inObj, err := scheme.New(inVersion.WithKind(dataKind.Kind))
 	if err != nil {
 		return err
 	}
@@ -136,7 +148,7 @@ func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *Embedded
 	}
 
 	// Make the desired internal version, and do the conversion.
-	outObj, err := scheme.New(outVersion, gvk.Kind)
+	outObj, err := scheme.New(outVersion.WithKind(dataKind.Kind))
 	if err != nil {
 		return err
 	}
@@ -209,14 +221,14 @@ func (self *Scheme) rawExtensionToRuntimeObjectArray(in *[]RawExtension, out *[]
 
 	for i := range src {
 		data := src[i].RawJSON
-		gvk, err := scheme.raw.DataKind(data)
+		dataKind, err := scheme.raw.DataKind(data)
 		if err != nil {
 			return err
 		}
 		dest[i] = &Unknown{
 			TypeMeta: TypeMeta{
-				APIVersion: gvk.GroupVersion().String(),
-				Kind:       gvk.Kind,
+				APIVersion: dataKind.GroupVersion().String(),
+				Kind:       dataKind.Kind,
 			},
 			RawJSON: data,
 		}
@@ -306,10 +318,9 @@ func (s *Scheme) Recognizes(gvk unversioned.GroupVersionKind) bool {
 	return s.raw.Recognizes(gvk)
 }
 
-// New returns a new API object of the given version ("" for internal
-// representation) and name, or an error if it hasn't been registered.
-func (s *Scheme) New(versionName, typeName string) (Object, error) {
-	obj, err := s.raw.NewObject(versionName, typeName)
+// New returns a new API object of the given kind, or an error if it hasn't been registered.
+func (s *Scheme) New(kind unversioned.GroupVersionKind) (Object, error) {
+	obj, err := s.raw.NewObject(kind)
 	if err != nil {
 		return nil, err
 	}

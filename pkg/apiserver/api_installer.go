@@ -104,9 +104,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	admit := a.group.Admit
 	context := a.group.Context
 
-	serverGroupVersion := a.group.GroupVersion
-	if a.group.ServerGroupVersion != nil {
-		serverGroupVersion = *a.group.ServerGroupVersion
+	optionsExternalVersion := a.group.GroupVersion
+	if a.group.OptionsExternalVersion != nil {
+		optionsExternalVersion = *a.group.OptionsExternalVersion
 	}
 
 	var resource, subresource string
@@ -148,7 +148,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	kind := fqKindToRegister.Kind
 
-	versionedPtr, err := a.group.Creater.New(a.group.GroupVersion.String(), kind)
+	versionedPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind(kind))
 	if err != nil {
 		return nil, err
 	}
@@ -217,14 +217,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if isLister {
 		list := lister.NewList()
 		listGVK, err := a.group.Typer.ObjectKind(list)
-		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion.String(), listGVK.Kind)
+		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind(listGVK.Kind))
 		if err != nil {
 			return nil, err
 		}
 		versionedList = indirectArbitraryPointer(versionedListPtr)
 	}
 
-	versionedListOptions, err := a.group.Creater.New(serverGroupVersion.String(), "ListOptions")
+	versionedListOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("ListOptions"))
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +232,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var versionedDeleterObject interface{}
 	switch {
 	case isGracefulDeleter:
-		objectPtr, err := a.group.Creater.New(serverGroupVersion.String(), "DeleteOptions")
+		objectPtr, err := a.group.Creater.New(optionsExternalVersion.WithKind("DeleteOptions"))
 		if err != nil {
 			return nil, err
 		}
@@ -242,7 +242,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		gracefulDeleter = rest.GracefulDeleteAdapter{Deleter: deleter}
 	}
 
-	versionedStatusPtr, err := a.group.Creater.New(serverGroupVersion.String(), "Status")
+	versionedStatusPtr, err := a.group.Creater.New(optionsExternalVersion.WithKind("Status"))
 	if err != nil {
 		return nil, err
 	}
@@ -262,9 +262,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, err
 		}
 		// TODO this should be a list of all the different external versions we can coerce into the internalKind
-		getOptionsExternalKind = serverGroupVersion.WithKind(getOptionsInternalKind.Kind)
+		getOptionsExternalKind = optionsExternalVersion.WithKind(getOptionsInternalKind.Kind)
 
-		versionedGetOptions, err = a.group.Creater.New(serverGroupVersion.String(), getOptionsInternalKind.Kind)
+		versionedGetOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(getOptionsInternalKind.Kind))
 		if err != nil {
 			return nil, err
 		}
@@ -287,9 +287,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				return nil, err
 			}
 			// TODO this should be a list of all the different external versions we can coerce into the internalKind
-			connectOptionsExternalKind = serverGroupVersion.WithKind(connectOptionsInternalKind.Kind)
+			connectOptionsExternalKind = optionsExternalVersion.WithKind(connectOptionsInternalKind.Kind)
 
-			versionedConnectOptions, err = a.group.Creater.New(serverGroupVersion.String(), connectOptionsInternalKind.Kind)
+			versionedConnectOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(connectOptionsInternalKind.Kind))
 		}
 	}
 

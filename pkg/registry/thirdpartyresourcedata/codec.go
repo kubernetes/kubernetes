@@ -289,19 +289,19 @@ type thirdPartyResourceDataCreator struct {
 	delegate runtime.ObjectCreater
 }
 
-func (t *thirdPartyResourceDataCreator) New(groupVersion, kind string) (out runtime.Object, err error) {
-	switch kind {
+func (t *thirdPartyResourceDataCreator) New(kind unversioned.GroupVersionKind) (out runtime.Object, err error) {
+	switch kind.Kind {
 	case "ThirdPartyResourceData":
-		if apiutil.GetGroupVersion(t.group, t.version) != groupVersion {
-			return nil, fmt.Errorf("unknown version %s for kind %s", groupVersion, kind)
+		if apiutil.GetGroupVersion(t.group, t.version) != kind.GroupVersion().String() {
+			return nil, fmt.Errorf("unknown kind %v", kind)
 		}
 		return &extensions.ThirdPartyResourceData{}, nil
 	case "ThirdPartyResourceDataList":
-		if apiutil.GetGroupVersion(t.group, t.version) != groupVersion {
-			return nil, fmt.Errorf("unknown version %s for kind %s", groupVersion, kind)
+		if apiutil.GetGroupVersion(t.group, t.version) != kind.GroupVersion().String() {
+			return nil, fmt.Errorf("unknown kind %v", kind)
 		}
 		return &extensions.ThirdPartyResourceDataList{}, nil
 	default:
-		return t.delegate.New(groupVersion, kind)
+		return t.delegate.New(kind)
 	}
 }

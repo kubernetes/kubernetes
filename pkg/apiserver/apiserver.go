@@ -79,19 +79,20 @@ type Mux interface {
 type APIGroupVersion struct {
 	Storage map[string]rest.Storage
 
-	Root         string
+	Root string
+
+	// GroupVersion is the external group version
 	GroupVersion unversioned.GroupVersion
 
 	// RequestInfoResolver is used to parse URLs for the legacy proxy handler.  Don't use this for anything else
 	// TODO: refactor proxy handler to use sub resources
 	RequestInfoResolver *RequestInfoResolver
 
-	// ServerVersion controls the Kubernetes APIVersion used for common objects in the apiserver
+	// OptionsExternalVersion controls the Kubernetes APIVersion used for common objects in the apiserver
 	// schema like api.Status, api.DeleteOptions, and unversioned.ListOptions. Other implementors may
 	// define a version "v1beta1" but want to use the Kubernetes "v1" internal objects. If
-	// empty, defaults to Version.
-	// TODO this seems suspicious.  Is this actually just "unversioned" now?
-	ServerGroupVersion *unversioned.GroupVersion
+	// empty, defaults to GroupVersion.
+	OptionsExternalVersion *unversioned.GroupVersion
 
 	Mapper meta.RESTMapper
 

@@ -62,14 +62,14 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 	return buff.Bytes(), nil
 }
 
-func (s *Scheme) EncodeToVersionStream(obj interface{}, destVersion string, stream io.Writer) error {
+func (s *Scheme) EncodeToVersionStream(obj interface{}, destGroupVersionString string, stream io.Writer) error {
 	obj = maybeCopy(obj)
 	v, _ := EnforcePtr(obj) // maybeCopy guarantees a pointer
 
 	// Don't encode an object defined in the unversioned package, unless if the
-	// destVersion is v1, encode it to v1 for backward compatibility.
+	// destGroupVersionString is v1, encode it to v1 for backward compatibility.
 	pkg := path.Base(v.Type().PkgPath())
-	if pkg == "unversioned" && destVersion != "v1" {
+	if pkg == "unversioned" && destGroupVersionString != "v1" {
 		// TODO: convert this to streaming too
 		data, err := s.encodeUnversionedObject(obj)
 		if err != nil {
@@ -80,21 +80,26 @@ func (s *Scheme) EncodeToVersionStream(obj interface{}, destVersion string, stre
 	}
 
 	if _, registered := s.typeToGVK[v.Type()]; !registered {
-		return fmt.Errorf("type %v is not registered for %q and it will be impossible to Decode it, therefore Encode will refuse to encode it.", v.Type(), destVersion)
+		return fmt.Errorf("type %v is not registered for %q and it will be impossible to Decode it, therefore Encode will refuse to encode it.", v.Type(), destGroupVersionString)
 	}
 
-	objGVK, err := s.ObjectKind(obj)
+	objKind, err := s.ObjectKind(obj)
+	if err != nil {
+		return err
+	}
+
+	destVersion, err := unversioned.ParseGroupVersion(destGroupVersionString)
 	if err != nil {
 		return err
 	}
 
 	// Perform a conversion if necessary.
-	if objGVK.GroupVersion().String() != destVersion {
-		objOut, err := s.NewObject(destVersion, objGVK.Kind)
+	if objKind.GroupVersion() != destVersion {
+		objOut, err := s.NewObject(destVersion.WithKind(objKind.Kind))
 		if err != nil {
 			return err
 		}
-		flags, meta := s.generateConvertMeta(objGVK.GroupVersion(), unversioned.ParseGroupVersionOrDie(destVersion), obj)
+		flags, meta := s.generateConvertMeta(objKind.GroupVersion(), destVersion, obj)
 		err = s.converter.Convert(obj, objOut, flags, meta)
 		if err != nil {
 			return err
@@ -106,11 +111,11 @@ func (s *Scheme) EncodeToVersionStream(obj interface{}, destVersion string, stre
 		if err != nil {
 			return err
 		}
-		objGVK.Kind = newGroupVersionKind.Kind
+		objKind.Kind = newGroupVersionKind.Kind
 	}
 
 	// Version and Kind should be set on the wire.
-	err = s.SetVersionAndKind(destVersion, objGVK.Kind, obj)
+	err = s.SetVersionAndKind(destVersion.String(), objKind.Kind, obj)
 	if err != nil {
 		return err
 	}
