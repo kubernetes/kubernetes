@@ -87,7 +87,7 @@ var _ = Describe("Mesos", func() {
 			ObjectMeta: api.ObjectMeta{
 				Name: podName,
 				Labels: map[string]string{
-					"k8s.mesosphere.io/roles": "role1",
+					"k8s.mesosphere.io/roles": "public",
 				},
 			},
 			Spec: api.PodSpec{
@@ -106,10 +106,12 @@ var _ = Describe("Mesos", func() {
 		expectNoError(err)
 
 		nodeClient := framework.Client.Nodes()
-		role1 := labels.SelectorFromSet(map[string]string{
-			"k8s.mesosphere.io/attribute-role": "role1",
+
+		// schedule onto node with rack=2 being assigned to the "public" role
+		rack2 := labels.SelectorFromSet(map[string]string{
+			"k8s.mesosphere.io/attribute-rack": "2",
 		})
-		nodes, err := nodeClient.List(role1, fields.Everything())
+		nodes, err := nodeClient.List(rack2, fields.Everything())
 		expectNoError(err)
 
 		Expect(nodes.Items[0].Name).To(Equal(pod.Spec.NodeName))
