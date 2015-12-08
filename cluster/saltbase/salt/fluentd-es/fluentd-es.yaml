@@ -3,6 +3,8 @@ kind: Pod
 metadata:
   name: fluentd-elasticsearch
   namespace: kube-system
+  labels:
+    k8s-app: fluentd-logging
 spec:
   containers:
   - name: fluentd-elasticsearch

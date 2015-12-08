@@ -166,6 +166,8 @@ kind: Pod
 metadata:
   name: fluentd-cloud-logging
   namespace: kube-system
+  labels:
+    k8s-app: fluentd-logging
 spec:
   containers:
   - name: fluentd-cloud-logging
