@@ -119,10 +119,10 @@ func TestScheme(t *testing.T) {
 	if _, ok := obj2.(*InternalSimple); !ok {
 		t.Fatalf("Got wrong type")
 	}
-	simple.TypeMeta = TypeMeta{Kind: "Simple", APIVersion: externalGV.String()}
 	if e, a := simple, obj2; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
 	}
+	simple.TypeMeta = TypeMeta{Kind: "Simple", APIVersion: externalGV.String()}
 	if e, a := simple, obj3; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
 	}
@@ -244,18 +244,14 @@ func TestExternalToInternalMapping(t *testing.T) {
 	table := []struct {
 		obj     runtime.Object
 		encoded string
-		meta    TypeMeta
 	}{
 		{
 			&InternalOptionalExtensionType{Extension: nil},
 			`{"kind":"OptionalExtensionType","apiVersion":"` + externalGV.String() + `"}`,
-			TypeMeta{Kind: "OptionalExtensionType", APIVersion: externalGV.String()},
 		},
 	}
 
 	for i, item := range table {
-		item.obj.(*InternalOptionalExtensionType).TypeMeta = item.meta
-
 		gotDecoded, err := runtime.Decode(codec, []byte(item.encoded))
 		if err != nil {
 			t.Errorf("unexpected error '%v' (%v)", err, item.encoded)
@@ -294,9 +290,7 @@ func TestExtensionMapping(t *testing.T) {
 				Extension: &ExtensionA{TestString: "foo"},
 			},
 			&InternalExtensionType{
-				TypeMeta: TypeMeta{Kind: "ExtensionType", APIVersion: externalGV.String()},
 				Extension: &ExtensionA{
-					TypeMeta:   TypeMeta{Kind: "A", APIVersion: externalGV.String()},
 					TestString: "foo",
 				},
 			},
@@ -306,9 +300,7 @@ func TestExtensionMapping(t *testing.T) {
 		}, {
 			&InternalExtensionType{Extension: &ExtensionB{TestString: "bar"}},
 			&InternalExtensionType{
-				TypeMeta: TypeMeta{Kind: "ExtensionType", APIVersion: externalGV.String()},
 				Extension: &ExtensionB{
-					TypeMeta:   TypeMeta{Kind: "B", APIVersion: externalGV.String()},
 					TestString: "bar",
 				},
 			},
@@ -318,7 +310,6 @@ func TestExtensionMapping(t *testing.T) {
 		}, {
 			&InternalExtensionType{Extension: nil},
 			&InternalExtensionType{
-				TypeMeta:  TypeMeta{Kind: "ExtensionType", APIVersion: externalGV.String()},
 				Extension: nil,
 			},
 			`{"kind":"ExtensionType","apiVersion":"` + externalGV.String() + `","extension":null}
@@ -365,8 +356,6 @@ func TestEncode(t *testing.T) {
 	if _, ok := obj2.(*InternalSimple); !ok {
 		t.Fatalf("Got wrong type")
 	}
-	test.Kind = "Simple"
-	test.APIVersion = "test.group/testExternal"
 	if !reflect.DeepEqual(obj2, test) {
 		t.Errorf("Expected:\n %#v,\n Got:\n %#v", test, obj2)
 	}

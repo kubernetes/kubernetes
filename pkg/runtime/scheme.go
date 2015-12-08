@@ -245,8 +245,15 @@ func (s *Scheme) ConvertFieldLabel(version, kind, label, value string) (string, 
 // return an error if the conversion does not result in a valid Object being
 // returned. The serializer handles loading/serializing nested objects.
 func (s *Scheme) ConvertToVersion(in Object, outVersion string) (Object, error) {
+	gv, err := unversioned.ParseGroupVersion(outVersion)
+	if err != nil {
+		return nil, err
+	}
 	switch in.(type) {
 	case *Unknown, *Unstructured:
+		old := in.GroupVersionKind()
+		defer in.SetGroupVersionKind(old)
+		setTargetVersion(in, s.raw, gv)
 		return in, nil
 	}
 	unknown, err := s.raw.ConvertToVersion(in, outVersion)
@@ -257,5 +264,16 @@ func (s *Scheme) ConvertToVersion(in Object, outVersion string) (Object, error) 
 	if !ok {
 		return nil, fmt.Errorf("the provided object cannot be converted to a runtime.Object: %#v", unknown)
 	}
+	setTargetVersion(obj, s.raw, gv)
 	return obj, nil
+}
+
+func setTargetVersion(obj Object, raw *conversion.Scheme, gv unversioned.GroupVersion) {
+	if gv.Version == APIVersionInternal {
+		// internal is a special case
+		obj.SetGroupVersionKind(nil)
+	} else {
+		_, kind, _ := raw.ObjectVersionAndKind(obj)
+		obj.SetGroupVersionKind(&unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind})
+	}
 }

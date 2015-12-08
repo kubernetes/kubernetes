@@ -145,6 +145,9 @@ func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unv
 	}
 
 	if c.encodeVersion == nil || isUnversioned {
+		old := obj.GroupVersionKind()
+		obj.SetGroupVersionKind(gvk)
+		defer obj.SetGroupVersionKind(old)
 		return c.serializer.EncodeToStream(obj, w, overrides...)
 	}
 
@@ -185,6 +188,10 @@ func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unv
 		} else {
 			obj = out
 		}
+	} else {
+		old := obj.GroupVersionKind()
+		defer obj.SetGroupVersionKind(old)
+		obj.SetGroupVersionKind(&unversioned.GroupVersionKind{Group: targetGV.Group, Version: targetGV.Version, Kind: gvk.Kind})
 	}
 
 	return c.serializer.EncodeToStream(obj, w, overrides...)

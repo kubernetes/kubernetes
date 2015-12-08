@@ -180,8 +180,7 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	// Use real decode function to undo the versioning process.
 	poutput = kubectltesting.TestStruct{}
 	s := yamlserializer.NewDecodingSerializer(testapi.Default.Codec())
-	_, err = runtime.DecodeInto(s, buf.Bytes(), nil, &poutput)
-	if err != nil {
+	if err := runtime.DecodeInto(s, buf.Bytes(), &poutput); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(testData, poutput) {
@@ -201,8 +200,7 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	}
 	// Use real decode function to undo the versioning process.
 	objOut = api.Pod{}
-	_, err = runtime.DecodeInto(s, buf.Bytes(), nil, &objOut)
-	if err != nil {
+	if err := runtime.DecodeInto(s, buf.Bytes(), &objOut); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(obj, &objOut) {

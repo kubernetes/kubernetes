@@ -272,7 +272,7 @@ func BenchmarkDecode(b *testing.B) {
 	apiObjectFuzzer.Fuzz(&pod)
 	data, _ := runtime.Encode(testapi.Default.Codec(), &pod)
 	for i := 0; i < b.N; i++ {
-		testapi.Default.Codec().Decode(data, nil, nil)
+		runtime.Decode(testapi.Default.Codec(), data)
 	}
 }
 
@@ -283,7 +283,7 @@ func BenchmarkDecodeInto(b *testing.B) {
 	data, _ := runtime.Encode(testapi.Default.Codec(), &pod)
 	for i := 0; i < b.N; i++ {
 		obj := api.Pod{}
-		runtime.DecodeInto(testapi.Default.Codec(), data, nil, &obj)
+		runtime.DecodeInto(testapi.Default.Codec(), data, &obj)
 	}
 }
 

@@ -97,7 +97,7 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !reflect.DeepEqual(status, decoded) {
-		t.Errorf("expected: %v, got: %v", status, decoded)
+		t.Errorf("expected: %#v, got: %#v", status, decoded)
 	}
 }
 

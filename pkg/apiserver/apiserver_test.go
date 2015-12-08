@@ -642,8 +642,7 @@ func extractBodyDecoder(response *http.Response, object runtime.Object, decoder 
 	if err != nil {
 		return string(body), err
 	}
-	_, err = runtime.DecodeInto(decoder, body, nil, object)
-	return string(body), err
+	return string(body), runtime.DecodeInto(decoder, body, object)
 }
 
 func TestNotFound(t *testing.T) {

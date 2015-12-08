@@ -87,7 +87,7 @@ func TestCodec(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		codec := &thirdPartyResourceDataCodec{kind: "Foo", delegate: testapi.Default.Codec()}
+		codec := &thirdPartyResourceDataCodec{kind: "Foo", delegate: testapi.Extensions.Codec()}
 		data, err := json.Marshal(test.obj)
 		if err != nil {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)

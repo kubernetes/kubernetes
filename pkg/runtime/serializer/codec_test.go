@@ -248,8 +248,7 @@ func runTest(t *testing.T, source interface{}) {
 		return
 	}
 	obj3 := reflect.New(reflect.TypeOf(source).Elem()).Interface()
-	_, err = runtime.DecodeInto(codec, data, nil, obj3.(runtime.Object))
-	if err != nil {
+	if err := runtime.DecodeInto(codec, data, obj3.(runtime.Object)); err != nil {
 		t.Errorf("2: %v: %v", name, err)
 		return
 	}
@@ -350,7 +349,7 @@ func TestEncode_Ptr(t *testing.T) {
 	data, err := runtime.Encode(codec, tt)
 	obj2, err2 := runtime.Decode(codec, data)
 	if err != nil || err2 != nil {
-		t.Fatalf("Failure: '%v' '%v'", err, err2)
+		t.Fatalf("Failure: '%v' '%v'\n%s", err, err2, data)
 	}
 	if _, ok := obj2.(*TestType1); !ok {
 		t.Fatalf("Got wrong type")

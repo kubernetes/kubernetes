@@ -160,11 +160,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	internal.Items[0].(*EmbeddedTest).TypeMeta = runtime.TypeMeta{Kind: "EmbeddedTest", APIVersion: "test.group/v1test"}
-	internal.Items[1].(*EmbeddedTest).TypeMeta = runtime.TypeMeta{Kind: "EmbeddedTest", APIVersion: "test.group/v1test"}
 	internal.Items[2].(*runtime.Unknown).TypeMeta = runtime.TypeMeta{Kind: "OtherTest", APIVersion: "unknown"}
-	internal.Items[3].(*ObjectTest).TypeMeta = runtime.TypeMeta{Kind: "ObjectTest", APIVersion: "test.group/v1test"}
-	internal.Items[3].(*ObjectTest).Items[0].(*EmbeddedTest).TypeMeta = runtime.TypeMeta{Kind: "EmbeddedTest", APIVersion: "test.group/v1test"}
 	if e, a := internal.Items, list; !reflect.DeepEqual(e, a) {
 		t.Errorf("mismatched decoded: %s", util.ObjectGoPrintSideBySide(e, a))
 	}
@@ -199,9 +195,6 @@ func TestEmbeddedObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected decode error %v", err)
 	}
-
-	outer.TypeMeta = runtime.TypeMeta{Kind: "EmbeddedTest", APIVersion: externalGV.String()}
-	outer.Object.(*EmbeddedTest).TypeMeta = outer.TypeMeta
 
 	if e, a := outer, decoded; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected: %#v but got %#v", e, a)

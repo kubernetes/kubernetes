@@ -147,9 +147,11 @@ func TestDecodePodList(t *testing.T) {
 		parsed, podListOut, err = tryDecodePodList(yaml, noDefault)
 		if !parsed {
 			t.Errorf("expected to have parsed file: (%s)", string(yaml))
+			continue
 		}
 		if err != nil {
 			t.Errorf("unexpected error: %v (%s)", err, string(yaml))
+			continue
 		}
 		if !reflect.DeepEqual(podList, &podListOut) {
 			t.Errorf("expected:\n%#v\ngot:\n%#v\n%s", pod, &podListOut, string(yaml))
