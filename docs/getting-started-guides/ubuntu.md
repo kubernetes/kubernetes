@@ -296,7 +296,7 @@ $ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh -h
 Here are some examples:
 
 * upgrade master to version 1.0.5: `$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh -m 1.0.5`
-* upgrade node 10.10.103.223 to version 1.0.5 : `$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh -n 10.10.103.223 1.0.5`
+* upgrade node `vcap@10.10.103.223` to version 1.0.5 : `$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh -n 10.10.103.223 1.0.5`
 * upgrade master and all nodes to version 1.0.5: `$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh 1.0.5`
 
 The script will not delete any resources of your cluster, it just replaces the binaries.
@@ -308,7 +308,7 @@ also [test-it-out](ubuntu.md#test-it-out)
 
 To make sure the version of the upgraded cluster is what you expect, you will find these commands helpful.
 * upgrade all components or master: `$ kubectl version`. Check the *Server Version*.
-* upgrade node 10.10.102.223: `$ ssh -t vcap@10.10.102.223 'cd /opt/bin && sudo ./kubelet --version'`
+* upgrade node `vcap@10.10.102.223`: `$ ssh -t vcap@10.10.102.223 'cd /opt/bin && sudo ./kubelet --version'`
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
