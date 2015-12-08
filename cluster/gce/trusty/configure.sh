@@ -192,9 +192,10 @@ install_kube_binary_config() {
   fi
 
   # Put kube-system pods manifests in /etc/kube-manifests/.
-  cd /etc
+  mkdir -p /run/kube-manifests
+  cd /run/kube-manifests
   manifests_sha1="${KUBE_MANIFESTS_TAR_URL##*/}.sha1"
-  echo "Downloading kube-manifests tar sha1 file ${manifests_sha1}"
+  echo "Downloading kube-system manifests tar sha1 file ${manifests_sha1}"
   download_or_bust "${manifests_sha1}" "${KUBE_MANIFESTS_TAR_URL}.sha1"
   manifests_tar="${KUBE_MANIFESTS_TAR_URL##*/}"
   echo "Downloading kube-manifest tar file ${manifests_tar}"
@@ -206,9 +207,9 @@ install_kube_binary_config() {
   else
     echo "Validated ${KUBE_MANIFESTS_TAR_URL} SHA1 = ${KUBE_MANIFESTS_TAR_HASH}"
   fi
-  tar xzf "/etc/${manifests_tar}" -C /etc/ --overwrite
-  rm "/etc/${manifests_sha1}"
-  rm "/etc/${manifests_tar}"
+  tar xzf "/run/kube-manifests/${manifests_tar}" -C /run/kube-manifests/ --overwrite
+  rm "/run/kube-manifests/${manifests_sha1}"
+  rm "/run/kube-manifests/${manifests_tar}"
 }
 
 restart_docker_daemon() {

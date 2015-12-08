@@ -156,36 +156,6 @@ function copy-if-not-staged() {
   fi
 }
 
-# Prepare a tarball of kube-system manifests for trusty based cluster.
-#
-# Vars set:
-#   KUBE_MANIFESTS_TAR_URL
-#   KUBE_MANIFESTS_TAR_HASH
-function prepare-manifests-tar() {
-  KUBE_MANIFESTS_TAR_URL=
-  KUBE_MANIFESTS_TAR_HASH=
-  if [[ "${OS_DISTRIBUTION}" != "trusty" ]]; then
-    return
-  fi
-  local tmp_dir="${KUBE_TEMP}/kube-manifests"
-  mkdir -p ${tmp_dir}
-  # The manifests used by nodes can be directly used on non-salt system.
-  # We simply copy them from cluster/saltbase/salt.
-  local salt_dir="${KUBE_ROOT}/cluster/saltbase/salt"
-  cp -f "${salt_dir}/fluentd-es/fluentd-es.yaml" "${tmp_dir}"
-  cp -f "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${tmp_dir}"
-  cp -f "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${tmp_dir}"
-
-  local kube_manifests_tar="${KUBE_TEMP}/kube-manifests.tar.gz"
-  tar czf "${kube_manifests_tar}" -C "${KUBE_TEMP}" kube-manifests
-  KUBE_MANIFESTS_TAR_HASH=$(sha1sum-file "${kube_manifests_tar}")
-  local kube_manifests_gs_url="${staging_path}/${kube_manifests_tar##*/}"
-  copy-if-not-staged "${staging_path}" "${kube_manifests_gs_url}" "${kube_manifests_tar}" "${KUBE_MANIFESTS_TAR_HASH}"
-  # Convert from gs:// URL to an https:// URL
-  KUBE_MANIFESTS_TAR_URL="${kube_manifests_gs_url/gs:\/\//https://storage.googleapis.com/}"
-}
-
-
 # Take the local tar files and upload them to Google Storage.  They will then be
 # downloaded by the master as part of the start up script for the master.
 # If running on Ubuntu trusty, we also pack the dir cluster/gce/trusty/kube-manifest
@@ -195,16 +165,21 @@ function prepare-manifests-tar() {
 #   PROJECT
 #   SERVER_BINARY_TAR
 #   SALT_TAR
+#   KUBE_MANIFESTS_TAR
 # Vars set:
 #   SERVER_BINARY_TAR_URL
 #   SERVER_BINARY_TAR_HASH
 #   SALT_TAR_URL
 #   SALT_TAR_HASH
+#   KUBE_MANIFESTS_TAR_URL
+#   KUBE_MANIFESTS_TAR_HASH
 function upload-server-tars() {
   SERVER_BINARY_TAR_URL=
   SERVER_BINARY_TAR_HASH=
   SALT_TAR_URL=
   SALT_TAR_HASH=
+  KUBE_MANIFESTS_TAR_URL=
+  KUBE_MANIFESTS_TAR_HASH=
 
   local project_hash
   if which md5 > /dev/null 2>&1; then
@@ -240,11 +215,13 @@ function upload-server-tars() {
   SERVER_BINARY_TAR_URL="${server_binary_gs_url/gs:\/\//https://storage.googleapis.com/}"
   SALT_TAR_URL="${salt_gs_url/gs:\/\//https://storage.googleapis.com/}"
 
-  # Create a tar for kube-system manifests files and stage it.
-  # TODO(andyzheng0831): After finishing k8s master on trusty (issue #16702),
-  # we will not need to stage the salt tar for trusty anymore.
-  # TODO(andyzheng0831): Add release support for this tar, in case GKE will it.
-  prepare-manifests-tar
+  if [[ "${OS_DISTRIBUTION}" == "trusty" ]]; then
+    local kube_manifests_gs_url="${staging_path}/${KUBE_MANIFESTS_TAR##*/}"
+    KUBE_MANIFESTS_TAR_HASH=$(sha1sum-file "${KUBE_MANIFESTS_TAR}")
+    copy-if-not-staged "${staging_path}" "${kube_manifests_gs_url}" "${KUBE_MANIFESTS_TAR}" "${KUBE_MANIFESTS_TAR_HASH}"
+    # Convert from gs:// URL to an https:// URL
+    KUBE_MANIFESTS_TAR_URL="${kube_manifests_gs_url/gs:\/\//https://storage.googleapis.com/}"
+  fi
 }
 
 # Detect minions created in the minion group

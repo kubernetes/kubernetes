@@ -653,6 +653,7 @@ function kube::release::package_tarballs() {
   kube::release::package_client_tarballs &
   kube::release::package_server_tarballs &
   kube::release::package_salt_tarball &
+  kube::release::package_kube_manifests_tarball &
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 
   kube::release::package_full_tarball & # _full depends on all the previous phases
@@ -849,6 +850,36 @@ function kube::release::package_salt_tarball() {
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
 }
 
+# This will pack kube-system manifests files for distros without using salt
+# such as Ubuntu Trusty.
+#
+# There are two sources of manifests files: (1) some manifests in the directory
+# cluster/saltbase/salt can be directly used on instances without salt, so we copy
+# them from there; (2) for the ones containing salt config, we cannot directly
+# use them. Therefore, we will maintain separate copies in cluster/gce/kube-manifests.
+function kube::release::package_kube_manifests_tarball() {
+  kube::log::status "Building tarball: manifests"
+
+  local release_stage="${RELEASE_STAGE}/manifests/kubernetes"
+  rm -rf "${release_stage}"
+  mkdir -p "${release_stage}"
+
+  # Source 1: manifests from cluster/saltbase/salt.
+  # TODO(andyzheng0831): Add more manifests when supporting master on trusty.
+  local salt_dir="${KUBE_ROOT}/cluster/saltbase/salt"
+  cp "${salt_dir}/fluentd-es/fluentd-es.yaml" "${release_stage}/"
+  cp "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${release_stage}/"
+  cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
+  # Source 2: manifests from cluster/gce/kube-manifests.
+  # TODO(andyzheng0831): Enable the following line after finishing issue #16702.
+  # cp "${KUBE_ROOT}/cluster/gce/kube-manifests/*" "${release_stage}/"
+
+  kube::release::clean_cruft
+
+  local package_name="${RELEASE_DIR}/kubernetes-manifests.tar.gz"
+  kube::release::create_tarball "${package_name}" "${release_stage}/.."
+}
+
 # This is the stuff you need to run tests from the binary distribution.
 function kube::release::package_test_tarball() {
   kube::log::status "Building tarball: test"
@@ -912,6 +943,7 @@ function kube::release::package_full_tarball() {
   mkdir -p "${release_stage}/server"
   cp "${RELEASE_DIR}/kubernetes-salt.tar.gz" "${release_stage}/server/"
   cp "${RELEASE_DIR}"/kubernetes-server-*.tar.gz "${release_stage}/server/"
+  cp "${RELEASE_DIR}/kubernetes-manifests.tar.gz" "${release_stage}/server/"
 
   mkdir -p "${release_stage}/third_party"
   cp -R "${KUBE_ROOT}/third_party/htpasswd" "${release_stage}/third_party/htpasswd"
