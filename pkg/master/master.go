@@ -232,9 +232,6 @@ type Config struct {
 	// expire.
 	CacheTimeout time.Duration
 
-	// The name of the cluster.
-	ClusterName string
-
 	// The range of IPs to be assigned to services with type=ClusterIP or greater
 	ServiceClusterIPRange *net.IPNet
 
