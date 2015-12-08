@@ -259,7 +259,7 @@ func getPodsAnnotationSet(template *api.PodTemplateSpec, object runtime.Object) 
 	if err != nil {
 		return desiredAnnotations, fmt.Errorf("unable to get controller reference: %v", err)
 	}
-	createdByRefJson, err := latest.GroupOrDie("").Codec.Encode(&api.SerializedReference{
+	createdByRefJson, err := latest.GroupOrDie(api.GroupName).Codec.Encode(&api.SerializedReference{
 		Reference: *createdByRef,
 	})
 	if err != nil {

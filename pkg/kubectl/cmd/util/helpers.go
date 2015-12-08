@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -381,7 +382,7 @@ func Merge(dst runtime.Object, fragment, kind string) (runtime.Object, error) {
 		return nil, err
 	}
 
-	i, err := latest.GroupOrDie("").InterfacesFor(groupVersion)
+	i, err := latest.GroupOrDie(api.GroupName).InterfacesFor(groupVersion)
 	if err != nil {
 		return nil, err
 	}

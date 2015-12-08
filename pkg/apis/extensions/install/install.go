@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	_ "k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -39,13 +39,13 @@ const importPrefix = "k8s.io/kubernetes/pkg/apis/extensions"
 var accessor = meta.NewAccessor()
 
 func init() {
-	groupMeta, err := latest.RegisterGroup("extensions")
+	groupMeta, err := latest.RegisterGroup(extensions.GroupName)
 	if err != nil {
 		glog.V(4).Infof("%v", err)
 		return
 	}
 
-	registeredGroupVersions := registered.GroupVersionsForGroup("extensions")
+	registeredGroupVersions := registered.GroupVersionsForGroup(extensions.GroupName)
 	groupVersion := registeredGroupVersions[0]
 	*groupMeta = latest.GroupMeta{
 		GroupVersion: groupVersion,
@@ -82,7 +82,7 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 			MetadataAccessor: accessor,
 		}, nil
 	default:
-		g, _ := latest.Group("extensions")
+		g, _ := latest.Group(extensions.GroupName)
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
 	}
 }

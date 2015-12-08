@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -134,7 +135,7 @@ func NewExtensionsOrDie(c *Config) *ExtensionsClient {
 
 func setExtensionsDefaults(config *Config) error {
 	// if experimental group is not registered, return an error
-	g, err := latest.Group("extensions")
+	g, err := latest.Group(extensions.GroupName)
 	if err != nil {
 		return err
 	}
@@ -151,7 +152,7 @@ func setExtensionsDefaults(config *Config) error {
 	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
 	if err != nil {
 		return fmt.Errorf("Extensions API group/version '%v' is not recognized (valid values: %v)",
-			config.GroupVersion, g.GroupVersions)
+			config.GroupVersion, latest.GroupOrDie(extensions.GroupName).GroupVersions)
 	}
 	config.Codec = versionInterfaces.Codec
 	if config.QPS == 0 {

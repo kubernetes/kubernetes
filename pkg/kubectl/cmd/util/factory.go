@@ -164,9 +164,9 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return nil, err
 			}
 			switch gvk.Group {
-			case api.SchemeGroupVersion.Group:
+			case api.GroupName:
 				return client.RESTClient, nil
-			case extensions.SchemeGroupVersion.Group:
+			case extensions.GroupName:
 				return client.ExtensionsClient.RESTClient, nil
 			}
 			return nil, fmt.Errorf("unable to get RESTClient for resource '%s'", mapping.Resource)
@@ -500,7 +500,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	if ok := registered.IsRegisteredAPIGroupVersion(gvk.GroupVersion()); !ok {
 		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", gvk.GroupVersion().String(), registered.RegisteredGroupVersions)
 	}
-	if gvk.Group == "extensions" {
+	if gvk.Group == extensions.GroupName {
 		if c.c.ExtensionsClient == nil {
 			return errors.New("unable to validate: no experimental client")
 		}
