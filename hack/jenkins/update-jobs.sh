@@ -42,4 +42,4 @@ fi
 
 docker exec job-builder git checkout master
 docker exec job-builder git pull
-docker exec job-builder jenkins-jobs test ${config_dir}
+docker exec job-builder jenkins-jobs update ${config_dir}
