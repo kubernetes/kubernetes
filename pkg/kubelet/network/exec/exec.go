@@ -37,7 +37,6 @@ limitations under the License.
 //                         "kind" : "PodNetworkStatus",
 //                         "ip" : "10.20.30.40"
 //                     }
-//                The fields "apiVersion" and "kind" are optional in version v1beta1
 // As the executables are called, the file-descriptors stdin, stdout, stderr
 // remain open. The combined output of stdout/stderr is captured and logged.
 //
@@ -169,7 +168,7 @@ func (plugin *execNetworkPlugin) Status(namespace string, name string, id kubety
 	switch findVersion.APIVersion {
 	case "":
 		fallthrough
-	case "v1beta1":
+	case "v1":
 		networkStatus := &network.PodNetworkStatus{}
 		err = json.Unmarshal(out, networkStatus)
 		return networkStatus, err
