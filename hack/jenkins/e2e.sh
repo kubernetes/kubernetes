@@ -71,11 +71,12 @@ function get_latest_trusty_image() {
 #
 # These suites:
 #   step1: launch a cluster at $old_version,
-#   step2: upgrades the master to $new_version,
-#   step3: runs $old_version e2es,
-#   step4: upgrades the rest of the cluster,
-#   step5: runs $old_version e2es again, then
-#   step6: runs $new_version e2es and tears down the cluster.
+#   step2: runs $new_version Kubectl e2es,
+#   step3: upgrades the master to $new_version,
+#   step4: runs $old_version e2es,
+#   step5: upgrades the rest of the cluster,
+#   step6: runs $old_version e2es again, then
+#   step7: runs $new_version e2es and tears down the cluster.
 #
 # Assumes globals:
 #   $JOB_NAME
@@ -143,6 +144,18 @@ function configure_upgrade_step() {
       ;;
 
     step2)
+      # Run new e2e kubectl tests
+      JENKINS_PUBLISHED_VERSION="${new_version}"
+      JENKINS_FORCE_GET_TARS=y
+
+      E2E_OPT="--check_version_skew=false"
+      E2E_UP="false"
+      E2E_TEST="true"
+      E2E_DOWN="false"
+      GINKGO_TEST_ARGS="--ginkgo.focus=Kubectl"
+      ;;
+
+    step3)
       # Use upgrade logic of version we're upgrading to.
       JENKINS_PUBLISHED_VERSION="${new_version}"
       JENKINS_FORCE_GET_TARS=y
@@ -154,7 +167,7 @@ function configure_upgrade_step() {
       GINKGO_TEST_ARGS="--ginkgo.focus=Cluster\supgrade.*upgrade-master --upgrade-target=${new_version}"
       ;;
 
-    step3)
+    step4)
       # Run old e2es
       JENKINS_PUBLISHED_VERSION="${old_version}"
       JENKINS_FORCE_GET_TARS=y
@@ -171,7 +184,7 @@ function configure_upgrade_step() {
       fi
       ;;
 
-    step4)
+    step5)
       # Use upgrade logic of version we're upgrading to.
       JENKINS_PUBLISHED_VERSION="${new_version}"
       JENKINS_FORCE_GET_TARS=y
@@ -183,7 +196,7 @@ function configure_upgrade_step() {
       GINKGO_TEST_ARGS="--ginkgo.focus=Cluster\supgrade.*upgrade-cluster --upgrade-target=${new_version}"
       ;;
 
-    step5)
+    step6)
       # Run old e2es
       JENKINS_PUBLISHED_VERSION="${old_version}"
       JENKINS_FORCE_GET_TARS=y
@@ -200,7 +213,7 @@ function configure_upgrade_step() {
       fi
       ;;
 
-    step6)
+    step7)
       # Run new e2es
       JENKINS_PUBLISHED_VERSION="${new_version}"
       JENKINS_FORCE_GET_TARS=y
