@@ -1406,6 +1406,7 @@ func (t *WebserverTest) BuildServiceSpec() *api.Service {
 				Port:       80,
 				TargetPort: intstr.FromInt(80),
 			}},
+			SessionAffinity: api.ServiceAffinityClientIP,
 		},
 	}
 	return service
