@@ -20,6 +20,7 @@ import (
 	"errors"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -33,8 +34,14 @@ type IgnoredList struct {
 	Items []Ignored
 }
 
-func (*Ignored) IsAnAPIObject()     {}
-func (*IgnoredList) IsAnAPIObject() {}
+func (obj *Ignored) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj *Ignored) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}
+func (obj *IgnoredList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj *IgnoredList) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}
 
 func TestSelectionPredicate(t *testing.T) {
 	table := map[string]struct {

@@ -14,19 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testing
+package runtime
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-type TestResource struct {
-	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata"`
-	Value                int `json:"value"`
+// GroupVersionKind satisfies the Object interface for all objects that embed TypeMeta
+func (obj TypeMeta) GroupVersionKind() *unversioned.GroupVersionKind {
+	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
 
-func (obj *TestResource) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
-	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+func (obj *Unknown) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *Unstructured) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
 }

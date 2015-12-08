@@ -35,4 +35,6 @@ func addKnownTypes() {
 	)
 }
 
-func (_ *KubeProxyConfiguration) IsAnAPIObject() {}
+func (obj *KubeProxyConfiguration) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}

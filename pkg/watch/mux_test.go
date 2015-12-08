@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -30,7 +31,10 @@ type myType struct {
 	Value string
 }
 
-func (*myType) IsAnAPIObject() {}
+func (obj *myType) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj *myType) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}
 
 func TestBroadcaster(t *testing.T) {
 	table := []Event{

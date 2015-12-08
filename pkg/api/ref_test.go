@@ -26,14 +26,20 @@ import (
 
 type FakeAPIObject struct{}
 
-func (*FakeAPIObject) IsAnAPIObject() {}
+func (obj *FakeAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+}
+func (obj *FakeAPIObject) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}
 
 type ExtensionAPIObject struct {
 	unversioned.TypeMeta
 	ObjectMeta
 }
 
-func (*ExtensionAPIObject) IsAnAPIObject() {}
+func (obj *ExtensionAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
 
 func TestGetReference(t *testing.T) {
 	table := map[string]struct {

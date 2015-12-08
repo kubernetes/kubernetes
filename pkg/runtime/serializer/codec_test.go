@@ -119,6 +119,10 @@ type ExternalInternalSame struct {
 	A                                     TestType2 `json:"A,omitempty"`
 }
 
+type NonPtrType struct {
+	A string
+}
+
 // TestObjectFuzzer can randomly populate all the above objects.
 var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
 	func(j *MyWeirdCustomEmbeddedVersionKindField, c fuzz.Continue) {
@@ -128,12 +132,50 @@ var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
 	},
 )
 
-func (MyWeirdCustomEmbeddedVersionKindField) IsAnAPIObject() {}
-func (ExternalTestType1) IsAnAPIObject()                     {}
-func (ExternalInternalSame) IsAnAPIObject()                  {}
-func (ExternalTestType2) IsAnAPIObject()                     {}
-func (TestType2) IsAnAPIObject()                             {}
-func (TestType1) IsAnAPIObject()                             {}
+func (obj *MyWeirdCustomEmbeddedVersionKindField) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	updateTypeMeta(obj, gvk)
+}
+func (obj MyWeirdCustomEmbeddedVersionKindField) GroupVersionKind() *unversioned.GroupVersionKind {
+	return typeMetaToGroupVersionKind(obj)
+}
+func (obj *ExternalTestType1) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	updateTypeMeta(&obj.MyWeirdCustomEmbeddedVersionKindField, gvk)
+}
+func (obj ExternalTestType1) GroupVersionKind() *unversioned.GroupVersionKind {
+	return typeMetaToGroupVersionKind(obj.MyWeirdCustomEmbeddedVersionKindField)
+}
+func (obj *ExternalInternalSame) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	updateTypeMeta(&obj.MyWeirdCustomEmbeddedVersionKindField, gvk)
+}
+func (obj ExternalInternalSame) GroupVersionKind() *unversioned.GroupVersionKind {
+	return typeMetaToGroupVersionKind(obj.MyWeirdCustomEmbeddedVersionKindField)
+}
+func (obj *ExternalTestType2) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+}
+func (obj ExternalTestType2) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}
+func (obj *TestType2) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+}
+func (obj TestType2) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}
+func (obj *TestType1) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	updateTypeMeta(&obj.MyWeirdCustomEmbeddedVersionKindField, gvk)
+}
+func (obj TestType1) GroupVersionKind() *unversioned.GroupVersionKind {
+	return typeMetaToGroupVersionKind(obj.MyWeirdCustomEmbeddedVersionKindField)
+}
+func (obj NonPtrType) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj NonPtrType) GroupVersionKind() *unversioned.GroupVersionKind       { return nil }
+
+func updateTypeMeta(meta *MyWeirdCustomEmbeddedVersionKindField, gvk *unversioned.GroupVersionKind) {
+	meta.APIVersion, meta.ObjectKind = gvk.ToAPIVersionAndKind()
+}
+
+func typeMetaToGroupVersionKind(meta MyWeirdCustomEmbeddedVersionKindField) *unversioned.GroupVersionKind {
+	return unversioned.FromAPIVersionAndKind(meta.APIVersion, meta.ObjectKind)
+}
 
 // Returns a new Scheme set up with the test objects.
 func GetTestScheme() (*runtime.Scheme, runtime.Codec) {
@@ -295,10 +337,10 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 // Behavior changed from legacy codec behavior - ptrs are enforced on encode
 func TestEncode_NonPtr(t *testing.T) {
 	_, codec := GetTestScheme()
-	tt := TestType1{A: "I'm not a pointer object"}
+	tt := NonPtrType{A: "I'm not a pointer object"}
 	_, err := runtime.Encode(codec, tt)
 	if err == nil {
-		t.Fatalf("Failure: %v", err)
+		t.Fatalf("unexpected non-error")
 	}
 }
 

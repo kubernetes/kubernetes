@@ -22,6 +22,7 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
@@ -35,7 +36,10 @@ type Master string
 // TODO(k8s): Either fix watch so this isn't necessary, or make this a real API Object.
 // TODO(k8s): when it becomes clear how this package will be used, move these declarations to
 // to the proper place.
-func (Master) IsAnAPIObject() {}
+func (obj Master) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj Master) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}
 
 // NewEtcdMasterElector returns an implementation of election.MasterElector backed by etcd.
 func NewEtcdMasterElector(h tools.EtcdClient) MasterElector {

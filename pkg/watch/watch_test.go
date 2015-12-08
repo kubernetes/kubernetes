@@ -18,11 +18,16 @@ package watch
 
 import (
 	"testing"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 type testType string
 
-func (testType) IsAnAPIObject() {}
+func (obj testType) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj testType) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}
 
 func TestFake(t *testing.T) {
 	f := NewFake()

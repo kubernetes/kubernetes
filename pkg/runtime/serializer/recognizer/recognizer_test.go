@@ -26,7 +26,8 @@ import (
 
 type A struct{}
 
-func (A) IsAnAPIObject() {}
+func (obj A) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj A) GroupVersionKind() *unversioned.GroupVersionKind       { return nil }
 
 func TestRecognizer(t *testing.T) {
 	s := runtime.NewScheme()

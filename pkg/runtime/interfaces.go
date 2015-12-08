@@ -139,7 +139,10 @@ type SelfLinker interface {
 // burden. Implement it with a pointer receiver; this will allow us to use the go compiler to check the
 // one thing about our objects that it's capable of checking for us.
 type Object interface {
-	// This function is used only to enforce membership. It's never called.
-	// TODO: Consider mass rename in the future to make it do something useful.
-	IsAnAPIObject()
+	// SetGroupVersionKind sets or clears the stored version with an object. Because most serialization
+	// requires this field, it is our marker interface for our objects.
+	SetGroupVersionKind(gvk *unversioned.GroupVersionKind)
+	// GroupVersionKind returns the stored group, version, and kind of an object, or nil if the object does
+	// not allow those fields to be encoded.
+	GroupVersionKind() *unversioned.GroupVersionKind
 }

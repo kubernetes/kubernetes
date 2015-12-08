@@ -30,4 +30,6 @@ type TestStruct struct {
 	IntList              []int          `json:"IntList"`
 }
 
-func (ts *TestStruct) IsAnAPIObject() {}
+func (obj *TestStruct) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
