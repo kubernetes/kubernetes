@@ -31,7 +31,8 @@ create_token() {
 echo "admin,admin,admin" > /data/basic_auth.csv
 
 # Create HTTPS certificates
-CERT_DIR=/data /make-ca-cert.sh $(hostname -i)
+groupadd -f -r kube-cert-test
+CERT_DIR=/data CERT_GROUP=kube-cert-test /make-ca-cert.sh $(hostname -i)
 
 # Create known tokens for service accounts
 echo "$(create_token),admin,admin" >> /data/known_tokens.csv
