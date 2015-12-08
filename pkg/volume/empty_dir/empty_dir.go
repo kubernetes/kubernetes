@@ -87,7 +87,7 @@ func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod
 		plugin:        plugin,
 		rootContext:   opts.RootContext,
 	}
-	ed.CapacityMetricsDu.InitCapacityMetricsDu(ed.GetPath())
+	ed.MetricsDu.InitMetricsDu(ed.GetPath())
 	return ed, nil
 }
 
@@ -105,7 +105,7 @@ func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UI
 		mountDetector: mountDetector,
 		plugin:        plugin,
 	}
-	ed.CapacityMetricsDu.InitCapacityMetricsDu(ed.GetPath())
+	ed.MetricsDu.InitMetricsDu(ed.GetPath())
 	return ed, nil
 }
 
@@ -136,7 +136,7 @@ type emptyDir struct {
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
 	rootContext   string
-	volume.CapacityMetricsDu
+	volume.MetricsDu
 }
 
 func (ed *emptyDir) GetAttributes() volume.Attributes {

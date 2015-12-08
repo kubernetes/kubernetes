@@ -147,7 +147,7 @@ type iscsiDisk struct {
 	plugin  *iscsiPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
-	volume.CapacityMetricsNil
+	volume.MetricsNil
 }
 
 func (iscsi *iscsiDisk) GetPath() string {

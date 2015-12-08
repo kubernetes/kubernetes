@@ -172,7 +172,7 @@ type rbd struct {
 	mounter  *mount.SafeFormatAndMount
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
-	volume.CapacityMetricsNil
+	volume.MetricsNil
 }
 
 func (rbd *rbd) GetPath() string {

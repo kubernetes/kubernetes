@@ -144,7 +144,7 @@ type awsElasticBlockStore struct {
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
 	plugin  *awsElasticBlockStorePlugin
-	volume.CapacityMetricsNil
+	volume.MetricsNil
 }
 
 func detachDiskLogError(ebs *awsElasticBlockStore) {

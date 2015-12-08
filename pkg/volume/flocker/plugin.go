@@ -111,7 +111,7 @@ type flockerBuilder struct {
 	exe      exec.Interface
 	opts     volume.VolumeOptions
 	readOnly bool
-	volume.CapacityMetricsNil
+	volume.MetricsNil
 }
 
 func (b flockerBuilder) GetAttributes() volume.Attributes {

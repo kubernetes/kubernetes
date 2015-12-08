@@ -514,7 +514,7 @@ func TestGetPodVolumesFromDisk(t *testing.T) {
 
 type stubVolume struct {
 	path string
-	volume.CapacityMetricsNil
+	volume.MetricsNil
 }
 
 func (f *stubVolume) GetPath() string {

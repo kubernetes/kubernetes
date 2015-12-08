@@ -92,7 +92,7 @@ func newMockRecycler(spec *volume.Spec, host volume.VolumeHost, config volume.Vo
 type mockRecycler struct {
 	path string
 	host volume.VolumeHost
-	volume.CapacityMetricsNil
+	volume.MetricsNil
 }
 
 func (r *mockRecycler) GetPath() string {

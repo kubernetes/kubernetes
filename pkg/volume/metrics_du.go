@@ -24,28 +24,28 @@ import (
 	"strings"
 )
 
-var _ VolumeMetricsProvider = &CapacityMetricsDu{}
+var _ VolumeMetricsProvider = &MetricsDu{}
 
-// CapacityMetricsDu represents a VolumeMetricsProvider that calculates the used and available
+// MetricsDu represents a VolumeMetricsProvider that calculates the used and available
 // Volume capacity by executing the "du" and "df" commands on the Volume path.
-type CapacityMetricsDu struct {
+type MetricsDu struct {
 	// the directory path the volume is mounted to.
 	path string
 }
 
-// InitCapacityMetricsDu initializes CapacityMetricsDu with the Volume path.
-// This is required before CapacityMetricsDu can be used.
-func (cm *CapacityMetricsDu) InitCapacityMetricsDu(path string) {
+// InitMetricsDu initializes MetricsDu with the Volume path.
+// This is required before MetricsDu can be used.
+func (cm *MetricsDu) InitMetricsDu(path string) {
 	cm.path = path
 }
 
 // See VolumeMetricsProvider.GetCapacityMetrics
 // GetCapacityMetrics calculates the volume usage and device free space by executing "du"
 // and "df" on path.
-func (cm *CapacityMetricsDu) GetCapacityMetrics() (*CapacityMetrics, error) {
+func (cm *MetricsDu) GetCapacityMetrics() (*CapacityMetrics, error) {
 	metrics := &CapacityMetrics{}
 	if cm.path == "" {
-		return metrics, errors.New("no path defined for disk usage capacity metrics.  Must call InitCapacityMetricsDu.")
+		return metrics, errors.New("no path defined for disk usage capacity metrics.  Must call InitMetricsDu.")
 	}
 
 	err := cm.runDu(metrics)
@@ -62,7 +62,7 @@ func (cm *CapacityMetricsDu) GetCapacityMetrics() (*CapacityMetrics, error) {
 }
 
 // runDu executes the "du" command and writes the results to metrics.VolumeKbUsed
-func (cm *CapacityMetricsDu) runDu(metrics *CapacityMetrics) error {
+func (cm *MetricsDu) runDu(metrics *CapacityMetrics) error {
 	// Uses the same niceness level as ccmvisor.fs does when running du
 	// Use -k flag so results in are kilobytes
 	out, err := exec.Command("nice", "-n", "19", "du", "-s", "-k", cm.path).CombinedOutput()
@@ -80,7 +80,7 @@ func (cm *CapacityMetricsDu) runDu(metrics *CapacityMetrics) error {
 // runDf executes the "df" command and writes the results to metrics.DeviceKbUsed
 // and metrics.DeviceKbAvailable
 // TODO(pwittrock): Consider using a statfs syscall directly to get the data
-func (cm *CapacityMetricsDu) runDf(metrics *CapacityMetrics) error {
+func (cm *MetricsDu) runDf(metrics *CapacityMetrics) error {
 	// Uses the same niceness level as ccmvisor.fs does when running du
 	// Use -k flag so results in are kilobytes
 	out, err := exec.Command("nice", "-n", "19", "df", "-k", cm.path).CombinedOutput()

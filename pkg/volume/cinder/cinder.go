@@ -144,7 +144,7 @@ type cinderVolume struct {
 	// diskMounter provides the interface that is used to mount the actual block device.
 	blockDeviceMounter mount.Interface
 	plugin             *cinderPlugin
-	volume.CapacityMetricsNil
+	volume.MetricsNil
 }
 
 func detachDiskLogError(cd *cinderVolume) {
