@@ -78,12 +78,8 @@ var mapper, namespaceMapper meta.RESTMapper // The mappers with namespace and wi
 var admissionControl admission.Interface
 var requestContextMapper api.RequestContextMapper
 
-func interfacesFor(version string) (*meta.VersionInterfaces, error) {
-	gv, err := unversioned.ParseGroupVersion(version)
-	if err != nil {
-		return nil, err
-	}
-	switch gv {
+func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
+	switch version {
 	case testGroupVersion:
 		return &meta.VersionInterfaces{
 			Codec:            codec,
