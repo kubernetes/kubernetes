@@ -139,8 +139,9 @@ start_k8s(){
     --net=host \
     --privileged \
     -v /dev/net:/dev/net \
-    quay.io/coreos/flannel:0.5.3 \
+    quay.io/coreos/flannel:0.5.5 \
     /opt/bin/flanneld \
+    --ip-masq \
     -iface="eth0")
 
     sleep 8
