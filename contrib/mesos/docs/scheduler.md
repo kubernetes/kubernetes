@@ -136,7 +136,6 @@ offer-ttl = 5s
 ; duration an expired offer lingers in history
 offer-linger-ttl = 2m
 
-<<<<<<< HEAD
 ; duration between offer listener notifications
 listener-delay = 1s
 
@@ -151,10 +150,10 @@ framework-id-refresh-interval = 30s
 initial-implicit-reconciliation-delay = 15s
 
 ; interval in between internal task status checks/updates
-explicit-reconciliation-max-backoff = 2m
+explicit-reconciliantion-max-backoff = 2m
 
-; waiting period after attempting to cancel an ongoing reconciliation
-explicit-reconciliation-abort-timeout = 30s
+; waiting period after attempting to cancel an ongoing reconciliantion
+explicit-reconciliantion-abort-timeout = 30s
 
 initial-pod-backoff = 1s
 max-pod-backoff = 60s
