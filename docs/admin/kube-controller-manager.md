@@ -55,7 +55,7 @@ kube-controller-manager
 ### Options
 
 ```
-      --address=127.0.0.1: The IP address to serve on (set to 0.0.0.0 for all interfaces)
+      --address=0.0.0.0: The IP address to serve on (set to 0.0.0.0 for all interfaces)
       --allocate-node-cidrs[=false]: Should CIDRs for Pods be allocated and set on the cloud provider.
       --cloud-config="": The path to the cloud provider configuration file.  Empty string for no configuration file.
       --cloud-provider="": The provider for cloud services.  Empty string for no provider.
