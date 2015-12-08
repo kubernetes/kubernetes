@@ -219,7 +219,7 @@ _If `go get -u path/to/dependency` fails with compilation errors, instead try `g
 to fetch the dependencies without compiling them.  This can happen when updating the cadvisor dependency._
 
 
-5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by running hack/verify-godeps.sh
+5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by running `hack/verify-godeps.sh`
 
 _If hack/verify-godeps.sh fails after a `godep update`, it is possible that a transitive dependency was added or removed but not
 updated by godeps.  It then may be necessary to perform a `godep save ./...` to pick up the transitive dependency changes._
@@ -227,6 +227,10 @@ updated by godeps.  It then may be necessary to perform a `godep save ./...` to 
 It is sometimes expedient to manually fix the /Godeps/godeps.json file to minimize the changes.
 
 Please send dependency updates in separate commits within your PR, for easier reviewing.
+
+6) If you updated the Godeps, please also update `Godeps/LICENSES.md` by running `hack/update-godep-licenses.sh`.
+
+_If Godep does not automatically vendor the proper license file for a new dependency, be sure to add an exception entry to `hack/update-godep-licenses.sh`._
 
 ## Unit tests
 
