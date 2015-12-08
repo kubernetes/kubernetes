@@ -27,4 +27,6 @@ type TestResource struct {
 	Value                int `json:"value"`
 }
 
-func (*TestResource) IsAnAPIObject() {}
+func (obj *TestResource) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}

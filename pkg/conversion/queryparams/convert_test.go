@@ -14,13 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package queryparams
+package queryparams_test
 
 import (
 	"net/url"
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/conversion/queryparams"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -38,7 +40,10 @@ type bar struct {
 	Ignored2 string
 }
 
-func (*bar) IsAnAPIObject() {}
+func (obj *bar) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj *bar) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}
 
 type foo struct {
 	Str       string            `json:"str"`
@@ -51,14 +56,20 @@ type foo struct {
 	Testmap   map[string]string `json:"testmap,omitempty"`
 }
 
-func (*foo) IsAnAPIObject() {}
+func (obj *foo) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj *foo) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}
 
 type baz struct {
 	Ptr  *int  `json:"ptr"`
 	Bptr *bool `json:"bptr,omitempty"`
 }
 
-func (*baz) IsAnAPIObject() {}
+func (obj *baz) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj *baz) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}
 
 func validateResult(t *testing.T, input interface{}, actual, expected url.Values) {
 	local := url.Values{}
@@ -160,7 +171,7 @@ func TestConvert(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result, err := Convert(test.input)
+		result, err := queryparams.Convert(test.input)
 		if err != nil {
 			t.Errorf("Unexpected error while converting %#v: %v", test.input, err)
 		}

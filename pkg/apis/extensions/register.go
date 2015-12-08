@@ -68,21 +68,57 @@ func addKnownTypes() {
 	api.Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.ListOptions{})
 }
 
-func (*ClusterAutoscaler) IsAnAPIObject()           {}
-func (*ClusterAutoscalerList) IsAnAPIObject()       {}
-func (*Deployment) IsAnAPIObject()                  {}
-func (*DeploymentList) IsAnAPIObject()              {}
-func (*HorizontalPodAutoscaler) IsAnAPIObject()     {}
-func (*HorizontalPodAutoscalerList) IsAnAPIObject() {}
-func (*Job) IsAnAPIObject()                         {}
-func (*JobList) IsAnAPIObject()                     {}
-func (*ReplicationControllerDummy) IsAnAPIObject()  {}
-func (*Scale) IsAnAPIObject()                       {}
-func (*ThirdPartyResource) IsAnAPIObject()          {}
-func (*ThirdPartyResourceList) IsAnAPIObject()      {}
-func (*DaemonSet) IsAnAPIObject()                   {}
-func (*DaemonSetList) IsAnAPIObject()               {}
-func (*ThirdPartyResourceData) IsAnAPIObject()      {}
-func (*ThirdPartyResourceDataList) IsAnAPIObject()  {}
-func (*Ingress) IsAnAPIObject()                     {}
-func (*IngressList) IsAnAPIObject()                 {}
+func (obj *ClusterAutoscaler) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *ClusterAutoscalerList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *Deployment) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *DeploymentList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *HorizontalPodAutoscaler) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *HorizontalPodAutoscalerList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *Job) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *JobList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *ReplicationControllerDummy) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *Scale) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *ThirdPartyResource) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *ThirdPartyResourceList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *DaemonSet) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *DaemonSetList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *ThirdPartyResourceData) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *ThirdPartyResourceDataList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *Ingress) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *IngressList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}

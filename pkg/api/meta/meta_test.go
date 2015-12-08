@@ -157,7 +157,12 @@ type InternalObject struct {
 	TypeMeta InternalTypeMeta `json:",inline"`
 }
 
-func (*InternalObject) IsAnAPIObject() {}
+func (obj *InternalObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *InternalObject) GroupVersionKind() *unversioned.GroupVersionKind {
+	return unversioned.FromAPIVersionAndKind(obj.TypeMeta.APIVersion, obj.TypeMeta.Kind)
+}
 
 func TestGenericTypeMetaAccessor(t *testing.T) {
 	j := &InternalObject{
@@ -498,12 +503,21 @@ type MyAPIObject struct {
 	TypeMeta InternalTypeMeta `json:",inline"`
 }
 
-func (*MyAPIObject) IsAnAPIObject() {}
+func (obj *MyAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *MyAPIObject) GroupVersionKind() *unversioned.GroupVersionKind {
+	return unversioned.FromAPIVersionAndKind(obj.TypeMeta.APIVersion, obj.TypeMeta.Kind)
+}
 
 type MyIncorrectlyMarkedAsAPIObject struct {
 }
 
-func (*MyIncorrectlyMarkedAsAPIObject) IsAnAPIObject() {}
+func (obj *MyIncorrectlyMarkedAsAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+}
+func (obj *MyIncorrectlyMarkedAsAPIObject) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}
 
 func TestResourceVersionerOfAPI(t *testing.T) {
 	type T struct {

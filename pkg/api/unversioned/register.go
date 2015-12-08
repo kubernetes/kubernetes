@@ -24,4 +24,27 @@ func Kind(kind string) GroupKind {
 	return SchemeGroupVersion.WithKind(kind).GroupKind()
 }
 
-// TODO this doesn't actually register them right now due to cycles.
+// GroupVersionKind supports the runtime.Object interface for any object which embeds
+// unversioned.TypeMeta
+func (obj TypeMeta) GroupVersionKind() *GroupVersionKind {
+	return TypeMetaToGroupVersionKind(obj)
+}
+
+func (obj *ListOptions) SetGroupVersionKind(gvk *GroupVersionKind) {
+	UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *Status) SetGroupVersionKind(gvk *GroupVersionKind) {
+	UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *APIVersions) SetGroupVersionKind(gvk *GroupVersionKind) {
+	UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *APIGroupList) SetGroupVersionKind(gvk *GroupVersionKind) {
+	UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *APIGroup) SetGroupVersionKind(gvk *GroupVersionKind) {
+	UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *APIResourceList) SetGroupVersionKind(gvk *GroupVersionKind) {
+	UpdateTypeMeta(&obj.TypeMeta, gvk)
+}

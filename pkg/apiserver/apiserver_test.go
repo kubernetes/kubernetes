@@ -369,7 +369,10 @@ func (s *SimpleStream) Close() error {
 	return nil
 }
 
-func (s *SimpleStream) IsAnAPIObject() {}
+func (obj *SimpleStream) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj *SimpleStream) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}
 
 func (s *SimpleStream) InputStream(version, accept string) (io.ReadCloser, bool, string, error) {
 	s.version = version
@@ -2684,7 +2687,8 @@ type UnregisteredAPIObject struct {
 	Value string
 }
 
-func (*UnregisteredAPIObject) IsAnAPIObject() {}
+func (obj *UnregisteredAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj *UnregisteredAPIObject) GroupVersionKind() *unversioned.GroupVersionKind       { return nil }
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
