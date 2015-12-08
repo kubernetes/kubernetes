@@ -177,7 +177,7 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		},
 	}
 	for k, test := range testCases {
-		apiCodec := runtime.CodecFor(api.Scheme, testapi.Default.GroupVersion().String())
+		apiCodec := runtime.CodecFor(api.Scheme, *testapi.Default.GroupVersion())
 		regularClient := &fake.RESTClient{
 			Codec: apiCodec,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

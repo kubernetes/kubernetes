@@ -27,7 +27,7 @@ import (
 
 // Codec is the identity codec for this package - it can only convert itself
 // to itself.
-var Codec = runtime.CodecFor(Scheme, "")
+var Codec = runtime.CodecFor(Scheme, unversioned.GroupVersion{})
 
 func init() {
 	Scheme.AddDefaultingFuncs(

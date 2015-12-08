@@ -61,7 +61,7 @@ func init() {
 	groupMeta := latest.GroupMeta{
 		GroupVersion:  preferredExternalVersion,
 		GroupVersions: externalVersions,
-		Codec:         runtime.CodecFor(api.Scheme, preferredExternalVersion.String()),
+		Codec:         runtime.CodecFor(api.Scheme, preferredExternalVersion),
 		RESTMapper:    newRESTMapper(externalVersions),
 		SelfLinker:    runtime.SelfLinker(accessor),
 		InterfacesFor: interfacesFor,

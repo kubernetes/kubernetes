@@ -26,7 +26,7 @@ import (
 var GroupVersion = unversioned.GroupVersion{Group: api.Group, Version: "v1beta1"}
 
 // Codec encodes internal objects to the v1beta1 version for the abac group
-var Codec = runtime.CodecFor(api.Scheme, GroupVersion.String())
+var Codec = runtime.CodecFor(api.Scheme, GroupVersion)
 
 func init() {
 	api.Scheme.AddKnownTypes(GroupVersion,

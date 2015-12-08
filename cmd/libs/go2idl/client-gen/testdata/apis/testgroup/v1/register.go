@@ -24,7 +24,7 @@ import (
 
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "testgroup", Version: "v1"}
 
-var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion.String())
+var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion)
 
 func init() {
 	// Register the API.
