@@ -306,9 +306,8 @@ func TestJobStop(t *testing.T) {
 					},
 				},
 			},
-			StopError: nil,
-			ExpectedActions: []string{"get:jobs", "get:jobs", "update:jobs",
-				"get:jobs", "get:jobs", "list:pods", "delete:jobs"},
+			StopError:       nil,
+			ExpectedActions: []string{"get:jobs", "delete:jobs", "list:pods"},
 		},
 		{
 			Name: "JobWithDeadPods",
@@ -353,9 +352,8 @@ func TestJobStop(t *testing.T) {
 					},
 				},
 			},
-			StopError: nil,
-			ExpectedActions: []string{"get:jobs", "get:jobs", "update:jobs",
-				"get:jobs", "get:jobs", "list:pods", "delete:pods", "delete:jobs"},
+			StopError:       nil,
+			ExpectedActions: []string{"get:jobs", "delete:jobs", "list:pods", "delete:pods"},
 		},
 	}
 
