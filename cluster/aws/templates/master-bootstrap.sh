@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,10 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Download release
+echo "Extracting & running kube-bootstrap"
+rm -f kube-bootstrap
+tar xzf "${SERVER_BINARY_TAR_URL##*/}" --strip-components=3 kubernetes/server/bin/kube-bootstrap
 
-echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
-download-or-bust "$SERVER_BINARY_TAR_URL"
+mkdir -p /etc/kubernetes/
+echo "${BOOTSTRAP_JSON}" >/etc/kubernetes/bootstrap.json
 
-echo "Downloading binary release tar ($SALT_TAR_URL)"
-download-or-bust "$SALT_TAR_URL"
+./kube-bootstrap --config /etc/kubernetes/bootstrap.json

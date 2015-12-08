@@ -40,7 +40,8 @@ ALLOCATE_NODE_CIDRS=true
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 
 # The Auto Scaling Group (ASG) name must be unique, so we include the zone
-ASG_NAME="${NODE_INSTANCE_PREFIX}-group-${ZONE}"
+NODE_ASG_NAME="${NODE_INSTANCE_PREFIX}-group-${ZONE}"
+MASTER_ASG_NAME="${INSTANCE_PREFIX}-master-group-${ZONE}"
 
 # We could allow the master disk volume id to be specified in future
 MASTER_DISK_ID=
@@ -49,6 +50,9 @@ MASTER_DISK_ID=
 if [[ "${KUBE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
   KUBE_OS_DISTRIBUTION=vivid
 fi
+
+# Well known tags
+TAG_KEY_MASTER_IP="kubernetes.io/master-ip"
 
 case "${KUBE_OS_DISTRIBUTION}" in
   trusty|wheezy|jessie|vivid|coreos)
@@ -69,14 +73,14 @@ AWS_CMD="aws ec2"
 AWS_ASG_CMD="aws autoscaling"
 
 VPC_CIDR_BASE=172.20
-MASTER_IP_SUFFIX=.9
-MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
 VPC_CIDR=${VPC_CIDR_BASE}.0.0/16
 SUBNET_CIDR=${VPC_CIDR_BASE}.0.0/24
 if [[ -n "${KUBE_SUBNET_CIDR:-}" ]]; then
   echo "Using subnet CIDR override: ${KUBE_SUBNET_CIDR}"
   SUBNET_CIDR=${KUBE_SUBNET_CIDR}
 fi
+
+MASTER_IP_SUFFIX=.9
 
 MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
 NODE_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
@@ -154,25 +158,23 @@ function get_security_group_id {
   | tr "\t" "\n"
 }
 
-function detect-master () {
+# Finds the master, if it already exists
+function find-master () {
   KUBE_MASTER=${MASTER_NAME}
-  if [[ -z "${KUBE_MASTER_ID-}" ]]; then
-    KUBE_MASTER_ID=$(get_instanceid_from_name ${MASTER_NAME})
+  KUBE_MASTER_IP=`${AWS_ASG_CMD} describe-tags --filter Name=auto-scaling-group,Values=${MASTER_ASG_NAME} Name=key,Values=${TAG_KEY_MASTER_IP} --query Tags[].Value`
+  if [[ -n "${KUBE_MASTER_IP}" ]]; then
+    echo "Found master IP: $KUBE_MASTER_IP"
   fi
-  if [[ -z "${KUBE_MASTER_ID-}" ]]; then
-    echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'"
-    exit 1
-  fi
-  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    KUBE_MASTER_IP=$(get_instance_public_ip ${KUBE_MASTER_ID})
-  fi
+}
+
+# Gets an existing master, exiting if not found
+function detect-master () {
+  find-master
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
     echo "Could not detect Kubernetes master node IP.  Make sure you've launched a cluster with 'kube-up.sh'"
     exit 1
   fi
-  echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
 }
-
 
 function query-running-minions () {
   local query=$1
@@ -180,7 +182,7 @@ function query-running-minions () {
            --filters Name=instance-state-name,Values=running \
                      Name=vpc-id,Values=${VPC_ID} \
                      Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
-                     Name=tag:aws:autoscaling:groupName,Values=${ASG_NAME} \
+                     Name=tag:aws:autoscaling:groupName,Values=${NODE_ASG_NAME} \
                      Name=tag:Role,Values=${NODE_TAG} \
            --query ${query}
 }
@@ -216,6 +218,24 @@ function detect-nodes () {
     echo "Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'"
     exit 1
   fi
+}
+
+function query-running-masters () {
+  local query=$1
+  $AWS_CMD describe-instances \
+           --filters Name=instance-state-name,Values=running \
+                     Name=vpc-id,Values=${VPC_ID} \
+                     Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                     Name=tag:aws:autoscaling:groupName,Values=${MASTER_ASG_NAME} \
+                     Name=tag:Role,Values=${MASTER_TAG} \
+           --query ${query}
+}
+
+function find-running-masters () {
+  MASTER_IDS=()
+  for id in $(query-running-masters "Reservations[].Instances[].InstanceId"); do
+    MASTER_IDS+=("${id}")
+  done
 }
 
 function detect-security-groups {
@@ -435,6 +455,27 @@ function ensure-master-pd {
   fi
 }
 
+# Finds the existing master IP, or creates/reuses an Elastic IP
+# If MASTER_RESERVED_IP looks like an IP address, we will use it;
+# otherwise we will create a new elastic IP
+# Sets KUBE_MASTER_IP
+function ensure-master-ip {
+  find-master
+
+  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
+    # Check if MASTER_RESERVED_IP looks like an IPv4 address
+    # Note that we used to only allocate an elastic IP when MASTER_RESERVED_IP=auto
+    # So be careful changing the IPV4 test, to be sure that 'auto' => 'allocate'
+    if [[ "${MASTER_RESERVED_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      KUBE_MASTER_IP="${MASTER_RESERVED_IP}"
+    else
+      KUBE_MASTER_IP=`$AWS_CMD allocate-address --domain vpc --query PublicIp`
+      echo "Allocated Elastic IP for master: ${KUBE_MASTER_IP}"
+      # Note: tag the ASG as soon as possible to prevent leaking the IP
+    fi
+  fi
+}
+
 # Creates a new DHCP option set configured correctly for Kubernetes
 # Sets DHCP_OPTION_SET_ID
 function create-dhcp-option-set () {
@@ -586,6 +627,15 @@ function add-tag {
   exit 1
 }
 
+# Gets a tag value from an AWS resource
+# usage: get-tag <resource-id> <tag-name>
+# outputs: the tag value, or "" if no tag
+function get-tag {
+  $AWS_CMD describe-tags --filters Name=resource-id,Values=${1} \
+                                   Name=key,Values=${2} \
+                         --query Tags[].Value
+}
+
 # Creates the IAM profile, based on configuration files in templates/iam
 function create-iam-profile {
   local key=$1
@@ -634,13 +684,8 @@ function wait-for-instance-state {
   done
 }
 
-# Allocates new Elastic IP from Amazon
-# Output: allocated IP address
-function allocate-elastic-ip {
-  $AWS_CMD allocate-address --domain vpc --query PublicIp
-}
-
-function assign-ip-to-instance {
+# Attaches an elastic IP to the specified instance
+function attach-ip-to-instance {
   local ip_address=$1
   local instance_id=$2
 
@@ -649,21 +694,17 @@ function assign-ip-to-instance {
   $AWS_CMD associate-address --instance-id ${instance_id} --allocation-id ${elastic_ip_allocation_id} > $LOG
 }
 
-# If MASTER_RESERVED_IP looks like IP address, will try to assign it to master instance
-# If MASTER_RESERVED_IP is "auto", will allocate new elastic ip and assign that
-# If none of the above or something fails, will output originally assigne IP
-# Output: assigned IP address
-function assign-elastic-ip {
-  local assigned_public_ip=$1
-  local master_instance_id=$2
+# Releases an elastic IP
+function release-elastic-ip {
+  local ip_address=$1
 
-  # Check that MASTER_RESERVED_IP looks like an IPv4 address
-  if [[ "${MASTER_RESERVED_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    assign-ip-to-instance "${MASTER_RESERVED_IP}" "${master_instance_id}" "${assigned_public_ip}"
-  elif [[ "${MASTER_RESERVED_IP}" = "auto" ]]; then
-    assign-ip-to-instance $(allocate-elastic-ip) "${master_instance_id}" "${assigned_public_ip}"
+  echo "Releasing elastic IP ${ip_address}"
+  local elastic_ip_allocation_id=""
+  elastic_ip_allocation_id=$($AWS_CMD describe-addresses --public-ips $ip_address --query Addresses[].AllocationId 2> $LOG) || true
+  if [[ -z "${elastic_ip_allocation_id}" ]]; then
+    echo "Elastic IP already released"
   else
-    echo "${assigned_public_ip}"
+    $AWS_CMD release-address --allocation-id ${elastic_ip_allocation_id} > $LOG
   fi
 }
 
@@ -687,12 +728,22 @@ function vpc-setup {
     VPC_ID=$(get_vpc_id)
   fi
   if [[ -z "$VPC_ID" ]]; then
-	  echo "Creating vpc."
-	  VPC_ID=$($AWS_CMD create-vpc --cidr-block ${VPC_CIDR} --query Vpc.VpcId)
-	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > $LOG
-	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > $LOG
-	  add-tag $VPC_ID Name kubernetes-vpc
-	  add-tag $VPC_ID KubernetesCluster ${CLUSTER_ID}
+    echo "Creating vpc."
+    VPC_ID=$($AWS_CMD create-vpc --cidr-block ${VPC_CIDR} --query Vpc.VpcId)
+    $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > $LOG
+    $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > $LOG
+    add-tag $VPC_ID Name kubernetes-vpc
+    add-tag $VPC_ID KubernetesCluster ${CLUSTER_ID}
+    MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
+  else
+    VPC_CIDR=$($AWS_CMD describe-vpcs --vpc-ids ${VPC_ID} --query Vpcs[].CidrBlock)
+    echo "VPC CIDR is $VPC_CIDR"
+    VPC_CIDR_BASE=${VPC_CIDR%.*.*}
+
+    if [[ -z "${MASTER_INTERNAL_IP:-}" ]]; then
+      MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
+      echo "Assuming MASTER_INTERNAL_IP=${MASTER_INTERNAL_IP}"
+    fi
   fi
 
   echo "Using VPC $VPC_ID"
@@ -710,11 +761,6 @@ function subnet-setup {
   else
     EXISTING_CIDR=$($AWS_CMD describe-subnets --subnet-ids ${SUBNET_ID} --query Subnets[].CidrBlock)
     echo "Using existing subnet with CIDR $EXISTING_CIDR"
-    VPC_CIDR=$($AWS_CMD describe-vpcs --vpc-ids ${VPC_ID} --query Vpcs[].CidrBlock)
-    echo "VPC CIDR is $VPC_CIDR"
-    VPC_CIDR_BASE=${VPC_CIDR%.*.*}
-    MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
-    echo "Assuming MASTER_INTERNAL_IP=${MASTER_INTERNAL_IP}"
   fi
 
   echo "Using subnet $SUBNET_ID"
@@ -840,19 +886,36 @@ function start-master() {
   # Get or create master persistent volume
   ensure-master-pd
 
+  # Get or create master elastic IP
+  ensure-master-ip
+  # Note: tag the ASG as soon as possible now that we've allocated the IP, to prevent leaking
+
   # Determine extra certificate names for master
   octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
   ((octets[3]+=1))
   service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
   MASTER_EXTRA_SANS="IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
 
+  # Build bootstrap config
+  NL=$'\n'
+  BOOTSTRAP_JSON="{"${NL}
+  BOOTSTRAP_JSON+=' "MasterCIDR": "'${MASTER_IP_RANGE}'",'${NL}
+  BOOTSTRAP_JSON+=' "MasterPublicIP": "'${KUBE_MASTER_IP}'",'${NL}
+  BOOTSTRAP_JSON+=' "MasterPrivateIP": "'${MASTER_INTERNAL_IP}/24'",'${NL}
+  BOOTSTRAP_JSON+=' "ClusterID": "'${CLUSTER_ID}'",'${NL}
+  BOOTSTRAP_JSON+=' "MasterVolume": "'${MASTER_DISK_ID}'",'${NL}
+  BOOTSTRAP_JSON+=' "CloudProvider": "aws"'${NL}
+  BOOTSTRAP_JSON+="}"
 
+  echo "Creating master configuration"
   (
     # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
     echo "#! /bin/bash"
     echo "mkdir -p /var/cache/kubernetes-install"
     echo "cd /var/cache/kubernetes-install"
+    echo "readonly BOOTSTRAP_JSON='${BOOTSTRAP_JSON}'"
     echo "readonly SALT_MASTER='${MASTER_INTERNAL_IP}'"
+    echo "readonly ADVERTISE_ADDRESS='${MASTER_INTERNAL_IP}'"
     echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "readonly NODE_INSTANCE_PREFIX='${NODE_INSTANCE_PREFIX}'"
     echo "readonly CLUSTER_IP_RANGE='${CLUSTER_IP_RANGE}'"
@@ -886,67 +949,70 @@ function start-master() {
     echo "readonly OPENCONTRAIL_PUBLIC_SUBNET='${OPENCONTRAIL_PUBLIC_SUBNET:-}'"
     echo "readonly E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/master-bootstrap.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/setup-master-pd.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/install-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-master.sh"
-  ) > "${KUBE_TEMP}/master-start.sh"
+  ) > "${KUBE_TEMP}/master-user-data"
 
-  echo "Starting Master"
-  master_id=$($AWS_CMD run-instances \
-    --image-id $AWS_IMAGE \
-    --iam-instance-profile Name=$IAM_PROFILE_MASTER \
-    --instance-type $MASTER_SIZE \
-    --subnet-id $SUBNET_ID \
-    --private-ip-address $MASTER_INTERNAL_IP \
-    --key-name ${AWS_SSH_KEY_NAME} \
-    --security-group-ids ${MASTER_SG_ID} \
-    --associate-public-ip-address \
-    --block-device-mappings "${MASTER_BLOCK_DEVICE_MAPPINGS}" \
-    --user-data file://${KUBE_TEMP}/master-start.sh \
-    --query Instances[].InstanceId)
-  add-tag $master_id Name $MASTER_NAME
-  add-tag $master_id Role $MASTER_TAG
-  add-tag $master_id KubernetesCluster ${CLUSTER_ID}
+  # We're running right up against the 16KB limit
+  # Remove all comment lines and then put back the bin/bash shebang
+  sed -i -e 's/^[[:blank:]]*#.*$//' -e '/^[[:blank:]]*$/d' "${KUBE_TEMP}/master-user-data"
+  sed -i '1i #! /bin/bash' "${KUBE_TEMP}/master-user-data"
 
-  echo "Waiting for master to be ready"
-  local attempt=0
+  ${AWS_ASG_CMD} create-launch-configuration \
+      --launch-configuration-name ${MASTER_ASG_NAME} \
+      --image-id ${AWS_IMAGE} \
+      --iam-instance-profile ${IAM_PROFILE_MASTER} \
+      --instance-type ${MASTER_SIZE} \
+      --key-name ${AWS_SSH_KEY_NAME} \
+      --security-groups ${MASTER_SG_ID} \
+      --associate-public-ip-address \
+      --block-device-mappings "${MASTER_BLOCK_DEVICE_MAPPINGS}" \
+      --user-data "file://${KUBE_TEMP}/master-user-data"
 
+  echo "Creating autoscaling group"
+  ${AWS_ASG_CMD} create-auto-scaling-group \
+      --auto-scaling-group-name ${MASTER_ASG_NAME} \
+      --launch-configuration-name ${MASTER_ASG_NAME} \
+      --min-size 1 \
+      --max-size 1 \
+      --vpc-zone-identifier ${SUBNET_ID} \
+      --tags ResourceId=${MASTER_ASG_NAME},ResourceType=auto-scaling-group,Key=Name,Value=${MASTER_NAME} \
+             ResourceId=${MASTER_ASG_NAME},ResourceType=auto-scaling-group,Key=Role,Value=${MASTER_TAG} \
+             ResourceId=${MASTER_ASG_NAME},ResourceType=auto-scaling-group,Key=KubernetesCluster,Value=${CLUSTER_ID} \
+             ResourceId=${MASTER_ASG_NAME},ResourceType=auto-scaling-group,Key=${TAG_KEY_MASTER_IP},Value=${KUBE_MASTER_IP}
+
+  # Wait for the master to be running
+  attempt=0
   while true; do
-    echo -n Attempt "$(($attempt+1))" to check for master node
-    local ip=$(get_instance_public_ip ${master_id})
-    if [[ -z "${ip}" ]]; then
-      if (( attempt > 30 )); then
-        echo
-        echo -e "${color_red}master failed to start. Your cluster is unlikely" >&2
-        echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
-        echo -e "cluster. (sorry!)${color_norm}" >&2
-        exit 1
-      fi
-    else
-      # We are not able to add an elastic ip, a route or volume to the instance until that instance is in "running" state.
-      wait-for-instance-state ${master_id} "running"
-
-      KUBE_MASTER=${MASTER_NAME}
-      KUBE_MASTER_IP=$(assign-elastic-ip $ip $master_id)
-      echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
-
-      # This is a race between instance start and volume attachment.  There appears to be no way to start an AWS instance with a volume attached.
-      # To work around this, we wait for volume to be ready in setup-master-pd.sh
-      echo "Attaching persistent data volume (${MASTER_DISK_ID}) to master"
-      $AWS_CMD attach-volume --volume-id ${MASTER_DISK_ID} --device /dev/sdb --instance-id ${master_id}
-
-      sleep 10
-      $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${MASTER_IP_RANGE} --instance-id $master_id > $LOG
-
+    find-running-masters > $LOG
+    if [[ ${#MASTER_IDS[@]} == 1 ]]; then
+      echo -e " ${color_green}master started; ready${color_norm}"
       break
     fi
-    echo -e " ${color_yellow}[master not working yet]${color_norm}"
+
+    if (( attempt > 30 )); then
+      echo
+      echo "Master did not start in time"
+      echo
+      echo -e "${color_red}Master failed to start.  Your cluster is unlikely" >&2
+      echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+      echo -e "cluster. (sorry!)${color_norm}" >&2
+      exit 1
+    fi
+
+    echo -e " ${color_yellow}Waiting for master${color_norm}"
     attempt=$(($attempt+1))
     sleep 10
   done
 
+  detect-master
+
+  # TODO(justinsb): We probably don't need this any more...
   # Check for SSH connectivity
   attempt=0
   while true; do
@@ -1011,7 +1077,7 @@ function start-minions() {
     public_ip_option="--no-associate-public-ip-address"
   fi
   ${AWS_ASG_CMD} create-launch-configuration \
-      --launch-configuration-name ${ASG_NAME} \
+      --launch-configuration-name ${NODE_ASG_NAME} \
       --image-id $KUBE_NODE_IMAGE \
       --iam-instance-profile ${IAM_PROFILE_NODE} \
       --instance-type $NODE_SIZE \
@@ -1023,14 +1089,14 @@ function start-minions() {
 
   echo "Creating autoscaling group"
   ${AWS_ASG_CMD} create-auto-scaling-group \
-      --auto-scaling-group-name ${ASG_NAME} \
-      --launch-configuration-name ${ASG_NAME} \
+      --auto-scaling-group-name ${NODE_ASG_NAME} \
+      --launch-configuration-name ${NODE_ASG_NAME} \
       --min-size ${NUM_NODES} \
       --max-size ${NUM_NODES} \
       --vpc-zone-identifier ${SUBNET_ID} \
-      --tags ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=Name,Value=${NODE_INSTANCE_PREFIX} \
-             ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=Role,Value=${NODE_TAG} \
-             ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=KubernetesCluster,Value=${CLUSTER_ID}
+      --tags ResourceId=${NODE_ASG_NAME},ResourceType=auto-scaling-group,Key=Name,Value=${NODE_INSTANCE_PREFIX} \
+             ResourceId=${NODE_ASG_NAME},ResourceType=auto-scaling-group,Key=Role,Value=${NODE_TAG} \
+             ResourceId=${NODE_ASG_NAME},ResourceType=auto-scaling-group,Key=KubernetesCluster,Value=${CLUSTER_ID}
 }
 
 function wait-minions {
@@ -1201,12 +1267,8 @@ function kube-down {
                               --instance-ids ${instance_ids})
       for asg_group in ${asg_groups}; do
         if [[ -n $(${AWS_ASG_CMD} describe-auto-scaling-groups --auto-scaling-group-names ${asg_group} --query AutoScalingGroups[].AutoScalingGroupName) ]]; then
-          echo "Deleting auto-scaling group: ${asg_group}"
-          ${AWS_ASG_CMD} delete-auto-scaling-group --force-delete --auto-scaling-group-name ${asg_group}
-        fi
-        if [[ -n $(${AWS_ASG_CMD} describe-launch-configurations --launch-configuration-names ${asg_group} --query LaunchConfigurations[].LaunchConfigurationName) ]]; then
-          echo "Deleting auto-scaling launch configuration: ${asg_group}"
-          ${AWS_ASG_CMD} delete-launch-configuration --launch-configuration-name ${asg_group}
+          echo "Scaling down autoscaling group ${asg_group}"
+          ${AWS_ASG_CMD} update-auto-scaling-group --min-size 0 --max-size 0 --auto-scaling-group-name ${asg_group} > $LOG
         fi
       done
 
@@ -1216,7 +1278,35 @@ function kube-down {
         wait-for-instance-state ${instance_id} "terminated"
       done
       echo "All instances deleted"
+
+      for asg_group in ${asg_groups}; do
+        if [[ -n $(${AWS_ASG_CMD} describe-auto-scaling-groups --auto-scaling-group-names ${asg_group} --query AutoScalingGroups[].AutoScalingGroupName) ]]; then
+          local asg_ip=`${AWS_ASG_CMD} describe-tags --filter Name=auto-scaling-group,Values=${asg_group} Name=key,Values=${TAG_KEY_MASTER_IP} --query Tags[].Value`
+          if [[ -n "${asg_ip}" ]]; then
+	    # TODO: Likely a dependency problem here, we might have to resize to size 0 and then delete the IP
+            release-elastic-ip ${asg_ip}
+          fi
+
+          echo "Deleting auto-scaling group: ${asg_group}"
+          ${AWS_ASG_CMD} delete-auto-scaling-group --force-delete --auto-scaling-group-name ${asg_group}
+        fi
+
+        if [[ -n $(${AWS_ASG_CMD} describe-launch-configurations --launch-configuration-names ${asg_group} --query LaunchConfigurations[].LaunchConfigurationName) ]]; then
+          echo "Deleting auto-scaling launch configuration: ${asg_group}"
+          ${AWS_ASG_CMD} delete-launch-configuration --launch-configuration-name ${asg_group}
+        fi
+      done
+      echo "All instances deleted"
     fi
+
+    echo "Deleting EBS volumes"
+    disk_ids=`$AWS_CMD describe-volumes \
+	               --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                       --query Volumes[].VolumeId`
+    for disk_id in ${disk_ids}; do
+      echo "Deleting volume ${disk_id}"
+      $AWS_CMD delete-volume --volume-id ${disk_id} > $LOG
+    done
 
     echo "Cleaning up resources in VPC: ${vpc_id}"
     default_sg_id=$($AWS_CMD describe-security-groups \
@@ -1289,6 +1379,7 @@ function kube-down {
       $AWS_CMD delete-route-table --route-table-id $route_table_id > $LOG
     done
 
+    echo "Deleting VPC: ${vpc_id}"
     $AWS_CMD delete-vpc --vpc-id $vpc_id > $LOG
   fi
 }
@@ -1309,6 +1400,7 @@ function kube-push {
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/install-release.sh"
     echo "echo Executing configuration"
     echo "sudo salt '*' mine.update"
     echo "sudo salt --force-color '*' state.highstate"

@@ -101,7 +101,8 @@ func (util *AWSDiskUtil) DetachDisk(c *awsElasticBlockStoreCleaner) error {
 		glog.V(2).Info("Error getting volume provider for volumeID ", c.volumeID, ": ", err)
 		return err
 	}
-	if err := volumes.DetachDisk("", c.volumeID); err != nil {
+	_, err = volumes.DetachDisk("", c.volumeID)
+	if err != nil {
 		glog.V(2).Info("Error detaching disk ", c.volumeID, ": ", err)
 		return err
 	}
