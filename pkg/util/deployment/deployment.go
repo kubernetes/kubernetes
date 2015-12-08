@@ -73,10 +73,10 @@ func GetNewRC(deployment extensions.Deployment, c client.Interface) (*api.Replic
 	}
 	newRCTemplate := GetNewRCTemplate(deployment)
 
-	for _, rc := range rcList.Items {
-		if api.Semantic.DeepEqual(rc.Spec.Template, newRCTemplate) {
+	for i := range rcList.Items {
+		if api.Semantic.DeepEqual(rcList.Items[i].Spec.Template, newRCTemplate) {
 			// This is the new RC.
-			return &rc, nil
+			return &rcList.Items[i], nil
 		}
 	}
 	// new RC does not exist.
