@@ -139,7 +139,7 @@ func TestList(t *testing.T) {
 	defer api.Scheme.Log(nil)
 
 	kind := "List"
-	item, err := api.Scheme.New("", kind)
+	item, err := api.Scheme.New(api.SchemeGroupVersion.WithKind(kind))
 	if err != nil {
 		t.Errorf("Couldn't make a %v? %v", kind, err)
 		return
@@ -172,7 +172,7 @@ func TestRoundTripTypes(t *testing.T) {
 }
 
 func doRoundTripTest(kind string, t *testing.T) {
-	item, err := api.Scheme.New(testapi.Default.InternalGroupVersion().String(), kind)
+	item, err := api.Scheme.New(testapi.Default.InternalGroupVersion().WithKind(kind))
 	if err != nil {
 		t.Fatalf("Couldn't make a %v? %v", kind, err)
 	}

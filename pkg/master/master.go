@@ -1001,7 +1001,7 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		strings.ToLower(kind) + "s": resourceStorage,
 	}
 
-	serverGroupVersion := latest.GroupOrDie("").GroupVersion
+	optionsExternalVersion := latest.GroupOrDie("").GroupVersion
 
 	return &apiserver.APIGroupVersion{
 		Root:                apiRoot,
@@ -1012,11 +1012,11 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:             thirdpartyresourcedata.NewMapper(latest.GroupOrDie("extensions").RESTMapper, kind, version, group),
-		Codec:              thirdpartyresourcedata.NewCodec(latest.GroupOrDie("extensions").Codec, kind),
-		Linker:             latest.GroupOrDie("extensions").SelfLinker,
-		Storage:            storage,
-		ServerGroupVersion: &serverGroupVersion,
+		Mapper:                 thirdpartyresourcedata.NewMapper(latest.GroupOrDie("extensions").RESTMapper, kind, version, group),
+		Codec:                  thirdpartyresourcedata.NewCodec(latest.GroupOrDie("extensions").Codec, kind),
+		Linker:                 latest.GroupOrDie("extensions").SelfLinker,
+		Storage:                storage,
+		OptionsExternalVersion: &optionsExternalVersion,
 
 		Context: m.requestContextMapper,
 
@@ -1091,7 +1091,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 	}
 
 	extensionsGroup := latest.GroupOrDie("extensions")
-	serverGroupVersion := latest.GroupOrDie("").GroupVersion
+	optionsExternalVersion := latest.GroupOrDie("").GroupVersion
 
 	return &apiserver.APIGroupVersion{
 		Root:                m.apiGroupPrefix,
@@ -1101,12 +1101,12 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:             extensionsGroup.RESTMapper,
-		Codec:              extensionsGroup.Codec,
-		Linker:             extensionsGroup.SelfLinker,
-		Storage:            storage,
-		GroupVersion:       extensionsGroup.GroupVersion,
-		ServerGroupVersion: &serverGroupVersion,
+		Mapper:                 extensionsGroup.RESTMapper,
+		Codec:                  extensionsGroup.Codec,
+		Linker:                 extensionsGroup.SelfLinker,
+		Storage:                storage,
+		GroupVersion:           extensionsGroup.GroupVersion,
+		OptionsExternalVersion: &optionsExternalVersion,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,

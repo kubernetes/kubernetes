@@ -109,7 +109,7 @@ type ObjectTyper interface {
 
 // ObjectCreater contains methods for instantiating an object by kind and version.
 type ObjectCreater interface {
-	New(version, kind string) (out Object, err error)
+	New(kind unversioned.GroupVersionKind) (out Object, err error)
 }
 
 // ObjectCopier duplicates an object.

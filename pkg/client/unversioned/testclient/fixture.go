@@ -152,24 +152,24 @@ func NewObjects(scheme ObjectScheme, decoder runtime.ObjectDecoder) ObjectRetrie
 	}
 }
 
-func (o objects) Kind(gvk unversioned.GroupVersionKind, name string) (runtime.Object, error) {
+func (o objects) Kind(kind unversioned.GroupVersionKind, name string) (runtime.Object, error) {
 	// TODO our test clients deal in internal versions.  We need to plumb that knowledge down here
 	// we might do this via an extra function to the scheme to allow getting internal group versions
 	// I'm punting for now
-	gvk.Version = ""
+	kind.Version = ""
 
-	empty, _ := o.scheme.New(gvk.GroupVersion().String(), gvk.Kind)
+	empty, _ := o.scheme.New(kind)
 	nilValue := reflect.Zero(reflect.TypeOf(empty)).Interface().(runtime.Object)
 
-	arr, ok := o.types[gvk.Kind]
+	arr, ok := o.types[kind.Kind]
 	if !ok {
-		if strings.HasSuffix(gvk.Kind, "List") {
-			itemKind := gvk.Kind[:len(gvk.Kind)-4]
+		if strings.HasSuffix(kind.Kind, "List") {
+			itemKind := kind.Kind[:len(kind.Kind)-4]
 			arr, ok := o.types[itemKind]
 			if !ok {
 				return empty, nil
 			}
-			out, err := o.scheme.New(gvk.GroupVersion().String(), gvk.Kind)
+			out, err := o.scheme.New(kind)
 			if err != nil {
 				return nilValue, err
 			}
@@ -181,25 +181,25 @@ func (o objects) Kind(gvk unversioned.GroupVersionKind, name string) (runtime.Ob
 			}
 			return out, nil
 		}
-		return nilValue, errors.NewNotFound(gvk.Kind, name)
+		return nilValue, errors.NewNotFound(kind.Kind, name)
 	}
 
-	index := o.last[gvk.Kind]
+	index := o.last[kind.Kind]
 	if index >= len(arr) {
 		index = len(arr) - 1
 	}
 	if index < 0 {
-		return nilValue, errors.NewNotFound(gvk.Kind, name)
+		return nilValue, errors.NewNotFound(kind.Kind, name)
 	}
 	out, err := o.scheme.Copy(arr[index])
 	if err != nil {
 		return nilValue, err
 	}
-	o.last[gvk.Kind] = index + 1
+	o.last[kind.Kind] = index + 1
 
 	if status, ok := out.(*unversioned.Status); ok {
 		if status.Details != nil {
-			status.Details.Kind = gvk.Kind
+			status.Details.Kind = kind.Kind
 		}
 		if status.Status != unversioned.StatusSuccess {
 			return nilValue, &errors.StatusError{ErrStatus: *status}
