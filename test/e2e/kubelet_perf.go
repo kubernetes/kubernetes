@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -31,12 +32,17 @@ import (
 
 const (
 	// Interval to poll /stats/container on a node
-	containerStatsPollingPeriod = 10 * time.Second
+	containerStatsPollingPeriod = 3 * time.Second
 	// The monitoring time for one test.
 	monitoringTime = 20 * time.Minute
 	// The periodic reporting period.
 	reportingPeriod = 5 * time.Minute
 )
+
+type resourceTest struct {
+	podsPerNode int
+	limits      containersCPUSummary
+}
 
 func logPodsOnNodes(c *client.Client, nodeNames []string) {
 	for _, n := range nodeNames {
@@ -49,7 +55,7 @@ func logPodsOnNodes(c *client.Client, nodeNames []string) {
 	}
 }
 
-func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames sets.String, resourceMonitor *resourceMonitor) {
+func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames sets.String, rm *resourceMonitor, expected map[string]map[float64]float64) {
 	numNodes := nodeNames.Len()
 	totalPods := podsPerNode * numNodes
 	By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
@@ -65,8 +71,8 @@ func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames se
 	})).NotTo(HaveOccurred())
 
 	// Log once and flush the stats.
-	resourceMonitor.LogLatest()
-	resourceMonitor.Reset()
+	rm.LogLatest()
+	rm.Reset()
 
 	By("Start monitoring resource usage")
 	// Periodically dump the cpu summary until the deadline is met.
@@ -76,8 +82,6 @@ func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames se
 	// entries if we plan to monitor longer (e.g., 8 hours).
 	deadline := time.Now().Add(monitoringTime)
 	for time.Now().Before(deadline) {
-		Logf("Still running...%v left", deadline.Sub(time.Now()))
-		time.Sleep(reportingPeriod)
 		timeLeft := deadline.Sub(time.Now())
 		Logf("Still running...%v left", timeLeft)
 		if timeLeft < reportingPeriod {
@@ -90,17 +94,54 @@ func runResourceTrackingTest(framework *Framework, podsPerNode int, nodeNames se
 
 	By("Reporting overall resource usage")
 	logPodsOnNodes(framework.Client, nodeNames.List())
-	resourceMonitor.LogCPUSummary()
-	resourceMonitor.LogLatest()
+	rm.LogLatest()
+
+	summary := rm.GetCPUSummary()
+	Logf("%s", rm.FormatCPUSummary(summary))
+	verifyCPULimits(expected, summary)
 
 	By("Deleting the RC")
 	DeleteRC(framework.Client, framework.Namespace.Name, rcName)
 }
 
+func verifyCPULimits(expected containersCPUSummary, actual nodesCPUSummary) {
+	if expected == nil {
+		return
+	}
+	var errList []string
+	for nodeName, perNodeSummary := range actual {
+		var nodeErrs []string
+		for cName, expectedResult := range expected {
+			perContainerSummary, ok := perNodeSummary[cName]
+			if !ok {
+				nodeErrs = append(nodeErrs, fmt.Sprintf("container %q: missing", cName))
+				continue
+			}
+			for p, expectedValue := range expectedResult {
+				actualValue, ok := perContainerSummary[p]
+				if !ok {
+					nodeErrs = append(nodeErrs, fmt.Sprintf("container %q: missing percentile %v", cName, p))
+					continue
+				}
+				if actualValue > expectedValue {
+					nodeErrs = append(nodeErrs, fmt.Sprintf("container %q: expected %.0fth%% usage < %.3f; got %.3f",
+						cName, p*100, expectedValue, actualValue))
+				}
+			}
+		}
+		if len(nodeErrs) > 0 {
+			errList = append(errList, fmt.Sprintf("node %v:\n %s", nodeName, strings.Join(nodeErrs, ", ")))
+		}
+	}
+	if len(errList) > 0 {
+		Failf("CPU usage exceeding limits:\n %s", strings.Join(errList, "\n"))
+	}
+}
+
 var _ = Describe("Kubelet", func() {
 	var nodeNames sets.String
 	framework := NewFramework("kubelet-perf")
-	var resourceMonitor *resourceMonitor
+	var rm *resourceMonitor
 
 	BeforeEach(func() {
 		nodes, err := framework.Client.Nodes().List(unversioned.ListOptions{})
@@ -109,22 +150,35 @@ var _ = Describe("Kubelet", func() {
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)
 		}
-		resourceMonitor = newResourceMonitor(framework.Client, targetContainers(), containerStatsPollingPeriod)
-		resourceMonitor.Start()
+		rm = newResourceMonitor(framework.Client, targetContainers(), containerStatsPollingPeriod)
+		rm.Start()
 	})
 
 	AfterEach(func() {
-		resourceMonitor.Stop()
+		rm.Stop()
 	})
-
 	Describe("regular resource usage tracking", func() {
-		density := []int{0, 40}
-		for i := range density {
-			podsPerNode := density[i]
+		rTests := []resourceTest{
+			{podsPerNode: 0,
+				limits: containersCPUSummary{
+					"/kubelet":       {0.50: 0.05, 0.95: 0.15},
+					"/docker-daemon": {0.50: 0.03, 0.95: 0.06},
+				},
+			},
+			{podsPerNode: 40,
+				limits: containersCPUSummary{
+					"/kubelet":       {0.50: 0.15, 0.95: 0.35},
+					"/docker-daemon": {0.50: 0.06, 0.95: 0.30},
+				},
+			},
+		}
+		for _, testArg := range rTests {
+			itArg := testArg
+			podsPerNode := itArg.podsPerNode
 			name := fmt.Sprintf(
-				"over %v with %d pods per node", monitoringTime, podsPerNode)
+				"for %d pods per node over %v", podsPerNode, monitoringTime)
 			It(name, func() {
-				runResourceTrackingTest(framework, podsPerNode, nodeNames, resourceMonitor)
+				runResourceTrackingTest(framework, podsPerNode, nodeNames, rm, itArg.limits)
 			})
 		}
 	})
@@ -133,9 +187,9 @@ var _ = Describe("Kubelet", func() {
 		for i := range density {
 			podsPerNode := density[i]
 			name := fmt.Sprintf(
-				"over %v with %d pods per node.", monitoringTime, podsPerNode)
+				"for %d pods per node over %v", podsPerNode, monitoringTime)
 			It(name, func() {
-				runResourceTrackingTest(framework, podsPerNode, nodeNames, resourceMonitor)
+				runResourceTrackingTest(framework, podsPerNode, nodeNames, rm, nil)
 			})
 		}
 	})
