@@ -1019,6 +1019,8 @@ func deepCopy_api_NodeSystemInfo(in NodeSystemInfo, out *NodeSystemInfo, c *conv
 
 func deepCopy_api_ObjectFieldSelector(in ObjectFieldSelector, out *ObjectFieldSelector, c *conversion.Cloner) error {
 	out.APIVersion = in.APIVersion
+	out.Kind = in.Kind
+	out.Name = in.Name
 	out.FieldPath = in.FieldPath
 	return nil
 }

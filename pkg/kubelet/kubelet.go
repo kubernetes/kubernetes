@@ -1432,7 +1432,22 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 			runtimeVal = expansion.Expand(runtimeVal, mappingFunc)
 		} else if envVar.ValueFrom != nil && envVar.ValueFrom.FieldRef != nil {
 			// Step 1b: resolve alternate env var sources
-			runtimeVal, err = kl.podFieldSelectorRuntimeValue(envVar.ValueFrom.FieldRef, pod)
+			name := envVar.ValueFrom.FieldRef.Name
+			kind := envVar.ValueFrom.FieldRef.Kind
+
+			// TODO this may be refactored by using obj interface{} as type
+			// so we use 'kind' to eliminate this switch case
+			switch kind {
+			case "Secret":
+				var secret *api.Secret
+				secret, err = kl.kubeClient.Secrets(pod.Namespace).Get(name)
+				runtimeVal, err = kl.secretFieldSelectorRuntimeValue(envVar.ValueFrom.FieldRef, secret)
+			case "":
+				runtimeVal, err = kl.podFieldSelectorRuntimeValue(envVar.ValueFrom.FieldRef, pod)
+			default:
+				glog.Errorf("Enviroment field ref kind: %v is not supported yet", kind)
+			}
+
 			if err != nil {
 				return result, err
 			}
@@ -1447,6 +1462,27 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 		result = append(result, kubecontainer.EnvVar{Name: k, Value: v})
 	}
 	return result, nil
+}
+
+func (kl *Kubelet) secretFieldSelectorRuntimeValue(fs *api.ObjectFieldSelector, secret *api.Secret) (string, error) {
+	items := strings.Split(fs.FieldPath, ".")
+	if len(items) != 2 {
+		return "", fmt.Errorf("Unsupported user provided fieldPath: %v", fs.FieldPath)
+	}
+	internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, "Secret", items[0], "")
+	if err != nil {
+		return "", err
+	}
+	switch internalFieldPath {
+	case "data":
+		key := items[1]
+		// Change []byte to string
+		value := string(secret.Data[key][:])
+		return value, nil
+	default:
+		return "", fmt.Errorf("Unsupported internal fieldPath: %v", internalFieldPath)
+	}
+
 }
 
 func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *api.ObjectFieldSelector, pod *api.Pod) (string, error) {

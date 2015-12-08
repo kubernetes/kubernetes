@@ -443,6 +443,8 @@ func deepCopy_v1_NFSVolumeSource(in v1.NFSVolumeSource, out *v1.NFSVolumeSource,
 
 func deepCopy_v1_ObjectFieldSelector(in v1.ObjectFieldSelector, out *v1.ObjectFieldSelector, c *conversion.Cloner) error {
 	out.APIVersion = in.APIVersion
+	out.Kind = in.Kind
+	out.Name = in.Name
 	out.FieldPath = in.FieldPath
 	return nil
 }

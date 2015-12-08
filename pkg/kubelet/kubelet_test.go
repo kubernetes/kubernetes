@@ -1501,11 +1501,43 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "env secret",
+			ns:   "test1",
+			container: &api.Container{
+				Env: []api.EnvVar{
+					{
+						Name: "SECRET_PASSWORD",
+						ValueFrom: &api.EnvVarSource{
+							FieldRef: &api.ObjectFieldSelector{
+								APIVersion: testapi.Default.Version(),
+								Kind:       "Secret",
+								Name:       "test_secret",
+								FieldPath:  "data.password",
+							},
+						},
+					},
+				},
+			},
+			masterServiceNs: "nothing",
+			nilLister:       true,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "SECRET_PASSWORD", Value: "password-value"},
+			},
+		},
 	}
 
 	for i, tc := range testCases {
 		testKubelet := newTestKubelet(t)
 		kl := testKubelet.kubelet
+		kubeClient := testKubelet.fakeKubeClient
+		kubeClient.AddReactor("get", "secrets", func(action testclient.Action) (bool, runtime.Object, error) {
+			// Return an existing (matching) secret on get.
+			return true, &api.Secret{
+				ObjectMeta: api.ObjectMeta{Name: "test_secret"},
+				Data:       map[string][]byte{"password": []byte("password-value")},
+			}, nil
+		})
 		kl.masterServiceNamespace = tc.masterServiceNs
 		if tc.nilLister {
 			kl.serviceLister = nil

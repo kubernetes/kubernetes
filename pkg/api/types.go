@@ -675,6 +675,14 @@ type ObjectFieldSelector struct {
 	// If no value is specified, it will be defaulted to the APIVersion of the
 	// enclosing object.
 	APIVersion string `json:"apiVersion"`
+	// The kind of this resource
+	// If no value is specified, it will be the kind of the
+	// enclosing object.
+	Kind string `json:"kind"`
+	// The name of this resource
+	// If no value is specified, it will be the kind of the
+	// enclosing object.
+	Name string `json:"name"`
 	// Required: Path of the field to select in the specified API version
 	FieldPath string `json:"fieldPath"`
 }

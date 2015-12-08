@@ -830,7 +830,7 @@ func validateEnv(vars []api.EnvVar, fldPath *validation.FieldPath) validation.Er
 	return allErrs
 }
 
-var validFieldPathExpressionsEnv = sets.NewString("metadata.name", "metadata.namespace", "status.podIP")
+var validFieldPathExpressionsEnv = sets.NewString("data", "metadata.name", "metadata.namespace", "status.podIP")
 
 func validateEnvVarValueFrom(ev api.EnvVar, fldPath *validation.FieldPath) validation.ErrorList {
 	allErrs := validation.ErrorList{}
@@ -862,12 +862,31 @@ func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.
 	} else if fs.FieldPath == "" {
 		allErrs = append(allErrs, validation.NewRequiredError(fldPath.Child("fieldPath")))
 	} else {
-		internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
-		if err != nil {
-			allErrs = append(allErrs, validation.NewInvalidError(fldPath.Child("fieldPath"), fs.FieldPath, "error converting fieldPath"))
-		} else if !expressions.Has(internalFieldPath) {
-			allErrs = append(allErrs, validation.NewNotSupportedError(fldPath.Child("fieldPath"), internalFieldPath, expressions.List()))
+		switch fs.Kind {
+		case "Secret":
+			if fs.Kind != "" && fs.Name == "" {
+				allErrs = append(allErrs, validation.NewRequiredError(fldPath.Child("name")))
+			} else if fs.Kind == "" && fs.Name != "" {
+				allErrs = append(allErrs, validation.NewRequiredError(fldPath.Child("kind")))
+			}
+
+			items := strings.Split(fs.FieldPath, ".")
+
+			internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, "Secret", items[0], "")
+			if err != nil {
+				allErrs = append(allErrs, validation.NewInvalidError(fldPath.Child("fieldPath"), items[0], "error converting fieldPath"))
+			} else if !expressions.Has(internalFieldPath) {
+				allErrs = append(allErrs, validation.NewNotSupportedError(fldPath.Child("fieldPath"), internalFieldPath, expressions.List()))
+			}
+		default:
+			internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
+			if err != nil {
+				allErrs = append(allErrs, validation.NewInvalidError(fldPath.Child("fieldPath"), fs.FieldPath, "error converting fieldPath"))
+			} else if !expressions.Has(internalFieldPath) {
+				allErrs = append(allErrs, validation.NewNotSupportedError(fldPath.Child("fieldPath"), internalFieldPath, expressions.List()))
+			}
 		}
+
 	}
 
 	return allErrs

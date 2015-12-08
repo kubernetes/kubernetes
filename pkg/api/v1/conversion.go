@@ -141,6 +141,8 @@ func addConversionFuncs() {
 			switch label {
 			case "type":
 				return label, value, nil
+			case "data":
+				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}

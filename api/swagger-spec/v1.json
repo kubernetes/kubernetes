@@ -13333,12 +13333,22 @@
     "id": "v1.ObjectFieldSelector",
     "description": "ObjectFieldSelector selects an APIVersioned field of an object.",
     "required": [
+     "kind",
+     "name",
      "fieldPath"
     ],
     "properties": {
      "apiVersion": {
       "type": "string",
       "description": "Version of the schema the FieldPath is written in terms of, defaults to \"v1\"."
+     },
+     "kind": {
+      "type": "string",
+      "description": "The kind of this resource If no value is specified, it will be the kind of the enclosing object."
+     },
+     "name": {
+      "type": "string",
+      "description": "The name of this resource If no value is specified, it will be the kind of the enclosing object."
      },
      "fieldPath": {
       "type": "string",

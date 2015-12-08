@@ -804,6 +804,14 @@ type EnvVarSource struct {
 type ObjectFieldSelector struct {
 	// Version of the schema the FieldPath is written in terms of, defaults to "v1".
 	APIVersion string `json:"apiVersion,omitempty"`
+	// The kind of this resource
+	// If no value is specified, it will be the kind of the
+	// enclosing object.
+	Kind string `json:"kind"`
+	// The name of this resource
+	// If no value is specified, it will be the kind of the
+	// enclosing object.
+	Name string `json:"name"`
 	// Path of the field to select in the specified API version.
 	FieldPath string `json:"fieldPath"`
 }
