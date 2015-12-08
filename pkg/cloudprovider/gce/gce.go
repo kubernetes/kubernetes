@@ -273,7 +273,7 @@ type GCEAffinityType string
 
 const (
 	// AffinityTypeNone - no session affinity.
-	GCEAffinityTypeNone GCEAffinityType = "None"
+	GCEAffinityTypeNone GCEAffinityType = "NONE"
 	// AffinityTypeClientIP is the Client IP based.
 	GCEAffinityTypeClientIP GCEAffinityType = "CLIENT_IP"
 	// AffinityTypeClientIP is the Client IP based.
