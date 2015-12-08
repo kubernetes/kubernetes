@@ -91,7 +91,7 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme.AddKnownTypeWithName(validVersionGV.WithKind("Type"), &ExternalType2{})
 
 	codecs := serializer.NewCodecFactory(scheme)
-	codec := codecs.LegacyCodec(unlikelyGV.String())
+	codec := codecs.LegacyCodec(unlikelyGV)
 	mapper := meta.NewDefaultRESTMapper([]unversioned.GroupVersion{unlikelyGV, validVersionGV}, func(version string) (*meta.VersionInterfaces, error) {
 		return &meta.VersionInterfaces{
 			Codec:            codecs.LegacyCodec(unversioned.ParseGroupVersionOrDie(version)),

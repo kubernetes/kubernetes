@@ -275,7 +275,7 @@ func rcFromManifest(fileName string) *api.ReplicationController {
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())
 
-	Expect(runtime.DecodeInto(latest.Codecs.UniversalDecoder(), json, nil, &controller)).NotTo(HaveOccurred())
+	Expect(runtime.DecodeInto(latest.Codecs.UniversalDecoder(), json, &controller)).NotTo(HaveOccurred())
 	return &controller
 }
 
@@ -289,6 +289,6 @@ func svcFromManifest(fileName string) *api.Service {
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())
 
-	Expect(runtime.DecodeInto(latest.Codecs.UniversalDecoder(), json, nil, &svc)).NotTo(HaveOccurred())
+	Expect(runtime.DecodeInto(latest.Codecs.UniversalDecoder(), json, &svc)).NotTo(HaveOccurred())
 	return &svc
 }

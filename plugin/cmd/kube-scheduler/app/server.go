@@ -170,7 +170,7 @@ func (s *SchedulerServer) createConfig(configFactory *factory.ConfigFactory) (*s
 		if err != nil {
 			return nil, fmt.Errorf("unable to read policy config: %v", err)
 		}
-		if _, err := runtime.DecodeInto(latestschedulerapi.Codec, configData, nil, &policy); err != nil {
+		if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
 			return nil, fmt.Errorf("invalid configuration: %v", err)
 		}
 		return configFactory.CreateFromConfig(policy)

@@ -77,7 +77,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 	}
 
 	obj3 := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
-	if _, err := runtime.DecodeInto(codec, data, nil, obj3); err != nil {
+	if err := runtime.DecodeInto(codec, data, obj3); err != nil {
 		t.Errorf("2: %v: %v", name, err)
 		return
 	}

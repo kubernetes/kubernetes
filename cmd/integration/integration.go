@@ -455,7 +455,7 @@ func runReplicationControllerTest(c *client.Client) {
 		glog.Fatalf("Unexpected error: %v", err)
 	}
 	var controller api.ReplicationController
-	if _, err := runtime.DecodeInto(latest.Codecs.UniversalDecoder(), data, nil, &controller); err != nil {
+	if err := runtime.DecodeInto(latest.Codecs.UniversalDecoder(), data, &controller); err != nil {
 		glog.Fatalf("Unexpected error: %v", err)
 	}
 

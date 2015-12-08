@@ -918,7 +918,7 @@ func (r Result) Into(obj runtime.Object) error {
 	if r.err != nil {
 		return r.err
 	}
-	_, err := runtime.DecodeInto(r.codec, r.body, nil, obj)
+	err := runtime.DecodeInto(r.codec, r.body, obj)
 	return err
 }
 

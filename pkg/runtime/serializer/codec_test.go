@@ -284,7 +284,7 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 	}
 
 	into := &TestType1{}
-	if _, err := runtime.DecodeInto(codec, data, nil, into); err != nil {
+	if err := runtime.DecodeInto(codec, data, into); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !semantic.DeepEqual(expect, obj) {
@@ -331,10 +331,10 @@ func TestBadJSONRejection(t *testing.T) {
 		}
 	}
 	badJSONKindMismatch := []byte(`{"myVersionKey":"v1","myKindKey":"ExternalInternalSame"}`)
-	if _, err := runtime.DecodeInto(codec, badJSONKindMismatch, nil, &TestType1{}); err == nil {
+	if err := runtime.DecodeInto(codec, badJSONKindMismatch, &TestType1{}); err == nil {
 		t.Errorf("Kind is set but doesn't match the object type: %s", badJSONKindMismatch)
 	}
-	if _, err := runtime.DecodeInto(codec, []byte(``), nil, &TestType1{}); err != nil {
+	if err := runtime.DecodeInto(codec, []byte(``), &TestType1{}); err != nil {
 		t.Errorf("Should allow empty decode")
 	}
 	if _, _, err := codec.Decode([]byte(``), &unversioned.GroupVersionKind{Kind: "ExternalInternalSame"}, nil); err == nil {
@@ -365,7 +365,7 @@ func TestBadJSONRejectionForSetInternalVersion(t *testing.T) {
 		}
 	}
 	badJSONKindMismatch := []byte(`{"myVersionKey":"v1","myKindKey":"ExternalInternalSame"}`)
-	if _, err := runtime.DecodeInto(codec, badJSONKindMismatch, nil, &TestType1{}); err == nil {
+	if err := runtime.DecodeInto(codec, badJSONKindMismatch, &TestType1{}); err == nil {
 		t.Errorf("Kind is set but doesn't match the object type: %s", badJSONKindMismatch)
 	}
 }

@@ -52,6 +52,18 @@ func Decode(d Decoder, data []byte) (Object, error) {
 	return obj, err
 }
 
+// DecodeInto performs a Decode and returns an error if the output object is not the same as the into object.
+func DecodeInto(d Decoder, data []byte, into Object) error {
+	out, gvk, err := d.Decode(data, nil, into)
+	if err != nil {
+		return err
+	}
+	if out != into {
+		return fmt.Errorf("unable to decode %s into %v", gvk, reflect.TypeOf(into))
+	}
+	return nil
+}
+
 func UseOrCreateObject(t Typer, c ObjectCreater, gvk unversioned.GroupVersionKind, obj Object) (Object, error) {
 	if obj != nil {
 		into, _, err := t.ObjectVersionAndKind(obj)
@@ -81,18 +93,6 @@ type NoopDecoder struct {
 
 func (n NoopDecoder) Decode(data []byte, gvk *unversioned.GroupVersionKind) (Object, *unversioned.GroupVersionKind, error) {
 	return nil, nil, fmt.Errorf("decoding is not allowed for this codec: %v", reflect.TypeOf(n.Encoder))
-}
-
-// DecodeInto performs a Decode and returns an error if the output object is not the same as the into object.
-func DecodeInto(d Decoder, data []byte, gvk *unversioned.GroupVersionKind, into Object) (*unversioned.GroupVersionKind, error) {
-	out, gvk, err := d.Decode(data, gvk, into)
-	if err != nil {
-		return gvk, err
-	}
-	if out != into {
-		return gvk, fmt.Errorf("unable to decode %s into %v", gvk.String, reflect.TypeOf(into))
-	}
-	return gvk, nil
 }
 
 // NewParameterCodec creates a ParameterCodec capable of transforming url values into versioned objects and back.

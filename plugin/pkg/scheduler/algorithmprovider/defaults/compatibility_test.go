@@ -93,7 +93,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 
 	for v, tc := range schedulerFiles {
 		policy := schedulerapi.Policy{}
-		if _, err := runtime.DecodeInto(latestschedulerapi.Codec, []byte(tc.JSON), nil, &policy); err != nil {
+		if err := runtime.DecodeInto(latestschedulerapi.Codec, []byte(tc.JSON), &policy); err != nil {
 			t.Errorf("%s: Error decoding: %v", v, err)
 			continue
 		}

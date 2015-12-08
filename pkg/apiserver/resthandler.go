@@ -502,7 +502,7 @@ func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.
 	}
 
 	objToUpdate := patcher.New()
-	if _, err := runtime.DecodeInto(codec, originalPatchedObjJS, nil, objToUpdate); err != nil {
+	if err := runtime.DecodeInto(codec, originalPatchedObjJS, objToUpdate); err != nil {
 		return nil, err
 	}
 	if err := checkName(objToUpdate, name, namespace, namer); err != nil {
@@ -560,7 +560,7 @@ func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.
 			if err != nil {
 				return nil, err
 			}
-			if _, err := runtime.DecodeInto(codec, newlyPatchedObjJS, nil, objToUpdate); err != nil {
+			if err := runtime.DecodeInto(codec, newlyPatchedObjJS, objToUpdate); err != nil {
 				return nil, err
 			}
 
@@ -682,8 +682,13 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 					return
 				}
 				defaultGVK := unversioned.ParseGroupVersionOrDie(scope.APIVersion).WithKind("DeleteOptions")
-				if _, err := runtime.DecodeInto(scope.Serializer.DecoderToVersion(s, defaultGVK.GroupVersion()), body, &defaultGVK, options); err != nil {
+				obj, _, err := scope.Serializer.DecoderToVersion(s, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
+				if err != nil {
 					scope.err(err, req, res)
+					return
+				}
+				if obj != options {
+					scope.err(fmt.Errorf("decoded object cannot be converted to DeleteOptions"), req, res)
 					return
 				}
 			}

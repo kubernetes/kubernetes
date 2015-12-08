@@ -411,7 +411,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 				return
 			}
 			if strings.Contains(name, "scheduler-policy-config") {
-				if _, err := runtime.DecodeInto(schedulerapilatest.Codec, data, nil, expectedType); err != nil {
+				if err := runtime.DecodeInto(schedulerapilatest.Codec, data, expectedType); err != nil {
 					t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 					return
 				}
@@ -421,7 +421,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 				if err != nil {
 					t.Errorf("Could not get codec for %s: %s", expectedType, err)
 				}
-				if _, err := runtime.DecodeInto(codec, data, nil, expectedType); err != nil {
+				if err := runtime.DecodeInto(codec, data, expectedType); err != nil {
 					t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 					return
 				}
@@ -506,7 +506,7 @@ func TestReadme(t *testing.T) {
 			if err != nil {
 				t.Errorf("%s could not be converted to JSON: %v\n%s", path, err, string(content))
 			}
-			if _, err := runtime.DecodeInto(testapi.Default.Codec(), json, nil, expectedType); err != nil {
+			if err := runtime.DecodeInto(testapi.Default.Codec(), json, expectedType); err != nil {
 				t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(content))
 				continue
 			}

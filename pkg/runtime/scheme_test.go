@@ -103,7 +103,7 @@ func TestScheme(t *testing.T) {
 	data, err := runtime.Encode(codec, obj)
 	obj2, err2 := runtime.Decode(codec, data)
 	obj3 := &InternalSimple{}
-	_, err3 := runtime.DecodeInto(codec, data, nil, obj3)
+	err3 := runtime.DecodeInto(codec, data, obj3)
 	obj4, err4 := runtime.Decode(jsonserializer, data)
 	if err != nil || err2 != nil || err3 != nil || err4 != nil {
 		t.Fatalf("Failure: '%v' '%v' '%v' '%v'", err, err2, err3, err4)

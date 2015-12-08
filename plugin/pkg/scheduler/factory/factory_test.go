@@ -85,7 +85,7 @@ func TestCreateFromConfig(t *testing.T) {
 			{"name" : "PriorityOne", "weight" : 2},
 			{"name" : "PriorityTwo", "weight" : 1}		]
 	}`)
-	if _, err := runtime.DecodeInto(latestschedulerapi.Codec, configData, nil, &policy); err != nil {
+	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
@@ -107,7 +107,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	factory := NewConfigFactory(client, nil)
 
 	configData = []byte(`{}`)
-	if _, err := runtime.DecodeInto(latestschedulerapi.Codec, configData, nil, &policy); err != nil {
+	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 

@@ -1462,7 +1462,7 @@ func containerAndPodFromLabels(inspect *docker.Container) (pod *api.Pod, contain
 	// the pod data may not be set
 	if body, found := labels[kubernetesPodLabel]; found {
 		pod = &api.Pod{}
-		if _, err = runtime.DecodeInto(latest.Codecs.UniversalDecoder(), []byte(body), nil, pod); err == nil {
+		if err = runtime.DecodeInto(latest.Codecs.UniversalDecoder(), []byte(body), pod); err == nil {
 			name := labels[kubernetesContainerLabel]
 			for ix := range pod.Spec.Containers {
 				if pod.Spec.Containers[ix].Name == name {

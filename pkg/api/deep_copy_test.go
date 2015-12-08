@@ -31,7 +31,7 @@ func BenchmarkPodCopy(b *testing.B) {
 		b.Fatalf("Unexpected error while reading file: %v", err)
 	}
 	var pod api.Pod
-	if _, err := runtime.DecodeInto(testapi.Default.Codec(), data, nil, &pod); err != nil {
+	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &pod); err != nil {
 		b.Fatalf("Unexpected error decoding pod: %v", err)
 	}
 
@@ -54,7 +54,7 @@ func BenchmarkNodeCopy(b *testing.B) {
 		b.Fatalf("Unexpected error while reading file: %v", err)
 	}
 	var node api.Node
-	if _, err := runtime.DecodeInto(testapi.Default.Codec(), data, nil, &node); err != nil {
+	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &node); err != nil {
 		b.Fatalf("Unexpected error decoding node: %v", err)
 	}
 
@@ -77,7 +77,7 @@ func BenchmarkReplicationControllerCopy(b *testing.B) {
 		b.Fatalf("Unexpected error while reading file: %v", err)
 	}
 	var replicationController api.ReplicationController
-	if _, err := runtime.DecodeInto(testapi.Default.Codec(), data, nil, &replicationController); err != nil {
+	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &replicationController); err != nil {
 		b.Fatalf("Unexpected error decoding node: %v", err)
 	}
 
