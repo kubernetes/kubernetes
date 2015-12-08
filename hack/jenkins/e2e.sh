@@ -102,10 +102,7 @@ function configure_upgrade_step() {
         ${GKE_FLAKY_TESTS[@]:+${GKE_FLAKY_TESTS[@]}} \
         )"
 
-  if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
-    DOGFOOD_GCLOUD="true"
-    GKE_API_ENDPOINT="https://test-container.sandbox.googleapis.com/"
-  else
+  if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
     NUM_NODES=5
     KUBE_ENABLE_DEPLOYMENTS=true
     KUBE_ENABLE_DAEMONSETS=true
@@ -249,6 +246,10 @@ if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
 elif [[ ${JOB_NAME} =~ ^kubernetes-.*-gke ]]; then
   KUBERNETES_PROVIDER="gke"
   : ${E2E_ZONE:="us-central1-f"}
+  # By default, GKE tests run against the GKE test endpoint using CI Cloud SDK.
+  # Release jobs (e.g. prod, staging, and test) override these two variables.
+  : ${CLOUDSDK_BUCKET:="gs://cloud-sdk-build/testing/staging"}
+  : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
 elif [[ ${JOB_NAME} =~ ^kubernetes-.*-aws ]]; then
   KUBERNETES_PROVIDER="aws"
   : ${E2E_MIN_STARTUP_PODS:="1"}
@@ -652,9 +653,6 @@ case ${JOB_NAME} in
     ;;
 
   kubernetes-e2e-gke-ci)
-    : ${DOGFOOD_GCLOUD:="true"}
-    : ${CLOUDSDK_BUCKET:="gs://cloud-sdk-build/testing/staging"}
-    : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-ci"}
     : ${E2E_NETWORK:="e2e-gke-ci"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
@@ -669,9 +667,6 @@ case ${JOB_NAME} in
     ;;
 
   kubernetes-e2e-gke-ci-reboot)
-    : ${DOGFOOD_GCLOUD:="true"}
-    : ${CLOUDSDK_BUCKET:="gs://cloud-sdk-build/testing/staging"}
-    : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-ci-reboot"}
     : ${E2E_NETWORK:="e2e-gke-ci-reboot"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
@@ -688,9 +683,6 @@ case ${JOB_NAME} in
     ;;
 
   kubernetes-e2e-gke-flaky)
-    : ${DOGFOOD_GCLOUD:="true"}
-    : ${CLOUDSDK_BUCKET:="gs://cloud-sdk-build/testing/staging"}
-    : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
     : ${E2E_CLUSTER_NAME:="kubernetes-gke-e2e-flaky"}
     : ${E2E_NETWORK:="gke-e2e-flaky"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
@@ -703,7 +695,6 @@ case ${JOB_NAME} in
 
   # Sets up the GKE soak cluster weekly using the latest CI release.
   kubernetes-soak-weekly-deploy-gke)
-    : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
     : ${E2E_CLUSTER_NAME:="jenkins-gke-soak-weekly"}
     : ${E2E_DOWN:="false"}
     : ${E2E_NETWORK:="gke-soak-weekly"}
@@ -718,7 +709,6 @@ case ${JOB_NAME} in
 
   # Runs tests on GKE soak cluster.
   kubernetes-soak-continuous-e2e-gke)
-    : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
     : ${E2E_CLUSTER_NAME:="jenkins-gke-soak-weekly"}
     : ${E2E_NETWORK:="gke-soak-weekly"}
     : ${E2E_DOWN:="false"}
@@ -1115,7 +1105,6 @@ export CLUSTER_NAME=${E2E_CLUSTER_NAME}
 export ZONE=${E2E_ZONE}
 export KUBE_GKE_NETWORK=${E2E_NETWORK}
 export E2E_SET_CLUSTER_API_VERSION=${E2E_SET_CLUSTER_API_VERSION:-}
-export DOGFOOD_GCLOUD=${DOGFOOD_GCLOUD:-}
 export CMD_GROUP=${CMD_GROUP:-}
 export MACHINE_TYPE=${NODE_SIZE:-}  # GKE scripts use MACHINE_TYPE for the node vm size
 
