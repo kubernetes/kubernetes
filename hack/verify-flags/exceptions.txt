@@ -1,11 +1,2 @@
-_output/release-stage/full/kubernetes/cluster/addons/registry/images/Dockerfile:ADD run_proxy.sh /usr/bin/run_proxy
-_output/release-stage/full/kubernetes/docs/admin/salt.md:`api_servers` | (Optional) The IP address / host name where a kubelet can get read-only access to kube-apiserver
-_output/release-stage/full/kubernetes/docs/admin/salt.md:`etcd_servers` | (Optional) Comma-delimited list of IP addresses the kube-apiserver and kubelet use to reach etcd.  Uses the IP of the first machine in the kubernetes_master role, or 127.0.0.1 on GCE.
-_output/release-stage/full/kubernetes/docs/admin/salt.md:`hostname_override` | (Optional) Mapped to the kubelet hostname-override
-_output/release-stage/full/kubernetes/docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:var cloud_config = require('../cloud_config.js');
 cluster/addons/registry/images/Dockerfile:ADD run_proxy.sh /usr/bin/run_proxy
-docs/admin/salt.md:`api_servers` | (Optional) The IP address / host name where a kubelet can get read-only access to kube-apiserver
-docs/admin/salt.md:`etcd_servers` | (Optional) Comma-delimited list of IP addresses the kube-apiserver and kubelet use to reach etcd.  Uses the IP of the first machine in the kubernetes_master role, or 127.0.0.1 on GCE.
-docs/admin/salt.md:`hostname_override` | (Optional) Mapped to the kubelet hostname-override
 docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:var cloud_config = require('../cloud_config.js');
-hack/jenkins/README.md:[jenkins_jobs.ini](http://docs.openstack.org/infra/jenkins-job-builder/execution.html)
