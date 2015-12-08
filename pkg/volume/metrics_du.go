@@ -61,11 +61,11 @@ func (cm *MetricsDu) GetCapacityMetrics() (*CapacityMetrics, error) {
 	return metrics, nil
 }
 
-// runDu executes the "du" command and writes the results to metrics.VolumeKbUsed
+// runDu executes the "du" command and writes the results to metrics.VolumeBytesUsed
 func (cm *MetricsDu) runDu(metrics *CapacityMetrics) error {
 	// Uses the same niceness level as ccmvisor.fs does when running du
-	// Use -k flag so results in are kilobytes
-	out, err := exec.Command("nice", "-n", "19", "du", "-s", "-k", cm.path).CombinedOutput()
+	// Uses -B 1 to always scale to a blocksize of 1 byte
+	out, err := exec.Command("nice", "-n", "19", "du", "-s", "-B", "1", cm.path).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed command 'du' on %s with error %v", cm.path, err)
 	}
@@ -73,17 +73,17 @@ func (cm *MetricsDu) runDu(metrics *CapacityMetrics) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse 'du' output %s due to error %v", out, err)
 	}
-	metrics.VolumeKbUsed = 1024 * bUsed
+	metrics.VolumeBytesUsed = bUsed
 	return nil
 }
 
-// runDf executes the "df" command and writes the results to metrics.DeviceKbUsed
-// and metrics.DeviceKbAvailable
+// runDf executes the "df" command and writes the results to metrics.DeviceBytesUsed
+// and metrics.DeviceBytesAvailable
 // TODO(pwittrock): Consider using a statfs syscall directly to get the data
 func (cm *MetricsDu) runDf(metrics *CapacityMetrics) error {
 	// Uses the same niceness level as ccmvisor.fs does when running du
-	// Use -k flag so results in are kilobytes
-	out, err := exec.Command("nice", "-n", "19", "df", "-k", cm.path).CombinedOutput()
+	// Uses -B 1 to always scale to a blocksize of 1 byte
+	out, err := exec.Command("nice", "-n", "19", "df", "-B", "1", cm.path).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed command 'df' on %s with error %v", cm.path, err)
 	}
@@ -109,7 +109,7 @@ func (cm *MetricsDu) runDf(metrics *CapacityMetrics) error {
 		if err != nil {
 			return fmt.Errorf("failed to parse 'df' 'Used' output %s due to error %v", out, err)
 		}
-		metrics.FileSystemKbUsed = 1024 * bUsed
+		metrics.FileSystemBytesUsed = bUsed
 	} else {
 		return fmt.Errorf(`failed to find 'df' field 'Used' in output %s`, out)
 	}
@@ -120,7 +120,7 @@ func (cm *MetricsDu) runDf(metrics *CapacityMetrics) error {
 		if err != nil {
 			return fmt.Errorf("failed to parse 'df' 'Available' output %s due to error %v", out, err)
 		}
-		metrics.FileSystemKbAvailable = 1024 * bAvailable
+		metrics.FileSystemBytesAvailable = bAvailable
 	} else {
 		return fmt.Errorf("failed to find 'df' field 'Available' in output %s", out)
 	}

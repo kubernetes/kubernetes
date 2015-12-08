@@ -29,7 +29,7 @@ type Volume interface {
 	// GetPath returns the directory path the volume is mounted to.
 	GetPath() string
 
-	// VolumeMetricsProvider embeds methods for exposing Volume capacity data.
+	// VolumeMetricsProvider embeds methods for exposing Volume metrics (e.g. capacity).
 	VolumeMetricsProvider
 }
 
@@ -41,14 +41,15 @@ type VolumeMetricsProvider interface {
 
 // CapacityMetrics represents available and consumed capacity for the Volume.
 type CapacityMetrics struct {
-	// VolumeKbUsed represents the total kilobytes used under the directory path that the Volume is mounted.
-	VolumeKbUsed uint64
+	// VolumeBytesUsed represents the total bytes used under the directory path that the Volume is mounted.
+	// Note: For block devices this maybe more than the total size of the files.  See `man du` for details.
+	VolumeBytesUsed uint64
 
-	// FileSystemKbUsed represents the total kilobytes used on the filesystem that the Volume path resides.
-	FileSystemKbUsed uint64
+	// FileSystemBytesUsed represents the total bytes used on the filesystem that the Volume path resides.
+	FileSystemBytesUsed uint64
 
-	// FileSystemKbAvailable represents the total kilobytes free on the filesystem that the Volume path resides.
-	FileSystemKbAvailable uint64
+	// FileSystemBytesAvailable represents the total bytes free on the filesystem that the Volume path resides.
+	FileSystemBytesAvailable uint64
 }
 
 // Attributes represents the attributes of this builder.

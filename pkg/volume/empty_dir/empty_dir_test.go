@@ -274,3 +274,42 @@ func TestPluginBackCompat(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volPath)
 	}
 }
+
+// TestVolumeMetrics tests that VolumeMetrics methods return sane values.
+func TestVolumeMetrics(t *testing.T) {
+	// Create an empty temp directory for the volume
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "host_path_test")
+	if err != nil {
+		t.Fatalf("Can't make a tmp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
+
+	spec := &api.Volume{
+		Name: "vol1",
+	}
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{RootContext: ""})
+	if err != nil {
+		t.Errorf("Failed to make a new Builder: %v", err)
+	}
+
+	// Need to create the subdirectory
+	os.MkdirAll(builder.GetPath(), 0755)
+
+	// TODO(pwittroc): Move this into a reusable testing utility
+	metrics, err := builder.GetCapacityMetrics()
+	if err != nil {
+		t.Errorf("Unexpected error when calling GetCapacityMetrics %v", err)
+	}
+	if metrics.VolumeBytesUsed != 4096 {
+		t.Errorf("Expected VolumeBytesUsed %d to be 4096", metrics.VolumeBytesUsed)
+	}
+	if metrics.VolumeBytesUsed <= 0 {
+		t.Errorf("Expected VolumeBytesUsed to be greater than 0")
+	}
+	if metrics.FileSystemBytesAvailable <= 0 {
+		t.Errorf("Expected FileSystemBytesAvailable to be greater than 0")
+	}
+}
