@@ -147,9 +147,9 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 //
 // The expected behavior of the `kubectl get` command is:
 // 1. objects using unrecognized schemes will always be returned using that scheme/version, "unlikelyversion" in this test;
-// 2. if the specified output-version is a recognized, valid Scheme, then the list should use that scheme, and otherwise it will default to the client version, testapi.Default.Version() in this test;
+// 2. if the specified output-version is a recognized, valid Scheme, then the list should use that scheme, and otherwise it will default to the client version, testapi.Default.GroupVersion().String() in this test;
 // 3a. if the specified output-version is a recognized, valid Scheme, in which the requested object (replicationcontroller) can be represented, then the object should be returned using that version;
-// 3b. otherwise if the specified output-version is unrecognized, but the requested object (replicationcontroller) is recognized by the client's codec, then it will be converted to the client version, testapi.Default.Version() in this test.
+// 3b. otherwise if the specified output-version is unrecognized, but the requested object (replicationcontroller) is recognized by the client's codec, then it will be converted to the client version, testapi.Default.GroupVersion().String() in this test.
 func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 	testCases := map[string]struct {
 		outputVersion   string
@@ -158,26 +158,26 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		rcVersion       string
 	}{
 		"handles specific version": {
-			outputVersion:   testapi.Default.Version(),
-			listVersion:     testapi.Default.Version(),
+			outputVersion:   testapi.Default.GroupVersion().String(),
+			listVersion:     testapi.Default.GroupVersion().String(),
 			testtypeVersion: unlikelyGV.String(),
-			rcVersion:       testapi.Default.Version(),
+			rcVersion:       testapi.Default.GroupVersion().String(),
 		},
 		"handles second specific version": {
 			outputVersion:   "unlikely.group/unlikelyversion",
-			listVersion:     testapi.Default.Version(),
+			listVersion:     testapi.Default.GroupVersion().String(),
 			testtypeVersion: unlikelyGV.String(),
-			rcVersion:       testapi.Default.Version(), // see expected behavior 3b
+			rcVersion:       testapi.Default.GroupVersion().String(), // see expected behavior 3b
 		},
 		"handles common version": {
-			outputVersion:   testapi.Default.Version(),
-			listVersion:     testapi.Default.Version(),
+			outputVersion:   testapi.Default.GroupVersion().String(),
+			listVersion:     testapi.Default.GroupVersion().String(),
 			testtypeVersion: unlikelyGV.String(),
-			rcVersion:       testapi.Default.Version(),
+			rcVersion:       testapi.Default.GroupVersion().String(),
 		},
 	}
 	for k, test := range testCases {
-		apiCodec := runtime.CodecFor(api.Scheme, testapi.Default.Version())
+		apiCodec := runtime.CodecFor(api.Scheme, testapi.Default.GroupVersion().String())
 		regularClient := &fake.RESTClient{
 			Codec: apiCodec,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -509,7 +509,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.Version())) != "a=b" {
+			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -635,7 +635,7 @@ func TestWatchSelector(t *testing.T) {
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.Version())) != "a=b" {
+			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {

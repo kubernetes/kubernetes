@@ -56,11 +56,11 @@ func TestSecrets(t *testing.T) {
 
 	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&client.Config{Host: s.URL, GroupVersion: testapi.Default.GroupVersion()})
-	DoTestSecrets(t, client, testapi.Default.Version())
+	DoTestSecrets(t, client)
 }
 
 // DoTestSecrets test secrets for one api version.
-func DoTestSecrets(t *testing.T, client *client.Client, apiVersion string) {
+func DoTestSecrets(t *testing.T, client *client.Client) {
 	// Make a secret object.
 	ns := "ns"
 	s := api.Secret{

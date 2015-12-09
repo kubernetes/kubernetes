@@ -61,7 +61,7 @@ func TestDoRequestSuccess(t *testing.T) {
 	if !reflect.DeepEqual(status, statusOut) {
 		t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", status, statusOut)
 	}
-	fakeHandler.ValidateRequest(t, "/"+testapi.Default.Version()+"/test", "GET", nil)
+	fakeHandler.ValidateRequest(t, "/"+testapi.Default.GroupVersion().String()+"/test", "GET", nil)
 }
 
 func TestDoRequestFailed(t *testing.T) {
@@ -137,5 +137,5 @@ func TestDoRequestCreated(t *testing.T) {
 	if !reflect.DeepEqual(status, statusOut) {
 		t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", status, statusOut)
 	}
-	fakeHandler.ValidateRequest(t, "/"+testapi.Default.Version()+"/test", "GET", nil)
+	fakeHandler.ValidateRequest(t, "/"+testapi.Default.GroupVersion().String()+"/test", "GET", nil)
 }

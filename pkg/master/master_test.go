@@ -69,8 +69,8 @@ func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.A
 	storageDestinations.AddAPIGroup(
 		"extensions", etcdstorage.NewEtcdStorage(server.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix()))
 	config.StorageDestinations = storageDestinations
-	storageVersions[""] = testapi.Default.Version()
-	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
+	storageVersions[""] = testapi.Default.GroupVersion().String()
+	storageVersions["extensions"] = testapi.Extensions.GroupVersion().String()
 	config.StorageVersions = storageVersions
 	config.PublicAddress = net.ParseIP("192.168.10.4")
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
@@ -413,8 +413,8 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	expectGroupName := "extensions"
 	expectVersions := []unversioned.GroupVersionForDiscovery{
 		{
-			GroupVersion: testapi.Extensions.GroupAndVersion(),
-			Version:      testapi.Extensions.Version(),
+			GroupVersion: testapi.Extensions.GroupVersion().String(),
+			Version:      testapi.Extensions.GroupVersion().Version,
 		},
 	}
 	expectPreferredVersion := unversioned.GroupVersionForDiscovery{

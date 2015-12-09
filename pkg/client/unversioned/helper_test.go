@@ -199,8 +199,8 @@ func TestSetsCodec(t *testing.T) {
 		Prefix string
 		Codec  runtime.Codec
 	}{
-		testapi.Default.Version(): {false, "/api/" + testapi.Default.Version() + "/", testapi.Default.Codec()},
-		"invalidVersion":          {true, "", nil},
+		testapi.Default.GroupVersion().Version: {false, "/api/" + testapi.Default.GroupVersion().Version + "/", testapi.Default.Codec()},
+		"invalidVersion":                       {true, "", nil},
 	}
 	for version, expected := range testCases {
 		client, err := New(&Config{Host: "127.0.0.1", GroupVersion: &unversioned.GroupVersion{Version: version}})
@@ -243,13 +243,13 @@ func TestValidatesHostParameter(t *testing.T) {
 		URL string
 		Err bool
 	}{
-		{"127.0.0.1", "", "http://127.0.0.1/" + testapi.Default.Version(), false},
-		{"127.0.0.1:8080", "", "http://127.0.0.1:8080/" + testapi.Default.Version(), false},
-		{"foo.bar.com", "", "http://foo.bar.com/" + testapi.Default.Version(), false},
-		{"http://host/prefix", "", "http://host/prefix/" + testapi.Default.Version(), false},
-		{"http://host", "", "http://host/" + testapi.Default.Version(), false},
-		{"http://host", "/", "http://host/" + testapi.Default.Version(), false},
-		{"http://host", "/other", "http://host/other/" + testapi.Default.Version(), false},
+		{"127.0.0.1", "", "http://127.0.0.1/" + testapi.Default.GroupVersion().Version, false},
+		{"127.0.0.1:8080", "", "http://127.0.0.1:8080/" + testapi.Default.GroupVersion().Version, false},
+		{"foo.bar.com", "", "http://foo.bar.com/" + testapi.Default.GroupVersion().Version, false},
+		{"http://host/prefix", "", "http://host/prefix/" + testapi.Default.GroupVersion().Version, false},
+		{"http://host", "", "http://host/" + testapi.Default.GroupVersion().Version, false},
+		{"http://host", "/", "http://host/" + testapi.Default.GroupVersion().Version, false},
+		{"http://host", "/other", "http://host/other/" + testapi.Default.GroupVersion().Version, false},
 		{"host/server", "", "", true},
 	}
 	for i, testCase := range testCases {

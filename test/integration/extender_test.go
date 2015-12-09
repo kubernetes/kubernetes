@@ -236,7 +236,7 @@ func TestSchedulerExtender(t *testing.T) {
 			},
 		},
 	}
-	policy.APIVersion = testapi.Default.Version()
+	policy.APIVersion = testapi.Default.GroupVersion().String()
 
 	schedulerConfigFactory := factory.NewConfigFactory(restClient, nil)
 	schedulerConfig, err := schedulerConfigFactory.CreateFromConfig(policy)
