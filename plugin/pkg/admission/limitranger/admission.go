@@ -54,9 +54,18 @@ type limitRanger struct {
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
 func (l *limitRanger) Admit(a admission.Attributes) (err error) {
-
 	// Ignore all calls to subresources
 	if a.GetSubresource() != "" {
+		return nil
+	}
+
+	// NOTE:
+	// Right now, this operation ignores update operations for the pod resource type.
+	// At this time, we do not allow a pod's resource requirements to change dynamically.
+	// In the future, if we allow updating a pod's resource requirements post creation, we need to coordinate
+	// that change with how admission control works today to ensure that we do not break kubectl patch.
+	// see: https://github.com/kubernetes/kubernetes/issues/18272 for history
+	if a.GetOperation() == admission.Update && a.GetResource() == api.Resource("pods") {
 		return nil
 	}
 

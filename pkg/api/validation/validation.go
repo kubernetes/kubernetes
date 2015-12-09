@@ -1198,6 +1198,10 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) validation.ErrorList {
 	// Tricky, we need to copy the container list so that we don't overwrite the update
 	var newContainers []api.Container
 	for ix, container := range pod.Spec.Containers {
+		// NOTE: it is very important that if we ever support updating a containers resource requirements
+		// that we coordinate that change by ensuring admission control for quota and limitrange are modified to intercept
+		// pod updates.  Right now, they are not intercepting pod updates to preserve support for kubectl patch
+		// see https://github.com/kubernetes/kubernetes/issues/18272 for history
 		container.Image = oldPod.Spec.Containers[ix].Image
 		newContainers = append(newContainers, container)
 	}
