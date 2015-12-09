@@ -311,35 +311,42 @@ func TestUpdate(t *testing.T) {
 		pair{FROM, FROM}: true,
 	}
 
-	pod := func(name, check string) *api.Pod {
-		return &api.Pod{
+	pod := func(name, check string, final bool) *api.Pod {
+		p := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   name,
 				Labels: map[string]string{"check": check},
 			},
 		}
+		if final {
+			p.Labels["final"] = "true"
+		}
+		return p
+	}
+	deletePod := func(p *api.Pod) bool {
+		return p.Labels["final"] == "true"
 	}
 
 	tests := []func(string){
 		func(name string) {
 			name = "a-" + name
-			source.Add(pod(name, FROM))
-			source.Modify(pod(name, TO))
+			source.Add(pod(name, FROM, false))
+			source.Modify(pod(name, TO, true))
 		},
 		func(name string) {
 			name = "b-" + name
-			source.Add(pod(name, FROM))
-			source.ModifyDropWatch(pod(name, TO))
+			source.Add(pod(name, FROM, false))
+			source.ModifyDropWatch(pod(name, TO, true))
 		},
 		func(name string) {
 			name = "c-" + name
-			source.AddDropWatch(pod(name, FROM))
-			source.Modify(pod(name, ADD_MISSED))
-			source.Modify(pod(name, TO))
+			source.AddDropWatch(pod(name, FROM, false))
+			source.Modify(pod(name, ADD_MISSED, false))
+			source.Modify(pod(name, TO, true))
 		},
 		func(name string) {
 			name = "d-" + name
-			source.Add(pod(name, FROM))
+			source.Add(pod(name, FROM, true))
 		},
 	}
 
@@ -362,7 +369,9 @@ func TestUpdate(t *testing.T) {
 				if !allowedTransitions[pair{from, to}] {
 					t.Errorf("observed transition %q -> %q for %v", from, to, n.Name)
 				}
-				source.Delete(n)
+				if deletePod(n) {
+					source.Delete(n)
+				}
 			},
 			DeleteFunc: func(obj interface{}) {
 				testDoneWG.Done()
