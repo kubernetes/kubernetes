@@ -95,13 +95,13 @@ func getTestPod(probeType probeType, probeSpec api.Probe) api.Pod {
 func newTestManager() *manager {
 	refManager := kubecontainer.NewRefManager()
 	refManager.SetRef(testContainerID, &api.ObjectReference{}) // Suppress prober warnings.
-	m := NewManager(
+	m := newManager(
 		status.NewManager(&testclient.Fake{}, kubepod.NewBasicPodManager(nil)),
 		results.NewManager(),
 		nil, // runner
 		refManager,
 		&record.FakeRecorder{},
-	).(*manager)
+	)
 	// Don't actually execute probes.
 	m.prober.exec = fakeExecProber{probe.Success, nil}
 	return m
