@@ -108,8 +108,8 @@ func (c *realRecyclerClient) WatchPod(name, namespace, resourceVersion string, s
 	fieldSelector, _ := fields.ParseSelector("metadata.name=" + name)
 
 	podLW := &cache.ListWatch{
-		ListFunc: func() (runtime.Object, error) {
-			options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{fieldSelector}}
+		ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			options.FieldSelector.Selector = fieldSelector
 			return c.client.Pods(namespace).List(options)
 		},
 		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {

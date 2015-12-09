@@ -65,8 +65,8 @@ func NewResourceQuotaController(kubeClient client.Interface, resyncPeriod contro
 
 	rq.rqIndexer, rq.rqController = framework.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return rq.kubeClient.ResourceQuotas(api.NamespaceAll).List(unversioned.ListOptions{})
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return rq.kubeClient.ResourceQuotas(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return rq.kubeClient.ResourceQuotas(api.NamespaceAll).Watch(options)
@@ -105,8 +105,8 @@ func NewResourceQuotaController(kubeClient client.Interface, resyncPeriod contro
 	// release compute resources from any associated quota.
 	rq.podStore.Store, rq.podController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return rq.kubeClient.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return rq.kubeClient.Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return rq.kubeClient.Pods(api.NamespaceAll).Watch(options)

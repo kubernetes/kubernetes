@@ -32,7 +32,7 @@ type fakePodLW struct {
 	watchResp watch.Interface
 }
 
-func (lw fakePodLW) List() (runtime.Object, error) {
+func (lw fakePodLW) List(options unversioned.ListOptions) (runtime.Object, error) {
 	return lw.listResp, nil
 }
 

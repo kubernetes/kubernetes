@@ -66,8 +66,8 @@ func New(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc, 
 
 	gcc.podStore.Store, gcc.podStoreSyncer = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{terminatedSelector}}
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				options.FieldSelector.Selector = terminatedSelector
 				return gcc.kubeClient.Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {

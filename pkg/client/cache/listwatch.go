@@ -28,7 +28,7 @@ import (
 )
 
 // ListFunc knows how to list resources
-type ListFunc func() (runtime.Object, error)
+type ListFunc func(options unversioned.ListOptions) (runtime.Object, error)
 
 // WatchFunc knows how to watch resources
 type WatchFunc func(options unversioned.ListOptions) (watch.Interface, error)
@@ -48,10 +48,11 @@ type Getter interface {
 
 // NewListWatchFromClient creates a new ListWatch from the specified client, resource, namespace and field selector.
 func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSelector fields.Selector) *ListWatch {
-	listFunc := func() (runtime.Object, error) {
+	listFunc := func(options unversioned.ListOptions) (runtime.Object, error) {
 		return c.Get().
 			Namespace(namespace).
 			Resource(resource).
+			VersionedParams(&options, api.Scheme).
 			FieldsSelectorParam(fieldSelector).
 			Do().
 			Get()
@@ -76,8 +77,8 @@ func timeoutFromListOptions(options unversioned.ListOptions) time.Duration {
 }
 
 // List a set of apiserver resources
-func (lw *ListWatch) List() (runtime.Object, error) {
-	return lw.ListFunc()
+func (lw *ListWatch) List(options unversioned.ListOptions) (runtime.Object, error) {
+	return lw.ListFunc(options)
 }
 
 // Watch a set of apiserver resources
