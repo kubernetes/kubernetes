@@ -32,8 +32,6 @@
 #   * export KUBERNETES_PROVIDER=libvirt-coreos; wget -q -O - https://get.k8s.io | bash
 #  Vagrant (local virtual machines)
 #   * export KUBERNETES_PROVIDER=vagrant; wget -q -O - https://get.k8s.io | bash
-#  VMWare VSphere
-#   * export KUBERNETES_PROVIDER=vsphere; wget -q -O - https://get.k8s.io | bash
 #  Rackspace
 #   * export KUBERNETES_PROVIDER=rackspace; wget -q -O - https://get.k8s.io | bash
 #

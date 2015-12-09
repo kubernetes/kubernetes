@@ -76,7 +76,3 @@ base:
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-master
 {% endif %}
-
-  'roles:kubernetes-pool-vsphere':
-    - match: grain
-    - static-routes

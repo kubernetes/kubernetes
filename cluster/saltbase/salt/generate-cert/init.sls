@@ -6,9 +6,6 @@
   {% if grains.cloud == 'aws' %}
     {% set cert_ip='_use_aws_external_ip_' %}
   {% endif %}
-  {% if grains.cloud == 'vsphere' %}
-    {% set cert_ip=grains.ip_interfaces.eth0[0] %}
-  {% endif %}
 {% endif %}
 
 # If there is a pillar defined, override any defaults.
