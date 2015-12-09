@@ -91,13 +91,19 @@ func (c *stateCache) cachedState(ctx context.Context) (*mesosState, error) {
 // clusterName returns the cached Mesos cluster name.
 func (c *stateCache) clusterName(ctx context.Context) (string, error) {
 	cached, err := c.cachedState(ctx)
-	return cached.clusterName, err
+	if err != nil {
+		return "", err
+	}
+	return cached.clusterName, nil
 }
 
 // nodes returns the cached list of slave nodes.
 func (c *stateCache) nodes(ctx context.Context) (map[string]*slaveNode, error) {
 	cached, err := c.cachedState(ctx)
-	return cached.nodes, err
+	if err != nil {
+		return nil, err
+	}
+	return cached.nodes, nil
 }
 
 func newMesosClient(
