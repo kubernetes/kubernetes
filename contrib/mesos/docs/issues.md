@@ -198,6 +198,16 @@ The scheduler also offers `/debug` API endpoints that may be useful:
 All of the issues in the above section also apply to the Kubernetes-Mesos DCOS package builds.
 The issues listed in this section apply specifically to the Kubernetes-Mesos DCOS package available from https://github.com/mesosphere/multiverse.
 
+### Etcd
+
+The default configuration of the DCOS Kubernetes package launches an internal etcd process **which only persists the cluster state in the sandbox of the current container instance**. While this is simpler for the first steps with Kubernetes-Mesos, it means that any cluster state is lost when the Kubernetes-Mesos Docker container is restarted.
+
+Hence, for any kind of production-like deployment it is highly recommended to install the etcd DCOS package alongside Kubernetes-Mesos and
+configure the later to use the etcd cluster. Further instructions
+can be found at https://docs.mesosphere.com/services/kubernetes/#install.
+
+This situation will eventually go away as soon as DCOS supports package dependencies and/or interactive package configuration.
+
 ### Kubectl
 
 The following `kubectl` and `dcos kubectl` commands are not yet supported:
