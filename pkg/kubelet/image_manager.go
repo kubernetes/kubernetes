@@ -207,15 +207,16 @@ func (im *realImageManager) GarbageCollect() error {
 	if usagePercent >= im.policy.HighThresholdPercent {
 		amountToFree := usage - (int64(im.policy.LowThresholdPercent) * capacity / 100)
 		glog.Infof("[ImageManager]: Disk usage on %q (%s) is at %d%% which is over the high threshold (%d%%). Trying to free %d bytes", fsInfo.Device, fsInfo.Mountpoint, usagePercent, im.policy.HighThresholdPercent, amountToFree)
-		freed, err := im.freeSpace(amountToFree)
-		if err != nil {
-			return err
-		}
-
-		if freed < amountToFree {
-			err := fmt.Errorf("failed to garbage collect required amount of images. Wanted to free %d, but freed %d", amountToFree, freed)
-			im.recorder.Eventf(im.nodeRef, api.EventTypeWarning, container.FreeDiskSpaceFailed, err.Error())
-			return err
+		if amountToFree > 0 {
+			freed, err := im.freeSpace(amountToFree)
+			if err != nil {
+				return err
+			}
+			if freed < amountToFree {
+				err := fmt.Errorf("failed to garbage collect required amount of bytes. Wanted to free %d, but freed %d", amountToFree, freed)
+				im.recorder.Eventf(im.nodeRef, api.EventTypeWarning, container.FreeDiskSpaceFailed, err.Error())
+				return err
+			}
 		}
 	}
 
