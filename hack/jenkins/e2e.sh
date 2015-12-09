@@ -361,6 +361,7 @@ GCE_PARALLEL_FLAKY_TESTS=(
     "DaemonRestart"
     "Elasticsearch"
     "Namespaces.*should\sdelete\sfast"
+    "Pods.*back-off\srestarting.*LivenessProbe" # issue: #18293
     "ServiceAccounts"
     "Services.*identically\snamed" # error waiting for reachability, issue: #16285
     )
