@@ -153,8 +153,11 @@ kube::util::host_platform() {
     s390x*)
       host_arch=s390x
       ;;
+    ppc64le*)
+      host_arch=ppc64le
+      ;;
     *)	
-      kube::log::error "Unsupported host arch. Must be x86_64, 386, arm or s390x."
+      kube::log::error "Unsupported host arch. Must be x86_64, 386, arm, s390x or ppc64le."
       exit 1
       ;;
   esac
