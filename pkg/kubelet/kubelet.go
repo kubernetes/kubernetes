@@ -188,7 +188,6 @@ func NewMainKubelet(
 	imageGCPolicy ImageGCPolicy,
 	diskSpacePolicy DiskSpacePolicy,
 	cloud cloudprovider.Interface,
-	nodeLabels []string,
 	nodeLabelsFile string,
 	nodeStatusUpdateFrequency time.Duration,
 	resourceContainer string,
@@ -310,7 +309,6 @@ func NewMainKubelet(
 		volumeManager:                  volumeManager,
 		cloud:                          cloud,
 		nodeRef:                        nodeRef,
-		nodeLabels:                     nodeLabels,
 		nodeLabelsFile:                 nodeLabelsFile,
 		nodeStatusUpdateFrequency:      nodeStatusUpdateFrequency,
 		resourceContainer:              resourceContainer,
@@ -528,9 +526,6 @@ type Kubelet struct {
 	serviceLister          serviceLister
 	nodeLister             nodeLister
 	nodeInfo               predicates.NodeInfo
-
-	// a list of node labels to register
-	nodeLabels []string
 
 	// the path to a yaml or json file container series of node labels
 	nodeLabelsFile string
@@ -936,16 +931,18 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 		},
 	}
 
-	labels, err := kl.getNodeLabels()
-	if err != nil {
-		return nil, err
-	}
-	// @question: should this be place after the call to the cloud provider? which also applies labels
-	for k, v := range labels {
-		if cv, found := node.ObjectMeta.Labels[k]; found {
-			glog.Warningf("the node label %s=%s will overwrite default setting %s", k, v, cv)
+	if kl.nodeLabelsFile != "" {
+		labels, err := kl.getNodeLabelsFile(kl.nodeLabelsFile)
+		if err != nil {
+			return nil, err
 		}
-		node.ObjectMeta.Labels[k] = v
+		// @question: should this be place after the call to the cloud provider? which also applies labels
+		for k, v := range labels {
+			if cv, found := node.ObjectMeta.Labels[k]; found {
+				glog.Warningf("the node label %s=%s will overwrite default setting %s", k, v, cv)
+			}
+			node.ObjectMeta.Labels[k] = v
+		}
 	}
 
 	if kl.cloud != nil {
@@ -996,55 +993,12 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 	return node, nil
 }
 
-// getNodeLabels is just a wrapper method for the two below, not to duplicate above
-func (kl *Kubelet) getNodeLabels() (map[string]string, error) {
-	var err error
-	labels := make(map[string]string, 0)
-
-	if kl.nodeLabelsFile != "" {
-		labels, err = kl.retrieveNodeLabelsFile(kl.nodeLabelsFile)
-		if err != nil {
-			return labels, err
-		}
-	}
-	// step: apply the command line label - permitted to override those from file
-	if len(kl.nodeLabels) > 0 {
-		nl, err := kl.retrieveNodeLabels(kl.nodeLabels)
-		if err != nil {
-			return labels, err
-		}
-		for k, v := range nl {
-			if vl, found := labels[k]; found {
-				glog.Warningf("the --node-label %s=%s option will overwrite %s from node-labels-file", k, v, vl)
-			}
-			labels[k] = v
-		}
-	}
-
-	return labels, nil
-}
-
-// retrieveNodeLabels extracts the node labels specified on the command line
-func (kl *Kubelet) retrieveNodeLabels(labels []string) (map[string]string, error) {
-	nodeLabels := make(map[string]string, 0)
-
-	for _, label := range labels {
-		items := strings.Split(label, "=")
-		if len(items) != 2 {
-			return nodeLabels, fmt.Errorf("--node-label %s, should be in the form key=pair", label)
-		}
-		nodeLabels[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
-	}
-
-	return nodeLabels, nil
-}
-
-// retrieveNodeLabelsFile reads in and parses the yaml or json node labels file
-func (kl *Kubelet) retrieveNodeLabelsFile(path string) (map[string]string, error) {
+// getNodeLabels reads in and parses the yaml or json node labels file
+func (kl *Kubelet) getNodeLabelsFile(filename string) (map[string]string, error) {
 	labels := make(map[string]string, 0)
 	kps := make(map[string]interface{}, 0)
 
-	fd, err := os.Open(path)
+	fd, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -1052,7 +1006,7 @@ func (kl *Kubelet) retrieveNodeLabelsFile(path string) (map[string]string, error
 
 	err = yaml.NewYAMLOrJSONDecoder(bufio.NewReader(fd), 12).Decode(&kps)
 	if err != nil {
-		return nil, fmt.Errorf("the --node-labels-file %s content is invalid, %s", path, err)
+		return nil, fmt.Errorf("the --node-labels-file %s content is invalid, %s", filename, err)
 	}
 
 	for k, v := range kps {
