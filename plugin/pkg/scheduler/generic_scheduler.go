@@ -63,6 +63,9 @@ type genericScheduler struct {
 	randomLock   sync.Mutex
 }
 
+// Schedule tries to schedule the given pod to one of node in the node list.
+// If it succeeds, it will return the name of the node.
+// If it fails, it will return a Fiterror error with reasons.
 func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeLister) (string, error) {
 	nodes, err := nodeLister.List()
 	if err != nil {
@@ -84,15 +87,16 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 		return "", err
 	}
 
-	priorityList, err := PrioritizeNodes(pod, machinesToPods, g.pods, g.prioritizers, algorithm.FakeNodeLister(filteredNodes), g.extenders)
-	if err != nil {
-		return "", err
-	}
-	if len(priorityList) == 0 {
+	if len(filteredNodes.Items) == 0 {
 		return "", &FitError{
 			Pod:              pod,
 			FailedPredicates: failedPredicateMap,
 		}
+	}
+
+	priorityList, err := PrioritizeNodes(pod, machinesToPods, g.pods, g.prioritizers, algorithm.FakeNodeLister(filteredNodes), g.extenders)
+	if err != nil {
+		return "", err
 	}
 
 	return g.selectHost(priorityList)
