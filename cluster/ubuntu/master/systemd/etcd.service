@@ -1,0 +1,11 @@
+[Unit]
+Description=Etcd service
+After=network.target local-fs.target docker.service
+Requires=docker.service
+
+[Service]
+EnvironmentFile=-/etc/default/etcd
+ExecStart=/opt/bin/etcd $ETCD_OPTS
+
+[Install]
+WantedBy=multi-user.target

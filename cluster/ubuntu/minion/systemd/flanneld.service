@@ -1,0 +1,12 @@
+[Unit]
+Description=Flannel service
+After=network.target local-fs.target docker.service
+Requires=docker.service
+
+[Service]
+EnvironmentFile=-/etc/default/flanneld
+ExecStart=/opt/bin/flanneld $FLANNEL_OPTS
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

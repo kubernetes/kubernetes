@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: etcd
-        image: gcr.io/google_containers/etcd:2.0.9
+        image: daocloud.io/gpx_dev/etcd:2.0.12
         resources:
           limits:
             cpu: 100m
@@ -40,7 +40,7 @@ spec:
         - name: etcd-storage
           mountPath: /var/etcd/data
       - name: kube2sky
-        image: gcr.io/google_containers/kube2sky:1.11
+        image: daocloud.io/gpx_dev/kube2sky:1.11
         resources:
           limits:
             cpu: 100m
@@ -49,7 +49,7 @@ spec:
         # command = "/kube2sky"
         - -domain={{ pillar['dns_domain'] }}
       - name: skydns
-        image: gcr.io/google_containers/skydns:2015-10-13-8c72f8c
+        image: daocloud.io/gpx_dev/skydns:2015-10-13-8c72f8c
         resources:
           limits:
             cpu: 100m
@@ -82,7 +82,7 @@ spec:
           initialDelaySeconds: 1
           timeoutSeconds: 5
       - name: healthz
-        image: gcr.io/google_containers/exechealthz:1.0
+        image: daocloud.io/gpx_dev/exechealthz:1.0
         resources:
           limits:
             cpu: 10m

@@ -130,6 +130,13 @@ If all things goes right, you will see the below message from console indicating
 Cluster validation succeeded
 ```
 
+As using flannel net, you should substitute docker bridge with flannel net settings as change the systemd config of docker.
+
+```docker.service
+EnvironmentFile=-/run/flannel/subnet.env
+ExecStart=/usr/bin/docker daemon -H fd:// --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU}
+```
+
 ### Test it out
 
 You can use `kubectl` command to check if the newly created k8s is working correctly.

@@ -1,0 +1,13 @@
+[Unit]
+Description=Kube-Apiserver service
+After=etcd.service flanneld.service
+Requires=etcd.service flanneld.service
+BindsTo=etcd.service
+
+[Service]
+EnvironmentFile=-/etc/default/kube-apiserver
+ExecStart=/opt/bin/kube-apiserver $KUBE_APISERVER_OPTS
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

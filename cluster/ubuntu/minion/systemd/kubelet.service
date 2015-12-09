@@ -1,0 +1,14 @@
+[Unit]
+Description=Kubelet service
+After=flanneld.service
+Requires=flanneld.service
+BindsTo=flanneld.service
+
+[Service]
+EnvironmentFile=-/etc/default/kubelet
+ExecStart=/opt/bin/kubelet $KUBELET_OPTS
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+

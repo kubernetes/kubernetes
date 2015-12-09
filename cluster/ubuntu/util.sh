@@ -190,7 +190,7 @@ function verify-node(){
 
 function create-etcd-opts(){
   cat <<EOF > ~/kube/default/etcd
-ETCD_OPTS="-name infra
+ETCD_OPTS="-name infra \
 -listen-client-urls http://0.0.0.0:4001 \
 -advertise-client-urls http://127.0.0.1:4001"
 EOF
@@ -359,7 +359,7 @@ function provision-master() {
                             create-kube-controller-manager-opts "${NODE_IPS}"; \
                             create-kube-scheduler-opts; \
                             create-flanneld-opts "127.0.0.1"; \
-                            sudo -p '[sudo] password to start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ;\
+                            sudo -p '[sudo] password to start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/systemd/* /lib/systemd/system/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ;\
                             sudo groupadd -f -r kube-cert; \
                             ${PROXY_SETTING} sudo -E ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
                             sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/; \
@@ -380,7 +380,7 @@ function provision-node() {
                          create-kubelet-opts "${1#*@}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}"; \
                          create-kube-proxy-opts "${MASTER_IP}"; \
                          create-flanneld-opts "${MASTER_IP}"; \
-                         sudo -p '[sudo] password to start node: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
+                         sudo -p '[sudo] password to start node: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/systemd/* /lib/systemd/system/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
                          && sudo mkdir -p /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin; \
                          sudo service flanneld start; \
                          sudo -b ~/kube/reconfDocker.sh "i";"
@@ -404,7 +404,7 @@ function provision-masterandnode() {
                             create-kubelet-opts "${MASTER_IP}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}";
                             create-kube-proxy-opts "${MASTER_IP}";\
                             create-flanneld-opts "127.0.0.1"; \
-                            sudo -p '[sudo] password to start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ; \
+                            sudo -p '[sudo] password to start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/systemd/* /lib/systemd/system/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ ; \
                             sudo groupadd -f -r kube-cert; \
                             ${PROXY_SETTING} sudo -E ~/kube/make-ca-cert.sh ${MASTER_IP} IP:${MASTER_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
                             sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/ && sudo cp ~/kube/minion/* /opt/bin/; \
@@ -425,7 +425,7 @@ function kube-down {
       echo "Cleaning on node ${i#*@}"
       if [[ "${roles[${ii}]}" == "ai" || "${roles[${ii}]}" == "a" ]]; then
         ssh -t $i 'pgrep etcd && sudo -p "[sudo] password to stop master: " service etcd stop && sudo rm -rf /infra*; 
-          sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /etc/init.d/etcd /etc/default/etcd'
+          sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /lib/systemd/system/etcd.service /etc/init.d/etcd /etc/default/etcd'
       elif [[ "${roles[${ii}]}" == "i" ]]; then
         ssh -t $i 'pgrep flanneld && sudo -p "[sudo] password to stop node: " service flanneld stop'
       else
@@ -433,7 +433,7 @@ function kube-down {
       fi
       # Delete the files in order to generate a clean environment, so you can change each node's role at next deployment.
       ssh -t $i 'sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
-      sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
+      sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /lib/systemd/system/kube* /lib/systemd/system/flanneld.service /etc/init.d/kube* /etc/init.d/flanneld;
       sudo rm -rf /etc/default/kube* /etc/default/flanneld; 
       sudo rm -rf ~/kube /var/lib/kubelet'
     }
@@ -475,18 +475,18 @@ function push-master {
     if [[ "${roles[${ii}]}" == "a" ]]; then
       echo "Cleaning master ${i#*@}"
       ssh -t $i 'sudo -p "[sudo] stop the all process: " service etcd stop;
-      sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /etc/init.d/etcd /etc/default/etcd;
+      sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /lib/systemd/system/etcd.service /etc/init.d/etcd /etc/default/etcd;
       sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
-      sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
+      sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /lib/systemd/system/kube* /lib/systemd/system/flanneld.service /etc/init.d/kube* /etc/init.d/flanneld;
       sudo rm -rf /etc/default/kube* /etc/default/flanneld; 
       sudo rm -rf ~/kube' || true
       provision-master
     elif [[ "${roles[${ii}]}" == "ai" ]]; then 
       echo "Cleaning master ${i#*@}"
       ssh -t $i 'sudo -p "[sudo] stop the all process: " service etcd stop;
-      sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /etc/init.d/etcd /etc/default/etcd;
+      sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /lib/systemd/system/etcd.service /etc/init.d/etcd /etc/default/etcd;
       sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
-      sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
+      sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /lib/systemd/system/kube* /lib/systemd/system/flanneld.service /etc/init.d/kube* /etc/init.d/flanneld;
       sudo rm -rf /etc/default/kube* /etc/default/flanneld; 
       sudo rm -rf ~/kube' || true
       provision-masterandnode
@@ -520,7 +520,7 @@ function push-node() {
       echo "Cleaning node ${i#*@}"
       ssh -t $i 'sudo -p "[sudo] stop the all process: " service flanneld stop;
       sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
-      sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
+      sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /lib/systemd/system/kube* /lib/systemd/system/flanneld.service /etc/init.d/kube* /etc/init.d/flanneld;
       sudo rm -rf /etc/default/kube* /etc/default/flanneld; 
       sudo rm -rf ~/kube' || true
       provision-node $i
@@ -562,7 +562,7 @@ function kube-push {
       echo "Cleaning on node ${i#*@}"
       if [[ "${roles[${ii}]}" == "ai" || "${roles[${ii}]}" == "a" ]]; then
         ssh -t $i 'pgrep etcd && sudo -p "[sudo] password to stop master: " service etcd stop; 
-        sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /etc/init.d/etcd /etc/default/etcd' || true
+        sudo rm -rf /opt/bin/etcd* /etc/init/etcd.conf /lib/systemd/system/etcd.service /etc/init.d/etcd /etc/default/etcd' || true
       elif [[ "${roles[${ii}]}" == "i" ]]; then
         ssh -t $i 'pgrep flanneld && sudo -p "[sudo] password to stop node: " service flanneld stop' || true
       else
@@ -570,7 +570,7 @@ function kube-push {
       fi
 
       ssh -t $i 'sudo rm -f /opt/bin/kube* /opt/bin/flanneld;
-      sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /etc/init.d/kube* /etc/init.d/flanneld;
+      sudo rm -rf /etc/init/kube* /etc/init/flanneld.conf /lib/systemd/system/kube* /lib/systemd/system/flanneld.service /etc/init.d/kube* /etc/init.d/flanneld;
       sudo rm -rf /etc/default/kube* /etc/default/flanneld; 
       sudo rm -rf ~/kube' || true
     }

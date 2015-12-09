@@ -1,0 +1,13 @@
+[Unit]
+Description=Kube-Scheduler service
+After=etcd.service flanneld.service
+Requires=etcd.service flanneld.service
+BindsTo=etcd.service
+
+[Service]
+EnvironmentFile=-/etc/default/kube-scheduler
+ExecStart=/opt/bin/kube-scheduler $KUBE_SCHEDULER_OPTS
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
