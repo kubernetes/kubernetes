@@ -25,7 +25,10 @@ import (
 func ValidateEvent(event *api.Event) validation.ErrorList {
 	allErrs := validation.ErrorList{}
 	// There is no namespace required for node.
+	// However, older client code accidentally sets event.Namespace
+	// to api.NamespaceDefault, so we accept that too, but "" is preferred.
 	if event.InvolvedObject.Kind == "Node" &&
+		event.Namespace != api.NamespaceDefault &&
 		event.Namespace != "" {
 		allErrs = append(allErrs, validation.NewInvalidError(validation.NewFieldPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "namespace is not required for node"))
 	}
