@@ -264,6 +264,7 @@ script
 		--configure-cbr0=true \
 		--cgroup-root=/ \
 		--system-container=/system \
+		--nosystemd=true \
 		${ARGS}
 end script
 
