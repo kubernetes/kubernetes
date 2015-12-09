@@ -87,10 +87,12 @@ func (md *metricsDu) runStatfs(metrics *Metrics) error {
 		return fmt.Errorf("failed to call statfs due to error %v", err)
 	}
 
-	// Available is blocks available * fragment size
-	metrics.Available = resource.NewQuantity(int64(statfs.Bavail)*statfs.Frsize, resource.BinarySI)
+	// Available is blocks available * block size
+	// Note: using fragment size instead of block size will cause the build to fail on macs
+	metrics.Available = resource.NewQuantity(int64(statfs.Bavail)*int64(statfs.Bsize), resource.BinarySI)
 
-	// Capacity is block count * fragment size
-	metrics.Capacity = resource.NewQuantity(int64(statfs.Blocks)*statfs.Frsize, resource.BinarySI)
+	// Capacity is block count * block size
+	// Note: using fragment size instead of block size will cause the build to fail on macs
+	metrics.Capacity = resource.NewQuantity(int64(statfs.Blocks)*int64(statfs.Bsize), resource.BinarySI)
 	return nil
 }

@@ -274,8 +274,8 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	}
 }
 
-// TestVolumeMetrics tests that VolumeMetrics methods return sane values.
-func TestVolumeMetrics(t *testing.T) {
+// TestMetrics tests that MetricProvider methods return sane values.
+func TestMetrics(t *testing.T) {
 	// Create an empty temp directory for the volume
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "host_path_test")
 	if err != nil {
