@@ -73,9 +73,13 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*api.Node, error) {
 }
 
 func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
+	// fast path if there is no conflict checking targets.
+	if volume.GCEPersistentDisk == nil && volume.AWSElasticBlockStore == nil && volume.RBD == nil {
+		return false
+	}
+
 	for _, existingVolume := range pod.Spec.Volumes {
-		// Same GCE Disk can be mounted as read-only by multiple pod simultaneously.
-		// Or they conflicts
+		// Same GCE disk mounted by multiple pods conflicts unless all pods mount it read-only.
 		if volume.GCEPersistentDisk != nil && existingVolume.GCEPersistentDisk != nil {
 			disk, existingDisk := volume.GCEPersistentDisk, existingVolume.GCEPersistentDisk
 			if disk.PDName == existingDisk.PDName && !(disk.ReadOnly && existingDisk.ReadOnly) {
