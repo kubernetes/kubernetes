@@ -102,7 +102,7 @@ function configure_upgrade_step() {
   local -r cluster_name="$3"
   local -r project="$4"
 
-  [[ "${JOB_NAME}" =~ .*-(step[1-6])-.* ]] || {
+  [[ "${JOB_NAME}" =~ .*-(step[1-7])-.* ]] || {
     echo "JOB_NAME ${JOB_NAME} is not a valid upgrade job name, could not parse"
     exit 1
   }
