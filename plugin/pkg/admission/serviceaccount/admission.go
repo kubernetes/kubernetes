@@ -90,8 +90,8 @@ type serviceAccount struct {
 func NewServiceAccount(cl client.Interface) *serviceAccount {
 	serviceAccountsIndexer, serviceAccountsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return cl.ServiceAccounts(api.NamespaceAll).List(unversioned.ListOptions{})
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return cl.ServiceAccounts(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return cl.ServiceAccounts(api.NamespaceAll).Watch(options)
@@ -104,8 +104,8 @@ func NewServiceAccount(cl client.Interface) *serviceAccount {
 	tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
 	secretsIndexer, secretsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{tokenSelector}}
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				options.FieldSelector.Selector = tokenSelector
 				return cl.Secrets(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {

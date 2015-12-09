@@ -387,7 +387,7 @@ func newCacherListerWatcher(storage Interface, resourcePrefix string, newListFun
 }
 
 // Implements cache.ListerWatcher interface.
-func (lw *cacherListerWatcher) List() (runtime.Object, error) {
+func (lw *cacherListerWatcher) List(options unversioned.ListOptions) (runtime.Object, error) {
 	list := lw.newListFunc()
 	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, 0, Everything, list); err != nil {
 		return nil, err

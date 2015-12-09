@@ -122,7 +122,7 @@ func (f *FakeControllerSource) Change(e watch.Event, watchProbability float64) {
 }
 
 // List returns a list object, with its resource version set.
-func (f *FakeControllerSource) List() (runtime.Object, error) {
+func (f *FakeControllerSource) List(options unversioned.ListOptions) (runtime.Object, error) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	list := make([]runtime.Object, 0, len(f.items))

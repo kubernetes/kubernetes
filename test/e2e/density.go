@@ -235,8 +235,8 @@ var _ = Describe("Density [Skipped]", func() {
 			events := make([](*api.Event), 0)
 			_, controller := controllerframework.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func() (runtime.Object, error) {
-						return c.Events(ns).List(unversioned.ListOptions{})
+					ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+						return c.Events(ns).List(options)
 					},
 					WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 						return c.Events(ns).Watch(options)
@@ -318,9 +318,9 @@ var _ = Describe("Density [Skipped]", func() {
 				additionalPodsPrefix = "density-latency-pod-" + string(util.NewUUID())
 				_, controller := controllerframework.NewInformer(
 					&cache.ListWatch{
-						ListFunc: func() (runtime.Object, error) {
+						ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
 							selector := labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
-							options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+							options.LabelSelector.Selector = selector
 							return c.Pods(ns).List(options)
 						},
 						WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {

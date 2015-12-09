@@ -83,8 +83,8 @@ func NewJobController(kubeClient client.Interface, resyncPeriod controller.Resyn
 
 	jm.jobStore.Store, jm.jobController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return jm.kubeClient.Extensions().Jobs(api.NamespaceAll).List(unversioned.ListOptions{})
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return jm.kubeClient.Extensions().Jobs(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return jm.kubeClient.Extensions().Jobs(api.NamespaceAll).Watch(options)
@@ -106,8 +106,8 @@ func NewJobController(kubeClient client.Interface, resyncPeriod controller.Resyn
 
 	jm.podStore.Store, jm.podController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return jm.kubeClient.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return jm.kubeClient.Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 				return jm.kubeClient.Pods(api.NamespaceAll).Watch(options)
