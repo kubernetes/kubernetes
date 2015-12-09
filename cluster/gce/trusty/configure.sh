@@ -144,8 +144,19 @@ install_additional_packages() {
   fi
 }
 
-# Downloads kubernetes binaries and salt tarball, unpacks them, and places them
-# to suitable directories.
+# Retry a download until we get it.
+#
+# $1 is the file to create
+# $2 is the URL to download
+download_or_bust() {
+  rm -f $1 > /dev/null
+  until curl --ipv4 -Lo "$1" --connect-timeout 20 --retry 6 --retry-delay 10 "$2"; do
+    echo "Failed to download file ($2). Retrying."
+  done
+}
+
+# Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
+# and places them into suitable directories.
 install_kube_binary_config() {
   . /etc/kube-env
   # For a testing cluster, we pull kubelet, kube-proxy, and kubectl binaries,
@@ -160,10 +171,10 @@ install_kube_binary_config() {
     cd /tmp
     k8s_sha1="${SERVER_BINARY_TAR_URL##*/}.sha1"
     echo "Downloading k8s tar sha1 file ${k8s_sha1}"
-    curl -Lo "${k8s_sha1}" --connect-timeout 20 --retry 6 --retry-delay 2 "${SERVER_BINARY_TAR_URL}.sha1"
+    download_or_bust "${k8s_sha1}" "${SERVER_BINARY_TAR_URL}.sha1"
     k8s_tar="${SERVER_BINARY_TAR_URL##*/}"
     echo "Downloading k8s tar file ${k8s_tar}"
-    curl -Lo "${k8s_tar}" --connect-timeout 20 --retry 6 --retry-delay 2 "${SERVER_BINARY_TAR_URL}"
+    download_or_bust "${k8s_tar}" "${SERVER_BINARY_TAR_URL}"
     # Validate hash.
     actual=$(sha1sum ${k8s_tar} | awk '{ print $1 }') || true
     if [ "${actual}" != "${SERVER_BINARY_TAR_HASH}" ]; then
@@ -178,27 +189,26 @@ install_kube_binary_config() {
     rm -rf "/tmp/kubernetes"
     rm "/tmp/${k8s_tar}"
     rm "/tmp/${k8s_sha1}"
-	fi
-
-  # Put saltbase configuration files in /etc/saltbase. We will use the add-on yaml files.
-  mkdir -p /etc/saltbase
-  cd /etc/saltbase
-  salt_sha1="${SALT_TAR_URL##*/}.sha1"
-  echo "Downloading Salt tar sha1 file ${salt_sha1}"
-  curl -Lo "${salt_sha1}" --connect-timeout 20 --retry 6 --retry-delay 2 "${SALT_TAR_URL}.sha1"
-  salt_tar="${SALT_TAR_URL##*/}"
-  echo "Downloading Salt tar file ${salt_tar}"
-  curl -Lo "${salt_tar}" --connect-timeout 20 --retry 6 --retry-delay 2 "${SALT_TAR_URL}"
-  # Validate hash.
-  actual=$(sha1sum ${salt_tar} | awk '{ print $1 }') || true
-  if [ "${actual}" != "${SALT_TAR_HASH}" ]; then
-    echo "== ${salt_tar} corrupted, sha1 ${actual} doesn't match expected ${SALT_TAR_HASH} =="
-  else
-    echo "Validated ${SALT_TAR_URL} SHA1 = ${SALT_TAR_HASH}"
   fi
-  tar xzf "/etc/saltbase/${salt_tar}" -C /etc/saltbase/ --overwrite
-  rm "/etc/saltbase/${salt_sha1}"
-  rm "/etc/saltbase/${salt_tar}"
+
+  # Put kube-system pods manifests in /etc/kube-manifests/.
+  cd /etc
+  manifests_sha1="${KUBE_MANIFESTS_TAR_URL##*/}.sha1"
+  echo "Downloading kube-manifests tar sha1 file ${manifests_sha1}"
+  download_or_bust "${manifests_sha1}" "${KUBE_MANIFESTS_TAR_URL}.sha1"
+  manifests_tar="${KUBE_MANIFESTS_TAR_URL##*/}"
+  echo "Downloading kube-manifest tar file ${manifests_tar}"
+  download_or_bust "${manifests_tar}" "${KUBE_MANIFESTS_TAR_URL}"
+  # Validate hash.
+  actual=$(sha1sum ${manifests_tar} | awk '{ print $1 }') || true
+  if [ "${actual}" != "${KUBE_MANIFESTS_TAR_HASH}" ]; then
+    echo "== ${manifests_tar} corrupted, sha1 ${actual} doesn't match expected ${KUBE_MANIFESTS_TAR_HASH} =="
+  else
+    echo "Validated ${KUBE_MANIFESTS_TAR_URL} SHA1 = ${KUBE_MANIFESTS_TAR_HASH}"
+  fi
+  tar xzf "/etc/${manifests_tar}" -C /etc/ --overwrite
+  rm "/etc/${manifests_sha1}"
+  rm "/etc/${manifests_tar}"
 }
 
 restart_docker_daemon() {
@@ -208,7 +218,7 @@ restart_docker_daemon() {
   if [ "${TEST_CLUSTER:-}" = "true" ]; then
     DOCKER_OPTS="${DOCKER_OPTS} --log-level=debug"
   fi
-  echo "DOCKER_OPTS=\"${DOCKER_OPTS} ${EXTRA_DOCKER_OPTS}\"" > /etc/default/docker
+  echo "DOCKER_OPTS=\"${DOCKER_OPTS} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
   # Make sure the network interface cbr0 is created before restarting docker daemon
   while ! [ -L /sys/class/net/cbr0 ]; do
     echo "Sleep 1 second to wait for cbr0"
