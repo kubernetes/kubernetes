@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
+	"encoding/json"
 	"math/big"
 	"time"
 
@@ -16,6 +17,19 @@ func NewPublicKey(jwk jose.JWK) *PublicKey {
 
 type PublicKey struct {
 	jwk jose.JWK
+}
+
+func (k *PublicKey) MarshalJSON() ([]byte, error) {
+	return json.Marshal(k.jwk)
+}
+
+func (k *PublicKey) UnmarshalJSON(data []byte) error {
+	var jwk jose.JWK
+	if err := json.Unmarshal(data, &jwk); err != nil {
+		return err
+	}
+	k.jwk = jwk
+	return nil
 }
 
 func (k *PublicKey) ID() string {
