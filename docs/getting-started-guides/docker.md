@@ -44,6 +44,7 @@ Running Kubernetes locally via Docker
 - [Run an application](#run-an-application)
 - [Expose it as a service](#expose-it-as-a-service)
 - [A note on turning down your cluster](#a-note-on-turning-down-your-cluster)
+- [Troubleshooting](#troubleshooting)
 
 ### Overview
 
@@ -55,35 +56,7 @@ Here's a diagram of what the final result will look like:
 ### Prerequisites
 
 1. You need to have docker installed on one machine.
-2. Your kernel should support memory and swap accounting. Ensure that the
-following configs are turned on in your linux kernel:
-
-    ```console
-    CONFIG_RESOURCE_COUNTERS=y
-    CONFIG_MEMCG=y
-    CONFIG_MEMCG_SWAP=y
-    CONFIG_MEMCG_SWAP_ENABLED=y
-    CONFIG_MEMCG_KMEM=y
-    ```
-
-3. Enable the memory and swap accounting in the kernel, at boot, as command line
-parameters as follows:
-
-    ```console
-    GRUB_CMDLINE_LINUX="cgroup_enable=memory swapaccount=1"
-    ```
-
-    NOTE: The above is specifically for GRUB2.
-    You can check the command line parameters passed to your kernel by looking at the
-    output of /proc/cmdline:
-
-    ```console
-    $cat /proc/cmdline
-    BOOT_IMAGE=/boot/vmlinuz-3.18.4-aufs root=/dev/sda5 ro cgroup_enable=memory
-    swapaccount=1
-    ```
-
-4. Decide what Kubernetes version to use.  Set the `${K8S_VERSION}` variable to
+2. Decide what Kubernetes version to use.  Set the `${K8S_VERSION}` variable to
    a value such as "1.1.1".
 
 ### Step One: Run etcd
@@ -225,6 +198,40 @@ Many of these containers run under the management of the `kubelet` binary, which
 the cluster, you need to first kill the kubelet container, and then any other containers.
 
 You may use `docker kill $(docker ps -aq)`, note this removes _all_ containers running under Docker, so use with caution.
+
+### Troubleshooting
+
+#### Node is in ```NotReady``` state
+
+If you see your node as ```NotReady``` it's possible that your OS does not have memcg and swap enabled.
+
+1. Your kernel should support memory and swap accounting. Ensure that the
+following configs are turned on in your linux kernel:
+
+    ```console
+    CONFIG_RESOURCE_COUNTERS=y
+    CONFIG_MEMCG=y
+    CONFIG_MEMCG_SWAP=y
+    CONFIG_MEMCG_SWAP_ENABLED=y
+    CONFIG_MEMCG_KMEM=y
+    ```
+
+2. Enable the memory and swap accounting in the kernel, at boot, as command line
+parameters as follows:
+
+    ```console
+    GRUB_CMDLINE_LINUX="cgroup_enable=memory swapaccount=1"
+    ```
+
+    NOTE: The above is specifically for GRUB2.
+    You can check the command line parameters passed to your kernel by looking at the
+    output of /proc/cmdline:
+
+    ```console
+    $cat /proc/cmdline
+    BOOT_IMAGE=/boot/vmlinuz-3.18.4-aufs root=/dev/sda5 ro cgroup_enable=memory
+    swapaccount=1
+    ```
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker.md?pixel)]()
