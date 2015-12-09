@@ -3,11 +3,29 @@
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Creating a Kubernetes Cluster
+Creating a Kubernetes Cluster
+----------------------------------------
 
 Kubernetes can run on a range of platforms, from your laptop, to VMs on a cloud provider, to rack of
 bare metal servers.  The effort required to set up a cluster varies from running a single command to
 crafting your own customized cluster.  We'll guide you in picking a solution that fits for your needs.
+
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+  - [Picking the Right Solution](#picking-the-right-solution)
+    - [Local-machine Solutions](#local-machine-solutions)
+    - [Hosted Solutions](#hosted-solutions)
+    - [Turn-key Cloud Solutions](#turn-key-cloud-solutions)
+    - [Custom Solutions](#custom-solutions)
+      - [Cloud](#cloud)
+      - [On-Premises VMs](#on-premises-vms)
+      - [Bare Metal](#bare-metal)
+      - [Integrations](#integrations)
+  - [Table of Solutions](#table-of-solutions)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 
 ## Picking the Right Solution
 
@@ -33,9 +51,10 @@ physical machine.  Setup is completely automated and doesn't require a cloud pro
 But their size and availability is limited to that of a single machine.
 
 The local-machine solutions are:
-  - [Local Docker-based](docker.md) (recommended starting point)
-  - [Vagrant](vagrant.md) (works on any platform with Vagrant: Linux, MacOS, or Windows.)
-  - [No-VM local cluster](locally.md) (Linux only)
+
+- [Local Docker-based](docker.md) (recommended starting point)
+- [Vagrant](vagrant.md) (works on any platform with Vagrant: Linux, MacOS, or Windows.)
+- [No-VM local cluster](locally.md) (Linux only)
 
 
 ### Hosted Solutions
@@ -47,6 +66,7 @@ clusters.
 
 These solutions allow you to create Kubernetes clusters on a range of Cloud IaaS providers with only a
 few commands, and have active community support.
+
 - [GCE](gce.md)
 - [AWS](aws.md)
 - [Azure](coreos/azure/README.md)
@@ -67,6 +87,7 @@ writing a new solution](../../docs/devel/writing-a-getting-started-guide.md).
 #### Cloud
 
 These solutions are combinations of cloud provider and OS not covered by the above solutions.
+
 - [AWS + coreos](coreos.md)
 - [GCE + CoreOS](coreos.md)
 - [AWS + Ubuntu](juju.md)
@@ -150,21 +171,23 @@ any                  | any          | any    | any         | [docs](scratch.md) 
 *Note*: The above table is ordered by version test/used in notes followed by support level.
 
 Definition of columns:
-  - **IaaS Provider** is who/what provides the virtual or physical machines (nodes) that Kubernetes runs on.
-  - **OS** is the base operating system of the nodes.
-  - **Config. Mgmt** is the configuration management system that helps install and maintain Kubernetes software on the
-    nodes.
-  - **Networking** is what implements the [networking model](../../docs/admin/networking.md).  Those with networking type
-    _none_ may not support more than one node, or may support multiple VM nodes only in the same physical node.
-  - **Conformance** indicates whether a cluster created with this configuration has passed the project's conformance
-    tests for supporting the API and base features of Kubernetes v1.0.0.
-  - Support Levels
-    - **Project**:  Kubernetes Committers regularly use this configuration, so it usually works with the latest release
-      of Kubernetes.
-    - **Commercial**: A commercial offering with its own support arrangements.
-    - **Community**: Actively supported by community contributions. May not work with more recent releases of Kubernetes.
-    - **Inactive**: No active maintainer.  Not recommended for first-time Kubernetes users, and may be deleted soon.
-  - **Notes** is relevant information such as the version of Kubernetes used.
+
+- **IaaS Provider** is who/what provides the virtual or physical machines (nodes) that Kubernetes runs on.
+- **OS** is the base operating system of the nodes.
+- **Config. Mgmt** is the configuration management system that helps install and maintain Kubernetes software on the
+  nodes.
+- **Networking** is what implements the [networking model](../../docs/admin/networking.md).  Those with networking type
+  _none_ may not support more than one node, or may support multiple VM nodes only in the same physical node.
+- **Conformance** indicates whether a cluster created with this configuration has passed the project's conformance
+  tests for supporting the API and base features of Kubernetes v1.0.0.
+- Support Levels
+  - **Project**:  Kubernetes Committers regularly use this configuration, so it usually works with the latest release
+    of Kubernetes.
+  - **Commercial**: A commercial offering with its own support arrangements.
+  - **Community**: Actively supported by community contributions. May not work with more recent releases of Kubernetes.
+  - **Inactive**: No active maintainer.  Not recommended for first-time Kubernetes users, and may be deleted soon.
+- **Notes** is relevant information such as the version of Kubernetes used.
+
 
 <!-- reference style links below here -->
 <!-- GCE conformance test result -->
