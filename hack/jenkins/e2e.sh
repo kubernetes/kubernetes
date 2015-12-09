@@ -788,17 +788,17 @@ case ${JOB_NAME} in
   #
   # Test upgrades from the latest release-1.1 build to the latest master build.
   #
-  # Configurations for step2, step4, and step6 live in master.
+  # Configurations for step2, step3, step5, and step7 live in master.
 
   kubernetes-upgrade-gke-1.1-master-step1-deploy)
     configure_upgrade_step 'ci/latest-1.1' 'configured-in-master' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-1.1-master-step3-e2e-old)
+  kubernetes-upgrade-gke-1.1-master-step4-e2e-old)
     configure_upgrade_step 'ci/latest-1.1' 'configured-in-master' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-1.1-master-step5-e2e-old)
+  kubernetes-upgrade-gke-1.1-master-step6-e2e-old)
     configure_upgrade_step 'ci/latest-1.1' 'configured-in-master' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
@@ -807,17 +807,21 @@ case ${JOB_NAME} in
   # Test upgrades from the latest release-1.0 build to the latest current
   # release build.
   #
-  # Configurations for step1, step3, and step5 live in the release-1.0 branch.
+  # Configurations for step1, step4, and step6 live in the release-1.0 branch.
 
-  kubernetes-upgrade-gke-1.0-current-release-step2-upgrade-master)
+  kubernetes-upgrade-gke-1.0-current-release-step2-kubectl-e2e-new)
     configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-1.0-current-release-step4-upgrade-cluster)
+  kubernetes-upgrade-gke-1.0-current-release-step3-upgrade-master)
     configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-1.0-current-release-step6-e2e-new)
+  kubernetes-upgrade-gke-1.0-current-release-step5-upgrade-cluster)
+    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
+  kubernetes-upgrade-gke-1.0-current-release-step7-e2e-new)
     configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
@@ -829,23 +833,27 @@ case ${JOB_NAME} in
     configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-current-release-step2-upgrade-master)
+  kubernetes-upgrade-gke-stable-current-release-step2-kubectl-e2e-new)
     configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-current-release-step3-e2e-old)
+  kubernetes-upgrade-gke-stable-current-release-step3-upgrade-master)
     configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-current-release-step4-upgrade-cluster)
+  kubernetes-upgrade-gke-stable-current-release-step4-e2e-old)
     configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-current-release-step5-e2e-old)
+  kubernetes-upgrade-gke-stable-current-release-step5-upgrade-cluster)
     configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-current-release-step6-e2e-new)
+  kubernetes-upgrade-gke-stable-current-release-step6-e2e-old)
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
+  kubernetes-upgrade-gke-stable-current-release-step7-e2e-new)
     configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 esac
