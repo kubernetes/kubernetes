@@ -17,27 +17,21 @@ limitations under the License.
 package e2e_node
 
 import (
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"time"
 
-	"flag"
-	"testing"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
-var kubeletAddress = flag.String("kubelet-address", "localhost:10250", "Host and port of the kubelet")
-var apiServerAddress = flag.String("api-server-address", "localhost:8080", "Host and port of the api server")
-var nodeName = flag.String("node-name", "", "Name of the node")
+type RetryFn func(cl *client.Client) error
 
-func TestE2eNode(t *testing.T) {
-	flag.Parse()
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "E2eNode Suite")
+func Retry(maxWait time.Duration, wait time.Duration, cl *client.Client, retry RetryFn) []error {
+	errs := []error{}
+	for start := time.Now(); time.Now().Before(start.Add(maxWait)); {
+		if err := retry(cl); err != nil {
+			errs = append(errs, err)
+		} else {
+			return []error{}
+		}
+	}
+	return errs
 }
-
-// Setup the kubelet on the node
-var _ = BeforeSuite(func() {
-})
-
-// Tear down the kubelet on the node
-var _ = AfterSuite(func() {
-})
