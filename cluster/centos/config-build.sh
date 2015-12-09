@@ -20,7 +20,7 @@
 RELEASES_DIR=${RELEASES_DIR:-/tmp/downloads}
 
 # Define flannel version to use.
-FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.3"}
+FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.5"}
 
 # Define etcd version to use.
 ETCD_VERSION=${ETCD_VERSION:-"2.2.1"}
