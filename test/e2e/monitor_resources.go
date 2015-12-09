@@ -32,20 +32,17 @@ var systemContainers = []string{"/docker-daemon", "/kubelet", "/system"}
 
 var allowedUsage = resourceUsagePerContainer{
 	"/docker-daemon": &containerResourceUsage{
-		CPUUsageInCores:         0.08,
-		MemoryUsageInBytes:      4500000000,
+		CPUUsageInCores:         0.1,
 		MemoryWorkingSetInBytes: 1500000000,
 	},
 	// TODO: Make Kubelet constraints sane again when #17774 is fixed.
 	"/kubelet": &containerResourceUsage{
 		CPUUsageInCores:         0.1,
-		MemoryUsageInBytes:      1000000000,
-		MemoryWorkingSetInBytes: 250000000,
+		MemoryWorkingSetInBytes: 300000000,
 	},
 	"/system": &containerResourceUsage{
-		CPUUsageInCores:         0.03,
-		MemoryUsageInBytes:      100000000,
-		MemoryWorkingSetInBytes: 100000000,
+		CPUUsageInCores:         0.05,
+		MemoryWorkingSetInBytes: 700000000,
 	},
 }
 
@@ -58,7 +55,6 @@ func computeAverage(sliceOfUsages []resourceUsagePerContainer) (result resourceU
 		for _, container := range systemContainers {
 			singleResult := &containerResourceUsage{
 				CPUUsageInCores:         result[container].CPUUsageInCores + usage[container].CPUUsageInCores,
-				MemoryUsageInBytes:      result[container].MemoryUsageInBytes + usage[container].MemoryUsageInBytes,
 				MemoryWorkingSetInBytes: result[container].MemoryWorkingSetInBytes + usage[container].MemoryWorkingSetInBytes,
 			}
 			result[container] = singleResult
@@ -67,7 +63,6 @@ func computeAverage(sliceOfUsages []resourceUsagePerContainer) (result resourceU
 	for _, container := range systemContainers {
 		singleResult := &containerResourceUsage{
 			CPUUsageInCores:         result[container].CPUUsageInCores / float64(len(sliceOfUsages)),
-			MemoryUsageInBytes:      result[container].MemoryUsageInBytes / int64(len(sliceOfUsages)),
 			MemoryWorkingSetInBytes: result[container].MemoryWorkingSetInBytes / int64(len(sliceOfUsages)),
 		}
 		result[container] = singleResult
@@ -122,9 +117,6 @@ var _ = Describe("Resource usage of system containers", func() {
 					}
 					if allowedUsage[container].CPUUsageInCores < cUsage.CPUUsageInCores {
 						Logf("CPU is too high for %s (%v)", container, cUsage.CPUUsageInCores)
-					}
-					if allowedUsage[container].MemoryUsageInBytes < cUsage.MemoryUsageInBytes {
-						Logf("Memory use is too high for %s (%v)", container, cUsage.MemoryUsageInBytes)
 					}
 					if allowedUsage[container].MemoryWorkingSetInBytes < cUsage.MemoryWorkingSetInBytes {
 						Logf("Working set is too high for %s (%v)", container, cUsage.MemoryWorkingSetInBytes)
