@@ -65,7 +65,7 @@
 "containers":[
     {
     "name": "kube-controller-manager",
-    "image": "gcr.io/google_containers/kube-controller-manager:{{pillar['kube-controller-manager_docker_tag']}}",
+    "image": "{{pillar['kube_docker_registry']}}/kube-controller-manager:{{pillar['kube-controller-manager_docker_tag']}}",
     "resources": {
       "limits": {
         "cpu": "200m"
