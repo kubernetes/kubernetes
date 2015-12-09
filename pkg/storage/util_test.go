@@ -25,7 +25,6 @@ import (
 func TestEtcdParseWatchResourceVersion(t *testing.T) {
 	testCases := []struct {
 		Version       string
-		Kind          string
 		ExpectVersion uint64
 		Err           bool
 	}{
@@ -36,7 +35,7 @@ func TestEtcdParseWatchResourceVersion(t *testing.T) {
 		{Version: "10", ExpectVersion: 11},
 	}
 	for _, testCase := range testCases {
-		version, err := ParseWatchResourceVersion(testCase.Version, testCase.Kind)
+		version, err := ParseWatchResourceVersion(testCase.Version)
 		switch {
 		case testCase.Err:
 			if err == nil {

@@ -117,7 +117,7 @@ func TestList(t *testing.T) {
 	var got api.PodList
 	// TODO: a sorted filter function could be applied such implied
 	// ordering on the returned list doesn't matter.
-	err := helper.List(context.TODO(), key, 0, storage.Everything, &got)
+	err := helper.List(context.TODO(), key, "", storage.Everything, &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -156,7 +156,7 @@ func TestListFiltered(t *testing.T) {
 	}
 
 	var got api.PodList
-	err := helper.List(context.TODO(), key, 0, filter, &got)
+	err := helper.List(context.TODO(), key, "", filter, &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -206,7 +206,7 @@ func TestListAcrossDirectories(t *testing.T) {
 	list.Items[2] = *returnedObj
 
 	var got api.PodList
-	err := roothelper.List(context.TODO(), rootkey, 0, storage.Everything, &got)
+	err := roothelper.List(context.TODO(), rootkey, "", storage.Everything, &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
