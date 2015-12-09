@@ -133,6 +133,7 @@ type SyncHandler interface {
 	HandlePodAdditions(pods []*api.Pod)
 	HandlePodUpdates(pods []*api.Pod)
 	HandlePodDeletions(pods []*api.Pod)
+	HandlePodReconcile(pods []*api.Pod)
 	HandlePodSyncs(pods []*api.Pod)
 	HandlePodCleanups() error
 }
@@ -2334,6 +2335,9 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 		case kubetypes.REMOVE:
 			glog.V(2).Infof("SyncLoop (REMOVE, %q): %q", u.Source, format.Pods(u.Pods))
 			handler.HandlePodDeletions(u.Pods)
+		case kubetypes.RECONCILE:
+			glog.V(4).Infof("SyncLoop (RECONCILE, %q): %q", u.Source, format.Pods(u.Pods))
+			handler.HandlePodReconcile(u.Pods)
 		case kubetypes.SET:
 			// TODO: Do we want to support this?
 			glog.Errorf("Kubelet does not support snapshot update")
@@ -2465,6 +2469,14 @@ func (kl *Kubelet) HandlePodDeletions(pods []*api.Pod) {
 			glog.V(2).Infof("Failed to delete pod %q, err: %v", format.Pod(pod), err)
 		}
 		kl.probeManager.RemovePod(pod)
+	}
+}
+
+func (kl *Kubelet) HandlePodReconcile(pods []*api.Pod) {
+	for _, pod := range pods {
+		// Update the pod in pod manager, status manager will do periodically reconcile according
+		// to the pod manager.
+		kl.podManager.UpdatePod(pod)
 	}
 }
 
