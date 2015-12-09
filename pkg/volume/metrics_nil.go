@@ -18,14 +18,14 @@ package volume
 
 import "errors"
 
-var _ VolumeMetricsProvider = &MetricsNil{}
+var _ MetricsProvider = &MetricsNil{}
 
-// MetricsNil represents a VolumeMetricsProvider that does not support returning
+// MetricsNil represents a MetricsProvider that does not support returning
 // Metrics.  It serves as a placeholder for Volumes that do not yet support metrics.
 type MetricsNil struct{}
 
-// See VolumeMetricsProvider.GetCapacityMetrics
-// GetCapacityMetrics returns an empty CapacityMetrics and an error.
-func (*MetricsNil) GetCapacityMetrics() (*CapacityMetrics, error) {
-	return &CapacityMetrics{}, errors.New("metrics are not supported for MetricsNil Volumes")
+// See MetricsProvider.GetMetrics
+// GetMetrics returns an empty Metrics and an error.
+func (*MetricsNil) GetMetrics() (*Metrics, error) {
+	return &Metrics{}, errors.New("metrics are not supported for MetricsNil Volumes")
 }

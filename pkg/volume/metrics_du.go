@@ -20,40 +20,41 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"strconv"
 	"strings"
+	"syscall"
+
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
-var _ VolumeMetricsProvider = &MetricsDu{}
+var _ MetricsProvider = &metricsDu{}
 
-// MetricsDu represents a VolumeMetricsProvider that calculates the used and available
-// Volume capacity by executing the "du" and "df" commands on the Volume path.
-type MetricsDu struct {
+// metricsDu represents a MetricsProvider that calculates the used and available
+// Volume space by executing the "du" command and statfs syscall on the Volume path.
+type metricsDu struct {
 	// the directory path the volume is mounted to.
 	path string
 }
 
-// InitMetricsDu initializes MetricsDu with the Volume path.
-// This is required before MetricsDu can be used.
-func (cm *MetricsDu) InitMetricsDu(path string) {
-	cm.path = path
+// NewMetricsDu creates a new metricsDu with the Volume path.
+func NewMetricsDu(path string) MetricsProvider {
+	return &metricsDu{path}
 }
 
-// See VolumeMetricsProvider.GetCapacityMetrics
-// GetCapacityMetrics calculates the volume usage and device free space by executing "du"
-// and "df" on path.
-func (cm *MetricsDu) GetCapacityMetrics() (*CapacityMetrics, error) {
-	metrics := &CapacityMetrics{}
-	if cm.path == "" {
-		return metrics, errors.New("no path defined for disk usage metrics.  Must call InitMetricsDu.")
+// See MetricsProvider.GetMetrics
+// GetMetrics calculates the volume usage and device free space by executing "du"
+// and statfs on path.
+func (md *metricsDu) GetMetrics() (*Metrics, error) {
+	metrics := &Metrics{}
+	if md.path == "" {
+		return metrics, errors.New("no path defined for disk usage metrics.")
 	}
 
-	err := cm.runDu(metrics)
+	err := md.runDu(metrics)
 	if err != nil {
 		return metrics, err
 	}
 
-	err = cm.runDf(metrics)
+	err = md.runStatfs(metrics)
 	if err != nil {
 		return metrics, err
 	}
@@ -61,69 +62,35 @@ func (cm *MetricsDu) GetCapacityMetrics() (*CapacityMetrics, error) {
 	return metrics, nil
 }
 
-// runDu executes the "du" command and writes the results to metrics.VolumeBytesUsed
-func (cm *MetricsDu) runDu(metrics *CapacityMetrics) error {
+// runDu executes the "du" command and writes the results to metrics.Used
+func (md *metricsDu) runDu(metrics *Metrics) error {
 	// Uses the same niceness level as cadvisor.fs does when running du
 	// Uses -B 1 to always scale to a blocksize of 1 byte
-	out, err := exec.Command("nice", "-n", "19", "du", "-s", "-B", "1", cm.path).CombinedOutput()
+	out, err := exec.Command("nice", "-n", "19", "du", "-s", "-B", "1", md.path).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed command 'du' on %s with error %v", cm.path, err)
+		return fmt.Errorf("failed command 'du' on %s with error %v", md.path, err)
 	}
-	bUsed, err := strconv.ParseUint(strings.Fields(string(out))[0], 10, 64)
+	used, err := resource.ParseQuantity(strings.Fields(string(out))[0])
 	if err != nil {
 		return fmt.Errorf("failed to parse 'du' output %s due to error %v", out, err)
 	}
-	metrics.VolumeBytesUsed = bUsed
+	used.Format = resource.BinarySI
+	metrics.Used = used
 	return nil
 }
 
-// runDf executes the "df" command and writes the results to metrics.DeviceBytesUsed
-// and metrics.DeviceBytesAvailable
-// TODO(pwittrock): Consider using a statfs syscall directly to get the data
-func (cm *MetricsDu) runDf(metrics *CapacityMetrics) error {
-	// Uses the same niceness level as cadvisor.fs does when running du
-	// Uses -B 1 to always scale to a blocksize of 1 byte
-	out, err := exec.Command("nice", "-n", "19", "df", "-B", "1", cm.path).CombinedOutput()
+// runStatfs executes the statfs syscall and writes the results to metrics.Capacity and metrics.Available
+func (md *metricsDu) runStatfs(metrics *Metrics) error {
+	statfs := &syscall.Statfs_t{}
+	err := syscall.Statfs(md.path, statfs)
 	if err != nil {
-		return fmt.Errorf("failed command 'df' on %s with error %v", cm.path, err)
-	}
-	lines := strings.Split(string(out), "\n")
-	header := strings.Fields(lines[0])
-	content := strings.Fields(lines[1])
-
-	// Find the indexes into content for the fields we are interested in
-	usedIndex := -1
-	availableIndex := -1
-	for i, v := range header {
-		if v == "Used" {
-			usedIndex = i
-		}
-		if v == "Available" {
-			availableIndex = i
-		}
+		return fmt.Errorf("failed to call statfs due to error %v", err)
 	}
 
-	// Parse "Used"
-	if usedIndex >= 0 {
-		bUsed, err := strconv.ParseUint(content[usedIndex], 10, 64)
-		if err != nil {
-			return fmt.Errorf("failed to parse 'df' 'Used' output %s due to error %v", out, err)
-		}
-		metrics.FileSystemBytesUsed = bUsed
-	} else {
-		return fmt.Errorf(`failed to find 'df' field 'Used' in output %s`, out)
-	}
+	// Available is blocks available * fragment size
+	metrics.Available = resource.NewQuantity(int64(statfs.Bavail)*statfs.Frsize, resource.BinarySI)
 
-	// Parse "Available"
-	if availableIndex >= 0 {
-		bAvailable, err := strconv.ParseUint(content[availableIndex], 10, 64)
-		if err != nil {
-			return fmt.Errorf("failed to parse 'df' 'Available' output %s due to error %v", out, err)
-		}
-		metrics.FileSystemBytesAvailable = bAvailable
-	} else {
-		return fmt.Errorf("failed to find 'df' field 'Available' in output %s", out)
-	}
-
+	// Capacity is block count * fragment size
+	metrics.Capacity = resource.NewQuantity(int64(statfs.Blocks)*statfs.Frsize, resource.BinarySI)
 	return nil
 }

@@ -78,17 +78,16 @@ func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod
 	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.Volume.EmptyDir.Medium
 	}
-	ed := &emptyDir{
-		pod:           pod,
-		volName:       spec.Name(),
-		medium:        medium,
-		mounter:       mounter,
-		mountDetector: mountDetector,
-		plugin:        plugin,
-		rootContext:   opts.RootContext,
-	}
-	ed.MetricsDu.InitMetricsDu(ed.GetPath())
-	return ed, nil
+	return &emptyDir{
+		pod:             pod,
+		volName:         spec.Name(),
+		medium:          medium,
+		mounter:         mounter,
+		mountDetector:   mountDetector,
+		plugin:          plugin,
+		rootContext:     opts.RootContext,
+		MetricsProvider: volume.NewMetricsDu(GetPath(pod.UID, spec.Name(), plugin.host)),
+	}, nil
 }
 
 func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
@@ -98,14 +97,14 @@ func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID) (volu
 
 func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface, mountDetector mountDetector) (volume.Cleaner, error) {
 	ed := &emptyDir{
-		pod:           &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
-		volName:       volName,
-		medium:        api.StorageMediumDefault, // might be changed later
-		mounter:       mounter,
-		mountDetector: mountDetector,
-		plugin:        plugin,
+		pod:             &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
+		volName:         volName,
+		medium:          api.StorageMediumDefault, // might be changed later
+		mounter:         mounter,
+		mountDetector:   mountDetector,
+		plugin:          plugin,
+		MetricsProvider: volume.NewMetricsDu(GetPath(podUID, volName, plugin.host)),
 	}
-	ed.MetricsDu.InitMetricsDu(ed.GetPath())
 	return ed, nil
 }
 
@@ -136,7 +135,7 @@ type emptyDir struct {
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
 	rootContext   string
-	volume.MetricsDu
+	volume.MetricsProvider
 }
 
 func (ed *emptyDir) GetAttributes() volume.Attributes {
@@ -269,8 +268,12 @@ func (ed *emptyDir) setupDir(dir string) error {
 }
 
 func (ed *emptyDir) GetPath() string {
+	return GetPath(ed.pod.UID, ed.volName, ed.plugin.host)
+}
+
+func GetPath(uid types.UID, volName string, host volume.VolumeHost) string {
 	name := emptyDirPluginName
-	return ed.plugin.host.GetPodVolumeDir(ed.pod.UID, util.EscapeQualifiedNameForDisk(name), ed.volName)
+	return host.GetPodVolumeDir(uid, util.EscapeQualifiedNameForDisk(name), volName)
 }
 
 // TearDown simply discards everything in the directory.

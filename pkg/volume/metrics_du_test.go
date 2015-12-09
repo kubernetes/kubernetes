@@ -23,75 +23,68 @@ import (
 	"testing"
 )
 
-// TestMetricsDuGetCapacity tests that an initialized MetricsDu can read disk usage
+// TestMetricsDuGetCapacity tests that MetricsDu can read disk usage
 // for path
 func TestMetricsDuGetCapacity(t *testing.T) {
-	metrics := &MetricsDu{}
-
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "metrics_du_test")
 	if err != nil {
 		t.Fatalf("Can't make a tmp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	metrics.InitMetricsDu(tmpDir)
+	metrics := NewMetricsDu(tmpDir)
 
-	actual, err := metrics.GetCapacityMetrics()
+	actual, err := metrics.GetMetrics()
 	if err != nil {
-		t.Errorf("Unexpected error when calling GetCapacityMetrics %v", err)
+		t.Errorf("Unexpected error when calling GetMetrics %v", err)
 	}
-	if actual.VolumeBytesUsed != 4096 {
-		t.Errorf("Expected VolumeBytesUsed %d for empty directory to be 4096.", actual.VolumeBytesUsed)
+	if actual.Used.Value() != 4096 {
+		t.Errorf("Expected Used %d for empty directory to be 4096.", actual.Used.Value())
 	}
 
 	// TODO(pwittroc): Figure out a way to test these values for correctness, maybe by formatting and mounting a file
 	// as a filesystem
-	if actual.FileSystemBytesUsed <= 0 {
-		t.Errorf("Expected FileSystemBytesUsed %d to be greater than 0.", actual.FileSystemBytesUsed)
+	if actual.Capacity.Value() <= 0 {
+		t.Errorf("Expected Capacity %d to be greater than 0.", actual.Capacity.Value())
 	}
-	if actual.FileSystemBytesAvailable <= 0 {
-		t.Errorf("Expected FileSystemBytesAvailable %d to be greater than 0.", actual.FileSystemBytesAvailable)
-	}
-	if actual.FileSystemBytesAvailable <= actual.FileSystemBytesUsed {
-		t.Errorf("Expected FileSystemBytesAvailable %d to be greater than FileSystemBytesUsed %d.",
-			actual.FileSystemBytesAvailable, actual.FileSystemBytesUsed)
+	if actual.Available.Value() <= 0 {
+		t.Errorf("Expected Available %d to be greater than 0.", actual.Available.Value())
 	}
 
-	// Write a file and expect the VolumeBytesUsed to increase
+	// Write a file and expect Used to increase
 	ioutil.WriteFile(filepath.Join(tmpDir, "f1"), []byte("Hello World"), os.ModeTemporary)
-	actual, err = metrics.GetCapacityMetrics()
+	actual, err = metrics.GetMetrics()
 	if err != nil {
-		t.Errorf("Unexpected error when calling GetCapacityMetrics %v", err)
+		t.Errorf("Unexpected error when calling GetMetrics %v", err)
 	}
-	if actual.VolumeBytesUsed != 8192 {
-		t.Errorf("Unexpected VolumeBytesUsed for directory with file.  Expected 8192, was %d.", actual.VolumeBytesUsed)
-	}
-}
-
-// TestMetricsDuRequireInit tests that if MetricsDu is not initialized with a path, GetCapacityMetrics
-// returns an error
-func TestMetricsDuRequireInit(t *testing.T) {
-	metrics := &MetricsDu{}
-	actual, err := metrics.GetCapacityMetrics()
-	expected := &CapacityMetrics{}
-	if *actual != *expected {
-		t.Errorf("Expected empty CapacityMetrics from uninitialized MetricsDu, actual %v", *actual)
-	}
-	if err == nil {
-		t.Errorf("Expected error when calling GetCapacityMetrics on uninitialized MetricsDu, actual nil")
+	if actual.Used.Value() != 8192 {
+		t.Errorf("Unexpected Used for directory with file.  Expected 8192, was %d.", actual.Used.Value())
 	}
 }
 
-// TestMetricsDuRealDirectory tests that if MetricsDu is initialized to a non-existent path, GetCapacityMetrics
+// TestMetricsDuRequireInit tests that if MetricsDu is not initialized with a path, GetMetrics
 // returns an error
-func TestMetricsDuRealDirectory(t *testing.T) {
-	metrics := &MetricsDu{}
-	metrics.InitMetricsDu("/not/a/real/directory")
-	actual, err := metrics.GetCapacityMetrics()
-	expected := &CapacityMetrics{}
+func TestMetricsDuRequirePath(t *testing.T) {
+	metrics := &metricsDu{}
+	actual, err := metrics.GetMetrics()
+	expected := &Metrics{}
 	if *actual != *expected {
-		t.Errorf("Expected empty CapacityMetrics from incorrectly initialized MetricsDu, actual %v", *actual)
+		t.Errorf("Expected empty Metrics from uninitialized MetricsDu, actual %v", *actual)
 	}
 	if err == nil {
-		t.Errorf("Expected error when calling GetCapacityMetrics on incorrectly initialized MetricsDu, actual nil")
+		t.Errorf("Expected error when calling GetMetrics on uninitialized MetricsDu, actual nil")
+	}
+}
+
+// TestMetricsDuRealDirectory tests that if MetricsDu is initialized to a non-existent path, GetMetrics
+// returns an error
+func TestMetricsDuRequireRealDirectory(t *testing.T) {
+	metrics := NewMetricsDu("/not/a/real/directory")
+	actual, err := metrics.GetMetrics()
+	expected := &Metrics{}
+	if *actual != *expected {
+		t.Errorf("Expected empty Metrics from incorrectly initialized MetricsDu, actual %v", *actual)
+	}
+	if err == nil {
+		t.Errorf("Expected error when calling GetMetrics on incorrectly initialized MetricsDu, actual nil")
 	}
 }

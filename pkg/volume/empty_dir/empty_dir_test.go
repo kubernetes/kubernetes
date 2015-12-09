@@ -299,17 +299,17 @@ func TestVolumeMetrics(t *testing.T) {
 	os.MkdirAll(builder.GetPath(), 0755)
 
 	// TODO(pwittroc): Move this into a reusable testing utility
-	metrics, err := builder.GetCapacityMetrics()
+	metrics, err := builder.GetMetrics()
 	if err != nil {
-		t.Errorf("Unexpected error when calling GetCapacityMetrics %v", err)
+		t.Errorf("Unexpected error when calling GetMetrics %v", err)
 	}
-	if metrics.VolumeBytesUsed != 4096 {
-		t.Errorf("Expected VolumeBytesUsed %d to be 4096", metrics.VolumeBytesUsed)
+	if metrics.Used.Value() != 4096 {
+		t.Errorf("Expected Used %d to be 4096", metrics.Used.Value())
 	}
-	if metrics.VolumeBytesUsed <= 0 {
-		t.Errorf("Expected VolumeBytesUsed to be greater than 0")
+	if metrics.Capacity.Value() <= 0 {
+		t.Errorf("Expected Capacity to be greater than 0")
 	}
-	if metrics.FileSystemBytesAvailable <= 0 {
-		t.Errorf("Expected FileSystemBytesAvailable to be greater than 0")
+	if metrics.Available.Value() <= 0 {
+		t.Errorf("Expected Available to be greater than 0")
 	}
 }

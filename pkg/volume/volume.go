@@ -19,6 +19,7 @@ package volume
 import (
 	"io/ioutil"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"os"
 	"path"
 )
@@ -29,27 +30,31 @@ type Volume interface {
 	// GetPath returns the directory path the volume is mounted to.
 	GetPath() string
 
-	// VolumeMetricsProvider embeds methods for exposing Volume metrics (e.g. capacity).
-	VolumeMetricsProvider
+	// MetricsProvider embeds methods for exposing metrics (e.g. used,available space).
+	MetricsProvider
 }
 
-// VolumeMetricsProvider exposes metrics (e.g. capacity) related to a Volume.
-type VolumeMetricsProvider interface {
-	// GetCapacityMetrics returns the CapacityMetrics for this Volume.  Maybe expensive for some implementations.
-	GetCapacityMetrics() (*CapacityMetrics, error)
+// MetricsProvider exposes metrics (e.g. used,available space) related to a Volume.
+type MetricsProvider interface {
+	// GetMetrics returns the Metrics for this Volume.  Maybe expensive for some implementations.
+	GetMetrics() (*Metrics, error)
 }
 
-// CapacityMetrics represents available and consumed capacity for the Volume.
-type CapacityMetrics struct {
-	// VolumeBytesUsed represents the total bytes used under the directory path that the Volume is mounted.
+// Metrics represents the used and available bytes of the Volume.
+type Metrics struct {
+	// Used represents the total bytes used by the Volume.
 	// Note: For block devices this maybe more than the total size of the files.  See `man du` for details.
-	VolumeBytesUsed uint64
+	Used *resource.Quantity
 
-	// FileSystemBytesUsed represents the total bytes used on the filesystem that the Volume path resides.
-	FileSystemBytesUsed uint64
+	// Capacity represents the total capacity (bytes) of the volume's underlying storage.
+	// For Volumes that share a filesystem with the host (e.g. emptydir, hostpath) this is the size
+	// of the underlying storage, and will not equal Used + Available as the fs is shared.
+	Capacity *resource.Quantity
 
-	// FileSystemBytesAvailable represents the total bytes free on the filesystem that the Volume path resides.
-	FileSystemBytesAvailable uint64
+	// Available represents the storage space available (bytes) for the Volume.
+	// For Volumes that share a filesystem with the host (e.g. emptydir, hostpath), this is the available
+	// space on the underlying storage, and is shared with host processes and other Volumes.
+	Available *resource.Quantity
 }
 
 // Attributes represents the attributes of this builder.
