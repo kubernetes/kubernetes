@@ -46,7 +46,6 @@ limitations under the License.
 // DISCLAIMER: this is an alpha API. This library will likely change significantly
 // or even be removed entirely in subsequent releases. Depend on this API at
 // your own risk.
-
 package leaderelection
 
 import (
