@@ -134,21 +134,24 @@ The following table includes a list of all the supported resource types and thei
 Resource type	| Abbreviated alias
 -------------------- | --------------------
 `componentstatuses`	|	`cs`
-`events`	|	`ev`
-`endpoints`	|	`ep`
-`horizontalpodautoscalers`	|	`hpa`
-`limitranges`	|	`limits`
-`nodes`	|	`no`
-`namespaces`	|	`ns`
-`pods`	|	`po`
-`persistentvolumes`	|	`pv`
-`persistentvolumeclaims`	|	`pvc`
-`resourcequotas`	|	`quota`
-`replicationcontrollers`	|	`rc`
-`secrets`	|
-`serviceaccounts`	|
-`services`	|	`svc`
-`ingress`		|	`ing`
+`daemonsets` | `ds`
+`deployments` |
+`events` | `ev`
+`endpoints` | `ep`
+`horizontalpodautoscalers` | `hpa`
+`ingresses` | `ing`
+`jobs` |
+`limitranges` | `limits`
+`nodes` | `no`
+`namespaces` | `ns`
+`pods` | `po`
+`persistentvolumes` | `pv`
+`persistentvolumeclaims` | `pvc`
+`resourcequotas` | `quota`
+`replicationcontrollers` | `rc`
+`secrets` |
+`serviceaccounts` |
+`services` | `svc`
 
 ## Output options
 
