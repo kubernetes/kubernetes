@@ -31,7 +31,7 @@ func ValidateEvent(event *api.Event) field.ErrorList {
 	if event.InvolvedObject.Kind == "Node" &&
 		event.Namespace != api.NamespaceDefault &&
 		event.Namespace != "" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "not required for node"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "not allowed for node"))
 	}
 	if event.InvolvedObject.Kind != "Node" &&
 		event.Namespace != event.InvolvedObject.Namespace {
