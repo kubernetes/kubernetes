@@ -2570,6 +2570,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	// NOTE(aaronlevy): NodeReady condition needs to be the last in the list of node conditions.
 	// This is due to an issue with version skewed kubelet and master components.
 	// ref: https://github.com/kubernetes/kubernetes/issues/16961
+	// TODO: Remove the code after we drop support for v1.0 kubelets
 	lastIndex := len(node.Status.Conditions) - 1
 	for i := range node.Status.Conditions {
 		if node.Status.Conditions[i].Type == api.NodeReady && i < lastIndex {
