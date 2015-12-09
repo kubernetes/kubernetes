@@ -71,11 +71,12 @@ function get_latest_trusty_image() {
 #
 # These suites:
 #   step1: launch a cluster at $old_version,
-#   step2: upgrades the master to $new_version,
-#   step3: runs $old_version e2es,
-#   step4: upgrades the rest of the cluster,
-#   step5: runs $old_version e2es again, then
-#   step6: runs $new_version e2es and tears down the cluster.
+#   step2: runs $new_version Kubectl e2es,
+#   step3: upgrades the master to $new_version,
+#   step4: runs $old_version e2es,
+#   step5: upgrades the rest of the cluster,
+#   step6: runs $old_version e2es again, then
+#   step7: runs $new_version e2es and tears down the cluster.
 #
 # Assumes globals:
 #   $JOB_NAME
@@ -143,6 +144,18 @@ function configure_upgrade_step() {
       ;;
 
     step2)
+      # Run new e2e kubectl tests
+      JENKINS_PUBLISHED_VERSION="${new_version}"
+      JENKINS_FORCE_GET_TARS=y
+
+      E2E_OPT="--check_version_skew=false"
+      E2E_UP="false"
+      E2E_TEST="true"
+      E2E_DOWN="false"
+      GINKGO_TEST_ARGS="--ginkgo.focus=Kubectl"
+      ;;
+
+    step3)
       # Use upgrade logic of version we're upgrading to.
       JENKINS_PUBLISHED_VERSION="${new_version}"
       JENKINS_FORCE_GET_TARS=y
@@ -154,7 +167,7 @@ function configure_upgrade_step() {
       GINKGO_TEST_ARGS="--ginkgo.focus=Cluster\supgrade.*upgrade-master --upgrade-target=${new_version}"
       ;;
 
-    step3)
+    step4)
       # Run old e2es
       JENKINS_PUBLISHED_VERSION="${old_version}"
       JENKINS_FORCE_GET_TARS=y
@@ -171,7 +184,7 @@ function configure_upgrade_step() {
       fi
       ;;
 
-    step4)
+    step5)
       # Use upgrade logic of version we're upgrading to.
       JENKINS_PUBLISHED_VERSION="${new_version}"
       JENKINS_FORCE_GET_TARS=y
@@ -183,7 +196,7 @@ function configure_upgrade_step() {
       GINKGO_TEST_ARGS="--ginkgo.focus=Cluster\supgrade.*upgrade-cluster --upgrade-target=${new_version}"
       ;;
 
-    step5)
+    step6)
       # Run old e2es
       JENKINS_PUBLISHED_VERSION="${old_version}"
       JENKINS_FORCE_GET_TARS=y
@@ -200,7 +213,7 @@ function configure_upgrade_step() {
       fi
       ;;
 
-    step6)
+    step7)
       # Run new e2es
       JENKINS_PUBLISHED_VERSION="${new_version}"
       JENKINS_FORCE_GET_TARS=y
@@ -775,17 +788,17 @@ case ${JOB_NAME} in
   #
   # Test upgrades from the latest release-1.1 build to the latest master build.
   #
-  # Configurations for step2, step4, and step6 live in master.
+  # Configurations for step2, step3, step5, and step7 live in master.
 
   kubernetes-upgrade-gke-1.1-master-step1-deploy)
     configure_upgrade_step 'ci/latest-1.1' 'configured-in-master' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-1.1-master-step3-e2e-old)
+  kubernetes-upgrade-gke-1.1-master-step4-e2e-old)
     configure_upgrade_step 'ci/latest-1.1' 'configured-in-master' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-1.1-master-step5-e2e-old)
+  kubernetes-upgrade-gke-1.1-master-step6-e2e-old)
     configure_upgrade_step 'ci/latest-1.1' 'configured-in-master' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
@@ -794,17 +807,21 @@ case ${JOB_NAME} in
   # Test upgrades from the latest release-1.0 build to the latest current
   # release build.
   #
-  # Configurations for step1, step3, and step5 live in the release-1.0 branch.
+  # Configurations for step1, step4, and step6 live in the release-1.0 branch.
 
-  kubernetes-upgrade-gke-1.0-current-release-step2-upgrade-master)
+  kubernetes-upgrade-gke-1.0-current-release-step2-kubectl-e2e-new)
     configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-1.0-current-release-step4-upgrade-cluster)
+  kubernetes-upgrade-gke-1.0-current-release-step3-upgrade-master)
     configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-1.0-current-release-step6-e2e-new)
+  kubernetes-upgrade-gke-1.0-current-release-step5-upgrade-cluster)
+    configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
+  kubernetes-upgrade-gke-1.0-current-release-step7-e2e-new)
     configure_upgrade_step 'configured-in-release-1.0' 'ci/latest-1.1' 'upgrade-gke-1-0-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
@@ -816,23 +833,27 @@ case ${JOB_NAME} in
     configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-current-release-step2-upgrade-master)
+  kubernetes-upgrade-gke-stable-current-release-step2-kubectl-e2e-new)
     configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-current-release-step3-e2e-old)
+  kubernetes-upgrade-gke-stable-current-release-step3-upgrade-master)
     configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-current-release-step4-upgrade-cluster)
+  kubernetes-upgrade-gke-stable-current-release-step4-e2e-old)
     configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-current-release-step5-e2e-old)
+  kubernetes-upgrade-gke-stable-current-release-step5-upgrade-cluster)
     configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 
-  kubernetes-upgrade-gke-stable-current-release-step6-e2e-new)
+  kubernetes-upgrade-gke-stable-current-release-step6-e2e-old)
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
+  kubernetes-upgrade-gke-stable-current-release-step7-e2e-new)
     configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gke-stable-current-release' 'kubernetes-jenkins-gke-upgrade'
     ;;
 esac
