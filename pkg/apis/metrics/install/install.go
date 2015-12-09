@@ -20,7 +20,6 @@ package install
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/golang/glog"
 
@@ -53,13 +52,10 @@ func init() {
 		Codec:        runtime.CodecFor(api.Scheme, groupVersion.String()),
 	}
 
-	var versions []string
 	worstToBestGroupVersions := []unversioned.GroupVersion{}
 	for i := len(registeredGroupVersions) - 1; i >= 0; i-- {
-		versions = append(versions, registeredGroupVersions[i].Version)
 		worstToBestGroupVersions = append(worstToBestGroupVersions, registeredGroupVersions[i])
 	}
-	groupMeta.Versions = versions
 	groupMeta.GroupVersions = registeredGroupVersions
 
 	groupMeta.SelfLinker = runtime.SelfLinker(accessor)
@@ -87,6 +83,6 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 		}, nil
 	default:
 		g, _ := latest.Group("metrics")
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(g.Versions, ", "))
+		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
 	}
 }
