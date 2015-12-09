@@ -214,6 +214,19 @@ func UsageError(cmd *cobra.Command, format string, args ...interface{}) error {
 	return fmt.Errorf("%s\nSee '%s -h' for help and examples.", msg, cmd.CommandPath())
 }
 
+// Whether this cmd need watching objects.
+func isWatch(cmd *cobra.Command) bool {
+	if w, err := cmd.Flags().GetBool("watch"); w && err == nil {
+		return true
+	}
+
+	if wo, err := cmd.Flags().GetBool("watch-only"); wo && err == nil {
+		return true
+	}
+
+	return false
+}
+
 func getFlag(cmd *cobra.Command, flag string) *pflag.Flag {
 	f := cmd.Flags().Lookup(flag)
 	if f == nil {
