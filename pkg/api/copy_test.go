@@ -60,7 +60,7 @@ func doDeepCopyTest(t *testing.T, version, kind string, f *fuzz.Fuzzer) {
 
 func TestDeepCopySingleType(t *testing.T) {
 	for i := 0; i < *fuzzIters; i++ {
-		for _, version := range []string{"", testapi.Default.Version()} {
+		for _, version := range []string{"", testapi.Default.GroupVersion().String()} {
 			f := apitesting.FuzzerFor(t, version, rand.NewSource(rand.Int63()))
 			doDeepCopyTest(t, version, "Pod", f)
 		}

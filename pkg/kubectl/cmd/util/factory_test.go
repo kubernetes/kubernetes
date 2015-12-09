@@ -207,7 +207,7 @@ func TestFlagUnderscoreRenaming(t *testing.T) {
 }
 
 func loadSchemaForTest() (validation.Schema, error) {
-	pathToSwaggerSpec := "../../../../api/swagger-spec/" + testapi.Default.Version() + ".json"
+	pathToSwaggerSpec := "../../../../api/swagger-spec/" + testapi.Default.GroupVersion().Version + ".json"
 	data, err := ioutil.ReadFile(pathToSwaggerSpec)
 	if err != nil {
 		return nil, err

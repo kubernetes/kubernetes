@@ -77,7 +77,7 @@ func versionErrIfFalse(b bool) error {
 	return versionErr
 }
 
-var validVersion = testapi.Default.Version()
+var validVersion = testapi.Default.GroupVersion().Version
 var internalGV = unversioned.GroupVersion{Group: "apitest", Version: ""}
 var unlikelyGV = unversioned.GroupVersion{Group: "apitest", Version: "unlikelyversion"}
 var validVersionGV = unversioned.GroupVersion{Group: "apitest", Version: validVersion}

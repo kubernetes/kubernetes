@@ -153,7 +153,7 @@ func makeCheckPod(ns string, nfsserver string) *api.Pod {
 	return &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: testapi.Default.Version(),
+			APIVersion: testapi.Default.GroupVersion().String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "checker-",
