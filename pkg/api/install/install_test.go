@@ -27,7 +27,7 @@ import (
 
 func TestResourceVersioner(t *testing.T) {
 	pod := internal.Pod{ObjectMeta: internal.ObjectMeta{ResourceVersion: "10"}}
-	version, err := accessor.ResourceVersion(&pod)
+	version, err := latest.Accessor.ResourceVersion(&pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestResourceVersioner(t *testing.T) {
 	}
 
 	podList := internal.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "10"}}
-	version, err = accessor.ResourceVersion(&podList)
+	version, err = latest.Accessor.ResourceVersion(&podList)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -45,11 +45,12 @@ func TestResourceVersioner(t *testing.T) {
 	}
 }
 
+// TODO its weird to round-trip an internal type
 func TestCodec(t *testing.T) {
 	pod := internal.Pod{}
 	// We do want to use package latest rather than testapi here, because we
 	// want to test if the package install and package latest work as expected.
-	data, err := latest.GroupOrDie("").Codec.Encode(&pod)
+	data, err := latest.Codec.Encode(&pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -57,17 +58,17 @@ func TestCodec(t *testing.T) {
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if other.APIVersion != latest.GroupOrDie("").GroupVersion.Version || other.Kind != "Pod" {
+	if other.APIVersion != latest.PreferredExternalVersion.Version || other.Kind != "Pod" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
 	}
 }
 
 func TestInterfacesFor(t *testing.T) {
-	if _, err := latest.GroupOrDie("").InterfacesFor(""); err == nil {
+	if _, err := latest.InterfacesFor(""); err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
 	}
-	for i, version := range append([]string{latest.GroupOrDie("").GroupVersion.Version}, latest.GroupOrDie("").Versions...) {
-		if vi, err := latest.GroupOrDie("").InterfacesFor(version); err != nil || vi == nil {
+	for i, version := range latest.ExternalVersions {
+		if vi, err := latest.InterfacesFor(version.String()); err != nil || vi == nil {
 			t.Fatalf("%d: unexpected result: %v", i, err)
 		}
 	}
@@ -78,18 +79,16 @@ func TestRESTMapper(t *testing.T) {
 	rcGVK := gv.WithKind("ReplicationController")
 	podTemplateGVK := gv.WithKind("PodTemplate")
 
-	if gvk, err := latest.GroupOrDie("").RESTMapper.KindFor("replicationcontrollers"); err != nil || gvk != rcGVK {
+	if gvk, err := latest.RESTMapper.KindFor("replicationcontrollers"); err != nil || gvk != rcGVK {
 		t.Errorf("unexpected version mapping: %v %v", gvk, err)
 	}
 
-	if m, err := latest.GroupOrDie("").RESTMapper.RESTMapping(podTemplateGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != podTemplateGVK || m.Resource != "podtemplates" {
+	if m, err := latest.RESTMapper.RESTMapping(podTemplateGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != podTemplateGVK || m.Resource != "podtemplates" {
 		t.Errorf("unexpected version mapping: %#v %v", m, err)
 	}
 
-	for _, version := range latest.GroupOrDie("").Versions {
-		currGroupVersion := unversioned.GroupVersion{Version: version}
-
-		mapping, err := latest.GroupOrDie("").RESTMapper.RESTMapping(rcGVK.GroupKind(), currGroupVersion.String())
+	for _, version := range latest.ExternalVersions {
+		mapping, err := latest.RESTMapper.RESTMapping(rcGVK.GroupKind(), version.Version)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -97,11 +96,11 @@ func TestRESTMapper(t *testing.T) {
 		if mapping.Resource != "replicationControllers" && mapping.Resource != "replicationcontrollers" {
 			t.Errorf("incorrect resource name: %#v", mapping)
 		}
-		if mapping.GroupVersionKind.GroupVersion() != currGroupVersion {
+		if mapping.GroupVersionKind.GroupVersion() != version {
 			t.Errorf("incorrect version: %v", mapping)
 		}
 
-		interfaces, _ := latest.GroupOrDie("").InterfacesFor(currGroupVersion.String())
+		interfaces, _ := latest.InterfacesFor(version.String())
 		if mapping.Codec != interfaces.Codec {
 			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
 		}

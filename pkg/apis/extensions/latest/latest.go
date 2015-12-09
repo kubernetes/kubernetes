@@ -23,7 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -43,12 +44,12 @@ var RESTMapper meta.RESTMapper
 var Accessor = meta.NewAccessor()
 
 // availableVersions lists all known external versions for this group from most preferred to least preferred
-var availableVersions = []unversioned.GroupVersion{v1.SchemeGroupVersion}
+var availableVersions = []unversioned.GroupVersion{v1beta1.SchemeGroupVersion}
 
 func init() {
 	finalExternalVersions := []unversioned.GroupVersion{}
 
-	for _, allowedVersion := range registered.GroupVersionsForGroup(api.SchemeGroupVersion.Group) {
+	for _, allowedVersion := range registered.GroupVersionsForGroup(extensions.SchemeGroupVersion.Group) {
 		for _, externalVersion := range availableVersions {
 			if externalVersion == allowedVersion {
 				finalExternalVersions = append(finalExternalVersions, externalVersion)
@@ -66,9 +67,7 @@ func init() {
 	RESTMapper = newRESTMapper()
 }
 
-var userResources = []string{"rc", "svc", "pods", "pvc"}
-
-const importPrefix = "k8s.io/kubernetes/pkg/api"
+const importPrefix = "k8s.io/kubernetes/pkg/apis/extensions"
 
 func newRESTMapper() meta.RESTMapper {
 	worstToBestGroupVersions := []unversioned.GroupVersion{}
@@ -78,39 +77,20 @@ func newRESTMapper() meta.RESTMapper {
 
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
-	rootScoped := sets.NewString(
-		"Node",
-		"Namespace",
-		"PersistentVolume",
-		"ComponentStatus",
-	)
+	rootScoped := sets.NewString()
 
-	// these kinds should be excluded from the list of resources
-	ignoredKinds := sets.NewString(
-		"ListOptions",
-		"DeleteOptions",
-		"Status",
-		"PodLogOptions",
-		"PodExecOptions",
-		"PodAttachOptions",
-		"PodProxyOptions",
-		"ThirdPartyResource",
-		"ThirdPartyResourceData",
-		"ThirdPartyResourceList")
+	ignoredKinds := sets.NewString()
 
-	mapper := api.NewDefaultRESTMapper(worstToBestGroupVersions, InterfacesFor, importPrefix, ignoredKinds, rootScoped)
-	// setup aliases for groups of resources
-	mapper.AddResourceAlias("all", userResources...)
-	return mapper
+	return api.NewDefaultRESTMapper(worstToBestGroupVersions, InterfacesFor, importPrefix, ignoredKinds, rootScoped)
 }
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version
 // string, or an error if the version is not known.
 func InterfacesFor(groupVersionString string) (*meta.VersionInterfaces, error) {
 	switch groupVersionString {
-	case v1.SchemeGroupVersion.String():
+	case v1beta1.SchemeGroupVersion.String():
 		return &meta.VersionInterfaces{
-			Codec:            v1.Codec,
+			Codec:            v1beta1.Codec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: Accessor,
 		}, nil

@@ -24,11 +24,11 @@ import (
 	"net/url"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	extlatest "k8s.io/kubernetes/pkg/apis/extensions/latest"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -69,7 +69,7 @@ func (t *thirdPartyResourceDataMapper) RESTMapping(gk unversioned.GroupKind, ver
 	// TODO figure out why we're doing this rewriting
 	extensionGK := unversioned.GroupKind{Group: "extensions", Kind: "ThirdPartyResourceData"}
 
-	mapping, err := t.mapper.RESTMapping(extensionGK, latest.GroupOrDie("extensions").GroupVersion.Version)
+	mapping, err := t.mapper.RESTMapping(extensionGK, extlatest.PreferredExternalVersion.Version)
 	if err != nil {
 		return nil, err
 	}

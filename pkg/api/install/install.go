@@ -19,99 +19,33 @@ limitations under the License.
 package install
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/util/sets"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/registered"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// userResources is a group of resources mostly used by a kubectl user
-var userResources = []string{"rc", "svc", "pods", "pvc"}
-
-const importPrefix = "k8s.io/kubernetes/pkg/api"
-
-var accessor = meta.NewAccessor()
-
 func init() {
-	groupMeta, err := latest.RegisterGroup("")
-	if err != nil {
+	// this means that the entire group is disabled
+	if len(latest.ExternalVersions) == 0 {
+		return
+	}
+
+	groupMeta := latest.GroupMeta{
+		GroupVersion:  latest.PreferredExternalVersion,
+		GroupVersions: latest.ExternalVersions,
+		Codec:         latest.Codec,
+		RESTMapper:    latest.RESTMapper,
+		SelfLinker:    runtime.SelfLinker(latest.Accessor),
+		InterfacesFor: latest.InterfacesFor,
+	}
+
+	if err := latest.RegisterGroup(groupMeta); err != nil {
 		glog.V(4).Infof("%v", err)
 		return
 	}
 
-	// Use the first API version in the list of registered versions as the latest.
-	registeredGroupVersions := registered.GroupVersionsForGroup("")
-	groupVersion := registeredGroupVersions[0]
-	*groupMeta = latest.GroupMeta{
-		GroupVersion: groupVersion,
-		Codec:        runtime.CodecFor(api.Scheme, groupVersion.String()),
-	}
-
-	var versions []string
-	worstToBestGroupVersions := []unversioned.GroupVersion{}
-	for i := len(registeredGroupVersions) - 1; i >= 0; i-- {
-		versions = append(versions, registeredGroupVersions[i].Version)
-		worstToBestGroupVersions = append(worstToBestGroupVersions, registeredGroupVersions[i])
-	}
-	groupMeta.Versions = versions
-	groupMeta.GroupVersions = registeredGroupVersions
-
-	groupMeta.SelfLinker = runtime.SelfLinker(accessor)
-
-	// the list of kinds that are scoped at the root of the api hierarchy
-	// if a kind is not enumerated here, it is assumed to have a namespace scope
-	rootScoped := sets.NewString(
-		"Node",
-		"Namespace",
-		"PersistentVolume",
-		"ComponentStatus",
-	)
-
-	// these kinds should be excluded from the list of resources
-	ignoredKinds := sets.NewString(
-		"ListOptions",
-		"DeleteOptions",
-		"Status",
-		"PodLogOptions",
-		"PodExecOptions",
-		"PodAttachOptions",
-		"PodProxyOptions",
-		"ThirdPartyResource",
-		"ThirdPartyResourceData",
-		"ThirdPartyResourceList")
-
-	mapper := api.NewDefaultRESTMapper(worstToBestGroupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
-	// setup aliases for groups of resources
-	mapper.AddResourceAlias("all", userResources...)
-	groupMeta.RESTMapper = mapper
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
-	groupMeta.InterfacesFor = interfacesFor
-}
-
-// InterfacesFor returns the default Codec and ResourceVersioner for a given version
-// string, or an error if the version is not known.
-func interfacesFor(version string) (*meta.VersionInterfaces, error) {
-	switch version {
-	case "v1":
-		return &meta.VersionInterfaces{
-			Codec:            v1.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	default:
-		{
-			g, _ := latest.Group("")
-			return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(g.Versions, ", "))
-		}
-	}
 }

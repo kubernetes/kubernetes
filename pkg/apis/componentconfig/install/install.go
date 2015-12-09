@@ -19,74 +19,33 @@ limitations under the License.
 package install
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/registered"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	_ "k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	cclatest "k8s.io/kubernetes/pkg/apis/componentconfig/latest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-const importPrefix = "k8s.io/kubernetes/pkg/apis/componentconfig"
-
-var accessor = meta.NewAccessor()
-
 func init() {
-	groupMeta, err := latest.RegisterGroup("componentconfig")
-	if err != nil {
+	// this means that the entire group is disabled
+	if len(cclatest.ExternalVersions) == 0 {
+		return
+	}
+
+	groupMeta := latest.GroupMeta{
+		GroupVersion:  cclatest.PreferredExternalVersion,
+		GroupVersions: cclatest.ExternalVersions,
+		Codec:         cclatest.Codec,
+		RESTMapper:    cclatest.RESTMapper,
+		SelfLinker:    runtime.SelfLinker(cclatest.Accessor),
+		InterfacesFor: cclatest.InterfacesFor,
+	}
+
+	if err := latest.RegisterGroup(groupMeta); err != nil {
 		glog.V(4).Infof("%v", err)
 		return
 	}
 
-	registeredGroupVersions := registered.GroupVersionsForGroup("componentconfig")
-	groupVersion := registeredGroupVersions[0]
-	*groupMeta = latest.GroupMeta{
-		GroupVersion: groupVersion,
-		Codec:        runtime.CodecFor(api.Scheme, groupVersion.String()),
-	}
-
-	var versions []string
-	worstToBestGroupVersions := []unversioned.GroupVersion{}
-	for i := len(registeredGroupVersions) - 1; i >= 0; i-- {
-		versions = append(versions, registeredGroupVersions[i].Version)
-		worstToBestGroupVersions = append(worstToBestGroupVersions, registeredGroupVersions[i])
-	}
-	groupMeta.Versions = versions
-	groupMeta.GroupVersions = registeredGroupVersions
-
-	groupMeta.SelfLinker = runtime.SelfLinker(accessor)
-
-	// the list of kinds that are scoped at the root of the api hierarchy
-	// if a kind is not enumerated here, it is assumed to have a namespace scope
-	rootScoped := sets.NewString()
-
-	ignoredKinds := sets.NewString()
-
-	groupMeta.RESTMapper = api.NewDefaultRESTMapper(worstToBestGroupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
-	groupMeta.InterfacesFor = interfacesFor
-}
-
-// interfacesFor returns the default Codec and ResourceVersioner for a given version
-// string, or an error if the version is not known.
-func interfacesFor(version string) (*meta.VersionInterfaces, error) {
-	switch version {
-	case "componentconfig/v1alpha1":
-		return &meta.VersionInterfaces{
-			Codec:            v1alpha1.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	default:
-		g, _ := latest.Group("componentconfig")
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(g.Versions, ", "))
-	}
 }

@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
+	extlatest "k8s.io/kubernetes/pkg/apis/extensions/latest"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -64,12 +65,12 @@ func init() {
 	// TODO: caesarxuchao: we need a central place to store all available API
 	// groups and their metadata.
 	if _, ok := Groups[""]; !ok {
-		// TODO: The second latest.GroupOrDie("").GroupVersion.Version will be latest.GroupVersion after we
+		// TODO: The second latest.PreferredExternalVersion.Version will be latest.GroupVersion after we
 		// have multiple group support
-		Groups[""] = TestGroup{"", latest.GroupOrDie("").GroupVersion.Version, latest.GroupOrDie("").GroupVersion.String()}
+		Groups[""] = TestGroup{"", latest.PreferredExternalVersion.Version, latest.PreferredExternalVersion.String()}
 	}
 	if _, ok := Groups["extensions"]; !ok {
-		Groups["extensions"] = TestGroup{"extensions", latest.GroupOrDie("extensions").GroupVersion.Version, latest.GroupOrDie("extensions").GroupVersion.String()}
+		Groups["extensions"] = TestGroup{"extensions", extlatest.PreferredExternalVersion.Version, extlatest.PreferredExternalVersion.String()}
 	}
 
 	Default = Groups[""]
@@ -101,8 +102,12 @@ func (g TestGroup) InternalGroupVersion() unversioned.GroupVersion {
 // Codec returns the codec for the API version to test against, as set by the
 // KUBE_TEST_API env var.
 func (g TestGroup) Codec() runtime.Codec {
-	// TODO: caesarxuchao: Restructure the body once we have a central `latest`.
-	interfaces, err := latest.GroupOrDie(g.Group).InterfacesFor(g.GroupVersionUnderTest)
+	groupMeta, err := latest.Group(g.Group)
+	if err != nil {
+		panic(err)
+	}
+
+	interfaces, err := groupMeta.InterfacesFor(g.GroupVersionUnderTest)
 	if err != nil {
 		panic(err)
 	}
@@ -114,14 +119,14 @@ func (g TestGroup) Codec() runtime.Codec {
 func (g TestGroup) Converter() runtime.ObjectConvertor {
 	// TODO: caesarxuchao: Restructure the body once we have a central `latest`.
 	if g.Group == "" {
-		interfaces, err := latest.GroupOrDie("").InterfacesFor(g.VersionUnderTest)
+		interfaces, err := latest.InterfacesFor(g.VersionUnderTest)
 		if err != nil {
 			panic(err)
 		}
 		return interfaces.ObjectConvertor
 	}
 	if g.Group == "extensions" {
-		interfaces, err := latest.GroupOrDie("extensions").InterfacesFor(g.VersionUnderTest)
+		interfaces, err := extlatest.InterfacesFor(g.VersionUnderTest)
 		if err != nil {
 			panic(err)
 		}
@@ -136,14 +141,14 @@ func (g TestGroup) Converter() runtime.ObjectConvertor {
 func (g TestGroup) MetadataAccessor() meta.MetadataAccessor {
 	// TODO: caesarxuchao: Restructure the body once we have a central `latest`.
 	if g.Group == "" {
-		interfaces, err := latest.GroupOrDie("").InterfacesFor(g.VersionUnderTest)
+		interfaces, err := latest.InterfacesFor(g.VersionUnderTest)
 		if err != nil {
 			panic(err)
 		}
 		return interfaces.MetadataAccessor
 	}
 	if g.Group == "extensions" {
-		interfaces, err := latest.GroupOrDie("extensions").InterfacesFor(g.VersionUnderTest)
+		interfaces, err := extlatest.InterfacesFor(g.VersionUnderTest)
 		if err != nil {
 			panic(err)
 		}
@@ -209,7 +214,12 @@ func (g TestGroup) ResourcePath(resource, namespace, name string) string {
 }
 
 func (g TestGroup) RESTMapper() meta.RESTMapper {
-	return latest.GroupOrDie(g.Group).RESTMapper
+	groupMeta, err := latest.Group(g.Group)
+	if err != nil {
+		panic(err)
+	}
+
+	return groupMeta.RESTMapper
 }
 
 // Get codec based on runtime.Object

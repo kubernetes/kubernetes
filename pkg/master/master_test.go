@@ -30,12 +30,12 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	extlatest "k8s.io/kubernetes/pkg/apis/extensions/latest"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
@@ -329,14 +329,12 @@ func TestExpapi(t *testing.T) {
 	master, etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	extensionsGroupMeta := latest.GroupOrDie("extensions")
-
 	expAPIGroup := master.experimental(&config)
 	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix)
-	assert.Equal(expAPIGroup.Mapper, extensionsGroupMeta.RESTMapper)
-	assert.Equal(expAPIGroup.Codec, extensionsGroupMeta.Codec)
-	assert.Equal(expAPIGroup.Linker, extensionsGroupMeta.SelfLinker)
-	assert.Equal(expAPIGroup.GroupVersion, extensionsGroupMeta.GroupVersion)
+	assert.Equal(expAPIGroup.Mapper, extlatest.RESTMapper)
+	assert.Equal(expAPIGroup.Codec, extlatest.Codec)
+	assert.Equal(expAPIGroup.Linker, runtime.SelfLinker(extlatest.Accessor))
+	assert.Equal(expAPIGroup.GroupVersion, extlatest.PreferredExternalVersion)
 }
 
 // TestGetNodeAddresses verifies that proper results are returned

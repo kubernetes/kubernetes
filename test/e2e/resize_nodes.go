@@ -188,7 +188,7 @@ func rcByNameContainer(name string, replicas int, image string, labels map[strin
 	return &api.ReplicationController{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "ReplicationController",
-			APIVersion: latest.GroupOrDie("").GroupVersion.Version,
+			APIVersion: latest.PreferredExternalVersion.Version,
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: name,

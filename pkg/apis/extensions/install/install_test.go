@@ -21,14 +21,14 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	extlatest "k8s.io/kubernetes/pkg/apis/extensions/latest"
 )
 
 func TestResourceVersioner(t *testing.T) {
 	daemonSet := extensions.DaemonSet{ObjectMeta: api.ObjectMeta{ResourceVersion: "10"}}
-	version, err := accessor.ResourceVersion(&daemonSet)
+	version, err := extlatest.Accessor.ResourceVersion(&daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestResourceVersioner(t *testing.T) {
 	}
 
 	daemonSetList := extensions.DaemonSetList{ListMeta: unversioned.ListMeta{ResourceVersion: "10"}}
-	version, err = accessor.ResourceVersion(&daemonSetList)
+	version, err = extlatest.Accessor.ResourceVersion(&daemonSetList)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -46,29 +46,31 @@ func TestResourceVersioner(t *testing.T) {
 	}
 }
 
+// TODO its weird to round-trip an internal type
 func TestCodec(t *testing.T) {
 	daemonSet := extensions.DaemonSet{}
 	// We do want to use package latest rather than testapi here, because we
 	// want to test if the package install and package latest work as expected.
-	data, err := latest.GroupOrDie("extensions").Codec.Encode(&daemonSet)
+	data, err := extlatest.Codec.Encode(&daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	other := extensions.DaemonSet{}
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if other.APIVersion != latest.GroupOrDie("extensions").GroupVersion.String() || other.Kind != "DaemonSet" {
+	if other.APIVersion != extlatest.PreferredExternalVersion.String() || other.Kind != "DaemonSet" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
 	}
 }
 
 func TestInterfacesFor(t *testing.T) {
-	if _, err := latest.GroupOrDie("extensions").InterfacesFor(""); err == nil {
+	if _, err := extlatest.InterfacesFor(""); err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
 	}
-	for i, groupVersion := range append([]unversioned.GroupVersion{latest.GroupOrDie("extensions").GroupVersion}, latest.GroupOrDie("extensions").GroupVersions...) {
-		if vi, err := latest.GroupOrDie("extensions").InterfacesFor(groupVersion.String()); err != nil || vi == nil {
+	for i, groupVersion := range append([]unversioned.GroupVersion{extlatest.PreferredExternalVersion}, extlatest.ExternalVersions...) {
+		if vi, err := extlatest.InterfacesFor(groupVersion.String()); err != nil || vi == nil {
 			t.Fatalf("%d: unexpected result: %v", i, err)
 		}
 	}
@@ -79,16 +81,16 @@ func TestRESTMapper(t *testing.T) {
 	hpaGVK := gv.WithKind("HorizontalPodAutoscaler")
 	daemonSetGVK := gv.WithKind("DaemonSet")
 
-	if gvk, err := latest.GroupOrDie("extensions").RESTMapper.KindFor("horizontalpodautoscalers"); err != nil || gvk != hpaGVK {
+	if gvk, err := extlatest.RESTMapper.KindFor("horizontalpodautoscalers"); err != nil || gvk != hpaGVK {
 		t.Errorf("unexpected version mapping: %v %v", gvk, err)
 	}
 
-	if m, err := latest.GroupOrDie("extensions").RESTMapper.RESTMapping(daemonSetGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != daemonSetGVK || m.Resource != "daemonsets" {
+	if m, err := extlatest.RESTMapper.RESTMapping(daemonSetGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != daemonSetGVK || m.Resource != "daemonsets" {
 		t.Errorf("unexpected version mapping: %#v %v", m, err)
 	}
 
-	for _, version := range latest.GroupOrDie("extensions").Versions {
-		mapping, err := latest.GroupOrDie("extensions").RESTMapper.RESTMapping(hpaGVK.GroupKind(), version)
+	for _, version := range extlatest.ExternalVersions {
+		mapping, err := extlatest.RESTMapper.RESTMapping(hpaGVK.GroupKind(), version.Version)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -100,7 +102,7 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("incorrect groupVersion: %v", mapping)
 		}
 
-		interfaces, _ := latest.GroupOrDie("extensions").InterfacesFor(gv.String())
+		interfaces, _ := extlatest.InterfacesFor(gv.String())
 		if mapping.Codec != interfaces.Codec {
 			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
 		}
