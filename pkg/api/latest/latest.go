@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -52,16 +51,14 @@ var ExternalVersions = []unversioned.GroupVersion{
 type GroupMetaMap map[string]*GroupMeta
 
 // RegisterGroup registers a group to GroupMetaMap.
-func (g GroupMetaMap) RegisterGroup(group string) (*GroupMeta, error) {
-	_, found := g[group]
-	if found {
-		return nil, fmt.Errorf("group %v is already registered", g)
+func (g GroupMetaMap) RegisterGroup(groupMeta GroupMeta) error {
+	groupName := groupMeta.GroupVersion.Group
+	if _, found := g[groupName]; found {
+		return fmt.Errorf("group %v is already registered", g)
 	}
-	if len(registered.GroupVersionsForGroup(group)) == 0 {
-		return nil, fmt.Errorf("No version is registered for group %v", group)
-	}
-	g[group] = &GroupMeta{}
-	return g[group], nil
+
+	g[groupName] = &groupMeta
+	return nil
 }
 
 // Group returns the metadata of a group if the gruop is registered, otherwise
@@ -71,7 +68,8 @@ func (g GroupMetaMap) Group(group string) (*GroupMeta, error) {
 	if !found {
 		return nil, fmt.Errorf("no version is registered for group %v", group)
 	}
-	return groupMeta, nil
+	groupMetaCopy := *groupMeta
+	return &groupMetaCopy, nil
 }
 
 // IsRegistered takes a string and determines if it's one of the registered groups
@@ -93,7 +91,8 @@ func (g GroupMetaMap) GroupOrDie(group string) *GroupMeta {
 			panic(fmt.Sprintf("No version is registered for group %s. ", group) + msg)
 		}
 	}
-	return groupMeta
+	groupMetaCopy := *groupMeta
+	return &groupMetaCopy
 }
 
 // AllPreferredGroupVersions returns the preferred versions of all registered
