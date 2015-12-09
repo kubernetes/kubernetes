@@ -46,7 +46,7 @@ const (
 	// PodConfigNotificationSnapshotAndUpdates delivers an UPDATE message whenever pods are
 	// changed, and a SET message if there are any additions or removals.
 	PodConfigNotificationSnapshotAndUpdates
-	// PodConfigNotificationIncremental delivers ADD, UPDATE, and REMOVE to the update channel.
+	// PodConfigNotificationIncremental delivers ADD, UPDATE, REMOVE, RECONCILE to the update channel.
 	PodConfigNotificationIncremental
 )
 
@@ -152,7 +152,7 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	defer s.updateLock.Unlock()
 
 	seenBefore := s.sourcesSeen.Has(source)
-	adds, updates, deletes := s.merge(source, change)
+	adds, updates, deletes, reconciles := s.merge(source, change)
 	firstSet := !seenBefore && s.sourcesSeen.Has(source)
 
 	// deliver update notifications
@@ -166,6 +166,10 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 		}
 		if len(updates.Pods) > 0 {
 			s.updates <- *updates
+		}
+		// Only add reconcile support here, because kubelet doesn't support Snapshot update now.
+		if len(reconciles.Pods) > 0 {
+			s.updates <- *reconciles
 		}
 
 	case PodConfigNotificationSnapshotAndUpdates:
@@ -190,13 +194,14 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	return nil
 }
 
-func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes *kubetypes.PodUpdate) {
+func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes, reconciles *kubetypes.PodUpdate) {
 	s.podLock.Lock()
 	defer s.podLock.Unlock()
 
 	addPods := []*api.Pod{}
 	updatePods := []*api.Pod{}
 	deletePods := []*api.Pod{}
+	reconcilePods := []*api.Pod{}
 
 	pods := s.pods[source]
 	if pods == nil {
@@ -221,12 +226,12 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			}
 			ref.Annotations[kubetypes.ConfigSourceAnnotationKey] = source
 			if existing, found := pods[name]; found {
-				if checkAndUpdatePod(existing, ref) {
-					// this is an update
+				needUpdate, needReconcile := checkAndUpdatePod(existing, ref)
+				if needUpdate {
 					updatePods = append(updatePods, existing)
-					continue
+				} else if needReconcile {
+					reconcilePods = append(reconcilePods, existing)
 				}
-				// this is a no-op
 				continue
 			}
 			// this is an add
@@ -265,12 +270,12 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			ref.Annotations[kubetypes.ConfigSourceAnnotationKey] = source
 			if existing, found := oldPods[name]; found {
 				pods[name] = existing
-				if checkAndUpdatePod(existing, ref) {
-					// this is an update
+				needUpdate, needReconcile := checkAndUpdatePod(existing, ref)
+				if needUpdate {
 					updatePods = append(updatePods, existing)
-					continue
+				} else if needReconcile {
+					reconcilePods = append(reconcilePods, existing)
 				}
-				// this is a no-op
 				continue
 			}
 			recordFirstSeenTime(ref)
@@ -295,8 +300,9 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	adds = &kubetypes.PodUpdate{Op: kubetypes.ADD, Pods: copyPods(addPods), Source: source}
 	updates = &kubetypes.PodUpdate{Op: kubetypes.UPDATE, Pods: copyPods(updatePods), Source: source}
 	deletes = &kubetypes.PodUpdate{Op: kubetypes.REMOVE, Pods: copyPods(deletePods), Source: source}
+	reconciles = &kubetypes.PodUpdate{Op: kubetypes.RECONCILE, Pods: copyPods(reconcilePods), Source: source}
 
-	return adds, updates, deletes
+	return adds, updates, deletes, reconciles
 }
 
 func (s *podStorage) markSourceSet(source string) {
@@ -416,13 +422,25 @@ func podsDifferSemantically(existing, ref *api.Pod) bool {
 	return true
 }
 
-// checkAndUpdatePod updates existing if ref makes a meaningful change and returns true, or
-// returns false if there was no update.
-func checkAndUpdatePod(existing, ref *api.Pod) bool {
+// checkAndUpdatePod updates existing, and:
+//   * if ref makes a meaningful change, returns needUpdate=true
+//   * if ref makes no meaningful change, but changes the pod status, returns needReconcile=true
+//   * else return both false
+//   Now, needUpdate and needReconcile should never be both true
+func checkAndUpdatePod(existing, ref *api.Pod) (needUpdate, needReconcile bool) {
 	// TODO: it would be better to update the whole object and only preserve certain things
 	//       like the source annotation or the UID (to ensure safety)
 	if !podsDifferSemantically(existing, ref) {
-		return false
+		// this is not an update
+		// Only check reconcile when it is not an update, because if the pod is going to
+		// be updated, an extra reconcile is unnecessary
+		if !reflect.DeepEqual(existing.Status, ref.Status) {
+			// Pod with changed pod status needs reconcile, because kubelet should
+			// be the source of truth of pod status.
+			existing.Status = ref.Status
+			needReconcile = true
+		}
+		return
 	}
 	// this is an update
 
@@ -434,8 +452,10 @@ func checkAndUpdatePod(existing, ref *api.Pod) bool {
 	existing.Labels = ref.Labels
 	existing.DeletionTimestamp = ref.DeletionTimestamp
 	existing.DeletionGracePeriodSeconds = ref.DeletionGracePeriodSeconds
+	existing.Status = ref.Status
 	updateAnnotations(existing, ref)
-	return true
+	needUpdate = true
+	return
 }
 
 // Sync sends a copy of the current state through the update channel.
