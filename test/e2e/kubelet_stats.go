@@ -207,7 +207,7 @@ type containerResourceUsage struct {
 }
 
 func (r *containerResourceUsage) isStrictlyGreaterThan(rhs *containerResourceUsage) bool {
-	return r.CPUUsageInCores > rhs.CPUUsageInCores && r.MemoryUsageInBytes > rhs.MemoryUsageInBytes && r.MemoryWorkingSetInBytes > rhs.MemoryWorkingSetInBytes
+	return r.CPUUsageInCores > rhs.CPUUsageInCores && r.MemoryWorkingSetInBytes > rhs.MemoryWorkingSetInBytes
 }
 
 type resourceUsagePerContainer map[string]*containerResourceUsage
