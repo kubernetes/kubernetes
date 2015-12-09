@@ -79,20 +79,34 @@ func NewManager(
 	runner kubecontainer.ContainerCommandRunner,
 	refManager *kubecontainer.RefManager,
 	recorder record.EventRecorder) Manager {
+	m := newManager(statusManager, livenessManager, runner, refManager, recorder)
+	m.start()
+	return m
+}
+
+// newManager is the internal version of NewManager for testing.
+func newManager(
+	statusManager status.Manager,
+	livenessManager results.Manager,
+	runner kubecontainer.ContainerCommandRunner,
+	refManager *kubecontainer.RefManager,
+	recorder record.EventRecorder) *manager {
+
 	prober := newProber(runner, refManager, recorder)
 	readinessManager := results.NewManager()
-	m := &manager{
+	return &manager{
 		statusManager:    statusManager,
 		prober:           prober,
 		readinessManager: readinessManager,
 		livenessManager:  livenessManager,
 		workers:          make(map[probeKey]*worker),
 	}
+}
 
+// start syncing probe status.
+func (m *manager) start() {
 	// Start syncing readiness.
 	go util.Forever(m.updateReadiness, 0)
-
-	return m
 }
 
 // Key uniquely identifying container probes
