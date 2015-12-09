@@ -681,6 +681,7 @@ func deepCopy_v1_ISCSIVolumeSource(in ISCSIVolumeSource, out *ISCSIVolumeSource,
 	out.TargetPortal = in.TargetPortal
 	out.IQN = in.IQN
 	out.Lun = in.Lun
+	out.ISCSIInterface = in.ISCSIInterface
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	return nil

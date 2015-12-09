@@ -715,6 +715,8 @@ type ISCSIVolumeSource struct {
 	IQN string `json:"iqn"`
 	// iSCSI target lun number.
 	Lun int32 `json:"lun"`
+	// Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.
+	ISCSIInterface string `json:"iscsiInterface,omitempty"`
 	// Filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
 	// Examples: "ext4", "xfs", "ntfs".

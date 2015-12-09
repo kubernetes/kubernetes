@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -30,9 +31,26 @@ import (
 )
 
 // stat a path, if not exists, retry maxRetries times
-func waitForPathToExist(devicePath string, maxRetries int) bool {
+// when iscsi transports other than default are used,  use glob instead as pci id of device is unknown
+type StatFunc func(string) (os.FileInfo, error)
+type GlobFunc func(string) ([]string, error)
+
+func waitForPathToExist(devicePath string, maxRetries int, deviceInterface string) bool {
+	// This makes unit testing a lot easier
+	return waitForPathToExistInternal(devicePath, maxRetries, deviceInterface, os.Stat, filepath.Glob)
+}
+
+func waitForPathToExistInternal(devicePath string, maxRetries int, deviceInterface string, osStat StatFunc, filepathGlob GlobFunc) bool {
 	for i := 0; i < maxRetries; i++ {
-		_, err := os.Stat(devicePath)
+		var err error
+		if deviceInterface == "default" {
+			_, err = osStat(devicePath)
+		} else {
+			fpath, _ := filepathGlob(devicePath)
+			if fpath == nil {
+				err = os.ErrNotExist
+			}
+		}
 		if err == nil {
 			return true
 		}
@@ -80,22 +98,27 @@ func (util *ISCSIUtil) MakeGlobalPDName(iscsi iscsiDisk) string {
 }
 
 func (util *ISCSIUtil) AttachDisk(b iscsiDiskBuilder) error {
-	devicePath := strings.Join([]string{"/dev/disk/by-path/ip", b.portal, "iscsi", b.iqn, "lun", b.lun}, "-")
-	exist := waitForPathToExist(devicePath, 1)
+	var devicePath string
+	if b.iface == "default" {
+		devicePath = strings.Join([]string{"/dev/disk/by-path/ip", b.portal, "iscsi", b.iqn, "lun", b.lun}, "-")
+	} else {
+		devicePath = strings.Join([]string{"/dev/disk/by-path/pci", "*", "ip", b.portal, "iscsi", b.iqn, "lun", b.lun}, "-")
+	}
+	exist := waitForPathToExist(devicePath, 1, b.iface)
 	if exist == false {
 		// discover iscsi target
-		out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "discovery", "-t", "sendtargets", "-p", b.portal})
+		out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "discovery", "-t", "sendtargets", "-p", b.portal, "-I", b.iface})
 		if err != nil {
 			glog.Errorf("iscsi: failed to sendtargets to portal %s error: %s", b.portal, string(out))
 			return err
 		}
 		// login to iscsi target
-		out, err = b.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", b.portal, "-T", b.iqn, "--login"})
+		out, err = b.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", b.portal, "-T", b.iqn, "-I", b.iface, "--login"})
 		if err != nil {
 			glog.Errorf("iscsi: failed to attach disk:Error: %s (%v)", string(out), err)
 			return err
 		}
-		exist = waitForPathToExist(devicePath, 10)
+		exist = waitForPathToExist(devicePath, 10, b.iface)
 		if !exist {
 			return errors.New("Could not attach disk: Timeout after 10s")
 		}
