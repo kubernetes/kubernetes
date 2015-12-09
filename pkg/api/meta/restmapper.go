@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // Implements RESTScope interface
@@ -182,7 +183,7 @@ func (m *DefaultRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...st
 	var gvk *unversioned.GroupVersionKind
 	hadVersion := false
 	for _, version := range versions {
-		if len(version) == 0 {
+		if len(version) == 0 || version == runtime.APIVersionInternal {
 			continue
 		}
 
