@@ -57,19 +57,31 @@ There is no mandated timeline for major versions. They only occur when we need t
 
 ## Release versions as related to API versions
 
-Here is an example major release cycle:
+Release versions and API versions are entirely separate. API versions apply only
+to a particular API group. We can say a few things, though:
 
-* **Kube 1.0 should have API v1 without v1beta\* API versions**
- * The last version of Kube before 1.0 (e.g. 0.14 or whatever it is) will have the stable v1 API. This enables you to migrate all your objects off of the beta API versions of the API and allows us to remove those beta API versions in Kube 1.0 with no effect. There will be tooling to help you detect and migrate any v1beta\* data versions or calls to v1 before you do the upgrade.
-* **Kube 1.x may have API v2beta***
- * The first incarnation of a new (backwards-incompatible) API in HEAD is v2beta1. By default this will be unregistered in apiserver, so it can change freely. Once it is available by default in apiserver (which may not happen for several minor releases), it cannot change ever again because we serialize objects in versioned form, and we always need to be able to deserialize any objects that are saved in etcd, even between alpha versions. If further changes to v2beta1 need to be made, v2beta2 is created, and so on, in subsequent 1.x versions.
-* **Kube 1.y (where y is the last version of the 1.x series) must have final API v2**
- * Before Kube 2.0 is cut, API v2 must be released in 1.x. This enables two things: (1) users can upgrade to API v2 when running Kube 1.x and then switch over to Kube 2.x transparently, and (2) in the Kube 2.0 release itself we can cleanup and remove all API v2beta\* versions because no one should have v2beta\* objects left in their database. As mentioned above, tooling will exist to make sure there are no calls or references to a given API version anywhere inside someone's kube installation before someone upgrades.
- * Kube 2.0 must include the v1 API, but Kube 3.0 must include the v2 API only. It *may* include the v1 API as well if the burden is not high - this will be determined on a per-major-version basis.
+* API versions will not go *backwards*!
+* API versions have a defined lifecycle, going through alpha and beta
+  incarnations before becoming stable.
+  * group/v1alpha1 -> group/v1beta1 -> group/v1 -> group/v2alpha1 ...
+* Stable API versions (e.g., group/v1, group/v2, ...) will live for more than
+  one major release. This is to give time to update clients and run the script
+  to update stored objects.
+* **Breaking changes between API versions will be few, well announced, and there
+  will be adequate time to update clients.**
+* Clients will need to understand only one version per group. E.g., net/v2 will
+  completely replace net/v1. Both will be served simultaneously by some version
+  of kubernetes--this is to allow for a transition period with both old and
+  new clients.
+* (For clarity: The default API group, for historical reasons, is "" (empty
+  string). This will become less important as we move more things into their own
+  groups.)
 
-### Rationale for API v2 being complete before v2.0's release
+For more, see the [api documentation](../api.md#api-versioning).
 
-It may seem a bit strange to complete the v2 API before v2.0 is released, but *adding* a v2 API is not a breaking change. *Removing* the v2beta\* APIs *is* a breaking change, which is what necessitates the major version bump. There are other ways to do this, but having the major release be the fresh start of that release's API without the baggage of its beta versions seems most intuitive out of the available options.
+Future:
+* Once we collect enough API groups, we'll probably start "blessing" sets of
+  group/versions as official or recommended for a given binary release.
 
 ## Patches
 
