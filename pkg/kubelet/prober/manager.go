@@ -52,6 +52,9 @@ type Manager interface {
 	// UpdatePodStatus modifies the given PodStatus with the appropriate Ready state for each
 	// container based on container running status, cached probe results and worker states.
 	UpdatePodStatus(types.UID, *api.PodStatus)
+
+	// Start starts the Manager sync loops.
+	Start()
 }
 
 type manager struct {
@@ -79,18 +82,6 @@ func NewManager(
 	runner kubecontainer.ContainerCommandRunner,
 	refManager *kubecontainer.RefManager,
 	recorder record.EventRecorder) Manager {
-	m := newManager(statusManager, livenessManager, runner, refManager, recorder)
-	m.start()
-	return m
-}
-
-// newManager is the internal version of NewManager for testing.
-func newManager(
-	statusManager status.Manager,
-	livenessManager results.Manager,
-	runner kubecontainer.ContainerCommandRunner,
-	refManager *kubecontainer.RefManager,
-	recorder record.EventRecorder) *manager {
 
 	prober := newProber(runner, refManager, recorder)
 	readinessManager := results.NewManager()
@@ -103,8 +94,8 @@ func newManager(
 	}
 }
 
-// start syncing probe status.
-func (m *manager) start() {
+// Start syncing probe status. This should only be called once.
+func (m *manager) Start() {
 	// Start syncing readiness.
 	go util.Forever(m.updateReadiness, 0)
 }

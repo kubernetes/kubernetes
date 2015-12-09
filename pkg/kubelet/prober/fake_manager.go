@@ -29,6 +29,7 @@ var _ Manager = FakeManager{}
 func (_ FakeManager) AddPod(_ *api.Pod)        {}
 func (_ FakeManager) RemovePod(_ *api.Pod)     {}
 func (_ FakeManager) CleanupPods(_ []*api.Pod) {}
+func (_ FakeManager) Start()                   {}
 
 func (_ FakeManager) UpdatePodStatus(_ types.UID, podStatus *api.PodStatus) {
 	for i := range podStatus.ContainerStatuses {

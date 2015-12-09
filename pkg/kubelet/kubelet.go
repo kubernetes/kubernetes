@@ -918,8 +918,9 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	// handled by pod workers).
 	go util.Until(kl.podKiller, 1*time.Second, util.NeverStop)
 
-	// Run the system oom watcher forever.
+	// Start component sync loops.
 	kl.statusManager.Start()
+	kl.probeManager.Start()
 	// Start the pod lifecycle event generator.
 	kl.pleg.Start()
 	kl.syncLoop(updates, kl)
