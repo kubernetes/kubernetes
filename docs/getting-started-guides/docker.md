@@ -118,7 +118,7 @@ This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.md
 docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
 ```
 
-### Test it out
+### Download ```kubectl```
 
 At this point you should have a running Kubernetes cluster.  You can test this
 by downloading the kubectl binary for `${K8S_VERSION}` (look at the URL in the
@@ -143,32 +143,17 @@ $ chmod 755 kubectl
 $ PATH=$PATH:`pwd`
 ```
 
-<hr>
+Create configuration:
 
-**Note for OS/X users:**
-You will need to set up port forwarding via ssh. For users still using boot2docker directly, it is enough to run the command:
-
-```sh
-boot2docker ssh -L8080:localhost:8080
+```
+$ kubectl config set-cluster test-doc --server=http://localhost:8080
+$ kubectl config set-context test-doc --cluster=test-doc
+$ kubectl config use-context test-doc
 ```
 
-Since the recent deprecation of boot2docker/osx-installer, the correct way to solve the problem is to issue
+For Max OS X users instead of ```localhost``` you will have to use IP address of your docker machine.
 
-```sh
-docker-machine ssh default -L 8080:localhost:8080
-```
-
-However, this solution works only from docker-machine version 0.5. For older versions of docker-machine, a workaround is the
-following:
-
-```sh
-docker-machine env default
-ssh -f -T -N -L8080:localhost:8080 -l docker $(echo $DOCKER_HOST | cut -d ':' -f 2 | tr -d '/')
-```
-
-Type `tcuser` as the password.
-
-<hr>
+### Test it out
 
 List the nodes in your cluster by running:
 
@@ -183,12 +168,10 @@ NAME        LABELS                             STATUS
 127.0.0.1   kubernetes.io/hostname=127.0.0.1   Ready
 ```
 
-If you are running different Kubernetes clusters, you may need to specify `-s http://localhost:8080` to select the local cluster.
-
 ### Run an application
 
 ```sh
-kubectl -s http://localhost:8080 run nginx --image=nginx --port=80
+kubectl run nginx --image=nginx --port=80
 ```
 
 Now run `docker ps` you should see nginx running.  You may need to wait a few minutes for the image to get pulled.
