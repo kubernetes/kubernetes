@@ -218,19 +218,19 @@ script
 	set -o errexit
 	set -o nounset
 
-	# Configuration files are located at /etc/saltbase.
+	# Kube-system pod manifest files are located at /etc/kube-manifests.
 	. /etc/kube-env
 	# Fluentd
 	if [ "${ENABLE_NODE_LOGGING:-}" = "true" ]; then
 		if [ "${LOGGING_DESTINATION:-}" = "gcp" ]; then
-			cp /etc/saltbase/kubernetes/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml /etc/kubernetes/manifests/
+			cp /etc/kube-manifests/fluentd-gcp.yaml /etc/kubernetes/manifests/
 		elif [ "${LOGGING_DESTINATION:-}" = "elasticsearch" ]; then
-			cp /etc/saltbase/kubernetes/saltbase/salt/fluentd-es/fluentd-es.yaml /etc/kubernetes/manifests/
+			cp /etc/kube-manifests/fluentd-es.yaml /etc/kubernetes/manifests/
 		fi
 	fi
 	# Kube-registry-proxy
 	if [ "${ENABLE_CLUSTER_REGISTRY:-}" = "true" ]; then
-		cp /etc/saltbase/kubernetes/saltbase/salt/kube-registry-proxy/kube-registry-proxy.yaml /etc/kubernetes/manifests/
+		cp /etc/kube-manifests/kube-registry-proxy.yaml /etc/kubernetes/manifests/
 	fi
 end script
 
