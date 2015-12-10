@@ -1,7 +1,6 @@
 # Resource Consumer
 
 ## Overview
-
 Resource Consumer is a tool which allows to generate cpu/memory utilization in a container.
 The reason why it was created is testing kubernetes autoscaling.
 Resource Consumer can help with autoscaling tests for:
@@ -10,8 +9,7 @@ Resource Consumer can help with autoscaling tests for:
 - vertical autoscaling of pod - changing its resource limits.
 
 ## Usage
-
-Resource Consumer starts an HTTP server and handle sended requests.
+Resource Consumer starts an HTTP server and handle sent requests.
 It listens on port given as a flag (default 8080).
 Action of consuming resources is send to the container by a POST http request.
 Each http request creates new process.
@@ -20,12 +18,10 @@ Http request handler is in file resource_consumer_handler.go
 The container consumes specified amount of resources:
 
 - CPU in millicores,
-- Memory in megabytes.
-
-
+- Memory in megabytes,
+- Fake custom metrics.
 
 ###Consume CPU http request
-
 - suffix "ConsumeCPU",
 - parameters "millicores" and "durationSec".
 
@@ -36,13 +32,19 @@ and if consumption is too high binary sleeps for 10 millisecond.
 One replica of Resource Consumer cannot consume more that 1 cpu.
 
 ###Consume Memory http request
-
 - suffix "ConsumeMem",
 - parameters "megabytes" and "durationSec".
 
 Consumes specified amount of megabytes for durationSec seconds.
 Consume Memory uses stress tool (stress -m 1 --vm-bytes megabytes --vm-hang 0 -t durationSec).
-Request leading to consumig more memory then container limit will be ignored. 
+Request leading to consuming more memory then container limit will be ignored.
+
+###Bump value of a fake custom metric
+- suffix "BumpMetric",
+- parameters "metric", "delta" and "durationSec".
+
+Bumps metric with given name by delta for durationSec seconds.
+Custom metrics in Prometheus format are exposed on "/metrics" endpoint.
 
 ###CURL example
 ```console
