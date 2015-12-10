@@ -221,7 +221,14 @@ func (p *AttachOptions) Run() error {
 		TTY:       tty,
 	}, api.Scheme)
 
-	return p.Attach.Attach("POST", req.URL(), p.Config, stdin, p.Out, p.Err, tty)
+	err = p.Attach.Attach("POST", req.URL(), p.Config, stdin, p.Out, p.Err, tty)
+	if err != nil {
+		return err
+	}
+	if p.Stdin && tty && pod.Spec.RestartPolicy == api.RestartPolicyAlways {
+		fmt.Fprintf(p.Out, "Session ended, resume using 'kubectl attach %s -c %s -i -t' command when the pod is running\n", pod.Name, containerToAttach.Name)
+	}
+	return nil
 }
 
 // GetContainer returns the container to attach to, with a fallback.
