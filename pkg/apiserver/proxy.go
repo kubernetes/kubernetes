@@ -101,7 +101,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	redirector, ok := storage.(rest.Redirector)
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resource)
-		httpCode = errorJSON(errors.NewMethodNotSupported(resource, "proxy"), r.codec, w)
+		httpCode = errorJSON(errors.NewMethodNotSupported(api.Resource(resource), "proxy"), r.codec, w)
 		return
 	}
 

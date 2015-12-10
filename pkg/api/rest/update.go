@@ -96,7 +96,7 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx api.Context, obj, old runtime
 
 	errs = append(errs, strategy.ValidateUpdate(ctx, obj, old)...)
 	if len(errs) > 0 {
-		return errors.NewInvalid(kind, objectMeta.Name, errs)
+		return errors.NewInvalid(kind.GroupKind(), objectMeta.Name, errs)
 	}
 
 	strategy.Canonicalize(obj)

@@ -92,11 +92,11 @@ func NewTestGenericEtcdRegistry(t *testing.T) (*etcdtesting.EtcdTestServer, *Etc
 	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
 
 	return server, &Etcd{
-		NewFunc:        func() runtime.Object { return &api.Pod{} },
-		NewListFunc:    func() runtime.Object { return &api.PodList{} },
-		EndpointName:   "pods",
-		CreateStrategy: strategy,
-		UpdateStrategy: strategy,
+		NewFunc:           func() runtime.Object { return &api.Pod{} },
+		NewListFunc:       func() runtime.Object { return &api.PodList{} },
+		QualifiedResource: api.Resource("pods"),
+		CreateStrategy:    strategy,
+		UpdateStrategy:    strategy,
 		KeyRootFunc: func(ctx api.Context) string {
 			return podPrefix
 		},

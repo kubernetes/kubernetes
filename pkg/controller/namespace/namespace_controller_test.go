@@ -180,7 +180,7 @@ func TestRetryOnConflictError(t *testing.T) {
 	retryOnce := func(kubeClient client.Interface, namespace *api.Namespace) (*api.Namespace, error) {
 		numTries++
 		if numTries <= 1 {
-			return namespace, errors.NewConflict(namespace.Kind, namespace.Name, fmt.Errorf("ERROR!"))
+			return namespace, errors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("ERROR!"))
 		}
 		return namespace, nil
 	}

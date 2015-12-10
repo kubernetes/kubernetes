@@ -84,7 +84,7 @@ func NewStorage(
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return pod.MatchPod(label, field)
 		},
-		EndpointName: "pods",
+		QualifiedResource: api.Resource("pods"),
 
 		CreateStrategy:      pod.Strategy,
 		UpdateStrategy:      pod.Strategy,
@@ -178,10 +178,10 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx api.Context, podID, oldMachin
 // assignPod assigns the given pod to the given machine.
 func (r *BindingREST) assignPod(ctx api.Context, podID string, machine string, annotations map[string]string) (err error) {
 	if _, err = r.setPodHostAndAnnotations(ctx, podID, "", machine, annotations); err != nil {
-		err = etcderr.InterpretGetError(err, "pod", podID)
-		err = etcderr.InterpretUpdateError(err, "pod", podID)
+		err = etcderr.InterpretGetError(err, api.Resource("pods"), podID)
+		err = etcderr.InterpretUpdateError(err, api.Resource("pods"), podID)
 		if _, ok := err.(*errors.StatusError); !ok {
-			err = errors.NewConflict("binding", podID, err)
+			err = errors.NewConflict(api.Resource("pods/binding"), podID, err)
 		}
 	}
 	return

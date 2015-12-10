@@ -211,7 +211,7 @@ func (c *mockControllerClient) GetPersistentVolumeClaim(namespace, name string) 
 	if c.claim != nil {
 		return c.claim, nil
 	} else {
-		return nil, errors.NewNotFound("persistentVolume", name)
+		return nil, errors.NewNotFound(api.Resource("persistentvolumes"), name)
 	}
 }
 

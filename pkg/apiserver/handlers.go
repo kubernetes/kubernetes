@@ -245,7 +245,7 @@ func (tw *baseTimeoutWriter) timeout(msg string) {
 			tw.w.Write([]byte(msg))
 		} else {
 			enc := json.NewEncoder(tw.w)
-			enc.Encode(errors.NewServerTimeout("", "", 0))
+			enc.Encode(errors.NewServerTimeout(api.Resource(""), "", 0))
 		}
 	}
 	tw.timedOut = true

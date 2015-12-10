@@ -63,7 +63,7 @@ type Etcd struct {
 	NewListFunc func() runtime.Object
 
 	// Used for error reporting
-	EndpointName string
+	QualifiedResource unversioned.GroupResource
 
 	// Used for listing/watching; should not include trailing "/"
 	KeyRootFunc func(ctx api.Context) string
@@ -181,7 +181,7 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *unvers
 	if name, ok := m.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
 			err := e.Storage.GetToList(ctx, key, filterFunc, list)
-			return list, etcderr.InterpretListError(err, e.EndpointName)
+			return list, etcderr.InterpretListError(err, e.QualifiedResource)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
@@ -190,7 +190,7 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *unvers
 		options = &unversioned.ListOptions{ResourceVersion: "0"}
 	}
 	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, filterFunc, list)
-	return list, etcderr.InterpretListError(err, e.EndpointName)
+	return list, etcderr.InterpretListError(err, e.QualifiedResource)
 }
 
 // Create inserts a new item according to the unique key from the object.
@@ -212,7 +212,7 @@ func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, erro
 	}
 	out := e.NewFunc()
 	if err := e.Storage.Create(ctx, key, obj, out, ttl); err != nil {
-		err = etcderr.InterpretCreateError(err, e.EndpointName, name)
+		err = etcderr.InterpretCreateError(err, e.QualifiedResource, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
 		return nil, err
 	}
@@ -259,7 +259,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 		}
 		if version == 0 {
 			if !e.UpdateStrategy.AllowCreateOnUpdate() {
-				return nil, nil, kubeerr.NewNotFound(e.EndpointName, name)
+				return nil, nil, kubeerr.NewNotFound(e.QualifiedResource, name)
 			}
 			creating = true
 			if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
@@ -286,7 +286,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 				return nil, nil, err
 			}
 			if newVersion != version {
-				return nil, nil, kubeerr.NewConflict(e.EndpointName, name, fmt.Errorf("the object has been modified; please apply your changes to the latest version and try again"))
+				return nil, nil, kubeerr.NewConflict(e.QualifiedResource, name, fmt.Errorf("the object has been modified; please apply your changes to the latest version and try again"))
 			}
 		}
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
@@ -304,10 +304,10 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 
 	if err != nil {
 		if creating {
-			err = etcderr.InterpretCreateError(err, e.EndpointName, name)
+			err = etcderr.InterpretCreateError(err, e.QualifiedResource, name)
 			err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
 		} else {
-			err = etcderr.InterpretUpdateError(err, e.EndpointName, name)
+			err = etcderr.InterpretUpdateError(err, e.QualifiedResource, name)
 		}
 		return nil, false, err
 	}
@@ -340,7 +340,7 @@ func (e *Etcd) Get(ctx api.Context, name string) (runtime.Object, error) {
 		return nil, err
 	}
 	if err := e.Storage.Get(ctx, key, obj, false); err != nil {
-		return nil, etcderr.InterpretGetError(err, e.EndpointName, name)
+		return nil, etcderr.InterpretGetError(err, e.QualifiedResource, name)
 	}
 	if e.Decorator != nil {
 		if err := e.Decorator(obj); err != nil {
@@ -364,7 +364,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 
 	obj := e.NewFunc()
 	if err := e.Storage.Get(ctx, key, obj, false); err != nil {
-		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)
+		return nil, etcderr.InterpretDeleteError(err, e.QualifiedResource, name)
 	}
 
 	// support older consumers of delete by treating "nil" as delete immediately
@@ -410,14 +410,14 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 		case errAlreadyDeleting:
 			return e.finalizeDelete(obj, true)
 		default:
-			return nil, etcderr.InterpretUpdateError(err, e.EndpointName, name)
+			return nil, etcderr.InterpretUpdateError(err, e.QualifiedResource, name)
 		}
 	}
 
 	// delete immediately, or no graceful deletion supported
 	out := e.NewFunc()
 	if err := e.Storage.Delete(ctx, key, out); err != nil {
-		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)
+		return nil, etcderr.InterpretDeleteError(err, e.QualifiedResource, name)
 	}
 	return e.finalizeDelete(out, true)
 }

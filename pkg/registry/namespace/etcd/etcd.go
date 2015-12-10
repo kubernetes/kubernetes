@@ -70,7 +70,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return namespace.MatchNamespace(label, field)
 		},
-		EndpointName: "namespaces",
+		QualifiedResource: api.Resource("namespaces"),
 
 		CreateStrategy:      namespace.Strategy,
 		UpdateStrategy:      namespace.Strategy,
@@ -108,7 +108,7 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 
 	// prior to final deletion, we must ensure that finalizers is empty
 	if len(namespace.Spec.Finalizers) != 0 {
-		err = apierrors.NewConflict("Namespace", namespace.Name, fmt.Errorf("The system is ensuring all content is removed from this namespace.  Upon completion, this namespace will automatically be purged by the system."))
+		err = apierrors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("The system is ensuring all content is removed from this namespace.  Upon completion, this namespace will automatically be purged by the system."))
 		return nil, err
 	}
 	return r.Etcd.Delete(ctx, name, nil)

@@ -54,7 +54,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *RE
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return podtemplate.MatchPodTemplate(label, field)
 		},
-		EndpointName: "podtemplates",
+		QualifiedResource: api.Resource("podtemplates"),
 
 		CreateStrategy: podtemplate.Strategy,
 		UpdateStrategy: podtemplate.Strategy,

@@ -256,7 +256,7 @@ func TestSyncBatchIgnoresNotFound(t *testing.T) {
 	client := testclient.Fake{}
 	syncer := newTestManager(&client)
 	client.AddReactor("get", "pods", func(action testclient.Action) (bool, runtime.Object, error) {
-		return true, nil, errors.NewNotFound("pods", "test-pod")
+		return true, nil, errors.NewNotFound(api.Resource("pods"), "test-pod")
 	})
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	syncer.syncBatch()
@@ -322,7 +322,7 @@ func TestSyncBatchNoDeadlock(t *testing.T) {
 
 	// Pod not found.
 	ret = *pod
-	err = errors.NewNotFound("pods", pod.Name)
+	err = errors.NewNotFound(api.Resource("pods"), pod.Name)
 	m.SetPodStatus(pod, getRandomPodStatus())
 	m.syncBatch()
 	verifyActions(t, client, []testclient.Action{getAction})
