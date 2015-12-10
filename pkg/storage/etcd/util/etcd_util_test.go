@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,8 +38,7 @@ func TestIsEtcdNotFound(t *testing.T) {
 			t.Errorf("Expected %#v to return %v, but it did not", err, isNotFound)
 		}
 	}
-	try(etcdErrorNotFound, true)
-	try(&etcd.EtcdError{ErrorCode: 101}, false)
+	try(&etcd.Error{Code: 101}, false)
 	try(nil, false)
 	try(fmt.Errorf("some other kind of error"), false)
 }
