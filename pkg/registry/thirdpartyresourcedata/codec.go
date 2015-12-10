@@ -42,7 +42,8 @@ type thirdPartyResourceDataMapper struct {
 var _ meta.RESTMapper = &thirdPartyResourceDataMapper{}
 
 func (t *thirdPartyResourceDataMapper) isThirdPartyResource(resource string) bool {
-	return resource == strings.ToLower(t.kind)+"s"
+	plural, _ := meta.KindToResource(t.kind, false)
+	return resource == plural
 }
 
 func (t *thirdPartyResourceDataMapper) KindFor(resource string) (unversioned.GroupVersionKind, error) {
