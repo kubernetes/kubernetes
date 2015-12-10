@@ -203,6 +203,7 @@ KUBE_APISERVER_OPTS="\
  --service-cluster-ip-range=${1}\
  --admission-control=${2}\
  --service-node-port-range=${3}\
+ --advertise-address=${4}\
  --client-ca-file=/srv/kubernetes/ca.crt\
  --tls-cert-file=/srv/kubernetes/server.cert\
  --tls-private-key-file=/srv/kubernetes/server.key"
@@ -232,14 +233,12 @@ EOF
 function create-kubelet-opts() {
   cat <<EOF > ~/kube/default/kubelet
 KUBELET_OPTS="\
- --address=0.0.0.0\
- --port=10250 \
  --hostname-override=${1} \
  --api-servers=http://${2}:8080 \
  --logtostderr=true \
  --config=/etc/kubernetes/manifests \
- --cluster-dns=$3 \
- --cluster-domain=$4"
+ --cluster-dns=${3} \
+ --cluster-domain=${4}"
 EOF
 
 }
@@ -383,7 +382,8 @@ function provision-master() {
     create-kube-apiserver-opts \
       '${SERVICE_CLUSTER_IP_RANGE}' \
       '${ADMISSION_CONTROL}' \
-      '${SERVICE_NODE_PORT_RANGE}'
+      '${SERVICE_NODE_PORT_RANGE}' \
+      '${MASTER_IP}'
     create-kube-controller-manager-opts '${NODE_IPS}'
     create-kube-scheduler-opts
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
@@ -487,7 +487,8 @@ function provision-masterandnode() {
     create-kube-apiserver-opts \
       '${SERVICE_CLUSTER_IP_RANGE}' \
       '${ADMISSION_CONTROL}' \
-      '${SERVICE_NODE_PORT_RANGE}'
+      '${SERVICE_NODE_PORT_RANGE}' \
+      '${MASTER_IP}'
     create-kube-controller-manager-opts '${NODE_IPS}'
     create-kube-scheduler-opts
     create-kubelet-opts \
