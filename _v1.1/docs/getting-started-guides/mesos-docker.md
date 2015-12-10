@@ -7,12 +7,33 @@ title: "Getting Started With Kubernetes on Mesos on Docker"
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-## Getting Started With Kubernetes on Mesos on Docker
+Getting Started With Kubernetes on Mesos on Docker
+----------------------------------------
 
 The mesos/docker provider uses docker-compose to launch Kubernetes as a Mesos framework, running in docker with its
 dependencies (etcd & mesos).
 
-### Cluster Goals
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+  - [Cluster Goals](#cluster-goals)
+  - [Cluster Topology](#cluster-topology)
+  - [Prerequisites](#prerequisites)
+    - [Install on Mac (Homebrew)](#install-on-mac-homebrew)
+    - [Install on Linux](#install-on-linux)
+    - [Boot2Docker Config (Mac)](#boot2docker-config-mac)
+  - [Walkthrough](#walkthrough)
+  - [Addons](#addons)
+    - [KubeUI](#kubeui)
+  - [End To End Testing](#end-to-end-testing)
+  - [Kubernetes CLI](#kubernetes-cli)
+  - [Helpful scripts](#helpful-scripts)
+  - [Build Locally](#build-locally)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
+
+## Cluster Goals
 
 - kubernetes development
 - pod/service development
@@ -34,7 +55,7 @@ Non-Goals:
 - long running
 - state persistence across restarts
 
-### Cluster Topology
+## Cluster Topology
 
 The cluster consists of several docker containers linked together by docker-managed hostnames:
 
@@ -48,7 +69,7 @@ The cluster consists of several docker containers linked together by docker-mana
 | Kubernetes Controller Manager | controller                  |                                                                                         |
 | Kubernetes Scheduler          | scheduler                   | Schedules container deployment by accepting Mesos offers                                |
 
-### Prerequisites
+## Prerequisites
 
 Required:
 - [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) - version control system
@@ -65,7 +86,7 @@ Optional:
 - [Make](https://en.wikipedia.org/wiki/Make_(software))  - Utility for building executables from source
   - Required to build Kubernetes locally with make
 
-#### Install on Mac (Homebrew)
+### Install on Mac (Homebrew)
 
 It's possible to install all of the above via [Homebrew](http://brew.sh/) on a Mac.
 
@@ -84,7 +105,7 @@ brew install docker-compose
 {% endraw %}
 ```
 
-#### Install on Linux
+### Install on Linux
 
 Most of the above are available via apt and yum, but depending on your distribution, you may have to install via other
 means to get the latest versions.
@@ -96,7 +117,7 @@ In order to build Kubernetes, the current user must be in a docker group with su
 See the docker docs for [instructions](https://docs.docker.com/installation/ubuntulinux/#create-a-docker-group).
 
 
-#### Boot2Docker Config (Mac)
+### Boot2Docker Config (Mac)
 
 If on a mac using boot2docker, the following steps will make the docker IPs (in the virtualbox VM) reachable from the
 host machine (mac).
@@ -128,7 +149,7 @@ host machine (mac).
     To delete the route later: `sudo route delete 172.17.0.0`
 
 
-### Walkthrough
+## Walkthrough
 
 1. Checkout source
 
@@ -222,10 +243,10 @@ host machine (mac).
 
 1. Explore examples
 
-   To learn more about Pods, Volumes, Labels, Services, and Replication Controllers, start with the
-   [Kubernetes Walkthrough](../user-guide/walkthrough/).
+    To learn more about Pods, Volumes, Labels, Services, and Replication Controllers, start with the
+    [Kubernetes Walkthrough](../user-guide/walkthrough/).
 
-   To skip to a more advanced example, see the [Guestbook Example](../../examples/guestbook/)
+    To skip to a more advanced example, see the [Guestbook Example](../../examples/guestbook/)
 
 1. Destroy cluster
 
@@ -235,7 +256,7 @@ host machine (mac).
 {% endraw %}
     ```
 
-### Addons
+## Addons
 
 The `kube-up` for the mesos/docker provider will automatically deploy KubeDNS and KubeUI addons as pods/services.
 
@@ -247,7 +268,7 @@ Check their status with:
 {% endraw %}
 ```
 
-#### KubeUI
+### KubeUI
 
 The web-based Kubernetes UI is accessible in a browser through the API Server proxy: `https://<apiserver>:6443/ui/`.
 
@@ -256,7 +277,7 @@ By default, basic-auth is configured with user `admin` and password `admin`.
 The IP of the API Server can be found using `./cluster/kubectl.sh cluster-info`.
 
 
-### End To End Testing
+## End To End Testing
 
 Warning: e2e tests can take a long time to run. You may not want to run them immediately if you're just getting started.
 
@@ -281,7 +302,7 @@ make test_e2e
 ```
 
 
-### Kubernetes CLI
+## Kubernetes CLI
 
 When compiling from source, it's simplest to use the `./cluster/kubectl.sh` script, which detects your platform &
 architecture and proxies commands to the appropriate `kubectl` binary.
@@ -289,7 +310,7 @@ architecture and proxies commands to the appropriate `kubectl` binary.
 ex: `./cluster/kubectl.sh get pods`
 
 
-### Helpful scripts
+## Helpful scripts
 
 - Kill all docker containers
 
@@ -307,7 +328,7 @@ ex: `./cluster/kubectl.sh get pods`
 {% endraw %}
     ```
 
-### Build Locally
+## Build Locally
 
 The steps above tell you how to build in a container, for minimal local dependencies. But if you have Go and Make installed you can build locally much faster:
 
