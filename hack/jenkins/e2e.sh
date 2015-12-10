@@ -1165,32 +1165,32 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
             # "release/v0.19.1"
             IFS='/' read -a varr <<< "${JENKINS_EXPLICIT_VERSION}"
             bucket="${varr[0]}"
-            githash="${varr[1]}"
-            echo "Using explicit version $bucket/$githash"
+            build_version="${varr[1]}"
+            echo "Using explicit version $bucket/$build_version"
         elif [[ ${JENKINS_USE_SERVER_VERSION:-}  =~ ^[yY]$ ]]; then
             # for GKE we can use server default version.
             bucket="release"
             msg=$(gcloud ${CMD_GROUP} container get-server-config --project=${PROJECT} --zone=${ZONE} | grep defaultClusterVersion)
             # msg will look like "defaultClusterVersion: 1.0.1". Strip
             # everything up to, including ": "
-            githash="v${msg##*: }"
-            echo "Using server version $bucket/$githash"
+            build_version="v${msg##*: }"
+            echo "Using server version $bucket/$build_version"
         else  # use JENKINS_PUBLISHED_VERSION
             # Use a published version like "ci/latest" (default),
             # "release/latest", "release/latest-1", or "release/stable"
             IFS='/' read -a varr <<< "${JENKINS_PUBLISHED_VERSION}"
             bucket="${varr[0]}"
-            githash=$(gsutil cat gs://kubernetes-release/${JENKINS_PUBLISHED_VERSION}.txt)
-            echo "Using published version $bucket/$githash (from ${JENKINS_PUBLISHED_VERSION})"
+            build_version=$(gsutil cat gs://kubernetes-release/${JENKINS_PUBLISHED_VERSION}.txt)
+            echo "Using published version $bucket/$build_version (from ${JENKINS_PUBLISHED_VERSION})"
         fi
         # At this point, we want to have the following vars set:
         # - bucket
-        # - githash
-        gsutil -m cp gs://kubernetes-release/${bucket}/${githash}/kubernetes.tar.gz gs://kubernetes-release/${bucket}/${githash}/kubernetes-test.tar.gz .
+        # - build_version
+        gsutil -m cp gs://kubernetes-release/${bucket}/${build_version}/kubernetes.tar.gz gs://kubernetes-release/${bucket}/${build_version}/kubernetes-test.tar.gz .
 
         # Set by GKE-CI to change the CLUSTER_API_VERSION to the git version
         if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
-            export CLUSTER_API_VERSION=$(echo ${githash} | cut -c 2-)
+            export CLUSTER_API_VERSION=$(echo ${build_version} | cut -c 2-)
         fi
     fi
 
@@ -1283,10 +1283,10 @@ if [[ "${E2E_TEST,,}" == "true" ]]; then
     # Check to make sure the cluster is up before running tests, and fail if it's not.
     go run ./hack/e2e.go ${E2E_OPT} -v --isup
     go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS}" && exitcode=0 || exitcode=$?
-    if [[ "${E2E_PUBLISH_GREEN_VERSION:-}" == "true" && ${exitcode} == 0 && -n ${githash:-} ]]; then
-        echo "publish githash to ci/latest-green.txt: ${githash}"
-        echo "${githash}" > ${WORKSPACE}/githash.txt
-        gsutil cp ${WORKSPACE}/githash.txt gs://kubernetes-release/ci/latest-green.txt
+    if [[ "${E2E_PUBLISH_GREEN_VERSION:-}" == "true" && ${exitcode} == 0 && -n ${build_version:-} ]]; then
+        echo "publish build_version to ci/latest-green.txt: ${build_version}"
+        echo "${build_version}" > ${WORKSPACE}/build_version.txt
+        gsutil cp ${WORKSPACE}/build_version.txt gs://kubernetes-release/ci/latest-green.txt
     fi
 fi
 
