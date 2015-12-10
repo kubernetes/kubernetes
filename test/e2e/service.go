@@ -509,7 +509,7 @@ var _ = Describe("Services", func() {
 		for i := 1; i < ServiceNodePortRange.Size; i++ {
 			offs1 := nodePort1 - ServiceNodePortRange.Base
 			offs2 := (offs1 + i) % ServiceNodePortRange.Size
-			nodePort2 := ServiceNodePortRange.Base + offs2
+			nodePort2 = ServiceNodePortRange.Base + offs2
 			service, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
 				s.Spec.Ports[0].NodePort = nodePort2
 			})
@@ -523,17 +523,17 @@ var _ = Describe("Services", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		if service.Spec.Type != api.ServiceTypeLoadBalancer {
-			Failf("got unexpected Spec.Type for updated-NodePort service: %v", service)
+			Failf("got unexpected Spec.Type for updated-LoadBalancer service: %v", service)
 		}
 		if len(service.Spec.Ports) != 1 {
-			Failf("got unexpected len(Spec.Ports) for updated-NodePort service: %v", service)
+			Failf("got unexpected len(Spec.Ports) for updated-LoadBalancer service: %v", service)
 		}
 		port = service.Spec.Ports[0]
 		if port.NodePort != nodePort2 {
-			Failf("got unexpected Spec.Ports[0].nodePort for NodePort service: %v", service)
+			Failf("got unexpected Spec.Ports[0].nodePort for LoadBalancer service: %v", service)
 		}
 		if len(service.Status.LoadBalancer.Ingress) != 1 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingress) for NodePort service: %v", service)
+			Failf("got unexpected len(Status.LoadBalancer.Ingress) for LoadBalancer service: %v", service)
 		}
 
 		By("hitting the pod through the service's updated NodePort")
@@ -548,7 +548,7 @@ var _ = Describe("Services", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			ingress2 := service.Status.LoadBalancer.Ingress[0]
-			if testLoadBalancerReachableInTime(ingress2, 80, 5*time.Second) {
+			if testLoadBalancerReachable(ingress2, 80) {
 				break
 			}
 
