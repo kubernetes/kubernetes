@@ -62,7 +62,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return horizontalpodautoscaler.MatchAutoscaler(label, field)
 		},
-		EndpointName: "horizontalPodAutoscalers",
+		QualifiedResource: extensions.Resource("horizontalpodautoscalers"),
 
 		// Used to validate autoscaler creation
 		CreateStrategy: horizontalpodautoscaler.Strategy,

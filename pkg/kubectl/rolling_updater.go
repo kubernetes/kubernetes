@@ -431,7 +431,7 @@ func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *api.R
 func (r *RollingUpdater) existingController(controller *api.ReplicationController) (*api.ReplicationController, error) {
 	// without rc name but generate name, there's no existing rc
 	if len(controller.Name) == 0 && len(controller.GenerateName) > 0 {
-		return nil, errors.NewNotFound("ReplicationController", controller.Name)
+		return nil, errors.NewNotFound(api.Resource("replicationcontrollers"), controller.Name)
 	}
 	// controller name is required to get rc back
 	return r.c.ReplicationControllers(controller.Namespace).Get(controller.Name)

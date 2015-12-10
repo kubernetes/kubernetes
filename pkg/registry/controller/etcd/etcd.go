@@ -62,7 +62,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return controller.MatchController(label, field)
 		},
-		EndpointName: "replicationControllers",
+		QualifiedResource: api.Resource("replicationcontrollers"),
 
 		// Used to validate controller creation
 		CreateStrategy: controller.Strategy,

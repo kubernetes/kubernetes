@@ -181,7 +181,7 @@ func (o objects) Kind(kind unversioned.GroupVersionKind, name string) (runtime.O
 			}
 			return out, nil
 		}
-		return nilValue, errors.NewNotFound(kind.Kind, name)
+		return nilValue, errors.NewNotFound(unversioned.GroupResource{Group: kind.Group, Resource: kind.Kind}, name)
 	}
 
 	index := o.last[kind.Kind]
@@ -189,7 +189,7 @@ func (o objects) Kind(kind unversioned.GroupVersionKind, name string) (runtime.O
 		index = len(arr) - 1
 	}
 	if index < 0 {
-		return nilValue, errors.NewNotFound(kind.Kind, name)
+		return nilValue, errors.NewNotFound(unversioned.GroupResource{Group: kind.Group, Resource: kind.Kind}, name)
 	}
 	out, err := o.scheme.Copy(arr[index])
 	if err != nil {

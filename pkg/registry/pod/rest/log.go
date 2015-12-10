@@ -52,7 +52,7 @@ func (r *LogREST) Get(ctx api.Context, name string, opts runtime.Object) (runtim
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
 	if errs := validation.ValidatePodLogOptions(logOpts); len(errs) > 0 {
-		return nil, errors.NewInvalid("podlogs", name, errs)
+		return nil, errors.NewInvalid(api.Kind("PodLogOptions"), name, errs)
 	}
 	location, transport, err := pod.LogLocation(r.Store, r.KubeletConn, ctx, name, logOpts)
 	if err != nil {
@@ -63,7 +63,7 @@ func (r *LogREST) Get(ctx api.Context, name string, opts runtime.Object) (runtim
 		Transport:       transport,
 		ContentType:     "text/plain",
 		Flush:           logOpts.Follow,
-		ResponseChecker: genericrest.NewGenericHttpResponseChecker("Pod", name),
+		ResponseChecker: genericrest.NewGenericHttpResponseChecker(api.Resource("pods/log"), name),
 	}, nil
 }
 

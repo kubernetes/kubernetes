@@ -68,7 +68,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *RE
 		// Matches objects based on labels/fields for list and watch
 		PredicateFunc: configmap.MatchConfigMap,
 
-		EndpointName: "configmaps",
+		QualifiedResource: extensions.Resource("configmaps"),
 
 		CreateStrategy: configmap.Strategy,
 		UpdateStrategy: configmap.Strategy,

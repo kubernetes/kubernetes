@@ -54,7 +54,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *RE
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return secret.Matcher(label, field)
 		},
-		EndpointName: "secrets",
+		QualifiedResource: api.Resource("secrets"),
 
 		CreateStrategy: secret.Strategy,
 		UpdateStrategy: secret.Strategy,

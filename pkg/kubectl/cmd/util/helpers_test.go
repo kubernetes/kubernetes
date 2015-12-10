@@ -274,15 +274,15 @@ func TestCheckInvalidErr(t *testing.T) {
 		expected string
 	}{
 		{
-			errors.NewInvalid("Invalid1", "invalidation", field.ErrorList{field.Invalid(field.NewPath("field"), "single", "details")}),
+			errors.NewInvalid(api.Kind("Invalid1"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field"), "single", "details")}),
 			`Error from server: Invalid1 "invalidation" is invalid: field: invalid value 'single', Details: details`,
 		},
 		{
-			errors.NewInvalid("Invalid2", "invalidation", field.ErrorList{field.Invalid(field.NewPath("field1"), "multi1", "details"), field.Invalid(field.NewPath("field2"), "multi2", "details")}),
+			errors.NewInvalid(api.Kind("Invalid2"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field1"), "multi1", "details"), field.Invalid(field.NewPath("field2"), "multi2", "details")}),
 			`Error from server: Invalid2 "invalidation" is invalid: [field1: invalid value 'multi1', Details: details, field2: invalid value 'multi2', Details: details]`,
 		},
 		{
-			errors.NewInvalid("Invalid3", "invalidation", field.ErrorList{}),
+			errors.NewInvalid(api.Kind("Invalid3"), "invalidation", field.ErrorList{}),
 			`Error from server: Invalid3 "invalidation" is invalid: <nil>`,
 		},
 	}

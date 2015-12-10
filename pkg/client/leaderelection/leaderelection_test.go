@@ -58,7 +58,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				{
 					verb: "get",
 					reaction: func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, nil, errors.NewNotFound(action.GetVerb(), action.(testclient.GetAction).GetName())
+						return true, nil, errors.NewNotFound(api.Resource(action.(testclient.GetAction).GetResource()), action.(testclient.GetAction).GetName())
 					},
 				},
 				{

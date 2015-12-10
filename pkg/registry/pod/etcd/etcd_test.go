@@ -354,7 +354,7 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Expected not-found-error but got nothing")
 	}
-	if !errors.IsNotFound(etcderrors.InterpretGetError(err, "Pod", "foo")) {
+	if !errors.IsNotFound(etcderrors.InterpretGetError(err, api.Resource("pods"), "foo")) {
 		t.Fatalf("Unexpected error returned: %#v", err)
 	}
 
@@ -362,7 +362,7 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Expected not-found-error but got nothing")
 	}
-	if !errors.IsNotFound(etcderrors.InterpretGetError(err, "Pod", "foo")) {
+	if !errors.IsNotFound(etcderrors.InterpretGetError(err, api.Resource("pods"), "foo")) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 }

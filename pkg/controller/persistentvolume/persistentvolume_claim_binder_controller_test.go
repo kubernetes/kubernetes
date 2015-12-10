@@ -419,7 +419,7 @@ func (c *mockBinderClient) GetPersistentVolumeClaim(namespace, name string) (*ap
 	if c.claim != nil {
 		return c.claim, nil
 	} else {
-		return nil, errors.NewNotFound("persistentVolume", name)
+		return nil, errors.NewNotFound(api.Resource("persistentvolumes"), name)
 	}
 }
 

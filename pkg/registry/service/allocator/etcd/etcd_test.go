@@ -32,7 +32,7 @@ import (
 func newStorage(t *testing.T) (*Etcd, *etcdtesting.EtcdTestServer, allocator.Interface) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	mem := allocator.NewAllocationMap(100, "rangeSpecValue")
-	etcd := NewEtcd(mem, "/ranges/serviceips", "serviceipallocation", etcdStorage)
+	etcd := NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), etcdStorage)
 	return etcd, server, mem
 }
 
@@ -50,7 +50,7 @@ func key() string {
 func TestEmpty(t *testing.T) {
 	storage, server, _ := newStorage(t)
 	defer server.Terminate(t)
-	if _, err := storage.Allocate(1); !strings.Contains(err.Error(), "cannot allocate resources of type serviceipallocation at this time") {
+	if _, err := storage.Allocate(1); !strings.Contains(err.Error(), "cannot allocate resources of type serviceipallocations at this time") {
 		t.Fatal(err)
 	}
 }
@@ -93,7 +93,7 @@ func TestStore(t *testing.T) {
 	}
 
 	other = allocator.NewAllocationMap(100, "rangeSpecValue")
-	otherStorage := NewEtcd(other, "/ranges/serviceips", "serviceipallocation", storage.storage)
+	otherStorage := NewEtcd(other, "/ranges/serviceips", api.Resource("serviceipallocations"), storage.storage)
 	if ok, err := otherStorage.Allocate(2); ok || err != nil {
 		t.Fatal(err)
 	}
