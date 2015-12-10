@@ -778,8 +778,8 @@ func TestGetContainerInfoWithNoContainers(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected error from cadvisor client, got none")
 	}
-	if err != ErrContainerNotFound {
-		t.Errorf("expected error %v, got %v", ErrContainerNotFound.Error(), err.Error())
+	if err != kubecontainer.ErrContainerNotFound {
+		t.Errorf("expected error %v, got %v", kubecontainer.ErrContainerNotFound.Error(), err.Error())
 	}
 	if stats != nil {
 		t.Errorf("non-nil stats when dockertools returned no containers")
@@ -808,8 +808,8 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error from cadvisor client, got none")
 	}
-	if err != ErrContainerNotFound {
-		t.Errorf("Expected error %v, got %v", ErrContainerNotFound.Error(), err.Error())
+	if err != kubecontainer.ErrContainerNotFound {
+		t.Errorf("Expected error %v, got %v", kubecontainer.ErrContainerNotFound.Error(), err.Error())
 	}
 	if stats != nil {
 		t.Errorf("non-nil stats when dockertools returned no containers")
