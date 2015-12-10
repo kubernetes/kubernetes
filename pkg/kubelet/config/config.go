@@ -194,9 +194,9 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	s.podLock.Lock()
 	defer s.podLock.Unlock()
 
-	adds = &kubetypes.PodUpdate{Op: kubetypes.ADD, Source: source}
-	updates = &kubetypes.PodUpdate{Op: kubetypes.UPDATE, Source: source}
-	deletes = &kubetypes.PodUpdate{Op: kubetypes.REMOVE, Source: source}
+	addPods := []*api.Pod{}
+	updatePods := []*api.Pod{}
+	deletePods := []*api.Pod{}
 
 	pods := s.pods[source]
 	if pods == nil {
@@ -223,7 +223,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			if existing, found := pods[name]; found {
 				if checkAndUpdatePod(existing, ref) {
 					// this is an update
-					updates.Pods = append(updates.Pods, existing)
+					updatePods = append(updatePods, existing)
 					continue
 				}
 				// this is a no-op
@@ -232,7 +232,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			// this is an add
 			recordFirstSeenTime(ref)
 			pods[name] = ref
-			adds.Pods = append(adds.Pods, ref)
+			addPods = append(addPods, ref)
 		}
 
 	case kubetypes.REMOVE:
@@ -242,7 +242,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			if existing, found := pods[name]; found {
 				// this is a delete
 				delete(pods, name)
-				deletes.Pods = append(deletes.Pods, existing)
+				deletePods = append(deletePods, existing)
 				continue
 			}
 			// this is a no-op
@@ -267,7 +267,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				pods[name] = existing
 				if checkAndUpdatePod(existing, ref) {
 					// this is an update
-					updates.Pods = append(updates.Pods, existing)
+					updatePods = append(updatePods, existing)
 					continue
 				}
 				// this is a no-op
@@ -275,13 +275,13 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			}
 			recordFirstSeenTime(ref)
 			pods[name] = ref
-			adds.Pods = append(adds.Pods, ref)
+			addPods = append(addPods, ref)
 		}
 
 		for name, existing := range oldPods {
 			if _, found := pods[name]; !found {
 				// this is a delete
-				deletes.Pods = append(deletes.Pods, existing)
+				deletePods = append(deletePods, existing)
 			}
 		}
 
@@ -291,6 +291,11 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	}
 
 	s.pods[source] = pods
+
+	adds = &kubetypes.PodUpdate{Op: kubetypes.ADD, Pods: copyPods(addPods), Source: source}
+	updates = &kubetypes.PodUpdate{Op: kubetypes.UPDATE, Pods: copyPods(updatePods), Source: source}
+	deletes = &kubetypes.PodUpdate{Op: kubetypes.REMOVE, Pods: copyPods(deletePods), Source: source}
+
 	return adds, updates, deletes
 }
 
@@ -466,4 +471,17 @@ func bestPodIdentString(pod *api.Pod) string {
 		name = "<empty-name>"
 	}
 	return fmt.Sprintf("%s.%s", name, namespace)
+}
+
+func copyPods(sourcePods []*api.Pod) []*api.Pod {
+	pods := []*api.Pod{}
+	for _, source := range sourcePods {
+		// Use a deep copy here just in case
+		pod, err := api.Scheme.Copy(source)
+		if err != nil {
+			glog.Errorf("unable to copy pod: %v", err)
+		}
+		pods = append(pods, pod.(*api.Pod))
+	}
+	return pods
 }
