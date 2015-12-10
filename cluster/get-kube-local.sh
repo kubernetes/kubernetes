@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,9 +30,9 @@ set -o pipefail
 
 KUBE_HOST=${KUBE_HOST:-localhost}
 
-RED="\033[0;31m"
-GREEN="\033[0;32m"
-ORANGE="\033[0;33m"
+declare -r RED="\033[0;31m"
+declare -r GREEN="\033[0;32m"
+declare -r YELLOW="\033[0;33m"
 
 function echo_green {
   echo -e "${GREEN}$1"; tput sgr0
@@ -42,12 +42,12 @@ function echo_red {
   echo -e "${RED}$1"; tput sgr0
 }
 
-function echo_orange {
-  echo -e "${ORANGE}$1"; tput sgr0
+function echo_yellow {
+  echo -e "${YELLOW}$1"; tput sgr0
 }
 
 function run {
-  output=`$1 2>&1 || true`
+  output=$($1 2>&1 || true)
   if [ $? -eq 0 ]; then
     echo_green "SUCCESS"
   else
@@ -83,7 +83,7 @@ function create_cluster {
 
   echo -e -n "\tWaiting for master components to start..."
   while true; do
-    local running_count=`kubectl -s=http://${KUBE_HOST}:8080 get pods --no-headers 2>/dev/null | grep "Running" | wc -l`
+    local running_count=$(kubectl -s=http://${KUBE_HOST}:8080 get pods --no-headers 2>/dev/null | grep "Running" | wc -l)
     # We expect to have 3 running pods - etcd, master and kube-proxy.
     if [ "$running_count" -ge 3 ]; then
       break
@@ -139,9 +139,9 @@ else
   exit 3
 fi
 
-kubectl_url=https://storage.googleapis.com/kubernetes-release/release/${release}/bin/${platform}/${arch}/kubectl
+kubectl_url="https://storage.googleapis.com/kubernetes-release/release/${release}/bin/${platform}/${arch}/kubectl"
 
-if [[ `ls . | grep ^kubectl$ | wc -l` -lt 1 ]]; then
+if [[ $(ls . | grep ^kubectl$ | wc -l) -lt 1 ]]; then
   echo -n "Downloading kubectl binary..."
   if [[ $(which wget) ]]; then
     run "wget ${kubectl_url}"
@@ -154,6 +154,8 @@ if [[ `ls . | grep ^kubectl$ | wc -l` -lt 1 ]]; then
   chmod a+x kubectl
   echo ""
 else
+  # TODO: We should detect version of kubectl binary if it too old
+  # download newer version.
   echo "Detected existing kubectl binary. Skipping download."
 fi
 
@@ -162,7 +164,7 @@ create_cluster
 echo ""
 echo ""
 echo "To list the nodes in your cluster run"
-echo_orange "\tkubectl -s=http://${KUBE_HOST}:8080 get nodes"
+echo_yellow "\tkubectl -s=http://${KUBE_HOST}:8080 get nodes"
 echo ""
 echo "To run your first pod run"
-echo_orange "\tkubectl -s http://${KUBE_HOST}:8080 run nginx --image=nginx --port=80"
+echo_yellow "\tkubectl -s http://${KUBE_HOST}:8080 run nginx --image=nginx --port=80"
