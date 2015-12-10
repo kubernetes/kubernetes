@@ -186,23 +186,23 @@ func createApp(c *client.Client, ns string, i int) {
 }
 
 // gcloudUnmarshal unmarshals json output of gcloud into given out interface.
-func gcloudUnmarshal(resource, regex string, out interface{}) {
+func gcloudUnmarshal(resource, regex, project string, out interface{}) {
 	output, err := exec.Command("gcloud", "compute", resource, "list",
 		fmt.Sprintf("--regex=%v", regex),
-		fmt.Sprintf("--project=%v", testContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--project=%v", project),
 		"-q", "--format=json").CombinedOutput()
 	if err != nil {
-		Failf("Error unmarshalling gcloud output: %v", err)
+		Logf("Error unmarshalling gcloud err: %v, output: %v", err, string(output))
 	}
 	if err := json.Unmarshal([]byte(output), out); err != nil {
-		Failf("Error unmarshalling gcloud output for %v: %v", resource, err)
+		Logf("Error unmarshalling gcloud output for %v: %v, output: %v", resource, err, string(output))
 	}
 }
 
-func gcloudDelete(resource, name string) {
+func gcloudDelete(resource, name, project string) {
 	Logf("Deleting %v: %v", resource, name)
 	output, err := exec.Command("gcloud", "compute", resource, "delete",
-		name, fmt.Sprintf("--project=%v", testContext.CloudConfig.ProjectID), "-q").CombinedOutput()
+		name, fmt.Sprintf("--project=%v", project), "-q").CombinedOutput()
 	if err != nil {
 		Logf("Error deleting %v, output: %v\nerror: %+v", resource, string(output), err)
 	}
@@ -228,17 +228,18 @@ func kubectlLogLBController(c *client.Client, ns string) {
 	}
 }
 
-type ingressController struct {
+type IngressController struct {
 	ns             string
 	rcPath         string
 	defaultSvcPath string
 	UID            string
+	Project        string
 	rc             *api.ReplicationController
 	svc            *api.Service
 	c              *client.Client
 }
 
-func (cont *ingressController) create() {
+func (cont *IngressController) create() {
 
 	// TODO: This cop out is because it would be *more* brittle to duplicate all
 	// the name construction logic from the controller cross-repo. We will not
@@ -294,12 +295,12 @@ func (cont *ingressController) create() {
 	Expect(waitForRCPodsRunning(cont.c, cont.ns, cont.rc.Name)).NotTo(HaveOccurred())
 }
 
-func (cont *ingressController) cleanup(del bool) error {
+func (cont *IngressController) Cleanup(del bool) error {
 	errMsg := ""
 	// Ordering is important here because we cannot delete resources that other
 	// resources hold references to.
 	fwList := []compute.ForwardingRule{}
-	gcloudUnmarshal("forwarding-rules", fmt.Sprintf("k8s-fw-.*--%v", cont.UID), &fwList)
+	gcloudUnmarshal("forwarding-rules", fmt.Sprintf("k8s-fw-.*--%v", cont.UID), cont.Project, &fwList)
 	if len(fwList) != 0 {
 		msg := ""
 		for _, f := range fwList {
@@ -307,7 +308,7 @@ func (cont *ingressController) cleanup(del bool) error {
 			if del {
 				Logf("Deleting forwarding-rule: %v", f.Name)
 				output, err := exec.Command("gcloud", "compute", "forwarding-rules", "delete",
-					f.Name, fmt.Sprintf("--project=%v", testContext.CloudConfig.ProjectID), "-q", "--global").CombinedOutput()
+					f.Name, fmt.Sprintf("--project=%v", cont.Project), "-q", "--global").CombinedOutput()
 				if err != nil {
 					Logf("Error deleting forwarding rules, output: %v\nerror:%v", string(output), err)
 				}
@@ -317,52 +318,52 @@ func (cont *ingressController) cleanup(del bool) error {
 	}
 
 	tpList := []compute.TargetHttpProxy{}
-	gcloudUnmarshal("target-http-proxies", fmt.Sprintf("k8s-tp-.*--%v", cont.UID), &tpList)
+	gcloudUnmarshal("target-http-proxies", fmt.Sprintf("k8s-tp-.*--%v", cont.UID), cont.Project, &tpList)
 	if len(tpList) != 0 {
 		msg := ""
 		for _, t := range tpList {
 			msg += fmt.Sprintf("%v\n", t.Name)
 			if del {
-				gcloudDelete("target-http-proxies", t.Name)
+				gcloudDelete("target-http-proxies", t.Name, cont.Project)
 			}
 		}
 		errMsg += fmt.Sprintf("Found target proxies:\n%v", msg)
 	}
 
 	umList := []compute.UrlMap{}
-	gcloudUnmarshal("url-maps", fmt.Sprintf("k8s-um-.*--%v", cont.UID), &umList)
+	gcloudUnmarshal("url-maps", fmt.Sprintf("k8s-um-.*--%v", cont.UID), cont.Project, &umList)
 	if len(umList) != 0 {
 		msg := ""
 		for _, u := range umList {
 			msg += fmt.Sprintf("%v\n", u.Name)
 			if del {
-				gcloudDelete("url-maps", u.Name)
+				gcloudDelete("url-maps", u.Name, cont.Project)
 			}
 		}
 		errMsg += fmt.Sprintf("Found url maps:\n%v", msg)
 	}
 
 	beList := []compute.BackendService{}
-	gcloudUnmarshal("backend-services", fmt.Sprintf("k8s-be-[0-9]+--%v", cont.UID), &beList)
+	gcloudUnmarshal("backend-services", fmt.Sprintf("k8s-be-[0-9]+--%v", cont.UID), cont.Project, &beList)
 	if len(beList) != 0 {
 		msg := ""
 		for _, b := range beList {
 			msg += fmt.Sprintf("%v\n", b.Name)
 			if del {
-				gcloudDelete("backend-services", b.Name)
+				gcloudDelete("backend-services", b.Name, cont.Project)
 			}
 		}
 		errMsg += fmt.Sprintf("Found backend services:\n%v", msg)
 	}
 
 	hcList := []compute.HttpHealthCheck{}
-	gcloudUnmarshal("http-health-checks", fmt.Sprintf("k8s-be-[0-9]+--%v", cont.UID), &hcList)
+	gcloudUnmarshal("http-health-checks", fmt.Sprintf("k8s-be-[0-9]+--%v", cont.UID), cont.Project, &hcList)
 	if len(hcList) != 0 {
 		msg := ""
 		for _, h := range hcList {
 			msg += fmt.Sprintf("%v\n", h.Name)
 			if del {
-				gcloudDelete("http-health-checks", h.Name)
+				gcloudDelete("http-health-checks", h.Name, cont.Project)
 			}
 		}
 		errMsg += fmt.Sprintf("Found health check:\n%v", msg)
@@ -382,7 +383,7 @@ var _ = Describe("GCE L7 LoadBalancer Controller", func() {
 	var addonDir string
 	var client *client.Client
 	var responseTimes, creationTimes []time.Duration
-	var ingController *ingressController
+	var ingController *IngressController
 
 	framework := Framework{BaseName: "glbc"}
 
@@ -398,11 +399,12 @@ var _ = Describe("GCE L7 LoadBalancer Controller", func() {
 			testContext.RepoRoot, "cluster", "addons", "cluster-loadbalancing", "glbc")
 
 		nsParts := strings.Split(ns, "-")
-		ingController = &ingressController{
+		ingController = &IngressController{
 			ns: ns,
 			// The UID in the namespace was generated by the master, so it's
 			// global to the cluster.
 			UID:            nsParts[len(nsParts)-1],
+			Project:        testContext.CloudConfig.ProjectID,
 			rcPath:         filepath.Join(addonDir, "glbc-controller.yaml"),
 			defaultSvcPath: filepath.Join(addonDir, "default-svc.yaml"),
 			c:              client,
@@ -410,7 +412,7 @@ var _ = Describe("GCE L7 LoadBalancer Controller", func() {
 		ingController.create()
 		// If we somehow get the same namespace uid as someone else in this
 		// gce project, just back off.
-		Expect(ingController.cleanup(false)).NotTo(HaveOccurred())
+		Expect(ingController.Cleanup(false)).NotTo(HaveOccurred())
 		responseTimes = []time.Duration{}
 		creationTimes = []time.Duration{}
 	})
@@ -436,7 +438,7 @@ var _ = Describe("GCE L7 LoadBalancer Controller", func() {
 			}
 		}
 		pollErr := wait.Poll(5*time.Second, lbCleanupTimeout, func() (bool, error) {
-			if err := ingController.cleanup(false); err != nil {
+			if err := ingController.Cleanup(false); err != nil {
 				Logf("Still waiting for glbc to cleanup: %v", err)
 				return false, nil
 			}
@@ -448,7 +450,7 @@ var _ = Describe("GCE L7 LoadBalancer Controller", func() {
 		// If the controller failed to cleanup the test will fail, but we want to cleanup
 		// resources before that.
 		if pollErr != nil {
-			if cleanupErr := ingController.cleanup(true); cleanupErr != nil {
+			if cleanupErr := ingController.Cleanup(true); cleanupErr != nil {
 				Logf("WARNING: Failed to cleanup resources %v", cleanupErr)
 			}
 			Failf("Failed to cleanup GCE L7 resources.")
