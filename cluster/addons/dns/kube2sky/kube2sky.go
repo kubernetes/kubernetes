@@ -88,6 +88,7 @@ type kube2sky struct {
 	endpointsStore kcache.Store
 	// A cache that contains all the servicess in the system.
 	servicesStore kcache.Store
+	podsStore     kcache.Store
 	// Lock for controlling access to headless services.
 	mlock sync.Mutex
 }
@@ -131,7 +132,8 @@ func (ks *kube2sky) newHeadlessService(subdomain string, service *kapi.Service) 
 		return fmt.Errorf("failed to get endpoints object from endpoints store - %v", err)
 	}
 	if !exists {
-		glog.V(1).Infof("Could not find endpoints for service %q in namespace %q. DNS records will be created once endpoints show up.", service.Name, service.Namespace)
+		glog.V(1).Infof("Could not find endpoints for service %q in namespace %q using service lookup key:%s. DNS records will be created once endpoints show up.",
+			service.Name, service.Namespace, key)
 		return nil
 	}
 	if e, ok := e.(*kapi.Endpoints); ok {
@@ -191,7 +193,7 @@ func (ks *kube2sky) getServiceFromEndpoints(e *kapi.Endpoints) (*kapi.Service, e
 		return nil, fmt.Errorf("failed to get service object from services store - %v", err)
 	}
 	if !exists {
-		glog.V(1).Infof("could not find service for endpoint %q in namespace %q", e.Name, e.Namespace)
+		glog.V(1).Infof("could not find service, with endpoint key:%s, for endpoint %q in namespace %q", key, e.Name, e.Namespace)
 		return nil, nil
 	}
 	if svc, ok := obj.(*kapi.Service); ok {
@@ -396,13 +398,17 @@ func createEndpointsPodLW(kubeClient *kclient.Client) *kcache.ListWatch {
 func (ks *kube2sky) newService(obj interface{}) {
 	if s, ok := obj.(*kapi.Service); ok {
 		name := buildDNSNameString(ks.domain, serviceSubdomain, s.Namespace, s.Name)
+		glog.V(4).Infof("Adding DNS entry:%s, for new service:%s", name, s.Name)
 		ks.mutateEtcdOrDie(func() error { return ks.addDNS(name, s) })
+	} else {
+		glog.Errorf("Service could not be created. obj:%v", obj)
 	}
 }
 
 func (ks *kube2sky) removeService(obj interface{}) {
 	if s, ok := obj.(*kapi.Service); ok {
 		name := buildDNSNameString(ks.domain, serviceSubdomain, s.Namespace, s.Name)
+		glog.V(4).Infof("Removing service: %s, DNS entry:%s", s.Name, name)
 		ks.mutateEtcdOrDie(func() error { return ks.removeDNS(name) })
 	}
 }
@@ -583,7 +589,7 @@ func main() {
 
 	ks.endpointsStore = watchEndpoints(kubeClient, &ks)
 	ks.servicesStore = watchForServices(kubeClient, &ks)
-	ks.servicesStore = watchPods(kubeClient, &ks)
+	ks.podsStore = watchPods(kubeClient, &ks)
 
 	select {}
 }
