@@ -27,8 +27,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -342,7 +342,7 @@ func (r *RollingUpdater) scaleDown(newRc, oldRc *api.ReplicationController, desi
 
 // scalerScaleAndWait scales a controller using a Scaler and a real client.
 func (r *RollingUpdater) scaleAndWaitWithScaler(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error) {
-	scaler, err := ScalerFor("ReplicationController", r.c)
+	scaler, err := ScalerFor(api.Kind("ReplicationController"), r.c)
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't make scaler: %s", err)
 	}
@@ -363,7 +363,8 @@ func (r *RollingUpdater) pollForReadyPods(interval, timeout time.Duration, oldRc
 		anyReady := false
 		for _, controller := range controllers {
 			selector := labels.Set(controller.Spec.Selector).AsSelector()
-			pods, err := r.c.Pods(controller.Namespace).List(selector, fields.Everything())
+			options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+			pods, err := r.c.Pods(controller.Namespace).List(options)
 			if err != nil {
 				return false, err
 			}
@@ -489,7 +490,7 @@ func extractMaxValue(field intstr.IntOrString, name string, value int) (int, err
 		if field.IntVal < 0 {
 			return 0, fmt.Errorf("%s must be >= 0", name)
 		}
-		return field.IntVal, nil
+		return field.IntValue(), nil
 	case intstr.String:
 		s := strings.Replace(field.StrVal, "%", "", -1)
 		v, err := strconv.Atoi(s)
@@ -627,7 +628,9 @@ func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 
 	// Update all pods managed by the rc to have the new hash label, so they are correctly adopted
 	// TODO: extract the code from the label command and re-use it here.
-	podList, err := client.Pods(namespace).List(labels.SelectorFromSet(oldRc.Spec.Selector), fields.Everything())
+	selector := labels.SelectorFromSet(oldRc.Spec.Selector)
+	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	podList, err := client.Pods(namespace).List(options)
 	if err != nil {
 		return nil, err
 	}
@@ -677,7 +680,9 @@ func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 	// Clean up any orphaned pods that don't have the new label, this can happen if the rc manager
 	// doesn't see the update to its pod template and creates a new pod with the old labels after
 	// we've finished re-adopting existing pods to the rc.
-	podList, err = client.Pods(namespace).List(labels.SelectorFromSet(selectorCopy), fields.Everything())
+	selector = labels.SelectorFromSet(selectorCopy)
+	options = unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	podList, err = client.Pods(namespace).List(options)
 	for ix := range podList.Items {
 		pod := &podList.Items[ix]
 		if value, found := pod.Labels[deploymentKey]; !found || value != deploymentValue {
@@ -718,7 +723,7 @@ func updateWithRetries(rcClient client.ReplicationControllerInterface, rc *api.R
 }
 
 func FindSourceController(r client.ReplicationControllersNamespacer, namespace, name string) (*api.ReplicationController, error) {
-	list, err := r.ReplicationControllers(namespace).List(labels.Everything(), fields.Everything())
+	list, err := r.ReplicationControllers(namespace).List(unversioned.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

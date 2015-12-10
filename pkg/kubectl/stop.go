@@ -23,9 +23,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -45,11 +45,11 @@ type Reaper interface {
 }
 
 type NoSuchReaperError struct {
-	kind string
+	kind unversioned.GroupKind
 }
 
 func (n *NoSuchReaperError) Error() string {
-	return fmt.Sprintf("no reaper has been implemented for %q", n.kind)
+	return fmt.Sprintf("no reaper has been implemented for %v", n.kind)
 }
 
 func IsNoSuchReaperError(err error) bool {
@@ -57,18 +57,23 @@ func IsNoSuchReaperError(err error) bool {
 	return ok
 }
 
-func ReaperFor(kind string, c client.Interface) (Reaper, error) {
+func ReaperFor(kind unversioned.GroupKind, c client.Interface) (Reaper, error) {
 	switch kind {
-	case "ReplicationController":
+	case api.Kind("ReplicationController"):
 		return &ReplicationControllerReaper{c, Interval, Timeout}, nil
-	case "DaemonSet":
+
+	case extensions.Kind("DaemonSet"):
 		return &DaemonSetReaper{c, Interval, Timeout}, nil
-	case "Pod":
+
+	case api.Kind("Pod"):
 		return &PodReaper{c}, nil
-	case "Service":
+
+	case api.Kind("Service"):
 		return &ServiceReaper{c}, nil
-	case "Job":
+
+	case extensions.Kind("Job"):
 		return &JobReaper{c, Interval, Timeout}, nil
+
 	}
 	return nil, &NoSuchReaperError{kind}
 }
@@ -103,7 +108,7 @@ type objInterface interface {
 
 // getOverlappingControllers finds rcs that this controller overlaps, as well as rcs overlapping this controller.
 func getOverlappingControllers(c client.ReplicationControllerInterface, rc *api.ReplicationController) ([]api.ReplicationController, error) {
-	rcs, err := c.List(labels.Everything(), fields.Everything())
+	rcs, err := c.List(unversioned.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting replication controllers: %v", err)
 	}
@@ -120,7 +125,7 @@ func getOverlappingControllers(c client.ReplicationControllerInterface, rc *api.
 
 func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
 	rc := reaper.ReplicationControllers(namespace)
-	scaler, err := ScalerFor("ReplicationController", *reaper)
+	scaler, err := ScalerFor(api.Kind("ReplicationController"), *reaper)
 	if err != nil {
 		return err
 	}
@@ -224,7 +229,7 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
 	jobs := reaper.Extensions().Jobs(namespace)
 	pods := reaper.Pods(namespace)
-	scaler, err := ScalerFor("Job", *reaper)
+	scaler, err := ScalerFor(extensions.Kind("Job"), *reaper)
 	if err != nil {
 		return err
 	}
@@ -245,8 +250,9 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 		return err
 	}
 	// at this point only dead pods are left, that should be removed
-	selector, _ := extensions.PodSelectorAsSelector(job.Spec.Selector)
-	podList, err := pods.List(selector, fields.Everything())
+	selector, _ := extensions.LabelSelectorAsSelector(job.Spec.Selector)
+	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	podList, err := pods.List(options)
 	if err != nil {
 		return err
 	}

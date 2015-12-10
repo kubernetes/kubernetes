@@ -168,7 +168,7 @@ KUBE_API_VERSIONS="v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver
   --kubelet-port=${KUBELET_PORT} \
   --runtime-config=api/v1 \
   --cert-dir="${TMPDIR:-/tmp/}" \
-  --runtime_config="extensions/v1beta1=true" \
+  --runtime_config="extensions/v1beta1/deployments=true" \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
@@ -186,6 +186,9 @@ kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1/nodes/127.0.0.1" "
 
 # Expose kubectl directly for readability
 PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
+
+kube::log::status "Checking kubectl version"
+kubectl version
 
 runTests() {
   version="$1"
@@ -219,6 +222,8 @@ runTests() {
   hpa_min_field=".spec.minReplicas"
   hpa_max_field=".spec.maxReplicas"
   hpa_cpu_field=".spec.cpuUtilization.targetPercentage"
+  job_parallelism_field=".spec.parallelism"
+  deployment_replicas=".spec.replicas"
 
   # Passing no arguments to create is an error
   ! kubectl create
@@ -611,7 +616,7 @@ runTests() {
   # Pre-Condition: no RC is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command: create the rc "nginx" with image nginx
-  kubectl run nginx --image=nginx --save-config "${kube_flags[@]}"
+  kubectl run nginx --image=nginx --save-config --generator=run/v1 "${kube_flags[@]}"
   # Post-Condition: rc "nginx" has configuration annotation
   [[ "$(kubectl get rc nginx -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   ## 5. kubectl expose --save-config should generate configuration annotation
@@ -646,6 +651,24 @@ runTests() {
   [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   # Clean up 
   kubectl delete pods test-pod "${kube_flags[@]}"
+
+  ## kubectl run should create deployments or jobs 
+  # Pre-Condition: no Job is running 
+  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)'
+  # Post-Condition: Job "pi" is created 
+  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
+  # Clean up
+  kubectl delete jobs pi
+  # Pre-Condition: no Deployment is running 
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl run nginx --image=nginx --generator=deployment/v1beta1
+  # Post-Condition: Deployment "nginx" is created 
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
+  # Clean up 
+  kubectl delete deployment nginx
 
   ##############
   # Namespaces #
@@ -848,16 +871,36 @@ __EOF__
   kubectl create -f examples/guestbook/redis-master-controller.yaml "${kube_flags[@]}"
   kubectl create -f examples/guestbook/redis-slave-controller.yaml "${kube_flags[@]}"
   # Command
-  kubectl scale rc/redis-master rc/redis-slave --replicas=4
+  kubectl scale rc/redis-master rc/redis-slave --replicas=4 "${kube_flags[@]}"
   # Post-condition: 4 replicas each
   kube::test::get_object_assert 'rc redis-master' "{{$rc_replicas_field}}" '4'
   kube::test::get_object_assert 'rc redis-slave' "{{$rc_replicas_field}}" '4'
   # Clean-up
   kubectl delete rc redis-{master,slave} "${kube_flags[@]}"
 
+  ### Scale a job
+  kubectl create -f docs/user-guide/job.yaml "${kube_flags[@]}"
+  # Command
+  kubectl scale --replicas=2 job/pi
+  # Post-condition: 2 replicas for pi
+  kube::test::get_object_assert 'job pi' "{{$job_parallelism_field}}" '2'
+  # Clean-up
+  kubectl delete job/pi "${kube_flags[@]}"
+  ### Scale a deployment
+  kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
+  # Command
+  kubectl scale --current-replicas=3 --replicas=1 deployment/nginx-deployment
+  # Post-condition: 1 replica for nginx-deployment
+  kube::test::get_object_assert 'deployment nginx-deployment' "{{$deployment_replicas}}" '1'
+  # Clean-up
+  kubectl delete deployment/nginx-deployment "${kube_flags[@]}"
+  # TODO: Remove once deployment reaping is implemented
+  kubectl delete rc --all "${kube_flags[@]}"
+
   ### Expose replication controller as service
-  # Pre-condition: 2 replicas
-  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
+  kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
+  # Pre-condition: 3 replicas
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
   # Command
   kubectl expose rc frontend --port=80 "${kube_flags[@]}"
   # Post-condition: service exists and the port is unnamed
@@ -956,6 +999,19 @@ __EOF__
   ! kubectl autoscale rc frontend "${kube_flags[@]}"
   # Clean up
   kubectl delete rc frontend "${kube_flags[@]}"
+
+  ### Auto scale deployment 
+  # Pre-condition: no deployment is running
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
+  # autoscale 2~3 pods, default CPU utilization (80%)
+  kubectl autoscale deployment nginx-deployment "${kube_flags[@]}" --min=2 --max=3
+  kube::test::get_object_assert 'hpa nginx-deployment' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
+  # Clean up
+  kubectl delete hpa nginx-deployment "${kube_flags[@]}"
+  kubectl delete deployment nginx-deployment "${kube_flags[@]}"
 
   ######################
   # Multiple Resources #
@@ -1186,8 +1242,8 @@ __EOF__
   kubectl create -f examples/cassandra/cassandra-controller.yaml "${kube_flags[@]}"
   kubectl scale rc cassandra --replicas=1 "${kube_flags[@]}"
   kubectl create -f examples/cassandra/cassandra-service.yaml "${kube_flags[@]}"
-  kube::test::get_object_assert "all -l'name=cassandra'" "{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}" 'cassandra:cassandra:cassandra:'
-  kubectl delete all -l name=cassandra "${kube_flags[@]}"
+  kube::test::get_object_assert "all -l'app=cassandra'" "{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}" 'cassandra:cassandra:cassandra:'
+  kubectl delete all -l app=cassandra "${kube_flags[@]}"
 
 
   ###########

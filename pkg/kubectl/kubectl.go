@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 const kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
@@ -46,26 +47,27 @@ func makeImageList(spec *api.PodSpec) string {
 // correspond to a preferred output version (if feasible)
 type OutputVersionMapper struct {
 	meta.RESTMapper
-	OutputVersion string
+
+	// output versions takes a list of preferred GroupVersions. Only the first
+	// hit for a given group will have effect.  This allows different output versions
+	// depending upon the group of the kind being requested
+	OutputVersions []unversioned.GroupVersion
 }
 
 // RESTMapping implements meta.RESTMapper by prepending the output version to the preferred version list.
-func (m OutputVersionMapper) RESTMapping(kind string, versions ...string) (*meta.RESTMapping, error) {
-	preferred := []string{m.OutputVersion}
-	for _, version := range versions {
-		if len(version) > 0 {
-			preferred = append(preferred, version)
+func (m OutputVersionMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	for _, preferredVersion := range m.OutputVersions {
+		if gk.Group == preferredVersion.Group {
+			mapping, err := m.RESTMapper.RESTMapping(gk, preferredVersion.Version)
+			if err == nil {
+				return mapping, nil
+			}
+
+			break
 		}
 	}
-	// if the caller wants to use the default version list, try with the preferred version, and on
-	// error, use the default behavior.
-	if len(preferred) == 1 {
-		if m, err := m.RESTMapper.RESTMapping(kind, preferred...); err == nil {
-			return m, nil
-		}
-		preferred = nil
-	}
-	return m.RESTMapper.RESTMapping(kind, preferred...)
+
+	return m.RESTMapper.RESTMapping(gk, versions...)
 }
 
 // ShortcutExpander is a RESTMapper that can be used for Kubernetes
@@ -74,12 +76,13 @@ type ShortcutExpander struct {
 	meta.RESTMapper
 }
 
-// VersionAndKindForResource implements meta.RESTMapper. It expands the resource first, then invokes the wrapped
+var _ meta.RESTMapper = &ShortcutExpander{}
+
+// KindFor implements meta.RESTMapper. It expands the resource first, then invokes the wrapped
 // mapper.
-func (e ShortcutExpander) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
+func (e ShortcutExpander) KindFor(resource string) (unversioned.GroupVersionKind, error) {
 	resource = expandResourceShortcut(resource)
-	defaultVersion, kind, err = e.RESTMapper.VersionAndKindForResource(resource)
-	return defaultVersion, kind, err
+	return e.RESTMapper.KindFor(resource)
 }
 
 // ResourceIsValid takes a string (kind) and checks if it's a valid resource.
@@ -95,20 +98,20 @@ func expandResourceShortcut(resource string) string {
 	shortForms := map[string]string{
 		// Please keep this alphabetized
 		"cs":     "componentstatuses",
-		"ev":     "events",
+		"ds":     "daemonsets",
 		"ep":     "endpoints",
+		"ev":     "events",
 		"hpa":    "horizontalpodautoscalers",
+		"ing":    "ingresses",
 		"limits": "limitranges",
 		"no":     "nodes",
 		"ns":     "namespaces",
 		"po":     "pods",
-		"pv":     "persistentvolumes",
 		"pvc":    "persistentvolumeclaims",
+		"pv":     "persistentvolumes",
 		"quota":  "resourcequotas",
 		"rc":     "replicationcontrollers",
-		"ds":     "daemonsets",
 		"svc":    "services",
-		"ing":    "ingresses",
 	}
 	if expanded, ok := shortForms[resource]; ok {
 		return expanded

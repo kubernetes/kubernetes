@@ -24,8 +24,21 @@ import (
 // Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
 var Scheme = runtime.NewScheme()
 
+// SchemeGroupVersion is group version used to register these objects
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: ""}
+
+// Kind takes an unqualified kind and returns back a Group qualified GroupKind
+func Kind(kind string) unversioned.GroupKind {
+	return SchemeGroupVersion.WithKind(kind).GroupKind()
+}
+
+// Resource takes an unqualified resource and returns back a Group qualified GroupResource
+func Resource(resource string) unversioned.GroupResource {
+	return SchemeGroupVersion.WithResource(resource).GroupResource()
+}
+
 func init() {
-	Scheme.AddKnownTypes("",
+	Scheme.AddKnownTypes(SchemeGroupVersion,
 		&Pod{},
 		&PodList{},
 		&PodStatusResult{},
@@ -58,7 +71,6 @@ func init() {
 		&PersistentVolumeClaim{},
 		&PersistentVolumeClaimList{},
 		&DeleteOptions{},
-		&ListOptions{},
 		&PodAttachOptions{},
 		&PodLogOptions{},
 		&PodExecOptions{},
@@ -70,11 +82,13 @@ func init() {
 	)
 
 	// Register Unversioned types
-	Scheme.AddKnownTypes("", &unversioned.Status{})
-	Scheme.AddKnownTypes("", &unversioned.APIVersions{})
-	Scheme.AddKnownTypes("", &unversioned.APIGroupList{})
-	Scheme.AddKnownTypes("", &unversioned.APIGroup{})
-	Scheme.AddKnownTypes("", &unversioned.APIResourceList{})
+	// TODO this should not be done here
+	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.ListOptions{})
+	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.Status{})
+	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIVersions{})
+	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIGroupList{})
+	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIGroup{})
+	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIResourceList{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}
@@ -109,7 +123,6 @@ func (*PersistentVolumeList) IsAnAPIObject()      {}
 func (*PersistentVolumeClaim) IsAnAPIObject()     {}
 func (*PersistentVolumeClaimList) IsAnAPIObject() {}
 func (*DeleteOptions) IsAnAPIObject()             {}
-func (*ListOptions) IsAnAPIObject()               {}
 func (*PodAttachOptions) IsAnAPIObject()          {}
 func (*PodLogOptions) IsAnAPIObject()             {}
 func (*PodExecOptions) IsAnAPIObject()            {}

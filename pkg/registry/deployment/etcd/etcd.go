@@ -30,6 +30,8 @@ import (
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+
+	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 )
 
 // DeploymentStorage includes dummy storage for Deployments and for Scale subresource.
@@ -130,20 +132,7 @@ func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 	if err != nil {
 		return nil, errors.NewNotFound("scale", name)
 	}
-	return &extensions.Scale{
-		ObjectMeta: api.ObjectMeta{
-			Name:              name,
-			Namespace:         deployment.Namespace,
-			CreationTimestamp: deployment.CreationTimestamp,
-		},
-		Spec: extensions.ScaleSpec{
-			Replicas: deployment.Spec.Replicas,
-		},
-		Status: extensions.ScaleStatus{
-			Replicas: deployment.Status.Replicas,
-			Selector: deployment.Spec.Selector,
-		},
-	}, nil
+	return extensions.ScaleFromDeployment(deployment), nil
 }
 
 func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
@@ -154,6 +143,11 @@ func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object,
 	if !ok {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
 	}
+
+	if errs := extvalidation.ValidateScale(scale); len(errs) > 0 {
+		return nil, false, errors.NewInvalid("scale", scale.Name, errs)
+	}
+
 	deployment, err := (*r.registry).GetDeployment(ctx, scale.Name)
 	if err != nil {
 		return nil, false, errors.NewNotFound("scale", scale.Name)
@@ -163,18 +157,5 @@ func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object,
 	if err != nil {
 		return nil, false, errors.NewConflict("scale", scale.Name, err)
 	}
-	return &extensions.Scale{
-		ObjectMeta: api.ObjectMeta{
-			Name:              deployment.Name,
-			Namespace:         deployment.Namespace,
-			CreationTimestamp: deployment.CreationTimestamp,
-		},
-		Spec: extensions.ScaleSpec{
-			Replicas: deployment.Spec.Replicas,
-		},
-		Status: extensions.ScaleStatus{
-			Replicas: deployment.Status.Replicas,
-			Selector: deployment.Spec.Selector,
-		},
-	}, false, nil
+	return extensions.ScaleFromDeployment(deployment), false, nil
 }

@@ -19,11 +19,12 @@ package deployment
 import (
 	"fmt"
 	"hash/adler32"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -32,24 +33,26 @@ import (
 func GetOldRCs(deployment extensions.Deployment, c client.Interface) ([]*api.ReplicationController, error) {
 	namespace := deployment.ObjectMeta.Namespace
 	// 1. Find all pods whose labels match deployment.Spec.Selector
-	podList, err := c.Pods(namespace).List(labels.SelectorFromSet(deployment.Spec.Selector), fields.Everything())
+	selector := labels.SelectorFromSet(deployment.Spec.Selector)
+	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	podList, err := c.Pods(namespace).List(options)
 	if err != nil {
 		return nil, fmt.Errorf("error listing pods: %v", err)
 	}
 	// 2. Find the corresponding RCs for pods in podList.
 	// TODO: Right now we list all RCs and then filter. We should add an API for this.
 	oldRCs := map[string]api.ReplicationController{}
-	rcList, err := c.ReplicationControllers(namespace).List(labels.Everything(), fields.Everything())
+	rcList, err := c.ReplicationControllers(namespace).List(unversioned.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error listing replication controllers: %v", err)
 	}
+	newRCTemplate := GetNewRCTemplate(deployment)
 	for _, pod := range podList.Items {
 		podLabelsSelector := labels.Set(pod.ObjectMeta.Labels)
 		for _, rc := range rcList.Items {
 			rcLabelsSelector := labels.SelectorFromSet(rc.Spec.Selector)
 			if rcLabelsSelector.Matches(podLabelsSelector) {
 				// Filter out RC that has the same pod template spec as the deployment - that is the new RC.
-				newRCTemplate := GetNewRCTemplate(deployment)
 				if api.Semantic.DeepEqual(rc.Spec.Template, &newRCTemplate) {
 					continue
 				}
@@ -68,7 +71,7 @@ func GetOldRCs(deployment extensions.Deployment, c client.Interface) ([]*api.Rep
 // Returns nil if the new RC doesnt exist yet.
 func GetNewRC(deployment extensions.Deployment, c client.Interface) (*api.ReplicationController, error) {
 	namespace := deployment.ObjectMeta.Namespace
-	rcList, err := c.ReplicationControllers(namespace).List(labels.Everything(), fields.Everything())
+	rcList, err := c.ReplicationControllers(namespace).List(unversioned.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error listing replication controllers: %v", err)
 	}
@@ -130,25 +133,44 @@ func GetReplicaCountForRCs(replicationControllers []*api.ReplicationController) 
 }
 
 // Returns the number of available pods corresponding to the given RCs.
-func GetAvailablePodsForRCs(c client.Interface, rcs []*api.ReplicationController) (int, error) {
-	// TODO: Use MinReadySeconds once https://github.com/kubernetes/kubernetes/pull/12894 is merged.
+func GetAvailablePodsForRCs(c client.Interface, rcs []*api.ReplicationController, minReadySeconds int) (int, error) {
 	allPods, err := getPodsForRCs(c, rcs)
 	if err != nil {
 		return 0, err
 	}
+	return getReadyPodsCount(allPods, minReadySeconds), nil
+}
+
+func getReadyPodsCount(pods []api.Pod, minReadySeconds int) int {
 	readyPodCount := 0
-	for _, pod := range allPods {
+	for _, pod := range pods {
 		if api.IsPodReady(&pod) {
-			readyPodCount++
+			// Check if we've passed minReadySeconds since LastTransitionTime
+			// If so, this pod is ready
+			for _, c := range pod.Status.Conditions {
+				// we only care about pod ready conditions
+				if c.Type == api.PodReady {
+					// 2 cases that this ready condition is valid (passed minReadySeconds, i.e. the pod is ready):
+					// 1. minReadySeconds <= 0
+					// 2. LastTransitionTime (is set) + minReadySeconds (>0) < current time
+					minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
+					if minReadySeconds <= 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(time.Now()) {
+						readyPodCount++
+						break
+					}
+				}
+			}
 		}
 	}
-	return readyPodCount, nil
+	return readyPodCount
 }
 
 func getPodsForRCs(c client.Interface, replicationControllers []*api.ReplicationController) ([]api.Pod, error) {
 	allPods := []api.Pod{}
 	for _, rc := range replicationControllers {
-		podList, err := c.Pods(rc.ObjectMeta.Namespace).List(labels.SelectorFromSet(rc.Spec.Selector), fields.Everything())
+		selector := labels.SelectorFromSet(rc.Spec.Selector)
+		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		podList, err := c.Pods(rc.ObjectMeta.Namespace).List(options)
 		if err != nil {
 			return allPods, fmt.Errorf("error listing pods: %v", err)
 		}

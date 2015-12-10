@@ -70,7 +70,7 @@ across reboots and failures.
 Run:
 
 ```sh
-sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host -d gcr.io/google_containers/etcd:2.2.1 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
+sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host -d gcr.io/google_containers/etcd:2.2.1 /usr/local/bin/etcd --listen-client-urls=http://127.0.0.1:4001,http://${MASTER_IP}:4001 --advertise-client-urls=http://${MASTER_IP}:4001 --data-dir=/var/etcd/data
 ```
 
 Next, you need to set a CIDR range for flannel.  This CIDR should be chosen to be non-overlapping with any existing network you are using:
@@ -115,7 +115,7 @@ or it may be something else.
 Now run flanneld itself:
 
 ```sh
-sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.3
+sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.5 --ip-masq
 ```
 
 The previous command should have printed a really long hash, copy this hash.
@@ -177,7 +177,7 @@ sudo docker run \
     --volume=/var/run:/var/run:rw \
     --net=host \
     --privileged=true \
-    --pid=host \ 
+    --pid=host \
     -d \
     gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube kubelet --api-servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=127.0.0.1 --config=/etc/kubernetes/manifests-multi --cluster-dns=10.0.0.10 --cluster-domain=cluster.local
 ```

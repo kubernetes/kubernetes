@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -34,11 +33,11 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -163,11 +162,11 @@ func NewNodeController(
 
 	nc.podStore.Store, nc.podController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return nc.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return nc.kubeClient.Pods(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return nc.kubeClient.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+				return nc.kubeClient.Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -179,11 +178,11 @@ func NewNodeController(
 	)
 	nc.nodeStore.Store, nc.nodeController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return nc.kubeClient.Nodes().List(labels.Everything(), fields.Everything())
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return nc.kubeClient.Nodes().List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return nc.kubeClient.Nodes().Watch(labels.Everything(), fields.Everything(), options)
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+				return nc.kubeClient.Nodes().Watch(options)
 			},
 		},
 		&api.Node{},
@@ -247,7 +246,7 @@ func (nc *NodeController) Run(period time.Duration) {
 
 			if completed {
 				glog.Infof("All pods terminated on %s", value.Value)
-				nc.recordNodeEvent(value.Value, "TerminatedAllPods", fmt.Sprintf("Terminated all Pods on Node %s.", value.Value))
+				nc.recordNodeEvent(value.Value, api.EventTypeNormal, "TerminatedAllPods", fmt.Sprintf("Terminated all Pods on Node %s.", value.Value))
 				return true, 0
 			}
 
@@ -287,6 +286,8 @@ func (nc *NodeController) getCondition(status *api.NodeStatus, conditionType api
 	}
 	return nil
 }
+
+var gracefulDeletionVersion = version.MustParse("v1.1.0")
 
 // maybeDeleteTerminatingPod non-gracefully deletes pods that are terminating
 // that should not be gracefully terminated.
@@ -329,7 +330,13 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 	// guarantee backwards compatibility of master API to kubelets with
 	// versions less than 1.1.0
 	node := nodeObj.(*api.Node)
-	if strings.HasPrefix(node.Status.NodeInfo.KubeletVersion, "v1.0") {
+	v, err := version.Parse(node.Status.NodeInfo.KubeletVersion)
+	if err != nil {
+		glog.Infof("couldn't parse verions %q of minion: %v", node.Status.NodeInfo.KubeletVersion, err)
+		nc.forcefullyDeletePod(pod)
+		return
+	}
+	if gracefulDeletionVersion.GT(v) {
 		nc.forcefullyDeletePod(pod)
 		return
 	}
@@ -347,14 +354,14 @@ func forcefullyDeletePod(c client.Interface, pod *api.Pod) {
 // post "NodeReady==ConditionUnknown". It also evicts all pods if node is not ready or
 // not reachable for a long period of time.
 func (nc *NodeController) monitorNodeStatus() error {
-	nodes, err := nc.kubeClient.Nodes().List(labels.Everything(), fields.Everything())
+	nodes, err := nc.kubeClient.Nodes().List(unversioned.ListOptions{})
 	if err != nil {
 		return err
 	}
 	for _, node := range nodes.Items {
 		if !nc.knownNodeSet.Has(node.Name) {
 			glog.V(1).Infof("NodeController observed a new Node: %#v", node)
-			nc.recordNodeEvent(node.Name, "RegisteredNode", fmt.Sprintf("Registered Node %v in NodeController", node.Name))
+			nc.recordNodeEvent(node.Name, api.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in NodeController", node.Name))
 			nc.cancelPodEviction(node.Name)
 			nc.knownNodeSet.Insert(node.Name)
 		}
@@ -369,7 +376,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 		deleted := nc.knownNodeSet.Difference(observedSet)
 		for nodeName := range deleted {
 			glog.V(1).Infof("NodeController observed a Node deletion: %v", nodeName)
-			nc.recordNodeEvent(nodeName, "RemovingNode", fmt.Sprintf("Removing Node %v from NodeController", nodeName))
+			nc.recordNodeEvent(nodeName, api.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from NodeController", nodeName))
 			nc.evictPods(nodeName)
 			nc.knownNodeSet.Delete(nodeName)
 		}
@@ -414,7 +421,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 				}
 			}
 			if lastReadyCondition.Status == api.ConditionUnknown &&
-				decisionTimestamp.After(nc.nodeStatusMap[node.Name].probeTimestamp.Add(nc.podEvictionTimeout-gracePeriod)) {
+				decisionTimestamp.After(nc.nodeStatusMap[node.Name].probeTimestamp.Add(nc.podEvictionTimeout)) {
 				if nc.evictPods(node.Name) {
 					glog.Infof("Evicting pods on node %s: %v is later than %v + %v", node.Name, decisionTimestamp, nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout-gracePeriod)
 				}
@@ -440,7 +447,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 				}
 				if _, err := instances.ExternalID(node.Name); err != nil && err == cloudprovider.InstanceNotFound {
 					glog.Infof("Deleting node (no longer present in cloud provider): %s", node.Name)
-					nc.recordNodeEvent(node.Name, "DeletingNode", fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name))
+					nc.recordNodeEvent(node.Name, api.EventTypeNormal, "DeletingNode", fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name))
 
 					remaining, err := nc.hasPods(node.Name)
 					if err != nil {
@@ -494,7 +501,7 @@ func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
 	}
 }
 
-func (nc *NodeController) recordNodeEvent(nodeName string, reason string, event string) {
+func (nc *NodeController) recordNodeEvent(nodeName, eventtype, reason, event string) {
 	ref := &api.ObjectReference{
 		Kind:      "Node",
 		Name:      nodeName,
@@ -502,7 +509,7 @@ func (nc *NodeController) recordNodeEvent(nodeName string, reason string, event 
 		Namespace: "",
 	}
 	glog.V(2).Infof("Recording %s event message for node %s", event, nodeName)
-	nc.recorder.Eventf(ref, reason, "Node %s event: %s", nodeName, event)
+	nc.recorder.Eventf(ref, eventtype, reason, "Node %s event: %s", nodeName, event)
 }
 
 func (nc *NodeController) recordNodeStatusChange(node *api.Node, new_status string) {
@@ -515,7 +522,7 @@ func (nc *NodeController) recordNodeStatusChange(node *api.Node, new_status stri
 	glog.V(2).Infof("Recording status change %s event message for node %s", new_status, node.Name)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
-	nc.recorder.Eventf(ref, new_status, "Node %s status is now: %s", node.Name, new_status)
+	nc.recorder.Eventf(ref, api.EventTypeNormal, new_status, "Node %s status is now: %s", node.Name, new_status)
 }
 
 // For a given node checks its conditions and tries to update it. Returns grace period to which given node
@@ -684,7 +691,9 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 // returns true if the provided node still has pods scheduled to it, or an error if
 // the server could not be contacted.
 func (nc *NodeController) hasPods(nodeName string) (bool, error) {
-	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(), fields.OneTermEqualSelector(client.PodHost, nodeName))
+	selector := fields.OneTermEqualSelector(client.PodHost, nodeName)
+	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(options)
 	if err != nil {
 		return false, err
 	}
@@ -717,13 +726,15 @@ func (nc *NodeController) cancelPodEviction(nodeName string) bool {
 // if any pods were deleted.
 func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 	remaining := false
-	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(), fields.OneTermEqualSelector(client.PodHost, nodeName))
+	selector := fields.OneTermEqualSelector(client.PodHost, nodeName)
+	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(options)
 	if err != nil {
 		return remaining, err
 	}
 
 	if len(pods.Items) > 0 {
-		nc.recordNodeEvent(nodeName, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
+		nc.recordNodeEvent(nodeName, api.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
 	}
 
 	for _, pod := range pods.Items {
@@ -737,7 +748,7 @@ func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 		}
 
 		glog.V(2).Infof("Starting deletion of pod %v", pod.Name)
-		nc.recorder.Eventf(&pod, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
+		nc.recorder.Eventf(&pod, api.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
 		if err := nc.kubeClient.Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
 			return false, err
 		}
@@ -755,8 +766,9 @@ func (nc *NodeController) terminatePods(nodeName string, since time.Time) (bool,
 	// have we deleted all pods
 	complete := true
 
-	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(),
-		fields.OneTermEqualSelector(client.PodHost, nodeName))
+	selector := fields.OneTermEqualSelector(client.PodHost, nodeName)
+	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(options)
 	if err != nil {
 		return false, nextAttempt, err
 	}
@@ -784,7 +796,7 @@ func (nc *NodeController) terminatePods(nodeName string, since time.Time) (bool,
 		if remaining < 0 {
 			remaining = 0
 			glog.V(2).Infof("Removing pod %v after %s grace period", pod.Name, grace)
-			nc.recordNodeEvent(nodeName, "TerminatingEvictedPod", fmt.Sprintf("Pod %s has exceeded the grace period for deletion after being evicted from Node %q and is being force killed", pod.Name, nodeName))
+			nc.recordNodeEvent(nodeName, api.EventTypeNormal, "TerminatingEvictedPod", fmt.Sprintf("Pod %s has exceeded the grace period for deletion after being evicted from Node %q and is being force killed", pod.Name, nodeName))
 			if err := nc.kubeClient.Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err != nil {
 				glog.Errorf("Error completing deletion of pod %s: %v", pod.Name, err)
 				complete = false

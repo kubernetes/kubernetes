@@ -19,9 +19,8 @@ package e2e
 import (
 	"time"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -29,29 +28,21 @@ import (
 
 const datapointAmount = 5
 
-var systemContainers = []string{"/docker-daemon", "/kubelet", "/kube-proxy", "/system"}
+var systemContainers = []string{"/docker-daemon", "/kubelet", "/system"}
 
-//TODO tweak those values.
 var allowedUsage = resourceUsagePerContainer{
 	"/docker-daemon": &containerResourceUsage{
-		CPUUsageInCores:         0.08,
-		MemoryUsageInBytes:      4500000000,
+		CPUUsageInCores:         0.1,
 		MemoryWorkingSetInBytes: 1500000000,
 	},
+	// TODO: Make Kubelet constraints sane again when #17774 is fixed.
 	"/kubelet": &containerResourceUsage{
 		CPUUsageInCores:         0.1,
-		MemoryUsageInBytes:      150000000,
-		MemoryWorkingSetInBytes: 150000000,
-	},
-	"/kube-proxy": &containerResourceUsage{
-		CPUUsageInCores:         0.025,
-		MemoryUsageInBytes:      100000000,
-		MemoryWorkingSetInBytes: 100000000,
+		MemoryWorkingSetInBytes: 300000000,
 	},
 	"/system": &containerResourceUsage{
-		CPUUsageInCores:         0.03,
-		MemoryUsageInBytes:      100000000,
-		MemoryWorkingSetInBytes: 100000000,
+		CPUUsageInCores:         0.05,
+		MemoryWorkingSetInBytes: 700000000,
 	},
 }
 
@@ -64,7 +55,6 @@ func computeAverage(sliceOfUsages []resourceUsagePerContainer) (result resourceU
 		for _, container := range systemContainers {
 			singleResult := &containerResourceUsage{
 				CPUUsageInCores:         result[container].CPUUsageInCores + usage[container].CPUUsageInCores,
-				MemoryUsageInBytes:      result[container].MemoryUsageInBytes + usage[container].MemoryUsageInBytes,
 				MemoryWorkingSetInBytes: result[container].MemoryWorkingSetInBytes + usage[container].MemoryWorkingSetInBytes,
 			}
 			result[container] = singleResult
@@ -73,7 +63,6 @@ func computeAverage(sliceOfUsages []resourceUsagePerContainer) (result resourceU
 	for _, container := range systemContainers {
 		singleResult := &containerResourceUsage{
 			CPUUsageInCores:         result[container].CPUUsageInCores / float64(len(sliceOfUsages)),
-			MemoryUsageInBytes:      result[container].MemoryUsageInBytes / int64(len(sliceOfUsages)),
 			MemoryWorkingSetInBytes: result[container].MemoryWorkingSetInBytes / int64(len(sliceOfUsages)),
 		}
 		result[container] = singleResult
@@ -93,14 +82,14 @@ var _ = Describe("Resource usage of system containers", func() {
 
 	It("should not exceed expected amount.", func() {
 		By("Getting ResourceConsumption on all nodes")
-		nodeList, err := c.Nodes().List(labels.Everything(), fields.Everything())
+		nodeList, err := c.Nodes().List(unversioned.ListOptions{})
 		expectNoError(err)
 
 		resourceUsagePerNode := make(map[string][]resourceUsagePerContainer)
 
 		for i := 0; i < datapointAmount; i++ {
 			for _, node := range nodeList.Items {
-				resourceUsage, err := getOneTimeResourceUsageOnNode(c, node.Name, 5*time.Second, func() []string {
+				resourceUsage, err := getOneTimeResourceUsageOnNode(c, node.Name, 15*time.Second, func() []string {
 					if providerIs("gce", "gke") {
 						return systemContainers
 					} else {
@@ -128,9 +117,6 @@ var _ = Describe("Resource usage of system containers", func() {
 					}
 					if allowedUsage[container].CPUUsageInCores < cUsage.CPUUsageInCores {
 						Logf("CPU is too high for %s (%v)", container, cUsage.CPUUsageInCores)
-					}
-					if allowedUsage[container].MemoryUsageInBytes < cUsage.MemoryUsageInBytes {
-						Logf("Memory use is too high for %s (%v)", container, cUsage.MemoryUsageInBytes)
 					}
 					if allowedUsage[container].MemoryWorkingSetInBytes < cUsage.MemoryWorkingSetInBytes {
 						Logf("Working set is too high for %s (%v)", container, cUsage.MemoryWorkingSetInBytes)

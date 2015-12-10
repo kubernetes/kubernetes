@@ -18,16 +18,16 @@ package extensions
 
 import (
 	"fmt"
-
 	"sort"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-// PodSelectorAsSelector converts the PodSelector api type into a struct that implements
+// LabelSelectorAsSelector converts the LabelSelector api type into a struct that implements
 // labels.Selector
-func PodSelectorAsSelector(ps *PodSelector) (labels.Selector, error) {
+func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 	if ps == nil {
 		return labels.Nothing(), nil
 	}
@@ -45,13 +45,13 @@ func PodSelectorAsSelector(ps *PodSelector) (labels.Selector, error) {
 	for _, expr := range ps.MatchExpressions {
 		var op labels.Operator
 		switch expr.Operator {
-		case PodSelectorOpIn:
+		case LabelSelectorOpIn:
 			op = labels.InOperator
-		case PodSelectorOpNotIn:
+		case LabelSelectorOpNotIn:
 			op = labels.NotInOperator
-		case PodSelectorOpExists:
+		case LabelSelectorOpExists:
 			op = labels.ExistsOperator
-		case PodSelectorOpDoesNotExist:
+		case LabelSelectorOpDoesNotExist:
 			op = labels.DoesNotExistOperator
 		default:
 			return nil, fmt.Errorf("%q is not a valid pod selector operator", expr.Operator)
@@ -64,4 +64,22 @@ func PodSelectorAsSelector(ps *PodSelector) (labels.Selector, error) {
 	}
 	sort.Sort(labels.ByKey(selector))
 	return selector, nil
+}
+
+// ScaleFromDeployment returns a scale subresource for a deployment.
+func ScaleFromDeployment(deployment *Deployment) *Scale {
+	return &Scale{
+		ObjectMeta: api.ObjectMeta{
+			Name:              deployment.Name,
+			Namespace:         deployment.Namespace,
+			CreationTimestamp: deployment.CreationTimestamp,
+		},
+		Spec: ScaleSpec{
+			Replicas: deployment.Spec.Replicas,
+		},
+		Status: ScaleStatus{
+			Replicas: deployment.Status.Replicas,
+			Selector: deployment.Spec.Selector,
+		},
+	}
 }

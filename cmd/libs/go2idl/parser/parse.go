@@ -83,6 +83,11 @@ func New() *Builder {
 	}
 }
 
+// AddBuildTags adds the specified build tags to the parse context.
+func (b *Builder) AddBuildTags(tags ...string) {
+	b.context.BuildTags = append(b.context.BuildTags, tags...)
+}
+
 // Get package information from the go/build package. Automatically excludes
 // e.g. test files and files for other platforms-- there is quite a bit of
 // logic of that nature in the build package.
@@ -293,11 +298,19 @@ func (b *Builder) FindTypes() (types.Universe, error) {
 		for _, n := range s.Names() {
 			obj := s.Lookup(n)
 			tn, ok := obj.(*tc.TypeName)
-			if !ok {
-				continue
+			if ok {
+				t := b.walkType(u, nil, tn.Type())
+				t.CommentLines = b.priorCommentLines(obj.Pos())
 			}
-			t := b.walkType(u, nil, tn.Type())
-			t.CommentLines = b.priorCommentLines(obj.Pos())
+			tf, ok := obj.(*tc.Func)
+			// We only care about functions, not concrete/abstract methods.
+			if ok && tf.Type() != nil && tf.Type().(*tc.Signature).Recv() == nil {
+				b.addFunction(u, nil, tf)
+			}
+			tv, ok := obj.(*tc.Var)
+			if ok && !tv.IsField() {
+				b.addVariable(u, nil, tv)
+			}
 		}
 		for p := range b.importGraph[pkgName] {
 			u.AddImports(pkgName, p)
@@ -314,6 +327,19 @@ func (b *Builder) priorCommentLines(pos token.Pos) string {
 		return c.Text()
 	}
 	return ""
+}
+
+func tcFuncNameToName(in string) types.Name {
+	name := strings.TrimLeft(in, "func ")
+	nameParts := strings.Split(name, "(")
+	return tcNameToName(nameParts[0])
+}
+
+func tcVarNameToName(in string) types.Name {
+	nameParts := strings.Split(in, " ")
+	// nameParts[0] is "var".
+	// nameParts[2:] is the type of the variable, we ignore it for now.
+	return tcNameToName(nameParts[1])
 }
 
 func tcNameToName(in string) types.Name {
@@ -363,7 +389,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 
 	switch t := in.(type) {
 	case *tc.Struct:
-		out := u.Get(name)
+		out := u.Type(name)
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -381,7 +407,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		}
 		return out
 	case *tc.Map:
-		out := u.Get(name)
+		out := u.Type(name)
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -390,7 +416,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		out.Key = b.walkType(u, nil, t.Key())
 		return out
 	case *tc.Pointer:
-		out := u.Get(name)
+		out := u.Type(name)
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -398,7 +424,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		out.Elem = b.walkType(u, nil, t.Elem())
 		return out
 	case *tc.Slice:
-		out := u.Get(name)
+		out := u.Type(name)
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -406,7 +432,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		out.Elem = b.walkType(u, nil, t.Elem())
 		return out
 	case *tc.Array:
-		out := u.Get(name)
+		out := u.Type(name)
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -416,7 +442,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		// cannot be properly written.
 		return out
 	case *tc.Chan:
-		out := u.Get(name)
+		out := u.Type(name)
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -426,7 +452,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		// cannot be properly written.
 		return out
 	case *tc.Basic:
-		out := u.Get(types.Name{
+		out := u.Type(types.Name{
 			Package: "",
 			Name:    t.Name(),
 		})
@@ -436,7 +462,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		out.Kind = types.Unsupported
 		return out
 	case *tc.Signature:
-		out := u.Get(name)
+		out := u.Type(name)
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -444,7 +470,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		out.Signature = b.convertSignature(u, t)
 		return out
 	case *tc.Interface:
-		out := u.Get(name)
+		out := u.Type(name)
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -458,7 +484,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		switch t.Underlying().(type) {
 		case *tc.Named, *tc.Basic:
 			name := tcNameToName(t.String())
-			out := u.Get(name)
+			out := u.Type(name)
 			if out.Kind != types.Unknown {
 				return out
 			}
@@ -471,7 +497,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 			// "feature" for users. This flattens those types
 			// together.
 			name := tcNameToName(t.String())
-			if out := u.Get(name); out.Kind != types.Unknown {
+			if out := u.Type(name); out.Kind != types.Unknown {
 				return out // short circuit if we've already made this.
 			}
 			out := b.walkType(u, &name, t.Underlying())
@@ -486,7 +512,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 			return out
 		}
 	default:
-		out := u.Get(name)
+		out := u.Type(name)
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -494,4 +520,26 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 		fmt.Printf("Making unsupported type entry %q for: %#v\n", out, t)
 		return out
 	}
+}
+
+func (b *Builder) addFunction(u types.Universe, useName *types.Name, in *tc.Func) *types.Type {
+	name := tcFuncNameToName(in.String())
+	if useName != nil {
+		name = *useName
+	}
+	out := u.Function(name)
+	out.Kind = types.DeclarationOf
+	out.Underlying = b.walkType(u, nil, in.Type())
+	return out
+}
+
+func (b *Builder) addVariable(u types.Universe, useName *types.Name, in *tc.Var) *types.Type {
+	name := tcVarNameToName(in.String())
+	if useName != nil {
+		name = *useName
+	}
+	out := u.Variable(name)
+	out.Kind = types.DeclarationOf
+	out.Underlying = b.walkType(u, nil, in.Type())
+	return out
 }

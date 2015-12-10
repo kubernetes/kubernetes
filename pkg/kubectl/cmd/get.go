@@ -41,7 +41,8 @@ const (
 Possible resource types include (case insensitive): pods (po), services (svc),
 replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
 limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
-resourcequotas (quota), namespaces (ns), endpoints (ep), serviceaccounts or secrets.
+resourcequotas (quota), namespaces (ns), endpoints (ep),
+horizontalpodautoscalers (hpa), serviceaccounts or secrets.
 
 By specifying the output as 'template' and providing a Go template as the value
 of the --template flag, you can filter the attributes of the fetched resource(s).`
@@ -77,7 +78,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs := []string{}
-	p, err := f.Printer(nil, false, false, false, false, []string{})
+	p, err := f.Printer(nil, false, false, false, false, false, []string{})
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
@@ -198,7 +199,6 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		if err != nil {
 			return err
 		}
-		defaultVersion := clientConfig.Version
 
 		singular := false
 		r := b.Flatten().Do()
@@ -209,8 +209,11 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 		// the outermost object will be converted to the output-version, but inner
 		// objects can use their mappings
-		version := cmdutil.OutputVersion(cmd, defaultVersion)
-		obj, err := resource.AsVersionedObject(infos, !singular, version)
+		version, err := cmdutil.OutputVersion(cmd, clientConfig.GroupVersion)
+		if err != nil {
+			return err
+		}
+		obj, err := resource.AsVersionedObject(infos, !singular, version.String())
 		if err != nil {
 			return err
 		}

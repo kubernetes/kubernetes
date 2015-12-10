@@ -204,10 +204,10 @@ function detect-master {
   echo "KUBE_MASTER_IP: $KUBE_MASTER_IP" 1>&2
 }
 
-# Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
+# Get minion IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
 # These Mesos slaves MAY host Kublets,
 # but might not have a Kublet running unless a kubernetes task has been scheduled on them.
-function detect-minions {
+function detect-nodes {
   local docker_ids=$(docker ps --filter="name=docker_mesosslave" --quiet)
   if [ -z "${docker_ids}" ]; then
     echo "ERROR: Mesos slave(s) not running" 1>&2
@@ -215,9 +215,9 @@ function detect-minions {
   fi
   while read -r docker_id; do
     local minion_ip=$(docker inspect --format="{{.NetworkSettings.IPAddress}}" "${docker_id}")
-    KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
+    KUBE_NODE_IP_ADDRESSES+=("${minion_ip}")
   done <<< "$docker_ids"
-  echo "KUBE_MINION_IP_ADDRESSES: [${KUBE_MINION_IP_ADDRESSES[*]}]" 1>&2
+  echo "KUBE_NODE_IP_ADDRESSES: [${KUBE_NODE_IP_ADDRESSES[*]}]" 1>&2
 }
 
 # Verify prereqs on host machine
@@ -283,15 +283,15 @@ function kube-up {
 
   echo "Starting ${KUBERNETES_PROVIDER} cluster" 1>&2
   cluster::mesos::docker::docker_compose up -d
-  echo "Scaling ${KUBERNETES_PROVIDER} cluster to ${NUM_MINIONS} slaves"
-  cluster::mesos::docker::docker_compose scale mesosslave=${NUM_MINIONS}
+  echo "Scaling ${KUBERNETES_PROVIDER} cluster to ${NUM_NODES} slaves"
+  cluster::mesos::docker::docker_compose scale mesosslave=${NUM_NODES}
 
   # await-health-check requires GNU timeout
   # apiserver hostname resolved by docker
   cluster::mesos::docker::run_in_docker_test await-health-check "-t=${MESOS_DOCKER_API_TIMEOUT}" http://apiserver:8888/healthz
 
   detect-master
-  detect-minions
+  detect-nodes
   create-kubeconfig
 
   echo "Deploying Addons" 1>&2

@@ -55,7 +55,7 @@ func buildLocation(resourcePath string, query url.Values) string {
 }
 
 func TestListWatchesCanList(t *testing.T) {
-	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.Version())
+	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String())
 	table := []struct {
 		location      string
 		resource      string
@@ -96,16 +96,16 @@ func TestListWatchesCanList(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+		client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
 		lw := NewListWatchFromClient(client, item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
-		lw.List()
+		lw.List(unversioned.ListOptions{})
 		handler.ValidateRequest(t, item.location, "GET", nil)
 	}
 }
 
 func TestListWatchesCanWatch(t *testing.T) {
-	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.Version())
+	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String())
 	table := []struct {
 		rv            string
 		location      string
@@ -117,7 +117,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		{
 			location: buildLocation(
 				testapi.Default.ResourcePathWithPrefix("watch", "nodes", api.NamespaceAll, ""),
-				buildQueryValues(url.Values{"resourceVersion": []string{""}})),
+				buildQueryValues(url.Values{})),
 			rv:            "",
 			resource:      "nodes",
 			namespace:     api.NamespaceAll,
@@ -162,10 +162,10 @@ func TestListWatchesCanWatch(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+		client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
 		lw := NewListWatchFromClient(client, item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
-		lw.Watch(api.ListOptions{ResourceVersion: item.rv})
+		lw.Watch(unversioned.ListOptions{ResourceVersion: item.rv})
 		handler.ValidateRequest(t, item.location, "GET", nil)
 	}
 }

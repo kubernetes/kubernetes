@@ -36,15 +36,18 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/storage"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
 	forked "k8s.io/kubernetes/third_party/forked/coreos/go-etcd/etcd"
@@ -106,7 +109,7 @@ type APIServer struct {
 	EnableLogsSupport          bool
 	MasterServiceNamespace     string
 	RuntimeConfig              util.ConfigurationMap
-	KubeletConfig              client.KubeletConfig
+	KubeletConfig              kubeletclient.KubeletClientConfig
 	ClusterName                string
 	EnableProfiling            bool
 	EnableWatchCache           bool
@@ -139,7 +142,7 @@ func NewAPIServer() *APIServer {
 		StorageVersions:        latest.AllPreferredGroupVersions(),
 
 		RuntimeConfig: make(util.ConfigurationMap),
-		KubeletConfig: client.KubeletConfig{
+		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:        ports.KubeletPort,
 			EnableHttps: true,
 			HTTPTimeout: time.Duration(5) * time.Second,
@@ -183,7 +186,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.InsecureBindAddress, "address", s.InsecureBindAddress, "DEPRECATED: see --insecure-bind-address instead")
 	fs.MarkDeprecated("address", "see --insecure-bind-address instead")
 	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, ""+
-		"The IP address on which to serve the --read-only-port and --secure-port ports. The "+
+		"The IP address on which to listen for the --secure-port port. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
 		"clients. If blank, all interfaces will be used (0.0.0.0).")
 	fs.IPVar(&s.AdvertiseAddress, "advertise-address", s.AdvertiseAddress, ""+
@@ -258,6 +261,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	// Kubelet related flags:
 	fs.BoolVar(&s.KubeletConfig.EnableHttps, "kubelet-https", s.KubeletConfig.EnableHttps, "Use https for kubelet connections")
 	fs.UintVar(&s.KubeletConfig.Port, "kubelet-port", s.KubeletConfig.Port, "Kubelet port")
+	fs.MarkDeprecated("kubelet-port", "kubelet-port is deprecated and will be removed")
 	fs.DurationVar(&s.KubeletConfig.HTTPTimeout, "kubelet-timeout", s.KubeletConfig.HTTPTimeout, "Timeout for kubelet operations")
 	fs.StringVar(&s.KubeletConfig.CertFile, "kubelet-client-certificate", s.KubeletConfig.CertFile, "Path to a client cert file for TLS.")
 	fs.StringVar(&s.KubeletConfig.KeyFile, "kubelet-client-key", s.KubeletConfig.KeyFile, "Path to a client key file for TLS.")
@@ -303,8 +307,12 @@ func newEtcd(etcdConfigFile string, etcdServerList []string, interfacesFunc meta
 		etcdClient.SetTransport(transport)
 		client = etcdClient
 	}
-	etcdStorage, err = master.NewEtcdStorage(client, interfacesFunc, storageVersion, pathPrefix)
-	return etcdStorage, err
+	versionedInterface, err := interfacesFunc(storageVersion)
+	if err != nil {
+		return nil, err
+	}
+	etcdStorage = etcdstorage.NewEtcdStorage(client, versionedInterface.Codec, pathPrefix)
+	return etcdStorage, nil
 }
 
 // convert to a map between group and groupVersions.
@@ -346,13 +354,13 @@ func updateEtcdOverrides(overrides []string, storageVersions map[string]string, 
 			glog.Errorf("invalid api group %s: %v", group, err)
 			continue
 		}
-		if _, found := storageVersions[apigroup.Group]; !found {
-			glog.Errorf("Couldn't find the storage version for group %s", apigroup.Group)
+		if _, found := storageVersions[apigroup.GroupVersion.Group]; !found {
+			glog.Errorf("Couldn't find the storage version for group %s", apigroup.GroupVersion.Group)
 			continue
 		}
 
 		servers := strings.Split(tokens[1], ";")
-		etcdOverrideStorage, err := newEtcdFn("", servers, apigroup.InterfacesFor, storageVersions[apigroup.Group], prefix)
+		etcdOverrideStorage, err := newEtcdFn("", servers, apigroup.InterfacesFor, storageVersions[apigroup.GroupVersion.Group], prefix)
 		if err != nil {
 			glog.Fatalf("Invalid storage version or misconfigured etcd for %s: %v", tokens[0], err)
 		}
@@ -366,12 +374,17 @@ func (s *APIServer) Run(_ []string) error {
 	s.verifyClusterIPFlags()
 
 	// If advertise-address is not specified, use bind-address. If bind-address
-	// is not usable (unset, 0.0.0.0, or loopback), setDefaults() in
-	// pkg/master/master.go will do the right thing and use the host's default
-	// interface.
+	// is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
+	// interface as valid public addr for master (see: util#ValidPublicAddrForMaster)
 	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
-		s.AdvertiseAddress = s.BindAddress
+		hostIP, err := util.ValidPublicAddrForMaster(s.BindAddress)
+		if err != nil {
+			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
+				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
+		}
+		s.AdvertiseAddress = hostIP
 	}
+	glog.Infof("Will report %v as public IP address.", s.AdvertiseAddress)
 
 	if (s.EtcdConfigFile != "" && len(s.EtcdServerList) != 0) || (s.EtcdConfigFile == "" && len(s.EtcdServerList) == 0) {
 		glog.Fatalf("Specify either --etcd-servers or --etcd-config")
@@ -421,7 +434,7 @@ func (s *APIServer) Run(_ []string) error {
 	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
 	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
 
-	kubeletClient, err := client.NewKubeletClient(&s.KubeletConfig)
+	kubeletClient, err := kubeletclient.NewStaticKubeletClient(&s.KubeletConfig)
 	if err != nil {
 		glog.Fatalf("Failure to start kubelet client: %v", err)
 	}
@@ -432,9 +445,16 @@ func (s *APIServer) Run(_ []string) error {
 	}
 
 	clientConfig := &client.Config{
-		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
-		Version: s.DeprecatedStorageVersion,
+		Host: net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
 	}
+	if len(s.DeprecatedStorageVersion) != 0 {
+		gv, err := unversioned.ParseGroupVersion(s.DeprecatedStorageVersion)
+		if err != nil {
+			glog.Fatalf("error in parsing group version: %s", err)
+		}
+		clientConfig.GroupVersion = &gv
+	}
+
 	client, err := client.New(clientConfig)
 	if err != nil {
 		glog.Fatalf("Invalid server address: %v", err)
@@ -448,10 +468,10 @@ func (s *APIServer) Run(_ []string) error {
 	storageDestinations := master.NewStorageDestinations()
 
 	storageVersions := generateStorageVersionMap(s.DeprecatedStorageVersion, s.StorageVersions)
-	if _, found := storageVersions[legacyV1Group.Group]; !found {
-		glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", legacyV1Group.Group, storageVersions)
+	if _, found := storageVersions[legacyV1Group.GroupVersion.Group]; !found {
+		glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", legacyV1Group.GroupVersion.Group, storageVersions)
 	}
-	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, legacyV1Group.InterfacesFor, storageVersions[legacyV1Group.Group], s.EtcdPathPrefix)
+	etcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, legacyV1Group.InterfacesFor, storageVersions[legacyV1Group.GroupVersion.Group], s.EtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
@@ -462,10 +482,10 @@ func (s *APIServer) Run(_ []string) error {
 		if err != nil {
 			glog.Fatalf("Extensions API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
 		}
-		if _, found := storageVersions[expGroup.Group]; !found {
-			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", expGroup.Group, storageVersions)
+		if _, found := storageVersions[expGroup.GroupVersion.Group]; !found {
+			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", expGroup.GroupVersion.Group, storageVersions)
 		}
-		expEtcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, expGroup.InterfacesFor, storageVersions[expGroup.Group], s.EtcdPathPrefix)
+		expEtcdStorage, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, expGroup.InterfacesFor, storageVersions[expGroup.GroupVersion.Group], s.EtcdPathPrefix)
 		if err != nil {
 			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
 		}

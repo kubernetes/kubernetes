@@ -30,8 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -299,14 +299,18 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("setting up watch")
-		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
+		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		pods, err := podClient.List(options)
 		if err != nil {
 			Failf("Failed to query for pods: %v", err)
 		}
 		Expect(len(pods.Items)).To(Equal(0))
-		w, err := podClient.Watch(
-			labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything(),
-			api.ListOptions{ResourceVersion: pods.ListMeta.ResourceVersion})
+		options = unversioned.ListOptions{
+			LabelSelector:   unversioned.LabelSelector{selector},
+			ResourceVersion: pods.ListMeta.ResourceVersion,
+		}
+		w, err := podClient.Watch(options)
 		if err != nil {
 			Failf("Failed to set up watch: %v", err)
 		}
@@ -322,7 +326,9 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("verifying the pod is in kubernetes")
-		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
+		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+		options = unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		pods, err = podClient.List(options)
 		if err != nil {
 			Failf("Failed to query for pods: %v", err)
 		}
@@ -366,7 +372,9 @@ var _ = Describe("Pods", func() {
 		Expect(lastPod.DeletionTimestamp).ToNot(BeNil())
 		Expect(lastPod.Spec.TerminationGracePeriodSeconds).ToNot(BeZero())
 
-		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
+		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+		options = unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		pods, err = podClient.List(options)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to list pods to verify deletion: %v", err))
 		}
@@ -420,7 +428,9 @@ var _ = Describe("Pods", func() {
 		expectNoError(framework.WaitForPodRunning(pod.Name))
 
 		By("verifying the pod is in kubernetes")
-		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
+		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		pods, err := podClient.List(options)
 		Expect(len(pods.Items)).To(Equal(1))
 
 		// Standard get, update retry loop
@@ -450,7 +460,9 @@ var _ = Describe("Pods", func() {
 		expectNoError(framework.WaitForPodRunning(pod.Name))
 
 		By("verifying the updated pod is in kubernetes")
-		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
+		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+		options = unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		pods, err = podClient.List(options)
 		Expect(len(pods.Items)).To(Equal(1))
 		Logf("Pod update OK")
 	})
@@ -1036,7 +1048,9 @@ var _ = Describe("Pods", func() {
 			expectNoError(framework.WaitForPodRunning(pod.Name))
 
 			By("verifying the pod is in kubernetes")
-			pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+			selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+			options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+			pods, err := podClient.List(options)
 			if err != nil {
 				Failf("Failed to query for pods: %v", err)
 			}
@@ -1109,7 +1123,9 @@ var _ = Describe("Pods", func() {
 			expectNoError(framework.WaitForPodRunning(pod.Name))
 
 			By("verifying the pod is in kubernetes")
-			pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+			selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+			options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+			pods, err := podClient.List(options)
 			if err != nil {
 				Failf("Failed to query for pods: %v", err)
 			}

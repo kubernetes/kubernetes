@@ -23,8 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func getPersistentVolumeClaimsResoureName() string {
@@ -115,7 +114,7 @@ func TestPersistentVolumeClaimList(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: persistentVolumeList},
 	}
-	response, err := c.Setup(t).PersistentVolumeClaims(ns).List(labels.Everything(), fields.Everything())
+	response, err := c.Setup(t).PersistentVolumeClaims(ns).List(unversioned.ListOptions{})
 	c.Validate(t, response, err)
 }
 
@@ -197,6 +196,6 @@ func TestPersistentVolumeClaimWatch(t *testing.T) {
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).PersistentVolumeClaims(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), api.ListOptions{})
+	_, err := c.Setup(t).PersistentVolumeClaims(api.NamespaceAll).Watch(unversioned.ListOptions{})
 	c.Validate(t, nil, err)
 }

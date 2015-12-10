@@ -24,6 +24,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -54,9 +55,9 @@ const (
 // 1. Fill disk space on all nodes except one. One node is left out so that we can schedule pods
 //    on that node. Arbitrarily choose that node to be node with index 0.
 // 2. Get the CPU capacity on unfilled node.
-// 3. Divide the CPU capacity into one less than the number of pods we want to schedule. We want
+// 3. Divide the available CPU into one less than the number of pods we want to schedule. We want
 //    to schedule 3 pods, so divide CPU capacity by 2.
-// 4. Request the divided capacity for each pod.
+// 4. Request the divided CPU for each pod.
 // 5. Observe that 2 of the pods schedule onto the node whose disk is not full, and the remaining
 //    pod stays pending and does not schedule onto the nodes whose disks are full nor the node
 //    with the other two pods, since there is not enough free CPU capacity there.
@@ -101,13 +102,16 @@ var _ = Describe("NodeOutOfDisk", func() {
 		unfilledNode, err := c.Nodes().Get(unfilledNodeName)
 		expectNoError(err)
 
-		By(fmt.Sprintf("Get CPU capacity on node %s", unfilledNode.Name))
+		By(fmt.Sprintf("Calculating CPU availability on node %s", unfilledNode.Name))
+		milliCpu, err := availCpu(c, unfilledNode)
+		expectNoError(err)
 
-		milliCPU := unfilledNode.Status.Capacity.Cpu().MilliValue()
-		// Per pod CPU should be just enough to fit only (numNodeOODPods - 1) pods on the
-		// given node. We compute this value by dividing the available CPU capacity on the given
-		// node by (numNodeOODPods - 1) and subtracting ϵ from it.
-		podCPU := (milliCPU / (numNodeOODPods - 1)) - (milliCPU / 5)
+		// Per pod CPU should be just enough to fit only (numNodeOODPods - 1) pods on the given
+		// node. We compute this value by dividing the available CPU capacity on the node by
+		// (numNodeOODPods - 1) and subtracting ϵ from it. We arbitrarily choose ϵ to be 1%
+		// of the available CPU per pod, i.e. 0.01 * milliCpu/(numNodeOODPods-1). Instead of
+		// subtracting 1% from the value, we directly use 0.99 as the multiplier.
+		podCPU := int64(float64(milliCpu/(numNodeOODPods-1)) * 0.99)
 
 		ns := framework.Namespace.Name
 		podClient := c.Pods(ns)
@@ -129,15 +133,15 @@ var _ = Describe("NodeOutOfDisk", func() {
 
 		By(fmt.Sprintf("Finding a failed scheduler event for pod %s", pendingPodName))
 		wait.Poll(2*time.Second, 5*time.Minute, func() (bool, error) {
-			schedEvents, err := c.Events(ns).List(
-				labels.Everything(),
-				fields.Set{
-					"involvedObject.kind":      "Pod",
-					"involvedObject.name":      pendingPodName,
-					"involvedObject.namespace": ns,
-					"source":                   "scheduler",
-					"reason":                   "FailedScheduling",
-				}.AsSelector())
+			selector := fields.Set{
+				"involvedObject.kind":      "Pod",
+				"involvedObject.name":      pendingPodName,
+				"involvedObject.namespace": ns,
+				"source":                   "scheduler",
+				"reason":                   "FailedScheduling",
+			}.AsSelector()
+			options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+			schedEvents, err := c.Events(ns).List(options)
 			expectNoError(err)
 
 			if len(schedEvents.Items) > 0 {
@@ -154,7 +158,6 @@ var _ = Describe("NodeOutOfDisk", func() {
 		nodeToRecover := nodelist.Items[1]
 		Expect(nodeToRecover.Name).ToNot(Equal(unfilledNodeName))
 
-		By(fmt.Sprintf("Recovering disk space on node %s", nodeToRecover.Name))
 		recoverDiskSpace(c, &nodeToRecover)
 		recoveredNodeName = nodeToRecover.Name
 
@@ -192,6 +195,26 @@ func createOutOfDiskPod(c *client.Client, ns, name string, milliCPU int64) {
 
 	_, err := podClient.Create(pod)
 	expectNoError(err)
+}
+
+// availCpu calculates the available CPU on a given node by subtracting the CPU requested by
+// all the pods from the total available CPU capacity on the node.
+func availCpu(c *client.Client, node *api.Node) (int64, error) {
+	podClient := c.Pods(api.NamespaceAll)
+
+	selector := fields.Set{"spec.nodeName": node.Name}.AsSelector()
+	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+	pods, err := podClient.List(options)
+	if err != nil {
+		return 0, fmt.Errorf("failed to retrieve all the pods on node %s: %v", node.Name, err)
+	}
+	avail := node.Status.Capacity.Cpu().MilliValue()
+	for _, pod := range pods.Items {
+		for _, cont := range pod.Spec.Containers {
+			avail -= cont.Resources.Requests.Cpu().MilliValue()
+		}
+	}
+	return avail, nil
 }
 
 // availSize returns the available disk space on a given node by querying node stats which

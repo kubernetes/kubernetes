@@ -141,7 +141,7 @@ In future, it will be possible to specify a specific annotation or label.
 
 ## Example
 
-This is an example of a pod that consumes its labels and annotations via the downward API volume, labels and annotations are dumped in `/etc/podlabels` and in `/etc/annotations`, respectively:
+This is an example of a pod that consumes its labels and annotations via the downward API volume, labels and annotations are dumped in `/etc/labels` and in `/etc/annotations`, respectively:
 
 <!-- BEGIN MUNGE: EXAMPLE downward-api/volume/dapi-volume.yaml -->
 

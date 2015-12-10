@@ -21,7 +21,7 @@ import (
 	"net/http"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -52,7 +52,7 @@ func errToAPIStatus(err error) *unversioned.Status {
 		status := http.StatusInternalServerError
 		switch {
 		//TODO: replace me with NewConflictErr
-		case etcdstorage.IsEtcdTestFailed(err):
+		case etcdutil.IsEtcdTestFailed(err):
 			status = http.StatusConflict
 		}
 		// Log errors that were not converted to an error status
@@ -62,7 +62,7 @@ func errToAPIStatus(err error) *unversioned.Status {
 		util.HandleError(fmt.Errorf("apiserver received an error that is not an unversioned.Status: %v", err))
 		return &unversioned.Status{
 			Status:  unversioned.StatusFailure,
-			Code:    status,
+			Code:    int32(status),
 			Reason:  unversioned.StatusReasonUnknown,
 			Message: err.Error(),
 		}

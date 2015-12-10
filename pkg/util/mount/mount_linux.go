@@ -235,3 +235,51 @@ func readProcMountsFrom(file io.Reader, out *[]MountPoint) (uint32, error) {
 	}
 	return hash.Sum32(), nil
 }
+
+// formatAndMount uses unix utils to format and mount the given disk
+func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
+	options = append(options, "defaults")
+
+	// Try to mount the disk
+	err := mounter.Interface.Mount(source, target, fstype, options)
+	if err != nil {
+		// It is possible that this disk is not formatted. Double check using diskLooksUnformatted
+		notFormatted, err := mounter.diskLooksUnformatted(source)
+		if err == nil && notFormatted {
+			args := []string{source}
+			// Disk is unformatted so format it.
+			// Use 'ext4' as the default
+			if len(fstype) == 0 {
+				fstype = "ext4"
+			}
+			if fstype == "ext4" || fstype == "ext3" {
+				args = []string{"-E", "lazy_itable_init=0,lazy_journal_init=0", "-F", source}
+			}
+			cmd := mounter.Runner.Command("mkfs."+fstype, args...)
+			_, err := cmd.CombinedOutput()
+			if err == nil {
+				// the disk has been formatted sucessfully try to mount it again.
+				return mounter.Interface.Mount(source, target, fstype, options)
+			}
+			return err
+		}
+	}
+	return err
+}
+
+// diskLooksUnformatted uses 'lsblk' to see if the given disk is unformated
+func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
+	args := []string{"-nd", "-o", "FSTYPE", disk}
+	cmd := mounter.Runner.Command("lsblk", args...)
+	dataOut, err := cmd.CombinedOutput()
+	output := strings.TrimSpace(string(dataOut))
+
+	// TODO (#13212): check if this disk has partitions and return false, and
+	// an error if so.
+
+	if err != nil {
+		return false, err
+	}
+
+	return output == "", nil
+}

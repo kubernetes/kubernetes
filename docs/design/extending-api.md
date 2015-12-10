@@ -41,7 +41,7 @@ This document describes the design for implementing the storage of custom API ty
 ### The ThirdPartyResource
 
 The `ThirdPartyResource` resource describes the multiple versions of a custom resource that the user wants to add
-to the Kubernetes API.  `ThirdPartyResource` is a non-namespaced resource, attempting to place it in a resource
+to the Kubernetes API.  `ThirdPartyResource` is a non-namespaced resource; attempting to place it in a namespace
 will return an error.
 
 Each `ThirdPartyResource` resource has the following:
@@ -63,18 +63,18 @@ only specifies:
 Every object that is added to a third-party Kubernetes object store is expected to contain Kubernetes
 compatible [object metadata](../devel/api-conventions.md#metadata).  This requirement enables the
 Kubernetes API server to provide the following features:
-   * Filtering lists of objects via LabelQueries
+   * Filtering lists of objects via label queries
    * `resourceVersion`-based optimistic concurrency via compare-and-swap
    * Versioned storage
    * Event recording
-   * Integration with basic `kubectl` command line tooling.
-   * Watch for resource changes.
+   * Integration with basic `kubectl` command line tooling
+   * Watch for resource changes
 
 The `Kind` for an instance of a third-party object (e.g. CronTab) below is expected to be
 programmatically convertible to the name of the resource using
-the following conversion.  Kinds are expected to be of the form `<CamelCaseKind>`, the
+the following conversion.  Kinds are expected to be of the form `<CamelCaseKind>`, and the
 `APIVersion` for the object is expected to be `<api-group>/<api-version>`. To
-prevent collisions, it's expected that you'll use a fulling qualified domain
+prevent collisions, it's expected that you'll use a fully qualified domain
 name for the API group, e.g. `example.com`.
 
 For example `stable.example.com/v1`
@@ -106,8 +106,8 @@ This is also the reason why `ThirdPartyResource` is not namespaced.
 ## Usage
 
 When a user creates a new `ThirdPartyResource`, the Kubernetes API Server reacts by creating a new, namespaced
-RESTful resource path.  For now, non-namespaced objects are not supported. As with existing built-in objects
-deleting a namespace, deletes all third party resources in that namespace.
+RESTful resource path.  For now, non-namespaced objects are not supported. As with existing built-in objects,
+deleting a namespace deletes all third party resources in that namespace.
 
 For example, if a user creates:
 
@@ -136,7 +136,7 @@ Now that this schema has been created, a user can `POST`:
    "apiVersion": "stable.example.com/v1",
    "kind": "CronTab",
    "cronSpec": "* * * * /5",
-   "image":     "my-awesome-chron-image"
+   "image":     "my-awesome-cron-image"
 }
 ```
 
@@ -171,14 +171,14 @@ and get back:
        "apiVersion": "stable.example.com/v1",
        "kind": "CronTab",
        "cronSpec": "* * * * /5",
-       "image":     "my-awesome-chron-image"
+       "image":     "my-awesome-cron-image"
     }
    ]
 }
 ```
 
 Because all objects are expected to contain standard Kubernetes metadata fields, these
-list operations can also use `Label` queries to filter requests down to specific subsets.
+list operations can also use label queries to filter requests down to specific subsets.
 
 Likewise, clients can use watch endpoints to watch for changes to stored objects.
 
@@ -196,10 +196,10 @@ Each custom object stored by the API server needs a custom key in storage, this 
 
 #### Definitions
 
-   * `resource-namespace` : the namespace of the particular resource that is being stored
+   * `resource-namespace`: the namespace of the particular resource that is being stored
    * `resource-name`: the name of the particular resource being stored
-   * `third-party-resource-namespace`: the namespace of the `ThirdPartyResource` resource that represents the type for the specific instance being stored.
-   * `third-party-resource-name`: the name of the `ThirdPartyResource` resource that represents the type for the specific instance being stored.
+   * `third-party-resource-namespace`: the namespace of the `ThirdPartyResource` resource that represents the type for the specific instance being stored
+   * `third-party-resource-name`: the name of the `ThirdPartyResource` resource that represents the type for the specific instance being stored
 
 #### Key
 

@@ -20,16 +20,22 @@ import (
 	"fmt"
 
 	log "github.com/golang/glog"
+	"github.com/mesos/mesos-go/mesosproto"
 	"k8s.io/kubernetes/contrib/mesos/pkg/offers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/algorithm/podschedulers"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
 
+// SchedulerAlgorithm is the interface that orchestrates the pod scheduling.
+//
+// Schedule implements the Scheduler interface of Kubernetes.
+// It returns the selectedMachine's hostname or an error if the schedule failed.
 type SchedulerAlgorithm interface {
 	Schedule(pod *api.Pod) (string, error)
 }
@@ -39,18 +45,34 @@ type schedulerAlgorithm struct {
 	sched        scheduler.Scheduler
 	podUpdates   queue.FIFO
 	podScheduler podschedulers.PodScheduler
+	prototype    *mesosproto.ExecutorInfo
+	roles        []string
+	defaultCpus  mresource.CPUShares
+	defaultMem   mresource.MegaBytes
 }
 
-func New(sched scheduler.Scheduler, podUpdates queue.FIFO, podScheduler podschedulers.PodScheduler) SchedulerAlgorithm {
+// New returns a new SchedulerAlgorithm
+// TODO(sur): refactor params to separate config object
+func New(
+	sched scheduler.Scheduler,
+	podUpdates queue.FIFO,
+	podScheduler podschedulers.PodScheduler,
+	prototype *mesosproto.ExecutorInfo,
+	roles []string,
+	defaultCpus mresource.CPUShares,
+	defaultMem mresource.MegaBytes,
+) SchedulerAlgorithm {
 	return &schedulerAlgorithm{
 		sched:        sched,
 		podUpdates:   podUpdates,
 		podScheduler: podScheduler,
+		roles:        roles,
+		prototype:    prototype,
+		defaultCpus:  defaultCpus,
+		defaultMem:   defaultMem,
 	}
 }
 
-// Schedule implements the Scheduler interface of Kubernetes.
-// It returns the selectedMachine's name and error (if there's any).
 func (k *schedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 	log.Infof("Try to schedule pod %v\n", pod.Name)
 	ctx := api.WithNamespace(api.NewDefaultContext(), pod.Namespace)
@@ -74,13 +96,18 @@ func (k *schedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 			log.Warningf("aborting Schedule, unable to understand pod object %+v", pod)
 			return "", errors.NoSuchPodErr
 		}
+
 		if deleted := k.podUpdates.Poll(podName, queue.DELETE_EVENT); deleted {
 			// avoid scheduling a pod that's been deleted between yieldPod() and Schedule()
 			log.Infof("aborting Schedule, pod has been deleted %+v", pod)
 			return "", errors.NoSuchPodErr
 		}
 
-		podTask, err := podtask.New(ctx, "", pod)
+		// write resource limits into the pod spec.
+		// From here on we can expect that the pod spec of a task has proper limits for CPU and memory.
+		k.limitPod(pod)
+
+		podTask, err := podtask.New(ctx, "", pod, k.prototype, k.roles)
 		if err != nil {
 			log.Warningf("aborting Schedule, unable to create podtask object %+v: %v", pod, err)
 			return "", err
@@ -115,7 +142,29 @@ func (k *schedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 	}
 }
 
-// Call ScheduleFunc and subtract some resources, returning the name of the machine the task is scheduled on
+// limitPod limits the given pod based on the scheduler's default limits.
+func (k *schedulerAlgorithm) limitPod(pod *api.Pod) error {
+	cpuRequest, cpuLimit, _, err := mresource.LimitPodCPU(pod, k.defaultCpus)
+	if err != nil {
+		return err
+	}
+
+	memRequest, memLimit, _, err := mresource.LimitPodMem(pod, k.defaultMem)
+	if err != nil {
+		return err
+	}
+
+	log.V(3).Infof(
+		"setting pod %s/%s resources: requested cpu %.2f mem %.2f MB, limited cpu %.2f mem %.2f MB",
+		pod.Namespace, pod.Name, cpuRequest, memRequest, cpuLimit, memLimit,
+	)
+
+	return nil
+}
+
+// doSchedule implements the actual scheduling of the given pod task.
+// It checks whether the offer has been accepted and is still present in the offer registry.
+// It delegates to the actual pod scheduler and updates the task registry.
 func (k *schedulerAlgorithm) doSchedule(task *podtask.T) (string, error) {
 	var offer offers.Perishable
 	var err error
@@ -134,8 +183,9 @@ func (k *schedulerAlgorithm) doSchedule(task *podtask.T) (string, error) {
 		}
 	}
 
+	var spec *podtask.Spec
 	if offer == nil {
-		offer, err = k.podScheduler.SchedulePod(k.sched.Offers(), task)
+		offer, spec, err = k.podScheduler.SchedulePod(k.sched.Offers(), task)
 	}
 
 	if err != nil {
@@ -152,11 +202,7 @@ func (k *schedulerAlgorithm) doSchedule(task *podtask.T) (string, error) {
 	}
 
 	task.Offer = offer
-	if err := k.podScheduler.Procurement()(task, details); err != nil {
-		offer.Release()
-		task.Reset()
-		return "", err
-	}
+	task.Spec = spec
 
 	if err := k.sched.Tasks().Update(task); err != nil {
 		offer.Release()

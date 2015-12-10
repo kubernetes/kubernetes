@@ -25,10 +25,10 @@ function detect-master () {
   echo "KUBE_MASTER_IP: ${KUBE_MASTER_IP}" 1>&2
 }
 
-# Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
-function detect-minions {
-  echo "Minions already detected" 1>&2
-  KUBE_MINION_IP_ADDRESSES=("${MINION_IPS[@]}")
+# Get node IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
+function detect-nodes {
+  echo "Nodes already detected" 1>&2
+  KUBE_NODE_IP_ADDRESSES=("${NODE_IPS[@]}")
 }
 
 # Verify prereqs on host machine  Also sets exports USING_KUBE_SCRIPTS=true so
@@ -114,81 +114,76 @@ function ensure-temp-dir {
   fi
 }
 
-# Create a set of provision scripts for the master and each of the minions
+# Create a set of provision scripts for the master and each of the nodes
 function create-provision-scripts {
   ensure-temp-dir
 
   (
     echo "#! /bin/bash"
-    echo "KUBE_ROOT=/vagrant"
-    echo "INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
-    echo "MASTER_NAME='${INSTANCE_PREFIX}-master'"
-    echo "MASTER_IP='${MASTER_IP}'"
-    echo "MINION_NAMES=(${MINION_NAMES[@]})"
-    echo "MINION_IPS=(${MINION_IPS[@]})"
+    echo-kube-env
     echo "NODE_IP='${MASTER_IP}'"
-    echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
-    echo "CONTAINER_NETMASK='${MASTER_CONTAINER_NETMASK}'"
-    echo "MASTER_CONTAINER_SUBNET='${MASTER_CONTAINER_SUBNET}'"
     echo "CONTAINER_ADDR='${MASTER_CONTAINER_ADDR}'"
-    echo "MINION_CONTAINER_NETMASKS='${MINION_CONTAINER_NETMASKS[@]}'"
-    echo "MINION_CONTAINER_SUBNETS=(${MINION_CONTAINER_SUBNETS[@]})"
-    echo "SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
-    echo "MASTER_USER='${MASTER_USER}'"
-    echo "MASTER_PASSWD='${MASTER_PASSWD}'"
-    echo "KUBE_USER='${KUBE_USER}'"
-    echo "KUBE_PASSWORD='${KUBE_PASSWORD}'"
-    echo "ENABLE_CLUSTER_MONITORING='${ENABLE_CLUSTER_MONITORING}'"
-    echo "ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
-    echo "ENABLE_CLUSTER_UI='${ENABLE_CLUSTER_UI}'"
-    echo "LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
-    echo "ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
-    echo "DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
-    echo "DNS_DOMAIN='${DNS_DOMAIN:-}'"
-    echo "DNS_REPLICAS='${DNS_REPLICAS:-}'"
-    echo "RUNTIME_CONFIG='${RUNTIME_CONFIG:-}'"
-    echo "ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
-    echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
-    echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
-    echo "KUBELET_TOKEN='${KUBELET_TOKEN:-}'"
-    echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
-    echo "MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
-    echo "ENABLE_CPU_CFS_QUOTA='${ENABLE_CPU_CFS_QUOTA}'"
-    echo "NETWORK_PROVIDER='${NETWORK_PROVIDER:-}'"
-    echo "OPENCONTRAIL_TAG='${OPENCONTRAIL_TAG:-}'"
-    echo "OPENCONTRAIL_KUBERNETES_TAG='${OPENCONTRAIL_KUBERNETES_TAG:-}'"
-    echo "OPENCONTRAIL_PUBLIC_SUBNET='${OPENCONTRAIL_PUBLIC_SUBNET:-}'"
-    echo "E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
+    echo "CONTAINER_NETMASK='${MASTER_CONTAINER_NETMASK}'"
+    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-utils.sh"
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-master.sh"
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     (
       echo "#! /bin/bash"
-      echo "MASTER_NAME='${MASTER_NAME}'"
-      echo "MASTER_IP='${MASTER_IP}'"
-      echo "MINION_NAMES=(${MINION_NAMES[@]})"
-      echo "MINION_NAME=(${MINION_NAMES[$i]})"
-      echo "MINION_IPS=(${MINION_IPS[@]})"
-      echo "MINION_IP='${MINION_IPS[$i]}'"
-      echo "MINION_ID='$i'"
-      echo "NODE_IP='${MINION_IPS[$i]}'"
-      echo "MASTER_CONTAINER_SUBNET='${MASTER_CONTAINER_SUBNET}'"
-      echo "CONTAINER_ADDR='${MINION_CONTAINER_ADDRS[$i]}'"
-      echo "CONTAINER_NETMASK='${MINION_CONTAINER_NETMASKS[$i]}'"
-      echo "MINION_CONTAINER_SUBNETS=(${MINION_CONTAINER_SUBNETS[@]})"
-      echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
-      echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
-      echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
-      echo "KUBELET_TOKEN='${KUBELET_TOKEN:-}'"
-      echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
-      echo "MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
-      echo "E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
-      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-minion.sh"
-      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
-    ) > "${KUBE_TEMP}/minion-start-${i}.sh"
+      echo-kube-env
+      echo "NODE_NAME=(${NODE_NAMES[$i]})"
+      echo "NODE_IP='${NODE_IPS[$i]}'"
+      echo "NODE_ID='$i'"
+      echo "CONTAINER_ADDR='${NODE_CONTAINER_ADDRS[$i]}'"
+      echo "CONTAINER_NETMASK='${NODE_CONTAINER_NETMASKS[$i]}'"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-utils.sh"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-node.sh"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-node.sh"
+    ) > "${KUBE_TEMP}/node-start-${i}.sh"
   done
+}
+
+function echo-kube-env() {
+  echo "KUBE_ROOT=/vagrant"
+  echo "INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
+  echo "MASTER_NAME='${INSTANCE_PREFIX}-master'"
+  echo "MASTER_IP='${MASTER_IP}'"
+  echo "NODE_NAMES=(${NODE_NAMES[@]})"
+  echo "NODE_IPS=(${NODE_IPS[@]})"
+  echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
+  echo "MASTER_CONTAINER_SUBNET='${MASTER_CONTAINER_SUBNET}'"
+  echo "NODE_CONTAINER_NETMASKS='${NODE_CONTAINER_NETMASKS[@]}'"
+  echo "NODE_CONTAINER_SUBNETS=(${NODE_CONTAINER_SUBNETS[@]})"
+  echo "SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
+  echo "MASTER_USER='${MASTER_USER}'"
+  echo "MASTER_PASSWD='${MASTER_PASSWD}'"
+  echo "KUBE_USER='${KUBE_USER}'"
+  echo "KUBE_PASSWORD='${KUBE_PASSWORD}'"
+  echo "ENABLE_CLUSTER_MONITORING='${ENABLE_CLUSTER_MONITORING}'"
+  echo "ENABLE_CLUSTER_LOGGING='${ENABLE_CLUSTER_LOGGING:-false}'"
+  echo "ELASTICSEARCH_LOGGING_REPLICAS='${ELASTICSEARCH_LOGGING_REPLICAS:-1}'"
+  echo "ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
+  echo "ENABLE_CLUSTER_UI='${ENABLE_CLUSTER_UI}'"
+  echo "LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
+  echo "ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
+  echo "DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
+  echo "DNS_DOMAIN='${DNS_DOMAIN:-}'"
+  echo "DNS_REPLICAS='${DNS_REPLICAS:-}'"
+  echo "RUNTIME_CONFIG='${RUNTIME_CONFIG:-}'"
+  echo "ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
+  echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
+  echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
+  echo "KUBELET_TOKEN='${KUBELET_TOKEN:-}'"
+  echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
+  echo "MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
+  echo "ENABLE_CPU_CFS_QUOTA='${ENABLE_CPU_CFS_QUOTA}'"
+  echo "NETWORK_PROVIDER='${NETWORK_PROVIDER:-}'"
+  echo "OPENCONTRAIL_TAG='${OPENCONTRAIL_TAG:-}'"
+  echo "OPENCONTRAIL_KUBERNETES_TAG='${OPENCONTRAIL_KUBERNETES_TAG:-}'"
+  echo "OPENCONTRAIL_PUBLIC_SUBNET='${OPENCONTRAIL_PUBLIC_SUBNET:-}'"
+  echo "E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
 }
 
 function verify-cluster {
@@ -203,16 +198,12 @@ function verify-cluster {
   # verify master has all required daemons
   echo "Validating master"
   local machine="master"
-  local -a required_daemon=("salt-master" "salt-minion" "kubelet")
+  local -a required_processes=("kube-apiserver" "kube-scheduler" "kube-controller-manager" "kubelet" "docker")
   local validated="1"
-  # This is a hack, but sometimes the salt-minion gets stuck on the master, so we just restart it
-  # to ensure that users never wait forever
-  vagrant ssh "$machine" -c "sudo systemctl restart salt-minion"
   until [[ "$validated" == "0" ]]; do
     validated="0"
-    local daemon
-    for daemon in "${required_daemon[@]}"; do
-      vagrant ssh "$machine" -c "which '${daemon}'" >/dev/null 2>&1 || {
+    for process in "${required_processes[@]}"; do
+      vagrant ssh "${machine}" -c "pgrep -f ${process}" >/dev/null 2>&1 || {
         printf "."
         validated="1"
         sleep 2
@@ -220,18 +211,17 @@ function verify-cluster {
     done
   done
 
-  # verify each minion has all required daemons
+  # verify each node has all required daemons
   local i
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    echo "Validating ${VAGRANT_MINION_NAMES[$i]}"
-    local machine=${VAGRANT_MINION_NAMES[$i]}
-    local -a required_daemon=("salt-minion" "kubelet" "docker")
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+    echo "Validating ${VAGRANT_NODE_NAMES[$i]}"
+    local machine=${VAGRANT_NODE_NAMES[$i]}
+    local -a required_processes=("kube-proxy" "kubelet" "docker")
     local validated="1"
-    until [[ "$validated" == "0" ]]; do
+    until [[ "${validated}" == "0" ]]; do
       validated="0"
-      local daemon
-      for daemon in "${required_daemon[@]}"; do
-        vagrant ssh "$machine" -c "which $daemon" >/dev/null 2>&1 || {
+      for process in "${required_processes[@]}"; do
+        vagrant ssh "${machine}" -c "pgrep -f ${process}" >/dev/null 2>&1 || {
           printf "."
           validated="1"
           sleep 2
@@ -241,17 +231,15 @@ function verify-cluster {
   done
 
   echo
-  echo "Waiting for each minion to be registered with cloud provider"
-  for (( i=0; i<${#MINION_IPS[@]}; i++)); do
-    local machine="${MINION_IPS[$i]}"
-    local count="0"
-    until [[ "$count" == "1" ]]; do
-      local minions
-      minions=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o go-template='{{range.items}}{{.metadata.name}}:{{end}}' --api-version=v1)
-      count=$(echo $minions | grep -c "${MINION_IPS[i]}") || {
+  echo "Waiting for each node to be registered with cloud provider"
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+    local validated="0"
+    until [[ "$validated" == "1" ]]; do
+      local nodes=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o name --api-version=v1)
+      validated=$(echo $nodes | grep -c "${NODE_NAMES[i]}") || {
         printf "."
         sleep 2
-        count="0"
+        validated="0"
       }
     done
   done
@@ -277,7 +265,7 @@ function verify-cluster {
     echo "  https://${MASTER_IP}:9090"
     echo
     echo "For more information on Cockpit, visit http://cockpit-project.org"
-    echo 
+    echo
     echo "The user name and password to use is located in ${KUBECONFIG}"
     echo
   )
@@ -336,34 +324,34 @@ function test-teardown {
   kube-down
 }
 
-# Find the minion name based on the IP address
+# Find the node name based on the IP address
 function find-vagrant-name-by-ip {
   local ip="$1"
-  local ip_pattern="${MINION_IP_BASE}(.*)"
+  local ip_pattern="${NODE_IP_BASE}(.*)"
 
-  # This is subtle.  We map 10.245.2.2 -> minion-1.  We do this by matching a
+  # This is subtle.  We map 10.245.2.2 -> node-1.  We do this by matching a
   # regexp and using the capture to construct the name.
   [[ $ip =~ $ip_pattern ]] || {
     return 1
   }
 
-  echo "minion-$((${BASH_REMATCH[1]} - 1))"
+  echo "node-$((${BASH_REMATCH[1]} - 1))"
 }
 
-# Find the vagrant machine name based on the host name of the minion
-function find-vagrant-name-by-minion-name {
+# Find the vagrant machine name based on the host name of the node
+function find-vagrant-name-by-node-name {
   local ip="$1"
   if [[ "$ip" == "${INSTANCE_PREFIX}-master" ]]; then
     echo "master"
     return $?
   fi
-  local ip_pattern="${INSTANCE_PREFIX}-minion-(.*)"
+  local ip_pattern="${INSTANCE_PREFIX}-node-(.*)"
 
   [[ $ip =~ $ip_pattern ]] || {
     return 1
   }
 
-  echo "minion-${BASH_REMATCH[1]}"
+  echo "node-${BASH_REMATCH[1]}"
 }
 
 
@@ -374,7 +362,7 @@ function ssh-to-node {
   local machine
 
   machine=$(find-vagrant-name-by-ip $node) || true
-  [[ -n ${machine-} ]] || machine=$(find-vagrant-name-by-minion-name $node) || true
+  [[ -n ${machine-} ]] || machine=$(find-vagrant-name-by-node-name $node) || true
   [[ -n ${machine-} ]] || {
     echo "Cannot find machine to ssh to: $1"
     return 1

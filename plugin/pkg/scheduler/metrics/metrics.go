@@ -25,12 +25,15 @@ import (
 
 const schedulerSubsystem = "scheduler"
 
+var BindingSaturationReportInterval = 1 * time.Second
+
 var (
 	E2eSchedulingLatency = prometheus.NewSummary(
 		prometheus.SummaryOpts{
 			Subsystem: schedulerSubsystem,
 			Name:      "e2e_scheduling_latency_microseconds",
 			Help:      "E2e scheduling latency (scheduling algorithm + binding)",
+			MaxAge:    time.Hour,
 		},
 	)
 	SchedulingAlgorithmLatency = prometheus.NewSummary(
@@ -38,6 +41,7 @@ var (
 			Subsystem: schedulerSubsystem,
 			Name:      "scheduling_algorithm_latency_microseconds",
 			Help:      "Scheduling algorithm latency",
+			MaxAge:    time.Hour,
 		},
 	)
 	BindingLatency = prometheus.NewSummary(
@@ -45,6 +49,14 @@ var (
 			Subsystem: schedulerSubsystem,
 			Name:      "binding_latency_microseconds",
 			Help:      "Binding latency",
+			MaxAge:    time.Hour,
+		},
+	)
+	BindingRateLimiterSaturation = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Subsystem: schedulerSubsystem,
+			Name:      "binding_ratelimiter_saturation",
+			Help:      "Binding rateLimiter's saturation rate in percentage",
 		},
 	)
 )
@@ -58,6 +70,7 @@ func Register() {
 		prometheus.MustRegister(E2eSchedulingLatency)
 		prometheus.MustRegister(SchedulingAlgorithmLatency)
 		prometheus.MustRegister(BindingLatency)
+		prometheus.MustRegister(BindingRateLimiterSaturation)
 	})
 }
 

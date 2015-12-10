@@ -243,7 +243,7 @@ func TestWatch(t *testing.T) {
 	key := "/some/key"
 	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
-	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
+	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -289,7 +289,7 @@ func TestWatchEtcdState(t *testing.T) {
 	defer server.Terminate(t)
 
 	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
-	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
+	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -353,7 +353,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
+	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -388,7 +388,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 	defer server.Terminate(t)
 	h := newEtcdHelper(server.Client, codec, key)
 
-	watching, err := h.WatchList(context.TODO(), key, 0, storage.Everything)
+	watching, err := h.WatchList(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -420,7 +420,7 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 	defer server.Terminate(t)
 	h := newEtcdHelper(server.Client, codec, key)
 
-	watching, err := h.WatchList(context.TODO(), key, 0, storage.Everything)
+	watching, err := h.WatchList(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -451,7 +451,7 @@ func TestWatchPurposefulShutdown(t *testing.T) {
 	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
 	// Test purposeful shutdown
-	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
+	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

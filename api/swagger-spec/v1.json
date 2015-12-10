@@ -3168,7 +3168,7 @@
     ]
    },
    {
-    "path": "/api/v1/proxy/nodes/{name}/{path:*}",
+    "path": "/api/v1/proxy/nodes/{name}/{path}",
     "description": "API at /api/v1",
     "operations": [
      {
@@ -5281,7 +5281,7 @@
     ]
    },
    {
-    "path": "/api/v1/proxy/namespaces/{namespace}/pods/{name}/{path:*}",
+    "path": "/api/v1/proxy/namespaces/{namespace}/pods/{name}/{path}",
     "description": "API at /api/v1",
     "operations": [
      {
@@ -6633,7 +6633,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespace}/pods/{name}/proxy/{path:*}",
+    "path": "/api/v1/namespaces/{namespace}/pods/{name}/proxy/{path}",
     "description": "API at /api/v1",
     "operations": [
      {
@@ -10918,7 +10918,7 @@
     ]
    },
    {
-    "path": "/api/v1/proxy/namespaces/{namespace}/services/{name}/{path:*}",
+    "path": "/api/v1/proxy/namespaces/{namespace}/services/{name}/{path}",
     "description": "API at /api/v1",
     "operations": [
      {
@@ -12037,6 +12037,10 @@
       "type": "integer",
       "format": "int32",
       "description": "The number of times this event has occurred."
+     },
+     "type": {
+      "type": "string",
+      "description": "Type of this event (Normal, Warning), new types could be added in the future"
      }
     }
    },
@@ -12897,6 +12901,10 @@
       "format": "int32",
       "description": "iSCSI target lun number."
      },
+     "iscsiInterface": {
+      "type": "string",
+      "description": "Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport."
+     },
      "fsType": {
       "type": "string",
       "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#iscsi"
@@ -13247,8 +13255,7 @@
     "id": "v1.GitRepoVolumeSource",
     "description": "GitRepoVolumeSource represents a volume that is pulled from git when the pod is created.",
     "required": [
-     "repository",
-     "revision"
+     "repository"
     ],
     "properties": {
      "repository": {
@@ -13258,6 +13265,10 @@
      "revision": {
       "type": "string",
       "description": "Commit hash for the specified revision."
+     },
+     "directory": {
+      "type": "string",
+      "description": "Target directory name. Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the git repository.  Otherwise, if specified, the volume will contain the git repository in the subdirectory with the given name."
      }
     }
    },
@@ -13524,7 +13535,7 @@
    },
    "v1.Probe": {
     "id": "v1.Probe",
-    "description": "Probe describes a health check to be performed against a container to determine whether it is alive or ready to recieve traffic.",
+    "description": "Probe describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.",
     "properties": {
      "exec": {
       "$ref": "v1.ExecAction",
@@ -13540,17 +13551,17 @@
      },
      "initialDelaySeconds": {
       "type": "integer",
-      "format": "int64",
+      "format": "int32",
       "description": "Number of seconds after the container has started before liveness probes are initiated. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
      },
      "timeoutSeconds": {
       "type": "integer",
-      "format": "int64",
+      "format": "int32",
       "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
      },
      "periodSeconds": {
       "type": "integer",
-      "format": "int64",
+      "format": "int32",
       "description": "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1."
      },
      "successThreshold": {

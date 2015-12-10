@@ -23,12 +23,15 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
+// SchemeGroupVersion is group version used to register these objects
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
+
 // Codec encodes internal objects to the v1 scheme
-var Codec = runtime.CodecFor(api.Scheme, "v1")
+var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion.String())
 
 func init() {
 	// Check if v1 is in the list of supported API versions.
-	if !registered.IsRegisteredAPIVersion("v1") {
+	if !registered.IsRegisteredAPIGroupVersion(SchemeGroupVersion) {
 		return
 	}
 
@@ -40,7 +43,7 @@ func init() {
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
-	api.Scheme.AddKnownTypes("v1",
+	api.Scheme.AddKnownTypes(SchemeGroupVersion,
 		&Pod{},
 		&PodList{},
 		&PodStatusResult{},
@@ -85,7 +88,7 @@ func addKnownTypes() {
 	)
 
 	// Add common types
-	api.Scheme.AddKnownTypes("v1", &unversioned.Status{})
+	api.Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.Status{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}

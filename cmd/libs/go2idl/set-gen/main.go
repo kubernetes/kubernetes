@@ -25,6 +25,8 @@ limitations under the License.
 package main
 
 import (
+	"os"
+
 	"k8s.io/kubernetes/cmd/libs/go2idl/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/set-gen/generators"
 
@@ -44,6 +46,8 @@ func main() {
 		generators.DefaultNameSystem(),
 		generators.Packages,
 	); err != nil {
-		glog.Fatalf("Error: %v", err)
+		glog.Errorf("Error: %v", err)
+		os.Exit(1)
 	}
+	glog.Info("Completed successfully.")
 }

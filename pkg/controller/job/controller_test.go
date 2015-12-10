@@ -43,7 +43,7 @@ func newJob(parallelism, completions int) *extensions.Job {
 		Spec: extensions.JobSpec{
 			Parallelism: &parallelism,
 			Completions: &completions,
-			Selector: &extensions.PodSelector{
+			Selector: &extensions.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
 			Template: api.PodTemplateSpec{
@@ -162,7 +162,7 @@ func TestControllerSyncJob(t *testing.T) {
 
 	for name, tc := range testCases {
 		// job manager setup
-		client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
+		client := client.NewOrDie(&client.Config{Host: "", GroupVersion: testapi.Default.GroupVersion()})
 		manager := NewJobController(client, controller.NoResyncPeriodFunc)
 		fakePodControl := controller.FakePodControl{Err: tc.podControllerError}
 		manager.podControl = &fakePodControl
@@ -226,7 +226,7 @@ func TestControllerSyncJob(t *testing.T) {
 }
 
 func TestSyncJobDeleted(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
+	client := client.NewOrDie(&client.Config{Host: "", GroupVersion: testapi.Default.GroupVersion()})
 	manager := NewJobController(client, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
@@ -246,7 +246,7 @@ func TestSyncJobDeleted(t *testing.T) {
 }
 
 func TestSyncJobUpdateRequeue(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
+	client := client.NewOrDie(&client.Config{Host: "", GroupVersion: testapi.Default.GroupVersion()})
 	manager := NewJobController(client, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
@@ -267,7 +267,7 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 }
 
 func TestJobPodLookup(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
+	client := client.NewOrDie(&client.Config{Host: "", GroupVersion: testapi.Default.GroupVersion()})
 	manager := NewJobController(client, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady
 	testCases := []struct {
@@ -291,7 +291,7 @@ func TestJobPodLookup(t *testing.T) {
 			job: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec: extensions.JobSpec{
-					Selector: &extensions.PodSelector{
+					Selector: &extensions.LabelSelector{
 						MatchLabels: map[string]string{"foo": "bar"},
 					},
 				},
@@ -310,11 +310,11 @@ func TestJobPodLookup(t *testing.T) {
 			job: &extensions.Job{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 				Spec: extensions.JobSpec{
-					Selector: &extensions.PodSelector{
-						MatchExpressions: []extensions.PodSelectorRequirement{
+					Selector: &extensions.LabelSelector{
+						MatchExpressions: []extensions.LabelSelectorRequirement{
 							{
 								Key:      "foo",
-								Operator: extensions.PodSelectorOpIn,
+								Operator: extensions.LabelSelectorOpIn,
 								Values:   []string{"bar"},
 							},
 						},
@@ -357,7 +357,7 @@ func (fe FakeJobExpectations) SatisfiedExpectations(controllerKey string) bool {
 // TestSyncJobExpectations tests that a pod cannot sneak in between counting active pods
 // and checking expectations.
 func TestSyncJobExpectations(t *testing.T) {
-	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Default.GroupAndVersion()})
+	client := client.NewOrDie(&client.Config{Host: "", GroupVersion: testapi.Default.GroupVersion()})
 	manager := NewJobController(client, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl

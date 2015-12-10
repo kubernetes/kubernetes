@@ -20,8 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,10 +31,10 @@ type NamespacesInterface interface {
 type NamespaceInterface interface {
 	Create(item *api.Namespace) (*api.Namespace, error)
 	Get(name string) (result *api.Namespace, err error)
-	List(label labels.Selector, field fields.Selector) (*api.NamespaceList, error)
+	List(opts unversioned.ListOptions) (*api.NamespaceList, error)
 	Delete(name string) error
 	Update(item *api.Namespace) (*api.Namespace, error)
-	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
+	Watch(opts unversioned.ListOptions) (watch.Interface, error)
 	Finalize(item *api.Namespace) (*api.Namespace, error)
 	Status(item *api.Namespace) (*api.Namespace, error)
 }
@@ -58,12 +57,11 @@ func (c *namespaces) Create(namespace *api.Namespace) (*api.Namespace, error) {
 }
 
 // List lists all the namespaces in the cluster.
-func (c *namespaces) List(label labels.Selector, field fields.Selector) (*api.NamespaceList, error) {
+func (c *namespaces) List(opts unversioned.ListOptions) (*api.NamespaceList, error) {
 	result := &api.NamespaceList{}
 	err := c.r.Get().
 		Resource("namespaces").
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
+		VersionedParams(&opts, api.Scheme).
 		Do().Into(result)
 	return result, err
 }
@@ -114,12 +112,10 @@ func (c *namespaces) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested namespaces.
-func (c *namespaces) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (c *namespaces) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Resource("namespaces").
 		VersionedParams(&opts, api.Scheme).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
 		Watch()
 }

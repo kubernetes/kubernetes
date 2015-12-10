@@ -23,10 +23,9 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -278,11 +277,11 @@ func (eq *endpointQueries) added(e *api.Endpoints) {
 func startEndpointWatcher(f *Framework, q *endpointQueries) {
 	_, controller := framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return f.Client.Endpoints(f.Namespace.Name).List(labels.Everything(), fields.Everything())
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return f.Client.Endpoints(f.Namespace.Name).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return f.Client.Endpoints(f.Namespace.Name).Watch(labels.Everything(), fields.Everything(), options)
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+				return f.Client.Endpoints(f.Namespace.Name).Watch(options)
 			},
 		},
 		&api.Endpoints{},

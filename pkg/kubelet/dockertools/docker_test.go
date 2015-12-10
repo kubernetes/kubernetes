@@ -37,6 +37,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 func verifyCalls(t *testing.T, fakeDocker *FakeDockerClient, calls []string) {
@@ -79,19 +80,16 @@ func findPodContainer(dockerContainers []*docker.APIContainers, podFullName stri
 
 func TestGetContainerID(t *testing.T) {
 	fakeDocker := &FakeDockerClient{}
-	fakeDocker.ContainerList = []docker.APIContainers{
+	fakeDocker.SetFakeRunningContainers([]*docker.Container{
 		{
-			ID:    "foobar",
-			Names: []string{"/k8s_foo_qux_ns_1234_42"},
+			ID:   "foobar",
+			Name: "/k8s_foo_qux_ns_1234_42",
 		},
 		{
-			ID:    "barbar",
-			Names: []string{"/k8s_bar_qux_ns_2565_42"},
+			ID:   "barbar",
+			Name: "/k8s_bar_qux_ns_2565_42",
 		},
-	}
-	fakeDocker.Container = &docker.Container{
-		ID: "foobar",
-	}
+	})
 
 	dockerContainers, err := GetKubeletDockerContainers(fakeDocker, false)
 	if err != nil {
@@ -207,16 +205,16 @@ func TestParseImageName(t *testing.T) {
 		name      string
 		tag       string
 	}{
-		{"ubuntu", "ubuntu", ""},
+		{"ubuntu", "ubuntu", "latest"},
 		{"ubuntu:2342", "ubuntu", "2342"},
 		{"ubuntu:latest", "ubuntu", "latest"},
 		{"foo/bar:445566", "foo/bar", "445566"},
-		{"registry.example.com:5000/foobar", "registry.example.com:5000/foobar", ""},
+		{"registry.example.com:5000/foobar", "registry.example.com:5000/foobar", "latest"},
 		{"registry.example.com:5000/foobar:5342", "registry.example.com:5000/foobar", "5342"},
 		{"registry.example.com:5000/foobar:latest", "registry.example.com:5000/foobar", "latest"},
 	}
 	for _, test := range tests {
-		name, tag := parseImageName(test.imageName)
+		name, tag := parsers.ParseImageName(test.imageName)
 		if name != test.name || tag != test.tag {
 			t.Errorf("Expected name/tag: %s/%s, got %s/%s", test.name, test.tag, name, tag)
 		}
@@ -580,16 +578,16 @@ func TestFindContainersByPod(t *testing.T) {
 					Namespace: "ns",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:     kubetypes.DockerID("foobar").ContainerID(),
-							Name:   "foobar",
-							Hash:   0x1234,
-							Status: kubecontainer.ContainerStatusUnknown,
+							ID:    kubetypes.DockerID("foobar").ContainerID(),
+							Name:  "foobar",
+							Hash:  0x1234,
+							State: kubecontainer.ContainerStateUnknown,
 						},
 						{
-							ID:     kubetypes.DockerID("baz").ContainerID(),
-							Name:   "baz",
-							Hash:   0x1234,
-							Status: kubecontainer.ContainerStatusUnknown,
+							ID:    kubetypes.DockerID("baz").ContainerID(),
+							Name:  "baz",
+							Hash:  0x1234,
+							State: kubecontainer.ContainerStateUnknown,
 						},
 					},
 				},
@@ -599,10 +597,10 @@ func TestFindContainersByPod(t *testing.T) {
 					Namespace: "ns",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:     kubetypes.DockerID("barbar").ContainerID(),
-							Name:   "barbar",
-							Hash:   0x1234,
-							Status: kubecontainer.ContainerStatusUnknown,
+							ID:    kubetypes.DockerID("barbar").ContainerID(),
+							Name:  "barbar",
+							Hash:  0x1234,
+							State: kubecontainer.ContainerStateUnknown,
 						},
 					},
 				},
@@ -641,22 +639,22 @@ func TestFindContainersByPod(t *testing.T) {
 					Namespace: "ns",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:     kubetypes.DockerID("foobar").ContainerID(),
-							Name:   "foobar",
-							Hash:   0x1234,
-							Status: kubecontainer.ContainerStatusUnknown,
+							ID:    kubetypes.DockerID("foobar").ContainerID(),
+							Name:  "foobar",
+							Hash:  0x1234,
+							State: kubecontainer.ContainerStateUnknown,
 						},
 						{
-							ID:     kubetypes.DockerID("barfoo").ContainerID(),
-							Name:   "barfoo",
-							Hash:   0x1234,
-							Status: kubecontainer.ContainerStatusUnknown,
+							ID:    kubetypes.DockerID("barfoo").ContainerID(),
+							Name:  "barfoo",
+							Hash:  0x1234,
+							State: kubecontainer.ContainerStateUnknown,
 						},
 						{
-							ID:     kubetypes.DockerID("baz").ContainerID(),
-							Name:   "baz",
-							Hash:   0x1234,
-							Status: kubecontainer.ContainerStatusUnknown,
+							ID:    kubetypes.DockerID("baz").ContainerID(),
+							Name:  "baz",
+							Hash:  0x1234,
+							State: kubecontainer.ContainerStateUnknown,
 						},
 					},
 				},
@@ -666,10 +664,10 @@ func TestFindContainersByPod(t *testing.T) {
 					Namespace: "ns",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:     kubetypes.DockerID("barbar").ContainerID(),
-							Name:   "barbar",
-							Hash:   0x1234,
-							Status: kubecontainer.ContainerStatusUnknown,
+							ID:    kubetypes.DockerID("barbar").ContainerID(),
+							Name:  "barbar",
+							Hash:  0x1234,
+							State: kubecontainer.ContainerStateUnknown,
 						},
 					},
 				},
@@ -679,10 +677,10 @@ func TestFindContainersByPod(t *testing.T) {
 					Namespace: "ns",
 					Containers: []*kubecontainer.Container{
 						{
-							ID:     kubetypes.DockerID("bazbaz").ContainerID(),
-							Name:   "bazbaz",
-							Hash:   0x1234,
-							Status: kubecontainer.ContainerStatusUnknown,
+							ID:    kubetypes.DockerID("bazbaz").ContainerID(),
+							Name:  "bazbaz",
+							Hash:  0x1234,
+							State: kubecontainer.ContainerStateUnknown,
 						},
 					},
 				},

@@ -35,6 +35,7 @@ type yamlCodec struct {
 
 // yamlCodec implements Codec
 var _ Codec = yamlCodec{}
+var _ Decoder = yamlCodec{}
 
 // YAMLDecoder adds YAML decoding support to a codec that supports JSON.
 func YAMLDecoder(codec Codec) Codec {
@@ -74,6 +75,9 @@ type codecWrapper struct {
 	ObjectCodec
 	version string
 }
+
+// codecWrapper implements Decoder
+var _ Decoder = &codecWrapper{}
 
 // Encode implements Codec
 func (c *codecWrapper) Encode(obj Object) ([]byte, error) {

@@ -33,14 +33,15 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/common/model"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+
+	. "github.com/onsi/gomega"
 )
 
 // KubeletMetric stores metrics scraped from the kubelet server's /metric endpoint.
@@ -186,7 +187,6 @@ func targetContainers() []string {
 			"/",
 			"/docker-daemon",
 			"/kubelet",
-			"/kube-proxy",
 			"/system",
 		}
 	} else {
@@ -207,7 +207,7 @@ type containerResourceUsage struct {
 }
 
 func (r *containerResourceUsage) isStrictlyGreaterThan(rhs *containerResourceUsage) bool {
-	return r.CPUUsageInCores > rhs.CPUUsageInCores && r.MemoryUsageInBytes > rhs.MemoryUsageInBytes && r.MemoryWorkingSetInBytes > rhs.MemoryWorkingSetInBytes
+	return r.CPUUsageInCores > rhs.CPUUsageInCores && r.MemoryWorkingSetInBytes > rhs.MemoryWorkingSetInBytes
 }
 
 type resourceUsagePerContainer map[string]*containerResourceUsage
@@ -271,11 +271,11 @@ func getOneTimeResourceUsageOnNode(
 }
 
 func getKubeSystemContainersResourceUsage(c *client.Client) (resourceUsagePerContainer, error) {
-	pods, err := c.Pods("kube-system").List(labels.Everything(), fields.Everything())
+	pods, err := c.Pods("kube-system").List(unversioned.ListOptions{})
 	if err != nil {
 		return resourceUsagePerContainer{}, err
 	}
-	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	nodes, err := c.Nodes().List(unversioned.ListOptions{})
 	if err != nil {
 		return resourceUsagePerContainer{}, err
 	}
@@ -297,7 +297,7 @@ func getKubeSystemContainersResourceUsage(c *client.Client) (resourceUsagePerCon
 	for _, node := range nodes.Items {
 		go func(nodeName string) {
 			defer wg.Done()
-			nodeUsage, err := getOneTimeResourceUsageOnNode(c, nodeName, 5*time.Second, func() []string { return containerIDs }, true)
+			nodeUsage, err := getOneTimeResourceUsageOnNode(c, nodeName, 15*time.Second, func() []string { return containerIDs }, true)
 			mutex.Lock()
 			defer mutex.Unlock()
 			if err != nil {
@@ -339,7 +339,6 @@ func formatResourceUsageStats(nodeName string, containerStats resourceUsagePerCo
 	// "/"              0.363       2942.09
 	// "/docker-daemon" 0.088       521.80
 	// "/kubelet"       0.086       424.37
-	// "/kube-proxy"    0.011       4.66
 	// "/system"        0.007       119.88
 	buf := &bytes.Buffer{}
 	w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
@@ -405,6 +404,11 @@ func computePercentiles(timeSeries map[time.Time]resourceUsagePerContainer, perc
 	return result
 }
 
+type resourceConstraint struct {
+	cpuConstraint    float64
+	memoryConstraint int64
+}
+
 type containerResourceGatherer struct {
 	usageTimeseries map[time.Time]resourceUsagePerContainer
 	stopCh          chan struct{}
@@ -435,7 +439,7 @@ func (g *containerResourceGatherer) startGatheringData(c *client.Client, period 
 	}()
 }
 
-func (g *containerResourceGatherer) stopAndPrintData(percentiles []int) {
+func (g *containerResourceGatherer) stopAndPrintData(percentiles []int, constraints map[string]resourceConstraint) {
 	close(g.stopCh)
 	g.timer.Stop()
 	g.wg.Wait()
@@ -449,6 +453,7 @@ func (g *containerResourceGatherer) stopAndPrintData(percentiles []int) {
 		sortedKeys = append(sortedKeys, name)
 	}
 	sort.Strings(sortedKeys)
+	violatedConstraints := make([]string, 0)
 	for _, perc := range percentiles {
 		buf := &bytes.Buffer{}
 		w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
@@ -456,10 +461,38 @@ func (g *containerResourceGatherer) stopAndPrintData(percentiles []int) {
 		for _, name := range sortedKeys {
 			usage := stats[perc][name]
 			fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", name, usage.CPUUsageInCores, float64(usage.MemoryWorkingSetInBytes)/(1024*1024))
+			// Verifying 99th percentile of resource usage
+			if perc == 99 {
+				// Name has a form: <pod_name>/<container_name>
+				containerName := strings.Split(name, "/")[1]
+				if constraint, ok := constraints[containerName]; ok {
+					if usage.CPUUsageInCores > constraint.cpuConstraint {
+						violatedConstraints = append(
+							violatedConstraints,
+							fmt.Sprintf("Container %v is using %v/%v CPU",
+								name,
+								usage.CPUUsageInCores,
+								constraint.cpuConstraint,
+							),
+						)
+					}
+					if usage.MemoryWorkingSetInBytes > constraint.memoryConstraint {
+						violatedConstraints = append(
+							violatedConstraints,
+							fmt.Sprintf("Container %v is using %v/%v MB of memory",
+								name,
+								float64(usage.MemoryWorkingSetInBytes)/(1024*1024),
+								float64(constraint.memoryConstraint)/(1024*1024),
+							),
+						)
+					}
+				}
+			}
 		}
 		w.Flush()
 		Logf("%v percentile:\n%v", perc, buf.String())
 	}
+	Expect(violatedConstraints).To(BeEmpty())
 }
 
 // Performs a get on a node proxy endpoint given the nodename and rest client.
@@ -653,7 +686,7 @@ func newResourceMonitor(c *client.Client, containerNames []string, pollingInterv
 }
 
 func (r *resourceMonitor) Start() {
-	nodes, err := r.client.Nodes().List(labels.Everything(), fields.Everything())
+	nodes, err := r.client.Nodes().List(unversioned.ListOptions{})
 	if err != nil {
 		Failf("resourceMonitor: unable to get list of nodes: %v", err)
 	}
@@ -690,7 +723,6 @@ func (r *resourceMonitor) LogCPUSummary() {
 	// "/"              0.051 0.159 0.387 0.455
 	// "/docker-daemon" 0.000 0.000 0.146 0.166
 	// "/kubelet"       0.036 0.053 0.091 0.154
-	// "/kube-proxy"    0.017 0.000 0.000 0.000
 	// "/system"        0.001 0.001 0.001 0.002
 	var header []string
 	header = append(header, "container")

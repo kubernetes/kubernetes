@@ -19,7 +19,6 @@ package unversioned
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -140,13 +139,14 @@ func setExtensionsDefaults(config *Config) error {
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	//if config.Version == "" {
-	config.Version = g.GroupVersion
+	copyGroupVersion := g.GroupVersion
+	config.GroupVersion = &copyGroupVersion
 	//}
 
-	versionInterfaces, err := g.InterfacesFor(config.Version)
+	versionInterfaces, err := g.InterfacesFor(config.GroupVersion.String())
 	if err != nil {
-		return fmt.Errorf("Extensions API version '%s' is not recognized (valid values: %s)",
-			config.Version, strings.Join(latest.GroupOrDie("extensions").Versions, ", "))
+		return fmt.Errorf("Extensions API group/version '%v' is not recognized (valid values: %v)",
+			config.GroupVersion, g.GroupVersions)
 	}
 	config.Codec = versionInterfaces.Codec
 	if config.QPS == 0 {

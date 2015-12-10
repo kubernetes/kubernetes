@@ -26,10 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/watch"
@@ -62,7 +61,6 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 	}
 
 	obj := a.GetObject()
-	resource := a.GetResource()
 	name := "Unknown"
 	if obj != nil {
 		name, _ = meta.NewAccessor().Name(obj)
@@ -79,7 +77,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 	}
 	items, err := l.indexer.Index("namespace", key)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing limit ranges", a.GetOperation(), resource))
+		return admission.NewForbidden(a, fmt.Errorf("Unable to %s %v at this time because there was an error enforcing limit ranges", a.GetOperation(), a.GetResource()))
 	}
 	if len(items) == 0 {
 		return nil
@@ -88,7 +86,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 	// ensure it meets each prescribed min/max
 	for i := range items {
 		limitRange := items[i].(*api.LimitRange)
-		err = l.limitFunc(limitRange, a.GetResource(), a.GetObject())
+		err = l.limitFunc(limitRange, a.GetResource().Resource, a.GetObject())
 		if err != nil {
 			return admission.NewForbidden(a, err)
 		}
@@ -99,11 +97,11 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 // NewLimitRanger returns an object that enforces limits based on the supplied limit function
 func NewLimitRanger(client client.Interface, limitFunc LimitFunc) admission.Interface {
 	lw := &cache.ListWatch{
-		ListFunc: func() (runtime.Object, error) {
-			return client.LimitRanges(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+		ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			return client.LimitRanges(api.NamespaceAll).List(options)
 		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			return client.LimitRanges(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
+		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			return client.LimitRanges(api.NamespaceAll).Watch(options)
 		},
 	}
 	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.LimitRange{}, 0)

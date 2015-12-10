@@ -23,11 +23,10 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 )
@@ -60,7 +59,7 @@ func (d *DeploymentController) Run(syncPeriod time.Duration) {
 }
 
 func (d *DeploymentController) reconcileDeployments() []error {
-	list, err := d.expClient.Deployments(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+	list, err := d.expClient.Deployments(api.NamespaceAll).List(unversioned.ListOptions{})
 	if err != nil {
 		return []error{fmt.Errorf("error listing deployments: %v", err)}
 	}
@@ -209,8 +208,9 @@ func (d *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationControll
 	}
 	// Check if we can scale down.
 	minAvailable := deployment.Spec.Replicas - maxUnavailable
+	minReadySeconds := deployment.Spec.Strategy.RollingUpdate.MinReadySeconds
 	// Find the number of ready pods.
-	readyPodCount, err := deploymentutil.GetAvailablePodsForRCs(d.client, allRCs)
+	readyPodCount, err := deploymentutil.GetAvailablePodsForRCs(d.client, allRCs, minReadySeconds)
 	if err != nil {
 		return false, fmt.Errorf("could not find available pods: %v", err)
 	}
@@ -261,7 +261,7 @@ func (d *DeploymentController) scaleRCAndRecordEvent(rc *api.ReplicationControll
 	}
 	newRC, err := d.scaleRC(rc, newScale)
 	if err == nil {
-		d.eventRecorder.Eventf(&deployment, "ScalingRC", "Scaled %s rc %s to %d", scalingOperation, rc.Name, newScale)
+		d.eventRecorder.Eventf(&deployment, api.EventTypeNormal, "ScalingRC", "Scaled %s rc %s to %d", scalingOperation, rc.Name, newScale)
 	}
 	return newRC, err
 }

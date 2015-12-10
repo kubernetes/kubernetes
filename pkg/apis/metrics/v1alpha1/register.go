@@ -18,10 +18,14 @@ package v1alpha1
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-var Codec = runtime.CodecFor(api.Scheme, "metrics/v1alpha1")
+// SchemeGroupVersion is group version used to register these objects
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "metrics", Version: "v1alpha1"}
+
+var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion.String())
 
 func init() {
 	// Register the API.
@@ -30,7 +34,7 @@ func init() {
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
-	api.Scheme.AddKnownTypes("metrics/v1alpha1",
+	api.Scheme.AddKnownTypes(SchemeGroupVersion,
 		&RawNode{},
 		&RawPod{},
 	)

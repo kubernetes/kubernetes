@@ -30,9 +30,8 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -298,12 +297,13 @@ var _ = Describe("Services", func() {
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
 
 		By("Removing iptable rules")
-		_, _, code, err := SSH(`
+		result, err := SSH(`
 					sudo iptables -t nat -F KUBE-SERVICES || true;
 					sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
 					sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, testContext.Provider)
-		if err != nil || code != 0 {
-			Failf("couldn't remove iptable rules: %v (code %v)", err, code)
+		if err != nil || result.Code != 0 {
+			LogSSHResult(result)
+			Failf("couldn't remove iptable rules: %v", err)
 		}
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
@@ -394,17 +394,13 @@ var _ = Describe("Services", func() {
 		ip := pickNodeIP(c)
 		testReachable(ip, nodePort)
 
-		// this test uses NodeSSHHosts that does not work if a Node only reports LegacyHostIP
-		if providerIs(providersWithSSH...) {
-			hosts, err := NodeSSHHosts(c)
-			if err != nil {
-				Expect(err).NotTo(HaveOccurred())
-			}
-			cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
-			_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
-			if code != 0 {
-				Failf("expected node port (%d) to be in use", nodePort)
-			}
+		By("verifying the node port is locked")
+		hostExec := LaunchHostExecPod(f.Client, f.Namespace.Name, "hostexec")
+		// Loop a bit because we see transient flakes.
+		cmd := fmt.Sprintf(`for i in $(seq 1 10); do if ss -ant46 'sport = :%d' | grep ^LISTEN; then exit 0; fi; sleep 0.1; done; exit 1`, nodePort)
+		stdout, err := RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+		if err != nil {
+			Failf("expected node port (%d) to be in use, stdout: %v", nodePort, stdout)
 		}
 	})
 
@@ -759,17 +755,11 @@ var _ = Describe("Services", func() {
 		err = t.DeleteService(serviceName)
 		Expect(err).NotTo(HaveOccurred())
 
-		// this test uses NodeSSHHosts that does not work if a Node only reports LegacyHostIP
-		if providerIs(providersWithSSH...) {
-			hosts, err := NodeSSHHosts(c)
-			if err != nil {
-				Expect(err).NotTo(HaveOccurred())
-			}
-			cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
-			_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
-			if code == 0 {
-				Failf("expected node port (%d) to not be in use", nodePort)
-			}
+		hostExec := LaunchHostExecPod(f.Client, f.Namespace.Name, "hostexec")
+		cmd := fmt.Sprintf(`! ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
+		stdout, err := RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+		if err != nil {
+			Failf("expected node port (%d) to not be in use, stdout: %v", nodePort, stdout)
 		}
 
 		By(fmt.Sprintf("creating service "+serviceName+" with same NodePort %d", nodePort))
@@ -1054,7 +1044,7 @@ func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, ex
 		i++
 	}
 
-	if pods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything()); err == nil {
+	if pods, err := c.Pods(api.NamespaceAll).List(unversioned.ListOptions{}); err == nil {
 		for _, pod := range pods.Items {
 			Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
 		}
@@ -1106,7 +1096,7 @@ func collectAddresses(nodes *api.NodeList, addressType api.NodeAddressType) []st
 }
 
 func getNodePublicIps(c *client.Client) ([]string, error) {
-	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	nodes, err := c.Nodes().List(unversioned.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -1316,11 +1306,12 @@ func verifyServeHostnameServiceUp(c *client.Client, host string, expectedPods []
 	for _, cmd := range commands {
 		passed := false
 		for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5) {
-			stdout, _, code, err := SSH(cmd, host, testContext.Provider)
-			if err != nil || code != 0 {
-				Logf("error while SSH-ing to node: %v (code %v)", err, code)
+			result, err := SSH(cmd, host, testContext.Provider)
+			if err != nil || result.Code != 0 {
+				LogSSHResult(result)
+				Logf("error while SSH-ing to node: %v", err)
 			}
-			pods := strings.Split(strings.TrimSpace(stdout), "\n")
+			pods := strings.Split(strings.TrimSpace(result.Stdout), "\n")
 			sort.StringSlice(pods).Sort()
 			if api.Semantic.DeepEqual(pods, expectedPods) {
 				passed = true
@@ -1340,11 +1331,12 @@ func verifyServeHostnameServiceDown(c *client.Client, host string, serviceIP str
 		"curl -s --connect-timeout 2 http://%s:%d && exit 99", serviceIP, servicePort)
 
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		_, _, code, err := SSH(command, host, testContext.Provider)
+		result, err := SSH(command, host, testContext.Provider)
 		if err != nil {
+			LogSSHResult(result)
 			Logf("error while SSH-ing to node: %v", err)
 		}
-		if code != 99 {
+		if result.Code != 99 {
 			return nil
 		}
 		Logf("service still alive - still waiting")

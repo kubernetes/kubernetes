@@ -24,8 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 func TestEventSearch(t *testing.T) {
@@ -34,12 +32,12 @@ func TestEventSearch(t *testing.T) {
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath("events", "baz", ""),
 			Query: url.Values{
-				unversioned.FieldSelectorQueryParam(testapi.Default.Version()): []string{
-					getInvolvedObjectNameFieldLabel(testapi.Default.Version()) + "=foo,",
+				unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String()): []string{
+					getInvolvedObjectNameFieldLabel(testapi.Default.GroupVersion().String()) + "=foo,",
 					"involvedObject.namespace=baz,",
 					"involvedObject.kind=Pod",
 				},
-				unversioned.LabelSelectorQueryParam(testapi.Default.Version()): []string{},
+				unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String()): []string{},
 			},
 		},
 		Response: Response{StatusCode: 200, Body: &api.EventList{}},
@@ -74,6 +72,7 @@ func TestEventCreate(t *testing.T) {
 		FirstTimestamp: timeStamp,
 		LastTimestamp:  timeStamp,
 		Count:          1,
+		Type:           api.EventTypeNormal,
 	}
 	c := &testClient{
 		Request: testRequest{
@@ -113,6 +112,7 @@ func TestEventGet(t *testing.T) {
 		FirstTimestamp: timeStamp,
 		LastTimestamp:  timeStamp,
 		Count:          1,
+		Type:           api.EventTypeNormal,
 	}
 	c := &testClient{
 		Request: testRequest{
@@ -152,6 +152,7 @@ func TestEventList(t *testing.T) {
 				FirstTimestamp: timeStamp,
 				LastTimestamp:  timeStamp,
 				Count:          1,
+				Type:           api.EventTypeNormal,
 			},
 		},
 	}
@@ -163,8 +164,7 @@ func TestEventList(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: eventList},
 	}
-	response, err := c.Setup(t).Events(ns).List(labels.Everything(),
-		fields.Everything())
+	response, err := c.Setup(t).Events(ns).List(unversioned.ListOptions{})
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)

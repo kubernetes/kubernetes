@@ -17,26 +17,26 @@
 ZONE=${KUBE_AWS_ZONE:-us-west-2a}
 
 MASTER_SIZE=${MASTER_SIZE:-}
-MINION_SIZE=${MINION_SIZE:-}
-NUM_MINIONS=${NUM_MINIONS:-2}
+NODE_SIZE=${NODE_SIZE:-}
+NUM_NODES=${NUM_NODES:-2}
 
 # Dynamically set node sizes so that Heapster has enough space to run
-if [[ -z ${MINION_SIZE} ]]; then
-  if (( ${NUM_MINIONS} < 50 )); then
-    MINION_SIZE="t2.micro"
-  elif (( ${NUM_MINIONS} < 150 )); then
-    MINION_SIZE="t2.small"
+if [[ -z ${NODE_SIZE} ]]; then
+  if (( ${NUM_NODES} < 50 )); then
+    NODE_SIZE="t2.micro"
+  elif (( ${NUM_NODES} < 150 )); then
+    NODE_SIZE="t2.small"
   else
-    MINION_SIZE="t2.medium"
+    NODE_SIZE="t2.medium"
   fi
 fi
 
 # Dynamically set the master size by the number of nodes, these are guesses
 # TODO: gather some data
 if [[ -z ${MASTER_SIZE} ]]; then
-  if (( ${NUM_MINIONS} < 50 )); then
+  if (( ${NUM_NODES} < 50 )); then
     MASTER_SIZE="t2.micro"
-  elif (( ${NUM_MINIONS} < 150 )); then
+  elif (( ${NUM_NODES} < 150 )); then
     MASTER_SIZE="t2.small"
   else
     MASTER_SIZE="t2.medium"
@@ -54,7 +54,7 @@ INSTANCE_PREFIX="${KUBE_AWS_INSTANCE_PREFIX:-e2e-test-${USER}}"
 CLUSTER_ID=${INSTANCE_PREFIX}
 AWS_SSH_KEY=${AWS_SSH_KEY:-$HOME/.ssh/kube_aws_rsa}
 IAM_PROFILE_MASTER="kubernetes-master"
-IAM_PROFILE_MINION="kubernetes-minion"
+IAM_PROFILE_NODE="kubernetes-minion"
 
 LOG="/dev/null"
 
@@ -64,13 +64,13 @@ MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20}
 MASTER_ROOT_DISK_TYPE="${MASTER_ROOT_DISK_TYPE:-gp2}"
 MASTER_ROOT_DISK_SIZE=${MASTER_ROOT_DISK_SIZE:-8}
 # The minions root EBS volume size (used to house Docker images)
-MINION_ROOT_DISK_TYPE="${MINION_ROOT_DISK_TYPE:-gp2}"
-MINION_ROOT_DISK_SIZE=${MINION_ROOT_DISK_SIZE:-32}
+NODE_ROOT_DISK_TYPE="${NODE_ROOT_DISK_TYPE:-gp2}"
+NODE_ROOT_DISK_SIZE=${NODE_ROOT_DISK_SIZE:-32}
 
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
-MINION_TAG="${INSTANCE_PREFIX}-minion"
-MINION_SCOPES=""
+NODE_TAG="${INSTANCE_PREFIX}-minion"
+NODE_SCOPES=""
 POLL_SLEEP_INTERVAL=3
 SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.245.0.0/16}"
@@ -117,7 +117,7 @@ ENABLE_NODE_AUTOSCALER="${KUBE_ENABLE_NODE_AUTOSCALER:-false}"
 if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
   # TODO: actually configure ASG or similar
   AUTOSCALER_MIN_NODES="${KUBE_AUTOSCALER_MIN_NODES:-1}"
-  AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-${NUM_MINIONS}}"
+  AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-${NUM_NODES}}"
   TARGET_NODE_UTILIZATION="${KUBE_TARGET_NODE_UTILIZATION:-0.7}"
 fi
 
@@ -126,11 +126,11 @@ ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAcco
 
 # Optional: Enable/disable public IP assignment for minions.
 # Important Note: disable only if you have setup a NAT instance for internet access and configured appropriate routes!
-ENABLE_MINION_PUBLIC_IP=${KUBE_ENABLE_MINION_PUBLIC_IP:-true}
+ENABLE_NODE_PUBLIC_IP=${KUBE_ENABLE_NODE_PUBLIC_IP:-true}
 
 # OS options for minions
 KUBE_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION:-vivid}"
-KUBE_MINION_IMAGE="${KUBE_MINION_IMAGE:-}"
+KUBE_NODE_IMAGE="${KUBE_NODE_IMAGE:-}"
 COREOS_CHANNEL="${COREOS_CHANNEL:-alpha}"
 CONTAINER_RUNTIME="${KUBE_CONTAINER_RUNTIME:-docker}"
 RKT_VERSION="${KUBE_RKT_VERSION:-0.5.5}"

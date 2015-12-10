@@ -137,8 +137,8 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 		Updates:   updates,
 		NodeInfos: make(chan NodeInfo, 1),
 		APIClient: client.NewOrDie(&client.Config{
-			Host:    testApiServer.server.URL,
-			Version: testapi.Default.Version(),
+			Host:         testApiServer.server.URL,
+			GroupVersion: testapi.Default.GroupVersion(),
 		}),
 		PodStatusFunc: func(pod *api.Pod) (*api.PodStatus, error) {
 			return &api.PodStatus{
@@ -168,10 +168,23 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	}
 
 	pod := NewTestPod(1)
-	podTask, err := podtask.New(api.NewDefaultContext(), "", pod)
+	executorinfo := &mesosproto.ExecutorInfo{}
+	podTask, err := podtask.New(
+		api.NewDefaultContext(),
+		"",
+		pod,
+		executorinfo,
+		nil,
+	)
+
 	assert.Equal(t, nil, err, "must be able to create a task from a pod")
 
-	taskInfo := podTask.BuildTaskInfo(&mesosproto.ExecutorInfo{})
+	podTask.Spec = &podtask.Spec{
+		Executor: executorinfo,
+	}
+	taskInfo, err := podTask.BuildTaskInfo()
+	assert.Equal(t, nil, err, "must be able to build task info")
+
 	data, err := testapi.Default.Codec().Encode(pod)
 	assert.Equal(t, nil, err, "must be able to encode a pod's spec data")
 	taskInfo.Data = data
@@ -338,8 +351,8 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 		Updates:   make(chan kubetypes.PodUpdate, 1024),
 		NodeInfos: make(chan NodeInfo, 1),
 		APIClient: client.NewOrDie(&client.Config{
-			Host:    testApiServer.server.URL,
-			Version: testapi.Default.Version(),
+			Host:         testApiServer.server.URL,
+			GroupVersion: testapi.Default.GroupVersion(),
 		}),
 		PodStatusFunc: func(pod *api.Pod) (*api.PodStatus, error) {
 			return &api.PodStatus{
@@ -370,8 +383,21 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 
 	// set up a pod to then lose
 	pod := NewTestPod(1)
-	podTask, _ := podtask.New(api.NewDefaultContext(), "foo", pod)
-	taskInfo := podTask.BuildTaskInfo(&mesosproto.ExecutorInfo{})
+	executorinfo := &mesosproto.ExecutorInfo{}
+	podTask, _ := podtask.New(
+		api.NewDefaultContext(),
+		"foo",
+		pod,
+		executorinfo,
+		nil,
+	)
+
+	podTask.Spec = &podtask.Spec{
+		Executor: executorinfo,
+	}
+	taskInfo, err := podTask.BuildTaskInfo()
+	assert.Equal(t, nil, err, "must be able to build task info")
+
 	data, _ := testapi.Default.Codec().Encode(pod)
 	taskInfo.Data = data
 
@@ -430,7 +456,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 func NewTestPod(i int) *api.Pod {
 	name := fmt.Sprintf("pod%d", i)
 	return &api.Pod{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
@@ -494,10 +520,10 @@ func NewMockPodsListWatch(initialPodList api.PodList) *MockPodsListWatch {
 		list:        initialPodList,
 	}
 	lw.ListWatch = cache.ListWatch{
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 			return lw.fakeWatcher, nil
 		},
-		ListFunc: func() (runtime.Object, error) {
+		ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
 			return &lw.list, nil
 		},
 	}

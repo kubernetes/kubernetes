@@ -51,12 +51,13 @@ func TestGetAttrs(t *testing.T) {
 			Name:            "foo",
 			Namespace:       "baz",
 			UID:             "long uid string",
-			APIVersion:      testapi.Default.Version(),
+			APIVersion:      testapi.Default.GroupVersion().String(),
 			ResourceVersion: "0",
 			FieldPath:       "",
 		},
 		Reason: "ForTesting",
 		Source: api.EventSource{Component: "test"},
+		Type:   api.EventTypeNormal,
 	}
 	label, field, err := getAttrs(eventA)
 	if err != nil {
@@ -72,11 +73,12 @@ func TestGetAttrs(t *testing.T) {
 		"involvedObject.name":            "foo",
 		"involvedObject.namespace":       "baz",
 		"involvedObject.uid":             "long uid string",
-		"involvedObject.apiVersion":      testapi.Default.Version(),
+		"involvedObject.apiVersion":      testapi.Default.GroupVersion().String(),
 		"involvedObject.resourceVersion": "0",
 		"involvedObject.fieldPath":       "",
 		"reason":                         "ForTesting",
 		"source":                         "test",
+		"type":                           api.EventTypeNormal,
 	}
 	if e, a := expect, field; !reflect.DeepEqual(e, a) {
 		t.Errorf("diff: %s", util.ObjectDiff(e, a))

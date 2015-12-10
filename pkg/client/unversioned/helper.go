@@ -28,8 +28,6 @@ import (
 	"reflect"
 	gruntime "runtime"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -49,10 +47,10 @@ type Config struct {
 	// Prefix is the sub path of the server. If not specified, the client will set
 	// a default value.  Use "/" to indicate the server root should be used
 	Prefix string
-	// Version is the API version to talk to. Must be provided when initializing
+	// GroupVersion is the API version to talk to. Must be provided when initializing
 	// a RESTClient directly. When initializing a Client, will be set with the default
 	// code version.
-	Version string
+	GroupVersion *unversioned.GroupVersion
 	// Codec specifies the encoding and decoding behavior for runtime.Objects passed
 	// to a RESTClient or Client. Required when initializing a RESTClient, optional
 	// when initializing a Client.
@@ -92,24 +90,6 @@ type Config struct {
 
 	// Maximum burst for throttle
 	Burst int
-}
-
-type KubeletConfig struct {
-	// ToDo: Add support for different kubelet instances exposing different ports
-	Port        uint
-	EnableHttps bool
-
-	// TLSClientConfig contains settings to enable transport layer security
-	TLSClientConfig
-
-	// Server requires Bearer authentication
-	BearerToken string
-
-	// HTTPTimeout is used by the client to timeout http requests to Kubelet.
-	HTTPTimeout time.Duration
-
-	// Dial is a custom dialer used for the client
-	Dial func(net, addr string) (net.Conn, error)
 }
 
 // TLSClientConfig contains settings to enable transport layer security
@@ -209,7 +189,7 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 	client := http.Client{Transport: transport}
 
 	configCopy := *c
-	configCopy.Version = ""
+	configCopy.GroupVersion = nil
 	configCopy.Prefix = ""
 	baseURL, err := defaultServerUrlFor(c)
 	if err != nil {
@@ -255,50 +235,59 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 //   stderr and try client's registered versions in order of preference.
 // - If version is config default, and the server does not support it,
 //   return an error.
-func NegotiateVersion(client *Client, c *Config, version string, clientRegisteredVersions []string) (string, error) {
+func NegotiateVersion(client *Client, c *Config, requestedGV *unversioned.GroupVersion, clientRegisteredGVs []unversioned.GroupVersion) (*unversioned.GroupVersion, error) {
 	var err error
 	if client == nil {
 		client, err = New(c)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 	clientVersions := sets.String{}
-	for _, v := range clientRegisteredVersions {
-		clientVersions.Insert(v)
+	for _, gv := range clientRegisteredGVs {
+		clientVersions.Insert(gv.String())
 	}
 	apiVersions, err := client.ServerAPIVersions()
 	if err != nil {
 		// This is almost always a connection error, and higher level code should treat this as a generic error,
 		// not a negotiation specific error.
-		return "", err
+		return nil, err
 	}
 	serverVersions := sets.String{}
 	for _, v := range apiVersions.Versions {
 		serverVersions.Insert(v)
 	}
+
 	// If no version requested, use config version (may also be empty).
-	if len(version) == 0 {
-		version = c.Version
+	// make a copy of the original so we don't risk mutating input here or in the returned value
+	var preferredGV *unversioned.GroupVersion
+	switch {
+	case requestedGV != nil:
+		t := *requestedGV
+		preferredGV = &t
+	case c.GroupVersion != nil:
+		t := *c.GroupVersion
+		preferredGV = &t
 	}
+
 	// If version explicitly requested verify that both client and server support it.
 	// If server does not support warn, but try to negotiate a lower version.
-	if len(version) != 0 {
-		if !clientVersions.Has(version) {
-			return "", fmt.Errorf("client does not support API version %q; client supported API versions: %v", version, clientVersions)
+	if preferredGV != nil {
+		if !clientVersions.Has(preferredGV.String()) {
+			return nil, fmt.Errorf("client does not support API version %q; client supported API versions: %v", preferredGV, clientVersions)
 
 		}
-		if serverVersions.Has(version) {
-			return version, nil
+		if serverVersions.Has(preferredGV.String()) {
+			return preferredGV, nil
 		}
 		// If we are using an explicit config version the server does not support, fail.
-		if version == c.Version {
-			return "", fmt.Errorf("server does not support API version %q", version)
+		if (c.GroupVersion != nil) && (*preferredGV == *c.GroupVersion) {
+			return nil, fmt.Errorf("server does not support API version %q", preferredGV)
 		}
 	}
 
-	for _, clientVersion := range clientRegisteredVersions {
-		if serverVersions.Has(clientVersion) {
+	for _, clientGV := range clientRegisteredGVs {
+		if serverVersions.Has(clientGV.String()) {
 			// Version was not explicitly requested in command config (--api-version).
 			// Ok to fall back to a supported version with a warning.
 			// TODO: caesarxuchao: enable the warning message when we have
@@ -306,11 +295,12 @@ func NegotiateVersion(client *Client, c *Config, version string, clientRegistere
 			// if len(version) != 0 {
 			// 	glog.Warningf("Server does not support API version '%s'. Falling back to '%s'.", version, clientVersion)
 			// }
-			return clientVersion, nil
+			t := clientGV
+			return &t, nil
 		}
 	}
-	return "", fmt.Errorf("failed to negotiate an api version; server supports: %v, client supports: %v",
-		serverVersions, clientRegisteredVersions)
+	return nil, fmt.Errorf("failed to negotiate an api version; server supports: %v, client supports: %v",
+		serverVersions, clientVersions)
 }
 
 // NewOrDie creates a Kubernetes client and panics if the provided API version is not recognized.
@@ -371,13 +361,12 @@ func SetKubernetesDefaults(config *Config) error {
 	if len(config.UserAgent) == 0 {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
-	if len(config.Version) == 0 {
-		config.Version = defaultVersionFor(config)
+	if config.GroupVersion == nil {
+		config.GroupVersion = defaultVersionFor(config)
 	}
-	version := config.Version
-	versionInterfaces, err := latest.GroupOrDie("").InterfacesFor(version)
+	versionInterfaces, err := latest.GroupOrDie("").InterfacesFor(config.GroupVersion.String())
 	if err != nil {
-		return fmt.Errorf("API version '%s' is not recognized (valid values: %s)", version, strings.Join(latest.GroupOrDie("").Versions, ", "))
+		return fmt.Errorf("API version '%v' is not recognized (valid values: %v)", *config.GroupVersion, latest.GroupOrDie("").GroupVersions)
 	}
 	if config.Codec == nil {
 		config.Codec = versionInterfaces.Codec
@@ -396,8 +385,8 @@ func SetKubernetesDefaults(config *Config) error {
 // A RESTClient created by this method is generic - it expects to operate on an API that follows
 // the Kubernetes conventions, but may not be the Kubernetes API.
 func RESTClientFor(config *Config) (*RESTClient, error) {
-	if len(config.Version) == 0 {
-		return nil, fmt.Errorf("version is required when initializing a RESTClient")
+	if config.GroupVersion == nil {
+		return nil, fmt.Errorf("GroupVersion is required when initializing a RESTClient")
 	}
 	if config.Codec == nil {
 		return nil, fmt.Errorf("Codec is required when initializing a RESTClient")
@@ -408,7 +397,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, config.Version, config.Codec, config.QPS, config.Burst)
+	client := NewRESTClient(baseURL, *config.GroupVersion, config.Codec, config.QPS, config.Burst)
 
 	transport, err := TransportFor(config)
 	if err != nil {
@@ -433,7 +422,7 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, config.Version, config.Codec, config.QPS, config.Burst)
+	client := NewRESTClient(baseURL, unversioned.SchemeGroupVersion, config.Codec, config.QPS, config.Burst)
 
 	transport, err := TransportFor(config)
 	if err != nil {
@@ -446,128 +435,10 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 	return client, nil
 }
 
-var (
-	// tlsTransports stores reusable round trippers with custom TLSClientConfig options
-	tlsTransports = map[string]*http.Transport{}
-
-	// tlsTransportLock protects retrieval and storage of round trippers into the tlsTransports map
-	tlsTransportLock sync.Mutex
-)
-
-// tlsTransportFor returns a http.RoundTripper for the given config, or an error
-// The same RoundTripper will be returned for configs with identical TLS options
-// If the config has no custom TLS options, http.DefaultTransport is returned
-func tlsTransportFor(config *Config) (http.RoundTripper, error) {
-	// Get a unique key for the TLS options in the config
-	key, err := tlsConfigKey(config)
-	if err != nil {
-		return nil, err
-	}
-
-	// Ensure we only create a single transport for the given TLS options
-	tlsTransportLock.Lock()
-	defer tlsTransportLock.Unlock()
-
-	// See if we already have a custom transport for this config
-	if cachedTransport, ok := tlsTransports[key]; ok {
-		return cachedTransport, nil
-	}
-
-	// Get the TLS options for this client config
-	tlsConfig, err := TLSConfigFor(config)
-	if err != nil {
-		return nil, err
-	}
-	// The options didn't require a custom TLS config
-	if tlsConfig == nil {
-		return http.DefaultTransport, nil
-	}
-
-	// Cache a single transport for these options
-	tlsTransports[key] = util.SetTransportDefaults(&http.Transport{
-		TLSClientConfig: tlsConfig,
-	})
-	return tlsTransports[key], nil
-}
-
-// TransportFor returns an http.RoundTripper that will provide the authentication
-// or transport level security defined by the provided Config. Will return the
-// default http.DefaultTransport if no special case behavior is needed.
-func TransportFor(config *Config) (http.RoundTripper, error) {
-	hasCA := len(config.CAFile) > 0 || len(config.CAData) > 0
-	hasCert := len(config.CertFile) > 0 || len(config.CertData) > 0
-
-	// Set transport level security
-	if config.Transport != nil && (hasCA || hasCert || config.Insecure) {
-		return nil, fmt.Errorf("using a custom transport with TLS certificate options or the insecure flag is not allowed")
-	}
-
-	var (
-		transport http.RoundTripper
-		err       error
-	)
-
-	if config.Transport != nil {
-		transport = config.Transport
-	} else {
-		transport, err = tlsTransportFor(config)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Call wrap prior to adding debugging wrappers
-	if config.WrapTransport != nil {
-		transport = config.WrapTransport(transport)
-	}
-
-	switch {
-	case bool(glog.V(9)):
-		transport = NewDebuggingRoundTripper(transport, CurlCommand, URLTiming, ResponseHeaders)
-	case bool(glog.V(8)):
-		transport = NewDebuggingRoundTripper(transport, JustURL, RequestHeaders, ResponseStatus, ResponseHeaders)
-	case bool(glog.V(7)):
-		transport = NewDebuggingRoundTripper(transport, JustURL, RequestHeaders, ResponseStatus)
-	case bool(glog.V(6)):
-		transport = NewDebuggingRoundTripper(transport, URLTiming)
-	}
-
-	transport, err = HTTPWrappersForConfig(config, transport)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: use the config context to wrap a transport
-
-	return transport, nil
-}
-
-// HTTPWrappersForConfig wraps a round tripper with any relevant layered behavior from the
-// config. Exposed to allow more clients that need HTTP-like behavior but then must hijack
-// the underlying connection (like WebSocket or HTTP2 clients). Pure HTTP clients should use
-// the higher level TransportFor or RESTClientFor methods.
-func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTripper, error) {
-	// Set authentication wrappers
-	hasBasicAuth := config.Username != "" || config.Password != ""
-	if hasBasicAuth && config.BearerToken != "" {
-		return nil, fmt.Errorf("username/password or bearer token may be set, but not both")
-	}
-	switch {
-	case config.BearerToken != "":
-		rt = NewBearerAuthRoundTripper(config.BearerToken, rt)
-	case hasBasicAuth:
-		rt = NewBasicAuthRoundTripper(config.Username, config.Password, rt)
-	}
-	if len(config.UserAgent) > 0 {
-		rt = NewUserAgentRoundTripper(config.UserAgent, rt)
-	}
-	return rt, nil
-}
-
 // DefaultServerURL converts a host, host:port, or URL string to the default base server API path
 // to use with a Client at a given API version following the standard conventions for a
 // Kubernetes API.
-func DefaultServerURL(host, prefix, version string, defaultTLS bool) (*url.URL, error) {
+func DefaultServerURL(host, prefix string, groupVersion unversioned.GroupVersion, defaultTLS bool) (*url.URL, error) {
 	if host == "" {
 		return nil, fmt.Errorf("host must be a URL or a host:port pair")
 	}
@@ -600,7 +471,13 @@ func DefaultServerURL(host, prefix, version string, defaultTLS bool) (*url.URL, 
 	}
 
 	// Add the version to the end of the path
-	hostURL.Path = path.Join(hostURL.Path, version)
+	if len(groupVersion.Group) > 0 {
+		hostURL.Path = path.Join(hostURL.Path, groupVersion.Group, groupVersion.Version)
+
+	} else {
+		hostURL.Path = path.Join(hostURL.Path, groupVersion.Version)
+
+	}
 
 	return hostURL, nil
 }
@@ -614,7 +491,7 @@ func DefaultServerURL(host, prefix, version string, defaultTLS bool) (*url.URL, 
 func IsConfigTransportTLS(config Config) bool {
 	// determination of TLS transport does not logically require a version to be specified
 	// modify the copy of the config we got to satisfy preconditions for defaultServerUrlFor
-	config.Version = defaultVersionFor(&config)
+	config.GroupVersion = defaultVersionFor(&config)
 
 	baseURL, err := defaultServerUrlFor(&config)
 	if err != nil {
@@ -635,18 +512,24 @@ func defaultServerUrlFor(config *Config) (*url.URL, error) {
 	if host == "" {
 		host = "localhost"
 	}
-	return DefaultServerURL(host, config.Prefix, config.Version, defaultTLS)
+
+	if config.GroupVersion != nil {
+		return DefaultServerURL(host, config.Prefix, *config.GroupVersion, defaultTLS)
+	}
+	return DefaultServerURL(host, config.Prefix, unversioned.GroupVersion{}, defaultTLS)
 }
 
 // defaultVersionFor is shared between defaultServerUrlFor and RESTClientFor
-func defaultVersionFor(config *Config) string {
-	version := config.Version
-	if version == "" {
+func defaultVersionFor(config *Config) *unversioned.GroupVersion {
+	if config.GroupVersion == nil {
 		// Clients default to the preferred code API version
 		// TODO: implement version negotiation (highest version supported by server)
-		version = latest.GroupOrDie("").Version
+		// TODO this drops out when groupmeta is refactored
+		copyGroupVersion := latest.GroupOrDie("").GroupVersion
+		return &copyGroupVersion
 	}
-	return version
+
+	return config.GroupVersion
 }
 
 // DefaultKubernetesUserAgent returns the default user agent that clients can use.
@@ -662,13 +545,4 @@ func DefaultKubernetesUserAgent() string {
 	seg := strings.SplitN(version, "-", 2)
 	version = seg[0]
 	return fmt.Sprintf("%s/%s (%s/%s) kubernetes/%s", path.Base(os.Args[0]), version, gruntime.GOOS, gruntime.GOARCH, commit)
-}
-
-// TimeoutFromListOptions returns timeout to be set via TimeoutSeconds() method
-// based on given options.
-func TimeoutFromListOptions(options api.ListOptions) time.Duration {
-	if options.TimeoutSeconds != nil {
-		return time.Duration(*options.TimeoutSeconds) * time.Second
-	}
-	return 0
 }

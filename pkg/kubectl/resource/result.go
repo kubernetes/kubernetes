@@ -138,7 +138,7 @@ func (r *Result) Object() (runtime.Object, error) {
 			return objects[0], nil
 		}
 		// if the item is a list already, don't create another list
-		if runtime.IsListType(objects[0]) {
+		if meta.IsListType(objects[0]) {
 			return objects[0], nil
 		}
 	}
@@ -221,7 +221,7 @@ func AsVersionedObject(infos []*Info, forceList bool, version string) (runtime.O
 		object = objects[0]
 	} else {
 		object = &api.List{Items: objects}
-		converted, err := tryConvert(api.Scheme, object, version, latest.GroupOrDie("").Version)
+		converted, err := tryConvert(api.Scheme, object, version, latest.GroupOrDie("").GroupVersion.Version)
 		if err != nil {
 			return nil, err
 		}
@@ -243,7 +243,7 @@ func AsVersionedObjects(infos []*Info, version string) ([]runtime.Object, error)
 		// objects that are not part of api.Scheme must be converted to JSON
 		// TODO: convert to map[string]interface{}, attach to runtime.Unknown?
 		if len(version) > 0 {
-			if _, _, err := api.Scheme.ObjectVersionAndKind(info.Object); runtime.IsNotRegisteredError(err) {
+			if _, err := api.Scheme.ObjectKind(info.Object); runtime.IsNotRegisteredError(err) {
 				// TODO: ideally this would encode to version, but we don't expose multiple codecs here.
 				data, err := info.Mapping.Codec.Encode(info.Object)
 				if err != nil {

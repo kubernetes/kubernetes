@@ -136,14 +136,14 @@ func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 func GetIntOrPercentValue(intOrStr *intstr.IntOrString) (int, bool, error) {
 	switch intOrStr.Type {
 	case intstr.Int:
-		return intOrStr.IntVal, false, nil
+		return intOrStr.IntValue(), false, nil
 	case intstr.String:
 		s := strings.Replace(intOrStr.StrVal, "%", "", -1)
 		v, err := strconv.Atoi(s)
 		if err != nil {
 			return 0, false, fmt.Errorf("invalid value %q: %v", intOrStr.StrVal, err)
 		}
-		return v, true, nil
+		return int(v), true, nil
 	}
 	return 0, false, fmt.Errorf("invalid value: neither int nor percentage")
 }
@@ -511,4 +511,18 @@ func ReadDirNoExit(dirname string) ([]os.FileInfo, []error, error) {
 	}
 
 	return list, errs, nil
+}
+
+// If bind-address is usable, return it directly
+// If bind-address is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
+// interface.
+func ValidPublicAddrForMaster(bindAddress net.IP) (net.IP, error) {
+	if bindAddress == nil || bindAddress.IsUnspecified() || bindAddress.IsLoopback() {
+		hostIP, err := ChooseHostInterface()
+		if err != nil {
+			return nil, err
+		}
+		bindAddress = hostIP
+	}
+	return bindAddress, nil
 }

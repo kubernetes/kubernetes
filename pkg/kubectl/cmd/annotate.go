@@ -39,6 +39,7 @@ type AnnotateOptions struct {
 	removeAnnotations []string
 	builder           *resource.Builder
 	filenames         []string
+	selector          string
 
 	overwrite       bool
 	all             bool
@@ -60,7 +61,7 @@ If --resource-version is specified, then updates will use this resource version,
 Possible resources include (case insensitive): pods (po), services (svc),
 replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
 limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
-resourcequotas (quota) or secrets.`
+horizontalpodautoscalers (hpa), resourcequotas (quota) or secrets.`
 	annotate_example = `# Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
 # If the same annotation is set multiple times, only the last value will be applied
 $ kubectl annotate pods foo description='my frontend'
@@ -103,6 +104,7 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 	cmdutil.AddPrinterFlags(cmd)
+	cmd.Flags().StringVarP(&options.selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().BoolVar(&options.overwrite, "overwrite", false, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
 	cmd.Flags().BoolVar(&options.all, "all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVar(&options.resourceVersion, "resource-version", "", "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
@@ -153,6 +155,7 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, o.filenames...).
+		SelectorParam(o.selector).
 		ResourceTypeOrNameArgs(o.all, o.resources...).
 		Flatten().
 		Latest()

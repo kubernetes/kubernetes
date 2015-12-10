@@ -2941,7 +2941,7 @@
       "description": "Completions specifies the desired number of successfully finished pods the job should be run with. Defaults to 1. More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md"
      },
      "selector": {
-      "$ref": "v1beta1.PodSelector",
+      "$ref": "v1beta1.LabelSelector",
       "description": "Selector is a label query over pods that should match the pod count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"
      },
      "template": {
@@ -2950,9 +2950,9 @@
      }
     }
    },
-   "v1beta1.PodSelector": {
-    "id": "v1beta1.PodSelector",
-    "description": "A pod selector is a label query over a set of pods. The result of matchLabels and matchExpressions are ANDed. An empty pod selector matches all objects. A null pod selector matches no objects.",
+   "v1beta1.LabelSelector": {
+    "id": "v1beta1.LabelSelector",
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
     "properties": {
      "matchLabels": {
       "type": "any",
@@ -2961,15 +2961,15 @@
      "matchExpressions": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.PodSelectorRequirement"
+       "$ref": "v1beta1.LabelSelectorRequirement"
       },
-      "description": "matchExpressions is a list of pod selector requirements. The requirements are ANDed."
+      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
      }
     }
    },
-   "v1beta1.PodSelectorRequirement": {
-    "id": "v1beta1.PodSelectorRequirement",
-    "description": "A pod selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+   "v1beta1.LabelSelectorRequirement": {
+    "id": "v1beta1.LabelSelectorRequirement",
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
     "required": [
      "key",
      "operator"
@@ -3244,8 +3244,7 @@
     "id": "v1.GitRepoVolumeSource",
     "description": "GitRepoVolumeSource represents a volume that is pulled from git when the pod is created.",
     "required": [
-     "repository",
-     "revision"
+     "repository"
     ],
     "properties": {
      "repository": {
@@ -3255,6 +3254,10 @@
      "revision": {
       "type": "string",
       "description": "Commit hash for the specified revision."
+     },
+     "directory": {
+      "type": "string",
+      "description": "Target directory name. Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the git repository.  Otherwise, if specified, the volume will contain the git repository in the subdirectory with the given name."
      }
     }
    },
@@ -3315,6 +3318,10 @@
       "type": "integer",
       "format": "int32",
       "description": "iSCSI target lun number."
+     },
+     "iscsiInterface": {
+      "type": "string",
+      "description": "Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport."
      },
      "fsType": {
       "type": "string",
@@ -3768,7 +3775,7 @@
    },
    "v1.Probe": {
     "id": "v1.Probe",
-    "description": "Probe describes a health check to be performed against a container to determine whether it is alive or ready to recieve traffic.",
+    "description": "Probe describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.",
     "properties": {
      "exec": {
       "$ref": "v1.ExecAction",
@@ -3784,17 +3791,17 @@
      },
      "initialDelaySeconds": {
       "type": "integer",
-      "format": "int64",
+      "format": "int32",
       "description": "Number of seconds after the container has started before liveness probes are initiated. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
      },
      "timeoutSeconds": {
       "type": "integer",
-      "format": "int64",
+      "format": "int32",
       "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes"
      },
      "periodSeconds": {
       "type": "integer",
-      "format": "int64",
+      "format": "int32",
       "description": "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1."
      },
      "successThreshold": {

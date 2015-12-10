@@ -60,6 +60,9 @@ pull an image if it already exists. If you would like to always force a pull
 you must set a pull image policy of `Always` or specify a `:latest` tag on
 your image.
 
+If you did not specify tag of your image, it will be assumed as `:latest`, with
+pull image policy of `Always` correspondingly.
+
 ## Using a Private Registry
 
 Private registries may require keys to read images from them.
@@ -109,8 +112,9 @@ Here are the recommended steps to configuring your nodes to use a private regist
 example, run these on your desktop/laptop:
    1. run `docker login [server]` for each set of credentials you want to use.
    1. view `$HOME/.dockercfg` in an editor to ensure it contains just the credentials you want to use.
-   1. get a list of your nodes
-      - for example: `nodes=$(kubectl get nodes -o template --template='{{range.items}}{{.metadata.name}} {{end}}')`
+   1. get a list of your nodes, for example:
+      - if you want the names: `nodes=$(kubectl get nodes -o jsonpath='{range.items[*].metadata}{.name} {end}')`
+      - if you want to get the IPs: `nodes=$(kubectl get nodes -o jsonpath='{range .items[*].status.addresses[?(@.type=="ExternalIP")]}{.address} {end}')`
    1. copy your local `.dockercfg` to the home directory of root on each node.
       - for example: `for n in $nodes; do scp ~/.dockercfg root@$n:/root/.dockercfg; done`
 

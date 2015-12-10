@@ -96,12 +96,12 @@ func (pb *prober) probe(probeType probeType, pod *api.Pod, status api.PodStatus,
 		if err != nil {
 			glog.V(1).Infof("%s probe for %q errored: %v", probeType, ctrName, err)
 			if hasRef {
-				pb.recorder.Eventf(ref, kubecontainer.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
+				pb.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
 			}
 		} else { // result != probe.Success
 			glog.V(1).Infof("%s probe for %q failed (%v): %s", probeType, ctrName, result, output)
 			if hasRef {
-				pb.recorder.Eventf(ref, kubecontainer.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
+				pb.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
 			}
 		}
 		return results.Failure, err
@@ -163,7 +163,7 @@ func extractPort(param intstr.IntOrString, container api.Container) (int, error)
 	var err error
 	switch param.Type {
 	case intstr.Int:
-		port = param.IntVal
+		port = param.IntValue()
 	case intstr.String:
 		if port, err = findPortByName(container, param.StrVal); err != nil {
 			// Last ditch effort - maybe it was an int stored as string?

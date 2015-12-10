@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   labels:
-    name: cassandra
+    app: cassandra
   name: cassandra
 spec:
   containers:

@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -45,10 +46,14 @@ func (*InternalComplex) IsAnAPIObject() {}
 func (*ExternalComplex) IsAnAPIObject() {}
 
 func TestStringMapConversion(t *testing.T) {
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "external"}
+
 	scheme := runtime.NewScheme()
 	scheme.Log(t)
-	scheme.AddKnownTypeWithName("", "Complex", &InternalComplex{})
-	scheme.AddKnownTypeWithName("external", "Complex", &ExternalComplex{})
+	scheme.AddInternalGroupVersion(internalGV)
+	scheme.AddKnownTypeWithName(internalGV.WithKind("Complex"), &InternalComplex{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("Complex"), &ExternalComplex{})
 
 	testCases := map[string]struct {
 		input    map[string][]string

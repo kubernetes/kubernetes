@@ -17,15 +17,22 @@ limitations under the License.
 package v1
 
 import (
-	"strings"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 func addDefaultingFuncs() {
 	api.Scheme.AddDefaultingFuncs(
+		func(obj *PodExecOptions) {
+			obj.Stdout = true
+			obj.Stderr = true
+		},
+		func(obj *PodAttachOptions) {
+			obj.Stdout = true
+			obj.Stderr = true
+		},
 		func(obj *ReplicationController) {
 			var labels map[string]string
 			if obj.Spec.Template != nil {
@@ -41,7 +48,7 @@ func addDefaultingFuncs() {
 				}
 			}
 			if obj.Spec.Replicas == nil {
-				obj.Spec.Replicas = new(int)
+				obj.Spec.Replicas = new(int32)
 				*obj.Spec.Replicas = 1
 			}
 		},
@@ -59,10 +66,10 @@ func addDefaultingFuncs() {
 		},
 		func(obj *Container) {
 			if obj.ImagePullPolicy == "" {
-				// TODO(dchen1107): Move ParseImageName code to pkg/util
-				parts := strings.Split(obj.Image, ":")
+				_, tag := parsers.ParseImageName(obj.Image)
 				// Check image tag
-				if parts[len(parts)-1] == "latest" {
+
+				if tag == "latest" {
 					obj.ImagePullPolicy = PullAlways
 				} else {
 					obj.ImagePullPolicy = PullIfNotPresent
@@ -85,7 +92,7 @@ func addDefaultingFuncs() {
 					sp.Protocol = ProtocolTCP
 				}
 				if sp.TargetPort == intstr.FromInt(0) || sp.TargetPort == intstr.FromString("") {
-					sp.TargetPort = intstr.FromInt(sp.Port)
+					sp.TargetPort = intstr.FromInt(int(sp.Port))
 				}
 			}
 		},
@@ -155,6 +162,11 @@ func addDefaultingFuncs() {
 		func(obj *PersistentVolumeClaim) {
 			if obj.Status.Phase == "" {
 				obj.Status.Phase = ClaimPending
+			}
+		},
+		func(obj *ISCSIVolumeSource) {
+			if obj.ISCSIInterface == "" {
+				obj.ISCSIInterface = "default"
 			}
 		},
 		func(obj *Endpoints) {

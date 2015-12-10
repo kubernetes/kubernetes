@@ -37,6 +37,7 @@ kube::test::find_dirs() {
           -o -path './release/*' \
           -o -path './target/*' \
           -o -path './test/e2e/*' \
+          -o -path './test/e2e_node/*' \
           -o -path './test/integration/*' \
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | sort -u

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -70,7 +71,7 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs := []string{}
-	p, err := f.Printer(nil, false, false, false, false, []string{})
+	p, err := f.Printer(nil, false, false, false, false, false, []string{})
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
@@ -227,6 +228,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		}
 
 		var outputObj runtime.Object
+		dataChangeMsg := "not labeled"
 		if cmdutil.GetFlagBool(cmd, "dry-run") {
 			err = labelFunc(info.Object, overwrite, resourceVersion, lbls, remove)
 			if err != nil {
@@ -239,12 +241,22 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			if err != nil {
 				return err
 			}
+			meta, err := api.ObjectMetaFor(obj)
+			for _, label := range remove {
+				if _, ok := meta.Labels[label]; !ok {
+					fmt.Fprintf(out, "label %q not found.\n", label)
+				}
+			}
+
 			if err := labelFunc(obj, overwrite, resourceVersion, lbls, remove); err != nil {
 				return err
 			}
 			newData, err := json.Marshal(obj)
 			if err != nil {
 				return err
+			}
+			if !reflect.DeepEqual(oldData, newData) {
+				dataChangeMsg = "labeled"
 			}
 			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
 			if err != nil {
@@ -267,7 +279,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if outputFormat != "" {
 			return f.PrintObject(cmd, outputObj, out)
 		}
-		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "labeled")
+		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, dataChangeMsg)
 		return nil
 	})
 }

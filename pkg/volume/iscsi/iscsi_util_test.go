@@ -17,6 +17,8 @@ limitations under the License.
 package iscsi
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -67,5 +69,42 @@ func TestExtractPortalAndIqn(t *testing.T) {
 	portal, iqn, err := extractPortalAndIqn(devicePath)
 	if err != nil || portal != "127.0.0.1:3260" || iqn != "iqn.2014-12.com.example:test.tgt00" {
 		t.Errorf("extractPortalAndIqn: got %v %s %s", err, portal, iqn)
+	}
+	devicePath = "127.0.0.1:3260-eui.02004567A425678D-lun-0"
+	portal, iqn, err = extractPortalAndIqn(devicePath)
+	if err != nil || portal != "127.0.0.1:3260" || iqn != "eui.02004567A425678D" {
+		t.Errorf("extractPortalAndIqn: got %v %s %s", err, portal, iqn)
+	}
+}
+
+func fakeOsStat(devicePath string) (fi os.FileInfo, err error) {
+	var cmd os.FileInfo
+	return cmd, nil
+}
+
+func fakeFilepathGlob(devicePath string) (globs []string, err error) {
+	return []string{devicePath}, nil
+}
+
+func TestWaitForPathToExist(t *testing.T) {
+	devicePath := []string{"/dev/disk/by-path/ip-127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0",
+		"/dev/disk/by-path/pci-0000:00:00.0-ip-127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0"}
+
+	exist := waitForPathToExistInternal(devicePath[0], 1, "default", fakeOsStat, filepath.Glob)
+	if exist == false {
+		t.Errorf("waitForPathToExist: could not find path %s", devicePath[0])
+	}
+	exist = waitForPathToExistInternal(devicePath[0], 1, "fake_iface", fakeOsStat, filepath.Glob)
+	if exist != false {
+		t.Errorf("waitForPathToExist: wrong code path called for %s", devicePath[0])
+	}
+
+	exist = waitForPathToExistInternal(devicePath[1], 1, "fake_iface", os.Stat, fakeFilepathGlob)
+	if exist == false {
+		t.Errorf("waitForPathToExist: could not find path %s", devicePath[1])
+	}
+	exist = waitForPathToExistInternal(devicePath[1], 1, "default", os.Stat, fakeFilepathGlob)
+	if exist != false {
+		t.Errorf("waitForPathToExist: wrong code path called for %s", devicePath[1])
 	}
 }

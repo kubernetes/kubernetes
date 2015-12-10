@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -40,12 +39,12 @@ func TestListNodes(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: &api.NodeList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}},
 	}
-	response, err := c.Setup(t).Nodes().List(labels.Everything(), fields.Everything())
+	response, err := c.Setup(t).Nodes().List(unversioned.ListOptions{})
 	c.Validate(t, response, err)
 }
 
 func TestListNodesLabels(t *testing.T) {
-	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testapi.Default.Version())
+	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
@@ -70,7 +69,8 @@ func TestListNodesLabels(t *testing.T) {
 	c.Setup(t)
 	c.QueryValidator[labelSelectorQueryParamName] = validateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	receivedNodeList, err := c.Nodes().List(selector, fields.Everything())
+	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	receivedNodeList, err := c.Nodes().List(options)
 	c.Validate(t, receivedNodeList, err)
 }
 

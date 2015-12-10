@@ -65,7 +65,7 @@ function set-good-motd() {
 }
 
 function curl-metadata() {
-  curl --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/attributes/${1}"
+  curl --fail --retry 5 --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/attributes/${1}"
 }
 
 function set-kube-env() {
@@ -77,12 +77,13 @@ function set-kube-env() {
   done
 
   # kube-env has all the environment variables we care about, in a flat yaml format
-  eval $(python -c '''
+  eval "$(python -c '
 import pipes,sys,yaml
 
 for k,v in yaml.load(sys.stdin).iteritems():
-  print "readonly {var}={value}".format(var = k, value = pipes.quote(str(v)))
-''' < "${kube_env_yaml}")
+  print """readonly {var}={value}""".format(var = k, value = pipes.quote(str(v)))
+  print """export {var}""".format(var = k)
+  ' < """${kube_env_yaml}""")"
 }
 
 function remove-docker-artifacts() {
@@ -285,10 +286,14 @@ opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
 enable_manifest_url: '$(echo "$ENABLE_MANIFEST_URL" | sed -e "s/'/''/g")'
 manifest_url: '$(echo "$MANIFEST_URL" | sed -e "s/'/''/g")'
 manifest_url_header: '$(echo "$MANIFEST_URL_HEADER" | sed -e "s/'/''/g")'
-num_nodes: $(echo "${NUM_MINIONS}")
+num_nodes: $(echo "${NUM_NODES}")
 e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
 EOF
-
+    if [ -n "${KUBELET_PORT:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+kubelet_port: '$(echo "$KUBELET_PORT" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 apiserver_test_args: '$(echo "$APISERVER_TEST_ARGS" | sed -e "s/'/''/g")'
@@ -524,7 +529,7 @@ function download-release() {
   done
 
   echo "Running release install script"
-  sudo kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"
+  kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"
 }
 
 function fix-apt-sources() {
@@ -661,6 +666,15 @@ if [[ -z "${is_push}" ]]; then
   remove-docker-artifacts
   run-salt
   set-good-motd
+
+  if curl-metadata k8s-user-startup-script > "${INSTALL_DIR}/k8s-user-script.sh"; then
+    user_script=$(cat "${INSTALL_DIR}/k8s-user-script.sh")
+  fi
+  if [[ ! -z ${user_script:-} ]]; then
+    chmod u+x "${INSTALL_DIR}/k8s-user-script.sh"
+    echo "== running user startup script =="
+    "${INSTALL_DIR}/k8s-user-script.sh"
+  fi
   echo "== kube-up node config done =="
 else
   echo "== kube-push node config starting =="

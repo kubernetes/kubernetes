@@ -20,11 +20,12 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestAdmission(t *testing.T) {
 	handler := NewAlwaysDeny()
-	err := handler.Admit(admission.NewAttributesRecord(nil, "kind", "namespace", "name", "resource", "subresource", admission.Create, nil))
+	err := handler.Admit(admission.NewAttributesRecord(nil, api.Kind("kind"), "namespace", "name", api.Resource("resource"), "subresource", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected error returned from admission handler")
 	}

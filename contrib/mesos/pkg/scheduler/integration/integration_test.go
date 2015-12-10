@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"github.com/mesos/mesos-go/mesosutil"
@@ -169,10 +170,10 @@ func NewMockPodsListWatch(initialPodList api.PodList) *MockPodsListWatch {
 		list:        initialPodList,
 	}
 	lw.ListWatch = cache.ListWatch{
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
 			return lw.fakeWatcher, nil
 		},
-		ListFunc: func() (runtime.Object, error) {
+		ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
 			lw.lock.Lock()
 			defer lw.lock.Unlock()
 
@@ -263,7 +264,7 @@ func NewTestPod() (*api.Pod, int) {
 	currentPodNum = currentPodNum + 1
 	name := fmt.Sprintf("pod%d", currentPodNum)
 	return &api.Pod{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
@@ -313,6 +314,7 @@ func NewTestOffer(id string) *mesos.Offer {
 // Add assertions to reason about event streams
 type Event struct {
 	Object  runtime.Object
+	Type    string
 	Reason  string
 	Message string
 }
@@ -334,15 +336,15 @@ func NewEventObserver() *EventObserver {
 	}
 }
 
-func (o *EventObserver) Event(object runtime.Object, reason, message string) {
-	o.fifo <- Event{Object: object, Reason: reason, Message: message}
+func (o *EventObserver) Event(object runtime.Object, eventtype, reason, message string) {
+	o.fifo <- Event{Object: object, Type: eventtype, Reason: reason, Message: message}
 }
 
-func (o *EventObserver) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
-	o.fifo <- Event{Object: object, Reason: reason, Message: fmt.Sprintf(messageFmt, args...)}
+func (o *EventObserver) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	o.fifo <- Event{Object: object, Type: eventtype, Reason: reason, Message: fmt.Sprintf(messageFmt, args...)}
 }
-func (o *EventObserver) PastEventf(object runtime.Object, timestamp unversioned.Time, reason, messageFmt string, args ...interface{}) {
-	o.fifo <- Event{Object: object, Reason: reason, Message: fmt.Sprintf(messageFmt, args...)}
+func (o *EventObserver) PastEventf(object runtime.Object, timestamp unversioned.Time, eventtype, reason, messageFmt string, args ...interface{}) {
+	o.fifo <- Event{Object: object, Type: eventtype, Reason: reason, Message: fmt.Sprintf(messageFmt, args...)}
 }
 
 func (a *EventAssertions) Event(observer *EventObserver, pred EventPredicate, msgAndArgs ...interface{}) bool {
@@ -435,6 +437,24 @@ type lifecycleTest struct {
 	t             *testing.T
 }
 
+type mockRegistry struct {
+	prototype *mesos.ExecutorInfo
+}
+
+func (m mockRegistry) New(nodename string, rs []*mesos.Resource) *mesos.ExecutorInfo {
+	clone := proto.Clone(m.prototype).(*mesos.ExecutorInfo)
+	clone.Resources = rs
+	return clone
+}
+
+func (m mockRegistry) Get(nodename string) (*mesos.ExecutorInfo, error) {
+	panic("N/A")
+}
+
+func (m mockRegistry) Invalidate(hostname string) {
+	panic("N/A")
+}
+
 func newLifecycleTest(t *testing.T) lifecycleTest {
 	assert := &EventAssertions{*assert.New(t)}
 
@@ -453,12 +473,12 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 
 	// create framework
 	client := client.NewOrDie(&client.Config{
-		Host:    apiServer.server.URL,
-		Version: testapi.Default.Version(),
+		Host:         apiServer.server.URL,
+		GroupVersion: testapi.Default.GroupVersion(),
 	})
 	c := *schedcfg.CreateDefaultConfig()
 	fw := framework.New(framework.Config{
-		Executor:        ei,
+		ExecutorId:      ei.GetExecutorId(),
 		Client:          client,
 		SchedulerConfig: c,
 		LookupNode:      apiServer.LookupNode,
@@ -470,24 +490,28 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 	// assert.NotNil(framework.offers, "offer registry is nil")
 
 	// create pod scheduler
-	strategy := podschedulers.NewAllocationStrategy(
-		podtask.NewDefaultPredicate(
-			mresource.DefaultDefaultContainerCPULimit,
-			mresource.DefaultDefaultContainerMemLimit,
-		),
-		podtask.NewDefaultProcurement(
-			mresource.DefaultDefaultContainerCPULimit,
-			mresource.DefaultDefaultContainerMemLimit,
-		),
-	)
-	fcfs := podschedulers.NewFCFSPodScheduler(strategy, apiServer.LookupNode)
+	pr := podtask.NewDefaultProcurement(ei, mockRegistry{ei})
+	fcfs := podschedulers.NewFCFSPodScheduler(pr, apiServer.LookupNode)
 
 	// create scheduler process
 	schedulerProc := ha.New(fw)
 
 	// create scheduler
 	eventObs := NewEventObserver()
-	scheduler := components.New(&c, fw, fcfs, client, eventObs, schedulerProc.Terminal(), http.DefaultServeMux, &podsListWatch.ListWatch)
+	scheduler := components.New(
+		&c,
+		fw,
+		fcfs,
+		client,
+		eventObs,
+		schedulerProc.Terminal(),
+		http.DefaultServeMux,
+		&podsListWatch.ListWatch,
+		ei,
+		[]string{"*"},
+		mresource.DefaultDefaultContainerCPULimit,
+		mresource.DefaultDefaultContainerMemLimit,
+	)
 	assert.NotNil(scheduler)
 
 	// create mock mesos scheduler driver

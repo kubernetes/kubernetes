@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
@@ -47,7 +47,7 @@ const (
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
 // -t/--test flag or ginkgo.focus flag.
-var _ = Describe("Load capacity", func() {
+var _ = Describe("Load capacity [Skipped]", func() {
 	var c *client.Client
 	var nodeCount int
 	var ns string
@@ -64,13 +64,15 @@ var _ = Describe("Load capacity", func() {
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
 
+	// Explicitly put here, to delete namespace at the end of the test
+	// (after measuring latency metrics, etc.).
 	framework := NewFramework("load")
 	framework.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
 		c = framework.Client
 		ns = framework.Namespace.Name
-		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+		nodes, err := c.Nodes().List(unversioned.ListOptions{})
 		expectNoError(err)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
@@ -97,7 +99,10 @@ var _ = Describe("Load capacity", func() {
 	}
 
 	for _, testArg := range loadTests {
-		name := fmt.Sprintf("[Skipped] [Performance suite] should be able to handle %v pods per node", testArg.podsPerNode)
+		name := fmt.Sprintf("should be able to handle %v pods per node", testArg.podsPerNode)
+		if testArg.podsPerNode == 30 {
+			name = "[Performance] " + name
+		}
 		itArg := testArg
 
 		It(name, func() {
@@ -209,7 +214,8 @@ func scaleRC(wg *sync.WaitGroup, config *RCConfig) {
 	expectNoError(ScaleRC(config.Client, config.Namespace, config.Name, newSize, true),
 		fmt.Sprintf("scaling rc %s for the first time", config.Name))
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
-	_, err := config.Client.Pods(config.Namespace).List(selector, fields.Everything())
+	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	_, err := config.Client.Pods(config.Namespace).List(options)
 	expectNoError(err, fmt.Sprintf("listing pods from rc %v", config.Name))
 }
 

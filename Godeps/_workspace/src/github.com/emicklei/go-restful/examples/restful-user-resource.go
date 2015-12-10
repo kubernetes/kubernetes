@@ -100,8 +100,7 @@ func (u *UserResource) createUser(request *restful.Request, response *restful.Re
 	}
 	usr.Id = strconv.Itoa(len(u.users) + 1) // simple id generation
 	u.users[usr.Id] = *usr
-	response.WriteHeader(http.StatusCreated)
-	response.WriteEntity(usr)
+	response.WriteHeaderAndEntity(http.StatusCreated, usr)
 }
 
 // PUT http://localhost:8080/users/1

@@ -77,31 +77,34 @@ func versionErrIfFalse(b bool) error {
 	return versionErr
 }
 
-var validVersion = testapi.Default.Version()
+var validVersion = testapi.Default.GroupVersion().Version
 var internalGV = unversioned.GroupVersion{Group: "apitest", Version: ""}
 var unlikelyGV = unversioned.GroupVersion{Group: "apitest", Version: "unlikelyversion"}
 var validVersionGV = unversioned.GroupVersion{Group: "apitest", Version: validVersion}
 
 func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName(internalGV.Version, "Type", &internalType{})
-	scheme.AddKnownTypeWithName(unlikelyGV.String(), "Type", &externalType{})
+	scheme.AddInternalGroupVersion(internalGV)
+	scheme.AddKnownTypeWithName(internalGV.WithKind("Type"), &internalType{})
+	scheme.AddKnownTypeWithName(unlikelyGV.WithKind("Type"), &externalType{})
 	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
-	scheme.AddKnownTypeWithName(validVersionGV.String(), "Type", &ExternalType2{})
+	scheme.AddKnownTypeWithName(validVersionGV.WithKind("Type"), &ExternalType2{})
 
 	codec := runtime.CodecFor(scheme, unlikelyGV.String())
-	mapper := meta.NewDefaultRESTMapper("apitest", []string{unlikelyGV.String(), validVersionGV.String()}, func(version string) (*meta.VersionInterfaces, error) {
+	mapper := meta.NewDefaultRESTMapper([]unversioned.GroupVersion{unlikelyGV, validVersionGV}, func(version string) (*meta.VersionInterfaces, error) {
 		return &meta.VersionInterfaces{
 			Codec:            runtime.CodecFor(scheme, version),
 			ObjectConvertor:  scheme,
 			MetadataAccessor: meta.NewAccessor(),
 		}, versionErrIfFalse(version == validVersionGV.String() || version == unlikelyGV.String())
 	})
-	for _, version := range []string{unlikelyGV.String(), validVersionGV.String()} {
-		for kind := range scheme.KnownTypes(version) {
+	for _, gv := range []unversioned.GroupVersion{unlikelyGV, validVersionGV} {
+		for kind := range scheme.KnownTypes(gv) {
+			gvk := gv.WithKind(kind)
+
 			mixedCase := false
 			scope := meta.RESTScopeNamespace
-			mapper.Add(scope, kind, version, mixedCase)
+			mapper.Add(gvk, scope, mixedCase)
 		}
 	}
 
@@ -164,7 +167,7 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
@@ -221,7 +224,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
@@ -250,11 +253,11 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 				}
 				return c.Pods(t.Namespace).GetLogs(t.Name, opts), nil
 			default:
-				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
+				fqKind, err := api.Scheme.ObjectKind(object)
 				if err != nil {
 					return nil, err
 				}
-				return nil, fmt.Errorf("cannot get the logs from %s", kind)
+				return nil, fmt.Errorf("cannot get the logs from %v", fqKind)
 			}
 		},
 	}
@@ -296,7 +299,7 @@ func stringBody(body string) io.ReadCloser {
 
 func ExamplePrintReplicationControllerWithNamespace() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, false, []string{})
 	tf.Client = &fake.RESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -338,7 +341,7 @@ func ExamplePrintReplicationControllerWithNamespace() {
 
 func ExamplePrintPodWithWideFormat() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, false, false, []string{})
 	tf.Client = &fake.RESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -465,7 +468,7 @@ func newAllPhasePodList() *api.PodList {
 
 func ExamplePrintPodHideTerminated() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, false, false, []string{})
 	tf.Client = &fake.RESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -485,7 +488,7 @@ func ExamplePrintPodHideTerminated() {
 
 func ExamplePrintPodShowAll() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, true, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, true, false, []string{})
 	tf.Client = &fake.RESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -507,7 +510,7 @@ func ExamplePrintPodShowAll() {
 
 func ExamplePrintServiceWithNamespacesAndLabels() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, []string{"l1"})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, true, false, false, false, []string{"l1"})
 	tf.Client = &fake.RESTClient{
 		Codec:  codec,
 		Client: nil,

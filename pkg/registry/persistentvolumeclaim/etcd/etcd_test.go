@@ -21,21 +21,20 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
-	"k8s.io/kubernetes/pkg/tools"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/util"
 )
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
+func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	persistentVolumeClaimStorage, statusStorage := NewREST(etcdStorage, generic.UndecoratedStorage)
-	return persistentVolumeClaimStorage, statusStorage, fakeClient
+	return persistentVolumeClaimStorage, statusStorage, server
 }
 
 func validNewPersistentVolumeClaim(name, ns string) *api.PersistentVolumeClaim {
@@ -60,8 +59,9 @@ func validNewPersistentVolumeClaim(name, ns string) *api.PersistentVolumeClaim {
 }
 
 func TestCreate(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Etcd)
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Etcd)
 	pv := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
 	pv.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
@@ -75,8 +75,9 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Etcd)
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Etcd)
 	test.TestUpdate(
 		// valid
 		validNewPersistentVolumeClaim("foo", api.NamespaceDefault),
@@ -94,26 +95,30 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Etcd).ReturnDeletedObject()
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Etcd).ReturnDeletedObject()
 	test.TestDelete(validNewPersistentVolumeClaim("foo", api.NamespaceDefault))
 }
 
 func TestGet(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Etcd)
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Etcd)
 	test.TestGet(validNewPersistentVolumeClaim("foo", api.NamespaceDefault))
 }
 
 func TestList(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Etcd)
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Etcd)
 	test.TestList(validNewPersistentVolumeClaim("foo", api.NamespaceDefault))
 }
 
 func TestWatch(t *testing.T) {
-	storage, _, fakeClient := newStorage(t)
-	test := registrytest.New(t, fakeClient, storage.Etcd)
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Etcd)
 	test.TestWatch(
 		validNewPersistentVolumeClaim("foo", api.NamespaceDefault),
 		// matching labels
@@ -135,20 +140,19 @@ func TestWatch(t *testing.T) {
 }
 
 func TestUpdateStatus(t *testing.T) {
-	storage, statusStorage, fakeClient := newStorage(t)
+	storage, statusStorage, server := newStorage(t)
+	defer server.Terminate(t)
 	ctx := api.NewDefaultContext()
-	fakeClient.TestIndex = true
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
 	pvcStart := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
-	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Default.Codec(), pvcStart), 0)
+	err := storage.Storage.Set(ctx, key, pvcStart, nil, 0)
 
 	pvc := &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
-			Name:            "foo",
-			Namespace:       api.NamespaceDefault,
-			ResourceVersion: "1",
+			Name:      "foo",
+			Namespace: api.NamespaceDefault,
 		},
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
@@ -163,20 +167,17 @@ func TestUpdateStatus(t *testing.T) {
 		},
 	}
 
-	expected := *pvcStart
-	expected.ResourceVersion = "2"
-	expected.Labels = pvc.Labels
-	expected.Status = pvc.Status
-
-	_, _, err := statusStorage.Update(ctx, pvc)
+	_, _, err = statusStorage.Update(ctx, pvc)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	pvcOut, err := storage.Get(ctx, "foo")
+	obj, err := storage.Get(ctx, "foo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !api.Semantic.DeepEqual(&expected, pvcOut) {
-		t.Errorf("unexpected object: %s", util.ObjectDiff(&expected, pvcOut))
+	pvcOut := obj.(*api.PersistentVolumeClaim)
+	// only compare relevant changes b/c of difference in metadata
+	if !api.Semantic.DeepEqual(pvc.Status, pvcOut.Status) {
+		t.Errorf("unexpected object: %s", util.ObjectDiff(pvc.Status, pvcOut.Status))
 	}
 }

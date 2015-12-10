@@ -300,7 +300,7 @@ func deepCopy_v1_FCVolumeSource(in v1.FCVolumeSource, out *v1.FCVolumeSource, c 
 		out.TargetWWNs = nil
 	}
 	if in.Lun != nil {
-		out.Lun = new(int)
+		out.Lun = new(int32)
 		*out.Lun = *in.Lun
 	} else {
 		out.Lun = nil
@@ -326,6 +326,7 @@ func deepCopy_v1_GCEPersistentDiskVolumeSource(in v1.GCEPersistentDiskVolumeSour
 func deepCopy_v1_GitRepoVolumeSource(in v1.GitRepoVolumeSource, out *v1.GitRepoVolumeSource, c *conversion.Cloner) error {
 	out.Repository = in.Repository
 	out.Revision = in.Revision
+	out.Directory = in.Directory
 	return nil
 }
 
@@ -383,6 +384,7 @@ func deepCopy_v1_ISCSIVolumeSource(in v1.ISCSIVolumeSource, out *v1.ISCSIVolumeS
 	out.TargetPortal = in.TargetPortal
 	out.IQN = in.IQN
 	out.Lun = in.Lun
+	out.ISCSIInterface = in.ISCSIInterface
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	return nil
@@ -983,8 +985,8 @@ func deepCopy_v1beta1_DaemonSetList(in DaemonSetList, out *DaemonSetList, c *con
 
 func deepCopy_v1beta1_DaemonSetSpec(in DaemonSetSpec, out *DaemonSetSpec, c *conversion.Cloner) error {
 	if in.Selector != nil {
-		out.Selector = new(PodSelector)
-		if err := deepCopy_v1beta1_PodSelector(*in.Selector, out.Selector, c); err != nil {
+		out.Selector = new(LabelSelector)
+		if err := deepCopy_v1beta1_LabelSelector(*in.Selector, out.Selector, c); err != nil {
 			return err
 		}
 	} else {
@@ -1046,7 +1048,7 @@ func deepCopy_v1beta1_DeploymentList(in DeploymentList, out *DeploymentList, c *
 
 func deepCopy_v1beta1_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, c *conversion.Cloner) error {
 	if in.Replicas != nil {
-		out.Replicas = new(int)
+		out.Replicas = new(int32)
 		*out.Replicas = *in.Replicas
 	} else {
 		out.Replicas = nil
@@ -1156,7 +1158,7 @@ func deepCopy_v1beta1_HorizontalPodAutoscalerSpec(in HorizontalPodAutoscalerSpec
 		return err
 	}
 	if in.MinReplicas != nil {
-		out.MinReplicas = new(int)
+		out.MinReplicas = new(int32)
 		*out.MinReplicas = *in.MinReplicas
 	} else {
 		out.MinReplicas = nil
@@ -1191,7 +1193,7 @@ func deepCopy_v1beta1_HorizontalPodAutoscalerStatus(in HorizontalPodAutoscalerSt
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
 	if in.CurrentCPUUtilizationPercentage != nil {
-		out.CurrentCPUUtilizationPercentage = new(int)
+		out.CurrentCPUUtilizationPercentage = new(int32)
 		*out.CurrentCPUUtilizationPercentage = *in.CurrentCPUUtilizationPercentage
 	} else {
 		out.CurrentCPUUtilizationPercentage = nil
@@ -1344,20 +1346,20 @@ func deepCopy_v1beta1_JobList(in JobList, out *JobList, c *conversion.Cloner) er
 
 func deepCopy_v1beta1_JobSpec(in JobSpec, out *JobSpec, c *conversion.Cloner) error {
 	if in.Parallelism != nil {
-		out.Parallelism = new(int)
+		out.Parallelism = new(int32)
 		*out.Parallelism = *in.Parallelism
 	} else {
 		out.Parallelism = nil
 	}
 	if in.Completions != nil {
-		out.Completions = new(int)
+		out.Completions = new(int32)
 		*out.Completions = *in.Completions
 	} else {
 		out.Completions = nil
 	}
 	if in.Selector != nil {
-		out.Selector = new(PodSelector)
-		if err := deepCopy_v1beta1_PodSelector(*in.Selector, out.Selector, c); err != nil {
+		out.Selector = new(LabelSelector)
+		if err := deepCopy_v1beta1_LabelSelector(*in.Selector, out.Selector, c); err != nil {
 			return err
 		}
 	} else {
@@ -1402,13 +1404,7 @@ func deepCopy_v1beta1_JobStatus(in JobStatus, out *JobStatus, c *conversion.Clon
 	return nil
 }
 
-func deepCopy_v1beta1_NodeUtilization(in NodeUtilization, out *NodeUtilization, c *conversion.Cloner) error {
-	out.Resource = in.Resource
-	out.Value = in.Value
-	return nil
-}
-
-func deepCopy_v1beta1_PodSelector(in PodSelector, out *PodSelector, c *conversion.Cloner) error {
+func deepCopy_v1beta1_LabelSelector(in LabelSelector, out *LabelSelector, c *conversion.Cloner) error {
 	if in.MatchLabels != nil {
 		out.MatchLabels = make(map[string]string)
 		for key, val := range in.MatchLabels {
@@ -1418,9 +1414,9 @@ func deepCopy_v1beta1_PodSelector(in PodSelector, out *PodSelector, c *conversio
 		out.MatchLabels = nil
 	}
 	if in.MatchExpressions != nil {
-		out.MatchExpressions = make([]PodSelectorRequirement, len(in.MatchExpressions))
+		out.MatchExpressions = make([]LabelSelectorRequirement, len(in.MatchExpressions))
 		for i := range in.MatchExpressions {
-			if err := deepCopy_v1beta1_PodSelectorRequirement(in.MatchExpressions[i], &out.MatchExpressions[i], c); err != nil {
+			if err := deepCopy_v1beta1_LabelSelectorRequirement(in.MatchExpressions[i], &out.MatchExpressions[i], c); err != nil {
 				return err
 			}
 		}
@@ -1430,7 +1426,7 @@ func deepCopy_v1beta1_PodSelector(in PodSelector, out *PodSelector, c *conversio
 	return nil
 }
 
-func deepCopy_v1beta1_PodSelectorRequirement(in PodSelectorRequirement, out *PodSelectorRequirement, c *conversion.Cloner) error {
+func deepCopy_v1beta1_LabelSelectorRequirement(in LabelSelectorRequirement, out *LabelSelectorRequirement, c *conversion.Cloner) error {
 	out.Key = in.Key
 	out.Operator = in.Operator
 	if in.Values != nil {
@@ -1441,6 +1437,12 @@ func deepCopy_v1beta1_PodSelectorRequirement(in PodSelectorRequirement, out *Pod
 	} else {
 		out.Values = nil
 	}
+	return nil
+}
+
+func deepCopy_v1beta1_NodeUtilization(in NodeUtilization, out *NodeUtilization, c *conversion.Cloner) error {
+	out.Resource = in.Resource
+	out.Value = in.Value
 	return nil
 }
 
@@ -1680,9 +1682,9 @@ func init() {
 		deepCopy_v1beta1_JobList,
 		deepCopy_v1beta1_JobSpec,
 		deepCopy_v1beta1_JobStatus,
+		deepCopy_v1beta1_LabelSelector,
+		deepCopy_v1beta1_LabelSelectorRequirement,
 		deepCopy_v1beta1_NodeUtilization,
-		deepCopy_v1beta1_PodSelector,
-		deepCopy_v1beta1_PodSelectorRequirement,
 		deepCopy_v1beta1_ReplicationControllerDummy,
 		deepCopy_v1beta1_RollingUpdateDeployment,
 		deepCopy_v1beta1_Scale,

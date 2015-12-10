@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -61,7 +62,6 @@ type testClient struct {
 	Response Response
 	Error    bool
 	Created  bool
-	Version  string
 	server   *httptest.Server
 	handler  *util.FakeHandler
 	// For query args, an optional function to validate the contents
@@ -80,24 +80,16 @@ func (c *testClient) Setup(t *testing.T) *testClient {
 	}
 	c.server = httptest.NewServer(c.handler)
 	if c.Client == nil {
-		version := c.Version
-		if len(version) == 0 {
-			version = testapi.Default.Version()
-		}
 		c.Client = NewOrDie(&Config{
-			Host:    c.server.URL,
-			Version: version,
+			Host:         c.server.URL,
+			GroupVersion: testapi.Default.GroupVersion(),
 		})
 
 		// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 		// We will fix this by supporting multiple group versions in Config
-		version = c.Version
-		if len(version) == 0 {
-			version = testapi.Extensions.Version()
-		}
 		c.ExtensionsClient = NewExtensionsOrDie(&Config{
-			Host:    c.server.URL,
-			Version: version,
+			Host:         c.server.URL,
+			GroupVersion: testapi.Extensions.GroupVersion(),
 		})
 	}
 	c.QueryValidator = map[string]func(string, string) bool{}
@@ -150,9 +142,9 @@ func (c *testClient) ValidateCommon(t *testing.T, err error) {
 		validator, ok := c.QueryValidator[key]
 		if !ok {
 			switch key {
-			case unversioned.LabelSelectorQueryParam(testapi.Default.Version()):
+			case unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String()):
 				validator = validateLabels
-			case unversioned.FieldSelectorQueryParam(testapi.Default.Version()):
+			case unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String()):
 				validator = validateFields
 			default:
 				validator = func(a, b string) bool { return a == b }
@@ -216,7 +208,7 @@ func validateFields(a, b string) bool {
 
 func body(t *testing.T, obj runtime.Object, raw *string) *string {
 	if obj != nil {
-		_, kind, err := api.Scheme.ObjectVersionAndKind(obj)
+		fqKind, err := api.Scheme.ObjectKind(obj)
 		if err != nil {
 			t.Errorf("unexpected encoding error: %v", err)
 		}
@@ -225,18 +217,18 @@ func body(t *testing.T, obj runtime.Object, raw *string) *string {
 		// split the schemes for internal objects.
 		// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
 		var bs []byte
-		if api.Scheme.Recognizes(testapi.Default.GroupAndVersion(), kind) {
+		if api.Scheme.Recognizes(testapi.Default.GroupVersion().WithKind(fqKind.Kind)) {
 			bs, err = testapi.Default.Codec().Encode(obj)
 			if err != nil {
 				t.Errorf("unexpected encoding error: %v", err)
 			}
-		} else if api.Scheme.Recognizes(testapi.Extensions.GroupAndVersion(), kind) {
+		} else if api.Scheme.Recognizes(testapi.Extensions.GroupVersion().WithKind(fqKind.Kind)) {
 			bs, err = testapi.Extensions.Codec().Encode(obj)
 			if err != nil {
 				t.Errorf("unexpected encoding error: %v", err)
 			}
 		} else {
-			t.Errorf("unexpected kind: %v", kind)
+			t.Errorf("unexpected kind: %v", fqKind.Kind)
 		}
 		body := string(bs)
 		return &body
@@ -505,7 +497,7 @@ func TestGetSwaggerSchema(t *testing.T) {
 	}
 
 	client := NewOrDie(&Config{Host: server.URL})
-	got, err := client.SwaggerSchema("v1")
+	got, err := client.SwaggerSchema(v1.SchemeGroupVersion)
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
@@ -515,7 +507,7 @@ func TestGetSwaggerSchema(t *testing.T) {
 }
 
 func TestGetSwaggerSchemaFail(t *testing.T) {
-	expErr := "API version: v4 is not supported by the server. Use one of: [v1 v2 v3]"
+	expErr := "API version: api.group/v4 is not supported by the server. Use one of: [v1 v2 v3]"
 
 	server, err := swaggerSchemaFakeServer()
 	if err != nil {
@@ -523,7 +515,7 @@ func TestGetSwaggerSchemaFail(t *testing.T) {
 	}
 
 	client := NewOrDie(&Config{Host: server.URL})
-	got, err := client.SwaggerSchema("v4")
+	got, err := client.SwaggerSchema(unversioned.GroupVersion{Group: "api.group", Version: "v4"})
 	if got != nil {
 		t.Fatalf("unexpected response: %v", got)
 	}

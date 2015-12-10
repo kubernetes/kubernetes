@@ -20,8 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,13 +31,13 @@ type PersistentVolumeClaimsNamespacer interface {
 
 // PersistentVolumeClaimInterface has methods to work with PersistentVolumeClaim resources.
 type PersistentVolumeClaimInterface interface {
-	List(label labels.Selector, field fields.Selector) (*api.PersistentVolumeClaimList, error)
+	List(opts unversioned.ListOptions) (*api.PersistentVolumeClaimList, error)
 	Get(name string) (*api.PersistentVolumeClaim, error)
 	Create(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	Update(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	UpdateStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	Delete(name string) error
-	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
+	Watch(opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // persistentVolumeClaims implements PersistentVolumeClaimsNamespacer interface
@@ -52,14 +51,13 @@ func newPersistentVolumeClaims(c *Client, namespace string) *persistentVolumeCla
 	return &persistentVolumeClaims{c, namespace}
 }
 
-func (c *persistentVolumeClaims) List(label labels.Selector, field fields.Selector) (result *api.PersistentVolumeClaimList, err error) {
+func (c *persistentVolumeClaims) List(opts unversioned.ListOptions) (result *api.PersistentVolumeClaimList, err error) {
 	result = &api.PersistentVolumeClaimList{}
 
 	err = c.client.Get().
 		Namespace(c.namespace).
 		Resource("persistentVolumeClaims").
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
+		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
 
@@ -98,13 +96,11 @@ func (c *persistentVolumeClaims) Delete(name string) error {
 	return c.client.Delete().Namespace(c.namespace).Resource("persistentVolumeClaims").Name(name).Do().Error()
 }
 
-func (c *persistentVolumeClaims) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (c *persistentVolumeClaims) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.namespace).
 		Resource("persistentVolumeClaims").
 		VersionedParams(&opts, api.Scheme).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
 		Watch()
 }

@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -39,7 +39,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("[Performance Suite] Latency", func() {
+var _ = Describe("Latency [Skipped]", func() {
 	var c *client.Client
 	var nodeCount int
 	var additionalPodsPrefix string
@@ -51,11 +51,6 @@ var _ = Describe("[Performance Suite] Latency", func() {
 		for i := 1; i <= nodeCount; i++ {
 			name := additionalPodsPrefix + "-" + strconv.Itoa(i)
 			c.Pods(ns).Delete(name, nil)
-		}
-
-		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := c.Namespaces().Delete(ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
 		}
 
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
@@ -74,7 +69,7 @@ var _ = Describe("[Performance Suite] Latency", func() {
 		ns = framework.Namespace.Name
 		var err error
 
-		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+		nodes, err := c.Nodes().List(unversioned.ListOptions{})
 		expectNoError(err)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
@@ -100,8 +95,7 @@ var _ = Describe("[Performance Suite] Latency", func() {
 		}
 	})
 
-	// Skipped to avoid running in e2e
-	It("[Skipped] pod start latency should be acceptable", func() {
+	It("pod start latency should be acceptable", func() {
 		runLatencyTest(nodeCount, c, ns)
 	})
 })
@@ -149,11 +143,14 @@ func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 	stopCh := make(chan struct{})
 	_, informer := framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return c.Pods(ns).List(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything())
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				selector := labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
+				options.LabelSelector.Selector = selector
+				return c.Pods(ns).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return c.Pods(ns).Watch(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything(), options)
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+				options.LabelSelector.Selector = labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
+				return c.Pods(ns).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -195,13 +192,13 @@ func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 	close(stopCh)
 
 	// Read the schedule timestamp by checking the scheduler event for each pod
-	schedEvents, err := c.Events(ns).List(
-		labels.Everything(),
-		fields.Set{
-			"involvedObject.kind":      "Pod",
-			"involvedObject.namespace": ns,
-			"source":                   "scheduler",
-		}.AsSelector())
+	selector := fields.Set{
+		"involvedObject.kind":      "Pod",
+		"involvedObject.namespace": ns,
+		"source":                   "scheduler",
+	}.AsSelector()
+	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+	schedEvents, err := c.Events(ns).List(options)
 	expectNoError(err)
 	for k := range createTimestamps {
 		for _, event := range schedEvents.Items {

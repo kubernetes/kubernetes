@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -72,13 +73,9 @@ type RequestScope struct {
 	Creater   runtime.ObjectCreater
 	Convertor runtime.ObjectConvertor
 
-	Resource    string
+	Resource    unversioned.GroupVersionResource
+	Kind        unversioned.GroupVersionKind
 	Subresource string
-	Kind        string
-	APIVersion  string
-
-	// The version of apiserver resources to use
-	ServerAPIVersion string
 }
 
 // getterFunc performs a get request with the given context and object name. The request
@@ -110,7 +107,7 @@ func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunc
 			errorJSON(err, scope.Codec, w)
 			return
 		}
-		write(http.StatusOK, scope.APIVersion, scope.Codec, result, w, req.Request)
+		write(http.StatusOK, scope.Kind.GroupVersion(), scope.Codec, result, w, req.Request)
 	}
 }
 
@@ -123,10 +120,10 @@ func GetResource(r rest.Getter, scope RequestScope) restful.RouteFunction {
 }
 
 // GetResourceWithOptions returns a function that handles retrieving a single resource from a rest.Storage object.
-func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, getOptionsKind string, subpath bool, subpathKey string) restful.RouteFunction {
+func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, internalKind, externalKind unversioned.GroupVersionKind, subpath bool, subpathKey string) restful.RouteFunction {
 	return getResourceHandler(scope,
 		func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error) {
-			opts, err := getRequestOptions(req, scope, getOptionsKind, subpath, subpathKey)
+			opts, err := getRequestOptions(req, scope, internalKind, externalKind, subpath, subpathKey)
 			if err != nil {
 				return nil, err
 			}
@@ -134,10 +131,11 @@ func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, getOpt
 		})
 }
 
-func getRequestOptions(req *restful.Request, scope RequestScope, kind string, subpath bool, subpathKey string) (runtime.Object, error) {
-	if len(kind) == 0 {
+func getRequestOptions(req *restful.Request, scope RequestScope, internalKind, externalKind unversioned.GroupVersionKind, subpath bool, subpathKey string) (runtime.Object, error) {
+	if internalKind.IsEmpty() {
 		return nil, nil
 	}
+
 	query := req.Request.URL.Query()
 	if subpath {
 		newQuery := make(url.Values)
@@ -147,11 +145,25 @@ func getRequestOptions(req *restful.Request, scope RequestScope, kind string, su
 		newQuery[subpathKey] = []string{req.PathParameter("path")}
 		query = newQuery
 	}
-	return queryToObject(query, scope, kind)
+
+	versioned, err := scope.Creater.New(externalKind.GroupVersion().String(), externalKind.Kind)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := scope.Codec.DecodeParametersInto(query, versioned); err != nil {
+		return nil, errors.NewBadRequest(err.Error())
+	}
+	out, err := scope.Convertor.ConvertToVersion(versioned, internalKind.GroupVersion().String())
+	if err != nil {
+		// programmer error
+		return nil, err
+	}
+	return out, nil
 }
 
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
-func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admission.Interface, connectOptionsKind, restPath string, subpath bool, subpathKey string) restful.RouteFunction {
+func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admission.Interface, internalKind, externalKind unversioned.GroupVersionKind, restPath string, subpath bool, subpathKey string) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 		namespace, name, err := scope.Namer.Name(req)
@@ -161,7 +173,7 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 		}
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
-		opts, err := getRequestOptions(req, scope, connectOptionsKind, subpath, subpathKey)
+		opts, err := getRequestOptions(req, scope, internalKind, externalKind, subpath, subpathKey)
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -174,7 +186,7 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 			}
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(connectRequest, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, userInfo))
+			err = admit.Admit(admission.NewAttributesRecord(connectRequest, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Connect, userInfo))
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -197,7 +209,7 @@ type responder struct {
 }
 
 func (r *responder) Object(statusCode int, obj runtime.Object) {
-	write(statusCode, r.scope.APIVersion, r.scope.Codec, obj, r.w, r.req)
+	write(statusCode, r.scope.Kind.GroupVersion(), r.scope.Codec, obj, r.w, r.req)
 }
 
 func (r *responder) Error(err error) {
@@ -207,6 +219,9 @@ func (r *responder) Error(err error) {
 // ListResource returns a function that handles retrieving a list of resources from a rest.Storage object.
 func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
+		// For performance tracking purposes.
+		trace := util.NewTrace("List " + req.Request.URL.Path)
+
 		w := res.ResponseWriter
 
 		namespace, err := scope.Namer.Namespace(req)
@@ -226,23 +241,24 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
-		out, err := queryToObject(req.Request.URL.Query(), scope, "ListOptions")
-		if err != nil {
+		opts := unversioned.ListOptions{}
+		if err := scope.Codec.DecodeParametersInto(req.Request.URL.Query(), &opts); err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
-		opts := *out.(*api.ListOptions)
 
 		// transform fields
-		// TODO: queryToObject should do this.
-		fn := func(label, value string) (newLabel, newValue string, err error) {
-			return scope.Convertor.ConvertFieldLabel(scope.APIVersion, scope.Kind, label, value)
-		}
-		if opts.FieldSelector, err = opts.FieldSelector.Transform(fn); err != nil {
-			// TODO: allow bad request to set field causes based on query parameters
-			err = errors.NewBadRequest(err.Error())
-			errorJSON(err, scope.Codec, w)
-			return
+		// TODO: DecodeParametersInto should do this.
+		if opts.FieldSelector.Selector != nil {
+			fn := func(label, value string) (newLabel, newValue string, err error) {
+				return scope.Convertor.ConvertFieldLabel(scope.Kind.GroupVersion().String(), scope.Kind.Kind, label, value)
+			}
+			if opts.FieldSelector.Selector, err = opts.FieldSelector.Selector.Transform(fn); err != nil {
+				// TODO: allow bad request to set field causes based on query parameters
+				err = errors.NewBadRequest(err.Error())
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 
 		if hasName {
@@ -251,7 +267,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			// a request for a single object and optimize the
 			// storage query accordingly.
 			nameSelector := fields.OneTermEqualSelector("metadata.name", name)
-			if opts.FieldSelector != nil && !opts.FieldSelector.Empty() {
+			if opts.FieldSelector.Selector != nil && !opts.FieldSelector.Selector.Empty() {
 				// It doesn't make sense to ask for both a name
 				// and a field selector, since just the name is
 				// sufficient to narrow down the request to a
@@ -263,7 +279,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 				)
 				return
 			}
-			opts.FieldSelector = nameSelector
+			opts.FieldSelector.Selector = nameSelector
 		}
 
 		if (opts.Watch || forceWatch) && rw != nil {
@@ -284,16 +300,23 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			return
 		}
 
+		// Log only long List requests (ignore Watch).
+		defer trace.LogIfLong(500 * time.Millisecond)
+		trace.Step("About to List from storage")
 		result, err := r.List(ctx, &opts)
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
-		if err := setListSelfLink(result, req, scope.Namer); err != nil {
+		trace.Step("Listing from storage done")
+		numberOfItems, err := setListSelfLink(result, req, scope.Namer)
+		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
-		write(http.StatusOK, scope.APIVersion, scope.Codec, result, w, req.Request)
+		trace.Step("Self-linking done")
+		write(http.StatusOK, scope.Kind.GroupVersion(), scope.Codec, result, w, req.Request)
+		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
 	}
 }
 
@@ -328,7 +351,8 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 
 		obj := r.New()
-		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, scope.APIVersion, scope.Kind); err != nil {
+		// TODO this cleans up with proper typing
+		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, scope.Kind); err != nil {
 			err = transformDecodeError(typer, err, obj, body)
 			errorJSON(err, scope.Codec, w)
 			return
@@ -337,7 +361,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		if admit != nil && admit.Handles(admission.Create) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo))
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Create, userInfo))
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -361,7 +385,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			return
 		}
 
-		write(http.StatusCreated, scope.APIVersion, scope.Codec, result, w, req.Request)
+		write(http.StatusCreated, scope.Kind.GroupVersion(), scope.Codec, result, w, req.Request)
 	}
 }
 
@@ -408,14 +432,14 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 		if admit.Handles(admission.Update) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Update, userInfo))
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
 			}
 		}
 
-		versionedObj, err := converter.ConvertToVersion(r.New(), scope.APIVersion)
+		versionedObj, err := converter.ConvertToVersion(r.New(), scope.Kind.GroupVersion().String())
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -445,7 +469,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 			return
 		}
 
-		write(http.StatusOK, scope.APIVersion, scope.Codec, result, w, req.Request)
+		write(http.StatusOK, scope.Kind.GroupVersion(), scope.Codec, result, w, req.Request)
 	}
 
 }
@@ -561,7 +585,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		}
 
 		obj := r.New()
-		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, scope.APIVersion, scope.Kind); err != nil {
+		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, scope.Kind); err != nil {
 			err = transformDecodeError(typer, err, obj, body)
 			errorJSON(err, scope.Codec, w)
 			return
@@ -575,7 +599,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		if admit != nil && admit.Handles(admission.Update) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Update, userInfo))
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -640,7 +664,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 		if admit != nil && admit.Handles(admission.Delete) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
+			err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Delete, userInfo))
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -663,7 +687,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 				Code:   http.StatusOK,
 				Details: &unversioned.StatusDetails{
 					Name: name,
-					Kind: scope.Kind,
+					Kind: scope.Kind.Kind,
 				},
 			}
 		} else {
@@ -675,29 +699,8 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 				}
 			}
 		}
-		write(http.StatusOK, scope.APIVersion, scope.Codec, result, w, req.Request)
+		write(http.StatusOK, scope.Kind.GroupVersion(), scope.Codec, result, w, req.Request)
 	}
-}
-
-// queryToObject converts query parameters into a structured internal object by
-// kind. The caller must cast the returned object to the matching internal Kind
-// to use it.
-// TODO: add appropriate structured error responses
-func queryToObject(query url.Values, scope RequestScope, kind string) (runtime.Object, error) {
-	versioned, err := scope.Creater.New(scope.ServerAPIVersion, kind)
-	if err != nil {
-		// programmer error
-		return nil, err
-	}
-	if err := scope.Convertor.Convert(&query, versioned); err != nil {
-		return nil, errors.NewBadRequest(err.Error())
-	}
-	out, err := scope.Convertor.ConvertToVersion(versioned, "")
-	if err != nil {
-		// programmer error
-		return nil, err
-	}
-	return out, nil
 }
 
 // resultFunc is a function that returns a rest result and can be run in a goroutine
@@ -742,14 +745,14 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 
 // transformDecodeError adds additional information when a decode fails.
 func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime.Object, body []byte) error {
-	_, kind, err := typer.ObjectVersionAndKind(into)
+	objectGroupVersionKind, err := typer.ObjectKind(into)
 	if err != nil {
 		return err
 	}
-	if version, dataKind, err := typer.DataVersionAndKind(body); err == nil && len(dataKind) > 0 {
-		return errors.NewBadRequest(fmt.Sprintf("%s in version %s cannot be handled as a %s: %v", dataKind, version, kind, baseErr))
+	if dataGroupVersionKind, err := typer.DataKind(body); err == nil && len(dataGroupVersionKind.Kind) > 0 {
+		return errors.NewBadRequest(fmt.Sprintf("%s in version %v cannot be handled as a %s: %v", dataGroupVersionKind.Kind, dataGroupVersionKind.GroupVersion(), objectGroupVersionKind.Kind, baseErr))
 	}
-	return errors.NewBadRequest(fmt.Sprintf("the object provided is unrecognized (must be of type %s): %v", kind, baseErr))
+	return errors.NewBadRequest(fmt.Sprintf("the object provided is unrecognized (must be of type %s): %v", objectGroupVersionKind.Kind, baseErr))
 }
 
 // setSelfLink sets the self link of an object (or the child items in a list) to the base URL of the request
@@ -791,16 +794,16 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 }
 
 // setListSelfLink sets the self link of a list to the base URL, then sets the self links
-// on all child objects returned.
-func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer) error {
-	if !runtime.IsListType(obj) {
-		return nil
+// on all child objects returned. Returns the number of items in the list.
+func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer) (int, error) {
+	if !meta.IsListType(obj) {
+		return 0, nil
 	}
 
 	// TODO: List SelfLink generation should return a full URL?
 	path, query, err := namer.GenerateListLink(req)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	newURL := *req.Request.URL
 	newURL.Path = path
@@ -812,17 +815,16 @@ func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer)
 	}
 
 	// Set self-link of objects in the list.
-	items, err := runtime.ExtractList(obj)
+	items, err := meta.ExtractList(obj)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	for i := range items {
 		if err := setSelfLink(items[i], req, namer); err != nil {
-			return err
+			return len(items), err
 		}
 	}
-	return runtime.SetList(obj, items)
-
+	return len(items), meta.SetList(obj, items)
 }
 
 func getPatchedJS(patchType api.PatchType, originalJS, patchJS []byte, obj runtime.Object) ([]byte, error) {

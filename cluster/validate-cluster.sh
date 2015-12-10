@@ -24,7 +24,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
-EXPECTED_NUM_NODES="${NUM_MINIONS}"
+EXPECTED_NUM_NODES="${NUM_NODES}"
 if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
   EXPECTED_NUM_NODES=$((EXPECTED_NUM_NODES+1))
 fi
@@ -40,7 +40,7 @@ while true; do
   # Suppress errors from kubectl output because during cluster bootstrapping
   # for clusters where the master node is registered, the apiserver will become
   # available and then get restarted as the kubelet configures the docker bridge.
-  nodes_status=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o template --template='{{range .items}}{{with index .status.conditions 0}}{{.type}}:{{.status}},{{end}}{{end}}' --api-version=v1) || true
+  nodes_status=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o template --template='{{range .items}}{{range .status.conditions}}{{if eq .type "Ready"}}{{.type}}:{{.status}},{{end}}{{end}}{{end}}' --api-version=v1) || true
   found=$(echo "${nodes_status}" | tr "," "\n" | grep -c 'Ready:') || true
   ready=$(echo "${nodes_status}" | tr "," "\n" | grep -c 'Ready:True') || true
 

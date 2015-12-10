@@ -198,14 +198,14 @@ func TestWatchParamParsing(t *testing.T) {
 			namespace:       api.NamespaceAll,
 		}, {
 			path:            rootPath,
-			rawQuery:        "resourceVersion=314159&fields=Host%3D&labels=name%3Dfoo",
+			rawQuery:        "resourceVersion=314159&fieldSelector=Host%3D&labelSelector=name%3Dfoo",
 			resourceVersion: "314159",
 			labelSelector:   "name=foo",
 			fieldSelector:   "Host=",
 			namespace:       api.NamespaceAll,
 		}, {
 			path:            rootPath,
-			rawQuery:        "fields=id%3dfoo&resourceVersion=1492",
+			rawQuery:        "fieldSelector=id%3dfoo&resourceVersion=1492",
 			resourceVersion: "1492",
 			labelSelector:   "",
 			fieldSelector:   "id=foo",
@@ -227,14 +227,14 @@ func TestWatchParamParsing(t *testing.T) {
 			namespace:       "other",
 		}, {
 			path:            namespacedPath,
-			rawQuery:        "resourceVersion=314159&fields=Host%3D&labels=name%3Dfoo",
+			rawQuery:        "resourceVersion=314159&fieldSelector=Host%3D&labelSelector=name%3Dfoo",
 			resourceVersion: "314159",
 			labelSelector:   "name=foo",
 			fieldSelector:   "Host=",
 			namespace:       "other",
 		}, {
 			path:            namespacedPath,
-			rawQuery:        "fields=id%3dfoo&resourceVersion=1492",
+			rawQuery:        "fieldSelector=id%3dfoo&resourceVersion=1492",
 			resourceVersion: "1492",
 			labelSelector:   "",
 			fieldSelector:   "id=foo",

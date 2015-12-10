@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -72,7 +73,9 @@ var _ = Describe("Events", func() {
 		expectNoError(framework.WaitForPodRunning(pod.Name))
 
 		By("verifying the pod is in kubernetes")
-		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
+		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		pods, err := podClient.List(options)
 		Expect(len(pods.Items)).To(Equal(1))
 
 		By("retrieving the pod")
@@ -85,15 +88,14 @@ var _ = Describe("Events", func() {
 		// Check for scheduler event about the pod.
 		By("checking for scheduler event about the pod")
 		expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
-			events, err := framework.Client.Events(framework.Namespace.Name).List(
-				labels.Everything(),
-				fields.Set{
-					"involvedObject.kind":      "Pod",
-					"involvedObject.uid":       string(podWithUid.UID),
-					"involvedObject.namespace": framework.Namespace.Name,
-					"source":                   "scheduler",
-				}.AsSelector(),
-			)
+			selector := fields.Set{
+				"involvedObject.kind":      "Pod",
+				"involvedObject.uid":       string(podWithUid.UID),
+				"involvedObject.namespace": framework.Namespace.Name,
+				"source":                   "scheduler",
+			}.AsSelector()
+			options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+			events, err := framework.Client.Events(framework.Namespace.Name).List(options)
 			if err != nil {
 				return false, err
 			}
@@ -106,15 +108,14 @@ var _ = Describe("Events", func() {
 		// Check for kubelet event about the pod.
 		By("checking for kubelet event about the pod")
 		expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
-			events, err = framework.Client.Events(framework.Namespace.Name).List(
-				labels.Everything(),
-				fields.Set{
-					"involvedObject.uid":       string(podWithUid.UID),
-					"involvedObject.kind":      "Pod",
-					"involvedObject.namespace": framework.Namespace.Name,
-					"source":                   "kubelet",
-				}.AsSelector(),
-			)
+			selector := fields.Set{
+				"involvedObject.uid":       string(podWithUid.UID),
+				"involvedObject.kind":      "Pod",
+				"involvedObject.namespace": framework.Namespace.Name,
+				"source":                   "kubelet",
+			}.AsSelector()
+			options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+			events, err = framework.Client.Events(framework.Namespace.Name).List(options)
 			if err != nil {
 				return false, err
 			}

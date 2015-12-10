@@ -109,8 +109,9 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		httplog.LogOf(req, w).Addf("Error getting ResourceLocation: %v", err)
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
-		httpCode = status.Code
+		code := int(status.Code)
+		writeJSON(code, r.codec, status, w, true)
+		httpCode = code
 		return
 	}
 	if location == nil {
@@ -144,13 +145,18 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	newReq, err := http.NewRequest(req.Method, location.String(), req.Body)
 	if err != nil {
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
+		code := int(status.Code)
+		writeJSON(code, r.codec, status, w, true)
 		notFound(w, req)
-		httpCode = status.Code
+		httpCode = code
 		return
 	}
 	httpCode = http.StatusOK
 	newReq.Header = req.Header
+	newReq.ContentLength = req.ContentLength
+	// Copy the TransferEncoding is for future-proofing. Currently Go only supports "chunked" and
+	// it can determine the TransferEncoding based on ContentLength and the Body.
+	newReq.TransferEncoding = req.TransferEncoding
 
 	// TODO convert this entire proxy to an UpgradeAwareProxy similar to
 	// https://github.com/openshift/origin/blob/master/pkg/util/httpproxy/upgradeawareproxy.go.
@@ -211,7 +217,8 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 	backendConn, err := proxyutil.DialURL(location, transport)
 	if err != nil {
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
+		code := int(status.Code)
+		writeJSON(code, r.codec, status, w, true)
 		return true
 	}
 	defer backendConn.Close()
@@ -222,14 +229,16 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 	requestHijackedConn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
+		code := int(status.Code)
+		writeJSON(code, r.codec, status, w, true)
 		return true
 	}
 	defer requestHijackedConn.Close()
 
 	if err = newReq.Write(backendConn); err != nil {
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
+		code := int(status.Code)
+		writeJSON(code, r.codec, status, w, true)
 		return true
 	}
 

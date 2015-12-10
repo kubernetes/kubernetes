@@ -97,3 +97,26 @@ func IsNodeReady(node *Node) bool {
 	}
 	return false
 }
+
+// PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
+// containers of the pod.
+func PodRequestsAndLimits(pod *Pod) (reqs map[ResourceName]resource.Quantity, limits map[ResourceName]resource.Quantity, err error) {
+	reqs, limits = map[ResourceName]resource.Quantity{}, map[ResourceName]resource.Quantity{}
+	for _, container := range pod.Spec.Containers {
+		for name, quantity := range container.Resources.Requests {
+			if value, ok := reqs[name]; !ok {
+				reqs[name] = *quantity.Copy()
+			} else if err = value.Add(quantity); err != nil {
+				return nil, nil, err
+			}
+		}
+		for name, quantity := range container.Resources.Limits {
+			if value, ok := limits[name]; !ok {
+				limits[name] = *quantity.Copy()
+			} else if err = value.Add(quantity); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+	return
+}

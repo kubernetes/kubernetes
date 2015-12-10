@@ -87,7 +87,7 @@ type APIGroupVersion struct {
 	RequestInfoResolver *RequestInfoResolver
 
 	// ServerVersion controls the Kubernetes APIVersion used for common objects in the apiserver
-	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
+	// schema like api.Status, api.DeleteOptions, and unversioned.ListOptions. Other implementors may
 	// define a version "v1beta1" but want to use the Kubernetes "v1" internal objects. If
 	// empty, defaults to Version.
 	// TODO this seems suspicious.  Is this actually just "unversioned" now?
@@ -336,9 +336,9 @@ func SupportedResourcesHandler(groupVersion unversioned.GroupVersion, apiResourc
 // response. The Accept header and current API version will be passed in, and the output will be copied
 // directly to the response body. If content type is returned it is used, otherwise the content type will
 // be "application/octet-stream". All other objects are sent to standard JSON serialization.
-func write(statusCode int, apiVersion string, codec runtime.Codec, object runtime.Object, w http.ResponseWriter, req *http.Request) {
+func write(statusCode int, groupVersion unversioned.GroupVersion, codec runtime.Codec, object runtime.Object, w http.ResponseWriter, req *http.Request) {
 	if stream, ok := object.(rest.ResourceStreamer); ok {
-		out, flush, contentType, err := stream.InputStream(apiVersion, req.Header.Get("Accept"))
+		out, flush, contentType, err := stream.InputStream(groupVersion.String(), req.Header.Get("Accept"))
 		if err != nil {
 			errorJSONFatal(err, codec, w)
 			return
@@ -420,8 +420,9 @@ func prettyJSON(codec runtime.Codec, object runtime.Object, w http.ResponseWrite
 // errorJSON renders an error to the response. Returns the HTTP status code of the error.
 func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) int {
 	status := errToAPIStatus(err)
-	writeJSON(status.Code, codec, status, w, true)
-	return status.Code
+	code := int(status.Code)
+	writeJSON(code, codec, status, w, true)
+	return code
 }
 
 // errorJSONFatal renders an error to the response, and if codec fails will render plaintext.
@@ -429,16 +430,17 @@ func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) int {
 func errorJSONFatal(err error, codec runtime.Codec, w http.ResponseWriter) int {
 	util.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
 	status := errToAPIStatus(err)
+	code := int(status.Code)
 	output, err := codec.Encode(status)
 	if err != nil {
-		w.WriteHeader(status.Code)
+		w.WriteHeader(code)
 		fmt.Fprintf(w, "%s: %s", status.Reason, status.Message)
-		return status.Code
+		return code
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status.Code)
+	w.WriteHeader(code)
 	w.Write(output)
-	return status.Code
+	return code
 }
 
 // writeRawJSON writes a non-API object in JSON.

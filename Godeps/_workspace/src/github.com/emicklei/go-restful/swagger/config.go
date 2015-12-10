@@ -29,4 +29,6 @@ type Config struct {
 	ApiVersion string
 	// If set then call this handler after building the complete ApiDeclaration Map
 	PostBuildHandler PostBuildDeclarationMapFunc
+	// Swagger global info struct
+	Info Info
 }

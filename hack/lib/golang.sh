@@ -50,6 +50,7 @@ readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 # The server platform we are building on.
 readonly KUBE_SERVER_PLATFORMS=(
   linux/amd64
+  linux/arm
 )
 
 # The set of client targets that we are building for all platforms
@@ -111,7 +112,7 @@ readonly KUBE_CLIENT_PLATFORMS=(
 # arbitrary, but is a reasonable splitting point for 2015
 # laptops-versus-not.
 #
-# If you are using boot2docker, the following seems to work (note 
+# If you are using boot2docker, the following seems to work (note
 # that 12000 rounds to 11G):
 #   boot2docker down
 #   VBoxManage modifyvm boot2docker-vm --memory 12000
@@ -129,6 +130,7 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-apiserver
   kube-controller-manager
   kube-scheduler
+  kube-proxy
 )
 
 kube::golang::is_statically_linked_library() {
@@ -415,9 +417,15 @@ kube::golang::build_binaries_for_platform() {
   done
 }
 
-# Return approximate physical memory in gigabytes.
+# Return approximate physical memory available in gigabytes.
 kube::golang::get_physmem() {
   local mem
+
+  # Linux kernel version >=3.14, in kb
+  if mem=$(grep MemAvailable /proc/meminfo | awk '{ print $2 }'); then
+    echo $(( ${mem} / 1048576 ))
+    return
+  fi
 
   # Linux, in kb
   if mem=$(grep MemTotal /proc/meminfo | awk '{ print $2 }'); then

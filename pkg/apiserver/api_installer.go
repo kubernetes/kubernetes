@@ -122,17 +122,39 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	hasSubresource := len(subresource) > 0
 
 	object := storage.New()
-	_, kind, err := a.group.Typer.ObjectVersionAndKind(object)
+	fqKinds, err := a.group.Typer.ObjectKinds(object)
 	if err != nil {
 		return nil, err
 	}
+	// a given go type can have multiple potential fully qualified kinds.  Find the one that corresponds with the group
+	// we're trying to register here
+	fqKindToRegister := unversioned.GroupVersionKind{}
+	for _, fqKind := range fqKinds {
+		if fqKind.Group == a.group.GroupVersion.Group {
+			fqKindToRegister = fqKind
+			break
+		}
+
+		// TODO This keeps it doing what it was doing before, but it doesn't feel right.
+		if fqKind.Group == "extensions" && fqKind.Kind == "ThirdPartyResourceData" {
+			fqKindToRegister = fqKind
+			fqKindToRegister.Group = a.group.GroupVersion.Group
+			fqKindToRegister.Version = a.group.GroupVersion.Version
+		}
+	}
+
+	if fqKindToRegister.IsEmpty() {
+		return nil, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
+	}
+	kind := fqKindToRegister.Kind
+
 	versionedPtr, err := a.group.Creater.New(a.group.GroupVersion.String(), kind)
 	if err != nil {
 		return nil, err
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
 
-	mapping, err := a.group.Mapper.RESTMapping(kind, a.group.GroupVersion.String())
+	mapping, err := a.group.Mapper.RESTMapping(fqKindToRegister.GroupKind(), a.group.GroupVersion.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -144,11 +166,25 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, fmt.Errorf("subresources can only be declared when the parent is also registered: %s needs %s", path, resource)
 		}
 		parentObject := parentStorage.New()
-		_, parentKind, err := a.group.Typer.ObjectVersionAndKind(parentObject)
+
+		parentFQKinds, err := a.group.Typer.ObjectKinds(parentObject)
 		if err != nil {
 			return nil, err
 		}
-		parentMapping, err := a.group.Mapper.RESTMapping(parentKind, a.group.GroupVersion.String())
+		// a given go type can have multiple potential fully qualified kinds.  Find the one that corresponds with the group
+		// we're trying to register here
+		parentFQKindToRegister := unversioned.GroupVersionKind{}
+		for _, fqKind := range parentFQKinds {
+			if fqKind.Group == a.group.GroupVersion.Group {
+				parentFQKindToRegister = fqKind
+				break
+			}
+		}
+		if parentFQKindToRegister.IsEmpty() {
+			return nil, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
+		}
+
+		parentMapping, err := a.group.Mapper.RESTMapping(parentFQKindToRegister.GroupKind(), a.group.GroupVersion.Version)
 		if err != nil {
 			return nil, err
 		}
@@ -180,8 +216,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var versionedList interface{}
 	if isLister {
 		list := lister.NewList()
-		_, listKind, err := a.group.Typer.ObjectVersionAndKind(list)
-		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion.String(), listKind)
+		listGVK, err := a.group.Typer.ObjectKind(list)
+		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion.String(), listGVK.Kind)
 		if err != nil {
 			return nil, err
 		}
@@ -212,19 +248,23 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	versionedStatus := indirectArbitraryPointer(versionedStatusPtr)
 	var (
-		getOptions          runtime.Object
-		versionedGetOptions runtime.Object
-		getOptionsKind      string
-		getSubpath          bool
-		getSubpathKey       string
+		getOptions             runtime.Object
+		versionedGetOptions    runtime.Object
+		getOptionsInternalKind unversioned.GroupVersionKind
+		getOptionsExternalKind unversioned.GroupVersionKind
+		getSubpath             bool
+		getSubpathKey          string
 	)
 	if isGetterWithOptions {
 		getOptions, getSubpath, getSubpathKey = getterWithOptions.NewGetOptions()
-		_, getOptionsKind, err = a.group.Typer.ObjectVersionAndKind(getOptions)
+		getOptionsInternalKind, err = a.group.Typer.ObjectKind(getOptions)
 		if err != nil {
 			return nil, err
 		}
-		versionedGetOptions, err = a.group.Creater.New(serverGroupVersion.String(), getOptionsKind)
+		// TODO this should be a list of all the different external versions we can coerce into the internalKind
+		getOptionsExternalKind = serverGroupVersion.WithKind(getOptionsInternalKind.Kind)
+
+		versionedGetOptions, err = a.group.Creater.New(serverGroupVersion.String(), getOptionsInternalKind.Kind)
 		if err != nil {
 			return nil, err
 		}
@@ -232,20 +272,24 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	var (
-		connectOptions          runtime.Object
-		versionedConnectOptions runtime.Object
-		connectOptionsKind      string
-		connectSubpath          bool
-		connectSubpathKey       string
+		connectOptions             runtime.Object
+		versionedConnectOptions    runtime.Object
+		connectOptionsInternalKind unversioned.GroupVersionKind
+		connectOptionsExternalKind unversioned.GroupVersionKind
+		connectSubpath             bool
+		connectSubpathKey          string
 	)
 	if isConnecter {
 		connectOptions, connectSubpath, connectSubpathKey = connecter.NewConnectOptions()
 		if connectOptions != nil {
-			_, connectOptionsKind, err = a.group.Typer.ObjectVersionAndKind(connectOptions)
+			connectOptionsInternalKind, err = a.group.Typer.ObjectKind(connectOptions)
 			if err != nil {
 				return nil, err
 			}
-			versionedConnectOptions, err = a.group.Creater.New(serverGroupVersion.String(), connectOptionsKind)
+			// TODO this should be a list of all the different external versions we can coerce into the internalKind
+			connectOptionsExternalKind = serverGroupVersion.WithKind(connectOptionsInternalKind.Kind)
+
+			versionedConnectOptions, err = a.group.Creater.New(serverGroupVersion.String(), connectOptionsInternalKind.Kind)
 		}
 	}
 
@@ -375,15 +419,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// test/integration/auth_test.go is currently the most comprehensive status code test
 
 	reqScope := RequestScope{
-		ContextFunc:      ctxFn,
-		Creater:          a.group.Creater,
-		Convertor:        a.group.Convertor,
-		Codec:            mapping.Codec,
-		APIVersion:       a.group.GroupVersion.String(),
-		ServerAPIVersion: serverGroupVersion.String(),
-		Resource:         resource,
-		Subresource:      subresource,
-		Kind:             kind,
+		ContextFunc: ctxFn,
+		Creater:     a.group.Creater,
+		Convertor:   a.group.Convertor,
+		Codec:       mapping.Codec,
+
+		Resource:    a.group.GroupVersion.WithResource(resource),
+		Subresource: subresource,
+		Kind:        a.group.GroupVersion.WithKind(kind),
 	}
 	for _, action := range actions {
 		reqScope.Namer = action.Namer
@@ -396,7 +439,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
 			if isGetterWithOptions {
-				handler = GetResourceWithOptions(getterWithOptions, reqScope, getOptionsKind, getSubpath, getSubpathKey)
+				handler = GetResourceWithOptions(getterWithOptions, reqScope, getOptionsInternalKind, getOptionsExternalKind, getSubpath, getSubpathKey)
 			} else {
 				handler = GetResource(getter, reqScope)
 			}
@@ -577,7 +620,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					doc = "connect " + method + " requests to " + subresource + " of " + kind
 				}
 				route := ws.Method(method).Path(action.Path).
-					To(ConnectResource(connecter, reqScope, admit, connectOptionsKind, path, connectSubpath, connectSubpathKey)).
+					To(ConnectResource(connecter, reqScope, admit, connectOptionsInternalKind, connectOptionsExternalKind, path, connectSubpath, connectSubpathKey)).
 					Filter(m).
 					Doc(doc).
 					Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource)).

@@ -58,6 +58,7 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 
 // This creates fake API versions, similar to api/latest.go.
 var testAPIGroup = "test.group"
+var testInternalGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: ""}
 var testGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version"}
 var newGroupVersion = unversioned.GroupVersion{Group: testAPIGroup, Version: "version2"}
 var prefix = "apis"
@@ -107,55 +108,27 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 }
 
 func newMapper() *meta.DefaultRESTMapper {
-	gvStrings := []string{testGroupVersion.String(), newGroupVersion.String()}
-	return meta.NewDefaultRESTMapper(testAPIGroup, gvStrings, interfacesFor)
+	return meta.NewDefaultRESTMapper([]unversioned.GroupVersion{testGroupVersion, newGroupVersion}, interfacesFor)
 }
 
 func addGrouplessTypes() {
-	type ListOptions struct {
-		runtime.Object
-		unversioned.TypeMeta `json:",inline"`
-		LabelSelector        string `json:"labelSelector,omitempty"`
-		FieldSelector        string `json:"fieldSelector,omitempty"`
-		Watch                bool   `json:"watch,omitempty"`
-		ResourceVersion      string `json:"resourceVersion,omitempty"`
-		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
-	}
 	api.Scheme.AddKnownTypes(
-		grouplessGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
-		&ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
-	api.Scheme.AddKnownTypes(grouplessGroupVersion.String(), &api.Pod{})
+		grouplessGroupVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+	api.Scheme.AddKnownTypes(grouplessGroupVersion, &api.Pod{})
 }
 
 func addTestTypes() {
-	type ListOptions struct {
-		runtime.Object
-		unversioned.TypeMeta `json:",inline"`
-		LabelSelector        string `json:"labels,omitempty"`
-		FieldSelector        string `json:"fields,omitempty"`
-		Watch                bool   `json:"watch,omitempty"`
-		ResourceVersion      string `json:"resourceVersion,omitempty"`
-		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
-	}
 	api.Scheme.AddKnownTypes(
-		testGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
-		&ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
-	api.Scheme.AddKnownTypes(testGroupVersion.String(), &api.Pod{})
+		testGroupVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+	api.Scheme.AddKnownTypes(testGroupVersion, &api.Pod{})
 }
 
 func addNewTestTypes() {
-	type ListOptions struct {
-		runtime.Object
-		unversioned.TypeMeta `json:",inline"`
-		LabelSelector        string `json:"labelSelector,omitempty"`
-		FieldSelector        string `json:"fieldSelector,omitempty"`
-		Watch                bool   `json:"watch,omitempty"`
-		ResourceVersion      string `json:"resourceVersion,omitempty"`
-		TimeoutSeconds       *int64 `json:"timeoutSeconds,omitempty"`
-	}
 	api.Scheme.AddKnownTypes(
-		newGroupVersion.String(), &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
-		&ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+		newGroupVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		&unversioned.ListOptions{}, &api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
 }
 
 func init() {
@@ -164,8 +137,9 @@ func init() {
 
 	// "internal" version
 	api.Scheme.AddKnownTypes(
-		"", &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
-		&api.ListOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+		testInternalGroupVersion, &apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &unversioned.Status{},
+		&unversioned.ListOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
+	api.Scheme.AddInternalGroupVersion(testInternalGroupVersion)
 	addGrouplessTypes()
 	addTestTypes()
 	addNewTestTypes()
@@ -175,12 +149,13 @@ func init() {
 	// enumerate all supported versions, get the kinds, and register with
 	// the mapper how to address our resources
 	for _, gv := range groupVersions {
-		for kind := range api.Scheme.KnownTypes(gv.String()) {
+		for kind := range api.Scheme.KnownTypes(gv) {
+			gvk := gv.WithKind(kind)
 			root := bool(kind == "SimpleRoot")
 			if root {
-				nsMapper.Add(meta.RESTScopeRoot, kind, gv.String(), false)
+				nsMapper.Add(gvk, meta.RESTScopeRoot, false)
 			} else {
-				nsMapper.Add(meta.RESTScopeNamespace, kind, gv.String(), false)
+				nsMapper.Add(gvk, meta.RESTScopeNamespace, false)
 			}
 		}
 	}
@@ -363,18 +338,18 @@ type SimpleRESTStorage struct {
 	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
 }
 
-func (storage *SimpleRESTStorage) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) List(ctx api.Context, options *unversioned.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &apiservertesting.SimpleList{
 		Items: storage.list,
 	}
 	storage.requestedLabelSelector = labels.Everything()
-	if options != nil && options.LabelSelector != nil {
-		storage.requestedLabelSelector = options.LabelSelector
+	if options != nil && options.LabelSelector.Selector != nil {
+		storage.requestedLabelSelector = options.LabelSelector.Selector
 	}
 	storage.requestedFieldSelector = fields.Everything()
-	if options != nil && options.FieldSelector != nil {
-		storage.requestedFieldSelector = options.FieldSelector
+	if options != nil && options.FieldSelector.Selector != nil {
+		storage.requestedFieldSelector = options.FieldSelector.Selector
 	}
 	return result, storage.errors["list"]
 }
@@ -472,15 +447,15 @@ func (storage *SimpleRESTStorage) Update(ctx api.Context, obj runtime.Object) (r
 }
 
 // Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (storage *SimpleRESTStorage) Watch(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
 	storage.checkContext(ctx)
 	storage.requestedLabelSelector = labels.Everything()
-	if options != nil && options.LabelSelector != nil {
-		storage.requestedLabelSelector = options.LabelSelector
+	if options != nil && options.LabelSelector.Selector != nil {
+		storage.requestedLabelSelector = options.LabelSelector.Selector
 	}
 	storage.requestedFieldSelector = fields.Everything()
-	if options != nil && options.FieldSelector != nil {
-		storage.requestedFieldSelector = options.FieldSelector
+	if options != nil && options.FieldSelector.Selector != nil {
+		storage.requestedFieldSelector = options.FieldSelector.Selector
 	}
 	storage.requestedResourceVersion = ""
 	if options != nil {
@@ -931,7 +906,7 @@ func TestList(t *testing.T) {
 			legacy:    true,
 		},
 		{
-			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple?namespace=other&labels=a%3Db&fields=c%3Dd",
+			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple?namespace=other&labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "",
 			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
 			legacy:    true,
@@ -952,7 +927,7 @@ func TestList(t *testing.T) {
 			legacy:    true,
 		},
 		{
-			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple?labels=a%3Db&fields=c%3Dd",
+			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "other",
 			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple",
 			legacy:    true,
@@ -1009,6 +984,7 @@ func TestList(t *testing.T) {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
 		}
+		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, testCase.url, http.StatusOK, resp)
 			body, err := ioutil.ReadAll(resp.Body)
@@ -1656,7 +1632,7 @@ func TestConnectWithOptions(t *testing.T) {
 	}
 	opts, ok := connectStorage.receivedConnectOptions.(*apiservertesting.SimpleGetOptions)
 	if !ok {
-		t.Errorf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
+		t.Fatalf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
 	}
 	if opts.Param1 != "value1" && opts.Param2 != "value2" {
 		t.Errorf("Unexpected options value: %#v", opts)
@@ -1703,7 +1679,7 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 	}
 	opts, ok := connectStorage.receivedConnectOptions.(*apiservertesting.SimpleGetOptions)
 	if !ok {
-		t.Errorf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
+		t.Fatalf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
 	}
 	if opts.Param1 != "value1" && opts.Param2 != "value2" {
 		t.Errorf("Unexpected options value: %#v", opts)

@@ -7,14 +7,15 @@ package printer
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/third_party/golang/go/ast"
-	"k8s.io/kubernetes/third_party/golang/go/token"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 	"text/tabwriter"
 	"unicode"
+
+	"k8s.io/kubernetes/third_party/golang/go/ast"
+	"k8s.io/kubernetes/third_party/golang/go/token"
 )
 
 const (

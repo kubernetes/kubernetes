@@ -426,11 +426,11 @@ func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 	}
 	mappings := []*meta.RESTMapping{}
 	for _, r := range b.resources {
-		version, kind, err := b.mapper.VersionAndKindForResource(r)
+		gvk, err := b.mapper.KindFor(r)
 		if err != nil {
 			return nil, err
 		}
-		mapping, err := b.mapper.RESTMapping(kind, version)
+		mapping, err := b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
 			return nil, err
 		}
@@ -446,11 +446,11 @@ func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) 
 		if _, ok := mappings[r.Resource]; ok {
 			continue
 		}
-		version, kind, err := b.mapper.VersionAndKindForResource(r.Resource)
+		gvk, err := b.mapper.KindFor(r.Resource)
 		if err != nil {
 			return nil, err
 		}
-		mapping, err := b.mapper.RESTMapping(kind, version)
+		mapping, err := b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
 			return nil, err
 		}

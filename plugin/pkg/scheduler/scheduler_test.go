@@ -190,6 +190,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	algo := NewGenericScheduler(
 		map[string]algorithm.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts},
 		[]algorithm.PriorityConfig{},
+		[]algorithm.SchedulerExtender{},
 		modeler.PodLister(),
 		rand.New(rand.NewSource(time.Now().UnixNano())))
 
@@ -302,14 +303,18 @@ type FakeRateLimiter struct {
 	acceptValues []bool
 }
 
-func (fr *FakeRateLimiter) CanAccept() bool {
+func (fr *FakeRateLimiter) TryAccept() bool {
 	return true
+}
+
+func (fr *FakeRateLimiter) Saturation() float64 {
+	return 0
 }
 
 func (fr *FakeRateLimiter) Stop() {}
 
 func (fr *FakeRateLimiter) Accept() {
-	fr.acceptValues = append(fr.acceptValues, fr.r.CanAccept())
+	fr.acceptValues = append(fr.acceptValues, fr.r.TryAccept())
 }
 
 func TestSchedulerRateLimitsBinding(t *testing.T) {
@@ -322,6 +327,7 @@ func TestSchedulerRateLimitsBinding(t *testing.T) {
 	algo := NewGenericScheduler(
 		map[string]algorithm.FitPredicate{},
 		[]algorithm.PriorityConfig{},
+		[]algorithm.SchedulerExtender{},
 		modeler.PodLister(),
 		rand.New(rand.NewSource(time.Now().UnixNano())))
 

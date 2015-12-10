@@ -442,12 +442,12 @@ func TestLimitRangerIgnoresSubresource(t *testing.T) {
 	testPod := validPod("testPod", 1, api.ResourceRequirements{})
 
 	indexer.Add(&limitRange)
-	err := handler.Admit(admission.NewAttributesRecord(&testPod, "Pod", limitRange.Namespace, "testPod", "pods", "", admission.Update, nil))
+	err := handler.Admit(admission.NewAttributesRecord(&testPod, api.Kind("Pod"), limitRange.Namespace, "testPod", api.Resource("pods"), "", admission.Update, nil))
 	if err == nil {
 		t.Errorf("Expected an error since the pod did not specify resource limits in its update call")
 	}
 
-	err = handler.Admit(admission.NewAttributesRecord(&testPod, "Pod", limitRange.Namespace, "testPod", "pods", "status", admission.Update, nil))
+	err = handler.Admit(admission.NewAttributesRecord(&testPod, api.Kind("Pod"), limitRange.Namespace, "testPod", api.Resource("pods"), "status", admission.Update, nil))
 	if err != nil {
 		t.Errorf("Should have ignored calls to any subresource of pod %v", err)
 	}

@@ -151,7 +151,7 @@ func TestWatch(t *testing.T) {
 		expectedVersion := resp.Node.ModifiedIndex
 
 		// watch should load the object at the current index
-		w, err := etcdStorage.Watch(ctx, key, 0, storage.Everything)
+		w, err := etcdStorage.Watch(ctx, key, "0", storage.Everything)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}

@@ -18,9 +18,8 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -30,13 +29,13 @@ type DaemonSetsNamespacer interface {
 }
 
 type DaemonSetInterface interface {
-	List(label labels.Selector, field fields.Selector) (*extensions.DaemonSetList, error)
+	List(opts unversioned.ListOptions) (*extensions.DaemonSetList, error)
 	Get(name string) (*extensions.DaemonSet, error)
 	Create(ctrl *extensions.DaemonSet) (*extensions.DaemonSet, error)
 	Update(ctrl *extensions.DaemonSet) (*extensions.DaemonSet, error)
 	UpdateStatus(ctrl *extensions.DaemonSet) (*extensions.DaemonSet, error)
 	Delete(name string) error
-	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
+	Watch(opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // daemonSets implements DaemonsSetsNamespacer interface
@@ -52,9 +51,9 @@ func newDaemonSets(c *ExtensionsClient, namespace string) *daemonSets {
 // Ensure statically that daemonSets implements DaemonSetsInterface.
 var _ DaemonSetInterface = &daemonSets{}
 
-func (c *daemonSets) List(label labels.Selector, field fields.Selector) (result *extensions.DaemonSetList, err error) {
+func (c *daemonSets) List(opts unversioned.ListOptions) (result *extensions.DaemonSetList, err error) {
 	result = &extensions.DaemonSetList{}
-	err = c.r.Get().Namespace(c.ns).Resource("daemonsets").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("daemonsets").VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
 }
 
@@ -92,14 +91,11 @@ func (c *daemonSets) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested daemon sets.
-func (c *daemonSets) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (c *daemonSets) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("daemonsets").
-		Param("resourceVersion", opts.ResourceVersion).
-		TimeoutSeconds(TimeoutFromListOptions(opts)).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
+		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

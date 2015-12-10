@@ -18,14 +18,29 @@ package componentconfig
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func init() {
 	addKnownTypes()
 }
 
+// SchemeGroupVersion is group version used to register these objects
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "componentconfig", Version: ""}
+
+// Kind takes an unqualified kind and returns back a Group qualified GroupKind
+func Kind(kind string) unversioned.GroupKind {
+	return SchemeGroupVersion.WithKind(kind).GroupKind()
+}
+
+// Resource takes an unqualified resource and returns back a Group qualified GroupResource
+func Resource(resource string) unversioned.GroupResource {
+	return SchemeGroupVersion.WithResource(resource).GroupResource()
+}
+
 func addKnownTypes() {
-	api.Scheme.AddKnownTypes("",
+	// TODO this will get cleaned up with the scheme types are fixed
+	api.Scheme.AddKnownTypes(SchemeGroupVersion,
 		&KubeProxyConfiguration{},
 	)
 }

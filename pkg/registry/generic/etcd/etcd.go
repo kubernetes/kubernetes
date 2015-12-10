@@ -161,44 +161,34 @@ func (e *Etcd) NewList() runtime.Object {
 }
 
 // List returns a list of items matching labels and field
-func (e *Etcd) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
+func (e *Etcd) List(ctx api.Context, options *unversioned.ListOptions) (runtime.Object, error) {
 	label := labels.Everything()
-	if options != nil && options.LabelSelector != nil {
-		label = options.LabelSelector
+	if options != nil && options.LabelSelector.Selector != nil {
+		label = options.LabelSelector.Selector
 	}
 	field := fields.Everything()
-	if options != nil && options.FieldSelector != nil {
-		field = options.FieldSelector
+	if options != nil && options.FieldSelector.Selector != nil {
+		field = options.FieldSelector.Selector
 	}
 	return e.ListPredicate(ctx, e.PredicateFunc(label, field), options)
 }
 
 // ListPredicate returns a list of all the items matching m.
-func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *api.ListOptions) (runtime.Object, error) {
+func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *unversioned.ListOptions) (runtime.Object, error) {
 	list := e.NewListFunc()
-	trace := util.NewTrace("List " + reflect.TypeOf(list).String())
 	filterFunc := e.filterAndDecorateFunction(m)
-	defer trace.LogIfLong(600 * time.Millisecond)
 	if name, ok := m.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
-			trace.Step("About to read single object")
 			err := e.Storage.GetToList(ctx, key, filterFunc, list)
-			trace.Step("Object extracted")
 			return list, etcderr.InterpretListError(err, e.EndpointName)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
-	trace.Step("About to list directory")
 	if options == nil {
-		options = &api.ListOptions{ResourceVersion: "0"}
+		options = &unversioned.ListOptions{ResourceVersion: "0"}
 	}
-	version, err := storage.ParseWatchResourceVersion(options.ResourceVersion, e.EndpointName)
-	if err != nil {
-		return nil, err
-	}
-	err = e.Storage.List(ctx, e.KeyRootFunc(ctx), version, filterFunc, list)
-	trace.Step("List extracted")
+	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, filterFunc, list)
 	return list, etcderr.InterpretListError(err, e.EndpointName)
 }
 
@@ -467,14 +457,14 @@ func (e *Etcd) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object
 // WatchPredicate. If possible, you should customize PredicateFunc to produre a
 // matcher that matches by key. generic.SelectionPredicate does this for you
 // automatically.
-func (e *Etcd) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (e *Etcd) Watch(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
 	label := labels.Everything()
-	if options != nil && options.LabelSelector != nil {
-		label = options.LabelSelector
+	if options != nil && options.LabelSelector.Selector != nil {
+		label = options.LabelSelector.Selector
 	}
 	field := fields.Everything()
-	if options != nil && options.FieldSelector != nil {
-		field = options.FieldSelector
+	if options != nil && options.FieldSelector.Selector != nil {
+		field = options.FieldSelector.Selector
 	}
 	resourceVersion := ""
 	if options != nil {
@@ -485,10 +475,6 @@ func (e *Etcd) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface
 
 // WatchPredicate starts a watch for the items that m matches.
 func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
-	version, err := storage.ParseWatchResourceVersion(resourceVersion, e.EndpointName)
-	if err != nil {
-		return nil, err
-	}
 	filterFunc := e.filterAndDecorateFunction(m)
 
 	if name, ok := m.MatchesSingle(); ok {
@@ -496,12 +482,12 @@ func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersio
 			if err != nil {
 				return nil, err
 			}
-			return e.Storage.Watch(ctx, key, version, filterFunc)
+			return e.Storage.Watch(ctx, key, resourceVersion, filterFunc)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
-	return e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), version, filterFunc)
+	return e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, filterFunc)
 }
 
 func (e *Etcd) filterAndDecorateFunction(m generic.Matcher) func(runtime.Object) bool {

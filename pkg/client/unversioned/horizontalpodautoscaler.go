@@ -18,9 +18,8 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -31,13 +30,13 @@ type HorizontalPodAutoscalersNamespacer interface {
 
 // HorizontalPodAutoscalerInterface has methods to work with HorizontalPodAutoscaler resources.
 type HorizontalPodAutoscalerInterface interface {
-	List(label labels.Selector, field fields.Selector) (*extensions.HorizontalPodAutoscalerList, error)
+	List(opts unversioned.ListOptions) (*extensions.HorizontalPodAutoscalerList, error)
 	Get(name string) (*extensions.HorizontalPodAutoscaler, error)
 	Delete(name string, options *api.DeleteOptions) error
 	Create(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
 	Update(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
 	UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
-	Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error)
+	Watch(opts unversioned.ListOptions) (watch.Interface, error)
 }
 
 // horizontalPodAutoscalers implements HorizontalPodAutoscalersNamespacer interface
@@ -55,9 +54,9 @@ func newHorizontalPodAutoscalers(c *ExtensionsClient, namespace string) *horizon
 }
 
 // List takes label and field selectors, and returns the list of horizontalPodAutoscalers that match those selectors.
-func (c *horizontalPodAutoscalers) List(label labels.Selector, field fields.Selector) (result *extensions.HorizontalPodAutoscalerList, err error) {
+func (c *horizontalPodAutoscalers) List(opts unversioned.ListOptions) (result *extensions.HorizontalPodAutoscalerList, err error) {
 	result = &extensions.HorizontalPodAutoscalerList{}
-	err = c.client.Get().Namespace(c.ns).Resource("horizontalPodAutoscalers").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.client.Get().Namespace(c.ns).Resource("horizontalPodAutoscalers").VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
 }
 
@@ -74,7 +73,7 @@ func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOption
 	if options == nil {
 		return c.client.Delete().Namespace(c.ns).Resource("horizontalPodAutoscalers").Name(name).Do().Error()
 	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion())
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
 	if err != nil {
 		return err
 	}
@@ -103,14 +102,11 @@ func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *extensi
 }
 
 // Watch returns a watch.Interface that watches the requested horizontalPodAutoscalers.
-func (c *horizontalPodAutoscalers) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
+func (c *horizontalPodAutoscalers) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("horizontalPodAutoscalers").
-		Param("resourceVersion", opts.ResourceVersion).
-		TimeoutSeconds(TimeoutFromListOptions(opts)).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
+		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

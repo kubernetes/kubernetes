@@ -17,11 +17,9 @@ limitations under the License.
 package testclient
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	kclientlib "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -43,8 +41,8 @@ func (c *FakeDaemonSets) Get(name string) (*extensions.DaemonSet, error) {
 	return obj.(*extensions.DaemonSet), err
 }
 
-func (c *FakeDaemonSets) List(label labels.Selector, field fields.Selector) (*extensions.DaemonSetList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("daemonsets", c.Namespace, label, field), &extensions.DaemonSetList{})
+func (c *FakeDaemonSets) List(opts unversioned.ListOptions) (*extensions.DaemonSetList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("daemonsets", c.Namespace, opts), &extensions.DaemonSetList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -80,6 +78,6 @@ func (c *FakeDaemonSets) Delete(name string) error {
 	return err
 }
 
-func (c *FakeDaemonSets) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("daemonsets", c.Namespace, label, field, opts))
+func (c *FakeDaemonSets) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("daemonsets", c.Namespace, opts))
 }

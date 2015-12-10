@@ -70,6 +70,14 @@ type Object struct {
 	common.Object
 }
 
+func AFunc(obj1 common.Object, obj2 Object) Frobber {
+}
+
+var AVar Frobber
+
+var (
+	AnotherVar = Frobber{}
+)
 `,
 		"base/common/proto/common.go": `
 package common
@@ -88,10 +96,20 @@ package o
 }
 
 {{end}}
-{{range $t := .}}{{if eq $t.Kind "Struct"}}{{template "Struct" $t}}{{end}}{{end}}`
+{{define "Func"}}{{$s := .Underlying.Signature}}var {{Name .}} func({{range $index,$elem := $s.Parameters}}{{if $index}}, {{end}}{{Raw $elem}}{{end}}) {{if $s.Results|len |gt 1}}({{end}}{{range $index,$elem := $s.Results}}{{if $index}}, {{end}}{{Raw .}}{{end}}{{if $s.Results|len |gt 1}}){{end}} = {{Raw .}}
+
+{{end}}
+{{define "Var"}}{{$t := .Underlying}}var {{Name .}} {{Raw $t}} = {{Raw .}}
+
+{{end}}
+{{range $t := .}}{{if eq $t.Kind "Struct"}}{{template "Struct" $t}}{{end}}{{end}}
+{{range $t := .}}{{if eq $t.Kind "DeclarationOf"}}{{if eq $t.Underlying.Kind "Func"}}{{template "Func" $t}}{{end}}{{end}}{{end}}
+{{range $t := .}}{{if eq $t.Kind "DeclarationOf"}}{{if ne $t.Underlying.Kind "Func"}}{{template "Var" $t}}{{end}}{{end}}{{end}}`
 
 	var expect = `
 package o
+
+
 
 type CommonObject interface { 
 	ID() Int64
@@ -119,8 +137,17 @@ type FooObject interface {
 	CommonObject
 }
 
+
+var FooAFunc func(proto.Object, proto.Object) proto.Frobber = proto.AFunc
+
+
+var FooAVar proto.Frobber = proto.AVar
+
+var FooAnotherVar proto.Frobber = proto.AnotherVar
+
 `
 	testNamer := namer.NewPublicNamer(1, "proto")
+	rawNamer := namer.NewRawNamer("o", nil)
 	_, u, o := construct(t, testFiles, testNamer)
 	t.Logf("\n%v\n\n", o)
 	tmpl := template.Must(
@@ -128,6 +155,7 @@ type FooObject interface {
 			Funcs(
 			map[string]interface{}{
 				"Name": testNamer.Name,
+				"Raw":  rawNamer.Name,
 			}).
 			Parse(tmplText),
 	)
@@ -136,7 +164,6 @@ type FooObject interface {
 	if e, a := expect, buf.String(); e != a {
 		t.Errorf("Wanted, got:\n%v\n-----\n%v\n", e, a)
 	}
-
 	if p := u.Package("base/foo/proto"); !p.HasImport("base/common/proto") {
 		t.Errorf("Unexpected lack of import line: %#s", p.Imports)
 	}
@@ -162,7 +189,7 @@ type Blah struct {
 
 	_, u, o := construct(t, structTest, namer.NewPublicNamer(0))
 	t.Logf("%#v", o)
-	blahT := u.Get(types.Name{"base/foo/proto", "Blah"})
+	blahT := u.Type(types.Name{Package: "base/foo/proto", Name: "Blah"})
 	if blahT == nil {
 		t.Fatal("type not found")
 	}
@@ -317,7 +344,7 @@ type Interface interface{Method(a, b string) (c, d string)}
 
 		for _, item := range assertions {
 			n := types.Name{Package: item.Package, Name: item.Name}
-			thisType := u.Get(n)
+			thisType := u.Type(n)
 			if thisType == nil {
 				t.Errorf("type %s not found", n)
 				continue
@@ -331,11 +358,11 @@ type Interface interface{Method(a, b string) (c, d string)}
 		}
 
 		// Also do some one-off checks
-		gtest := u.Get(types.Name{"g", "Test"})
+		gtest := u.Type(types.Name{Package: "g", Name: "Test"})
 		if e, a := 1, len(gtest.Methods); e != a {
 			t.Errorf("expected %v but found %v methods: %#v", e, a, gtest)
 		}
-		iface := u.Get(types.Name{"g", "Interface"})
+		iface := u.Type(types.Name{Package: "g", Name: "Interface"})
 		if e, a := 1, len(iface.Methods); e != a {
 			t.Errorf("expected %v but found %v methods: %#v", e, a, iface)
 		}

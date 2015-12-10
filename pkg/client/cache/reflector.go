@@ -31,9 +31,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
@@ -43,9 +43,9 @@ import (
 type ListerWatcher interface {
 	// List should return a list type object; the Items field will be extracted, and the
 	// ResourceVersion field will be used to start the watch in the right place.
-	List() (runtime.Object, error)
+	List(options unversioned.ListOptions) (runtime.Object, error)
 	// Watch should begin a watch at the specified version.
-	Watch(options api.ListOptions) (watch.Interface, error)
+	Watch(options unversioned.ListOptions) (watch.Interface, error)
 }
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
@@ -227,16 +227,17 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	resyncCh, cleanup := r.resyncChan()
 	defer cleanup()
 
-	list, err := r.listerWatcher.List()
+	options := unversioned.ListOptions{}
+	list, err := r.listerWatcher.List(options)
 	if err != nil {
 		return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
 	}
-	meta, err := meta.Accessor(list)
+	metaInterface, err := meta.Accessor(list)
 	if err != nil {
 		return fmt.Errorf("%s: Unable to understand list result %#v", r.name, list)
 	}
-	resourceVersion = meta.ResourceVersion()
-	items, err := runtime.ExtractList(list)
+	resourceVersion = metaInterface.ResourceVersion()
+	items, err := meta.ExtractList(list)
 	if err != nil {
 		return fmt.Errorf("%s: Unable to understand list result %#v (%v)", r.name, list, err)
 	}
@@ -246,7 +247,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	r.setLastSyncResourceVersion(resourceVersion)
 
 	for {
-		options := api.ListOptions{
+		options := unversioned.ListOptions{
 			ResourceVersion: resourceVersion,
 			// We want to avoid situations when resyncing is breaking the TCP connection
 			// - see comment for 'timeoutForWatch()' for more details.

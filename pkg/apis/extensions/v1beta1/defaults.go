@@ -36,7 +36,7 @@ func addDefaultingFuncs() {
 			// TODO: support templates defined elsewhere when we support them in the API
 			if labels != nil {
 				if obj.Spec.Selector == nil {
-					obj.Spec.Selector = &PodSelector{
+					obj.Spec.Selector = &LabelSelector{
 						MatchLabels: labels,
 					}
 				}
@@ -59,7 +59,7 @@ func addDefaultingFuncs() {
 			}
 			// Set DeploymentSpec.Replicas to 1 if it is not set.
 			if obj.Spec.Replicas == nil {
-				obj.Spec.Replicas = new(int)
+				obj.Spec.Replicas = new(int32)
 				*obj.Spec.Replicas = 1
 			}
 			strategy := &obj.Spec.Strategy
@@ -93,7 +93,7 @@ func addDefaultingFuncs() {
 			// TODO: support templates defined elsewhere when we support them in the API
 			if labels != nil {
 				if obj.Spec.Selector == nil {
-					obj.Spec.Selector = &PodSelector{
+					obj.Spec.Selector = &LabelSelector{
 						MatchLabels: labels,
 					}
 				}
@@ -102,7 +102,7 @@ func addDefaultingFuncs() {
 				}
 			}
 			if obj.Spec.Completions == nil {
-				completions := 1
+				completions := int32(1)
 				obj.Spec.Completions = &completions
 			}
 			if obj.Spec.Parallelism == nil {
@@ -111,7 +111,7 @@ func addDefaultingFuncs() {
 		},
 		func(obj *HorizontalPodAutoscaler) {
 			if obj.Spec.MinReplicas == nil {
-				minReplicas := 1
+				minReplicas := int32(1)
 				obj.Spec.MinReplicas = &minReplicas
 			}
 			if obj.Spec.CPUUtilization == nil {

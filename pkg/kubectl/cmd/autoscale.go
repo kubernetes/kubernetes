@@ -31,22 +31,21 @@ import (
 const (
 	autoscaleLong = `Creates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.
 
-Looks up a replication controller by name and creates an autoscaler that uses this replication controller as a reference.
+Looks up a deployment or replication controller by name and creates an autoscaler that uses this deployment or replication controller as a reference.
 An autoscaler can automatically increase or decrease number of pods deployed within the system as needed.`
 
-	autoscaleExample = `# Auto scale a replication controller "foo", with the number of pods between 2 to 10, target CPU utilization at a default value that server applies:
-$ kubectl autoscale rc foo --min=2 --max=10
+	autoscaleExample = `# Auto scale a deployment "foo", with the number of pods between 2 to 10, target CPU utilization at a default value that server applies:
+$ kubectl autoscale deployment foo --min=2 --max=10
 
 # Auto scale a replication controller "foo", with the number of pods between 1 to 5, target CPU utilization at 80%:
 $ kubectl autoscale rc foo --max=5 --cpu-percent=80`
 )
 
-// TODO: support autoscale for deployments
 func NewCmdAutoscale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	filenames := []string{}
 	cmd := &cobra.Command{
 		Use:     "autoscale (-f FILENAME | TYPE NAME | TYPE/NAME) [--min=MINPODS] --max=MAXPODS [--cpu-percent=CPU] [flags]",
-		Short:   "Auto-scale a replication controller",
+		Short:   "Auto-scale a deployment or replication controller",
 		Long:    autoscaleLong,
 		Example: autoscaleExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -62,7 +61,7 @@ func NewCmdAutoscale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Int("cpu-percent", -1, fmt.Sprintf("The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, the server will apply a default value."))
 	cmd.Flags().String("name", "", "The name for the newly created object. If not specified, the name of the input resource will be used.")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without creating it.")
-	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
+	usage := "Filename, directory, or URL to a file identifying the resource to autoscale."
 	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	return cmd
@@ -96,7 +95,7 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	}
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	if err := f.CanBeAutoscaled(mapping.GroupVersionKind.Kind); err != nil {
+	if err := f.CanBeAutoscaled(mapping.GroupVersionKind.GroupKind()); err != nil {
 		return err
 	}
 

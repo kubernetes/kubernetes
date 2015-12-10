@@ -20,7 +20,6 @@ package install
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/golang/glog"
 
@@ -28,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
-	apiutil "k8s.io/kubernetes/pkg/api/util"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	_ "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -45,22 +44,19 @@ func init() {
 		glog.V(4).Infof("%v", err)
 		return
 	}
+
 	registeredGroupVersions := registered.GroupVersionsForGroup("extensions")
 	groupVersion := registeredGroupVersions[0]
 	*groupMeta = latest.GroupMeta{
 		GroupVersion: groupVersion,
-		Group:        apiutil.GetGroup(groupVersion),
-		Version:      apiutil.GetVersion(groupVersion),
-		Codec:        runtime.CodecFor(api.Scheme, groupVersion),
+		Codec:        runtime.CodecFor(api.Scheme, groupVersion.String()),
 	}
-	var versions []string
-	var groupVersions []string
+
+	worstToBestGroupVersions := []unversioned.GroupVersion{}
 	for i := len(registeredGroupVersions) - 1; i >= 0; i-- {
-		versions = append(versions, apiutil.GetVersion(registeredGroupVersions[i]))
-		groupVersions = append(groupVersions, registeredGroupVersions[i])
+		worstToBestGroupVersions = append(worstToBestGroupVersions, registeredGroupVersions[i])
 	}
-	groupMeta.Versions = versions
-	groupMeta.GroupVersions = groupVersions
+	groupMeta.GroupVersions = registeredGroupVersions
 
 	groupMeta.SelfLinker = runtime.SelfLinker(accessor)
 
@@ -70,7 +66,7 @@ func init() {
 
 	ignoredKinds := sets.NewString()
 
-	groupMeta.RESTMapper = api.NewDefaultRESTMapper("extensions", groupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
+	groupMeta.RESTMapper = api.NewDefaultRESTMapper(worstToBestGroupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
 	groupMeta.InterfacesFor = interfacesFor
 }
@@ -87,6 +83,6 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 		}, nil
 	default:
 		g, _ := latest.Group("extensions")
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(g.Versions, ", "))
+		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
 	}
 }

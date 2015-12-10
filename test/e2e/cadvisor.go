@@ -20,9 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -49,7 +48,7 @@ var _ = Describe("Cadvisor", func() {
 
 func CheckCadvisorHealthOnAllNodes(c *client.Client, timeout time.Duration) {
 	By("getting list of nodes")
-	nodeList, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	nodeList, err := c.Nodes().List(unversioned.ListOptions{})
 	expectNoError(err)
 	var errors []error
 	retries := maxRetries

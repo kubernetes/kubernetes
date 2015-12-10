@@ -56,6 +56,9 @@ type GeneratorArgs struct {
 
 	// Where to get copyright header text.
 	GoHeaderFilePath string
+
+	// If true, only verify, don't write anything.
+	VerifyOnly bool
 }
 
 func (g *GeneratorArgs) AddFlags(fs *pflag.FlagSet) {
@@ -63,6 +66,7 @@ func (g *GeneratorArgs) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&g.OutputBase, "output-base", "o", g.OutputBase, "Output base; defaults to $GOPATH/src/ or ./ if $GOPATH is not set.")
 	fs.StringVarP(&g.OutputPackagePath, "output-package", "p", g.OutputPackagePath, "Base package path.")
 	fs.StringVarP(&g.GoHeaderFilePath, "go-header-file", "h", g.GoHeaderFilePath, "File containing boilerplate header text. The string YEAR will be replaced with the current 4-digit year.")
+	fs.BoolVar(&g.VerifyOnly, "verify-only", g.VerifyOnly, "If true, only verify existing output, do not write anything.")
 }
 
 // LoadGoBoilerplate loads the boilerplate file passed to --go-header-file.
@@ -75,6 +79,8 @@ func (g *GeneratorArgs) LoadGoBoilerplate() ([]byte, error) {
 	return b, nil
 }
 
+// NewBuilder makes a new parser.Builder and populates it with the input
+// directories.
 func (g *GeneratorArgs) NewBuilder() (*parser.Builder, error) {
 	b := parser.New()
 	for _, d := range g.InputDirs {
@@ -112,6 +118,7 @@ func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem str
 		return fmt.Errorf("Failed making a context: %v", err)
 	}
 
+	c.Verify = g.VerifyOnly
 	packages := pkgs(c, g)
 	if err := c.ExecutePackages(g.OutputBase, packages); err != nil {
 		return fmt.Errorf("Failed executing generator: %v", err)

@@ -23,13 +23,13 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -96,11 +96,11 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 	// Manage addition/update of daemon sets.
 	dsc.dsStore.Store, dsc.dsController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).Watch(options)
 			},
 		},
 		&extensions.DaemonSet{},
@@ -128,11 +128,11 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 	// more pods until all the effects (expectations) of a daemon set's create/delete have been observed.
 	dsc.podStore.Store, dsc.podController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return dsc.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return dsc.kubeClient.Pods(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dsc.kubeClient.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), options)
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+				return dsc.kubeClient.Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -146,11 +146,11 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 	// Watch for new nodes or updates to nodes - daemon pods are launched on new nodes, and possibly when labels on nodes change,
 	dsc.nodeStore.Store, dsc.nodeController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return dsc.kubeClient.Nodes().List(labels.Everything(), fields.Everything())
+			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+				return dsc.kubeClient.Nodes().List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dsc.kubeClient.Nodes().Watch(labels.Everything(), fields.Everything(), options)
+			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+				return dsc.kubeClient.Nodes().Watch(options)
 			},
 		},
 		&api.Node{},
@@ -306,7 +306,19 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 
 func (dsc *DaemonSetsController) addNode(obj interface{}) {
 	// TODO: it'd be nice to pass a hint with these enqueues, so that each ds would only examine the added node (unless it has other work to do, too).
-	dsc.enqueueAllDaemonSets()
+	dsList, err := dsc.dsStore.List()
+	if err != nil {
+		glog.V(4).Infof("Error enqueueing daemon sets: %v", err)
+		return
+	}
+	node := obj.(*api.Node)
+	for i := range dsList.Items {
+		ds := &dsList.Items[i]
+		shouldEnqueue := nodeShouldRunDaemonPod(node, ds)
+		if shouldEnqueue {
+			dsc.enqueueDaemonSet(ds)
+		}
+	}
 }
 
 func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
@@ -316,14 +328,25 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 		// A periodic relist will send update events for all known pods.
 		return
 	}
+	dsList, err := dsc.dsStore.List()
+	if err != nil {
+		glog.V(4).Infof("Error enqueueing daemon sets: %v", err)
+		return
+	}
+	for i := range dsList.Items {
+		ds := &dsList.Items[i]
+		shouldEnqueue := (nodeShouldRunDaemonPod(oldNode, ds) != nodeShouldRunDaemonPod(curNode, ds))
+		if shouldEnqueue {
+			dsc.enqueueDaemonSet(ds)
+		}
+	}
 	// TODO: it'd be nice to pass a hint with these enqueues, so that each ds would only examine the added node (unless it has other work to do, too).
-	dsc.enqueueAllDaemonSets()
 }
 
 // getNodesToDaemonSetPods returns a map from nodes to daemon pods (corresponding to ds) running on the nodes.
 func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) (map[string][]*api.Pod, error) {
 	nodeToDaemonPods := make(map[string][]*api.Pod)
-	selector, err := extensions.PodSelectorAsSelector(ds.Spec.Selector)
+	selector, err := extensions.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -352,27 +375,14 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 		glog.Errorf("Couldn't get list of nodes when syncing daemon set %+v: %v", ds, err)
 	}
 	var nodesNeedingDaemonPods, podsToDelete []string
-	for i, node := range nodeList.Items {
-		// Check if the node satisfies the daemon set's node selector.
-		nodeSelector := labels.Set(ds.Spec.Template.Spec.NodeSelector).AsSelector()
-		shouldRun := nodeSelector.Matches(labels.Set(nodeList.Items[i].Labels))
-		// If the daemon set specifies a node name, check that it matches with nodeName.
-		nodeName := nodeList.Items[i].Name
-		shouldRun = shouldRun && (ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == nodeName)
+	for _, node := range nodeList.Items {
+		shouldRun := nodeShouldRunDaemonPod(&node, ds)
 
-		// If the node is not ready, don't run on it.
-		// TODO(mikedanese): remove this once daemonpods forgive nodes
-		shouldRun = shouldRun && api.IsNodeReady(&node)
+		daemonPods, isRunning := nodeToDaemonPods[node.Name]
 
-		// If the node is unschedulable, don't run it
-		// TODO(mikedanese): remove this once we have the right node admitance levels.
-		// See https://github.com/kubernetes/kubernetes/issues/17297#issuecomment-156857375.
-		shouldRun = shouldRun && !node.Spec.Unschedulable
-
-		daemonPods, isRunning := nodeToDaemonPods[nodeName]
 		if shouldRun && !isRunning {
 			// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
-			nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, nodeName)
+			nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
 		} else if shouldRun && len(daemonPods) > 1 {
 			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
 			// Sort the daemon pods by creation time, so the the oldest is preserved.
@@ -455,10 +465,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 
 	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled int
 	for _, node := range nodeList.Items {
-		nodeSelector := labels.Set(ds.Spec.Template.Spec.NodeSelector).AsSelector()
-		nameMatch := ds.Spec.Template.Name == "" || ds.Spec.Template.Name == node.Name
-		labelMatch := nodeSelector.Matches(labels.Set(node.Labels))
-		shouldRun := nameMatch && labelMatch
+		shouldRun := nodeShouldRunDaemonPod(&node, ds)
 
 		numDaemonPods := len(nodeToDaemonPods[node.Name])
 
@@ -521,6 +528,23 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 
 	dsc.updateDaemonSetStatus(ds)
 	return nil
+}
+
+func nodeShouldRunDaemonPod(node *api.Node, ds *extensions.DaemonSet) bool {
+	// Check if the node satisfies the daemon set's node selector.
+	nodeSelector := labels.Set(ds.Spec.Template.Spec.NodeSelector).AsSelector()
+	shouldRun := nodeSelector.Matches(labels.Set(node.Labels))
+	// If the daemon set specifies a node name, check that it matches with node.Name.
+	shouldRun = shouldRun && (ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name)
+	// If the node is not ready, don't run on it.
+	// TODO(mikedanese): remove this once daemonpods forgive nodes
+	shouldRun = shouldRun && api.IsNodeReady(node)
+
+	// If the node is unschedulable, don't run it
+	// TODO(mikedanese): remove this once we have the right node admitance levels.
+	// See https://github.com/kubernetes/kubernetes/issues/17297#issuecomment-156857375.
+	shouldRun = shouldRun && !node.Spec.Unschedulable
+	return shouldRun
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.

@@ -132,7 +132,6 @@ func (k *inMemoryRegistry) Update(task *T) error {
 	case StatePending:
 		internal.Offer = task.Offer
 		internal.Spec = task.Spec
-		(&task.Spec).copyTo(&internal.Spec)
 		internal.Flags = map[FlagType]struct{}{}
 		fallthrough
 	case StateRunning:

@@ -23,9 +23,9 @@ import (
 	"os"
 	"path"
 	"runtime"
-	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	_ "k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig"
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
@@ -84,25 +84,24 @@ func main() {
 
 	data := new(bytes.Buffer)
 
-	group, version := path.Split(*groupVersion)
-	group = strings.TrimRight(group, "/")
+	gv := unversioned.ParseGroupVersionOrDie(*groupVersion)
 
-	_, err := data.WriteString(fmt.Sprintf("package %v\n", version))
+	_, err := data.WriteString(fmt.Sprintf("package %v\n", gv.Version))
 	if err != nil {
 		glog.Fatalf("Error while writing package line: %v", err)
 	}
 
-	versionPath := pkgPath(group, version)
+	versionPath := pkgPath(gv.Group, gv.Version)
 	generator := kruntime.NewConversionGenerator(api.Scheme.Raw(), versionPath)
 	apiShort := generator.AddImport(path.Join(pkgBase, "api"))
 	generator.AddImport(path.Join(pkgBase, "api/resource"))
 	// TODO(wojtek-t): Change the overwrites to a flag.
-	generator.OverwritePackage(version, "")
-	for _, knownType := range api.Scheme.KnownTypes(*groupVersion) {
+	generator.OverwritePackage(gv.Version, "")
+	for _, knownType := range api.Scheme.KnownTypes(gv) {
 		if knownType.PkgPath() != versionPath {
 			continue
 		}
-		if err := generator.GenerateConversionsForType(version, knownType); err != nil {
+		if err := generator.GenerateConversionsForType(gv, knownType); err != nil {
 			glog.Errorf("Error while generating conversion functions for %v: %v", knownType, err)
 		}
 	}

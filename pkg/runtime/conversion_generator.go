@@ -24,12 +24,13 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type ConversionGenerator interface {
-	GenerateConversionsForType(version string, reflection reflect.Type) error
+	GenerateConversionsForType(groupVersion unversioned.GroupVersion, reflection reflect.Type) error
 	WriteConversionFunctions(w io.Writer) error
 	RegisterConversionFunctions(w io.Writer, pkg string) error
 	AddImport(pkg string) string
@@ -86,9 +87,15 @@ func (g *conversionGenerator) AddImport(pkg string) string {
 	return g.addImportByPath(pkg)
 }
 
-func (g *conversionGenerator) GenerateConversionsForType(version string, reflection reflect.Type) error {
+func (g *conversionGenerator) GenerateConversionsForType(gv unversioned.GroupVersion, reflection reflect.Type) error {
 	kind := reflection.Name()
-	internalObj, err := g.scheme.NewObject(g.scheme.InternalVersion, kind)
+	// TODO this is equivalent to what it did before, but it needs to be fixed for the proper group
+	internalGV, exists := g.scheme.InternalVersions[gv.Group]
+	if !exists {
+		return fmt.Errorf("no internal version for %v", gv)
+	}
+
+	internalObj, err := g.scheme.NewObject(internalGV.String(), kind)
 	if err != nil {
 		return fmt.Errorf("cannot create an object of type %v in internal version", kind)
 	}
@@ -104,6 +111,22 @@ func (g *conversionGenerator) GenerateConversionsForType(version string, reflect
 	return nil
 }
 
+// primitiveConversion returns true if the two types can be converted via a cast.
+func primitiveConversion(inType, outType reflect.Type) (string, bool) {
+	switch inType.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		switch outType.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+			reflect.Float32, reflect.Float64:
+			return outType.Name(), true
+		}
+	}
+	return "", false
+}
+
 func (g *conversionGenerator) generateConversionsBetween(inType, outType reflect.Type) error {
 	existingConversion := g.scheme.Converter().HasConversionFunc(inType, outType) && g.scheme.Converter().HasConversionFunc(outType, inType)
 
@@ -116,6 +139,10 @@ func (g *conversionGenerator) generateConversionsBetween(inType, outType reflect
 	}
 	if inType == outType {
 		// Don't generate conversion methods for the same type.
+		return nil
+	}
+
+	if _, ok := primitiveConversion(inType, outType); ok {
 		return nil
 	}
 

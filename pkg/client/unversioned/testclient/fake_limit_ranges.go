@@ -18,8 +18,7 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -39,8 +38,8 @@ func (c *FakeLimitRanges) Get(name string) (*api.LimitRange, error) {
 	return obj.(*api.LimitRange), err
 }
 
-func (c *FakeLimitRanges) List(label labels.Selector, field fields.Selector) (*api.LimitRangeList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("limitranges", c.Namespace, label, field), &api.LimitRangeList{})
+func (c *FakeLimitRanges) List(opts unversioned.ListOptions) (*api.LimitRangeList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("limitranges", c.Namespace, opts), &api.LimitRangeList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -71,6 +70,6 @@ func (c *FakeLimitRanges) Delete(name string) error {
 	return err
 }
 
-func (c *FakeLimitRanges) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("limitranges", c.Namespace, label, field, opts))
+func (c *FakeLimitRanges) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("limitranges", c.Namespace, opts))
 }

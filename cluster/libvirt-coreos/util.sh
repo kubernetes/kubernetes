@@ -167,8 +167,8 @@ function wait-cluster-readiness {
   local timeout=120
   while [[ $timeout -ne 0 ]]; do
     nb_ready_nodes=$("${kubectl}" get nodes -o go-template="{{range.items}}{{range.status.conditions}}{{.type}}{{end}}:{{end}}" --api-version=v1 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
-    echo "Nb ready nodes: $nb_ready_nodes / $NUM_MINIONS"
-    if [[ "$nb_ready_nodes" -eq "$NUM_MINIONS" ]]; then
+    echo "Nb ready nodes: $nb_ready_nodes / $NUM_NODES"
+    if [[ "$nb_ready_nodes" -eq "$NUM_NODES" ]]; then
         return 0
     fi
 
@@ -191,8 +191,8 @@ function kube-up {
   readonly kubernetes_dir="$POOL_PATH/kubernetes"
 
   local i
-  for (( i = 0 ; i <= $NUM_MINIONS ; i++ )); do
-    if [[ $i -eq $NUM_MINIONS ]]; then
+  for (( i = 0 ; i <= $NUM_NODES ; i++ )); do
+    if [[ $i -eq $NUM_NODES ]]; then
         etcd2_initial_cluster[$i]="${MASTER_NAME}=http://${MASTER_IP}:2380"
     else
         etcd2_initial_cluster[$i]="${NODE_NAMES[$i]}=http://${NODE_IPS[$i]}:2380"
@@ -201,8 +201,8 @@ function kube-up {
   etcd2_initial_cluster=$(join , "${etcd2_initial_cluster[@]}")
   readonly machines=$(join , "${KUBE_NODE_IP_ADDRESSES[@]}")
 
-  for (( i = 0 ; i <= $NUM_MINIONS ; i++ )); do
-    if [[ $i -eq $NUM_MINIONS ]]; then
+  for (( i = 0 ; i <= $NUM_NODES ; i++ )); do
+    if [[ $i -eq $NUM_NODES ]]; then
         type=master
         name=$MASTER_NAME
         public_ip=$MASTER_IP
@@ -262,7 +262,7 @@ function upload-server-tars {
 function kube-push {
   kube-push-internal
   ssh-to-node "$MASTER_NAME" "sudo systemctl restart kube-apiserver kube-controller-manager kube-scheduler"
-  for ((i=0; i < NUM_MINIONS; i++)); do
+  for ((i=0; i < NUM_NODES; i++)); do
     ssh-to-node "${NODE_NAMES[$i]}" "sudo systemctl restart kubelet kube-proxy"
   done
   wait-cluster-readiness
@@ -317,7 +317,7 @@ function ssh-to-node {
   elif [[ "$node" == "$MASTER_NAME" ]]; then
       machine="$MASTER_IP"
   else
-    for ((i=0; i < NUM_MINIONS; i++)); do
+    for ((i=0; i < NUM_NODES; i++)); do
         if [[ "$node" == "${NODE_NAMES[$i]}" ]]; then
             machine="${NODE_IPS[$i]}"
             break

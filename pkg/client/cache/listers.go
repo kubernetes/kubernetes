@@ -138,23 +138,6 @@ func (s storeToNodeConditionLister) List() (nodes api.NodeList, err error) {
 	return
 }
 
-// TODO Move this back to scheduler as a helper function that takes a Store,
-// rather than a method of StoreToNodeLister.
-// GetNodeInfo returns cached data for the node 'id'.
-func (s *StoreToNodeLister) GetNodeInfo(id string) (*api.Node, error) {
-	node, exists, err := s.Get(&api.Node{ObjectMeta: api.ObjectMeta{Name: id}})
-
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving node '%v' from cache: %v", id, err)
-	}
-
-	if !exists {
-		return nil, fmt.Errorf("node '%v' is not in cache", id)
-	}
-
-	return node.(*api.Node), nil
-}
-
 // StoreToReplicationControllerLister gives a store List and Exists methods. The store must contain only ReplicationControllers.
 type StoreToReplicationControllerLister struct {
 	Store
@@ -247,7 +230,7 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 		if daemonSet.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = extensions.PodSelectorAsSelector(daemonSet.Spec.Selector)
+		selector, err = extensions.LabelSelectorAsSelector(daemonSet.Spec.Selector)
 		if err != nil {
 			// this should not happen if the DaemonSet passed validation
 			return nil, err
@@ -353,7 +336,7 @@ func (s *StoreToJobLister) List() (jobs extensions.JobList, err error) {
 	return jobs, nil
 }
 
-// GetPodControllers returns a list of jobs managing a pod. Returns an error only if no matching jobs are found.
+// GetPodJobs returns a list of jobs managing a pod. Returns an error only if no matching jobs are found.
 func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err error) {
 	var selector labels.Selector
 	var job extensions.Job
@@ -369,7 +352,7 @@ func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err 
 			continue
 		}
 
-		selector, _ = extensions.PodSelectorAsSelector(job.Spec.Selector)
+		selector, _ = extensions.LabelSelectorAsSelector(job.Spec.Selector)
 		if !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}

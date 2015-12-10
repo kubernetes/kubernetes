@@ -31,11 +31,29 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Creating a Kubernetes Cluster
+Creating a Kubernetes Cluster
+----------------------------------------
 
 Kubernetes can run on a range of platforms, from your laptop, to VMs on a cloud provider, to rack of
 bare metal servers.  The effort required to set up a cluster varies from running a single command to
 crafting your own customized cluster.  We'll guide you in picking a solution that fits for your needs.
+
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+  - [Picking the Right Solution](#picking-the-right-solution)
+    - [Local-machine Solutions](#local-machine-solutions)
+    - [Hosted Solutions](#hosted-solutions)
+    - [Turn-key Cloud Solutions](#turn-key-cloud-solutions)
+    - [Custom Solutions](#custom-solutions)
+      - [Cloud](#cloud)
+      - [On-Premises VMs](#on-premises-vms)
+      - [Bare Metal](#bare-metal)
+      - [Integrations](#integrations)
+  - [Table of Solutions](#table-of-solutions)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 
 ## Picking the Right Solution
 
@@ -61,9 +79,10 @@ physical machine.  Setup is completely automated and doesn't require a cloud pro
 But their size and availability is limited to that of a single machine.
 
 The local-machine solutions are:
-  - [Local Docker-based](docker.md) (recommended starting point)
-  - [Vagrant](vagrant.md) (works on any platform with Vagrant: Linux, MacOS, or Windows.)
-  - [No-VM local cluster](locally.md) (Linux only)
+
+- [Local Docker-based](docker.md) (recommended starting point)
+- [Vagrant](vagrant.md) (works on any platform with Vagrant: Linux, MacOS, or Windows.)
+- [No-VM local cluster](locally.md) (Linux only)
 
 
 ### Hosted Solutions
@@ -75,6 +94,7 @@ clusters.
 
 These solutions allow you to create Kubernetes clusters on a range of Cloud IaaS providers with only a
 few commands, and have active community support.
+
 - [GCE](gce.md)
 - [AWS](aws.md)
 - [Azure](coreos/azure/README.md)
@@ -95,6 +115,7 @@ writing a new solution](../../docs/devel/writing-a-getting-started-guide.md).
 #### Cloud
 
 These solutions are combinations of cloud provider and OS not covered by the above solutions.
+
 - [AWS + coreos](coreos.md)
 - [GCE + CoreOS](coreos.md)
 - [AWS + Ubuntu](juju.md)
@@ -125,7 +146,13 @@ These solutions are combinations of cloud provider and OS not covered by the abo
 
 #### Integrations
 
-- [Kubernetes on Mesos](mesos.md) (Uses GCE)
+These solutions provide integration with 3rd party schedulers, resource managers, and/or lower level platforms.
+
+- [Kubernetes on Mesos](mesos.md)
+  - Instructions specify GCE, but are generic enough to be adapted to most existing Mesos clusters
+- [Kubernetes on DCOS](dcos.md)
+  - Community Edition DCOS uses AWS
+  - Enterprise Edition DCOS supports cloud hosting, on-premise VMs, and bare metal
 
 ## Table of Solutions
 
@@ -145,8 +172,9 @@ Bare-metal           | custom       | Fedora | _none_      | [docs](fedora/fedor
 Bare-metal           | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
 libvirt              | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
 KVM                  | custom       | Fedora | flannel     | [docs](fedora/flannel_multi_node_cluster.md)      |          | Community ([@aveshagarwal](https://github.com/aveshagarwal))
-Mesos/Docker         | custom       | Ubuntu | Docker      | [docs](mesos-docker.md)                           |          | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
+Mesos/Docker         | custom       | Ubuntu | Docker      | [docs](mesos-docker.md)                           | [✓][4]  | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
 Mesos/GCE            |              |        |             | [docs](mesos.md)                                  |          | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
+DCOS                 | Marathon   | CoreOS/Alpine | custom | [docs](dcos.md)                                   |          | Community ([Kubernetes-Mesos Authors](https://github.com/mesosphere/kubernetes-mesos/blob/master/AUTHORS.md))
 AWS                  | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community
 GCE                  | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community ([@pires](https://github.com/pires))
 Vagrant              | CoreOS       | CoreOS | flannel     | [docs](coreos.md)                                 |          | Community ([@pires](https://github.com/pires), [@AntonioMeireles](https://github.com/AntonioMeireles))
@@ -160,7 +188,7 @@ OpenStack/HPCloud    | Juju         | Ubuntu | flannel     | [docs](juju.md)    
 Joyent               | Juju         | Ubuntu | flannel     | [docs](juju.md)                                   |          | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) )
 AWS                  | Saltstack    | Ubuntu | OVS         | [docs](aws.md)                                    |          | Community ([@justinsb](https://github.com/justinsb))
 Bare-metal           | custom       | Ubuntu | Calico      | [docs](ubuntu-calico.md)                          |          | Community ([@djosborne](https://github.com/djosborne))
-Bare-metal           | custom       | Ubuntu | flannel     | [docs](ubuntu.md)                                 |          | Community ([@resouer](https://github.com/resouer), [@WIZARD-CXY](https://github.com/WIZARD-CXY))
+Bare-metal           | custom       | Ubuntu | flannel     | [docs](ubuntu.md)                                 |          | Community ([@resouer](https://github.com/resouer), [@dalanlan](https://github.com/dalanlan), [@WIZARD-CXY](https://github.com/WIZARD-CXY))
 Local                |              |        | _none_      | [docs](locally.md)                                |          | Community ([@preillyme](https://github.com/preillyme))
 libvirt/KVM          | CoreOS       | CoreOS | libvirt/KVM | [docs](libvirt-coreos.md)                         |          | Community ([@lhuard1A](https://github.com/lhuard1A))
 oVirt                |              |        |             | [docs](ovirt.md)                                  |          | Community ([@simon3z](https://github.com/simon3z))
@@ -171,21 +199,23 @@ any                  | any          | any    | any         | [docs](scratch.md) 
 *Note*: The above table is ordered by version test/used in notes followed by support level.
 
 Definition of columns:
-  - **IaaS Provider** is who/what provides the virtual or physical machines (nodes) that Kubernetes runs on.
-  - **OS** is the base operating system of the nodes.
-  - **Config. Mgmt** is the configuration management system that helps install and maintain Kubernetes software on the
-    nodes.
-  - **Networking** is what implements the [networking model](../../docs/admin/networking.md).  Those with networking type
-    _none_ may not support more than one node, or may support multiple VM nodes only in the same physical node.
-  - **Conformance** indicates whether a cluster created with this configuration has passed the project's conformance
-    tests for supporting the API and base features of Kubernetes v1.0.0.
-  - Support Levels
-    - **Project**:  Kubernetes Committers regularly use this configuration, so it usually works with the latest release
-      of Kubernetes.
-    - **Commercial**: A commercial offering with its own support arrangements.
-    - **Community**: Actively supported by community contributions. May not work with more recent releases of Kubernetes.
-    - **Inactive**: No active maintainer.  Not recommended for first-time Kubernetes users, and may be deleted soon.
-  - **Notes** is relevant information such as the version of Kubernetes used.
+
+- **IaaS Provider** is who/what provides the virtual or physical machines (nodes) that Kubernetes runs on.
+- **OS** is the base operating system of the nodes.
+- **Config. Mgmt** is the configuration management system that helps install and maintain Kubernetes software on the
+  nodes.
+- **Networking** is what implements the [networking model](../../docs/admin/networking.md).  Those with networking type
+  _none_ may not support more than one node, or may support multiple VM nodes only in the same physical node.
+- **Conformance** indicates whether a cluster created with this configuration has passed the project's conformance
+  tests for supporting the API and base features of Kubernetes v1.0.0.
+- Support Levels
+  - **Project**:  Kubernetes Committers regularly use this configuration, so it usually works with the latest release
+    of Kubernetes.
+  - **Commercial**: A commercial offering with its own support arrangements.
+  - **Community**: Actively supported by community contributions. May not work with more recent releases of Kubernetes.
+  - **Inactive**: No active maintainer.  Not recommended for first-time Kubernetes users, and may be deleted soon.
+- **Notes** is relevant information such as the version of Kubernetes used.
+
 
 <!-- reference style links below here -->
 <!-- GCE conformance test result -->
@@ -194,6 +224,8 @@ Definition of columns:
 [2]: https://gist.github.com/derekwaynecarr/505e56036cdf010bf6b6
 <!-- GKE conformance test result -->
 [3]: https://gist.github.com/erictune/2f39b22f72565365e59b
+<!-- Mesos/Docker conformance test result -->
+[4]: https://gist.github.com/sttts/d27f3b879223895494d4
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -50,6 +50,7 @@ using resources with kubectl can be found in [Working with resources](../user-gu
         - [Typical status properties](#typical-status-properties)
       - [References to related objects](#references-to-related-objects)
       - [Lists of named subobjects preferred over maps](#lists-of-named-subobjects-preferred-over-maps)
+      - [Primitive types](#primitive-types)
       - [Constants](#constants)
     - [Lists and Simple kinds](#lists-and-simple-kinds)
   - [Differing Representations](#differing-representations)
@@ -247,6 +248,14 @@ ports:
 
 This rule maintains the invariant that all JSON/YAML keys are fields in API objects. The only exceptions are pure maps in the API (currently, labels, selectors, annotations, data), as opposed to sets of subobjects.
 
+#### Primitive types
+
+* Avoid floating-point values as much as possible, and never use them in spec. Floating-point values cannot be reliably round-tripped (encoded and re-decoded) without changing, and have varying precision and representations across languages and architectures.
+* All numbers (e.g., uint32, int64) are converted to float64 by Javascript and some other languages, so any field which is expected to exceed that either in magnitude or in precision (specifically integer values > 53 bits) should be serialized and accepted as strings.
+* Do not use unsigned integers, due to inconsistent support across languages and libraries. Just validate that the integer is non-negative if that's the case.
+* Do not use enums. Use aliases for string instead (e.g., `NodeConditionType`).
+* Look at similar fields in the API (e.g., ports, durations) and follow the conventions of existing fields.
+
 #### Constants
 
 Some fields will have a list of allowed values (enumerations). These values will be strings, and they will be in CamelCase, with an initial uppercase letter. Examples: "ClusterFirst", "Pending", "ClientIP".
@@ -378,7 +387,8 @@ Fields must be either optional or required.
 Optional fields have the following properties:
 
 - They have `omitempty` struct tag in Go.
-- They are a pointer type in the Go definition (e.g. `bool *awesomeFlag`).
+- They are a pointer type in the Go definition (e.g. `bool *awesomeFlag`) or have a built-in `nil`
+  value (e.g. maps and slices).
 - The API server should allow POSTing and PUTing a resource with this field unset.
 
 Required fields have the opposite properties, namely:
@@ -400,7 +410,8 @@ codebase.  However:
 - having a pointer consistently imply optional is clearer for users of the Go language client, and any
   other clients that use corresponding types
 
-Therefore, we ask that pointers always be used with optional fields.
+Therefore, we ask that pointers always be used with optional fields that do not have a built-in
+`nil` value.
 
 
 ## Defaulting
@@ -547,6 +558,10 @@ The following HTTP status codes may be returned by the API.
   * * If updating an existing resource:
       * See `Conflict` from the `status` response section below on how to retrieve more information about the nature of the conflict.
       * GET and compare the fields in the pre-existing object, merge changes (if still valid according to preconditions), and retry with the updated request (including `ResourceVersion`).
+* `410 StatusGone`
+  * Indicates that the item is no longer available at the server and no forwarding address is known.
+  * Suggested client recovery behavior
+    * Do not retry. Fix the request.
 * `422 StatusUnprocessableEntity`
   * Indicates that the requested create or update operation cannot be completed due to invalid data provided as part of the request.
   * Suggested client recovery behavior

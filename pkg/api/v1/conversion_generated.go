@@ -23,6 +23,7 @@ import (
 
 	api "k8s.io/kubernetes/pkg/api"
 	resource "k8s.io/kubernetes/pkg/api/resource"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -32,7 +33,7 @@ func autoconvert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStore
 	}
 	out.VolumeID = in.VolumeID
 	out.FSType = in.FSType
-	out.Partition = in.Partition
+	out.Partition = int32(in.Partition)
 	out.ReadOnly = in.ReadOnly
 	return nil
 }
@@ -306,8 +307,8 @@ func autoconvert_api_ContainerPort_To_v1_ContainerPort(in *api.ContainerPort, ou
 		defaulting.(func(*api.ContainerPort))(in)
 	}
 	out.Name = in.Name
-	out.HostPort = in.HostPort
-	out.ContainerPort = in.ContainerPort
+	out.HostPort = int32(in.HostPort)
+	out.ContainerPort = int32(in.ContainerPort)
 	out.Protocol = Protocol(in.Protocol)
 	out.HostIP = in.HostIP
 	return nil
@@ -370,8 +371,8 @@ func autoconvert_api_ContainerStateTerminated_To_v1_ContainerStateTerminated(in 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ContainerStateTerminated))(in)
 	}
-	out.ExitCode = in.ExitCode
-	out.Signal = in.Signal
+	out.ExitCode = int32(in.ExitCode)
+	out.Signal = int32(in.Signal)
 	out.Reason = in.Reason
 	out.Message = in.Message
 	if err := s.Convert(&in.StartedAt, &out.StartedAt, 0); err != nil {
@@ -413,7 +414,7 @@ func autoconvert_api_ContainerStatus_To_v1_ContainerStatus(in *api.ContainerStat
 		return err
 	}
 	out.Ready = in.Ready
-	out.RestartCount = in.RestartCount
+	out.RestartCount = int32(in.RestartCount)
 	out.Image = in.Image
 	out.ImageID = in.ImageID
 	out.ContainerID = in.ContainerID
@@ -428,7 +429,7 @@ func autoconvert_api_DaemonEndpoint_To_v1_DaemonEndpoint(in *api.DaemonEndpoint,
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.DaemonEndpoint))(in)
 	}
-	out.Port = in.Port
+	out.Port = int32(in.Port)
 	return nil
 }
 
@@ -529,7 +530,7 @@ func autoconvert_api_EndpointPort_To_v1_EndpointPort(in *api.EndpointPort, out *
 		defaulting.(func(*api.EndpointPort))(in)
 	}
 	out.Name = in.Name
-	out.Port = in.Port
+	out.Port = int32(in.Port)
 	out.Protocol = Protocol(in.Protocol)
 	return nil
 }
@@ -697,7 +698,8 @@ func autoconvert_api_Event_To_v1_Event(in *api.Event, out *Event, s conversion.S
 	if err := s.Convert(&in.LastTimestamp, &out.LastTimestamp, 0); err != nil {
 		return err
 	}
-	out.Count = in.Count
+	out.Count = int32(in.Count)
+	out.Type = in.Type
 	return nil
 }
 
@@ -777,8 +779,8 @@ func autoconvert_api_FCVolumeSource_To_v1_FCVolumeSource(in *api.FCVolumeSource,
 		out.TargetWWNs = nil
 	}
 	if in.Lun != nil {
-		out.Lun = new(int)
-		*out.Lun = *in.Lun
+		out.Lun = new(int32)
+		*out.Lun = int32(*in.Lun)
 	} else {
 		out.Lun = nil
 	}
@@ -809,7 +811,7 @@ func autoconvert_api_GCEPersistentDiskVolumeSource_To_v1_GCEPersistentDiskVolume
 	}
 	out.PDName = in.PDName
 	out.FSType = in.FSType
-	out.Partition = in.Partition
+	out.Partition = int32(in.Partition)
 	out.ReadOnly = in.ReadOnly
 	return nil
 }
@@ -824,6 +826,7 @@ func autoconvert_api_GitRepoVolumeSource_To_v1_GitRepoVolumeSource(in *api.GitRe
 	}
 	out.Repository = in.Repository
 	out.Revision = in.Revision
+	out.Directory = in.Directory
 	return nil
 }
 
@@ -915,7 +918,8 @@ func autoconvert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource(in *api.ISCSIVolu
 	}
 	out.TargetPortal = in.TargetPortal
 	out.IQN = in.IQN
-	out.Lun = in.Lun
+	out.Lun = int32(in.Lun)
+	out.ISCSIInterface = in.ISCSIInterface
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	return nil
@@ -1110,34 +1114,6 @@ func autoconvert_api_List_To_v1_List(in *api.List, out *List, s conversion.Scope
 
 func convert_api_List_To_v1_List(in *api.List, out *List, s conversion.Scope) error {
 	return autoconvert_api_List_To_v1_List(in, out, s)
-}
-
-func autoconvert_api_ListOptions_To_v1_ListOptions(in *api.ListOptions, out *ListOptions, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.ListOptions))(in)
-	}
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.LabelSelector, &out.LabelSelector, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.FieldSelector, &out.FieldSelector, 0); err != nil {
-		return err
-	}
-	out.Watch = in.Watch
-	out.ResourceVersion = in.ResourceVersion
-	if in.TimeoutSeconds != nil {
-		out.TimeoutSeconds = new(int64)
-		*out.TimeoutSeconds = *in.TimeoutSeconds
-	} else {
-		out.TimeoutSeconds = nil
-	}
-	return nil
-}
-
-func convert_api_ListOptions_To_v1_ListOptions(in *api.ListOptions, out *ListOptions, s conversion.Scope) error {
-	return autoconvert_api_ListOptions_To_v1_ListOptions(in, out, s)
 }
 
 func autoconvert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress(in *api.LoadBalancerIngress, out *LoadBalancerIngress, s conversion.Scope) error {
@@ -2241,11 +2217,11 @@ func autoconvert_api_Probe_To_v1_Probe(in *api.Probe, out *Probe, s conversion.S
 	if err := convert_api_Handler_To_v1_Handler(&in.Handler, &out.Handler, s); err != nil {
 		return err
 	}
-	out.InitialDelaySeconds = in.InitialDelaySeconds
-	out.TimeoutSeconds = in.TimeoutSeconds
-	out.PeriodSeconds = in.PeriodSeconds
-	out.SuccessThreshold = in.SuccessThreshold
-	out.FailureThreshold = in.FailureThreshold
+	out.InitialDelaySeconds = int32(in.InitialDelaySeconds)
+	out.TimeoutSeconds = int32(in.TimeoutSeconds)
+	out.PeriodSeconds = int32(in.PeriodSeconds)
+	out.SuccessThreshold = int32(in.SuccessThreshold)
+	out.FailureThreshold = int32(in.FailureThreshold)
 	return nil
 }
 
@@ -2387,7 +2363,7 @@ func autoconvert_api_ReplicationControllerStatus_To_v1_ReplicationControllerStat
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ReplicationControllerStatus))(in)
 	}
-	out.Replicas = in.Replicas
+	out.Replicas = int32(in.Replicas)
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
@@ -2805,11 +2781,11 @@ func autoconvert_api_ServicePort_To_v1_ServicePort(in *api.ServicePort, out *Ser
 	}
 	out.Name = in.Name
 	out.Protocol = Protocol(in.Protocol)
-	out.Port = in.Port
+	out.Port = int32(in.Port)
 	if err := s.Convert(&in.TargetPort, &out.TargetPort, 0); err != nil {
 		return err
 	}
-	out.NodePort = in.NodePort
+	out.NodePort = int32(in.NodePort)
 	return nil
 }
 
@@ -3050,13 +3026,41 @@ func convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *Volu
 	return autoconvert_api_VolumeSource_To_v1_VolumeSource(in, out, s)
 }
 
+func autoconvert_unversioned_ListOptions_To_v1_ListOptions(in *unversioned.ListOptions, out *ListOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*unversioned.ListOptions))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.LabelSelector, &out.LabelSelector, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.FieldSelector, &out.FieldSelector, 0); err != nil {
+		return err
+	}
+	out.Watch = in.Watch
+	out.ResourceVersion = in.ResourceVersion
+	if in.TimeoutSeconds != nil {
+		out.TimeoutSeconds = new(int64)
+		*out.TimeoutSeconds = *in.TimeoutSeconds
+	} else {
+		out.TimeoutSeconds = nil
+	}
+	return nil
+}
+
+func convert_unversioned_ListOptions_To_v1_ListOptions(in *unversioned.ListOptions, out *ListOptions, s conversion.Scope) error {
+	return autoconvert_unversioned_ListOptions_To_v1_ListOptions(in, out, s)
+}
+
 func autoconvert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource(in *AWSElasticBlockStoreVolumeSource, out *api.AWSElasticBlockStoreVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*AWSElasticBlockStoreVolumeSource))(in)
 	}
 	out.VolumeID = in.VolumeID
 	out.FSType = in.FSType
-	out.Partition = in.Partition
+	out.Partition = int(in.Partition)
 	out.ReadOnly = in.ReadOnly
 	return nil
 }
@@ -3330,8 +3334,8 @@ func autoconvert_v1_ContainerPort_To_api_ContainerPort(in *ContainerPort, out *a
 		defaulting.(func(*ContainerPort))(in)
 	}
 	out.Name = in.Name
-	out.HostPort = in.HostPort
-	out.ContainerPort = in.ContainerPort
+	out.HostPort = int(in.HostPort)
+	out.ContainerPort = int(in.ContainerPort)
 	out.Protocol = api.Protocol(in.Protocol)
 	out.HostIP = in.HostIP
 	return nil
@@ -3394,8 +3398,8 @@ func autoconvert_v1_ContainerStateTerminated_To_api_ContainerStateTerminated(in 
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ContainerStateTerminated))(in)
 	}
-	out.ExitCode = in.ExitCode
-	out.Signal = in.Signal
+	out.ExitCode = int(in.ExitCode)
+	out.Signal = int(in.Signal)
 	out.Reason = in.Reason
 	out.Message = in.Message
 	if err := s.Convert(&in.StartedAt, &out.StartedAt, 0); err != nil {
@@ -3437,7 +3441,7 @@ func autoconvert_v1_ContainerStatus_To_api_ContainerStatus(in *ContainerStatus, 
 		return err
 	}
 	out.Ready = in.Ready
-	out.RestartCount = in.RestartCount
+	out.RestartCount = int(in.RestartCount)
 	out.Image = in.Image
 	out.ImageID = in.ImageID
 	out.ContainerID = in.ContainerID
@@ -3452,7 +3456,7 @@ func autoconvert_v1_DaemonEndpoint_To_api_DaemonEndpoint(in *DaemonEndpoint, out
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DaemonEndpoint))(in)
 	}
-	out.Port = in.Port
+	out.Port = int(in.Port)
 	return nil
 }
 
@@ -3553,7 +3557,7 @@ func autoconvert_v1_EndpointPort_To_api_EndpointPort(in *EndpointPort, out *api.
 		defaulting.(func(*EndpointPort))(in)
 	}
 	out.Name = in.Name
-	out.Port = in.Port
+	out.Port = int(in.Port)
 	out.Protocol = api.Protocol(in.Protocol)
 	return nil
 }
@@ -3721,7 +3725,8 @@ func autoconvert_v1_Event_To_api_Event(in *Event, out *api.Event, s conversion.S
 	if err := s.Convert(&in.LastTimestamp, &out.LastTimestamp, 0); err != nil {
 		return err
 	}
-	out.Count = in.Count
+	out.Count = int(in.Count)
+	out.Type = in.Type
 	return nil
 }
 
@@ -3802,7 +3807,7 @@ func autoconvert_v1_FCVolumeSource_To_api_FCVolumeSource(in *FCVolumeSource, out
 	}
 	if in.Lun != nil {
 		out.Lun = new(int)
-		*out.Lun = *in.Lun
+		*out.Lun = int(*in.Lun)
 	} else {
 		out.Lun = nil
 	}
@@ -3833,7 +3838,7 @@ func autoconvert_v1_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolume
 	}
 	out.PDName = in.PDName
 	out.FSType = in.FSType
-	out.Partition = in.Partition
+	out.Partition = int(in.Partition)
 	out.ReadOnly = in.ReadOnly
 	return nil
 }
@@ -3848,6 +3853,7 @@ func autoconvert_v1_GitRepoVolumeSource_To_api_GitRepoVolumeSource(in *GitRepoVo
 	}
 	out.Repository = in.Repository
 	out.Revision = in.Revision
+	out.Directory = in.Directory
 	return nil
 }
 
@@ -3939,7 +3945,8 @@ func autoconvert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in *ISCSIVolumeSo
 	}
 	out.TargetPortal = in.TargetPortal
 	out.IQN = in.IQN
-	out.Lun = in.Lun
+	out.Lun = int(in.Lun)
+	out.ISCSIInterface = in.ISCSIInterface
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	return nil
@@ -4136,7 +4143,7 @@ func convert_v1_List_To_api_List(in *List, out *api.List, s conversion.Scope) er
 	return autoconvert_v1_List_To_api_List(in, out, s)
 }
 
-func autoconvert_v1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.ListOptions, s conversion.Scope) error {
+func autoconvert_v1_ListOptions_To_unversioned_ListOptions(in *ListOptions, out *unversioned.ListOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ListOptions))(in)
 	}
@@ -4160,8 +4167,8 @@ func autoconvert_v1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.Lis
 	return nil
 }
 
-func convert_v1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.ListOptions, s conversion.Scope) error {
-	return autoconvert_v1_ListOptions_To_api_ListOptions(in, out, s)
+func convert_v1_ListOptions_To_unversioned_ListOptions(in *ListOptions, out *unversioned.ListOptions, s conversion.Scope) error {
+	return autoconvert_v1_ListOptions_To_unversioned_ListOptions(in, out, s)
 }
 
 func autoconvert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress(in *LoadBalancerIngress, out *api.LoadBalancerIngress, s conversion.Scope) error {
@@ -5269,11 +5276,11 @@ func autoconvert_v1_Probe_To_api_Probe(in *Probe, out *api.Probe, s conversion.S
 	if err := convert_v1_Handler_To_api_Handler(&in.Handler, &out.Handler, s); err != nil {
 		return err
 	}
-	out.InitialDelaySeconds = in.InitialDelaySeconds
-	out.TimeoutSeconds = in.TimeoutSeconds
-	out.PeriodSeconds = in.PeriodSeconds
-	out.SuccessThreshold = in.SuccessThreshold
-	out.FailureThreshold = in.FailureThreshold
+	out.InitialDelaySeconds = int(in.InitialDelaySeconds)
+	out.TimeoutSeconds = int(in.TimeoutSeconds)
+	out.PeriodSeconds = int(in.PeriodSeconds)
+	out.SuccessThreshold = int(in.SuccessThreshold)
+	out.FailureThreshold = int(in.FailureThreshold)
 	return nil
 }
 
@@ -5413,7 +5420,7 @@ func autoconvert_v1_ReplicationControllerStatus_To_api_ReplicationControllerStat
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationControllerStatus))(in)
 	}
-	out.Replicas = in.Replicas
+	out.Replicas = int(in.Replicas)
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
@@ -5831,11 +5838,11 @@ func autoconvert_v1_ServicePort_To_api_ServicePort(in *ServicePort, out *api.Ser
 	}
 	out.Name = in.Name
 	out.Protocol = api.Protocol(in.Protocol)
-	out.Port = in.Port
+	out.Port = int(in.Port)
 	if err := s.Convert(&in.TargetPort, &out.TargetPort, 0); err != nil {
 		return err
 	}
-	out.NodePort = in.NodePort
+	out.NodePort = int(in.NodePort)
 	return nil
 }
 
@@ -6124,7 +6131,6 @@ func init() {
 		autoconvert_api_LimitRangeList_To_v1_LimitRangeList,
 		autoconvert_api_LimitRangeSpec_To_v1_LimitRangeSpec,
 		autoconvert_api_LimitRange_To_v1_LimitRange,
-		autoconvert_api_ListOptions_To_v1_ListOptions,
 		autoconvert_api_List_To_v1_List,
 		autoconvert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress,
 		autoconvert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus,
@@ -6197,6 +6203,7 @@ func init() {
 		autoconvert_api_VolumeMount_To_v1_VolumeMount,
 		autoconvert_api_VolumeSource_To_v1_VolumeSource,
 		autoconvert_api_Volume_To_v1_Volume,
+		autoconvert_unversioned_ListOptions_To_v1_ListOptions,
 		autoconvert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource,
 		autoconvert_v1_Binding_To_api_Binding,
 		autoconvert_v1_Capabilities_To_api_Capabilities,
@@ -6242,7 +6249,7 @@ func init() {
 		autoconvert_v1_LimitRangeList_To_api_LimitRangeList,
 		autoconvert_v1_LimitRangeSpec_To_api_LimitRangeSpec,
 		autoconvert_v1_LimitRange_To_api_LimitRange,
-		autoconvert_v1_ListOptions_To_api_ListOptions,
+		autoconvert_v1_ListOptions_To_unversioned_ListOptions,
 		autoconvert_v1_List_To_api_List,
 		autoconvert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress,
 		autoconvert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus,

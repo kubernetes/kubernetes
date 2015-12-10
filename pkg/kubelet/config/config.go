@@ -27,11 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/config"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 )
 
 // PodConfigNotificationMode describes how changes are sent to the update channel.
@@ -310,7 +309,7 @@ func (s *podStorage) seenSources(sources ...string) bool {
 func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventRecorder) (filtered []*api.Pod) {
 	names := sets.String{}
 	for i, pod := range pods {
-		var errlist []error
+		var errlist utilvalidation.ErrorList
 		if errs := validation.ValidatePod(pod); len(errs) != 0 {
 			errlist = append(errlist, errs...)
 			// If validation fails, don't trust it any further -
@@ -318,16 +317,17 @@ func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventReco
 		} else {
 			name := kubecontainer.GetPodFullName(pod)
 			if names.Has(name) {
-				errlist = append(errlist, fielderrors.NewFieldDuplicate("name", pod.Name))
+				//FIXME: this implies an API version
+				errlist = append(errlist, utilvalidation.NewDuplicateError(utilvalidation.NewFieldPath("metadata", "name"), pod.Name))
 			} else {
 				names.Insert(name)
 			}
 		}
 		if len(errlist) > 0 {
 			name := bestPodIdentString(pod)
-			err := utilerrors.NewAggregate(errlist)
+			err := errlist.ToAggregate()
 			glog.Warningf("Pod[%d] (%s) from %s failed validation, ignoring: %v", i+1, name, source, err)
-			recorder.Eventf(pod, kubecontainer.FailedValidation, "Error validating pod %s from %s, ignoring: %v", name, source, err)
+			recorder.Eventf(pod, api.EventTypeWarning, kubecontainer.FailedValidation, "Error validating pod %s from %s, ignoring: %v", name, source, err)
 			continue
 		}
 		filtered = append(filtered, pod)
@@ -380,7 +380,7 @@ func isAnnotationMapEqual(existingMap, candidateMap map[string]string) bool {
 
 // recordFirstSeenTime records the first seen time of this pod.
 func recordFirstSeenTime(pod *api.Pod) {
-	glog.V(4).Infof("Receiving a new pod %q", kubeletutil.FormatPodName(pod))
+	glog.V(4).Infof("Receiving a new pod %q", format.Pod(pod))
 	pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey] = kubetypes.NewTimestamp().GetString()
 }
 

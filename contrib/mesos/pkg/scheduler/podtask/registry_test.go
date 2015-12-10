@@ -17,6 +17,7 @@ limitations under the License.
 package podtask
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -37,14 +38,14 @@ func TestInMemoryRegistry_RegisterGetUnregister(t *testing.T) {
 	assert.Empty(tasks)
 
 	// add a task
-	a, _ := fakePodTask("a")
+	a := fakePodTask("a")
 	a_clone, err := registry.Register(a)
 	assert.NoError(err)
 	assert.Equal(a_clone.ID, a.ID)
 	assert.Equal(a_clone.podKey, a.podKey)
 
 	// add another task
-	b, _ := fakePodTask("b")
+	b := fakePodTask("b")
 	b_clone, err := registry.Register(b)
 	assert.NoError(err)
 	assert.Equal(b_clone.ID, b.ID)
@@ -53,12 +54,12 @@ func TestInMemoryRegistry_RegisterGetUnregister(t *testing.T) {
 	// find tasks in the registry
 	tasks = registry.List(func(t *T) bool { return true })
 	assert.Len(tasks, 2)
-	assert.Contains(tasks, a_clone)
-	assert.Contains(tasks, b_clone)
+	assertContains(t, a_clone, tasks...)
+	assertContains(t, b_clone, tasks...)
 
 	tasks = registry.List(func(t *T) bool { return t.ID == a.ID })
 	assert.Len(tasks, 1)
-	assert.Contains(tasks, a_clone)
+	assertContains(t, a_clone, tasks...)
 
 	task, _ := registry.ForPod(a.podKey)
 	assert.NotNil(task)
@@ -102,10 +103,10 @@ func TestInMemoryRegistry_RegisterGetUnregister(t *testing.T) {
 
 	tasks = registry.List(func(t *T) bool { return true })
 	assert.Len(tasks, 1)
-	assert.Contains(tasks, a)
+	assertContains(t, a, tasks...)
 
 	// unregister a task not registered
-	unregistered_task, _ := fakePodTask("unregistered-task")
+	unregistered_task := fakePodTask("unregistered-task")
 	registry.Unregister(unregistered_task)
 }
 
@@ -123,7 +124,7 @@ func TestInMemoryRegistry_State(t *testing.T) {
 	registry := NewInMemoryRegistry()
 
 	// add a task
-	a, _ := fakePodTask("a")
+	a := fakePodTask("a")
 	a_clone, err := registry.Register(a)
 	assert.NoError(err)
 	assert.Equal(a.State, a_clone.State)
@@ -166,7 +167,7 @@ func TestInMemoryRegistry_Update(t *testing.T) {
 
 	// create registry
 	registry := NewInMemoryRegistry()
-	a, _ := fakePodTask("a")
+	a := fakePodTask("a")
 	registry.Register(a.Clone()) // here clone a because we change it below
 
 	// state changes are ignored
@@ -184,7 +185,7 @@ func TestInMemoryRegistry_Update(t *testing.T) {
 	assert.Equal(offer.Id(), a_clone.Offer.Id())
 
 	// spec is updated while pending
-	a.Spec = Spec{SlaveID: "slave-1"}
+	a.Spec = &Spec{SlaveID: "slave-1"}
 	err = registry.Update(a)
 	assert.NoError(err)
 	a_clone, _ = registry.Get(a.ID)
@@ -212,7 +213,7 @@ func TestInMemoryRegistry_Update(t *testing.T) {
 	assert.True(found_bound)
 
 	// spec is ignored while running
-	a.Spec = Spec{SlaveID: "slave-2"}
+	a.Spec = &Spec{SlaveID: "slave-2"}
 	err = registry.Update(a)
 	assert.NoError(err)
 	a_clone, _ = registry.Get(a.ID)
@@ -224,7 +225,7 @@ func TestInMemoryRegistry_Update(t *testing.T) {
 	assert.Error(err)
 
 	// update unknown task
-	unknown_task, _ := fakePodTask("unknown-task")
+	unknown_task := fakePodTask("unknown-task")
 	err = registry.Update(unknown_task)
 	assert.Error(err)
 
@@ -255,7 +256,7 @@ func testStateTrace(t *testing.T, transitions []transition) *Registry {
 	assert := assert.New(t)
 
 	registry := NewInMemoryRegistry()
-	a, _ := fakePodTask("a")
+	a := fakePodTask("a")
 	a, _ = registry.Register(a)
 
 	// initial pending state
@@ -318,4 +319,18 @@ func TestInMemoryRegistry_NotFinished(t *testing.T) {
 			NewTransition(notFinishedState, StateFinished),
 		})
 	}
+}
+
+func assertContains(t *testing.T, want *T, ts ...*T) bool {
+	for _, got := range ts {
+		if taskEquals(want, got) {
+			return true
+		}
+	}
+
+	return assert.Fail(t, fmt.Sprintf("%v does not contain %v", ts, want))
+}
+
+func taskEquals(t1, t2 *T) bool {
+	return t1.ID == t2.ID && t1.podKey == t2.podKey
 }

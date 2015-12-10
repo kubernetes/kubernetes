@@ -24,13 +24,17 @@ import (
 	"github.com/google/gofuzz"
 )
 
-// IntOrString is a type that can hold an int or a string.  When used in
+// IntOrString is a type that can hold an int32 or a string.  When used in
 // JSON or YAML marshalling and unmarshalling, it produces or consumes the
 // inner type.  This allows you to have, for example, a JSON field that can
 // accept a name or number.
+// TODO: Rename to Int32OrString
+//
+// +protobuf=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type IntOrString struct {
 	Type   Type
-	IntVal int
+	IntVal int32
 	StrVal string
 }
 
@@ -42,9 +46,12 @@ const (
 	String             // The IntOrString holds a string.
 )
 
-// FromInt creates an IntOrString object with an int value.
+// FromInt creates an IntOrString object with an int32 value. It is
+// your responsibility not to call this method with a value greater
+// than int32.
+// TODO: convert to (val int32)
 func FromInt(val int) IntOrString {
-	return IntOrString{Type: Int, IntVal: val}
+	return IntOrString{Type: Int, IntVal: int32(val)}
 }
 
 // FromString creates an IntOrString object with a string value.
@@ -67,7 +74,17 @@ func (intstr *IntOrString) String() string {
 	if intstr.Type == String {
 		return intstr.StrVal
 	}
-	return strconv.Itoa(intstr.IntVal)
+	return strconv.Itoa(intstr.IntValue())
+}
+
+// IntValue returns the IntVal if type Int, or if
+// it is a String, will attempt a conversion to int.
+func (intstr *IntOrString) IntValue() int {
+	if intstr.Type == String {
+		i, _ := strconv.Atoi(intstr.StrVal)
+		return i
+	}
+	return int(intstr.IntVal)
 }
 
 // MarshalJSON implements the json.Marshaller interface.

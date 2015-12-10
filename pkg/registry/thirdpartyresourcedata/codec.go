@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -38,28 +39,37 @@ type thirdPartyResourceDataMapper struct {
 	group   string
 }
 
+var _ meta.RESTMapper = &thirdPartyResourceDataMapper{}
+
 func (t *thirdPartyResourceDataMapper) isThirdPartyResource(resource string) bool {
 	return resource == strings.ToLower(t.kind)+"s"
 }
 
-func (t *thirdPartyResourceDataMapper) GroupForResource(resource string) (string, error) {
+func (t *thirdPartyResourceDataMapper) KindFor(resource string) (unversioned.GroupVersionKind, error) {
 	if t.isThirdPartyResource(resource) {
-		return t.group, nil
+		return unversioned.GroupVersionKind{Group: t.group, Version: t.version, Kind: t.kind}, nil
 	}
-	return t.mapper.GroupForResource(resource)
+	return t.mapper.KindFor(resource)
 }
 
-func (t *thirdPartyResourceDataMapper) RESTMapping(kind string, groupVersions ...string) (*meta.RESTMapping, error) {
-	if len(groupVersions) != 1 {
-		return nil, fmt.Errorf("unexpected set of groupVersions: %v", groupVersions)
+func (t *thirdPartyResourceDataMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	if len(versions) != 1 {
+		return nil, fmt.Errorf("unexpected set of versions: %v", versions)
 	}
-	if groupVersions[0] != apiutil.GetGroupVersion(t.group, t.version) {
-		return nil, fmt.Errorf("unknown version %s expected %s", groupVersions[0], apiutil.GetGroupVersion(t.group, t.version))
+	if gk.Group != t.group {
+		return nil, fmt.Errorf("unknown group %q expected %s", gk.Group, t.group)
 	}
-	if kind != "ThirdPartyResourceData" {
-		return nil, fmt.Errorf("unknown kind %s expected %s", kind, t.kind)
+	if gk.Kind != "ThirdPartyResourceData" {
+		return nil, fmt.Errorf("unknown kind %s expected %s", gk.Kind, t.kind)
 	}
-	mapping, err := t.mapper.RESTMapping("ThirdPartyResourceData", latest.GroupOrDie("extensions").GroupVersion)
+	if versions[0] != t.version {
+		return nil, fmt.Errorf("unknown version %q expected %q", versions[0], t.version)
+	}
+
+	// TODO figure out why we're doing this rewriting
+	extensionGK := unversioned.GroupKind{Group: "extensions", Kind: "ThirdPartyResourceData"}
+
+	mapping, err := t.mapper.RESTMapping(extensionGK, latest.GroupOrDie("extensions").GroupVersion.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -73,13 +83,6 @@ func (t *thirdPartyResourceDataMapper) AliasesForResource(resource string) ([]st
 
 func (t *thirdPartyResourceDataMapper) ResourceSingularizer(resource string) (singular string, err error) {
 	return t.mapper.ResourceSingularizer(resource)
-}
-
-func (t *thirdPartyResourceDataMapper) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
-	if t.isThirdPartyResource(resource) {
-		return t.version, t.kind, nil
-	}
-	return t.mapper.VersionAndKindForResource(resource)
 }
 
 // ResourceIsValid takes a string (kind) and checks if it's a valid resource
@@ -153,7 +156,7 @@ func (t *thirdPartyResourceDataCodec) Decode(data []byte) (runtime.Object, error
 	return result, nil
 }
 
-func (t *thirdPartyResourceDataCodec) DecodeToVersion(data []byte, version string) (runtime.Object, error) {
+func (t *thirdPartyResourceDataCodec) DecodeToVersion(data []byte, gv unversioned.GroupVersion) (runtime.Object, error) {
 	// TODO: this is hacky, there must be a better way...
 	obj, err := t.Decode(data)
 	if err != nil {
@@ -163,7 +166,7 @@ func (t *thirdPartyResourceDataCodec) DecodeToVersion(data []byte, version strin
 	if err != nil {
 		return nil, err
 	}
-	return t.delegate.DecodeToVersion(objData, version)
+	return t.delegate.DecodeToVersion(objData, gv)
 }
 
 func (t *thirdPartyResourceDataCodec) DecodeInto(data []byte, obj runtime.Object) error {
@@ -174,14 +177,14 @@ func (t *thirdPartyResourceDataCodec) DecodeInto(data []byte, obj runtime.Object
 	return t.populate(thirdParty, data)
 }
 
-func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []byte, obj runtime.Object, version, kind string) error {
+func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []byte, obj runtime.Object, gvk unversioned.GroupVersionKind) error {
 	thirdParty, ok := obj.(*extensions.ThirdPartyResourceData)
 	if !ok {
 		return fmt.Errorf("unexpected object: %#v", obj)
 	}
 
-	if kind != "ThirdPartyResourceData" {
-		return fmt.Errorf("unexpeceted kind: %s", kind)
+	if gvk.Kind != "ThirdPartyResourceData" {
+		return fmt.Errorf("unexpeceted kind: %s", gvk.Kind)
 	}
 
 	var dataObj interface{}
@@ -193,25 +196,25 @@ func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []
 		return fmt.Errorf("unexpcted object: %#v", dataObj)
 	}
 	if kindObj, found := mapObj["kind"]; !found {
-		mapObj["kind"] = kind
+		mapObj["kind"] = gvk.Kind
 	} else {
 		kindStr, ok := kindObj.(string)
 		if !ok {
 			return fmt.Errorf("unexpected object for 'kind': %v", kindObj)
 		}
 		if kindStr != t.kind {
-			return fmt.Errorf("kind doesn't match, expecting: %s, got %s", kind, kindStr)
+			return fmt.Errorf("kind doesn't match, expecting: %s, got %s", gvk.Kind, kindStr)
 		}
 	}
 	if versionObj, found := mapObj["apiVersion"]; !found {
-		mapObj["apiVersion"] = version
+		mapObj["apiVersion"] = gvk.GroupVersion().String()
 	} else {
 		versionStr, ok := versionObj.(string)
 		if !ok {
 			return fmt.Errorf("unexpected object for 'apiVersion': %v", versionObj)
 		}
-		if versionStr != version {
-			return fmt.Errorf("version doesn't match, expecting: %s, got %s", version, versionStr)
+		if versionStr != gvk.GroupVersion().String() {
+			return fmt.Errorf("version doesn't match, expecting: %v, got %s", gvk.GroupVersion(), versionStr)
 		}
 	}
 
@@ -219,6 +222,10 @@ func (t *thirdPartyResourceDataCodec) DecodeIntoWithSpecifiedVersionKind(data []
 		return err
 	}
 	return nil
+}
+
+func (t *thirdPartyResourceDataCodec) DecodeParametersInto(parameters url.Values, obj runtime.Object) error {
+	return t.delegate.DecodeParametersInto(parameters, obj)
 }
 
 const template = `{

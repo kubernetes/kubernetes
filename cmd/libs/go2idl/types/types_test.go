@@ -25,7 +25,7 @@ func TestGetBuiltin(t *testing.T) {
 	if builtinPkg := u.Package(""); builtinPkg.Has("string") {
 		t.Errorf("Expected builtin package to not have builtins until they're asked for explicitly. %#v", builtinPkg)
 	}
-	s := u.Get(Name{"", "string"})
+	s := u.Type(Name{Package: "", Name: "string"})
 	if s != String {
 		t.Errorf("Expected canonical string type.")
 	}
@@ -39,8 +39,8 @@ func TestGetBuiltin(t *testing.T) {
 
 func TestGetMarker(t *testing.T) {
 	u := Universe{}
-	n := Name{"path/to/package", "Foo"}
-	f := u.Get(n)
+	n := Name{Package: "path/to/package", Name: "Foo"}
+	f := u.Type(n)
 	if f == nil || f.Name != n {
 		t.Errorf("Expected marker type.")
 	}

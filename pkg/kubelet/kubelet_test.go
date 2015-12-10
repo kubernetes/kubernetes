@@ -112,6 +112,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.masterServiceNamespace = api.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.nodeLister = testNodeLister{}
+	kubelet.nodeInfo = testNodeInfo{}
 	kubelet.recorder = fakeRecorder
 	if err := kubelet.setupDataDirs(); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
@@ -1019,8 +1020,8 @@ func TestDNSConfigurationParams(t *testing.T) {
 		}
 	}
 	t.Logf("nameservers %+v", options[1].DNS)
-	if len(options[0].DNS) != len(options[1].DNS)+1 {
-		t.Errorf("expected prepend of cluster nameserver, got %+v", options[0].DNS)
+	if len(options[0].DNS) != 1 {
+		t.Errorf("expected cluster nameserver only, got %+v", options[0].DNS)
 	} else if options[0].DNS[0] != clusterNS {
 		t.Errorf("expected nameserver %s, got %v", clusterNS, options[0].DNS[0])
 	}
@@ -1045,7 +1046,11 @@ type testNodeLister struct {
 	nodes []api.Node
 }
 
-func (ls testNodeLister) GetNodeInfo(id string) (*api.Node, error) {
+type testNodeInfo struct {
+	nodes []api.Node
+}
+
+func (ls testNodeInfo) GetNodeInfo(id string) (*api.Node, error) {
 	for _, node := range ls.nodes {
 		if node.Name == id {
 			return &node, nil
@@ -1332,7 +1337,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAME",
 						ValueFrom: &api.EnvVarSource{
 							FieldRef: &api.ObjectFieldSelector{
-								APIVersion: testapi.Default.Version(),
+								APIVersion: testapi.Default.GroupVersion().String(),
 								FieldPath:  "metadata.name",
 							},
 						},
@@ -1341,7 +1346,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAMESPACE",
 						ValueFrom: &api.EnvVarSource{
 							FieldRef: &api.ObjectFieldSelector{
-								APIVersion: testapi.Default.Version(),
+								APIVersion: testapi.Default.GroupVersion().String(),
 								FieldPath:  "metadata.namespace",
 							},
 						},
@@ -1350,7 +1355,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_IP",
 						ValueFrom: &api.EnvVarSource{
 							FieldRef: &api.ObjectFieldSelector{
-								APIVersion: testapi.Default.Version(),
+								APIVersion: testapi.Default.GroupVersion().String(),
 								FieldPath:  "status.podIP",
 							},
 						},
@@ -1378,7 +1383,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAME",
 						ValueFrom: &api.EnvVarSource{
 							FieldRef: &api.ObjectFieldSelector{
-								APIVersion: testapi.Default.Version(),
+								APIVersion: testapi.Default.GroupVersion().String(),
 								FieldPath:  "metadata.name",
 							},
 						},
@@ -1904,119 +1909,6 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 	}
 }
 
-func getReadyStatus(cName string) api.ContainerStatus {
-	return api.ContainerStatus{
-		Name:  cName,
-		Ready: true,
-	}
-}
-func getNotReadyStatus(cName string) api.ContainerStatus {
-	return api.ContainerStatus{
-		Name:  cName,
-		Ready: false,
-	}
-}
-func getReadyCondition(status api.ConditionStatus, reason, message string) []api.PodCondition {
-	return []api.PodCondition{{
-		Type:    api.PodReady,
-		Status:  status,
-		Reason:  reason,
-		Message: message,
-	}}
-}
-
-func TestGetPodReadyCondition(t *testing.T) {
-	tests := []struct {
-		spec              *api.PodSpec
-		containerStatuses []api.ContainerStatus
-		podPhase          api.PodPhase
-		expected          []api.PodCondition
-	}{
-		{
-			spec:              nil,
-			containerStatuses: nil,
-			podPhase:          api.PodRunning,
-			expected:          getReadyCondition(api.ConditionFalse, "UnknownContainerStatuses", ""),
-		},
-		{
-			spec:              &api.PodSpec{},
-			containerStatuses: []api.ContainerStatus{},
-			podPhase:          api.PodRunning,
-			expected:          getReadyCondition(api.ConditionTrue, "", ""),
-		},
-		{
-			spec: &api.PodSpec{
-				Containers: []api.Container{
-					{Name: "1234"},
-				},
-			},
-			containerStatuses: []api.ContainerStatus{},
-			podPhase:          api.PodRunning,
-			expected:          getReadyCondition(api.ConditionFalse, "ContainersNotReady", "containers with unknown status: [1234]"),
-		},
-		{
-			spec: &api.PodSpec{
-				Containers: []api.Container{
-					{Name: "1234"},
-					{Name: "5678"},
-				},
-			},
-			containerStatuses: []api.ContainerStatus{
-				getReadyStatus("1234"),
-				getReadyStatus("5678"),
-			},
-			podPhase: api.PodRunning,
-			expected: getReadyCondition(api.ConditionTrue, "", ""),
-		},
-		{
-			spec: &api.PodSpec{
-				Containers: []api.Container{
-					{Name: "1234"},
-					{Name: "5678"},
-				},
-			},
-			containerStatuses: []api.ContainerStatus{
-				getReadyStatus("1234"),
-			},
-			podPhase: api.PodRunning,
-			expected: getReadyCondition(api.ConditionFalse, "ContainersNotReady", "containers with unknown status: [5678]"),
-		},
-		{
-			spec: &api.PodSpec{
-				Containers: []api.Container{
-					{Name: "1234"},
-					{Name: "5678"},
-				},
-			},
-			containerStatuses: []api.ContainerStatus{
-				getReadyStatus("1234"),
-				getNotReadyStatus("5678"),
-			},
-			podPhase: api.PodRunning,
-			expected: getReadyCondition(api.ConditionFalse, "ContainersNotReady", "containers with unready status: [5678]"),
-		},
-		{
-			spec: &api.PodSpec{
-				Containers: []api.Container{
-					{Name: "1234"},
-				},
-			},
-			containerStatuses: []api.ContainerStatus{
-				getNotReadyStatus("1234"),
-			},
-			podPhase: api.PodSucceeded,
-			expected: getReadyCondition(api.ConditionFalse, "PodCompleted", ""),
-		},
-	}
-
-	for i, test := range tests {
-		condition := getPodReadyCondition(test.spec, test.containerStatuses, test.podPhase)
-		if !reflect.DeepEqual(condition, test.expected) {
-			t.Errorf("On test case %v, expected:\n%+v\ngot\n%+v\n", i, test.expected, condition)
-		}
-	}
-}
-
 func TestExecInContainerNoSuchPod(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
@@ -2319,6 +2211,9 @@ func TestHandleNodeSelector(t *testing.T) {
 	kl.nodeLister = testNodeLister{nodes: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}}},
 	}}
+	kl.nodeInfo = testNodeInfo{nodes: []api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}}},
+	}}
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
@@ -2575,18 +2470,18 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
-					Type:               api.NodeReady,
-					Status:             api.ConditionTrue,
-					Reason:             "KubeletReady",
-					Message:            fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
-				},
-				{
 					Type:               api.NodeOutOfDisk,
 					Status:             api.ConditionFalse,
 					Reason:             "KubeletHasSufficientDisk",
 					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
+				},
+				{
+					Type:               api.NodeReady,
+					Status:             api.ConditionTrue,
+					Reason:             "KubeletReady",
+					Message:            fmt.Sprintf("kubelet is posting ready status"),
 					LastHeartbeatTime:  unversioned.Time{},
 					LastTransitionTime: unversioned.Time{},
 				},
@@ -2637,6 +2532,11 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		}
 		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
 		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
+	}
+
+	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
+	if updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type != api.NodeReady {
+		t.Errorf("unexpected node condition order. NodeReady should be last.")
 	}
 
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
@@ -2691,18 +2591,18 @@ func testDockerRuntimeVersion(t *testing.T) {
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
-					Type:               api.NodeReady,
-					Status:             api.ConditionTrue,
-					Reason:             "KubeletReady",
-					Message:            fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
-				},
-				{
 					Type:               api.NodeOutOfDisk,
 					Status:             api.ConditionFalse,
 					Reason:             "KubeletHasSufficientDisk",
 					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
+				},
+				{
+					Type:               api.NodeReady,
+					Status:             api.ConditionTrue,
+					Reason:             "KubeletReady",
+					Message:            fmt.Sprintf("kubelet is posting ready status"),
 					LastHeartbeatTime:  unversioned.Time{},
 					LastTransitionTime: unversioned.Time{},
 				},
@@ -2754,6 +2654,12 @@ func testDockerRuntimeVersion(t *testing.T) {
 		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
 		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
 	}
+
+	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
+	if updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type != api.NodeReady {
+		t.Errorf("unexpected node condition order. NodeReady should be last.")
+	}
+
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
 	}
@@ -2793,18 +2699,18 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			Status: api.NodeStatus{
 				Conditions: []api.NodeCondition{
 					{
-						Type:               api.NodeReady,
-						Status:             api.ConditionTrue,
-						Reason:             "KubeletReady",
-						Message:            fmt.Sprintf("kubelet is posting ready status"),
-						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-					},
-					{
 						Type:               api.NodeOutOfDisk,
 						Status:             api.ConditionTrue,
 						Reason:             "KubeletOutOfDisk",
 						Message:            "out of disk space",
+						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					},
+					{
+						Type:               api.NodeReady,
+						Status:             api.ConditionTrue,
+						Reason:             "KubeletReady",
+						Message:            fmt.Sprintf("kubelet is posting ready status"),
 						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
@@ -2855,18 +2761,18 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
-					Type:               api.NodeReady,
-					Status:             api.ConditionTrue,
-					Reason:             "KubeletReady",
-					Message:            fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  unversioned.Time{}, // placeholder
-					LastTransitionTime: unversioned.Time{}, // placeholder
-				},
-				{
 					Type:               api.NodeOutOfDisk,
 					Status:             api.ConditionTrue,
 					Reason:             "KubeletOutOfDisk",
 					Message:            "out of disk space",
+					LastHeartbeatTime:  unversioned.Time{}, // placeholder
+					LastTransitionTime: unversioned.Time{}, // placeholder
+				},
+				{
+					Type:               api.NodeReady,
+					Status:             api.ConditionTrue,
+					Reason:             "KubeletReady",
+					Message:            fmt.Sprintf("kubelet is posting ready status"),
 					LastHeartbeatTime:  unversioned.Time{}, // placeholder
 					LastTransitionTime: unversioned.Time{}, // placeholder
 				},
@@ -2919,6 +2825,11 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		}
 		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
 		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
+	}
+
+	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
+	if updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type != api.NodeReady {
+		t.Errorf("unexpected node condition order. NodeReady should be last.")
 	}
 
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
@@ -2977,18 +2888,18 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
-					Type:               api.NodeReady,
-					Status:             api.ConditionFalse,
-					Reason:             "KubeletNotReady",
-					Message:            fmt.Sprintf("container runtime is down"),
-					LastHeartbeatTime:  unversioned.Time{},
-					LastTransitionTime: unversioned.Time{},
-				},
-				{
 					Type:               api.NodeOutOfDisk,
 					Status:             api.ConditionFalse,
 					Reason:             "KubeletHasSufficientDisk",
 					Message:            "kubelet has sufficient disk space available",
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
+				},
+				{
+					Type:               api.NodeReady,
+					Status:             api.ConditionFalse,
+					Reason:             "KubeletNotReady",
+					Message:            fmt.Sprintf("container runtime is down"),
 					LastHeartbeatTime:  unversioned.Time{},
 					LastTransitionTime: unversioned.Time{},
 				},
@@ -3040,6 +2951,11 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 		}
 		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
 		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
+	}
+
+	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
+	if updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type != api.NodeReady {
+		t.Errorf("unexpected node condition order. NodeReady should be last.")
 	}
 
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
@@ -3460,6 +3376,176 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 	}
 }
 
+func TestGetNodeLabels(t *testing.T) {
+	kubelet := newTestKubelet(t).kubelet
+
+	testCases := []struct {
+		Expecting    map[string]string
+		LabelOptions []string
+		FileContent  string
+		Ok           bool
+	}{
+		{
+			Ok:           true,
+			Expecting:    map[string]string{"key1": "pair1", "key2": "pair2", "key3": "pair3", "key4": "pair4", "key5": "pair5"},
+			LabelOptions: []string{"key5=pair5"},
+			FileContent: `---
+key1: pair1
+key2: pair2
+key3: pair3
+key4: pair4
+`,
+		}, {
+			Ok:           true,
+			Expecting:    map[string]string{"key1": "pair1", "key2": "override"},
+			LabelOptions: []string{"key2=override"},
+			FileContent: `---
+key1: pair1
+key2: pair2
+`,
+		},
+	}
+
+	for i, test := range testCases {
+		fd := createTestNodeLabelFile(t, test.FileContent)
+		defer func(f *os.File) {
+			os.Remove(f.Name())
+		}(fd)
+
+		kubelet.nodeLabels = test.LabelOptions
+		kubelet.nodeLabelsFile = fd.Name()
+
+		list, err := kubelet.getNodeLabels()
+		if test.Ok && err != nil {
+			t.Errorf("test case %d should not have failed, error: %s", i, err)
+		}
+		if !reflect.DeepEqual(test.Expecting, list) {
+			t.Errorf("test case %d are not the same, %v ~ %v", i, list, test.Expecting)
+		}
+	}
+}
+
+func TestRetrieveNodeLabels(t *testing.T) {
+	kubelet := newTestKubelet(t).kubelet
+
+	testCases := []struct {
+		Expecting    map[string]string
+		LabelOptions []string
+		Ok           bool
+	}{
+		{
+			Expecting:    map[string]string{"key1": "pair1", "key2": "pair2", "key3": "pair3", "key4": "pair4"},
+			LabelOptions: []string{"key1=pair1", "key2=pair2", "key3=pair3", "key4=pair4"},
+			Ok:           true,
+		},
+		{
+			Expecting:    map[string]string{"key1": "pair1"},
+			LabelOptions: []string{"key1=pair1", "key2paiwdsr2"},
+		},
+	}
+
+	for i, test := range testCases {
+		list, err := kubelet.retrieveNodeLabels(test.LabelOptions)
+		if test.Ok && err != nil {
+			t.Errorf("test case %d should not have failed, error: %s", i, err)
+		}
+		if !reflect.DeepEqual(test.Expecting, list) {
+			t.Errorf("test case %d are not the same, %v ~ %v", i, list, test.Expecting)
+		}
+	}
+}
+
+func TestRetrieveNodeLabelsFile(t *testing.T) {
+	kubelet := newTestKubelet(t).kubelet
+
+	testCases := []struct {
+		Expecting   map[string]string
+		Ok          bool
+		FileContent string
+	}{
+		{
+			Expecting: map[string]string{"key1": "pair1", "key2": "pair2", "key3": "pair3", "key4": "pair4"},
+			Ok:        true,
+			FileContent: `---
+key1: pair1
+key2: pair2
+key3: pair3
+key4: pair4`,
+		}, {
+			FileContent: `---
+key1: pair1
+hash_map:
+  key2: pair2
+`,
+		}, {
+			Expecting: map[string]string{"key1": "pair1", "key2": "pair2"},
+			Ok:        true,
+			FileContent: `
+
+key1: pair1
+key2: pair2
+`,
+		}, {
+			FileContent: `---
+key1: pair1
+bad_key_pair
+`,
+		}, {
+			Expecting: nil,
+			FileContent: `{
+	"key1": "pair1",
+	"key2": "pair2",
+	"key3": "pair3",
+	"key4": {
+		"some_key": "some_value"
+	}
+}`,
+		}, {
+			FileContent: "",
+		}, {
+			Expecting: map[string]string{"key1": "pair1", "key2": "pair2", "key3": "pair3", "key4": "pair4"},
+			Ok:        true,
+			FileContent: `---
+key1: pair1
+key2: pair2
+key3: pair3
+key4: pair4
+`,
+		},
+	}
+
+	for i, test := range testCases {
+		fd := createTestNodeLabelFile(t, test.FileContent)
+		defer func(f *os.File) {
+			os.Remove(f.Name())
+		}(fd)
+
+		labels, err := kubelet.retrieveNodeLabelsFile(fd.Name())
+		if test.Ok && err != nil {
+			t.Errorf("test case %d should not have returned an error, %s", i, err)
+			continue
+		}
+
+		if test.Expecting != nil && !reflect.DeepEqual(test.Expecting, labels) {
+			t.Errorf("test case %d not as expected, got: %#v, expecting: %#v", i, labels, test.Expecting)
+		}
+	}
+}
+
+func createTestNodeLabelFile(t *testing.T, content string) *os.File {
+	f, err := ioutil.TempFile("", "node_label_file")
+	if err != nil {
+		t.Fatalf("unexpected error creating node_label_file: %v", err)
+	}
+	f.Close()
+
+	if err := ioutil.WriteFile(f.Name(), []byte(content), 0700); err != nil {
+		t.Fatalf("unexpected error writing node label file: %v", err)
+	}
+
+	return f
+}
+
 func TestMakePortMappings(t *testing.T) {
 	tests := []struct {
 		container            *api.Container
@@ -3827,7 +3913,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 			},
 			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
 			expectResetCIDRs: []string{"2.3.4.5/32", "5.6.7.8/32"},
-			expectedCalls:    []string{"GetPodStatus"},
+			expectedCalls:    []string{"GetAPIPodStatus"},
 			name:             "pod running",
 		},
 		{
@@ -3878,7 +3964,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 			},
 			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
 			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectedCalls:    []string{"GetPodStatus"},
+			expectedCalls:    []string{"GetAPIPodStatus"},
 			name:             "pod not running",
 		},
 		{
@@ -3936,7 +4022,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 
 		testKube := newTestKubelet(t)
 		testKube.kubelet.shaper = shaper
-		testKube.fakeRuntime.PodStatus = *test.status
+		testKube.fakeRuntime.APIPodStatus = *test.status
 
 		if test.cacheStatus {
 			for _, pod := range test.pods {

@@ -83,6 +83,11 @@ import (
 // This format is intended to make it difficult to use these numbers without
 // writing some sort of special handling code in the hopes that that will
 // cause implementors to also use a fixed point implementation.
+//
+// +protobuf=true
+// +protobuf.embed=QuantityProto
+// +protobuf.options.marshal=false
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type Quantity struct {
 	// Amount is public, so you can manipulate it if the accessor
 	// functions are not sufficient.
@@ -377,8 +382,7 @@ func (q *Quantity) Value() int64 {
 	if q.Amount == nil {
 		return 0
 	}
-	tmp := &inf.Dec{}
-	return tmp.Round(q.Amount, 0, inf.RoundUp).UnscaledBig().Int64()
+	return scaledValue(q.Amount.UnscaledBig(), int(q.Amount.Scale()), 0)
 }
 
 // MilliValue returns the value of q * 1000; this could overflow an int64;
@@ -387,8 +391,7 @@ func (q *Quantity) MilliValue() int64 {
 	if q.Amount == nil {
 		return 0
 	}
-	tmp := &inf.Dec{}
-	return tmp.Round(tmp.Mul(q.Amount, decThousand), 0, inf.RoundUp).UnscaledBig().Int64()
+	return scaledValue(q.Amount.UnscaledBig(), int(q.Amount.Scale()), 3)
 }
 
 // Set sets q's value to be value.

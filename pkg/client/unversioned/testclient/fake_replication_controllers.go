@@ -18,8 +18,7 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -39,8 +38,8 @@ func (c *FakeReplicationControllers) Get(name string) (*api.ReplicationControlle
 	return obj.(*api.ReplicationController), err
 }
 
-func (c *FakeReplicationControllers) List(label labels.Selector, field fields.Selector) (*api.ReplicationControllerList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("replicationcontrollers", c.Namespace, label, field), &api.ReplicationControllerList{})
+func (c *FakeReplicationControllers) List(opts unversioned.ListOptions) (*api.ReplicationControllerList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("replicationcontrollers", c.Namespace, opts), &api.ReplicationControllerList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -79,6 +78,6 @@ func (c *FakeReplicationControllers) Delete(name string) error {
 	return err
 }
 
-func (c *FakeReplicationControllers) Watch(label labels.Selector, field fields.Selector, opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("replicationcontrollers", c.Namespace, label, field, opts))
+func (c *FakeReplicationControllers) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("replicationcontrollers", c.Namespace, opts))
 }

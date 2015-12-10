@@ -1321,7 +1321,14 @@ Examples:<br>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">revision</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Commit hash for the specified revision.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">directory</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Target directory name. Must not contain or start with <em>..</em>.  If <em>.</em> is supplied, the volume directory will be the git repository.  Otherwise, if specified, the volume will contain the git repository in the subdirectory with the given name.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
@@ -1804,6 +1811,13 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">iSCSI target lun number.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">iscsiInterface</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: Defaults to <em>default</em> (tcp). iSCSI interface name that uses an iSCSI transport.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -3023,7 +3037,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_probe">v1.Probe</h3>
 <div class="paragraph">
-<p>Probe describes a health check to be performed against a container to determine whether it is alive or ready to recieve traffic.</p>
+<p>Probe describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3068,21 +3082,21 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">initialDelaySeconds</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Number of seconds after the container has started before liveness probes are initiated. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes">http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes">http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">periodSeconds</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -4618,14 +4632,14 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">command</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Entrypoint array. Not executed within a shell. The docker image&#8217;s entrypoint is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container&#8217;s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands">http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Entrypoint array. Not executed within a shell. The docker image&#8217;s entrypoint is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container&#8217;s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands">http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">args</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Arguments to the entrypoint. The docker image&#8217;s cmd is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container&#8217;s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands">http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Arguments to the entrypoint. The docker image&#8217;s cmd is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container&#8217;s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands">http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5891,6 +5905,13 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">type</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Type of this event (Normal, Warning), new types could be added in the future</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -5927,7 +5948,7 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">value</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the container and any service environment variables. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double , ie: (VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Defaults to "".</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the container and any service environment variables. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Defaults to "".</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -6887,7 +6908,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2015-11-06 18:46:00 UTC
+Last updated 2015-12-01 22:56:16 UTC
 </div>
 </div>
 </body>

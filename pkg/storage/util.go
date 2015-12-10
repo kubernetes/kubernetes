@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
 )
 
 type SimpleUpdateFunc func(runtime.Object) (runtime.Object, error)
@@ -41,16 +41,29 @@ func SimpleUpdate(fn SimpleUpdateFunc) UpdateFunc {
 // the etcd version we should pass to helper.Watch(). Because resourceVersion is
 // an opaque value, the default watch behavior for non-zero watch is to watch
 // the next value (if you pass "1", you will see updates from "2" onwards).
-func ParseWatchResourceVersion(resourceVersion, kind string) (uint64, error) {
+func ParseWatchResourceVersion(resourceVersion string) (uint64, error) {
 	if resourceVersion == "" || resourceVersion == "0" {
 		return 0, nil
 	}
 	version, err := strconv.ParseUint(resourceVersion, 10, 64)
 	if err != nil {
-		// TODO: Does this need to be a ValidationErrorList?  I can't convince myself it does.
-		return 0, errors.NewInvalid(kind, "", fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("resourceVersion", resourceVersion, err.Error())})
+		return 0, errors.NewInvalid("", "", utilvalidation.ErrorList{
+			// Validation errors are supposed to return version-specific field
+			// paths, but this is probably close enough.
+			utilvalidation.NewInvalidError(utilvalidation.NewFieldPath("resourceVersion"), resourceVersion, err.Error()),
+		})
 	}
 	return version + 1, nil
+}
+
+// ParseListResourceVersion takes a resource version argument and converts it to
+// the etcd version.
+func ParseListResourceVersion(resourceVersion string) (uint64, error) {
+	if resourceVersion == "" {
+		return 0, nil
+	}
+	version, err := strconv.ParseUint(resourceVersion, 10, 64)
+	return version, err
 }
 
 func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {

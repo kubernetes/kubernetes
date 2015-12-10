@@ -343,6 +343,7 @@ var map_Event = map[string]string{
 	"firstTimestamp": "The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)",
 	"lastTimestamp":  "The time at which the most recent occurrence of this event was recorded.",
 	"count":          "The number of times this event has occurred.",
+	"type":           "Type of this event (Normal, Warning), new types could be added in the future",
 }
 
 func (Event) SwaggerDoc() map[string]string {
@@ -415,6 +416,7 @@ var map_GitRepoVolumeSource = map[string]string{
 	"":           "GitRepoVolumeSource represents a volume that is pulled from git when the pod is created.",
 	"repository": "Repository URL",
 	"revision":   "Commit hash for the specified revision.",
+	"directory":  "Target directory name. Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the git repository.  Otherwise, if specified, the volume will contain the git repository in the subdirectory with the given name.",
 }
 
 func (GitRepoVolumeSource) SwaggerDoc() map[string]string {
@@ -465,12 +467,13 @@ func (HostPathVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_ISCSIVolumeSource = map[string]string{
-	"":             "ISCSIVolumeSource describes an ISCSI Disk can only be mounted as read/write once.",
-	"targetPortal": "iSCSI target portal. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
-	"iqn":          "Target iSCSI Qualified Name.",
-	"lun":          "iSCSI target lun number.",
-	"fsType":       "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#iscsi",
-	"readOnly":     "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
+	"":               "ISCSIVolumeSource describes an ISCSI Disk can only be mounted as read/write once.",
+	"targetPortal":   "iSCSI target portal. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"iqn":            "Target iSCSI Qualified Name.",
+	"lun":            "iSCSI target lun number.",
+	"iscsiInterface": "Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.",
+	"fsType":         "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#iscsi",
+	"readOnly":       "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
 }
 
 func (ISCSIVolumeSource) SwaggerDoc() map[string]string {
@@ -1068,7 +1071,7 @@ func (PodTemplateSpec) SwaggerDoc() map[string]string {
 }
 
 var map_Probe = map[string]string{
-	"": "Probe describes a health check to be performed against a container to determine whether it is alive or ready to recieve traffic.",
+	"": "Probe describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.",
 	"initialDelaySeconds": "Number of seconds after the container has started before liveness probes are initiated. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes",
 	"timeoutSeconds":      "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes",
 	"periodSeconds":       "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.",
