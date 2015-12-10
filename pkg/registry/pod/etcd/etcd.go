@@ -26,6 +26,7 @@ import (
 	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
@@ -35,7 +36,6 @@ import (
 	podrest "k8s.io/kubernetes/pkg/registry/pod/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // PodStorage includes storage for pods and all sub resources
@@ -93,8 +93,8 @@ func NewStorage(
 
 		Storage: storageInterface,
 	}
-	statusStore := *store
 
+	statusStore := *store
 	statusStore.UpdateStrategy = pod.StatusStrategy
 
 	return PodStorage{
@@ -132,15 +132,12 @@ var _ = rest.Creater(&BindingREST{})
 // Create ensures a pod is bound to a specific host.
 func (r *BindingREST) Create(ctx api.Context, obj runtime.Object) (out runtime.Object, err error) {
 	binding := obj.(*api.Binding)
+
 	// TODO: move me to a binding strategy
-	if len(binding.Target.Kind) != 0 && binding.Target.Kind != "Node" {
-		// TODO: When validation becomes versioned, this gets more complicated.
-		return nil, errors.NewInvalid("binding", binding.Name, field.ErrorList{field.NotSupported(field.NewPath("target", "kind"), binding.Target.Kind, []string{"Node", "<empty>"})})
+	if errs := validation.ValidatePodBinding(binding); len(errs) != 0 {
+		return nil, errs.ToAggregate()
 	}
-	if len(binding.Target.Name) == 0 {
-		// TODO: When validation becomes versioned, this gets more complicated.
-		return nil, errors.NewInvalid("binding", binding.Name, field.ErrorList{field.Required(field.NewPath("target", "name"))})
-	}
+
 	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations)
 	out = &unversioned.Status{Status: unversioned.StatusSuccess}
 	return
