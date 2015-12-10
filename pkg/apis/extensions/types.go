@@ -182,7 +182,7 @@ type ThirdPartyResourceData struct {
 	api.ObjectMeta `json:"metadata,omitempty"`
 
 	// Data is the raw JSON data for this data.
-	Data []byte `json:"name,omitempty"`
+	Data []byte `json:"data,omitempty"`
 }
 
 type Deployment struct {
