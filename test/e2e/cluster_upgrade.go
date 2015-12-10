@@ -29,7 +29,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -418,7 +417,7 @@ func runCmd(command string, args ...string) (string, string, error) {
 func validate(f *Framework, svcNameWant, rcNameWant string, ingress api.LoadBalancerIngress, podsWant int) error {
 	Logf("Beginning cluster validation")
 	// Verify RC.
-	rcs, err := f.Client.ReplicationControllers(f.Namespace.Name).List(unversioned.ListOptions{})
+	rcs, err := f.Client.ReplicationControllers(f.Namespace.Name).List(api.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("error listing RCs: %v", err)
 	}

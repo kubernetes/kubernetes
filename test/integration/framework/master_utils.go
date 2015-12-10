@@ -29,7 +29,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -249,7 +248,7 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 		glog.Infof("StartPods took %v with numPods %d", time.Since(start), numPods)
 	}()
 	hostField := fields.OneTermEqualSelector(client.PodHost, host)
-	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{hostField}}
+	options := api.ListOptions{FieldSelector: hostField}
 	pods, err := restClient.Pods(TestNS).List(options)
 	if err != nil || len(pods.Items) == numPods {
 		return err

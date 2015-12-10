@@ -17,7 +17,7 @@ limitations under the License.
 package testclient
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	kclientlib "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
@@ -41,7 +41,7 @@ func (c *FakeThirdPartyResources) Get(name string) (*extensions.ThirdPartyResour
 	return obj.(*extensions.ThirdPartyResource), err
 }
 
-func (c *FakeThirdPartyResources) List(opts unversioned.ListOptions) (*extensions.ThirdPartyResourceList, error) {
+func (c *FakeThirdPartyResources) List(opts api.ListOptions) (*extensions.ThirdPartyResourceList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("thirdpartyresources", c.Namespace, opts), &extensions.ThirdPartyResourceList{})
 	if obj == nil {
 		return nil, err
@@ -78,6 +78,6 @@ func (c *FakeThirdPartyResources) Delete(name string) error {
 	return err
 }
 
-func (c *FakeThirdPartyResources) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *FakeThirdPartyResources) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.InvokesWatch(NewWatchAction("thirdpartyresources", c.Namespace, opts))
 }

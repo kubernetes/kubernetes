@@ -23,7 +23,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -96,10 +95,10 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 	// Manage addition/update of daemon sets.
 	dsc.dsStore.Store, dsc.dsController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).Watch(options)
 			},
 		},
@@ -128,10 +127,10 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 	// more pods until all the effects (expectations) of a daemon set's create/delete have been observed.
 	dsc.podStore.Store, dsc.podController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return dsc.kubeClient.Pods(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return dsc.kubeClient.Pods(api.NamespaceAll).Watch(options)
 			},
 		},
@@ -146,10 +145,10 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 	// Watch for new nodes or updates to nodes - daemon pods are launched on new nodes, and possibly when labels on nodes change,
 	dsc.nodeStore.Store, dsc.nodeController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return dsc.kubeClient.Nodes().List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return dsc.kubeClient.Nodes().Watch(options)
 			},
 		},

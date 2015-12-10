@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -31,12 +30,12 @@ type LimitRangesNamespacer interface {
 
 // LimitRangeInterface has methods to work with LimitRange resources.
 type LimitRangeInterface interface {
-	List(opts unversioned.ListOptions) (*api.LimitRangeList, error)
+	List(opts api.ListOptions) (*api.LimitRangeList, error)
 	Get(name string) (*api.LimitRange, error)
 	Delete(name string) error
 	Create(limitRange *api.LimitRange) (*api.LimitRange, error)
 	Update(limitRange *api.LimitRange) (*api.LimitRange, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // limitRanges implements LimitRangesNamespacer interface
@@ -54,7 +53,7 @@ func newLimitRanges(c *Client, namespace string) *limitRanges {
 }
 
 // List takes a selector, and returns the list of limitRanges that match that selector.
-func (c *limitRanges) List(opts unversioned.ListOptions) (result *api.LimitRangeList, err error) {
+func (c *limitRanges) List(opts api.ListOptions) (result *api.LimitRangeList, err error) {
 	result = &api.LimitRangeList{}
 	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
@@ -91,7 +90,7 @@ func (c *limitRanges) Update(limitRange *api.LimitRange) (result *api.LimitRange
 }
 
 // Watch returns a watch.Interface that watches the requested resource
-func (c *limitRanges) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *limitRanges) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).

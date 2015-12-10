@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	fake_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/util"
@@ -185,13 +184,13 @@ func (c *mockControllerClient) CreatePersistentVolume(pv *api.PersistentVolume) 
 	return c.volume, nil
 }
 
-func (c *mockControllerClient) ListPersistentVolumes(options unversioned.ListOptions) (*api.PersistentVolumeList, error) {
+func (c *mockControllerClient) ListPersistentVolumes(options api.ListOptions) (*api.PersistentVolumeList, error) {
 	return &api.PersistentVolumeList{
 		Items: []api.PersistentVolume{*c.volume},
 	}, nil
 }
 
-func (c *mockControllerClient) WatchPersistentVolumes(options unversioned.ListOptions) (watch.Interface, error) {
+func (c *mockControllerClient) WatchPersistentVolumes(options api.ListOptions) (watch.Interface, error) {
 	return watch.NewFake(), nil
 }
 
@@ -216,13 +215,13 @@ func (c *mockControllerClient) GetPersistentVolumeClaim(namespace, name string) 
 	}
 }
 
-func (c *mockControllerClient) ListPersistentVolumeClaims(namespace string, options unversioned.ListOptions) (*api.PersistentVolumeClaimList, error) {
+func (c *mockControllerClient) ListPersistentVolumeClaims(namespace string, options api.ListOptions) (*api.PersistentVolumeClaimList, error) {
 	return &api.PersistentVolumeClaimList{
 		Items: []api.PersistentVolumeClaim{*c.claim},
 	}, nil
 }
 
-func (c *mockControllerClient) WatchPersistentVolumeClaims(namespace string, options unversioned.ListOptions) (watch.Interface, error) {
+func (c *mockControllerClient) WatchPersistentVolumeClaims(namespace string, options api.ListOptions) (watch.Interface, error) {
 	return watch.NewFake(), nil
 }
 

@@ -54,11 +54,8 @@ func addKnownTypes() {
 		&ThirdPartyResourceDataList{},
 		&Ingress{},
 		&IngressList{},
+		&ListOptions{},
 	)
-
-	// Register Unversioned types
-	// TODO this should not be done here
-	api.Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.ListOptions{})
 }
 
 func (*ClusterAutoscaler) IsAnAPIObject()           {}
@@ -79,3 +76,4 @@ func (*ThirdPartyResourceData) IsAnAPIObject()      {}
 func (*ThirdPartyResourceDataList) IsAnAPIObject()  {}
 func (*Ingress) IsAnAPIObject()                     {}
 func (*IngressList) IsAnAPIObject()                 {}
+func (*ListOptions) IsAnAPIObject()                 {}

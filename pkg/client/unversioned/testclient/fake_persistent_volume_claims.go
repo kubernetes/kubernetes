@@ -18,7 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -36,7 +35,7 @@ func (c *FakePersistentVolumeClaims) Get(name string) (*api.PersistentVolumeClai
 	return obj.(*api.PersistentVolumeClaim), err
 }
 
-func (c *FakePersistentVolumeClaims) List(opts unversioned.ListOptions) (*api.PersistentVolumeClaimList, error) {
+func (c *FakePersistentVolumeClaims) List(opts api.ListOptions) (*api.PersistentVolumeClaimList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("persistentvolumeclaims", c.Namespace, opts), &api.PersistentVolumeClaimList{})
 	if obj == nil {
 		return nil, err
@@ -68,7 +67,7 @@ func (c *FakePersistentVolumeClaims) Delete(name string) error {
 	return err
 }
 
-func (c *FakePersistentVolumeClaims) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *FakePersistentVolumeClaims) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.InvokesWatch(NewWatchAction("persistentvolumeclaims", c.Namespace, opts))
 }
 

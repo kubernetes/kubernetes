@@ -89,7 +89,7 @@ func (m *FakeNodeHandler) Get(name string) (*api.Node, error) {
 	return nil, nil
 }
 
-func (m *FakeNodeHandler) List(opts unversioned.ListOptions) (*api.NodeList, error) {
+func (m *FakeNodeHandler) List(opts api.ListOptions) (*api.NodeList, error) {
 	defer func() { m.RequestCount++ }()
 	var nodes []*api.Node
 	for i := 0; i < len(m.UpdatedNodes); i++ {
@@ -134,7 +134,7 @@ func (m *FakeNodeHandler) UpdateStatus(node *api.Node) (*api.Node, error) {
 	return node, nil
 }
 
-func (m *FakeNodeHandler) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (m *FakeNodeHandler) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return nil, nil
 }
 

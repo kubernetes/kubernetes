@@ -24,7 +24,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -107,10 +106,10 @@ func NewReplicationManager(kubeClient client.Interface, resyncPeriod controller.
 
 	rm.rcStore.Store, rm.rcController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return rm.kubeClient.ReplicationControllers(api.NamespaceAll).Watch(options)
 			},
 		},
@@ -148,10 +147,10 @@ func NewReplicationManager(kubeClient client.Interface, resyncPeriod controller.
 
 	rm.podStore.Store, rm.podController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return rm.kubeClient.Pods(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return rm.kubeClient.Pods(api.NamespaceAll).Watch(options)
 			},
 		},

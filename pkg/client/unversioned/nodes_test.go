@@ -44,7 +44,7 @@ func TestListNodes(t *testing.T) {
 		},
 		Response: simple.Response{StatusCode: 200, Body: &api.NodeList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}},
 	}
-	response, err := c.Setup(t).Nodes().List(unversioned.ListOptions{})
+	response, err := c.Setup(t).Nodes().List(api.ListOptions{})
 	c.Validate(t, response, err)
 }
 
@@ -74,7 +74,7 @@ func TestListNodesLabels(t *testing.T) {
 	c.Setup(t)
 	c.QueryValidator[labelSelectorQueryParamName] = simple.ValidateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	options := api.ListOptions{LabelSelector: selector}
 	receivedNodeList, err := c.Nodes().List(options)
 	c.Validate(t, receivedNodeList, err)
 }

@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -42,7 +41,7 @@ var _ = Describe("[Autoscaling] [Skipped]", func() {
 	BeforeEach(func() {
 		SkipUnlessProviderIs("gce")
 
-		nodes, err := f.Client.Nodes().List(unversioned.ListOptions{})
+		nodes, err := f.Client.Nodes().List(api.ListOptions{})
 		expectNoError(err)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())

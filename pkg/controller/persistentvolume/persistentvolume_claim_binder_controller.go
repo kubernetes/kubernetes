@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -55,10 +54,10 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 
 	_, volumeController := framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return kubeClient.PersistentVolumes().List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return kubeClient.PersistentVolumes().Watch(options)
 			},
 		},
@@ -73,10 +72,10 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 	)
 	_, claimController := framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return kubeClient.PersistentVolumeClaims(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return kubeClient.PersistentVolumeClaims(api.NamespaceAll).Watch(options)
 			},
 		},

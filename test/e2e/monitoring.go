@@ -23,7 +23,6 @@ import (
 
 	influxdb "github.com/influxdb/influxdb/client"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 
@@ -78,7 +77,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 	// is running (which would be an error except during a rolling update).
 	for _, rcLabel := range rcLabels {
 		selector := labels.Set{"k8s-app": rcLabel}.AsSelector()
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		options := api.ListOptions{LabelSelector: selector}
 		rcList, err := c.ReplicationControllers(api.NamespaceSystem).List(options)
 		if err != nil {
 			return nil, err
@@ -89,7 +88,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 		}
 		for _, rc := range rcList.Items {
 			selector := labels.Set(rc.Spec.Selector).AsSelector()
-			options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+			options := api.ListOptions{LabelSelector: selector}
 			podList, err := c.Pods(api.NamespaceSystem).List(options)
 			if err != nil {
 				return nil, err
@@ -106,7 +105,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 }
 
 func expectedServicesExist(c *client.Client) error {
-	serviceList, err := c.Services(api.NamespaceSystem).List(unversioned.ListOptions{})
+	serviceList, err := c.Services(api.NamespaceSystem).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -124,7 +123,7 @@ func expectedServicesExist(c *client.Client) error {
 }
 
 func getAllNodesInCluster(c *client.Client) ([]string, error) {
-	nodeList, err := c.Nodes().List(unversioned.ListOptions{})
+	nodeList, err := c.Nodes().List(api.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +243,7 @@ func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {
 
 func printDebugInfo(c *client.Client) {
 	set := labels.Set{"k8s-app": "heapster"}
-	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{set.AsSelector()}}
+	options := api.ListOptions{LabelSelector: set.AsSelector()}
 	podList, err := c.Pods(api.NamespaceSystem).List(options)
 	if err != nil {
 		Logf("Error while listing pods %v", err)

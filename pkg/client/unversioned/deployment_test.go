@@ -105,7 +105,7 @@ func TestDeploymentList(t *testing.T) {
 		},
 		Response: simple.Response{StatusCode: 200, Body: deploymentList},
 	}
-	response, err := c.Setup(t).Deployments(ns).List(unversioned.ListOptions{})
+	response, err := c.Setup(t).Deployments(ns).List(api.ListOptions{})
 	c.Validate(t, response, err)
 }
 
@@ -174,7 +174,7 @@ func TestDeploymentWatch(t *testing.T) {
 		},
 		Response: simple.Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).Deployments(api.NamespaceAll).Watch(unversioned.ListOptions{})
+	_, err := c.Setup(t).Deployments(api.NamespaceAll).Watch(api.ListOptions{})
 	c.Validate(t, nil, err)
 }
 
@@ -205,7 +205,7 @@ func TestListDeploymentsLabels(t *testing.T) {
 	c.Setup(t)
 	c.QueryValidator[labelSelectorQueryParamName] = simple.ValidateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	options := api.ListOptions{LabelSelector: selector}
 	receivedPodList, err := c.Deployments(ns).List(options)
 	c.Validate(t, receivedPodList, err)
 }

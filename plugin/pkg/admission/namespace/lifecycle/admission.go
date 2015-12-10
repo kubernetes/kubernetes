@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -107,10 +106,10 @@ func NewLifecycle(c client.Interface) admission.Interface {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return c.Namespaces().List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return c.Namespaces().Watch(options)
 			},
 		},

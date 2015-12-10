@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
@@ -85,7 +84,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	// Wait for the Elasticsearch pods to enter the running state.
 	By("Checking to make sure the Elasticsearch pods are running")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{esKey: esValue}))
-	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{label}}
+	options := api.ListOptions{LabelSelector: label}
 	pods, err := f.Client.Pods(api.NamespaceSystem).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
@@ -182,7 +181,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	}
 
 	// Obtain a list of nodes so we can place one synthetic logger on each node.
-	nodes, err := f.Client.Nodes().List(unversioned.ListOptions{})
+	nodes, err := f.Client.Nodes().List(api.ListOptions{})
 	if err != nil {
 		Failf("Failed to list nodes: %v", err)
 	}
@@ -270,7 +269,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 
 		// Debugging code to report the status of the elasticsearch logging endpoints.
 		selector := labels.Set{esKey: esValue}.AsSelector()
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		options := api.ListOptions{LabelSelector: selector}
 		esPods, err := f.Client.Pods(api.NamespaceSystem).List(options)
 		if err != nil {
 			Logf("Attempt to list Elasticsearch nodes encountered a problem -- may retry: %v", err)

@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func TestListEndpoints(t *testing.T) {
@@ -47,7 +46,7 @@ func TestListEndpoints(t *testing.T) {
 			},
 		},
 	}
-	receivedEndpointsList, err := c.Setup(t).Endpoints(ns).List(unversioned.ListOptions{})
+	receivedEndpointsList, err := c.Setup(t).Endpoints(ns).List(api.ListOptions{})
 	c.Validate(t, receivedEndpointsList, err)
 }
 

@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -80,12 +79,12 @@ func NewServiceAccountsController(cl client.Interface, options ServiceAccountsCo
 	}
 	e.serviceAccounts, e.serviceAccountController = framework.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
-				options.FieldSelector.Selector = accountSelector
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				options.FieldSelector = accountSelector
 				return e.client.ServiceAccounts(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				options.FieldSelector.Selector = accountSelector
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				options.FieldSelector = accountSelector
 				return e.client.ServiceAccounts(api.NamespaceAll).Watch(options)
 			},
 		},
@@ -99,10 +98,10 @@ func NewServiceAccountsController(cl client.Interface, options ServiceAccountsCo
 
 	e.namespaces, e.namespaceController = framework.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return e.client.Namespaces().List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return e.client.Namespaces().Watch(options)
 			},
 		},

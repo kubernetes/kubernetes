@@ -97,6 +97,12 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.SelfLink = c.RandString()
 		},
+		func(j *api.ListOptions, c fuzz.Continue) {
+			label, _ := labels.Parse("a=b")
+			j.LabelSelector = label
+			field, _ := fields.ParseSelector("a=b")
+			j.FieldSelector = field
+		},
 		func(j *unversioned.ListOptions, c fuzz.Continue) {
 			// TODO: add some parsing
 			label, _ := labels.Parse("a=b")

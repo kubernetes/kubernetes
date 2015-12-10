@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -650,7 +649,7 @@ func (k *framework) makeTaskRegistryReconciler() taskreconciler.Action {
 // tasks identified by annotations in the Kubernetes pod registry.
 func (k *framework) makePodRegistryReconciler() taskreconciler.Action {
 	return taskreconciler.Action(func(drv bindings.SchedulerDriver, cancel <-chan struct{}) <-chan error {
-		podList, err := k.client.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
+		podList, err := k.client.Pods(api.NamespaceAll).List(api.ListOptions{})
 		if err != nil {
 			return proc.ErrorChanf("failed to reconcile pod registry: %v", err)
 		}
@@ -726,7 +725,7 @@ func (k *framework) explicitlyReconcileTasks(driver bindings.SchedulerDriver, ta
 }
 
 func (ks *framework) recoverTasks() error {
-	podList, err := ks.client.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
+	podList, err := ks.client.Pods(api.NamespaceAll).List(api.ListOptions{})
 	if err != nil {
 		log.V(1).Infof("failed to recover pod registry, madness may ensue: %v", err)
 		return err
