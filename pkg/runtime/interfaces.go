@@ -137,14 +137,17 @@ type SelfLinker interface {
 	Namespace(obj Object) (string, error)
 }
 
-// All api types must support the Object interface. It's deliberately tiny so that this is not an onerous
-// burden. Implement it with a pointer receiver; this will allow us to use the go compiler to check the
-// one thing about our objects that it's capable of checking for us.
+// All API types registered with Scheme must support the Object interface. Since objects in a scheme are
+// expected to be serialized to the wire, the interface an Object must provide to the Scheme allows
+// serializers to set the kind, version, and group the object is represented as. Objects *may* choose
+// to have GroupVersionKind or SetGroupVersionKind be no-ops in specific scenarios, but generally the
+// value set onto the Object should be returned by a subsequent call to GroupVersionKind. Objects that
+// are part of a Scheme but which are not serialized may choose to have these methods be no-ops.
 type Object interface {
-	// SetGroupVersionKind sets or clears the stored version with an object. Because most serialization
-	// requires this field, it is our marker interface for our objects.
-	SetGroupVersionKind(gvk *unversioned.GroupVersionKind)
+	// SetGroupVersionKind sets or clears the intended serialized kind of an object. Passing kind nil
+	// should clear the group version kind.
+	SetGroupVersionKind(kind *unversioned.GroupVersionKind)
 	// GroupVersionKind returns the stored group, version, and kind of an object, or nil if the object does
-	// not allow those fields to be encoded.
+	// not expose or provide these fields.
 	GroupVersionKind() *unversioned.GroupVersionKind
 }
