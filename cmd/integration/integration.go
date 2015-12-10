@@ -63,9 +63,10 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"golang.org/x/net/context"
 )
 
 var (
@@ -93,17 +94,23 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func startComponents(firstManifestURL, secondManifestURL string) (string, string) {
 	// Setup
-	servers := []string{}
-	glog.Infof("Creating etcd client pointing to %v", servers)
-
 	handler := delegateHandler{}
 	apiServer := httptest.NewServer(&handler)
 
-	etcdClient := etcd.NewClient(servers)
+	cfg := etcd.Config{
+		Endpoints: []string{"http://127.0.0.1:4001"},
+	}
+	etcdClient, err := etcd.New(cfg)
+	if err != nil {
+		glog.Fatalf("Error creating etcd client: %v", err)
+	}
+	glog.Infof("Creating etcd client pointing to %v", cfg.Endpoints)
+
+	keysAPI := etcd.NewKeysAPI(etcdClient)
 	sleep := 4 * time.Second
 	ok := false
 	for i := 0; i < 3; i++ {
-		keys, err := etcdClient.Get("/", false, false)
+		keys, err := keysAPI.Get(context.TODO(), "/", nil)
 		if err != nil {
 			glog.Warningf("Unable to list root etcd keys: %v", err)
 			if i < 2 {
@@ -113,7 +120,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 			continue
 		}
 		for _, node := range keys.Node.Nodes {
-			if _, err := etcdClient.Delete(node.Key, true); err != nil {
+			if _, err := keysAPI.Delete(context.TODO(), node.Key, &etcd.DeleteOptions{Recursive: true}); err != nil {
 				glog.Fatalf("Unable delete key: %v", err)
 			}
 		}

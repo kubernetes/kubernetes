@@ -53,7 +53,7 @@ func ParseWatchResourceVersion(resourceVersion string) (uint64, error) {
 			field.Invalid(field.NewPath("resourceVersion"), resourceVersion, err.Error()),
 		})
 	}
-	return version + 1, nil
+	return version, nil
 }
 
 // ParseListResourceVersion takes a resource version argument and converts it to

@@ -32,7 +32,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/golang/glog"
 	"github.com/kardianos/osext"
@@ -102,7 +102,6 @@ type SchedulerServer struct {
 	authPath            string
 	apiServerList       []string
 	etcdServerList      []string
-	etcdConfigFile      string
 	allowPrivileged     bool
 	executorPath        string
 	proxyPath           string
@@ -234,8 +233,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.enableProfiling, "profiling", s.enableProfiling, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringSliceVar(&s.apiServerList, "api-servers", s.apiServerList, "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
 	fs.StringVar(&s.authPath, "auth-path", s.authPath, "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
-	fs.StringSliceVar(&s.etcdServerList, "etcd-servers", s.etcdServerList, "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with --etcd-config")
-	fs.StringVar(&s.etcdConfigFile, "etcd-config", s.etcdConfigFile, "The config file for the etcd client. Mutually exclusive with --etcd-servers.")
+	fs.StringSliceVar(&s.etcdServerList, "etcd-servers", s.etcdServerList, "List of etcd servers to watch (http://ip:port), comma separated.")
 	fs.BoolVar(&s.allowPrivileged, "allow-privileged", s.allowPrivileged, "Enable privileged containers in the kubelet (compare the same flag in the apiserver).")
 	fs.StringVar(&s.clusterDomain, "cluster-domain", s.clusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
 	fs.IPVar(&s.clusterDNS, "cluster-dns", s.clusterDNS, "IP address for a cluster DNS server. If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
@@ -640,16 +638,14 @@ func validateLeadershipTransition(desired, current string) {
 }
 
 // hacked from https://github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kube-apiserver/app/server.go
-func newEtcd(etcdConfigFile string, etcdServerList []string) (client *etcd.Client, err error) {
-	if etcdConfigFile != "" {
-		client, err = etcd.NewClientFromFile(etcdConfigFile)
-	} else {
-		client = etcd.NewClient(etcdServerList)
+func newEtcd(etcdServerList []string) (etcd.Client, error) {
+	cfg := etcd.Config{
+		Endpoints: etcdServerList,
 	}
-	return
+	return etcd.New(cfg)
 }
 
-func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config) (*ha.SchedulerProcess, ha.DriverFactory, *etcd.Client, *mesos.ExecutorID) {
+func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config) (*ha.SchedulerProcess, ha.DriverFactory, etcd.Client, *mesos.ExecutorID) {
 	s.frameworkName = strings.TrimSpace(s.frameworkName)
 	if s.frameworkName == "" {
 		log.Fatalf("framework-name must be a non-empty string")
@@ -661,8 +657,8 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	s.mux.Handle("/metrics", prometheus.Handler())
 	healthz.InstallHandler(s.mux)
 
-	if (s.etcdConfigFile != "" && len(s.etcdServerList) != 0) || (s.etcdConfigFile == "" && len(s.etcdServerList) == 0) {
-		log.Fatalf("specify either --etcd-servers or --etcd-config")
+	if len(s.etcdServerList) == 0 {
+		log.Fatalf("specify --etcd-servers must be specified")
 	}
 
 	if len(s.apiServerList) < 1 {
@@ -689,10 +685,11 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	// (1) the generic config store is available for the FrameworkId storage
 	// (2) the generic master election is provided by the apiserver
 	// Compare docs/proposals/high-availability.md
-	etcdClient, err := newEtcd(s.etcdConfigFile, s.etcdServerList)
+	etcdClient, err := newEtcd(s.etcdServerList)
 	if err != nil {
 		log.Fatalf("misconfigured etcd: %v", err)
 	}
+	keysAPI := etcd.NewKeysAPI(etcdClient)
 
 	// mirror all nodes into the nodeStore
 	var eiRegistry executorinfo.Registry
@@ -741,7 +738,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		LookupNode:        lookupNode,
 		StoreFrameworkId: func(id string) {
 			// TODO(jdef): port FrameworkId store to generic Kubernetes config store as soon as available
-			_, err := etcdClient.Set(meta.FrameworkIDKey, id, uint64(s.failoverTimeout))
+			_, err := keysAPI.Set(context.TODO(), meta.FrameworkIDKey, id, &etcd.SetOptions{TTL: time.Duration(s.failoverTimeout) * time.Second})
 			if err != nil {
 				log.Errorf("failed to renew frameworkId TTL: %v", err)
 			}
@@ -806,7 +803,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		log.V(1).Infoln("deferred init complete")
 		// defer obtaining framework ID to prevent multiple schedulers
 		// from overwriting each other's framework IDs
-		dconfig.Framework.Id, err = s.fetchFrameworkID(etcdClient)
+		dconfig.Framework.Id, err = s.fetchFrameworkID(keysAPI)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch framework ID from etcd: %v", err)
 		}
@@ -928,9 +925,9 @@ func (s *SchedulerServer) buildFrameworkInfo() (info *mesos.FrameworkInfo, cred 
 	return
 }
 
-func (s *SchedulerServer) fetchFrameworkID(client *etcd.Client) (*mesos.FrameworkID, error) {
+func (s *SchedulerServer) fetchFrameworkID(client etcd.KeysAPI) (*mesos.FrameworkID, error) {
 	if s.failoverTimeout > 0 {
-		if response, err := client.Get(meta.FrameworkIDKey, false, false); err != nil {
+		if response, err := client.Get(context.TODO(), meta.FrameworkIDKey, nil); err != nil {
 			if !etcdutil.IsEtcdNotFound(err) {
 				return nil, fmt.Errorf("unexpected failure attempting to load framework ID from etcd: %v", err)
 			}
@@ -941,7 +938,7 @@ func (s *SchedulerServer) fetchFrameworkID(client *etcd.Client) (*mesos.Framewor
 		}
 	} else {
 		//TODO(jdef) this seems like a totally hackish way to clean up the framework ID
-		if _, err := client.Delete(meta.FrameworkIDKey, true); err != nil {
+		if _, err := client.Delete(context.TODO(), meta.FrameworkIDKey, &etcd.DeleteOptions{Recursive: true}); err != nil {
 			if !etcdutil.IsEtcdNotFound(err) {
 				return nil, fmt.Errorf("failed to delete framework ID from etcd: %v", err)
 			}
