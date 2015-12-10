@@ -14,7 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package unversioned_test
+
+import (
+	. "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
+)
 
 import (
 	"net/url"
@@ -27,20 +32,20 @@ import (
 )
 
 func TestEventSearch(t *testing.T) {
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath("events", "baz", ""),
 			Query: url.Values{
 				unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String()): []string{
-					getInvolvedObjectNameFieldLabel(testapi.Default.GroupVersion().String()) + "=foo,",
+					GetInvolvedObjectNameFieldLabel(testapi.Default.GroupVersion().String()) + "=foo,",
 					"involvedObject.namespace=baz,",
 					"involvedObject.kind=Pod",
 				},
 				unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String()): []string{},
 			},
 		},
-		Response: Response{StatusCode: 200, Body: &api.EventList{}},
+		Response: simple.Response{StatusCode: 200, Body: &api.EventList{}},
 	}
 	eventList, err := c.Setup(t).Events("baz").Search(
 		&api.Pod{
@@ -74,13 +79,13 @@ func TestEventCreate(t *testing.T) {
 		Count:          1,
 		Type:           api.EventTypeNormal,
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "POST",
 			Path:   testapi.Default.ResourcePath("events", api.NamespaceDefault, ""),
 			Body:   event,
 		},
-		Response: Response{StatusCode: 200, Body: event},
+		Response: simple.Response{StatusCode: 200, Body: event},
 	}
 
 	response, err := c.Setup(t).Events(api.NamespaceDefault).Create(event)
@@ -114,13 +119,13 @@ func TestEventGet(t *testing.T) {
 		Count:          1,
 		Type:           api.EventTypeNormal,
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath("events", "other", "1"),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: event},
+		Response: simple.Response{StatusCode: 200, Body: event},
 	}
 
 	response, err := c.Setup(t).Events("other").Get("1")
@@ -156,13 +161,13 @@ func TestEventList(t *testing.T) {
 			},
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath("events", ns, ""),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: eventList},
+		Response: simple.Response{StatusCode: 200, Body: eventList},
 	}
 	response, err := c.Setup(t).Events(ns).List(unversioned.ListOptions{})
 
@@ -183,12 +188,12 @@ func TestEventList(t *testing.T) {
 
 func TestEventDelete(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "DELETE",
 			Path:   testapi.Default.ResourcePath("events", ns, "foo"),
 		},
-		Response: Response{StatusCode: 200},
+		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Events(ns).Delete("foo")
 	c.Validate(t, nil, err)
