@@ -142,7 +142,7 @@ func objectToVersionedRuntimeObject(obj interface{}) (runtime.Object, uint64, er
 	if err != nil {
 		return nil, 0, err
 	}
-	resourceVersion, err := parseResourceVersion(meta.ResourceVersion())
+	resourceVersion, err := parseResourceVersion(meta.GetResourceVersion())
 	if err != nil {
 		return nil, 0, err
 	}

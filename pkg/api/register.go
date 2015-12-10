@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -91,48 +92,57 @@ func init() {
 	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIResourceList{})
 }
 
+func (obj *Pod) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *Pod) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
 func (obj *PodList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *PodStatusResult) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *PodStatusResult) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *PodTemplate) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *PodTemplate) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
 func (obj *PodTemplateList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *ReplicationController) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *ReplicationController) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
 func (obj *ReplicationControllerList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *Service) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *Service) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
 func (obj *ServiceList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *Endpoints) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *Endpoints) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
 func (obj *EndpointsList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *Node) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *Node) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
 func (obj *NodeList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *Binding) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *Binding) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *Event) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *Event) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
@@ -142,42 +152,49 @@ func (obj *EventList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 func (obj *List) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *LimitRange) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *LimitRange) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
 func (obj *LimitRangeList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *ResourceQuota) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *ResourceQuota) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
 func (obj *ResourceQuotaList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *Namespace) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *Namespace) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
 func (obj *NamespaceList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *ServiceAccount) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *ServiceAccount) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
 func (obj *ServiceAccountList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *Secret) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *Secret) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
 func (obj *SecretList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *PersistentVolume) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *PersistentVolume) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
 func (obj *PersistentVolumeList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *PersistentVolumeClaim) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *PersistentVolumeClaim) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
@@ -199,6 +216,7 @@ func (obj *PodExecOptions) SetGroupVersionKind(gvk *unversioned.GroupVersionKind
 func (obj *PodProxyOptions) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *ComponentStatus) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *ComponentStatus) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
@@ -208,6 +226,7 @@ func (obj *ComponentStatusList) SetGroupVersionKind(gvk *unversioned.GroupVersio
 func (obj *SerializedReference) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }
+func (obj *RangeAllocation) GetObjectMeta() meta.ObjectInterface { return &obj.ObjectMeta }
 func (obj *RangeAllocation) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
 }

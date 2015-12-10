@@ -50,10 +50,16 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 		return nil, err
 	}
 
+	gvk := obj.GroupVersionKind()
+
 	// if the object referenced is actually persisted, we can just get kind from meta
 	// if we are building an object reference to something not yet persisted, we should fallback to scheme
-	kind := meta.Kind()
-	if kind == "" {
+	var kind string
+	if gvk != nil {
+		kind = gvk.Kind
+	}
+	if len(kind) == 0 {
+		// TODO: this is wrong
 		gvk, err := Scheme.ObjectKind(obj)
 		if err != nil {
 			return nil, err
@@ -62,32 +68,34 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	}
 
 	// if the object referenced is actually persisted, we can also get version from meta
-	version := meta.APIVersion()
-	if version == "" {
-		selfLink := meta.SelfLink()
-		if selfLink == "" {
+	var version string
+	if gvk != nil {
+		version = gvk.GroupVersion().String()
+	}
+	if len(version) == 0 {
+		selfLink := meta.GetSelfLink()
+		if len(selfLink) == 0 {
 			return nil, ErrNoSelfLink
-		} else {
-			selfLinkUrl, err := url.Parse(selfLink)
-			if err != nil {
-				return nil, err
-			}
-			// example paths: /<prefix>/<version>/*
-			parts := strings.Split(selfLinkUrl.Path, "/")
-			if len(parts) < 3 {
-				return nil, fmt.Errorf("unexpected self link format: '%v'; got version '%v'", selfLink, version)
-			}
-			version = parts[2]
 		}
+		selfLinkUrl, err := url.Parse(selfLink)
+		if err != nil {
+			return nil, err
+		}
+		// example paths: /<prefix>/<version>/*
+		parts := strings.Split(selfLinkUrl.Path, "/")
+		if len(parts) < 3 {
+			return nil, fmt.Errorf("unexpected self link format: '%v'; got version '%v'", selfLink, version)
+		}
+		version = parts[2]
 	}
 
 	return &ObjectReference{
 		Kind:            kind,
 		APIVersion:      version,
-		Name:            meta.Name(),
-		Namespace:       meta.Namespace(),
-		UID:             meta.UID(),
-		ResourceVersion: meta.ResourceVersion(),
+		Name:            meta.GetName(),
+		Namespace:       meta.GetNamespace(),
+		UID:             meta.GetUID(),
+		ResourceVersion: meta.GetResourceVersion(),
 	}, nil
 }
 
