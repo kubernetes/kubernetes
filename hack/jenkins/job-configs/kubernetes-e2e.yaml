@@ -1,0 +1,38 @@
+- job-template:
+    name: 'kubernetes-e2e-{suffix}'
+    description: 'Run E2E tests on GCE using the latest successful build. Test owner: Build Cop.'
+    logrotate:
+        daysToKeep: 7
+    builders:
+        - shell: |
+            curl -fsS -o upload-to-gcs.sh --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh" && source upload-to-gcs.sh; rm -f upload-to-gcs.sh
+            curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e.sh" | bash -
+    properties:
+        - mail-watcher
+    publishers:
+        - claim-build
+        - email-ext
+        - gcs-uploader
+        - log-parser
+        - junit-publisher
+    triggers:
+        - reverse:
+            jobs: kubernetes-build
+            result: success
+        - timed: 'H/30 * * * *'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: 150
+            abort: true
+            fail: true
+        - timestamps
+        - workspace-cleanup
+
+- project:
+    name: kubernetes-e2e
+    suffix:
+        - 'gce'
+    jobs:
+        - 'kubernetes-e2e-{suffix}'
