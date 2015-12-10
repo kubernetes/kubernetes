@@ -778,7 +778,7 @@ var _ = Describe("Services", func() {
 		ns1 := f.Namespace.Name
 
 		By("Building a second namespace api object")
-		namespacePtr, err := createTestingNS("services", c)
+		namespacePtr, err := createTestingNS("services", c, nil)
 		Expect(err).NotTo(HaveOccurred())
 		ns2 := namespacePtr.Name
 		extraNamespaces = append(extraNamespaces, ns2)
