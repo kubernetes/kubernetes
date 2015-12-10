@@ -234,8 +234,8 @@ func (r *Requirement) String() string {
 // Add adds requirements to the selector. It copies the current selector returning a new one
 func (lsel internalSelector) Add(reqs ...Requirement) Selector {
 	var sel internalSelector
-	for _, item := range lsel {
-		sel = append(sel, item)
+	for ix := range lsel {
+		sel = append(sel, lsel[ix])
 	}
 	for _, r := range reqs {
 		sel = append(sel, r)
@@ -248,8 +248,8 @@ func (lsel internalSelector) Add(reqs ...Requirement) Selector {
 // its Requirements match the input Labels. If any
 // Requirement does not match, false is returned.
 func (lsel internalSelector) Matches(l Labels) bool {
-	for _, req := range lsel {
-		if matches := req.Matches(l); !matches {
+	for ix := range lsel {
+		if matches := lsel[ix].Matches(l); !matches {
 			return false
 		}
 	}
@@ -260,8 +260,8 @@ func (lsel internalSelector) Matches(l Labels) bool {
 // the internalSelector Requirements' human-readable strings.
 func (lsel internalSelector) String() string {
 	var reqs []string
-	for _, req := range lsel {
-		reqs = append(reqs, req.String())
+	for ix := range lsel {
+		reqs = append(reqs, lsel[ix].String())
 	}
 	return strings.Join(reqs, ",")
 }
