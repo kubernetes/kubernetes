@@ -55,7 +55,10 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
+	"k8s.io/kubernetes/pkg/volume/git_repo"
+	"k8s.io/kubernetes/pkg/volume/secret"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
@@ -211,7 +214,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		10250, /* KubeletPort */
 		0,     /* ReadOnlyPort */
 		api.NamespaceDefault,
-		empty_dir.ProbeVolumePlugins(),
+		probeVolumePlugins(),
 		nil,
 		cadvisorInterface,
 		configFilePath,
@@ -244,7 +247,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		10251, /* KubeletPort */
 		0,     /* ReadOnlyPort */
 		api.NamespaceDefault,
-		empty_dir.ProbeVolumePlugins(),
+		probeVolumePlugins(),
 		nil,
 		cadvisorInterface,
 		"",
@@ -263,6 +266,16 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 
 	kubeletapp.RunKubelet(kcfg)
 	return apiServer.URL, configFilePath
+}
+
+// The list of plugins to probe in this test
+func probeVolumePlugins() []volume.VolumePlugin {
+	allPlugins := []volume.VolumePlugin{}
+
+	allPlugins = append(allPlugins, empty_dir.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, git_repo.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, secret.ProbeVolumePlugins()...)
+	return allPlugins
 }
 
 func makeTempDirOrDie(prefix string, baseDir string) string {
@@ -989,6 +1002,7 @@ func main() {
 		runServiceTest,
 		runAPIVersionsTest,
 		runMasterServiceTest,
+		runWrapperVolumesPluginsTest,
 		func(c *client.Client) {
 			runSelfLinkTestOnNamespace(c, api.NamespaceDefault)
 			runSelfLinkTestOnNamespace(c, "other")
@@ -1038,8 +1052,8 @@ func main() {
 	//              1 pod infra container + 1 container from the service test.
 	// The total number of container created is 9
 
-	if len(createdConts) != 12 {
-		glog.Fatalf("Expected 12 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
+	if len(createdConts) != 14 {
+		glog.Fatalf("Expected 14 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
 	glog.Infof("OK - found created containers: %#v", createdConts.List())
 
@@ -1097,3 +1111,72 @@ const (
 		}
 	}`
 )
+
+// This is a test to make sure multiple empty_dir wrapper based volumes should not affect each other
+func runWrapperVolumesPluginsTest(client *client.Client) {
+	// Make a secret object.
+	ns := api.NamespaceDefault
+	s := api.Secret{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "secret-name",
+			Namespace: ns,
+		},
+		Data: map[string][]byte{
+			"data": []byte("value1\n"),
+		},
+	}
+
+	if _, err := client.Secrets(s.Namespace).Create(&s); err != nil {
+		glog.Fatalf("unable to create test secret: %v", err)
+	}
+
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  "vol-container",
+					Image: "kubernetes/pause",
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      "vol-secret",
+							MountPath: "/fake/path-1",
+							ReadOnly:  true,
+						},
+						{
+							Name:      "vol-git",
+							MountPath: "/fake/path-2",
+						},
+					},
+				},
+			},
+			Volumes: []api.Volume{
+				{
+					Name: "vol-secret",
+					VolumeSource: api.VolumeSource{
+						Secret: &api.SecretVolumeSource{
+							SecretName: "secret-name",
+						},
+					},
+				},
+				{
+					Name: "vol-git",
+					VolumeSource: api.VolumeSource{
+						GitRepo: &api.GitRepoVolumeSource{
+							Repository: "https://github.com/kubernetes/kubedash",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pod.ObjectMeta.Name = "wrappedvolumes.foo"
+	foo, err := client.Pods(api.NamespaceDefault).Create(pod)
+	if err != nil {
+		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
+	}
+	if err := wait.Poll(time.Second, longTestTimeout, podRunning(client, foo.Namespace, foo.Name)); err != nil {
+		glog.Fatalf("FAILED: pod never started running %v", err)
+	}
+	glog.Info("empty_dir wrapper based volumes doesn't affect each other: test passed.")
+}
