@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/rkt"
+	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -125,12 +126,6 @@ const (
 	// error. It is also used as the base period for the exponential backoff
 	// container restarts and image pulls.
 	backOffPeriod = time.Second * 10
-)
-
-var (
-	// ErrContainerNotFound returned when a container in the given pod with the
-	// given container name was not found, amongst those managed by the kubelet.
-	ErrContainerNotFound = errors.New("no matching container")
 )
 
 // SyncHandler is an interface implemented by Kubelet, for testability
@@ -3215,7 +3210,7 @@ func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, contai
 	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
 	container := pod.FindContainerByName(containerName)
 	if container == nil {
-		return nil, ErrContainerNotFound
+		return nil, kubecontainer.ErrContainerNotFound
 	}
 
 	ci, err := kl.cadvisor.DockerContainer(container.ID.ID, req)
@@ -3252,12 +3247,12 @@ func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) {
 	return kl.machineInfo, nil
 }
 
-func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *TLSOptions, auth AuthInterface, enableDebuggingHandlers bool) {
-	ListenAndServeKubeletServer(kl, address, port, tlsOptions, auth, enableDebuggingHandlers)
+func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers bool) {
+	server.ListenAndServeKubeletServer(kl, address, port, tlsOptions, auth, enableDebuggingHandlers)
 }
 
 func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
-	ListenAndServeKubeletReadOnlyServer(kl, address, port)
+	server.ListenAndServeKubeletReadOnlyServer(kl, address, port)
 }
 
 // GetRuntime returns the current Runtime implementation in use by the kubelet. This func

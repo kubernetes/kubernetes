@@ -34,8 +34,8 @@ import (
 	"github.com/prometheus/common/model"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -150,7 +150,7 @@ func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nod
 
 // getContainerInfo contacts kubelet for the container information. The "Stats"
 // in the returned ContainerInfo is subject to the requirements in statsRequest.
-func getContainerInfo(c *client.Client, nodeName string, req *kubelet.StatsRequest) (map[string]cadvisorapi.ContainerInfo, error) {
+func getContainerInfo(c *client.Client, nodeName string, req *server.StatsRequest) (map[string]cadvisorapi.ContainerInfo, error) {
 	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -243,7 +243,7 @@ func getOneTimeResourceUsageOnNode(
 		return nil, fmt.Errorf("numStats needs to be > 1 and < %d", maxNumStatsToRequest)
 	}
 	// Get information of all containers on the node.
-	containerInfos, err := getContainerInfo(c, nodeName, &kubelet.StatsRequest{
+	containerInfos, err := getContainerInfo(c, nodeName, &server.StatsRequest{
 		ContainerName: "/",
 		NumStats:      numStats,
 		Subcontainers: true,
@@ -590,7 +590,7 @@ func (r *resourceCollector) Stop() {
 // collectStats gets the latest stats from kubelet's /stats/container, computes
 // the resource usage, and pushes it to the buffer.
 func (r *resourceCollector) collectStats(oldStats map[string]*cadvisorapi.ContainerStats) {
-	infos, err := getContainerInfo(r.client, r.node, &kubelet.StatsRequest{
+	infos, err := getContainerInfo(r.client, r.node, &server.StatsRequest{
 		ContainerName: "/",
 		NumStats:      1,
 		Subcontainers: true,

@@ -32,7 +32,7 @@ import (
 
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
-	"k8s.io/kubernetes/pkg/kubelet"
+	kubeletserver "k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 )
@@ -204,7 +204,7 @@ func TestGetListener(t *testing.T) {
 }
 
 // fakePortForwarder simulates port forwarding for testing. It implements
-// kubelet.PortForwarder.
+// kubeletserver.PortForwarder.
 type fakePortForwarder struct {
 	lock sync.Mutex
 	// stores data expected from the stream per port
@@ -215,7 +215,7 @@ type fakePortForwarder struct {
 	send map[uint16]string
 }
 
-var _ kubelet.PortForwarder = &fakePortForwarder{}
+var _ kubeletserver.PortForwarder = &fakePortForwarder{}
 
 func (pf *fakePortForwarder) PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
 	defer stream.Close()
@@ -250,7 +250,7 @@ func fakePortForwardServer(t *testing.T, testName string, serverSends, expectedF
 			received: make(map[uint16]string),
 			send:     serverSends,
 		}
-		kubelet.ServePortForward(w, req, pf, "pod", "uid", 0, 10*time.Second)
+		kubeletserver.ServePortForward(w, req, pf, "pod", "uid", 0, 10*time.Second)
 
 		for port, expected := range expectedFromClient {
 			actual, ok := pf.received[port]

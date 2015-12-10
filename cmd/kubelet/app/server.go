@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
@@ -162,7 +163,7 @@ type KubeletServer struct {
 type KubeletBootstrap interface {
 	BirthCry()
 	StartGarbageCollection()
-	ListenAndServe(address net.IP, port uint, tlsOptions *kubelet.TLSOptions, auth kubelet.AuthInterface, enableDebuggingHandlers bool)
+	ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers bool)
 	ListenAndServeReadOnly(address net.IP, port uint)
 	Run(<-chan kubetypes.PodUpdate)
 	RunOnce(<-chan kubetypes.PodUpdate) ([]kubelet.RunPodResult, error)
@@ -572,8 +573,8 @@ func (s *KubeletServer) Run(kcfg *KubeletConfig) error {
 }
 
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
-// certificate and key file are generated. Returns a configured kubelet.TLSOptions object.
-func (s *KubeletServer) InitializeTLS() (*kubelet.TLSOptions, error) {
+// certificate and key file are generated. Returns a configured server.TLSOptions object.
+func (s *KubeletServer) InitializeTLS() (*server.TLSOptions, error) {
 	if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
 		s.TLSCertFile = path.Join(s.CertDirectory, "kubelet.crt")
 		s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "kubelet.key")
@@ -582,7 +583,7 @@ func (s *KubeletServer) InitializeTLS() (*kubelet.TLSOptions, error) {
 		}
 		glog.V(4).Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
 	}
-	tlsOptions := &kubelet.TLSOptions{
+	tlsOptions := &server.TLSOptions{
 		Config: &tls.Config{
 			// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability).
 			MinVersion: tls.VersionTLS10,
@@ -694,7 +695,7 @@ func SimpleKubelet(client *client.Client,
 	readOnlyPort uint,
 	masterServiceNamespace string,
 	volumePlugins []volume.VolumePlugin,
-	tlsOptions *kubelet.TLSOptions,
+	tlsOptions *server.TLSOptions,
 	cadvisorInterface cadvisor.Interface,
 	configFilePath string,
 	cloud cloudprovider.Interface,
@@ -884,7 +885,7 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 type KubeletConfig struct {
 	Address                        net.IP
 	AllowPrivileged                bool
-	Auth                           kubelet.AuthInterface
+	Auth                           server.AuthInterface
 	Builder                        KubeletBuilder
 	CAdvisorInterface              cadvisor.Interface
 	CgroupRoot                     string
@@ -955,7 +956,7 @@ type KubeletConfig struct {
 	StreamingConnectionIdleTimeout time.Duration
 	SyncFrequency                  time.Duration
 	SystemContainer                string
-	TLSOptions                     *kubelet.TLSOptions
+	TLSOptions                     *server.TLSOptions
 	Writer                         io.Writer
 	VolumePlugins                  []volume.VolumePlugin
 
