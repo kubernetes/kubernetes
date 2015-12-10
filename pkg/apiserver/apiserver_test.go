@@ -276,11 +276,11 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 
 func TestSimpleSetupRight(t *testing.T) {
 	s := &apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: "aName"}}
-	wire, err := codec.Encode(s)
+	wire, err := runtime.Encode(codec, s)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s2, err := codec.Decode(wire)
+	s2, err := runtime.Decode(codec, wire)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,11 +291,11 @@ func TestSimpleSetupRight(t *testing.T) {
 
 func TestSimpleOptionsSetupRight(t *testing.T) {
 	s := &apiservertesting.SimpleGetOptions{}
-	wire, err := codec.Encode(s)
+	wire, err := runtime.Encode(codec, s)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s2, err := codec.Decode(wire)
+	s2, err := runtime.Decode(codec, wire)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -618,7 +618,7 @@ func extractBody(response *http.Response, object runtime.Object) (string, error)
 	if err != nil {
 		return string(body), err
 	}
-	err = codec.DecodeInto(body, object)
+	err = runtime.DecodeInto(codec, body, object)
 	return string(body), err
 }
 
@@ -1514,7 +1514,7 @@ func TestConnectResponderObject(t *testing.T) {
 	if connectStorage.receivedID != itemID {
 		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
 	}
-	obj, err := codec.Decode(body)
+	obj, err := runtime.Decode(codec, body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1555,7 +1555,7 @@ func TestConnectResponderError(t *testing.T) {
 	if connectStorage.receivedID != itemID {
 		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
 	}
-	obj, err := codec.Decode(body)
+	obj, err := runtime.Decode(codec, body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1725,7 +1725,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	item := &api.DeleteOptions{
 		GracePeriodSeconds: &grace,
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1789,7 +1789,7 @@ func TestLegacyDeleteIgnoresOptions(t *testing.T) {
 	defer server.Close()
 
 	item := api.NewDeleteOptions(300)
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1942,7 +1942,7 @@ func TestUpdate(t *testing.T) {
 		},
 		Other: "bar",
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		// The following cases will fail, so die now
 		t.Fatalf("unexpected error: %v", err)
@@ -1979,7 +1979,7 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 		},
 		Other: "bar",
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		// The following cases will fail, so die now
 		t.Fatalf("unexpected error: %v", err)
@@ -2008,7 +2008,7 @@ func TestUpdateRequiresMatchingName(t *testing.T) {
 	item := &apiservertesting.Simple{
 		Other: "bar",
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		// The following cases will fail, so die now
 		t.Fatalf("unexpected error: %v", err)
@@ -2040,7 +2040,7 @@ func TestUpdateAllowsMissingNamespace(t *testing.T) {
 		},
 		Other: "bar",
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		// The following cases will fail, so die now
 		t.Fatalf("unexpected error: %v", err)
@@ -2078,7 +2078,7 @@ func TestUpdateAllowsMismatchedNamespaceOnError(t *testing.T) {
 		},
 		Other: "bar",
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		// The following cases will fail, so die now
 		t.Fatalf("unexpected error: %v", err)
@@ -2115,7 +2115,7 @@ func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
 		},
 		Other: "bar",
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		// The following cases will fail, so die now
 		t.Fatalf("unexpected error: %v", err)
@@ -2150,7 +2150,7 @@ func TestUpdateMissing(t *testing.T) {
 		},
 		Other: "bar",
 	}
-	body, err := codec.Encode(item)
+	body, err := runtime.Encode(codec, item)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2179,7 +2179,7 @@ func TestCreateNotFound(t *testing.T) {
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{Other: "foo"}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2205,7 +2205,7 @@ func TestCreateChecksDecode(t *testing.T) {
 	client := http.Client{}
 
 	simple := &api.Pod{}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2395,7 +2395,7 @@ func TestCreateWithName(t *testing.T) {
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{Other: "foo"}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2422,7 +2422,7 @@ func TestUpdateChecksDecode(t *testing.T) {
 	client := http.Client{}
 
 	simple := &api.Pod{}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2498,7 +2498,7 @@ func TestCreate(t *testing.T) {
 	simple := &apiservertesting.Simple{
 		Other: "bar",
 	}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2557,7 +2557,7 @@ func TestCreateInNamespace(t *testing.T) {
 	simple := &apiservertesting.Simple{
 		Other: "bar",
 	}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2616,7 +2616,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 	simple := &apiservertesting.Simple{
 		Other: "bar",
 	}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2744,7 +2744,7 @@ func TestCreateTimeout(t *testing.T) {
 	defer server.Close()
 
 	simple := &apiservertesting.Simple{Other: "foo"}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2836,7 +2836,7 @@ func TestCreateChecksAPIVersion(t *testing.T) {
 
 	simple := &apiservertesting.Simple{}
 	//using newCodec and send the request to testVersion URL shall cause a discrepancy in apiVersion
-	data, err := newCodec.Encode(simple)
+	data, err := runtime.Encode(newCodec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2866,7 +2866,7 @@ func TestCreateDefaultsAPIVersion(t *testing.T) {
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{}
-	data, err := codec.Encode(simple)
+	data, err := runtime.Encode(codec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2901,7 +2901,7 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}
-	data, err := newCodec.Encode(simple)
+	data, err := runtime.Encode(newCodec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

@@ -483,7 +483,7 @@ func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.
 		return nil, err
 	}
 
-	originalObjJS, err := codec.Encode(original)
+	originalObjJS, err := runtime.Encode(codec, original)
 	if err != nil {
 		return nil, err
 	}
@@ -493,7 +493,7 @@ func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.
 	}
 
 	objToUpdate := patcher.New()
-	if err := codec.DecodeInto(originalPatchedObjJS, objToUpdate); err != nil {
+	if err := runtime.DecodeInto(codec, originalPatchedObjJS, objToUpdate); err != nil {
 		return nil, err
 	}
 	if err := checkName(objToUpdate, name, namespace, namer); err != nil {
@@ -517,7 +517,7 @@ func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.
 			if err != nil {
 				return nil, err
 			}
-			currentObjectJS, err := codec.Encode(currentObject)
+			currentObjectJS, err := runtime.Encode(codec, currentObject)
 			if err != nil {
 				return nil, err
 			}
@@ -551,7 +551,7 @@ func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.
 			if err != nil {
 				return nil, err
 			}
-			if err := codec.DecodeInto(newlyPatchedObjJS, objToUpdate); err != nil {
+			if err := runtime.DecodeInto(codec, newlyPatchedObjJS, objToUpdate); err != nil {
 				return nil, err
 			}
 

@@ -67,13 +67,13 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 	t.Logf("fully qualified kind for %v is %v with codec %v", reflect.TypeOf(item), gvk, codec)
 
 	name := reflect.TypeOf(item).Elem().Name()
-	data, err := codec.Encode(item)
+	data, err := runtime.Encode(codec, item)
 	if err != nil {
 		t.Errorf("%v: %v (%s)", name, err, printer.Sprintf("%#v", item))
 		return
 	}
 
-	obj2, err := codec.Decode(data)
+	obj2, err := runtime.Decode(codec, data)
 	if err != nil {
 		t.Errorf("0: %v: %v\nCodec: %v\nData: %s\nSource: %#v", name, err, codec, string(data), printer.Sprintf("%#v", item))
 		return
@@ -84,7 +84,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 	}
 
 	obj3 := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
-	err = codec.DecodeInto(data, obj3)
+	err = runtime.DecodeInto(codec, data, obj3)
 	if err != nil {
 		t.Errorf("2: %v: %v", name, err)
 		return
@@ -307,7 +307,7 @@ func BenchmarkDecodeCodec(b *testing.B) {
 	width := len(items)
 	encoded := make([][]byte, width)
 	for i := range items {
-		data, err := codec.Encode(&items[i])
+		data, err := runtime.Encode(codec, &items[i])
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -316,7 +316,7 @@ func BenchmarkDecodeCodec(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := codec.Decode(encoded[i%width]); err != nil {
+		if _, err := runtime.Decode(codec, encoded[i%width]); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -329,7 +329,7 @@ func BenchmarkDecodeIntoCodec(b *testing.B) {
 	width := len(items)
 	encoded := make([][]byte, width)
 	for i := range items {
-		data, err := codec.Encode(&items[i])
+		data, err := runtime.Encode(codec, &items[i])
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -339,7 +339,7 @@ func BenchmarkDecodeIntoCodec(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
-		if err := codec.DecodeInto(encoded[i%width], &obj); err != nil {
+		if err := runtime.DecodeInto(codec, encoded[i%width], &obj); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -353,7 +353,7 @@ func BenchmarkDecodeIntoJSON(b *testing.B) {
 	width := len(items)
 	encoded := make([][]byte, width)
 	for i := range items {
-		data, err := codec.Encode(&items[i])
+		data, err := runtime.Encode(codec, &items[i])
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -377,7 +377,7 @@ func BenchmarkDecodeIntoJSONCodecGen(b *testing.B) {
 	width := len(items)
 	encoded := make([][]byte, width)
 	for i := range items {
-		data, err := kcodec.Encode(&items[i])
+		data, err := runtime.Encode(kcodec, &items[i])
 		if err != nil {
 			b.Fatal(err)
 		}

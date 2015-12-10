@@ -45,7 +45,7 @@ func Object(codec runtime.Codec, event *watch.Event) (interface{}, error) {
 	if !ok {
 		return nil, fmt.Errorf("the event object cannot be safely converted to JSON: %v", reflect.TypeOf(event.Object).Name())
 	}
-	data, err := codec.Encode(obj)
+	data, err := runtime.Encode(codec, obj)
 	if err != nil {
 		return nil, err
 	}

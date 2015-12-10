@@ -95,9 +95,9 @@ func TestScheme(t *testing.T) {
 	// Test Encode, Decode, DecodeInto, and DecodeToVersion
 	obj := runtime.Object(simple)
 	data, err := scheme.EncodeToVersion(obj, externalGV.String())
-	obj2, err2 := scheme.Decode(data)
+	obj2, err2 := runtime.Decode(scheme, data)
 	obj3 := &InternalSimple{}
-	err3 := scheme.DecodeInto(data, obj3)
+	err3 := runtime.DecodeInto(scheme, data, obj3)
 	obj4, err4 := scheme.DecodeToVersion(data, externalGV)
 	if err != nil || err2 != nil || err3 != nil || err4 != nil {
 		t.Fatalf("Failure: '%v' '%v' '%v' '%v'", err, err2, err3, err4)
@@ -154,11 +154,11 @@ func TestInvalidObjectValueKind(t *testing.T) {
 func TestBadJSONRejection(t *testing.T) {
 	scheme := runtime.NewScheme()
 	badJSONMissingKind := []byte(`{ }`)
-	if _, err := scheme.Decode(badJSONMissingKind); err == nil {
+	if _, err := runtime.Decode(scheme, badJSONMissingKind); err == nil {
 		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
 	}
 	badJSONUnknownType := []byte(`{"kind": "bar"}`)
-	if _, err1 := scheme.Decode(badJSONUnknownType); err1 == nil {
+	if _, err1 := runtime.Decode(scheme, badJSONUnknownType); err1 == nil {
 		t.Errorf("Did not reject despite use of unknown type: %s", badJSONUnknownType)
 	}
 	/*badJSONKindMismatch := []byte(`{"kind": "Pod"}`)
@@ -224,7 +224,7 @@ func TestExternalToInternalMapping(t *testing.T) {
 	}
 
 	for _, item := range table {
-		gotDecoded, err := scheme.Decode([]byte(item.encoded))
+		gotDecoded, err := runtime.Decode(scheme, []byte(item.encoded))
 		if err != nil {
 			t.Errorf("unexpected error '%v' (%v)", err, item.encoded)
 		} else if e, a := item.obj, gotDecoded; !reflect.DeepEqual(e, a) {
@@ -282,7 +282,7 @@ func TestExtensionMapping(t *testing.T) {
 			t.Errorf("expected\n%#v\ngot\n%#v\n", e, a)
 		}
 
-		gotDecoded, err := scheme.Decode([]byte(item.encoded))
+		gotDecoded, err := runtime.Decode(scheme, []byte(item.encoded))
 		if err != nil {
 			t.Errorf("unexpected error '%v' (%v)", err, item.encoded)
 		} else if e, a := item.obj, gotDecoded; !reflect.DeepEqual(e, a) {
@@ -311,8 +311,8 @@ func TestEncode(t *testing.T) {
 		TestString: "I'm the same",
 	}
 	obj := runtime.Object(test)
-	data, err := codec.Encode(obj)
-	obj2, err2 := codec.Decode(data)
+	data, err := runtime.Encode(codec, obj)
+	obj2, err2 := runtime.Decode(codec, data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
