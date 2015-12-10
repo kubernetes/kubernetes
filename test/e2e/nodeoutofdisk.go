@@ -46,7 +46,7 @@ const (
 	// flag value affects all the e2e tests. So we are hard-coding this value for now.
 	lowDiskSpaceThreshold uint64 = 256 * mb
 
-	nodeOODTimeOut = 1 * time.Minute
+	nodeOODTimeOut = 5 * time.Minute
 
 	numNodeOODPods = 3
 )
