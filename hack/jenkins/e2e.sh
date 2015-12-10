@@ -224,6 +224,7 @@ E2E_OPT=${E2E_OPT:-""}
 # Set environment variables shared for all of the GCE Jenkins projects.
 if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
   KUBERNETES_PROVIDER="gce"
+  : ${GCE_SERVICE_ACCOUNT:=$(gcloud auth list 2> /dev/null | grep active | cut -f3 -d' ')}
   : ${E2E_MIN_STARTUP_PODS:="1"}
   : ${E2E_ZONE:="us-central1-f"}
   : ${NUM_NODES_PARALLEL:="6"}  # Number of nodes required to run all of the tests in parallel
@@ -389,6 +390,7 @@ case ${JOB_NAME} in
   # Runs all non-flaky, non-slow tests on GCE, sequentially.
   kubernetes-e2e-gce)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e"}
+    : ${E2E_PUBLISH_GREEN_VERSION:="true"}
     : ${E2E_NETWORK:="e2e-gce"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
