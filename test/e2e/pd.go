@@ -384,7 +384,8 @@ func detachPD(hostName, pdName string) error {
 		if !ok {
 			return fmt.Errorf("Provider does not support volumes")
 		}
-		return volumes.DetachDisk(hostName, pdName)
+		_, err := volumes.DetachDisk(hostName, pdName)
+		return err
 	}
 }
 

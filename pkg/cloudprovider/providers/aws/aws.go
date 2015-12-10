@@ -42,9 +42,11 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 const ProviderName = "aws"
@@ -101,6 +103,10 @@ type EC2 interface {
 	DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.DeleteRouteOutput, error)
 
 	ModifyInstanceAttribute(request *ec2.ModifyInstanceAttributeInput) (*ec2.ModifyInstanceAttributeOutput, error)
+
+	DescribeAddresses(*ec2.DescribeAddressesInput) ([]*ec2.Address, error)
+	AssociateAddress(*ec2.AssociateAddressInput) (*ec2.AssociateAddressOutput, error)
+	AssignPrivateIpAddresses(*ec2.AssignPrivateIpAddressesInput) (*ec2.AssignPrivateIpAddressesOutput, error)
 }
 
 // This is a simple pass-through of the ELB client interface, which allows for testing
@@ -147,11 +153,14 @@ type Volumes interface {
 	AttachDisk(instanceName string, volumeName string, readOnly bool) (string, error)
 	// Detach the disk from the specified instance
 	// instanceName can be empty to mean "the instance on which we are running"
-	DetachDisk(instanceName string, volumeName string) error
+	DetachDisk(instanceName string, volumeName string) (string, error)
 
 	// Create a volume with the specified options
 	CreateVolume(volumeOptions *VolumeOptions) (volumeName string, err error)
 	DeleteVolume(volumeName string) error
+
+	// Get labels to apply to volume on creation
+	GetVolumeLabels(volumeName string) (map[string]string, error)
 }
 
 // InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
@@ -437,6 +446,23 @@ func (s *awsSdkEC2) ModifyInstanceAttribute(request *ec2.ModifyInstanceAttribute
 	return s.ec2.ModifyInstanceAttribute(request)
 }
 
+func (s *awsSdkEC2) DescribeAddresses(request *ec2.DescribeAddressesInput) ([]*ec2.Address, error) {
+	// Not paged
+	response, err := s.ec2.DescribeAddresses(request)
+	if err != nil {
+		return nil, fmt.Errorf("error listing AWS addresses: %v", err)
+	}
+	return response.Addresses, nil
+}
+
+func (s *awsSdkEC2) AssociateAddress(request *ec2.AssociateAddressInput) (*ec2.AssociateAddressOutput, error) {
+	return s.ec2.AssociateAddress(request)
+}
+
+func (s *awsSdkEC2) AssignPrivateIpAddresses(request *ec2.AssignPrivateIpAddressesInput) (*ec2.AssignPrivateIpAddressesOutput, error) {
+	return s.ec2.AssignPrivateIpAddresses(request)
+}
+
 func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		creds := credentials.NewChainCredentials(
@@ -609,6 +635,11 @@ func (aws *AWSCloud) Instances() (cloudprovider.Instances, bool) {
 // Zones returns an implementation of Zones for Amazon Web Services.
 func (aws *AWSCloud) Zones() (cloudprovider.Zones, bool) {
 	return aws, true
+}
+
+// MasterBootstrap returns an implementation of MasterBootstrap for Amazon Web Services.
+func (c *AWSCloud) MasterBootstrap() (cloudprovider.MasterBootstrap, bool) {
+	return c, true
 }
 
 // Routes returns an implementation of Routes for Amazon Web Services.
@@ -790,12 +821,16 @@ func (self *AWSCloud) GetZone() (cloudprovider.Zone, error) {
 type awsInstanceType struct {
 }
 
+// Used to represent a mount device for attaching an EBS volume
+// This should be stored as a single letter (i.e. c, not sdc or /dev/sdc)
+type mountDevice string
+
 // TODO: Also return number of mounts allowed?
-func (self *awsInstanceType) getEBSMountDevices() []string {
+func (self *awsInstanceType) getEBSMountDevices() []mountDevice {
 	// See: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/block-device-mapping-concepts.html
-	devices := []string{}
+	devices := []mountDevice{}
 	for c := 'f'; c <= 'p'; c++ {
-		devices = append(devices, fmt.Sprintf("%c", c))
+		devices = append(devices, mountDevice(fmt.Sprintf("%c", c)))
 	}
 	return devices
 }
@@ -813,7 +848,7 @@ type awsInstance struct {
 
 	// We must cache because otherwise there is a race condition,
 	// where we assign a device mapping and then get a second request before we attach the volume
-	deviceMappings map[string]string
+	deviceMappings map[mountDevice]string
 }
 
 func newAWSInstance(ec2 EC2, awsID, nodeName string) *awsInstance {
@@ -852,9 +887,13 @@ func (self *awsInstance) getInfo() (*ec2.Instance, error) {
 	return instances[0], nil
 }
 
-// Assigns an unused mountpoint (device) for the specified volume.
-// If the volume is already assigned, this will return the existing mountpoint and true
-func (self *awsInstance) assignMountpoint(volumeID string) (mountpoint string, alreadyAttached bool, err error) {
+// Gets the mountDevice already assigned to the volume, or assigns an unused mountDevice
+// to the volume if assign==true.
+// If the volume is already assigned, this will return the existing mountDevice and true
+// We also allow the assigned-mountDevice to be forced; if provided we will only assign the specified mountDevice;
+// returning an error if that mountDevice is already attached to a different volume.
+// Otherwise the mountpoint is assigned by finding the first available mountDevice.
+func (self *awsInstance) getMountDevice(volumeID string, assign bool, forceMountDevice mountDevice) (device mountDevice, alreadyAttached bool, err error) {
 	instanceType := self.getInstanceType()
 	if instanceType == nil {
 		return "", false, fmt.Errorf("could not get instance type for instance: %s", self.awsID)
@@ -872,41 +911,62 @@ func (self *awsInstance) assignMountpoint(volumeID string) (mountpoint string, a
 		if err != nil {
 			return "", false, err
 		}
-		deviceMappings := map[string]string{}
+		deviceMappings := map[mountDevice]string{}
 		for _, blockDevice := range info.BlockDeviceMappings {
-			mountpoint := orEmpty(blockDevice.DeviceName)
-			if strings.HasPrefix(mountpoint, "/dev/sd") {
-				mountpoint = mountpoint[7:]
+			name := aws.StringValue(blockDevice.DeviceName)
+			if strings.HasPrefix(name, "/dev/sd") {
+				name = name[7:]
 			}
-			if strings.HasPrefix(mountpoint, "/dev/xvd") {
-				mountpoint = mountpoint[8:]
+			if strings.HasPrefix(name, "/dev/xvd") {
+				name = name[8:]
 			}
-			deviceMappings[mountpoint] = orEmpty(blockDevice.Ebs.VolumeId)
+			if len(name) != 1 {
+				glog.Warningf("Unexpected EBS DeviceName: %q", aws.StringValue(blockDevice.DeviceName))
+			}
+			deviceMappings[mountDevice(name)] = aws.StringValue(blockDevice.Ebs.VolumeId)
 		}
 		self.deviceMappings = deviceMappings
 	}
 
 	// Check to see if this volume is already assigned a device on this machine
-	for mountpoint, mappingVolumeID := range self.deviceMappings {
+	for mountDevice, mappingVolumeID := range self.deviceMappings {
 		if volumeID == mappingVolumeID {
-			glog.Warningf("Got assignment call for already-assigned volume: %s@%s", mountpoint, mappingVolumeID)
-			return mountpoint, true, nil
+			if assign {
+				glog.Warningf("Got assignment call for already-assigned volume: %s@%s", mountDevice, mappingVolumeID)
+			}
+			return mountDevice, true, nil
 		}
+	}
+
+	if !assign {
+		return mountDevice(""), false, nil
 	}
 
 	// Check all the valid mountpoints to see if any of them are free
 	valid := instanceType.getEBSMountDevices()
-	chosen := ""
-	for _, device := range valid {
-		_, found := self.deviceMappings[device]
+	chosen := mountDevice("")
+	if forceMountDevice != mountDevice("") {
+		_, found := self.deviceMappings[forceMountDevice]
 		if !found {
-			chosen = device
-			break
+			chosen = forceMountDevice
+		} else {
+			glog.Warning("Could not assign forced mount device - already in use.  forceMountDevice=%v, mappings=%v", forceMountDevice, self.deviceMappings)
+		}
+	} else {
+		for _, mountDevice := range valid {
+			_, found := self.deviceMappings[mountDevice]
+			if !found {
+				chosen = mountDevice
+				break
+			}
+		}
+
+		if chosen == mountDevice("") {
+			glog.Warningf("Could not assign a mount device (all in use?).  mappings=%v, valid=%v", self.deviceMappings, valid)
 		}
 	}
 
-	if chosen == "" {
-		glog.Warningf("Could not assign a mount device (all in use?).  mappings=%v, valid=%v", self.deviceMappings, valid)
+	if chosen == mountDevice("") {
 		return "", false, nil
 	}
 
@@ -916,7 +976,7 @@ func (self *awsInstance) assignMountpoint(volumeID string) (mountpoint string, a
 	return chosen, false, nil
 }
 
-func (self *awsInstance) releaseMountDevice(volumeID string, mountDevice string) {
+func (self *awsInstance) releaseMountDevice(volumeID string, mountDevice mountDevice) {
 	self.mutex.Lock()
 	defer self.mutex.Unlock()
 
@@ -1118,24 +1178,30 @@ func (c *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly boo
 		return "", errors.New("AWS volumes cannot be mounted read-only")
 	}
 
-	mountpoint, alreadyAttached, err := awsInstance.assignMountpoint(disk.awsID)
+	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID, true, "")
 	if err != nil {
 		return "", err
 	}
 
+	return c.attachVolumeAt(awsInstance, disk, mountDevice, alreadyAttached)
+}
+
+func (c *AWSCloud) attachVolumeAt(awsInstance *awsInstance, disk *awsDisk, mountDevice mountDevice, alreadyAttached bool) (string, error) {
+	// TODO: Are hostDevice/ec2Device really the right way round?  It doesn't look right...
+
 	// Inside the instance, the mountpoint always looks like /dev/xvdX (?)
-	hostDevice := "/dev/xvd" + mountpoint
+	hostDevice := "/dev/xvd" + string(mountDevice)
 	// In the EC2 API, it is sometimes is /dev/sdX and sometimes /dev/xvdX
 	// We are running on the node here, so we check if /dev/xvda exists to determine this
-	ec2Device := "/dev/xvd" + mountpoint
+	ec2Device := "/dev/xvd" + string(mountDevice)
 	if _, err := os.Stat("/dev/xvda"); os.IsNotExist(err) {
-		ec2Device = "/dev/sd" + mountpoint
+		ec2Device = "/dev/sd" + string(mountDevice)
 	}
 
 	attached := false
 	defer func() {
 		if !attached {
-			awsInstance.releaseMountDevice(disk.awsID, mountpoint)
+			awsInstance.releaseMountDevice(disk.awsID, mountDevice)
 		}
 	}()
 
@@ -1155,7 +1221,7 @@ func (c *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly boo
 		glog.V(2).Info("AttachVolume request returned %v", attachResponse)
 	}
 
-	err = disk.waitForAttachmentStatus("attached")
+	err := disk.waitForAttachmentStatus("attached")
 	if err != nil {
 		return "", err
 	}
@@ -1165,16 +1231,130 @@ func (c *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly boo
 	return hostDevice, nil
 }
 
-// Implements Volumes.DetachDisk
-func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
-	disk, err := newAWSDisk(aws, diskName)
+// Implements MasterBootstrap.AttachMasterVolume
+func (c *AWSCloud) AttachMasterVolume(volumeID string) (string, error) {
+	disk, err := newAWSDisk(c, volumeID)
+	if err != nil {
+		return "", err
+	}
+
+	instanceName := "" // self
+	awsInstance, err := c.getAwsInstance(instanceName)
+	if err != nil {
+		return "", err
+	}
+
+	forceMountDevice := mountDevice("b")
+
+	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID, true, forceMountDevice)
+	if err != nil {
+		return "", err
+	}
+
+	return c.attachVolumeAt(awsInstance, disk, mountDevice, alreadyAttached)
+}
+
+// Implements MasterBootstrap.AttachPrivateIP
+func (c *AWSCloud) AttachPrivateIP(ip net.IP, ipNet *net.IPNet) error {
+	instanceName := "" // self
+	awsInstance, err := c.getAwsInstance(instanceName)
 	if err != nil {
 		return err
 	}
 
-	awsInstance, err := aws.getAwsInstance(instanceName)
+	info, err := awsInstance.getInfo()
 	if err != nil {
 		return err
+	}
+
+	if len(info.NetworkInterfaces) != 1 {
+		return fmt.Errorf("unexpectedly found multiple network interfaces on instance")
+	}
+
+	ipString := ip.String()
+
+	request := &ec2.AssignPrivateIpAddressesInput{
+		NetworkInterfaceId: info.NetworkInterfaces[0].NetworkInterfaceId,
+		AllowReassignment:  aws.Bool(false), // Seems safer
+		PrivateIpAddresses: []*string{aws.String(ipString)},
+	}
+
+	_, err = c.ec2.AssignPrivateIpAddresses(request)
+	if err != nil {
+		return fmt.Errorf("error associating private IP %q with instance %q: %v", ipString, awsInstance.awsID, err)
+	}
+
+	glog.V(2).Info("associated private IP %q with instance %q", ipString, awsInstance.awsID)
+
+	maskSize, _ := ipNet.Mask.Size()
+	ipCIDR := fmt.Sprintf("%s/%d", ipString, maskSize)
+	out, err := exec.New().Command("/bin/ip", "addr", "add", ipCIDR, "dev", "eth0").CombinedOutput()
+	glog.V(5).Infof("ip addr add output: %s, %v", string(out), err)
+	if err != nil {
+		glog.Warningf("error adding private IP to interface: %s, %v", string(out), err)
+		return fmt.Errorf("error adding private IP to interface: %s, %v", string(out), err)
+	}
+
+	return nil
+}
+
+// Implements MasterBootstrap.AttachPublicIP
+func (c *AWSCloud) AttachPublicIP(ip net.IP) error {
+	instanceName := "" // self
+	awsInstance, err := c.getAwsInstance(instanceName)
+	if err != nil {
+		return err
+	}
+
+	ipString := ip.String()
+
+	addresses, err := c.ec2.DescribeAddresses(&ec2.DescribeAddressesInput{
+		PublicIps: []*string{aws.String(ipString)},
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(addresses) != 1 {
+		return fmt.Errorf("unexpectedly found multiple public addresses matching IP: %q", ipString)
+	}
+
+	request := &ec2.AssociateAddressInput{
+		AllocationId:       addresses[0].AllocationId,
+		AllowReassociation: aws.Bool(false), // Seems safer
+		InstanceId:         &awsInstance.awsID,
+	}
+
+	response, err := c.ec2.AssociateAddress(request)
+	if err != nil {
+		return fmt.Errorf("error associating public IP %q with instance %q: %v", ipString, awsInstance.awsID, err)
+	}
+
+	glog.V(2).Info("associated public IP %q with instance %q, reservation id=%q", ipString, awsInstance.awsID, aws.StringValue(response.AssociationId))
+
+	return nil
+}
+
+// Implements Volumes.DetachDisk
+func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) (string, error) {
+	disk, err := newAWSDisk(aws, diskName)
+	if err != nil {
+		return "", err
+	}
+
+	awsInstance, err := aws.getAwsInstance(instanceName)
+	if err != nil {
+		return "", err
+	}
+
+	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID, false, "")
+	if err != nil {
+		return "", err
+	}
+
+	if !alreadyAttached {
+		glog.Warning("DetachDisk called on non-attached disk: ", diskName)
+		// TODO: Continue?  Tolerate non-attached error in DetachVolume?
 	}
 
 	request := ec2.DetachVolumeInput{
@@ -1184,10 +1364,10 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 
 	response, err := aws.ec2.DetachVolume(&request)
 	if err != nil {
-		return fmt.Errorf("error detaching EBS volume: %v", err)
+		return "", fmt.Errorf("error detaching EBS volume: %v", err)
 	}
 	if response == nil {
-		return errors.New("no response from DetachVolume")
+		return "", errors.New("no response from DetachVolume")
 	}
 
 	// At this point we are waiting for the volume being detached. This
@@ -1209,10 +1389,11 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 
 	err = disk.waitForAttachmentStatus("detached")
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return err
+	hostDevicePath := "/dev/xvd" + string(mountDevice)
+	return hostDevicePath, err
 }
 
 // Implements Volumes.CreateVolume
@@ -1244,6 +1425,28 @@ func (aws *AWSCloud) DeleteVolume(volumeName string) error {
 		return err
 	}
 	return awsDisk.deleteVolume()
+}
+
+// Implements Volumes.GetVolumeLabels
+func (c *AWSCloud) GetVolumeLabels(volumeName string) (map[string]string, error) {
+	awsDisk, err := newAWSDisk(c, volumeName)
+	if err != nil {
+		return nil, err
+	}
+	info, err := awsDisk.getInfo()
+	if err != nil {
+		return nil, err
+	}
+	labels := make(map[string]string)
+	az := aws.StringValue(info.AvailabilityZone)
+	if az != "" {
+		labels[unversioned.LabelZoneFailureDomain] = az
+		region := azToRegion(az)
+		if region != "" {
+			labels[unversioned.LabelZoneRegion] = region
+		}
+	}
+	return labels, nil
 }
 
 func (v *AWSCloud) Configure(name string, spec *api.NodeSpec) error {
