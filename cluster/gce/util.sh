@@ -33,7 +33,7 @@ NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 
 ALLOCATE_NODE_CIDRS=true
 
-KUBE_PROMPT_FOR_UPDATE=y
+KUBE_PROMPT_FOR_UPDATE=n
 KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 # Suffix to append to the staging path used for the server tars. Useful if
 # multiple versions of the server are being used in the same project
