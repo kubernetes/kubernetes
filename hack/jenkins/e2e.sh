@@ -1106,6 +1106,7 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
             rm -rf kubernetes*
         elif [[ $(find . | wc -l) != 1 ]]; then
             echo $PWD not empty, bailing!
+            find .
             exit 1
         fi
 
