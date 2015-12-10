@@ -37,7 +37,7 @@ function config_etcd {
         exit 2
       fi
 
-      /opt/bin/etcdctl mk /coreos.com/network/config "{\"Network\":\"${FLANNEL_NET}\"}"
+      /opt/bin/etcdctl mk /coreos.com/network/config "{\"Network\":\"${FLANNEL_NET}\", \"Backend\": {\"Type\": \"vxlan\"}}"
       attempt=$((attempt+1))
       sleep 3
     fi
