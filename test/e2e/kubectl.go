@@ -861,6 +861,25 @@ var _ = Describe("Kubectl client", func() {
 
 	})
 
+	Describe("Kubectl run --rm job", func() {
+		nsFlag := fmt.Sprintf("--namespace=%v", ns)
+		jobName := "e2e-test-rm-busybox-job"
+
+		It("should create a job from an image, then delete the job [Conformance]", func() {
+			By("executing a command with run --rm and attach with stdin")
+			runOutput := newKubectlCommand(nsFlag, "run", jobName, "--image=busybox", "--rm=true", "--restart=Never", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+				withStdinData("abcd1234").
+				execOrDie()
+			Expect(runOutput).To(ContainSubstring("abcd1234"))
+			Expect(runOutput).To(ContainSubstring("stdin closed"))
+
+			By("verifying the job " + jobName + " was deleted")
+			_, err := c.Extensions().Jobs(ns).Get(jobName)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
 	Describe("Proxy server", func() {
 		// TODO: test proxy options (static, prefix, etc)
 		It("should support proxy with --port 0 [Conformance]", func() {
