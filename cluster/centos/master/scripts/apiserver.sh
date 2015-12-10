@@ -31,14 +31,18 @@ KUBE_LOG_LEVEL="--v=4"
 # comma separated. Mutually exclusive with -etcd-config
 KUBE_ETCD_SERVERS="--etcd-servers=${ETCD_SERVERS}"
 
-# --address=127.0.0.1: DEPRECATED: see --insecure-bind-address instead
-KUBE_API_ADDRESS="--address=${MASTER_ADDRESS}"
+# --insecure-bind-address=127.0.0.1: The IP address on which to serve the --insecure-port.
+KUBE_API_ADDRESS="--insecure-bind-address=${MASTER_ADDRESS}"
 
-# --port=8080: DEPRECATED: see --insecure-port instead
-KUBE_API_PORT="--port=8080"
+# --insecure-port=8080: The port on which to serve unsecured, unauthenticated access.
+KUBE_API_PORT="--insecure-port=8080"
 
 # --kubelet-port=10250: Kubelet port
 NODE_PORT="--kubelet-port=10250"
+
+# --advertise-address=<nil>: The IP address on which to advertise 
+# the apiserver to members of the cluster.
+KUBE_ADVERTISE_ADDR="--advertise-address=${MASTER_ADDRESS}"
 
 # --allow-privileged=false: If true, allow privileged containers.
 KUBE_ALLOW_PRIV="--allow-privileged=false"
@@ -75,7 +79,8 @@ KUBE_APISERVER_OPTS="   \${KUBE_LOGTOSTDERR}         \\
                         \${KUBE_ETCD_SERVERS}        \\
                         \${KUBE_API_ADDRESS}         \\
                         \${KUBE_API_PORT}            \\
-                        \${NODE_PORT}              \\
+                        \${NODE_PORT}                \\
+                        \${KUBE_ADVERTISE_ADDR}      \\
                         \${KUBE_ALLOW_PRIV}          \\
                         \${KUBE_SERVICE_ADDRESSES}   \\
                         \${KUBE_ADMISSION_CONTROL}   \\
