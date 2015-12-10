@@ -47,6 +47,7 @@ var _ = Describe("Cadvisor", func() {
 })
 
 func CheckCadvisorHealthOnAllNodes(c *client.Client, timeout time.Duration) {
+	// It should be OK to list unschedulable Nodes here.
 	By("getting list of nodes")
 	nodeList, err := c.Nodes().List(api.ListOptions{})
 	expectNoError(err)

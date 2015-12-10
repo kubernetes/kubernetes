@@ -64,8 +64,7 @@ var _ = Describe("Mesos", func() {
 		client := framework.Client
 		expectNoError(allNodesReady(client, util.ForeverTestTimeout), "all nodes ready")
 
-		nodelist, err := client.Nodes().List(api.ListOptions{})
-		expectNoError(err, "nodes fetched from apiserver")
+		nodelist := ListSchedulableNodesOrDie(framework.Client)
 
 		const ns = "static-pods"
 		numpods := len(nodelist.Items)

@@ -194,9 +194,7 @@ var _ = Describe("SchedulerPredicates", func() {
 	BeforeEach(func() {
 		c = framework.Client
 		ns = framework.Namespace.Name
-		var err error
-		nodeList, err = c.Nodes().List(api.ListOptions{})
-		expectNoError(err)
+		nodeList = ListSchedulableNodesOrDie(c)
 	})
 
 	// This test verifies that max-pods flag works as advertised. It assumes that cluster add-on pods stay stable
