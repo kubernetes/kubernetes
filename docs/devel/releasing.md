@@ -92,22 +92,24 @@ release from HEAD of the branch, (because you have to do some version-rev
 commits,) so choose the latest build on the release branch.  (Remember, that
 branch should be frozen.)
 
-Once you find some greens, you can find the git hash for a build by looking at
-the Full Console Output and searching for `githash=`. You should see a line:
+Once you find some greens, you can find the build hash for a build by looking at
+the Full Console Output and searching for `build_version=`. You should see a line:
 
 ```console
-githash=v1.2.0-alpha.2.164+b44c7d79d6c9bb
+build_version=v1.2.0-alpha.2.164+b44c7d79d6c9bb
 ```
 
 Or, if you're cutting from a release branch (i.e. doing an official release),
 
 ```console
-githash=v1.1.0-beta.567+d79d6c9bbb44c7
+build_version=v1.1.0-beta.567+d79d6c9bbb44c7
 ```
+
+Please note that `build_version` was called `githash` versions prior to v1.2.
 
 Because Jenkins builds frequently, if you're looking between jobs
 (e.g. `kubernetes-e2e-gke-ci` and `kubernetes-e2e-gce`), there may be no single
-`githash` that's been run on both jobs. In that case, take the a green
+`build_version` that's been run on both jobs. In that case, take the a green
 `kubernetes-e2e-gce` build (but please check that it corresponds to a temporally
 similar build that's green on `kubernetes-e2e-gke-ci`). Lastly, if you're having
 trouble understanding why the GKE continuous integration clusters are failing
@@ -117,10 +119,10 @@ oncall.
 Before proceeding to the next step:
 
 ```sh
-export GITHASH=v1.2.0-alpha.2.164+b44c7d79d6c9bb
+export BUILD_VERSION=v1.2.0-alpha.2.164+b44c7d79d6c9bb
 ```
 
-Where `v1.2.0-alpha.2.164+b44c7d79d6c9bb` is the git hash you decided on. This
+Where `v1.2.0-alpha.2.164+b44c7d79d6c9bb` is the build hash you decided on. This
 will become your release point.
 
 ### Cutting/branching the release
@@ -136,15 +138,15 @@ or `git checkout upstream/master` from an existing repo.
 
 Decide what version you're cutting and export it:
 
-- alpha release: `export VER="vX.Y.0-alpha.W"`;
-- beta release: `export VER="vX.Y.Z-beta.W"`;
-- official release: `export VER="vX.Y.Z"`;
-- new release series: `export VER="vX.Y"`.
+- alpha release: `export RELEASE_VERSION="vX.Y.0-alpha.W"`;
+- beta release: `export RELEASE_VERSION="vX.Y.Z-beta.W"`;
+- official release: `export RELEASE_VERSION="vX.Y.Z"`;
+- new release series: `export RELEASE_VERSION="vX.Y"`.
 
 Then, run
 
 ```console
-./release/cut-official-release.sh "${VER}" "${GITHASH}"
+./release/cut-official-release.sh "${RELEASE_VERSION}" "${BUILD_VERSION}"
 ```
 
 This will do a dry run of the release.  It will give you instructions at the
@@ -152,7 +154,7 @@ end for `pushd`ing into the dry-run directory and having a look around.
 `pushd` into the directory and make sure everythig looks as you expect:
 
 ```console
-git log "${VER}"  # do you see the commit you expect?
+git log "${RELEASE_VERSION}"  # do you see the commit you expect?
 make release
 ./cluster/kubectl.sh version -c
 ```
@@ -161,7 +163,7 @@ If you're satisfied with the result of the script, go back to `upstream/master`
 run
 
 ```console
-./release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
+./release/cut-official-release.sh "${RELEASE_VERSION}" "${BUILD_VERSION}" --no-dry-run
 ```
 
 and follow the instructions.
@@ -185,10 +187,10 @@ notes, (see #17444 for more info).
   - Only publish a beta release if it's a standalone pre-release.  (We create
     beta tags after we do official releases to maintain proper semantic
     versioning, *we don't publish these beta releases*.)  Use
-    `./hack/cherry_pick_list.sh ${VER}` to get release notes for such a
+    `./hack/cherry_pick_list.sh ${RELEASE_VERSION}` to get release notes for such a
     release.
 - Official release:
-  - From your clone of upstream/master, run `./hack/cherry_pick_list.sh ${VER}`
+  - From your clone of upstream/master, run `./hack/cherry_pick_list.sh ${RELEASE_VERSION}`
     to get the release notes for the patch release you just created. Feel free
     to prune anything internal, but typically for patch releases we tend to
     include everything in the release notes.
