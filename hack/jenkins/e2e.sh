@@ -776,7 +776,6 @@ case ${JOB_NAME} in
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           ${AWS_REQUIRED_SKIP_TESTS[@]:+${AWS_REQUIRED_SKIP_TESTS[@]}} \
           )"}
-
     : ${AWS_CONFIG_FILE:='/var/lib/jenkins/.aws/credentials'}
     : ${AWS_SSH_KEY:='/var/lib/jenkins/.ssh/kube_aws_rsa'}
     : ${KUBE_SSH_USER:='ubuntu'}
@@ -861,6 +860,10 @@ esac
 # AWS variables
 export KUBE_AWS_INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
 export KUBE_AWS_ZONE=${E2E_ZONE}
+export AWS_CONFIG_FILE=${AWS_CONFIG_FILE}
+export AWS_SSH_KEY=${AWS_SSH_KEY}
+export KUBE_SSH_USER=${KUBE_SSH_USER}
+export AWS_SHARED_CREDENTIALS_FILE=${AWS_SHARED_CREDENTIALS_FILE}
 
 # GCE variables
 export INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
