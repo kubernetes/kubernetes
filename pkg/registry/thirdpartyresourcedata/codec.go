@@ -158,7 +158,7 @@ func (t *thirdPartyResourceDataCodec) Decode(data []byte) (runtime.Object, error
 
 func (t *thirdPartyResourceDataCodec) DecodeToVersion(data []byte, gv unversioned.GroupVersion) (runtime.Object, error) {
 	// TODO: this is hacky, there must be a better way...
-	obj, err := t.Decode(data)
+	obj, err := runtime.Decode(t, data)
 	if err != nil {
 		return nil, err
 	}

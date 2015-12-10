@@ -49,7 +49,7 @@ func TestCompatibility(
 
 	// Decode
 	codec := runtime.CodecFor(api.Scheme, version)
-	obj, err := codec.Decode(input)
+	obj, err := runtime.Decode(codec, input)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestCompatibility(
 	}
 
 	// Encode
-	output, err := codec.Encode(obj)
+	output, err := runtime.Encode(codec, obj)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

@@ -406,7 +406,7 @@ func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w htt
 
 func prettyJSON(codec runtime.Codec, object runtime.Object, w http.ResponseWriter) {
 	formatted := &bytes.Buffer{}
-	output, err := codec.Encode(object)
+	output, err := runtime.Encode(codec, object)
 	if err != nil {
 		errorJSONFatal(err, codec, w)
 	}
@@ -431,7 +431,7 @@ func errorJSONFatal(err error, codec runtime.Codec, w http.ResponseWriter) int {
 	util.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
 	status := errToAPIStatus(err)
 	code := int(status.Code)
-	output, err := codec.Encode(status)
+	output, err := runtime.Encode(codec, status)
 	if err != nil {
 		w.WriteHeader(code)
 		fmt.Fprintf(w, "%s: %s", status.Reason, status.Message)

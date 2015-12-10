@@ -66,7 +66,7 @@ func DecodeList(objects []Object, decoders ...ObjectDecoder) []error {
 				if !decoder.Recognizes(gv.WithKind(t.Kind)) {
 					continue
 				}
-				obj, err := decoder.Decode(t.RawJSON)
+				obj, err := Decode(decoder, t.RawJSON)
 				if err != nil {
 					errs = append(errs, err)
 					break
