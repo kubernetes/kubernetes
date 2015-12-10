@@ -45,10 +45,10 @@ func NewNamespaceController(kubeClient client.Interface, versions *unversioned.A
 	var controller *framework.Controller
 	_, controller = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return kubeClient.Namespaces().List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return kubeClient.Namespaces().Watch(options)
 			},
 		},
@@ -337,7 +337,7 @@ func syncNamespace(kubeClient client.Interface, versions *unversioned.APIVersion
 }
 
 func deleteLimitRanges(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.LimitRanges(ns).List(unversioned.ListOptions{})
+	items, err := kubeClient.LimitRanges(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -351,7 +351,7 @@ func deleteLimitRanges(kubeClient client.Interface, ns string) error {
 }
 
 func deleteResourceQuotas(kubeClient client.Interface, ns string) error {
-	resourceQuotas, err := kubeClient.ResourceQuotas(ns).List(unversioned.ListOptions{})
+	resourceQuotas, err := kubeClient.ResourceQuotas(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -365,7 +365,7 @@ func deleteResourceQuotas(kubeClient client.Interface, ns string) error {
 }
 
 func deleteServiceAccounts(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.ServiceAccounts(ns).List(unversioned.ListOptions{})
+	items, err := kubeClient.ServiceAccounts(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -379,7 +379,7 @@ func deleteServiceAccounts(kubeClient client.Interface, ns string) error {
 }
 
 func deleteServices(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Services(ns).List(unversioned.ListOptions{})
+	items, err := kubeClient.Services(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -393,7 +393,7 @@ func deleteServices(kubeClient client.Interface, ns string) error {
 }
 
 func deleteReplicationControllers(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.ReplicationControllers(ns).List(unversioned.ListOptions{})
+	items, err := kubeClient.ReplicationControllers(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -407,7 +407,7 @@ func deleteReplicationControllers(kubeClient client.Interface, ns string) error 
 }
 
 func deletePods(kubeClient client.Interface, ns string, before unversioned.Time) (int64, error) {
-	items, err := kubeClient.Pods(ns).List(unversioned.ListOptions{})
+	items, err := kubeClient.Pods(ns).List(api.ListOptions{})
 	if err != nil {
 		return 0, err
 	}
@@ -436,11 +436,11 @@ func deletePods(kubeClient client.Interface, ns string, before unversioned.Time)
 }
 
 func deleteEvents(kubeClient client.Interface, ns string) error {
-	return kubeClient.Events(ns).DeleteCollection(nil, unversioned.ListOptions{})
+	return kubeClient.Events(ns).DeleteCollection(nil, api.ListOptions{})
 }
 
 func deleteSecrets(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Secrets(ns).List(unversioned.ListOptions{})
+	items, err := kubeClient.Secrets(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -454,7 +454,7 @@ func deleteSecrets(kubeClient client.Interface, ns string) error {
 }
 
 func deletePersistentVolumeClaims(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.PersistentVolumeClaims(ns).List(unversioned.ListOptions{})
+	items, err := kubeClient.PersistentVolumeClaims(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -468,7 +468,7 @@ func deletePersistentVolumeClaims(kubeClient client.Interface, ns string) error 
 }
 
 func deleteHorizontalPodAutoscalers(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.HorizontalPodAutoscalers(ns).List(unversioned.ListOptions{})
+	items, err := expClient.HorizontalPodAutoscalers(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -482,7 +482,7 @@ func deleteHorizontalPodAutoscalers(expClient client.ExtensionsInterface, ns str
 }
 
 func deleteDaemonSets(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.DaemonSets(ns).List(unversioned.ListOptions{})
+	items, err := expClient.DaemonSets(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -496,7 +496,7 @@ func deleteDaemonSets(expClient client.ExtensionsInterface, ns string) error {
 }
 
 func deleteJobs(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.Jobs(ns).List(unversioned.ListOptions{})
+	items, err := expClient.Jobs(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -510,7 +510,7 @@ func deleteJobs(expClient client.ExtensionsInterface, ns string) error {
 }
 
 func deleteDeployments(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.Deployments(ns).List(unversioned.ListOptions{})
+	items, err := expClient.Deployments(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -524,7 +524,7 @@ func deleteDeployments(expClient client.ExtensionsInterface, ns string) error {
 }
 
 func deleteIngress(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.Ingress(ns).List(unversioned.ListOptions{})
+	items, err := expClient.Ingress(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}

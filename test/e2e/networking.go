@@ -136,7 +136,7 @@ var _ = Describe("Networking", func() {
 
 		By("Creating a webserver (pending) pod on each node")
 
-		nodes, err := f.Client.Nodes().List(unversioned.ListOptions{})
+		nodes, err := f.Client.Nodes().List(api.ListOptions{})
 		if err != nil {
 			Failf("Failed to list nodes: %v", err)
 		}

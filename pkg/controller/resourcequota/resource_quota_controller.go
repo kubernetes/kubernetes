@@ -23,7 +23,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
@@ -65,10 +64,10 @@ func NewResourceQuotaController(kubeClient client.Interface, resyncPeriod contro
 
 	rq.rqIndexer, rq.rqController = framework.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return rq.kubeClient.ResourceQuotas(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return rq.kubeClient.ResourceQuotas(api.NamespaceAll).Watch(options)
 			},
 		},
@@ -105,10 +104,10 @@ func NewResourceQuotaController(kubeClient client.Interface, resyncPeriod contro
 	// release compute resources from any associated quota.
 	rq.podStore.Store, rq.podController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return rq.kubeClient.Pods(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return rq.kubeClient.Pods(api.NamespaceAll).Watch(options)
 			},
 		},
@@ -265,7 +264,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (e
 
 	pods := &api.PodList{}
 	if set[api.ResourcePods] || set[api.ResourceMemory] || set[api.ResourceCPU] {
-		pods, err = rq.kubeClient.Pods(usage.Namespace).List(unversioned.ListOptions{})
+		pods, err = rq.kubeClient.Pods(usage.Namespace).List(api.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -288,31 +287,31 @@ func (rq *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (e
 		case api.ResourcePods:
 			value = resource.NewQuantity(int64(len(filteredPods)), resource.DecimalSI)
 		case api.ResourceServices:
-			items, err := rq.kubeClient.Services(usage.Namespace).List(unversioned.ListOptions{})
+			items, err := rq.kubeClient.Services(usage.Namespace).List(api.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceReplicationControllers:
-			items, err := rq.kubeClient.ReplicationControllers(usage.Namespace).List(unversioned.ListOptions{})
+			items, err := rq.kubeClient.ReplicationControllers(usage.Namespace).List(api.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceQuotas:
-			items, err := rq.kubeClient.ResourceQuotas(usage.Namespace).List(unversioned.ListOptions{})
+			items, err := rq.kubeClient.ResourceQuotas(usage.Namespace).List(api.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceSecrets:
-			items, err := rq.kubeClient.Secrets(usage.Namespace).List(unversioned.ListOptions{})
+			items, err := rq.kubeClient.Secrets(usage.Namespace).List(api.ListOptions{})
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourcePersistentVolumeClaims:
-			items, err := rq.kubeClient.PersistentVolumeClaims(usage.Namespace).List(unversioned.ListOptions{})
+			items, err := rq.kubeClient.PersistentVolumeClaims(usage.Namespace).List(api.ListOptions{})
 			if err != nil {
 				return err
 			}

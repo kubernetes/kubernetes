@@ -31,6 +31,14 @@ var Codec = runtime.CodecFor(Scheme, "")
 
 func init() {
 	Scheme.AddDefaultingFuncs(
+		func(obj *ListOptions) {
+			if obj.LabelSelector == nil {
+				obj.LabelSelector = labels.Everything()
+			}
+			if obj.FieldSelector == nil {
+				obj.FieldSelector = fields.Everything()
+			}
+		},
 		func(obj *unversioned.ListOptions) {
 			if obj.LabelSelector.Selector == nil {
 				obj.LabelSelector = unversioned.LabelSelector{labels.Everything()}

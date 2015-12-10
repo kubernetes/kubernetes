@@ -158,7 +158,7 @@ var _ = Describe("Density [Skipped]", func() {
 		ns = framework.Namespace.Name
 		var err error
 
-		nodes, err := c.Nodes().List(unversioned.ListOptions{})
+		nodes, err := c.Nodes().List(api.ListOptions{})
 		expectNoError(err)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
@@ -235,10 +235,10 @@ var _ = Describe("Density [Skipped]", func() {
 			events := make([](*api.Event), 0)
 			_, controller := controllerframework.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+					ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 						return c.Events(ns).List(options)
 					},
-					WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 						return c.Events(ns).Watch(options)
 					},
 				},
@@ -318,13 +318,12 @@ var _ = Describe("Density [Skipped]", func() {
 				additionalPodsPrefix = "density-latency-pod-" + string(util.NewUUID())
 				_, controller := controllerframework.NewInformer(
 					&cache.ListWatch{
-						ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
-							selector := labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
-							options.LabelSelector.Selector = selector
+						ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+							options.LabelSelector = labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
 							return c.Pods(ns).List(options)
 						},
-						WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-							options.LabelSelector.Selector = labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
+						WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+							options.LabelSelector = labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
 							return c.Pods(ns).Watch(options)
 						},
 					},
@@ -373,7 +372,7 @@ var _ = Describe("Density [Skipped]", func() {
 					"involvedObject.namespace": ns,
 					"source":                   "scheduler",
 				}.AsSelector()
-				options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+				options := api.ListOptions{FieldSelector: selector}
 				schedEvents, err := c.Events(ns).List(options)
 				expectNoError(err)
 				for k := range createTimes {

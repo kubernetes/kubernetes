@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -29,12 +28,12 @@ type PodTemplatesNamespacer interface {
 
 // PodTemplateInterface has methods to work with PodTemplate resources.
 type PodTemplateInterface interface {
-	List(opts unversioned.ListOptions) (*api.PodTemplateList, error)
+	List(opts api.ListOptions) (*api.PodTemplateList, error)
 	Get(name string) (*api.PodTemplate, error)
 	Delete(name string, options *api.DeleteOptions) error
 	Create(podTemplate *api.PodTemplate) (*api.PodTemplate, error)
 	Update(podTemplate *api.PodTemplate) (*api.PodTemplate, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // podTemplates implements PodTemplatesNamespacer interface
@@ -52,7 +51,7 @@ func newPodTemplates(c *Client, namespace string) *podTemplates {
 }
 
 // List takes label and field selectors, and returns the list of podTemplates that match those selectors.
-func (c *podTemplates) List(opts unversioned.ListOptions) (result *api.PodTemplateList, err error) {
+func (c *podTemplates) List(opts api.ListOptions) (result *api.PodTemplateList, err error) {
 	result = &api.PodTemplateList{}
 	err = c.r.Get().Namespace(c.ns).Resource("podTemplates").VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
@@ -93,7 +92,7 @@ func (c *podTemplates) Update(podTemplate *api.PodTemplate) (result *api.PodTemp
 }
 
 // Watch returns a watch.Interface that watches the requested podTemplates.
-func (c *podTemplates) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *podTemplates) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).

@@ -143,11 +143,11 @@ func (d *NamespaceDescriber) Describe(namespace, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	resourceQuotaList, err := d.ResourceQuotas(name).List(unversioned.ListOptions{})
+	resourceQuotaList, err := d.ResourceQuotas(name).List(api.ListOptions{})
 	if err != nil {
 		return "", err
 	}
-	limitRangeList, err := d.LimitRanges(name).List(unversioned.ListOptions{})
+	limitRangeList, err := d.LimitRanges(name).List(api.ListOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -425,7 +425,7 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 	if err != nil {
 		eventsInterface := d.Events(namespace)
 		selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
-		options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+		options := api.ListOptions{FieldSelector: selector}
 		events, err2 := eventsInterface.List(options)
 		if err2 == nil && len(events.Items) > 0 {
 			return tabbedString(func(out io.Writer) error {
@@ -1236,7 +1236,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string) (string, erro
 	tokens := []api.Secret{}
 
 	tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
-	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{tokenSelector}}
+	options := api.ListOptions{FieldSelector: tokenSelector}
 	secrets, err := d.Secrets(namespace).List(options)
 	if err == nil {
 		for _, s := range secrets.Items {
@@ -1320,7 +1320,7 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 	// in a policy aware setting, users may have access to a node, but not all pods
 	// in that case, we note that the user does not have access to the pods
 	canViewPods := true
-	nodeNonTerminatedPodsList, err := d.Pods(namespace).List(unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{fieldSelector}})
+	nodeNonTerminatedPodsList, err := d.Pods(namespace).List(api.ListOptions{FieldSelector: fieldSelector})
 	if err != nil {
 		if !errors.IsForbidden(err) {
 			return "", err
@@ -1596,7 +1596,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.Labels) ([]extensions.DaemonSet, error) {
 	// Get all daemon sets
 	// TODO: this needs a namespace scope as argument
-	dss, err := c.List(unversioned.ListOptions{})
+	dss, err := c.List(api.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting daemon set: %v", err)
 	}
@@ -1623,7 +1623,7 @@ func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.La
 func getReplicationControllersForLabels(c client.ReplicationControllerInterface, labelsToMatch labels.Labels) ([]api.ReplicationController, error) {
 	// Get all replication controllers.
 	// TODO this needs a namespace scope as argument
-	rcs, err := c.List(unversioned.ListOptions{})
+	rcs, err := c.List(api.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting replication controllers: %v", err)
 	}
@@ -1654,7 +1654,7 @@ func printReplicationControllersByLabels(matchingRCs []*api.ReplicationControlle
 }
 
 func getPodStatusForController(c client.PodInterface, selector labels.Selector) (running, waiting, succeeded, failed int, err error) {
-	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	options := api.ListOptions{LabelSelector: selector}
 	rcPods, err := c.List(options)
 	if err != nil {
 		return

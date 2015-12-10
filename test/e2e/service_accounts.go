@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util"
@@ -42,7 +41,7 @@ var _ = Describe("ServiceAccounts", func() {
 		expectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
 			By("getting the auto-created API token")
 			tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
-			options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{tokenSelector}}
+			options := api.ListOptions{FieldSelector: tokenSelector}
 			secrets, err := f.Client.Secrets(f.Namespace.Name).List(options)
 			if err != nil {
 				return false, err

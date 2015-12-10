@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -60,7 +59,7 @@ func TestListJobs(t *testing.T) {
 			},
 		},
 	}
-	receivedJobList, err := c.Setup(t).Extensions().Jobs(ns).List(unversioned.ListOptions{})
+	receivedJobList, err := c.Setup(t).Extensions().Jobs(ns).List(api.ListOptions{})
 	c.Validate(t, receivedJobList, err)
 }
 

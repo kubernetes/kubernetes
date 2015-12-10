@@ -169,7 +169,7 @@ func TestEventList(t *testing.T) {
 		},
 		Response: simple.Response{StatusCode: 200, Body: eventList},
 	}
-	response, err := c.Setup(t).Events(ns).List(unversioned.ListOptions{})
+	response, err := c.Setup(t).Events(ns).List(api.ListOptions{})
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)

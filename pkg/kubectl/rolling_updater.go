@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -364,7 +363,7 @@ func (r *RollingUpdater) pollForReadyPods(interval, timeout time.Duration, oldRc
 		anyReady := false
 		for _, controller := range controllers {
 			selector := labels.Set(controller.Spec.Selector).AsSelector()
-			options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+			options := api.ListOptions{LabelSelector: selector}
 			pods, err := r.c.Pods(controller.Namespace).List(options)
 			if err != nil {
 				return false, err
@@ -647,7 +646,7 @@ func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 	// Update all pods managed by the rc to have the new hash label, so they are correctly adopted
 	// TODO: extract the code from the label command and re-use it here.
 	selector := labels.SelectorFromSet(oldRc.Spec.Selector)
-	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	options := api.ListOptions{LabelSelector: selector}
 	podList, err := client.Pods(namespace).List(options)
 	if err != nil {
 		return nil, err
@@ -699,7 +698,7 @@ func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 	// doesn't see the update to its pod template and creates a new pod with the old labels after
 	// we've finished re-adopting existing pods to the rc.
 	selector = labels.SelectorFromSet(selectorCopy)
-	options = unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	options = api.ListOptions{LabelSelector: selector}
 	podList, err = client.Pods(namespace).List(options)
 	for ix := range podList.Items {
 		pod := &podList.Items[ix]
@@ -741,7 +740,7 @@ func updateWithRetries(rcClient client.ReplicationControllerInterface, rc *api.R
 }
 
 func FindSourceController(r client.ReplicationControllersNamespacer, namespace, name string) (*api.ReplicationController, error) {
-	list, err := r.ReplicationControllers(namespace).List(unversioned.ListOptions{})
+	list, err := r.ReplicationControllers(namespace).List(api.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

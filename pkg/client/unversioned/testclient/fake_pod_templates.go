@@ -18,7 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -38,7 +37,7 @@ func (c *FakePodTemplates) Get(name string) (*api.PodTemplate, error) {
 	return obj.(*api.PodTemplate), err
 }
 
-func (c *FakePodTemplates) List(opts unversioned.ListOptions) (*api.PodTemplateList, error) {
+func (c *FakePodTemplates) List(opts api.ListOptions) (*api.PodTemplateList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("podtemplates", c.Namespace, opts), &api.PodTemplateList{})
 	if obj == nil {
 		return nil, err
@@ -70,6 +69,6 @@ func (c *FakePodTemplates) Delete(name string, options *api.DeleteOptions) error
 	return err
 }
 
-func (c *FakePodTemplates) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *FakePodTemplates) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.InvokesWatch(NewWatchAction("podtemplates", c.Namespace, opts))
 }

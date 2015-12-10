@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -29,13 +28,13 @@ type ResourceQuotasNamespacer interface {
 
 // ResourceQuotaInterface has methods to work with ResourceQuota resources.
 type ResourceQuotaInterface interface {
-	List(opts unversioned.ListOptions) (*api.ResourceQuotaList, error)
+	List(opts api.ListOptions) (*api.ResourceQuotaList, error)
 	Get(name string) (*api.ResourceQuota, error)
 	Delete(name string) error
 	Create(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
 	Update(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
 	UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // resourceQuotas implements ResourceQuotasNamespacer interface
@@ -53,7 +52,7 @@ func newResourceQuotas(c *Client, namespace string) *resourceQuotas {
 }
 
 // List takes a selector, and returns the list of resourceQuotas that match that selector.
-func (c *resourceQuotas) List(opts unversioned.ListOptions) (result *api.ResourceQuotaList, err error) {
+func (c *resourceQuotas) List(opts api.ListOptions) (result *api.ResourceQuotaList, err error) {
 	result = &api.ResourceQuotaList{}
 	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
@@ -93,7 +92,7 @@ func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (result 
 }
 
 // Watch returns a watch.Interface that watches the requested resource
-func (c *resourceQuotas) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *resourceQuotas) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).

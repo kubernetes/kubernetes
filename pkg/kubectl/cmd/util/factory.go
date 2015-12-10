@@ -346,7 +346,7 @@ func GetFirstPod(client *client.Client, namespace string, selector map[string]st
 	for pods == nil || len(pods.Items) == 0 {
 		var err error
 		labelSelector := labels.SelectorFromSet(selector)
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{labelSelector}}
+		options := api.ListOptions{LabelSelector: labelSelector}
 		if pods, err = client.Pods(namespace).List(options); err != nil {
 			return nil, err
 		}

@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -60,7 +59,7 @@ func TestListIngress(t *testing.T) {
 			},
 		},
 	}
-	receivedIngressList, err := c.Setup(t).Extensions().Ingress(ns).List(unversioned.ListOptions{})
+	receivedIngressList, err := c.Setup(t).Extensions().Ingress(ns).List(api.ListOptions{})
 	c.Validate(t, receivedIngressList, err)
 }
 

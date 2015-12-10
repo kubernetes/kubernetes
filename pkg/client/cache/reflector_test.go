@@ -35,10 +35,10 @@ type testLW struct {
 	WatchFunc func(resourceVersion string) (watch.Interface, error)
 }
 
-func (t *testLW) List(options unversioned.ListOptions) (runtime.Object, error) {
+func (t *testLW) List(options api.ListOptions) (runtime.Object, error) {
 	return t.ListFunc()
 }
-func (t *testLW) Watch(options unversioned.ListOptions) (watch.Interface, error) {
+func (t *testLW) Watch(options api.ListOptions) (watch.Interface, error) {
 	return t.WatchFunc(options.ResourceVersion)
 }
 
