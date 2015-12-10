@@ -136,10 +136,7 @@ var _ = Describe("Networking", func() {
 
 		By("Creating a webserver (pending) pod on each node")
 
-		nodes, err := f.Client.Nodes().List(api.ListOptions{})
-		if err != nil {
-			Failf("Failed to list nodes: %v", err)
-		}
+		nodes := ListSchedulableNodesOrDie(f.Client)
 		// previous tests may have cause failures of some nodes. Let's skip
 		// 'Not Ready' nodes, just in case (there is no need to fail the test).
 		filterNodes(nodes, func(node api.Node) bool {

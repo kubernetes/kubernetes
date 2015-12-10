@@ -115,10 +115,7 @@ var _ = Describe("Reboot", func() {
 
 func testReboot(c *client.Client, rebootCmd string) {
 	// Get all nodes, and kick off the test on each.
-	nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
-	if err != nil {
-		Failf("Error getting nodes: %v", err)
-	}
+	nodelist := ListSchedulableNodesOrDie(c)
 	result := make([]bool, len(nodelist.Items))
 	wg := sync.WaitGroup{}
 	wg.Add(len(nodelist.Items))

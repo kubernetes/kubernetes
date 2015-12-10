@@ -82,6 +82,7 @@ var _ = Describe("Resource usage of system containers", func() {
 
 	It("should not exceed expected amount.", func() {
 		By("Getting ResourceConsumption on all nodes")
+		// It should be OK to list unschedulable Nodes here.
 		nodeList, err := c.Nodes().List(api.ListOptions{})
 		expectNoError(err)
 

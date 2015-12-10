@@ -52,9 +52,7 @@ var _ = Describe("Pod Disks", func() {
 		SkipUnlessNodeCountIsAtLeast(2)
 
 		podClient = framework.Client.Pods(framework.Namespace.Name)
-
-		nodes, err := framework.Client.Nodes().List(api.ListOptions{})
-		expectNoError(err, "Failed to list nodes for e2e cluster.")
+		nodes := ListSchedulableNodesOrDie(framework.Client)
 
 		Expect(len(nodes.Items)).To(BeNumerically(">=", 2), "Requires at least 2 nodes")
 

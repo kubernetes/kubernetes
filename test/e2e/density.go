@@ -158,8 +158,7 @@ var _ = Describe("Density [Skipped]", func() {
 		ns = framework.Namespace.Name
 		var err error
 
-		nodes, err := c.Nodes().List(api.ListOptions{})
-		expectNoError(err)
+		nodes := ListSchedulableNodesOrDie(c)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 
