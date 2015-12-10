@@ -88,6 +88,7 @@ type WatchServer struct {
 
 // HandleWS implements a websocket handler.
 func (w *WatchServer) HandleWS(ws *websocket.Conn) {
+	defer ws.Close()
 	done := make(chan struct{})
 	go func() {
 		var unused interface{}
