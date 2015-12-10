@@ -39,12 +39,12 @@ func formatMap(m map[string]string) (fmtstr string) {
 	return
 }
 
-func newTestHost(t *testing.T, client client.Interface, basePath string) volume.VolumeHost {
+func newTestHost(t *testing.T, client client.Interface, basePath string) (string, volume.VolumeHost) {
 	tempDir, err := ioutil.TempDir(basePath, "downwardApi_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return volume.NewFakeVolumeHost(tempDir, client, empty_dir.ProbeVolumePlugins())
+	return tempDir, volume.NewFakeVolumeHost(tempDir, client, empty_dir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -54,7 +54,8 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, nil, tmpDir))
+	_, host := newTestHost(t, nil, tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
@@ -110,7 +111,8 @@ func TestLabels(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	rootDir, host := newTestHost(t, fake, tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -139,6 +141,17 @@ func TestLabels(t *testing.T) {
 	err = builder.SetUp()
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
+	}
+
+	// gitRepo volume should create it's own empty wrapper path
+	podWrapperMetadataDir := fmt.Sprintf("%v/pods/%v/plugins/kubernetes.io~empty-dir/wrapped_%v", rootDir, testPodUID, testVolumeName)
+
+	if _, err := os.Stat(podWrapperMetadataDir); err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("SetUp() failed, empty-dir wrapper path was not created: %s", podWrapperMetadataDir)
+		} else {
+			t.Errorf("SetUp() failed: %v", err)
+		}
 	}
 
 	var data []byte
@@ -189,7 +202,8 @@ func TestAnnotations(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	_, host := newTestHost(t, fake, tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -254,7 +268,8 @@ func TestName(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	_, host := newTestHost(t, fake, tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -320,7 +335,8 @@ func TestNamespace(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	_, host := newTestHost(t, fake, tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -379,7 +395,8 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	_, host := newTestHost(t, fake, tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -468,7 +485,8 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	_, host := newTestHost(t, fake, tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -577,7 +595,8 @@ func TestWriteWithUnixPath(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	_, host := newTestHost(t, fake, tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
@@ -656,7 +675,8 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, fake, tmpDir))
+	_, host := newTestHost(t, fake, tmpDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
