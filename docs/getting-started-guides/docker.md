@@ -151,7 +151,9 @@ $ kubectl config set-context test-doc --cluster=test-doc
 $ kubectl config use-context test-doc
 ```
 
-For Max OS X users instead of ```localhost``` you will have to use IP address of your docker machine.
+For Max OS X users instead of ```localhost``` you will have to use IP address of your docker machine,
+which you can find by running ```docker-machine env <machinename>``` (see [documentation](https://docs.docker.com/machine/reference/env/)
+for details).
 
 ### Test it out
 
