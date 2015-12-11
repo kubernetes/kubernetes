@@ -41,10 +41,10 @@ logging and DNS resolution for names of Kubernetes services:
 ```console
 $ kubectl get pods --namespace=kube-system
 NAME                                           READY     REASON    RESTARTS   AGE
-fluentd-cloud-logging-kubernetes-minion-0f64   1/1       Running   0          32m
-fluentd-cloud-logging-kubernetes-minion-27gf   1/1       Running   0          32m
-fluentd-cloud-logging-kubernetes-minion-pk22   1/1       Running   0          31m
-fluentd-cloud-logging-kubernetes-minion-20ej   1/1       Running   0          31m
+fluentd-cloud-logging-kubernetes-node-0f64     1/1       Running   0          32m
+fluentd-cloud-logging-kubernetes-node-27gf     1/1       Running   0          32m
+fluentd-cloud-logging-kubernetes-node-pk22     1/1       Running   0          31m
+fluentd-cloud-logging-kubernetes-node-20ej     1/1       Running   0          31m
 kube-dns-v3-pk22                               3/3       Running   0          32m
 monitoring-heapster-v1-20ej                    0/1       Running   9          32m
 ```
@@ -215,7 +215,7 @@ Note the first container counted to 108 and then it was terminated. When the nex
 
  ```console
  SELECT metadata.timestamp, structPayload.log
- FROM [mylogs.kubernetes_counter_default_count_20150611] 
+ FROM [mylogs.kubernetes_counter_default_count_20150611]
  ORDER BY metadata.timestamp DESC
  ```
 

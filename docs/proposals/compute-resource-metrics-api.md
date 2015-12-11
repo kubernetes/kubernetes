@@ -68,7 +68,7 @@ user via a periodically refreshing interface similar to `top` on Unix-like
 systems. This info could let users assign resource limits more efficiently.
 
 ```
-$ kubectl top kubernetes-minion-abcd
+$ kubectl top kubernetes-node-abcd
 POD                        CPU         MEM
 monitoring-heapster-abcde  0.12 cores  302 MB
 kube-ui-v1-nd7in           0.07 cores  130 MB
