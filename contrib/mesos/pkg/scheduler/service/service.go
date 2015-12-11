@@ -75,7 +75,6 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
-	"k8s.io/kubernetes/pkg/tools"
 
 	// lock to this API version, compilation will fail when this becomes unsupported
 	_ "k8s.io/kubernetes/pkg/api/v1"
@@ -630,7 +629,7 @@ func validateLeadershipTransition(desired, current string) {
 }
 
 // hacked from https://github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kube-apiserver/app/server.go
-func newEtcd(etcdConfigFile string, etcdServerList []string) (client tools.EtcdClient, err error) {
+func newEtcd(etcdConfigFile string, etcdServerList []string) (client *etcd.Client, err error) {
 	if etcdConfigFile != "" {
 		client, err = etcd.NewClientFromFile(etcdConfigFile)
 	} else {
@@ -639,7 +638,7 @@ func newEtcd(etcdConfigFile string, etcdServerList []string) (client tools.EtcdC
 	return
 }
 
-func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config) (*ha.SchedulerProcess, ha.DriverFactory, tools.EtcdClient, *mesos.ExecutorID) {
+func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config) (*ha.SchedulerProcess, ha.DriverFactory, *etcd.Client, *mesos.ExecutorID) {
 	s.frameworkName = strings.TrimSpace(s.frameworkName)
 	if s.frameworkName == "" {
 		log.Fatalf("framework-name must be a non-empty string")
@@ -917,7 +916,7 @@ func (s *SchedulerServer) buildFrameworkInfo() (info *mesos.FrameworkInfo, cred 
 	return
 }
 
-func (s *SchedulerServer) fetchFrameworkID(client tools.EtcdClient) (*mesos.FrameworkID, error) {
+func (s *SchedulerServer) fetchFrameworkID(client *etcd.Client) (*mesos.FrameworkID, error) {
 	if s.failoverTimeout > 0 {
 		if response, err := client.Get(meta.FrameworkIDKey, false, false); err != nil {
 			if !etcdutil.IsEtcdNotFound(err) {
