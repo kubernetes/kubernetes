@@ -51,7 +51,7 @@ func CustomSize(format string, size float64, base float64, _map []string) string
 // HumanSize returns a human-readable approximation of a size
 // using SI standard (eg. "44kB", "17MB")
 func HumanSize(size float64) string {
-	return CustomSize("%.4g %s", float64(size), 1000.0, decimapAbbrs)
+	return CustomSize("%.4g %s", size, 1000.0, decimapAbbrs)
 }
 
 func BytesSize(size float64) string {

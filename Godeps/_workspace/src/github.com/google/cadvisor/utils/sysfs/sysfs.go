@@ -24,11 +24,12 @@ import (
 )
 
 const (
-	blockDir   = "/sys/block"
-	cacheDir   = "/sys/devices/system/cpu/cpu"
-	netDir     = "/sys/class/net"
-	dmiDir     = "/sys/class/dmi"
-	ppcDevTree = "/proc/device-tree"
+	blockDir     = "/sys/block"
+	cacheDir     = "/sys/devices/system/cpu/cpu"
+	netDir       = "/sys/class/net"
+	dmiDir       = "/sys/class/dmi"
+	ppcDevTree   = "/proc/device-tree"
+	s390xDevTree = "/etc" // s390/s390x changes
 )
 
 type CacheInfo struct {
@@ -234,17 +235,15 @@ func (self *realSysFs) GetCacheInfo(id int, name string) (CacheInfo, error) {
 }
 
 func (self *realSysFs) GetSystemUUID() (string, error) {
-	id, err := ioutil.ReadFile(path.Join(dmiDir, "id", "product_uuid"))
-	if err != nil {
-		//If running on baremetal Power then UID is /proc/device-tree/system-id
-		id, err = ioutil.ReadFile(path.Join(ppcDevTree, "system-id"))
-		if err != nil {
-			//If running on a KVM guest on Power then UUID is /proc/device-tree/vm,uuid
-			id, err = ioutil.ReadFile(path.Join(ppcDevTree, "vm,uuid"))
-			if err != nil {
-				return "", err
-			}
-		}
+	if id, err := ioutil.ReadFile(path.Join(dmiDir, "id", "product_uuid")); err == nil {
+		return strings.TrimSpace(string(id)), nil
+	} else if id, err = ioutil.ReadFile(path.Join(ppcDevTree, "system-id")); err == nil {
+		return strings.TrimSpace(string(id)), nil
+	} else if id, err = ioutil.ReadFile(path.Join(ppcDevTree, "vm,uuid")); err == nil {
+		return strings.TrimSpace(string(id)), nil
+	} else if id, err = ioutil.ReadFile(path.Join(s390xDevTree, "machine-id")); err == nil {
+		return strings.TrimSpace(string(id)), nil
+	} else {
+		return "", err
 	}
-	return strings.TrimSpace(string(id)), nil
 }

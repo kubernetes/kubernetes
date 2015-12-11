@@ -24,16 +24,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/libcontainer/cgroups"
-	cgroup_fs "github.com/docker/libcontainer/cgroups/fs"
-	"github.com/docker/libcontainer/configs"
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils"
 	"github.com/google/cadvisor/utils/machine"
+
+	"github.com/golang/glog"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
+	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	"github.com/opencontainers/runc/libcontainer/configs"
 	"golang.org/x/exp/inotify"
 )
 
@@ -78,7 +79,7 @@ func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSu
 	}
 
 	// Generate the equivalent cgroup manager for this container.
-	cgroupManager := &cgroup_fs.Manager{
+	cgroupManager := &cgroupfs.Manager{
 		Cgroups: &configs.Cgroup{
 			Name: name,
 		},
@@ -138,7 +139,7 @@ func readString(dirpath string, file string) string {
 	return strings.TrimSpace(string(out))
 }
 
-func readInt64(dirpath string, file string) uint64 {
+func readUInt64(dirpath string, file string) uint64 {
 	out := readString(dirpath, file)
 	if out == "" {
 		return 0
@@ -202,7 +203,7 @@ func (self *rawContainerHandler) GetSpec() (info.ContainerSpec, error) {
 	if ok {
 		if utils.FileExists(cpuRoot) {
 			spec.HasCpu = true
-			spec.Cpu.Limit = readInt64(cpuRoot, "cpu.shares")
+			spec.Cpu.Limit = readUInt64(cpuRoot, "cpu.shares")
 		}
 	}
 
@@ -241,8 +242,8 @@ func (self *rawContainerHandler) GetSpec() (info.ContainerSpec, error) {
 		if ok {
 			if utils.FileExists(memoryRoot) {
 				spec.HasMemory = true
-				spec.Memory.Limit = readInt64(memoryRoot, "memory.limit_in_bytes")
-				spec.Memory.SwapLimit = readInt64(memoryRoot, "memory.memsw.limit_in_bytes")
+				spec.Memory.Limit = readUInt64(memoryRoot, "memory.limit_in_bytes")
+				spec.Memory.SwapLimit = readUInt64(memoryRoot, "memory.memsw.limit_in_bytes")
 			}
 		}
 	}

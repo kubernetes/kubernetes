@@ -57,9 +57,9 @@ type systemdInterface interface {
 	// ListUnits lists all the loaded units.
 	ListUnits() ([]dbus.UnitStatus, error)
 	// StopUnits stops the unit with the given name.
-	StopUnit(name, mode string) (string, error)
+	StopUnit(name string, mode string, ch chan<- string) (int, error)
 	// StopUnits restarts the unit with the given name.
-	RestartUnit(name, mode string) (string, error)
+	RestartUnit(name string, mode string, ch chan<- string) (int, error)
 	// Reload is equivalent to 'systemctl daemon-reload'.
 	Reload() error
 }

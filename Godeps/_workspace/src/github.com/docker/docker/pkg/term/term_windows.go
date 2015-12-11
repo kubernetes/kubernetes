@@ -1,4 +1,5 @@
 // +build windows
+
 package term
 
 import (

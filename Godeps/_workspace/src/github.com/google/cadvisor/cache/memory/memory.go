@@ -19,10 +19,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/storage"
 	"github.com/google/cadvisor/utils"
+
+	"github.com/golang/glog"
 )
 
 // TODO(vmarmol): See about refactoring this class, we have an unecessary redirection of containerCache and InMemoryCache.

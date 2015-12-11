@@ -802,11 +802,18 @@ func (r *Runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
 
 	r.generateEvents(runtimePod, "Created", nil)
 
-	// TODO(yifan): This is the old version of go-systemd. Should update when libcontainer updates
-	// its version of go-systemd.
 	// RestartUnit has the same effect as StartUnit if the unit is not running, besides it can restart
 	// a unit if the unit file is changed and reloaded.
-	if _, err := r.systemd.RestartUnit(name, "replace"); err != nil {
+	reschan := make(chan string)
+	_, err := r.systemd.RestartUnit(name, "replace", reschan)
+	if err != nil {
+		r.generateEvents(runtimePod, "Failed", err)
+		return err
+	}
+
+	res := <-reschan
+	if res != "done" {
+		err := fmt.Errorf("Failed to restart unit %q: %s", name, res)
 		r.generateEvents(runtimePod, "Failed", err)
 		return err
 	}
@@ -987,10 +994,19 @@ func (r *Runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 
 	// Since all service file have 'KillMode=mixed', the processes in
 	// the unit's cgroup will receive a SIGKILL if the normal stop timeouts.
-	if _, err := r.systemd.StopUnit(serviceName, "replace"); err != nil {
+	reschan := make(chan string)
+	_, err := r.systemd.StopUnit(serviceName, "replace", reschan)
+	if err != nil {
 		glog.Errorf("rkt: Failed to stop unit %q: %v", serviceName, err)
 		return err
 	}
+
+	res := <-reschan
+	if res != "done" {
+		glog.Errorf("rkt: Failed to stop unit %q: %s", serviceName, res)
+		return err
+	}
+
 	return nil
 }
 
