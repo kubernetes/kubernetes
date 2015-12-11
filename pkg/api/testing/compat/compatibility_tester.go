@@ -27,10 +27,9 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/validation"
-
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // Based on: https://github.com/openshift/origin/blob/master/pkg/api/compatibility_test.go
@@ -42,7 +41,7 @@ func TestCompatibility(
 	t *testing.T,
 	version string,
 	input []byte,
-	validator func(obj runtime.Object) validation.ErrorList,
+	validator func(obj runtime.Object) field.ErrorList,
 	expectedKeys map[string]string,
 	absentKeys []string,
 ) {

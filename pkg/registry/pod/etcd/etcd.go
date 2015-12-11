@@ -35,7 +35,7 @@ import (
 	podrest "k8s.io/kubernetes/pkg/registry/pod/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // PodStorage includes storage for pods and all sub resources
@@ -134,10 +134,12 @@ func (r *BindingREST) Create(ctx api.Context, obj runtime.Object) (out runtime.O
 	binding := obj.(*api.Binding)
 	// TODO: move me to a binding strategy
 	if len(binding.Target.Kind) != 0 && binding.Target.Kind != "Node" {
-		return nil, errors.NewInvalid("binding", binding.Name, validation.ErrorList{validation.NewInvalidError(validation.NewFieldPath("target", "kind"), binding.Target.Kind, "must be empty or 'Node'")})
+		// TODO: When validation becomes versioned, this gets more complicated.
+		return nil, errors.NewInvalid("binding", binding.Name, field.ErrorList{field.NotSupported(field.NewPath("target", "kind"), binding.Target.Kind, []string{"Node", "<empty>"})})
 	}
 	if len(binding.Target.Name) == 0 {
-		return nil, errors.NewInvalid("binding", binding.Name, validation.ErrorList{validation.NewRequiredError(validation.NewFieldPath("target", "name"))})
+		// TODO: When validation becomes versioned, this gets more complicated.
+		return nil, errors.NewInvalid("binding", binding.Name, field.ErrorList{field.Required(field.NewPath("target", "name"))})
 	}
 	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations)
 	out = &unversioned.Status{Status: unversioned.StatusSuccess}

@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // HTTP Status codes not in the golang http package.
@@ -168,7 +168,7 @@ func NewGone(message string) error {
 }
 
 // NewInvalid returns an error indicating the item is invalid and cannot be processed.
-func NewInvalid(kind, name string, errs validation.ErrorList) error {
+func NewInvalid(kind, name string, errs field.ErrorList) error {
 	causes := make([]unversioned.StatusCause, 0, len(errs))
 	for i := range errs {
 		err := errs[i]
