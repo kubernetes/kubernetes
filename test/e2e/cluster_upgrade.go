@@ -83,7 +83,8 @@ func masterUpgradeGKE(v string) error {
 		"upgrade",
 		testContext.CloudConfig.Cluster,
 		"--master",
-		fmt.Sprintf("--cluster-version=%s", v))
+		fmt.Sprintf("--cluster-version=%s", v),
+		"--quiet")
 	return err
 }
 
@@ -141,7 +142,8 @@ func nodeUpgradeGKE(v string) error {
 		"clusters",
 		"upgrade",
 		testContext.CloudConfig.Cluster,
-		fmt.Sprintf("--cluster-version=%s", v))
+		fmt.Sprintf("--cluster-version=%s", v),
+		"--quiet")
 	return err
 }
 
@@ -393,6 +395,9 @@ func retryCmd(command string, args ...string) (string, string, error) {
 
 // runCmd runs cmd using args and returns its stdout and stderr. It also outputs
 // cmd's stdout and stderr to their respective OS streams.
+//
+// TODO(ihmccreery) This function should either be moved into util.go or
+// removed; other e2e's use bare exe.Command.
 func runCmd(command string, args ...string) (string, string, error) {
 	Logf("Running %s %v", command, args)
 	var bout, berr bytes.Buffer
