@@ -22,6 +22,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/coreos/go-etcd/etcd"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
@@ -34,10 +35,6 @@ import (
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
-
-	// TODO: once fakeClient has been purged move utils
-	// and eliminate these deps
-	"k8s.io/kubernetes/pkg/tools"
 )
 
 const validEtcdVersion = "etcd 2.0.9"
@@ -58,7 +55,7 @@ func init() {
 	)
 }
 
-func newEtcdHelper(client tools.EtcdClient, codec runtime.Codec, prefix string) etcdHelper {
+func newEtcdHelper(client *etcd.Client, codec runtime.Codec, prefix string) etcdHelper {
 	return *NewEtcdStorage(client, codec, prefix).(*etcdHelper)
 }
 

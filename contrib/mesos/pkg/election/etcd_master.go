@@ -23,7 +23,6 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
-	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -38,7 +37,7 @@ type Master string
 func (Master) IsAnAPIObject() {}
 
 // NewEtcdMasterElector returns an implementation of election.MasterElector backed by etcd.
-func NewEtcdMasterElector(h tools.EtcdClient) MasterElector {
+func NewEtcdMasterElector(h *etcd.Client) MasterElector {
 	return &etcdMasterElector{etcd: h}
 }
 
@@ -46,7 +45,7 @@ type empty struct{}
 
 // internal implementation struct
 type etcdMasterElector struct {
-	etcd   tools.EtcdClient
+	etcd   *etcd.Client
 	done   chan empty
 	events chan watch.Event
 }
