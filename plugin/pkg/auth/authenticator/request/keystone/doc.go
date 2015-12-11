@@ -16,5 +16,5 @@ limitations under the License.
 
 //Package keystone provide authentication via keystone.
 // For details //about keystone and how to use the plugin, refer to
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/oidc/docs/admin/authentication.md
+// https://github.com/kubernetes/kubernetes/blob/oidc/docs/admin/authentication.md
 package keystone
