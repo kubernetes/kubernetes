@@ -25,9 +25,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/manager"
+
+	"github.com/golang/glog"
 )
 
 const ContainersPage = "/containers/"
@@ -144,10 +145,6 @@ func printShares(shares *uint64) string {
 	return fmt.Sprintf("%d", *shares)
 }
 
-func toMegabytes(bytes uint64) float64 {
-	return float64(bytes) / (1 << 20)
-}
-
 // Size after which we consider memory to be "unlimited". This is not
 // MaxInt64 due to rounding by the kernel.
 const maxMemorySize = uint64(1 << 62)
@@ -164,16 +161,6 @@ func printUnit(bytes uint64) string {
 		return ""
 	}
 	return ByteSize(bytes).Unit()
-}
-
-func toMemoryPercent(usage uint64, spec *info.ContainerSpec, machine *info.MachineInfo) int {
-	// Saturate limit to the machine size.
-	limit := uint64(spec.Memory.Limit)
-	if limit > uint64(machine.MemoryCapacity) {
-		limit = uint64(machine.MemoryCapacity)
-	}
-
-	return int((usage * 100) / limit)
 }
 
 func serveContainersPage(m manager.Manager, w http.ResponseWriter, u *url.URL) error {

@@ -25,11 +25,11 @@ import (
 	"path"
 	"strings"
 
-	"github.com/google/cadvisor/manager"
-
-	"github.com/docker/libcontainer/cgroups"
 	"github.com/google/cadvisor/container/docker"
+	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/utils"
+
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
 const (

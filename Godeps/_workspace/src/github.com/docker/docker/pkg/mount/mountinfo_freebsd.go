@@ -15,7 +15,7 @@ import (
 
 // Parse /proc/self/mountinfo because comparing Dev and ino does not work from
 // bind mounts.
-func parseMountTable() ([]*MountInfo, error) {
+func parseMountTable() ([]*Info, error) {
 	var rawEntries *C.struct_statfs
 
 	count := int(C.getmntinfo(&rawEntries, C.MNT_WAIT))
@@ -29,9 +29,9 @@ func parseMountTable() ([]*MountInfo, error) {
 	header.Len = count
 	header.Data = uintptr(unsafe.Pointer(rawEntries))
 
-	var out []*MountInfo
+	var out []*Info
 	for _, entry := range entries {
-		var mountinfo MountInfo
+		var mountinfo Info
 		mountinfo.Mountpoint = C.GoString(&entry.f_mntonname[0])
 		mountinfo.Source = C.GoString(&entry.f_mntfromname[0])
 		mountinfo.Fstype = C.GoString(&entry.f_fstypename[0])

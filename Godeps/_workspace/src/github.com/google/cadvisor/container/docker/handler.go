@@ -22,21 +22,28 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/libcontainer/cgroups"
-	cgroup_fs "github.com/docker/libcontainer/cgroups/fs"
-	libcontainerConfigs "github.com/docker/libcontainer/configs"
-	docker "github.com/fsouza/go-dockerclient"
 	"github.com/google/cadvisor/container"
-	containerLibcontainer "github.com/google/cadvisor/container/libcontainer"
+	containerlibcontainer "github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils"
+
+	docker "github.com/fsouza/go-dockerclient"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
+	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 )
 
-// Path to aufs dir where all the files exist.
-// aufs/layers is ignored here since it does not hold a lot of data.
-// aufs/mnt contains the mount points used to compose the rootfs. Hence it is also ignored.
-var pathToAufsDir = "aufs/diff"
+const (
+	// Path to aufs dir where all the files exist.
+	// aufs/layers is ignored here since it does not hold a lot of data.
+	// aufs/mnt contains the mount points used to compose the rootfs. Hence it is also ignored.
+	pathToAufsDir = "aufs/diff"
+	// Path to the directory where docker stores log files if the json logging driver is enabled.
+	pathToContainersDir = "containers"
+	// Path to the overlayfs storage driver directory.
+	pathToOverlayDir = "overlay"
+)
 
 type dockerContainerHandler struct {
 	client             *docker.Client
@@ -44,16 +51,6 @@ type dockerContainerHandler struct {
 	id                 string
 	aliases            []string
 	machineInfoFactory info.MachineInfoFactory
-
-	// Path to the libcontainer config file.
-	libcontainerConfigPath string
-
-	// Path to the libcontainer state file.
-	libcontainerStatePath string
-
-	// TODO(vmarmol): Remove when we depend on a newer Docker.
-	// Path to the libcontainer pid file.
-	libcontainerPidPath string
 
 	// Absolute path to the cgroup hierarchies of this container.
 	// (e.g.: "cpu" -> "/sys/fs/cgroup/cpu/test")
@@ -94,7 +91,7 @@ func newDockerContainerHandler(
 	machineInfoFactory info.MachineInfoFactory,
 	fsInfo fs.FsInfo,
 	storageDriver storageDriver,
-	cgroupSubsystems *containerLibcontainer.CgroupSubsystems,
+	cgroupSubsystems *containerlibcontainer.CgroupSubsystems,
 	inHostNamespace bool,
 ) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
@@ -104,8 +101,8 @@ func newDockerContainerHandler(
 	}
 
 	// Generate the equivalent cgroup manager for this container.
-	cgroupManager := &cgroup_fs.Manager{
-		Cgroups: &libcontainerConfigs.Cgroup{
+	cgroupManager := &cgroupfs.Manager{
+		Cgroups: &libcontainerconfigs.Cgroup{
 			Name: name,
 		},
 		Paths: cgroupPaths,
@@ -118,7 +115,16 @@ func newDockerContainerHandler(
 
 	id := ContainerNameToDockerId(name)
 
-	storageDirs := []string{path.Join(*dockerRootDir, pathToAufsDir, id)}
+	// Add the Containers dir where the log files are stored.
+	storageDirs := []string{path.Join(*dockerRootDir, pathToContainersDir, id)}
+
+	switch storageDriver {
+	case aufsStorageDriver:
+		// Add writable layer for aufs.
+		storageDirs = append(storageDirs, path.Join(*dockerRootDir, pathToAufsDir, id))
+	case overlayStorageDriver:
+		storageDirs = append(storageDirs, path.Join(*dockerRootDir, pathToOverlayDir, id))
+	}
 
 	handler := &dockerContainerHandler{
 		id:                 id,
@@ -134,10 +140,8 @@ func newDockerContainerHandler(
 		fsHandler:          newFsHandler(time.Minute, storageDirs, fsInfo),
 	}
 
-	switch storageDriver {
-	case aufsStorageDriver:
-		handler.fsHandler.start()
-	}
+	// Start the filesystem handler.
+	handler.fsHandler.start()
 
 	// We assume that if Inspect fails then the container is not known to docker.
 	ctnr, err := client.InspectContainer(id)
@@ -168,15 +172,15 @@ func (self *dockerContainerHandler) ContainerReference() (info.ContainerReferenc
 	}, nil
 }
 
-func (self *dockerContainerHandler) readLibcontainerConfig() (*libcontainerConfigs.Config, error) {
-	config, err := containerLibcontainer.ReadConfig(*dockerRootDir, *dockerRunDir, self.id)
+func (self *dockerContainerHandler) readLibcontainerConfig() (*libcontainerconfigs.Config, error) {
+	config, err := containerlibcontainer.ReadConfig(*dockerRootDir, *dockerRunDir, self.id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read libcontainer config: %v", err)
 	}
 
 	// Replace cgroup parent and name with our own since we may be running in a different context.
 	if config.Cgroups == nil {
-		config.Cgroups = new(libcontainerConfigs.Cgroup)
+		config.Cgroups = new(libcontainerconfigs.Cgroup)
 	}
 	config.Cgroups.Name = self.name
 	config.Cgroups.Parent = "/"
@@ -184,7 +188,7 @@ func (self *dockerContainerHandler) readLibcontainerConfig() (*libcontainerConfi
 	return config, nil
 }
 
-func libcontainerConfigToContainerSpec(config *libcontainerConfigs.Config, mi *info.MachineInfo) info.ContainerSpec {
+func libcontainerConfigToContainerSpec(config *libcontainerconfigs.Config, mi *info.MachineInfo) info.ContainerSpec {
 	var spec info.ContainerSpec
 	spec.HasMemory = true
 	spec.Memory.Limit = math.MaxUint64
@@ -233,8 +237,14 @@ func (self *dockerContainerHandler) GetSpec() (info.ContainerSpec, error) {
 
 	spec := libcontainerConfigToContainerSpec(libcontainerConfig, mi)
 	spec.CreationTime = self.creationTime
-	// For now only enable for aufs filesystems
-	spec.HasFilesystem = self.storageDriver == aufsStorageDriver
+
+	switch self.storageDriver {
+	case aufsStorageDriver, overlayStorageDriver:
+		spec.HasFilesystem = true
+	default:
+		spec.HasFilesystem = false
+	}
+
 	spec.Labels = self.labels
 	spec.Image = self.image
 	spec.HasNetwork = hasNet(self.networkMode)
@@ -243,8 +253,9 @@ func (self *dockerContainerHandler) GetSpec() (info.ContainerSpec, error) {
 }
 
 func (self *dockerContainerHandler) getFsStats(stats *info.ContainerStats) error {
-	// No support for non-aufs storage drivers.
-	if self.storageDriver != aufsStorageDriver {
+	switch self.storageDriver {
+	case aufsStorageDriver, overlayStorageDriver:
+	default:
 		return nil
 	}
 
@@ -278,7 +289,7 @@ func (self *dockerContainerHandler) getFsStats(stats *info.ContainerStats) error
 
 // TODO(vmarmol): Get from libcontainer API instead of cgroup manager when we don't have to support older Dockers.
 func (self *dockerContainerHandler) GetStats() (*info.ContainerStats, error) {
-	stats, err := containerLibcontainer.GetStats(self.cgroupManager, self.rootFs, self.pid)
+	stats, err := containerlibcontainer.GetStats(self.cgroupManager, self.rootFs, self.pid)
 	if err != nil {
 		return stats, err
 	}
@@ -322,7 +333,7 @@ func (self *dockerContainerHandler) GetContainerLabels() map[string]string {
 }
 
 func (self *dockerContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {
-	return containerLibcontainer.GetProcesses(self.cgroupManager)
+	return containerlibcontainer.GetProcesses(self.cgroupManager)
 }
 
 func (self *dockerContainerHandler) WatchSubcontainers(events chan container.SubcontainerEvent) error {
@@ -335,7 +346,7 @@ func (self *dockerContainerHandler) StopWatchingSubcontainers() error {
 }
 
 func (self *dockerContainerHandler) Exists() bool {
-	return containerLibcontainer.Exists(*dockerRootDir, *dockerRunDir, self.id)
+	return containerlibcontainer.Exists(*dockerRootDir, *dockerRunDir, self.id)
 }
 
 func DockerInfo() (map[string]string, error) {

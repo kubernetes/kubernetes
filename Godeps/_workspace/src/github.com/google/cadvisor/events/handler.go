@@ -21,9 +21,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils"
+
+	"github.com/golang/glog"
 )
 
 type byTimestamp []*info.Event
@@ -115,9 +116,6 @@ type watch struct {
 	request *Request
 	// a channel used to send event back to the caller.
 	eventChannel *EventChannel
-	// unique identifier of a watch that is used as a key in events' watchers
-	// map
-	id int
 }
 
 func NewEventChannel(watchId int) *EventChannel {

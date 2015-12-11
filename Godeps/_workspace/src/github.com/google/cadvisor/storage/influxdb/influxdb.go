@@ -16,12 +16,19 @@ package influxdb
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
 	info "github.com/google/cadvisor/info/v1"
+	"github.com/google/cadvisor/storage"
+
 	influxdb "github.com/influxdb/influxdb/client"
 )
+
+func init() {
+	storage.RegisterStorageDriver("influxdb", new)
+}
 
 type influxdbStorage struct {
 	client         *influxdb.Client
@@ -58,6 +65,23 @@ const (
 	// Filesystem usage.
 	colFsUsage = "fs_usage"
 )
+
+func new() (storage.StorageDriver, error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return nil, err
+	}
+	return newStorage(
+		hostname,
+		*storage.ArgDbTable,
+		*storage.ArgDbName,
+		*storage.ArgDbUsername,
+		*storage.ArgDbPassword,
+		*storage.ArgDbHost,
+		*storage.ArgDbIsSecure,
+		*storage.ArgDbBufferDuration,
+	)
+}
 
 func (self *influxdbStorage) getSeriesDefaultValues(
 	ref info.ContainerReference,
@@ -195,7 +219,8 @@ func (self *influxdbStorage) newSeries(columns []string, points []interface{}) *
 // machineName: A unique identifier to identify the host that current cAdvisor
 // instance is running on.
 // influxdbHost: The host which runs influxdb.
-func New(machineName,
+func newStorage(
+	machineName,
 	tablename,
 	database,
 	username,

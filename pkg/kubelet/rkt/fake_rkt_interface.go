@@ -131,12 +131,12 @@ func (f *fakeSystemd) ListUnits() ([]dbus.UnitStatus, error) {
 	return nil, fmt.Errorf("Not implemented")
 }
 
-func (f *fakeSystemd) StopUnit(name, mode string) (string, error) {
-	return "", fmt.Errorf("Not implemented")
+func (f *fakeSystemd) StopUnit(name string, mode string, ch chan<- string) (int, error) {
+	return 0, fmt.Errorf("Not implemented")
 }
 
-func (f *fakeSystemd) RestartUnit(name, mode string) (string, error) {
-	return "", fmt.Errorf("Not implemented")
+func (f *fakeSystemd) RestartUnit(name string, mode string, ch chan<- string) (int, error) {
+	return 0, fmt.Errorf("Not implemented")
 }
 
 func (f *fakeSystemd) Reload() error {
