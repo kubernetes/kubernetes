@@ -652,7 +652,7 @@ func validateLeadershipTransition(desired, current string) {
 	}
 }
 
-// hacked from https://github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kube-apiserver/app/server.go
+// hacked from https://github.com/kubernetes/kubernetes/blob/release-0.14/cmd/kube-apiserver/app/server.go
 func newEtcd(etcdServerList []string) (etcd.Client, error) {
 	cfg := etcd.Config{
 		Endpoints: etcdServerList,

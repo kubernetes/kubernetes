@@ -40,7 +40,7 @@ KUBE_CONTROLLER_MANAGER_OPTS="  \${KUBE_LOGTOSTDERR} \\
 cat <<EOF >/usr/lib/systemd/system/kube-controller-manager.service
 [Unit]
 Description=Kubernetes Controller Manager
-Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+Documentation=https://github.com/kubernetes/kubernetes
 
 [Service]
 EnvironmentFile=-/opt/kubernetes/cfg/kube-controller-manager

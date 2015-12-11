@@ -82,7 +82,7 @@ and allocates a unique MCS label per pod.
 ### Kubernetes
 
 
-There is a [proposed change](https://github.com/GoogleCloudPlatform/kubernetes/pull/9844) to the
+There is a [proposed change](https://github.com/kubernetes/kubernetes/pull/9844) to the
 EmptyDir plugin that adds SELinux relabeling capabilities to that plugin, which is also carried as a
 patch in [OpenShift](https://github.com/openshift/origin).  It is preferable to solve the problem
 in general of handling SELinux in kubernetes to merging this PR.
@@ -216,7 +216,7 @@ depends on:
 
 1.  Users and groups in Kubernetes
 2.  General auth policy in Kubernetes
-3.  [security policy](https://github.com/GoogleCloudPlatform/kubernetes/pull/7893)
+3.  [security policy](https://github.com/kubernetes/kubernetes/pull/7893)
 
 ### API changes
 

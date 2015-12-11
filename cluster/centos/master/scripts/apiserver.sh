@@ -92,7 +92,7 @@ KUBE_APISERVER_OPTS="   \${KUBE_LOGTOSTDERR}         \\
 cat <<EOF >/usr/lib/systemd/system/kube-apiserver.service
 [Unit]
 Description=Kubernetes API Server
-Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+Documentation=https://github.com/kubernetes/kubernetes
 
 [Service]
 EnvironmentFile=-/opt/kubernetes/cfg/kube-apiserver

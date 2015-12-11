@@ -45,7 +45,7 @@ coreos:
       content: |
         [Unit]
         Description=Kubernetes Proxy
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         Requires=setup-network-environment.service
         After=setup-network-environment.service
 
@@ -64,7 +64,7 @@ coreos:
       content: |
         [Unit]
         Description=Kubernetes Kubelet
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         Requires=setup-network-environment.service
         After=setup-network-environment.service
 
