@@ -392,6 +392,14 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"javaweb":   &api.Pod{},
 			"javaweb-2": &api.Pod{},
 		},
+		"../examples/job/work-queue-1": {
+			"job": &extensions.Job{},
+		},
+		"../examples/job/work-queue-2": {
+			"redis-pod":     &api.Pod{},
+			"redis-service": &api.Service{},
+			"job":           &extensions.Job{},
+		},
 	}
 
 	capabilities.SetForTests(capabilities.Capabilities{

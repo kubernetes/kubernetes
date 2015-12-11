@@ -18,68 +18,68 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api/errors"
-	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
-// InterpretListError converts a generic etcd error on a retrieval
+// InterpretListError converts a generic error on a retrieval
 // operation into the appropriate API error.
 func InterpretListError(err error, kind string) error {
 	switch {
-	case etcdutil.IsEtcdNotFound(err):
+	case storage.IsNotFound(err):
 		return errors.NewNotFound(kind, "")
-	case etcdutil.IsEtcdUnreachable(err):
+	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(kind, "list", 2) // TODO: make configurable or handled at a higher level
 	default:
 		return err
 	}
 }
 
-// InterpretGetError converts a generic etcd error on a retrieval
+// InterpretGetError converts a generic error on a retrieval
 // operation into the appropriate API error.
 func InterpretGetError(err error, kind, name string) error {
 	switch {
-	case etcdutil.IsEtcdNotFound(err):
+	case storage.IsNotFound(err):
 		return errors.NewNotFound(kind, name)
-	case etcdutil.IsEtcdUnreachable(err):
+	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(kind, "get", 2) // TODO: make configurable or handled at a higher level
 	default:
 		return err
 	}
 }
 
-// InterpretCreateError converts a generic etcd error on a create
+// InterpretCreateError converts a generic error on a create
 // operation into the appropriate API error.
 func InterpretCreateError(err error, kind, name string) error {
 	switch {
-	case etcdutil.IsEtcdNodeExist(err):
+	case storage.IsNodeExist(err):
 		return errors.NewAlreadyExists(kind, name)
-	case etcdutil.IsEtcdUnreachable(err):
+	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(kind, "create", 2) // TODO: make configurable or handled at a higher level
 	default:
 		return err
 	}
 }
 
-// InterpretUpdateError converts a generic etcd error on a update
+// InterpretUpdateError converts a generic error on a update
 // operation into the appropriate API error.
 func InterpretUpdateError(err error, kind, name string) error {
 	switch {
-	case etcdutil.IsEtcdTestFailed(err), etcdutil.IsEtcdNodeExist(err):
+	case storage.IsTestFailed(err), storage.IsNodeExist(err):
 		return errors.NewConflict(kind, name, err)
-	case etcdutil.IsEtcdUnreachable(err):
+	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(kind, "update", 2) // TODO: make configurable or handled at a higher level
 	default:
 		return err
 	}
 }
 
-// InterpretDeleteError converts a generic etcd error on a delete
+// InterpretDeleteError converts a generic error on a delete
 // operation into the appropriate API error.
 func InterpretDeleteError(err error, kind, name string) error {
 	switch {
-	case etcdutil.IsEtcdNotFound(err):
+	case storage.IsNotFound(err):
 		return errors.NewNotFound(kind, name)
-	case etcdutil.IsEtcdUnreachable(err):
+	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(kind, "delete", 2) // TODO: make configurable or handled at a higher level
 	default:
 		return err

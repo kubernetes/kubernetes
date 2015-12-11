@@ -17,14 +17,15 @@ limitations under the License.
 package etcd
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/http"
 	"path"
 	"reflect"
 	"strings"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -32,15 +33,48 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/metrics"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
-	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 
+	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
+	forked "k8s.io/kubernetes/third_party/forked/coreos/go-etcd/etcd"
 )
 
-func NewEtcdStorage(client tools.EtcdClient, codec runtime.Codec, prefix string) storage.Interface {
+// storage.Config object for etcd.
+type EtcdConfig struct {
+	ServerList []string
+	Codec      runtime.Codec
+	Prefix     string
+}
+
+// implements storage.Config
+func (c *EtcdConfig) GetType() string {
+	return "etcd"
+}
+
+// implements storage.Config
+func (c *EtcdConfig) NewStorage() (storage.Interface, error) {
+	etcdClient := etcd.NewClient(c.ServerList)
+	if etcdClient == nil {
+		return nil, errors.New("Failed to create new etcd client from serverlist")
+	}
+	transport := &http.Transport{
+		Dial: forked.Dial,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+		MaxIdleConnsPerHost: 500,
+	}
+	etcdClient.SetTransport(transport)
+
+	return NewEtcdStorage(etcdClient, c.Codec, c.Prefix), nil
+}
+
+// Creates a new storage interface from the client
+// TODO: deprecate in favor of storage.Config abstraction over time
+func NewEtcdStorage(client *etcd.Client, codec runtime.Codec, prefix string) storage.Interface {
 	return &etcdHelper{
 		client:     client,
 		codec:      codec,
@@ -53,7 +87,7 @@ func NewEtcdStorage(client tools.EtcdClient, codec runtime.Codec, prefix string)
 
 // etcdHelper is the reference implementation of storage.Interface.
 type etcdHelper struct {
-	client tools.EtcdClient
+	client *etcd.Client
 	codec  runtime.Codec
 	copier runtime.ObjectCopier
 	// optional, has to be set to perform any atomic operations

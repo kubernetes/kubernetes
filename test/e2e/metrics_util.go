@@ -38,11 +38,10 @@ import (
 )
 
 const (
-	podStartupThreshold time.Duration = 5 * time.Second
-	// TODO: Decrease PodStartup latencies as soon as their perfomance improves
-	listPodLatencySmallThreshold  time.Duration = 2 * time.Second
-	listPodLatencyMediumThreshold time.Duration = 4 * time.Second
-	listPodLatencyLargeThreshold  time.Duration = 15 * time.Second
+	podStartupThreshold           time.Duration = 5 * time.Second
+	listPodLatencySmallThreshold  time.Duration = 500 * time.Millisecond
+	listPodLatencyMediumThreshold time.Duration = 1 * time.Second
+	listPodLatencyLargeThreshold  time.Duration = 1 * time.Second
 	apiCallLatencySmallThreshold  time.Duration = 250 * time.Millisecond
 	apiCallLatencyMediumThreshold time.Duration = 500 * time.Millisecond
 	apiCallLatencyLargeThreshold  time.Duration = 1 * time.Second

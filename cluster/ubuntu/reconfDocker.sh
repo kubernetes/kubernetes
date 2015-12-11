@@ -16,6 +16,8 @@
 
 # reconfigure docker network setting
 
+source ~/kube/config-default.sh
+
 if [ "$(id -u)" != "0" ]; then
   echo >&2 "Please run as root"
   exit 1
@@ -23,9 +25,6 @@ fi
 
 
 function config_etcd {
-
-  source ~/kube/config-default.sh
-
   attempt=0
   while true; do
     /opt/bin/etcdctl get /coreos.com/network/config
@@ -38,7 +37,7 @@ function config_etcd {
         exit 2
       fi
 
-      /opt/bin/etcdctl mk /coreos.com/network/config "{\"Network\":\"${FLANNEL_NET}\"}"
+      /opt/bin/etcdctl mk /coreos.com/network/config "{\"Network\":\"${FLANNEL_NET}\", \"Backend\": {\"Type\": \"vxlan\"}}"
       attempt=$((attempt+1))
       sleep 3
     fi
@@ -46,7 +45,6 @@ function config_etcd {
 }
 
 function restart_docker {
-  
   attempt=0
   while [[ ! -f /run/flannel/subnet.env ]]; do 
     if (( attempt > 200 )); then

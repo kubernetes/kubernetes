@@ -149,3 +149,13 @@ type Interface interface {
 	// Codec provides access to the underlying codec being used by the implementation.
 	Codec() runtime.Codec
 }
+
+// Config interface allows storage tiers to generate the proper storage.interface
+// and reduce the dependencies to encapsulate storage.
+type Config interface {
+	// Creates the Interface base on ConfigObject
+	NewStorage() (Interface, error)
+
+	// This function is used to enforce membership, and return the underlying type
+	GetType() string
+}

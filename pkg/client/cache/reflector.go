@@ -227,7 +227,10 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	resyncCh, cleanup := r.resyncChan()
 	defer cleanup()
 
-	options := unversioned.ListOptions{}
+	// Explicitly set "0" as resource version - it's fine for the List()
+	// to be served from cache and potentially be delayed relative to
+	// etcd contents. Reflector framework will catch up via Watch() eventually.
+	options := unversioned.ListOptions{ResourceVersion: "0"}
 	list, err := r.listerWatcher.List(options)
 	if err != nil {
 		return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)

@@ -26,8 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/tools"
-
 	"github.com/coreos/etcd/etcdserver"
 	"github.com/coreos/etcd/etcdserver/etcdhttp"
 	"github.com/coreos/etcd/pkg/transport"
@@ -40,7 +38,7 @@ import (
 type EtcdTestServer struct {
 	etcdserver.ServerConfig
 	PeerListeners, ClientListeners []net.Listener
-	Client                         tools.EtcdClient
+	Client                         *goetcd.Client
 
 	raftHandler http.Handler
 	s           *etcdserver.EtcdServer
@@ -128,7 +126,7 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 
 // Terminate will shutdown the running etcd server
 func (m *EtcdTestServer) Terminate(t *testing.T) {
-	m.Client.(*goetcd.Client).Close()
+	m.Client.Close()
 	m.s.Stop()
 	for _, hs := range m.hss {
 		hs.CloseClientConnections()

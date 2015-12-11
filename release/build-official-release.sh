@@ -52,7 +52,12 @@ VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(beta|alph
 }
 VERSION_MAJOR="${BASH_REMATCH[1]}"
 VERSION_MINOR="${BASH_REMATCH[2]}"
-RELEASE_BRANCH="release-${VERSION_MAJOR}.${VERSION_MINOR}"
+if [[ "$KUBE_RELEASE_VERSION" =~ "alpha" ]]; then
+  # We don't want to version docs for alpha releases, so we are just pointing to head.
+  RELEASE_BRANCH="master"
+else
+  RELEASE_BRANCH="release-${VERSION_MAJOR}.${VERSION_MINOR}"
+fi
 
 declare -r KUBE_BUILD_DIR=$(mktemp -d "/tmp/kubernetes-build-release-${KUBE_RELEASE_VERSION}-XXXXXXX")
 
@@ -117,11 +122,9 @@ binary | hash alg | hash
 \`kubernetes.tar.gz\` | md5 | \`${MD5}\`
 \`kubernetes.tar.gz\` | sha1 | \`${SHA1}\`
 
-     We'll fill in the release notes in the next stage.
-
-  4) Ensure all the binaries are in place on GCS before cleaning, (you might
+  3) Ensure all the binaries are in place on GCS before cleaning, (you might
   want to wait until the release is announced and published on GitHub, too).
 
-  5) make clean; popd; rm -rf ${KUBE_BUILD_DIR}
+  4) make clean; popd; rm -rf ${KUBE_BUILD_DIR}
 
 EOM

@@ -167,7 +167,7 @@ Node controller is a component in Kubernetes master which manages Node
 objects. It performs two major functions: cluster-wide node synchronization
 and single node life-cycle management.
 
-Node controller has a sync loop that creates/deletes Nodes from Kubernetes
+Node controller has a sync loop that deletes Nodes from Kubernetes
 based on all matching VM instances listed from the cloud provider. The sync period
 can be controlled via flag `--node-sync-period`. If a new VM instance
 gets created, Node Controller creates a representation for it. If an existing
@@ -177,6 +177,12 @@ any binary; therefore, to
 join a node to a Kubernetes cluster, you as an admin need to make sure proper services are
 running in the node. In the future, we plan to automatically provision some node
 services.
+
+In general, node controller is responsible for updating the NodeReady condition of node
+status to ConditionUnknown when a node becomes unreachable (e.g. due to the node being down),
+and then later evicting all the pods from the node (using graceful termination) if the node
+continues to be unreachable. (The current timeouts for those are 40s and 5m, respectively.)
+It also allocates CIDR blocks to the new nodes.
 
 ### Self-Registration of Nodes
 

@@ -1,3 +1,5 @@
+// +build linux
+
 /*
 Copyright 2014 The Kubernetes Authors All rights reserved.
 
@@ -14,6 +16,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package tools implements types which help work with etcd which depend on the api package.
-// TODO: move this package to an etcd specific utility package.
-package tools
+package util
+
+import (
+	"syscall"
+)
+
+// FSInfo linux returns (available bytes, byte capacity, error) for the filesystem that
+// path resides upon.
+func FsInfo(path string) (int64, int64, error) {
+	statfs := &syscall.Statfs_t{}
+	err := syscall.Statfs(path, statfs)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// Available is blocks available * fragment size
+	available := int64(statfs.Bavail) * int64(statfs.Frsize)
+
+	// Capacity is total block count * fragment size
+	capacity := int64(statfs.Blocks) * int64(statfs.Frsize)
+
+	return available, capacity, nil
+}

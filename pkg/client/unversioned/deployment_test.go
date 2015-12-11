@@ -14,7 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package unversioned_test
+
+import (
+	. "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
+)
 
 import (
 	"net/url"
@@ -38,14 +43,14 @@ func TestDeploymentCreate(t *testing.T) {
 			Namespace: ns,
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "POST",
 			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, ""),
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 			Body:   &deployment,
 		},
-		Response: Response{StatusCode: 200, Body: &deployment},
+		Response: simple.Response{StatusCode: 200, Body: &deployment},
 	}
 
 	response, err := c.Setup(t).Deployments(ns).Create(&deployment)
@@ -63,14 +68,14 @@ func TestDeploymentGet(t *testing.T) {
 			Namespace: ns,
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, "abc"),
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: deployment},
+		Response: simple.Response{StatusCode: 200, Body: deployment},
 	}
 
 	response, err := c.Setup(t).Deployments(ns).Get("abc")
@@ -89,14 +94,14 @@ func TestDeploymentList(t *testing.T) {
 			},
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, ""),
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: deploymentList},
+		Response: simple.Response{StatusCode: 200, Body: deploymentList},
 	}
 	response, err := c.Setup(t).Deployments(ns).List(unversioned.ListOptions{})
 	c.Validate(t, response, err)
@@ -111,13 +116,13 @@ func TestDeploymentUpdate(t *testing.T) {
 			ResourceVersion: "1",
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "PUT",
 			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, "abc"),
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 		},
-		Response: Response{StatusCode: 200, Body: deployment},
+		Response: simple.Response{StatusCode: 200, Body: deployment},
 	}
 	response, err := c.Setup(t).Deployments(ns).Update(deployment)
 	c.Validate(t, response, err)
@@ -132,13 +137,13 @@ func TestDeploymentUpdateStatus(t *testing.T) {
 			ResourceVersion: "1",
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "PUT",
 			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, "abc") + "/status",
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 		},
-		Response: Response{StatusCode: 200, Body: deployment},
+		Response: simple.Response{StatusCode: 200, Body: deployment},
 	}
 	response, err := c.Setup(t).Deployments(ns).UpdateStatus(deployment)
 	c.Validate(t, response, err)
@@ -146,26 +151,26 @@ func TestDeploymentUpdateStatus(t *testing.T) {
 
 func TestDeploymentDelete(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "DELETE",
 			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, "foo"),
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 		},
-		Response: Response{StatusCode: 200},
+		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Deployments(ns).Delete("foo", nil)
 	c.Validate(t, nil, err)
 }
 
 func TestDeploymentWatch(t *testing.T) {
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Extensions.ResourcePathWithPrefix("watch", getDeploymentsResoureName(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}},
 		},
-		Response: Response{StatusCode: 200},
+		Response: simple.Response{StatusCode: 200},
 	}
 	_, err := c.Setup(t).Deployments(api.NamespaceAll).Watch(unversioned.ListOptions{})
 	c.Validate(t, nil, err)

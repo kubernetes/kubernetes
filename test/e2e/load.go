@@ -214,7 +214,10 @@ func scaleRC(wg *sync.WaitGroup, config *RCConfig) {
 	expectNoError(ScaleRC(config.Client, config.Namespace, config.Name, newSize, true),
 		fmt.Sprintf("scaling rc %s for the first time", config.Name))
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
-	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	options := unversioned.ListOptions{
+		LabelSelector:   unversioned.LabelSelector{selector},
+		ResourceVersion: "0",
+	}
 	_, err := config.Client.Pods(config.Namespace).List(options)
 	expectNoError(err, fmt.Sprintf("listing pods from rc %v", config.Name))
 }

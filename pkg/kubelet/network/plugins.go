@@ -56,7 +56,7 @@ type NetworkPlugin interface {
 }
 
 // PodNetworkStatus stores the network status of a pod (currently just the primary IP address)
-// This struct represents version "v1"
+// This struct represents version "v1beta1"
 type PodNetworkStatus struct {
 	unversioned.TypeMeta `json:",inline"`
 

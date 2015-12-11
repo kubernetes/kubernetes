@@ -61,7 +61,11 @@ func GetOldRCs(deployment extensions.Deployment, c client.Interface) ([]*api.Rep
 		}
 	}
 	requiredRCs := []*api.ReplicationController{}
-	for _, value := range oldRCs {
+	// Note that go reuses the same memory location for every iteration,
+	// which means the 'value' returned from range will have the same address.
+	// Therefore, we should use the returned 'index' instead.
+	for i := range oldRCs {
+		value := oldRCs[i]
 		requiredRCs = append(requiredRCs, &value)
 	}
 	return requiredRCs, nil
@@ -77,10 +81,10 @@ func GetNewRC(deployment extensions.Deployment, c client.Interface) (*api.Replic
 	}
 	newRCTemplate := GetNewRCTemplate(deployment)
 
-	for _, rc := range rcList.Items {
-		if api.Semantic.DeepEqual(rc.Spec.Template, &newRCTemplate) {
+	for i := range rcList.Items {
+		if api.Semantic.DeepEqual(rcList.Items[i].Spec.Template, &newRCTemplate) {
 			// This is the new RC.
-			return &rc, nil
+			return &rcList.Items[i], nil
 		}
 	}
 	// new RC does not exist.

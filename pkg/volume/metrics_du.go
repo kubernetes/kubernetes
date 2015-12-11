@@ -21,15 +21,15 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
-	"syscall"
 
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 var _ MetricsProvider = &metricsDu{}
 
 // metricsDu represents a MetricsProvider that calculates the used and available
-// Volume space by executing the "du" command and statfs syscall on the Volume path.
+// Volume space by executing the "du" command and gathering filesystem info for the Volume path.
 type metricsDu struct {
 	// the directory path the volume is mounted to.
 	path string
@@ -42,7 +42,7 @@ func NewMetricsDu(path string) MetricsProvider {
 
 // See MetricsProvider.GetMetrics
 // GetMetrics calculates the volume usage and device free space by executing "du"
-// and statfs on path.
+// and gathering filesystem info for the Volume path.
 func (md *metricsDu) GetMetrics() (*Metrics, error) {
 	metrics := &Metrics{}
 	if md.path == "" {
@@ -54,7 +54,7 @@ func (md *metricsDu) GetMetrics() (*Metrics, error) {
 		return metrics, err
 	}
 
-	err = md.runStatfs(metrics)
+	err = md.getFsInfo(metrics)
 	if err != nil {
 		return metrics, err
 	}
@@ -79,20 +79,13 @@ func (md *metricsDu) runDu(metrics *Metrics) error {
 	return nil
 }
 
-// runStatfs executes the statfs syscall and writes the results to metrics.Capacity and metrics.Available
-func (md *metricsDu) runStatfs(metrics *Metrics) error {
-	statfs := &syscall.Statfs_t{}
-	err := syscall.Statfs(md.path, statfs)
+// getFsInfo writes metrics.Capacity and metrics.Available from the filesystem info
+func (md *metricsDu) getFsInfo(metrics *Metrics) error {
+	available, capacity, err := util.FsInfo(md.path)
 	if err != nil {
-		return fmt.Errorf("failed to call statfs due to error %v", err)
+		return fmt.Errorf("Failed to get FsInfo due to error %v", err)
 	}
-
-	// Available is blocks available * block size
-	// Note: using fragment size instead of block size will cause the build to fail on macs
-	metrics.Available = resource.NewQuantity(int64(statfs.Bavail)*int64(statfs.Bsize), resource.BinarySI)
-
-	// Capacity is block count * block size
-	// Note: using fragment size instead of block size will cause the build to fail on macs
-	metrics.Capacity = resource.NewQuantity(int64(statfs.Blocks)*int64(statfs.Bsize), resource.BinarySI)
+	metrics.Available = resource.NewQuantity(available, resource.BinarySI)
+	metrics.Capacity = resource.NewQuantity(capacity, resource.BinarySI)
 	return nil
 }

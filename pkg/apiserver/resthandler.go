@@ -115,6 +115,9 @@ func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunc
 func GetResource(r rest.Getter, scope RequestScope) restful.RouteFunction {
 	return getResourceHandler(scope,
 		func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error) {
+			// For performance tracking purposes.
+			trace := util.NewTrace("Get " + req.Request.URL.Path)
+			defer trace.LogIfLong(250 * time.Millisecond)
 			return r.Get(ctx, name)
 		})
 }
@@ -322,6 +325,10 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 
 func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, includeName bool) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
+		// For performance tracking purposes.
+		trace := util.NewTrace("Create " + req.Request.URL.Path)
+		defer trace.LogIfLong(250 * time.Millisecond)
+
 		w := res.ResponseWriter
 
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
@@ -351,12 +358,14 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 
 		obj := r.New()
+		trace.Step("About to convert to expected version")
 		// TODO this cleans up with proper typing
 		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, scope.Kind); err != nil {
 			err = transformDecodeError(typer, err, obj, body)
 			errorJSON(err, scope.Codec, w)
 			return
 		}
+		trace.Step("Conversion done")
 
 		if admit != nil && admit.Handles(admission.Create) {
 			userInfo, _ := api.UserFrom(ctx)
@@ -368,6 +377,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			}
 		}
 
+		trace.Step("About to store object in database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			out, err := r.Create(ctx, name, obj)
 			if status, ok := out.(*unversioned.Status); ok && err == nil && status.Code == 0 {
@@ -379,11 +389,13 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			errorJSON(err, scope.Codec, w)
 			return
 		}
+		trace.Step("Object stored in database")
 
 		if err := setSelfLink(result, req, scope.Namer); err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
+		trace.Step("Self-link added")
 
 		write(http.StatusCreated, scope.Kind.GroupVersion(), scope.Codec, result, w, req.Request)
 	}
@@ -565,6 +577,10 @@ func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.
 // UpdateResource returns a function that will handle a resource update
 func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
+		// For performance tracking purposes.
+		trace := util.NewTrace("Update " + req.Request.URL.Path)
+		defer trace.LogIfLong(250 * time.Millisecond)
+
 		w := res.ResponseWriter
 
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
@@ -585,11 +601,13 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		}
 
 		obj := r.New()
+		trace.Step("About to convert to expected version")
 		if err := scope.Codec.DecodeIntoWithSpecifiedVersionKind(body, obj, scope.Kind); err != nil {
 			err = transformDecodeError(typer, err, obj, body)
 			errorJSON(err, scope.Codec, w)
 			return
 		}
+		trace.Step("Conversion done")
 
 		if err := checkName(obj, name, namespace, scope.Namer); err != nil {
 			errorJSON(err, scope.Codec, w)
@@ -606,6 +624,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			}
 		}
 
+		trace.Step("About to store object in database")
 		wasCreated := false
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			obj, created, err := r.Update(ctx, obj)
@@ -616,11 +635,13 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			errorJSON(err, scope.Codec, w)
 			return
 		}
+		trace.Step("Object stored in database")
 
 		if err := setSelfLink(result, req, scope.Namer); err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
+		trace.Step("Self-link added")
 
 		status := http.StatusOK
 		if wasCreated {
@@ -633,6 +654,10 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 // DeleteResource returns a function that will handle a resource deletion
 func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
+		// For performance tracking purposes.
+		trace := util.NewTrace("Delete " + req.Request.URL.Path)
+		defer trace.LogIfLong(250 * time.Millisecond)
+
 		w := res.ResponseWriter
 
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
@@ -671,6 +696,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 			}
 		}
 
+		trace.Step("About do delete object from database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			return r.Delete(ctx, name, options)
 		})
@@ -678,6 +704,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 			errorJSON(err, scope.Codec, w)
 			return
 		}
+		trace.Step("Object deleted from database")
 
 		// if the rest.Deleter returns a nil object, fill out a status. Callers may return a valid
 		// object with the response.

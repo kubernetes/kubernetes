@@ -203,6 +203,7 @@ KUBE_APISERVER_OPTS="\
  --service-cluster-ip-range=${1}\
  --admission-control=${2}\
  --service-node-port-range=${3}\
+ --advertise-address=${4}\
  --client-ca-file=/srv/kubernetes/ca.crt\
  --tls-cert-file=/srv/kubernetes/server.cert\
  --tls-private-key-file=/srv/kubernetes/server.key"
@@ -232,14 +233,12 @@ EOF
 function create-kubelet-opts() {
   cat <<EOF > ~/kube/default/kubelet
 KUBELET_OPTS="\
- --address=0.0.0.0\
- --port=10250 \
  --hostname-override=${1} \
  --api-servers=http://${2}:8080 \
  --logtostderr=true \
  --config=/etc/kubernetes/manifests \
- --cluster-dns=$3 \
- --cluster-domain=$4"
+ --cluster-dns=${3} \
+ --cluster-domain=${4}"
 EOF
 
 }
@@ -257,6 +256,7 @@ EOF
 function create-flanneld-opts() {
   cat <<EOF > ~/kube/default/flanneld
 FLANNEL_OPTS="--etcd-endpoints=http://${1}:4001 \
+ --ip-masq \
  --iface=${2}"
 EOF
 }
@@ -374,8 +374,15 @@ function provision-master() {
 
   EXTRA_SANS=$(echo "${EXTRA_SANS[@]}" | tr ' ' ,)
 
+  BASH_DEBUG_FLAGS=""
+  if [[ "$DEBUG" == "true" ]] ; then
+    BASH_DEBUG_FLAGS="set -x"
+  fi
+
   # remote login to MASTER and configue k8s master
   ssh $SSH_OPTS -t "${MASTER}" "
+    set +e
+    ${BASH_DEBUG_FLAGS}
     source ~/kube/util.sh
 
     setClusterInfo
@@ -383,11 +390,14 @@ function provision-master() {
     create-kube-apiserver-opts \
       '${SERVICE_CLUSTER_IP_RANGE}' \
       '${ADMISSION_CONTROL}' \
-      '${SERVICE_NODE_PORT_RANGE}'
+      '${SERVICE_NODE_PORT_RANGE}' \
+      '${MASTER_IP}'
     create-kube-controller-manager-opts '${NODE_IPS}'
     create-kube-scheduler-opts
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
-    sudo -E -p '[sudo] password to start master: ' -- /bin/bash -c '
+    sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce '
+      ${BASH_DEBUG_FLAGS}
+
       cp ~/kube/default/* /etc/default/
       cp ~/kube/init_conf/* /etc/init/
       cp ~/kube/init_scripts/* /etc/init.d/
@@ -419,8 +429,15 @@ function provision-node() {
     ubuntu/binaries/minion \
     "${1}:~/kube"
 
+  BASH_DEBUG_FLAGS=""
+  if [[ "$DEBUG" == "true" ]] ; then
+    BASH_DEBUG_FLAGS="set -x"
+  fi
+
   # remote login to node and configue k8s node
   ssh $SSH_OPTS -t "$1" "
+    set +e
+    ${BASH_DEBUG_FLAGS}
     source ~/kube/util.sh
 
     setClusterInfo
@@ -434,7 +451,8 @@ function provision-node() {
       '${MASTER_IP}' 
     create-flanneld-opts '${MASTER_IP}' '${1#*@}'
 
-    sudo -E -p '[sudo] password to start node: ' -- /bin/bash -c '
+    sudo -E -p '[sudo] password to start node: ' -- /bin/bash -ce '    
+      ${BASH_DEBUG_FLAGS}
       cp ~/kube/default/* /etc/default/
       cp ~/kube/init_conf/* /etc/init/
       cp ~/kube/init_scripts/* /etc/init.d/
@@ -478,8 +496,15 @@ function provision-masterandnode() {
 
   EXTRA_SANS=$(echo "${EXTRA_SANS[@]}" | tr ' ' ,)
 
+  BASH_DEBUG_FLAGS=""
+  if [[ "$DEBUG" == "true" ]] ; then
+    BASH_DEBUG_FLAGS="set -x"
+  fi
+
   # remote login to the master/node and configue k8s
   ssh $SSH_OPTS -t "$MASTER" "
+    set +e
+    ${BASH_DEBUG_FLAGS}
     source ~/kube/util.sh
 
     setClusterInfo
@@ -487,7 +512,8 @@ function provision-masterandnode() {
     create-kube-apiserver-opts \
       '${SERVICE_CLUSTER_IP_RANGE}' \
       '${ADMISSION_CONTROL}' \
-      '${SERVICE_NODE_PORT_RANGE}'
+      '${SERVICE_NODE_PORT_RANGE}' \
+      '${MASTER_IP}'
     create-kube-controller-manager-opts '${NODE_IPS}'
     create-kube-scheduler-opts
     create-kubelet-opts \
@@ -500,7 +526,8 @@ function provision-masterandnode() {
       '${MASTER_IP}'
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
 
-    sudo -E -p '[sudo] password to start master: ' -- /bin/bash -c '
+    sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce ' 
+      ${BASH_DEBUG_FLAGS}
       cp ~/kube/default/* /etc/default/
       cp ~/kube/init_conf/* /etc/init/
       cp ~/kube/init_scripts/* /etc/init.d/

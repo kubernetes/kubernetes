@@ -181,3 +181,44 @@ func TestCreater(t *testing.T) {
 
 	}
 }
+
+func TestResourceIsValid(t *testing.T) {
+	tests := []struct {
+		kind     string
+		resource string
+		valid    bool
+		name     string
+	}{
+		{
+			kind:     "Foo",
+			resource: "foos",
+			valid:    true,
+			name:     "basic",
+		},
+		{
+			kind:     "Party",
+			resource: "parties",
+			valid:    true,
+			name:     "fun",
+		},
+		{
+			kind:     "bus",
+			resource: "buses",
+			valid:    true,
+			name:     "transport",
+		},
+		{
+			kind:     "Foo",
+			resource: "fooies",
+			name:     "bad",
+		},
+	}
+	for _, test := range tests {
+		mapper := &thirdPartyResourceDataMapper{kind: test.kind}
+		mapper.mapper = api.RESTMapper
+		valid := mapper.ResourceIsValid(test.resource)
+		if valid != test.valid {
+			t.Errorf("expected: %v, saw: %v for %s", test.valid, valid, test.name)
+		}
+	}
+}

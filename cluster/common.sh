@@ -24,6 +24,8 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 DEFAULT_KUBECONFIG="${HOME}/.kube/config"
 
+source "${KUBE_ROOT}/hack/lib/util.sh"
+source "${KUBE_ROOT}/hack/lib/logging.sh"
 # KUBE_RELEASE_VERSION_REGEX matches things like "v1.2.3" or "v1.2.3-alpha.4"
 #
 # NOTE This must match the version_regex in build/common.sh

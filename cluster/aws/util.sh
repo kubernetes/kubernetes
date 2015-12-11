@@ -891,7 +891,12 @@ function start-master() {
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-master.sh"
-  ) > "${KUBE_TEMP}/master-start.sh"
+  ) > "${KUBE_TEMP}/master-user-data"
+
+  # We're running right up against the 16KB limit
+  # Remove all comment lines and then put back the bin/bash shebang
+  sed -i -e 's/^[[:blank:]]*#.*$//' -e '/^[[:blank:]]*$/d' "${KUBE_TEMP}/master-user-data"
+  sed -i '1i #! /bin/bash' "${KUBE_TEMP}/master-user-data"
 
   echo "Starting Master"
   master_id=$($AWS_CMD run-instances \
@@ -904,7 +909,7 @@ function start-master() {
     --security-group-ids ${MASTER_SG_ID} \
     --associate-public-ip-address \
     --block-device-mappings "${MASTER_BLOCK_DEVICE_MAPPINGS}" \
-    --user-data file://${KUBE_TEMP}/master-start.sh \
+    --user-data file://${KUBE_TEMP}/master-user-data \
     --query Instances[].InstanceId)
   add-tag $master_id Name $MASTER_NAME
   add-tag $master_id Role $MASTER_TAG

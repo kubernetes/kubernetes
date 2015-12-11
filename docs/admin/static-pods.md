@@ -49,17 +49,17 @@ The configuration files are just standard pod definition in json or yaml format 
 
 For example, this is how to start a simple web server as a static pod:
 
-1. Choose a node where we want to run the static pod. In this example, it's `my-minion1`.
+1. Choose a node where we want to run the static pod. In this example, it's `my-node1`.
 
     ```console
-    [joe@host ~] $ ssh my-minion1
+    [joe@host ~] $ ssh my-node1
     ```
 
 2. Choose a directory, say `/etc/kubelet.d` and place a web server pod definition there, e.g. `/etc/kubernetes.d/static-web.yaml`:
 
     ```console
-    [root@my-minion1 ~] $ mkdir /etc/kubernetes.d/
-    [root@my-minion1 ~] $ cat <<EOF >/etc/kubernetes.d/static-web.yaml
+    [root@my-node1 ~] $ mkdir /etc/kubernetes.d/
+    [root@my-node1 ~] $ cat <<EOF >/etc/kubernetes.d/static-web.yaml
     apiVersion: v1
     kind: Pod
     metadata:
@@ -88,7 +88,7 @@ For example, this is how to start a simple web server as a static pod:
 3. Restart kubelet. On Fedora 21, this is:
 
     ```console
-    [root@my-minion1 ~] $ systemctl restart kubelet
+    [root@my-node1 ~] $ systemctl restart kubelet
     ```
 
 ## Pods created via HTTP
@@ -100,9 +100,9 @@ Kubelet periodically downloads a file specified by `--manifest-url=<URL>` argume
 When kubelet starts, it automatically starts all pods defined in directory specified in `--config=` or `--manifest-url=` arguments, i.e. our static-web.  (It may take some time to pull nginx image, be patient…):
 
 ```console
-[joe@my-minion1 ~] $ docker ps
+[joe@my-node1 ~] $ docker ps
 CONTAINER ID IMAGE         COMMAND  CREATED        STATUS              NAMES
-f6d05272b57e nginx:latest  "nginx"  8 minutes ago  Up 8 minutes        k8s_web.6f802af4_static-web-fk-minion1_default_67e24ed9466ba55986d120c867395f3c_378e5f3c
+f6d05272b57e nginx:latest  "nginx"  8 minutes ago  Up 8 minutes        k8s_web.6f802af4_static-web-fk-node1_default_67e24ed9466ba55986d120c867395f3c_378e5f3c
 ```
 
 If we look at our Kubernetes API server (running on host `my-master`), we see that a new mirror-pod was created there too:
@@ -111,7 +111,7 @@ If we look at our Kubernetes API server (running on host `my-master`), we see th
 [joe@host ~] $ ssh my-master
 [joe@my-master ~] $ kubectl get pods
 POD                     IP           CONTAINER(S)   IMAGE(S)    HOST                        LABELS       STATUS    CREATED         MESSAGE
-static-web-my-minion1   172.17.0.3                              my-minion1/192.168.100.71   role=myrole  Running   11 minutes
+static-web-my-node1     172.17.0.3                              my-node1/192.168.100.71     role=myrole  Running   11 minutes
                                      web            nginx                                                Running   11 minutes
 ```
 
@@ -120,20 +120,20 @@ Labels from the static pod are propagated into the mirror-pod and can be used as
 Notice we cannot delete the pod with the API server (e.g. via [`kubectl`](../user-guide/kubectl/kubectl.md) command), kubelet simply won't remove it.
 
 ```console
-[joe@my-master ~] $ kubectl delete pod static-web-my-minion1
-pods/static-web-my-minion1
+[joe@my-master ~] $ kubectl delete pod static-web-my-node1
+pods/static-web-my-node1
 [joe@my-master ~] $ kubectl get pods
 POD                     IP           CONTAINER(S)   IMAGE(S)    HOST                        ...
-static-web-my-minion1   172.17.0.3                              my-minion1/192.168.100.71   ...
+static-web-my-node1     172.17.0.3                              my-node1/192.168.100.71     ...
 ```
 
-Back to our `my-minion1` host, we can try to stop the container manually and see, that kubelet automatically restarts it in a while:
+Back to our `my-node1` host, we can try to stop the container manually and see, that kubelet automatically restarts it in a while:
 
 ```console
-[joe@host ~] $ ssh my-minion1
-[joe@my-minion1 ~] $ docker stop f6d05272b57e
-[joe@my-minion1 ~] $ sleep 20
-[joe@my-minion1 ~] $ docker ps
+[joe@host ~] $ ssh my-node1
+[joe@my-node1 ~] $ docker stop f6d05272b57e
+[joe@my-node1 ~] $ sleep 20
+[joe@my-node1 ~] $ docker ps
 CONTAINER ID        IMAGE         COMMAND                CREATED       ...
 5b920cbaf8b1        nginx:latest  "nginx -g 'daemon of   2 seconds ago ...
 ```
@@ -143,13 +143,13 @@ CONTAINER ID        IMAGE         COMMAND                CREATED       ...
 Running kubelet periodically scans the configured directory (`/etc/kubelet.d` in our example) for changes and adds/removes pods as files appear/disappear in this directory.
 
 ```console
-[joe@my-minion1 ~] $ mv /etc/kubernetes.d/static-web.yaml /tmp
-[joe@my-minion1 ~] $ sleep 20
-[joe@my-minion1 ~] $ docker ps
+[joe@my-node1 ~] $ mv /etc/kubernetes.d/static-web.yaml /tmp
+[joe@my-node1 ~] $ sleep 20
+[joe@my-node1 ~] $ docker ps
 // no nginx container is running
-[joe@my-minion1 ~] $ mv /tmp/static-web.yaml  /etc/kubernetes.d/
-[joe@my-minion1 ~] $ sleep 20
-[joe@my-minion1 ~] $ docker ps
+[joe@my-node1 ~] $ mv /tmp/static-web.yaml  /etc/kubernetes.d/
+[joe@my-node1 ~] $ sleep 20
+[joe@my-node1 ~] $ docker ps
 CONTAINER ID        IMAGE         COMMAND                CREATED           ...
 e7a62e3427f1        nginx:latest  "nginx -g 'daemon of   27 seconds ago
 ```

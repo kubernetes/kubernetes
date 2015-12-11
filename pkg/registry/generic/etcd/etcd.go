@@ -18,8 +18,6 @@ package etcd
 
 import (
 	"fmt"
-	"reflect"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	kubeerr "k8s.io/kubernetes/pkg/api/errors"
@@ -32,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -194,8 +191,6 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *unvers
 
 // Create inserts a new item according to the unique key from the object.
 func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-	trace := util.NewTrace("Create " + reflect.TypeOf(obj).String())
-	defer trace.LogIfLong(time.Second)
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 		return nil, err
 	}
@@ -211,14 +206,12 @@ func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, erro
 	if err != nil {
 		return nil, err
 	}
-	trace.Step("About to create object")
 	out := e.NewFunc()
 	if err := e.Storage.Create(ctx, key, obj, out, ttl); err != nil {
 		err = etcderr.InterpretCreateError(err, e.EndpointName, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
 		return nil, err
 	}
-	trace.Step("Object created")
 	if e.AfterCreate != nil {
 		if err := e.AfterCreate(out); err != nil {
 			return nil, err
@@ -236,8 +229,6 @@ func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, erro
 // or an error. If the registry allows create-on-update, the create flow will be executed.
 // A bool is returned along with the object and any errors, to indicate object creation.
 func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	trace := util.NewTrace("Update " + reflect.TypeOf(obj).String())
-	defer trace.LogIfLong(time.Second)
 	name, err := e.ObjectNameFunc(obj)
 	if err != nil {
 		return nil, false, err
@@ -340,17 +331,13 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 // Get retrieves the item from etcd.
 func (e *Etcd) Get(ctx api.Context, name string) (runtime.Object, error) {
 	obj := e.NewFunc()
-	trace := util.NewTrace("Get " + reflect.TypeOf(obj).String())
-	defer trace.LogIfLong(time.Second)
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, err
 	}
-	trace.Step("About to read object")
 	if err := e.Storage.Get(ctx, key, obj, false); err != nil {
 		return nil, etcderr.InterpretGetError(err, e.EndpointName, name)
 	}
-	trace.Step("Object read")
 	if e.Decorator != nil {
 		if err := e.Decorator(obj); err != nil {
 			return nil, err
@@ -372,9 +359,6 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	}
 
 	obj := e.NewFunc()
-	trace := util.NewTrace("Delete " + reflect.TypeOf(obj).String())
-	defer trace.LogIfLong(time.Second)
-	trace.Step("About to read object")
 	if err := e.Storage.Get(ctx, key, obj, false); err != nil {
 		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)
 	}
@@ -391,7 +375,6 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 		return e.finalizeDelete(obj, false)
 	}
 	if graceful {
-		trace.Step("Graceful deletion")
 		out := e.NewFunc()
 		lastGraceful := int64(0)
 		err := e.Storage.GuaranteedUpdate(
@@ -429,7 +412,6 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 
 	// delete immediately, or no graceful deletion supported
 	out := e.NewFunc()
-	trace.Step("About to delete object")
 	if err := e.Storage.Delete(ctx, key, out); err != nil {
 		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)
 	}

@@ -237,6 +237,7 @@ E2E_OPT=${E2E_OPT:-""}
 # Set environment variables shared for all of the GCE Jenkins projects.
 if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
   KUBERNETES_PROVIDER="gce"
+  : ${GCE_SERVICE_ACCOUNT:=$(gcloud auth list 2> /dev/null | grep active | cut -f3 -d' ')}
   : ${E2E_MIN_STARTUP_PODS:="1"}
   : ${E2E_ZONE:="us-central1-f"}
   : ${NUM_NODES_PARALLEL:="6"}  # Number of nodes required to run all of the tests in parallel
@@ -331,6 +332,7 @@ DISRUPTIVE_TESTS=(
 GCE_FLAKY_TESTS=(
     "GCE\sL7\sLoadBalancer\sController" # issue: #17518
     "DaemonRestart\sController\sManager" # issue: #17829
+    "Daemon\sset\sshould\srun\sand\sstop\scomplex\sdaemon" # issue: #16623
     "Resource\susage\sof\ssystem\scontainers" # issue: #13931
     "NodeOutOfDisk" # issue: #17687
     "Cluster\slevel\slogging\susing\sElasticsearch" # issue: #17873
@@ -402,6 +404,7 @@ case ${JOB_NAME} in
   # Runs all non-flaky, non-slow tests on GCE, sequentially.
   kubernetes-e2e-gce)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e"}
+    : ${E2E_PUBLISH_GREEN_VERSION:="true"}
     : ${E2E_NETWORK:="e2e-gce"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
@@ -416,8 +419,10 @@ case ${JOB_NAME} in
 
   # Runs all non-flaky, non-slow tests on AWS, sequentially.
   kubernetes-e2e-aws)
+    : ${E2E_PUBLISH_GREEN_VERSION:=true}
     : ${E2E_CLUSTER_NAME:="jenkins-aws-e2e"}
-    : ${E2E_DOWN:="false"}
+    : ${E2E_ZONE:="us-west-2a"}
+    : ${ZONE:="us-west-2a"}
     : ${E2E_NETWORK:="e2e-aws"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
@@ -428,6 +433,11 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_INSTANCE_PREFIX="e2e-aws"}
     : ${PROJECT:="k8s-jkns-e2e-aws"}
     : ${ENABLE_DEPLOYMENTS:=true}
+    : ${AWS_CONFIG_FILE:='/var/lib/jenkins/.aws/credentials'}
+    : ${AWS_SSH_KEY:='/var/lib/jenkins/.ssh/kube_aws_rsa'}
+    : ${KUBE_SSH_USER:='ubuntu'}
+    # This is needed to be able to create PD from the e2e test
+    : ${AWS_SHARED_CREDENTIALS_FILE:='/var/lib/jenkins/.aws/credentials'}
     ;;
 
   # Runs only the examples tests on GCE.
@@ -577,6 +587,30 @@ case ${JOB_NAME} in
     NODE_SIZE="n1-standard-2"
     NODE_DISK_SIZE="50GB"
     NUM_NODES="100"
+    # Reduce logs verbosity
+    TEST_CLUSTER_LOG_LEVEL="--v=2"
+    # Increase resync period to simulate production
+    TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
+    ;;
+
+  # Runs the performance/scalability test on huge 1000-node cluster on GCE.
+  # Flannel is used as network provider.
+  kubernetes-e2e-gce-enormous-cluster)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-enormous-cluster"}
+    : ${E2E_NETWORK:="e2e-enormous-cluster"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\]"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-enormous-cluster"}
+    : ${PROJECT:="kubernetes-scale"}
+    # Override GCE defaults.
+    NETWORK_PROVIDER="flannel"
+    # Temporarily switch of Heapster, as this will not schedule anywhere.
+    # TODO: Think of a solution to enable it.
+    ENABLE_CLUSTER_MONITORING="none"
+    E2E_ZONE="asia-east1-a"
+    MASTER_SIZE="n1-standard-32"
+    NODE_SIZE="n1-standard-1"
+    NODE_DISK_SIZE="50GB"
+    NUM_NODES="1000"
     # Reduce logs verbosity
     TEST_CLUSTER_LOG_LEVEL="--v=2"
     # Increase resync period to simulate production
@@ -1032,6 +1066,10 @@ esac
 # AWS variables
 export KUBE_AWS_INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
 export KUBE_AWS_ZONE=${E2E_ZONE}
+export AWS_CONFIG_FILE=${AWS_CONFIG_FILE:-}
+export AWS_SSH_KEY=${AWS_SSH_KEY:-}
+export KUBE_SSH_USER=${KUBE_SSH_USER:-}
+export AWS_SHARED_CREDENTIALS_FILE=${AWS_SHARED_CREDENTIALS_FILE:-}
 
 # GCE variables
 export INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
@@ -1154,32 +1192,32 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
             # "release/v0.19.1"
             IFS='/' read -a varr <<< "${JENKINS_EXPLICIT_VERSION}"
             bucket="${varr[0]}"
-            githash="${varr[1]}"
-            echo "Using explicit version $bucket/$githash"
+            build_version="${varr[1]}"
+            echo "Using explicit version $bucket/$build_version"
         elif [[ ${JENKINS_USE_SERVER_VERSION:-}  =~ ^[yY]$ ]]; then
             # for GKE we can use server default version.
             bucket="release"
             msg=$(gcloud ${CMD_GROUP} container get-server-config --project=${PROJECT} --zone=${ZONE} | grep defaultClusterVersion)
             # msg will look like "defaultClusterVersion: 1.0.1". Strip
             # everything up to, including ": "
-            githash="v${msg##*: }"
-            echo "Using server version $bucket/$githash"
+            build_version="v${msg##*: }"
+            echo "Using server version $bucket/$build_version"
         else  # use JENKINS_PUBLISHED_VERSION
             # Use a published version like "ci/latest" (default),
             # "release/latest", "release/latest-1", or "release/stable"
             IFS='/' read -a varr <<< "${JENKINS_PUBLISHED_VERSION}"
             bucket="${varr[0]}"
-            githash=$(gsutil cat gs://kubernetes-release/${JENKINS_PUBLISHED_VERSION}.txt)
-            echo "Using published version $bucket/$githash (from ${JENKINS_PUBLISHED_VERSION})"
+            build_version=$(gsutil cat gs://kubernetes-release/${JENKINS_PUBLISHED_VERSION}.txt)
+            echo "Using published version $bucket/$build_version (from ${JENKINS_PUBLISHED_VERSION})"
         fi
         # At this point, we want to have the following vars set:
         # - bucket
-        # - githash
-        gsutil -m cp gs://kubernetes-release/${bucket}/${githash}/kubernetes.tar.gz gs://kubernetes-release/${bucket}/${githash}/kubernetes-test.tar.gz .
+        # - build_version
+        gsutil -m cp gs://kubernetes-release/${bucket}/${build_version}/kubernetes.tar.gz gs://kubernetes-release/${bucket}/${build_version}/kubernetes-test.tar.gz .
 
         # Set by GKE-CI to change the CLUSTER_API_VERSION to the git version
         if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
-            export CLUSTER_API_VERSION=$(echo ${githash} | cut -c 2-)
+            export CLUSTER_API_VERSION=$(echo ${build_version} | cut -c 2-)
         fi
     fi
 
@@ -1272,10 +1310,10 @@ if [[ "${E2E_TEST,,}" == "true" ]]; then
     # Check to make sure the cluster is up before running tests, and fail if it's not.
     go run ./hack/e2e.go ${E2E_OPT} -v --isup
     go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS}" && exitcode=0 || exitcode=$?
-    if [[ "${E2E_PUBLISH_GREEN_VERSION:-}" == "true" && ${exitcode} == 0 && -n ${githash:-} ]]; then
-        echo "publish githash to ci/latest-green.txt: ${githash}"
-        echo "${githash}" > ${WORKSPACE}/githash.txt
-        gsutil cp ${WORKSPACE}/githash.txt gs://kubernetes-release/ci/latest-green.txt
+    if [[ "${E2E_PUBLISH_GREEN_VERSION:-}" == "true" && ${exitcode} == 0 && -n ${build_version:-} ]]; then
+        echo "publish build_version to ci/latest-green.txt: ${build_version}"
+        echo "${build_version}" > ${WORKSPACE}/build_version.txt
+        gsutil cp ${WORKSPACE}/build_version.txt gs://kubernetes-release/ci/latest-green.txt
     fi
 fi
 

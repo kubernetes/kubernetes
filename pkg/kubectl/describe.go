@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -1008,11 +1009,53 @@ func (i *IngressDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 	events, _ := i.Events(namespace).Search(ing)
-	return describeIngress(ing, events)
+	endpoints, _ := i.Endpoints(namespace).Get(ing.Spec.Backend.ServiceName)
+	service, _ := i.Services(namespace).Get(ing.Spec.Backend.ServiceName)
+	return describeIngress(ing, endpoints, service, events)
 }
 
-func describeIngress(ing *extensions.Ingress, events *api.EventList) (string, error) {
+func describeIngressEndpoints(out io.Writer, ing *extensions.Ingress, endpoints *api.Endpoints, service *api.Service) {
+	spName := ""
+	for i := range service.Spec.Ports {
+		sp := &service.Spec.Ports[i]
+		switch ing.Spec.Backend.ServicePort.Type {
+		case intstr.String:
+			if ing.Spec.Backend.ServicePort.StrVal == sp.Name {
+				spName = sp.Name
+			}
+		case intstr.Int:
+			if int(ing.Spec.Backend.ServicePort.IntVal) == sp.Port {
+				spName = sp.Name
+			}
+		}
+	}
+
+	fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints, sets.NewString(spName)))
+}
+
+func describeIngress(ing *extensions.Ingress, endpoints *api.Endpoints, service *api.Service, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", ing.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", ing.Namespace)
+		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(ing.Labels))
+
+		fmt.Fprintf(out, "Rules:\n")
+		for _, rules := range ing.Spec.Rules {
+			if rules.HTTP == nil {
+				continue
+			}
+
+			fmt.Fprintf(out, "  Host\tPath\tBackend\n")
+			fmt.Fprintf(out, "  ----\t----\t--------\n")
+			for _, path := range rules.HTTP.Paths {
+				fmt.Fprintf(out, "  %s\t%s\t%s\n", rules.Host, path.Path, backendStringer(&path.Backend))
+			}
+		}
+
+		fmt.Fprintf(out, "Backend:\t%v\t%v\n", backendStringer(ing.Spec.Backend),
+			loadBalancerStatusStringer(ing.Status.LoadBalancer))
+		describeIngressEndpoints(out, ing, endpoints, service)
+
 		describeIngressAnnotations(out, ing.Annotations)
 		if events != nil {
 			DescribeEvents(events, out)
@@ -1023,6 +1066,7 @@ func describeIngress(ing *extensions.Ingress, events *api.EventList) (string, er
 
 // TODO: Move from annotations into Ingress status.
 func describeIngressAnnotations(out io.Writer, annotations map[string]string) {
+	fmt.Fprintf(out, "Annotations:\n")
 	for k, v := range annotations {
 		if !strings.HasPrefix(k, "ingress") {
 			continue

@@ -80,9 +80,9 @@ You can use this script to automate checking for failures, assuming your cluster
 ```sh
 echo "" > output.txt
 for i in {1..4}; do
-  echo "Checking kubernetes-minion-${i}"
-  echo "kubernetes-minion-${i}:" >> output.txt
-  gcloud compute ssh "kubernetes-minion-${i}" --command="sudo docker ps -a" >> output.txt
+  echo "Checking kubernetes-node-${i}"
+  echo "kubernetes-node-${i}:" >> output.txt
+  gcloud compute ssh "kubernetes-node-${i}" --command="sudo docker ps -a" >> output.txt
 done
 grep "Exited ([^0])" output.txt
 ```

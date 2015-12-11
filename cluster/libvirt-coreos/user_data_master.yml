@@ -14,6 +14,9 @@ coreos:
 
         [Service]
         ExecStart=/opt/kubernetes/bin/kube-apiserver \
+        --service-account-key-file=/opt/kubernetes/certs/kube-serviceaccount.key \
+        --service-account-lookup=${SERVICE_ACCOUNT_LOOKUP} \
+        --admission-control=${ADMISSION_CONTROL} \
         --insecure-bind-address=0.0.0.0 \
         --insecure-port=8080 \
         --etcd-servers=http://127.0.0.1:2379 \
@@ -36,7 +39,8 @@ coreos:
 
         [Service]
         ExecStart=/opt/kubernetes/bin/kube-controller-manager \
-        --master=127.0.0.1:8080
+        --master=127.0.0.1:8080 \
+        --service-account-private-key-file=/opt/kubernetes/certs/kube-serviceaccount.key \
         Restart=always
         RestartSec=2
 

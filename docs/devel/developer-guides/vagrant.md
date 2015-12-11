@@ -139,9 +139,9 @@ You may need to build the binaries first, you can do this with `make`
 $ ./cluster/kubectl.sh get nodes
 
 NAME                     LABELS                                          STATUS
-kubernetes-node-0whl   kubernetes.io/hostname=kubernetes-node-0whl   Ready
-kubernetes-node-4jdf   kubernetes.io/hostname=kubernetes-node-4jdf   Ready
-kubernetes-node-epbe   kubernetes.io/hostname=kubernetes-node-epbe   Ready
+kubernetes-node-0whl     kubernetes.io/hostname=kubernetes-node-0whl     Ready
+kubernetes-node-4jdf     kubernetes.io/hostname=kubernetes-node-4jdf     Ready
+kubernetes-node-epbe     kubernetes.io/hostname=kubernetes-node-epbe     Ready
 ```
 
 ### Interacting with your Kubernetes cluster with the `kube-*` scripts.
@@ -206,9 +206,9 @@ Your cluster is running, you can list the nodes in your cluster:
 $ ./cluster/kubectl.sh get nodes
 
 NAME                     LABELS                                          STATUS
-kubernetes-node-0whl   kubernetes.io/hostname=kubernetes-node-0whl   Ready
-kubernetes-node-4jdf   kubernetes.io/hostname=kubernetes-node-4jdf   Ready
-kubernetes-node-epbe   kubernetes.io/hostname=kubernetes-node-epbe   Ready
+kubernetes-node-0whl     kubernetes.io/hostname=kubernetes-node-0whl     Ready
+kubernetes-node-4jdf     kubernetes.io/hostname=kubernetes-node-4jdf     Ready
+kubernetes-node-epbe     kubernetes.io/hostname=kubernetes-node-epbe     Ready
 ```
 
 Now start running some containers!

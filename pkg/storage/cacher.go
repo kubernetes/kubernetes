@@ -48,11 +48,6 @@ type CacherConfig struct {
 	// An underlying storage.Versioner.
 	Versioner Versioner
 
-	// Whether to serve Lists from in-memory cache.
-	//
-	// NOTE: DO NOT SET TO TRUE IN PRODUCTION CODE!
-	ListFromCache bool
-
 	// The Cache will be caching objects of a given Type and assumes that they
 	// are all stored under ResourcePrefix directory in the underlying database.
 	Type           interface{}
@@ -107,11 +102,6 @@ type Cacher struct {
 
 	// keyFunc is used to get a key in the underyling storage for a given object.
 	keyFunc func(runtime.Object) (string, error)
-
-	// Whether to serve Lists from in-memory cache.
-	//
-	// NOTE: DO NOT SET TO TRUE IN PRODUCTION CODE!
-	ListFromCache bool
 }
 
 // Create a new Cacher responsible from service WATCH and LIST requests from its
@@ -153,15 +143,14 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 
 	cacher := &Cacher{
-		usable:        sync.RWMutex{},
-		storage:       config.Storage,
-		watchCache:    watchCache,
-		reflector:     cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
-		watcherIdx:    0,
-		watchers:      make(map[int]*cacheWatcher),
-		versioner:     config.Versioner,
-		keyFunc:       config.KeyFunc,
-		ListFromCache: config.ListFromCache,
+		usable:     sync.RWMutex{},
+		storage:    config.Storage,
+		watchCache: watchCache,
+		reflector:  cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
+		watcherIdx: 0,
+		watchers:   make(map[int]*cacheWatcher),
+		versioner:  config.Versioner,
+		keyFunc:    config.KeyFunc,
 	}
 	cacher.usable.Lock()
 	// See startCaching method for why explanation on it.
@@ -270,9 +259,15 @@ func (c *Cacher) GetToList(ctx context.Context, key string, filter FilterFunc, l
 
 // Implements storage.Interface.
 func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, filter FilterFunc, listObj runtime.Object) error {
-	if !c.ListFromCache {
+	if resourceVersion == "" {
+		// If resourceVersion is not specified, serve it from underlying
+		// storage (for backward compatibility).
 		return c.storage.List(ctx, key, resourceVersion, filter, listObj)
 	}
+
+	// If resourceVersion is specified, serve it from cache.
+	// It's guaranteed that the returned value is at least that
+	// fresh as the given resourceVersion.
 
 	listRV, err := ParseListResourceVersion(resourceVersion)
 	if err != nil {

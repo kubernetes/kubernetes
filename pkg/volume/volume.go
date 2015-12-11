@@ -36,14 +36,14 @@ type Volume interface {
 
 // MetricsProvider exposes metrics (e.g. used,available space) related to a Volume.
 type MetricsProvider interface {
-	// GetMetrics returns the Metrics for this Volume.  Maybe expensive for some implementations.
+	// GetMetrics returns the Metrics for the Volume.  Maybe expensive for some implementations.
 	GetMetrics() (*Metrics, error)
 }
 
 // Metrics represents the used and available bytes of the Volume.
 type Metrics struct {
 	// Used represents the total bytes used by the Volume.
-	// Note: For block devices this maybe more than the total size of the files.  See `man du` for details.
+	// Note: For block devices this maybe more than the total size of the files.
 	Used *resource.Quantity
 
 	// Capacity represents the total capacity (bytes) of the volume's underlying storage.

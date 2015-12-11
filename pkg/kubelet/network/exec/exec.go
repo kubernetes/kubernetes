@@ -33,7 +33,7 @@ limitations under the License.
 //                formatted output indicating the pod's IPAddress(v4/v6). An empty string value or an erroneous output
 //                will mean the container runtime (docker) will be asked for the PodIP
 //                e.g. {
-//                         "apiVersion" : "v1",
+//                         "apiVersion" : "v1beta1",
 //                         "kind" : "PodNetworkStatus",
 //                         "ip" : "10.20.30.40"
 //                     }
