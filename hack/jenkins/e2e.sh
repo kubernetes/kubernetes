@@ -590,6 +590,30 @@ case ${JOB_NAME} in
     TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
     ;;
 
+  # Runs the performance/scalability test on huge 1000-node cluster on GCE.
+  # Flannel is used as network provider.
+  kubernetes-e2e-gce-enormous-cluster)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-enormous-cluster"}
+    : ${E2E_NETWORK:="e2e-enormous-cluster"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\]"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-enormous-cluster"}
+    : ${PROJECT:="kubernetes-scale"}
+    # Override GCE defaults.
+    NETWORK_PROVIDER="flannel"
+    # Temporarily switch of Heapster, as this will not schedule anywhere.
+    # TODO: Think of a solution to enable it.
+    ENABLE_CLUSTER_MONITORING="none"
+    E2E_ZONE="asia-east1-a"
+    MASTER_SIZE="n1-standard-32"
+    NODE_SIZE="n1-standard-1"
+    NODE_DISK_SIZE="50GB"
+    NUM_NODES="1000"
+    # Reduce logs verbosity
+    TEST_CLUSTER_LOG_LEVEL="--v=2"
+    # Increase resync period to simulate production
+    TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
+    ;;
+
   # Sets up the GCE soak cluster weekly using the latest CI release.
   kubernetes-soak-weekly-deploy-gce)
     : ${E2E_CLUSTER_NAME:="gce-soak-weekly"}
