@@ -117,10 +117,13 @@ func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 type FakeVolumePlugin struct {
 	PluginName string
 	Host       VolumeHost
+	Config     VolumeConfig
 }
 
 var _ VolumePlugin = &FakeVolumePlugin{}
 var _ RecyclableVolumePlugin = &FakeVolumePlugin{}
+var _ DeletableVolumePlugin = &FakeVolumePlugin{}
+var _ ProvisionableVolumePlugin = &FakeVolumePlugin{}
 
 func (plugin *FakeVolumePlugin) Init(host VolumeHost) {
 	plugin.Host = host
@@ -149,6 +152,10 @@ func (plugin *FakeVolumePlugin) NewRecycler(spec *Spec) (Recycler, error) {
 
 func (plugin *FakeVolumePlugin) NewDeleter(spec *Spec) (Deleter, error) {
 	return &FakeDeleter{"/attributesTransferredFromSpec", MetricsNil{}}, nil
+}
+
+func (plugin *FakeVolumePlugin) NewProvisioner(options VolumeOptions) (Provisioner, error) {
+	return &FakeProvisioner{options, plugin.Host}, nil
 }
 
 func (plugin *FakeVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -226,4 +233,37 @@ func (fd *FakeDeleter) Delete() error {
 
 func (fd *FakeDeleter) GetPath() string {
 	return fd.path
+}
+
+type FakeProvisioner struct {
+	Options VolumeOptions
+	Host    VolumeHost
+}
+
+func (fc *FakeProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
+	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", util.NewUUID())
+	return &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "pv-fakeplugin-",
+			Annotations: map[string]string{
+				"kubernetes.io/createdby": "fakeplugin-provisioner",
+			},
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeReclaimPolicy: fc.Options.PersistentVolumeReclaimPolicy,
+			AccessModes:                   fc.Options.AccessModes,
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): fc.Options.Capacity,
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: fullpath,
+				},
+			},
+		},
+	}, nil
+}
+
+func (fc *FakeProvisioner) Provision(pv *api.PersistentVolume) error {
+	return nil
 }

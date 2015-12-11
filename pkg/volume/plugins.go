@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
@@ -39,11 +40,11 @@ type VolumeOptions struct {
 	// it will be replaced and expanded on by future SecurityContext work.
 	RootContext string
 
-	// The attributes below are required by volume.Creater
-	// perhaps CreaterVolumeOptions struct?
+	// The attributes below are required by volume.Provisioner
+	// TODO: refactor all of this out of volumes when an admin can configure many kinds of provisioners.
 
-	// CapacityMB is the size in MB of a volume.
-	CapacityMB int
+	// Capacity is the size of a volume.
+	Capacity resource.Quantity
 	// AccessModes of a volume
 	AccessModes []api.PersistentVolumeAccessMode
 	// Reclamation policy for a persistent volume
@@ -106,12 +107,12 @@ type DeletableVolumePlugin interface {
 	NewDeleter(spec *Spec) (Deleter, error)
 }
 
-// CreatableVolumePlugin is an extended interface of VolumePlugin and is used to create volumes for the cluster.
-type CreatableVolumePlugin interface {
+// ProvisionableVolumePlugin is an extended interface of VolumePlugin and is used to create volumes for the cluster.
+type ProvisionableVolumePlugin interface {
 	VolumePlugin
-	// NewCreater creates a new volume.Creater which knows how to create PersistentVolumes in accordance with
+	// NewProvisioner creates a new volume.Provisioner which knows how to create PersistentVolumes in accordance with
 	// the plugin's underlying storage provider
-	NewCreater(options VolumeOptions) (Creater, error)
+	NewProvisioner(options VolumeOptions) (Provisioner, error)
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.
@@ -365,13 +366,13 @@ func (pm *VolumePluginMgr) FindDeletablePluginBySpec(spec *Spec) (DeletableVolum
 
 // FindCreatablePluginBySpec fetches a persistent volume plugin by name.  If no plugin
 // is found, returns error.
-func (pm *VolumePluginMgr) FindCreatablePluginBySpec(spec *Spec) (CreatableVolumePlugin, error) {
+func (pm *VolumePluginMgr) FindCreatablePluginBySpec(spec *Spec) (ProvisionableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
 	}
-	if creatableVolumePlugin, ok := volumePlugin.(CreatableVolumePlugin); ok {
-		return creatableVolumePlugin, nil
+	if provisionableVolumePlugin, ok := volumePlugin.(ProvisionableVolumePlugin); ok {
+		return provisionableVolumePlugin, nil
 	}
 	return nil, fmt.Errorf("no creatable volume plugin matched")
 }
