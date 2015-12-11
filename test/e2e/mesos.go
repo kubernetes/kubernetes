@@ -73,7 +73,7 @@ var _ = Describe("Mesos", func() {
 			fmt.Sprintf("number of static pods in namespace %s is %d", ns, numpods))
 	})
 
-	It("schedules pods labelled with roles on correct slaves", func() {
+	It("schedules pods annotated with roles on correct slaves", func() {
 		// launch a pod to find a node which can launch a pod. We intentionally do
 		// not just take the node list and choose the first of them. Depending on the
 		// cluster and the scheduler it might be that a "normal" pod cannot be
@@ -86,7 +86,7 @@ var _ = Describe("Mesos", func() {
 			},
 			ObjectMeta: api.ObjectMeta{
 				Name: podName,
-				Labels: map[string]string{
+				Annotations: map[string]string{
 					"k8s.mesosphere.io/roles": "public",
 				},
 			},
