@@ -223,7 +223,7 @@ func NewKubeletServer() *KubeletServer {
 		RktStage1Image:                 "",
 		RootDirectory:                  defaultRootDir,
 		SerializeImagePulls:            true,
-		StreamingConnectionIdleTimeout: 5 * time.Minute,
+		StreamingConnectionIdleTimeout: 0,
 		SyncFrequency:                  1 * time.Minute,
 		SystemContainer:                "",
 		ReconcileCIDR:                  true,
@@ -311,7 +311,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ClusterDomain, "cluster-domain", s.ClusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
 	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.IPVar(&s.ClusterDNS, "cluster-dns", s.ClusterDNS, "IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
-	fs.DurationVar(&s.StreamingConnectionIdleTimeout, "streaming-connection-idle-timeout", s.StreamingConnectionIdleTimeout, "Maximum time a streaming connection can be idle before the connection is automatically closed.  Example: '5m'")
+	fs.DurationVar(&s.StreamingConnectionIdleTimeout, "streaming-connection-idle-timeout", s.StreamingConnectionIdleTimeout, "Maximum time a streaming connection can be idle before the connection is automatically closed. Example: '5m'. Default: 0 (indicating no timeout)")
 	fs.StringSliceVar(&s.NodeLabels, "node-label", []string{}, "add labels when registering the node in the cluster, the flag can be used multiple times (key=value)")
 	fs.StringVar(&s.NodeLabelsFile, "node-labels-file", "", "the path to a yaml or json file containing a series of key pair labels to apply on node registration")
 	fs.DurationVar(&s.NodeStatusUpdateFrequency, "node-status-update-frequency", s.NodeStatusUpdateFrequency, "Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller. Default: 10s")
