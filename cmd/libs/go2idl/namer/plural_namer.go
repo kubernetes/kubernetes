@@ -19,20 +19,22 @@ package namer
 import "k8s.io/kubernetes/cmd/libs/go2idl/types"
 
 type pluralNamer struct {
+	// key is the case-sensitive type name, value is the case-insensitive
+	// intended output.
 	exceptions map[string]string
 	finalize   func(string) string
 }
 
-// NewPluralNamer returns a namer that returns the plural form of the input
-// type's name.
-func NewPluralNamer(exceptions map[string]string, public bool) *pluralNamer {
-	var finalize func(string) string
-	if public {
-		finalize = IC
-	} else {
-		finalize = IL
-	}
-	return &pluralNamer{exceptions, finalize}
+// NewPublicPluralNamer returns a namer that returns the plural form of the input
+// type's name, starting with a uppercase letter.
+func NewPublicPluralNamer(exceptions map[string]string) *pluralNamer {
+	return &pluralNamer{exceptions, IC}
+}
+
+// NewPrivatePluralNamer returns a namer that returns the plural form of the input
+// type's name, starting with a lowercase letter.
+func NewPrivatePluralNamer(exceptions map[string]string) *pluralNamer {
+	return &pluralNamer{exceptions, IL}
 }
 
 // Name returns the plural form of the type's name. If the type's name is found

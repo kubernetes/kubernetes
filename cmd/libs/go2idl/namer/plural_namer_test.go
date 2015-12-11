@@ -27,8 +27,8 @@ func TestPluralNamer(t *testing.T) {
 		// The type name is already in the plural form
 		"Endpoints": "endpoints",
 	}
-	public := NewPluralNamer(exceptions, true)
-	private := NewPluralNamer(exceptions, false)
+	public := NewPublicPluralNamer(exceptions)
+	private := NewPrivatePluralNamer(exceptions)
 
 	cases := []struct {
 		typeName        string
