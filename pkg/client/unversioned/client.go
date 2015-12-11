@@ -116,7 +116,6 @@ func (c *Client) ComponentStatuses() ComponentStatusInterface {
 // VersionInterface has a method to retrieve the server version.
 type VersionInterface interface {
 	ServerVersion() (*version.Info, error)
-	ServerAPIVersions() (*unversioned.APIVersions, error)
 }
 
 // Client is the implementation of a Kubernetes client.
@@ -139,20 +138,6 @@ func (c *Client) ServerVersion() (*version.Info, error) {
 		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
 	return &info, nil
-}
-
-// ServerAPIVersions retrieves and parses the list of API versions the server supports.
-func (c *Client) ServerAPIVersions() (*unversioned.APIVersions, error) {
-	body, err := c.Get().AbsPath("/api").Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var v unversioned.APIVersions
-	err = json.Unmarshal(body, &v)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &v, nil
 }
 
 // SwaggerSchemaInterface has a method to retrieve the swagger schema. Used in
