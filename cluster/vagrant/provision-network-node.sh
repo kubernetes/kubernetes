@@ -33,7 +33,7 @@ function provision-network-node {
     cat <<EOF >/etc/sysconfig/flanneld
 FLANNEL_ETCD="${FLANNEL_ETCD_URL}"
 FLANNEL_ETCD_KEY="/coreos.com/network"
-FLANNEL_OPTIONS="-iface=${NETWORK_IF_NAME}"
+FLANNEL_OPTIONS="-iface=${NETWORK_IF_NAME} --ip-masq"
 EOF
 
     # Start flannel
