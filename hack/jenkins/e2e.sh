@@ -1142,7 +1142,7 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
         # Otherwise, we want a completely empty directory.
         if [[ "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; then
             rm -rf kubernetes*
-        elif [[ $(find . | wc -l) != 1 ]]; then
+        elif [[ $(find . -not -path './.config*' | wc -l) != 1 ]]; then
             echo $PWD not empty, bailing!
             find .
             exit 1
