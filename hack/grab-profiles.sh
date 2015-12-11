@@ -32,7 +32,7 @@ function grab_profiles_from_component {
   for profile in ${requested_profiles}; do
     case ${profile} in
       cpu)
-        go tool pprof "-pdf" "${binary}" "http://localhost:${tunnel_port}/${path}/profile" > "${output_prefix}-${profile}-profile-${timestamp}.pdf"
+        go tool pprof "-pdf" "${binary}" "http://localhost:${tunnel_port}${path}/debug/pprof/profile" > "${output_prefix}-${profile}-profile-${timestamp}.pdf"
         ;;
       mem)
         # There are different kinds of memory profiles that are available that
@@ -40,7 +40,7 @@ function grab_profiles_from_component {
         # --alloc-space, --alloc-objects. We need to iterate over all requested
         # kinds.
         for flag in ${mem_pprof_flags}; do
-          go tool pprof "-${flag}" "-pdf" "${binary}" "http://localhost:${tunnel_port}/${path}/heap" > "${output_prefix}-${profile}-${flag}-profile-${timestamp}.pdf"
+          go tool pprof "-${flag}" "-pdf" "${binary}" "http://localhost:${tunnel_port}${path}/debug/pprof/heap" > "${output_prefix}-${profile}-${flag}-profile-${timestamp}.pdf"
         done
         ;;
     esac
@@ -53,22 +53,29 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 server_addr=""
 kubelet_addreses=""
 kubelet_binary=""
+master_binary=""
+scheduler_binary=""
+scheduler_port="10251"
+controller_manager_port="10252"
+controller_manager_binary=""
 requested_profiles=""
 mem_pprof_flags=""
 profile_components=""
 output_dir="."
 tunnel_port="${tunnel_port:-1234}"
 
-args=$(getopt -o s:mho:k: -l server:,master,heapster,output:,kubelet:,help,inuse-space,inuse-objects,alloc-space,alloc-objects,cpu,kubelet-binary: -- "$@")
+args=$(getopt -o s:mho:k:c -l server:,master,heapster,output:,kubelet:,scheduler,controller-manager,help,inuse-space,inuse-objects,alloc-space,alloc-objects,cpu,kubelet-binary:,master-binary:,scheduler-binary:,controller-manager-binary:,scheduler-port:,controller-manager-port: -- "$@")
 if [[ $? -ne 0 ]]; then
   >&2 echo "Error in getopt"
   exit 1
 fi
 
 HEAPSTER_VERSION="v0.18.2"
-MASTER_PPROF_PATH="debug/pprof"
-HEAPSTER_PPROF_PATH="api/v1/proxy/namespaces/kube-system/services/monitoring-heapster/debug/pprof"
-KUBELET_PPROF_PATH_PREFIX="api/v1/proxy/nodes"
+MASTER_PPROF_PATH=""
+HEAPSTER_PPROF_PATH="/api/v1/proxy/namespaces/kube-system/services/monitoring-heapster"
+KUBELET_PPROF_PATH_PREFIX="/api/v1/proxy/nodes"
+SCHEDULER_PPROF_PATH_PREFIX="/api/v1/proxy/namespaces/kube-system/pods/kube-scheduler"
+CONTROLLER_MANAGER_PPROF_PATH_PREFIX="/api/v1/proxy/namespaces/kube-system/pods/kube-controller-manager"
 
 eval set -- "${args}"
 
@@ -87,18 +94,18 @@ while true; do
       shift
       profile_components="master ${profile_components}"
       ;;
+    --master-binary)
+      shift
+      if [ -z "$1" ]; then
+        >&2 echo "empty argumet to --master-binary flag"
+        exit 1
+      fi
+      master_binary=$1
+      shift
+      ;;
     -h|--heapster)
       shift
       profile_components="heapster ${profile_components}"
-      ;;
-    -o|--output)
-      shift
-      if [ -z "$1" ]; then
-        >&2 echo "empty argument to --output flag"
-        exit 1
-      fi
-      output_dir=$1
-      shift
       ;;
     -k|--kubelet)
       shift
@@ -117,6 +124,59 @@ while true; do
         exit 1
       fi
       kubelet_binary=$1
+      shift
+      ;;
+    --scheduler)
+      shift
+      profile_components="scheduler ${profile_components}"
+      ;;
+    --scheduler-binary)
+      shift
+      if [ -z "$1" ]; then
+        >&2 echo "empty argumet to --scheduler-binary flag"
+        exit 1
+      fi
+      scheduler_binary=$1
+      shift
+      ;;
+    --scheduler-port)
+      shift
+      if [ -z "$1" ]; then
+        >&2 echo "empty argumet to --scheduler-port flag"
+        exit 1
+      fi
+      scheduler_port=$1
+      shift
+      ;;
+    -c|--controller-manager)
+      shift
+      profile_components="controller-manager ${profile_components}"
+      ;;
+    --controller-manager-binary)
+      shift
+      if [ -z "$1" ]; then
+        >&2 echo "empty argumet to --controller-manager-binary flag"
+        exit 1
+      fi
+      controller_manager_binary=$1
+      shift
+      ;;
+    --controller-manager-port)
+      shift
+      if [ -z "$1" ]; then
+        >&2 echo "empty argumet to --controller-manager-port flag"
+        exit 1
+      fi
+      controller-managerr_port=$1
+      shift
+      ;;
+    -o|--output)
+      shift
+      if [ -z "$1" ]; then
+        >&2 echo "empty argument to --output flag"
+        exit 1
+      fi
+      output_dir=$1
       shift
       ;;
     --inuse-space)
@@ -202,7 +262,15 @@ for component in ${profile_components}; do
   case ${component} in
     master)
       path=${MASTER_PPROF_PATH}
-      binary=""
+      binary=${master_binary}
+      ;;
+    controller-manager)
+      path="${CONTROLLER_MANAGER_PPROF_PATH_PREFIX}-${server_addr}:${controller_manager_port}"
+      binary=${controller_manager_binary}
+      ;;
+    scheduler)
+      path="${SCHEDULER_PPROF_PATH_PREFIX}-${server_addr}:${scheduler_port}"
+      binary=${scheduler_binary}
       ;;
     heapster)
       rm heapster
@@ -224,7 +292,7 @@ for component in ${profile_components}; do
 
   if [[ "${component}" == "kubelet" ]]; then
     for node in $(echo ${kubelet_addreses} | sed 's/[,;]/\n/g'); do
-      grab_profiles_from_component "${requested_profiles}" "${mem_pprof_flags}" "${binary}" "${tunnel_port}" "${path}/${node}/debug/pprof" "${output_dir}/${component}" "${timestamp}"
+      grab_profiles_from_component "${requested_profiles}" "${mem_pprof_flags}" "${binary}" "${tunnel_port}" "${path}/${node}" "${output_dir}/${component}" "${timestamp}"
     done    
   else 
     grab_profiles_from_component "${requested_profiles}" "${mem_pprof_flags}" "${binary}" "${tunnel_port}" "${path}" "${output_dir}/${component}" "${timestamp}"
