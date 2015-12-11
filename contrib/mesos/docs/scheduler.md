@@ -35,53 +35,60 @@ is restarted.
 A Mesos cluster can be statically partitioned using [resources roles][2]. Each
 resource is assigned such a role (`*` is the default role, if none is explicitly
 assigned in the mesos-slave command line). The Mesos master will send offers to
-frameworks for `*` resources and – optionally – for one extra role that a
-framework is assigned to. Right now only one such extra role for a framework is
+frameworks for `*` resources and – optionally – one additional role that a
+framework is assigned to. Right now only one such additional role for a framework is
 supported.
 
 ### Configuring Roles for the Scheduler
 
-Every Mesos framework scheduler can choose among the offered `*` resources and
-those of the extra role. The Kubernetes-Mesos scheduler supports this by setting
+Every Mesos framework scheduler can choose among offered `*` resources and
+optionally one additional role. The Kubernetes-Mesos scheduler supports this by setting
 the framework roles in the scheduler command line, e.g.
 
 ```bash
-$ km scheduler ... --mesos-roles="*,role1" ...
+$ km scheduler ... --mesos-framework-roles="*,role1" ...
 ```
 
-This will tell the Kubernetes-Mesos scheduler to default to using `*` resources
-if a pod is not specially assigned to another role. Moreover, the extra role
-`role1` is allowed, i.e. the Mesos master will send resources or role `role1`
-to the Kubernetes scheduler.
+This permits the Kubernetes-Mesos scheduler to accept offered resources for the `*` and `role1` roles.
+By default pods may be assigned any combination of resources for the roles accepted by the scheduler.
+This default role assignment behavior may be overridden using the `--mesos-default-pod-roles` flag or
+else by annotating the pod (as described later).
 
-Note the following restrictions and possibilities:
-- Due to the restrictions of Mesos, only one extra role may be provided on the
-  command line.
-- It is allowed to only pass an extra role without the `*`, e.g. `--mesos-roles=role1`.
-  This means that no `*` resources should be considered by the scheduler at all.
-- It is allowed to pass the extra role first, e.g. `--mesos-roles=role1,*`.
-  This means that `role1` is the default role for pods without special role
-  assignment (see below). But `*` resources would be considered for pods with a special `*`
-  assignment.
+One can configure default pod roles, e.g.
+
+```bash
+$ km scheduler ... --mesos-default-pod-roles="role1" ...
+```
+
+This will tell the Kubernetes-Mesos scheduler to default to `role1` resource offers.
+The configured default pod roles must be a subset of the configured framework roles.
+
+The order of configured default pod roles is relevant,
+`--mesos-default-pod-roles=role1,*` will first try to consume `role1` resources
+from an offer and, once depleted, fall back to `*` resources.
+
+The configuration `--mesos-default-pod-roles=*,role1` has the reverse behavior.
+It first tries to consume `*` resources from an offer and, once depleted, falls
+back to `role1` resources.
+
+Due to restrictions of Mesos, currently only one additional role next to `*` can be configured
+for both framework and default pod roles.
 
 ### Specifying Roles for Pods
 
-By default a pod is scheduled using resources of the role which comes first in
-the list of scheduler roles.
+By default a pod is scheduled using resources as specified using the
+`--mesos-default-pod-roles` configuration.
 
-A pod can opt-out of this default behaviour using the `k8s.mesosphere.io/roles`
-label:
+A pod can override of this default behaviour using a `k8s.mesosphere.io/roles`
+annotation:
 
 ```yaml
-k8s.mesosphere.io/roles: role1,role2,role3
+k8s.mesosphere.io/roles: "*,role1"
 ```
 
 The format is a comma separated list of allowed resource roles. The scheduler
-will try to schedule the pod with `role1` resources first, using `role2`
-resources if the former are not available and finally falling back to `role3`
-resources.
-
-The `*` role may be specified as well in this list.
+will try to schedule the pod with `*` resources first, using `role1`
+resources if the former are not available or are depleted.
 
 **Note:** An empty list will mean that no resource roles are allowed which is
 equivalent to a pod which is unschedulable.
@@ -93,29 +100,29 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: backend
-  labels:
-    k8s.mesosphere.io/roles: *,prod,test,dev
+  annotations:
+    k8s.mesosphere.io/roles: "*,public"
   namespace: prod
 spec:
   ...
 ```
 
-This `prod/backend` pod will be scheduled using resources from all four roles,
-preferably using `*` resources, followed by `prod`, `test` and `dev`. If none
-of those for roles provides enough resources, the scheduling fails.
+This `*/public` pod will be scheduled using resources from both roles,
+preferably using `*` resources, followed by `public`. If none
+of those roles provides enough resources, the scheduling fails.
 
 **Note:** The scheduler will also allow to mix different roles in the following
 sense: if a node provides `cpu` resources for the `*` role, but `mem` resources
-only for the `prod` role, the upper pod will be schedule using `cpu(*)` and
-`mem(prod)` resources.
+only for the `public` role, the above pod will be scheduled using `cpu(*)` and
+`mem(public)` resources.
 
 **Note:** The scheduler might also mix within one resource type, i.e. it will
 use as many `cpu`s of the `*` role as possible. If a pod requires even more
 `cpu` resources (defined using the `pod.spec.resources.limits` property) for successful
-scheduling, the scheduler will add resources from the `prod`, `test` and `dev`
-roles, in this order until the pod resource requirements are satisfied. E.g. a
-pod might be scheduled with 0.5 `cpu(*)`, 1.5 `cpu(prod)` and 1 `cpu(test)`
-resources plus e.g. 2 GB `mem(prod)` resources.
+scheduling, the scheduler will add resources from the `public`
+role until the pod resource requirements are satisfied. E.g. a
+pod might be scheduled with 0.5 `cpu(*)`, 1.5 `cpu(public)`
+resources plus e.g. 2 GB `mem(public)` resources.
 
 ## Tuning
 
