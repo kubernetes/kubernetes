@@ -67,8 +67,8 @@ func TestConfig_Read(t *testing.T) {
 	updates-backlog=42
 	framework-id-refresh-interval=42s
 	initial-implicit-reconciliation-delay=42s
-	explicit-reconciliantion-max-backoff=42s
-	explicit-reconciliantion-abort-timeout=42s
+	explicit-reconciliation-max-backoff=42s
+	explicit-reconciliation-abort-timeout=42s
 	initial-pod-backoff=42s
 	max-pod-backoff=42s
 	http-handler-timeout=42s
