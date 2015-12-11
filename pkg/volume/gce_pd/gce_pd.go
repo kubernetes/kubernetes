@@ -144,6 +144,7 @@ type gcePersistentDisk struct {
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
 	plugin  *gcePersistentDiskPlugin
+	volume.MetricsNil
 }
 
 func detachDiskLogError(pd *gcePersistentDisk) {

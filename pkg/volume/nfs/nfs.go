@@ -131,6 +131,7 @@ type nfs struct {
 	plugin  *nfsPlugin
 	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
 	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
+	volume.MetricsNil
 }
 
 func (nfsVolume *nfs) GetPath() string {
@@ -271,6 +272,7 @@ type nfsRecycler struct {
 	host    volume.VolumeHost
 	config  volume.VolumeConfig
 	timeout int64
+	volume.MetricsNil
 }
 
 func (r *nfsRecycler) GetPath() string {
