@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	kubeerr "k8s.io/kubernetes/pkg/api/errors"
 	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -416,6 +417,37 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)
 	}
 	return e.finalizeDelete(out, true)
+}
+
+// DeleteCollection remove all items returned by List with a given ListOptions from etcd.
+//
+// DeleteCollection is currently NOT atomic. It can happen that only subset of objects
+// will be deleted from etcd, and then an error will be returned.
+// In case of success, the list of deleted objects will be returned.
+//
+// TODO: Currently, there is no easy way to remove 'directory' entry from etcd (if we
+// are removing all objects of a given type) with the current API (it's technically
+// possibly with etcd API, but watch is not delivered correctly then).
+// It will be possible to fix it with v3 etcd API.
+func (e *Etcd) DeleteCollection(ctx api.Context, options *api.DeleteOptions, listOptions *unversioned.ListOptions) (runtime.Object, error) {
+	listObj, err := e.List(ctx, listOptions)
+	if err != nil {
+		return nil, err
+	}
+	items, err := meta.ExtractList(listObj)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range items {
+		accessor, err := meta.Accessor(item)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := e.Delete(ctx, accessor.Name(), options); err != nil {
+			return nil, err
+		}
+	}
+	return listObj, nil
 }
 
 func (e *Etcd) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object, error) {

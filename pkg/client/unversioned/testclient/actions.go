@@ -166,6 +166,41 @@ func NewDeleteAction(resource, namespace, name string) DeleteActionImpl {
 	return action
 }
 
+func NewRootDeleteCollectionAction(resource string, opts unversioned.ListOptions) DeleteCollectionActionImpl {
+	action := DeleteCollectionActionImpl{}
+	action.Verb = "delete-collection"
+	action.Resource = resource
+	labelSelector := opts.LabelSelector.Selector
+	if labelSelector == nil {
+		labelSelector = labels.Everything()
+	}
+	fieldSelector := opts.FieldSelector.Selector
+	if fieldSelector == nil {
+		fieldSelector = fields.Everything()
+	}
+	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
+
+	return action
+}
+
+func NewDeleteCollectionAction(resource, namespace string, opts unversioned.ListOptions) DeleteCollectionActionImpl {
+	action := DeleteCollectionActionImpl{}
+	action.Verb = "delete-collection"
+	action.Resource = resource
+	action.Namespace = namespace
+	labelSelector := opts.LabelSelector.Selector
+	if labelSelector == nil {
+		labelSelector = labels.Everything()
+	}
+	fieldSelector := opts.FieldSelector.Selector
+	if fieldSelector == nil {
+		fieldSelector = fields.Everything()
+	}
+	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
+
+	return action
+}
+
 func NewRootWatchAction(resource string, opts unversioned.ListOptions) WatchActionImpl {
 	action := WatchActionImpl{}
 	action.Verb = "watch"
@@ -361,6 +396,15 @@ type DeleteActionImpl struct {
 
 func (a DeleteActionImpl) GetName() string {
 	return a.Name
+}
+
+type DeleteCollectionActionImpl struct {
+	ActionImpl
+	ListRestrictions ListRestrictions
+}
+
+func (a DeleteCollectionActionImpl) GetListRestrictions() ListRestrictions {
+	return a.ListRestrictions
 }
 
 type WatchActionImpl struct {

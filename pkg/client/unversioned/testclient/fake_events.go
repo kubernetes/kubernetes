@@ -110,6 +110,15 @@ func (c *FakeEvents) Delete(name string) error {
 	return err
 }
 
+func (c *FakeEvents) DeleteCollection(options *api.DeleteOptions, listOptions unversioned.ListOptions) error {
+	action := NewRootDeleteCollectionAction("events", listOptions)
+	if c.Namespace != "" {
+		action = NewDeleteCollectionAction("events", c.Namespace, listOptions)
+	}
+	_, err := c.Fake.Invokes(action, &api.EventList{})
+	return err
+}
+
 // Watch starts watching for events matching the given selectors.
 func (c *FakeEvents) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
 	action := NewRootWatchAction("events", opts)
