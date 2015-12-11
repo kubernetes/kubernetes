@@ -1207,7 +1207,6 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) validation.ErrorList {
 		allErrs = append(allErrs, validation.NewInvalidError(specPath, "contents not printed here, please refer to the \"details\"", "may not update fields other than container.image"))
 	}
 
-	newPod.Status = oldPod.Status
 	return allErrs
 }
 
