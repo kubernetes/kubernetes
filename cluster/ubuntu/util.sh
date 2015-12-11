@@ -256,6 +256,7 @@ EOF
 function create-flanneld-opts() {
   cat <<EOF > ~/kube/default/flanneld
 FLANNEL_OPTS="--etcd-endpoints=http://${1}:4001 \
+ --ip-masq \
  --iface=${2}"
 EOF
 }
