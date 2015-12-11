@@ -92,7 +92,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool) ([]byte, error
 		}
 
 		// Get the current annotations from the object.
-		annotations := accessor.Annotations()
+		annotations := accessor.GetAnnotations()
 		if annotations == nil {
 			annotations = map[string]string{}
 		}

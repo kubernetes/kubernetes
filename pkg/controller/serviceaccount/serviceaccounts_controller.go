@@ -39,7 +39,7 @@ func nameIndexFunc(obj interface{}) ([]string, error) {
 	if err != nil {
 		return []string{""}, fmt.Errorf("object has no meta: %v", err)
 	}
-	return []string{meta.Name()}, nil
+	return []string{meta.GetName()}, nil
 }
 
 // ServiceAccountsControllerOptions contains options for running a ServiceAccountsController

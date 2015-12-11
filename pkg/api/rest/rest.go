@@ -263,4 +263,7 @@ type ConnectRequest struct {
 }
 
 // IsAnAPIObject makes ConnectRequest a runtime.Object
-func (*ConnectRequest) IsAnAPIObject() {}
+func (obj *ConnectRequest) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj *ConnectRequest) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}

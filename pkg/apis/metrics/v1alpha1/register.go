@@ -40,5 +40,9 @@ func addKnownTypes() {
 	)
 }
 
-func (*RawNode) IsAnAPIObject() {}
-func (*RawPod) IsAnAPIObject()  {}
+func (obj *RawNode) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}
+func (obj *RawPod) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}

@@ -35,4 +35,9 @@ func init() {
 	)
 }
 
-func (*Config) IsAnAPIObject() {}
+func (obj *Config) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *Config) GroupVersionKind() *unversioned.GroupVersionKind {
+	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}

@@ -76,11 +76,35 @@ func (f SimpleMetaFactory) Update(version, kind string, obj interface{}) error {
 	return UpdateVersionAndKind(f.BaseFields, f.VersionField, version, f.KindField, kind, obj)
 }
 
+// typedObject is identical to pkg/runtime.Object.
+// TODO: will be removed when codec is separated from scheme.
+type typedObject interface {
+	// SetGroupVersionKind sets or clears the stored version with an object. Because most serialization
+	// requires this field, it is our marker interface for our objects.
+	SetGroupVersionKind(gvk *unversioned.GroupVersionKind)
+	// GroupVersionKind returns the stored group, version, and kind of an object, or nil if the object does
+	// not allow those fields to be encoded.
+	GroupVersionKind() *unversioned.GroupVersionKind
+}
+
 // UpdateVersionAndKind uses reflection to find and set the versionField and kindField fields
 // on a pointer to a struct to version and kind. Provided as a convenience for others
 // implementing MetaFactory. Pass an array to baseFields to check one or more nested structs
 // for the named fields. The version field is treated as optional if it is not present in the struct.
 func UpdateVersionAndKind(baseFields []string, versionField, version, kindField, kind string, obj interface{}) error {
+	// TODO: this method is on its way out
+	if typed, ok := obj.(typedObject); ok {
+		if len(version) == 0 && len(kind) == 0 {
+			typed.SetGroupVersionKind(nil)
+		} else {
+			gv, err := unversioned.ParseGroupVersion(version)
+			if err != nil {
+				return err
+			}
+			typed.SetGroupVersionKind(&unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind})
+		}
+		return nil
+	}
 	v, err := EnforcePtr(obj)
 	if err != nil {
 		return err

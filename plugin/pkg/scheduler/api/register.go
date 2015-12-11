@@ -34,4 +34,6 @@ func init() {
 	)
 }
 
-func (*Policy) IsAnAPIObject() {}
+func (obj *Policy) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	unversioned.UpdateTypeMeta(&obj.TypeMeta, gvk)
+}

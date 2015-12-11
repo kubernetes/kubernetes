@@ -56,10 +56,18 @@ type ObjectTestExternal struct {
 	Items []runtime.RawExtension `json:"items,omitempty"`
 }
 
-func (*ObjectTest) IsAnAPIObject()           {}
-func (*ObjectTestExternal) IsAnAPIObject()   {}
-func (*EmbeddedTest) IsAnAPIObject()         {}
-func (*EmbeddedTestExternal) IsAnAPIObject() {}
+func (obj *ObjectTest) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *ObjectTestExternal) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *EmbeddedTest) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *EmbeddedTestExternal) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
+}
 
 func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}

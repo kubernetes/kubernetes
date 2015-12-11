@@ -198,3 +198,40 @@ func (gv *GroupVersion) UnmarshalJSON(value []byte) error {
 func (gv *GroupVersion) UnmarshalText(value []byte) error {
 	return gv.unmarshal(value)
 }
+
+// UpdateTypeMeta is a helper for setting a TypeMeta based on a provided gvk.
+func UpdateTypeMeta(meta *TypeMeta, gvk *GroupVersionKind) {
+	if gvk == nil {
+		meta.APIVersion, meta.Kind = "", ""
+		return
+	}
+	meta.APIVersion, meta.Kind = gvk.GroupVersion().String(), gvk.Kind
+}
+
+// TypeMetaToGroupVersionKind attempts to return a GVK for the provided TypeMeta.
+// If the APIVersion cannot be parsed under the rules for ParseGroupVersion, neither
+// group or version are set in the returned object.
+func TypeMetaToGroupVersionKind(meta TypeMeta) *GroupVersionKind {
+	if gv, err := ParseGroupVersion(meta.APIVersion); err == nil {
+		return &GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: meta.Kind}
+	}
+	return &GroupVersionKind{Kind: meta.Kind}
+}
+
+// ToAPIVersionAndKind is a convenience method for satisfying runtime.Object on types that
+// do not use TypeMeta.
+func (gvk *GroupVersionKind) ToAPIVersionAndKind() (string, string) {
+	if gvk == nil {
+		return "", ""
+	}
+	return gvk.GroupVersion().String(), gvk.Kind
+}
+
+// FromAPIVersionAndKind returns a GVK representing the provided fields for types that
+// do not use TypeMeta.
+func FromAPIVersionAndKind(apiVersion, kind string) *GroupVersionKind {
+	if gv, err := ParseGroupVersion(apiVersion); err == nil {
+		return &GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind}
+	}
+	return &GroupVersionKind{Kind: kind}
+}

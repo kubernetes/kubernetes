@@ -226,7 +226,8 @@ func TestRequestURI(t *testing.T) {
 
 type NotAnAPIObject struct{}
 
-func (NotAnAPIObject) IsAnAPIObject() {}
+func (obj NotAnAPIObject) GroupVersionKind() *unversioned.GroupVersionKind       { return nil }
+func (obj NotAnAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
 
 func TestRequestBody(t *testing.T) {
 	// test unknown type

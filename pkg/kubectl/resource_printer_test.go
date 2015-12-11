@@ -85,11 +85,13 @@ type TestPrintType struct {
 	Data string
 }
 
-func (*TestPrintType) IsAnAPIObject() {}
+func (obj *TestPrintType) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj *TestPrintType) GroupVersionKind() *unversioned.GroupVersionKind       { return nil }
 
 type TestUnknownType struct{}
 
-func (*TestUnknownType) IsAnAPIObject() {}
+func (obj *TestUnknownType) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj *TestUnknownType) GroupVersionKind() *unversioned.GroupVersionKind       { return nil }
 
 func TestPrinter(t *testing.T) {
 	//test inputs

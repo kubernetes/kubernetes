@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -114,7 +115,10 @@ type fakePtrInterfaceList struct {
 	Items *[]runtime.Object
 }
 
-func (f fakePtrInterfaceList) IsAnAPIObject() {}
+func (obj fakePtrInterfaceList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj fakePtrInterfaceList) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}
 
 func TestExtractListOfInterfacePtrs(t *testing.T) {
 	pl := &fakePtrInterfaceList{
@@ -133,7 +137,10 @@ type fakePtrValueList struct {
 	Items []*api.Pod
 }
 
-func (f fakePtrValueList) IsAnAPIObject() {}
+func (obj fakePtrValueList) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {}
+func (obj fakePtrValueList) GroupVersionKind() *unversioned.GroupVersionKind {
+	return nil
+}
 
 func TestExtractListOfValuePtrs(t *testing.T) {
 	pl := &fakePtrValueList{
