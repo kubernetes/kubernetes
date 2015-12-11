@@ -1,0 +1,20 @@
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  name: job-wq-2
+spec:
+  selector:
+    matchLabels:
+      app: job-wq-2
+  completions: 1
+  parallelism: 2
+  template:
+    metadata:
+      name: job-wq-2
+      labels:
+        app: job-wq-2
+    spec:
+      containers:
+      - name: c
+        image: gcr.io/myproject/job-wq-2
+      restartPolicy: OnFailure

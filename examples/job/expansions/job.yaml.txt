@@ -1,0 +1,21 @@
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  name: process-item-$ITEM
+spec:
+  selector:
+    matchLabels:
+      app: jobexample
+      item: $ITEM
+  template:
+    metadata:
+      name: jobexample
+      labels:
+        app: jobexample
+        item: $ITEM
+    spec:
+      containers:
+      - name: c
+        image: busybox
+        command: ["sh", "-c", "echo Processing item $ITEM && sleep 5"]
+      restartPolicy: Never
