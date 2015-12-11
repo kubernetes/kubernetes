@@ -100,10 +100,16 @@ type Recycler interface {
 	Recycle() error
 }
 
-// Create adds a new resource in the storage provider and creates a PersistentVolume for the new resource.
-// Calls to Create should block until complete.
-type Creater interface {
-	Create() (*api.PersistentVolume, error)
+// Provisioner is an interface that creates templates for PersistentVolumes and can create the volume
+// as a new resource in the infrastructure provider.
+type Provisioner interface {
+	// Provision creates the resource by allocating the underlying volume in a storage system.
+	// This method should block until completion.
+	Provision(*api.PersistentVolume) error
+	// NewPersistentVolumeTemplate creates a new PersistentVolume to be used as a template before saving.
+	// The provisioner will want to tweak its properties, assign correct annotations, etc.
+	// This func should *NOT* persist the PV in the API.  That is left to the caller.
+	NewPersistentVolumeTemplate() (*api.PersistentVolume, error)
 }
 
 // Delete removes the resource from the underlying storage provider.  Calls to this method should block until
@@ -111,6 +117,7 @@ type Creater interface {
 // A nil return indicates success.
 type Deleter interface {
 	Volume
+	// This method should block until completion.
 	Delete() error
 }
 

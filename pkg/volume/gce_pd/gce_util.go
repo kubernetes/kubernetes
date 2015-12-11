@@ -17,6 +17,7 @@ limitations under the License.
 package gce_pd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -110,6 +111,41 @@ func (util *GCEDiskUtil) DetachDisk(c *gcePersistentDiskCleaner) error {
 	// Detach disk asynchronously so that the kubelet sync loop is not blocked.
 	go detachDiskAndVerify(c)
 	return nil
+}
+
+func (util *GCEDiskUtil) DeleteVolume(d *gcePersistentDiskDeleter) error {
+	cloud := d.plugin.host.GetCloudProvider()
+	if cloud == nil {
+		glog.Errorf("Cloud provider not initialized properly")
+		return errors.New("Cloud provider not initialized properly")
+	}
+
+	if err := cloud.(*gcecloud.GCECloud).DeleteDisk(d.pdName); err != nil {
+		glog.V(2).Infof("Error deleting GCE PD volume %s: %v", d.pdName, err)
+		return err
+	}
+	glog.V(2).Infof("Successfully deleted GCE PD volume %s", d.pdName)
+	return nil
+}
+
+func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (string, int, error) {
+	cloud := c.plugin.host.GetCloudProvider()
+	if cloud == nil {
+		glog.Errorf("Cloud provider not initialized properly")
+		return "", 0, errors.New("Cloud provider not initialized properly")
+	}
+
+	name := fmt.Sprintf("kube-dynamic-%s", util.NewUUID())
+	// convert to GB with rounding
+	const giga = 1024 * 1024 * 1024
+	volSize := int((c.options.Capacity.Value() + giga - 1) / giga)
+	err := cloud.(*gcecloud.GCECloud).CreateDisk(name, int64(volSize))
+	if err != nil {
+		glog.V(2).Infof("Error creating GCE PD volume: %v", err)
+		return "", 0, err
+	}
+	glog.V(2).Infof("Successfully created GCE PD volume %s", name)
+	return name, volSize * giga, nil
 }
 
 // Attaches the specified persistent disk device to node, verifies that it is attached, and retries if it fails.
