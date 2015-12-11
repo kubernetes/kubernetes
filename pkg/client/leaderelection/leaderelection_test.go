@@ -35,6 +35,7 @@ import (
 
 func TestTryAcquireOrRenew(t *testing.T) {
 	future := time.Now().Add(1000 * time.Hour)
+	past := time.Now().Add(-1000 * time.Hour)
 
 	tests := []struct {
 		observedRecord LeaderElectionRecord
@@ -109,6 +110,9 @@ func TestTryAcquireOrRenew(t *testing.T) {
 							ObjectMeta: api.ObjectMeta{
 								Namespace: action.GetNamespace(),
 								Name:      action.(testclient.GetAction).GetName(),
+								Annotations: map[string]string{
+									LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
+								},
 							},
 						}, nil
 					},
@@ -120,6 +124,9 @@ func TestTryAcquireOrRenew(t *testing.T) {
 					},
 				},
 			},
+			observedRecord: LeaderElectionRecord{HolderIdentity: "bing"},
+			observedTime:   past,
+
 			expectSuccess: true,
 			outHolder:     "baz",
 		},
