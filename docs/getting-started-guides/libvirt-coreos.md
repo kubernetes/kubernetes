@@ -83,11 +83,12 @@ On the other hand, `libvirt-coreos` might be useful for people investigating low
 2. Install [ebtables](http://ebtables.netfilter.org/)
 3. Install [qemu](http://wiki.qemu.org/Main_Page)
 4. Install [libvirt](http://libvirt.org/)
-5. Enable and start the libvirt daemon, e.g:
+5. Install [openssl](http://openssl.org/)
+6. Enable and start the libvirt daemon, e.g:
    * ``systemctl enable libvirtd``
    * ``systemctl start libvirtd``
-6. [Grant libvirt access to your user¹](https://libvirt.org/aclpolkit.html)
-7. Check that your $HOME is accessible to the qemu user²
+7. [Grant libvirt access to your user¹](https://libvirt.org/aclpolkit.html)
+8. Check that your $HOME is accessible to the qemu user²
 
 #### ¹ Depending on your distribution, libvirt access may be denied by default or may require a password at each access.
 
