@@ -16,13 +16,12 @@
 
 # reconfigure docker network setting
 
-source ~/kube/config-default.sh
+source "$HOME/kube/${KUBE_CONFIG_FILE##*/}"
 
-if [ "$(id -u)" != "0" ]; then
+if [[ "$(id -u)" != "0" ]]; then
   echo >&2 "Please run as root"
   exit 1
 fi
-
 
 function config_etcd {
   attempt=0
@@ -72,4 +71,7 @@ elif [[ $1 == "ai" ]]; then
   restart_docker
 elif [[ $1 == "a" ]]; then
   config_etcd
-fi
+else
+  echo "Another arguement is required."
+  exit 1
+fi 
