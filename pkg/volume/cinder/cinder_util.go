@@ -132,6 +132,40 @@ func (util *CinderDiskUtil) DetachDisk(cd *cinderVolumeCleaner) error {
 	return nil
 }
 
+func (util *CinderDiskUtil) DeleteVolume(cd *cinderVolumeDeleter) error {
+	cloud := cd.plugin.host.GetCloudProvider()
+	if cloud == nil {
+		glog.Errorf("Cloud provider not initialized properly")
+		return errors.New("Cloud provider not initialized properly")
+	}
+
+	if err := cloud.(*openstack.OpenStack).DeleteVolume(cd.pdName); err != nil {
+		glog.V(2).Infof("Error deleting cinder volume %s: %v", cd.pdName, err)
+		return err
+	}
+	glog.V(2).Infof("Successfully deleted cinder volume %s", cd.pdName)
+	return nil
+}
+
+func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (string, int, error) {
+	cloud := c.plugin.host.GetCloudProvider()
+	if cloud == nil {
+		glog.Errorf("Cloud provider not initialized properly")
+		return "", 0, errors.New("Cloud provider not initialized properly")
+	}
+
+	// convert to GB with rounding
+	const giga = 1024 * 1024 * 1024
+	volSize := int((c.options.Capacity.Value() + giga - 1) / giga)
+	name, err := cloud.(*openstack.OpenStack).CreateVolume(volSize)
+	if err != nil {
+		glog.V(2).Infof("Error creating cinder volume: %v", err)
+		return "", 0, err
+	}
+	glog.V(2).Infof("Successfully created cinder volume %s", name)
+	return name, volSize * giga, nil
+}
+
 type cinderSafeFormatAndMount struct {
 	mount.Interface
 	runner exec.Interface
