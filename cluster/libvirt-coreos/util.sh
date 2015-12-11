@@ -22,7 +22,8 @@ source "$ROOT/${KUBE_CONFIG_FILE:-"config-default.sh"}"
 source "$KUBE_ROOT/cluster/common.sh"
 
 export LIBVIRT_DEFAULT_URI=qemu:///system
-
+export SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-false}
+export ADMISSION_CONTROL=${ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota}
 readonly POOL=kubernetes
 readonly POOL_PATH="$(cd $ROOT && pwd)/libvirt_storage_pool"
 
@@ -50,6 +51,19 @@ function detect-master {
 function detect-nodes {
   KUBE_NODE_IP_ADDRESSES=("${NODE_IPS[@]}")
 }
+
+function set_service_accounts {
+    SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-"/tmp/kube-serviceaccount.key"}
+    # Generate ServiceAccount key if needed
+    if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
+      mkdir -p "$(dirname ${SERVICE_ACCOUNT_KEY})"
+      openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
+    fi
+
+    mkdir -p  "$POOL_PATH/kubernetes/certs"
+    cp "${SERVICE_ACCOUNT_KEY}" "$POOL_PATH/kubernetes/certs"
+}
+
 
 # Verify prereqs on host machine
 function verify-prereqs {
@@ -185,6 +199,7 @@ function kube-up {
   detect-nodes
   load-or-gen-kube-bearertoken
   initialize-pool keep_base_image
+  set_service_accounts
   initialize-network
 
   readonly ssh_keys="$(cat ~/.ssh/id_*.pub | sed 's/^/  - /')"
