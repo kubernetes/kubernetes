@@ -307,7 +307,7 @@ Scaling foo-v1 down to 0
 				up{8},
 				down{oldReady: 4, newReady: 8, to: 1},
 				up{10},
-				down{oldReady: 10, newReady: 1, to: 0},
+				down{oldReady: 1, newReady: 10, to: 0},
 			},
 			output: `Created foo-v2
 Scaling up foo-v2 from 0 to 10, scaling down foo-v1 from 10 to 0 (keep 9 pods available, don't exceed 12 pods)
@@ -515,7 +515,7 @@ Scaling foo-v1 down to 0
 				up{8},
 				down{oldReady: 4, newReady: 8, to: 2},
 				up{10},
-				down{oldReady: 10, newReady: 2, to: 0},
+				down{oldReady: 1, newReady: 10, to: 0},
 			},
 			output: `Created foo-v2
 Scaling up foo-v2 from 5 to 10, scaling down foo-v1 from 6 to 0 (keep 10 pods available, don't exceed 12 pods)
@@ -540,6 +540,21 @@ Scaling foo-v1 down to 0
 			output: `Created foo-v2
 Scaling up foo-v2 from 0 to 20, scaling down foo-v1 from 10 to 0 (keep 10 pods available, don't exceed 70 pods)
 Scaling foo-v2 up to 20
+Scaling foo-v1 down to 0
+`,
+		}, {
+			name:        "1->1 0/1 scale down unavailable rc to a ready rc (rollback)",
+			oldRc:       oldRc(1, 1),
+			newRc:       newRc(1, 1),
+			newRcExists: true,
+			maxUnavail:  util.NewIntOrStringFromInt(0),
+			maxSurge:    util.NewIntOrStringFromInt(1),
+			expected: []interface{}{
+				up{1},
+				down{oldReady: 0, newReady: 1, to: 0},
+			},
+			output: `Continuing update with existing controller foo-v2.
+Scaling up foo-v2 from 1 to 1, scaling down foo-v1 from 1 to 0 (keep 1 pods available, don't exceed 2 pods)
 Scaling foo-v1 down to 0
 `,
 		},
