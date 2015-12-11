@@ -29,6 +29,7 @@ import (
 type genClientForType struct {
 	generator.DefaultGen
 	outputPackage string
+	group         string
 	typeToMatch   *types.Type
 	imports       *generator.ImportTracker
 }
@@ -54,6 +55,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"type":             t,
 		"package":          pkg,
 		"Package":          namer.IC(pkg),
+		"Group":            namer.IC(g.group),
 		"watchInterface":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
 		"apiDeleteOptions": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
 		"unvListOptions":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/unversioned", Name: "ListOptions"}),
@@ -97,13 +99,13 @@ type $.type|public$Interface interface {
 var structTemplate = `
 // $.type|privatePlural$ implements $.type|public$Interface
 type $.type|privatePlural$ struct {
-	client *$.Package$Client
+	client *$.Group$Client
 	ns     string
 }
 `
 var newStructTemplate = `
 // new$.type|publicPlural$ returns a $.type|publicPlural$
-func new$.type|publicPlural$(c *$.Package$Client, namespace string) *$.type|privatePlural$ {
+func new$.type|publicPlural$(c *$.Group$Client, namespace string) *$.type|privatePlural$ {
 	return &$.type|privatePlural${
 		client: c,
 		ns:     namespace,
