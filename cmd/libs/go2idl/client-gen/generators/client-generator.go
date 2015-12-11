@@ -32,10 +32,16 @@ import (
 
 // NameSystems returns the name system used by the generators in this package.
 func NameSystems() namer.NameSystems {
+	pluralExceptions := map[string]string{
+		"Endpoints":       "endpoints",
+		"ComponentStatus": "componentStatus",
+	}
 	return namer.NameSystems{
-		"public":  namer.NewPublicNamer(0),
-		"private": namer.NewPrivateNamer(0),
-		"raw":     namer.NewRawNamer("", nil),
+		"public":        namer.NewPublicNamer(0),
+		"private":       namer.NewPrivateNamer(0),
+		"raw":           namer.NewRawNamer("", nil),
+		"publicPlural":  namer.NewPluralNamer(pluralExceptions, true),
+		"privatePlural": namer.NewPluralNamer(pluralExceptions, false),
 	}
 }
 
