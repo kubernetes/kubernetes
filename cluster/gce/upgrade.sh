@@ -174,7 +174,6 @@ function upgrade-nodes() {
 #
 # Vars set:
 #   SANITIZED_VERSION
-#   INSTANCE_GROUPS
 #   KUBELET_TOKEN
 #   KUBE_PROXY_TOKEN
 #   CA_CERT_BASE64
@@ -185,7 +184,7 @@ function prepare-node-upgrade() {
   echo "== Preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
   SANITIZED_VERSION=$(echo ${KUBE_VERSION} | sed 's/[\.\+]/-/g')
 
-  detect-node-names # sets INSTANCE_GROUPS
+  detect-node-names
 
   # TODO(zmerlynn): Refactor setting scope flags.
   local scope_flags=
@@ -232,18 +231,16 @@ function do-node-upgrade() {
     subgroup="alpha compute"
   fi
   local template_name=$(get-template-name-from-version ${SANITIZED_VERSION})
-  for group in ${INSTANCE_GROUPS[@]}; do
-    gcloud ${subgroup} rolling-updates \
-        --project="${PROJECT}" \
-        --zone="${ZONE}" \
-        start \
-        --group="${group}" \
-        --template="${template_name}" \
-        --instance-startup-timeout=300s \
-        --max-num-concurrent-instances=1 \
-        --max-num-failed-instances=0 \
-        --min-instance-update-time=0s
-  done
+  gcloud ${subgroup} rolling-updates \
+      --project="${PROJECT}" \
+      --zone="${ZONE}" \
+      start \
+      --group="${NODE_INSTANCE_PREFIX}-group" \
+      --template="${template_name}" \
+      --instance-startup-timeout=300s \
+      --max-num-concurrent-instances=1 \
+      --max-num-failed-instances=0 \
+      --min-instance-update-time=0s
 
   # TODO(zmerlynn): Wait for the rolling-update to finish.
 
