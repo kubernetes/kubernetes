@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/version"
 )
@@ -61,21 +60,6 @@ func (c *ExtensionsClient) ServerVersion() (*version.Info, error) {
 		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
 	return &info, nil
-}
-
-// ServerAPIVersions retrieves and parses the list of experimental API versions the
-// server supports.
-func (c *ExtensionsClient) ServerAPIVersions() (*unversioned.APIVersions, error) {
-	body, err := c.Get().AbsPath("/apis/extensions").Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var v unversioned.APIVersions
-	err = json.Unmarshal(body, &v)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &v, nil
 }
 
 func (c *ExtensionsClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
