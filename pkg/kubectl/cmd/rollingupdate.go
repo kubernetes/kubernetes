@@ -97,6 +97,7 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("image", "", "Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f")
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().String("deployment-label-key", "deployment", "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise")
+	cmd.Flags().String("container", "", "Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod")
 	cmd.Flags().Bool("dry-run", false, "If true, print out the changes that would be made, but don't actually make them.")
 	cmd.Flags().Bool("rollback", false, "If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout")
 	cmdutil.AddValidateFlags(cmd)
@@ -155,6 +156,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	timeout := cmdutil.GetFlagDuration(cmd, "timeout")
 	dryrun := cmdutil.GetFlagBool(cmd, "dry-run")
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
+	container := cmdutil.GetFlagString(cmd, "container")
 
 	if len(options.Filenames) > 0 {
 		filename = options.Filenames[0]
@@ -247,7 +249,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			if oldRc.Spec.Template.Spec.Containers[0].Image == image {
 				return cmdutil.UsageError(cmd, "Specified --image must be distinct from existing container image")
 			}
-			newRc, err = kubectl.CreateNewControllerFromCurrentController(client, cmdNamespace, oldName, newName, image, deploymentKey)
+			newRc, err = kubectl.CreateNewControllerFromCurrentController(client, client.Codec, cmdNamespace, oldName, newName, image, container, deploymentKey)
 			if err != nil {
 				return err
 			}

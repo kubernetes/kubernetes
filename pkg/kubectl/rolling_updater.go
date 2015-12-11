@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -532,23 +533,40 @@ func LoadExistingNextReplicationController(c client.ReplicationControllersNamesp
 	return newRc, err
 }
 
-func CreateNewControllerFromCurrentController(c *client.Client, namespace, oldName, newName, image, deploymentKey string) (*api.ReplicationController, error) {
+func CreateNewControllerFromCurrentController(c client.Interface, codec runtime.Codec, namespace, oldName, newName, image, container, deploymentKey string) (*api.ReplicationController, error) {
+	containerIndex := 0
 	// load the old RC into the "new" RC
 	newRc, err := c.ReplicationControllers(namespace).Get(oldName)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(newRc.Spec.Template.Spec.Containers) > 1 {
-		// TODO: support multi-container image update.
-		return nil, goerrors.New("Image update is not supported for multi-container pods")
+	if len(container) != 0 {
+		containerFound := false
+
+		for i, c := range newRc.Spec.Template.Spec.Containers {
+			if c.Name == container {
+				containerIndex = i
+				containerFound = true
+				break
+			}
+		}
+
+		if !containerFound {
+			return nil, fmt.Errorf("container %s not found in pod", container)
+		}
 	}
+
+	if len(newRc.Spec.Template.Spec.Containers) > 1 && len(container) == 0 {
+		return nil, goerrors.New("Must specify container to update when updating a multi-container pod")
+	}
+
 	if len(newRc.Spec.Template.Spec.Containers) == 0 {
 		return nil, goerrors.New(fmt.Sprintf("Pod has no containers! (%v)", newRc))
 	}
-	newRc.Spec.Template.Spec.Containers[0].Image = image
+	newRc.Spec.Template.Spec.Containers[containerIndex].Image = image
 
-	newHash, err := api.HashObject(newRc, c.Codec)
+	newHash, err := api.HashObject(newRc, codec)
 	if err != nil {
 		return nil, err
 	}
