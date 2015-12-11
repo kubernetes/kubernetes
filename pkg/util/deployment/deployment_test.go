@@ -21,7 +21,10 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
 func newPod(now time.Time, ready bool, beforeSec int) api.Pod {
@@ -72,6 +75,109 @@ func TestGetReadyPodsCount(t *testing.T) {
 	for _, test := range tests {
 		if count := getReadyPodsCount(test.pods, test.minReadySeconds); count != test.expected {
 			t.Errorf("Pods = %#v, minReadySeconds = %d, expected %d, got %d", test.pods, test.minReadySeconds, test.expected, count)
+		}
+	}
+}
+
+func generateRC(deployment extensions.Deployment) api.ReplicationController {
+	template := GetNewRCTemplate(deployment)
+	return api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Labels: template.Labels,
+		},
+		Spec: api.ReplicationControllerSpec{
+			Template: &template,
+			Selector: template.Labels,
+		},
+	}
+}
+
+func generateDeployment(image string) extensions.Deployment {
+	podLabels := map[string]string{"name": image}
+	terminationSec := int64(30)
+	return extensions.Deployment{
+		ObjectMeta: api.ObjectMeta{
+			Name: image,
+		},
+		Spec: extensions.DeploymentSpec{
+			Replicas:       1,
+			Selector:       podLabels,
+			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
+			Template: api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: podLabels,
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:                   image,
+							Image:                  image,
+							ImagePullPolicy:        api.PullAlways,
+							TerminationMessagePath: api.TerminationMessagePathDefault,
+						},
+					},
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &terminationSec,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					SecurityContext:               &api.PodSecurityContext{},
+				},
+			},
+		},
+	}
+}
+
+func TestGetNewRC(t *testing.T) {
+	newDeployment := generateDeployment("nginx")
+	newRC := generateRC(newDeployment)
+
+	tests := []struct {
+		test     string
+		rcList   api.ReplicationControllerList
+		expected *api.ReplicationController
+	}{
+		{
+			"No new RC",
+			api.ReplicationControllerList{
+				Items: []api.ReplicationController{
+					generateRC(generateDeployment("foo")),
+					generateRC(generateDeployment("bar")),
+				},
+			},
+			nil,
+		},
+		{
+			"Has new RC",
+			api.ReplicationControllerList{
+				Items: []api.ReplicationController{
+					generateRC(generateDeployment("foo")),
+					generateRC(generateDeployment("bar")),
+					generateRC(generateDeployment("abc")),
+					newRC,
+					generateRC(generateDeployment("xyz")),
+				},
+			},
+			&newRC,
+		},
+	}
+
+	ns := api.NamespaceDefault
+	for _, test := range tests {
+		c := &simple.Client{
+			Request: simple.Request{
+				Method: "GET",
+				Path:   testapi.Default.ResourcePath("replicationControllers", ns, ""),
+			},
+			Response: simple.Response{
+				StatusCode: 200,
+				Body:       &test.rcList,
+			},
+		}
+		rc, err := GetNewRC(newDeployment, c.Setup(t))
+		if err != nil {
+			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
+		}
+		if !api.Semantic.DeepEqual(rc, test.expected) {
+			t.Errorf("In test case %s, expected %+v, got %+v", test.test, test.expected, rc)
 		}
 	}
 }
