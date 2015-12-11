@@ -253,12 +253,24 @@ function upload-server-tars() {
 #   NODE_INSTANCE_PREFIX
 # Vars set:
 #   NODE_NAMES
+#   INSTANCE_GROUPS
 function detect-node-names {
   detect-project
-  NODE_NAMES=($(gcloud compute instance-groups managed list-instances \
-    "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project "${PROJECT}" \
-    --format=yaml | grep instance: | cut -d ' ' -f 2))
-  echo "NODE_NAMES=${NODE_NAMES[*]}" >&2
+  INSTANCE_GROUPS=()
+  INSTANCE_GROUPS+=($(gcloud compute instance-groups managed list --zone "${ZONE}" --project "${PROJECT}" | grep ${NODE_INSTANCE_PREFIX} | cut -f1 -d" "))
+  NODE_NAMES=()
+  if [[ -n "${INSTANCE_GROUPS[@]:-}" ]]; then
+    for group in "${INSTANCE_GROUPS[@]}"; do
+      NODE_NAMES+=($(gcloud compute instance-groups managed list-instances \
+        "${group}" --zone "${ZONE}" --project "${PROJECT}" \
+        --format=yaml | grep instance: | cut -d ' ' -f 2))
+    done
+    echo "INSTANCE_GROUPS=${INSTANCE_GROUPS[*]}" >&2
+    echo "NODE_NAMES=${NODE_NAMES[*]}" >&2
+  else 
+    echo "INSTANCE_GROUPS=" >&2
+    echo "NODE_NAMES=" >&2
+  fi
 }
 
 # Detect the information about the minions
@@ -273,10 +285,10 @@ function detect-nodes () {
   detect-node-names
   KUBE_NODE_IP_ADDRESSES=()
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
-    local minion_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
+    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
       "${NODE_NAMES[$i]}" --fields networkInterfaces[0].accessConfigs[0].natIP \
       --format=text | awk '{ print $2 }')
-    if [[ -z "${minion_ip-}" ]] ; then
+    if [[ -z "${node_ip-}" ]] ; then
       echo "Did not find ${NODE_NAMES[$i]}" >&2
     else
       echo "Found ${NODE_NAMES[$i]} at ${minion_ip}"
@@ -713,17 +725,45 @@ function kube-up {
   
   create-node-instance-template $template_name
 
+  local defaulted_max_instances_per_mig=${MAX_INSTANCES_PER_MIG:-500}
+
+  if [[ ${defaulted_max_instances_per_mig} -le "0" ]]; then
+    echo "MAX_INSTANCES_PER_MIG cannot be negative. Assuming default 500"
+    defaulted_max_instances_per_mig=500
+  fi
+  local num_migs=$(((${NUM_NODES} + ${defaulted_max_instances_per_mig} - 1) / ${defaulted_max_instances_per_mig}))
+  local instances_per_mig=$(((${NUM_NODES} + ${num_migs} - 1) / ${num_migs}))
+  local last_mig_size=$((${NUM_NODES} - (${num_migs} - 1) * ${instances_per_mig}))
+
+  #TODO: parallelize this loop to speed up the process
+  for i in $(seq $((${num_migs} - 1))); do
+    gcloud compute instance-groups managed \
+        create "${NODE_INSTANCE_PREFIX}-group-$i" \
+        --project "${PROJECT}" \
+        --zone "${ZONE}" \
+        --base-instance-name "${NODE_INSTANCE_PREFIX}" \
+        --size "${instances_per_mig}" \
+        --template "$template_name" || true;
+    gcloud compute instance-groups managed wait-until-stable \
+        "${NODE_INSTANCE_PREFIX}-group-$i" \
+	      --zone "${ZONE}" \
+	      --project "${PROJECT}" || true;
+  done
+
+  # TODO: We don't add a suffix for the last group to keep backward compatibility when there's only one MIG.
+  # We should change it at some point, but note #18545 when changing this.
   gcloud compute instance-groups managed \
       create "${NODE_INSTANCE_PREFIX}-group" \
       --project "${PROJECT}" \
       --zone "${ZONE}" \
       --base-instance-name "${NODE_INSTANCE_PREFIX}" \
-      --size "${NUM_NODES}" \
+      --size "${last_mig_size}" \
       --template "$template_name" || true;
   gcloud compute instance-groups managed wait-until-stable \
       "${NODE_INSTANCE_PREFIX}-group" \
-			--zone "${ZONE}" \
-			--project "${PROJECT}" || true;
+      --zone "${ZONE}" \
+      --project "${PROJECT}" || true;
+
   detect-node-names
   detect-master
 
@@ -742,9 +782,19 @@ function kube-up {
     METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_reservation,"
     METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
 
-    echo "Creating node autoscaler."
+    echo "Creating node autoscalers."
+
+    local max_instances_per_mig=$(((${AUTOSCALER_MAX_NODES} + ${num_migs} - 1) / ${num_migs}))
+    local last_max_instances=$((${AUTOSCALER_MAX_NODES} - (${num_migs} - 1) * ${max_instances_per_mig}))
+    local min_instances_per_mig=$(((${AUTOSCALER_MIN_NODES} + ${num_migs} - 1) / ${num_migs}))
+    local last_min_instances=$((${AUTOSCALER_MIN_NODES} - (${num_migs} - 1) * ${min_instances_per_mig}))
+
+    for i in $(seq $((${num_migs} - 1))); do
+      gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group-$i" --zone "${ZONE}" --project "${PROJECT}" \
+          --min-num-replicas "${min_instances_per_mig}" --max-num-replicas "${max_instances_per_mig}" ${METRICS} || true
+    done
     gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project "${PROJECT}" \
-        --min-num-replicas "${AUTOSCALER_MIN_NODES}" --max-num-replicas "${AUTOSCALER_MAX_NODES}" ${METRICS} || true
+      --min-num-replicas "${last_min_instances}" --max-num-replicas "${last_max_instances}" ${METRICS} || true
   fi
 
   echo "Waiting up to ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds for cluster initialization."
@@ -810,17 +860,20 @@ function kube-up {
 # down the firewall rules and routes.
 function kube-down {
   detect-project
+  detect-node-names # For INSTANCE_GROUPS
 
   echo "Bringing down cluster"
   set +e  # Do not stop on error
 
-  # Delete autoscaler for nodes if present.
+  # Delete autoscaler for nodes if present. We assume that all or none instance groups have an autoscaler
   local autoscaler
   autoscaler=( $(gcloud compute instance-groups managed list --zone "${ZONE}" --project "${PROJECT}" \
                  | grep "${NODE_INSTANCE_PREFIX}-group" \
                  | awk '{print $7}') )
   if [[ "${autoscaler:-}" == "yes" ]]; then
-    gcloud compute instance-groups managed stop-autoscaling "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project "${PROJECT}"
+    for group in ${INSTANCE_GROUPS[@]}; do
+      gcloud compute instance-groups managed stop-autoscaling "${group}" --zone "${ZONE}" --project "${PROJECT}"
+    done
   fi
 
   # Get the name of the managed instance group template before we delete the
@@ -830,26 +883,28 @@ function kube-down {
 
   # The gcloud APIs don't return machine parseable error codes/retry information. Therefore the best we can
   # do is parse the output and special case particular responses we are interested in.
-  if gcloud compute instance-groups managed describe "${NODE_INSTANCE_PREFIX}-group" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
-    deleteCmdOutput=$(gcloud compute instance-groups managed delete --zone "${ZONE}" \
-      --project "${PROJECT}" \
-      --quiet \
-      "${NODE_INSTANCE_PREFIX}-group")
-    if [[ "$deleteCmdOutput" != ""  ]]; then
-      # Managed instance group deletion is done asynchronously, we must wait for it to complete, or subsequent steps fail
-      deleteCmdOperationId=$(echo $deleteCmdOutput | grep "Operation:" | sed "s/.*Operation:[[:space:]]*\([^[:space:]]*\).*/\1/g")
-      if [[ "$deleteCmdOperationId" != ""  ]]; then
-        deleteCmdStatus="PENDING"
-        while [[ "$deleteCmdStatus" != "DONE" ]]
-        do
-          sleep 5
-          deleteCmdOperationOutput=$(gcloud compute instance-groups managed --zone "${ZONE}" --project "${PROJECT}" get-operation $deleteCmdOperationId)
-          deleteCmdStatus=$(echo $deleteCmdOperationOutput | grep -i "status:" | sed "s/.*status:[[:space:]]*\([^[:space:]]*\).*/\1/g")
-          echo "Waiting for MIG deletion to complete. Current status: " $deleteCmdStatus
-        done
+  for group in ${INSTANCE_GROUPS[@]}; do 
+    if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
+      deleteCmdOutput=$(gcloud compute instance-groups managed delete --zone "${ZONE}" \
+        --project "${PROJECT}" \
+        --quiet \
+        "${group}")
+      if [[ "$deleteCmdOutput" != ""  ]]; then
+        # Managed instance group deletion is done asynchronously, we must wait for it to complete, or subsequent steps fail
+        deleteCmdOperationId=$(echo $deleteCmdOutput | grep "Operation:" | sed "s/.*Operation:[[:space:]]*\([^[:space:]]*\).*/\1/g")
+        if [[ "$deleteCmdOperationId" != ""  ]]; then
+          deleteCmdStatus="PENDING"
+          while [[ "$deleteCmdStatus" != "DONE" ]]
+          do
+            sleep 5
+            deleteCmdOperationOutput=$(gcloud compute instance-groups managed --zone "${ZONE}" --project "${PROJECT}" get-operation $deleteCmdOperationId)
+            deleteCmdStatus=$(echo $deleteCmdOperationOutput | grep -i "status:" | sed "s/.*status:[[:space:]]*\([^[:space:]]*\).*/\1/g")
+            echo "Waiting for MIG deletion to complete. Current status: " $deleteCmdStatus
+          done
+        fi
       fi
     fi
-  fi
+  done
 
   if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
     gcloud compute instance-templates delete \
@@ -982,12 +1037,13 @@ function get-template {
 #   KUBE_RESOURCE_FOUND
 function check-resources {
   detect-project
+  detect-node-names
 
   echo "Looking for already existing resources"
   KUBE_RESOURCE_FOUND=""
 
-  if gcloud compute instance-groups managed describe --project "${PROJECT}" --zone "${ZONE}" "${NODE_INSTANCE_PREFIX}-group" &>/dev/null; then
-    KUBE_RESOURCE_FOUND="Managed instance group ${NODE_INSTANCE_PREFIX}-group"
+  if [[ -n "${INSTANCE_GROUPS[@]:-}" ]]; then
+    KUBE_RESOURCE_FOUND="Managed instance groups ${INSTANCE_GROUPS[@]}"
     return 1
   fi
 
@@ -1090,11 +1146,13 @@ function prepare-push() {
     create-node-instance-template $tmp_template_name
 
     local template_name="${NODE_INSTANCE_PREFIX}-template"
-    gcloud compute instance-groups managed \
-      set-instance-template "${NODE_INSTANCE_PREFIX}-group" \
-      --template "$tmp_template_name" \
-      --zone "${ZONE}" \
-      --project "${PROJECT}" || true;
+    for group in ${INSTANCE_GROUPS[@]}; do
+      gcloud compute instance-groups managed \
+        set-instance-template "${group}" \
+        --template "$tmp_template_name" \
+        --zone "${ZONE}" \
+        --project "${PROJECT}" || true;
+    done
 
     gcloud compute instance-templates delete \
       --project "${PROJECT}" \
@@ -1103,11 +1161,13 @@ function prepare-push() {
 
     create-node-instance-template "$template_name"
 
-    gcloud compute instance-groups managed \
-      set-instance-template "${NODE_INSTANCE_PREFIX}-group" \
-      --template "$template_name" \
-      --zone "${ZONE}" \
-      --project "${PROJECT}" || true;
+    for group in ${INSTANCE_GROUPS[@]}; do
+      gcloud compute instance-groups managed \
+        set-instance-template "${group}" \
+        --template "$template_name" \
+        --zone "${ZONE}" \
+        --project "${PROJECT}" || true;
+    done
 
     gcloud compute instance-templates delete \
       --project "${PROJECT}" \
