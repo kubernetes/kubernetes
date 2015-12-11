@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testoutput_test
+package unversioned_test
 
 import (
 	"net/http"
@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup"
 	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup/install"
-	. "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput"
+	. "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/testgroup/unversioned"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -53,7 +53,7 @@ type DecoratedSimpleClient struct {
 func (c *DecoratedSimpleClient) Setup(t *testing.T) *DecoratedSimpleClient {
 	c.simpleClient.Setup(t)
 	url := c.simpleClient.ServerURL()
-	c.TestgroupClient = NewTestgroupOrDie(&client.Config{
+	c.TestgroupClient = NewForConfigOrDie(&client.Config{
 		Host: url,
 	})
 	return c

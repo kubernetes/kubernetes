@@ -22,6 +22,7 @@ import (
 )
 
 // +genclient=true
+
 type TestType struct {
 	unversioned.TypeMeta `json:",inline"`
 	api.ObjectMeta       `json:"metadata,omitempty"`

@@ -119,6 +119,8 @@ type HorizontalPodAutoscalerStatus struct {
 	CurrentCPUUtilizationPercentage *int `json:"currentCPUUtilizationPercentage,omitempty"`
 }
 
+// +genclient=true
+
 // configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscaler struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -139,6 +141,8 @@ type HorizontalPodAutoscalerList struct {
 	// list of horizontal pod autoscaler objects.
 	Items []HorizontalPodAutoscaler `json:"items"`
 }
+
+// +genclient=true
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
@@ -184,6 +188,8 @@ type ThirdPartyResourceData struct {
 	// Data is the raw JSON data for this data.
 	Data []byte `json:"name,omitempty"`
 }
+
+// +genclient=true
 
 type Deployment struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -331,6 +337,8 @@ type DaemonSetStatus struct {
 	DesiredNumberScheduled int `json:"desiredNumberScheduled"`
 }
 
+// +genclient=true
+
 // DaemonSet represents the configuration of a daemon set.
 type DaemonSet struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -369,6 +377,8 @@ type ThirdPartyResourceDataList struct {
 	// Items is a list of third party objects
 	Items []ThirdPartyResourceData `json:"items"`
 }
+
+// +genclient=true
 
 // Job represents the configuration of a single job.
 type Job struct {
@@ -467,6 +477,8 @@ type JobCondition struct {
 	// Human readable message indicating details about last transition.
 	Message string `json:"message,omitempty"`
 }
+
+// +genclient=true
 
 // Ingress is a collection of rules that allow inbound connections to reach the
 // endpoints defined by a backend. An Ingress can be configured to give services

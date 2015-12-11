@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package unversioned has the automatically generated clients for unversioned resources.
-package testoutput
+package unversioned
