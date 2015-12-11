@@ -181,9 +181,9 @@ $ virsh -c qemu:///system list
  Id    Name                           State
 ----------------------------------------------------
  15    kubernetes_master              running
- 16    kubernetes_minion-01           running
- 17    kubernetes_minion-02           running
- 18    kubernetes_minion-03           running
+ 16    kubernetes_node-01             running
+ 17    kubernetes_node-02             running
+ 18    kubernetes_node-03             running
  ```
 
 You can check that the Kubernetes cluster is working with:
@@ -208,7 +208,7 @@ Connect to `kubernetes_master`:
 ssh core@192.168.10.1
 ```
 
-Connect to `kubernetes_minion-01`:
+Connect to `kubernetes_node-01`:
 
 ```sh
 ssh core@192.168.10.2
