@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	aws_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 )
 
 type AWSDiskUtil struct{}
@@ -106,4 +107,43 @@ func (util *AWSDiskUtil) DetachDisk(c *awsElasticBlockStoreCleaner) error {
 		return err
 	}
 	return nil
+}
+
+func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
+	cloud := d.plugin.host.GetCloudProvider()
+	if cloud == nil {
+		glog.Errorf("Cloud provider not initialized properly")
+		return errors.New("Cloud provider not initialized properly")
+	}
+
+	if err := cloud.(*aws_cloud.AWSCloud).DeleteVolume(d.volumeID); err != nil {
+		glog.V(2).Infof("Error deleting AWS EBS volume %s: %v", d.volumeID, err)
+		return err
+	}
+	glog.V(2).Infof("Successfully deleted AWS EBS volume %s", d.volumeID)
+	return nil
+}
+
+func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (string, int, error) {
+	const mega = 1024 * 1024
+	cloud := c.plugin.host.GetCloudProvider()
+	if cloud == nil {
+		glog.Errorf("Cloud provider not initialized properly")
+		return "", 0, errors.New("Cloud provider not initialized properly")
+	}
+
+	// convert to MB with rounding
+	volSize := int((c.options.Capacity.Value() + mega - 1) / mega)
+	volSpec := &aws_cloud.VolumeOptions{
+		CapacityMB: volSize,
+		Tags:       c.options.CloudTags,
+	}
+
+	name, err := cloud.(*aws_cloud.AWSCloud).CreateVolume(volSpec)
+	if err != nil {
+		glog.V(2).Infof("Error creating AWS EBS volume: %v", err)
+		return "", 0, err
+	}
+	glog.V(2).Infof("Successfully created AWS EBS volume %s", name)
+	return name, volSize * mega, nil
 }
