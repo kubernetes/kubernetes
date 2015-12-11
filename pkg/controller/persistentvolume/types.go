@@ -21,15 +21,15 @@ import (
 	"sort"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 const (
-	// A PV created specifically for one claim must contain this annotation in order to bind to the claim.
-	// The value must be the namespace and name of the claim being bound to (i.e, claim.Namespace/claim.Name)
-	// This is an experimental feature and likely to change in the future.
-	createdForKey = "volume.extensions.kubernetes.io/provisioned-for"
+	// A PVClaim can request a quality of service tier by adding this annotation.  The value of the annotation
+	// is arbitrary.  The values are pre-defined by a cluster admin and known to users when requesting a QoS.
+	// For example tiers might be gold, silver, and tin and the admin configures what that means for each volume plugin that can provision a volume.
+	// Values in the alpha version of this feature are not meaningful, but will be in the full version of this feature.
+	qosProvisioningKey = "volume.alpha.kubernetes.io/storage-class"
 )
 
 // persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes indexed by AccessModes and ordered by storage capacity.
@@ -80,10 +80,7 @@ func (pvIndex *persistentVolumeOrderedIndex) ListByAccessModes(modes []api.Persi
 type matchPredicate func(compareThis, toThis *api.PersistentVolume) bool
 
 // find returns the nearest PV from the ordered list or nil if a match is not found
-func (pvIndex *persistentVolumeOrderedIndex) find(searchPV *api.PersistentVolume, matchPredicate matchPredicate) (*api.PersistentVolume, error) {
-	// the 'searchPV' argument is a synthetic PV with capacity and accessmodes set according to the user's PersistentVolumeClaim.
-	// the synthetic pv arg is, therefore, a request for a storage resource.
-	//
+func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVolumeClaim, matchPredicate matchPredicate) (*api.PersistentVolume, error) {
 	// PVs are indexed by their access modes to allow easier searching.  Each index is the string representation of a set of access modes.
 	// There is a finite number of possible sets and PVs will only be indexed in one of them (whichever index matches the PV's modes).
 	//
@@ -92,17 +89,7 @@ func (pvIndex *persistentVolumeOrderedIndex) find(searchPV *api.PersistentVolume
 	//
 	// Searches are performed against a set of access modes, so we can attempt not only the exact matching modes but also
 	// potential matches (the GCEPD example above).
-	allPossibleModes := pvIndex.allPossibleMatchingAccessModes(searchPV.Spec.AccessModes)
-
-	// the searchPV should contain an annotation that allows pre-binding to a claim.
-	// we can use the same annotation value (pvc's namespace/name) and check against
-	// existing volumes to find an exact match. It is possible that a bind is made (ClaimRef persisted to PV)
-	// but the fail to update claim.Spec.VolumeName fails.  This check allows the claim to find the volume
-	// that's already bound to the claim.
-	preboundClaim := ""
-	if createdFor, ok := searchPV.Annotations[createdForKey]; ok {
-		preboundClaim = createdFor
-	}
+	allPossibleModes := pvIndex.allPossibleMatchingAccessModes(claim.Spec.AccessModes)
 
 	for _, modes := range allPossibleModes {
 		volumes, err := pvIndex.ListByAccessModes(modes)
@@ -115,17 +102,32 @@ func (pvIndex *persistentVolumeOrderedIndex) find(searchPV *api.PersistentVolume
 		// return the exact pre-binding match, if found
 		unboundVolumes := []*api.PersistentVolume{}
 		for _, volume := range volumes {
+			// volume isn't currently bound or pre-bound.
 			if volume.Spec.ClaimRef == nil {
-				// volume isn't currently bound or pre-bound.
 				unboundVolumes = append(unboundVolumes, volume)
 				continue
 			}
 
-			boundClaim := fmt.Sprintf("%s/%s", volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
-			if boundClaim == preboundClaim {
+			if claim.Name == volume.Spec.ClaimRef.Name && claim.Namespace == volume.Spec.ClaimRef.Namespace {
 				// exact match! No search required.
 				return volume, nil
 			}
+		}
+
+		// a claim requesting provisioning will have an exact match pre-bound to the claim.
+		// no need to search through unbound volumes.  The matching volume will be created by the provisioner
+		// and will match above when the claim is re-processed by the binder.
+		if keyExists(qosProvisioningKey, claim.Annotations) {
+			return nil, nil
+		}
+
+		searchPV := &api.PersistentVolume{
+			Spec: api.PersistentVolumeSpec{
+				AccessModes: claim.Spec.AccessModes,
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)],
+				},
+			},
 		}
 
 		i := sort.Search(len(unboundVolumes), func(i int) bool { return matchPredicate(searchPV, unboundVolumes[i]) })
@@ -136,27 +138,9 @@ func (pvIndex *persistentVolumeOrderedIndex) find(searchPV *api.PersistentVolume
 	return nil, nil
 }
 
-// findByAccessModesAndStorageCapacity is a convenience method that calls Find w/ requisite matchPredicate for storage
-func (pvIndex *persistentVolumeOrderedIndex) findByAccessModesAndStorageCapacity(prebindKey string, modes []api.PersistentVolumeAccessMode, qty resource.Quantity) (*api.PersistentVolume, error) {
-	pv := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
-			Annotations: map[string]string{
-				createdForKey: prebindKey,
-			},
-		},
-		Spec: api.PersistentVolumeSpec{
-			AccessModes: modes,
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): qty,
-			},
-		},
-	}
-	return pvIndex.find(pv, matchStorageCapacity)
-}
-
 // findBestMatchForClaim is a convenience method that finds a volume by the claim's AccessModes and requests for Storage
 func (pvIndex *persistentVolumeOrderedIndex) findBestMatchForClaim(claim *api.PersistentVolumeClaim) (*api.PersistentVolume, error) {
-	return pvIndex.findByAccessModesAndStorageCapacity(fmt.Sprintf("%s/%s", claim.Namespace, claim.Name), claim.Spec.AccessModes, claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)])
+	return pvIndex.findByClaim(claim, matchStorageCapacity)
 }
 
 // byCapacity is used to order volumes by ascending storage size
@@ -267,4 +251,8 @@ func (c byAccessModes) Swap(i, j int) {
 
 func (c byAccessModes) Len() int {
 	return len(c.modes)
+}
+
+func claimToClaimKey(claim *api.PersistentVolumeClaim) string {
+	return fmt.Sprintf("%s/%s", claim.Namespace, claim.Name)
 }
