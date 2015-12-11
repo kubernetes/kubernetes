@@ -535,3 +535,47 @@ func TestQFlagIsPFlag(t *testing.T) {
 		t.Errorf("Unexpected result %v != %v", e, a)
 	}
 }
+
+func TestSub(t *testing.T) {
+	tests := []struct {
+		a        Quantity
+		b        Quantity
+		expected Quantity
+	}{
+		{Quantity{dec(10, 0), DecimalSI}, Quantity{dec(1, 1), DecimalSI}, Quantity{dec(0, 0), DecimalSI}},
+		{Quantity{dec(10, 0), DecimalSI}, Quantity{dec(1, 0), BinarySI}, Quantity{dec(9, 0), DecimalSI}},
+		{Quantity{dec(10, 0), BinarySI}, Quantity{dec(1, 0), DecimalSI}, Quantity{dec(9, 0), BinarySI}},
+		{Quantity{nil, DecimalSI}, Quantity{dec(50, 0), DecimalSI}, Quantity{dec(-50, 0), DecimalSI}},
+		{Quantity{dec(50, 0), DecimalSI}, Quantity{nil, DecimalSI}, Quantity{dec(50, 0), DecimalSI}},
+		{Quantity{nil, DecimalSI}, Quantity{nil, DecimalSI}, Quantity{dec(0, 0), DecimalSI}},
+	}
+
+	for i, test := range tests {
+		test.a.Sub(test.b)
+		if test.a.Cmp(test.expected) != 0 {
+			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
+		}
+	}
+}
+
+func TestAdd(t *testing.T) {
+	tests := []struct {
+		a        Quantity
+		b        Quantity
+		expected Quantity
+	}{
+		{Quantity{dec(10, 0), DecimalSI}, Quantity{dec(1, 1), DecimalSI}, Quantity{dec(20, 0), DecimalSI}},
+		{Quantity{dec(10, 0), DecimalSI}, Quantity{dec(1, 0), BinarySI}, Quantity{dec(11, 0), DecimalSI}},
+		{Quantity{dec(10, 0), BinarySI}, Quantity{dec(1, 0), DecimalSI}, Quantity{dec(11, 0), BinarySI}},
+		{Quantity{nil, DecimalSI}, Quantity{dec(50, 0), DecimalSI}, Quantity{dec(50, 0), DecimalSI}},
+		{Quantity{dec(50, 0), DecimalSI}, Quantity{nil, DecimalSI}, Quantity{dec(50, 0), DecimalSI}},
+		{Quantity{nil, DecimalSI}, Quantity{nil, DecimalSI}, Quantity{dec(0, 0), DecimalSI}},
+	}
+
+	for i, test := range tests {
+		test.a.Add(test.b)
+		if test.a.Cmp(test.expected) != 0 {
+			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
+		}
+	}
+}
