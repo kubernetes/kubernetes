@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // deploymentStrategy implements behavior for Deployments.
@@ -51,7 +51,7 @@ func (deploymentStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
 // Validate validates a new deployment.
-func (deploymentStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
+func (deploymentStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
 	deployment := obj.(*extensions.Deployment)
 	return validation.ValidateDeployment(deployment)
 }
@@ -73,7 +73,7 @@ func (deploymentStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (deploymentStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
+func (deploymentStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateDeploymentUpdate(obj.(*extensions.Deployment), old.(*extensions.Deployment))
 }
 
@@ -95,7 +95,7 @@ func (deploymentStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // ValidateUpdate is the default update validation for an end user updating status
-func (deploymentStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
+func (deploymentStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateDeploymentUpdate(obj.(*extensions.Deployment), old.(*extensions.Deployment))
 }
 
