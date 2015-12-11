@@ -25,6 +25,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -90,7 +93,20 @@ func NewTestGenericEtcdRegistry(t *testing.T) (*etcdtesting.EtcdTestServer, *Etc
 			return path.Join(podPrefix, id), nil
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*api.Pod).Name, nil },
-		Storage:        s,
+		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
+			return &generic.SelectionPredicate{
+				Label: label,
+				Field: field,
+				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+					pod, ok := obj.(*api.Pod)
+					if !ok {
+						return nil, nil, fmt.Errorf("not a pod")
+					}
+					return labels.Set(pod.ObjectMeta.Labels), generic.ObjectMetaFieldsSet(pod.ObjectMeta, true), nil
+				},
+			}
+		},
+		Storage: s,
 	}
 }
 
@@ -363,6 +379,78 @@ func TestEtcdDelete(t *testing.T) {
 	_, err = registry.Get(testContext, podA.Name)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+func TestEtcdDeleteCollection(t *testing.T) {
+	podA := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	podB := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
+
+	testContext := api.WithNamespace(api.NewContext(), "test")
+	server, registry := NewTestGenericEtcdRegistry(t)
+	defer server.Terminate(t)
+
+	if _, err := registry.Create(testContext, podA); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if _, err := registry.Create(testContext, podB); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// Delete all pods.
+	deleted, err := registry.DeleteCollection(testContext, nil, &unversioned.ListOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	deletedPods := deleted.(*api.PodList)
+	if len(deletedPods.Items) != 2 {
+		t.Errorf("Unexpected number of pods deleted: %d, expected: 2", len(deletedPods.Items))
+	}
+
+	if _, err := registry.Get(testContext, podA.Name); !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if _, err := registry.Get(testContext, podB.Name); !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+// Test whether objects deleted with DeleteCollection are correctly delivered
+// to watchers.
+func TestEtcdDeleteCollectionWithWatch(t *testing.T) {
+	podA := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+
+	testContext := api.WithNamespace(api.NewContext(), "test")
+	server, registry := NewTestGenericEtcdRegistry(t)
+	defer server.Terminate(t)
+
+	objCreated, err := registry.Create(testContext, podA)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	podCreated := objCreated.(*api.Pod)
+
+	watcher, err := registry.WatchPredicate(testContext, setMatcher{sets.NewString("foo")}, podCreated.ResourceVersion)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if _, err := registry.DeleteCollection(testContext, nil, &unversioned.ListOptions{}); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	got, open := <-watcher.ResultChan()
+	if !open {
+		t.Errorf("Unexpected channel close")
+	} else {
+		if got.Type != "DELETED" {
+			t.Errorf("Unexpected event type: %s", got.Type)
+		}
+		gotObject := got.Object.(*api.Pod)
+		gotObject.ResourceVersion = podCreated.ResourceVersion
+		if e, a := podCreated, gotObject; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected: %#v, got: %#v", e, a)
+		}
 	}
 }
 
