@@ -18,10 +18,14 @@ package volume
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
@@ -266,4 +270,23 @@ func (fc *FakeProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume,
 
 func (fc *FakeProvisioner) Provision(pv *api.PersistentVolume) error {
 	return nil
+}
+
+// FindEmptyDirectoryUsageOnTmpfs finds the expected usage of an empty directory existing on
+// a tmpfs filesystem on this system.
+func FindEmptyDirectoryUsageOnTmpfs() (*resource.Quantity, error) {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "metrics_du_test")
+	if err != nil {
+		return nil, err
+	}
+	out, err := exec.Command("nice", "-n", "19", "du", "-s", "-B", "1", tmpDir).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed command 'du' on %s with error %v", tmpDir, err)
+	}
+	used, err := resource.ParseQuantity(strings.Fields(string(out))[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse 'du' output %s due to error %v", out, err)
+	}
+	used.Format = resource.BinarySI
+	return used, nil
 }

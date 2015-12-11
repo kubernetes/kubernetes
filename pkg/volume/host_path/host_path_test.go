@@ -300,13 +300,17 @@ func TestMetrics(t *testing.T) {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
 
-	// TODO(pwittroc): Move this into a reusable testing utility
+	expectedEmptyDirUsage, err := volume.FindEmptyDirectoryUsageOnTmpfs()
+	if err != nil {
+		t.Errorf("Unexpected error finding expected empty directory usage on tmpfs: %v", err)
+	}
+
 	metrics, err := builder.GetMetrics()
 	if err != nil {
 		t.Errorf("Unexpected error when calling GetMetrics %v", err)
 	}
-	if metrics.Used.Value() != 4096 {
-		t.Errorf("Expected Used %d to be 4096", metrics.Used)
+	if e, a := expectedEmptyDirUsage.Value(), metrics.Used.Value(); e != a {
+		t.Errorf("Unexpected value for empty directory; expected %v, got %v", e, a)
 	}
 	if metrics.Capacity.Value() <= 0 {
 		t.Errorf("Expected Capacity to be greater than 0")
