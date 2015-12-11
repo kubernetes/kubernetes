@@ -136,7 +136,6 @@ offer-ttl = 5s
 ; duration an expired offer lingers in history
 offer-linger-ttl = 2m
 
-<<<<<<< HEAD
 ; duration between offer listener notifications
 listener-delay = 1s
 
