@@ -3298,7 +3298,7 @@ func validateBandwidthIsReasonable(rsrc *resource.Quantity) error {
 }
 
 func extractBandwidthResources(pod *api.Pod) (ingress, egress *resource.Quantity, err error) {
-	str, found := pod.Annotations["net.alpha.kubernetes.io/ingress-bandwidth"]
+	str, found := pod.Annotations["kubernetes.io/ingress-bandwidth"]
 	if found {
 		if ingress, err = resource.ParseQuantity(str); err != nil {
 			return nil, nil, err
@@ -3307,7 +3307,7 @@ func extractBandwidthResources(pod *api.Pod) (ingress, egress *resource.Quantity
 			return nil, nil, err
 		}
 	}
-	str, found = pod.Annotations["net.alpha.kubernetes.io/egress-bandwidth"]
+	str, found = pod.Annotations["kubernetes.io/egress-bandwidth"]
 	if found {
 		if egress, err = resource.ParseQuantity(str); err != nil {
 			return nil, nil, err
