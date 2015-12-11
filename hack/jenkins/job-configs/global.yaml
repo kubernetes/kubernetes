@@ -1,0 +1,47 @@
+# Mail Watcher Plugin alerts the specified address whenever a job config is updated or deleted.
+- property:
+    name: mail-watcher
+    properties:
+        - raw:
+            xml: |
+                <org.jenkinsci.plugins.mailwatcher.WatcherJobProperty plugin="mail-watcher-plugin@1.13">
+                    <watcherAddresses>cloud-kubernetes-team@google.com</watcherAddresses>
+                </org.jenkinsci.plugins.mailwatcher.WatcherJobProperty>
+
+- publisher:
+    name: gcs-uploader
+    publishers:
+        - google-cloud-storage:
+            credentials-id: kubernetes-jenkins
+            uploads:
+                - build-log:
+                    log-name: build-log.txt
+                    storage-location: gs://kubernetes-jenkins/logs/$JOB_NAME/$BUILD_NUMBER
+                    share-publicly: true
+                    upload-for-failed-jobs: true
+
+# Default log parser rules.
+- publisher:
+    name: log-parser
+    publishers:
+        - logparser:
+            parse-rules: /jenkins-master-data/log_parser_rules.txt
+            unstable-on-warning: false
+            fail-on-error: false
+
+# There is a junit JJB tag, but it doesn't handle the flaky-test-handler plugin.
+- publisher:
+    name: junit-publisher
+    publishers:
+        - raw:
+            xml: |
+                <hudson.tasks.junit.JUnitResultArchiver plugin="junit@1.9">
+                    <testResults>_artifacts/junit*.xml</testResults>
+                    <keepLongStdio>true</keepLongStdio>
+                    <testDataPublishers>
+                        <de.esailors.jenkins.teststability.StabilityTestDataPublisher plugin="test-stability@1.0"/>
+                        <com.google.jenkins.flakyTestHandler.plugin.JUnitFlakyTestDataPublisher plugin="flaky-test-handler@1.0.1"/>
+                        <hudson.plugins.claim.ClaimTestDataPublisher plugin="claim@2.7"/>
+                    </testDataPublishers>
+                    <healthScaleFactor>100.0</healthScaleFactor>
+                </hudson.tasks.junit.JUnitResultArchiver>

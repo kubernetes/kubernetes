@@ -1,6 +1,6 @@
 - job:
     name: kubernetes-update-jenkins-jobs
-    description: 'Update Jenkins jobs'
+    description: 'Update Jenkins jobs. Test owner: spxtr.'
 
     triggers:
         - timed: 'H/15 * * * *'
