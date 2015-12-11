@@ -1595,8 +1595,6 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 }
 
 func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) (syncErr error) {
-	podFullName := kubecontainer.GetPodFullName(pod)
-	uid := pod.UID
 	start := time.Now()
 	var firstSeenTime time.Time
 	if firstSeenTimeStr, ok := pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey]; !ok {
@@ -1609,7 +1607,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	defer func() {
 		status, err := kl.generatePodStatus(pod)
 		if err != nil {
-			glog.Errorf("Unable to generate status for pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
+			glog.Errorf("Unable to generate status for pod %q with error(%v)", format.Pod(pod), err)
 			// Propagate the error upstream.
 			syncErr = err
 		} else {
@@ -1632,18 +1630,19 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 
 	// Create Mirror Pod for Static Pod if it doesn't already exist
 	if kubepod.IsStaticPod(pod) {
+		podFullName := kubecontainer.GetPodFullName(pod)
 		if mirrorPod != nil && !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
 			// The mirror pod is semantically different from the static pod. Remove
 			// it. The mirror pod will get recreated later.
-			glog.Errorf("Deleting mirror pod %q because it is outdated", podFullName)
+			glog.Errorf("Deleting mirror pod %q because it is outdated", format.Pod(mirrorPod))
 			if err := kl.podManager.DeleteMirrorPod(podFullName); err != nil {
-				glog.Errorf("Failed deleting mirror pod %q: %v", podFullName, err)
+				glog.Errorf("Failed deleting mirror pod %q: %v", format.Pod(mirrorPod), err)
 			}
 		}
 		if mirrorPod == nil {
-			glog.V(3).Infof("Creating a mirror pod for static pod %q", podFullName)
+			glog.V(3).Infof("Creating a mirror pod for static pod %q", format.Pod(pod))
 			if err := kl.podManager.CreateMirrorPod(pod); err != nil {
-				glog.Errorf("Failed creating a mirror pod %q: %v", podFullName, err)
+				glog.Errorf("Failed creating a mirror pod for %q: %v", format.Pod(pod), err)
 			}
 
 			_, ok := kl.podManager.GetMirrorPodByPod(pod)
@@ -1654,7 +1653,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}
 
 	if err := kl.makePodDataDirs(pod); err != nil {
-		glog.Errorf("Unable to make pod data directories for pod %q (uid %q): %v", podFullName, uid, err)
+		glog.Errorf("Unable to make pod data directories for pod %q: %v", format.Pod(pod), err)
 		return err
 	}
 
@@ -1663,8 +1662,8 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	if err != nil {
 		ref, errGetRef := api.GetReference(pod)
 		if errGetRef == nil && ref != nil {
-			kl.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedMountVolume, "Unable to mount volumes for pod %q: %v", podFullName, err)
-			glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", podFullName, err)
+			kl.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedMountVolume, "Unable to mount volumes for pod %q: %v", format.Pod(pod), err)
+			glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", format.Pod(pod), err)
 			return err
 		}
 	}
@@ -1706,11 +1705,11 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 			Name:      pod.Name,
 			Namespace: pod.Namespace,
 		}
-		glog.V(3).Infof("Not generating pod status for new pod %q", podFullName)
+		glog.V(3).Infof("Not generating pod status for new pod %q", format.Pod(pod))
 	} else {
 		podStatusPtr, apiPodStatusPtr, err := kl.containerRuntime.GetPodStatusAndAPIPodStatus(pod)
 		if err != nil {
-			glog.Errorf("Unable to get status for pod %q (uid %q): %v", podFullName, uid, err)
+			glog.Errorf("Unable to get status for pod %q: %v", format.Pod(pod), err)
 			return err
 		}
 		apiPodStatus = *apiPodStatusPtr
@@ -1719,7 +1718,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 
 	pullSecrets, err := kl.getPullSecretsForPod(pod)
 	if err != nil {
-		glog.Errorf("Unable to get pull secrets for pod %q (uid %q): %v", podFullName, uid, err)
+		glog.Errorf("Unable to get pull secrets for pod %q: %v", format.Pod(pod), err)
 		return err
 	}
 
@@ -1912,8 +1911,7 @@ func (kl *Kubelet) cleanupTerminatedPods(pods []*api.Pod, runningPods []*kubecon
 				}
 			}
 			if found {
-				podFullName := kubecontainer.GetPodFullName(pod)
-				glog.V(5).Infof("Keeping terminated pod %q and uid %q, still running", podFullName, pod.UID)
+				glog.V(5).Infof("Keeping terminated pod %q, still running", format.Pod(pod))
 				continue
 			}
 			terminating = append(terminating, pod)
@@ -3079,8 +3077,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 		metrics.PodStatusLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
 
-	podFullName := kubecontainer.GetPodFullName(pod)
-	glog.V(3).Infof("Generating status for %q", podFullName)
+	glog.V(3).Infof("Generating status for %q", format.Pod(pod))
 
 	// TODO: Consider include the container information.
 	if kl.pastActiveDeadline(pod) {
@@ -3097,7 +3094,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 
 	if err != nil {
 		// Error handling
-		glog.Infof("Query container info for pod %q failed with error (%v)", podFullName, err)
+		glog.Infof("Query container info for pod %q failed with error (%v)", format.Pod(pod), err)
 		if strings.Contains(err.Error(), "resource temporarily unavailable") {
 			// Leave upstream layer to decide what to do
 			return api.PodStatus{}, err

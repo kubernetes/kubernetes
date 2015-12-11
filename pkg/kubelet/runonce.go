@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 const (
@@ -109,10 +110,9 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 		}
 		glog.Infof("pod %q containers not running: syncing", pod.Name)
 
-		podFullName := kubecontainer.GetPodFullName(pod)
-		glog.Infof("Creating a mirror pod for static pod %q", podFullName)
+		glog.Infof("Creating a mirror pod for static pod %q", format.Pod(pod))
 		if err := kl.podManager.CreateMirrorPod(pod); err != nil {
-			glog.Errorf("Failed creating a mirror pod %q: %v", podFullName, err)
+			glog.Errorf("Failed creating a mirror pod %q: %v", format.Pod(pod), err)
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 
