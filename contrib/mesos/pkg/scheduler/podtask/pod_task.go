@@ -170,10 +170,10 @@ func (t *T) Has(f FlagType) (exists bool) {
 }
 
 // Roles returns the valid roles under which this pod task can be scheduled.
-// If the pod has roles labels defined they are being used
+// If the pod has roles annotations defined they are being used
 // else default pod roles are being returned.
-func (t *T) Roles() []string {
-	if r, ok := t.Pod.ObjectMeta.Labels[annotation.RolesKey]; ok {
+func (t *T) Roles() (result []string) {
+	if r, ok := t.Pod.ObjectMeta.Annotations[annotation.RolesKey]; ok {
 		roles := strings.Split(r, ",")
 
 		for i, r := range roles {
