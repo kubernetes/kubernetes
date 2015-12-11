@@ -95,20 +95,25 @@ func (plugin *hostPathPlugin) GetAccessModes() []api.PersistentVolumeAccessMode 
 
 func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
 	if spec.Volume != nil && spec.Volume.HostPath != nil {
+		path := spec.Volume.HostPath.Path
 		return &hostPathBuilder{
-			hostPath: &hostPath{path: spec.Volume.HostPath.Path},
+			hostPath: &hostPath{path: path, MetricsProvider: volume.NewMetricsDu(path)},
 			readOnly: false,
 		}, nil
 	} else {
+		path := spec.PersistentVolume.Spec.HostPath.Path
 		return &hostPathBuilder{
-			hostPath: &hostPath{path: spec.PersistentVolume.Spec.HostPath.Path},
+			hostPath: &hostPath{path: path, MetricsProvider: volume.NewMetricsDu(path)},
 			readOnly: spec.ReadOnly,
 		}, nil
 	}
 }
 
 func (plugin *hostPathPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return &hostPathCleaner{&hostPath{""}}, nil
+	return &hostPathCleaner{&hostPath{
+		path:            "",
+		MetricsProvider: volume.NewMetricsDu(""),
+	}}, nil
 }
 
 func (plugin *hostPathPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error) {
@@ -130,12 +135,14 @@ func newRecycler(spec *volume.Spec, host volume.VolumeHost, config volume.Volume
 	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
 	}
+	path := spec.PersistentVolume.Spec.HostPath.Path
 	return &hostPathRecycler{
-		name:    spec.Name(),
-		path:    spec.PersistentVolume.Spec.HostPath.Path,
-		host:    host,
-		config:  config,
-		timeout: volume.CalculateTimeoutForVolume(config.RecyclerMinimumTimeout, config.RecyclerTimeoutIncrement, spec.PersistentVolume),
+		name:            spec.Name(),
+		path:            path,
+		host:            host,
+		config:          config,
+		timeout:         volume.CalculateTimeoutForVolume(config.RecyclerMinimumTimeout, config.RecyclerTimeoutIncrement, spec.PersistentVolume),
+		MetricsProvider: volume.NewMetricsDu(path),
 	}, nil
 }
 
@@ -143,7 +150,8 @@ func newDeleter(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, erro
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.HostPath == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
 	}
-	return &hostPathDeleter{spec.Name(), spec.PersistentVolume.Spec.HostPath.Path, host}, nil
+	path := spec.PersistentVolume.Spec.HostPath.Path
+	return &hostPathDeleter{spec.Name(), path, host, volume.NewMetricsDu(path)}, nil
 }
 
 func newCreater(options volume.VolumeOptions, host volume.VolumeHost) (volume.Creater, error) {
@@ -154,6 +162,7 @@ func newCreater(options volume.VolumeOptions, host volume.VolumeHost) (volume.Cr
 // The direct at the specified path will be directly exposed to the container.
 type hostPath struct {
 	path string
+	volume.MetricsProvider
 }
 
 func (hp *hostPath) GetPath() string {
@@ -214,6 +223,7 @@ type hostPathRecycler struct {
 	host    volume.VolumeHost
 	config  volume.VolumeConfig
 	timeout int64
+	volume.MetricsProvider
 }
 
 func (r *hostPathRecycler) GetPath() string {
@@ -280,6 +290,7 @@ type hostPathDeleter struct {
 	name string
 	path string
 	host volume.VolumeHost
+	volume.MetricsProvider
 }
 
 func (r *hostPathDeleter) GetPath() string {

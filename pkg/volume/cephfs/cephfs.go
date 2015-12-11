@@ -143,6 +143,7 @@ type cephfs struct {
 	readonly    bool
 	mounter     mount.Interface
 	plugin      *cephfsPlugin
+	volume.MetricsNil
 }
 
 type cephfsBuilder struct {
