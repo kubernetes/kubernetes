@@ -1608,7 +1608,6 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubetypes.Docker
 	return kubetypes.DockerID(id.ID), nil
 }
 
-// TODO(vmarmol): This will soon be made non-public when its only use is internal.
 // Structure keeping information on changes that need to happen for a pod. The semantics is as follows:
 // - startInfraContainer is true if new Infra Containers have to be started and old one (if running) killed.
 //   Additionally if it is true then containersToKeep have to be empty
@@ -1619,7 +1618,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubetypes.Docker
 //   It shouldn't be the case where containersToStart is empty and containersToKeep contains only infraContainerId. In such case
 //   Infra Container should be killed, hence it's removed from this map.
 // - all running containers which are NOT contained in containersToKeep should be killed.
-type PodContainerChangesSpec struct {
+type podContainerChangesSpec struct {
 	StartInfraContainer bool
 	InfraChanged        bool
 	InfraContainerId    kubetypes.DockerID
@@ -1627,7 +1626,7 @@ type PodContainerChangesSpec struct {
 	ContainersToKeep    map[kubetypes.DockerID]int
 }
 
-func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kubecontainer.PodStatus) (PodContainerChangesSpec, error) {
+func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kubecontainer.PodStatus) (podContainerChangesSpec, error) {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("computePodContainerChanges").Observe(metrics.SinceInMicroseconds(start))
@@ -1645,7 +1644,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kub
 		glog.V(4).Infof("Found pod infra container for %q", format.Pod(pod))
 		changed, err = dm.podInfraContainerChanged(pod, podInfraContainerStatus)
 		if err != nil {
-			return PodContainerChangesSpec{}, err
+			return podContainerChangesSpec{}, err
 		}
 	}
 
@@ -1726,7 +1725,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kub
 		containersToKeep = make(map[kubetypes.DockerID]int)
 	}
 
-	return PodContainerChangesSpec{
+	return podContainerChangesSpec{
 		StartInfraContainer: createPodInfraContainer,
 		InfraChanged:        changed,
 		InfraContainerId:    podInfraContainerID,
