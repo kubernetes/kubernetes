@@ -35,6 +35,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -171,6 +172,11 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		manifestURLHeader.Set(pieces[0], pieces[1])
 	}
 
+	reservation, err := parseReservation(s.KubeReserved, s.SystemReserved)
+	if err != nil {
+		return nil, err
+	}
+
 	return &KubeletConfig{
 		Address:                   s.Address,
 		AllowPrivileged:           s.AllowPrivileged,
@@ -228,6 +234,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		RegistryBurst:                  s.RegistryBurst,
 		RegistryPullQPS:                s.RegistryPullQPS,
 		ResolverConfig:                 s.ResolverConfig,
+		Reservation:                    *reservation,
 		ResourceContainer:              s.ResourceContainer,
 		RktPath:                        s.RktPath,
 		RktStage1Image:                 s.RktStage1Image,
@@ -706,6 +713,7 @@ type KubeletConfig struct {
 	RegisterSchedulable            bool
 	RegistryBurst                  int
 	RegistryPullQPS                float64
+	Reservation                    kubetypes.Reservation
 	ResolverConfig                 string
 	ResourceContainer              string
 	RktPath                        string
@@ -808,6 +816,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.OutOfDiskTransitionFrequency,
 		kc.ExperimentalFlannelOverlay,
 		kc.NodeIP,
+		kc.Reservation,
 	)
 
 	if err != nil {
@@ -819,4 +828,37 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 	k.StartGarbageCollection()
 
 	return k, pc, nil
+}
+
+func parseReservation(kubeReserved, systemReserved util.ConfigurationMap) (*kubetypes.Reservation, error) {
+	reservation := new(kubetypes.Reservation)
+	if rl, err := parseResourceList(kubeReserved); err != nil {
+		return nil, err
+	} else {
+		reservation.Kubernetes = rl
+	}
+	if rl, err := parseResourceList(systemReserved); err != nil {
+		return nil, err
+	} else {
+		reservation.System = rl
+	}
+	return reservation, nil
+}
+
+func parseResourceList(m util.ConfigurationMap) (api.ResourceList, error) {
+	rl := make(api.ResourceList)
+	for k, v := range m {
+		switch api.ResourceName(k) {
+		// Only CPU and memory resources are supported.
+		case api.ResourceCPU, api.ResourceMemory:
+			q, err := resource.ParseQuantity(v)
+			if err != nil {
+				return nil, err
+			}
+			rl[api.ResourceName(k)] = *q
+		default:
+			return nil, fmt.Errorf("cannot reserve %q resource", k)
+		}
+	}
+	return rl, nil
 }
