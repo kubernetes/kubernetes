@@ -28999,7 +28999,7 @@ func (x *NodeSystemInfo) CodecEncodeSelf(e *codec1978.Encoder) {
 				_ = yym2272
 				if false {
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.OsImage))
+					r.EncodeString(codecSelferC_UTF81234, string(x.OSImage))
 				}
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
@@ -29009,7 +29009,7 @@ func (x *NodeSystemInfo) CodecEncodeSelf(e *codec1978.Encoder) {
 				_ = yym2273
 				if false {
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.OsImage))
+					r.EncodeString(codecSelferC_UTF81234, string(x.OSImage))
 				}
 			}
 			if yyr2258 || yy2arr2258 {
@@ -29156,9 +29156,9 @@ func (x *NodeSystemInfo) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "osImage":
 			if r.TryDecodeAsNil() {
-				x.OsImage = ""
+				x.OSImage = ""
 			} else {
-				x.OsImage = string(r.DecodeString())
+				x.OSImage = string(r.DecodeString())
 			}
 		case "containerRuntimeVersion":
 			if r.TryDecodeAsNil() {
@@ -29268,9 +29268,9 @@ func (x *NodeSystemInfo) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.OsImage = ""
+		x.OSImage = ""
 	} else {
-		x.OsImage = string(r.DecodeString())
+		x.OSImage = string(r.DecodeString())
 	}
 	yyj2294++
 	if yyhl2294 {

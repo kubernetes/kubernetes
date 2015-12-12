@@ -1834,7 +1834,7 @@ type NodeSystemInfo struct {
 	// Kernel Version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64).
 	KernelVersion string `json:"kernelVersion"`
 	// OS Image reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy)).
-	OsImage string `json:"osImage"`
+	OSImage string `json:"osImage"`
 	// ContainerRuntime Version reported by the node through runtime remote API (e.g. docker://1.5.0).
 	ContainerRuntimeVersion string `json:"containerRuntimeVersion"`
 	// Kubelet Version reported by the node.
