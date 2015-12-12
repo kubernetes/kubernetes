@@ -102,4 +102,5 @@ type UniqueDeadlined interface {
 	Deadlined
 }
 
+// WithoutCancel returns a chan that may never be closed and always blocks
 func WithoutCancel() <-chan struct{} { return nil }
