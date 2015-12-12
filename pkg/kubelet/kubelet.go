@@ -335,14 +335,6 @@ func NewMainKubelet(
 	if klet.flannelExperimentalOverlay {
 		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
 	}
-	if klet.kubeClient == nil {
-		// The master kubelet cannot wait for the flannel daemon because it is responsible
-		// for starting up the flannel server in a static pod. So even though the flannel
-		// daemon runs on the master, it doesn't hold up cluster bootstrap. All the pods
-		// on the master run with host networking, so the master flannel doesn't care
-		// even if the network changes. We only need it for the master proxy.
-		klet.flannelExperimentalOverlay = false
-	}
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
 		return nil, err
 	} else {
