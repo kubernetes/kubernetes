@@ -21,13 +21,13 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-
 	"time"
 
 	log "github.com/golang/glog"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
@@ -55,6 +55,19 @@ func Create(
 		},
 		Status: api.NodeStatus{
 			Phase: api.NodePending,
+			// WORKAROUND(sttts): make sure that the Ready condition is the
+			// first one. The kube-ui v3 depends on this assumption.
+			// TODO(sttts): remove this workaround when kube-ui v4 is used or we
+			//              merge this with the statusupdate in the controller manager.
+			Conditions: []api.NodeCondition{
+				{
+					Type:              api.NodeReady,
+					Status:            api.ConditionTrue,
+					Reason:            slaveReadyReason,
+					Message:           slaveReadyMessage,
+					LastHeartbeatTime: unversioned.Now(),
+				},
+			},
 		},
 	}
 
