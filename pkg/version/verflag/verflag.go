@@ -74,6 +74,8 @@ func (v *versionValue) Type() string {
 func VersionVar(p *versionValue, name string, value versionValue, usage string) {
 	*p = value
 	flag.Var(p, name, usage)
+	// "--version" will be treated as "--version=true"
+	flag.Lookup(name).NoOptDefVal = "true"
 }
 
 func Version(name string, value versionValue, usage string) *versionValue {
