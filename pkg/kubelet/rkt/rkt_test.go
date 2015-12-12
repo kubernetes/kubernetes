@@ -20,11 +20,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	appcschema "github.com/appc/spec/schema"
 	appctypes "github.com/appc/spec/schema/types"
 	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"github.com/stretchr/testify/assert"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -458,4 +460,256 @@ func mustMarshalImageManifest(man *appcschema.ImageManifest) []byte {
 		panic(err)
 	}
 	return manblob
+}
+
+func mustRktHash(hash string) *appctypes.Hash {
+	h, err := appctypes.NewHash(hash)
+	if err != nil {
+		panic(err)
+	}
+	return h
+}
+
+func makeRktPod(rktPodState rktapi.PodState,
+	rktPodID, podUID, podName, podNamespace,
+	podIP, podCreationTs, podRestartCount string,
+	appNames, imgIDs, imgNames, containerHashes []string,
+	appStates []rktapi.AppState) *rktapi.Pod {
+
+	podManifest := &appcschema.PodManifest{
+		ACKind:    appcschema.PodManifestKind,
+		ACVersion: appcschema.AppContainerVersion,
+		Annotations: appctypes.Annotations{
+			appctypes.Annotation{
+				Name:  *appctypes.MustACIdentifier(k8sRktKubeletAnno),
+				Value: k8sRktKubeletAnnoValue,
+			},
+			appctypes.Annotation{
+				Name:  *appctypes.MustACIdentifier(k8sRktUIDAnno),
+				Value: podUID,
+			},
+			appctypes.Annotation{
+				Name:  *appctypes.MustACIdentifier(k8sRktNameAnno),
+				Value: podName,
+			},
+			appctypes.Annotation{
+				Name:  *appctypes.MustACIdentifier(k8sRktNamespaceAnno),
+				Value: podNamespace,
+			},
+			appctypes.Annotation{
+				Name:  *appctypes.MustACIdentifier(k8sRktCreationTimeAnno),
+				Value: podCreationTs,
+			},
+			appctypes.Annotation{
+				Name:  *appctypes.MustACIdentifier(k8sRktRestartCountAnno),
+				Value: podRestartCount,
+			},
+		},
+	}
+
+	appNum := len(appNames)
+	if appNum != len(imgNames) ||
+		appNum != len(imgIDs) ||
+		appNum != len(containerHashes) ||
+		appNum != len(appStates) {
+		panic("inconsistent app number")
+	}
+
+	apps := make([]*rktapi.App, appNum)
+	for i := range appNames {
+		apps[i] = &rktapi.App{
+			Name:  appNames[i],
+			State: appStates[i],
+			Image: &rktapi.Image{
+				Id:   imgIDs[i],
+				Name: imgNames[i],
+				Manifest: mustMarshalImageManifest(
+					&appcschema.ImageManifest{
+						ACKind:    appcschema.ImageManifestKind,
+						ACVersion: appcschema.AppContainerVersion,
+						Name:      *appctypes.MustACIdentifier(imgNames[i]),
+						Annotations: appctypes.Annotations{
+							appctypes.Annotation{
+								Name:  *appctypes.MustACIdentifier(k8sRktContainerHashAnno),
+								Value: containerHashes[i],
+							},
+						},
+					},
+				),
+			},
+		}
+		podManifest.Apps = append(podManifest.Apps, appcschema.RuntimeApp{
+			Name:  *appctypes.MustACName(appNames[i]),
+			Image: appcschema.RuntimeImage{ID: *mustRktHash("sha512-foo")},
+			Annotations: appctypes.Annotations{
+				appctypes.Annotation{
+					Name:  *appctypes.MustACIdentifier(k8sRktContainerHashAnno),
+					Value: containerHashes[i],
+				},
+			},
+		})
+	}
+
+	return &rktapi.Pod{
+		Id:       rktPodID,
+		State:    rktPodState,
+		Networks: []*rktapi.Network{{Name: defaultNetworkName, Ipv4: podIP}},
+		Apps:     apps,
+		Manifest: mustMarshalPodManifest(podManifest),
+	}
+}
+
+func TestGetPodStatus(t *testing.T) {
+	fr := newFakeRktInterface()
+	fs := newFakeSystemd()
+	r := &Runtime{apisvc: fr, systemd: fs}
+
+	tests := []struct {
+		pods   []*rktapi.Pod
+		result *kubecontainer.PodStatus
+	}{
+		// No pods.
+		{
+			nil,
+			&kubecontainer.PodStatus{ID: "42", Name: "guestbook", Namespace: "default"},
+		},
+		// One pod.
+		{
+			[]*rktapi.Pod{
+				makeRktPod(rktapi.PodState_POD_STATE_RUNNING,
+					"uuid-4002", "42", "guestbook", "default",
+					"10.10.10.42", "100000", "7",
+					[]string{"app-1", "app-2"},
+					[]string{"img-id-1", "img-id-2"},
+					[]string{"img-name-1", "img-name-2"},
+					[]string{"1001", "1002"},
+					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+				),
+			},
+			&kubecontainer.PodStatus{
+				ID:        "42",
+				Name:      "guestbook",
+				Namespace: "default",
+				IP:        "10.10.10.42",
+				ContainerStatuses: []*kubecontainer.ContainerStatus{
+					{
+						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4002:app-1"),
+						Name:         "app-1",
+						State:        kubecontainer.ContainerStateRunning,
+						CreatedAt:    time.Unix(100000, 0),
+						StartedAt:    time.Unix(100000, 0),
+						Image:        "img-name-1",
+						ImageID:      "rkt://img-id-1",
+						Hash:         1001,
+						RestartCount: 7,
+					},
+					{
+						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4002:app-2"),
+						Name:         "app-2",
+						State:        kubecontainer.ContainerStateExited,
+						CreatedAt:    time.Unix(100000, 0),
+						StartedAt:    time.Unix(100000, 0),
+						Image:        "img-name-2",
+						ImageID:      "rkt://img-id-2",
+						Hash:         1002,
+						RestartCount: 7,
+					},
+				},
+			},
+		},
+		// Multiple pods.
+		{
+			[]*rktapi.Pod{
+				makeRktPod(rktapi.PodState_POD_STATE_EXITED,
+					"uuid-4002", "42", "guestbook", "default",
+					"10.10.10.42", "90000", "7",
+					[]string{"app-1", "app-2"},
+					[]string{"img-id-1", "img-id-2"},
+					[]string{"img-name-1", "img-name-2"},
+					[]string{"1001", "1002"},
+					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+				),
+				makeRktPod(rktapi.PodState_POD_STATE_RUNNING, // The latest pod is running.
+					"uuid-4003", "42", "guestbook", "default",
+					"10.10.10.42", "100000", "10",
+					[]string{"app-1", "app-2"},
+					[]string{"img-id-1", "img-id-2"},
+					[]string{"img-name-1", "img-name-2"},
+					[]string{"1001", "1002"},
+					[]rktapi.AppState{rktapi.AppState_APP_STATE_RUNNING, rktapi.AppState_APP_STATE_EXITED},
+				),
+			},
+			&kubecontainer.PodStatus{
+				ID:        "42",
+				Name:      "guestbook",
+				Namespace: "default",
+				IP:        "10.10.10.42",
+				// Result should contain all contianers.
+				ContainerStatuses: []*kubecontainer.ContainerStatus{
+					{
+						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4002:app-1"),
+						Name:         "app-1",
+						State:        kubecontainer.ContainerStateRunning,
+						CreatedAt:    time.Unix(90000, 0),
+						StartedAt:    time.Unix(90000, 0),
+						Image:        "img-name-1",
+						ImageID:      "rkt://img-id-1",
+						Hash:         1001,
+						RestartCount: 7,
+					},
+					{
+						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4002:app-2"),
+						Name:         "app-2",
+						State:        kubecontainer.ContainerStateExited,
+						CreatedAt:    time.Unix(90000, 0),
+						StartedAt:    time.Unix(90000, 0),
+						Image:        "img-name-2",
+						ImageID:      "rkt://img-id-2",
+						Hash:         1002,
+						RestartCount: 7,
+					},
+					{
+						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4003:app-1"),
+						Name:         "app-1",
+						State:        kubecontainer.ContainerStateRunning,
+						CreatedAt:    time.Unix(100000, 0),
+						StartedAt:    time.Unix(100000, 0),
+						Image:        "img-name-1",
+						ImageID:      "rkt://img-id-1",
+						Hash:         1001,
+						RestartCount: 10,
+					},
+					{
+						ID:           kubecontainer.BuildContainerID("rkt", "uuid-4003:app-2"),
+						Name:         "app-2",
+						State:        kubecontainer.ContainerStateExited,
+						CreatedAt:    time.Unix(100000, 0),
+						StartedAt:    time.Unix(100000, 0),
+						Image:        "img-name-2",
+						ImageID:      "rkt://img-id-2",
+						Hash:         1002,
+						RestartCount: 10,
+					},
+				},
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		testCaseHint := fmt.Sprintf("test case #%d", i)
+		fr.pods = tt.pods
+
+		status, err := r.GetPodStatus("42", "guestbook", "default")
+		if err != nil {
+			t.Errorf("test case #%d: unexpected error: %v", i, err)
+		}
+		assert.Equal(t, tt.result, status, testCaseHint)
+
+		var inspectPodCalls []string
+		for range tt.pods {
+			inspectPodCalls = append(inspectPodCalls, "InspectPod")
+		}
+		assert.Equal(t, append([]string{"ListPods"}, inspectPodCalls...), fr.called, testCaseHint)
+		fr.CleanCalls()
+	}
 }
