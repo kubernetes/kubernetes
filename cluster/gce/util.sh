@@ -554,18 +554,21 @@ function create-certs {
   local -r service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
   local -r sans="IP:${cert_ip},IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
 
+  local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
   # Note: This was heavily cribbed from make-ca-cert.sh
-  (cd "${KUBE_TEMP}"
-    curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz > /dev/null 2>&1
-    tar xzf easy-rsa.tar.gz > /dev/null 2>&1
+  (set -x
+    cd "${KUBE_TEMP}"
+    curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz
+    tar xzf easy-rsa.tar.gz
     cd easy-rsa-master/easyrsa3
-    ./easyrsa init-pki > /dev/null 2>&1
-    ./easyrsa --batch "--req-cn=${cert_ip}@$(date +%s)" build-ca nopass > /dev/null 2>&1
-    ./easyrsa --subject-alt-name="${sans}" build-server-full "${MASTER_NAME}" nopass > /dev/null 2>&1
-    ./easyrsa build-client-full kubelet nopass > /dev/null 2>&1
-    ./easyrsa build-client-full kubecfg nopass > /dev/null 2>&1) || {
+    ./easyrsa init-pki
+    ./easyrsa --batch "--req-cn=${cert_ip}@$(date +%s)" build-ca nopass
+    ./easyrsa --subject-alt-name="${sans}" build-server-full "${MASTER_NAME}" nopass
+    ./easyrsa build-client-full kubelet nopass
+    ./easyrsa build-client-full kubecfg nopass) &>${cert_create_debug_output} || {
     # If there was an error in the subshell, just die.
     # TODO(roberthbailey): add better error handling here
+    cat "${cert_create_debug_output}" >&2
     echo "=== Failed to generate certificates: Aborting ===" >&2
     exit 2
   }
