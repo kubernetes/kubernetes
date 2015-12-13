@@ -365,11 +365,7 @@ func (s *CMServer) Run(_ []string) error {
 				metrics.DefaultHeapsterService,
 				metrics.DefaultHeapsterPort,
 			)
-			// TODO parameterize tolerance/downscale/upscale options.
-			tolerance := 1.0
-			downScale := time.Duration(5) * time.Second
-			upScale := time.Duration(3) * time.Second
-			podautoscaler.NewHorizontalController(kubeClient, metricsClient, tolerance, downScale, upScale).
+			podautoscaler.NewHorizontalController(hpaClient, metricsClient).
 				Run(s.HorizontalPodAutoscalerSyncPeriod)
 		}
 
