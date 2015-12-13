@@ -90,12 +90,12 @@ func (g *conversionGenerator) AddImport(pkg string) string {
 func (g *conversionGenerator) GenerateConversionsForType(gv unversioned.GroupVersion, reflection reflect.Type) error {
 	kind := reflection.Name()
 	// TODO this is equivalent to what it did before, but it needs to be fixed for the proper group
-	internalGV, exists := g.scheme.InternalVersions[gv.Group]
+	internalVersion, exists := g.scheme.InternalVersions[gv.Group]
 	if !exists {
 		return fmt.Errorf("no internal version for %v", gv)
 	}
 
-	internalObj, err := g.scheme.NewObject(internalGV.String(), kind)
+	internalObj, err := g.scheme.NewObject(internalVersion.WithKind(kind))
 	if err != nil {
 		return fmt.Errorf("cannot create an object of type %v in internal version", kind)
 	}

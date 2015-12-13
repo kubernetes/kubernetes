@@ -149,7 +149,7 @@ func getRequestOptions(req *restful.Request, scope RequestScope, internalKind, e
 		query = newQuery
 	}
 
-	versioned, err := scope.Creater.New(externalKind.GroupVersion().String(), externalKind.Kind)
+	versioned, err := scope.Creater.New(externalKind)
 	if err != nil {
 		return nil, err
 	}
