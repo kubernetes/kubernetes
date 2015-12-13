@@ -533,7 +533,7 @@ func (b *Builder) visitorResult() *Result {
 		}
 		clients := make(map[string]RESTClient)
 		for _, mapping := range mappings {
-			s := fmt.Sprintf("%s/%s", mapping.APIVersion, mapping.Resource)
+			s := fmt.Sprintf("%s/%s", mapping.GroupVersionKind.GroupVersion().String(), mapping.Resource)
 			if _, ok := clients[s]; ok {
 				continue
 			}
@@ -550,7 +550,7 @@ func (b *Builder) visitorResult() *Result {
 			if !ok {
 				return &Result{singular: isSingular, err: fmt.Errorf("resource %q is not recognized: %v", tuple.Resource, mappings)}
 			}
-			s := fmt.Sprintf("%s/%s", mapping.APIVersion, mapping.Resource)
+			s := fmt.Sprintf("%s/%s", mapping.GroupVersionKind.GroupVersion().String(), mapping.Resource)
 			client, ok := clients[s]
 			if !ok {
 				return &Result{singular: isSingular, err: fmt.Errorf("could not find a client for resource %q", tuple.Resource)}
