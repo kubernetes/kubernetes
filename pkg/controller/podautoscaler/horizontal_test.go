@@ -380,18 +380,10 @@ func (tc *testCase) verifyResults(t *testing.T) {
 func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
 	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
-<<<<<<< daf6be1a6656514211343847b7745bc7a6d5b3d3
 
 	broadcaster := record.NewBroadcasterForTests(0)
 	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: testClient.Core().Events("")})
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "horizontal-pod-autoscaler"})
-
-	hpaController := &HorizontalController{
-		metricsClient:   metricsClient,
-		eventRecorder:   recorder,
-		scaleNamespacer: testClient.Extensions(),
-		hpaNamespacer:   testClient.Extensions(),
-	}
 
 	store, frameworkController := newInformer(hpaController, time.Minute)
 	hpaController.store = store
@@ -402,11 +394,9 @@ func (tc *testCase) runTest(t *testing.T) {
 	go hpaController.Run(stop)
 
 	tc.Lock()
-=======
 	hpaController := NewHorizontalController(testClient, testClient.Extensions(), testClient.Extensions(), metricsClient, tolerance, time.Second, time.Second)
 	err := hpaController.reconcileAutoscalers()
 	assert.Equal(t, nil, err)
->>>>>>> Revert "Merge pull request #18630 from kubernetes/revert-18315-hpa-tolerance-config"
 	if tc.verifyEvents {
 		tc.Unlock()
 		// We need to wait for events to be broadcasted (sleep for longer than record.sleepDuration).
@@ -815,6 +805,16 @@ func TestComputedToleranceAlgImplementation(t *testing.T) {
 			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
 		},
 	}
+
+	tc.runTest(t)
+
+	// Reuse the data structure above, now testing "unscaling".
+	glog.Infof("Now, we test that no scaling happens if we are in a very close margin to the tolerance.")
+	target = math.Abs(1/(requestedToUsed*(1-tolerance))) + .004
+	finalCpuPercentTarget = int(target * 100)
+	tc.CPUTarget = finalCpuPercentTarget
+	tc.initialReplicas = startPods
+	tc.desiredReplicas = startPods
 	tc.runTest(t)
 }
 
