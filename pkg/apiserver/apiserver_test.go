@@ -233,7 +233,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group := template
 		group.Root = "/" + grouplessPrefix
 		group.GroupVersion = grouplessGroupVersion
-		group.ServerGroupVersion = &grouplessGroupVersion
+		group.OptionsExternalVersion = &grouplessGroupVersion
 		group.Codec = grouplessCodec
 		if err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
@@ -245,7 +245,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group := template
 		group.Root = "/" + prefix
 		group.GroupVersion = testGroupVersion
-		group.ServerGroupVersion = &testGroupVersion
+		group.OptionsExternalVersion = &testGroupVersion
 		group.Codec = codec
 		if err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
@@ -257,7 +257,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group := template
 		group.Root = "/" + prefix
 		group.GroupVersion = newGroupVersion
-		group.ServerGroupVersion = &newGroupVersion
+		group.OptionsExternalVersion = &newGroupVersion
 		group.Codec = newCodec
 		if err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
@@ -2241,9 +2241,9 @@ func TestUpdateREST(t *testing.T) {
 			Context: requestContextMapper,
 			Mapper:  namespaceMapper,
 
-			GroupVersion:       newGroupVersion,
-			ServerGroupVersion: &newGroupVersion,
-			Codec:              newCodec,
+			GroupVersion:           newGroupVersion,
+			OptionsExternalVersion: &newGroupVersion,
+			Codec: newCodec,
 		}
 	}
 
@@ -2323,9 +2323,9 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Context: requestContextMapper,
 		Mapper:  namespaceMapper,
 
-		GroupVersion:       newGroupVersion,
-		ServerGroupVersion: &newGroupVersion,
-		Codec:              newCodec,
+		GroupVersion:           newGroupVersion,
+		OptionsExternalVersion: &newGroupVersion,
+		Codec: newCodec,
 	}
 	container := restful.NewContainer()
 	if err := group.InstallREST(container); err == nil {
@@ -2352,9 +2352,9 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Context: requestContextMapper,
 		Mapper:  namespaceMapper,
 
-		GroupVersion:       newGroupVersion,
-		ServerGroupVersion: &newGroupVersion,
-		Codec:              newCodec,
+		GroupVersion:           newGroupVersion,
+		OptionsExternalVersion: &newGroupVersion,
+		Codec: newCodec,
 	}
 	container = restful.NewContainer()
 	if err := group.InstallREST(container); err != nil {

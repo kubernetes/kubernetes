@@ -140,35 +140,31 @@ func TestCreater(t *testing.T) {
 	creater := NewObjectCreator("creater group", "creater version", api.Scheme)
 	tests := []struct {
 		name        string
-		version     string
-		kind        string
+		kind        unversioned.GroupVersionKind
 		expectedObj runtime.Object
 		expectErr   bool
 	}{
 		{
 			name:        "valid ThirdPartyResourceData creation",
-			version:     "creater group/creater version",
-			kind:        "ThirdPartyResourceData",
+			kind:        unversioned.GroupVersionKind{Group: "creater group", Version: "creater version", Kind: "ThirdPartyResourceData"},
 			expectedObj: &extensions.ThirdPartyResourceData{},
 			expectErr:   false,
 		},
 		{
 			name:        "invalid ThirdPartyResourceData creation",
-			version:     "invalid version",
-			kind:        "ThirdPartyResourceData",
+			kind:        unversioned.GroupVersionKind{Version: "invalid version", Kind: "ThirdPartyResourceData"},
 			expectedObj: nil,
 			expectErr:   true,
 		},
 		{
 			name:        "valid ListOptions creation",
-			version:     "v1",
-			kind:        "ListOptions",
+			kind:        unversioned.GroupVersionKind{Version: "v1", Kind: "ListOptions"},
 			expectedObj: &v1.ListOptions{},
 			expectErr:   false,
 		},
 	}
 	for _, test := range tests {
-		out, err := creater.New(test.version, test.kind)
+		out, err := creater.New(test.kind)
 		if err != nil && !test.expectErr {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 		}

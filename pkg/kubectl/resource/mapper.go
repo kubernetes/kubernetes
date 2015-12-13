@@ -73,7 +73,7 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 
 	var versionedObject interface{}
 
-	if vo, _, _, err := api.Scheme.Raw().DecodeToVersionedObject(data); err == nil {
+	if vo, _, err := api.Scheme.Raw().DecodeToVersionedObject(data); err == nil {
 		versionedObject = vo
 	}
 	return &Info{
