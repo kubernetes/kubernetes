@@ -319,6 +319,12 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 			)
 			go podautoscaler.NewHorizontalController(hpaClient.Core(), hpaClient.Extensions(), hpaClient, metricsClient, s.HorizontalPodAutoscalerSyncPeriod.Duration).
 				Run(wait.NeverStop)
+			// TODO parameterize tolerance/downscale/upscale options.
+			tolerance := 1.0
+			downScale := time.Duration(5) * time.Second
+			upScale := time.Duration(3) * time.Second
+			go podautoscaler.NewHorizontalController(hpaClient, hpaClient, hpaClient, metricsClient, tolerance, downScale, upScale), s.HorizontalPodAutoscalerSyncPeriod.Duration)
+				Run(s.HorizontalPodAutoscalerSyncPeriod)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 
