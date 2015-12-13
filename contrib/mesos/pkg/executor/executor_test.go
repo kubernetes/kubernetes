@@ -608,3 +608,77 @@ func TestExecutorsendFrameworkMessage(t *testing.T) {
 	}
 	mockDriver.AssertExpectations(t)
 }
+
+func TestExecutor_updateMetaMap(t *testing.T) {
+	for i, tc := range []struct {
+		oldmap map[string]string
+		newmap map[string]string
+		wants  bool
+	}{
+		{
+			oldmap: nil,
+			newmap: nil,
+			wants:  false,
+		},
+		{
+			oldmap: nil,
+			newmap: map[string]string{},
+			wants:  false,
+		},
+		{
+			oldmap: map[string]string{},
+			newmap: nil,
+			wants:  false,
+		},
+		{
+			oldmap: nil,
+			newmap: map[string]string{
+				"foo": "bar",
+			},
+			wants: true,
+		},
+		{
+			oldmap: map[string]string{},
+			newmap: map[string]string{
+				"foo": "bar",
+			},
+			wants: true,
+		},
+		{
+			oldmap: map[string]string{
+				"baz": "qax",
+			},
+			newmap: map[string]string{
+				"foo": "bar",
+			},
+			wants: true,
+		},
+		{
+			oldmap: map[string]string{
+				"baz": "qax",
+			},
+			newmap: nil,
+			wants:  true,
+		},
+		{
+			oldmap: map[string]string{
+				"baz": "qax",
+				"qwe": "iop",
+			},
+			newmap: map[string]string{
+				"foo": "bar",
+				"qwe": "iop",
+			},
+			wants: true,
+		},
+	} {
+		// do work here
+		actual := updateMetaMap(&tc.oldmap, tc.newmap)
+		if actual != tc.wants {
+			t.Fatalf("test case %d failed, expected %v but got %v instead", i, tc.wants, actual)
+		}
+		if len(tc.oldmap) != len(tc.newmap) || (len(tc.oldmap) > 0 && !reflect.DeepEqual(tc.oldmap, tc.newmap)) {
+			t.Fatalf("test case %d failed, expected %v but got %v instead", i, tc.newmap, tc.oldmap)
+		}
+	}
+}
