@@ -358,7 +358,7 @@ func TestDFIFO_sanity_check(t *testing.T) {
 
 	// pop last
 	before := time.Now()
-	x := df.Pop()
+	x := df.Pop(WithoutCancel())
 	assert.Equal(a.(*testjob).instance, 2)
 
 	now := time.Now()
@@ -395,7 +395,7 @@ func TestDFIFO_Offer(t *testing.T) {
 	}
 
 	before := time.Now()
-	x := dq.Pop()
+	x := dq.Pop(WithoutCancel())
 
 	now := time.Now()
 	waitPeriod := now.Sub(before)

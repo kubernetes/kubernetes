@@ -220,22 +220,28 @@ func (f *HistoricalFIFO) Poll(id string, t EventType) bool {
 
 // Variant of DelayQueue.Pop() for UniqueDelayed items
 func (q *HistoricalFIFO) Await(timeout time.Duration) interface{} {
-	cancel := make(chan struct{})
-	ch := make(chan interface{}, 1)
-	go func() { ch <- q.CancelablePop(cancel) }()
+	var (
+		cancel = make(chan struct{})
+		ch     = make(chan interface{}, 1)
+		t      = time.NewTimer(timeout)
+	)
+	defer t.Stop()
+
+	go func() { ch <- q.Pop(cancel) }()
+
 	select {
-	case <-time.After(timeout):
+	case <-t.C:
 		close(cancel)
 		return <-ch
 	case x := <-ch:
 		return x
 	}
 }
-func (f *HistoricalFIFO) Pop() interface{} {
-	return f.CancelablePop(nil)
-}
 
-func (f *HistoricalFIFO) CancelablePop(cancel <-chan struct{}) interface{} {
+// Pop blocks until either there is an item available to dequeue or else the specified
+// cancel chan is closed. Callers that have no interest in providing a cancel chan
+// should specify nil, or else WithoutCancel() (for readability).
+func (f *HistoricalFIFO) Pop(cancel <-chan struct{}) interface{} {
 	popEvent := (Entry)(nil)
 	defer func() {
 		f.carrier(popEvent)
