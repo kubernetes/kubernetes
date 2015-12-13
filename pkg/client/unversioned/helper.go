@@ -364,7 +364,7 @@ func SetKubernetesDefaults(config *Config) error {
 	if config.GroupVersion == nil {
 		config.GroupVersion = defaultVersionFor(config)
 	}
-	versionInterfaces, err := latest.GroupOrDie("").InterfacesFor(config.GroupVersion.String())
+	versionInterfaces, err := latest.GroupOrDie("").InterfacesFor(*config.GroupVersion)
 	if err != nil {
 		return fmt.Errorf("API version '%v' is not recognized (valid values: %v)", *config.GroupVersion, latest.GroupOrDie("").GroupVersions)
 	}

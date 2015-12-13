@@ -136,6 +136,6 @@ type GroupMeta struct {
 	RESTMapper meta.RESTMapper
 
 	// InterfacesFor returns the default Codec and ResourceVersioner for a given version
-	// string, or an error if the version is not known.
-	InterfacesFor func(version string) (*meta.VersionInterfaces, error)
+	// or an error if the version is not known.
+	InterfacesFor func(version unversioned.GroupVersion) (*meta.VersionInterfaces, error)
 }
