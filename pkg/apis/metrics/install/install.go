@@ -73,9 +73,9 @@ func init() {
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version
 // string, or an error if the version is not known.
-func interfacesFor(version string) (*meta.VersionInterfaces, error) {
+func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
 	switch version {
-	case "metrics/v1alpha1":
+	case v1alpha1.SchemeGroupVersion:
 		return &meta.VersionInterfaces{
 			Codec:            v1alpha1.Codec,
 			ObjectConvertor:  api.Scheme,

@@ -280,10 +280,15 @@ func (s *APIServer) verifyClusterIPFlags() {
 
 type newEtcdFunc func([]string, meta.VersionInterfacesFunc, string, string) (storage.Interface, error)
 
-func newEtcd(etcdServerList []string, interfacesFunc meta.VersionInterfacesFunc, storageVersion, pathPrefix string) (etcdStorage storage.Interface, err error) {
-	if storageVersion == "" {
+func newEtcd(etcdServerList []string, interfacesFunc meta.VersionInterfacesFunc, storageGroupVersionString, pathPrefix string) (etcdStorage storage.Interface, err error) {
+	if storageGroupVersionString == "" {
 		return etcdStorage, fmt.Errorf("storageVersion is required to create a etcd storage")
 	}
+	storageVersion, err := unversioned.ParseGroupVersion(storageGroupVersionString)
+	if err != nil {
+		return nil, err
+	}
+
 	var storageConfig etcdstorage.EtcdConfig
 	storageConfig.ServerList = etcdServerList
 	storageConfig.Prefix = pathPrefix

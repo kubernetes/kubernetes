@@ -91,12 +91,12 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme.AddKnownTypeWithName(validVersionGV.WithKind("Type"), &ExternalType2{})
 
 	codec := runtime.CodecFor(scheme, unlikelyGV.String())
-	mapper := meta.NewDefaultRESTMapper([]unversioned.GroupVersion{unlikelyGV, validVersionGV}, func(version string) (*meta.VersionInterfaces, error) {
+	mapper := meta.NewDefaultRESTMapper([]unversioned.GroupVersion{unlikelyGV, validVersionGV}, func(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
 		return &meta.VersionInterfaces{
-			Codec:            runtime.CodecFor(scheme, version),
+			Codec:            runtime.CodecFor(scheme, version.String()),
 			ObjectConvertor:  scheme,
 			MetadataAccessor: meta.NewAccessor(),
-		}, versionErrIfFalse(version == validVersionGV.String() || version == unlikelyGV.String())
+		}, versionErrIfFalse(version == validVersionGV || version == unlikelyGV)
 	})
 	for _, gv := range []unversioned.GroupVersion{unlikelyGV, validVersionGV} {
 		for kind := range scheme.KnownTypes(gv) {

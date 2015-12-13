@@ -91,7 +91,7 @@ func (g TestGroup) InternalGroupVersion() unversioned.GroupVersion {
 // KUBE_TEST_API env var.
 func (g TestGroup) Codec() runtime.Codec {
 	// TODO: caesarxuchao: Restructure the body once we have a central `latest`.
-	interfaces, err := latest.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion.String())
+	interfaces, err := latest.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion)
 	if err != nil {
 		panic(err)
 	}
@@ -101,7 +101,7 @@ func (g TestGroup) Codec() runtime.Codec {
 // Converter returns the api.Scheme for the API version to test against, as set by the
 // KUBE_TEST_API env var.
 func (g TestGroup) Converter() runtime.ObjectConvertor {
-	interfaces, err := latest.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion.String())
+	interfaces, err := latest.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion)
 	if err != nil {
 		panic(err)
 	}
@@ -111,7 +111,7 @@ func (g TestGroup) Converter() runtime.ObjectConvertor {
 // MetadataAccessor returns the MetadataAccessor for the API version to test against,
 // as set by the KUBE_TEST_API env var.
 func (g TestGroup) MetadataAccessor() meta.MetadataAccessor {
-	interfaces, err := latest.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion.String())
+	interfaces, err := latest.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion)
 	if err != nil {
 		panic(err)
 	}

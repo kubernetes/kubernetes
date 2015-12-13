@@ -84,7 +84,7 @@ var _ RESTMapper = &DefaultRESTMapper{}
 
 // VersionInterfacesFunc returns the appropriate codec, typer, and metadata accessor for a
 // given api version, or an error if no such api version exists.
-type VersionInterfacesFunc func(apiVersion string) (*VersionInterfaces, error)
+type VersionInterfacesFunc func(version unversioned.GroupVersion) (*VersionInterfaces, error)
 
 // NewDefaultRESTMapper initializes a mapping between Kind and APIVersion
 // to a resource name and back based on the objects in a runtime.Scheme
@@ -232,7 +232,7 @@ func (m *DefaultRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...st
 		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported scope", gvk.GroupVersion().String(), gvk.Kind)
 	}
 
-	interfaces, err := m.interfacesFunc(gvk.GroupVersion().String())
+	interfaces, err := m.interfacesFunc(gvk.GroupVersion())
 	if err != nil {
 		return nil, fmt.Errorf("the provided version %q has no relevant versions", gvk.GroupVersion().String())
 	}

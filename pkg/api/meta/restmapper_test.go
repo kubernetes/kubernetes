@@ -76,13 +76,13 @@ var validCodec = fakeCodec{}
 var validAccessor = resourceAccessor{}
 var validConvertor = fakeConvertor{}
 
-func fakeInterfaces(version string) (*VersionInterfaces, error) {
+func fakeInterfaces(version unversioned.GroupVersion) (*VersionInterfaces, error) {
 	return &VersionInterfaces{Codec: validCodec, ObjectConvertor: validConvertor, MetadataAccessor: validAccessor}, nil
 }
 
 var unmatchedErr = errors.New("no version")
 
-func unmatchedVersionInterfaces(version string) (*VersionInterfaces, error) {
+func unmatchedVersionInterfaces(version unversioned.GroupVersion) (*VersionInterfaces, error) {
 	return nil, unmatchedErr
 }
 
