@@ -47,6 +47,10 @@ type secretPlugin struct {
 
 var _ volume.VolumePlugin = &secretPlugin{}
 
+var wrappedVolumeSpec = volume.Spec{
+	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
+}
+
 func (plugin *secretPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 	return nil
@@ -69,7 +73,6 @@ func (plugin *secretPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts vol
 			plugin.host.GetMounter(),
 			plugin.host.GetWriter(),
 			volume.MetricsNil{},
-			volume.GetWrappedVolumeSpec(spec.Name(), secretPluginName),
 		},
 		secretName: spec.Volume.Secret.SecretName,
 		pod:        *pod,
@@ -86,7 +89,6 @@ func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID) (volume
 			plugin.host.GetMounter(),
 			plugin.host.GetWriter(),
 			volume.MetricsNil{},
-			volume.GetWrappedVolumeSpec(volName, secretPluginName),
 		},
 	}, nil
 }
@@ -98,7 +100,6 @@ type secretVolume struct {
 	mounter mount.Interface
 	writer  ioutil.Writer
 	volume.MetricsNil
-	wrappedVolumeSpec *volume.Spec
 }
 
 var _ volume.Volume = &secretVolume{}
@@ -152,7 +153,7 @@ func (b *secretVolumeBuilder) SetUpAt(dir string) error {
 	glog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperBuilder(b.wrappedVolumeSpec, &b.pod, *b.opts)
+	wrapped, err := b.plugin.host.NewWrapperBuilder(b.volName, wrappedVolumeSpec, &b.pod, *b.opts)
 	if err != nil {
 		return err
 	}
@@ -217,7 +218,7 @@ func (c *secretVolumeCleaner) TearDownAt(dir string) error {
 	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", c.volName, c.podUID, dir)
 
 	// Wrap EmptyDir, let it do the teardown.
-	wrapped, err := c.plugin.host.NewWrapperCleaner(c.wrappedVolumeSpec, c.podUID)
+	wrapped, err := c.plugin.host.NewWrapperCleaner(c.volName, wrappedVolumeSpec, c.podUID)
 	if err != nil {
 		return err
 	}

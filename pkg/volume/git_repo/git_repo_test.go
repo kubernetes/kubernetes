@@ -266,7 +266,7 @@ func doTestPlugin(scenario struct {
 		}
 	}
 
-	// gitRepo volume should create it's own empty wrapper path
+	// gitRepo volume should create its own empty wrapper path
 	podWrapperMetadataDir := fmt.Sprintf("%v/pods/poduid/plugins/kubernetes.io~empty-dir/wrapped_%v", rootDir, scenario.vol.Name)
 
 	if _, err := os.Stat(podWrapperMetadataDir); err != nil {
