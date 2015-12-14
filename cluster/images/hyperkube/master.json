@@ -41,7 +41,7 @@
               "--tls-cert-file=/srv/kubernetes/server.cert",
               "--tls-private-key-file=/srv/kubernetes/server.key",
               "--token-auth-file=/srv/kubernetes/known_tokens.csv",
-              "--allow-privileged=True",
+              "--allow-privileged=true",
               "--v=4"
         ],
       "volumeMounts": [
@@ -63,7 +63,7 @@
     },
     {
       "name": "setup",
-      "image": "gcr.io/google_containers/hyperkube:VERSION",
+      "image": "gcr.io/google_containers/hyperkube-ARCH:VERSION",
       "command": [
               "/setup-files.sh"
       ],

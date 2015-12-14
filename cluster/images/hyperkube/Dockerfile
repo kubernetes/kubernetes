@@ -20,6 +20,8 @@ RUN chmod a+rx /hyperkube
 
 COPY master-multi.json /etc/kubernetes/manifests-multi/master.json
 COPY master.json /etc/kubernetes/manifests/master.json
+COPY etcd.json /etc/kubernetes/manifests/etcd.json
+COPY kube-proxy.json /etc/kubernetes/manifests/kube-proxy.json
 
 COPY safe_format_and_mount /usr/share/google/safe_format_and_mount
 RUN chmod a+rx /usr/share/google/safe_format_and_mount

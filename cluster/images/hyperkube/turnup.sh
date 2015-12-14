@@ -20,13 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-docker run --net=host -d gcr.io/google_containers/etcd:2.2.1 \
-  /usr/local/bin/etcd \
-    --addr=127.0.0.1:4001 \
-    --bind-addr=0.0.0.0:4001 \
-    --data-dir=/var/etcd/data
-
-docker run --pid=host \
+docker run \
   --volume=/:/rootfs:ro \
   --volume=/sys:/sys:ro \
   --volume=/dev:/dev \
@@ -42,9 +36,5 @@ docker run --pid=host \
     --hostname-override="127.0.0.1" \
     --address="0.0.0.0" \
     --api-servers=http://localhost:8080 \
-    --config=/etc/kubernetes/manifests --v=10
-
-docker run -d --net=host --privileged \
-  gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
-  /hyperkube proxy \
-    --master=http://127.0.0.1:8080 --v=2
+    --config=/etc/kubernetes/manifests \
+    --allow-privileged=true --v=10

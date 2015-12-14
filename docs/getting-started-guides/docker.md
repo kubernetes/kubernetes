@@ -59,13 +59,7 @@ Here's a diagram of what the final result will look like:
 2. Decide what Kubernetes version to use.  Set the `${K8S_VERSION}` variable to
    a value such as "1.1.1".
 
-### Step One: Run etcd
-
-```sh
-docker run --net=host -d gcr.io/google_containers/etcd:2.2.1 /usr/local/bin/etcd --listen-client-urls=http://127.0.0.1:4001 --advertise-client-urls=http://127.0.0.1:4001 --data-dir=/var/etcd/data
-```
-
-### Step Two: Run the master
+### Run it
 
 ```sh
 docker run \
@@ -80,16 +74,16 @@ docker run \
     --privileged=true \
     -d \
     gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
-    /hyperkube kubelet --containerized --hostname-override="127.0.0.1" --address="0.0.0.0" --api-servers=http://localhost:8080 --config=/etc/kubernetes/manifests
+    /hyperkube kubelet \
+        --containerized \
+        --hostname-override="127.0.0.1" \
+        --address="0.0.0.0" \
+        --api-servers=http://localhost:8080 \
+        --config=/etc/kubernetes/manifests \
+        --allow-privileged=true --v=10
 ```
 
 This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.md) that contains the other master components.
-
-### Step Three: Run the service proxy
-
-```sh
-docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
-```
 
 ### Download ```kubectl```
 
