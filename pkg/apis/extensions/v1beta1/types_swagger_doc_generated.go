@@ -384,6 +384,19 @@ func (LabelSelectorRequirement) SwaggerDoc() map[string]string {
 	return map_LabelSelectorRequirement
 }
 
+var map_ListOptions = map[string]string{
+	"":                "ListOptions is the query options to a standard REST list call.",
+	"labelSelector":   "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+	"fieldSelector":   "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+	"watch":           "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+	"resourceVersion": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+	"timeoutSeconds":  "Timeout for the list/watch call.",
+}
+
+func (ListOptions) SwaggerDoc() map[string]string {
+	return map_ListOptions
+}
+
 var map_NodeUtilization = map[string]string{
 	"":      "NodeUtilization describes what percentage of a particular resource is used on a node.",
 	"value": "The accepted values are from 0 to 1.",
