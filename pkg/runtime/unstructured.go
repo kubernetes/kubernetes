@@ -43,7 +43,7 @@ func (unstructuredJSONScheme) Recognizes(gvk unversioned.GroupVersionKind) bool 
 
 func (s unstructuredJSONScheme) Decode(data []byte) (Object, error) {
 	unstruct := &Unstructured{}
-	if err := s.DecodeInto(data, unstruct); err != nil {
+	if err := DecodeInto(s, data, unstruct); err != nil {
 		return nil, err
 	}
 	return unstruct, nil

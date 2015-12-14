@@ -275,7 +275,7 @@ func TestSetDefaultJob(t *testing.T) {
 }
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	data, err := Codec.Encode(obj)
+	data, err := runtime.Encode(Codec, obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)
 		return nil

@@ -153,7 +153,7 @@ func AddToNodeAddresses(addresses *[]NodeAddress, addAddresses ...NodeAddress) {
 }
 
 func HashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
-	data, err := codec.Encode(obj)
+	data, err := runtime.Encode(codec, obj)
 	if err != nil {
 		return "", err
 	}

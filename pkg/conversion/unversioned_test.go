@@ -40,7 +40,7 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 
 	v1Codec := testapi.Default.Codec()
 
-	encoded, err := v1Codec.Encode(status)
+	encoded, err := runtime.Encode(v1Codec, status)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 	if typeMeta.APIVersion != "v1" {
 		t.Errorf("APIVersion is not set to \"v1\". Got %v", string(encoded))
 	}
-	decoded, err := v1Codec.Decode(encoded)
+	decoded, err := runtime.Decode(v1Codec, encoded)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	// moves experimental from v1 to v1beta1 got merged.
 	// expCodec := testapi.Extensions.Codec()
 	expCodec := runtime.CodecFor(api.Scheme, "extensions/v1beta1")
-	encoded, err := expCodec.Encode(status)
+	encoded, err := runtime.Encode(expCodec, status)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	if typeMeta.APIVersion != "" {
 		t.Errorf("APIVersion is not set to \"\". Got %s", encoded)
 	}
-	decoded, err := expCodec.Decode(encoded)
+	decoded, err := runtime.Decode(expCodec, encoded)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

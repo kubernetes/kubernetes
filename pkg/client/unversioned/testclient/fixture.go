@@ -114,7 +114,7 @@ func AddObjectsFromPath(path string, o ObjectRetriever, decoder runtime.Decoder)
 	if err != nil {
 		return err
 	}
-	obj, err := decoder.Decode(data)
+	obj, err := runtime.Decode(decoder, data)
 	if err != nil {
 		return err
 	}
