@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -30,13 +29,13 @@ type DeploymentsNamespacer interface {
 
 // DeploymentInterface has methods to work with Deployment resources.
 type DeploymentInterface interface {
-	List(opts unversioned.ListOptions) (*extensions.DeploymentList, error)
+	List(opts api.ListOptions) (*extensions.DeploymentList, error)
 	Get(name string) (*extensions.Deployment, error)
 	Delete(name string, options *api.DeleteOptions) error
 	Create(*extensions.Deployment) (*extensions.Deployment, error)
 	Update(*extensions.Deployment) (*extensions.Deployment, error)
 	UpdateStatus(*extensions.Deployment) (*extensions.Deployment, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // deployments implements DeploymentInterface
@@ -54,7 +53,7 @@ func newDeployments(c *ExtensionsClient, namespace string) *deployments {
 }
 
 // List takes label and field selectors, and returns the list of Deployments that match those selectors.
-func (c *deployments) List(opts unversioned.ListOptions) (result *extensions.DeploymentList, err error) {
+func (c *deployments) List(opts api.ListOptions) (result *extensions.DeploymentList, err error) {
 	result = &extensions.DeploymentList{}
 	err = c.client.Get().Namespace(c.ns).Resource("deployments").VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
@@ -100,7 +99,7 @@ func (c *deployments) UpdateStatus(deployment *extensions.Deployment) (result *e
 }
 
 // Watch returns a watch.Interface that watches the requested deployments.
-func (c *deployments) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *deployments) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

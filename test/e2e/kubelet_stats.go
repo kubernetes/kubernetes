@@ -33,7 +33,6 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/common/model"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -271,11 +270,11 @@ func getOneTimeResourceUsageOnNode(
 }
 
 func getKubeSystemContainersResourceUsage(c *client.Client) (resourceUsagePerContainer, error) {
-	pods, err := c.Pods("kube-system").List(unversioned.ListOptions{})
+	pods, err := c.Pods("kube-system").List(api.ListOptions{})
 	if err != nil {
 		return resourceUsagePerContainer{}, err
 	}
-	nodes, err := c.Nodes().List(unversioned.ListOptions{})
+	nodes, err := c.Nodes().List(api.ListOptions{})
 	if err != nil {
 		return resourceUsagePerContainer{}, err
 	}
@@ -686,7 +685,7 @@ func newResourceMonitor(c *client.Client, containerNames []string, pollingInterv
 }
 
 func (r *resourceMonitor) Start() {
-	nodes, err := r.client.Nodes().List(unversioned.ListOptions{})
+	nodes, err := r.client.Nodes().List(api.ListOptions{})
 	if err != nil {
 		Failf("resourceMonitor: unable to get list of nodes: %v", err)
 	}

@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -74,10 +73,10 @@ func NewPersistentVolumeProvisionerController(client controllerClient, syncPerio
 
 	controller.volumeStore, controller.volumeController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return client.ListPersistentVolumes(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return client.WatchPersistentVolumes(options)
 			},
 		},
@@ -92,10 +91,10 @@ func NewPersistentVolumeProvisionerController(client controllerClient, syncPerio
 	)
 	controller.claimStore, controller.claimController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return client.ListPersistentVolumeClaims(api.NamespaceAll, options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return client.WatchPersistentVolumeClaims(api.NamespaceAll, options)
 			},
 		},
@@ -345,16 +344,16 @@ func newProvisioner(plugin volume.ProvisionableVolumePlugin, claim *api.Persiste
 // controllerClient abstracts access to PVs and PVCs.  Easy to mock for testing and wrap for real client.
 type controllerClient interface {
 	CreatePersistentVolume(pv *api.PersistentVolume) (*api.PersistentVolume, error)
-	ListPersistentVolumes(options unversioned.ListOptions) (*api.PersistentVolumeList, error)
-	WatchPersistentVolumes(options unversioned.ListOptions) (watch.Interface, error)
+	ListPersistentVolumes(options api.ListOptions) (*api.PersistentVolumeList, error)
+	WatchPersistentVolumes(options api.ListOptions) (watch.Interface, error)
 	GetPersistentVolume(name string) (*api.PersistentVolume, error)
 	UpdatePersistentVolume(volume *api.PersistentVolume) (*api.PersistentVolume, error)
 	DeletePersistentVolume(volume *api.PersistentVolume) error
 	UpdatePersistentVolumeStatus(volume *api.PersistentVolume) (*api.PersistentVolume, error)
 
 	GetPersistentVolumeClaim(namespace, name string) (*api.PersistentVolumeClaim, error)
-	ListPersistentVolumeClaims(namespace string, options unversioned.ListOptions) (*api.PersistentVolumeClaimList, error)
-	WatchPersistentVolumeClaims(namespace string, options unversioned.ListOptions) (watch.Interface, error)
+	ListPersistentVolumeClaims(namespace string, options api.ListOptions) (*api.PersistentVolumeClaimList, error)
+	WatchPersistentVolumeClaims(namespace string, options api.ListOptions) (watch.Interface, error)
 	UpdatePersistentVolumeClaim(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	UpdatePersistentVolumeClaimStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 
@@ -376,11 +375,11 @@ func (c *realControllerClient) GetPersistentVolume(name string) (*api.Persistent
 	return c.client.PersistentVolumes().Get(name)
 }
 
-func (c *realControllerClient) ListPersistentVolumes(options unversioned.ListOptions) (*api.PersistentVolumeList, error) {
+func (c *realControllerClient) ListPersistentVolumes(options api.ListOptions) (*api.PersistentVolumeList, error) {
 	return c.client.PersistentVolumes().List(options)
 }
 
-func (c *realControllerClient) WatchPersistentVolumes(options unversioned.ListOptions) (watch.Interface, error) {
+func (c *realControllerClient) WatchPersistentVolumes(options api.ListOptions) (watch.Interface, error) {
 	return c.client.PersistentVolumes().Watch(options)
 }
 
@@ -404,11 +403,11 @@ func (c *realControllerClient) GetPersistentVolumeClaim(namespace, name string) 
 	return c.client.PersistentVolumeClaims(namespace).Get(name)
 }
 
-func (c *realControllerClient) ListPersistentVolumeClaims(namespace string, options unversioned.ListOptions) (*api.PersistentVolumeClaimList, error) {
+func (c *realControllerClient) ListPersistentVolumeClaims(namespace string, options api.ListOptions) (*api.PersistentVolumeClaimList, error) {
 	return c.client.PersistentVolumeClaims(namespace).List(options)
 }
 
-func (c *realControllerClient) WatchPersistentVolumeClaims(namespace string, options unversioned.ListOptions) (watch.Interface, error) {
+func (c *realControllerClient) WatchPersistentVolumeClaims(namespace string, options api.ListOptions) (watch.Interface, error) {
 	return c.client.PersistentVolumeClaims(namespace).Watch(options)
 }
 

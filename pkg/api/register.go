@@ -71,6 +71,7 @@ func init() {
 		&PersistentVolumeClaim{},
 		&PersistentVolumeClaimList{},
 		&DeleteOptions{},
+		&ListOptions{},
 		&PodAttachOptions{},
 		&PodLogOptions{},
 		&PodExecOptions{},
@@ -83,7 +84,6 @@ func init() {
 
 	// Register Unversioned types
 	// TODO this should not be done here
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.ListOptions{})
 	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.Status{})
 	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIVersions{})
 	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIGroupList{})
@@ -123,6 +123,7 @@ func (*PersistentVolumeList) IsAnAPIObject()      {}
 func (*PersistentVolumeClaim) IsAnAPIObject()     {}
 func (*PersistentVolumeClaimList) IsAnAPIObject() {}
 func (*DeleteOptions) IsAnAPIObject()             {}
+func (*ListOptions) IsAnAPIObject()               {}
 func (*PodAttachOptions) IsAnAPIObject()          {}
 func (*PodLogOptions) IsAnAPIObject()             {}
 func (*PodExecOptions) IsAnAPIObject()            {}

@@ -190,7 +190,7 @@ var _ = Describe("DNS", func() {
 
 		systemClient := f.Client.Pods(api.NamespaceSystem)
 		By("Waiting for DNS Service to be Running")
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{dnsServiceLableSelector}}
+		options := api.ListOptions{LabelSelector: dnsServiceLableSelector}
 		dnsPods, err := systemClient.List(options)
 		if err != nil {
 			Failf("Failed to list all dns service pods")
@@ -229,7 +229,7 @@ var _ = Describe("DNS", func() {
 		systemClient := f.Client.Pods(api.NamespaceSystem)
 
 		By("Waiting for DNS Service to be Running")
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{dnsServiceLableSelector}}
+		options := api.ListOptions{LabelSelector: dnsServiceLableSelector}
 		dnsPods, err := systemClient.List(options)
 		if err != nil {
 			Failf("Failed to list all dns service pods")

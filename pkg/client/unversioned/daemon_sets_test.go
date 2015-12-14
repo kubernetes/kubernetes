@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -60,7 +59,7 @@ func TestListDaemonSets(t *testing.T) {
 			},
 		},
 	}
-	receivedDSs, err := c.Setup(t).Extensions().DaemonSets(ns).List(unversioned.ListOptions{})
+	receivedDSs, err := c.Setup(t).Extensions().DaemonSets(ns).List(api.ListOptions{})
 	c.Validate(t, receivedDSs, err)
 
 }

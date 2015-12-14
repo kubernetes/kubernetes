@@ -23,7 +23,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -59,7 +58,7 @@ func (d *DeploymentController) Run(syncPeriod time.Duration) {
 }
 
 func (d *DeploymentController) reconcileDeployments() []error {
-	list, err := d.expClient.Deployments(api.NamespaceAll).List(unversioned.ListOptions{})
+	list, err := d.expClient.Deployments(api.NamespaceAll).List(api.ListOptions{})
 	if err != nil {
 		return []error{fmt.Errorf("error listing deployments: %v", err)}
 	}

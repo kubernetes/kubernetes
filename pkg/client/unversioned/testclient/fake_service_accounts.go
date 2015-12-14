@@ -18,7 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -38,7 +37,7 @@ func (c *FakeServiceAccounts) Get(name string) (*api.ServiceAccount, error) {
 	return obj.(*api.ServiceAccount), err
 }
 
-func (c *FakeServiceAccounts) List(opts unversioned.ListOptions) (*api.ServiceAccountList, error) {
+func (c *FakeServiceAccounts) List(opts api.ListOptions) (*api.ServiceAccountList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("serviceaccounts", c.Namespace, opts), &api.ServiceAccountList{})
 	if obj == nil {
 		return nil, err
@@ -70,6 +69,6 @@ func (c *FakeServiceAccounts) Delete(name string) error {
 	return err
 }
 
-func (c *FakeServiceAccounts) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *FakeServiceAccounts) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.InvokesWatch(NewWatchAction("serviceaccounts", c.Namespace, opts))
 }

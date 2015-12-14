@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -97,10 +96,10 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 // NewLimitRanger returns an object that enforces limits based on the supplied limit function
 func NewLimitRanger(client client.Interface, limitFunc LimitFunc) admission.Interface {
 	lw := &cache.ListWatch{
-		ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			return client.LimitRanges(api.NamespaceAll).List(options)
 		},
-		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			return client.LimitRanges(api.NamespaceAll).Watch(options)
 		},
 	}

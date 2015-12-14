@@ -25,7 +25,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 
@@ -120,7 +119,7 @@ func (h *HeapsterMetricsClient) GetCPUUtilization(namespace string, selector map
 func (h *HeapsterMetricsClient) GetResourceConsumptionAndRequest(resourceName api.ResourceName, namespace string, selector map[string]string) (consumption *ResourceConsumption, request *resource.Quantity, timestamp time.Time, err error) {
 	labelSelector := labels.SelectorFromSet(labels.Set(selector))
 	podList, err := h.client.Pods(namespace).
-		List(unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{labelSelector}})
+		List(api.ListOptions{LabelSelector: labelSelector})
 
 	if err != nil {
 		return nil, nil, time.Time{}, fmt.Errorf("failed to get pod list: %v", err)
