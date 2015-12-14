@@ -864,6 +864,19 @@ func waitTimeoutForPodNoLongerRunningInNamespace(c *client.Client, podName strin
 	})
 }
 
+func waitTimeoutForPodReadyInNamespace(c *client.Client, podName string, namespace string, timeout time.Duration) error {
+	return waitForPodCondition(c, namespace, podName, "running", timeout, func(pod *api.Pod) (bool, error) {
+		if pod.Status.Phase == api.PodRunning {
+			Logf("Found pod '%s' on node '%s'", podName, pod.Spec.NodeName)
+			return true, nil
+		}
+		if pod.Status.Phase == api.PodFailed {
+			return true, fmt.Errorf("Giving up; pod went into failed status: \n%s", spew.Sprintf("%#v", pod))
+		}
+		return podReady(pod), nil
+	})
+}
+
 // waitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
 func waitForPodNotPending(c *client.Client, ns, podName string) error {
 	return waitForPodCondition(c, ns, podName, "!pending", podStartTimeout, func(pod *api.Pod) (bool, error) {
@@ -2621,6 +2634,7 @@ func RunHostCmd(ns, name, cmd string) (string, error) {
 // RunHostCmdOrDie calls RunHostCmd and dies on error.
 func RunHostCmdOrDie(ns, name, cmd string) string {
 	stdout, err := RunHostCmd(ns, name, cmd)
+	Logf("stdout: %v", stdout)
 	expectNoError(err)
 	return stdout
 }
