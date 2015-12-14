@@ -23,6 +23,8 @@ import (
 	"testing"
 )
 
+const expectedBlockSize = 4096
+
 // TestMetricsDuGetCapacity tests that MetricsDu can read disk usage
 // for path
 func TestMetricsDuGetCapacity(t *testing.T) {
@@ -33,21 +35,26 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	metrics := NewMetricsDu(tmpDir)
 
+	expectedEmptyDirUsage, err := FindEmptyDirectoryUsageOnTmpfs()
+	if err != nil {
+		t.Errorf("Unexpected error finding expected empty directory usage on tmpfs: %v", err)
+	}
+
 	actual, err := metrics.GetMetrics()
 	if err != nil {
 		t.Errorf("Unexpected error when calling GetMetrics %v", err)
 	}
-	if actual.Used.Value() != 4096 {
-		t.Errorf("Expected Used %d for empty directory to be 4096.", actual.Used.Value())
+	if e, a := expectedEmptyDirUsage.Value(), actual.Used.Value(); e != a {
+		t.Errorf("Unexpected value for empty directory; expected %v, got %v", e, a)
 	}
 
 	// TODO(pwittroc): Figure out a way to test these values for correctness, maybe by formatting and mounting a file
 	// as a filesystem
-	if actual.Capacity.Value() <= 0 {
-		t.Errorf("Expected Capacity %d to be greater than 0.", actual.Capacity.Value())
+	if a := actual.Capacity.Value(); a <= 0 {
+		t.Errorf("Expected Capacity %d to be greater than 0.", a)
 	}
-	if actual.Available.Value() <= 0 {
-		t.Errorf("Expected Available %d to be greater than 0.", actual.Available.Value())
+	if a := actual.Available.Value(); a <= 0 {
+		t.Errorf("Expected Available %d to be greater than 0.", a)
 	}
 
 	// Write a file and expect Used to increase
@@ -56,8 +63,8 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error when calling GetMetrics %v", err)
 	}
-	if actual.Used.Value() != 8192 {
-		t.Errorf("Unexpected Used for directory with file.  Expected 8192, was %d.", actual.Used.Value())
+	if e, a := (expectedEmptyDirUsage.Value() + expectedBlockSize), actual.Used.Value(); e != a {
+		t.Errorf("Unexpected Used for directory with file.  Expected %v, got %d.", e, a)
 	}
 }
 
