@@ -36,14 +36,12 @@ import (
 var alwaysReady = func() bool { return true }
 
 func newJob(parallelism, completions int) *extensions.Job {
-	return &extensions.Job{
+	j := &extensions.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foobar",
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: extensions.JobSpec{
-			Parallelism: &parallelism,
-			Completions: &completions,
 			Selector: &extensions.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
@@ -61,6 +59,19 @@ func newJob(parallelism, completions int) *extensions.Job {
 			},
 		},
 	}
+	// Special case: -1 for either completions or parallelism means leave nil (negative is not allowed
+	// in practice by validation.
+	if completions >= 0 {
+		j.Spec.Completions = &completions
+	} else {
+		j.Spec.Completions = nil
+	}
+	if parallelism >= 0 {
+		j.Spec.Parallelism = &parallelism
+	} else {
+		j.Spec.Parallelism = nil
+	}
+	return j
 }
 
 func getKey(job *extensions.Job, t *testing.T) string {
@@ -114,8 +125,18 @@ func TestControllerSyncJob(t *testing.T) {
 			nil, 0, 0, 0,
 			2, 0, 2, 0, 0, false,
 		},
+		"WQ job start": {
+			2, -1,
+			nil, 0, 0, 0,
+			2, 0, 2, 0, 0, false,
+		},
 		"correct # of pods": {
 			2, 5,
+			nil, 2, 0, 0,
+			0, 0, 2, 0, 0, false,
+		},
+		"WQ job: correct # of pods": {
+			2, -1,
 			nil, 2, 0, 0,
 			0, 0, 2, 0, 0, false,
 		},
@@ -123,6 +144,11 @@ func TestControllerSyncJob(t *testing.T) {
 			2, 5,
 			nil, 1, 1, 0,
 			1, 0, 2, 1, 0, false,
+		},
+		"too few active pods with a dynamic job": {
+			2, -1,
+			nil, 1, 0, 0,
+			1, 0, 2, 0, 0, false,
 		},
 		"too few active pods, with controller error": {
 			2, 5,
@@ -148,6 +174,21 @@ func TestControllerSyncJob(t *testing.T) {
 			2, 5,
 			nil, 0, 5, 0,
 			0, 0, 0, 5, 0, true,
+		},
+		"WQ job finishing": {
+			2, -1,
+			nil, 1, 1, 0,
+			0, 0, 1, 1, 0, false,
+		},
+		"WQ job all finished": {
+			2, -1,
+			nil, 0, 2, 0,
+			0, 0, 0, 2, 0, true,
+		},
+		"WQ job all finished despite one failure": {
+			2, -1,
+			nil, 0, 1, 1,
+			0, 0, 0, 1, 1, true,
 		},
 		"more active pods than completions": {
 			2, 5,

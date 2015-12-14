@@ -185,6 +185,8 @@ using above links. Then build the image:
 $ docker build -t job-wq-2 .
 ```
 
+### Push the image
+
 For the [Docker Hub](https://hub.docker.com/), tag your app image with
 your username and push to the Hub with the below commands. Replace
 `<username>` with your Hub username.
@@ -193,6 +195,9 @@ your username and push to the Hub with the below commands. Replace
 docker tag job-wq-2 <username>/job-wq-2
 docker push <username>/job-wq-2
 ```
+
+You need to push to a public repository or [configure your cluster to be able to access
+your private repository](../../../docs/user-guide/images.md).
 
 If you are using [Google Container
 Registry](https://cloud.google.com/tools/container-registry/), tag
@@ -220,7 +225,6 @@ spec:
   selector:
     matchLabels:
       app: job-wq-2
-  completions: 1
   parallelism: 2
   template:
     metadata:
@@ -263,17 +267,19 @@ Now wait a bit, then check on the job.
 $ ./kubectl describe jobs/job-wq-2 
 Name:		job-wq-2
 Namespace:	default
-Image(s):	gcr.io/causal-jigsaw-637/job-wq-2
+Image(s):	gcr.io/exampleproject/job-wq-2
 Selector:	app in (job-wq-2)
 Parallelism:	2
-Completions:	1
+Completions:	Unset
+Start Time:	Mon, 11 Jan 2016 17:07:59 -0800
 Labels:		app=job-wq-2
-Pods Statuses:	0 Running / 1 Succeeded / 0 Failed
+Pods Statuses:	1 Running / 0 Succeeded / 0 Failed
 No volumes.
 Events:
-  FirstSeen	LastSeen	Count	From	SubobjectPath	Reason			Message
-  ─────────	────────	─────	────	─────────────	──────			───────
-  1m		1m		1	{job }			SuccessfulCreate	Created pod: job-wq-2-7r7b2
+  FirstSeen	LastSeen	Count	From			SubobjectPath	Type		Reason			Message
+  ---------	--------	-----	----			-------------	--------	------			-------
+  33s		33s		1	{job-controller }			Normal		SuccessfulCreate	Created pod: job-wq-2-lglf8
+
 
 $ kubectl logs pods/job-wq-2-7r7b2
 Worker with sessionID: bbd72d0a-9e5c-4dd6-abf6-416cc267991f
