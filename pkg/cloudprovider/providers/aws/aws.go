@@ -1776,7 +1776,6 @@ func (s *AWSCloud) updateInstanceSecurityGroupForLoadBalancer(lb *elb.LoadBalanc
 			glog.Warning("Ignoring group without ID: ", group)
 			continue
 		}
-
 		groupId := group.GroupId
 
 		sourceGroupId := &ec2.UserIdGroupPair{}
