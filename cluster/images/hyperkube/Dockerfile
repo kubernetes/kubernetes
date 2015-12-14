@@ -4,6 +4,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
     && DEBIAN_FRONTEND=noninteractive apt-get -yy -q \
     install \
     iptables \
+    ethtool \
     ca-certificates \
     file \
     util-linux \
