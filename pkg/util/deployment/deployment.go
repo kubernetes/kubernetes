@@ -130,8 +130,8 @@ func GetPodTemplateSpecHash(template api.PodTemplateSpec) uint32 {
 // Returns the sum of Replicas of the given replication controllers.
 func GetReplicaCountForRCs(replicationControllers []*api.ReplicationController) int {
 	totalReplicaCount := 0
-	for _, rc := range replicationControllers {
-		totalReplicaCount += rc.Spec.Replicas
+	for i := range replicationControllers {
+		totalReplicaCount += replicationControllers[i].Spec.Replicas
 	}
 	return totalReplicaCount
 }
