@@ -156,7 +156,7 @@ bring up the whole cluster.
 
 `$ KUBERNETES_PROVIDER=ubuntu ./kube-up.sh`
 
-The scripts automatically `scp` binaries and config files to all the machines and start kubernetes
+The scripts automatically copy binaries and config files to all the machines via `scp` and start kubernetes
 service on them. The only thing you need to do is to type the sudo password when promoted.
 
 ```console
