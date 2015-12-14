@@ -355,15 +355,8 @@ func (s *Scheme) ConvertToVersion(in interface{}, outGroupVersionString string) 
 		return nil, err
 	}
 
-	// <<<<<<< HEAD
-	// 	if len(outVersion) != 0 {
-	// 		if err := s.SetVersionAndKind(outVersion, outKind.Kind, out); err != nil {
-	// 			return nil, err
-	// 		}
-	// =======
 	if err := s.SetVersionAndKind(outVersion.String(), outKind.Kind, out); err != nil {
 		return nil, err
-		// >>>>>>> Update ObjectTyper to GroupVersion
 	}
 
 	return out, nil
