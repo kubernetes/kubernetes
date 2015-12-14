@@ -656,7 +656,7 @@ func TestGenerateDeployment(t *testing.T) {
 				Spec: extensions.DeploymentSpec{
 					Replicas:       3,
 					Selector:       map[string]string{"foo": "bar", "baz": "blah"},
-					UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
+					UniqueLabelKey: extensions.DefaultDeploymentUniqueLabelKey,
 					Template: api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{"foo": "bar", "baz": "blah"},
