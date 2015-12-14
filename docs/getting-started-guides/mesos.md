@@ -73,7 +73,7 @@ Further information is available in the Kubernetes on Mesos [contrib directory][
 - A running [Mesos cluster on Google Compute Engine][5]
 - A [VPN connection][10] to the cluster
 - A machine in the cluster which should become the Kubernetes *master node* with:
-  - GoLang > 1.2
+  - Go (see [here](../devel/development.md#go-versions) for required versions)
   - make (i.e. build-essential)
   - Docker
 
