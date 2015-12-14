@@ -481,7 +481,7 @@ type JobSpec struct {
 	Parallelism *int `json:"parallelism,omitempty"`
 
 	// Completions specifies the desired number of successfully finished pods the
-	// job should be run with. Defaults to 1.
+	// job should be run with.  When unset, any pod exiting signals the job to complete.
 	Completions *int `json:"completions,omitempty"`
 
 	// Optional duration in seconds relative to the startTime that the job may be active
