@@ -143,7 +143,7 @@ var map_DeploymentSpec = map[string]string{
 	"selector":       "Label selector for pods. Existing ReplicationControllers whose pods are selected by this will be the ones affected by this deployment.",
 	"template":       "Template describes the pods that will be created.",
 	"strategy":       "The deployment strategy to use to replace existing pods with new ones.",
-	"uniqueLabelKey": "Key of the selector that is added to existing RCs (and label key that is added to its pods) to prevent the existing RCs to select new pods (and old pods being selected by new RC). Users can set this to an empty string to indicate that the system should not add any selector and label. If unspecified, system uses \"deployment.kubernetes.io/podTemplateHash\". Value of this key is hash of DeploymentSpec.PodTemplateSpec. No label is added if this is set to empty string.",
+	"uniqueLabelKey": "Key of the selector that is added to existing RCs (and label key that is added to its pods) to prevent the existing RCs to select new pods (and old pods being selected by new RC). Users can set this to an empty string to indicate that the system should not add any selector and label. If unspecified, system uses DefaultDeploymentUniqueLabelKey(\"deployment.kubernetes.io/podTemplateHash\"). Value of this key is hash of DeploymentSpec.PodTemplateSpec. No label is added if this is set to empty string.",
 }
 
 func (DeploymentSpec) SwaggerDoc() map[string]string {
