@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -144,6 +145,12 @@ func convertStruct(result url.Values, st reflect.Type, sv reflect.Value) {
 				addListOfParams(result, tag, omitempty, field)
 			}
 		case isStructKind(kind) && !(zeroValue(field) && omitempty):
+			if selector, ok := field.Interface().(unversioned.LabelSelector); ok {
+				addParam(result, tag, omitempty, reflect.ValueOf(selector.Selector.String()))
+			}
+			if selector, ok := field.Interface().(unversioned.FieldSelector); ok {
+				addParam(result, tag, omitempty, reflect.ValueOf(selector.Selector.String()))
+			}
 			convertStruct(result, ft, field)
 		}
 	}
