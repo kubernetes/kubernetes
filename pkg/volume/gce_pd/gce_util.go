@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
@@ -110,6 +111,39 @@ func (util *GCEDiskUtil) DetachDisk(c *gcePersistentDiskCleaner) error {
 	// Detach disk asynchronously so that the kubelet sync loop is not blocked.
 	go detachDiskAndVerify(c)
 	return nil
+}
+
+func (util *GCEDiskUtil) DeleteVolume(d *gcePersistentDiskDeleter) error {
+	cloud, err := getCloudProvider()
+	if err != nil {
+		return err
+	}
+
+	if err = cloud.DeleteDisk(d.pdName); err != nil {
+		glog.V(2).Infof("Error deleting GCE PD volume %s: %v", d.pdName, err)
+		return err
+	}
+	glog.V(2).Infof("Successfully deleted GCE PD volume %s", d.pdName)
+	return nil
+}
+
+func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (volumeID string, volumeSizeGB int, err error) {
+	cloud, err := getCloudProvider()
+	if err != nil {
+		return "", 0, err
+	}
+
+	name := fmt.Sprintf("kube-dynamic-%s", util.NewUUID())
+	requestBytes := c.options.Capacity.Value()
+	// GCE works with gigabytes, convert to GiB with rounding up
+	requestGB := volume.RoundUpSize(requestBytes, 1024*1024*1024)
+	err = cloud.CreateDisk(name, int64(requestGB))
+	if err != nil {
+		glog.V(2).Infof("Error creating GCE PD volume: %v", err)
+		return "", 0, err
+	}
+	glog.V(2).Infof("Successfully created GCE PD volume %s", name)
+	return name, int(requestGB), nil
 }
 
 // Attaches the specified persistent disk device to node, verifies that it is attached, and retries if it fails.

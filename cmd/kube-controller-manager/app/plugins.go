@@ -29,6 +29,7 @@ import (
 	// Volume plugins
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/volume"
@@ -91,8 +92,8 @@ func NewVolumeProvisioner(cloud cloudprovider.Interface, flags VolumeConfigFlags
 		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(volume.VolumeConfig{}))
 	case cloud != nil && aws.ProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(aws_ebs.ProbeVolumePlugins())
-		//	case cloud != nil && gce.ProviderName == cloud.ProviderName():
-		//		return getProvisionablePluginFromVolumePlugins(gce_pd.ProbeVolumePlugins())
+	case cloud != nil && gce.ProviderName == cloud.ProviderName():
+		return getProvisionablePluginFromVolumePlugins(gce_pd.ProbeVolumePlugins())
 	case cloud != nil && openstack.ProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(cinder.ProbeVolumePlugins())
 	}
