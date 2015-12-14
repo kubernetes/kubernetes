@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -41,12 +40,11 @@ func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeBuilder, globalPDPath stri
 	if b.readOnly {
 		options = append(options, "ro")
 	}
-	cloud := b.plugin.host.GetCloudProvider()
-	if cloud == nil {
-		glog.Errorf("Cloud provider not initialized properly")
-		return errors.New("Cloud provider not initialized properly")
+	cloud, err := b.plugin.getCloudProvider()
+	if err != nil {
+		return err
 	}
-	diskid, err := cloud.(*openstack.OpenStack).AttachDisk(b.pdName)
+	diskid, err := cloud.AttachDisk(b.pdName)
 	if err != nil {
 		return err
 	}
@@ -120,13 +118,12 @@ func (util *CinderDiskUtil) DetachDisk(cd *cinderVolumeCleaner) error {
 	}
 	glog.V(2).Infof("Successfully unmounted main device: %s\n", globalPDPath)
 
-	cloud := cd.plugin.host.GetCloudProvider()
-	if cloud == nil {
-		glog.Errorf("Cloud provider not initialized properly")
-		return errors.New("Cloud provider not initialized properly")
+	cloud, err := cd.plugin.getCloudProvider()
+	if err != nil {
+		return err
 	}
 
-	if err := cloud.(*openstack.OpenStack).DetachDisk(cd.pdName); err != nil {
+	if err = cloud.DetachDisk(cd.pdName); err != nil {
 		return err
 	}
 	glog.V(2).Infof("Successfully detached cinder volume %s", cd.pdName)
@@ -134,13 +131,12 @@ func (util *CinderDiskUtil) DetachDisk(cd *cinderVolumeCleaner) error {
 }
 
 func (util *CinderDiskUtil) DeleteVolume(cd *cinderVolumeDeleter) error {
-	cloud := cd.plugin.host.GetCloudProvider()
-	if cloud == nil {
-		glog.Errorf("Cloud provider not initialized properly")
-		return errors.New("Cloud provider not initialized properly")
+	cloud, err := cd.plugin.getCloudProvider()
+	if err != nil {
+		return err
 	}
 
-	if err := cloud.(*openstack.OpenStack).DeleteVolume(cd.pdName); err != nil {
+	if err = cloud.DeleteVolume(cd.pdName); err != nil {
 		glog.V(2).Infof("Error deleting cinder volume %s: %v", cd.pdName, err)
 		return err
 	}
@@ -149,16 +145,15 @@ func (util *CinderDiskUtil) DeleteVolume(cd *cinderVolumeDeleter) error {
 }
 
 func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, err error) {
-	cloud := c.plugin.host.GetCloudProvider()
-	if cloud == nil {
-		glog.Errorf("Cloud provider not initialized properly")
-		return "", 0, errors.New("Cloud provider not initialized properly")
+	cloud, err := c.plugin.getCloudProvider()
+	if err != nil {
+		return "", 0, err
 	}
 
 	volSizeBytes := c.options.Capacity.Value()
 	// Cinder works with gigabytes, convert to GiB with rounding up
 	volSizeGB := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
-	name, err := cloud.(*openstack.OpenStack).CreateVolume(volSizeGB)
+	name, err := cloud.CreateVolume(volSizeGB)
 	if err != nil {
 		glog.V(2).Infof("Error creating cinder volume: %v", err)
 		return "", 0, err
