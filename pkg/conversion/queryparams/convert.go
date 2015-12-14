@@ -75,7 +75,7 @@ func zeroValue(value reflect.Value) bool {
 	return reflect.DeepEqual(reflect.Zero(value.Type()).Interface(), value.Interface())
 }
 
-func addParam(values url.Values, tag string, omitempty bool, value reflect.Value) {
+func addParam(values url.Values, tag, parentTag string, omitempty bool, value reflect.Value) {
 	if omitempty && zeroValue(value) {
 		return
 	}
@@ -85,12 +85,15 @@ func addParam(values url.Values, tag string, omitempty bool, value reflect.Value
 	if iValue != "<nil>" {
 		val = iValue
 	}
+	if len(parentTag) > 0 {
+		tag = fmt.Sprintf("%s.%s", parentTag, tag)
+	}
 	values.Add(tag, val)
 }
 
 func addListOfParams(values url.Values, tag string, omitempty bool, list reflect.Value) {
 	for i := 0; i < list.Len(); i++ {
-		addParam(values, tag, omitempty, list.Index(i))
+		addParam(values, tag, "", omitempty, list.Index(i))
 	}
 }
 
@@ -115,12 +118,12 @@ func Convert(obj runtime.Object) (url.Values, error) {
 	}
 
 	// Check all object fields
-	convertStruct(result, st, sv)
+	convertStruct(result, st, sv, "")
 
 	return result, nil
 }
 
-func convertStruct(result url.Values, st reflect.Type, sv reflect.Value) {
+func convertStruct(result url.Values, st reflect.Type, sv reflect.Value, parentTag string) {
 	for i := 0; i < st.NumField(); i++ {
 		field := sv.Field(i)
 		tag, omitempty := jsonTag(st.Field(i))
@@ -139,19 +142,25 @@ func convertStruct(result url.Values, st reflect.Type, sv reflect.Value) {
 
 		switch {
 		case isValueKind(kind):
-			addParam(result, tag, omitempty, field)
+			addParam(result, tag, parentTag, omitempty, field)
 		case kind == reflect.Array || kind == reflect.Slice:
 			if isValueKind(ft.Elem().Kind()) {
 				addListOfParams(result, tag, omitempty, field)
 			}
+			if isStructKind(ft.Elem().Kind()) {
+				parentTag := tag
+				for i := 0; i < field.Len(); i++ {
+					convertStruct(result, field.Index(i).Type(), field.Index(i), parentTag+"."+fmt.Sprintf("%d", i))
+				}
+			}
 		case isStructKind(kind) && !(zeroValue(field) && omitempty):
 			if selector, ok := field.Interface().(unversioned.LabelSelector); ok {
-				addParam(result, tag, omitempty, reflect.ValueOf(selector.Selector.String()))
+				addParam(result, tag, parentTag, omitempty, reflect.ValueOf(selector.Selector.String()))
 			}
 			if selector, ok := field.Interface().(unversioned.FieldSelector); ok {
-				addParam(result, tag, omitempty, reflect.ValueOf(selector.Selector.String()))
+				addParam(result, tag, parentTag, omitempty, reflect.ValueOf(selector.Selector.String()))
 			}
-			convertStruct(result, ft, field)
+			convertStruct(result, ft, field, tag)
 		}
 	}
 }
