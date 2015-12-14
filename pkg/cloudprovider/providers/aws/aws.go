@@ -58,6 +58,11 @@ const TagNameKubernetesCluster = "KubernetesCluster"
 // MaxReadThenCreateRetries sets the maximum number of attempts we will make
 const MaxReadThenCreateRetries = 30
 
+// Default volume type for newly created Volumes
+// TODO: Remove when user/admin can configure volume types and thus we don't
+// need hardcoded defaults.
+const DefaultVolumeType = "gp2"
+
 // Abstraction over AWS, to allow mocking/other implementations
 type AWSServices interface {
 	Compute(region string) (EC2, error)
@@ -1219,12 +1224,12 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 // Implements Volumes.CreateVolume
 func (s *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) {
 	// TODO: Should we tag this with the cluster id (so it gets deleted when the cluster does?)
-	// This is only used for testing right now
 
 	request := &ec2.CreateVolumeInput{}
 	request.AvailabilityZone = &s.availabilityZone
 	volSize := int64(volumeOptions.CapacityGB)
 	request.Size = &volSize
+	request.VolumeType = aws.String(DefaultVolumeType)
 	response, err := s.ec2.CreateVolume(request)
 	if err != nil {
 		return "", err
