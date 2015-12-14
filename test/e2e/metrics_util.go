@@ -39,7 +39,7 @@ import (
 
 const (
 	podStartupThreshold           time.Duration = 5 * time.Second
-	listPodLatencySmallThreshold  time.Duration = 500 * time.Millisecond
+	listPodLatencySmallThreshold  time.Duration = 1 * time.Second
 	listPodLatencyMediumThreshold time.Duration = 1 * time.Second
 	listPodLatencyLargeThreshold  time.Duration = 1 * time.Second
 	apiCallLatencySmallThreshold  time.Duration = 250 * time.Millisecond
