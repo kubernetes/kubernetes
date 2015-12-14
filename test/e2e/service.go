@@ -1311,7 +1311,7 @@ func verifyServeHostnameServiceUp(c *client.Client, host string, expectedPods []
 	By(fmt.Sprintf("verifying service has %d reachable backends", len(expectedPods)))
 	for _, cmd := range commands {
 		passed := false
-		for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5) {
+		for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
 			result, err := SSH(cmd, host, testContext.Provider)
 			if err != nil || result.Code != 0 {
 				LogSSHResult(result)
