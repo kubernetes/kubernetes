@@ -1440,6 +1440,23 @@ func deepCopy_v1beta1_LabelSelectorRequirement(in LabelSelectorRequirement, out 
 	return nil
 }
 
+func deepCopy_v1beta1_ListOptions(in ListOptions, out *ListOptions, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	out.LabelSelector = in.LabelSelector
+	out.FieldSelector = in.FieldSelector
+	out.Watch = in.Watch
+	out.ResourceVersion = in.ResourceVersion
+	if in.TimeoutSeconds != nil {
+		out.TimeoutSeconds = new(int64)
+		*out.TimeoutSeconds = *in.TimeoutSeconds
+	} else {
+		out.TimeoutSeconds = nil
+	}
+	return nil
+}
+
 func deepCopy_v1beta1_NodeUtilization(in NodeUtilization, out *NodeUtilization, c *conversion.Cloner) error {
 	out.Resource = in.Resource
 	out.Value = in.Value
@@ -1684,6 +1701,7 @@ func init() {
 		deepCopy_v1beta1_JobStatus,
 		deepCopy_v1beta1_LabelSelector,
 		deepCopy_v1beta1_LabelSelectorRequirement,
+		deepCopy_v1beta1_ListOptions,
 		deepCopy_v1beta1_NodeUtilization,
 		deepCopy_v1beta1_ReplicationControllerDummy,
 		deepCopy_v1beta1_RollingUpdateDeployment,
