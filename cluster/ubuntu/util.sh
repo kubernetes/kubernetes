@@ -268,7 +268,7 @@ EOF
 # Vars set:
 #   KUBE_MASTER_IP
 function detect-master() {
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
+  source "${KUBE_CONFIG_FILE}"
   setClusterInfo
   export KUBE_MASTER="${MASTER}"
   export KUBE_MASTER_IP="${MASTER_IP}"
@@ -282,7 +282,7 @@ function detect-master() {
 # Vars set:
 #   KUBE_NODE_IP_ADDRESS (array)
 function detect-nodes() {
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
+  source "${KUBE_CONFIG_FILE}"
 
   KUBE_NODE_IP_ADDRESSES=()
   setClusterInfo
@@ -306,7 +306,8 @@ function detect-nodes() {
 
 # Instantiate a kubernetes cluster on ubuntu
 function kube-up() {
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
+  export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
+  source "${KUBE_CONFIG_FILE}"
 
   # downloading tarball release
   "${KUBE_ROOT}/cluster/ubuntu/download-release.sh"
@@ -357,7 +358,7 @@ function provision-master() {
   scp -r $SSH_OPTS \
     saltbase/salt/generate-cert/make-ca-cert.sh \
     ubuntu/reconfDocker.sh \
-    ubuntu/${KUBE_CONFIG_FILE:-config-default.sh} \
+    "${KUBE_CONFIG_FILE}" \
     ubuntu/util.sh \
     ubuntu/master/* \
     ubuntu/binaries/master/ \
@@ -407,7 +408,7 @@ function provision-master() {
       mkdir -p /opt/bin/
       cp ~/kube/master/* /opt/bin/
       service etcd start
-      FLANNEL_NET=\"${FLANNEL_NET}\" ~/kube/reconfDocker.sh a
+      FLANNEL_NET=\"${FLANNEL_NET}\" KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" ~/kube/reconfDocker.sh a
       '" || {
       echo "Deploying master on machine ${MASTER_IP} failed"
       exit 1
@@ -422,7 +423,7 @@ function provision-node() {
 
   # copy the binaries and scripts to the ~/kube directory on the node
   scp -r $SSH_OPTS \
-    ubuntu/${KUBE_CONFIG_FILE:-config-default.sh} \
+    "${KUBE_CONFIG_FILE}" \
     ubuntu/util.sh \
     ubuntu/reconfDocker.sh \
     ubuntu/minion/* \
@@ -459,7 +460,7 @@ function provision-node() {
       mkdir -p /opt/bin/
       cp ~/kube/minion/* /opt/bin
       service flanneld start
-      ~/kube/reconfDocker.sh i
+      KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" ~/kube/reconfDocker.sh i
       '" || {
       echo "Deploying node on machine ${1#*@} failed"
       exit 1
@@ -476,7 +477,7 @@ function provision-masterandnode() {
   # scp order matters
   scp -r $SSH_OPTS \
     saltbase/salt/generate-cert/make-ca-cert.sh \
-    ubuntu/${KUBE_CONFIG_FILE:-config-default.sh} \
+    "${KUBE_CONFIG_FILE}" \
     ubuntu/util.sh \
     ubuntu/minion/* \
     ubuntu/master/* \
@@ -539,7 +540,7 @@ function provision-masterandnode() {
       cp ~/kube/minion/* /opt/bin/
 
       service etcd start
-      FLANNEL_NET=\"${FLANNEL_NET}\" ~/kube/reconfDocker.sh ai
+      FLANNEL_NET=\"${FLANNEL_NET}\" KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" ~/kube/reconfDocker.sh ai
       '" || {
       echo "Deploying master and node on machine ${MASTER_IP} failed"
       exit 1
@@ -562,9 +563,11 @@ function check-pods-torn-down() {
 
 # Delete a kubernetes cluster
 function kube-down() {
-
   export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
+  
+  export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
+  source "${KUBE_CONFIG_FILE}"
+
   source "${KUBE_ROOT}/cluster/common.sh"
 
   tear_down_alive_resources
@@ -647,7 +650,8 @@ function prepare-push() {
 
 # Update a kubernetes master with expected release
 function push-master() {
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
+  export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
+  source "${KUBE_CONFIG_FILE}"
 
   if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/master/kube-apiserver" ]]; then
     echo "There is no required release of kubernetes, please check first"
@@ -702,7 +706,8 @@ function push-master() {
 
 # Update a kubernetes node with expected release
 function push-node() {
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
+  export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
+  source "${KUBE_CONFIG_FILE}"
 
   if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/minion/kubelet" ]]; then
     echo "There is no required release of kubernetes, please check first"
@@ -764,7 +769,8 @@ function push-node() {
 # Update a kubernetes cluster with expected source
 function kube-push() {
   prepare-push
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
+  export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
+  source "${KUBE_CONFIG_FILE}"
 
   if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/master/kube-apiserver" ]]; then
     echo "There is no required release of kubernetes, please check first"
