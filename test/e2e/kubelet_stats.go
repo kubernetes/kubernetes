@@ -692,7 +692,7 @@ func (r *resourceMonitor) Start() {
 	}
 	r.collectors = make(map[string]*resourceCollector, 0)
 	for _, node := range nodes.Items {
-		collector := newResourceCollector(r.client, node.Name, r.containers, pollInterval)
+		collector := newResourceCollector(r.client, node.Name, r.containers, r.pollingInterval)
 		r.collectors[node.Name] = collector
 		collector.Start()
 	}
@@ -716,33 +716,64 @@ func (r *resourceMonitor) LogLatest() {
 	}
 }
 
-func (r *resourceMonitor) LogCPUSummary() {
+// containersCPUSummary is indexed by the container name with each entry a
+// (percentile, value) map.
+type containersCPUSummary map[string]map[float64]float64
+
+// nodesCPUSummary is indexed by the node name with each entry a
+// containersCPUSummary map.
+type nodesCPUSummary map[string]containersCPUSummary
+
+func (r *resourceMonitor) FormatCPUSummary(summary nodesCPUSummary) string {
 	// Example output for a node (the percentiles may differ):
-	// CPU usage of containers on node "e2e-test-yjhong-minion-0vj7":
+	// CPU usage of containers on node "e2e-test-foo-minion-0vj7":
 	// container        5th%  50th% 90th% 95th%
 	// "/"              0.051 0.159 0.387 0.455
 	// "/docker-daemon" 0.000 0.000 0.146 0.166
 	// "/kubelet"       0.036 0.053 0.091 0.154
 	// "/system"        0.001 0.001 0.001 0.002
+	var summaryStrings []string
 	var header []string
 	header = append(header, "container")
 	for _, p := range percentiles {
 		header = append(header, fmt.Sprintf("%.0fth%%", p*100))
 	}
-	for nodeName, collector := range r.collectors {
+	for nodeName, containers := range summary {
 		buf := &bytes.Buffer{}
 		w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
 		fmt.Fprintf(w, "%s\n", strings.Join(header, "\t"))
 		for _, containerName := range targetContainers() {
-			data := collector.GetBasicCPUStats(containerName)
 			var s []string
 			s = append(s, fmt.Sprintf("%q", containerName))
+			data, ok := containers[containerName]
 			for _, p := range percentiles {
-				s = append(s, fmt.Sprintf("%.3f", data[p]))
+				value := "N/A"
+				if ok {
+					value = fmt.Sprintf("%.3f", data[p])
+				}
+				s = append(s, value)
 			}
 			fmt.Fprintf(w, "%s\n", strings.Join(s, "\t"))
 		}
 		w.Flush()
-		Logf("\nCPU usage of containers on node %q:\n%s", nodeName, buf.String())
+		summaryStrings = append(summaryStrings, fmt.Sprintf("CPU usage of containers on node %q\n:%s", nodeName, buf.String()))
 	}
+	return strings.Join(summaryStrings, "\n")
+}
+
+func (r *resourceMonitor) LogCPUSummary() {
+	summary := r.GetCPUSummary()
+	Logf(r.FormatCPUSummary(summary))
+}
+
+func (r *resourceMonitor) GetCPUSummary() nodesCPUSummary {
+	result := make(nodesCPUSummary)
+	for nodeName, collector := range r.collectors {
+		result[nodeName] = make(containersCPUSummary)
+		for _, containerName := range targetContainers() {
+			data := collector.GetBasicCPUStats(containerName)
+			result[nodeName][containerName] = data
+		}
+	}
+	return result
 }

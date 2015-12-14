@@ -289,7 +289,7 @@ GKE_REQUIRED_SKIP_TESTS=(
     "Nodes"
     "Etcd\sFailure"
     "MasterCerts"
-    "experimental\sresource\susage\stracking" # Expect --max-pods=100
+    "experimental\sresource\susage\stracking" # Expect --max-pods=110
     "ServiceLoadBalancer" # issue: #16602
     "Shell"
     # Alpha features, remove from skip when these move to beta
@@ -312,7 +312,7 @@ GKE_DEFAULT_SKIP_TESTS=(
 
 # Tests which cannot be run on AWS.
 AWS_REQUIRED_SKIP_TESTS=(
-    "experimental\sresource\susage\stracking" # Expect --max-pods=100
+    "experimental\sresource\susage\stracking" # Expect --max-pods=110
     "GCE\sL7\sLoadBalancer\sController" # GCE L7 loadbalancing
 )
 
