@@ -148,17 +148,18 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}, api.Scheme
 		},
 		Client: func() (*client.Client, error) {
-			return clients.ClientForVersion("")
+			return clients.ClientForVersion(nil)
 		},
 		ClientConfig: func() (*client.Config, error) {
-			return clients.ClientConfigForVersion("")
+			return clients.ClientConfigForVersion(nil)
 		},
 		RESTClient: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 			gvk, err := api.RESTMapper.KindFor(mapping.Resource)
 			if err != nil {
 				return nil, err
 			}
-			client, err := clients.ClientForVersion(mapping.GroupVersionKind.GroupVersion().String())
+			mappingVersion := mapping.GroupVersionKind.GroupVersion()
+			client, err := clients.ClientForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
 			}
@@ -171,7 +172,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return nil, fmt.Errorf("unable to get RESTClient for resource '%s'", mapping.Resource)
 		},
 		Describer: func(mapping *meta.RESTMapping) (kubectl.Describer, error) {
-			client, err := clients.ClientForVersion(mapping.GroupVersionKind.GroupVersion().String())
+			mappingVersion := mapping.GroupVersionKind.GroupVersion()
+			client, err := clients.ClientForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
 			}
@@ -227,7 +229,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return meta.NewAccessor().Labels(object)
 		},
 		LogsForObject: func(object, options runtime.Object) (*client.Request, error) {
-			c, err := clients.ClientForVersion("")
+			c, err := clients.ClientForVersion(nil)
 			if err != nil {
 				return nil, err
 			}
@@ -248,14 +250,16 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 		},
 		Scaler: func(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
-			client, err := clients.ClientForVersion(mapping.GroupVersionKind.GroupVersion().String())
+			mappingVersion := mapping.GroupVersionKind.GroupVersion()
+			client, err := clients.ClientForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
 			}
 			return kubectl.ScalerFor(mapping.GroupVersionKind.GroupKind(), client)
 		},
 		Reaper: func(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
-			client, err := clients.ClientForVersion(mapping.GroupVersionKind.GroupVersion().String())
+			mappingVersion := mapping.GroupVersionKind.GroupVersion()
+			client, err := clients.ClientForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
 			}
@@ -263,7 +267,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
 			if validate {
-				client, err := clients.ClientForVersion("")
+				client, err := clients.ClientForVersion(nil)
 				if err != nil {
 					return nil, err
 				}
@@ -309,7 +313,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return nil
 		},
 		AttachablePodForObject: func(object runtime.Object) (*api.Pod, error) {
-			client, err := clients.ClientForVersion("")
+			client, err := clients.ClientForVersion(nil)
 			if err != nil {
 				return nil, err
 			}
