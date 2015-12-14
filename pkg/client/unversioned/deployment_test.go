@@ -22,6 +22,7 @@ import (
 )
 
 import (
+	"net/http"
 	"net/url"
 	"testing"
 
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 func getDeploymentsResoureName() string {
@@ -174,4 +176,36 @@ func TestDeploymentWatch(t *testing.T) {
 	}
 	_, err := c.Setup(t).Deployments(api.NamespaceAll).Watch(unversioned.ListOptions{})
 	c.Validate(t, nil, err)
+}
+
+func TestListDeploymentsLabels(t *testing.T) {
+	ns := api.NamespaceDefault
+	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testapi.Extensions.GroupVersion().String())
+	c := &simple.Client{
+		Request: simple.Request{
+			Method: "GET",
+			Path:   testapi.Extensions.ResourcePath("deployments", ns, ""),
+			Query:  simple.BuildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
+		Response: simple.Response{
+			StatusCode: http.StatusOK,
+			Body: &extensions.DeploymentList{
+				Items: []extensions.Deployment{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Labels: map[string]string{
+								"foo":  "bar",
+								"name": "baz",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	c.Setup(t)
+	c.QueryValidator[labelSelectorQueryParamName] = simple.ValidateLabels
+	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
+	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	receivedPodList, err := c.Deployments(ns).List(options)
+	c.Validate(t, receivedPodList, err)
 }
