@@ -14,15 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloudprovider
+package concerto_cloud
 
 import (
-	// Cloud providers
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/concerto"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
+	"testing"
+
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
+
+func TestGetZone(t *testing.T) {
+	concerto := &ConcertoCloud{}
+	zone, err := concerto.GetZone()
+	expectedZone := cloudprovider.Zone{"concerto", "concerto"}
+	if expectedZone != zone {
+		t.Errorf("Unexpected zone: '%v'", zone)
+	}
+	if err != nil {
+		t.Errorf("Unexpected error: '%v'", err)
+	}
+}

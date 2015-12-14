@@ -14,15 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloudprovider
+package concerto_cloud
 
-import (
-	// Cloud providers
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/concerto"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
-)
+func subtractStringArrays(a, b []string) []string {
+	var result []string
+	for _, s := range a {
+		toBeRemoved := false
+		for _, t := range b {
+			if s == t {
+				toBeRemoved = true
+			}
+		}
+		if !toBeRemoved {
+			result = append(result, s)
+		}
+	}
+	return result
+}
