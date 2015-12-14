@@ -17,12 +17,14 @@ limitations under the License.
 package gce_pd
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"strconv"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -41,6 +43,8 @@ type gcePersistentDiskPlugin struct {
 
 var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.PersistentVolumePlugin = &gcePersistentDiskPlugin{}
+var _ volume.DeletableVolumePlugin = &gcePersistentDiskPlugin{}
+var _ volume.ProvisionableVolumePlugin = &gcePersistentDiskPlugin{}
 
 const (
 	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
@@ -122,12 +126,50 @@ func (plugin *gcePersistentDiskPlugin) newCleanerInternal(volName string, podUID
 	}}, nil
 }
 
+func (plugin *gcePersistentDiskPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+	return plugin.newDeleterInternal(spec, &GCEDiskUtil{})
+}
+
+func (plugin *gcePersistentDiskPlugin) newDeleterInternal(spec *volume.Spec, manager pdManager) (volume.Deleter, error) {
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.GCEPersistentDisk == nil {
+		return nil, fmt.Errorf("spec.PersistentVolumeSource.GCEPersistentDisk is nil")
+	}
+	return &gcePersistentDiskDeleter{
+		gcePersistentDisk: &gcePersistentDisk{
+			volName: spec.Name(),
+			pdName:  spec.PersistentVolume.Spec.GCEPersistentDisk.PDName,
+			manager: manager,
+			plugin:  plugin,
+		}}, nil
+}
+
+func (plugin *gcePersistentDiskPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+	if len(options.AccessModes) == 0 {
+		options.AccessModes = plugin.GetAccessModes()
+	}
+	return plugin.newProvisionerInternal(options, &GCEDiskUtil{})
+}
+
+func (plugin *gcePersistentDiskPlugin) newProvisionerInternal(options volume.VolumeOptions, manager pdManager) (volume.Provisioner, error) {
+	return &gcePersistentDiskProvisioner{
+		gcePersistentDisk: &gcePersistentDisk{
+			manager: manager,
+			plugin:  plugin,
+		},
+		options: options,
+	}, nil
+}
+
 // Abstract interface to PD operations.
 type pdManager interface {
 	// Attaches the disk to the kubelet's host machine.
 	AttachAndMountDisk(b *gcePersistentDiskBuilder, globalPDPath string) error
 	// Detaches the disk from the kubelet's host machine.
 	DetachDisk(c *gcePersistentDiskCleaner) error
+	// Creates a volume
+	CreateVolume(provisioner *gcePersistentDiskProvisioner) (volumeID string, volumeSizeGB int, err error)
+	// Deletes a volume
+	DeleteVolume(deleter *gcePersistentDiskDeleter) error
 }
 
 // gcePersistentDisk volumes are disk resources provided by Google Compute Engine
@@ -300,4 +342,67 @@ func (c *gcePersistentDiskCleaner) TearDownAt(dir string) error {
 		}
 	}
 	return nil
+}
+
+type gcePersistentDiskDeleter struct {
+	*gcePersistentDisk
+}
+
+var _ volume.Deleter = &gcePersistentDiskDeleter{}
+
+func (d *gcePersistentDiskDeleter) GetPath() string {
+	name := gcePersistentDiskPluginName
+	return d.plugin.host.GetPodVolumeDir(d.podUID, util.EscapeQualifiedNameForDisk(name), d.volName)
+}
+
+func (d *gcePersistentDiskDeleter) Delete() error {
+	return d.manager.DeleteVolume(d)
+}
+
+type gcePersistentDiskProvisioner struct {
+	*gcePersistentDisk
+	options volume.VolumeOptions
+}
+
+var _ volume.Provisioner = &gcePersistentDiskProvisioner{}
+
+func (c *gcePersistentDiskProvisioner) Provision(pv *api.PersistentVolume) error {
+	volumeID, sizeGB, err := c.manager.CreateVolume(c)
+	if err != nil {
+		return err
+	}
+	pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName = volumeID
+	pv.Spec.Capacity = api.ResourceList{
+		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+	}
+	return nil
+}
+
+func (c *gcePersistentDiskProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
+	// Provide dummy api.PersistentVolume.Spec, it will be filled in
+	// gcePersistentDiskProvisioner.Provision()
+	return &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "pv-gce-",
+			Labels:       map[string]string{},
+			Annotations: map[string]string{
+				"kubernetes.io/createdby": "gce-pd-dynamic-provisioner",
+			},
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
+			AccessModes:                   c.options.AccessModes,
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): c.options.Capacity,
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+					PDName:    "dummy",
+					FSType:    "ext4",
+					Partition: 0,
+					ReadOnly:  false,
+				},
+			},
+		},
+	}, nil
 }
