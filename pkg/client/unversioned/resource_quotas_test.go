@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func getResourceQuotasResoureName() string {
@@ -118,7 +117,7 @@ func TestResourceQuotaList(t *testing.T) {
 		},
 		Response: simple.Response{StatusCode: 200, Body: resourceQuotaList},
 	}
-	response, err := c.Setup(t).ResourceQuotas(ns).List(unversioned.ListOptions{})
+	response, err := c.Setup(t).ResourceQuotas(ns).List(api.ListOptions{})
 	c.Validate(t, response, err)
 }
 
@@ -197,6 +196,6 @@ func TestResourceQuotaWatch(t *testing.T) {
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: simple.Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).ResourceQuotas(api.NamespaceAll).Watch(unversioned.ListOptions{})
+	_, err := c.Setup(t).ResourceQuotas(api.NamespaceAll).Watch(api.ListOptions{})
 	c.Validate(t, nil, err)
 }

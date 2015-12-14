@@ -233,7 +233,7 @@ func podsCreated(c *client.Client, ns, name string, replicas int) (*api.PodList,
 	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{label}}
+		options := api.ListOptions{LabelSelector: label}
 		pods, err := c.Pods(ns).List(options)
 		if err != nil {
 			return nil, err
@@ -397,7 +397,7 @@ var _ = Describe("Nodes", func() {
 	BeforeEach(func() {
 		c = framework.Client
 		ns = framework.Namespace.Name
-		systemPods, err := c.Pods(api.NamespaceSystem).List(unversioned.ListOptions{})
+		systemPods, err := c.Pods(api.NamespaceSystem).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		systemPodsNo = len(systemPods.Items)
 	})
@@ -511,7 +511,7 @@ var _ = Describe("Nodes", func() {
 
 				By("choose a node with at least one pod - we will block some network traffic on this node")
 				label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-				options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{label}}
+				options := api.ListOptions{LabelSelector: label}
 				pods, err := c.Pods(ns).List(options) // list pods after all have been scheduled
 				Expect(err).NotTo(HaveOccurred())
 				nodeName := pods.Items[0].Spec.NodeName

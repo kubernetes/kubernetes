@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func getRCResourceName() string {
@@ -60,7 +59,7 @@ func TestListControllers(t *testing.T) {
 			},
 		},
 	}
-	receivedControllerList, err := c.Setup(t).ReplicationControllers(ns).List(unversioned.ListOptions{})
+	receivedControllerList, err := c.Setup(t).ReplicationControllers(ns).List(api.ListOptions{})
 	c.Validate(t, receivedControllerList, err)
 
 }

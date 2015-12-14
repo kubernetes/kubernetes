@@ -18,7 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -39,7 +38,7 @@ func (c *FakeIngress) Get(name string) (*extensions.Ingress, error) {
 	return obj.(*extensions.Ingress), err
 }
 
-func (c *FakeIngress) List(opts unversioned.ListOptions) (*extensions.IngressList, error) {
+func (c *FakeIngress) List(opts api.ListOptions) (*extensions.IngressList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("ingresses", c.Namespace, opts), &extensions.IngressList{})
 	if obj == nil {
 		return nil, err
@@ -71,7 +70,7 @@ func (c *FakeIngress) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeIngress) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *FakeIngress) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.InvokesWatch(NewWatchAction("ingresses", c.Namespace, opts))
 }
 

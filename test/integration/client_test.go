@@ -29,7 +29,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -54,7 +53,7 @@ func TestClient(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", e, a)
 	}
 
-	pods, err := client.Pods(ns).List(unversioned.ListOptions{})
+	pods, err := client.Pods(ns).List(api.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -92,7 +91,7 @@ func TestClient(t *testing.T) {
 	}
 
 	// pod is shown, but not scheduled
-	pods, err = client.Pods(ns).List(unversioned.ListOptions{})
+	pods, err = client.Pods(ns).List(api.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -244,8 +243,8 @@ func TestMultiWatch(t *testing.T) {
 			t.Fatalf("Couldn't make %v: %v", name, err)
 		}
 		go func(name, rv string) {
-			options := unversioned.ListOptions{
-				LabelSelector:   unversioned.LabelSelector{labels.Set{"watchlabel": name}.AsSelector()},
+			options := api.ListOptions{
+				LabelSelector:   labels.Set{"watchlabel": name}.AsSelector(),
 				ResourceVersion: rv,
 			}
 			w, err := client.Pods(ns).Watch(options)

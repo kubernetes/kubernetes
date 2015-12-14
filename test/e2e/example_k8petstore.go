@@ -20,7 +20,7 @@ import (
 	"fmt"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"log"
 	"os"
@@ -156,7 +156,7 @@ var _ = Describe("[Example] Pet Store [Skipped]", func() {
 	f := NewFramework("petstore")
 
 	It(fmt.Sprintf("should scale to persist a nominal number ( %v ) of transactions in %v seconds", k8bpsSmokeTestTransactions, k8bpsSmokeTestTimeout), func() {
-		minions, err := f.Client.Nodes().List(unversioned.ListOptions{})
+		minions, err := f.Client.Nodes().List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		minionCount = len(minions.Items)
 

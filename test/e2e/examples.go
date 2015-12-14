@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 
@@ -463,7 +462,7 @@ func forEachPod(c *client.Client, ns, selectorKey, selectorValue string, fn func
 	pods := []*api.Pod{}
 	for t := time.Now(); time.Since(t) < podListTimeout; time.Sleep(poll) {
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		options := api.ListOptions{LabelSelector: selector}
 		podList, err := c.Pods(ns).List(options)
 		Expect(err).NotTo(HaveOccurred())
 		for _, pod := range podList.Items {

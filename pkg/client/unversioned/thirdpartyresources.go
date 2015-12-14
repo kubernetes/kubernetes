@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -29,13 +28,13 @@ type ThirdPartyResourceNamespacer interface {
 }
 
 type ThirdPartyResourceInterface interface {
-	List(opts unversioned.ListOptions) (*extensions.ThirdPartyResourceList, error)
+	List(opts api.ListOptions) (*extensions.ThirdPartyResourceList, error)
 	Get(name string) (*extensions.ThirdPartyResource, error)
 	Create(ctrl *extensions.ThirdPartyResource) (*extensions.ThirdPartyResource, error)
 	Update(ctrl *extensions.ThirdPartyResource) (*extensions.ThirdPartyResource, error)
 	UpdateStatus(ctrl *extensions.ThirdPartyResource) (*extensions.ThirdPartyResource, error)
 	Delete(name string) error
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // thirdPartyResources implements DaemonsSetsNamespacer interface
@@ -51,7 +50,7 @@ func newThirdPartyResources(c *ExtensionsClient, namespace string) *thirdPartyRe
 // Ensure statically that thirdPartyResources implements ThirdPartyResourcesInterface.
 var _ ThirdPartyResourceInterface = &thirdPartyResources{}
 
-func (c *thirdPartyResources) List(opts unversioned.ListOptions) (result *extensions.ThirdPartyResourceList, err error) {
+func (c *thirdPartyResources) List(opts api.ListOptions) (result *extensions.ThirdPartyResourceList, err error) {
 	result = &extensions.ThirdPartyResourceList{}
 	err = c.r.Get().Namespace(c.ns).Resource("thirdpartyresources").VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
@@ -91,7 +90,7 @@ func (c *thirdPartyResources) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested daemon sets.
-func (c *thirdPartyResources) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *thirdPartyResources) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).

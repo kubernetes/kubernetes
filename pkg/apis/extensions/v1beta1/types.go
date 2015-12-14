@@ -663,6 +663,26 @@ type ClusterAutoscalerList struct {
 	Items []ClusterAutoscaler `json:"items"`
 }
 
+// ListOptions is the query options to a standard REST list call.
+type ListOptions struct {
+	unversioned.TypeMeta `json:",inline"`
+
+	// A selector to restrict the list of returned objects by their labels.
+	// Defaults to everything.
+	LabelSelector string `json:"labelSelector,omitempty"`
+	// A selector to restrict the list of returned objects by their fields.
+	// Defaults to everything.
+	FieldSelector string `json:"fieldSelector,omitempty"`
+	// Watch for changes to the described resources and return them as a stream of
+	// add, update, and remove notifications. Specify resourceVersion.
+	Watch bool `json:"watch,omitempty"`
+	// When specified with a watch call, shows changes that occur after that particular version of a resource.
+	// Defaults to changes from the beginning of history.
+	ResourceVersion string `json:"resourceVersion,omitempty"`
+	// Timeout for the list/watch call.
+	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty"`
+}
+
 // A label selector is a label query over a set of resources. The result of matchLabels and
 // matchExpressions are ANDed. An empty label selector matches all objects. A null
 // label selector matches no objects.

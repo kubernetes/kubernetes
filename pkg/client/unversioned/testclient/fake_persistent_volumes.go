@@ -18,7 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -35,7 +34,7 @@ func (c *FakePersistentVolumes) Get(name string) (*api.PersistentVolume, error) 
 	return obj.(*api.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) List(opts unversioned.ListOptions) (*api.PersistentVolumeList, error) {
+func (c *FakePersistentVolumes) List(opts api.ListOptions) (*api.PersistentVolumeList, error) {
 	obj, err := c.Fake.Invokes(NewRootListAction("persistentvolumes", opts), &api.PersistentVolumeList{})
 	if obj == nil {
 		return nil, err
@@ -67,7 +66,7 @@ func (c *FakePersistentVolumes) Delete(name string) error {
 	return err
 }
 
-func (c *FakePersistentVolumes) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *FakePersistentVolumes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.InvokesWatch(NewRootWatchAction("persistentvolumes", opts))
 }
 

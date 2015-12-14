@@ -17,17 +17,13 @@ limitations under the License.
 package unversioned_test
 
 import (
-	. "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
-)
-
-import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	. "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
 func getThirdPartyResourceName() string {
@@ -58,7 +54,7 @@ func TestListThirdPartyResources(t *testing.T) {
 			},
 		},
 	}
-	receivedDSs, err := c.Setup(t).Extensions().ThirdPartyResources(ns).List(unversioned.ListOptions{})
+	receivedDSs, err := c.Setup(t).Extensions().ThirdPartyResources(ns).List(api.ListOptions{})
 	c.Validate(t, receivedDSs, err)
 
 }

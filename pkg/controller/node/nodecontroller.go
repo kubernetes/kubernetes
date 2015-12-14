@@ -162,10 +162,10 @@ func NewNodeController(
 
 	nc.podStore.Store, nc.podController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return nc.kubeClient.Pods(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return nc.kubeClient.Pods(api.NamespaceAll).Watch(options)
 			},
 		},
@@ -178,10 +178,10 @@ func NewNodeController(
 	)
 	nc.nodeStore.Store, nc.nodeController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options unversioned.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return nc.kubeClient.Nodes().List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return nc.kubeClient.Nodes().Watch(options)
 			},
 		},
@@ -354,7 +354,7 @@ func forcefullyDeletePod(c client.Interface, pod *api.Pod) {
 // post "NodeReady==ConditionUnknown". It also evicts all pods if node is not ready or
 // not reachable for a long period of time.
 func (nc *NodeController) monitorNodeStatus() error {
-	nodes, err := nc.kubeClient.Nodes().List(unversioned.ListOptions{})
+	nodes, err := nc.kubeClient.Nodes().List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -692,7 +692,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 // the server could not be contacted.
 func (nc *NodeController) hasPods(nodeName string) (bool, error) {
 	selector := fields.OneTermEqualSelector(client.PodHost, nodeName)
-	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+	options := api.ListOptions{FieldSelector: selector}
 	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(options)
 	if err != nil {
 		return false, err
@@ -727,7 +727,7 @@ func (nc *NodeController) cancelPodEviction(nodeName string) bool {
 func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 	remaining := false
 	selector := fields.OneTermEqualSelector(client.PodHost, nodeName)
-	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+	options := api.ListOptions{FieldSelector: selector}
 	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(options)
 	if err != nil {
 		return remaining, err
@@ -767,7 +767,7 @@ func (nc *NodeController) terminatePods(nodeName string, since time.Time) (bool,
 	complete := true
 
 	selector := fields.OneTermEqualSelector(client.PodHost, nodeName)
-	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+	options := api.ListOptions{FieldSelector: selector}
 	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(options)
 	if err != nil {
 		return false, nextAttempt, err

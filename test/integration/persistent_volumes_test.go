@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	fake_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/persistentvolume"
@@ -81,7 +80,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 		},
 	}
 
-	w, _ := testClient.PersistentVolumes().Watch(unversioned.ListOptions{})
+	w, _ := testClient.PersistentVolumes().Watch(api.ListOptions{})
 	defer w.Stop()
 
 	_, _ = testClient.PersistentVolumes().Create(pv)
@@ -107,7 +106,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	// change the reclamation policy of the PV for the next test
 	pv.Spec.PersistentVolumeReclaimPolicy = api.PersistentVolumeReclaimDelete
 
-	w, _ = testClient.PersistentVolumes().Watch(unversioned.ListOptions{})
+	w, _ = testClient.PersistentVolumes().Watch(api.ListOptions{})
 	defer w.Stop()
 
 	_, _ = testClient.PersistentVolumes().Create(pv)

@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -58,7 +58,7 @@ func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSecond
 	expectNoError(wait.Poll(2*time.Second, time.Duration(maxSeconds)*time.Second,
 		func() (bool, error) {
 			var cnt = 0
-			nsList, err := c.Namespaces().List(unversioned.ListOptions{})
+			nsList, err := c.Namespaces().List(api.ListOptions{})
 			if err != nil {
 				return false, err
 			}

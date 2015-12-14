@@ -59,7 +59,7 @@ func TestListServices(t *testing.T) {
 			},
 		},
 	}
-	receivedServiceList, err := c.Setup(t).Services(ns).List(unversioned.ListOptions{})
+	receivedServiceList, err := c.Setup(t).Services(ns).List(api.ListOptions{})
 	t.Logf("received services: %v %#v", err, receivedServiceList)
 	c.Validate(t, receivedServiceList, err)
 }
@@ -96,7 +96,7 @@ func TestListServicesLabels(t *testing.T) {
 	c.Setup(t)
 	c.QueryValidator[labelSelectorQueryParamName] = simple.ValidateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	options := api.ListOptions{LabelSelector: selector}
 	receivedServiceList, err := c.Services(ns).List(options)
 	c.Validate(t, receivedServiceList, err)
 }

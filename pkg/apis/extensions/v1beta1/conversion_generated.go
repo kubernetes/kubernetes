@@ -527,6 +527,34 @@ func convert_api_Lifecycle_To_v1_Lifecycle(in *api.Lifecycle, out *v1.Lifecycle,
 	return autoconvert_api_Lifecycle_To_v1_Lifecycle(in, out, s)
 }
 
+func autoconvert_api_ListOptions_To_v1beta1_ListOptions(in *api.ListOptions, out *ListOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ListOptions))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.LabelSelector, &out.LabelSelector, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.FieldSelector, &out.FieldSelector, 0); err != nil {
+		return err
+	}
+	out.Watch = in.Watch
+	out.ResourceVersion = in.ResourceVersion
+	if in.TimeoutSeconds != nil {
+		out.TimeoutSeconds = new(int64)
+		*out.TimeoutSeconds = *in.TimeoutSeconds
+	} else {
+		out.TimeoutSeconds = nil
+	}
+	return nil
+}
+
+func convert_api_ListOptions_To_v1beta1_ListOptions(in *api.ListOptions, out *ListOptions, s conversion.Scope) error {
+	return autoconvert_api_ListOptions_To_v1beta1_ListOptions(in, out, s)
+}
+
 func autoconvert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress(in *api.LoadBalancerIngress, out *v1.LoadBalancerIngress, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.LoadBalancerIngress))(in)
@@ -3895,6 +3923,34 @@ func convert_v1beta1_LabelSelectorRequirement_To_extensions_LabelSelectorRequire
 	return autoconvert_v1beta1_LabelSelectorRequirement_To_extensions_LabelSelectorRequirement(in, out, s)
 }
 
+func autoconvert_v1beta1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.ListOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ListOptions))(in)
+	}
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.LabelSelector, &out.LabelSelector, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.FieldSelector, &out.FieldSelector, 0); err != nil {
+		return err
+	}
+	out.Watch = in.Watch
+	out.ResourceVersion = in.ResourceVersion
+	if in.TimeoutSeconds != nil {
+		out.TimeoutSeconds = new(int64)
+		*out.TimeoutSeconds = *in.TimeoutSeconds
+	} else {
+		out.TimeoutSeconds = nil
+	}
+	return nil
+}
+
+func convert_v1beta1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.ListOptions, s conversion.Scope) error {
+	return autoconvert_v1beta1_ListOptions_To_api_ListOptions(in, out, s)
+}
+
 func autoconvert_v1beta1_NodeUtilization_To_extensions_NodeUtilization(in *NodeUtilization, out *extensions.NodeUtilization, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NodeUtilization))(in)
@@ -4128,6 +4184,7 @@ func init() {
 		autoconvert_api_HostPathVolumeSource_To_v1_HostPathVolumeSource,
 		autoconvert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource,
 		autoconvert_api_Lifecycle_To_v1_Lifecycle,
+		autoconvert_api_ListOptions_To_v1beta1_ListOptions,
 		autoconvert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress,
 		autoconvert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus,
 		autoconvert_api_LocalObjectReference_To_v1_LocalObjectReference,
@@ -4266,6 +4323,7 @@ func init() {
 		autoconvert_v1beta1_Job_To_extensions_Job,
 		autoconvert_v1beta1_LabelSelectorRequirement_To_extensions_LabelSelectorRequirement,
 		autoconvert_v1beta1_LabelSelector_To_extensions_LabelSelector,
+		autoconvert_v1beta1_ListOptions_To_api_ListOptions,
 		autoconvert_v1beta1_NodeUtilization_To_extensions_NodeUtilization,
 		autoconvert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy,
 		autoconvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,

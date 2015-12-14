@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -29,13 +28,13 @@ type ReplicationControllersNamespacer interface {
 
 // ReplicationControllerInterface has methods to work with ReplicationController resources.
 type ReplicationControllerInterface interface {
-	List(opts unversioned.ListOptions) (*api.ReplicationControllerList, error)
+	List(opts api.ListOptions) (*api.ReplicationControllerList, error)
 	Get(name string) (*api.ReplicationController, error)
 	Create(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	Update(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	UpdateStatus(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	Delete(name string) error
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // replicationControllers implements ReplicationControllersNamespacer interface
@@ -50,7 +49,7 @@ func newReplicationControllers(c *Client, namespace string) *replicationControll
 }
 
 // List takes a selector, and returns the list of replication controllers that match that selector.
-func (c *replicationControllers) List(opts unversioned.ListOptions) (result *api.ReplicationControllerList, err error) {
+func (c *replicationControllers) List(opts api.ListOptions) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
 	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
@@ -90,7 +89,7 @@ func (c *replicationControllers) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested controllers.
-func (c *replicationControllers) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *replicationControllers) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).

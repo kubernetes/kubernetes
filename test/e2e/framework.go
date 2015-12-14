@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 
@@ -109,7 +108,7 @@ func (f *Framework) afterEach() {
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed {
 		By(fmt.Sprintf("Collecting events from namespace %q.", f.Namespace.Name))
-		events, err := f.Client.Events(f.Namespace.Name).List(unversioned.ListOptions{})
+		events, err := f.Client.Events(f.Namespace.Name).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, e := range events.Items {
@@ -183,7 +182,7 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 	for {
 		// TODO: Endpoints client should take a field selector so we
 		// don't have to list everything.
-		list, err := f.Client.Endpoints(f.Namespace.Name).List(unversioned.ListOptions{})
+		list, err := f.Client.Endpoints(f.Namespace.Name).List(api.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -198,8 +197,8 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 			}
 		}
 
-		options := unversioned.ListOptions{
-			FieldSelector:   unversioned.FieldSelector{fields.Set{"metadata.name": serviceName}.AsSelector()},
+		options := api.ListOptions{
+			FieldSelector:   fields.Set{"metadata.name": serviceName}.AsSelector(),
 			ResourceVersion: rv,
 		}
 		w, err := f.Client.Endpoints(f.Namespace.Name).Watch(options)

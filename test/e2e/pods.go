@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/labels"
@@ -300,14 +299,14 @@ var _ = Describe("Pods", func() {
 
 		By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		options := api.ListOptions{LabelSelector: selector}
 		pods, err := podClient.List(options)
 		if err != nil {
 			Failf("Failed to query for pods: %v", err)
 		}
 		Expect(len(pods.Items)).To(Equal(0))
-		options = unversioned.ListOptions{
-			LabelSelector:   unversioned.LabelSelector{selector},
+		options = api.ListOptions{
+			LabelSelector:   selector,
 			ResourceVersion: pods.ListMeta.ResourceVersion,
 		}
 		w, err := podClient.Watch(options)
@@ -327,7 +326,7 @@ var _ = Describe("Pods", func() {
 
 		By("verifying the pod is in kubernetes")
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-		options = unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		options = api.ListOptions{LabelSelector: selector}
 		pods, err = podClient.List(options)
 		if err != nil {
 			Failf("Failed to query for pods: %v", err)
@@ -373,7 +372,7 @@ var _ = Describe("Pods", func() {
 		Expect(lastPod.Spec.TerminationGracePeriodSeconds).ToNot(BeZero())
 
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-		options = unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		options = api.ListOptions{LabelSelector: selector}
 		pods, err = podClient.List(options)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to list pods to verify deletion: %v", err))
@@ -429,7 +428,7 @@ var _ = Describe("Pods", func() {
 
 		By("verifying the pod is in kubernetes")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		options := api.ListOptions{LabelSelector: selector}
 		pods, err := podClient.List(options)
 		Expect(len(pods.Items)).To(Equal(1))
 
@@ -461,7 +460,7 @@ var _ = Describe("Pods", func() {
 
 		By("verifying the updated pod is in kubernetes")
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-		options = unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		options = api.ListOptions{LabelSelector: selector}
 		pods, err = podClient.List(options)
 		Expect(len(pods.Items)).To(Equal(1))
 		Logf("Pod update OK")
@@ -1049,7 +1048,7 @@ var _ = Describe("Pods", func() {
 
 			By("verifying the pod is in kubernetes")
 			selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-			options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+			options := api.ListOptions{LabelSelector: selector}
 			pods, err := podClient.List(options)
 			if err != nil {
 				Failf("Failed to query for pods: %v", err)
@@ -1124,7 +1123,7 @@ var _ = Describe("Pods", func() {
 
 			By("verifying the pod is in kubernetes")
 			selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-			options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+			options := api.ListOptions{LabelSelector: selector}
 			pods, err := podClient.List(options)
 			if err != nil {
 				Failf("Failed to query for pods: %v", err)

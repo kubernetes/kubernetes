@@ -36,7 +36,7 @@ func TestListEmptyPods(t *testing.T) {
 		Request:  simple.Request{Method: "GET", Path: testapi.Default.ResourcePath("pods", ns, ""), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: http.StatusOK, Body: &api.PodList{}},
 	}
-	podList, err := c.Setup(t).Pods(ns).List(unversioned.ListOptions{})
+	podList, err := c.Setup(t).Pods(ns).List(api.ListOptions{})
 	c.Validate(t, podList, err)
 }
 
@@ -62,7 +62,7 @@ func TestListPods(t *testing.T) {
 			},
 		},
 	}
-	receivedPodList, err := c.Setup(t).Pods(ns).List(unversioned.ListOptions{})
+	receivedPodList, err := c.Setup(t).Pods(ns).List(api.ListOptions{})
 	c.Validate(t, receivedPodList, err)
 }
 
@@ -96,7 +96,7 @@ func TestListPodsLabels(t *testing.T) {
 	c.Setup(t)
 	c.QueryValidator[labelSelectorQueryParamName] = simple.ValidateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	options := api.ListOptions{LabelSelector: selector}
 	receivedPodList, err := c.Pods(ns).List(options)
 	c.Validate(t, receivedPodList, err)
 }

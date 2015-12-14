@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -32,11 +31,11 @@ type fakePodLW struct {
 	watchResp watch.Interface
 }
 
-func (lw fakePodLW) List(options unversioned.ListOptions) (runtime.Object, error) {
+func (lw fakePodLW) List(options api.ListOptions) (runtime.Object, error) {
 	return lw.listResp, nil
 }
 
-func (lw fakePodLW) Watch(options unversioned.ListOptions) (watch.Interface, error) {
+func (lw fakePodLW) Watch(options api.ListOptions) (watch.Interface, error) {
 	return lw.watchResp, nil
 }
 

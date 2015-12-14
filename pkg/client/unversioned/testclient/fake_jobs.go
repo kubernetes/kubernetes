@@ -18,7 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -39,7 +38,7 @@ func (c *FakeJobs) Get(name string) (*extensions.Job, error) {
 	return obj.(*extensions.Job), err
 }
 
-func (c *FakeJobs) List(opts unversioned.ListOptions) (*extensions.JobList, error) {
+func (c *FakeJobs) List(opts api.ListOptions) (*extensions.JobList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("jobs", c.Namespace, opts), &extensions.JobList{})
 	if obj == nil {
 		return nil, err
@@ -71,7 +70,7 @@ func (c *FakeJobs) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeJobs) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *FakeJobs) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.InvokesWatch(NewWatchAction("jobs", c.Namespace, opts))
 }
 
