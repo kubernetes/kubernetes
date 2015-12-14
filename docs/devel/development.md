@@ -33,15 +33,29 @@ Documentation for other releases can be found at
 
 # Development Guide
 
-# Releases and Official Builds
+This document is intended to be the canonical source of truth for things like
+supported toolchain versions for building Kubernetes.  If you find a
+requirement that this doc does not capture, please file a bug.  If you find
+other docs with references to requirements that are not simply links to this
+doc, please file a bug.
+
+This document is intended to be relative to the branch in which it is found.
+It is guaranteed that requirements will change over time for the development
+branch, but release branches of Kubernetes should not change.
+
+## Releases and Official Builds
 
 Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/HEAD/build/README.md).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
 
 ## Go development environment
 
-Kubernetes is written in [Go](http://golang.org) programming language. If you haven't set up Go development environment, please follow [this instruction](http://golang.org/doc/code.html) to install go tool and set up GOPATH. Ensure your version of Go is at least 1.3.
+Kubernetes is written in the [Go](http://golang.org) programming language. If you haven't set up a Go development environment, please follow [these instructions](http://golang.org/doc/code.html) to install the go tools and set up a GOPATH.
 
-## Git Setup
+### Go versions
+
+Requires Go version 1.4.x or 1.5.x
+
+## Git setup
 
 Below, we outline one of the more common git workflows that core developers use. Other git workflows are also valid.
 
