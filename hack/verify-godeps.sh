@@ -18,6 +18,12 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# release v33 fails because of godep: error restoring dep (github.com/google/btree): found packages btree (btree.go) and main (btree_mem.go) in /tmp/gopath.aSHREx/src/github.com/google/btree
+# release v34 fails because godep save just hangs forever
+# release v35 fails because of godep: error restoring dep (github.com/Sirupsen/logrus): Unable to find dependent package golang.org/x/sys/unix in context of /tmp/gopath.aSHREx/src/github.com/Sirupsen/logrus
+# https://github.com/tools/godep/issues/359
+GODEP_RELEASE=v32
+
 #### HACK ####
 # Sometimes godep just can't handle things. This lets use manually put
 # some deps in place first, so godep won't fall over.
@@ -53,10 +59,13 @@ function cleanup {
 }
 trap cleanup EXIT
 
-# build the godep tool
 export GOPATH="${_tmpdir}"
+# build the godep tool
 go get -u github.com/tools/godep 2>/dev/null
-go install github.com/tools/godep 2>/dev/null
+pushd "${_tmpdir}/src/github.com/tools/godep" > /dev/null
+  git checkout "${GODEP_RELEASE}" 2>/dev/null
+  go install github.com/tools/godep 2>/dev/null
+popd > /dev/null
 GODEP="${_tmpdir}/bin/godep"
 
 # fill out that nice clean place with the kube godeps
