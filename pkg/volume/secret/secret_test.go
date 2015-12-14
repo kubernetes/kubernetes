@@ -110,7 +110,7 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 
-	// secret volume should create it's own empty wrapper path
+	// secret volume should create its own empty wrapper path
 	podWrapperMetadataDir := fmt.Sprintf("%v/pods/test_pod_uid/plugins/kubernetes.io~empty-dir/wrapped_test_volume_name", rootDir)
 
 	if _, err := os.Stat(podWrapperMetadataDir); err != nil {

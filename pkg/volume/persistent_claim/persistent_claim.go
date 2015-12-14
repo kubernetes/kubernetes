@@ -80,7 +80,7 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod,
 		return nil, err
 	}
 
-	builder, err := plugin.host.NewWrapperBuilder(volume.NewSpecFromPersistentVolume(pv, spec.ReadOnly), pod, opts)
+	builder, err := plugin.host.NewWrapperBuilder(claim.Spec.VolumeName, *volume.NewSpecFromPersistentVolume(pv, spec.ReadOnly), pod, opts)
 	if err != nil {
 		glog.Errorf("Error creating builder for claim: %+v\n", claim.Name)
 		return nil, err

@@ -144,12 +144,12 @@ type VolumeHost interface {
 	// the provided spec.  This is used to implement volume plugins which
 	// "wrap" other plugins.  For example, the "secret" volume is
 	// implemented in terms of the "emptyDir" volume.
-	NewWrapperBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions) (Builder, error)
+	NewWrapperBuilder(volName string, spec Spec, pod *api.Pod, opts VolumeOptions) (Builder, error)
 
 	// NewWrapperCleaner finds an appropriate plugin with which to handle
 	// the provided spec.  See comments on NewWrapperBuilder for more
 	// context.
-	NewWrapperCleaner(spec *Spec, podUID types.UID) (Cleaner, error)
+	NewWrapperCleaner(volName string, spec Spec, podUID types.UID) (Cleaner, error)
 
 	// Get cloud provider from kubelet.
 	GetCloudProvider() cloudprovider.Interface

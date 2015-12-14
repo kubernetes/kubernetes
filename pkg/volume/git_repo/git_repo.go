@@ -41,6 +41,10 @@ type gitRepoPlugin struct {
 
 var _ volume.VolumePlugin = &gitRepoPlugin{}
 
+var wrappedVolumeSpec = volume.Spec{
+	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+}
+
 const (
 	gitRepoPluginName = "kubernetes.io/git-repo"
 )
@@ -61,10 +65,9 @@ func (plugin *gitRepoPlugin) CanSupport(spec *volume.Spec) bool {
 func (plugin *gitRepoPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
 	return &gitRepoVolumeBuilder{
 		gitRepoVolume: &gitRepoVolume{
-			volName:           spec.Name(),
-			podUID:            pod.UID,
-			plugin:            plugin,
-			wrappedVolumeSpec: volume.GetWrappedVolumeSpec(spec.Name(), gitRepoPluginName),
+			volName: spec.Name(),
+			podUID:  pod.UID,
+			plugin:  plugin,
 		},
 		pod:      *pod,
 		source:   spec.Volume.GitRepo.Repository,
@@ -78,10 +81,9 @@ func (plugin *gitRepoPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts vo
 func (plugin *gitRepoPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	return &gitRepoVolumeCleaner{
 		&gitRepoVolume{
-			volName:           volName,
-			podUID:            podUID,
-			plugin:            plugin,
-			wrappedVolumeSpec: volume.GetWrappedVolumeSpec(volName, gitRepoPluginName),
+			volName: volName,
+			podUID:  podUID,
+			plugin:  plugin,
 		},
 	}, nil
 }
@@ -89,10 +91,9 @@ func (plugin *gitRepoPlugin) NewCleaner(volName string, podUID types.UID) (volum
 // gitRepo volumes are directories which are pre-filled from a git repository.
 // These do not persist beyond the lifetime of a pod.
 type gitRepoVolume struct {
-	volName           string
-	podUID            types.UID
-	plugin            *gitRepoPlugin
-	wrappedVolumeSpec *volume.Spec
+	volName string
+	podUID  types.UID
+	plugin  *gitRepoPlugin
 	volume.MetricsNil
 }
 
@@ -138,7 +139,7 @@ func (b *gitRepoVolumeBuilder) SetUpAt(dir string) error {
 	}
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperBuilder(b.wrappedVolumeSpec, &b.pod, b.opts)
+	wrapped, err := b.plugin.host.NewWrapperBuilder(b.volName, wrappedVolumeSpec, &b.pod, b.opts)
 	if err != nil {
 		return err
 	}
@@ -218,7 +219,7 @@ func (c *gitRepoVolumeCleaner) TearDown() error {
 func (c *gitRepoVolumeCleaner) TearDownAt(dir string) error {
 
 	// Wrap EmptyDir, let it do the teardown.
-	wrapped, err := c.plugin.host.NewWrapperCleaner(c.wrappedVolumeSpec, c.podUID)
+	wrapped, err := c.plugin.host.NewWrapperCleaner(c.volName, wrappedVolumeSpec, c.podUID)
 	if err != nil {
 		return err
 	}

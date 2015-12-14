@@ -143,7 +143,7 @@ func TestLabels(t *testing.T) {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
 
-	// gitRepo volume should create it's own empty wrapper path
+	// downwardAPI volume should create its own empty wrapper path
 	podWrapperMetadataDir := fmt.Sprintf("%v/pods/%v/plugins/kubernetes.io~empty-dir/wrapped_%v", rootDir, testPodUID, testVolumeName)
 
 	if _, err := os.Stat(podWrapperMetadataDir); err != nil {
