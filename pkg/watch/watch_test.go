@@ -52,7 +52,7 @@ func TestFake(t *testing.T) {
 				t.Fatalf("Expected %v, got %v", expect.s, a)
 			}
 		}
-		_, stillOpen := <-w.ResultChan()
+		stillOpen := w.ResultChan() != nil
 		if stillOpen {
 			t.Fatal("Never stopped")
 		}

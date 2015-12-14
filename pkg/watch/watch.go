@@ -79,6 +79,7 @@ func (w emptyWatch) ResultChan() <-chan Event {
 // FakeWatcher lets you test anything that consumes a watch.Interface; threadsafe.
 type FakeWatcher struct {
 	result  chan Event
+	stop    chan struct{}
 	Stopped bool
 	sync.Mutex
 }
@@ -86,6 +87,7 @@ type FakeWatcher struct {
 func NewFake() *FakeWatcher {
 	return &FakeWatcher{
 		result: make(chan Event),
+		stop:   make(chan struct{}),
 	}
 }
 
@@ -94,7 +96,8 @@ func (f *FakeWatcher) Stop() {
 	f.Lock()
 	defer f.Unlock()
 	if !f.Stopped {
-		close(f.result)
+		f.result = nil
+		close(f.stop)
 		f.Stopped = true
 	}
 }
@@ -105,25 +108,40 @@ func (f *FakeWatcher) ResultChan() <-chan Event {
 
 // Add sends an add event.
 func (f *FakeWatcher) Add(obj runtime.Object) {
-	f.result <- Event{Added, obj}
+	select {
+	case f.result <- Event{Added, obj}:
+	case <-f.stop:
+	}
 }
 
 // Modify sends a modify event.
 func (f *FakeWatcher) Modify(obj runtime.Object) {
-	f.result <- Event{Modified, obj}
+	select {
+	case f.result <- Event{Modified, obj}:
+	case <-f.stop:
+	}
 }
 
 // Delete sends a delete event.
 func (f *FakeWatcher) Delete(lastValue runtime.Object) {
-	f.result <- Event{Deleted, lastValue}
+	select {
+	case f.result <- Event{Deleted, lastValue}:
+	case <-f.stop:
+	}
 }
 
 // Error sends an Error event.
 func (f *FakeWatcher) Error(errValue runtime.Object) {
-	f.result <- Event{Error, errValue}
+	select {
+	case f.result <- Event{Error, errValue}:
+	case <-f.stop:
+	}
 }
 
 // Action sends an event of the requested type, for table-based testing.
 func (f *FakeWatcher) Action(action EventType, obj runtime.Object) {
-	f.result <- Event{action, obj}
+	select {
+	case f.result <- Event{action, obj}:
+	case <-f.stop:
+	}
 }
