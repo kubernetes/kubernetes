@@ -47,8 +47,12 @@ function echo_yellow {
 }
 
 function run {
-  output=$($1 2>&1 || true)
-  if [ $? -eq 0 ]; then
+  # For a moment we need to change bash options to capture message if a command fails.
+  set +o errexit
+  output=$($1 2>&1)
+  exit_code=$?
+  set -o errexit
+  if [ $exit_code -eq 0 ]; then
     echo_green "SUCCESS"
   else
     echo_red "FAILED"
@@ -109,7 +113,8 @@ function get_latest_version_number {
   fi
 }
 
-release=$(get_latest_version_number)
+latest_release=$(get_latest_version_number)
+release=${KUBE_VERSION:-latest_release}
 
 uname=$(uname)
 if [[ "${uname}" == "Darwin" ]]; then
