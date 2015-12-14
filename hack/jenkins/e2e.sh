@@ -454,6 +454,7 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-flaky"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    : ${E2E_DOWN:="true"}
     ;;
 
   # Runs slow tests on GCE, sequentially.
