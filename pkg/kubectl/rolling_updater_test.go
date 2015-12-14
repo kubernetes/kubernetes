@@ -1259,7 +1259,7 @@ func readOrDie(t *testing.T, req *http.Request, codec runtime.Codec) runtime.Obj
 		t.Errorf("Error reading: %v", err)
 		t.FailNow()
 	}
-	obj, err := codec.Decode(data)
+	obj, err := runtime.Decode(codec, data)
 	if err != nil {
 		t.Errorf("error decoding: %v", err)
 		t.FailNow()

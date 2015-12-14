@@ -31,11 +31,13 @@ type Codec interface {
 
 // Decoder defines methods for deserializing API objects into a given type
 type Decoder interface {
+	// TODO: change the signature of this method
 	Decode(data []byte) (Object, error)
-	// TODO: Remove this method?
+	// DEPRECATED: This method is being removed
 	DecodeToVersion(data []byte, groupVersion unversioned.GroupVersion) (Object, error)
+	// DEPRECATED: This method is being removed
 	DecodeInto(data []byte, obj Object) error
-	// TODO: Remove this method?
+	// DEPRECATED: This method is being removed
 	DecodeIntoWithSpecifiedVersionKind(data []byte, obj Object, groupVersionKind unversioned.GroupVersionKind) error
 
 	DecodeParametersInto(parameters url.Values, obj Object) error
@@ -43,6 +45,7 @@ type Decoder interface {
 
 // Encoder defines methods for serializing API objects into bytes
 type Encoder interface {
+	// DEPRECATED: This method is being removed
 	Encode(obj Object) (data []byte, err error)
 	EncodeToStream(obj Object, stream io.Writer) error
 

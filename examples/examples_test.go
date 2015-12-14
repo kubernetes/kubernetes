@@ -430,7 +430,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 				if err != nil {
 					t.Errorf("Could not get codec for %s: %s", expectedType, err)
 				}
-				if err := codec.DecodeInto(data, expectedType); err != nil {
+				if err := runtime.DecodeInto(codec, data, expectedType); err != nil {
 					t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 					return
 				}

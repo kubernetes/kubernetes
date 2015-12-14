@@ -176,12 +176,12 @@ func (tc *patchTestCase) Run(t *testing.T) {
 		}
 		t.Logf("Working with patchType %v", patchType)
 
-		originalObjJS, err := codec.Encode(tc.startingPod)
+		originalObjJS, err := runtime.Encode(codec, tc.startingPod)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 			return
 		}
-		changedJS, err := codec.Encode(tc.changedPod)
+		changedJS, err := runtime.Encode(codec, tc.changedPod)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 			return
@@ -231,12 +231,12 @@ func (tc *patchTestCase) Run(t *testing.T) {
 		resultPod := resultObj.(*api.Pod)
 
 		// roundtrip to get defaulting
-		expectedJS, err := codec.Encode(tc.expectedPod)
+		expectedJS, err := runtime.Encode(codec, tc.expectedPod)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 			return
 		}
-		expectedObj, err := codec.Decode(expectedJS)
+		expectedObj, err := runtime.Decode(codec, expectedJS)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 			return

@@ -142,7 +142,7 @@ func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *Embedded
 		return err
 	}
 
-	err = scheme.DecodeInto(in.RawJSON, inObj)
+	err = DecodeInto(scheme, in.RawJSON, inObj)
 	if err != nil {
 		return err
 	}
