@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/gce_pd"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 	"k8s.io/kubernetes/pkg/volume/nfs"
+	"k8s.io/kubernetes/pkg/volume/rbd"
 
 	"github.com/golang/glog"
 )
@@ -87,6 +88,9 @@ func NewVolumeProvisioner(cloud cloudprovider.Interface, flags VolumeConfigFlags
 	switch {
 	case cloud == nil && flags.EnableHostPathProvisioning:
 		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(volume.VolumeConfig{}))
+	//TODO: selectively pick a network storage config
+	case flags.EnableNetworkStorageProvisioning:
+		return getProvisionablePluginFromVolumePlugins(rbd.ProbeVolumePlugins())
 		//	case cloud != nil && aws.ProviderName == cloud.ProviderName():
 		//		return getProvisionablePluginFromVolumePlugins(aws_ebs.ProbeVolumePlugins())
 		//	case cloud != nil && gce.ProviderName == cloud.ProviderName():

@@ -49,6 +49,7 @@ type PersistentVolumeProvisionerController struct {
 	pluginMgr        volume.VolumePluginMgr
 	stopChannels     map[string]chan struct{}
 	mutex            sync.RWMutex
+	storageConfigDir string
 }
 
 // constant name values for the controllers stopChannels map.
@@ -57,11 +58,12 @@ const volumesStopChannel = "volumes"
 const claimsStopChannel = "claims"
 
 // NewPersistentVolumeProvisionerController creates a new PersistentVolumeProvisionerController
-func NewPersistentVolumeProvisionerController(client controllerClient, syncPeriod time.Duration, plugins []volume.VolumePlugin, provisioner volume.ProvisionableVolumePlugin, cloud cloudprovider.Interface) (*PersistentVolumeProvisionerController, error) {
+func NewPersistentVolumeProvisionerController(client controllerClient, syncPeriod time.Duration, plugins []volume.VolumePlugin, provisioner volume.ProvisionableVolumePlugin, cloud cloudprovider.Interface, configDir string) (*PersistentVolumeProvisionerController, error) {
 	controller := &PersistentVolumeProvisionerController{
-		client:      client,
-		cloud:       cloud,
-		provisioner: provisioner,
+		client:           client,
+		cloud:            cloud,
+		provisioner:      provisioner,
+		storageConfigDir: configDir,
 	}
 
 	if err := controller.pluginMgr.InitPlugins(plugins, controller); err != nil {
@@ -485,6 +487,10 @@ func (c *PersistentVolumeProvisionerController) GetWriter() io.Writer {
 
 func (c *PersistentVolumeProvisionerController) GetHostName() string {
 	return ""
+}
+
+func (c *PersistentVolumeProvisionerController) GetStorageConfigDir() string {
+	return c.storageConfigDir
 }
 
 const (

@@ -94,6 +94,7 @@ type CMServer struct {
 	DeletingPodsBurst                 int
 	ServiceAccountKeyFile             string
 	RootCAFile                        string
+	StorageConfigDir                  string
 
 	ClusterName       string
 	ClusterCIDR       net.IPNet
@@ -138,6 +139,7 @@ func NewCMServer() *CMServer {
 			PersistentVolumeRecyclerMinimumTimeoutHostPath:   60,
 			PersistentVolumeRecyclerIncrementTimeoutHostPath: 30,
 			EnableHostPathProvisioning:                       false,
+			EnableNetworkStorageProvisioning:                 false,
 		},
 		KubeAPIQPS:   20.0,
 		KubeAPIBurst: 30,
@@ -178,6 +180,7 @@ type VolumeConfigFlags struct {
 	PersistentVolumeRecyclerMinimumTimeoutHostPath      int
 	PersistentVolumeRecyclerIncrementTimeoutHostPath    int
 	EnableHostPathProvisioning                          bool
+	EnableNetworkStorageProvisioning                    bool
 }
 
 // AddFlags adds flags for a specific CMServer to the specified FlagSet
@@ -204,6 +207,8 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.VolumeConfigFlags.PersistentVolumeRecyclerMinimumTimeoutHostPath, "pv-recycler-minimum-timeout-hostpath", s.VolumeConfigFlags.PersistentVolumeRecyclerMinimumTimeoutHostPath, "The minimum ActiveDeadlineSeconds to use for a HostPath Recycler pod.  This is for development and testing only and will not work in a multi-node cluster.")
 	fs.IntVar(&s.VolumeConfigFlags.PersistentVolumeRecyclerIncrementTimeoutHostPath, "pv-recycler-timeout-increment-hostpath", s.VolumeConfigFlags.PersistentVolumeRecyclerIncrementTimeoutHostPath, "the increment of time added per Gi to ActiveDeadlineSeconds for a HostPath scrubber pod.  This is for development and testing only and will not work in a multi-node cluster.")
 	fs.BoolVar(&s.VolumeConfigFlags.EnableHostPathProvisioning, "enable-hostpath-provisioner", s.VolumeConfigFlags.EnableHostPathProvisioning, "Enable HostPath PV provisioning when running without a cloud provider. This allows testing and development of provisioning features.  HostPath provisioning is not supported in any way, won't work in a multi-node cluster, and should not be used for anything other than testing or development.")
+	fs.BoolVar(&s.VolumeConfigFlags.EnableNetworkStorageProvisioning, "enable-network-storage-provisioner", s.VolumeConfigFlags.EnableNetworkStorageProvisioning, "Enable Network Storage PV provisioning.")
+	fs.StringVar(&s.StorageConfigDir, "storage-config", s.StorageConfigDir, "The path to the dir containing network storage (ceph/glusterfs) configuration files.  Empty string for no configuration file.")
 	fs.IntVar(&s.TerminatedPodGCThreshold, "terminated-pod-gc-threshold", s.TerminatedPodGCThreshold, "Number of terminated pods that can exist before the terminated pod garbage collector starts deleting terminated pods. If <= 0, the terminated pod garbage collector is disabled.")
 	fs.DurationVar(&s.HorizontalPodAutoscalerSyncPeriod, "horizontal-pod-autoscaler-sync-period", s.HorizontalPodAutoscalerSyncPeriod, "The period for syncing the number of pods in horizontal pod autoscaler.")
 	fs.DurationVar(&s.DeploymentControllerSyncPeriod, "deployment-controller-sync-period", s.DeploymentControllerSyncPeriod, "Period for syncing the deployments.")
@@ -404,7 +409,7 @@ func (s *CMServer) Run(_ []string) error {
 	pvRecycler.Run()
 
 	if provisioner != nil {
-		pvController, err := persistentvolumecontroller.NewPersistentVolumeProvisionerController(persistentvolumecontroller.NewControllerClient(clientForUserAgentOrDie(*kubeconfig, "persistent-volume-provisioner")), s.PVClaimBinderSyncPeriod, volumePlugins, provisioner, cloud)
+		pvController, err := persistentvolumecontroller.NewPersistentVolumeProvisionerController(persistentvolumecontroller.NewControllerClient(clientForUserAgentOrDie(*kubeconfig, "persistent-volume-provisioner")), s.PVClaimBinderSyncPeriod, volumePlugins, provisioner, cloud, s.StorageConfigDir)
 		if err != nil {
 			glog.Fatalf("Failed to start persistent volume provisioner controller: %+v", err)
 		}

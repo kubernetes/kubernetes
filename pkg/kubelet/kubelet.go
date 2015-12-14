@@ -215,6 +215,7 @@ func NewMainKubelet(
 	serializeImagePulls bool,
 	containerManager cm.ContainerManager,
 	flannelExperimentalOverlay bool,
+	storageConfigDir string,
 ) (*Kubelet, error) {
 
 	if rootDirectory == "" {
@@ -331,6 +332,7 @@ func NewMainKubelet(
 		containerManager:               containerManager,
 		flannelExperimentalOverlay:     flannelExperimentalOverlay,
 		flannelHelper:                  NewFlannelHelper(),
+		storageConfigDir:               storageConfigDir,
 	}
 	if klet.flannelExperimentalOverlay {
 		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
@@ -669,6 +671,9 @@ type Kubelet struct {
 	// on the fly if we're confident the dbus connetions it opens doesn't
 	// put the system under duress.
 	flannelHelper *FlannelHelper
+
+	// storage config dir
+	storageConfigDir string
 }
 
 func (kl *Kubelet) allSourcesReady() bool {

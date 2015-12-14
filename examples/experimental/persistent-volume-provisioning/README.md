@@ -118,6 +118,77 @@ persistentvolumeclaim "claim1" deleted
 $ kubectl get pv
 
 ```
+### Provision Ceph RBD Volume
+Enable RBD provisioning by supplying `--enable-network-storage-provisioner=true --storage-config=/path/to/storage/config/directory` to `kube-controller-manager`.
+
+In the storage configuration directory, provide a ceph cluster configuration json like the following. Note, only `Mon`, `Pool`, `Id`, and `Keyring` are mandatory.
+```json
+{
+  "Mon": ["10.16.154.78:6789"],
+  "Pool": "kube",
+  "Id": "kube",
+  "Keyring": "/etc/ceph/ceph.client.kube.keyring",
+  "FSType": "ext4"
+}
+```
+
+Create a PV json like the following:
+
+```json
+{
+  "kind": "PersistentVolumeClaim",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "claim1",
+    "annotations": {
+      "volume.alpha.kubernetes.io/storage-class": "foo"
+    }
+  },
+  "spec": {
+    "accessModes": [
+      "ReadWriteOnce"
+    ],
+    "resources": {
+      "requests": {
+        "storage": "1Mi"
+      }
+    }
+  }
+}
+```
+
+Create the PV using `kubectl`:
+
+```console
+# kubectl create -f claim1.json 
+persistentvolumeclaim "claim1" created
+```
+
+Confirm the PV is created using RBD volume:
+```console
+# kubectl.sh get pv
+NAME           LABELS    CAPACITY   ACCESSMODES   STATUS    CLAIM            REASON    AGE
+pv-rbd-7oiyw   <none>    1Mi        RWO           Bound     default/claim1             12s
+# kubectl describe pv pv-rbd-7oiyw
+Name:		pv-rbd-7oiyw
+Labels:		<none>
+Status:		Bound
+Claim:		default/claim1
+Reclaim Policy:	Delete
+Access Modes:	RWO
+Capacity:	1Mi
+Message:	
+Source:
+    Type:		RBD (a Rados Block Device mount on the host that shares a pod's lifetime)
+    CephMonitors:	[10.16.154.78:6789]
+    RBDImage:		b1918f4b-a352-11e5-a619-d4bed9b38fad
+    FSType:		ext4
+    RBDPool:		kube
+    RadosUser:		kube
+    Keyring:		/etc/ceph/ceph.client.kube.keyring
+    SecretRef:		<nil>
+    ReadOnly:		false
+```
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/experimental/persistent-volume-provisioning/README.md?pixel)]()

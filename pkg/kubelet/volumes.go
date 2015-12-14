@@ -98,6 +98,11 @@ func (vh *volumeHost) GetHostName() string {
 	return vh.kubelet.hostname
 }
 
+// Returns the storage config dir
+func (vh *volumeHost) GetStorageConfigDir() string {
+	return vh.kubelet.storageConfigDir
+}
+
 func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {

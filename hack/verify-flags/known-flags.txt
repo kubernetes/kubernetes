@@ -79,6 +79,7 @@ e2e-verify-service-account
 enable-debugging-handlers
 enable-server
 enable-hostpath-provisioner
+enable-ceph-rbd-provisioner
 etcd-config
 etcd-prefix
 etcd-server

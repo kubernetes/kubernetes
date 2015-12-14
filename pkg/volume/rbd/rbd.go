@@ -17,10 +17,14 @@ limitations under the License.
 package rbd
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -40,6 +44,11 @@ type rbdPlugin struct {
 
 var _ volume.VolumePlugin = &rbdPlugin{}
 var _ volume.PersistentVolumePlugin = &rbdPlugin{}
+var _ volume.PersistentVolumePlugin = &rbdPlugin{}
+var _ volume.DeletableVolumePlugin = &rbdPlugin{}
+var _ volume.ProvisionableVolumePlugin = &rbdPlugin{}
+var _ volume.Provisioner = &rbdVolumeProvisioner{}
+var _ volume.Deleter = &rbdVolumeDeleter{}
 
 const (
 	rbdPluginName = "kubernetes.io/rbd"
@@ -71,6 +80,128 @@ func (plugin *rbdPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 		api.ReadWriteOnce,
 		api.ReadOnlyMany,
 	}
+}
+
+func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+	return plugin.newDeleterInternal(spec, &RBDUtil{})
+}
+
+func (plugin *rbdPlugin) newDeleterInternal(spec *volume.Spec, manager diskManager) (volume.Deleter, error) {
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil {
+		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.RBD is nil")
+	}
+	return &rbdVolumeDeleter{
+		rbdBuilder: &rbdBuilder{
+			rbd: &rbd{
+				volName: spec.Name(),
+				Image:   spec.PersistentVolume.Spec.RBD.RBDImage,
+				Pool:    spec.PersistentVolume.Spec.RBD.RBDPool,
+				manager: manager,
+				plugin:  plugin,
+			},
+			Mon:     spec.PersistentVolume.Spec.RBD.CephMonitors,
+			Id:      spec.PersistentVolume.Spec.RBD.RadosUser,
+			Keyring: spec.PersistentVolume.Spec.RBD.Keyring,
+		}}, nil
+}
+
+func (plugin *rbdPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+	if len(options.AccessModes) == 0 {
+		options.AccessModes = plugin.GetAccessModes()
+	}
+	return plugin.newProvisionerInternal(options, &RBDUtil{})
+}
+
+func (plugin *rbdPlugin) newProvisionerInternal(options volume.VolumeOptions, manager diskManager) (volume.Provisioner, error) {
+	return &rbdVolumeProvisioner{
+		rbdBuilder: &rbdBuilder{
+			rbd: &rbd{
+				manager: manager,
+				plugin:  plugin,
+			},
+		},
+		options: options,
+	}, nil
+}
+
+type rbdVolumeProvisioner struct {
+	*rbdBuilder
+	options volume.VolumeOptions
+}
+
+func (r *rbdVolumeProvisioner) Provision(pv *api.PersistentVolume) error {
+	config := r.rbdBuilder.plugin.host.GetStorageConfigDir()
+	if config == "" {
+		glog.V(1).Infof("rbd: no storage config provided")
+		return fmt.Errorf("no storage config provided")
+	}
+	file := path.Join(config, "ceph.json")
+	fp, err := os.Open(file)
+	if err != nil {
+		glog.V(1).Infof("rbd NewPersistentVolumeTemplate: open err %s/%s", file, err)
+		return fmt.Errorf("rbd NewPersistentVolumeTemplate: open err %s/%s", file, err)
+	}
+	defer fp.Close()
+
+	decoder := json.NewDecoder(fp)
+	if err = decoder.Decode(r.rbdBuilder); err != nil {
+		glog.V(1).Infof("rbd: decode err: %v.", err)
+		return fmt.Errorf("rbd: decode err: %v.", err)
+	}
+	image := fmt.Sprintf("%s", util.NewUUID())
+	r.rbdBuilder.Image = image
+	rbd, sizeMB, err := r.manager.CreateImage(r)
+	if err != nil {
+		return err
+	}
+	pv.Spec.PersistentVolumeSource.RBD = rbd
+
+	pv.Spec.Capacity = api.ResourceList{
+		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dMi", sizeMB)),
+	}
+	return nil
+}
+
+func (c *rbdVolumeProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
+	// Provide rbd api.PersistentVolume.Spec, it will be filled in
+	// rbdVolumeProvisioner.Provision()
+	return &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "pv-rbd-",
+			Labels:       map[string]string{},
+			Annotations: map[string]string{
+				"kubernetes.io/createdby": "rbd-dynamic-provisioner",
+			},
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
+			AccessModes:                   c.options.AccessModes,
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): c.options.Capacity,
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				RBD: &api.RBDVolumeSource{
+					CephMonitors: []string{"test"},
+					RBDImage:     "foo",
+					FSType:       "ext4",
+				},
+			},
+		},
+	}, nil
+
+}
+
+type rbdVolumeDeleter struct {
+	*rbdBuilder
+}
+
+func (r *rbdVolumeDeleter) GetPath() string {
+	name := rbdPluginName
+	return r.plugin.host.GetPodVolumeDir(r.podUID, util.EscapeQualifiedNameForDisk(name), r.volName)
+}
+
+func (r *rbdVolumeDeleter) Delete() error {
+	return r.manager.DeleteImage(r)
 }
 
 func (plugin *rbdPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {

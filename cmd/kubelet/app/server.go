@@ -141,6 +141,7 @@ type KubeletServer struct {
 	TLSCertFile                    string
 	TLSPrivateKeyFile              string
 	ReconcileCIDR                  bool
+	StorageConfigDir               string
 
 	// Flags intended for testing
 	// Is the kubelet containerized?
@@ -230,6 +231,7 @@ func NewKubeletServer() *KubeletServer {
 		KubeAPIQPS:                     5.0,
 		KubeAPIBurst:                   10,
 		ExperimentalFlannelOverlay:     experimentalFlannelOverlay,
+		StorageConfigDir:               "",
 	}
 }
 
@@ -345,6 +347,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.BoolVar(&s.SerializeImagePulls, "serialize-image-pulls", s.SerializeImagePulls, "Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]")
 	fs.BoolVar(&s.ExperimentalFlannelOverlay, "experimental-flannel-overlay", s.ExperimentalFlannelOverlay, "Experimental support for starting the kubelet with the default overlay network (flannel). Assumes flanneld is already running in client mode. [default=false]")
+	fs.StringVar(&s.StorageConfigDir, "storage-config", s.StorageConfigDir, "The path to the dir containing network storage (ceph/glusterfs) configuration files.  Empty string for no configuration file.")
 }
 
 // UnsecuredKubeletConfig returns a KubeletConfig suitable for being run, or an error if the server setup
@@ -482,6 +485,7 @@ func (s *KubeletServer) UnsecuredKubeletConfig() (*KubeletConfig, error) {
 		TLSOptions:                     tlsOptions,
 		Writer:                         writer,
 		VolumePlugins:                  ProbeVolumePlugins(),
+		StorageConfigDir:               s.StorageConfigDir,
 
 		ExperimentalFlannelOverlay: s.ExperimentalFlannelOverlay,
 	}, nil
@@ -958,6 +962,7 @@ type KubeletConfig struct {
 	TLSOptions                     *kubelet.TLSOptions
 	Writer                         io.Writer
 	VolumePlugins                  []volume.VolumePlugin
+	StorageConfigDir               string
 
 	ExperimentalFlannelOverlay bool
 }
@@ -1043,6 +1048,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.SerializeImagePulls,
 		kc.ContainerManager,
 		kc.ExperimentalFlannelOverlay,
+		kc.StorageConfigDir,
 	)
 
 	if err != nil {

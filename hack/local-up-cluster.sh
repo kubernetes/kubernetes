@@ -92,7 +92,8 @@ RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-false}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
-
+ENABLE_NET_STORAGE_PROVISIONER=${ENABLE_NET_STORAGE_PROVISIONER:-"false"}
+STORAGE_CONFIG=${STORAGE_CONFIG:-""}
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
     # this can happen if you run local-up-cluster.sh twice and kill etcd in between.
@@ -252,6 +253,8 @@ function start_controller_manager {
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
       --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
+      --enable-network-storage-provisioner="${ENABLE_NET_STORAGE_PROVISIONER}" \
+      --storage-config=${STORAGE_CONFIG} \
       --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }

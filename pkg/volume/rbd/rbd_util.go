@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/node"
@@ -304,4 +305,71 @@ func (util *RBDUtil) DetachDisk(c rbdCleaner, mntPath string) error {
 		glog.Infof("rbd: successfully unmap device %s", device)
 	}
 	return nil
+}
+
+func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *api.RBDVolumeSource, size int, err error) {
+	volSizeBytes := p.options.Capacity.Value()
+	// convert to MB that rbd defaults on
+	const mb = 1024 * 1024
+	sz := int((volSizeBytes + mb - 1) / mb)
+	volSz := fmt.Sprintf("%d", sz)
+	// rbd create
+	l := len(p.rbdBuilder.Mon)
+	// pick a mon randomly
+	start := rand.Int() % l
+	// iterate all monitors until create succeeds.
+	for i := start; i < start+l; i++ {
+		mon := p.Mon[i%l]
+		glog.V(1).Infof("rbd: create using mon %s", mon)
+		if p.rbdBuilder.Keyring != "" {
+			_, err = p.rbdBuilder.plugin.execCommand("rbd",
+				[]string{"create", p.rbdBuilder.Image, "--size", volSz, "--pool", p.rbdBuilder.Pool, "--id", p.rbdBuilder.Id, "-m", mon, "-k", p.rbdBuilder.Keyring})
+		} else {
+			glog.V(1).Infof("rbd: missing keyring")
+			return nil, 0, fmt.Errorf("rbd: missing keyring")
+		}
+		if err == nil {
+			break
+		}
+	}
+
+	if err != nil {
+		glog.V(2).Infof("rbd: Error creating rbd image: %v", err)
+		return nil, 0, err
+	}
+
+	return &api.RBDVolumeSource{
+		CephMonitors: p.rbdBuilder.Mon,
+		RBDImage:     p.rbdBuilder.Image,
+		RadosUser:    p.rbdBuilder.Id,
+		RBDPool:      p.rbdBuilder.Pool,
+		Keyring:      p.rbdBuilder.Keyring,
+		FSType:       "ext4",
+	}, sz, nil
+}
+
+func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
+	var err error
+	// rbd rm
+	l := len(p.rbdBuilder.Mon)
+	// pick a mon randomly
+	start := rand.Int() % l
+	// iterate all monitors until rm succeeds.
+	for i := start; i < start+l; i++ {
+		mon := p.rbdBuilder.Mon[i%l]
+		glog.V(1).Infof("rbd: create using mon %s", mon)
+		if p.rbdBuilder.Keyring != "" {
+			_, err = p.plugin.execCommand("rbd",
+				[]string{"create", p.rbdBuilder.Image, "--pool", p.rbdBuilder.Pool, "--id", p.rbdBuilder.Id, "-m", mon, "-k", p.rbdBuilder.Keyring})
+		} else {
+			glog.V(1).Infof("rbd: missing keyring")
+			return fmt.Errorf("rbd: missing keyring")
+		}
+
+		if err == nil {
+			return nil
+		}
+	}
+	glog.V(2).Infof("Successfully deleted rbd image %s", p.rbdBuilder.Image)
+	return err
 }
