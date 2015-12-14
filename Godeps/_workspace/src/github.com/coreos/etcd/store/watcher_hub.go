@@ -78,8 +78,9 @@ func (wh *watcherHub) watch(key string, recursive, stream bool, index, storeInde
 	defer wh.mutex.Unlock()
 	// If the event exists in the known history, append the EtcdIndex and return immediately
 	if event != nil {
-		event.EtcdIndex = storeIndex
-		w.eventChan <- event
+		ne := event.Clone()
+		ne.EtcdIndex = storeIndex
+		w.eventChan <- ne
 		return w, nil
 	}
 
