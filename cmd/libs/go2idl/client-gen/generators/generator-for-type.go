@@ -76,7 +76,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 var namespacerTemplate = `
 // $.type|public$Namespacer has methods to work with $.type|public$ resources in a namespace
 type $.type|public$Namespacer interface {
-	$.type|public$s(namespace string) $.type|public$Interface
+	$.type|publicPlural$(namespace string) $.type|public$Interface
 }
 `
 
@@ -95,28 +95,28 @@ type $.type|public$Interface interface {
 
 // template for the struct that implements the interface
 var structTemplate = `
-// $.type|private$s implements $.type|public$Interface
-type $.type|private$s struct {
+// $.type|privatePlural$ implements $.type|public$Interface
+type $.type|privatePlural$ struct {
 	client *$.Package$Client
 	ns     string
 }
 `
 var newStructTemplate = `
-// new$.type|public$s returns a $.type|public$s
-func new$.type|public$s(c *ExtensionsClient, namespace string) *$.type|private$s {
-	return &$.type|private$s{
+// new$.type|publicPlural$ returns a $.type|publicPlural$
+func new$.type|publicPlural$(c *ExtensionsClient, namespace string) *$.type|privatePlural$ {
+	return &$.type|privatePlural${
 		client: c,
 		ns:     namespace,
 	}
 }
 `
 var listTemplate = `
-// List takes label and field selectors, and returns the list of $.type|public$s that match those selectors.
-func (c *$.type|private$s) List(opts $.unvListOptions|raw$) (result *$.type|raw$List, err error) {
+// List takes label and field selectors, and returns the list of $.type|publicPlural$ that match those selectors.
+func (c *$.type|privatePlural$) List(opts $.unvListOptions|raw$) (result *$.type|raw$List, err error) {
 	result = &$.type|raw$List{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("$.type|private$s").
+		Resource("$.type|privatePlural$").
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -125,11 +125,11 @@ func (c *$.type|private$s) List(opts $.unvListOptions|raw$) (result *$.type|raw$
 `
 var getTemplate = `
 // Get takes name of the $.type|private$, and returns the corresponding $.type|private$ object, and an error if there is any.
-func (c *$.type|private$s) Get(name string) (result *$.type|raw$, err error) {
+func (c *$.type|privatePlural$) Get(name string) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("$.type|private$s").
+		Resource("$.type|privatePlural$").
 		Name(name).
 		Do().
 		Into(result)
@@ -139,9 +139,9 @@ func (c *$.type|private$s) Get(name string) (result *$.type|raw$, err error) {
 
 var deleteTemplate = `
 // Delete takes name of the $.type|private$ and deletes it. Returns an error if one occurs.
-func (c *$.type|private$s) Delete(name string, options *$.apiDeleteOptions|raw$) error {
+func (c *$.type|privatePlural$) Delete(name string, options *$.apiDeleteOptions|raw$) error {
 	if options == nil {
-		return c.client.Delete().Namespace(c.ns).Resource("$.type|private$s").Name(name).Do().Error()
+		return c.client.Delete().Namespace(c.ns).Resource("$.type|privatePlural$").Name(name).Do().Error()
 	}
 	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion())
 	if err != nil {
@@ -149,7 +149,7 @@ func (c *$.type|private$s) Delete(name string, options *$.apiDeleteOptions|raw$)
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("$.type|private$s").
+		Resource("$.type|privatePlural$").
 		Name(name).
 		Body(body).
 		Do().
@@ -159,11 +159,11 @@ func (c *$.type|private$s) Delete(name string, options *$.apiDeleteOptions|raw$)
 
 var createTemplate = `
 // Create takes the representation of a $.type|private$ and creates it.  Returns the server's representation of the $.type|private$, and an error, if there is any.
-func (c *$.type|private$s) Create($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
+func (c *$.type|privatePlural$) Create($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("$.type|private$s").
+		Resource("$.type|privatePlural$").
 		Body($.type|private$).
 		Do().
 		Into(result)
@@ -173,11 +173,11 @@ func (c *$.type|private$s) Create($.type|private$ *$.type|raw$) (result *$.type|
 
 var updateTemplate = `
 // Update takes the representation of a $.type|private$ and updates it. Returns the server's representation of the $.type|private$, and an error, if there is any.
-func (c *$.type|private$s) Update($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
+func (c *$.type|privatePlural$) Update($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("$.type|private$s").
+		Resource("$.type|privatePlural$").
 		Name($.type|private$.Name).
 		Body($.type|private$).
 		Do().
@@ -187,12 +187,12 @@ func (c *$.type|private$s) Update($.type|private$ *$.type|raw$) (result *$.type|
 `
 
 var watchTemplate = `
-// Watch returns a $.watchInterface|raw$ that watches the requested $.type|private$s.
-func (c *$.type|private$s) Watch(opts $.unvListOptions|raw$) ($.watchInterface|raw$, error) {
+// Watch returns a $.watchInterface|raw$ that watches the requested $.type|privatePlural$.
+func (c *$.type|privatePlural$) Watch(opts $.unvListOptions|raw$) ($.watchInterface|raw$, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("$.type|private$s").
+		Resource("$.type|privatePlural$").
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }
