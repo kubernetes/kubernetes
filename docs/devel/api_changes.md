@@ -320,7 +320,8 @@ before starting "all the rest".
 The struct definitions for each API are in `pkg/api/<version>/types.go`.  Edit
 those files to reflect the change you want to make.  Note that all types and non-inline
 fields in versioned APIs must be preceded by descriptive comments - these are used to generate
-documentation.
+documentation.  Comments for types should not contain the type name; API documentation is
+generated from these comments and end-users should not be exposed to golang type names.
 
 Optional fields should have the `,omitempty` json tag; fields are interpreted as being
 required otherwise.
