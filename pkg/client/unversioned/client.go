@@ -25,7 +25,6 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/version"
@@ -160,25 +159,6 @@ func (c *Client) ServerAPIVersions() (*unversioned.APIVersions, error) {
 		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
 	return &v, nil
-}
-
-type ComponentValidatorInterface interface {
-	ValidateComponents() (*api.ComponentStatusList, error)
-}
-
-// ValidateComponents retrieves and parses the master's self-monitored cluster state.
-// TODO: This should hit the versioned endpoint when that is implemented.
-func (c *Client) ValidateComponents() (*api.ComponentStatusList, error) {
-	body, err := c.Get().AbsPath("/validate").DoRaw()
-	if err != nil {
-		return nil, err
-	}
-
-	statuses := []api.ComponentStatus{}
-	if err := json.Unmarshal(body, &statuses); err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &api.ComponentStatusList{Items: statuses}, nil
 }
 
 // SwaggerSchemaInterface has a method to retrieve the swagger schema. Used in
