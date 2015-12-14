@@ -1977,3 +1977,126 @@ func newInt(val int) *int {
 	*p = val
 	return p
 }
+
+func TestValidatePodSecurityPolicy(t *testing.T) {
+	validSCC := func() *extensions.PodSecurityPolicy {
+		return &extensions.PodSecurityPolicy{
+			ObjectMeta: api.ObjectMeta{Name: "foo"},
+			Spec: extensions.PodSecurityPolicySpec{
+				SELinuxContext: extensions.SELinuxContextStrategyOptions{
+					Type: extensions.SELinuxStrategyRunAsAny,
+				},
+				RunAsUser: extensions.RunAsUserStrategyOptions{
+					Type: extensions.RunAsUserStrategyRunAsAny,
+				},
+			},
+		}
+	}
+
+	noUserOptions := validSCC()
+	noUserOptions.Spec.RunAsUser.Type = ""
+
+	noSELinuxOptions := validSCC()
+	noSELinuxOptions.Spec.SELinuxContext.Type = ""
+
+	invalidUserStratType := validSCC()
+	invalidUserStratType.Spec.RunAsUser.Type = "invalid"
+
+	invalidSELinuxStratType := validSCC()
+	invalidSELinuxStratType.Spec.SELinuxContext.Type = "invalid"
+
+	missingObjectMetaName := validSCC()
+	missingObjectMetaName.ObjectMeta.Name = ""
+
+	invalidRangeMinGreaterThanMax := validSCC()
+	invalidRangeMinGreaterThanMax.Spec.RunAsUser.Ranges = []extensions.IDRange{
+		{Min: 2, Max: 1},
+	}
+
+	invalidRangeNegativeMin := validSCC()
+	invalidRangeNegativeMin.Spec.RunAsUser.Ranges = []extensions.IDRange{
+		{Min: -1, Max: 10},
+	}
+
+	invalidRangeNegativeMax := validSCC()
+	invalidRangeNegativeMax.Spec.RunAsUser.Ranges = []extensions.IDRange{
+		{Min: 1, Max: -10},
+	}
+
+	errorCases := map[string]struct {
+		scc         *extensions.PodSecurityPolicy
+		errorDetail string
+	}{
+		"no user options": {
+			scc:         noUserOptions,
+			errorDetail: "supported values: MustRunAs, MustRunAsNonRoot, RunAsAny",
+		},
+		"no selinux options": {
+			scc:         noSELinuxOptions,
+			errorDetail: "supported values: MustRunAs, RunAsAny",
+		},
+		"invalid user strategy type": {
+			scc:         invalidUserStratType,
+			errorDetail: "supported values: MustRunAs, MustRunAsNonRoot, RunAsAny",
+		},
+		"invalid selinux strategy type": {
+			scc:         invalidSELinuxStratType,
+			errorDetail: "supported values: MustRunAs, RunAsAny",
+		},
+		"missing object meta name": {
+			scc:         missingObjectMetaName,
+			errorDetail: "name or generateName is required",
+		},
+		"invalid range min greater than max": {
+			scc:         invalidRangeMinGreaterThanMax,
+			errorDetail: "min cannot be greater than max",
+		},
+		"invalid range negative min": {
+			scc:         invalidRangeNegativeMin,
+			errorDetail: "min cannot be negative",
+		},
+		"invalid range negative max": {
+			scc:         invalidRangeNegativeMax,
+			errorDetail: "max cannot be negative",
+		},
+	}
+
+	for k, v := range errorCases {
+		if errs := ValidatePodSecurityPolicy(v.scc); len(errs) == 0 || errs[0].Detail != v.errorDetail {
+			t.Errorf("Expected error with detail %s for %s, got %v", v.errorDetail, k, errs[0].Detail)
+		}
+	}
+
+	mustRunAs := validSCC()
+	mustRunAs.Spec.RunAsUser.Type = extensions.RunAsUserStrategyMustRunAs
+	mustRunAs.Spec.RunAsUser.Ranges = []extensions.IDRange{
+		{
+			Min: 1,
+			Max: 1,
+		},
+	}
+	mustRunAs.Spec.SELinuxContext.Type = extensions.SELinuxStrategyMustRunAs
+
+	runAsNonRoot := validSCC()
+	runAsNonRoot.Spec.RunAsUser.Type = extensions.RunAsUserStrategyMustRunAsNonRoot
+
+	successCases := map[string]struct {
+		scc *extensions.PodSecurityPolicy
+	}{
+		"must run as": {
+			scc: mustRunAs,
+		},
+		"run as any": {
+			scc: validSCC(),
+		},
+		"run as non-root (user only)": {
+			scc: runAsNonRoot,
+		},
+	}
+
+	for k, v := range successCases {
+		if errs := ValidatePodSecurityPolicy(v.scc); len(errs) != 0 {
+			t.Errorf("Expected success for %s, got %v", k, errs)
+		}
+	}
+}

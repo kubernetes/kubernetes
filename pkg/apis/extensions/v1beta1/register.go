@@ -60,6 +60,8 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&v1.DeleteOptions{},
 		&ReplicaSet{},
 		&ReplicaSetList{},
+		&PodSecurityPolicy{},
+		&PodSecurityPolicyList{},
 	)
 }
 
@@ -85,3 +87,5 @@ func (obj *IngressList) GetObjectKind() unversioned.ObjectKind                 {
 func (obj *ListOptions) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
 func (obj *ReplicaSet) GetObjectKind() unversioned.ObjectKind                  { return &obj.TypeMeta }
 func (obj *ReplicaSetList) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }
+func (obj *PodSecurityPolicy) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
+func (obj *PodSecurityPolicyList) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }
