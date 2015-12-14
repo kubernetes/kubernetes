@@ -96,8 +96,8 @@ type $.Group$Client struct {
 `
 
 var namespacerImplTemplate = `
-func (c *$.Group$Client) $.type.Name.Name$s(namespace string) $.type.Name.Name$Interface {
-	return new$.type.Name.Name$s(c, namespace)
+func (c *$.Group$Client) $.type|publicPlural$(namespace string) $.type.Name.Name$Interface {
+	return new$.type|publicPlural$(c, namespace)
 }
 `
 
