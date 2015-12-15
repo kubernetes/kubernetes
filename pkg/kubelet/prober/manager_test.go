@@ -251,6 +251,7 @@ func TestUpdatePodStatus(t *testing.T) {
 func TestUpdateReadiness(t *testing.T) {
 	testPod := getTestPod(readiness, api.Probe{})
 	m := newTestManager()
+	m.Start()
 	m.statusManager.SetPodStatus(&testPod, getTestRunningStatus())
 
 	m.AddPod(&testPod)
