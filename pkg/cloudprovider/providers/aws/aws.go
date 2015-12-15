@@ -135,7 +135,7 @@ type EC2Metadata interface {
 }
 
 type VolumeOptions struct {
-	CapacityMB int
+	CapacityGB int
 }
 
 // Volumes is an interface for managing cloud-provisioned volumes
@@ -1222,7 +1222,7 @@ func (aws *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) 
 
 	request := &ec2.CreateVolumeInput{}
 	request.AvailabilityZone = &aws.availabilityZone
-	volSize := (int64(volumeOptions.CapacityMB) + 1023) / 1024
+	volSize := int64(volumeOptions.CapacityGB)
 	request.Size = &volSize
 	response, err := aws.ec2.CreateVolume(request)
 	if err != nil {

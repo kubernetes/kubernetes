@@ -18,10 +18,11 @@ package e2e
 
 import (
 	"fmt"
-	"google.golang.org/api/googleapi"
 	mathrand "math/rand"
 	"strings"
 	"time"
+
+	"google.golang.org/api/googleapi"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -326,7 +327,7 @@ func createPD() (string, error) {
 			return "", fmt.Errorf("Provider does not support volumes")
 		}
 		volumeOptions := &awscloud.VolumeOptions{}
-		volumeOptions.CapacityMB = 10 * 1024
+		volumeOptions.CapacityGB = 10
 		return volumes.CreateVolume(volumeOptions)
 	}
 }
