@@ -1781,13 +1781,18 @@ type typeFunc struct {
 }
 
 // Matches returns true when the passed types exactly match the Extra list.
-// TODO: allow unordered types to be matched and reorderd.
 func (fn typeFunc) Matches(types []reflect.Type) bool {
 	if len(fn.Extra) != len(types) {
 		return false
 	}
+	// reorder the items in array types and fn.Extra
+	// convert the type into string and sort them, check if they are matched
+	varMap := make(map[reflect.Type]bool)
+	for i := range fn.Extra {
+		varMap[fn.Extra[i]] = true
+	}
 	for i := range types {
-		if fn.Extra[i] != types[i] {
+		if _, found := varMap[types[i]]; !found {
 			return false
 		}
 	}
