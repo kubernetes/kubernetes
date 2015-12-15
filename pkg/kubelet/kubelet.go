@@ -318,6 +318,7 @@ func NewMainKubelet(
 		containerManager:               containerManager,
 		flannelExperimentalOverlay:     flannelExperimentalOverlay,
 		flannelHelper:                  NewFlannelHelper(),
+		cbr0:                           newContainerBridgeReconciler("cbr0"),
 	}
 	if klet.flannelExperimentalOverlay {
 		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
@@ -637,6 +638,10 @@ type Kubelet struct {
 
 	// Optionally shape the bandwidth of a pod
 	shaper bandwidth.BandwidthShaper
+
+	// Used to reconcile the container bridge and bootstrap basic node
+	// networking. Abstracted out for unittesting.
+	cbr0 *containerBridgeReconciler
 
 	// True if container cpu limits should be enforced via cgroup CFS quota
 	cpuCFSQuota bool
@@ -2589,24 +2594,10 @@ func (kl *Kubelet) updateRuntimeUp() {
 	kl.runtimeState.setRuntimeSync(time.Now())
 }
 
-func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
-	if podCIDR == "" {
-		glog.V(5).Info("PodCIDR not set. Will not configure cbr0.")
-		return nil
-	}
-	glog.V(5).Infof("PodCIDR is set to %q", podCIDR)
-	_, cidr, err := net.ParseCIDR(podCIDR)
-	if err != nil {
-		return err
-	}
-	// Set cbr0 interface address to first address in IPNet
-	cidr.IP.To4()[3] += 1
-	if err := ensureCbr0(cidr); err != nil {
-		return err
-	}
+func (kl *Kubelet) applyBandwidthShaping() error {
 	if kl.shaper == nil {
 		glog.V(5).Info("Shaper is nil, creating")
-		kl.shaper = bandwidth.NewTCShaper("cbr0")
+		kl.shaper = bandwidth.NewTCShaper(kl.cbr0.name)
 	}
 	return kl.shaper.ReconcileInterface()
 }
@@ -2630,31 +2621,56 @@ func (kl *Kubelet) recordNodeStatusEvent(eventtype, event string) {
 	kl.recorder.Eventf(kl.nodeRef, eventtype, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
+// syncNetworkStatus is responsible configuring networking as follows:
+// [Network state set to Unknown]
+// * If configureCBR0==false, the kubelet doesn't bother with node networking.
+// [Network state cleared]
+// * Step1: configure IPTables masquerade rules for node traffic.
+// * Step2: Wait for podCIDR:
+//	- If flannelExperimentalOverlay is set, this requires waiting on subnet.env
+//	- Otherwise it requires waiting on the nodecontroller to assign a podCIDR
+// * Step3: Configure container bridge and restart docker.
+// [Network state cleared]
+// The kubelet will not create static pods till the network state has been
+// cleared. It also won't accept new pods till it has updated the node to Ready.
 func (kl *Kubelet) syncNetworkStatus() {
 	var err error
-	if kl.configureCBR0 {
-		if kl.flannelExperimentalOverlay {
-			podCIDR, err := kl.flannelHelper.Handshake()
-			if err != nil {
-				glog.Infof("Flannel server handshake failed %v", err)
-				return
-			}
-			glog.Infof("Setting cidr: %v -> %v",
-				kl.runtimeState.podCIDR(), podCIDR)
-			kl.runtimeState.setPodCIDR(podCIDR)
+	if !kl.configureCBR0 {
+		kl.runtimeState.setNetworkState(nil)
+		return
+	}
+	// Step1: install iptables MASQ rules. This step is independent of podCIDR.
+	// TODO: Turn this into a plugin that we always invoke for every other
+	// Kubernets network plugin.
+	if err = ensureIPTablesMasqRule(kl.cbr0.execer); err != nil {
+		glog.Error("Failed to install iptables rules: ", err)
+		kl.runtimeState.setNetworkState(fmt.Errorf("Error on adding ip table rules: %v", err))
+		return
+	}
+	// Step2: acquire a subnet/podCIDR.
+	// TODO: Re-implment this as --network-plugin-name=flannel.
+	if kl.flannelExperimentalOverlay {
+		podCIDR, err := kl.flannelHelper.Handshake()
+		if err != nil {
+			glog.Warning("Flannel handshake failed: ", err)
+			kl.runtimeState.setNetworkState(fmt.Errorf("Flannel handshake failed %v", err))
+			return
 		}
-		if err := ensureIPTablesMasqRule(); err != nil {
-			err = fmt.Errorf("Error on adding ip table rules: %v", err)
-			glog.Error(err)
-		}
-		podCIDR := kl.runtimeState.podCIDR()
-		if len(podCIDR) == 0 {
-			err = fmt.Errorf("ConfigureCBR0 requested, but PodCIDR not set. Will not configure CBR0 right now")
-			glog.Warning(err)
-		} else if err := kl.reconcileCBR0(podCIDR); err != nil {
-			err = fmt.Errorf("Error configuring cbr0: %v", err)
-			glog.Error(err)
-		}
+		glog.Infof("Setting cidr: %v -> %v",
+			kl.runtimeState.podCIDR(), podCIDR)
+		kl.runtimeState.setPodCIDR(podCIDR)
+	}
+	// Step3: reconcile container bridge with podCIDR.
+	podCIDR := kl.runtimeState.podCIDR()
+	if len(podCIDR) == 0 {
+		err = fmt.Errorf("ConfigureCBR0 requested, but PodCIDR not set. Will not configure CBR0 right now")
+		glog.Warning(err)
+	} else if cbrErr := kl.cbr0.reconcile(podCIDR); cbrErr != nil {
+		err = fmt.Errorf("Error configuring cbr0: ", cbrErr)
+		glog.Error(err)
+	} else if bwErr := kl.applyBandwidthShaping(); bwErr != nil {
+		// TODO: Is a failure here worthy of blocking pod creation?
+		glog.Error("Error applying bandwidth shaping: ", bwErr)
 	}
 	kl.runtimeState.setNetworkState(err)
 }

@@ -20,12 +20,15 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type runtimeState struct {
 	sync.Mutex
 	lastBaseRuntimeSync      time.Time
 	baseRuntimeSyncThreshold time.Duration
+	clock                    util.Clock
 	networkError             error
 	internalError            error
 	cidr                     string
@@ -79,7 +82,7 @@ func (s *runtimeState) errors() []string {
 	if s.networkError != nil {
 		ret = append(ret, s.networkError.Error())
 	}
-	if !s.lastBaseRuntimeSync.Add(s.baseRuntimeSyncThreshold).After(time.Now()) {
+	if !s.lastBaseRuntimeSync.Add(s.baseRuntimeSyncThreshold).After(s.clock.Now()) {
 		ret = append(ret, "container runtime is down")
 	}
 	if s.internalError != nil {
@@ -104,9 +107,10 @@ func newRuntimeState(
 	return &runtimeState{
 		lastBaseRuntimeSync:      time.Time{},
 		baseRuntimeSyncThreshold: runtimeSyncThreshold,
-		networkError:             networkError,
-		cidr:                     cidr,
-		internalError:            nil,
-		runtimeCompatibility:     runtimeCompatibility,
+		clock:                util.RealClock{},
+		networkError:         networkError,
+		cidr:                 cidr,
+		internalError:        nil,
+		runtimeCompatibility: runtimeCompatibility,
 	}
 }
