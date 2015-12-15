@@ -45,8 +45,9 @@ func TestTryAcquireOrRenew(t *testing.T) {
 			reaction testclient.ReactionFunc
 		}
 
-		expectSuccess bool
-		outHolder     string
+		expectSuccess    bool
+		transitionLeader bool
+		outHolder        string
 	}{
 		// acquire from no endpoints
 		{
@@ -94,8 +95,10 @@ func TestTryAcquireOrRenew(t *testing.T) {
 					},
 				},
 			},
-			expectSuccess: true,
-			outHolder:     "baz",
+
+			expectSuccess:    true,
+			transitionLeader: true,
+			outHolder:        "baz",
 		},
 		// acquire from led, unacked endpoints
 		{
@@ -127,8 +130,9 @@ func TestTryAcquireOrRenew(t *testing.T) {
 			observedRecord: LeaderElectionRecord{HolderIdentity: "bing"},
 			observedTime:   past,
 
-			expectSuccess: true,
-			outHolder:     "baz",
+			expectSuccess:    true,
+			transitionLeader: true,
+			outHolder:        "baz",
 		},
 		// don't acquire from led, acked endpoints
 		{
@@ -225,7 +229,13 @@ func TestTryAcquireOrRenew(t *testing.T) {
 			t.Errorf("[%v]expected holder:\n\t%+v\ngot:\n\t%+v", i, test.outHolder, le.observedRecord.HolderIdentity)
 		}
 		if len(test.reactors) != len(c.Actions()) {
-			t.Errorf("[%v]wrong number of api interactions")
+			t.Errorf("[%v]wrong number of api interactions", i)
+		}
+		if test.transitionLeader && le.observedRecord.LeaderTransitions != 1 {
+			t.Errorf("[%v]leader should have transitioned but did not", i)
+		}
+		if !test.transitionLeader && le.observedRecord.LeaderTransitions != 0 {
+			t.Errorf("[%v]leader should not have transitioned but did", i)
 		}
 	}
 }

@@ -150,6 +150,7 @@ type LeaderElectionRecord struct {
 	LeaseDurationSeconds int              `json:"leaseDurationSeconds"`
 	AcquireTime          unversioned.Time `json:"acquireTime"`
 	RenewTime            unversioned.Time `json:"renewTime"`
+	LeaderTransitions    int              `json:"leaderTransitions"`
 }
 
 // Run starts the leader election loop
@@ -242,8 +243,9 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 		e.Annotations = make(map[string]string)
 	}
 
+	var oldLeaderElectionRecord LeaderElectionRecord
+
 	if oldLeaderElectionRecordBytes, found := e.Annotations[LeaderElectionRecordAnnotationKey]; found {
-		var oldLeaderElectionRecord LeaderElectionRecord
 		if err := json.Unmarshal([]byte(oldLeaderElectionRecordBytes), &oldLeaderElectionRecord); err != nil {
 			glog.Errorf("error unmarshaling leader election record: %v", err)
 			return false
@@ -252,14 +254,19 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 			le.observedRecord = oldLeaderElectionRecord
 			le.observedTime = time.Now()
 		}
-		if oldLeaderElectionRecord.HolderIdentity == le.config.Identity {
-			leaderElectionRecord.AcquireTime = oldLeaderElectionRecord.AcquireTime
-		}
 		if le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &&
 			oldLeaderElectionRecord.HolderIdentity != le.config.Identity {
 			glog.Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
 			return false
 		}
+	}
+
+	// We're going to try to update. The leaderElectionRecord is set to it's default
+	// here. Let's correct it before updating.
+	if oldLeaderElectionRecord.HolderIdentity == le.config.Identity {
+		leaderElectionRecord.AcquireTime = oldLeaderElectionRecord.AcquireTime
+	} else {
+		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions + 1
 	}
 
 	leaderElectionRecordBytes, err := json.Marshal(leaderElectionRecord)
