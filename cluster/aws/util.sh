@@ -934,8 +934,13 @@ function start-master() {
       wait-for-instance-state ${master_id} "running"
 
       KUBE_MASTER=${MASTER_NAME}
-      KUBE_MASTER_IP=$(assign-elastic-ip $ip $master_id)
-      echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
+      echo -e " ${color_green}[master running @${ip}]${color_norm}"
+
+      local attach_message
+      attach_message=$(assign-elastic-ip $ip $master_id)
+      # Get master ip again after attachment.
+      KUBE_MASTER_IP=$(get_instance_public_ip $master_id)
+      echo ${attach_message}
 
       # This is a race between instance start and volume attachment.  There appears to be no way to start an AWS instance with a volume attached.
       # To work around this, we wait for volume to be ready in setup-master-pd.sh
