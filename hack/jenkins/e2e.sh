@@ -431,8 +431,6 @@ TRUSTY_BETA_SKIP_TESTS=(
     "${TRUSTY_DEFAULT_SKIP_TESTS[@]}"
 )
 
-KUBERNETES_VERSION_FOR_TRUSTY="${KUBERNETES_VERSION_FOR_TRUSTY:-"release/v1.1.2"}"
-
 # Define environment variables based on the Jenkins project name.
 # NOTE: Not all jobs are defined here. The hack/jenkins/e2e.sh in master and
 # release branches defines relevant jobs for that particular version of
@@ -530,7 +528,7 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
     : ${ENABLE_CLUSTER_REGISTRY:=false}
-    : ${JENKINS_EXPLICIT_VERSION:="${KUBERNETES_VERSION_FOR_TRUSTY}"}
+    : ${JENKINS_PUBLISHED_VERSION:="release/stable-1.1"}
     ;;
 
   # Runs slow tests on GCE with Trusy as base image for minions, sequentially.
@@ -548,7 +546,7 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
     : ${ENABLE_CLUSTER_REGISTRY:=false}
-    : ${JENKINS_EXPLICIT_VERSION:="${KUBERNETES_VERSION_FOR_TRUSTY}"}
+    : ${JENKINS_PUBLISHED_VERSION:="release/stable-1.1"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     ;;
 
@@ -571,7 +569,7 @@ case ${JOB_NAME} in
    : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
    : ${KUBE_OS_DISTRIBUTION:="trusty"}
    : ${ENABLE_CLUSTER_REGISTRY:=false}
-   : ${JENKINS_EXPLICIT_VERSION:="${KUBERNETES_VERSION_FOR_TRUSTY}"}
+   : ${JENKINS_PUBLISHED_VERSION:="release/stable-1.1"}
    ;;
 
   # Runs slow tests on GCE with Trusy-dev as base image for minions,
@@ -590,7 +588,7 @@ case ${JOB_NAME} in
    : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
    : ${KUBE_OS_DISTRIBUTION:="trusty"}
    : ${ENABLE_CLUSTER_REGISTRY:=false}
-   : ${JENKINS_EXPLICIT_VERSION:="${KUBERNETES_VERSION_FOR_TRUSTY}"}
+   : ${JENKINS_PUBLISHED_VERSION:="release/stable-1.1"}
    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
    ;;
 
@@ -613,7 +611,7 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
     : ${ENABLE_CLUSTER_REGISTRY:=false}
-    : ${JENKINS_EXPLICIT_VERSION:="${KUBERNETES_VERSION_FOR_TRUSTY}"}
+    : ${JENKINS_PUBLISHED_VERSION:="release/stable-1.1"}
     ;;
 
   # Runs slow tests on GCE with Trusy-beta as base image for minions,
@@ -632,7 +630,7 @@ case ${JOB_NAME} in
     : ${KUBE_GCE_MINION_IMAGE:="$(get_latest_trusty_image ${JOB_NAME})"}
     : ${KUBE_OS_DISTRIBUTION:="trusty"}
     : ${ENABLE_CLUSTER_REGISTRY:=false}
-    : ${JENKINS_EXPLICIT_VERSION:="${KUBERNETES_VERSION_FOR_TRUSTY}"}
+    : ${JENKINS_PUBLISHED_VERSION:="release/stable-1.1"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     ;;
 
