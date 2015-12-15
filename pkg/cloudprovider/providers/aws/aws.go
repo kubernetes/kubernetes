@@ -1396,9 +1396,9 @@ func (self *AWSCloud) findVPCID() (string, error) {
 }
 
 // Retrieves the specified security group from the AWS API, or returns nil if not found
-func (s *AWSCloud) findSecurityGroup(securityGroupID string) (*ec2.SecurityGroup, error) {
+func (s *AWSCloud) findSecurityGroup(securityGroupId string) (*ec2.SecurityGroup, error) {
 	describeSecurityGroupsRequest := &ec2.DescribeSecurityGroupsInput{
-		GroupIds: []*string{&securityGroupID},
+		GroupIds: []*string{&securityGroupId},
 	}
 
 	groups, err := s.ec2.DescribeSecurityGroups(describeSecurityGroupsRequest)
@@ -1476,15 +1476,15 @@ func isEqualIPPermission(l, r *ec2.IpPermission, compareGroupUserIDs bool) bool 
 // Makes sure the security group includes the specified permissions
 // Returns true if and only if changes were made
 // The security group must already exist
-func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupID string, addPermissions []*ec2.IpPermission) (bool, error) {
-	group, err := s.findSecurityGroup(securityGroupID)
+func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermissions []*ec2.IpPermission) (bool, error) {
+	group, err := s.findSecurityGroup(securityGroupId)
 	if err != nil {
 		glog.Warning("Error retrieving security group", err)
 		return false, err
 	}
 
 	if group == nil {
-		return false, fmt.Errorf("security group not found: %s", securityGroupID)
+		return false, fmt.Errorf("security group not found: %s", securityGroupId)
 	}
 
 	changes := []*ec2.IpPermission{}
@@ -1513,10 +1513,10 @@ func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupID string, addPermiss
 		return false, nil
 	}
 
-	glog.V(2).Infof("Adding security group ingress: %s %v", securityGroupID, changes)
+	glog.V(2).Infof("Adding security group ingress: %s %v", securityGroupId, changes)
 
 	request := &ec2.AuthorizeSecurityGroupIngressInput{}
-	request.GroupId = &securityGroupID
+	request.GroupId = &securityGroupId
 	request.IpPermissions = changes
 	_, err = s.ec2.AuthorizeSecurityGroupIngress(request)
 	if err != nil {
@@ -1639,7 +1639,7 @@ func (s *AWSCloud) ensureSecurityGroup(name string, description string, vpcID st
 	tagRequest.Resources = []*string{&groupID}
 	tagRequest.Tags = tags
 	if _, err := s.createTags(tagRequest); err != nil {
-		// Not clear how to recover fully from this; we're OK because we don't match on tags, but that is a little odd
+		// Not clear how to recover fully from this.
 		return "", fmt.Errorf("error tagging security group: %v", err)
 	}
 	return groupID, nil
@@ -1671,13 +1671,13 @@ func (s *AWSCloud) createTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOutp
 	}
 }
 
-func (s *AWSCloud) listSubnetIDsinVPC(vpcID string) ([]string, error) {
+func (s *AWSCloud) listSubnetIDsinVPC(vpcId string) ([]string, error) {
 
 	subnetIds := []string{}
 
 	request := &ec2.DescribeSubnetsInput{}
 	filters := []*ec2.Filter{}
-	filters = append(filters, newEc2Filter("vpc-id", vpcID))
+	filters = append(filters, newEc2Filter("vpc-id", vpcId))
 	// Note, this will only return subnets tagged with the cluster identifier for this Kubernetes cluster.
 	// In the case where an AZ has public & private subnets per AWS best practices, the deployment should ensure
 	// only the public subnet (where the ELB will go) is so tagged.
@@ -1738,21 +1738,21 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 		return nil, err
 	}
 
-	vpcID, err := s.findVPCID()
+	vpcId, err := s.findVPCID()
 	if err != nil {
 		glog.Error("Error finding VPC", err)
 		return nil, err
 	}
 
 	// Construct list of configured subnets
-	subnetIDs, err := s.listSubnetIDsinVPC(vpcID)
+	subnetIDs, err := s.listSubnetIDsinVPC(vpcId)
 	if err != nil {
 		glog.Error("Error listing subnets in VPC", err)
 		return nil, err
 	}
 
 	// Create a security group for the load balancer
-	securityGroupID, err := s.createSecurityGroupForLoadBalancer(name, vpcID, ports)
+	securityGroupID, err := s.createSecurityGroupForLoadBalancer(name, vpcId, ports)
 	if err != nil {
 		glog.Error("error creating security group for load balancer", err)
 		return nil, err
@@ -1791,7 +1791,7 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 	}
 
 	// Ensure the shared security group for instances exists and is attached to all hosts.
-	instanceSecurityGroupID, err := s.ensureSharedInstanceSecurityGroupForLoadBalancing(vpcID, instances)
+	instanceSecurityGroupID, err := s.ensureSharedInstanceSecurityGroupForLoadBalancing(vpcId, instances)
 	if err != nil {
 		glog.Error("error creating shared instance security group for load balancing", err)
 		return nil, err
@@ -1848,27 +1848,40 @@ func toStatus(lb *elb.LoadBalancerDescription) *api.LoadBalancerStatus {
 	return status
 }
 
-// Ensure the ELB's security group is present in the ingress rules for the shared instance security group.
-// Will also remove the ELB security group from other groups (to delete any legacy group setups).
+// Ensure the ELB's security group is present in the ingress rules for the shared instance security group, if provided.
+// Will also remove the ELB security group from other k8s owned groups to make removal idempotent.
 func (s *AWSCloud) updateInstanceSecurityGroupForLoadBalancer(lb *elb.LoadBalancerDescription, instanceSecurityGroupID *string) error {
 	// Determine the load balancer security group id
-	loadBalancerSecurityGroupID := ""
+	loadBalancerSecurityGroupId := ""
 	for _, securityGroup := range lb.SecurityGroups {
 		if isNilOrEmpty(securityGroup) {
 			continue
 		}
-		if loadBalancerSecurityGroupID != "" {
+		if loadBalancerSecurityGroupId != "" {
 			// We create LBs with one SG
 			glog.Warning("Multiple security groups for load balancer: ", orEmpty(lb.LoadBalancerName))
 		}
-		loadBalancerSecurityGroupID = *securityGroup
+		loadBalancerSecurityGroupId = *securityGroup
 	}
-	if loadBalancerSecurityGroupID == "" {
+	if loadBalancerSecurityGroupId == "" {
 		return fmt.Errorf("Could not determine security group for load balancer: %s", orEmpty(lb.LoadBalancerName))
 	}
 
-	// Gather all security groups
+	sourceGroupId := &ec2.UserIdGroupPair{}
+	sourceGroupId.GroupId = &loadBalancerSecurityGroupId
+
+	allProtocols := "-1"
+
+	permission := &ec2.IpPermission{}
+	permission.IpProtocol = &allProtocols
+	permission.UserIdGroupPairs = []*ec2.UserIdGroupPair{sourceGroupId}
+
+	permissions := []*ec2.IpPermission{permission}
+
+	// Gather all k8s owned security groups
 	describeRequest := &ec2.DescribeSecurityGroupsInput{}
+	filters := []*ec2.Filter{}
+	describeRequest.Filters = s.addFilters(filters)
 	actualGroups, err := s.ec2.DescribeSecurityGroups(describeRequest)
 	if err != nil {
 		return fmt.Errorf("error querying security groups: %v", err)
@@ -1882,17 +1895,6 @@ func (s *AWSCloud) updateInstanceSecurityGroupForLoadBalancer(lb *elb.LoadBalanc
 		}
 
 		groupId := group.GroupId
-
-		sourceGroupId := &ec2.UserIdGroupPair{}
-		sourceGroupId.GroupId = &loadBalancerSecurityGroupID
-
-		allProtocols := "-1"
-
-		permission := &ec2.IpPermission{}
-		permission.IpProtocol = &allProtocols
-		permission.UserIdGroupPairs = []*ec2.UserIdGroupPair{sourceGroupId}
-
-		permissions := []*ec2.IpPermission{permission}
 
 		if instanceSecurityGroupID != nil && *groupId == *instanceSecurityGroupID {
 			changed, err := s.ensureSecurityGroupIngress(*groupId, permissions)
@@ -1908,7 +1910,7 @@ func (s *AWSCloud) updateInstanceSecurityGroupForLoadBalancer(lb *elb.LoadBalanc
 				return err
 			}
 			if !changed {
-				glog.Warning("revoking ingress was not needed; concurrent change? groupId=", groupId)
+				glog.Warning("revoking ingress was not needed; concurrent change? groupId=", *groupId)
 			}
 		}
 	}
