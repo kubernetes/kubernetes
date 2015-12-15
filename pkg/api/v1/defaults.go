@@ -198,6 +198,15 @@ func addDefaultingFuncs() {
 				obj.Spec.ExternalID = obj.Name
 			}
 		},
+		func(obj *NodeStatus) {
+			if obj.Allocatable == nil && obj.Capacity != nil {
+				obj.Allocatable = make(ResourceList, len(obj.Capacity))
+				for key, value := range obj.Capacity {
+					obj.Allocatable[key] = *(value.Copy())
+				}
+				obj.Allocatable = obj.Capacity
+			}
+		},
 		func(obj *ObjectFieldSelector) {
 			if obj.APIVersion == "" {
 				obj.APIVersion = "v1"
