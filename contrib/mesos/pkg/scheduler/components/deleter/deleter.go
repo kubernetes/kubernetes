@@ -95,16 +95,9 @@ func (k *deleter) DeleteOne(pod *queuer.Pod) error {
 	// cleanup is easier (unregister) since there's no state to sync
 	case podtask.StatePending:
 		if !task.Has(podtask.Launched) {
-			// we've been invoked in between Schedule() and Bind()
-			if task.HasAcceptedOffer() {
-				task.Offer.Release()
-				task.Reset()
-				task.Set(podtask.Deleted)
-				//TODO(jdef) probably want better handling here
-				if err := k.sched.Tasks().Update(task); err != nil {
-					return err
-				}
-			}
+			// if this pod is between scheduling and binding the scheduler
+			// will notice because it takes the k.sched lock and gets the task
+			// again from the registry.
 			k.sched.Tasks().Unregister(task)
 			return nil
 		}

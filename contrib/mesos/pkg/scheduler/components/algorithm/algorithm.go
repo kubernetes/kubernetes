@@ -37,7 +37,7 @@ import (
 // Schedule implements the Scheduler interface of Kubernetes.
 // It returns the selectedMachine's hostname or an error if the schedule failed.
 type SchedulerAlgorithm interface {
-	Schedule(pod *api.Pod) (string, error)
+	Schedule(pod *api.Pod) (offers.Perishable, *podtask.Spec, error)
 }
 
 // SchedulerAlgorithm implements the algorithm.ScheduleAlgorithm interface
@@ -73,14 +73,14 @@ func New(
 	}
 }
 
-func (k *schedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
+func (k *schedulerAlgorithm) Schedule(pod *api.Pod) (offers.Perishable, *podtask.Spec, error) {
 	log.Infof("Try to schedule pod %v\n", pod.Name)
 	ctx := api.WithNamespace(api.NewDefaultContext(), pod.Namespace)
 
 	// default upstream scheduler passes pod.Name as binding.PodID
 	podKey, err := podtask.MakePodKey(ctx, pod.Name)
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 
 	k.sched.Lock()
@@ -94,31 +94,31 @@ func (k *schedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 		podName, err := cache.MetaNamespaceKeyFunc(pod)
 		if err != nil {
 			log.Warningf("aborting Schedule, unable to understand pod object %+v", pod)
-			return "", errors.NoSuchPodErr
+			return nil, nil, errors.NoSuchPodErr
 		}
 
 		if deleted := k.podUpdates.Poll(podName, queue.DELETE_EVENT); deleted {
 			// avoid scheduling a pod that's been deleted between yieldPod() and Schedule()
 			log.Infof("aborting Schedule, pod has been deleted %+v", pod)
-			return "", errors.NoSuchPodErr
+			return nil, nil, errors.NoSuchPodErr
 		}
 
 		// write resource limits into the pod spec.
 		// From here on we can expect that the pod spec of a task has proper limits for CPU and memory.
 		k.limitPod(pod)
 
-		podTask, err := podtask.New(ctx, "", pod, k.prototype, k.roles)
+		newTask, err := podtask.New(ctx, "", pod, k.prototype, k.roles)
 		if err != nil {
 			log.Warningf("aborting Schedule, unable to create podtask object %+v: %v", pod, err)
-			return "", err
+			return nil, nil, err
 		}
 
-		podTask, err = k.sched.Tasks().Register(podTask)
+		newTask, err = k.sched.Tasks().Register(newTask)
 		if err != nil {
-			return "", err
+			return nil, nil, err
 		}
 
-		return k.doSchedule(podTask)
+		return k.podScheduler.SchedulePod(k.sched.Offers(), newTask)
 
 	//TODO(jdef) it's possible that the pod state has diverged from what
 	//we knew previously, we should probably update the task.Pod state here
@@ -128,17 +128,17 @@ func (k *schedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 			// we're dealing with a brand new pod spec here, so the old one must have been
 			// deleted -- and so our task store is out of sync w/ respect to reality
 			//TODO(jdef) reconcile task
-			return "", fmt.Errorf("task %v spec is out of sync with pod %v spec, aborting schedule", task.ID, pod.Name)
+			return nil, nil, fmt.Errorf("task %v spec is out of sync with pod %v spec, aborting schedule", task.ID, pod.Name)
 		} else if task.Has(podtask.Launched) {
 			// task has been marked as "launched" but the pod binding creation may have failed in k8s,
 			// but we're going to let someone else handle it, probably the mesos task error handler
-			return "", fmt.Errorf("task %s has already been launched, aborting schedule", task.ID)
+			return nil, nil, fmt.Errorf("task %s has already been launched, aborting schedule", task.ID)
 		} else {
-			return k.doSchedule(task)
+			return k.podScheduler.SchedulePod(k.sched.Offers(), task)
 		}
 
 	default:
-		return "", fmt.Errorf("task %s is not pending, nothing to schedule", task.ID)
+		return nil, nil, fmt.Errorf("task %s is not pending, nothing to schedule", task.ID)
 	}
 }
 
@@ -160,54 +160,4 @@ func (k *schedulerAlgorithm) limitPod(pod *api.Pod) error {
 	)
 
 	return nil
-}
-
-// doSchedule implements the actual scheduling of the given pod task.
-// It checks whether the offer has been accepted and is still present in the offer registry.
-// It delegates to the actual pod scheduler and updates the task registry.
-func (k *schedulerAlgorithm) doSchedule(task *podtask.T) (string, error) {
-	var offer offers.Perishable
-	var err error
-
-	if task.HasAcceptedOffer() {
-		// verify that the offer is still on the table
-		var ok bool
-		offer, ok = k.sched.Offers().Get(task.GetOfferId())
-
-		if !ok || offer.HasExpired() {
-			task.Offer.Release()
-			task.Reset()
-			if err = k.sched.Tasks().Update(task); err != nil {
-				return "", err
-			}
-		}
-	}
-
-	var spec *podtask.Spec
-	if offer == nil {
-		offer, spec, err = k.podScheduler.SchedulePod(k.sched.Offers(), task)
-	}
-
-	if err != nil {
-		return "", err
-	}
-
-	details := offer.Details()
-	if details == nil {
-		return "", fmt.Errorf("offer already invalid/expired for task %v", task.ID)
-	}
-
-	if task.Offer != nil && task.Offer != offer {
-		return "", fmt.Errorf("task.offer assignment must be idempotent, task %+v: offer %+v", task, offer)
-	}
-
-	task.Offer = offer
-	task.Spec = spec
-
-	if err := k.sched.Tasks().Update(task); err != nil {
-		offer.Release()
-		return "", err
-	}
-
-	return details.GetHostname(), nil
 }

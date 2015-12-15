@@ -32,6 +32,6 @@ type Scheduler interface {
 	Offers() offers.Registry
 	Reconcile(t *podtask.T)
 	KillTask(id string) error
-	LaunchTask(t *podtask.T) error
+	LaunchTask(t *podtask.T, spec *podtask.Spec) error
 	Run(done <-chan struct{})
 }

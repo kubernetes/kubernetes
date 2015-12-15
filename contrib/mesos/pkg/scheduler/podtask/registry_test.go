@@ -162,8 +162,6 @@ func TestInMemoryRegistry_Update(t *testing.T) {
 	offerId := mesosutil.NewOfferID("foo")
 	mesosOffer := &mesos.Offer{Id: offerId}
 	storage.Add([]*mesos.Offer{mesosOffer})
-	offer, ok := storage.Get(offerId.GetValue())
-	assert.True(ok)
 
 	// create registry
 	registry := NewInMemoryRegistry()
@@ -176,20 +174,6 @@ func TestInMemoryRegistry_Update(t *testing.T) {
 	assert.NoError(err)
 	a_clone, _ := registry.Get(a.ID)
 	assert.Equal(StatePending, a_clone.State)
-
-	// offer is updated while pending
-	a.Offer = offer
-	err = registry.Update(a)
-	assert.NoError(err)
-	a_clone, _ = registry.Get(a.ID)
-	assert.Equal(offer.Id(), a_clone.Offer.Id())
-
-	// spec is updated while pending
-	a.Spec = &Spec{SlaveID: "slave-1"}
-	err = registry.Update(a)
-	assert.NoError(err)
-	a_clone, _ = registry.Get(a.ID)
-	assert.Equal("slave-1", a_clone.Spec.SlaveID)
 
 	// flags are updated while pending
 	a.Flags[Launched] = struct{}{}
@@ -211,13 +195,6 @@ func TestInMemoryRegistry_Update(t *testing.T) {
 	assert.True(found_launched)
 	_, found_bound := a_clone.Flags[Bound]
 	assert.True(found_bound)
-
-	// spec is ignored while running
-	a.Spec = &Spec{SlaveID: "slave-2"}
-	err = registry.Update(a)
-	assert.NoError(err)
-	a_clone, _ = registry.Get(a.ID)
-	assert.Equal("slave-1", a_clone.Spec.SlaveID)
 
 	// error when finished
 	registry.UpdateStatus(fakeStatusUpdate(a.ID, mesos.TaskState_TASK_FINISHED))

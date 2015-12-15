@@ -130,8 +130,6 @@ func (k *inMemoryRegistry) Update(task *T) error {
 	case StateUnknown:
 		return fmt.Errorf("no such task: %v", task.ID)
 	case StatePending:
-		internal.Offer = task.Offer
-		internal.Spec = task.Spec
 		internal.Flags = map[FlagType]struct{}{}
 		fallthrough
 	case StateRunning:

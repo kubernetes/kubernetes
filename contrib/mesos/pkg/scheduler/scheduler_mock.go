@@ -63,8 +63,8 @@ func (m *MockScheduler) KillTask(taskId string) error {
 	return args.Error(0)
 }
 
-func (m *MockScheduler) LaunchTask(task *podtask.T) error {
-	args := m.Called(task)
+func (m *MockScheduler) LaunchTask(task *podtask.T, spec *podtask.Spec) error {
+	args := m.Called(task, spec)
 	return args.Error(0)
 }
 

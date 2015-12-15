@@ -22,14 +22,13 @@ import (
 
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
-	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	annotation "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
 )
 
 type Binder interface {
-	Bind(binding *api.Binding) error
+	Bind(task *podtask.T, spec *podtask.Spec) error
 }
 
 type binder struct {
@@ -42,69 +41,27 @@ func New(sched scheduler.Scheduler) Binder {
 	}
 }
 
-// implements binding.Registry, launches the pod-associated-task in mesos
-func (b *binder) Bind(binding *api.Binding) error {
-
-	ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
-
-	// default upstream scheduler passes pod.Name as binding.Name
-	podKey, err := podtask.MakePodKey(ctx, binding.Name)
-	if err != nil {
-		return err
-	}
-
-	b.sched.Lock()
-	defer b.sched.Unlock()
-
-	switch task, state := b.sched.Tasks().ForPod(podKey); state {
-	case podtask.StatePending:
-		return b.bind(ctx, binding, task)
-	default:
-		// in this case it's likely that the pod has been deleted between Schedule
-		// and Bind calls
-		log.Infof("No pending task for pod %s", podKey)
-		return errors.NoSuchPodErr //TODO(jdef) this error is somewhat misleading since the task could be running?!
-	}
-}
-
-func (b *binder) rollback(task *podtask.T, err error) error {
-	task.Offer.Release()
-	task.Reset()
-	if err2 := b.sched.Tasks().Update(task); err2 != nil {
-		log.Errorf("failed to update pod task: %v", err2)
-	}
-	return err
-}
-
 // assumes that: caller has acquired scheduler lock and that the task is still pending
 //
-// bind does not actually do the binding itself, but launches the pod as a Mesos task. The
+// Bind does not actually do the binding itself, but launches the pod as a Mesos task. The
 // kubernetes executor on the slave will finally do the binding. This is different from the
 // upstream scheduler in the sense that the upstream scheduler does the binding and the
 // kubelet will notice that and launches the pod.
-func (b *binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (err error) {
-	// sanity check: ensure that the task hasAcceptedOffer(), it's possible that between
-	// Schedule() and now that the offer for this task was rescinded or invalidated.
-	// ((we should never see this here))
-	if !task.HasAcceptedOffer() {
-		return fmt.Errorf("task has not accepted a valid offer %v", task.ID)
-	}
-
+func (b *binder) Bind(task *podtask.T, spec *podtask.Spec) (err error) {
 	// By this time, there is a chance that the slave is disconnected.
-	offerId := task.GetOfferId()
-	if offer, ok := b.sched.Offers().Get(offerId); !ok || offer.HasExpired() {
+	if offer, ok := b.sched.Offers().Get(spec.OfferID.GetValue()); !ok || offer.HasExpired() {
 		// already rescinded or timed out or otherwise invalidated
-		return b.rollback(task, fmt.Errorf("failed prior to launchTask due to expired offer for task %v", task.ID))
+		return fmt.Errorf("failed prior to launchTask due to expired offer for task %v", task.ID)
 	}
 
-	if err = b.prepareTaskForLaunch(ctx, binding.Target.Name, task, offerId); err == nil {
+	if err = b.prepareTaskForLaunch(task, spec); err == nil {
 		log.V(2).Infof(
 			"launching task: %q on target %q slave %q for pod \"%v/%v\", resources %v",
-			task.ID, binding.Target.Name, task.Spec.SlaveID, task.Pod.Namespace, task.Pod.Name, task.Spec.Resources,
+			task.ID, spec.AssignedSlave, spec.SlaveID, task.Pod.Namespace, task.Pod.Name, spec.Resources,
 		)
 
-		if err = b.sched.LaunchTask(task); err == nil {
-			b.sched.Offers().Invalidate(offerId)
+		if err = b.sched.LaunchTask(task, spec); err == nil {
+			b.sched.Offers().Invalidate(spec.OfferID.GetValue())
 			task.Set(podtask.Launched)
 			if err = b.sched.Tasks().Update(task); err != nil {
 				// this should only happen if the task has been removed or has changed status,
@@ -114,11 +71,11 @@ func (b *binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (e
 			return
 		}
 	}
-	return b.rollback(task, fmt.Errorf("Failed to launch task %v: %v", task.ID, err))
+	return fmt.Errorf("Failed to launch task %v: %v", task.ID, err)
 }
 
 //TODO(jdef) unit test this, ensure that task's copy of api.Pod is not modified
-func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *podtask.T, offerId string) error {
+func (b *binder) prepareTaskForLaunch(task *podtask.T, spec *podtask.Spec) error {
 	pod := task.Pod
 
 	// we make an effort here to avoid making changes to the task's copy of the pod, since
@@ -131,10 +88,10 @@ func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *pod
 		pod.Annotations = make(map[string]string)
 	}
 
-	task.SaveRecoveryInfo(pod.Annotations)
-	pod.Annotations[annotation.BindingHostKey] = task.Spec.AssignedSlave
+	task.SaveRecoveryInfo(pod.Annotations, spec)
+	pod.Annotations[annotation.BindingHostKey] = spec.AssignedSlave
 
-	for _, entry := range task.Spec.PortMap {
+	for _, entry := range spec.PortMap {
 		oemPorts := pod.Spec.Containers[entry.ContainerIdx].Ports
 		ports := append([]api.ContainerPort{}, oemPorts...)
 		p := &ports[entry.PortIdx]
@@ -155,6 +112,6 @@ func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *pod
 		log.V(2).Infof("Failed to marshal the pod spec: %v", err)
 		return err
 	}
-	task.Spec.Data = data
+	spec.Data = data
 	return nil
 }
