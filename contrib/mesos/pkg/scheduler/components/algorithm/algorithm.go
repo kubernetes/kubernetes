@@ -42,13 +42,14 @@ type SchedulerAlgorithm interface {
 
 // SchedulerAlgorithm implements the algorithm.ScheduleAlgorithm interface
 type schedulerAlgorithm struct {
-	sched        scheduler.Scheduler
-	podUpdates   queue.FIFO
-	podScheduler podschedulers.PodScheduler
-	prototype    *mesosproto.ExecutorInfo
-	roles        []string
-	defaultCpus  mresource.CPUShares
-	defaultMem   mresource.MegaBytes
+	sched           scheduler.Scheduler
+	podUpdates      queue.FIFO
+	podScheduler    podschedulers.PodScheduler
+	prototype       *mesosproto.ExecutorInfo
+	frameworkRoles  []string
+	defaultPodRoles []string
+	defaultCpus     mresource.CPUShares
+	defaultMem      mresource.MegaBytes
 }
 
 // New returns a new SchedulerAlgorithm
@@ -58,18 +59,19 @@ func New(
 	podUpdates queue.FIFO,
 	podScheduler podschedulers.PodScheduler,
 	prototype *mesosproto.ExecutorInfo,
-	roles []string,
+	frameworkRoles, defaultPodRoles []string,
 	defaultCpus mresource.CPUShares,
 	defaultMem mresource.MegaBytes,
 ) SchedulerAlgorithm {
 	return &schedulerAlgorithm{
-		sched:        sched,
-		podUpdates:   podUpdates,
-		podScheduler: podScheduler,
-		roles:        roles,
-		prototype:    prototype,
-		defaultCpus:  defaultCpus,
-		defaultMem:   defaultMem,
+		sched:           sched,
+		podUpdates:      podUpdates,
+		podScheduler:    podScheduler,
+		frameworkRoles:  frameworkRoles,
+		defaultPodRoles: defaultPodRoles,
+		prototype:       prototype,
+		defaultCpus:     defaultCpus,
+		defaultMem:      defaultMem,
 	}
 }
 
@@ -107,7 +109,7 @@ func (k *schedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 		// From here on we can expect that the pod spec of a task has proper limits for CPU and memory.
 		k.limitPod(pod)
 
-		podTask, err := podtask.New(ctx, "", pod, k.prototype, k.roles)
+		podTask, err := podtask.New(ctx, "", pod, k.prototype, k.frameworkRoles, k.defaultPodRoles)
 		if err != nil {
 			log.Warningf("aborting Schedule, unable to create podtask object %+v: %v", pod, err)
 			return "", err

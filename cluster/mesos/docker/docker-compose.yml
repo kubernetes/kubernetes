@@ -23,7 +23,7 @@ mesosmaster1:
   - MESOS_QUORUM=1
   - MESOS_REGISTRY=in_memory
   - MESOS_WORK_DIR=/var/lib/mesos
-  - MESOS_ROLES=role1
+  - MESOS_ROLES=public
   links:
   - etcd
   - "ambassador:apiserver"
@@ -38,12 +38,13 @@ mesosslave:
   - >
     NAME=$$(cut -f2 -d/ <<<$${MESOSMASTER1_NAME}) &&
     N=$${NAME##*_} &&
+    PUBLIC_RESOURCES="$$(if [ $${N} = 2 ]; then echo ";cpus(public):2;mem(public):640;ports(public):[7000-7999]"; fi)" &&
     DOCKER_NETWORK_OFFSET=0.0.$${N}.0
     exec wrapdocker mesos-slave
     --work_dir="/var/tmp/mesos/$${N}"
-    --attributes="rack:$${N};gen:201$${N};role:role$${N}"
+    --attributes="rack:$${N};gen:201$${N}"
     --hostname=$$(getent hosts mesosslave | cut -d' ' -f1 | sort -u | tail -1)
-    --resources="cpus:4;mem:1280;disk:25600;ports:[8000-21099];cpus(role$${N}):1;mem(role$${N}):640;disk(role$${N}):25600;ports(role$${N}):[7000-7999]"
+    --resources="cpus:4;mem:1280;disk:25600;ports:[8000-21099]$${PUBLIC_RESOURCES}"
   command: []
   environment:
   - MESOS_MASTER=mesosmaster1:5050
@@ -144,7 +145,8 @@ scheduler:
     --mesos-executor-cpus=1.0
     --mesos-sandbox-overlay=/opt/sandbox-overlay.tar.gz
     --static-pods-config=/opt/static-pods
-    --mesos-roles=*,role1
+    --mesos-framework-roles=*,public
+    --mesos-default-pod-roles=*,public
     --v=4
     --executor-logv=4
     --profiling=true

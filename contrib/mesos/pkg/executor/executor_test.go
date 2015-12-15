@@ -175,6 +175,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 		pod,
 		executorinfo,
 		nil,
+		nil,
 	)
 
 	assert.Equal(t, nil, err, "must be able to create a task from a pod")
@@ -389,6 +390,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 		"foo",
 		pod,
 		executorinfo,
+		nil,
 		nil,
 	)
 
