@@ -37,9 +37,8 @@ Running Kubernetes locally via Docker
 
 - [Overview](#overview)
 - [Prerequisites](#prerequisites)
-- [Step One: Run etcd](#step-one-run-etcd)
-- [Step Two: Run the master](#step-two-run-the-master)
-- [Step Three: Run the service proxy](#step-three-run-the-service-proxy)
+- [Run it](#run-it)
+- [Download kubectl](#download-kubectl)
 - [Test it out](#test-it-out)
 - [Run an application](#run-an-application)
 - [Expose it as a service](#expose-it-as-a-service)
