@@ -49,6 +49,8 @@ type VolumeOptions struct {
 	AccessModes []api.PersistentVolumeAccessMode
 	// Reclamation policy for a persistent volume
 	PersistentVolumeReclaimPolicy api.PersistentVolumeReclaimPolicy
+	// Tags to attach to the real volume in the cloud provider - e.g. AWS EBS
+	CloudTags *map[string]string
 }
 
 // VolumePlugin is an interface to volume plugins that can be used on a
