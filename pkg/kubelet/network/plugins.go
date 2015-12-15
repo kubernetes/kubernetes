@@ -18,6 +18,7 @@ package network
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"strings"
 
@@ -31,7 +32,36 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
-const DefaultPluginName = "kubernetes.io/no-op"
+const (
+	CNIPluginName  = "cni"
+	NoOpPluginName = "kubernetes.io/no-op"
+
+	// If the value of the kubelet cmd line arg --network-plugin starts with
+	// this prefix, the final token (split on '/') resolves to a CNI plugin
+	// with a specific CNI driver.
+	KubernetesPluginPrefix = "net.alpha.kubernetes.io"
+	// The following values are valid identifiers for CNI drivers.
+	// CNI bridge plugin and host-local IPAM.
+	BridgePluginName = "bridge"
+	// CNI flannel plugin. Currently un-implemented.
+	FlannelPluginName = "flannel"
+	// Let the kubelet pick the best CNI plugin to use. This might resolve
+	// to different plugins/sets of plugins based on the environment. Currently
+	// it always resolves to the CNI bridge plugin and host-local IPAM, but
+	// uses the podCIDR allocated by the Kubernetes master as the IPAM subnet.
+	KubeletDefaultPluginName = "default"
+)
+
+// GetPluginType returns the string after the second '/' in the default
+// plugin name passed to the kubelet. This hack is so we can avoid defining
+// more command line flags but still get configurability.
+func GetPluginType(pluginName string) string {
+	parts := strings.Split(pluginName, "/")
+	if len(parts) == 2 && parts[0] == KubernetesPluginPrefix {
+		return parts[1]
+	}
+	return ""
+}
 
 // Plugin is an interface to network plugins for the kubelet
 type NetworkPlugin interface {
@@ -53,6 +83,15 @@ type NetworkPlugin interface {
 
 	// Status is the method called to obtain the ipv4 or ipv6 addresses of the container
 	Status(namespace string, name string, podInfraContainerID kubetypes.DockerID) (*PodNetworkStatus, error)
+
+	// ReloadConf reloads network configuration from the given confDir.
+	ReloadConf(ncw NetConfWriterTo) error
+}
+
+// NetConfWriterTo knows how to write out network configuration.
+type NetConfWriterTo interface {
+	// WriteTo writes the network conf to the given writer.
+	WriteTo(w io.Writer) (int64, error)
 }
 
 // PodNetworkStatus stores the network status of a pod (currently just the primary IP address)
@@ -131,7 +170,7 @@ func (plugin *noopNetworkPlugin) Init(host Host) error {
 }
 
 func (plugin *noopNetworkPlugin) Name() string {
-	return DefaultPluginName
+	return NoOpPluginName
 }
 
 func (plugin *noopNetworkPlugin) SetUpPod(namespace string, name string, id kubetypes.DockerID) error {
@@ -144,4 +183,8 @@ func (plugin *noopNetworkPlugin) TearDownPod(namespace string, name string, id k
 
 func (plugin *noopNetworkPlugin) Status(namespace string, name string, id kubetypes.DockerID) (*PodNetworkStatus, error) {
 	return nil, nil
+}
+
+func (plugin *noopNetworkPlugin) ReloadConf(ncw NetConfWriterTo) error {
+	return nil
 }

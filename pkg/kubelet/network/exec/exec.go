@@ -177,3 +177,7 @@ func (plugin *execNetworkPlugin) Status(namespace string, name string, id kubety
 	errStr := fmt.Sprintf("Unknown version '%s' in network status for pod '%s'.", findVersion.APIVersion, name)
 	return nil, errors.New(errStr)
 }
+
+func (plugin *execNetworkPlugin) ReloadConf(ncw network.NetConfWriterTo) error {
+	return nil
+}

@@ -19,7 +19,6 @@ package cni
 import (
 	"fmt"
 	"net"
-	"sort"
 	"strings"
 
 	"github.com/appc/cni/libcni"
@@ -40,6 +39,7 @@ const (
 )
 
 type cniNetworkPlugin struct {
+	confDir        string
 	defaultNetwork *cniNetwork
 	host           network.Host
 }
@@ -52,45 +52,39 @@ type cniNetwork struct {
 
 func probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, vendorCNIDirPrefix string) []network.NetworkPlugin {
 	configList := make([]network.NetworkPlugin, 0)
-	network, err := getDefaultCNINetwork(pluginDir, vendorCNIDirPrefix)
-	if err != nil {
-		return configList
-	}
-	return append(configList, &cniNetworkPlugin{defaultNetwork: network})
-}
-
-func ProbeNetworkPlugins(pluginDir string) []network.NetworkPlugin {
-	return probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, "")
-}
-
-func getDefaultCNINetwork(pluginDir, vendorCNIDirPrefix string) (*cniNetwork, error) {
 	if pluginDir == "" {
 		pluginDir = DefaultNetDir
 	}
-	files, err := libcni.ConfFiles(pluginDir)
-	switch {
-	case err != nil:
-		return nil, err
-	case len(files) == 0:
-		return nil, fmt.Errorf("No networks found in %s", pluginDir)
+	// Always create a CNI plugin even if no network configuration was found,
+	// because if the kubelet is responsible for networking it will defer
+	// writing a netconf till the node has been allocated a podCIDR.
+	plugin := &cniNetworkPlugin{
+		confDir: pluginDir,
+		defaultNetwork: &cniNetwork{
+			CNIConfig: &libcni.CNIConfig{
+				Path: []string{DefaultCNIDir},
+			},
+		},
 	}
+	// Look for *.conf in pluginDir.
+	if err := plugin.ReloadConf(nil); err != nil {
+		return configList
+	}
+	// We assume that vendors will always define their networks up front and
+	// only the Kubelet is capable of dynamically writing/loading a netconf.
+	if plugin.defaultNetwork.NetworkConfig != nil {
+		vendorDir := fmt.Sprintf(VendorCNIDirTemplate, vendorCNIDirPrefix, plugin.defaultNetwork.NetworkConfig.Network.Type)
+		plugin.defaultNetwork.CNIConfig.Path = append(plugin.defaultNetwork.CNIConfig.Path, vendorDir)
+	}
+	return append(configList, plugin)
+}
 
-	sort.Strings(files)
-	for _, confFile := range files {
-		conf, err := libcni.ConfFromFile(confFile)
-		if err != nil {
-			glog.Warningf("Error loading CNI config file %s: %v", confFile, err)
-			continue
-		}
-		// Search for vendor-specific plugins as well as default plugins in the CNI codebase.
-		vendorCNIDir := fmt.Sprintf(VendorCNIDirTemplate, vendorCNIDirPrefix, conf.Network.Type)
-		cninet := &libcni.CNIConfig{
-			Path: []string{DefaultCNIDir, vendorCNIDir},
-		}
-		network := &cniNetwork{name: conf.Network.Name, NetworkConfig: conf, CNIConfig: cninet}
-		return network, nil
+func ProbeNetworkPlugins(pluginDir string) []network.NetworkPlugin {
+	plugins := probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, "")
+	for _, plug := range plugins {
+		glog.Infof("Probe found CNI plugin %v", plug.Name())
 	}
-	return nil, fmt.Errorf("No valid networks found in %s", pluginDir)
+	return plugins
 }
 
 func (plugin *cniNetworkPlugin) Init(host network.Host) error {
@@ -99,7 +93,37 @@ func (plugin *cniNetworkPlugin) Init(host network.Host) error {
 }
 
 func (plugin *cniNetworkPlugin) Name() string {
-	return CNIPluginName
+	return network.CNIPluginName
+}
+
+func (plugin *cniNetworkPlugin) ReloadConf(ncw network.NetConfWriterTo) error {
+	if ncw != nil {
+		glog.V(4).Infof("writing bridge plugin net conf to %v", plugin.confDir)
+		if _, err := ncw.WriteTo(fileWriter{plugin.confDir, network.DefaultNetConfFile}); err != nil {
+			return err
+		}
+	}
+	// TODO: This can move completely into a Kubernetes meta plugin, since
+	// we're actually just writing to file to ready it back again via libcni,
+	// but the intermediate write isolates the kubelet from CNI netconf format.
+	files, err := libcni.ConfFiles(plugin.confDir)
+	if err != nil {
+		return err
+	}
+	sort.Strings(files)
+	glog.V(4).Infof("%v plugin found files %+v in dir %+v", plugin.Name(), files, plugin.confDir)
+	for _, confFile := range files {
+		conf, err := libcni.ConfFromFile(confFile)
+		if err != nil {
+			continue
+		}
+		plugin.defaultNetwork.NetworkConfig = conf
+		plugin.defaultNetwork.name = conf.Network.Name
+		plugin.defaultNetwork.requiresKubeEnvVars = false
+		glog.V(4).Infof("%v plugin found a network %v in %v. Search paths for network plugins that satisfy this network: %+v",
+			plugin.defaultNetwork.name, plugin.confDir, plugin.defaultNetwork.CNIConfig.Path)
+	}
+	return nil
 }
 
 func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubetypes.DockerID) error {

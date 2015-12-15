@@ -29,7 +29,7 @@ func TestSelectDefaultPlugin(t *testing.T) {
 	if plug == nil {
 		t.Fatalf("Failed to select the default plugin.")
 	}
-	if plug.Name() != DefaultPluginName {
-		t.Errorf("Failed to select the default plugin. Expected %s. Got %s", DefaultPluginName, plug.Name())
+	if plug.Name() != NoOpPluginName {
+		t.Errorf("Failed to select the default plugin. Expected %s. Got %s", NoOpPluginName, plug.Name())
 	}
 }
