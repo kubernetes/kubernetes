@@ -17,11 +17,9 @@ limitations under the License.
 package e2e
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -37,18 +35,45 @@ const (
 	mb = 1024 * 1024
 	gb = 1024 * mb
 
-	// TODO(madhusudancs): find a way to query kubelet's disk space manager to obtain this value. 256MB
-	// is the default that is set today. This test might break if the default value changes. This value
-	// can be configured by setting the "low-diskspace-threshold-mb" flag while starting a kubelet.
-	// However, kubelets are started as part of the cluster start up, once, before any e2e test is run,
-	// and remain unchanged until all the tests are run and the cluster is brought down. Changing the
-	// flag value affects all the e2e tests. So we are hard-coding this value for now.
-	lowDiskSpaceThreshold uint64 = 256 * mb
-
 	nodeOODTimeOut = 5 * time.Minute
 
 	numNodeOODPods = 3
+
+	fillDiskDir = "/data/filldisk"
+
+	fillDiskBashScript = `
+i="0";
+
+function filldisk () {
+	while fallocate -l 1073741824 "%s/test$i.empty";
+	do
+		i=$[$i+1];
+	done
+};
+
+function main () {
+	filldisk;
+	backoff=1;
+	while sleep $backoff;
+	do
+		oldi=$i;
+		fill_disk;
+		if [ $oldi -lt $i ]; then
+			backoff=1;
+		else
+			backoff=$[$backoff*2];
+		fi;
+	done
+};
+
+main`
 )
+
+type oodNodeInfo struct {
+	namespace string
+	name      string
+	podName   string
+}
 
 // Plan:
 // 1. Fill disk space on all nodes except one. One node is left out so that we can schedule pods
@@ -66,11 +91,11 @@ const (
 //
 var _ = Describe("NodeOutOfDisk", func() {
 	var c *client.Client
-	var unfilledNodeName, recoveredNodeName string
-	framework := Framework{BaseName: "node-outofdisk"}
+	var unfilledNodeName string
+	nodeInfos := make([]oodNodeInfo, 0)
+	framework := NewFramework("node-outofdisk")
 
 	BeforeEach(func() {
-		framework.beforeEach()
 		c = framework.Client
 
 		nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
@@ -79,21 +104,13 @@ var _ = Describe("NodeOutOfDisk", func() {
 
 		unfilledNodeName = nodelist.Items[0].Name
 		for _, node := range nodelist.Items[1:] {
-			fillDiskSpace(c, &node)
-		}
-	})
-
-	AfterEach(func() {
-		defer framework.afterEach()
-
-		nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
-		expectNoError(err, "Error retrieving nodes")
-		Expect(len(nodelist.Items)).ToNot(BeZero())
-		for _, node := range nodelist.Items {
-			if unfilledNodeName == node.Name || recoveredNodeName == node.Name {
-				continue
+			info := oodNodeInfo{
+				namespace: framework.Namespace.Name,
+				name:      node.Name,
+				podName:   fmt.Sprintf("filldisk-pod-%s", node.Name),
 			}
-			recoverDiskSpace(c, &node)
+			fillDiskSpace(c, info)
+			nodeInfos = append(nodeInfos, info)
 		}
 	})
 
@@ -119,7 +136,7 @@ var _ = Describe("NodeOutOfDisk", func() {
 
 		for i := 0; i < numNodeOODPods-1; i++ {
 			name := fmt.Sprintf("pod-node-outofdisk-%d", i)
-			createOutOfDiskPod(c, ns, name, podCPU)
+			createOutOfDiskTestPod(c, ns, name, podCPU)
 
 			expectNoError(framework.WaitForPodRunning(name))
 			pod, err := podClient.Get(name)
@@ -128,7 +145,7 @@ var _ = Describe("NodeOutOfDisk", func() {
 		}
 
 		pendingPodName := fmt.Sprintf("pod-node-outofdisk-%d", numNodeOODPods-1)
-		createOutOfDiskPod(c, ns, pendingPodName, podCPU)
+		createOutOfDiskTestPod(c, ns, pendingPodName, podCPU)
 
 		By(fmt.Sprintf("Finding a failed scheduler event for pod %s", pendingPodName))
 		wait.Poll(2*time.Second, 5*time.Minute, func() (bool, error) {
@@ -150,26 +167,22 @@ var _ = Describe("NodeOutOfDisk", func() {
 			}
 		})
 
-		nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
-		expectNoError(err, "Error retrieving nodes")
-		Expect(len(nodelist.Items)).To(BeNumerically(">", 1))
+		recoveredNodeInfo := nodeInfos[0]
+		Expect(recoveredNodeInfo.name).ToNot(Equal(unfilledNodeName))
 
-		nodeToRecover := nodelist.Items[1]
-		Expect(nodeToRecover.Name).ToNot(Equal(unfilledNodeName))
+		recoverDiskSpace(c, recoveredNodeInfo)
+		nodeInfos = nodeInfos[1:]
 
-		recoverDiskSpace(c, &nodeToRecover)
-		recoveredNodeName = nodeToRecover.Name
-
-		By(fmt.Sprintf("Verifying that pod %s schedules on node %s", pendingPodName, recoveredNodeName))
+		By(fmt.Sprintf("Verifying that pod %s schedules on node %s", pendingPodName, recoveredNodeInfo.name))
 		expectNoError(framework.WaitForPodRunning(pendingPodName))
 		pendingPod, err := podClient.Get(pendingPodName)
 		expectNoError(err)
-		Expect(pendingPod.Spec.NodeName).To(Equal(recoveredNodeName))
+		Expect(pendingPod.Spec.NodeName).To(Equal(recoveredNodeInfo.name))
 	})
 })
 
-// createOutOfDiskPod creates a pod in the given namespace with the requested amount of CPU.
-func createOutOfDiskPod(c *client.Client, ns, name string, milliCPU int64) {
+// createOutOfDiskTestPod creates a pod in the given namespace with the requested amount of CPU.
+func createOutOfDiskTestPod(c *client.Client, ns, name string, milliCPU int64) {
 	podClient := c.Pods(ns)
 
 	pod := &api.Pod{
@@ -216,52 +229,69 @@ func availCpu(c *client.Client, node *api.Node) (int64, error) {
 	return avail, nil
 }
 
-// availSize returns the available disk space on a given node by querying node stats which
-// is in turn obtained internally from cadvisor.
-func availSize(c *client.Client, node *api.Node) (uint64, error) {
-	statsResource := fmt.Sprintf("api/v1/proxy/nodes/%s/stats/", node.Name)
-	Logf("Querying stats for node %s using url %s", node.Name, statsResource)
-	res, err := c.Get().AbsPath(statsResource).Timeout(timeout).Do().Raw()
-	if err != nil {
-		return 0, fmt.Errorf("error querying cAdvisor API: %v", err)
+// createFillDiskPod creates a pod that runs a terrible chained-command that continously
+// fills disk space.
+func createFillDiskPod(c *client.Client, info oodNodeInfo) {
+	cmd := fmt.Sprintf(fillDiskBashScript, fillDiskDir)
+	volName := fmt.Sprintf("%s-storage", info.podName)
+	podClient := c.Pods(info.namespace)
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: info.podName,
+		},
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					Name: volName,
+					VolumeSource: api.VolumeSource{
+						EmptyDir: &api.EmptyDirVolumeSource{},
+					},
+				},
+			},
+			Containers: []api.Container{
+				{
+					Name:    "filldisk",
+					Image:   "ubuntu",
+					Command: []string{"/bin/bash", "-c", cmd},
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      volName,
+							MountPath: fillDiskDir,
+						},
+					},
+				},
+			},
+			NodeName: info.name,
+		},
 	}
-	ci := cadvisorapi.ContainerInfo{}
-	err = json.Unmarshal(res, &ci)
+
+	_, err := podClient.Create(pod)
 	if err != nil {
-		return 0, fmt.Errorf("couldn't unmarshal container info: %v", err)
+		panic(fmt.Sprintf("Error while creating pod: %v", err))
 	}
-	return ci.Stats[len(ci.Stats)-1].Filesystem[0].Available, nil
 }
 
-// fillDiskSpace fills the available disk space on a given node by creating a large file. The disk
-// space on the node is filled in such a way that the available space after filling the disk is just
-// below the lowDiskSpaceThreshold mark.
-func fillDiskSpace(c *client.Client, node *api.Node) {
-	avail, err := availSize(c, node)
-	expectNoError(err, "Node %s: couldn't obtain available disk size %v", node.Name, err)
+// fillDiskSpace fills the available disk space on a given node through a pod that runs a script
+// to fill the disk space.
+func fillDiskSpace(c *client.Client, info oodNodeInfo) {
+	By(fmt.Sprintf("Node %s: creating a pod %s to fill the available disk space", info.name, info.podName))
 
-	fillSize := (avail - lowDiskSpaceThreshold + (100 * mb))
+	createFillDiskPod(c, info)
+	expectNoError(waitForPodRunningInNamespace(c, info.podName, info.namespace))
 
-	Logf("Node %s: disk space available %d bytes", node.Name, avail)
-	By(fmt.Sprintf("Node %s: creating a file of size %d bytes to fill the available disk space", node.Name, fillSize))
-
-	cmd := fmt.Sprintf("fallocate -l %d test.img", fillSize)
-	expectNoError(issueSSHCommand(cmd, testContext.Provider, node))
-
-	ood := waitForNodeToBe(c, node.Name, api.NodeOutOfDisk, true, nodeOODTimeOut)
-	Expect(ood).To(BeTrue(), "Node %s did not run out of disk within %v", node.Name, nodeOODTimeOut)
-
-	avail, err = availSize(c, node)
-	Logf("Node %s: disk space available %d bytes", node.Name, avail)
-	Expect(avail < lowDiskSpaceThreshold).To(BeTrue())
+	ood := waitForNodeToBe(c, info.name, api.NodeOutOfDisk, true, nodeOODTimeOut)
+	Expect(ood).To(BeTrue(), "Node %s did not run out of disk within %v", info.name, nodeOODTimeOut)
 }
 
 // recoverDiskSpace recovers disk space, filled by creating a large file, on a given node.
-func recoverDiskSpace(c *client.Client, node *api.Node) {
-	By(fmt.Sprintf("Recovering disk space on node %s", node.Name))
-	cmd := "rm -f test.img"
-	expectNoError(issueSSHCommand(cmd, testContext.Provider, node))
+func recoverDiskSpace(c *client.Client, info oodNodeInfo) {
+	podClient := c.Pods(info.namespace)
 
-	ood := waitForNodeToBe(c, node.Name, api.NodeOutOfDisk, false, nodeOODTimeOut)
-	Expect(ood).To(BeTrue(), "Node %s's out of disk condition status did not change to false within %v", node.Name, nodeOODTimeOut)
+	By(fmt.Sprintf("Recovering disk space on node %s", info.name))
+	err := podClient.Delete(info.podName, nil)
+	expectNoError(err)
+
+	ood := waitForNodeToBe(c, info.name, api.NodeOutOfDisk, false, nodeOODTimeOut)
+	Expect(ood).To(BeTrue(), "Node %s's out of disk condition status did not change to false within %v", info.name, nodeOODTimeOut)
 }
