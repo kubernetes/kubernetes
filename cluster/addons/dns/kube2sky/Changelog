@@ -1,3 +1,8 @@
+## Version 1.12 (Dec 15 2015 Abhishek Shah <abshah@google.com>)
+- Gave pods their own cache store. (034ecbd)
+- Allow pods to have dns. (717660a)
+
+
 ## Version 1.10 (Jun 19 2015 Tim Hockin <thockin@google.com>)
 - Fall back on service account tokens if no other auth is specified.
 
