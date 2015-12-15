@@ -934,8 +934,14 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
         # Otherwise, we want a completely empty directory.
         if [[ "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; then
             rm -rf kubernetes*
-        elif [[ $(find . | wc -l) != 1 ]]; then
-            echo $PWD not empty, bailing!
+        # .config and its children are created by the gcloud call that we use to
+        # get the GCE service account.
+        # console-log.txt is created by Jenkins, but is usually not flushed out
+        # this early in the script.
+        elif [[ $(find . -not -path "./.config*" -not -name "console-log.txt" \
+                  | wc -l) != 1 ]]; then
+            echo "${PWD} not empty, bailing!"
+            find .
             exit 1
         fi
 
