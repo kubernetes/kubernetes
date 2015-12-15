@@ -19,12 +19,23 @@ package unversioned
 import (
 	"net/http"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+)
+
+const (
+	// Environment variables: Note that the duration should be long enough that the backoff
+	// persists for some reasonable time (i.e. 120 seconds).  The typical base might be "1".
+	envBackoffBase     = "KUBE_CLIENT_BACKOFF_BASE"
+	envBackoffDuration = "KUBE_CLIENT_BACKOFF_DURATION"
 )
 
 // RESTClient imposes common Kubernetes API conventions on a set of resource paths.
@@ -74,6 +85,28 @@ func NewRESTClient(baseURL *url.URL, groupVersion unversioned.GroupVersion, c ru
 	}
 }
 
+// readExpBackoffConfig handles the internal logic of determining what the
+// backoff policy is.  By default if no information is available, NoBackoff.
+// TODO Generalize this see #17727 .
+func readExpBackoffConfig() BackoffManager {
+	backoffBase := os.Getenv(envBackoffBase)
+	backoffDuration := os.Getenv(envBackoffDuration)
+
+	backoffBaseInt, errBase := strconv.ParseInt(backoffBase, 10, 64)
+	backoffDurationInt, errDuration := strconv.ParseInt(backoffDuration, 10, 64)
+
+	if errBase != nil || errDuration != nil {
+		glog.V(2).Infof("Configuring no exponential backoff.")
+		return &NoBackoff{}
+	} else {
+		glog.V(2).Infof("Configuring exponential backoff as %v, %v", backoffBaseInt, backoffDurationInt)
+		return &URLBackoff{
+			Backoff: util.NewBackOff(
+				time.Duration(backoffBaseInt)*time.Second,
+				time.Duration(backoffDurationInt)*time.Second)}
+	}
+}
+
 // Verb begins a request with a verb (GET, POST, PUT, DELETE).
 //
 // Example usage of RESTClient's request building interface:
@@ -90,10 +123,13 @@ func (c *RESTClient) Verb(verb string) *Request {
 	if c.Throttle != nil {
 		c.Throttle.Accept()
 	}
+
+	backoff := readExpBackoffConfig()
+
 	if c.Client == nil {
-		return NewRequest(nil, verb, c.baseURL, c.groupVersion, c.Codec)
+		return NewRequest(nil, verb, c.baseURL, c.groupVersion, c.Codec, backoff)
 	}
-	return NewRequest(c.Client, verb, c.baseURL, c.groupVersion, c.Codec)
+	return NewRequest(c.Client, verb, c.baseURL, c.groupVersion, c.Codec, backoff)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").

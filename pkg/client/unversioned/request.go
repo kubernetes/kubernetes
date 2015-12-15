@@ -109,10 +109,17 @@ type Request struct {
 	// The constructed request and the response
 	req  *http.Request
 	resp *http.Response
+
+	backoffMgr BackoffManager
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
-func NewRequest(client HTTPClient, verb string, baseURL *url.URL, groupVersion unversioned.GroupVersion, codec runtime.Codec) *Request {
+func NewRequest(client HTTPClient, verb string, baseURL *url.URL, groupVersion unversioned.GroupVersion, codec runtime.Codec, backoff BackoffManager) *Request {
+	if backoff == nil {
+		glog.V(2).Infof("Not implementing request backoff strategy.")
+		backoff = &NoBackoff{}
+	}
+	metrics.Register()
 	return &Request{
 		client:       client,
 		verb:         verb,
@@ -120,6 +127,7 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, groupVersion u
 		path:         baseURL.Path,
 		groupVersion: groupVersion,
 		codec:        codec,
+		backoffMgr:   backoff,
 	}
 }
 
@@ -610,8 +618,16 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
+	time.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
+	if r.baseURL != nil {
+		if err != nil {
+			r.backoffMgr.UpdateBackoff(r.baseURL, err, 0)
+		} else {
+			r.backoffMgr.UpdateBackoff(r.baseURL, err, resp.StatusCode)
+		}
+	}
 	if err != nil {
 		// The watch stream mechanism handles many common partial data errors, so closed
 		// connections can be retried in many cases.
@@ -663,8 +679,16 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
+	time.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
+	if r.baseURL != nil {
+		if err != nil {
+			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
+		} else {
+			r.backoffMgr.UpdateBackoff(r.URL(), err, resp.StatusCode)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -708,6 +732,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	}()
 
 	if r.err != nil {
+		glog.V(4).Infof("Error in request: %v", r.err)
 		return r.err
 	}
 
@@ -736,8 +761,14 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		}
 		req.Header = r.headers
 
+		time.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
 		resp, err := client.Do(req)
 		updateURLMetrics(r, resp, err)
+		if err != nil {
+			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
+		} else {
+			r.backoffMgr.UpdateBackoff(r.URL(), err, resp.StatusCode)
+		}
 		if err != nil {
 			return err
 		}
