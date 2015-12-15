@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -281,7 +282,7 @@ func TestGetAttribs(t *testing.T) {
 				Verb:            "list",
 				Path:            "/apis/extensions/v1beta1/namespaces/myns/jobs",
 				ResourceRequest: true,
-				APIGroup:        "extensions",
+				APIGroup:        extensions.GroupName,
 				Namespace:       "myns",
 				Resource:        "jobs",
 			},

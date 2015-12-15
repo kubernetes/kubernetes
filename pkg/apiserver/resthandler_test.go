@@ -152,7 +152,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	namespace := tc.startingPod.Namespace
 	name := tc.startingPod.Name
 
-	codec := latest.GroupOrDie("").Codec
+	codec := latest.GroupOrDie(api.GroupName).Codec
 
 	testPatcher := &testPatcher{}
 	testPatcher.startingPod = tc.startingPod

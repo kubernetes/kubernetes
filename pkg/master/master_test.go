@@ -64,12 +64,12 @@ func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.A
 	storageVersions := make(map[string]string)
 	storageDestinations := NewStorageDestinations()
 	storageDestinations.AddAPIGroup(
-		"", etcdstorage.NewEtcdStorage(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix()))
+		api.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix()))
 	storageDestinations.AddAPIGroup(
-		"extensions", etcdstorage.NewEtcdStorage(server.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix()))
+		extensions.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix()))
 	config.StorageDestinations = storageDestinations
-	storageVersions[""] = testapi.Default.GroupVersion().String()
-	storageVersions["extensions"] = testapi.Extensions.GroupVersion().String()
+	storageVersions[api.GroupName] = testapi.Default.GroupVersion().String()
+	storageVersions[extensions.GroupName] = testapi.Extensions.GroupVersion().String()
 	config.StorageVersions = storageVersions
 	config.PublicAddress = net.ParseIP("192.168.10.4")
 	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
@@ -328,7 +328,7 @@ func TestExpapi(t *testing.T) {
 	master, etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	extensionsGroupMeta := latest.GroupOrDie("extensions")
+	extensionsGroupMeta := latest.GroupOrDie(extensions.GroupName)
 
 	expAPIGroup := master.experimental(&config)
 	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix)
@@ -409,7 +409,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expectGroupName := "extensions"
+	expectGroupName := extensions.GroupName
 	expectVersions := []unversioned.GroupVersionForDiscovery{
 		{
 			GroupVersion: testapi.Extensions.GroupVersion().String(),
@@ -417,8 +417,8 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		},
 	}
 	expectPreferredVersion := unversioned.GroupVersionForDiscovery{
-		GroupVersion: config.StorageVersions["extensions"],
-		Version:      apiutil.GetVersion(config.StorageVersions["extensions"]),
+		GroupVersion: config.StorageVersions[extensions.GroupName],
+		Version:      apiutil.GetVersion(config.StorageVersions[extensions.GroupName]),
 	}
 	assert.Equal(expectGroupName, groupList.Groups[0].Name)
 	assert.Equal(expectVersions, groupList.Groups[0].Versions)

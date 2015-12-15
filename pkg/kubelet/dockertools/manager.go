@@ -659,7 +659,7 @@ func (dm *DockerManager) runContainer(
 	}
 	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
 		// TODO: This is kind of hacky, we should really just encode the bits we need.
-		data, err := latest.GroupOrDie("").Codec.Encode(pod)
+		data, err := latest.GroupOrDie(api.GroupName).Codec.Encode(pod)
 		if err != nil {
 			glog.Errorf("Failed to encode pod: %s for prestop hook", pod.Name)
 		} else {
@@ -1410,7 +1410,7 @@ func containerAndPodFromLabels(inspect *docker.Container) (pod *api.Pod, contain
 	// the pod data may not be set
 	if body, found := labels[kubernetesPodLabel]; found {
 		pod = &api.Pod{}
-		if err = latest.GroupOrDie("").Codec.DecodeInto([]byte(body), pod); err == nil {
+		if err = latest.GroupOrDie(api.GroupName).Codec.DecodeInto([]byte(body), pod); err == nil {
 			name := labels[kubernetesContainerLabel]
 			for ix := range pod.Spec.Containers {
 				if pod.Spec.Containers[ix].Name == name {

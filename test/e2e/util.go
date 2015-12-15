@@ -2099,7 +2099,7 @@ func NewHostExecPodSpec(ns, name string) *api.Pod {
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.GroupOrDie("").GroupVersion.Version,
+			APIVersion: latest.GroupOrDie(api.GroupName).GroupVersion.Version,
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,

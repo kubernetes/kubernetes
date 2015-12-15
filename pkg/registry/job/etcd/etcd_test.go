@@ -32,7 +32,7 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, "extensions")
+	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
 	jobStorage, statusStorage := NewREST(etcdStorage, generic.UndecoratedStorage)
 	return jobStorage, statusStorage, server
 }

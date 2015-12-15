@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -132,7 +133,7 @@ func New(c *Config) (*Client, error) {
 		return nil, err
 	}
 
-	if _, err := latest.Group("extensions"); err != nil {
+	if _, err := latest.Group(extensions.GroupName); err != nil {
 		return &Client{RESTClient: client, ExtensionsClient: nil, DiscoveryClient: discoveryClient}, nil
 	}
 	experimentalConfig := *c
@@ -364,9 +365,9 @@ func SetKubernetesDefaults(config *Config) error {
 	if config.GroupVersion == nil {
 		config.GroupVersion = defaultVersionFor(config)
 	}
-	versionInterfaces, err := latest.GroupOrDie("").InterfacesFor(*config.GroupVersion)
+	versionInterfaces, err := latest.GroupOrDie(api.GroupName).InterfacesFor(*config.GroupVersion)
 	if err != nil {
-		return fmt.Errorf("API version '%v' is not recognized (valid values: %v)", *config.GroupVersion, latest.GroupOrDie("").GroupVersions)
+		return fmt.Errorf("API version '%v' is not recognized (valid values: %v)", *config.GroupVersion, latest.GroupOrDie(api.GroupName).GroupVersions)
 	}
 	if config.Codec == nil {
 		config.Codec = versionInterfaces.Codec
@@ -525,7 +526,7 @@ func defaultVersionFor(config *Config) *unversioned.GroupVersion {
 		// Clients default to the preferred code API version
 		// TODO: implement version negotiation (highest version supported by server)
 		// TODO this drops out when groupmeta is refactored
-		copyGroupVersion := latest.GroupOrDie("").GroupVersion
+		copyGroupVersion := latest.GroupOrDie(api.GroupName).GroupVersion
 		return &copyGroupVersion
 	}
 
