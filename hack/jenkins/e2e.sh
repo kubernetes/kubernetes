@@ -598,7 +598,9 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-enormous-cluster)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-enormous-cluster"}
     : ${E2E_NETWORK:="e2e-enormous-cluster"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\]"}
+    # TODO: Currently run only density test.
+    # Once this is stable, run the whole [Performance] suite.
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=starting\s30\spods\sper\snode"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-enormous-cluster"}
     : ${PROJECT:="kubernetes-scale"}
     # Override GCE defaults.
@@ -612,7 +614,7 @@ case ${JOB_NAME} in
     NODE_DISK_SIZE="50GB"
     NUM_NODES="1000"
     # Reduce logs verbosity
-    TEST_CLUSTER_LOG_LEVEL="--v=2"
+    TEST_CLUSTER_LOG_LEVEL="--v=1"
     # Increase resync period to simulate production
     TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
     ;;
