@@ -3790,7 +3790,14 @@ The resulting set of endpoints can be viewed as:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">capacity</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Capacity represents the available resources of a node. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#capacity">http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#capacity</a> for more details.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Capacity represents the total resources of a node. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#capacity">http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#capacity</a> for more details.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_any">any</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">allocatable</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Allocatable represents the resources of a node that are available for scheduling. Defaults to Capacity.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_any">any</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -6911,7 +6918,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2015-12-14 19:06:15 UTC
+Last updated 2015-12-16 19:00:42 UTC
 </div>
 </div>
 </body>

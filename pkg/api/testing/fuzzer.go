@@ -388,6 +388,10 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			c.FuzzNoCustom(n)
 			n.Spec.ExternalID = "external"
 		},
+		func(s *api.NodeStatus, c fuzz.Continue) {
+			c.FuzzNoCustom(s)
+			s.Allocatable = s.Capacity
+		},
 		func(s *extensions.APIVersion, c fuzz.Continue) {
 			// We can't use c.RandString() here because it may generate empty
 			// string, which will cause tests failure.

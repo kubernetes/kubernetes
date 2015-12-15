@@ -1489,8 +1489,10 @@ type NodeSystemInfo struct {
 
 // NodeStatus is information about the current status of a node.
 type NodeStatus struct {
-	// Capacity represents the available resources of a node.
+	// Capacity represents the total resources of a node.
 	Capacity ResourceList `json:"capacity,omitempty"`
+	// Allocatable represents the resources of a node that are available for scheduling.
+	Allocatable ResourceList `json:"allocatable,omitempty"`
 	// NodePhase is the current lifecycle phase of the node.
 	Phase NodePhase `json:"phase,omitempty"`
 	// Conditions is an array of current node conditions.
