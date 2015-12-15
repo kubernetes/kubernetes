@@ -1199,6 +1199,12 @@ function push-node() {
 
 # Push binaries to kubernetes cluster
 function kube-push {
+  # Disable this until it's fixed.
+  # See https://github.com/kubernetes/kubernetes/issues/17397
+  echo "./cluster/kube-push.sh is currently not supported in GCE."
+  echo "Please use ./cluster/gce/upgrade.sh."
+  exit 1
+
   prepare-push true
 
   push-master
