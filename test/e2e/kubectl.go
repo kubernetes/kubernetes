@@ -259,10 +259,10 @@ var _ = Describe("Kubectl client", func() {
 				Failf("unable to create streaming upload. Error: %s", err)
 			}
 			resp, err := c.Post().
+				Prefix("proxy").
 				Namespace(ns).
 				Name("netexec").
 				Resource("pods").
-				SubResource("proxy").
 				Suffix("upload").
 				SetHeader("Content-Type", postConfigBodyWriter.FormDataContentType()).
 				Body(pipeConfigReader).
@@ -286,10 +286,10 @@ var _ = Describe("Kubectl client", func() {
 			var uploadOutput NetexecOutput
 			// Upload the kubectl binary
 			resp, err = c.Post().
+				Prefix("proxy").
 				Namespace(ns).
 				Name("netexec").
 				Resource("pods").
-				SubResource("proxy").
 				Suffix("upload").
 				SetHeader("Content-Type", postBodyWriter.FormDataContentType()).
 				Body(pipeReader).
@@ -324,10 +324,10 @@ var _ = Describe("Kubectl client", func() {
 				shellCommand := fmt.Sprintf("%s=%s .%s --kubeconfig=%s --server=%s --namespace=%s exec nginx echo running in container", proxyVar, proxyAddr, uploadBinaryName, kubecConfigRemotePath, apiServer, ns)
 				// Execute kubectl on remote exec server.
 				netexecShellOutput, err := c.Post().
+					Prefix("proxy").
 					Namespace(ns).
 					Name("netexec").
 					Resource("pods").
-					SubResource("proxy").
 					Suffix("shell").
 					Param("shellCommand", shellCommand).
 					Do().Raw()
@@ -1126,9 +1126,9 @@ func getUDData(jpgExpected string, ns string) func(*client.Client, string) error
 	return func(c *client.Client, podID string) error {
 		Logf("validating pod %s", podID)
 		body, err := c.Get().
+			Prefix("proxy").
 			Namespace(ns).
 			Resource("pods").
-			SubResource("proxy").
 			Name(podID).
 			Suffix("data.json").
 			Do().
