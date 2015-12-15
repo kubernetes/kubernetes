@@ -93,6 +93,13 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	fakeRecorder := &record.FakeRecorder{}
 	fakeKubeClient := &testclient.Fake{}
 	kubelet := &Kubelet{}
+
+	ls, err := NewLabelSet("", "")
+	if err != nil {
+		t.Fatalf("can't create label set %v", err)
+	}
+	kubelet.labelSet = ls
+
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.os = kubecontainer.FakeOS{}
 
@@ -2465,6 +2472,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	diskSpaceManager.Unfreeze()
 	kubelet.diskSpaceManager = diskSpaceManager
 
+	// TODO BEFORE MERGE: Test that updatestatus adds the new nodelabels and writes the checkpointfile
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
 		Spec:       api.NodeSpec{},
@@ -2883,6 +2891,7 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	diskSpaceManager.Unfreeze()
 	kubelet.diskSpaceManager = diskSpaceManager
 
+	// TODO BEFORE MERGE: Test that updatestatus adds the new nodelabels and writes the checkpointfile
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
 		Spec:       api.NodeSpec{},
@@ -2931,6 +2940,8 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	if err := kubelet.updateNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	// Check that label checkpoint has been updated
+
 	actions := kubeClient.Actions()
 	if len(actions) != 2 {
 		t.Fatalf("unexpected actions: %v", actions)
@@ -3328,6 +3339,8 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 	}
 }
 
+// TODO BEFORE MERGE: Test registerwithapiserver sets the node labels
+
 func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
@@ -3375,176 +3388,6 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 	case <-done:
 		return
 	}
-}
-
-func TestGetNodeLabels(t *testing.T) {
-	kubelet := newTestKubelet(t).kubelet
-
-	testCases := []struct {
-		Expecting    map[string]string
-		LabelOptions []string
-		FileContent  string
-		Ok           bool
-	}{
-		{
-			Ok:           true,
-			Expecting:    map[string]string{"key1": "pair1", "key2": "pair2", "key3": "pair3", "key4": "pair4", "key5": "pair5"},
-			LabelOptions: []string{"key5=pair5"},
-			FileContent: `---
-key1: pair1
-key2: pair2
-key3: pair3
-key4: pair4
-`,
-		}, {
-			Ok:           true,
-			Expecting:    map[string]string{"key1": "pair1", "key2": "override"},
-			LabelOptions: []string{"key2=override"},
-			FileContent: `---
-key1: pair1
-key2: pair2
-`,
-		},
-	}
-
-	for i, test := range testCases {
-		fd := createTestNodeLabelFile(t, test.FileContent)
-		defer func(f *os.File) {
-			os.Remove(f.Name())
-		}(fd)
-
-		kubelet.nodeLabels = test.LabelOptions
-		kubelet.nodeLabelsFile = fd.Name()
-
-		list, err := kubelet.getNodeLabels()
-		if test.Ok && err != nil {
-			t.Errorf("test case %d should not have failed, error: %s", i, err)
-		}
-		if !reflect.DeepEqual(test.Expecting, list) {
-			t.Errorf("test case %d are not the same, %v ~ %v", i, list, test.Expecting)
-		}
-	}
-}
-
-func TestRetrieveNodeLabels(t *testing.T) {
-	kubelet := newTestKubelet(t).kubelet
-
-	testCases := []struct {
-		Expecting    map[string]string
-		LabelOptions []string
-		Ok           bool
-	}{
-		{
-			Expecting:    map[string]string{"key1": "pair1", "key2": "pair2", "key3": "pair3", "key4": "pair4"},
-			LabelOptions: []string{"key1=pair1", "key2=pair2", "key3=pair3", "key4=pair4"},
-			Ok:           true,
-		},
-		{
-			Expecting:    map[string]string{"key1": "pair1"},
-			LabelOptions: []string{"key1=pair1", "key2paiwdsr2"},
-		},
-	}
-
-	for i, test := range testCases {
-		list, err := kubelet.retrieveNodeLabels(test.LabelOptions)
-		if test.Ok && err != nil {
-			t.Errorf("test case %d should not have failed, error: %s", i, err)
-		}
-		if !reflect.DeepEqual(test.Expecting, list) {
-			t.Errorf("test case %d are not the same, %v ~ %v", i, list, test.Expecting)
-		}
-	}
-}
-
-func TestRetrieveNodeLabelsFile(t *testing.T) {
-	kubelet := newTestKubelet(t).kubelet
-
-	testCases := []struct {
-		Expecting   map[string]string
-		Ok          bool
-		FileContent string
-	}{
-		{
-			Expecting: map[string]string{"key1": "pair1", "key2": "pair2", "key3": "pair3", "key4": "pair4"},
-			Ok:        true,
-			FileContent: `---
-key1: pair1
-key2: pair2
-key3: pair3
-key4: pair4`,
-		}, {
-			FileContent: `---
-key1: pair1
-hash_map:
-  key2: pair2
-`,
-		}, {
-			Expecting: map[string]string{"key1": "pair1", "key2": "pair2"},
-			Ok:        true,
-			FileContent: `
-
-key1: pair1
-key2: pair2
-`,
-		}, {
-			FileContent: `---
-key1: pair1
-bad_key_pair
-`,
-		}, {
-			Expecting: nil,
-			FileContent: `{
-	"key1": "pair1",
-	"key2": "pair2",
-	"key3": "pair3",
-	"key4": {
-		"some_key": "some_value"
-	}
-}`,
-		}, {
-			FileContent: "",
-		}, {
-			Expecting: map[string]string{"key1": "pair1", "key2": "pair2", "key3": "pair3", "key4": "pair4"},
-			Ok:        true,
-			FileContent: `---
-key1: pair1
-key2: pair2
-key3: pair3
-key4: pair4
-`,
-		},
-	}
-
-	for i, test := range testCases {
-		fd := createTestNodeLabelFile(t, test.FileContent)
-		defer func(f *os.File) {
-			os.Remove(f.Name())
-		}(fd)
-
-		labels, err := kubelet.retrieveNodeLabelsFile(fd.Name())
-		if test.Ok && err != nil {
-			t.Errorf("test case %d should not have returned an error, %s", i, err)
-			continue
-		}
-
-		if test.Expecting != nil && !reflect.DeepEqual(test.Expecting, labels) {
-			t.Errorf("test case %d not as expected, got: %#v, expecting: %#v", i, labels, test.Expecting)
-		}
-	}
-}
-
-func createTestNodeLabelFile(t *testing.T, content string) *os.File {
-	f, err := ioutil.TempFile("", "node_label_file")
-	if err != nil {
-		t.Fatalf("unexpected error creating node_label_file: %v", err)
-	}
-	f.Close()
-
-	if err := ioutil.WriteFile(f.Name(), []byte(content), 0700); err != nil {
-		t.Fatalf("unexpected error writing node label file: %v", err)
-	}
-
-	return f
 }
 
 func TestMakePortMappings(t *testing.T) {
