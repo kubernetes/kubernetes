@@ -90,6 +90,7 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 		extensions.Kind("Job"):                     &JobDescriber{c},
 		extensions.Kind("Deployment"):              &DeploymentDescriber{c},
 		extensions.Kind("Ingress"):                 &IngressDescriber{c},
+		extensions.Kind("ConfigMap"):               &ConfigMapDescriber{c},
 	}
 
 	return m
@@ -1691,6 +1692,38 @@ func getPodStatusForController(c client.PodInterface, selector labels.Selector) 
 		}
 	}
 	return
+}
+
+// ConfigMapDescriber generates information about a ConfigMap
+type ConfigMapDescriber struct {
+	client.Interface
+}
+
+func (d *ConfigMapDescriber) Describe(namespace, name string) (string, error) {
+	c := d.Extensions().ConfigMaps(namespace)
+
+	configMap, err := c.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	return describeConfigMap(configMap)
+}
+
+func describeConfigMap(configMap *extensions.ConfigMap) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", configMap.Name)
+		fmt.Fprintf(out, "Namespace:\t%s\n", configMap.Namespace)
+		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(configMap.Labels))
+		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(configMap.Annotations))
+
+		fmt.Fprintf(out, "\nData\n====\n")
+		for k, v := range configMap.Data {
+			fmt.Fprintf(out, "%s:\t%d bytes\n", k, len(v))
+		}
+
+		return nil
+	})
 }
 
 // newErrNoDescriber creates a new ErrNoDescriber with the names of the provided types.
