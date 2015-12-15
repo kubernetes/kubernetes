@@ -46,13 +46,20 @@ func (g *genGroup) Namers(c *generator.Context) namer.NameSystems {
 }
 
 func (g *genGroup) Imports(c *generator.Context) (imports []string) {
-	return append(g.imports.ImportLines(), "fmt", "strings")
+	return append(g.imports.ImportLines(), "fmt")
 }
 
 func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	const pkgUnversioned = "k8s.io/kubernetes/pkg/client/unversioned"
 	const pkgLatest = "k8s.io/kubernetes/pkg/api/latest"
+	prefix := func(group string) string {
+		if group == "" {
+			return `"/api"`
+		}
+		return `"/apis"`
+	}
+
 	m := map[string]interface{}{
 		"group":                      g.group,
 		"Group":                      namer.IC(g.group),
@@ -63,6 +70,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"RESTClientFor":              c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "RESTClientFor"}),
 		"latestGroup":                c.Universe.Variable(types.Name{Package: pkgLatest, Name: "Group"}),
 		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgLatest, Name: "GroupOrDie"}),
+		"prefix":                     prefix(g.group),
 	}
 	sw.Do(groupInterfaceTemplate, m)
 	sw.Do(groupClientTemplate, m)
@@ -135,19 +143,20 @@ func set$.Group$Defaults(config *$.Config|raw$) error {
 	if err != nil {
 		return err
 	}
-	config.Prefix = "apis/"
+	config.Prefix = $.prefix$
 	if config.UserAgent == "" {
 		config.UserAgent = $.DefaultKubernetesUserAgent|raw$()
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	//if config.Version == "" {
-	config.Version = g.GroupVersion
+	copyGroupVersion := g.GroupVersion
+	config.GroupVersion = &copyGroupVersion
 	//}
 
-	versionInterfaces, err := g.InterfacesFor(config.Version)
+	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
 	if err != nil {
 		return fmt.Errorf("$.Group$ API version '%s' is not recognized (valid values: %s)",
-			config.Version, strings.Join($.GroupOrDie|raw$("$.group$").Versions, ", "))
+			config.GroupVersion, g.GroupVersions)
 	}
 	config.Codec = versionInterfaces.Codec
 	if config.QPS == 0 {
