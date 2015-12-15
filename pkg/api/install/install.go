@@ -34,35 +34,55 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// userResources is a group of resources mostly used by a kubectl user
-var userResources = []string{"rc", "svc", "pods", "pvc"}
-
 const importPrefix = "k8s.io/kubernetes/pkg/api"
 
 var accessor = meta.NewAccessor()
 
+// availableVersions lists all known external versions for this group from most preferred to least preferred
+var availableVersions = []unversioned.GroupVersion{v1.SchemeGroupVersion}
+
 func init() {
-	groupMeta, err := latest.RegisterGroup(api.GroupName)
-	if err != nil {
+	externalVersions := []unversioned.GroupVersion{}
+	for _, allowedVersion := range registered.GroupVersionsForGroup(api.GroupName) {
+		for _, externalVersion := range availableVersions {
+			if externalVersion == allowedVersion {
+				externalVersions = append(externalVersions, externalVersion)
+			}
+		}
+	}
+
+	if len(externalVersions) == 0 {
+		glog.V(4).Infof("No version is registered for group %v", api.GroupName)
+		return
+	}
+
+	preferredExternalVersion := externalVersions[0]
+
+	groupMeta := latest.GroupMeta{
+		GroupVersion:  preferredExternalVersion,
+		GroupVersions: externalVersions,
+		Codec:         runtime.CodecFor(api.Scheme, preferredExternalVersion.String()),
+		RESTMapper:    newRESTMapper(externalVersions),
+		SelfLinker:    runtime.SelfLinker(accessor),
+		InterfacesFor: interfacesFor,
+	}
+
+	if err := latest.RegisterGroup(groupMeta); err != nil {
 		glog.V(4).Infof("%v", err)
 		return
 	}
 
-	// Use the first API version in the list of registered versions as the latest.
-	registeredGroupVersions := registered.GroupVersionsForGroup(api.GroupName)
-	groupVersion := registeredGroupVersions[0]
-	*groupMeta = latest.GroupMeta{
-		GroupVersion: groupVersion,
-		Codec:        runtime.CodecFor(api.Scheme, groupVersion.String()),
-	}
+	api.RegisterRESTMapper(groupMeta.RESTMapper)
+}
 
+// userResources is a group of resources mostly used by a kubectl user
+var userResources = []string{"rc", "svc", "pods", "pvc"}
+
+func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper {
 	worstToBestGroupVersions := []unversioned.GroupVersion{}
-	for i := len(registeredGroupVersions) - 1; i >= 0; i-- {
-		worstToBestGroupVersions = append(worstToBestGroupVersions, registeredGroupVersions[i])
+	for i := len(externalVersions) - 1; i >= 0; i-- {
+		worstToBestGroupVersions = append(worstToBestGroupVersions, externalVersions[i])
 	}
-	groupMeta.GroupVersions = registeredGroupVersions
-
-	groupMeta.SelfLinker = runtime.SelfLinker(accessor)
 
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
@@ -89,9 +109,8 @@ func init() {
 	mapper := api.NewDefaultRESTMapper(worstToBestGroupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 	// setup aliases for groups of resources
 	mapper.AddResourceAlias("all", userResources...)
-	groupMeta.RESTMapper = mapper
-	api.RegisterRESTMapper(groupMeta.RESTMapper)
-	groupMeta.InterfacesFor = interfacesFor
+
+	return mapper
 }
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version
@@ -105,9 +124,7 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 			MetadataAccessor: accessor,
 		}, nil
 	default:
-		{
-			g, _ := latest.Group(api.GroupName)
-			return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
-		}
+		g, _ := latest.Group(api.GroupName)
+		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
 	}
 }

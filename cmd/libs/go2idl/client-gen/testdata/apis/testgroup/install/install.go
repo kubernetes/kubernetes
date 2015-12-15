@@ -37,33 +37,39 @@ const importPrefix = "k8s.io/kubernetes/pkg/apis/testgroup"
 
 var accessor = meta.NewAccessor()
 
+const groupName = "testgroup"
+
+// availableVersions lists all known external versions for this group from most preferred to least preferred
+var availableVersions = []unversioned.GroupVersion{{Group: groupName, Version: "v1"}}
+
 func init() {
 	registered.RegisteredGroupVersions = append(registered.RegisteredGroupVersions, v1.SchemeGroupVersion)
-	groupMeta, err := latest.RegisterGroup("testgroup")
-	if err != nil {
+
+	externalVersions := availableVersions
+	preferredExternalVersion := externalVersions[0]
+
+	groupMeta := latest.GroupMeta{
+		GroupVersion:  preferredExternalVersion,
+		GroupVersions: externalVersions,
+		Codec:         runtime.CodecFor(api.Scheme, preferredExternalVersion.String()),
+		RESTMapper:    newRESTMapper(externalVersions),
+		SelfLinker:    runtime.SelfLinker(accessor),
+		InterfacesFor: interfacesFor,
+	}
+
+	if err := latest.RegisterGroup(groupMeta); err != nil {
 		glog.V(4).Infof("%v", err)
 		return
 	}
 
-	registeredGroupVersions := []unversioned.GroupVersion{
-		{
-			"testgroup",
-			"v1",
-		},
-	}
-	groupVersion := registeredGroupVersions[0]
-	*groupMeta = latest.GroupMeta{
-		GroupVersion: groupVersion,
-		Codec:        runtime.CodecFor(api.Scheme, groupVersion.String()),
-	}
+	api.RegisterRESTMapper(groupMeta.RESTMapper)
+}
 
+func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper {
 	worstToBestGroupVersions := []unversioned.GroupVersion{}
-	for i := len(registeredGroupVersions) - 1; i >= 0; i-- {
-		worstToBestGroupVersions = append(worstToBestGroupVersions, registeredGroupVersions[i])
+	for i := len(externalVersions) - 1; i >= 0; i-- {
+		worstToBestGroupVersions = append(worstToBestGroupVersions, externalVersions[i])
 	}
-	groupMeta.GroupVersions = registeredGroupVersions
-
-	groupMeta.SelfLinker = runtime.SelfLinker(accessor)
 
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
@@ -71,9 +77,7 @@ func init() {
 
 	ignoredKinds := sets.NewString()
 
-	groupMeta.RESTMapper = api.NewDefaultRESTMapper(worstToBestGroupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
-	api.RegisterRESTMapper(groupMeta.RESTMapper)
-	groupMeta.InterfacesFor = interfacesFor
+	return api.NewDefaultRESTMapper(worstToBestGroupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 }
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version
@@ -87,7 +91,7 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 			MetadataAccessor: accessor,
 		}, nil
 	default:
-		g, _ := latest.Group("testgroup")
+		g, _ := latest.Group(groupName)
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
 	}
 }
