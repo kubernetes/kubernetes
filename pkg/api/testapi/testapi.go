@@ -59,21 +59,21 @@ func init() {
 		}
 	}
 
-	if _, ok := Groups[api.SchemeGroupVersion.Group]; !ok {
-		Groups[api.SchemeGroupVersion.Group] = TestGroup{
-			externalGroupVersion: unversioned.GroupVersion{Group: api.SchemeGroupVersion.Group, Version: latest.GroupOrDie(api.SchemeGroupVersion.Group).GroupVersion.Version},
+	if _, ok := Groups[api.GroupName]; !ok {
+		Groups[api.GroupName] = TestGroup{
+			externalGroupVersion: unversioned.GroupVersion{Group: api.GroupName, Version: latest.GroupOrDie(api.GroupName).GroupVersion.Version},
 			internalGroupVersion: api.SchemeGroupVersion,
 		}
 	}
-	if _, ok := Groups[extensions.SchemeGroupVersion.Group]; !ok {
-		Groups[extensions.SchemeGroupVersion.Group] = TestGroup{
-			externalGroupVersion: unversioned.GroupVersion{Group: extensions.SchemeGroupVersion.Group, Version: latest.GroupOrDie(extensions.SchemeGroupVersion.Group).GroupVersion.Version},
+	if _, ok := Groups[extensions.GroupName]; !ok {
+		Groups[extensions.GroupName] = TestGroup{
+			externalGroupVersion: unversioned.GroupVersion{Group: extensions.GroupName, Version: latest.GroupOrDie(extensions.GroupName).GroupVersion.Version},
 			internalGroupVersion: extensions.SchemeGroupVersion,
 		}
 	}
 
-	Default = Groups[api.SchemeGroupVersion.Group]
-	Extensions = Groups[extensions.SchemeGroupVersion.Group]
+	Default = Groups[api.GroupName]
+	Extensions = Groups[extensions.GroupName]
 }
 
 func (g TestGroup) GroupVersion() *unversioned.GroupVersion {
@@ -122,7 +122,7 @@ func (g TestGroup) MetadataAccessor() meta.MetadataAccessor {
 // 'resource' should be the resource path, e.g. "pods" for the Pod type. 'name' should be
 // empty for lists.
 func (g TestGroup) SelfLink(resource, name string) string {
-	if g.externalGroupVersion.Group == api.SchemeGroupVersion.Group {
+	if g.externalGroupVersion.Group == api.GroupName {
 		if name == "" {
 			return fmt.Sprintf("/api/%s/%s", g.externalGroupVersion.Version, resource)
 		}
@@ -142,7 +142,7 @@ func (g TestGroup) SelfLink(resource, name string) string {
 // /api/v1/watch/namespaces/foo/pods/pod0 for v1.
 func (g TestGroup) ResourcePathWithPrefix(prefix, resource, namespace, name string) string {
 	var path string
-	if g.externalGroupVersion.Group == api.SchemeGroupVersion.Group {
+	if g.externalGroupVersion.Group == api.GroupName {
 		path = "/api/" + g.externalGroupVersion.Version
 	} else {
 		// TODO: switch back once we have proper multiple group support

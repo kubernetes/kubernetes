@@ -39,7 +39,7 @@ func LoadPodFromFile(filePath string) (*api.Pod, error) {
 	}
 	pod := &api.Pod{}
 
-	if err := latest.GroupOrDie("").Codec.DecodeInto(podDef, pod); err != nil {
+	if err := latest.GroupOrDie(api.GroupName).Codec.DecodeInto(podDef, pod); err != nil {
 		return nil, fmt.Errorf("failed decoding file: %v", err)
 	}
 	return pod, nil
@@ -50,7 +50,7 @@ func SavePodToFile(pod *api.Pod, filePath string, perm os.FileMode) error {
 	if filePath == "" {
 		return fmt.Errorf("file path not specified")
 	}
-	data, err := latest.GroupOrDie("").Codec.Encode(pod)
+	data, err := latest.GroupOrDie(api.GroupName).Codec.Encode(pod)
 	if err != nil {
 		return fmt.Errorf("failed encoding pod: %v", err)
 	}

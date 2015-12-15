@@ -22,7 +22,9 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/storage"
 )
@@ -78,16 +80,16 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 			legacyVersion:   "v1",
 			storageVersions: "v1,extensions/v1beta1",
 			expectedMap: map[string]string{
-				"":           "v1",
-				"extensions": "extensions/v1beta1",
+				api.GroupName:        "v1",
+				extensions.GroupName: "extensions/v1beta1",
 			},
 		},
 		{
 			legacyVersion:   "",
 			storageVersions: "extensions/v1beta1,v1",
 			expectedMap: map[string]string{
-				"":           "v1",
-				"extensions": "extensions/v1beta1",
+				api.GroupName:        "v1",
+				extensions.GroupName: "extensions/v1beta1",
 			},
 		},
 		{
@@ -113,17 +115,17 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 		servers  []string
 	}{
 		{
-			apigroup: "",
+			apigroup: api.GroupName,
 			resource: "resource",
 			servers:  []string{"http://127.0.0.1:10000"},
 		},
 		{
-			apigroup: "",
+			apigroup: api.GroupName,
 			resource: "resource",
 			servers:  []string{"http://127.0.0.1:10000", "http://127.0.0.1:20000"},
 		},
 		{
-			apigroup: "extensions",
+			apigroup: extensions.GroupName,
 			resource: "resource",
 			servers:  []string{"http://127.0.0.1:10000"},
 		},

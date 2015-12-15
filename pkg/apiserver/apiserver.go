@@ -211,7 +211,7 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 	glog.Errorln(buffer.String())
 
 	// TODO: make status unversioned or plumb enough of the request to deduce the requested API version
-	errorJSON(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", "", "", "", 0, false), latest.GroupOrDie("").Codec, httpWriter)
+	errorJSON(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", "", "", "", 0, false), latest.GroupOrDie(api.GroupName).Codec, httpWriter)
 }
 
 func InstallServiceErrorHandler(container *restful.Container, requestResolver *RequestInfoResolver, apiVersions []string) {
@@ -222,7 +222,7 @@ func InstallServiceErrorHandler(container *restful.Container, requestResolver *R
 
 func serviceErrorHandler(requestResolver *RequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
 	requestInfo, err := requestResolver.GetRequestInfo(request.Request)
-	codec := latest.GroupOrDie("").Codec
+	codec := latest.GroupOrDie(api.GroupName).Codec
 	if err == nil && requestInfo.APIVersion != "" {
 		// check if the api version is valid.
 		for _, version := range apiVersions {

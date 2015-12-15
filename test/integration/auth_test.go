@@ -38,6 +38,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
@@ -755,8 +756,8 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 		URL                string
 		expectedAttributes authorizer.Attributes
 	}{
-		"prefix/version/resource":       {"GET", "/api/v1/pods", authorizer.AttributesRecord{APIGroup: "", Resource: "pods"}},
-		"prefix/group/version/resource": {"GET", "/apis/extensions/v1/pods", authorizer.AttributesRecord{APIGroup: "extensions", Resource: "pods"}},
+		"prefix/version/resource":       {"GET", "/api/v1/pods", authorizer.AttributesRecord{APIGroup: api.GroupName, Resource: "pods"}},
+		"prefix/group/version/resource": {"GET", "/apis/extensions/v1/pods", authorizer.AttributesRecord{APIGroup: extensions.GroupName, Resource: "pods"}},
 	}
 
 	currentAuthorizationAttributesIndex := 0

@@ -23,10 +23,10 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/util/sets"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -42,14 +42,14 @@ const importPrefix = "k8s.io/kubernetes/pkg/api"
 var accessor = meta.NewAccessor()
 
 func init() {
-	groupMeta, err := latest.RegisterGroup("")
+	groupMeta, err := latest.RegisterGroup(api.GroupName)
 	if err != nil {
 		glog.V(4).Infof("%v", err)
 		return
 	}
 
 	// Use the first API version in the list of registered versions as the latest.
-	registeredGroupVersions := registered.GroupVersionsForGroup("")
+	registeredGroupVersions := registered.GroupVersionsForGroup(api.GroupName)
 	groupVersion := registeredGroupVersions[0]
 	*groupMeta = latest.GroupMeta{
 		GroupVersion: groupVersion,
@@ -106,7 +106,7 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 		}, nil
 	default:
 		{
-			g, _ := latest.Group("")
+			g, _ := latest.Group(api.GroupName)
 			return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
 		}
 	}
