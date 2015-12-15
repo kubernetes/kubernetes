@@ -5,7 +5,7 @@
 .PHONY: all kube2sky container push clean test
 
 TAG = 1.11
-PREFIX = gcr.io/google_containers
+PREFIX = artfulcoder
 
 all: container
 
