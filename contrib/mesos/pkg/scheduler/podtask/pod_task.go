@@ -51,7 +51,7 @@ const (
 	Deleted  = FlagType("deleted")
 )
 
-var defaultRoles = []string{"*"}
+var starRole = []string{"*"}
 
 // A struct that describes a pod task.
 type T struct {
@@ -68,13 +68,14 @@ type T struct {
 	CreateTime  time.Time
 	UpdatedTime time.Time // time of the most recent StatusUpdate we've seen from the mesos master
 
-	podStatus    api.PodStatus
-	prototype    *mesos.ExecutorInfo // readonly
-	allowedRoles []string            // roles under which pods are allowed to be launched
-	podKey       string
-	launchTime   time.Time
-	bindTime     time.Time
-	mapper       HostPortMapper
+	podStatus       api.PodStatus
+	prototype       *mesos.ExecutorInfo // readonly
+	frameworkRoles  []string            // Mesos framework roles, pods are allowed to be launched with those
+	defaultPodRoles []string            // roles under which pods are scheduled if none are specified in labels
+	podKey          string
+	launchTime      time.Time
+	bindTime        time.Time
+	mapper          HostPortMapper
 }
 
 type Port struct {
@@ -168,34 +169,38 @@ func (t *T) Has(f FlagType) (exists bool) {
 	return
 }
 
+// Roles returns the valid roles under which this pod task can be scheduled.
+// If the pod has roles labels defined they are being used
+// else default pod roles are being returned.
 func (t *T) Roles() []string {
-	var roles []string
-
 	if r, ok := t.Pod.ObjectMeta.Labels[annotation.RolesKey]; ok {
-		roles = strings.Split(r, ",")
+		roles := strings.Split(r, ",")
 
 		for i, r := range roles {
 			roles[i] = strings.TrimSpace(r)
 		}
 
-		roles = filterRoles(roles, not(emptyRole), not(seenRole()))
-	} else {
-		// no roles label defined,
-		// by convention return the first allowed role
-		// to be used for launching the pod task
-		return []string{t.allowedRoles[0]}
+		return filterRoles(
+			roles,
+			not(emptyRole), not(seenRole()), inRoles(t.frameworkRoles...),
+		)
 	}
 
-	return filterRoles(roles, inRoles(t.allowedRoles...))
+	// no roles label defined, return defaults
+	return t.defaultPodRoles
 }
 
-func New(ctx api.Context, id string, pod *api.Pod, prototype *mesos.ExecutorInfo, allowedRoles []string) (*T, error) {
+func New(ctx api.Context, id string, pod *api.Pod, prototype *mesos.ExecutorInfo, frameworkRoles, defaultPodRoles []string) (*T, error) {
 	if prototype == nil {
 		return nil, fmt.Errorf("illegal argument: executor is nil")
 	}
 
-	if len(allowedRoles) == 0 {
-		allowedRoles = defaultRoles
+	if len(frameworkRoles) == 0 {
+		frameworkRoles = starRole
+	}
+
+	if len(defaultPodRoles) == 0 {
+		defaultPodRoles = starRole
 	}
 
 	key, err := MakePodKey(ctx, pod.Name)
@@ -208,14 +213,15 @@ func New(ctx api.Context, id string, pod *api.Pod, prototype *mesos.ExecutorInfo
 	}
 
 	task := &T{
-		ID:           id,
-		Pod:          *pod,
-		State:        StatePending,
-		podKey:       key,
-		mapper:       NewHostPortMapper(pod),
-		Flags:        make(map[FlagType]struct{}),
-		prototype:    prototype,
-		allowedRoles: allowedRoles,
+		ID:              id,
+		Pod:             *pod,
+		State:           StatePending,
+		podKey:          key,
+		mapper:          NewHostPortMapper(pod),
+		Flags:           make(map[FlagType]struct{}),
+		prototype:       prototype,
+		frameworkRoles:  frameworkRoles,
+		defaultPodRoles: defaultPodRoles,
 	}
 	task.CreateTime = time.Now()
 

@@ -509,6 +509,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 		&podsListWatch.ListWatch,
 		ei,
 		[]string{"*"},
+		[]string{"*"},
 		mresource.DefaultDefaultContainerCPULimit,
 		mresource.DefaultDefaultContainerMemLimit,
 	)

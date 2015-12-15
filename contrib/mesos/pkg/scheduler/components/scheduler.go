@@ -65,7 +65,7 @@ func New(
 	mux *http.ServeMux,
 	lw *cache.ListWatch,
 	prototype *mesos.ExecutorInfo,
-	roles []string,
+	frameworkRoles, defaultPodRoles []string,
 	defaultCpus mresource.CPUShares,
 	defaultMem mresource.MegaBytes,
 ) scheduler.Scheduler {
@@ -81,7 +81,7 @@ func New(
 
 	q := queuer.New(queue.NewDelayFIFO(), podUpdates)
 
-	algorithm := algorithm.New(core, podUpdates, ps, prototype, roles, defaultCpus, defaultMem)
+	algorithm := algorithm.New(core, podUpdates, ps, prototype, frameworkRoles, defaultPodRoles, defaultCpus, defaultMem)
 
 	podDeleter := deleter.New(core, q)
 

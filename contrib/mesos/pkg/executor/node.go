@@ -36,9 +36,9 @@ func nodeInfo(si *mesos.SlaveInfo, ei *mesos.ExecutorInfo) NodeInfo {
 			}
 			switch r.GetName() {
 			case "cpus":
-				executorCPU = r.GetScalar().GetValue()
+				executorCPU += r.GetScalar().GetValue()
 			case "mem":
-				executorMem = r.GetScalar().GetValue()
+				executorMem += r.GetScalar().GetValue()
 			}
 		}
 	}
@@ -55,10 +55,15 @@ func nodeInfo(si *mesos.SlaveInfo, ei *mesos.ExecutorInfo) NodeInfo {
 			// We intentionally take the floor of executorCPU because cores are integers
 			// and we would loose a complete cpu here if the value is <1.
 			// TODO(sttts): switch to float64 when "Machine Allocables" are implemented
-			ni.Cores = int(r.GetScalar().GetValue() - float64(int(executorCPU)))
+			ni.Cores += int(r.GetScalar().GetValue())
 		case "mem":
-			ni.Mem = int64(r.GetScalar().GetValue()-executorMem) * 1024 * 1024
+			ni.Mem += int64(r.GetScalar().GetValue()) * 1024 * 1024
 		}
 	}
+
+	// TODO(sttts): subtract executorCPU/Mem from static pod resources before subtracting them from the capacity
+	ni.Cores -= int(executorCPU)
+	ni.Mem -= int64(executorMem) * 1024 * 1024
+
 	return ni
 }
