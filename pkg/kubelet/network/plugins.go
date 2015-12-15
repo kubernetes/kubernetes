@@ -50,7 +50,12 @@ const (
 	// it always resolves to the CNI bridge plugin and host-local IPAM, but
 	// uses the podCIDR allocated by the Kubernetes master as the IPAM subnet.
 	KubeletDefaultPluginName = "default"
-	DefaultNetConfFile       = "kubernetes-network.conf"
+
+	DefaultNetConfFile = "kubernetes-network.conf"
+	// String used to detect docker host networking. Must match the value
+	// returned by docker inspect -f '{{.HostConfig.NetworkMode}}'.
+	// TODO: Re-use a value from the Kubernetes/kubelet/docker.
+	HostNetworking = "host"
 )
 
 // GetPluginType returns the string after the second '/' in the default

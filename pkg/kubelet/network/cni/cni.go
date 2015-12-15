@@ -199,10 +199,20 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubet
 	if !ok {
 		return fmt.Errorf("CNI execution called on non-docker runtime")
 	}
+	netMode, err := runtime.GetNetworkMode(id.ContainerID())
+	if err != nil {
+		glog.Errorf("Error while getting network mode: %v", err)
+		return err
+	}
+	if netMode == network.HostNetworking {
+		glog.Infof("Skipping set up for pod %v with host networking", name)
+		return nil
+	}
 	netns, err := runtime.GetNetNs(id.ContainerID())
 	if err != nil {
 		return err
 	}
+	glog.Infof("%v plugin adding %v/%v with id %v to netns %v", plugin.Name(), name, namespace, id.ContainerID(), netns)
 
 	_, err = plugin.defaultNetwork.addToNetwork(name, namespace, id.ContainerID(), netns)
 	if err != nil {
@@ -217,6 +227,15 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 	runtime, ok := plugin.host.GetRuntime().(*dockertools.DockerManager)
 	if !ok {
 		return fmt.Errorf("CNI execution called on non-docker runtime")
+	}
+	netMode, err := runtime.GetNetworkMode(id.ContainerID())
+	if err != nil {
+		glog.Errorf("Error while getting network mode: %v", err)
+		return err
+	}
+	if netMode == network.HostNetworking {
+		glog.Infof("%v plugin skipping tear down for pod %v with host networking", plugin.Name(), name)
+		return nil
 	}
 	netns, err := runtime.GetNetNs(id.ContainerID())
 	if err != nil {
