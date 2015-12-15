@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 type CinderDiskUtil struct{}
@@ -130,6 +131,40 @@ func (util *CinderDiskUtil) DetachDisk(cd *cinderVolumeCleaner) error {
 	}
 	glog.V(2).Infof("Successfully detached cinder volume %s", cd.pdName)
 	return nil
+}
+
+func (util *CinderDiskUtil) DeleteVolume(cd *cinderVolumeDeleter) error {
+	cloud := cd.plugin.host.GetCloudProvider()
+	if cloud == nil {
+		glog.Errorf("Cloud provider not initialized properly")
+		return errors.New("Cloud provider not initialized properly")
+	}
+
+	if err := cloud.(*openstack.OpenStack).DeleteVolume(cd.pdName); err != nil {
+		glog.V(2).Infof("Error deleting cinder volume %s: %v", cd.pdName, err)
+		return err
+	}
+	glog.V(2).Infof("Successfully deleted cinder volume %s", cd.pdName)
+	return nil
+}
+
+func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, err error) {
+	cloud := c.plugin.host.GetCloudProvider()
+	if cloud == nil {
+		glog.Errorf("Cloud provider not initialized properly")
+		return "", 0, errors.New("Cloud provider not initialized properly")
+	}
+
+	volSizeBytes := c.options.Capacity.Value()
+	// Cinder works with gigabytes, convert to GiB with rounding up
+	volSizeGB := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
+	name, err := cloud.(*openstack.OpenStack).CreateVolume(volSizeGB)
+	if err != nil {
+		glog.V(2).Infof("Error creating cinder volume: %v", err)
+		return "", 0, err
+	}
+	glog.V(2).Infof("Successfully created cinder volume %s", name)
+	return name, volSizeGB, nil
 }
 
 type cinderSafeFormatAndMount struct {
