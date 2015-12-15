@@ -56,7 +56,7 @@ func TestRoles(t *testing.T) {
 	assert := assert.New(t)
 
 	for i, tt := range []struct {
-		labels         map[string]string
+		annotations    map[string]string
 		frameworkRoles []string
 		want           []string
 	}{
@@ -105,7 +105,7 @@ func TestRoles(t *testing.T) {
 		},
 	} {
 		task := fakePodTask("test", tt.frameworkRoles, starRole)
-		task.Pod.ObjectMeta.Labels = tt.labels
+		task.Pod.ObjectMeta.Annotations = tt.annotations
 		assert.True(reflect.DeepEqual(task.Roles(), tt.want), "test #%d got %#v want %#v", i, task.Roles(), tt.want)
 	}
 }
