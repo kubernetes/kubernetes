@@ -50,6 +50,7 @@ const (
 	// it always resolves to the CNI bridge plugin and host-local IPAM, but
 	// uses the podCIDR allocated by the Kubernetes master as the IPAM subnet.
 	KubeletDefaultPluginName = "default"
+	DefaultNetConfFile       = "kubernetes-network.conf"
 )
 
 // GetPluginType returns the string after the second '/' in the default

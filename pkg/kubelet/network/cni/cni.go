@@ -18,7 +18,11 @@ package cni
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/appc/cni/libcni"
@@ -48,6 +52,31 @@ type cniNetwork struct {
 	name          string
 	NetworkConfig *libcni.NetworkConfig
 	CNIConfig     *libcni.CNIConfig
+	// Indicates if the default plugin needs Kubernetes specific metadata as
+	// CNI_ARGS. Setting this to true and using a stock CNI plugin will lead
+	// to errors because of the unrecognized args. It should never be true if
+	// kubelet is responsible for dynamically loading plugins.
+	// TODO: get rid of this. Putting it in the cniNetwork object minizes churn.
+	requiresKubeEnvVars bool
+}
+
+// fileWriter implements io.Writer.
+// Only used by BridgeNetConf, abstracted out for unittesting.
+type fileWriter struct {
+	toDirPath  string
+	toFileName string
+}
+
+// Write writes bytes to toDirPath/toFileName after creating toDirPath.
+func (f fileWriter) Write(bytes []byte) (n int, err error) {
+	if err := os.MkdirAll(f.toDirPath, 0700); err != nil {
+		return 0, err
+	}
+	path := filepath.Join(f.toDirPath, f.toFileName)
+	if err := ioutil.WriteFile(path, bytes, 0600); err != nil {
+		return 0, err
+	}
+	return len(bytes), nil
 }
 
 func probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, vendorCNIDirPrefix string) []network.NetworkPlugin {
@@ -61,6 +90,7 @@ func probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, vendorCNIDirPrefix str
 	plugin := &cniNetworkPlugin{
 		confDir: pluginDir,
 		defaultNetwork: &cniNetwork{
+			requiresKubeEnvVars: true,
 			CNIConfig: &libcni.CNIConfig{
 				Path: []string{DefaultCNIDir},
 			},
@@ -98,6 +128,10 @@ func (plugin *cniNetworkPlugin) Name() string {
 
 func (plugin *cniNetworkPlugin) ReloadConf(ncw network.NetConfWriterTo) error {
 	if ncw != nil {
+		// Hack: assume that if the plugin is writing its own netconf, that
+		// netconf has all information to talk to the plugin so we don't need to
+		// pass CNI_ARGS.
+		plugin.defaultNetwork.requiresKubeEnvVars = false
 		glog.V(4).Infof("writing bridge plugin net conf to %v", plugin.confDir)
 		if _, err := ncw.WriteTo(fileWriter{plugin.confDir, network.DefaultNetConfFile}); err != nil {
 			return err
@@ -119,7 +153,6 @@ func (plugin *cniNetworkPlugin) ReloadConf(ncw network.NetConfWriterTo) error {
 		}
 		plugin.defaultNetwork.NetworkConfig = conf
 		plugin.defaultNetwork.name = conf.Network.Name
-		plugin.defaultNetwork.requiresKubeEnvVars = false
 		glog.V(4).Infof("%v plugin found a network %v in %v. Search paths for network plugins that satisfy this network: %+v",
 			plugin.defaultNetwork.name, plugin.confDir, plugin.defaultNetwork.CNIConfig.Path)
 	}
@@ -177,14 +210,14 @@ func (plugin *cniNetworkPlugin) Status(namespace string, name string, id kubetyp
 }
 
 func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*cnitypes.Result, error) {
-	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
-	if err != nil {
-		glog.Errorf("Error adding network: %v", err)
-		return nil, err
+	rt := &libcni.RuntimeConf{
+		ContainerID: podInfraContainerID.ID,
+		NetNS:       podNetnsPath,
+		IfName:      DefaultInterfaceName,
+		Args:        network.getCNIArgs(podNamespace, podName, podInfraContainerID.ID),
 	}
-
 	netconf, cninet := network.NetworkConfig, network.CNIConfig
-	glog.V(4).Infof("About to run with conf.Network.Type=%v, c.Path=%v", netconf.Network.Type, cninet.Path)
+	glog.V(4).Infof("Plugin about to run with conf.Network.Type=%v, c.Path=%v, CNI_ARGS=%v", netconf.Network.Type, cninet.Path, rt.Args)
 	res, err := cninet.AddNetwork(netconf, rt)
 	if err != nil {
 		glog.Errorf("Error adding network: %v", err)
@@ -194,37 +227,32 @@ func (network *cniNetwork) addToNetwork(podName string, podNamespace string, pod
 	return res, nil
 }
 
-func (network *cniNetwork) deleteFromNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) error {
-	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
-	if err != nil {
-		glog.Errorf("Error deleting network: %v", err)
-		return err
+// getCNIArgs returns the Kubernetes specific args piped through to a plugin via CNI_ARGS.
+// Piping these args will break "normal" CNI plugins.
+func (network *cniNetwork) getCNIArgs(podNs, podName, infraContainerID string) [][2]string {
+	if network.requiresKubeEnvVars {
+		return [][2]string{
+			// TODO: Remove when we've finally moved to CNI completely.
+			{"K8S_POD_NAMESPACE", podNs},
+			{"K8S_POD_NAME", podName},
+			{"K8S_POD_INFRA_CONTAINER_ID", infraContainerID},
+		}
 	}
-
-	netconf, cninet := network.NetworkConfig, network.CNIConfig
-	glog.V(4).Infof("About to run with conf.Network.Type=%v, c.Path=%v", netconf.Network.Type, cninet.Path)
-	err = cninet.DelNetwork(netconf, rt)
-	if err != nil {
-		glog.Errorf("Error deleting network: %v", err)
-		return err
-	}
-	return nil
+	return [][2]string{}
 }
 
-func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*libcni.RuntimeConf, error) {
-	glog.V(4).Infof("Got netns path %v", podNetnsPath)
-	glog.V(4).Infof("Using netns path %v", podNs)
-
+func (network *cniNetwork) deleteFromNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) error {
 	rt := &libcni.RuntimeConf{
 		ContainerID: podInfraContainerID.ID,
 		NetNS:       podNetnsPath,
 		IfName:      DefaultInterfaceName,
-		Args: [][2]string{
-			{"K8S_POD_NAMESPACE", podNs},
-			{"K8S_POD_NAME", podName},
-			{"K8S_POD_INFRA_CONTAINER_ID", podInfraContainerID.ID},
-		},
+		Args:        network.getCNIArgs(podNamespace, podName, podInfraContainerID.ID),
 	}
-
-	return rt, nil
+	netconf, cninet := network.NetworkConfig, network.CNIConfig
+	glog.V(4).Infof("About to run with conf.Network.Type=%v, c.Path=%v", netconf.Network.Type, cninet.Path)
+	if err := cninet.DelNetwork(netconf, rt); err != nil {
+		glog.Errorf("Error deleting network: %v", err)
+		return err
+	}
+	return nil
 }
