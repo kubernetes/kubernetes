@@ -14,22 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package v1beta1
 
-// These imports are the API groups the client will support.
 import (
-	"fmt"
-
-	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/api/registered"
-	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
-	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func init() {
-	if missingVersions := registered.ValidateEnvRequestedVersions(); len(missingVersions) != 0 {
-		panic(fmt.Sprintf("KUBE_API_VERSIONS contains versions that are not installed: %q.", missingVersions))
-	}
+func addDefaultingFuncs(scheme *runtime.Scheme) {
+	scheme.AddDefaultingFuncs()
 }
