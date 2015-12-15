@@ -1124,38 +1124,18 @@ func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Sec
 	return nil
 }
 
-// TODO(yifan): Searching the image via 'rkt images' might not be the most efficient way.
 func (r *Runtime) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
 	repoToPull, tag := parsers.ParseImageName(image.Image)
-	// Example output of 'rkt image list --fields=name':
-	//
-	// NAME
-	// nginx:latest
-	// coreos.com/rkt/stage1:0.8.1
-	//
-	// With '--no-legend=true' the fist line (NAME) will be omitted.
-	output, err := r.runCommand("image", "list", "--no-legend=true", "--fields=name")
+	listResp, err := r.apisvc.ListImages(context.Background(), &rktapi.ListImagesRequest{
+		Filter: &rktapi.ImageFilter{
+			BaseNames: []string{repoToPull},
+			Labels:    []*rktapi.KeyValue{{Key: "version", Value: tag}},
+		},
+	})
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("couldn't list images: %v", err)
 	}
-	for _, line := range output {
-		parts := strings.Split(strings.TrimSpace(line), ":")
-
-		var imgName, imgTag string
-		switch len(parts) {
-		case 1:
-			imgName, imgTag = parts[0], defaultImageTag
-		case 2:
-			imgName, imgTag = parts[0], parts[1]
-		default:
-			continue
-		}
-
-		if imgName == repoToPull && imgTag == tag {
-			return true, nil
-		}
-	}
-	return false, nil
+	return len(listResp.Images) > 0, nil
 }
 
 // SyncPod syncs the running pod to match the specified desired pod.
@@ -1463,35 +1443,32 @@ func (r *Runtime) getPodInfo(uuid string) (*podInfo, error) {
 	return info, nil
 }
 
+// buildImageName constructs the image name for kubecontainer.Image.
+func buildImageName(img *rktapi.Image) string {
+	return fmt.Sprintf("%s:%s", img.Name, img.Version)
+}
+
 // getImageByName tries to find the image info with the given image name.
-// TODO(yifan): Replace with 'rkt image cat-manifest'.
 // imageName should be in the form of 'example.com/app:latest', which should matches
 // the result of 'rkt image list'. If the version is empty, then 'latest' is assumed.
 func (r *Runtime) getImageByName(imageName string) (*kubecontainer.Image, error) {
-	// TODO(yifan): Print hash in 'rkt image cat-manifest'?
-	images, err := r.ListImages()
+	repoToPull, tag := parsers.ParseImageName(imageName)
+	listResp, err := r.apisvc.ListImages(context.Background(), &rktapi.ListImagesRequest{
+		Filter: &rktapi.ImageFilter{
+			BaseNames: []string{repoToPull},
+			Labels:    []*rktapi.KeyValue{{Key: "version", Value: tag}},
+		},
+	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't list images: %v", err)
 	}
-
-	nameVersion := strings.Split(imageName, ":")
-	switch len(nameVersion) {
-	case 1:
-		imageName += ":" + defaultImageTag
-	case 2:
-		break
-	default:
-		return nil, fmt.Errorf("invalid image name: %q, requires 'name[:version]'")
+	if len(listResp.Images) == 0 {
+		return nil, fmt.Errorf("cannot find the image %q", imageName)
 	}
-
-	for _, img := range images {
-		for _, t := range img.Tags {
-			if t == imageName {
-				return &img, nil
-			}
-		}
-	}
-	return nil, fmt.Errorf("cannot find the image %q", imageName)
+	return &kubecontainer.Image{
+		ID:   listResp.Images[0].Id,
+		Tags: []string{buildImageName(listResp.Images[0])},
+	}, nil
 }
 
 // ListImages lists all the available appc images on the machine by invoking 'rkt image list'.
@@ -1505,7 +1482,7 @@ func (r *Runtime) ListImages() ([]kubecontainer.Image, error) {
 	for i, image := range listResp.Images {
 		images[i] = kubecontainer.Image{
 			ID:   image.Id,
-			Tags: []string{image.Name},
+			Tags: []string{buildImageName(listResp.Images[0])},
 			//TODO: fill in the size of the image
 		}
 	}
