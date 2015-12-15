@@ -3,5 +3,12 @@
 {% if pillar.get('e2e_storage_test_environment', '').lower() == 'true' -%}
 {% set e2e_opts = '-s devicemapper' -%}
 {% endif -%}
-DOCKER_OPTS="{{grains_opts}} {{e2e_opts}} --bridge=cbr0 --iptables=false --ip-masq=false --log-level=warn"
+{% set bridge_opts = "--bridge=cbr0" %}
+# If Kubernetes is responsible for networking a network plugin will get invoked
+# that sets up the container bridge (and manages restarting) docker, if at all
+# necessary.
+{% if pillar.get('network_provider', '').lower() == 'kubernetes' %}
+  {% set bridge_opts = "" %}
+{% endif -%}
+DOCKER_OPTS="{{grains_opts}} {{e2e_opts}} {{bridge_opts}} --iptables=false --ip-masq=false --log-level=warn"
 DOCKER_NOFILE=1000000
