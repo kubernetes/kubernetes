@@ -333,7 +333,7 @@ func TestTransformResponse(t *testing.T) {
 		if hasErr != test.Error {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Error, err)
 		} else if hasErr && test.Response.StatusCode > 399 {
-			status, ok := err.(APIStatus)
+			status, ok := err.(apierrors.APIStatus)
 			if !ok {
 				t.Errorf("%d: response should have been transformable into APIStatus: %v", i, err)
 				continue

@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util"
@@ -95,7 +96,7 @@ func TestDoRequestFailed(t *testing.T) {
 	if err == nil || body != nil {
 		t.Errorf("unexpected non-error: %#v", body)
 	}
-	ss, ok := err.(APIStatus)
+	ss, ok := err.(errors.APIStatus)
 	if !ok {
 		t.Errorf("unexpected error type %v", err)
 	}

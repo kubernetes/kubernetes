@@ -710,7 +710,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		if runtimeObject, err := r.codec.Decode(bodyBytes); err == nil {
 			statusError := errors.FromObject(runtimeObject)
 
-			if _, ok := statusError.(APIStatus); ok {
+			if _, ok := statusError.(errors.APIStatus); ok {
 				return nil, statusError
 			}
 		}

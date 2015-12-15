@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
@@ -370,7 +369,7 @@ func (r *editResults) addError(err error, info *resource.Info) string {
 		reason := editReason{
 			head: fmt.Sprintf("%s %s was not valid", info.Mapping.Kind, info.Name),
 		}
-		if err, ok := err.(client.APIStatus); ok {
+		if err, ok := err.(errors.APIStatus); ok {
 			if details := err.Status().Details; details != nil {
 				for _, cause := range details.Causes {
 					reason.other = append(reason.other, cause.Message)
