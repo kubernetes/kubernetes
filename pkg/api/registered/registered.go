@@ -29,14 +29,16 @@ import (
 // The list is in the order of most preferred to the least.
 var RegisteredGroupVersions []unversioned.GroupVersion
 
-func init() {
-	validGroupVersions := map[unversioned.GroupVersion]bool{
-		unversioned.GroupVersion{Group: "", Version: "v1"}:                      true,
-		unversioned.GroupVersion{Group: "extensions", Version: "v1beta1"}:       true,
-		unversioned.GroupVersion{Group: "componentconfig", Version: "v1alpha1"}: true,
-		unversioned.GroupVersion{Group: "metrics", Version: "v1alpha1"}:         true,
-	}
+// These are the Kubernetes groupVersions. A groupVersion can be declared as
+// valid via ValidateGroupVersion.
+var validGroupVersions = map[unversioned.GroupVersion]bool{
+	unversioned.GroupVersion{Group: "", Version: "v1"}:                      true,
+	unversioned.GroupVersion{Group: "extensions", Version: "v1beta1"}:       true,
+	unversioned.GroupVersion{Group: "componentconfig", Version: "v1alpha1"}: true,
+	unversioned.GroupVersion{Group: "metrics", Version: "v1alpha1"}:         true,
+}
 
+func init() {
 	// The default list of supported api versions, in order of most preferred to the least.
 	supportedVersions := []unversioned.GroupVersion{
 		{Group: "", Version: "v1"},
@@ -70,6 +72,11 @@ func init() {
 	}
 
 	RegisteredGroupVersions = supportedVersions
+}
+
+// ValidateGroupVersion declares a groupVersion as valid.
+func ValidateGroupVersion(groupVersion unversioned.GroupVersion) {
+	validGroupVersions[groupVersion] = true
 }
 
 // Returns true if the given api version is one of the registered api versions.
