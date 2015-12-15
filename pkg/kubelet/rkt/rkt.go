@@ -845,35 +845,22 @@ func (r *Runtime) convertRktPod(rktpod rktapi.Pod) (*kubecontainer.Pod, error) {
 		return nil, fmt.Errorf("couldn't parse pod creation timestamp: %v", err)
 	}
 
-	var state kubecontainer.ContainerState
-	switch rktpod.State {
-	case rktapi.PodState_POD_STATE_RUNNING:
-		state = kubecontainer.ContainerStateRunning
-	case rktapi.PodState_POD_STATE_ABORTED_PREPARE, rktapi.PodState_POD_STATE_EXITED,
-		rktapi.PodState_POD_STATE_DELETING, rktapi.PodState_POD_STATE_GARBAGE:
-		state = kubecontainer.ContainerStateExited
-	default:
-		state = kubecontainer.ContainerStateUnknown
-	}
-
 	kubepod := &kubecontainer.Pod{
 		ID:        types.UID(podUID),
 		Name:      podName,
 		Namespace: podNamespace,
 	}
-	for _, app := range rktpod.Apps {
-		manifest := &appcschema.ImageManifest{}
-		err := json.Unmarshal(app.Image.Manifest, manifest)
-		if err != nil {
-			return nil, err
-		}
-		containerHashString, ok := manifest.Annotations.Get(k8sRktContainerHashAnno)
+
+	for i, app := range rktpod.Apps {
+		// The order of the apps is determined by the rkt pod manifest.
+		// TODO(yifan): Let the server to unmarshal the annotations? https://github.com/coreos/rkt/issues/1872
+		hashStr, ok := manifest.Apps[i].Annotations.Get(k8sRktContainerHashAnno)
 		if !ok {
-			return nil, fmt.Errorf("app is missing annotation %s", k8sRktContainerHashAnno)
+			return nil, fmt.Errorf("app %q is missing annotation %s", app.Name, k8sRktContainerHashAnno)
 		}
-		containerHash, err := strconv.ParseUint(containerHashString, 10, 64)
+		containerHash, err := strconv.ParseUint(hashStr, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't parse container's hash: %v", err)
+			return nil, fmt.Errorf("couldn't parse container's hash %q: %v", hashStr, err)
 		}
 
 		kubepod.Containers = append(kubepod.Containers, &kubecontainer.Container{
@@ -882,7 +869,7 @@ func (r *Runtime) convertRktPod(rktpod rktapi.Pod) (*kubecontainer.Pod, error) {
 			Image:   app.Image.Name,
 			Hash:    containerHash,
 			Created: podCreated,
-			State:   state,
+			State:   appStateToContainerState(app.State),
 		})
 	}
 
