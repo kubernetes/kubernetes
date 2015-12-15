@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network/cni"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
@@ -2688,22 +2689,23 @@ func (kl *Kubelet) syncNetworkStatus() {
 		kl.runtimeState.setNetworkState(err)
 		return
 	}
-	if reloadErr := kl.networkPlugin.ReloadConf(nil); reloadErr != nil {
-		err = fmt.Errorf("Error reloading netconf: ", reloadErr)
-		glog.Error(err)
-	} else if cbrErr := kl.cbr0.reconcile(podCIDR); cbrErr != nil {
-		err = fmt.Errorf("Error configuring cbr0: ", cbrErr)
-		glog.Error(err)
+	// TODO: Break this out into a meta Kubernetes plugin that the Kubelet
+	// communicates with by passing CNI_ARG=PluginName=<name>.
+	switch network.GetPluginType(kl.networkPluginName) {
+	case network.BridgePluginName, network.KubeletDefaultPluginName:
+		err = kl.networkPlugin.ReloadConf(&cni.BridgeNetConf{podCIDR})
+	default:
+		err = kl.cbr0.reconcile(podCIDR)
 	}
 	if err != nil {
-		glog.Error("Failed in bridge reconciliation: ", err)
-		kl.runtimeState.setNetworkState(err)
-		return
-	} else if bwErr := kl.applyBandwidthShaping(); bwErr != nil {
+		err = fmt.Errorf("Failed to configure networking")
+		glog.Warning(err)
+	}
+	if bwErr := kl.applyBandwidthShaping(); bwErr != nil {
 		// TODO: Is a failure here worthy of blocking pod creation?
 		glog.Error("Error applying bandwidth shaping: ", bwErr)
 	}
-	kl.runtimeState.setNetworkState(err)
+	kl.runtimeState.setNetworkState(nil)
 }
 
 // Set addresses for the node.

@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,6 +33,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/appc/cni/libcni"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
@@ -4251,5 +4253,84 @@ func TestSyncNetworkStatus(t *testing.T) {
 	bridgeUp := []string{"link", "set", "dev", "cbr0", "mtu", "1460", "up"}
 	if !reflect.DeepEqual(executedCmd, bridgeUp) {
 		t.Fatalf("Unexpected bridge creation command %v", executedCmd)
+	}
+}
+
+type fakeBridgeNetworkPlugin struct {
+	confWriter io.Writer
+}
+
+func (f *fakeBridgeNetworkPlugin) Init(host network.Host) error {
+	return nil
+}
+
+func (f *fakeBridgeNetworkPlugin) SetUpPod(namespace string, name string, podInfraContainerID kubetypes.DockerID) error {
+	return nil
+}
+
+func (f *fakeBridgeNetworkPlugin) TearDownPod(namespace string, name string, podInfraContainerID kubetypes.DockerID) error {
+	return nil
+}
+
+func (f *fakeBridgeNetworkPlugin) Status(namespace string, name string, podInfraContainerID kubetypes.DockerID) (*network.PodNetworkStatus, error) {
+	return nil, nil
+}
+
+func (f *fakeBridgeNetworkPlugin) ReloadConf(ncw network.NetConfWriterTo) error {
+	_, err := ncw.WriteTo(f.confWriter)
+	return err
+}
+
+func (f *fakeBridgeNetworkPlugin) Name() string {
+	return ""
+}
+
+func TestSyncNetConf(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	kubelet.configureCBR0 = true
+	kubelet.flannelExperimentalOverlay = false
+	kubelet.cbr0 = &containerBridgeReconciler{
+		&fakeExecer{Cmd: map[string][]string{}},
+		"cbr0", func(string) (bool, error) {
+			return true, nil
+		}}
+	kubelet.networkPluginName = fmt.Sprintf("%v/%v", network.KubernetesPluginPrefix, network.KubeletDefaultPluginName)
+
+	// Fake bridge plugin that writes netconf to a buffer.
+	var b bytes.Buffer
+	fBridge := &fakeBridgeNetworkPlugin{confWriter: &b}
+	kubelet.networkPlugin = fBridge
+
+	currTime := time.Now()
+	kubelet.runtimeState.clock = &util.FakeClock{currTime}
+	kubelet.runtimeState.lastBaseRuntimeSync = currTime
+
+	// Verify that the first sync after acquiring podCIDR writes out a netconf.
+	// Creation of pods is blocked till this happens.
+	podCIDR := "10.240.1.0/24"
+	kubelet.runtimeState.setPodCIDR(podCIDR)
+	kubelet.syncNetworkStatus()
+	errors := kubelet.runtimeState.errors()
+	if len(errors) != 0 {
+		t.Fatalf("Did not expect errors, got %v", errors)
+	}
+
+	// Make sure this is a valid CNI netconf, then reparse it as a generic map
+	// and check the pod CIDR.
+	nc, err := libcni.ConfFromBytes(b.Bytes())
+	if err != nil {
+		t.Fatalf("Unable to parse %v as a CNI netconf", b.String())
+	}
+	netConf := map[string]interface{}{}
+	if err := json.Unmarshal(nc.Bytes, &netConf); err != nil {
+		t.Fatalf("error parsing configuration: %s", err)
+	}
+	ipam, ok := netConf["ipam"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Failed to find ipam segment in %v", netConf)
+	}
+	if subnet, ok := ipam["subnet"].(string); !ok || subnet != podCIDR {
+		t.Fatalf("Failed to match podCIDR %v with netconf %v", podCIDR, netConf)
 	}
 }

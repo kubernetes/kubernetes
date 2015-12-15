@@ -17,7 +17,9 @@ limitations under the License.
 package cni
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"os"
@@ -35,11 +37,11 @@ import (
 )
 
 const (
-	CNIPluginName        = "cni"
 	DefaultNetDir        = "/etc/cni/net.d"
 	DefaultCNIDir        = "/opt/cni/bin"
 	DefaultInterfaceName = "eth0"
 	VendorCNIDirTemplate = "%s/opt/%s/bin"
+	defaultBridgeName    = "cbr0"
 )
 
 type cniNetworkPlugin struct {
@@ -58,6 +60,39 @@ type cniNetwork struct {
 	// kubelet is responsible for dynamically loading plugins.
 	// TODO: get rid of this. Putting it in the cniNetwork object minizes churn.
 	requiresKubeEnvVars bool
+}
+
+// BridgeNetConf knows how to produce a CNI network configuration file/files
+// for the bridge network plugin and host-local IPAM plugin. It implements
+// io.WriterTo.
+type BridgeNetConf struct {
+	// PodCIDR is the podCIDR from which the host-local IPAM can select IPs.
+	PodCIDR string
+}
+
+func (b *BridgeNetConf) WriteTo(w io.Writer) (int64, error) {
+	if b.PodCIDR == "" {
+		return 0, fmt.Errorf("Cannot write valid bridge configuration without a PodCIDR")
+	}
+	netConfData := map[string]interface{}{
+		"name":      "kubenet",
+		"type":      "bridge",
+		"bridge":    defaultBridgeName,
+		"isGateway": true,
+		"ipam": map[string]interface{}{
+			"type":   "host-local",
+			"subnet": b.PodCIDR,
+			"routes": []map[string]string{
+				{"dst": "0.0.0.0/0"},
+			},
+		},
+	}
+	netConfBytes, err := json.Marshal(netConfData)
+	if err != nil {
+		return 0, err
+	}
+	n, err := w.Write(netConfBytes)
+	return int64(n), err
 }
 
 // fileWriter implements io.Writer.
