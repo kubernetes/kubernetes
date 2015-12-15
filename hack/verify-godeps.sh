@@ -18,9 +18,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Lock this to a release that is known to work.  We can bump this as needed.
-GODEP_RELEASE=v45
-
 #### HACK ####
 # Sometimes godep just can't handle things. This lets use manually put
 # some deps in place first, so godep won't fall over.
@@ -56,13 +53,10 @@ function cleanup {
 }
 trap cleanup EXIT
 
-export GOPATH="${_tmpdir}"
 # build the godep tool
+export GOPATH="${_tmpdir}"
 go get -u github.com/tools/godep 2>/dev/null
-pushd "${_tmpdir}/src/github.com/tools/godep" > /dev/null
-  git checkout "${GODEP_RELEASE}" 2>/dev/null
-  go install github.com/tools/godep 2>/dev/null
-popd > /dev/null
+go install github.com/tools/godep 2>/dev/null
 GODEP="${_tmpdir}/bin/godep"
 
 # fill out that nice clean place with the kube godeps
