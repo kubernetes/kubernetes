@@ -99,14 +99,13 @@ func verifyResult(c *client.Client, podName string, ns string, oldNotRunning int
 	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	expectNoError(err)
 	_, notRunningPods := getPodsNumbers(allPods)
-
 	schedEvents, err := c.Events(ns).List(
 		labels.Everything(),
 		fields.Set{
 			"involvedObject.kind":      "Pod",
 			"involvedObject.name":      podName,
 			"involvedObject.namespace": ns,
-			"source":                   "scheduler",
+			"source":                   getSchedulerName(c),
 			"reason":                   "FailedScheduling",
 		}.AsSelector())
 	expectNoError(err)
@@ -121,7 +120,7 @@ func verifyResult(c *client.Client, podName string, ns string, oldNotRunning int
 				"involvedObject.kind":      "Pod",
 				"involvedObject.name":      podName,
 				"involvedObject.namespace": ns,
-				"source":                   "scheduler",
+				"source":                   getSchedulerName(c),
 				"reason":                   "failedScheduling",
 			}.AsSelector())
 		expectNoError(err)
