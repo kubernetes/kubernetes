@@ -181,12 +181,12 @@ func SlaveAttributesToLabels(attrs []*mesos.Attribute) map[string]string {
 		}
 
 		if errs := validation.IsQualifiedName(k); len(errs) != 0 {
-			log.V(3).Infof("ignoring invalid node label name %q", k, errs)
+			log.V(3).Infof("ignoring invalid node label %q: %v", k, errs)
 			continue
 		}
 
-		if !validation.IsValidLabelValue(v) {
-			log.V(3).Infof("ignoring invalid node label %s value: %q", k, v)
+		if errs := validation.IsValidLabelValue(v); len(errs) != 0 {
+			log.V(3).Infof("ignoring invalid node %s=%q: %v", k, v, errs)
 			continue
 		}
 
