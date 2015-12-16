@@ -64,7 +64,13 @@ do
 done
 
 if [ "x$GO_OUT" == "x" ]; then
-    "${KUBE_ROOT}/hack/build-go.sh" cmd/kube-proxy cmd/kube-apiserver cmd/kube-controller-manager cmd/kubelet plugin/cmd/kube-scheduler
+    "${KUBE_ROOT}/hack/build-go.sh" \
+        cmd/kube-apiserver \
+        cmd/kube-controller-manager \
+        cmd/kube-proxy \
+        cmd/kubectl \
+        cmd/kubelet \
+        plugin/cmd/kube-scheduler
 else
     echo "skipped the build."
 fi
