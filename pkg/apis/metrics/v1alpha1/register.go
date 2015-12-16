@@ -43,5 +43,5 @@ func addKnownTypes() {
 	)
 }
 
-func (*RawNode) IsAnAPIObject() {}
-func (*RawPod) IsAnAPIObject()  {}
+func (obj *RawNode) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *RawPod) GetObjectKind() unversioned.ObjectKind  { return &obj.TypeMeta }

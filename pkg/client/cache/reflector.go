@@ -240,7 +240,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("%s: Unable to understand list result %#v", r.name, list)
 	}
-	resourceVersion = metaInterface.ResourceVersion()
+	resourceVersion = metaInterface.GetResourceVersion()
 	items, err := meta.ExtractList(list)
 	if err != nil {
 		return fmt.Errorf("%s: Unable to understand list result %#v (%v)", r.name, list, err)
@@ -335,7 +335,7 @@ loop:
 				util.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", r.name, event))
 				continue
 			}
-			newResourceVersion := meta.ResourceVersion()
+			newResourceVersion := meta.GetResourceVersion()
 			switch event.Type {
 			case watch.Added:
 				r.store.Add(event.Object)

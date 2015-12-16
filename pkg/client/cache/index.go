@@ -59,7 +59,7 @@ func MetaNamespaceIndexFunc(obj interface{}) ([]string, error) {
 	if err != nil {
 		return []string{""}, fmt.Errorf("object has no meta: %v", err)
 	}
-	return []string{meta.Namespace()}, nil
+	return []string{meta.GetNamespace()}, nil
 }
 
 // Index maps the indexed value to a set of keys in the store that match on that value

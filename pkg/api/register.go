@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -94,44 +95,63 @@ func init() {
 	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIResourceList{})
 }
 
-func (*Pod) IsAnAPIObject()                       {}
-func (*PodList) IsAnAPIObject()                   {}
-func (*PodStatusResult) IsAnAPIObject()           {}
-func (*PodTemplate) IsAnAPIObject()               {}
-func (*PodTemplateList) IsAnAPIObject()           {}
-func (*ReplicationController) IsAnAPIObject()     {}
-func (*ReplicationControllerList) IsAnAPIObject() {}
-func (*Service) IsAnAPIObject()                   {}
-func (*ServiceList) IsAnAPIObject()               {}
-func (*Endpoints) IsAnAPIObject()                 {}
-func (*EndpointsList) IsAnAPIObject()             {}
-func (*Node) IsAnAPIObject()                      {}
-func (*NodeList) IsAnAPIObject()                  {}
-func (*Binding) IsAnAPIObject()                   {}
-func (*Event) IsAnAPIObject()                     {}
-func (*EventList) IsAnAPIObject()                 {}
-func (*List) IsAnAPIObject()                      {}
-func (*LimitRange) IsAnAPIObject()                {}
-func (*LimitRangeList) IsAnAPIObject()            {}
-func (*ResourceQuota) IsAnAPIObject()             {}
-func (*ResourceQuotaList) IsAnAPIObject()         {}
-func (*Namespace) IsAnAPIObject()                 {}
-func (*NamespaceList) IsAnAPIObject()             {}
-func (*ServiceAccount) IsAnAPIObject()            {}
-func (*ServiceAccountList) IsAnAPIObject()        {}
-func (*Secret) IsAnAPIObject()                    {}
-func (*SecretList) IsAnAPIObject()                {}
-func (*PersistentVolume) IsAnAPIObject()          {}
-func (*PersistentVolumeList) IsAnAPIObject()      {}
-func (*PersistentVolumeClaim) IsAnAPIObject()     {}
-func (*PersistentVolumeClaimList) IsAnAPIObject() {}
-func (*DeleteOptions) IsAnAPIObject()             {}
-func (*ListOptions) IsAnAPIObject()               {}
-func (*PodAttachOptions) IsAnAPIObject()          {}
-func (*PodLogOptions) IsAnAPIObject()             {}
-func (*PodExecOptions) IsAnAPIObject()            {}
-func (*PodProxyOptions) IsAnAPIObject()           {}
-func (*ComponentStatus) IsAnAPIObject()           {}
-func (*ComponentStatusList) IsAnAPIObject()       {}
-func (*SerializedReference) IsAnAPIObject()       {}
-func (*RangeAllocation) IsAnAPIObject()           {}
+func (obj *Pod) GetObjectMeta() meta.Object                                  { return &obj.ObjectMeta }
+func (obj *Pod) GetObjectKind() unversioned.ObjectKind                       { return &obj.TypeMeta }
+func (obj *PodList) GetObjectKind() unversioned.ObjectKind                   { return &obj.TypeMeta }
+func (obj *PodStatusResult) GetObjectMeta() meta.Object                      { return &obj.ObjectMeta }
+func (obj *PodStatusResult) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
+func (obj *PodTemplate) GetObjectMeta() meta.Object                          { return &obj.ObjectMeta }
+func (obj *PodTemplate) GetObjectKind() unversioned.ObjectKind               { return &obj.TypeMeta }
+func (obj *PodTemplateList) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
+func (obj *ReplicationController) GetObjectMeta() meta.Object                { return &obj.ObjectMeta }
+func (obj *ReplicationController) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
+func (obj *ReplicationControllerList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *Service) GetObjectMeta() meta.Object                              { return &obj.ObjectMeta }
+func (obj *Service) GetObjectKind() unversioned.ObjectKind                   { return &obj.TypeMeta }
+func (obj *ServiceList) GetObjectKind() unversioned.ObjectKind               { return &obj.TypeMeta }
+func (obj *Endpoints) GetObjectMeta() meta.Object                            { return &obj.ObjectMeta }
+func (obj *Endpoints) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
+func (obj *EndpointsList) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
+func (obj *Node) GetObjectMeta() meta.Object                                 { return &obj.ObjectMeta }
+func (obj *Node) GetObjectKind() unversioned.ObjectKind                      { return &obj.TypeMeta }
+func (obj *NodeList) GetObjectKind() unversioned.ObjectKind                  { return &obj.TypeMeta }
+func (obj *Binding) GetObjectMeta() meta.Object                              { return &obj.ObjectMeta }
+func (obj *Binding) GetObjectKind() unversioned.ObjectKind                   { return &obj.TypeMeta }
+func (obj *Event) GetObjectMeta() meta.Object                                { return &obj.ObjectMeta }
+func (obj *Event) GetObjectKind() unversioned.ObjectKind                     { return &obj.TypeMeta }
+func (obj *EventList) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
+func (obj *List) GetObjectKind() unversioned.ObjectKind                      { return &obj.TypeMeta }
+func (obj *ListOptions) GetObjectKind() unversioned.ObjectKind               { return &obj.TypeMeta }
+func (obj *LimitRange) GetObjectMeta() meta.Object                           { return &obj.ObjectMeta }
+func (obj *LimitRange) GetObjectKind() unversioned.ObjectKind                { return &obj.TypeMeta }
+func (obj *LimitRangeList) GetObjectKind() unversioned.ObjectKind            { return &obj.TypeMeta }
+func (obj *ResourceQuota) GetObjectMeta() meta.Object                        { return &obj.ObjectMeta }
+func (obj *ResourceQuota) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
+func (obj *ResourceQuotaList) GetObjectKind() unversioned.ObjectKind         { return &obj.TypeMeta }
+func (obj *Namespace) GetObjectMeta() meta.Object                            { return &obj.ObjectMeta }
+func (obj *Namespace) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
+func (obj *NamespaceList) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
+func (obj *ServiceAccount) GetObjectMeta() meta.Object                       { return &obj.ObjectMeta }
+func (obj *ServiceAccount) GetObjectKind() unversioned.ObjectKind            { return &obj.TypeMeta }
+func (obj *ServiceAccountList) GetObjectKind() unversioned.ObjectKind        { return &obj.TypeMeta }
+func (obj *Secret) GetObjectMeta() meta.Object                               { return &obj.ObjectMeta }
+func (obj *Secret) GetObjectKind() unversioned.ObjectKind                    { return &obj.TypeMeta }
+func (obj *SecretList) GetObjectKind() unversioned.ObjectKind                { return &obj.TypeMeta }
+func (obj *PersistentVolume) GetObjectMeta() meta.Object                     { return &obj.ObjectMeta }
+func (obj *PersistentVolume) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
+func (obj *PersistentVolumeList) GetObjectKind() unversioned.ObjectKind      { return &obj.TypeMeta }
+func (obj *PersistentVolumeClaim) GetObjectMeta() meta.Object                { return &obj.ObjectMeta }
+func (obj *PersistentVolumeClaim) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
+func (obj *PersistentVolumeClaimList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *DeleteOptions) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
+func (obj *PodAttachOptions) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
+func (obj *PodLogOptions) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
+func (obj *PodExecOptions) GetObjectKind() unversioned.ObjectKind            { return &obj.TypeMeta }
+func (obj *PodProxyOptions) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
+func (obj *ComponentStatus) GetObjectMeta() meta.Object                      { return &obj.ObjectMeta }
+func (obj *ComponentStatus) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
+func (obj *ComponentStatusList) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }
+func (obj *SerializedReference) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }
+func (obj *RangeAllocation) GetObjectMeta() meta.Object                      { return &obj.ObjectMeta }
+func (obj *RangeAllocation) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
+func (obj *ObjectReference) GetObjectKind() unversioned.ObjectKind           { return obj }

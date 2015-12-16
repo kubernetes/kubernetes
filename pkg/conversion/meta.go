@@ -80,7 +80,20 @@ func (f SimpleMetaFactory) Update(version, kind string, obj interface{}) error {
 // on a pointer to a struct to version and kind. Provided as a convenience for others
 // implementing MetaFactory. Pass an array to baseFields to check one or more nested structs
 // for the named fields. The version field is treated as optional if it is not present in the struct.
+// TODO: this method is on its way out
 func UpdateVersionAndKind(baseFields []string, versionField, version, kindField, kind string, obj interface{}) error {
+	if typed, ok := obj.(unversioned.ObjectKind); ok {
+		if len(version) == 0 && len(kind) == 0 {
+			typed.SetGroupVersionKind(nil)
+		} else {
+			gv, err := unversioned.ParseGroupVersion(version)
+			if err != nil {
+				return err
+			}
+			typed.SetGroupVersionKind(&unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind})
+		}
+		return nil
+	}
 	v, err := EnforcePtr(obj)
 	if err != nil {
 		return err

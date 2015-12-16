@@ -28,7 +28,7 @@ type Simple struct {
 	Labels               map[string]string `json:"labels,omitempty"`
 }
 
-func (*Simple) IsAnAPIObject() {}
+func (obj *Simple) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 
 type SimpleRoot struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -37,7 +37,7 @@ type SimpleRoot struct {
 	Labels               map[string]string `json:"labels,omitempty"`
 }
 
-func (*SimpleRoot) IsAnAPIObject() {}
+func (obj *SimpleRoot) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 
 type SimpleGetOptions struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -53,7 +53,7 @@ func (SimpleGetOptions) SwaggerDoc() map[string]string {
 	}
 }
 
-func (*SimpleGetOptions) IsAnAPIObject() {}
+func (obj *SimpleGetOptions) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 
 type SimpleList struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -61,4 +61,4 @@ type SimpleList struct {
 	Items                []Simple `json:"items,omitempty"`
 }
 
-func (*SimpleList) IsAnAPIObject() {}
+func (obj *SimpleList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
