@@ -300,7 +300,13 @@ func (b *Builder) FindTypes() (types.Universe, error) {
 			tn, ok := obj.(*tc.TypeName)
 			if ok {
 				t := b.walkType(u, nil, tn.Type())
-				t.CommentLines = b.priorCommentLines(obj.Pos())
+				c1 := b.priorCommentLines(obj.Pos(), 1)
+				t.CommentLines = c1.Text()
+				if c1 == nil {
+					t.SecondClosestCommentLines = b.priorCommentLines(obj.Pos(), 2).Text()
+				} else {
+					t.SecondClosestCommentLines = b.priorCommentLines(c1.List[0].Slash, 2).Text()
+				}
 			}
 			tf, ok := obj.(*tc.Func)
 			// We only care about functions, not concrete/abstract methods.
@@ -319,14 +325,11 @@ func (b *Builder) FindTypes() (types.Universe, error) {
 	return u, nil
 }
 
-// if there's a comment on the line before pos, return its text, otherwise "".
-func (b *Builder) priorCommentLines(pos token.Pos) string {
+// if there's a comment on the line `lines` before pos, return its text, otherwise "".
+func (b *Builder) priorCommentLines(pos token.Pos, lines int) *ast.CommentGroup {
 	position := b.fset.Position(pos)
-	key := fileLine{position.Filename, position.Line - 1}
-	if c, ok := b.endLineToCommentGroup[key]; ok {
-		return c.Text()
-	}
-	return ""
+	key := fileLine{position.Filename, position.Line - lines}
+	return b.endLineToCommentGroup[key]
 }
 
 func tcFuncNameToName(in string) types.Name {
@@ -401,7 +404,7 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 				Embedded:     f.Anonymous(),
 				Tags:         t.Tag(i),
 				Type:         b.walkType(u, nil, f.Type()),
-				CommentLines: b.priorCommentLines(f.Pos()),
+				CommentLines: b.priorCommentLines(f.Pos(), 1).Text(),
 			}
 			out.Members = append(out.Members, m)
 		}
