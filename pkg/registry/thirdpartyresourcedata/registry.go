@@ -19,15 +19,14 @@ package thirdpartyresourcedata
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface implemented by things that know how to store ThirdPartyResourceData objects.
 type Registry interface {
-	ListThirdPartyResourceData(ctx api.Context, options *unversioned.ListOptions) (*extensions.ThirdPartyResourceDataList, error)
-	WatchThirdPartyResourceData(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error)
+	ListThirdPartyResourceData(ctx api.Context, options *api.ListOptions) (*extensions.ThirdPartyResourceDataList, error)
+	WatchThirdPartyResourceData(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 	GetThirdPartyResourceData(ctx api.Context, name string) (*extensions.ThirdPartyResourceData, error)
 	CreateThirdPartyResourceData(ctx api.Context, resource *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error)
 	UpdateThirdPartyResourceData(ctx api.Context, resource *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error)
@@ -45,7 +44,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListThirdPartyResourceData(ctx api.Context, options *unversioned.ListOptions) (*extensions.ThirdPartyResourceDataList, error) {
+func (s *storage) ListThirdPartyResourceData(ctx api.Context, options *api.ListOptions) (*extensions.ThirdPartyResourceDataList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -53,7 +52,7 @@ func (s *storage) ListThirdPartyResourceData(ctx api.Context, options *unversion
 	return obj.(*extensions.ThirdPartyResourceDataList), nil
 }
 
-func (s *storage) WatchThirdPartyResourceData(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchThirdPartyResourceData(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

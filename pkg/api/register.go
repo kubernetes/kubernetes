@@ -89,7 +89,6 @@ func init() {
 	// Register Unversioned types
 	// TODO this should not be done here
 	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.ExportOptions{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.ListOptions{})
 	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.Status{})
 	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIVersions{})
 	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIGroupList{})

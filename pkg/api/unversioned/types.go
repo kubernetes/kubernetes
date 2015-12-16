@@ -63,27 +63,6 @@ type ExportOptions struct {
 	Exact bool `json:"exact"`
 }
 
-// ListOptions is the query options to a standard REST list/watch calls.
-type ListOptions struct {
-	TypeMeta `json:",inline"`
-
-	// A selector to restrict the list of returned objects by their labels.
-	// Defaults to everything.
-	LabelSelector LabelSelector `json:"labelSelector,omitempty"`
-	// A selector to restrict the list of returned objects by their fields.
-	// Defaults to everything.
-	FieldSelector FieldSelector `json:"fieldSelector,omitempty"`
-
-	// Watch for changes to the described resources and return them as a stream of
-	// add, update, and remove notifications. Specify resourceVersion.
-	Watch bool `json:"watch,omitempty"`
-	// When specified with a watch call, shows changes that occur after that particular version of a resource.
-	// Defaults to changes from the beginning of history.
-	ResourceVersion string `json:"resourceVersion,omitempty"`
-	// Timeout for the list/watch call.
-	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty"`
-}
-
 // Status is a return value for calls that don't return other objects.
 type Status struct {
 	TypeMeta `json:",inline"`
