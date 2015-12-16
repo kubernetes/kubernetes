@@ -128,7 +128,7 @@ func runTests(fullhost string) ([]byte, error) {
 	ah, err := c.RunAndWaitTillHealthy(
 		true, true, "8080", healthyTimeoutDuration, "healthz", apiBin, "--service-cluster-ip-range",
 		"10.0.0.1/24", "--insecure-bind-address", "0.0.0.0", "--etcd-servers", "http://127.0.0.1:4001",
-		"--cluster-name", "kubernetes", "--v", "2", "--kubelet-port", "10250")
+		"--v", "2", "--kubelet-port", "10250")
 	defer func() { ah.TearDown() }()
 	if err != nil {
 		return nil, fmt.Errorf("Host %s failed to run command %v", host, err)
