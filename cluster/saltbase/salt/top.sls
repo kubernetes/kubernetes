@@ -15,6 +15,8 @@ base:
     - docker
 {% if pillar.get('network_provider', '').lower() == 'flannel' %}
     - flannel
+{% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
+    - cni
 {% endif %}
     - helpers
     - cadvisor
@@ -46,6 +48,8 @@ base:
 {% if pillar.get('network_provider', '').lower() == 'flannel' %}
     - flannel-server
     - flannel
+{% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
+    - cni
 {% endif %}
     - kube-apiserver
     - kube-controller-manager
