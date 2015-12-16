@@ -44,7 +44,6 @@ kubernetes/server/bin/kube-apiserver \
 	--address=0.0.0.0 \
 	--etcd-servers=http://127.0.0.1:4001 \
 	--etcd-servers-overrides=/events#${EVENT_STORE_URL} \
-	--cluster-name=hollow-kubernetes \
 	--v=4 \
 	--tls-cert-file=/srv/kubernetes/server.cert \
 	--tls-private-key-file=/srv/kubernetes/server.key \
