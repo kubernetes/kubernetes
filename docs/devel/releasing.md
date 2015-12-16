@@ -170,39 +170,35 @@ and follow the instructions.
 
 ### Publishing binaries and release notes
 
+Only publish a beta release if it's a standalone pre-release (*not*
+vX.Y.Z-beta.0).  We create beta tags after we do official releases to
+maintain proper semantic versioning, but we don't publish these beta releases.
+
 The script you ran above will prompt you to take any remaining steps to push
 tars, and will also give you a template for the release notes.  Compose an
-email to the team with the template, and use `build/make-release-notes.sh`
-and/or `release-notes/release-notes.go` in
-[kubernetes/contrib](https://github.com/kubernetes/contrib) to make the release
-notes, (see #17444 for more info).
+email to the team with the template.  Figure out what the PR numbers for this
+release and last release are, and get an api-token from GitHub
+(https://github.com/settings/tokens).  From a clone of
+[kubernetes/contrib](https://github.com/kubernetes/contrib),
 
-- Alpha release:
-  - Figure out what the PR numbers for this release and last release are, and
-    get an api-token from GitHub (https://github.com/settings/tokens).  From a
-    clone of kubernetes/contrib at upstream/master,
-      go run release-notes/release-notes.go --last-release-pr=<number> --current-release-pr=<number> --api-token=<token>
-    Feel free to prune.
-- Beta release:
-  - Only publish a beta release if it's a standalone pre-release.  (We create
-    beta tags after we do official releases to maintain proper semantic
-    versioning, *we don't publish these beta releases*.)  Use
-    `./hack/cherry_pick_list.sh ${RELEASE_VERSION}` to get release notes for such a
-    release.
-- Official release:
-  - From your clone of upstream/master, run `./hack/cherry_pick_list.sh ${RELEASE_VERSION}`
-    to get the release notes for the patch release you just created. Feel free
-    to prune anything internal, but typically for patch releases we tend to
-    include everything in the release notes.
-  - If this is a first official release (vX.Y.0), look through the release
-    notes for all of the alpha releases since the last cycle, and include
-    anything important in release notes.
+```
+go run release-notes/release-notes.go --last-release-pr=<number> --current-release-pr=<number> --api-token=<token> --base=<release-branch>
+```
+
+where `<release-branch>` is `master` for alpha releases and `release-X.Y` for beta and official releases.
+
+**If this is a first official release (vX.Y.0)**, look through the release
+notes for all of the alpha releases since the last cycle, and include anything
+important in release notes.
+
+Feel free to edit the notes, (e.g. cherry picks should generally just have the
+same title as the original PR).
 
 Send the email out, letting people know these are the draft release notes.  If
 they want to change anything, they should update the appropriate PRs with the
 `release-note` label.
 
-When we're ready to announce the release, [create a GitHub
+When you're ready to announce the release, [create a GitHub
 release](https://github.com/kubernetes/kubernetes/releases/new):
 
 1. pick the appropriate tag;
@@ -215,6 +211,10 @@ console.developers.google.com/storage/browser/kubernetes-release/release/),
    download it, double check the hash (compare to what you had in the release
    notes draft), and attach it to the release; and
 1. publish!
+
+Finally, from a clone of upstream/master, *make sure* you still have
+`RELEASE_VERSION` set correctly, and run `./build/mark-stable-release.sh
+${RELEASE_VERSION}`.
 
 ## Injecting Version into Binaries
 
