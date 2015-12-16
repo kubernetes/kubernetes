@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -66,9 +67,8 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	// TODO: caesarxuchao: use the testapi.Extensions.Codec() once the PR that
 	// moves experimental from v1 to v1beta1 got merged.
-	// expCodec := testapi.Extensions.Codec()
-	expCodec := runtime.CodecFor(api.Scheme, "extensions/v1beta1")
-	encoded, err := runtime.Encode(expCodec, status)
+	expCodec := runtime.CodecFor(api.Scheme, v1beta1.SchemeGroupVersion)
+	encoded, err := expCodec.Encode(status)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

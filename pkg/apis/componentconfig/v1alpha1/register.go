@@ -28,7 +28,7 @@ const GroupName = "componentconfig"
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1alpha1"}
 
-var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion.String())
+var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion)
 
 func init() {
 	addKnownTypes()

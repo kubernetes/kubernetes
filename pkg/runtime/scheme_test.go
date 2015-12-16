@@ -306,7 +306,7 @@ func TestEncode(t *testing.T) {
 	scheme.AddInternalGroupVersion(internalGV)
 	scheme.AddKnownTypeWithName(internalGV.WithKind("Simple"), &InternalSimple{})
 	scheme.AddKnownTypeWithName(externalGV.WithKind("Simple"), &ExternalSimple{})
-	codec := runtime.CodecFor(scheme, externalGV.String())
+	codec := runtime.CodecFor(scheme, externalGV)
 	test := &InternalSimple{
 		TestString: "I'm the same",
 	}
