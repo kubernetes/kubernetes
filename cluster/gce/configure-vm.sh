@@ -65,7 +65,7 @@ function set-good-motd() {
 }
 
 function curl-metadata() {
-  curl --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/attributes/${1}"
+  curl --fail --retry 5 --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/attributes/${1}"
 }
 
 function set-kube-env() {
@@ -666,6 +666,15 @@ if [[ -z "${is_push}" ]]; then
   remove-docker-artifacts
   run-salt
   set-good-motd
+
+  if curl-metadata k8s-user-startup-script > "${INSTALL_DIR}/k8s-user-script.sh"; then
+    user_script=$(cat "${INSTALL_DIR}/k8s-user-script.sh")
+  fi
+  if [[ ! -z ${user_script:-} ]]; then
+    chmod u+x "${INSTALL_DIR}/k8s-user-script.sh"
+    echo "== running user startup script =="
+    "${INSTALL_DIR}/k8s-user-script.sh"
+  fi
   echo "== kube-up node config done =="
 else
   echo "== kube-push node config starting =="
