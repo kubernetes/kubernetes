@@ -211,6 +211,47 @@ type Blah struct {
 	}
 }
 
+func TestParseSecondClosestCommentLines(t *testing.T) {
+	const fileName = "base/foo/proto/foo.go"
+	testCases := []struct {
+		testFile map[string]string
+		expected string
+	}{
+		{
+			map[string]string{fileName: `package foo
+// Blah's SecondClosestCommentLines.
+// Another line.
+
+// Blah is a test.
+// A test, I tell you.
+type Blah struct {
+	a int
+}
+`},
+			"Blah's SecondClosestCommentLines.\nAnother line.\n",
+		},
+		{
+			map[string]string{fileName: `package foo
+// Blah's SecondClosestCommentLines.
+// Another line.
+
+type Blah struct {
+	a int
+}
+`},
+			"Blah's SecondClosestCommentLines.\nAnother line.\n",
+		},
+	}
+	for _, test := range testCases {
+		_, u, o := construct(t, test.testFile, namer.NewPublicNamer(0))
+		t.Logf("%#v", o)
+		blahT := u.Type(types.Name{Package: "base/foo/proto", Name: "Blah"})
+		if e, a := test.expected, blahT.SecondClosestCommentLines; e != a {
+			t.Errorf("struct second closest comment wrong, wanted %v, got %v", e, a)
+		}
+	}
+}
+
 func TestTypeKindParse(t *testing.T) {
 	var testFiles = map[string]string{
 		"a/foo.go": "package a\ntype Test string\n",

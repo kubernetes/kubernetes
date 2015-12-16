@@ -231,6 +231,23 @@ type Type struct {
 	// they will be recorded here.
 	CommentLines string
 
+	// If there are comment lines preceding the `CommentLines`, they will be
+	// recorded here. There are two cases:
+	// ---
+	// SecondClosestCommentLines
+	// a blank line
+	// CommentLines
+	// type definition
+	// ---
+	//
+	// or
+	// ---
+	// SecondClosestCommentLines
+	// a blank line
+	// type definition
+	// ---
+	SecondClosestCommentLines string
+
 	// If Kind == Struct
 	Members []Member
 
