@@ -72,7 +72,7 @@ func nodeInNodeList(nodeName string, nodeList *api.NodeList) bool {
 // ClusterLevelLoggingWithElasticsearch is an end to end test for cluster level logging.
 func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	// graceTime is how long to keep retrying requests for status information.
-	const graceTime = 2 * time.Minute
+	const graceTime = 5 * time.Minute
 	// ingestionTimeout is how long to keep retrying to wait for all the
 	// logs to be ingested.
 	const ingestionTimeout = 3 * time.Minute
@@ -108,7 +108,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	var esResponse map[string]interface{}
 	err = nil
 	var body []byte
-	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
+	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(10 * time.Second) {
 		// Query against the root URL for Elasticsearch.
 		body, err = f.Client.Get().
 			Namespace(api.NamespaceSystem).
@@ -134,6 +134,10 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 		if !ok {
 			// Assume this is a string returning Failure. Retry.
 			Logf("After %v expected status to be a float64 but got %v of type %T", time.Since(start), statusIntf, statusIntf)
+			continue
+		}
+		if int(statusCode) != 200 {
+			Logf("After %v Elasticsearch cluster has a bad status: %v", time.Since(start), statusCode)
 			continue
 		}
 		break
