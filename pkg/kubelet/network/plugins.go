@@ -119,7 +119,7 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 	allErrs := []error{}
 	for _, plugin := range plugins {
 		name := plugin.Name()
-		if !validation.IsQualifiedName(name) {
+		if len(validation.IsQualifiedName(name)) != 0 {
 			allErrs = append(allErrs, fmt.Errorf("network plugin has invalid name: %#v", plugin))
 			continue
 		}

@@ -310,20 +310,23 @@ func TestValidateAnnotations(t *testing.T) {
 		}
 	}
 
-	nameErrorCases := []map[string]string{
-		{"nospecialchars^=@": "bar"},
-		{"cantendwithadash-": "bar"},
-		{"only/one/slash": "bar"},
-		{strings.Repeat("a", 254): "bar"},
+	nameErrorCases := []struct {
+		annotations map[string]string
+		expect      string
+	}{
+		{map[string]string{"nospecialchars^=@": "bar"}, "must match the regex"},
+		{map[string]string{"cantendwithadash-": "bar"}, "must match the regex"},
+		{map[string]string{"only/one/slash": "bar"}, "must match the regex"},
+		{map[string]string{strings.Repeat("a", 254): "bar"}, "must be no more than"},
 	}
 	for i := range nameErrorCases {
-		errs := ValidateAnnotations(nameErrorCases[i], field.NewPath("field"))
+		errs := ValidateAnnotations(nameErrorCases[i].annotations, field.NewPath("field"))
 		if len(errs) != 1 {
-			t.Errorf("case[%d] expected failure", i)
-		}
-		detail := errs[0].Detail
-		if detail != qualifiedNameErrorMsg {
-			t.Errorf("error detail %s should be equal %s", detail, qualifiedNameErrorMsg)
+			t.Errorf("case[%d]: expected failure", i)
+		} else {
+			if !strings.Contains(errs[0].Detail, nameErrorCases[i].expect) {
+				t.Errorf("case[%d]: error details do not include %q: %q", i, nameErrorCases[i].expect, errs[0].Detail)
+			}
 		}
 	}
 	totalSizeErrorCases := []map[string]string{
@@ -4242,23 +4245,24 @@ func TestValidateResourceNames(t *testing.T) {
 	table := []struct {
 		input   string
 		success bool
+		expect  string
 	}{
-		{"memory", true},
-		{"cpu", true},
-		{"network", false},
-		{"disk", false},
-		{"", false},
-		{".", false},
-		{"..", false},
-		{"my.favorite.app.co/12345", true},
-		{"my.favorite.app.co/_12345", false},
-		{"my.favorite.app.co/12345_", false},
-		{"kubernetes.io/..", false},
-		{"kubernetes.io/" + strings.Repeat("a", 63), true},
-		{"kubernetes.io/" + strings.Repeat("a", 64), false},
-		{"kubernetes.io//", false},
-		{"kubernetes.io", false},
-		{"kubernetes.io/will/not/work/", false},
+		{"memory", true, ""},
+		{"cpu", true, ""},
+		{"network", false, ""},
+		{"disk", false, ""},
+		{"", false, ""},
+		{".", false, ""},
+		{"..", false, ""},
+		{"my.favorite.app.co/12345", true, ""},
+		{"my.favorite.app.co/_12345", false, ""},
+		{"my.favorite.app.co/12345_", false, ""},
+		{"kubernetes.io/..", false, ""},
+		{"kubernetes.io/" + strings.Repeat("a", 63), true, ""},
+		{"kubernetes.io/" + strings.Repeat("a", 64), false, ""},
+		{"kubernetes.io//", false, ""},
+		{"kubernetes.io", false, ""},
+		{"kubernetes.io/will/not/work/", false, ""},
 	}
 	for k, item := range table {
 		err := validateResourceName(item.input, field.NewPath("field"))
@@ -4268,8 +4272,8 @@ func TestValidateResourceNames(t *testing.T) {
 			t.Errorf("expected failure for input %q", item.input)
 			for i := range err {
 				detail := err[i].Detail
-				if detail != "" && detail != qualifiedNameErrorMsg {
-					t.Errorf("%d: expected error detail either empty or %s, got %s", k, qualifiedNameErrorMsg, detail)
+				if detail != "" && !strings.Contains(detail, item.expect) {
+					t.Errorf("%d: expected error detail either empty or %s, got %s", k, item.expect, detail)
 				}
 			}
 		}
