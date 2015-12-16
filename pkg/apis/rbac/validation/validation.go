@@ -25,7 +25,7 @@ import (
 // Minimal validation of names for roles and bindings. Identical to the validation for Openshift. See:
 // * https://github.com/kubernetes/kubernetes/blob/60db50/pkg/api/validation/name.go
 // * https://github.com/openshift/origin/blob/388478/pkg/api/helpers.go
-func minimalNameRequirements(name string, prefix bool) (bool, string) {
+func minimalNameRequirements(name string, prefix bool) []string {
 	return validation.IsValidPathSegmentName(name)
 }
 
@@ -86,16 +86,16 @@ func validateRoleBinding(roleBinding *rbac.RoleBinding, isNamespaced bool, fldPa
 
 	// roleRef namespace is empty when referring to global policy.
 	if len(roleBinding.RoleRef.Namespace) > 0 {
-		if ok, reason := validation.ValidateNamespaceName(roleBinding.RoleRef.Namespace, false); !ok {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("roleRef", "namespace"), roleBinding.RoleRef.Namespace, reason))
+		for _, msg := range validation.ValidateNamespaceName(roleBinding.RoleRef.Namespace, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("roleRef", "namespace"), roleBinding.RoleRef.Namespace, msg))
 		}
 	}
 
 	if len(roleBinding.RoleRef.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("roleRef", "name"), ""))
 	} else {
-		if valid, err := minimalNameRequirements(roleBinding.RoleRef.Name, false); !valid {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("roleRef", "name"), roleBinding.RoleRef.Name, err))
+		for _, msg := range minimalNameRequirements(roleBinding.RoleRef.Name, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("roleRef", "name"), roleBinding.RoleRef.Name, msg))
 		}
 	}
 
@@ -119,8 +119,10 @@ func validateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath
 
 	switch subject.Kind {
 	case rbac.ServiceAccountKind:
-		if valid, reason := validation.ValidateServiceAccountName(subject.Name, false); len(subject.Name) > 0 && !valid {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), subject.Name, reason))
+		if len(subject.Name) > 0 {
+			for _, msg := range validation.ValidateServiceAccountName(subject.Name, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), subject.Name, msg))
+			}
 		}
 		if !isNamespaced && len(subject.Namespace) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), ""))

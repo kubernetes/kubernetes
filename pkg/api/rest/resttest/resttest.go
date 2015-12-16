@@ -366,7 +366,7 @@ func (t *Tester) testCreateValidatesNames(valid runtime.Object) {
 		ctx := t.TestContext()
 		_, err := t.storage.(rest.Creater).Create(ctx, objCopy)
 		if !errors.IsInvalid(err) {
-			t.Errorf("%s: Expected to get an invalid resource error, got %v", invalidName, err)
+			t.Errorf("%s: Expected to get an invalid resource error, got '%v'", invalidName, err)
 		}
 	}
 
@@ -378,7 +378,7 @@ func (t *Tester) testCreateValidatesNames(valid runtime.Object) {
 		ctx := t.TestContext()
 		_, err := t.storage.(rest.Creater).Create(ctx, objCopy)
 		if !errors.IsInvalid(err) {
-			t.Errorf("%s: Expected to get an invalid resource error, got %v", invalidSuffix, err)
+			t.Errorf("%s: Expected to get an invalid resource error, got '%v'", invalidSuffix, err)
 		}
 	}
 }
