@@ -92,6 +92,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().String("image", "", "The image for the container to run.")
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
+	cmd.Flags().Bool("rm", false, "If true, delete resources created in this command for attached containers.")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
 	cmd.Flags().StringSlice("env", []string{}, "Environment variables to set in the container")
@@ -135,7 +136,6 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	if err != nil {
 		return err
 	}
-
 	restartPolicy, err := getRestartPolicy(cmd, interactive)
 	if err != nil {
 		return err
@@ -180,11 +180,17 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	if err != nil {
 		return err
 	}
+
 	attachFlag := cmd.Flags().Lookup("attach")
 	attach := cmdutil.GetFlagBool(cmd, "attach")
 
 	if !attachFlag.Changed && interactive {
 		attach = true
+	}
+
+	remove := cmdutil.GetFlagBool(cmd, "rm")
+	if !attach && remove {
+		return cmdutil.UsageError(cmd, "--rm should only be used for attached containers")
 	}
 
 	if attach {
@@ -213,7 +219,31 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		if err != nil {
 			return err
 		}
-		return handleAttachPod(f, client, attachablePod, opts)
+		err = handleAttachPod(f, client, attachablePod, opts)
+		if err != nil {
+			return err
+		}
+
+		if remove {
+			namespace, err = mapping.MetadataAccessor.Namespace(obj)
+			if err != nil {
+				return err
+			}
+			var name string
+			name, err = mapping.MetadataAccessor.Name(obj)
+			if err != nil {
+				return err
+			}
+			_, typer := f.Object()
+			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+				ContinueOnError().
+				NamespaceParam(namespace).DefaultNamespace().
+				ResourceNames(mapping.Resource, name).
+				Flatten().
+				Do()
+			return ReapResult(r, f, cmdOut, true, true, 0, -1, false, mapper)
+		}
+		return nil
 	}
 
 	outputFormat := cmdutil.GetFlagString(cmd, "output")

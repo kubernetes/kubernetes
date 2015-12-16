@@ -97,6 +97,10 @@ Creates a replication controller or job to manage the created container(s).
     The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a replication controller is created for this pod, if set to OnFailure or Never, a job is created for this pod and \-\-replicas must be 1.  Default 'Always'
 
 .PP
+\fB\-\-rm\fP=false
+    If true, delete resources created in this command for attached containers.
+
+.PP
 \fB\-\-save\-config\fP=false
     If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.
 
