@@ -67,20 +67,22 @@ func TestValidateLabels(t *testing.T) {
 		}
 	}
 
-	labelValueErrorCases := []map[string]string{
-		{"toolongvalue": strings.Repeat("a", 64)},
-		{"backslashesinvalue": "some\\bad\\value"},
-		{"nocommasallowed": "bad,value"},
-		{"strangecharsinvalue": "?#$notsogood"},
+	labelValueErrorCases := []struct {
+		labels map[string]string
+		expect string
+	}{
+		{map[string]string{"toolongvalue": strings.Repeat("a", 64)}, "must be no more than"},
+		{map[string]string{"backslashesinvalue": "some\\bad\\value"}, "must match the regex"},
+		{map[string]string{"nocommasallowed": "bad,value"}, "must match the regex"},
+		{map[string]string{"strangecharsinvalue": "?#$notsogood"}, "must match the regex"},
 	}
 	for i := range labelValueErrorCases {
-		errs := ValidateLabels(labelValueErrorCases[i], field.NewPath("field"))
+		errs := ValidateLabels(labelValueErrorCases[i].labels, field.NewPath("field"))
 		if len(errs) != 1 {
-			t.Errorf("case[%d] expected failure", i)
+			t.Errorf("case[%d]: expected failure", i)
 		} else {
-			detail := errs[0].Detail
-			if detail != labelValueErrorMsg {
-				t.Errorf("error detail %s should be equal %s", detail, labelValueErrorMsg)
+			if !strings.Contains(errs[0].Detail, labelValueErrorCases[i].expect) {
+				t.Errorf("case[%d]: error details do not include %q: %q", i, labelValueErrorCases[i].expect, errs[0].Detail)
 			}
 		}
 	}
