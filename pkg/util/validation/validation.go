@@ -67,13 +67,24 @@ func IsQualifiedName(value string) []string {
 	return errs
 }
 
-const LabelValueFmt string = "(" + qualifiedNameFmt + ")?"
+const labelValueFmt string = "(" + qualifiedNameFmt + ")?"
 const LabelValueMaxLength int = 63
 
-var labelValueRegexp = regexp.MustCompile("^" + LabelValueFmt + "$")
+var labelValueMaxLengthString = strconv.Itoa(LabelValueMaxLength)
+var labelValueRegexp = regexp.MustCompile("^" + labelValueFmt + "$")
 
-func IsValidLabelValue(value string) bool {
-	return (len(value) <= LabelValueMaxLength && labelValueRegexp.MatchString(value))
+// IsValidLabelValue tests whether the value passed is a valid label value.  If
+// the value is not valid, a list of error strings is returned.  Otherwise an
+// empty list (or nil) is returned.
+func IsValidLabelValue(value string) []string {
+	var errs []string
+	if len(value) > LabelValueMaxLength {
+		errs = append(errs, "must be no more than "+labelValueMaxLengthString+" characters")
+	}
+	if !labelValueRegexp.MatchString(value) {
+		errs = append(errs, "must match the regex "+labelValueFmt+" (e.g. 'MyValue' or 'my_value' or '12345')")
+	}
+	return errs
 }
 
 const DNS1123LabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"

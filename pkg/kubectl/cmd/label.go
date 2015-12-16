@@ -124,8 +124,11 @@ func parseLabels(spec []string) (map[string]string, []string, error) {
 	for _, labelSpec := range spec {
 		if strings.Index(labelSpec, "=") != -1 {
 			parts := strings.Split(labelSpec, "=")
-			if len(parts) != 2 || len(parts[1]) == 0 || !validation.IsValidLabelValue(parts[1]) {
+			if len(parts) != 2 || len(parts[1]) == 0 {
 				return nil, nil, fmt.Errorf("invalid label spec: %v", labelSpec)
+			}
+			if len(validation.IsValidLabelValue(parts[1])) != 0 {
+				return nil, nil, fmt.Errorf("invalid label value: %v", labelSpec)
 			}
 			labels[parts[0]] = parts[1]
 		} else if strings.HasSuffix(labelSpec, "-") {
