@@ -236,8 +236,8 @@ type VolumeSource struct {
 	// Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime.
 	// More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs,omitempty"`
-	// PersistentVolumeClaimVolumeSource represents a reference to a
-	// PersistentVolumeClaim in the same namespace.
+	// PersistentVolumeClaim represents a reference to a
+	// PersistentVolumeClaimVolumeSource in the same namespace.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
 	PersistentVolumeClaim *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty"`
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime.
@@ -376,7 +376,7 @@ type PersistentVolumeStatus struct {
 	// Phase indicates if a volume is available, bound to a claim, or released by a claim.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#phase
 	Phase PersistentVolumePhase `json:"phase,omitempty"`
-	// A human-readable message indicating details about why the volume is in this state.
+	// Message is a human-readable message indicating details about why the volume is in this state.
 	Message string `json:"message,omitempty"`
 	// Reason is a brief CamelCase string that describes any failure and is meant
 	// for machine parsing and tidy display in the CLI.
@@ -542,11 +542,11 @@ type RBDVolumeSource struct {
 	// Default is admin.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
 	RadosUser string `json:"user"`
-	// Keyring is the path to key ring for RBDUser.
+	// Keyring is the path to key ring for RadosUser.
 	// Default is /etc/ceph/keyring.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
 	Keyring string `json:"keyring"`
-	// SecretRef is name of the authentication secret for RBDUser. If provided
+	// SecretRef is name of the authentication secret for RadosUser. If provided
 	// overrides keyring.
 	// Default is empty.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
@@ -1867,7 +1867,7 @@ type NodeStatus struct {
 	// Capacity represents the available resources of a node.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#capacity for more details.
 	Capacity ResourceList `json:"capacity,omitempty"`
-	// NodePhase is the recently observed lifecycle phase of the node.
+	// Phase is the recently observed lifecycle phase of the node.
 	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase
 	Phase NodePhase `json:"phase,omitempty"`
 	// Conditions is an array of current observed node conditions.

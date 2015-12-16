@@ -92,7 +92,7 @@ func CanUseIptablesProxier(iptver IptablesVersioner) (bool, error) {
 	}
 
 	// Check for the required sysctls.  We don't care about the value, just
-	// that it exists.  If this Proxier is chosen, we'll iniialize it as we
+	// that it exists.  If this Proxier is chosen, we'll initialize it as we
 	// need.
 	// TODO: we should inject a sysctl.Interface like we do for iptables
 	_, err = utilsysctl.GetSysctl(sysctlRouteLocalnet)

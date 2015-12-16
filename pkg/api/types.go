@@ -189,12 +189,12 @@ type VolumeSource struct {
 	Secret *SecretVolumeSource `json:"secret,omitempty"`
 	// NFS represents an NFS mount on the host that shares a pod's lifetime
 	NFS *NFSVolumeSource `json:"nfs,omitempty"`
-	// ISCSIVolumeSource represents an ISCSI Disk resource that is attached to a
+	// ISCSI represents an ISCSI Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	ISCSI *ISCSIVolumeSource `json:"iscsi,omitempty"`
 	// Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs,omitempty"`
-	// PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace
+	// PersistentVolumeClaim represents a reference to a PersistentVolumeClaimVolumeSource in the same namespace
 	PersistentVolumeClaim *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty"`
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
 	RBD *RBDVolumeSource `json:"rbd,omitempty"`
@@ -233,7 +233,7 @@ type PersistentVolumeSource struct {
 	NFS *NFSVolumeSource `json:"nfs,omitempty"`
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
 	RBD *RBDVolumeSource `json:"rbd,omitempty"`
-	// ISCSIVolumeSource represents an ISCSI resource that is attached to a
+	// ISCSI represents an ISCSI resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	ISCSI *ISCSIVolumeSource `json:"iscsi,omitempty"`
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
@@ -258,7 +258,7 @@ type PersistentVolume struct {
 	unversioned.TypeMeta `json:",inline"`
 	ObjectMeta           `json:"metadata,omitempty"`
 
-	//Spec defines a persistent volume owned by the cluster
+	// Spec defines a persistent volume owned by the cluster
 	Spec PersistentVolumeSpec `json:"spec,omitempty"`
 
 	// Status represents the current information about persistent volume.
@@ -266,9 +266,9 @@ type PersistentVolume struct {
 }
 
 type PersistentVolumeSpec struct {
-	// Resources represents the actual resources of the volume
+	// Capacity represents the actual resources of the volume
 	Capacity ResourceList `json:"capacity"`
-	// Source represents the location and type of a volume to mount.
+	// PersistentVolumeSource represents the location and type of a volume to mount.
 	PersistentVolumeSource `json:",inline"`
 	// AccessModes contains all ways the volume can be mounted
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
@@ -298,7 +298,7 @@ const (
 type PersistentVolumeStatus struct {
 	// Phase indicates if a volume is available, bound to a claim, or released by a claim
 	Phase PersistentVolumePhase `json:"phase,omitempty"`
-	// A human-readable message indicating details about why the volume is in this state.
+	// Message is a human-readable message indicating details about why the volume is in this state.
 	Message string `json:"message,omitempty"`
 	// Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI
 	Reason string `json:"reason,omitempty"`
@@ -331,7 +331,7 @@ type PersistentVolumeClaimList struct {
 // PersistentVolumeClaimSpec describes the common attributes of storage devices
 // and allows a Source for provider-specific attributes
 type PersistentVolumeClaimSpec struct {
-	// Contains the types of access modes required
+	// AccessModes contains the types of access modes required
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 	// Resources represents the minimum resources required
 	Resources ResourceRequirements `json:"resources,omitempty"`
@@ -344,7 +344,7 @@ type PersistentVolumeClaimStatus struct {
 	Phase PersistentVolumeClaimPhase `json:"phase,omitempty"`
 	// AccessModes contains all ways the volume backing the PVC can be mounted
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
-	// Represents the actual resources of the underlying volume
+	// Capacity represents the actual resources of the underlying volume
 	Capacity ResourceList `json:"capacity,omitempty"`
 }
 
@@ -575,13 +575,13 @@ type RBDVolumeSource struct {
 	// Ex. "ext4", "xfs", "ntfs"
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty"`
-	// Optional: RadosPool is the rados pool name,default is rbd
+	// Optional: RBDPool is the rados pool name,default is rbd
 	RBDPool string `json:"pool"`
-	// Optional: RBDUser is the rados user name, default is admin
+	// Optional: RadosUser is the rados user name, default is admin
 	RadosUser string `json:"user"`
-	// Optional: Keyring is the path to key ring for RBDUser, default is /etc/ceph/keyring
+	// Optional: Keyring is the path to key ring for RadosUser, default is /etc/ceph/keyring
 	Keyring string `json:"keyring"`
-	// Optional: SecretRef is name of the authentication secret for RBDUser, default is empty.
+	// Optional: SecretRef is name of the authentication secret for RadosUser, default is empty.
 	SecretRef *LocalObjectReference `json:"secretRef"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
@@ -644,7 +644,7 @@ type DownwardAPIVolumeFile struct {
 
 // ContainerPort represents a network port in a single container
 type ContainerPort struct {
-	// Optional: If specified, this must be an IANA_SVC_NAME  Each named port
+	// Optional: If specified, this must be an IANA_SVC_NAME. Each named port
 	// in a pod must have a unique name.
 	Name string `json:"name,omitempty"`
 	// Optional: If specified, this must be a valid port number, 0 < x < 65536.
