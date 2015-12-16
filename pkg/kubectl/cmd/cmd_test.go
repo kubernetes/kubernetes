@@ -90,10 +90,10 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
 	scheme.AddKnownTypeWithName(validVersionGV.WithKind("Type"), &ExternalType2{})
 
-	codec := runtime.CodecFor(scheme, unlikelyGV.String())
+	codec := runtime.CodecFor(scheme, unlikelyGV)
 	mapper := meta.NewDefaultRESTMapper([]unversioned.GroupVersion{unlikelyGV, validVersionGV}, func(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
 		return &meta.VersionInterfaces{
-			Codec:            runtime.CodecFor(scheme, version.String()),
+			Codec:            runtime.CodecFor(scheme, version),
 			ObjectConvertor:  scheme,
 			MetadataAccessor: meta.NewAccessor(),
 		}, versionErrIfFalse(version == validVersionGV || version == unlikelyGV)

@@ -46,7 +46,7 @@ func init() {
 	scheme = runtime.NewScheme()
 	scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &storagetesting.TestResource{})
 	scheme.AddKnownTypes(*testapi.Default.GroupVersion(), &storagetesting.TestResource{})
-	codec = runtime.CodecFor(scheme, testapi.Default.GroupVersion().String())
+	codec = runtime.CodecFor(scheme, *testapi.Default.GroupVersion())
 	scheme.AddConversionFuncs(
 		func(in *storagetesting.TestResource, out *storagetesting.TestResource, s conversion.Scope) error {
 			*out = *in
