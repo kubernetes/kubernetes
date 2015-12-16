@@ -130,14 +130,29 @@ func assertFilesExist(fileNames []string, fileDir string, pod *api.Pod, client *
 
 	expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 		failed = []string{}
+		subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, client)
+		if err != nil {
+			return false, err
+		}
 		for _, fileName := range fileNames {
-			if _, err := client.Get().
-				Namespace(pod.Namespace).
-				Resource("pods").
-				SubResource("proxy").
-				Name(pod.Name).
-				Suffix(fileDir, fileName).
-				Do().Raw(); err != nil {
+			if subResourceProxyAvailable {
+				_, err = client.Get().
+					Namespace(pod.Namespace).
+					Resource("pods").
+					SubResource("proxy").
+					Name(pod.Name).
+					Suffix(fileDir, fileName).
+					Do().Raw()
+			} else {
+				_, err = client.Get().
+					Prefix("proxy").
+					Resource("pods").
+					Namespace(pod.Namespace).
+					Name(pod.Name).
+					Suffix(fileDir, fileName).
+					Do().Raw()
+			}
+			if err != nil {
 				Logf("Unable to read %s from pod %s: %v", fileName, pod.Name, err)
 				failed = append(failed, fileName)
 			}

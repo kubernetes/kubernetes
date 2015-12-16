@@ -258,15 +258,34 @@ var _ = Describe("Kubectl client", func() {
 			if err != nil {
 				Failf("unable to create streaming upload. Error: %s", err)
 			}
-			resp, err := c.Post().
-				Namespace(ns).
-				Name("netexec").
-				Resource("pods").
-				SubResource("proxy").
-				Suffix("upload").
-				SetHeader("Content-Type", postConfigBodyWriter.FormDataContentType()).
-				Body(pipeConfigReader).
-				Do().Raw()
+
+			subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, c)
+			if err != nil {
+				Failf("Unable to determine server version.  Error: %s", err)
+			}
+
+			var resp []byte
+			if subResourceProxyAvailable {
+				resp, err = c.Post().
+					Namespace(ns).
+					Name("netexec").
+					Resource("pods").
+					SubResource("proxy").
+					Suffix("upload").
+					SetHeader("Content-Type", postConfigBodyWriter.FormDataContentType()).
+					Body(pipeConfigReader).
+					Do().Raw()
+			} else {
+				resp, err = c.Post().
+					Prefix("proxy").
+					Namespace(ns).
+					Name("netexec").
+					Resource("pods").
+					Suffix("upload").
+					SetHeader("Content-Type", postConfigBodyWriter.FormDataContentType()).
+					Body(pipeConfigReader).
+					Do().Raw()
+			}
 			if err != nil {
 				Failf("Unable to upload kubeconfig to the remote exec server due to error: %s", err)
 			}
@@ -285,15 +304,27 @@ var _ = Describe("Kubectl client", func() {
 			By("uploading kubectl to netexec")
 			var uploadOutput NetexecOutput
 			// Upload the kubectl binary
-			resp, err = c.Post().
-				Namespace(ns).
-				Name("netexec").
-				Resource("pods").
-				SubResource("proxy").
-				Suffix("upload").
-				SetHeader("Content-Type", postBodyWriter.FormDataContentType()).
-				Body(pipeReader).
-				Do().Raw()
+			if subResourceProxyAvailable {
+				resp, err = c.Post().
+					Namespace(ns).
+					Name("netexec").
+					Resource("pods").
+					SubResource("proxy").
+					Suffix("upload").
+					SetHeader("Content-Type", postBodyWriter.FormDataContentType()).
+					Body(pipeReader).
+					Do().Raw()
+			} else {
+				resp, err = c.Post().
+					Prefix("proxy").
+					Namespace(ns).
+					Name("netexec").
+					Resource("pods").
+					Suffix("upload").
+					SetHeader("Content-Type", postBodyWriter.FormDataContentType()).
+					Body(pipeReader).
+					Do().Raw()
+			}
 			if err != nil {
 				Failf("Unable to upload kubectl binary to the remote exec server due to error: %s", err)
 			}
@@ -323,14 +354,26 @@ var _ = Describe("Kubectl client", func() {
 
 				shellCommand := fmt.Sprintf("%s=%s .%s --kubeconfig=%s --server=%s --namespace=%s exec nginx echo running in container", proxyVar, proxyAddr, uploadBinaryName, kubecConfigRemotePath, apiServer, ns)
 				// Execute kubectl on remote exec server.
-				netexecShellOutput, err := c.Post().
-					Namespace(ns).
-					Name("netexec").
-					Resource("pods").
-					SubResource("proxy").
-					Suffix("shell").
-					Param("shellCommand", shellCommand).
-					Do().Raw()
+				var netexecShellOutput []byte
+				if subResourceProxyAvailable {
+					netexecShellOutput, err = c.Post().
+						Namespace(ns).
+						Name("netexec").
+						Resource("pods").
+						SubResource("proxy").
+						Suffix("shell").
+						Param("shellCommand", shellCommand).
+						Do().Raw()
+				} else {
+					netexecShellOutput, err = c.Post().
+						Prefix("proxy").
+						Namespace(ns).
+						Name("netexec").
+						Resource("pods").
+						Suffix("shell").
+						Param("shellCommand", shellCommand).
+						Do().Raw()
+				}
 				if err != nil {
 					Failf("Unable to execute kubectl binary on the remote exec server due to error: %s", err)
 				}
@@ -1125,14 +1168,30 @@ func getUDData(jpgExpected string, ns string) func(*client.Client, string) error
 	// getUDData validates data.json in the update-demo (returns nil if data is ok).
 	return func(c *client.Client, podID string) error {
 		Logf("validating pod %s", podID)
-		body, err := c.Get().
-			Namespace(ns).
-			Resource("pods").
-			SubResource("proxy").
-			Name(podID).
-			Suffix("data.json").
-			Do().
-			Raw()
+		subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, c)
+		if err != nil {
+			return err
+		}
+		var body []byte
+		if subResourceProxyAvailable {
+			body, err = c.Get().
+				Namespace(ns).
+				Resource("pods").
+				SubResource("proxy").
+				Name(podID).
+				Suffix("data.json").
+				Do().
+				Raw()
+		} else {
+			body, err = c.Get().
+				Prefix("proxy").
+				Namespace(ns).
+				Resource("pods").
+				Name(podID).
+				Suffix("data.json").
+				Do().
+				Raw()
+		}
 		if err != nil {
 			return err
 		}
