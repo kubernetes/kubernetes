@@ -7900,11 +7900,12 @@ func (x *EmptyDirVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			var yyq511 [1]bool
 			_, _, _ = yysep511, yyq511, yy2arr511
 			const yyr511 bool = false
+			yyq511[0] = x.Medium != ""
 			var yynn511 int
 			if yyr511 || yy2arr511 {
 				r.EncodeArrayStart(1)
 			} else {
-				yynn511 = 1
+				yynn511 = 0
 				for _, b := range yyq511 {
 					if b {
 						yynn511++
@@ -7915,12 +7916,18 @@ func (x *EmptyDirVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr511 || yy2arr511 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				x.Medium.CodecEncodeSelf(e)
+				if yyq511[0] {
+					x.Medium.CodecEncodeSelf(e)
+				} else {
+					r.EncodeString(codecSelferC_UTF81234, "")
+				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("medium"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				x.Medium.CodecEncodeSelf(e)
+				if yyq511[0] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("medium"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					x.Medium.CodecEncodeSelf(e)
+				}
 			}
 			if yyr511 || yy2arr511 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)

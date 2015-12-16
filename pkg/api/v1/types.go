@@ -198,7 +198,7 @@ type Volume struct {
 	VolumeSource `json:",inline"`
 }
 
-// VolumeSource represents the source location of a volume to mount.
+// Represents the source of a volume to mount.
 // Only one of its members may be specified.
 type VolumeSource struct {
 	// HostPath represents a pre-existing file or directory on the host
@@ -484,14 +484,16 @@ const (
 	ClaimBound PersistentVolumeClaimPhase = "Bound"
 )
 
-// HostPathVolumeSource represents bare host directory volume.
+// Represents a host path mapped into a pod.
+// Host path volumes do not support ownership management or SELinux relabeling.
 type HostPathVolumeSource struct {
 	// Path of the directory on the host.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath
 	Path string `json:"path"`
 }
 
-// EmptyDirVolumeSource is temporary directory that shares a pod's lifetime.
+// Represents an empty directory for a pod.
+// Empty directory volumes support ownership management and SELinux relabeling.
 type EmptyDirVolumeSource struct {
 	// What type of storage medium should back this directory.
 	// The default is "" which means to use the node's default medium.
@@ -500,7 +502,8 @@ type EmptyDirVolumeSource struct {
 	Medium StorageMedium `json:"medium,omitempty"`
 }
 
-// GlusterfsVolumeSource represents a Glusterfs Mount that lasts the lifetime of a pod.
+// Represents a Glusterfs mount that lasts the lifetime of a pod.
+// Glusterfs volumes do not support ownership management or SELinux relabeling.
 type GlusterfsVolumeSource struct {
 	// EndpointsName is the endpoint name that details Glusterfs topology.
 	// More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod
@@ -516,10 +519,8 @@ type GlusterfsVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// StorageMedium defines ways that storage can be allocated to a volume.
-type StorageMedium string
-
-// RBDVolumeSource represents a Rados Block Device Mount that lasts the lifetime of a pod
+// Represents a Rados Block Device mount that lasts the lifetime of a pod.
+// RBD volumes support ownership management and SELinux relabeling.
 type RBDVolumeSource struct {
 	// A collection of Ceph monitors.
 	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
@@ -556,9 +557,10 @@ type RBDVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// CinderVolumeSource represents a cinder volume resource in Openstack.
+// Represents a cinder volume resource in Openstack.
 // A Cinder volume must exist before mounting to a container.
 // The volume must also be in the same region as the kubelet.
+// Cinder volumes support ownership management and SELinux relabeling.
 type CinderVolumeSource struct {
 	// volume id used to identify the volume in cinder
 	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
@@ -574,7 +576,8 @@ type CinderVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// CephFSVolumeSource represents a Ceph Filesystem Mount that lasts the lifetime of a pod
+// Represents a Ceph Filesystem mount that lasts the lifetime of a pod
+// Cephfs volumes do not support ownership management or SELinux relabeling.
 type CephFSVolumeSource struct {
 	// Required: Monitors is a collection of Ceph monitors
 	// More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it
@@ -594,11 +597,15 @@ type CephFSVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// FlockerVolumeSource represents a Flocker volume mounted by the Flocker agent.
+// Represents a Flocker volume mounted by the Flocker agent.
+// Flocker volumes do not support ownership management or SELinux relabeling.
 type FlockerVolumeSource struct {
 	// Required: the volume name. This is going to be store on metadata -> name on the payload for Flocker
 	DatasetName string `json:"datasetName"`
 }
+
+// StorageMedium defines ways that storage can be allocated to a volume.
+type StorageMedium string
 
 const (
 	StorageMediumDefault StorageMedium = ""       // use whatever the default is for the node
@@ -615,11 +622,12 @@ const (
 	ProtocolUDP Protocol = "UDP"
 )
 
-// GCEPersistentDiskVolumeSource represents a Persistent Disk resource in Google Compute Engine.
+// Represents a Persistent Disk resource in Google Compute Engine.
 //
 // A GCE PD must exist and be formatted before mounting to a container.
 // The disk must also be in the same GCE project and zone as the kubelet.
 // A GCE PD can only be mounted as read/write once.
+// GCE PDs support ownership management and SELinux relabeling.
 type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource in GCE. Used to identify the disk in GCE.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk
@@ -642,11 +650,12 @@ type GCEPersistentDiskVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// Represents a persistent disk resource in AWS.
+// Represents a Persistent Disk resource in AWS.
 //
-// An Amazon Elastic Block Store (EBS) must already be created, formatted,
-// and reside in the same AWS zone as the kubelet before it can be mounted.
-// Note: Amazon EBS volumes can be mounted to only one instance at a time.
+// An AWS EBS disk must exist and be formatted before mounting to a container.
+// The disk must also be in the same AWS zone as the kubelet.
+// An AWS EBS disk can only be mounted as read/write once.
+// AWS EBS volumes support ownership management and SELinux relabeling.
 type AWSElasticBlockStoreVolumeSource struct {
 	// Unique ID of the persistent disk resource in AWS (Amazon EBS volume).
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
@@ -668,7 +677,9 @@ type AWSElasticBlockStoreVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// GitRepoVolumeSource represents a volume that is pulled from git when the pod is created.
+// Represents a volume that is populated with the contents of a git repository.
+// Git repo volumes do not support ownership management.
+// Git repo volumes support SELinux relabeling.
 type GitRepoVolumeSource struct {
 	// Repository URL
 	Repository string `json:"repository"`
@@ -681,15 +692,19 @@ type GitRepoVolumeSource struct {
 	Directory string `json:"directory,omitempty"`
 }
 
-// SecretVolumeSource adapts a Secret into a VolumeSource.
-// More info: http://releases.k8s.io/HEAD/docs/design/secrets.md
+// Adapts a Secret into a volume.
+//
+// The contents of the target Secret's Data field will be presented in a volume
+// as files using the keys in the Data field as the file names.
+// Secret volumes support ownership management and SELinux relabeling.
 type SecretVolumeSource struct {
 	// SecretName is the name of a secret in the pod's namespace.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets
 	SecretName string `json:"secretName"`
 }
 
-// NFSVolumeSource represents an NFS mount that lasts the lifetime of a pod
+// Represents an NFS mount that lasts the lifetime of a pod.
+// NFS volumes do not support ownership management or SELinux relabeling.
 type NFSVolumeSource struct {
 	// Server is the hostname or IP address of the NFS server.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs
@@ -706,7 +721,9 @@ type NFSVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// ISCSIVolumeSource describes an ISCSI Disk can only be mounted as read/write once.
+// Represents an ISCSI disk.
+// ISCSI volumes can only be mounted as read/write once.
+// ISCSI volumes support ownership management and SELinux relabeling.
 type ISCSIVolumeSource struct {
 	// iSCSI target portal. The portal is either an IP or ip_addr:port if the port
 	// is other than default (typically TCP ports 860 and 3260).
@@ -728,7 +745,9 @@ type ISCSIVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// A Fibre Channel Disk can only be mounted as read/write once.
+// Represents a Fibre Channel volume.
+// Fibre Channel volumes can only be mounted as read/write once.
+// Fibre Channel volumes support ownership management and SELinux relabeling.
 type FCVolumeSource struct {
 	// Required: FC target world wide names (WWNs)
 	TargetWWNs []string `json:"targetWWNs"`
@@ -2523,7 +2542,8 @@ type ComponentStatusList struct {
 	Items []ComponentStatus `json:"items"`
 }
 
-// DownwardAPIVolumeSource represents a volume containing downward API info
+// DownwardAPIVolumeSource represents a volume containing downward API info.
+// Downward API volumes support ownership management and SELinux relabeling.
 type DownwardAPIVolumeSource struct {
 	// Items is a list of downward API volume file
 	Items []DownwardAPIVolumeFile `json:"items,omitempty"`
