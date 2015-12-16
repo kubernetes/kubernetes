@@ -21,14 +21,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store ReplicationControllers.
 type Registry interface {
-	ListControllers(ctx api.Context, options *unversioned.ListOptions) (*api.ReplicationControllerList, error)
-	WatchControllers(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error)
+	ListControllers(ctx api.Context, options *api.ListOptions) (*api.ReplicationControllerList, error)
+	WatchControllers(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 	GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error)
 	CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
 	UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
@@ -46,8 +45,8 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListControllers(ctx api.Context, options *unversioned.ListOptions) (*api.ReplicationControllerList, error) {
-	if options != nil && options.FieldSelector.Selector != nil && !options.FieldSelector.Selector.Empty() {
+func (s *storage) ListControllers(ctx api.Context, options *api.ListOptions) (*api.ReplicationControllerList, error) {
+	if options != nil && options.FieldSelector != nil && !options.FieldSelector.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
 	obj, err := s.List(ctx, options)
@@ -57,7 +56,7 @@ func (s *storage) ListControllers(ctx api.Context, options *unversioned.ListOpti
 	return obj.(*api.ReplicationControllerList), err
 }
 
-func (s *storage) WatchControllers(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchControllers(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

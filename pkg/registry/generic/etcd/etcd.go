@@ -162,20 +162,20 @@ func (e *Etcd) NewList() runtime.Object {
 }
 
 // List returns a list of items matching labels and field
-func (e *Etcd) List(ctx api.Context, options *unversioned.ListOptions) (runtime.Object, error) {
+func (e *Etcd) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
 	label := labels.Everything()
-	if options != nil && options.LabelSelector.Selector != nil {
-		label = options.LabelSelector.Selector
+	if options != nil && options.LabelSelector != nil {
+		label = options.LabelSelector
 	}
 	field := fields.Everything()
-	if options != nil && options.FieldSelector.Selector != nil {
-		field = options.FieldSelector.Selector
+	if options != nil && options.FieldSelector != nil {
+		field = options.FieldSelector
 	}
 	return e.ListPredicate(ctx, e.PredicateFunc(label, field), options)
 }
 
 // ListPredicate returns a list of all the items matching m.
-func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *unversioned.ListOptions) (runtime.Object, error) {
+func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *api.ListOptions) (runtime.Object, error) {
 	list := e.NewListFunc()
 	filterFunc := e.filterAndDecorateFunction(m)
 	if name, ok := m.MatchesSingle(); ok {
@@ -187,7 +187,7 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher, options *unvers
 	}
 
 	if options == nil {
-		options = &unversioned.ListOptions{ResourceVersion: "0"}
+		options = &api.ListOptions{ResourceVersion: "0"}
 	}
 	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, filterFunc, list)
 	return list, etcderr.InterpretListError(err, e.QualifiedResource)
@@ -432,7 +432,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 // are removing all objects of a given type) with the current API (it's technically
 // possibly with etcd API, but watch is not delivered correctly then).
 // It will be possible to fix it with v3 etcd API.
-func (e *Etcd) DeleteCollection(ctx api.Context, options *api.DeleteOptions, listOptions *unversioned.ListOptions) (runtime.Object, error) {
+func (e *Etcd) DeleteCollection(ctx api.Context, options *api.DeleteOptions, listOptions *api.ListOptions) (runtime.Object, error) {
 	listObj, err := e.List(ctx, listOptions)
 	if err != nil {
 		return nil, err
@@ -474,14 +474,14 @@ func (e *Etcd) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object
 // WatchPredicate. If possible, you should customize PredicateFunc to produre a
 // matcher that matches by key. generic.SelectionPredicate does this for you
 // automatically.
-func (e *Etcd) Watch(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
+func (e *Etcd) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	label := labels.Everything()
-	if options != nil && options.LabelSelector.Selector != nil {
-		label = options.LabelSelector.Selector
+	if options != nil && options.LabelSelector != nil {
+		label = options.LabelSelector
 	}
 	field := fields.Everything()
-	if options != nil && options.FieldSelector.Selector != nil {
-		field = options.FieldSelector.Selector
+	if options != nil && options.FieldSelector != nil {
+		field = options.FieldSelector
 	}
 	resourceVersion := ""
 	if options != nil {
