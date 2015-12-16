@@ -42,6 +42,12 @@ type Generator interface {
 	ParamNames() []GeneratorParam
 }
 
+// StructuredGenerator is an interface for things that can generate API objects not using parameter injection
+type StructuredGenerator interface {
+	// StructuredGenerator creates an API object using pre-configured parameters
+	StructuredGenerate() (runtime.Object, error)
+}
+
 func IsZero(i interface{}) bool {
 	if i == nil {
 		return true

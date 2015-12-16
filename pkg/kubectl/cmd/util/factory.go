@@ -106,6 +106,35 @@ type Factory struct {
 	EditorEnvs func() []string
 }
 
+const (
+	RunV1GeneratorName                          = "run/v1"
+	RunPodV1GeneratorName                       = "run-pod/v1"
+	ServiceV1GeneratorName                      = "service/v1"
+	ServiceV2GeneratorName                      = "service/v2"
+	HorizontalPodAutoscalerV1Beta1GeneratorName = "horizontalpodautoscaler/v1beta1"
+	DeploymentV1Beta1GeneratorName              = "deployment/v1beta1"
+	JobV1Beta1GeneratorName                     = "job/v1beta1"
+	NamespaceV1GeneratorName                    = "namespace/v1"
+	SecretV1GeneratorName                       = "secret/v1"
+	SecretForDockerRegistryV1GeneratorName      = "secret-for-docker-registry/v1"
+)
+
+// DefaultGenerators returns the set of default generators for use in Factory instances
+func DefaultGenerators() map[string]kubectl.Generator {
+	return map[string]kubectl.Generator{
+		RunV1GeneratorName:                          kubectl.BasicReplicationController{},
+		RunPodV1GeneratorName:                       kubectl.BasicPod{},
+		ServiceV1GeneratorName:                      kubectl.ServiceGeneratorV1{},
+		ServiceV2GeneratorName:                      kubectl.ServiceGeneratorV2{},
+		HorizontalPodAutoscalerV1Beta1GeneratorName: kubectl.HorizontalPodAutoscalerV1Beta1{},
+		DeploymentV1Beta1GeneratorName:              kubectl.DeploymentV1Beta1{},
+		JobV1Beta1GeneratorName:                     kubectl.JobV1Beta1{},
+		NamespaceV1GeneratorName:                    kubectl.NamespaceGeneratorV1{},
+		SecretV1GeneratorName:                       kubectl.SecretGeneratorV1{},
+		SecretForDockerRegistryV1GeneratorName:      kubectl.SecretForDockerRegistryGeneratorV1{},
+	}
+}
+
 // NewFactory creates a factory with the default Kubernetes resources defined
 // if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
 // if optionalClientConfig is not nil, then this factory will make use of it.
@@ -115,15 +144,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SetNormalizeFunc(util.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
-	generators := map[string]kubectl.Generator{
-		"run/v1":                          kubectl.BasicReplicationController{},
-		"run-pod/v1":                      kubectl.BasicPod{},
-		"service/v1":                      kubectl.ServiceGeneratorV1{},
-		"service/v2":                      kubectl.ServiceGeneratorV2{},
-		"horizontalpodautoscaler/v1beta1": kubectl.HorizontalPodAutoscalerV1Beta1{},
-		"deployment/v1beta1":              kubectl.DeploymentV1Beta1{},
-		"job/v1beta1":                     kubectl.JobV1Beta1{},
-	}
+	generators := DefaultGenerators()
 
 	clientConfig := optionalClientConfig
 	if optionalClientConfig == nil {

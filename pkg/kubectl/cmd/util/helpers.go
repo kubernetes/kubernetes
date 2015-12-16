@@ -304,6 +304,15 @@ func AddApplyAnnotationFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool(ApplyAnnotationsFlag, false, "If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.")
 }
 
+// AddGeneratorFlags adds flags common to resource generation commands
+// TODO: need to take a pass at other generator commands to use this set of flags
+func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
+	cmd.Flags().String("generator", defaultGenerator, "The name of the API generator to use.")
+	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
+	cmd.Flags().StringP("output", "o", "", "Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md].")
+	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")
+}
+
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
