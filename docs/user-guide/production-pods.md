@@ -155,21 +155,21 @@ For more details, see the [secrets document](secrets.md), [example](secrets/) an
 
 Secrets can also be used to pass [image registry credentials](images.md#using-a-private-registry).
 
-First, create a `.dockercfg` file, such as running `docker login <registry.domain>`.
-Then put the resulting `.dockercfg` file into a [secret resource](secrets.md).  For example:
+First, create a `.docker/config.json`, such as by running `docker login <registry.domain>`.
+Then put the resulting `.docker/config.json` file into a [secret resource](secrets.md).  For example:
 
 ```console
 $ docker login
 Username: janedoe
 Password: ●●●●●●●●●●●
 Email: jdoe@example.com
-WARNING: login credentials saved in /Users/jdoe/.dockercfg.
+WARNING: login credentials saved in /Users/jdoe/.docker/config.json.
 Login Succeeded
 
-$ echo $(cat ~/.dockercfg)
+$ echo $(cat ~/.docker/config.json)
 { "https://index.docker.io/v1/": { "auth": "ZmFrZXBhc3N3b3JkMTIK", "email": "jdoe@example.com" } }
 
-$ cat ~/.dockercfg | base64
+$ cat ~/.docker/config.json | base64
 eyAiaHR0cHM6Ly9pbmRleC5kb2NrZXIuaW8vdjEvIjogeyAiYXV0aCI6ICJabUZyWlhCaGMzTjNiM0prTVRJSyIsICJlbWFpbCI6ICJqZG9lQGV4YW1wbGUuY29tIiB9IH0K
 
 $ cat > /tmp/image-pull-secret.yaml <<EOF
@@ -178,11 +178,11 @@ kind: Secret
 metadata:
   name: myregistrykey
 data:
-  .dockercfg: eyAiaHR0cHM6Ly9pbmRleC5kb2NrZXIuaW8vdjEvIjogeyAiYXV0aCI6ICJabUZyWlhCaGMzTjNiM0prTVRJSyIsICJlbWFpbCI6ICJqZG9lQGV4YW1wbGUuY29tIiB9IH0K
-type: kubernetes.io/dockercfg
+  .dockerconfigjson: eyAiaHR0cHM6Ly9pbmRleC5kb2NrZXIuaW8vdjEvIjogeyAiYXV0aCI6ICJabUZyWlhCaGMzTjNiM0prTVRJSyIsICJlbWFpbCI6ICJqZG9lQGV4YW1wbGUuY29tIiB9IH0K
+type: kubernetes.io/dockerconfigjson
 EOF
 
-$ kubectl create -f ./image-pull-secret.yaml
+$ kubectl create -f /tmp/image-pull-secret.yaml
 secrets/myregistrykey
 ```
 
