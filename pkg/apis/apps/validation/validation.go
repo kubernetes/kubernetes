@@ -30,9 +30,7 @@ import (
 // name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-func ValidatePetSetName(name string, prefix bool) (bool, string) {
-	return apivalidation.NameIsDNSSubdomain(name, prefix)
-}
+var ValidatePetSetName = apivalidation.NameIsDNSSubdomain
 
 // Validates the given template and ensures that it is in accordance with the desired selector.
 func ValidatePodTemplateSpecForPetSet(template *api.PodTemplateSpec, selector labels.Selector, fldPath *field.Path) field.ErrorList {
