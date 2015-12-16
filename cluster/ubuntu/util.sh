@@ -526,7 +526,7 @@ function provision-masterandnode() {
       '${KUBELET_CONFIG}'
     create-kube-proxy-opts \
       '${MASTER_IP}' \
-      '${MASTER_IP}'
+      '${MASTER_IP}' \
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
 
     sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce ' 
