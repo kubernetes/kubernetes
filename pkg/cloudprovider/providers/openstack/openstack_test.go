@@ -198,3 +198,26 @@ func TestZones(t *testing.T) {
 		t.Fatalf("GetZone() returned wrong region (%s)", zone.Region)
 	}
 }
+
+func TestVolumes(t *testing.T) {
+	cfg, ok := configFromEnv()
+	if !ok {
+		t.Skipf("No config found in environment")
+	}
+
+	os, err := newOpenStack(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
+	}
+
+	vol, err := os.CreateVolume(1)
+	if err != nil {
+		t.Fatalf("Cannot create a new Cinder volume: %v", err)
+	}
+
+	err = os.DeleteVolume(vol)
+	if err != nil {
+		t.Fatalf("Cannot delete Cinder volume %s: %v", vol, err)
+	}
+
+}

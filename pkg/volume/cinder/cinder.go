@@ -17,11 +17,15 @@ limitations under the License.
 package cinder
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -39,6 +43,9 @@ type cinderPlugin struct {
 }
 
 var _ volume.VolumePlugin = &cinderPlugin{}
+var _ volume.PersistentVolumePlugin = &cinderPlugin{}
+var _ volume.DeletableVolumePlugin = &cinderPlugin{}
+var _ volume.ProvisionableVolumePlugin = &cinderPlugin{}
 
 const (
 	cinderVolumePluginName = "kubernetes.io/cinder"
@@ -107,12 +114,64 @@ func (plugin *cinderPlugin) newCleanerInternal(volName string, podUID types.UID,
 		}}, nil
 }
 
+func (plugin *cinderPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+	return plugin.newDeleterInternal(spec, &CinderDiskUtil{})
+}
+
+func (plugin *cinderPlugin) newDeleterInternal(spec *volume.Spec, manager cdManager) (volume.Deleter, error) {
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Cinder == nil {
+		return nil, fmt.Errorf("spec.PersistentVolumeSource.Cinder is nil")
+	}
+	return &cinderVolumeDeleter{
+		&cinderVolume{
+			volName: spec.Name(),
+			pdName:  spec.PersistentVolume.Spec.Cinder.VolumeID,
+			manager: manager,
+			plugin:  plugin,
+		}}, nil
+}
+
+func (plugin *cinderPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+	if len(options.AccessModes) == 0 {
+		options.AccessModes = plugin.GetAccessModes()
+	}
+	return plugin.newProvisionerInternal(options, &CinderDiskUtil{})
+}
+
+func (plugin *cinderPlugin) newProvisionerInternal(options volume.VolumeOptions, manager cdManager) (volume.Provisioner, error) {
+	return &cinderVolumeProvisioner{
+		cinderVolume: &cinderVolume{
+			manager: manager,
+			plugin:  plugin,
+		},
+		options: options,
+	}, nil
+}
+
+func (plugin *cinderPlugin) getCloudProvider() (*openstack.OpenStack, error) {
+	cloud := plugin.host.GetCloudProvider()
+	if cloud == nil {
+		glog.Errorf("Cloud provider not initialized properly")
+		return nil, errors.New("Cloud provider not initialized properly")
+	}
+
+	os := cloud.(*openstack.OpenStack)
+	if os == nil {
+		return nil, errors.New("Invalid cloud provider: expected OpenStack")
+	}
+	return os, nil
+}
+
 // Abstract interface to PD operations.
 type cdManager interface {
 	// Attaches the disk to the kubelet's host machine.
 	AttachDisk(builder *cinderVolumeBuilder, globalPDPath string) error
 	// Detaches the disk from the kubelet's host machine.
 	DetachDisk(cleaner *cinderVolumeCleaner) error
+	// Creates a volume
+	CreateVolume(provisioner *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, err error)
+	// Deletes a volume
+	DeleteVolume(deleter *cinderVolumeDeleter) error
 }
 
 var _ volume.Builder = &cinderVolumeBuilder{}
@@ -284,4 +343,67 @@ func (c *cinderVolumeCleaner) TearDownAt(dir string) error {
 		}
 	}
 	return nil
+}
+
+type cinderVolumeDeleter struct {
+	*cinderVolume
+}
+
+var _ volume.Deleter = &cinderVolumeDeleter{}
+
+func (r *cinderVolumeDeleter) GetPath() string {
+	name := cinderVolumePluginName
+	return r.plugin.host.GetPodVolumeDir(r.podUID, util.EscapeQualifiedNameForDisk(name), r.volName)
+}
+
+func (r *cinderVolumeDeleter) Delete() error {
+	return r.manager.DeleteVolume(r)
+}
+
+type cinderVolumeProvisioner struct {
+	*cinderVolume
+	options volume.VolumeOptions
+}
+
+var _ volume.Provisioner = &cinderVolumeProvisioner{}
+
+func (c *cinderVolumeProvisioner) Provision(pv *api.PersistentVolume) error {
+	volumeID, sizeGB, err := c.manager.CreateVolume(c)
+	if err != nil {
+		return err
+	}
+	pv.Spec.PersistentVolumeSource.Cinder.VolumeID = volumeID
+	pv.Spec.Capacity = api.ResourceList{
+		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+	}
+	return nil
+}
+
+func (c *cinderVolumeProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
+	// Provide dummy api.PersistentVolume.Spec, it will be filled in
+	// cinderVolumeProvisioner.Provision()
+	return &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "pv-cinder-",
+			Labels:       map[string]string{},
+			Annotations: map[string]string{
+				"kubernetes.io/createdby": "cinder-dynamic-provisioner",
+			},
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
+			AccessModes:                   c.options.AccessModes,
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): c.options.Capacity,
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				Cinder: &api.CinderVolumeSource{
+					VolumeID: "dummy",
+					FSType:   "ext4",
+					ReadOnly: false,
+				},
+			},
+		},
+	}, nil
+
 }
