@@ -1023,3 +1023,41 @@ func (os *OpenStack) getVolume(diskName string) (volumes.Volume, error) {
 	}
 	return volume, err
 }
+
+// Create a volume of given size (in GiB)
+func (os *OpenStack) CreateVolume(size int) (volumeName string, err error) {
+
+	sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
+		Region: os.region,
+	})
+
+	if err != nil || sClient == nil {
+		glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
+		return "", err
+	}
+
+	opts := volumes.CreateOpts{Size: size}
+	vol, err := volumes.Create(sClient, opts).Extract()
+	if err != nil {
+		glog.Errorf("Failed to create a %d GB volume: %v", size, err)
+		return "", err
+	}
+	glog.Infof("Created volume %v", vol.ID)
+	return vol.ID, err
+}
+
+func (os *OpenStack) DeleteVolume(volumeName string) error {
+	sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
+		Region: os.region,
+	})
+
+	if err != nil || sClient == nil {
+		glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
+		return err
+	}
+	err = volumes.Delete(sClient, volumeName).ExtractErr()
+	if err != nil {
+		glog.Errorf("Cannot delete volume %s: %v", volumeName, err)
+	}
+	return err
+}
