@@ -24,6 +24,7 @@ DOCKERIZE_KUBELET=${DOCKERIZE_KUBELET:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 ALLOW_SECURITY_CONTEXT=${ALLOW_SECURITY_CONTEXT:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
+NET_PLUGIN=${NET_PLUGIN:-""}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd "${KUBE_ROOT}"
 
@@ -255,12 +256,18 @@ function start_apiserver {
 }
 
 function start_controller_manager {
+    node_cidr_args=""
+    if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
+      node_cidr_args="--allocate-node-cidrs=true --cluster-cidr=10.1.0.0/16 "
+    fi
+
     CTLRMGR_LOG=/tmp/kube-controller-manager.log
     sudo -E "${GO_OUT}/kube-controller-manager" \
       --v=${LOG_LEVEL} \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
       --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
+      ${node_cidr_args} \
       --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
@@ -283,6 +290,16 @@ function start_kubelet {
 	 fi
       fi
 
+      net_plugin_args=""
+      if [[ -n "${NET_PLUGIN}" ]]; then
+        net_plugin_args="--network-plugin=${NET_PLUGIN}"
+      fi
+
+      kubenet_plugin_args=""
+      if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
+        kubenet_plugin_args="--reconcile-cidr=true "
+      fi
+
       sudo -E "${GO_OUT}/kubelet" ${priv_arg}\
         --v=${LOG_LEVEL} \
         --chaos-chance="${CHAOS_CHANCE}" \
@@ -294,6 +311,8 @@ function start_kubelet {
         --api-servers="${API_HOST}:${API_PORT}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
         --cluster-dns="127.0.0.1" \
+        ${net_plugin_args} \
+        ${kubenet_plugin_args} \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
     else

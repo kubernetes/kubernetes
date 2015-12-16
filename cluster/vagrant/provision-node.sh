@@ -53,7 +53,9 @@ for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
 done
 
 # Configure network
-provision-network-node
+if [ "${NETWORK_PROVIDER}" != "kubenet" ]; then
+  provision-network-node
+fi
 
 write-salt-config kubernetes-pool
 

@@ -57,7 +57,9 @@ echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' 
 echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
 
 # Configure the master network
-provision-network-master
+if [ "${NETWORK_PROVIDER}" != "kubenet" ]; then
+  provision-network-master
+fi
 
 write-salt-config kubernetes-master
 
