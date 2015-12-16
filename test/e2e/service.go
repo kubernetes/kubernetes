@@ -356,6 +356,9 @@ var _ = Describe("Services", func() {
 		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
 	})
 
+	// TODO: Run this test against the userspace proxy and nodes
+	// configured with a default deny firewall to validate that the
+	// proxy whitelists NodePort traffic.
 	It("should be able to create a functioning NodePort service", func() {
 		serviceName := "nodeportservice-test"
 		ns := f.Namespace.Name
