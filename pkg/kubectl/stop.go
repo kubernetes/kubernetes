@@ -103,7 +103,7 @@ type ServiceReaper struct {
 
 type objInterface interface {
 	Delete(name string) error
-	Get(name string) (meta.Interface, error)
+	Get(name string) (meta.Object, error)
 }
 
 // getOverlappingControllers finds rcs that this controller overlaps, as well as rcs overlapping this controller.

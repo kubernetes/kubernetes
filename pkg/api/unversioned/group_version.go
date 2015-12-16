@@ -198,3 +198,48 @@ func (gv *GroupVersion) UnmarshalJSON(value []byte) error {
 func (gv *GroupVersion) UnmarshalText(value []byte) error {
 	return gv.unmarshal(value)
 }
+
+// ToAPIVersionAndKind is a convenience method for satisfying runtime.Object on types that
+// do not use TypeMeta.
+func (gvk *GroupVersionKind) ToAPIVersionAndKind() (string, string) {
+	if gvk == nil {
+		return "", ""
+	}
+	return gvk.GroupVersion().String(), gvk.Kind
+}
+
+// FromAPIVersionAndKind returns a GVK representing the provided fields for types that
+// do not use TypeMeta. This method exists to support test types and legacy serializations
+// that have a distinct group and kind.
+// TODO: further reduce usage of this method.
+func FromAPIVersionAndKind(apiVersion, kind string) *GroupVersionKind {
+	if gv, err := ParseGroupVersion(apiVersion); err == nil {
+		return &GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind}
+	}
+	return &GroupVersionKind{Kind: kind}
+}
+
+// All objects that are serialized from a Scheme encode their type information. This interface is used
+// by serialization to set type information from the Scheme onto the serialized version of an object.
+// For objects that cannot be serialized or have unique requirements, this interface may be a no-op.
+// TODO: this belongs in pkg/runtime, move unversioned.GVK into runtime.
+type ObjectKind interface {
+	// SetGroupVersionKind sets or clears the intended serialized kind of an object. Passing kind nil
+	// should clear the current setting.
+	SetGroupVersionKind(kind *GroupVersionKind)
+	// GroupVersionKind returns the stored group, version, and kind of an object, or nil if the object does
+	// not expose or provide these fields.
+	GroupVersionKind() *GroupVersionKind
+}
+
+// EmptyObjectKind implements the ObjectKind interface as a noop
+// TODO: this belongs in pkg/runtime, move unversioned.GVK into runtime.
+var EmptyObjectKind = emptyObjectKind{}
+
+type emptyObjectKind struct{}
+
+// SetGroupVersionKind implements the ObjectKind interface
+func (emptyObjectKind) SetGroupVersionKind(gvk *GroupVersionKind) {}
+
+// GroupVersionKind implements the ObjectKind interface
+func (emptyObjectKind) GroupVersionKind() *GroupVersionKind { return nil }

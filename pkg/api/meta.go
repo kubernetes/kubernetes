@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -60,3 +61,22 @@ func ListMetaFor(obj runtime.Object) (*unversioned.ListMeta, error) {
 	err = runtime.FieldPtr(v, "ListMeta", &meta)
 	return meta, err
 }
+
+// Namespace implements meta.Object for any object with an ObjectMeta typed field. Allows
+// fast, direct access to metadata fields for API objects.
+func (meta *ObjectMeta) GetNamespace() string                         { return meta.Namespace }
+func (meta *ObjectMeta) SetNamespace(namespace string)                { meta.Namespace = namespace }
+func (meta *ObjectMeta) GetName() string                              { return meta.Name }
+func (meta *ObjectMeta) SetName(name string)                          { meta.Name = name }
+func (meta *ObjectMeta) GetGenerateName() string                      { return meta.GenerateName }
+func (meta *ObjectMeta) SetGenerateName(generateName string)          { meta.GenerateName = generateName }
+func (meta *ObjectMeta) GetUID() types.UID                            { return meta.UID }
+func (meta *ObjectMeta) SetUID(uid types.UID)                         { meta.UID = uid }
+func (meta *ObjectMeta) GetResourceVersion() string                   { return meta.ResourceVersion }
+func (meta *ObjectMeta) SetResourceVersion(version string)            { meta.ResourceVersion = version }
+func (meta *ObjectMeta) GetSelfLink() string                          { return meta.SelfLink }
+func (meta *ObjectMeta) SetSelfLink(selfLink string)                  { meta.SelfLink = selfLink }
+func (meta *ObjectMeta) GetLabels() map[string]string                 { return meta.Labels }
+func (meta *ObjectMeta) SetLabels(labels map[string]string)           { meta.Labels = labels }
+func (meta *ObjectMeta) GetAnnotations() map[string]string            { return meta.Annotations }
+func (meta *ObjectMeta) SetAnnotations(annotations map[string]string) { meta.Annotations = annotations }

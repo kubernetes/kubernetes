@@ -274,5 +274,4 @@ type ConnectRequest struct {
 	ResourcePath string
 }
 
-// IsAnAPIObject makes ConnectRequest a runtime.Object
-func (*ConnectRequest) IsAnAPIObject() {}
+func (obj *ConnectRequest) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }

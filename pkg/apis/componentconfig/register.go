@@ -48,4 +48,4 @@ func addKnownTypes() {
 	)
 }
 
-func (_ *KubeProxyConfiguration) IsAnAPIObject() {}
+func (obj *KubeProxyConfiguration) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
