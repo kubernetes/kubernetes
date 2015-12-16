@@ -179,8 +179,8 @@ func (r *Request) Resource(resource string) *Request {
 		r.err = fmt.Errorf("resource already set to %q, cannot change to %q", r.resource, resource)
 		return r
 	}
-	if ok, msg := validation.IsValidPathSegmentName(resource); !ok {
-		r.err = fmt.Errorf("invalid resource %q: %s", resource, msg)
+	if msgs := validation.IsValidPathSegmentName(resource); len(msgs) != 0 {
+		r.err = fmt.Errorf("invalid resource %q: %v", resource, msgs)
 		return r
 	}
 	r.resource = resource
@@ -199,8 +199,8 @@ func (r *Request) SubResource(subresources ...string) *Request {
 		return r
 	}
 	for _, s := range subresources {
-		if ok, msg := validation.IsValidPathSegmentName(s); !ok {
-			r.err = fmt.Errorf("invalid subresource %q: %s", s, msg)
+		if msgs := validation.IsValidPathSegmentName(s); len(msgs) != 0 {
+			r.err = fmt.Errorf("invalid subresource %q: %v", s, msgs)
 			return r
 		}
 	}
@@ -221,8 +221,8 @@ func (r *Request) Name(resourceName string) *Request {
 		r.err = fmt.Errorf("resource name already set to %q, cannot change to %q", r.resourceName, resourceName)
 		return r
 	}
-	if ok, msg := validation.IsValidPathSegmentName(resourceName); !ok {
-		r.err = fmt.Errorf("invalid resource name %q: %s", resourceName, msg)
+	if msgs := validation.IsValidPathSegmentName(resourceName); len(msgs) != 0 {
+		r.err = fmt.Errorf("invalid resource name %q: %v", resourceName, msgs)
 		return r
 	}
 	r.resourceName = resourceName
@@ -238,8 +238,8 @@ func (r *Request) Namespace(namespace string) *Request {
 		r.err = fmt.Errorf("namespace already set to %q, cannot change to %q", r.namespace, namespace)
 		return r
 	}
-	if ok, msg := validation.IsValidPathSegmentName(namespace); !ok {
-		r.err = fmt.Errorf("invalid namespace %q: %s", namespace, msg)
+	if msgs := validation.IsValidPathSegmentName(namespace); len(msgs) != 0 {
+		r.err = fmt.Errorf("invalid namespace %q: %v", namespace, msgs)
 		return r
 	}
 	r.namespaceSet = true
