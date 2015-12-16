@@ -629,8 +629,8 @@ func validateIngressBackend(backend *extensions.IngressBackend, fldPath *field.P
 		}
 	}
 	if backend.ServicePort.Type == intstr.String {
-		if !validation.IsDNS1123Label(backend.ServicePort.StrVal) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("servicePort"), backend.ServicePort.StrVal, apivalidation.DNS1123LabelErrorMsg))
+		for _, msg := range validation.IsDNS1123Label(backend.ServicePort.StrVal) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("servicePort"), backend.ServicePort.StrVal, msg))
 		}
 		if !validation.IsValidPortName(backend.ServicePort.StrVal) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("servicePort"), backend.ServicePort.StrVal, apivalidation.PortNameErrorMsg))

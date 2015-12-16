@@ -178,7 +178,7 @@ func (ks *kube2sky) generateRecordsForHeadlessService(subdomain string, e *kapi.
 					return err
 				}
 				if hostRecord, exists := podHostnames[string(endpointIP)]; exists {
-					if validation.IsDNS1123Label(hostRecord.HostName) {
+					if len(validation.IsDNS1123Label(hostRecord.HostName)) == 0 {
 						recordLabel = hostRecord.HostName
 					}
 				}

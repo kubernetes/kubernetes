@@ -1354,7 +1354,7 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string) {
 	}
 	hostname := pod.Name
 	hostnameCandidate := podAnnotations[utilpod.PodHostnameAnnotation]
-	if utilvalidation.IsDNS1123Label(hostnameCandidate) {
+	if len(utilvalidation.IsDNS1123Label(hostnameCandidate)) == 0 {
 		// use hostname annotation, if specified.
 		hostname = hostnameCandidate
 	}
@@ -1365,7 +1365,7 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string) {
 
 	hostDomain := ""
 	subdomainCandidate := pod.Annotations[utilpod.PodSubdomainAnnotation]
-	if utilvalidation.IsDNS1123Label(subdomainCandidate) {
+	if len(utilvalidation.IsDNS1123Label(subdomainCandidate)) == 0 {
 		hostDomain = fmt.Sprintf("%s.%s.svc.%s", subdomainCandidate, pod.Namespace, clusterDomain)
 	}
 	return hostname, hostDomain
