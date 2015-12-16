@@ -219,19 +219,19 @@ script
 	set -o errexit
 	set -o nounset
 
-	# Kube-system pod manifest files are located at /etc/kube-manifests.
+	# Kube-system pod manifest files are located at /run/kube-manifests/kubernetes.
 	. /etc/kube-env
 	# Fluentd
 	if [ "${ENABLE_NODE_LOGGING:-}" = "true" ]; then
 		if [ "${LOGGING_DESTINATION:-}" = "gcp" ]; then
-			cp /etc/kube-manifests/fluentd-gcp.yaml /etc/kubernetes/manifests/
+			cp /run/kube-manifests/kubernetes/fluentd-gcp.yaml /etc/kubernetes/manifests/
 		elif [ "${LOGGING_DESTINATION:-}" = "elasticsearch" ]; then
-			cp /etc/kube-manifests/fluentd-es.yaml /etc/kubernetes/manifests/
+			cp /run/kube-manifests/kubernetes/fluentd-es.yaml /etc/kubernetes/manifests/
 		fi
 	fi
 	# Kube-registry-proxy
 	if [ "${ENABLE_CLUSTER_REGISTRY:-}" = "true" ]; then
-		cp /etc/kube-manifests/kube-registry-proxy.yaml /etc/kubernetes/manifests/
+		cp /run/kube-manifests/kubernetes/kube-registry-proxy.yaml /etc/kubernetes/manifests/
 	fi
 end script
 

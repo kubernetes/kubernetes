@@ -315,23 +315,37 @@ function tars_from_version() {
 # Vars set:
 #   SERVER_BINARY_TAR
 #   SALT_TAR
+#   KUBE_MANIFESTS_TAR
 function find-release-tars() {
   SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
-  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
+  if [[ ! -f "${SERVER_BINARY_TAR}" ]]; then
     SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
   fi
-  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
+  if [[ ! -f "${SERVER_BINARY_TAR}" ]]; then
     echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz" >&2
     exit 1
   fi
 
   SALT_TAR="${KUBE_ROOT}/server/kubernetes-salt.tar.gz"
-  if [[ ! -f "$SALT_TAR" ]]; then
+  if [[ ! -f "${SALT_TAR}" ]]; then
     SALT_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-salt.tar.gz"
   fi
-  if [[ ! -f "$SALT_TAR" ]]; then
+  if [[ ! -f "${SALT_TAR}" ]]; then
     echo "!!! Cannot find kubernetes-salt.tar.gz" >&2
     exit 1
+  fi
+
+  # This tarball is only used by Ubuntu Trusty.
+  KUBE_MANIFESTS_TAR=
+  if [[ "${OS_DISTRIBUTION}" == "trusty" ]]; then
+    KUBE_MANIFESTS_TAR="${KUBE_ROOT}/server/kuernetes-manifests.tar.gz"
+    if [[ ! -f "${KUBE_MANIFESTS_TAR}" ]]; then
+      KUBE_MANIFESTS_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-manifests.tar.gz"
+    fi
+    if [[ ! -f "${KUBE_MANIFESTS_TAR}" ]]; then
+      echo "!!! Cannot find kubernetes-manifests.tar.gz" >&2
+      exit 1
+    fi
   fi
 }
 
