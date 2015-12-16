@@ -28,8 +28,8 @@ func TestIsDNS1123Label(t *testing.T) {
 		strings.Repeat("a", 63),
 	}
 	for _, val := range goodValues {
-		if !IsDNS1123Label(val) {
-			t.Errorf("expected true for '%s'", val)
+		if msgs := IsDNS1123Label(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%s': %v", val, msgs)
 		}
 	}
 
@@ -42,7 +42,7 @@ func TestIsDNS1123Label(t *testing.T) {
 		strings.Repeat("a", 64),
 	}
 	for _, val := range badValues {
-		if IsDNS1123Label(val) {
+		if msgs := IsDNS1123Label(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%s'", val)
 		}
 	}
