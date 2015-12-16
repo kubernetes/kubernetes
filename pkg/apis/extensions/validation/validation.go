@@ -69,8 +69,10 @@ func ValidateThirdPartyResource(obj *extensions.ThirdPartyResource) field.ErrorL
 		version := &obj.Versions[ix]
 		if len(version.Name) == 0 {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("versions").Index(ix).Child("name"), version, "must not be empty"))
-		} else if !validation.IsDNS1123Label(version.Name) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("versions").Index(ix).Child("name"), version, apivalidation.DNS1123LabelErrorMsg))
+		} else {
+			for _, msg := range validation.IsDNS1123Label(version.Name) {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("versions").Index(ix).Child("name"), version, msg))
+			}
 		}
 		if versions.Has(version.Name) {
 			allErrs = append(allErrs, field.Duplicate(field.NewPath("versions").Index(ix).Child("name"), version))
@@ -413,8 +415,8 @@ func validateIngressBackend(backend *extensions.IngressBackend, fldPath *field.P
 		}
 	}
 	if backend.ServicePort.Type == intstr.String {
-		if !validation.IsDNS1123Label(backend.ServicePort.StrVal) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("servicePort"), backend.ServicePort.StrVal, apivalidation.DNS1123LabelErrorMsg))
+		for _, msg := range validation.IsDNS1123Label(backend.ServicePort.StrVal) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("servicePort"), backend.ServicePort.StrVal, msg))
 		}
 		if !validation.IsValidPortName(backend.ServicePort.StrVal) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("servicePort"), backend.ServicePort.StrVal, apivalidation.PortNameErrorMsg))
