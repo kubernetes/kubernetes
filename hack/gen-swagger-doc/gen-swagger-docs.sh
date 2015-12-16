@@ -31,7 +31,7 @@ cp /swagger-source/"$1".json input.json
 
 #insert a TOC for top level API objects
 buf="== Top Level API Objects\n\n"
-top_level_models=$(grep IsAnAPIObject ./register.go | sed 's/func (\*\(.*\)) IsAnAPIObject/\1/g' \
+top_level_models=$(grep GetObjectKind ./register.go | sed 's/func (obj \*\(.*\)) GetObjectKind(\(.*\)) .*/\1/g' \
     | tr -d '()' | tr -d '{}' | tr -d ' ')
 for m in $top_level_models
 do
