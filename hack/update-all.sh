@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A single sciprt that runs a predefined set of update-* scripts, as they often go together.
+# A single script that runs a predefined set of update-* scripts, as they often go together.
 set -o errexit
 set -o nounset
 set -o pipefail
