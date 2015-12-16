@@ -607,8 +607,13 @@ func (r *resourceCollector) collectStats(oldStats map[string]*cadvisorapi.Contai
 			Logf("Missing info/stats for container %q on node %q", name, r.node)
 			return
 		}
-		if _, ok := oldStats[name]; ok {
-			r.buffers[name] = append(r.buffers[name], computeContainerResourceUsage(name, oldStats[name], info.Stats[0]))
+		if oldInfo, ok := oldStats[name]; ok {
+			newInfo := info.Stats[0]
+			if oldInfo.Timestamp.Equal(newInfo.Timestamp) {
+				// No change -> skip this stat.
+				continue
+			}
+			r.buffers[name] = append(r.buffers[name], computeContainerResourceUsage(name, oldInfo, newInfo))
 		}
 		oldStats[name] = info.Stats[0]
 	}
