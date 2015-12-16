@@ -71,15 +71,20 @@ func NewPersistentVolumeRecycler(kubeClient client.Interface, syncPeriod time.Du
 			},
 		},
 		&api.PersistentVolume{},
-		// TODO: Can we have much longer period here?
 		syncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				pv := obj.(*api.PersistentVolume)
+				pv, ok := obj.(*api.PersistentVolume)
+				if !ok {
+					glog.Errorf("Error casting object to PersistentVolume: %v", obj)
+				}
 				recycler.reclaimVolume(pv)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				pv := newObj.(*api.PersistentVolume)
+				pv, ok := newObj.(*api.PersistentVolume)
+				if !ok {
+					glog.Errorf("Error casting object to PersistentVolume: %v", newObj)
+				}
 				recycler.reclaimVolume(pv)
 			},
 		},
