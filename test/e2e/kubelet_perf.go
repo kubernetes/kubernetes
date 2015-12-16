@@ -165,7 +165,7 @@ var _ = Describe("Kubelet", func() {
 					"/docker-daemon": {0.50: 0.03, 0.95: 0.06},
 				},
 			},
-			{podsPerNode: 40,
+			{podsPerNode: 35,
 				limits: containersCPUSummary{
 					"/kubelet":       {0.50: 0.15, 0.95: 0.35},
 					"/docker-daemon": {0.50: 0.06, 0.95: 0.30},
