@@ -2655,7 +2655,6 @@ func (kl *Kubelet) recordNodeStatusEvent(eventtype, event string) {
 // The kubelet will not create static pods till the network state has been
 // cleared. It also won't accept new pods till it has updated the node to Ready.
 func (kl *Kubelet) syncNetworkStatus() {
-	var err error
 	if !kl.configureCBR0 {
 		kl.runtimeState.setNetworkState(nil)
 		return
@@ -2663,9 +2662,10 @@ func (kl *Kubelet) syncNetworkStatus() {
 	// Step1: install iptables MASQ rules. This step is independent of podCIDR.
 	// TODO: Turn this into a plugin that we always invoke for every other
 	// Kubernets network plugin.
-	if err = ensureIPTablesMasqRule(kl.cbr0.execer); err != nil {
-		glog.Error("Failed to install iptables rules: ", err)
-		kl.runtimeState.setNetworkState(fmt.Errorf("Error on adding ip table rules: %v", err))
+	if err := ensureIPTablesMasqRule(kl.cbr0.execer); err != nil {
+		err = fmt.Errorf("Error on adding ip table rules: %v", err)
+		glog.Warning(err)
+		kl.runtimeState.setNetworkState(err)
 		return
 	}
 	// Step2: acquire a subnet/podCIDR.
@@ -2673,8 +2673,9 @@ func (kl *Kubelet) syncNetworkStatus() {
 	if kl.flannelExperimentalOverlay {
 		podCIDR, err := kl.flannelHelper.Handshake()
 		if err != nil {
-			glog.Warning("Flannel handshake failed: ", err)
-			kl.runtimeState.setNetworkState(fmt.Errorf("Flannel handshake failed %v", err))
+			err = fmt.Errorf("Flannel handshake failed %v", err)
+			glog.Warning(err)
+			kl.runtimeState.setNetworkState(err)
 			return
 		}
 		glog.Infof("Setting cidr: %v -> %v",
@@ -2684,13 +2685,14 @@ func (kl *Kubelet) syncNetworkStatus() {
 	// Step3: reconcile container bridge with podCIDR.
 	podCIDR := kl.runtimeState.podCIDR()
 	if len(podCIDR) == 0 {
-		err = fmt.Errorf("ConfigureCBR0 requested, but PodCIDR not set. Will not configure CBR0 right now")
+		err := fmt.Errorf("ConfigureCBR0 requested, but PodCIDR not set. Will not configure CBR0 right now")
 		glog.Warning(err)
 		kl.runtimeState.setNetworkState(err)
 		return
 	}
 	// TODO: Break this out into a meta Kubernetes plugin that the Kubelet
 	// communicates with by passing CNI_ARG=PluginName=<name>.
+	var err error
 	switch network.GetPluginType(kl.networkPluginName) {
 	case network.BridgePluginName, network.KubeletDefaultPluginName:
 		err = kl.networkPlugin.ReloadConf(&cni.BridgeNetConf{podCIDR})
@@ -2698,14 +2700,14 @@ func (kl *Kubelet) syncNetworkStatus() {
 		err = kl.cbr0.reconcile(podCIDR)
 	}
 	if err != nil {
-		err = fmt.Errorf("Failed to configure networking")
+		err = fmt.Errorf("Failed to configure networking: %v", err)
+		glog.Warning(err)
+	} else if bwErr := kl.applyBandwidthShaping(); bwErr != nil {
+		// TODO: Is a failure here worthy of blocking pod creation?
+		err = fmt.Errorf("Failed to apply bandwidth shaping: %v", bwErr)
 		glog.Warning(err)
 	}
-	if bwErr := kl.applyBandwidthShaping(); bwErr != nil {
-		// TODO: Is a failure here worthy of blocking pod creation?
-		glog.Error("Error applying bandwidth shaping: ", bwErr)
-	}
-	kl.runtimeState.setNetworkState(nil)
+	kl.runtimeState.setNetworkState(err)
 }
 
 // Set addresses for the node.

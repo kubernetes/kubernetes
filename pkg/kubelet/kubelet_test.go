@@ -4195,12 +4195,22 @@ func (f *fakeExecer) execCmd(name string, args ...string) (string, error) {
 	return r, f.Err
 }
 
+// fakeShaper fakes out bandwidth shaper but returns a custom error for
+// ReconcileInterface alone.
+type fakeShaper struct {
+	bandwidth.FakeShaper
+	err error
+}
+
+func (f *fakeShaper) ReconcileInterface() error {
+	return f.err
+}
+
 func TestSyncNetworkStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubelet.configureCBR0 = true
 	kubelet.flannelExperimentalOverlay = false
-	kubelet.shaper = bandwidth.NewTCShaper("cbr0")
 	fe := &fakeExecer{
 		Cmd: map[string][]string{},
 		Err: fmt.Errorf("Error to test iptables appending."),
@@ -4209,6 +4219,7 @@ func TestSyncNetworkStatus(t *testing.T) {
 	currTime := time.Now()
 	kubelet.runtimeState.clock = &util.FakeClock{currTime}
 	kubelet.runtimeState.lastBaseRuntimeSync = currTime
+	kubelet.shaper = &fakeShaper{}
 
 	// Test step1: MASQ rule
 	log.Printf("First sync should throw error")
@@ -4254,6 +4265,11 @@ func TestSyncNetworkStatus(t *testing.T) {
 	if !reflect.DeepEqual(executedCmd, bridgeUp) {
 		t.Fatalf("Unexpected bridge creation command %v", executedCmd)
 	}
+	kubelet.shaper = &fakeShaper{err: fmt.Errorf("TC not found")}
+	kubelet.syncNetworkStatus()
+	if len(kubelet.runtimeState.errors()) == 0 {
+		t.Fatalf("Expected bandwidth shaping error.")
+	}
 }
 
 type fakeBridgeNetworkPlugin struct {
@@ -4296,6 +4312,7 @@ func TestSyncNetConf(t *testing.T) {
 			return true, nil
 		}}
 	kubelet.networkPluginName = fmt.Sprintf("%v/%v", network.KubernetesPluginPrefix, network.KubeletDefaultPluginName)
+	kubelet.shaper = &fakeShaper{}
 
 	// Fake bridge plugin that writes netconf to a buffer.
 	var b bytes.Buffer
