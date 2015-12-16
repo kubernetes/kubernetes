@@ -58,6 +58,11 @@ const TagNameKubernetesCluster = "KubernetesCluster"
 // MaxReadThenCreateRetries sets the maximum number of attempts we will make
 const MaxReadThenCreateRetries = 30
 
+// Default volume type for newly created Volumes
+// TODO: Remove when user/admin can configure volume types and thus we don't
+// need hardcoded defaults.
+const DefaultVolumeType = "gp2"
+
 // Abstraction over AWS, to allow mocking/other implementations
 type AWSServices interface {
 	Compute(region string) (EC2, error)
@@ -135,7 +140,8 @@ type EC2Metadata interface {
 }
 
 type VolumeOptions struct {
-	CapacityMB int
+	CapacityGB int
+	Tags       *map[string]string
 }
 
 // Volumes is an interface for managing cloud-provisioned volumes
@@ -1216,15 +1222,15 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 }
 
 // Implements Volumes.CreateVolume
-func (aws *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) {
+func (s *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) {
 	// TODO: Should we tag this with the cluster id (so it gets deleted when the cluster does?)
-	// This is only used for testing right now
 
 	request := &ec2.CreateVolumeInput{}
-	request.AvailabilityZone = &aws.availabilityZone
-	volSize := (int64(volumeOptions.CapacityMB) + 1023) / 1024
+	request.AvailabilityZone = &s.availabilityZone
+	volSize := int64(volumeOptions.CapacityGB)
 	request.Size = &volSize
-	response, err := aws.ec2.CreateVolume(request)
+	request.VolumeType = aws.String(DefaultVolumeType)
+	response, err := s.ec2.CreateVolume(request)
 	if err != nil {
 		return "", err
 	}
@@ -1234,6 +1240,28 @@ func (aws *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) 
 
 	volumeName := "aws://" + az + "/" + awsID
 
+	// apply tags
+	if volumeOptions.Tags != nil {
+		tags := []*ec2.Tag{}
+		for k, v := range *volumeOptions.Tags {
+			tag := &ec2.Tag{}
+			tag.Key = aws.String(k)
+			tag.Value = aws.String(v)
+			tags = append(tags, tag)
+		}
+		tagRequest := &ec2.CreateTagsInput{}
+		tagRequest.Resources = []*string{&awsID}
+		tagRequest.Tags = tags
+		if _, err := s.createTags(tagRequest); err != nil {
+			// delete the volume and hope it succeeds
+			delerr := s.DeleteVolume(volumeName)
+			if delerr != nil {
+				// delete did not succeed, we have a stray volume!
+				return "", fmt.Errorf("error tagging volume %s, could not delete the volume: %v", volumeName, delerr)
+			}
+			return "", fmt.Errorf("error tagging volume %s: %v", volumeName, err)
+		}
+	}
 	return volumeName, nil
 }
 

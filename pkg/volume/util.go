@@ -139,3 +139,12 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *api.Per
 		return timeout
 	}
 }
+
+// RoundUpSize calculates how many allocation units are needed to accomodate
+// a volume of given size. E.g. when user wants 1500MiB volume, while AWS EBS
+// allocates volumes in gibibyte-sized chunks,
+// RoundUpSize(1500 * 1024*1024, 1024*1024*1024) returns '2'
+// (2 GiB is the smallest allocatable volume that can hold 1500MiB)
+func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
+	return (volumeSizeBytes + allocationUnitBytes - 1) / allocationUnitBytes
+}
