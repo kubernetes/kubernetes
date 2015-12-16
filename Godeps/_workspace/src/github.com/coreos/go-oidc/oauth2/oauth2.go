@@ -220,11 +220,7 @@ func parseTokenResponse(resp *http.Response) (result TokenResponse, err error) {
 	if err != nil {
 		return
 	}
-
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		err = unmarshalError(body)
-		return
-	}
+	badStatusCode := resp.StatusCode < 200 || resp.StatusCode > 299
 
 	contentType, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 	if err != nil {
@@ -235,42 +231,69 @@ func parseTokenResponse(resp *http.Response) (result TokenResponse, err error) {
 		RawBody: body,
 	}
 
+	newError := func(typ, desc, state string) error {
+		if typ == "" {
+			return fmt.Errorf("unrecognized error %s", body)
+		}
+		return &Error{typ, desc, state}
+	}
+
 	if contentType == "application/x-www-form-urlencoded" || contentType == "text/plain" {
 		var vals url.Values
 		vals, err = url.ParseQuery(string(body))
 		if err != nil {
 			return
 		}
+		if error := vals.Get("error"); error != "" || badStatusCode {
+			err = newError(error, vals.Get("error_description"), vals.Get("state"))
+			return
+		}
+		e := vals.Get("expires_in")
+		if e == "" {
+			e = vals.Get("expires")
+		}
+		if e != "" {
+			result.Expires, err = strconv.Atoi(e)
+			if err != nil {
+				return
+			}
+		}
 		result.AccessToken = vals.Get("access_token")
 		result.TokenType = vals.Get("token_type")
 		result.IDToken = vals.Get("id_token")
 		result.RefreshToken = vals.Get("refresh_token")
 		result.Scope = vals.Get("scope")
-		e := vals.Get("expires_in")
-		if e == "" {
-			e = vals.Get("expires")
-		}
-		result.Expires, err = strconv.Atoi(e)
-		if err != nil {
-			return
-		}
 	} else {
-		b := make(map[string]interface{})
-		if err = json.Unmarshal(body, &b); err != nil {
+		var r struct {
+			AccessToken  string `json:"access_token"`
+			TokenType    string `json:"token_type"`
+			IDToken      string `json:"id_token"`
+			RefreshToken string `json:"refresh_token"`
+			Scope        string `json:"scope"`
+			State        string `json:"state"`
+			ExpiresIn    int    `json:"expires_in"`
+			Expires      int    `json:"expires"`
+			Error        string `json:"error"`
+			Desc         string `json:"error_description"`
+		}
+		if err = json.Unmarshal(body, &r); err != nil {
 			return
 		}
-		result.AccessToken, _ = b["access_token"].(string)
-		result.TokenType, _ = b["token_type"].(string)
-		result.IDToken, _ = b["id_token"].(string)
-		result.RefreshToken, _ = b["refresh_token"].(string)
-		result.Scope, _ = b["scope"].(string)
-		e, ok := b["expires_in"].(int)
-		if !ok {
-			e, _ = b["expires"].(int)
+		if r.Error != "" || badStatusCode {
+			err = newError(r.Error, r.Desc, r.State)
+			return
 		}
-		result.Expires = e
+		result.AccessToken = r.AccessToken
+		result.TokenType = r.TokenType
+		result.IDToken = r.IDToken
+		result.RefreshToken = r.RefreshToken
+		result.Scope = r.Scope
+		if r.ExpiresIn == 0 {
+			result.Expires = r.Expires
+		} else {
+			result.Expires = r.ExpiresIn
+		}
 	}
-
 	return
 }
 

@@ -350,7 +350,7 @@ func TestOIDCAuthentication(t *testing.T) {
 			op.generateGoodToken(t, srv.URL, "client-foo", "client-bar", "sub", "user-foo"),
 			nil,
 			false,
-			"oidc: JWT claims invalid: invalid claim value: 'aud'",
+			"oidc: JWT claims invalid: invalid claims, 'aud' claim and 'client_id' do not match",
 		},
 		{
 			// Invalid issuer.
