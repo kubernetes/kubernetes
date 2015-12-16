@@ -37,6 +37,10 @@ export FLANNEL_NET=${FLANNEL_NET:-172.16.0.0/16}
 # Admission Controllers to invoke prior to persisting objects in cluster
 export ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota,SecurityContextDeny
 
+# Path to the config file or directory of files of kubelet
+export KUBELET_CONFIG=${KUBELET_CONFIG:-""}
+
+# A port range to reserve for services with NodePort visibility
 SERVICE_NODE_PORT_RANGE=${SERVICE_NODE_PORT_RANGE:-"30000-32767"}
 
 # Optional: Enable node logging.

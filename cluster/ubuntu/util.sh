@@ -236,9 +236,9 @@ KUBELET_OPTS="\
  --hostname-override=${1} \
  --api-servers=http://${2}:8080 \
  --logtostderr=true \
- --config=/etc/kubernetes/manifests \
  --cluster-dns=${3} \
  --cluster-domain=${4}"
+ --config=${5}"
 EOF
 
 }
@@ -446,7 +446,8 @@ function provision-node() {
       '${1#*@}' \
       '${MASTER_IP}' \
       '${DNS_SERVER_IP}' \
-      '${DNS_DOMAIN}'
+      '${DNS_DOMAIN}' \
+      '${KUBELET_CONFIG}'
     create-kube-proxy-opts \
       '${1#*@}' \
       '${MASTER_IP}' 
@@ -521,7 +522,8 @@ function provision-masterandnode() {
       '${MASTER_IP}' \
       '${MASTER_IP}' \
       '${DNS_SERVER_IP}' \
-      '${DNS_DOMAIN}'
+      '${DNS_DOMAIN}' \
+      '${KUBELET_CONFIG}'
     create-kube-proxy-opts \
       '${MASTER_IP}' \
       '${MASTER_IP}'
