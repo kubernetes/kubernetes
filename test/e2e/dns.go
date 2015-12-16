@@ -132,9 +132,9 @@ func assertFilesExist(fileNames []string, fileDir string, pod *api.Pod, client *
 		failed = []string{}
 		for _, fileName := range fileNames {
 			if _, err := client.Get().
-				Namespace(pod.Namespace).
+				Prefix("proxy").
 				Resource("pods").
-				SubResource("proxy").
+				Namespace(pod.Namespace).
 				Name(pod.Name).
 				Suffix(fileDir, fileName).
 				Do().Raw(); err != nil {
