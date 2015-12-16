@@ -3958,25 +3958,44 @@ func TestValidateDockerConfigSecret(t *testing.T) {
 			},
 		}
 	}
+	validDockerSecret2 := func() api.Secret {
+		return api.Secret{
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Type:       api.SecretTypeDockerConfigJson,
+			Data: map[string][]byte{
+				api.DockerConfigJsonKey: []byte(`{"auths":{"https://index.docker.io/v1/": {"auth": "Y2x1ZWRyb29sZXIwMDAxOnBhc3N3b3Jk","email": "fake@example.com"}}}`),
+			},
+		}
+	}
 
 	var (
-		missingDockerConfigKey = validDockerSecret()
-		emptyDockerConfigKey   = validDockerSecret()
-		invalidDockerConfigKey = validDockerSecret()
+		missingDockerConfigKey  = validDockerSecret()
+		emptyDockerConfigKey    = validDockerSecret()
+		invalidDockerConfigKey  = validDockerSecret()
+		missingDockerConfigKey2 = validDockerSecret2()
+		emptyDockerConfigKey2   = validDockerSecret2()
+		invalidDockerConfigKey2 = validDockerSecret2()
 	)
 
 	delete(missingDockerConfigKey.Data, api.DockerConfigKey)
 	emptyDockerConfigKey.Data[api.DockerConfigKey] = []byte("")
 	invalidDockerConfigKey.Data[api.DockerConfigKey] = []byte("bad")
+	delete(missingDockerConfigKey2.Data, api.DockerConfigJsonKey)
+	emptyDockerConfigKey2.Data[api.DockerConfigJsonKey] = []byte("")
+	invalidDockerConfigKey2.Data[api.DockerConfigJsonKey] = []byte("bad")
 
 	tests := map[string]struct {
 		secret api.Secret
 		valid  bool
 	}{
-		"valid":             {validDockerSecret(), true},
-		"missing dockercfg": {missingDockerConfigKey, false},
-		"empty dockercfg":   {emptyDockerConfigKey, false},
-		"invalid dockercfg": {invalidDockerConfigKey, false},
+		"valid dockercfg":     {validDockerSecret(), true},
+		"missing dockercfg":   {missingDockerConfigKey, false},
+		"empty dockercfg":     {emptyDockerConfigKey, false},
+		"invalid dockercfg":   {invalidDockerConfigKey, false},
+		"valid config.json":   {validDockerSecret2(), true},
+		"missing config.json": {missingDockerConfigKey2, false},
+		"empty config.json":   {emptyDockerConfigKey2, false},
+		"invalid config.json": {invalidDockerConfigKey2, false},
 	}
 
 	for name, tc := range tests {
