@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
@@ -138,7 +138,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			}
 			return nil, nil
 		}
-		storageDestinations := master.NewStorageDestinations()
+		storageDestinations := genericapiserver.NewStorageDestinations()
 		override := test.apigroup + "/" + test.resource + "#" + strings.Join(test.servers, ";")
 		updateEtcdOverrides([]string{override}, storageVersions, "", &storageDestinations, newEtcd)
 		apigroup, ok := storageDestinations.APIGroups[test.apigroup]
@@ -160,12 +160,12 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 func TestParseRuntimeConfig(t *testing.T) {
 	testCases := []struct {
 		runtimeConfig            map[string]string
-		apiGroupVersionOverrides map[string]master.APIGroupVersionOverride
+		apiGroupVersionOverrides map[string]genericapiserver.APIGroupVersionOverride
 		err                      bool
 	}{
 		{
 			runtimeConfig:            map[string]string{},
-			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{},
+			apiGroupVersionOverrides: map[string]genericapiserver.APIGroupVersionOverride{},
 			err: false,
 		},
 		{
@@ -173,7 +173,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			runtimeConfig: map[string]string{
 				"api/v1/pods": "false",
 			},
-			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{},
+			apiGroupVersionOverrides: map[string]genericapiserver.APIGroupVersionOverride{},
 			err: true,
 		},
 		{
@@ -181,7 +181,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			runtimeConfig: map[string]string{
 				"api/v1": "false",
 			},
-			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{
+			apiGroupVersionOverrides: map[string]genericapiserver.APIGroupVersionOverride{
 				"api/v1": {
 					Disable: true,
 				},
@@ -193,7 +193,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			runtimeConfig: map[string]string{
 				"extensions/v1beta1": "false",
 			},
-			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{
+			apiGroupVersionOverrides: map[string]genericapiserver.APIGroupVersionOverride{
 				"extensions/v1beta1": {
 					Disable: true,
 				},
@@ -205,7 +205,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			runtimeConfig: map[string]string{
 				"extensions/v1beta1/deployments": "false",
 			},
-			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{
+			apiGroupVersionOverrides: map[string]genericapiserver.APIGroupVersionOverride{
 				"extensions/v1beta1": {
 					ResourceOverrides: map[string]bool{
 						"deployments": false,
@@ -220,7 +220,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 				"extensions/v1beta1/deployments": "true",
 				"extensions/v1beta1/jobs":        "false",
 			},
-			apiGroupVersionOverrides: map[string]master.APIGroupVersionOverride{
+			apiGroupVersionOverrides: map[string]genericapiserver.APIGroupVersionOverride{
 				"extensions/v1beta1": {
 					ResourceOverrides: map[string]bool{
 						"deployments": true,

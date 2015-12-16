@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
@@ -138,22 +139,26 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 func NewMasterConfig() *master.Config {
 	etcdClient := NewEtcdClient()
 	storageVersions := make(map[string]string)
+
 	etcdStorage := etcdstorage.NewEtcdStorage(etcdClient, testapi.Default.Codec(), etcdtest.PathPrefix())
 	storageVersions[api.GroupName] = testapi.Default.GroupVersion().String()
 	expEtcdStorage := NewExtensionsEtcdStorage(etcdClient)
 	storageVersions[extensions.GroupName] = testapi.Extensions.GroupVersion().String()
-	storageDestinations := master.NewStorageDestinations()
+
+	storageDestinations := genericapiserver.NewStorageDestinations()
 	storageDestinations.AddAPIGroup(api.GroupName, etcdStorage)
 	storageDestinations.AddAPIGroup(extensions.GroupName, expEtcdStorage)
 
 	return &master.Config{
-		StorageDestinations: storageDestinations,
-		StorageVersions:     storageVersions,
-		KubeletClient:       kubeletclient.FakeKubeletClient{},
-		APIPrefix:           "/api",
-		APIGroupPrefix:      "/apis",
-		Authorizer:          apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:    admit.NewAlwaysAdmit(),
+		Config: &genericapiserver.Config{
+			StorageDestinations: storageDestinations,
+			StorageVersions:     storageVersions,
+			APIPrefix:           "/api",
+			APIGroupPrefix:      "/apis",
+			Authorizer:          apiserver.NewAlwaysAllowAuthorizer(),
+			AdmissionControl:    admit.NewAlwaysAdmit(),
+		},
+		KubeletClient: kubeletclient.FakeKubeletClient{},
 	}
 }
 

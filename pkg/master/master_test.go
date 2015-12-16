@@ -36,7 +36,7 @@ import (
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
 	"k8s.io/kubernetes/pkg/registry/namespace"
@@ -59,14 +59,19 @@ import (
 func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	server := etcdtesting.NewEtcdTestClientServer(t)
 
-	master := Master{}
-	config := Config{}
+	master := Master{
+		GenericAPIServer: &genericapiserver.GenericAPIServer{},
+	}
+	config := Config{
+		Config: &genericapiserver.Config{},
+	}
 	storageVersions := make(map[string]string)
-	storageDestinations := NewStorageDestinations()
+	storageDestinations := genericapiserver.NewStorageDestinations()
 	storageDestinations.AddAPIGroup(
 		api.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix()))
 	storageDestinations.AddAPIGroup(
 		extensions.GroupName, etcdstorage.NewEtcdStorage(server.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix()))
+
 	config.StorageDestinations = storageDestinations
 	storageVersions[api.GroupName] = testapi.Default.GroupVersion().String()
 	storageVersions[extensions.GroupName] = testapi.Extensions.GroupVersion().String()
@@ -77,11 +82,8 @@ func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.A
 	return master, server, config, assert.New(t)
 }
 
-// TestNew verifies that the New function returns a Master
-// using the configuration properly.
-func TestNew(t *testing.T) {
+func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	_, etcdserver, config, assert := setUp(t)
-	defer etcdserver.Terminate(t)
 
 	config.KubeletClient = client.FakeKubeletClient{}
 
@@ -89,37 +91,34 @@ func TestNew(t *testing.T) {
 	config.ProxyTLSClientConfig = &tls.Config{}
 
 	master := New(&config)
+	return master, etcdserver, config, assert
+}
+
+// TestNew verifies that the New function returns a Master
+// using the configuration properly.
+func TestNew(t *testing.T) {
+	master, etcdserver, config, assert := newMaster(t)
+	defer etcdserver.Terminate(t)
 
 	// Verify many of the variables match their config counterparts
 	assert.Equal(master.enableCoreControllers, config.EnableCoreControllers)
-	assert.Equal(master.enableLogsSupport, config.EnableLogsSupport)
-	assert.Equal(master.enableUISupport, config.EnableUISupport)
-	assert.Equal(master.enableSwaggerSupport, config.EnableSwaggerSupport)
-	assert.Equal(master.enableSwaggerSupport, config.EnableSwaggerSupport)
-	assert.Equal(master.enableProfiling, config.EnableProfiling)
-	assert.Equal(master.apiPrefix, config.APIPrefix)
-	assert.Equal(master.apiGroupPrefix, config.APIGroupPrefix)
-	assert.Equal(master.corsAllowedOriginList, config.CorsAllowedOriginList)
-	assert.Equal(master.authenticator, config.Authenticator)
-	assert.Equal(master.authorizer, config.Authorizer)
-	assert.Equal(master.admissionControl, config.AdmissionControl)
-	assert.Equal(master.apiGroupVersionOverrides, config.APIGroupVersionOverrides)
-	assert.Equal(master.requestContextMapper, config.RequestContextMapper)
-	assert.Equal(master.cacheTimeout, config.CacheTimeout)
-	assert.Equal(master.masterCount, config.MasterCount)
-	assert.Equal(master.externalHost, config.ExternalHost)
-	assert.Equal(master.clusterIP, config.PublicAddress)
-	assert.Equal(master.publicReadWritePort, config.ReadWritePort)
-	assert.Equal(master.serviceReadWriteIP, config.ServiceReadWriteIP)
 	assert.Equal(master.tunneler, config.Tunneler)
+	assert.Equal(master.ApiPrefix, config.APIPrefix)
+	assert.Equal(master.ApiGroupPrefix, config.APIGroupPrefix)
+	assert.Equal(master.ApiGroupVersionOverrides, config.APIGroupVersionOverrides)
+	assert.Equal(master.RequestContextMapper, config.RequestContextMapper)
+	assert.Equal(master.MasterCount, config.MasterCount)
+	assert.Equal(master.ClusterIP, config.PublicAddress)
+	assert.Equal(master.PublicReadWritePort, config.ReadWritePort)
+	assert.Equal(master.ServiceReadWriteIP, config.ServiceReadWriteIP)
 
 	// These functions should point to the same memory location
-	masterDialer, _ := util.Dialer(master.proxyTransport)
+	masterDialer, _ := util.Dialer(master.ProxyTransport)
 	masterDialerFunc := fmt.Sprintf("%p", masterDialer)
 	configDialerFunc := fmt.Sprintf("%p", config.ProxyDialer)
 	assert.Equal(masterDialerFunc, configDialerFunc)
 
-	assert.Equal(master.proxyTransport.(*http.Transport).TLSClientConfig, config.ProxyTLSClientConfig)
+	assert.Equal(master.ProxyTransport.(*http.Transport).TLSClientConfig, config.ProxyTLSClientConfig)
 }
 
 // TestGetServersToValidate verifies the unexported getServersToValidate function
@@ -165,14 +164,29 @@ func TestFindExternalAddress(t *testing.T) {
 // TestApi_v1 verifies that the unexported api_v1 function does indeed
 // utilize the correct Version and Codec.
 func TestApi_v1(t *testing.T) {
-	master, etcdserver, _, assert := setUp(t)
+	_, etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	version := master.api_v1()
+	//	config.KubeletClient = client.FakeKubeletClient{}
+
+	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
+	config.ProxyTLSClientConfig = &tls.Config{}
+
+	s := genericapiserver.New(config.Config)
+	master := &Master{
+		GenericAPIServer: s,
+		tunneler:         config.Tunneler,
+	}
+
+	version := master.api_v1(&config)
 	assert.Equal(unversioned.GroupVersion{Version: "v1"}, version.GroupVersion, "Version was not v1: %s", version.GroupVersion)
 	assert.Equal(v1.Codec, version.Codec, "version.Codec was not for v1: %s", version.Codec)
-	for k, v := range master.storage {
-		assert.Contains(version.Storage, v, "Value %s not found (key: %s)", k, v)
+	// Verify that version storage has all the resources.
+	for k, v := range master.v1ResourcesStorage {
+		k = strings.ToLower(k)
+		val, ok := version.Storage[k]
+		assert.True(ok, "ok: %s", ok)
+		assert.Equal(val, v)
 	}
 }
 
@@ -188,10 +202,10 @@ func TestNewBootstrapController(t *testing.T) {
 	master.serviceRegistry = registrytest.NewServiceRegistry()
 	master.endpointRegistry = endpoint.NewRegistry(nil)
 
-	master.serviceNodePortRange = portRange
-	master.masterCount = 1
-	master.serviceReadWritePort = 1000
-	master.publicReadWritePort = 1010
+	master.ServiceNodePortRange = portRange
+	master.MasterCount = 1
+	master.ServiceReadWritePort = 1000
+	master.PublicReadWritePort = 1010
 
 	controller := master.NewBootstrapController()
 
@@ -199,9 +213,9 @@ func TestNewBootstrapController(t *testing.T) {
 	assert.Equal(controller.EndpointRegistry, master.endpointRegistry)
 	assert.Equal(controller.ServiceRegistry, master.serviceRegistry)
 	assert.Equal(controller.ServiceNodePortRange, portRange)
-	assert.Equal(controller.MasterCount, master.masterCount)
-	assert.Equal(controller.ServicePort, master.serviceReadWritePort)
-	assert.Equal(controller.PublicServicePort, master.publicReadWritePort)
+	assert.Equal(controller.MasterCount, master.MasterCount)
+	assert.Equal(controller.ServicePort, master.ServiceReadWritePort)
+	assert.Equal(controller.PublicServicePort, master.PublicReadWritePort)
 }
 
 // TestControllerServicePorts verifies master extraServicePorts are
@@ -214,7 +228,7 @@ func TestControllerServicePorts(t *testing.T) {
 	master.serviceRegistry = registrytest.NewServiceRegistry()
 	master.endpointRegistry = endpoint.NewRegistry(nil)
 
-	master.extraServicePorts = []api.ServicePort{
+	master.ExtraServicePorts = []api.ServicePort{
 		{
 			Name:       "additional-port-1",
 			Port:       1000,
@@ -235,79 +249,6 @@ func TestControllerServicePorts(t *testing.T) {
 	assert.Equal(1010, controller.ExtraServicePorts[1].Port)
 }
 
-// TestNewHandlerContainer verifies that NewHandlerContainer uses the
-// mux provided
-func TestNewHandlerContainer(t *testing.T) {
-	assert := assert.New(t)
-	mux := http.NewServeMux()
-	container := NewHandlerContainer(mux)
-	assert.Equal(mux, container.ServeMux, "ServerMux's do not match")
-}
-
-// TestHandleWithAuth verifies HandleWithAuth adds the path
-// to the muxHelper.RegisteredPaths.
-func TestHandleWithAuth(t *testing.T) {
-	master, etcdserver, _, assert := setUp(t)
-	defer etcdserver.Terminate(t)
-
-	mh := apiserver.MuxHelper{Mux: http.NewServeMux()}
-	master.muxHelper = &mh
-	handler := func(r http.ResponseWriter, w *http.Request) { w.Write(nil) }
-	master.HandleWithAuth("/test", http.HandlerFunc(handler))
-
-	assert.Contains(master.muxHelper.RegisteredPaths, "/test", "Path not found in muxHelper")
-}
-
-// TestHandleFuncWithAuth verifies HandleFuncWithAuth adds the path
-// to the muxHelper.RegisteredPaths.
-func TestHandleFuncWithAuth(t *testing.T) {
-	master, etcdserver, _, assert := setUp(t)
-	defer etcdserver.Terminate(t)
-
-	mh := apiserver.MuxHelper{Mux: http.NewServeMux()}
-	master.muxHelper = &mh
-	handler := func(r http.ResponseWriter, w *http.Request) { w.Write(nil) }
-	master.HandleFuncWithAuth("/test", handler)
-
-	assert.Contains(master.muxHelper.RegisteredPaths, "/test", "Path not found in muxHelper")
-}
-
-// TestInstallSwaggerAPI verifies that the swagger api is added
-// at the proper endpoint.
-func TestInstallSwaggerAPI(t *testing.T) {
-	master, etcdserver, _, assert := setUp(t)
-	defer etcdserver.Terminate(t)
-
-	mux := http.NewServeMux()
-	master.handlerContainer = NewHandlerContainer(mux)
-
-	// Ensure swagger isn't installed without the call
-	ws := master.handlerContainer.RegisteredWebServices()
-	if !assert.Equal(len(ws), 0) {
-		for x := range ws {
-			assert.NotEqual("/swaggerapi", ws[x].RootPath(), "SwaggerAPI was installed without a call to InstallSwaggerAPI()")
-		}
-	}
-
-	// Install swagger and test
-	master.InstallSwaggerAPI()
-	ws = master.handlerContainer.RegisteredWebServices()
-	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
-		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
-	}
-
-	// Empty externalHost verification
-	mux = http.NewServeMux()
-	master.handlerContainer = NewHandlerContainer(mux)
-	master.externalHost = ""
-	master.clusterIP = net.IPv4(10, 10, 10, 10)
-	master.publicReadWritePort = 1010
-	master.InstallSwaggerAPI()
-	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
-		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
-	}
-}
-
 // TestDefaultAPIGroupVersion verifies that the unexported defaultAPIGroupVersion
 // creates the expected APIGroupVersion based off of master.
 func TestDefaultAPIGroupVersion(t *testing.T) {
@@ -316,10 +257,10 @@ func TestDefaultAPIGroupVersion(t *testing.T) {
 
 	apiGroup := master.defaultAPIGroupVersion()
 
-	assert.Equal(apiGroup.Root, master.apiPrefix)
-	assert.Equal(apiGroup.Admit, master.admissionControl)
-	assert.Equal(apiGroup.Context, master.requestContextMapper)
-	assert.Equal(apiGroup.MinRequestTimeout, master.minRequestTimeout)
+	assert.Equal(apiGroup.Root, master.ApiPrefix)
+	assert.Equal(apiGroup.Admit, master.AdmissionControl)
+	assert.Equal(apiGroup.Context, master.RequestContextMapper)
+	assert.Equal(apiGroup.MinRequestTimeout, master.MinRequestTimeout)
 }
 
 // TestExpapi verifies that the unexported exapi creates
@@ -331,7 +272,7 @@ func TestExpapi(t *testing.T) {
 	extensionsGroupMeta := latest.GroupOrDie(extensions.GroupName)
 
 	expAPIGroup := master.experimental(&config)
-	assert.Equal(expAPIGroup.Root, master.apiGroupPrefix)
+	assert.Equal(expAPIGroup.Root, master.ApiGroupPrefix)
 	assert.Equal(expAPIGroup.Mapper, extensionsGroupMeta.RESTMapper)
 	assert.Equal(expAPIGroup.Codec, extensionsGroupMeta.Codec)
 	assert.Equal(expAPIGroup.Linker, extensionsGroupMeta.SelfLinker)
@@ -371,31 +312,10 @@ func TestGetNodeAddresses(t *testing.T) {
 }
 
 func TestDiscoveryAtAPIS(t *testing.T) {
-	master, etcdserver, config, assert := setUp(t)
+	master, etcdserver, config, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	// ================= preparation for master.init() ======================
-	portRange := util.PortRange{Base: 10, Size: 10}
-	master.serviceNodePortRange = portRange
-
-	_, ipnet, err := net.ParseCIDR("192.168.1.1/24")
-	if !assert.NoError(err) {
-		t.Errorf("unexpected error: %v", err)
-	}
-	master.serviceClusterIPRange = ipnet
-
-	mh := apiserver.MuxHelper{Mux: http.NewServeMux()}
-	master.muxHelper = &mh
-	master.rootWebService = new(restful.WebService)
-
-	master.handlerContainer = restful.NewContainer()
-
-	master.mux = http.NewServeMux()
-	master.requestContextMapper = api.NewRequestContextMapper()
-	// ======================= end of preparation ===========================
-
-	master.init(&config)
-	server := httptest.NewServer(master.handlerContainer.ServeMux)
+	server := httptest.NewServer(master.HandlerContainer.ServeMux)
 	resp, err := http.Get(server.URL + "/apis")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)
@@ -457,14 +377,14 @@ func initThirdParty(t *testing.T, version string) (*Master, *etcdtesting.EtcdTes
 			},
 		},
 	}
-	master.handlerContainer = restful.NewContainer()
+	master.HandlerContainer = restful.NewContainer()
 	master.thirdPartyStorage = etcdstorage.NewEtcdStorage(etcdserver.Client, testapi.Extensions.Codec(), etcdtest.PathPrefix())
 
 	if !assert.NoError(master.InstallThirdPartyResource(api)) {
 		t.FailNow()
 	}
 
-	server := httptest.NewServer(master.handlerContainer.ServeMux)
+	server := httptest.NewServer(master.HandlerContainer.ServeMux)
 	return &master, etcdserver, server, assert
 }
 
@@ -883,7 +803,7 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 	if len(installed) != 0 {
 		t.Errorf("Resource(s) still installed: %v", installed)
 	}
-	services := master.handlerContainer.RegisteredWebServices()
+	services := master.HandlerContainer.RegisteredWebServices()
 	for ix := range services {
 		if strings.HasPrefix(services[ix].RootPath(), "/apis/company.com") {
 			t.Errorf("Web service still installed at %s: %#v", services[ix].RootPath(), services[ix])

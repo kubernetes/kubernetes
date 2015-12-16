@@ -6,6 +6,10 @@
     "description": "API at /api/v1"
    },
    {
+    "path": "/version",
+    "description": "git code version from which this is built"
+   },
+   {
     "path": "/api",
     "description": "get available API versions"
    },
@@ -20,10 +24,6 @@
    {
     "path": "/apis",
     "description": "get available API versions"
-   },
-   {
-    "path": "/version",
-    "description": "git code version from which this is built"
    }
   ],
   "apiVersion": "",

@@ -31,6 +31,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+type InstallSSHKey func(user string, data []byte) error
+
 type AddressFunc func() (addresses []string, err error)
 
 type Tunneler interface {
