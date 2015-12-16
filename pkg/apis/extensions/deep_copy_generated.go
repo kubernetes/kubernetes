@@ -945,6 +945,44 @@ func deepCopy_extensions_ClusterAutoscalerSpec(in ClusterAutoscalerSpec, out *Cl
 	return nil
 }
 
+func deepCopy_extensions_ConfigMap(in ConfigMap, out *ConfigMap, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if in.Data != nil {
+		out.Data = make(map[string]string)
+		for key, val := range in.Data {
+			out.Data[key] = val
+		}
+	} else {
+		out.Data = nil
+	}
+	return nil
+}
+
+func deepCopy_extensions_ConfigMapList(in ConfigMapList, out *ConfigMapList, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_unversioned_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]ConfigMap, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_extensions_ConfigMap(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func deepCopy_extensions_DaemonSet(in DaemonSet, out *DaemonSet, c *conversion.Cloner) error {
 	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -1633,6 +1671,8 @@ func init() {
 		deepCopy_extensions_ClusterAutoscaler,
 		deepCopy_extensions_ClusterAutoscalerList,
 		deepCopy_extensions_ClusterAutoscalerSpec,
+		deepCopy_extensions_ConfigMap,
+		deepCopy_extensions_ConfigMapList,
 		deepCopy_extensions_DaemonSet,
 		deepCopy_extensions_DaemonSetList,
 		deepCopy_extensions_DaemonSetSpec,
