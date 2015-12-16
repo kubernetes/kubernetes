@@ -335,6 +335,10 @@ func newProvisioner(plugin volume.ProvisionableVolumePlugin, claim *api.Persiste
 		Capacity:                      claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)],
 		AccessModes:                   claim.Spec.AccessModes,
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
+		CloudTags: &map[string]string{
+			cloudVolumeCreatedForNamespaceTag: claim.Namespace,
+			cloudVolumeCreatedForNameTag:      claim.Name,
+		},
 	}
 
 	provisioner, err := plugin.NewProvisioner(volumeOptions)
