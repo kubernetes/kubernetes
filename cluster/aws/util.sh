@@ -895,8 +895,9 @@ function start-master() {
 
   # We're running right up against the 16KB limit
   # Remove all comment lines and then put back the bin/bash shebang
-  sed -i -e 's/^[[:blank:]]*#.*$//' -e '/^[[:blank:]]*$/d' "${KUBE_TEMP}/master-user-data"
-  sed -i '1i #! /bin/bash' "${KUBE_TEMP}/master-user-data"
+  cat "${KUBE_TEMP}/master-user-data" | sed -e 's/^[[:blank:]]*#.*$//' | sed -e '/^[[:blank:]]*$/d' > "${KUBE_TEMP}/master-user-data.tmp"
+  echo '#! /bin/bash' | cat - "${KUBE_TEMP}/master-user-data.tmp" > "${KUBE_TEMP}/master-user-data"
+  rm "${KUBE_TEMP}/master-user-data.tmp"
 
   echo "Starting Master"
   master_id=$($AWS_CMD run-instances \
