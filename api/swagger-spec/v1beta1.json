@@ -3396,7 +3396,7 @@
    },
    "v1.HostPathVolumeSource": {
     "id": "v1.HostPathVolumeSource",
-    "description": "HostPathVolumeSource represents bare host directory volume.",
+    "description": "Represents a host path mapped into a pod. Host path volumes do not support ownership management or SELinux relabeling.",
     "required": [
      "path"
     ],
@@ -3409,7 +3409,7 @@
    },
    "v1.EmptyDirVolumeSource": {
     "id": "v1.EmptyDirVolumeSource",
-    "description": "EmptyDirVolumeSource is temporary directory that shares a pod's lifetime.",
+    "description": "Represents an empty directory for a pod. Empty directory volumes support ownership management and SELinux relabeling.",
     "properties": {
      "medium": {
       "type": "string",
@@ -3419,7 +3419,7 @@
    },
    "v1.GCEPersistentDiskVolumeSource": {
     "id": "v1.GCEPersistentDiskVolumeSource",
-    "description": "GCEPersistentDiskVolumeSource represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist and be formatted before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once.",
+    "description": "Represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist and be formatted before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once. GCE PDs support ownership management and SELinux relabeling.",
     "required": [
      "pdName",
      "fsType"
@@ -3446,7 +3446,7 @@
    },
    "v1.AWSElasticBlockStoreVolumeSource": {
     "id": "v1.AWSElasticBlockStoreVolumeSource",
-    "description": "Represents a persistent disk resource in AWS.\n\nAn Amazon Elastic Block Store (EBS) must already be created, formatted, and reside in the same AWS zone as the kubelet before it can be mounted. Note: Amazon EBS volumes can be mounted to only one instance at a time.",
+    "description": "Represents a Persistent Disk resource in AWS.\n\nAn AWS EBS disk must exist and be formatted before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.",
     "required": [
      "volumeID",
      "fsType"
@@ -3473,7 +3473,7 @@
    },
    "v1.GitRepoVolumeSource": {
     "id": "v1.GitRepoVolumeSource",
-    "description": "GitRepoVolumeSource represents a volume that is pulled from git when the pod is created.",
+    "description": "Represents a volume that is populated with the contents of a git repository. Git repo volumes do not support ownership management. Git repo volumes support SELinux relabeling.",
     "required": [
      "repository"
     ],
@@ -3494,7 +3494,7 @@
    },
    "v1.SecretVolumeSource": {
     "id": "v1.SecretVolumeSource",
-    "description": "SecretVolumeSource adapts a Secret into a VolumeSource. More info: http://releases.k8s.io/HEAD/docs/design/secrets.md",
+    "description": "Adapts a Secret into a volume.\n\nThe contents of the target Secret's Data field will be presented in a volume as files using the keys in the Data field as the file names. Secret volumes support ownership management and SELinux relabeling.",
     "required": [
      "secretName"
     ],
@@ -3507,7 +3507,7 @@
    },
    "v1.NFSVolumeSource": {
     "id": "v1.NFSVolumeSource",
-    "description": "NFSVolumeSource represents an NFS mount that lasts the lifetime of a pod",
+    "description": "Represents an NFS mount that lasts the lifetime of a pod. NFS volumes do not support ownership management or SELinux relabeling.",
     "required": [
      "server",
      "path"
@@ -3529,7 +3529,7 @@
    },
    "v1.ISCSIVolumeSource": {
     "id": "v1.ISCSIVolumeSource",
-    "description": "ISCSIVolumeSource describes an ISCSI Disk can only be mounted as read/write once.",
+    "description": "Represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
     "required": [
      "targetPortal",
      "iqn",
@@ -3566,7 +3566,7 @@
    },
    "v1.GlusterfsVolumeSource": {
     "id": "v1.GlusterfsVolumeSource",
-    "description": "GlusterfsVolumeSource represents a Glusterfs Mount that lasts the lifetime of a pod.",
+    "description": "Represents a Glusterfs mount that lasts the lifetime of a pod. Glusterfs volumes do not support ownership management or SELinux relabeling.",
     "required": [
      "endpoints",
      "path"
@@ -3605,7 +3605,7 @@
    },
    "v1.RBDVolumeSource": {
     "id": "v1.RBDVolumeSource",
-    "description": "RBDVolumeSource represents a Rados Block Device Mount that lasts the lifetime of a pod",
+    "description": "Represents a Rados Block Device mount that lasts the lifetime of a pod. RBD volumes support ownership management and SELinux relabeling.",
     "required": [
      "monitors",
      "image",
@@ -3664,7 +3664,7 @@
    },
    "v1.CinderVolumeSource": {
     "id": "v1.CinderVolumeSource",
-    "description": "CinderVolumeSource represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet.",
+    "description": "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
     "required": [
      "volumeID"
     ],
@@ -3685,7 +3685,7 @@
    },
    "v1.CephFSVolumeSource": {
     "id": "v1.CephFSVolumeSource",
-    "description": "CephFSVolumeSource represents a Ceph Filesystem Mount that lasts the lifetime of a pod",
+    "description": "Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.",
     "required": [
      "monitors"
     ],
@@ -3717,7 +3717,7 @@
    },
    "v1.FlockerVolumeSource": {
     "id": "v1.FlockerVolumeSource",
-    "description": "FlockerVolumeSource represents a Flocker volume mounted by the Flocker agent.",
+    "description": "Represents a Flocker volume mounted by the Flocker agent. Flocker volumes do not support ownership management or SELinux relabeling.",
     "required": [
      "datasetName"
     ],
@@ -3730,7 +3730,7 @@
    },
    "v1.DownwardAPIVolumeSource": {
     "id": "v1.DownwardAPIVolumeSource",
-    "description": "DownwardAPIVolumeSource represents a volume containing downward API info",
+    "description": "DownwardAPIVolumeSource represents a volume containing downward API info. Downward API volumes support ownership management and SELinux relabeling.",
     "properties": {
      "items": {
       "type": "array",
@@ -3778,7 +3778,7 @@
    },
    "v1.FCVolumeSource": {
     "id": "v1.FCVolumeSource",
-    "description": "A Fibre Channel Disk can only be mounted as read/write once.",
+    "description": "Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.",
     "required": [
      "targetWWNs",
      "lun",
