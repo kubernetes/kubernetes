@@ -13294,7 +13294,11 @@
     "properties": {
      "capacity": {
       "type": "any",
-      "description": "Capacity represents the available resources of a node. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#capacity for more details."
+      "description": "Capacity represents the total resources of a node. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#capacity for more details."
+     },
+     "allocatable": {
+      "type": "any",
+      "description": "Allocatable represents the resources of a node that are available for scheduling. Defaults to Capacity."
      },
      "phase": {
       "type": "string",
