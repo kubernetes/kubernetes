@@ -300,14 +300,14 @@ func (r *RollingUpdater) scaleDown(newRc, oldRc *api.ReplicationController, desi
 		return oldRc, nil
 	}
 	// Block until there are any pods ready.
-	oldAvailable, newAvailable, err := r.waitForReadyPods(config.Interval, config.Timeout, oldRc, newRc)
+	_, newAvailable, err := r.waitForReadyPods(config.Interval, config.Timeout, oldRc, newRc)
 	if err != nil {
 		return nil, err
 	}
 	// The old controller is considered as part of the total because we want to
 	// maintain minimum availability even with a volatile old controller.
-	// Scale down as much as possible while maintaining minimum availability.
-	decrement := (oldAvailable + newAvailable) - minAvailable
+	// Scale down as much as possible while maintaining minimum availability
+	decrement := oldRc.Spec.Replicas + newAvailable - minAvailable
 	// The decrement normally shouldn't drop below 0 because the available count
 	// always starts below the old replica count, but the old replica count can
 	// decrement due to externalities like pods death in the replica set. This
