@@ -35,11 +35,19 @@ type NodeStats struct {
 	NodeName string `json:"nodeName"`
 	// Overall node stats.
 	Total []NodeSample `json:"total,omitempty" patchStrategy:"merge" patchMergeKey:"sampleTime"`
-	// Stats of system daemons tracked as raw containers, which may include:
-	//   "/kubelet", "/docker-daemon", "kube-proxy" - Tracks respective component stats
-	//   "/system" - Tracks stats of non-kubernetes and non-kernel processes (grouped together)
+	// Stats of system daemons tracked as raw containers.
+	// The system containers are named according to the SystemContainer* constants.
 	SystemContainers []ContainerStats `json:"systemContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
+
+const (
+	// Container name for the system container tracking Kubelet usage.
+	SystemContainerKubelet = "/kubelet"
+	// Container name for the system container tracking the runtime (e.g. docker or rkt) usage.
+	SystemContainerRuntime = "/runtime"
+	// Container name for the system container tracking non-kubernetes processes.
+	SystemContainerMisc = "/misc"
+)
 
 // PodStats holds pod-level unprocessed sample stats.
 type PodStats struct {
@@ -119,16 +127,18 @@ type NetworkStats struct {
 type CPUStats struct {
 	// Total CPU usage (sum of all cores) averaged over the sample window.
 	// The "core" unit can be interpreted as CPU core-seconds per second.
-	UsageCores *resource.Quantity `json:"totalCores,omitempty"`
+	UsageCores *resource.Quantity `json:"usageCores,omitempty"`
+	// Cumulative CPU usage (sum of all cores) since object creation.
+	UsageCoreSeconds *resource.Quantity `json:"usageCoreSeconds,omitempty"`
 }
 
 // MemoryStats contains data about memory usage.
 type MemoryStats struct {
 	// Total memory in use. This includes all memory regardless of when it was accessed.
-	UsageBytes *resource.Quantity `json:"totalBytes,omitempty"`
+	UsageBytes *resource.Quantity `json:"usageBytes,omitempty"`
 	// The amount of working set memory. This includes recently accessed memory,
 	// dirty memory, and kernel memory. UsageBytes is <= TotalBytes.
-	WorkingSetBytes *resource.Quantity `json:"usageBytes,omitempty"`
+	WorkingSetBytes *resource.Quantity `json:"workingSetBytes,omitempty"`
 	// Cumulative number of minor page faults.
 	PageFaults *int64 `json:"pageFaults,omitempty"`
 	// Cumulative number of major page faults.
@@ -153,6 +163,7 @@ type StatsOptions struct {
 	// Only include samples with sampleTime less recent than this time.
 	UntilTime *unversioned.Time `json:"untilTime,omitempty"`
 	// Specifies the maximum number of elements in any list of samples.
-	// When the total number of samples exceeds the maximum the most recent samples are returned.
+	// When the total number of samples exceeds the maximum the most recent MaxSamples samples are
+	// returned.
 	MaxSamples int `json:"maxSamples,omitempty"`
 }
