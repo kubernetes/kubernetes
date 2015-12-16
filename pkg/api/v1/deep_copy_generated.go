@@ -1025,6 +1025,18 @@ func deepCopy_v1_NodeStatus(in NodeStatus, out *NodeStatus, c *conversion.Cloner
 	} else {
 		out.Capacity = nil
 	}
+	if in.Allocatable != nil {
+		out.Allocatable = make(ResourceList)
+		for key, val := range in.Allocatable {
+			newVal := new(resource.Quantity)
+			if err := deepCopy_resource_Quantity(val, newVal, c); err != nil {
+				return err
+			}
+			out.Allocatable[key] = *newVal
+		}
+	} else {
+		out.Allocatable = nil
+	}
 	out.Phase = in.Phase
 	if in.Conditions != nil {
 		out.Conditions = make([]NodeCondition, len(in.Conditions))

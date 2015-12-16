@@ -1413,6 +1413,18 @@ func autoconvert_api_NodeStatus_To_v1_NodeStatus(in *api.NodeStatus, out *NodeSt
 	} else {
 		out.Capacity = nil
 	}
+	if in.Allocatable != nil {
+		out.Allocatable = make(ResourceList)
+		for key, val := range in.Allocatable {
+			newVal := resource.Quantity{}
+			if err := s.Convert(&val, &newVal, 0); err != nil {
+				return err
+			}
+			out.Allocatable[ResourceName(key)] = newVal
+		}
+	} else {
+		out.Allocatable = nil
+	}
 	out.Phase = NodePhase(in.Phase)
 	if in.Conditions != nil {
 		out.Conditions = make([]NodeCondition, len(in.Conditions))
@@ -4439,6 +4451,18 @@ func autoconvert_v1_NodeStatus_To_api_NodeStatus(in *NodeStatus, out *api.NodeSt
 		}
 	} else {
 		out.Capacity = nil
+	}
+	if in.Allocatable != nil {
+		out.Allocatable = make(api.ResourceList)
+		for key, val := range in.Allocatable {
+			newVal := resource.Quantity{}
+			if err := s.Convert(&val, &newVal, 0); err != nil {
+				return err
+			}
+			out.Allocatable[api.ResourceName(key)] = newVal
+		}
+	} else {
+		out.Allocatable = nil
 	}
 	out.Phase = api.NodePhase(in.Phase)
 	if in.Conditions != nil {
