@@ -203,7 +203,7 @@ func NewKubeletServer() *KubeletServer {
 		MaxContainerCount:           100,
 		MaxPerPodContainerCount:     2,
 		MaxOpenFiles:                1000000,
-		MaxPods:                     40,
+		MaxPods:                     50,
 		MinimumGCAge:                1 * time.Minute,
 		NetworkPluginDir:            "/usr/libexec/kubernetes/kubelet-plugins/net/exec/",
 		NetworkPluginName:           "",
