@@ -118,5 +118,10 @@ func addDefaultingFuncs() {
 				obj.Spec.CPUUtilization = &CPUTargetUtilization{TargetPercentage: 80}
 			}
 		},
+		func(obj *ConfigMap) {
+			if obj.Data == nil {
+				obj.Data = make(map[string]string)
+			}
+		},
 	)
 }

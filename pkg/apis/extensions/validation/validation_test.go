@@ -1300,3 +1300,105 @@ func newInt(val int) *int {
 	*p = val
 	return p
 }
+
+func TestValidateConfigMap(t *testing.T) {
+	newConfigMap := func(name, namespace string, data map[string]string) extensions.ConfigMap {
+		return extensions.ConfigMap{
+			ObjectMeta: api.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+			},
+			Data: data,
+		}
+	}
+
+	var (
+		validConfigMap = newConfigMap("validname", "validns", map[string]string{"key": "value"})
+		maxKeyLength   = newConfigMap("validname", "validns", map[string]string{strings.Repeat("a", 253): "value"})
+
+		emptyName        = newConfigMap("", "validns", nil)
+		invalidName      = newConfigMap("NoUppercaseOrSpecialCharsLike=Equals", "validns", nil)
+		emptyNs          = newConfigMap("validname", "", nil)
+		invalidNs        = newConfigMap("validname", "NoUppercaseOrSpecialCharsLike=Equals", nil)
+		invalidKey       = newConfigMap("validname", "validns", map[string]string{"a..b": "value"})
+		leadingDotKey    = newConfigMap("validname", "validns", map[string]string{".ab": "value"})
+		dotKey           = newConfigMap("validname", "validns", map[string]string{".": "value"})
+		doubleDotKey     = newConfigMap("validname", "validns", map[string]string{"..": "value"})
+		overMaxKeyLength = newConfigMap("validname", "validns", map[string]string{strings.Repeat("a", 254): "value"})
+	)
+
+	tests := map[string]struct {
+		cfg     extensions.ConfigMap
+		isValid bool
+	}{
+		"valid":               {validConfigMap, true},
+		"max key length":      {maxKeyLength, true},
+		"leading dot key":     {leadingDotKey, true},
+		"empty name":          {emptyName, false},
+		"invalid name":        {invalidName, false},
+		"invalid key":         {invalidKey, false},
+		"empty namespace":     {emptyNs, false},
+		"invalid namespace":   {invalidNs, false},
+		"dot key":             {dotKey, false},
+		"double dot key":      {doubleDotKey, false},
+		"over max key length": {overMaxKeyLength, false},
+	}
+
+	for name, tc := range tests {
+		errs := ValidateConfigMap(&tc.cfg)
+		if tc.isValid && len(errs) > 0 {
+			t.Errorf("%v: unexpected error: %v", name, errs)
+		}
+		if !tc.isValid && len(errs) == 0 {
+			t.Errorf("%v: unexpected non-error", name)
+		}
+	}
+}
+
+func TestValidateConfigMapUpdate(t *testing.T) {
+	newConfigMap := func(version, name, namespace string, data map[string]string) extensions.ConfigMap {
+		return extensions.ConfigMap{
+			ObjectMeta: api.ObjectMeta{
+				Name:            name,
+				Namespace:       namespace,
+				ResourceVersion: version,
+			},
+			Data: data,
+		}
+	}
+
+	var (
+		validConfigMap = newConfigMap("1", "validname", "validns", map[string]string{"key": "value"})
+		noVersion      = newConfigMap("", "validname", "validns", map[string]string{"key": "value"})
+	)
+
+	cases := []struct {
+		name    string
+		newCfg  extensions.ConfigMap
+		oldCfg  extensions.ConfigMap
+		isValid bool
+	}{
+		{
+			name:    "valid",
+			newCfg:  validConfigMap,
+			oldCfg:  validConfigMap,
+			isValid: true,
+		},
+		{
+			name:    "invalid",
+			newCfg:  noVersion,
+			oldCfg:  validConfigMap,
+			isValid: false,
+		},
+	}
+
+	for _, tc := range cases {
+		errs := ValidateConfigMapUpdate(&tc.newCfg, &tc.oldCfg)
+		if tc.isValid && len(errs) > 0 {
+			t.Errorf("%v: unexpected error: %v", tc.name, errs)
+		}
+		if !tc.isValid && len(errs) == 0 {
+			t.Errorf("%v: unexpected non-error", tc.name)
+		}
+	}
+}

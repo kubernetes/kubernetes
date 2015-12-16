@@ -58,6 +58,8 @@ func addKnownTypes() {
 		&Ingress{},
 		&IngressList{},
 		&ListOptions{},
+		&ConfigMap{},
+		&ConfigMapList{},
 	)
 }
 
@@ -80,3 +82,5 @@ func (obj *ThirdPartyResourceDataList) GetObjectKind() unversioned.ObjectKind  {
 func (obj *Ingress) GetObjectKind() unversioned.ObjectKind                     { return &obj.TypeMeta }
 func (obj *IngressList) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
 func (obj *ListOptions) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
+func (obj *ConfigMap) GetObjectKind() unversioned.ObjectKind                   { return &obj.TypeMeta }
+func (obj *ConfigMapList) GetObjectKind() unversioned.ObjectKind               { return &obj.TypeMeta }
