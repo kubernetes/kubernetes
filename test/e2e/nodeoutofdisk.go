@@ -93,9 +93,10 @@ var _ = Describe("NodeOutOfDisk", func() {
 	var c *client.Client
 	var unfilledNodeName string
 	nodeInfos := make([]oodNodeInfo, 0)
-	framework := NewFramework("node-outofdisk")
+	framework := Framework{BaseName: "node-outofdisk"}
 
 	BeforeEach(func() {
+		framework.beforeEach()
 		c = framework.Client
 
 		nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
@@ -111,6 +112,18 @@ var _ = Describe("NodeOutOfDisk", func() {
 			}
 			fillDiskSpace(c, info)
 			nodeInfos = append(nodeInfos, info)
+		}
+	})
+
+	AfterEach(func() {
+		framework.afterEach()
+
+		nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
+		expectNoError(err, "Error retrieving nodes")
+		Expect(len(nodelist.Items)).ToNot(BeZero())
+		for _, node := range nodelist.Items {
+			ood := waitForNodeToBe(c, node.Name, api.NodeOutOfDisk, false, nodeOODTimeOut)
+			Expect(ood).To(BeTrue(), "Node %s's out of disk condition status did not change to false within %v", node.Name, nodeOODTimeOut)
 		}
 	})
 
