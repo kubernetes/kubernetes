@@ -237,7 +237,7 @@ KUBELET_OPTS="\
  --api-servers=http://${2}:8080 \
  --logtostderr=true \
  --cluster-dns=${3} \
- --cluster-domain=${4}"
+ --cluster-domain=${4} \
  --config=${5}"
 EOF
 
@@ -526,7 +526,7 @@ function provision-masterandnode() {
       '${KUBELET_CONFIG}'
     create-kube-proxy-opts \
       '${MASTER_IP}' \
-      '${MASTER_IP}' \
+      '${MASTER_IP}'
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
 
     sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce ' 
