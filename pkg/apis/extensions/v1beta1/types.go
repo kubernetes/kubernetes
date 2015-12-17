@@ -172,7 +172,7 @@ type ThirdPartyResourceData struct {
 	v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Data is the raw JSON data for this data.
-	Data []byte `json:"name,omitempty"`
+	Data []byte `json:"data,omitempty"`
 }
 
 // Deployment enables declarative updates for Pods and ReplicationControllers.

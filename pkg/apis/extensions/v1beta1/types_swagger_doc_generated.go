@@ -501,7 +501,7 @@ func (ThirdPartyResource) SwaggerDoc() map[string]string {
 var map_ThirdPartyResourceData = map[string]string{
 	"":         "An internal object, used for versioned storage in etcd.  Not exposed to the end user.",
 	"metadata": "Standard object metadata.",
-	"name":     "Data is the raw JSON data for this data.",
+	"data":     "Data is the raw JSON data for this data.",
 }
 
 func (ThirdPartyResourceData) SwaggerDoc() map[string]string {
