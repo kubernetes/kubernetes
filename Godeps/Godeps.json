@@ -832,6 +832,10 @@
 			"Rev": "08b1a584251b5b62f458943640fc8ebd4d50aaa5"
 		},
 		{
+			"ImportPath": "github.com/ssoroka/ttime",
+			"Rev": "881f221816e0300201ac24f6c31e54e3bb958de7"
+		},
+		{
 			"ImportPath": "github.com/stretchr/objx",
 			"Rev": "d40df0cc104c06eae2dfe03d7dddb83802d52f9a"
 		},
