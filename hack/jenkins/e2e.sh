@@ -120,10 +120,7 @@ function configure_upgrade_step() {
         ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
         )"
 
-  if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
-    DOGFOOD_GCLOUD="true"
-    GKE_API_ENDPOINT="https://test-container.sandbox.googleapis.com/"
-  else
+  if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
     NUM_NODES=5
     KUBE_ENABLE_DEPLOYMENTS=true
     KUBE_ENABLE_DAEMONSETS=true
@@ -266,6 +263,10 @@ if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
 elif [[ ${JOB_NAME} =~ ^kubernetes-.*-gke ]]; then
   KUBERNETES_PROVIDER="gke"
   : ${E2E_ZONE:="us-central1-f"}
+  # By default, GKE tests run against the GKE test endpoint using CI Cloud SDK.
+  # Release jobs (e.g. prod, staging, and test) override these two variables.
+  : ${CLOUDSDK_BUCKET:="gs://cloud-sdk-build/testing/staging"}
+  : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
 elif [[ ${JOB_NAME} =~ ^kubernetes-.*-aws ]]; then
   KUBERNETES_PROVIDER="aws"
   : ${E2E_MIN_STARTUP_PODS:="1"}
@@ -683,7 +684,6 @@ case ${JOB_NAME} in
     ;;
 
   kubernetes-e2e-gke-subnet)
-    : ${DOGFOOD_GCLOUD:="true"}
     : ${E2E_CLUSTER_NAME:="jkns-gke-subnet"}
     # auto-subnet manually created - if deleted, it will need to be recreated
     # gcloud alpha compute networks create auto-subnet --mode auto
@@ -700,7 +700,9 @@ case ${JOB_NAME} in
     ;;
 
   kubernetes-e2e-gke-prod)
-    : ${DOGFOOD_GCLOUD:="true"}
+    # Override GKE default to use prod Cloud SDK and prod endpoint
+    CLOUDSDK_BUCKET=""
+    GKE_API_ENDPOINT="https://container.googleapis.com/"
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-prod"}
     : ${E2E_NETWORK:="e2e-gke-prod"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
@@ -715,8 +717,9 @@ case ${JOB_NAME} in
     ;;
 
   kubernetes-e2e-gke-staging)
-    : ${DOGFOOD_GCLOUD:="true"}
-    : ${GKE_API_ENDPOINT:="https://staging-container.sandbox.googleapis.com/"}
+    # Override GKE default to use rc Cloud SDK and prod endpoint
+    CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
+    GKE_API_ENDPOINT="https://staging-container.sandbox.googleapis.com/"
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-staging"}
     : ${E2E_NETWORK:="e2e-gke-staging"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
@@ -731,9 +734,8 @@ case ${JOB_NAME} in
     ;;
 
   kubernetes-e2e-gke-test)
-    : ${DOGFOOD_GCLOUD:="true"}
-    : ${CLOUDSDK_BUCKET:="gs://cloud-sdk-build/testing/rc"}
-    : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
+    # Override GKE default to use rc Cloud SDK
+    CLOUDSDK_BUCKET="gs://cloud-sdk-build/testing/rc"
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-test"}
     : ${E2E_NETWORK:="e2e-gke-test"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
@@ -748,8 +750,6 @@ case ${JOB_NAME} in
     ;;
 
   kubernetes-e2e-gke-1.1)
-    : ${DOGFOOD_GCLOUD:="true"}
-    : ${GKE_API_ENDPOINT:="https://test-container.sandbox.googleapis.com/"}
     : ${E2E_CLUSTER_NAME:="gke-release-1-1"}
     : ${E2E_NETWORK:="gke-release-1-1"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
@@ -938,7 +938,6 @@ export CLUSTER_NAME=${E2E_CLUSTER_NAME}
 export ZONE=${E2E_ZONE}
 export KUBE_GKE_NETWORK=${E2E_NETWORK}
 export E2E_SET_CLUSTER_API_VERSION=${E2E_SET_CLUSTER_API_VERSION:-}
-export DOGFOOD_GCLOUD=${DOGFOOD_GCLOUD:-}
 export CMD_GROUP=${CMD_GROUP:-}
 export MACHINE_TYPE=${MINION_SIZE:-}  # GKE scripts use MACHINE_TYPE for the node vm size
 
