@@ -255,7 +255,7 @@ func (config *KubeProxyTestConfig) createNetShellPodSpec(podName string, node st
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.GroupOrDie(api.GroupName).GroupVersion.Version,
+			APIVersion: latest.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      podName,
@@ -295,7 +295,7 @@ func (config *KubeProxyTestConfig) createTestPodSpec() *api.Pod {
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.GroupOrDie(api.GroupName).GroupVersion.Version,
+			APIVersion: latest.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      testPodName,
