@@ -1019,7 +1019,7 @@ func cleanup(filePath string, ns string, selectors ...string) {
 	if ns != "" {
 		nsArg = fmt.Sprintf("--namespace=%s", ns)
 	}
-	runKubectlOrDie("stop", "--grace-period=0", "-f", filePath, nsArg)
+	runKubectlOrDie("delete", "--grace-period=0", "-f", filePath, nsArg)
 
 	for _, selector := range selectors {
 		resources := runKubectlOrDie("get", "rc,svc", "-l", selector, "--no-headers", nsArg)
