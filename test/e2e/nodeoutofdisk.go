@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -73,8 +72,7 @@ var _ = Describe("NodeOutOfDisk", func() {
 		framework.beforeEach()
 		c = framework.Client
 
-		nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
-		expectNoError(err, "Error retrieving nodes")
+		nodelist := ListSchedulableNodesOrDie(c)
 		Expect(len(nodelist.Items)).To(BeNumerically(">", 1))
 
 		unfilledNodeName = nodelist.Items[0].Name
@@ -86,8 +84,7 @@ var _ = Describe("NodeOutOfDisk", func() {
 	AfterEach(func() {
 		defer framework.afterEach()
 
-		nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
-		expectNoError(err, "Error retrieving nodes")
+		nodelist := ListSchedulableNodesOrDie(c)
 		Expect(len(nodelist.Items)).ToNot(BeZero())
 		for _, node := range nodelist.Items {
 			if unfilledNodeName == node.Name || recoveredNodeName == node.Name {
@@ -150,8 +147,7 @@ var _ = Describe("NodeOutOfDisk", func() {
 			}
 		})
 
-		nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
-		expectNoError(err, "Error retrieving nodes")
+		nodelist := ListSchedulableNodesOrDie(c)
 		Expect(len(nodelist.Items)).To(BeNumerically(">", 1))
 
 		nodeToRecover := nodelist.Items[1]

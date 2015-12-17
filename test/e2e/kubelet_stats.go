@@ -690,6 +690,7 @@ func newResourceMonitor(c *client.Client, containerNames []string, pollingInterv
 }
 
 func (r *resourceMonitor) Start() {
+	// It should be OK to monitor unschedulable Nodes
 	nodes, err := r.client.Nodes().List(api.ListOptions{})
 	if err != nil {
 		Failf("resourceMonitor: unable to get list of nodes: %v", err)

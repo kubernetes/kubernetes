@@ -67,10 +67,8 @@ var _ = Describe("Latency [Skipped]", func() {
 	BeforeEach(func() {
 		c = framework.Client
 		ns = framework.Namespace.Name
-		var err error
 
-		nodes, err := c.Nodes().List(api.ListOptions{})
-		expectNoError(err)
+		nodes := ListSchedulableNodesOrDie(framework.Client)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 

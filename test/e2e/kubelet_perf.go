@@ -144,6 +144,7 @@ var _ = Describe("Kubelet", func() {
 	var rm *resourceMonitor
 
 	BeforeEach(func() {
+		// It should be OK to list unschedulable Nodes here.
 		nodes, err := framework.Client.Nodes().List(api.ListOptions{})
 		expectNoError(err)
 		nodeNames = sets.NewString()

@@ -529,6 +529,7 @@ var _ = Describe("Kubectl client", func() {
 			checkOutput(output, requiredStrings)
 
 			// Node
+			// It should be OK to list unschedulable Nodes here.
 			nodes, err := c.Nodes().List(api.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			node := nodes.Items[0]
