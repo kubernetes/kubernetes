@@ -1661,6 +1661,7 @@ func dumpAllPodInfo(c *client.Client) {
 }
 
 func dumpAllNodeInfo(c *client.Client) {
+	// It should be OK to list unschedulable Nodes here.
 	nodes, err := c.Nodes().List(api.ListOptions{})
 	if err != nil {
 		Logf("unable to fetch node list: %v", err)
@@ -1722,6 +1723,21 @@ func getNodeEvents(c *client.Client, nodeName string) []api.Event {
 		return []api.Event{}
 	}
 	return events.Items
+}
+
+// Convenient wrapper around listing nodes supporting retries.
+func ListSchedulableNodesOrDie(c *client.Client) *api.NodeList {
+	var nodes *api.NodeList
+	var err error
+	if wait.PollImmediate(poll, singleCallTimeout, func() (bool, error) {
+		nodes, err = c.Nodes().List(api.ListOptions{FieldSelector: fields.Set{
+			"spec.unschedulable": "false",
+		}.AsSelector()})
+		return err == nil, nil
+	}) != nil {
+		expectNoError(err, "Timed out while listing nodes for e2e cluster.")
+	}
+	return nodes
 }
 
 func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
@@ -1910,23 +1926,6 @@ func waitForEvents(c *client.Client, ns string, objOrRef runtime.Object, desired
 	})
 }
 
-// Convenient wrapper around listing nodes supporting retries.
-func listNodes(c *client.Client, label labels.Selector, field fields.Selector) (*api.NodeList, error) {
-	var nodes *api.NodeList
-	var errLast error
-	if wait.PollImmediate(poll, singleCallTimeout, func() (bool, error) {
-		options := api.ListOptions{
-			LabelSelector: label,
-			FieldSelector: field,
-		}
-		nodes, errLast = c.Nodes().List(options)
-		return errLast == nil, nil
-	}) != nil {
-		return nil, fmt.Errorf("listNodes() failed with last error: %v", errLast)
-	}
-	return nodes, nil
-}
-
 // FailedContainers inspects all containers in a pod and returns failure
 // information for containers that have failed or been restarted.
 // A map is returned where the key is the containerID and the value is a
@@ -2008,6 +2007,7 @@ func NodeAddresses(nodelist *api.NodeList, addrType api.NodeAddressType) []strin
 // if it can't find an external IP for every node, though it still returns all
 // hosts that it found in that case.
 func NodeSSHHosts(c *client.Client) ([]string, error) {
+	// It should be OK to list unschedulable Nodes here.
 	nodelist, err := c.Nodes().List(api.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting nodes: %v", err)
@@ -2256,6 +2256,7 @@ func allNodesReady(c *client.Client, timeout time.Duration) error {
 	var notReady []api.Node
 	err := wait.PollImmediate(poll, timeout, func() (bool, error) {
 		notReady = nil
+		// It should be OK to list unschedulable Nodes here.
 		nodes, err := c.Nodes().List(api.ListOptions{})
 		if err != nil {
 			return false, err
@@ -2373,9 +2374,12 @@ func waitForApiserverUp(c *client.Client) error {
 }
 
 // waitForClusterSize waits until the cluster has desired size and there is no not-ready nodes in it.
+// By cluster size we mean number of Nodes excluding Master Node.
 func waitForClusterSize(c *client.Client, size int, timeout time.Duration) error {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
-		nodes, err := c.Nodes().List(api.ListOptions{})
+		nodes, err := c.Nodes().List(api.ListOptions{FieldSelector: fields.Set{
+			"spec.unschedulable": "false",
+		}.AsSelector()})
 		if err != nil {
 			Logf("Failed to list nodes: %v", err)
 			continue
@@ -2569,6 +2573,7 @@ func getNodePortURL(client *client.Client, ns, name string, svcPort int) (string
 	if err != nil {
 		return "", err
 	}
+	// It should be OK to list unschedulable Node here.
 	nodes, err := client.Nodes().List(api.ListOptions{})
 	if err != nil {
 		return "", err

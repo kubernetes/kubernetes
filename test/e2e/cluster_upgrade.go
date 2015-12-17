@@ -30,8 +30,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -354,10 +352,7 @@ func testNodeUpgrade(f *Framework, nUp func(f *Framework, n int, v string) error
 }
 
 func checkNodesVersions(c *client.Client, want string) error {
-	l, err := listNodes(c, labels.Everything(), fields.Everything())
-	if err != nil {
-		return fmt.Errorf("checkNodesVersions() failed to list nodes: %v", err)
-	}
+	l := ListSchedulableNodesOrDie(c)
 	for _, n := range l.Items {
 		// We do prefix trimming and then matching because:
 		// want   looks like:  0.19.3-815-g50e67d4

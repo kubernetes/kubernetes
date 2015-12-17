@@ -18,10 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"log"
 	"os"
 	"os/exec"
@@ -29,6 +25,11 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 const (
@@ -151,17 +152,16 @@ T:
 
 var _ = Describe("[Example] Pet Store [Skipped]", func() {
 
-	// The number of minions dictates total number of generators/transaction expectations.
-	var minionCount int
+	// The number of nodes dictates total number of generators/transaction expectations.
+	var nodeCount int
 	f := NewFramework("petstore")
 
 	It(fmt.Sprintf("should scale to persist a nominal number ( %v ) of transactions in %v seconds", k8bpsSmokeTestTransactions, k8bpsSmokeTestTimeout), func() {
-		minions, err := f.Client.Nodes().List(api.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		minionCount = len(minions.Items)
+		nodes := ListSchedulableNodesOrDie(f.Client)
+		nodeCount = len(nodes.Items)
 
-		loadGenerators := minionCount
-		restServers := minionCount
+		loadGenerators := nodeCount
+		restServers := nodeCount
 		fmt.Printf("load generators / rest servers [ %v  /  %v ] ", loadGenerators, restServers)
 		runK8petstore(restServers, loadGenerators, f.Client, f.Namespace.Name, k8bpsSmokeTestTransactions, k8bpsSmokeTestTimeout)
 	})

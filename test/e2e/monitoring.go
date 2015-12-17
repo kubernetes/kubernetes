@@ -123,6 +123,7 @@ func expectedServicesExist(c *client.Client) error {
 }
 
 func getAllNodesInCluster(c *client.Client) ([]string, error) {
+	// It should be OK to list unschedulable Nodes here.
 	nodeList, err := c.Nodes().List(api.ListOptions{})
 	if err != nil {
 		return nil, err
