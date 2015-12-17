@@ -54,10 +54,10 @@ var (
 
 func init() {
 	// Turn on verbose by default to get spec names
-	config.DefaultReporterConfig.Verbose = true
+	config.DefaultReporterConfig.Verbose = false
 
 	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)
-	config.GinkgoConfig.EmitSpecProgress = true
+	config.GinkgoConfig.EmitSpecProgress = false
 
 	// Randomize specs as well as suites
 	config.GinkgoConfig.RandomizeAllSpecs = true
@@ -180,5 +180,7 @@ func TestE2E(t *testing.T) {
 	if *reportDir != "" {
 		r = append(r, reporters.NewJUnitReporter(path.Join(*reportDir, fmt.Sprintf("junit_%02d.xml", config.GinkgoConfig.ParallelNode))))
 	}
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
+
+	r = append(r, NewSimpleReporter())
+	ginkgo.RunSpecsWithCustomReporters(t, "Kubernetes e2e suite", r)
 }
