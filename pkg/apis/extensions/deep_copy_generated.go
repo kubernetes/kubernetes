@@ -1383,6 +1383,12 @@ func deepCopy_extensions_JobSpec(in JobSpec, out *JobSpec, c *conversion.Cloner)
 	} else {
 		out.Completions = nil
 	}
+	if in.ActiveDeadlineSeconds != nil {
+		out.ActiveDeadlineSeconds = new(int64)
+		*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
+	} else {
+		out.ActiveDeadlineSeconds = nil
+	}
 	if in.Selector != nil {
 		out.Selector = new(LabelSelector)
 		if err := deepCopy_extensions_LabelSelector(*in.Selector, out.Selector, c); err != nil {
