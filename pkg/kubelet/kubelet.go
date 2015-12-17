@@ -2754,7 +2754,7 @@ func (kl *Kubelet) setNodeStatusVersionInfo(node *api.Node) {
 		glog.Errorf("Error getting version info: %v", err)
 	} else {
 		node.Status.NodeInfo.KernelVersion = verinfo.KernelVersion
-		node.Status.NodeInfo.OsImage = verinfo.ContainerOsVersion
+		node.Status.NodeInfo.OSImage = verinfo.ContainerOsVersion
 		// TODO: Determine the runtime is docker or rocket
 		node.Status.NodeInfo.ContainerRuntimeVersion = "docker://" + verinfo.DockerVersion
 		node.Status.NodeInfo.KubeletVersion = version.Get().String()
