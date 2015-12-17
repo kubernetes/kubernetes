@@ -1225,6 +1225,22 @@ func ValidatePodStatusUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 	return allErrs
 }
 
+// ValidatePodBinding tests if required fields in the pod binding are legal.
+func ValidatePodBinding(binding *api.Binding) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(binding.Target.Kind) != 0 && binding.Target.Kind != "Node" {
+		// TODO: When validation becomes versioned, this gets more complicated.
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("target", "kind"), binding.Target.Kind, []string{"Node", "<empty>"}))
+	}
+	if len(binding.Target.Name) == 0 {
+		// TODO: When validation becomes versioned, this gets more complicated.
+		allErrs = append(allErrs, field.Required(field.NewPath("target", "name")))
+	}
+
+	return allErrs
+}
+
 // ValidatePodTemplate tests if required fields in the pod template are set.
 func ValidatePodTemplate(pod *api.PodTemplate) field.ErrorList {
 	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, field.NewPath("metadata"))

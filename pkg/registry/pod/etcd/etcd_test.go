@@ -482,14 +482,14 @@ func TestEtcdCreateBinding(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
 				Target:     api.ObjectReference{},
 			},
-			errOK: func(err error) bool { return errors.IsInvalid(err) },
+			errOK: func(err error) bool { return err != nil },
 		},
 		"badKind": {
 			binding: api.Binding{
 				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
 				Target:     api.ObjectReference{Name: "machine1", Kind: "unknown"},
 			},
-			errOK: func(err error) bool { return errors.IsInvalid(err) },
+			errOK: func(err error) bool { return err != nil },
 		},
 		"emptyKind": {
 			binding: api.Binding{
