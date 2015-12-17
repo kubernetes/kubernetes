@@ -53,16 +53,16 @@ func (t *testRESTStrategy) AllowCreateOnUpdate() bool      { return t.allowCreat
 func (t *testRESTStrategy) AllowUnconditionalUpdate() bool { return t.allowUnconditionalUpdate }
 
 func (t *testRESTStrategy) PrepareForCreate(obj runtime.Object) {
-	accessor, err := meta.Accessor(obj)
+	metaObj, err := meta.Accessor(obj)
 	if err != nil {
 		panic(err.Error())
 	}
-	labels := accessor.Labels()
+	labels := metaObj.GetLabels()
 	if labels == nil {
 		labels = map[string]string{}
 	}
 	labels["prepare_create"] = "true"
-	accessor.SetLabels(labels)
+	metaObj.SetLabels(labels)
 }
 
 func (t *testRESTStrategy) PrepareForUpdate(obj, old runtime.Object) {}
