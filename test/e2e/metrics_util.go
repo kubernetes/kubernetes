@@ -31,6 +31,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/prometheus/common/expfmt"
@@ -257,15 +258,41 @@ func getMetrics(c *client.Client) (string, error) {
 }
 
 // Retrieves scheduler metrics information.
-func getSchedulingLatency() (SchedulingLatency, error) {
+func getSchedulingLatency(c *client.Client) (SchedulingLatency, error) {
 	result := SchedulingLatency{}
 
-	cmd := "curl http://localhost:10251/metrics"
-	sshResult, err := SSH(cmd, getMasterHost()+":22", testContext.Provider)
-	if err != nil || sshResult.Code != 0 {
-		return result, fmt.Errorf("unexpected error (code: %d) in ssh connection to master: %#v", sshResult.Code, err)
+	// Check if master Node is registered
+	nodes, err := c.Nodes().List(api.ListOptions{})
+	expectNoError(err)
+
+	var data string
+	var masterRegistered = false
+	for _, node := range nodes.Items {
+		if strings.HasSuffix(node.Name, "master") {
+			masterRegistered = true
+		}
 	}
-	samples, err := extractMetricSamples(sshResult.Stdout)
+	if masterRegistered {
+		rawData, err := c.Get().
+			Prefix("proxy").
+			Namespace(api.NamespaceSystem).
+			Resource("pods").
+			Name(fmt.Sprintf("kube-scheduler-%v:%v", testContext.CloudConfig.MasterName, ports.SchedulerPort)).
+			Suffix("metrics").
+			Do().Raw()
+
+		expectNoError(err)
+		data = string(rawData)
+	} else {
+		// If master is not registered fall back to old method of using SSH.
+		cmd := "curl http://localhost:10251/metrics"
+		sshResult, err := SSH(cmd, getMasterHost()+":22", testContext.Provider)
+		if err != nil || sshResult.Code != 0 {
+			return result, fmt.Errorf("unexpected error (code: %d) in ssh connection to master: %#v", sshResult.Code, err)
+		}
+		data = sshResult.Stdout
+	}
+	samples, err := extractMetricSamples(data)
 	if err != nil {
 		return result, err
 	}
@@ -295,8 +322,8 @@ func getSchedulingLatency() (SchedulingLatency, error) {
 }
 
 // Verifies (currently just by logging them) the scheduling latencies.
-func VerifySchedulerLatency() error {
-	latency, err := getSchedulingLatency()
+func VerifySchedulerLatency(c *client.Client) error {
+	latency, err := getSchedulingLatency(c)
 	if err != nil {
 		return err
 	}
