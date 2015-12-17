@@ -1478,7 +1478,7 @@ type NodeSystemInfo struct {
 	// Kernel Version reported by the node.
 	KernelVersion string `json:"kernelVersion"`
 	// OS Image reported by the node.
-	OsImage string `json:"osImage"`
+	OSImage string `json:"osImage"`
 	// ContainerRuntime Version reported by the node.
 	ContainerRuntimeVersion string `json:"containerRuntimeVersion"`
 	// Kubelet Version reported by the node.

@@ -1023,7 +1023,7 @@ func deepCopy_api_NodeSystemInfo(in NodeSystemInfo, out *NodeSystemInfo, c *conv
 	out.SystemUUID = in.SystemUUID
 	out.BootID = in.BootID
 	out.KernelVersion = in.KernelVersion
-	out.OsImage = in.OsImage
+	out.OSImage = in.OSImage
 	out.ContainerRuntimeVersion = in.ContainerRuntimeVersion
 	out.KubeletVersion = in.KubeletVersion
 	out.KubeProxyVersion = in.KubeProxyVersion
