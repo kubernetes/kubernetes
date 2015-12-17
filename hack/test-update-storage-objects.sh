@@ -56,7 +56,8 @@ function startApiServer() {
     --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
   APISERVER_PID=$!
 
-  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
+  # url, prefix, wait, times
+  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: " 1 45
 }
 
 function killApiServer() {
