@@ -260,20 +260,12 @@ func (factory *ConfigFactory) createUnassignedPodLW() *cache.ListWatch {
 	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, fields.Set{client.PodHost: ""}.AsSelector())
 }
 
-func parseSelectorOrDie(s string) fields.Selector {
-	selector, err := fields.ParseSelector(s)
-	if err != nil {
-		panic(err)
-	}
-	return selector
-}
-
 // Returns a cache.ListWatch that finds all pods that are
 // already scheduled.
 // TODO: return a ListerWatcher interface instead?
 func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
 	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll,
-		parseSelectorOrDie(client.PodHost+"!="))
+		fields.ParseSelectorOrDie(client.PodHost+"!="))
 }
 
 // createNodeLW returns a cache.ListWatch that gets all changes to nodes.
@@ -285,12 +277,12 @@ func (factory *ConfigFactory) createNodeLW() *cache.ListWatch {
 
 // Returns a cache.ListWatch that gets all changes to services.
 func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client, "services", api.NamespaceAll, parseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.Client, "services", api.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 // Returns a cache.ListWatch that gets all changes to controllers.
 func (factory *ConfigFactory) createControllerLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client, "replicationControllers", api.NamespaceAll, parseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.Client, "replicationControllers", api.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
