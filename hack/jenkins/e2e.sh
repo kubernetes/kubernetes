@@ -121,6 +121,7 @@ function configure_upgrade_step() {
         )"
 
   if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+    KUBE_GCE_INSTANCE_PREFIX="$cluster_name"
     NUM_NODES=5
     KUBE_ENABLE_DEPLOYMENTS=true
     KUBE_ENABLE_DAEMONSETS=true
