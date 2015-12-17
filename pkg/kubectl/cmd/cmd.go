@@ -110,23 +110,24 @@ __custom_func() {
 }
 `
 	valid_resources = `Valid resource types include:
-   * pods (aka 'po')
-   * replicationcontrollers (aka 'rc')
-   * daemonsets (aka 'ds')
-   * services (aka 'svc')
+   * componentstatuses (aka 'cs')
    * events (aka 'ev')
+   * endpoints (aka 'ep')
+   * horizontalpodautoscalers (aka 'hpa')
+   * ingress (aka 'ing')
+   * jobs
+   * limitranges (aka 'limits')
    * nodes (aka 'no')
    * namespaces (aka 'ns')
-   * secrets
+   * pods (aka 'po')
    * persistentvolumes (aka 'pv')
    * persistentvolumeclaims (aka 'pvc')
-   * limitranges (aka 'limits')
-   * resourcequotas (aka 'quota')
-   * componentstatuses (aka 'cs')
-   * endpoints (aka 'ep')
    * quota
-   * horizontalpodautoscalers (aka 'hpa')
+   * resourcequotas (aka 'quota')
+   * replicationcontrollers (aka 'rc')
+   * secrets
    * serviceaccounts
+   * services (aka 'svc')
 `
 )
 
