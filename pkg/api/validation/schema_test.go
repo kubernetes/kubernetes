@@ -67,7 +67,7 @@ func TestValidateOk(t *testing.T) {
 	}
 
 	seed := rand.Int63()
-	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(seed))
+	apiObjectFuzzer := apitesting.FuzzerFor(nil, testapi.Default.InternalGroupVersion(), rand.NewSource(seed))
 	for i := 0; i < 5; i++ {
 		for _, test := range tests {
 			testObj := test.obj

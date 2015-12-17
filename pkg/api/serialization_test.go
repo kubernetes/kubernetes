@@ -41,13 +41,13 @@ import (
 
 var fuzzIters = flag.Int("fuzz-iters", 20, "How many fuzzing iterations to do.")
 
-var codecsToTest = []func(version string, item runtime.Object) (runtime.Codec, error){
-	func(version string, item runtime.Object) (runtime.Codec, error) {
+var codecsToTest = []func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, error){
+	func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, error) {
 		return testapi.GetCodecForObject(item)
 	},
 }
 
-func fuzzInternalObject(t *testing.T, forVersion string, item runtime.Object, seed int64) runtime.Object {
+func fuzzInternalObject(t *testing.T, forVersion unversioned.GroupVersion, item runtime.Object, seed int64) runtime.Object {
 	apitesting.FuzzerFor(t, forVersion, rand.NewSource(seed)).Fuzz(item)
 
 	j, err := meta.TypeAccessor(item)
@@ -99,9 +99,9 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
 	set := sets.NewString(except...)
 	seed := rand.Int63()
-	fuzzInternalObject(t, testapi.Default.InternalGroupVersion().String(), item, seed)
+	fuzzInternalObject(t, testapi.Default.InternalGroupVersion(), item, seed)
 
-	version := testapi.Default.GroupVersion().String()
+	version := *testapi.Default.GroupVersion()
 	codecs := []runtime.Codec{}
 	for _, fn := range codecsToTest {
 		codec, err := fn(version, item)
@@ -112,7 +112,7 @@ func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
 		codecs = append(codecs, codec)
 	}
 
-	if !set.Has(version) {
+	if !set.Has(version.String()) {
 		fuzzInternalObject(t, version, item, seed)
 		for _, codec := range codecs {
 			roundTrip(t, codec, item)
@@ -183,7 +183,7 @@ func doRoundTripTest(kind string, t *testing.T) {
 		roundTripSame(t, item, nonRoundTrippableTypesByVersion[kind]...)
 	}
 	if !nonInternalRoundTrippableTypes.Has(kind) {
-		roundTrip(t, api.Codec, fuzzInternalObject(t, testapi.Default.InternalGroupVersion().String(), item, rand.Int63()))
+		roundTrip(t, api.Codec, fuzzInternalObject(t, testapi.Default.InternalGroupVersion(), item, rand.Int63()))
 	}
 }
 
@@ -266,7 +266,7 @@ func TestUnversionedTypes(t *testing.T) {
 const benchmarkSeed = 100
 
 func benchmarkItems() []v1.Pod {
-	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer := apitesting.FuzzerFor(nil, api.SchemeGroupVersion, rand.NewSource(benchmarkSeed))
 	items := make([]v1.Pod, 2)
 	for i := range items {
 		apiObjectFuzzer.Fuzz(&items[i])

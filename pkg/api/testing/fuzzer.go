@@ -39,7 +39,7 @@ import (
 )
 
 // FuzzerFor can randomly populate api objects that are destined for version.
-func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
+func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) *fuzz.Fuzzer {
 	f := fuzz.New().NilChance(.5).NumElements(1, 1)
 	if src != nil {
 		f.RandSource(src)
