@@ -78,6 +78,8 @@ type Manager interface {
 	// SetPodStatus caches updates the cached status for the given pod, and triggers a status update.
 	SetPodStatus(pod *api.Pod, status api.PodStatus)
 
+	DeletePodStatus(uid types.UID)
+
 	// SetContainerReadiness updates the cached container status with the given readiness, and
 	// triggers a status update.
 	SetContainerReadiness(pod *api.Pod, containerID kubecontainer.ContainerID, ready bool)
@@ -129,7 +131,7 @@ func (m *manager) Start() {
 	go util.Forever(func() {
 		select {
 		case syncRequest := <-m.podStatusChannel:
-			m.syncPod(syncRequest.podUID, syncRequest.status)
+			m.syncPodCheckExistence(syncRequest.podUID, syncRequest.status)
 		case <-syncTicker:
 			m.syncBatch()
 		}
@@ -286,8 +288,8 @@ func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus) bool 
 	}
 }
 
-// deletePodStatus simply removes the given pod from the status cache.
-func (m *manager) deletePodStatus(uid types.UID) {
+// DeletePodStatus simply removes the given pod from the status cache.
+func (m *manager) DeletePodStatus(uid types.UID) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 	delete(m.podStatuses, uid)
@@ -338,6 +340,20 @@ func (m *manager) syncBatch() {
 	}
 }
 
+func (m *manager) podExists(uid types.UID) bool {
+	m.podStatusesLock.RLock()
+	defer m.podStatusesLock.RUnlock()
+	_, hasPod := m.podStatuses[uid]
+	return hasPod
+}
+
+func (m *manager) syncPodCheckExistence(uid types.UID, status versionedPodStatus) {
+	if !m.podExists(uid) {
+		return
+	}
+	m.syncPod(uid, status)
+}
+
 // syncPod syncs the given status with the API server. The caller must not hold the lock.
 func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	// TODO: make me easier to express from client code
@@ -352,7 +368,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		translatedUID := m.podManager.TranslatePodUID(pod.UID)
 		if len(translatedUID) > 0 && translatedUID != uid {
 			glog.V(3).Infof("Pod %q was deleted and then recreated, skipping status update", format.Pod(pod))
-			m.deletePodStatus(uid)
+			m.DeletePodStatus(uid)
 			return
 		}
 		if !m.needsUpdate(pod.UID, status) {
@@ -375,7 +391,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 			}
 			if err := m.kubeClient.Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err == nil {
 				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
-				m.deletePodStatus(uid)
+				m.DeletePodStatus(uid)
 				return
 			}
 		}
