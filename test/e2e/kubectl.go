@@ -775,7 +775,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		AfterEach(func() {
-			runKubectlOrDie("stop", "rc", rcName, nsFlag)
+			runKubectlOrDie("delete", "rc", rcName, nsFlag)
 		})
 
 		It("should create an rc from an image [Conformance]", func() {
@@ -818,7 +818,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		AfterEach(func() {
-			runKubectlOrDie("stop", "jobs", jobName, nsFlag)
+			runKubectlOrDie("delete", "jobs", jobName, nsFlag)
 		})
 
 		It("should create a job from an image when restart is OnFailure [Conformance]", func() {
