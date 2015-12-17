@@ -1135,6 +1135,7 @@ fi
 # at HEAD, release candidate.
 if [[ ! -z "${CLOUDSDK_BUCKET:-}" ]]; then
     gsutil -m cp -r "${CLOUDSDK_BUCKET}" ~
+    rm -rf ~/repo
     mv ~/$(basename "${CLOUDSDK_BUCKET}") ~/repo
     mkdir ~/cloudsdk
     tar zvxf ~/repo/google-cloud-sdk.tar.gz -C ~/cloudsdk
