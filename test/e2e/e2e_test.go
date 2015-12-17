@@ -180,5 +180,6 @@ func TestE2E(t *testing.T) {
 	if *reportDir != "" {
 		r = append(r, reporters.NewJUnitReporter(path.Join(*reportDir, fmt.Sprintf("junit_%02d.xml", config.GinkgoConfig.ParallelNode))))
 	}
+	glog.Infof("Starting e2e run; %q", runId)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }

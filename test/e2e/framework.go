@@ -74,7 +74,9 @@ func (f *Framework) beforeEach() {
 	f.Client = c
 
 	By("Building a namespace api object")
-	namespace, err := createTestingNS(f.BaseName, f.Client)
+	namespace, err := createTestingNS(f.BaseName, f.Client, map[string]string{
+		"e2e-framework": f.BaseName,
+	})
 	Expect(err).NotTo(HaveOccurred())
 
 	f.Namespace = namespace
