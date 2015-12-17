@@ -56,7 +56,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"Package":          namer.IC(pkg),
 		"watchInterface":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
 		"apiDeleteOptions": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
-		"unvListOptions":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/unversioned", Name: "ListOptions"}),
+		"apiListOptions":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
 	}
 	sw.Do(namespacerTemplate, m)
 	sw.Do(interfaceTemplate, m)
@@ -65,6 +65,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	sw.Do(createTemplate, m)
 	sw.Do(updateTemplate, m)
 	sw.Do(deleteTemplate, m)
+	sw.Do(deleteCollectionTemplate, m)
 	sw.Do(getTemplate, m)
 	sw.Do(listTemplate, m)
 	sw.Do(watchTemplate, m)
@@ -87,9 +88,10 @@ type $.type|public$Interface interface {
 	Create(*$.type|raw$) (*$.type|raw$, error)
 	Update(*$.type|raw$) (*$.type|raw$, error)
 	Delete(name string, options *$.apiDeleteOptions|raw$) error
+	DeleteCollection(options *$.apiDeleteOptions|raw$, listOptions $.apiListOptions|raw$) error
 	Get(name string) (*$.type|raw$, error)
-	List(opts $.unvListOptions|raw$) (*$.type|raw$List, error)
-	Watch(opts $.unvListOptions|raw$) ($.watchInterface|raw$, error)
+	List(opts $.apiListOptions|raw$) (*$.type|raw$List, error)
+	Watch(opts $.apiListOptions|raw$) ($.watchInterface|raw$, error)
 }
 `
 
@@ -112,7 +114,7 @@ func new$.type|publicPlural$(c *$.Package$Client, namespace string) *$.type|priv
 `
 var listTemplate = `
 // List takes label and field selectors, and returns the list of $.type|publicPlural$ that match those selectors.
-func (c *$.type|privatePlural$) List(opts $.unvListOptions|raw$) (result *$.type|raw$List, err error) {
+func (c *$.type|privatePlural$) List(opts $.apiListOptions|raw$) (result *$.type|raw$List, err error) {
 	result = &$.type|raw$List{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -157,6 +159,31 @@ func (c *$.type|privatePlural$) Delete(name string, options *$.apiDeleteOptions|
 }
 `
 
+var deleteCollectionTemplate = `
+// DeleteCollection deletes a collection of objects.
+func (c *$.type|privatePlural$) DeleteCollection(options *$.apiDeleteOptions|raw$, listOptions $.apiListOptions|raw$) error {
+	if options == nil {
+		return c.Client.Delete().
+			NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
+			Resource("$.type|privatePlural$").
+			VersionedParams(&listOptions, api.Scheme).
+			Do().
+			Error()
+	}
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion())
+	if err != nil {
+		return err
+	}
+	return c.Client.Delete().
+		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
+		Resource("$.type|privatePlural$").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(body).
+		Do().
+		Error()
+}
+`
+
 var createTemplate = `
 // Create takes the representation of a $.type|private$ and creates it.  Returns the server's representation of the $.type|private$, and an error, if there is any.
 func (c *$.type|privatePlural$) Create($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
@@ -188,7 +215,7 @@ func (c *$.type|privatePlural$) Update($.type|private$ *$.type|raw$) (result *$.
 
 var watchTemplate = `
 // Watch returns a $.watchInterface|raw$ that watches the requested $.type|privatePlural$.
-func (c *$.type|privatePlural$) Watch(opts $.unvListOptions|raw$) ($.watchInterface|raw$, error) {
+func (c *$.type|privatePlural$) Watch(opts $.apiListOptions|raw$) ($.watchInterface|raw$, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
