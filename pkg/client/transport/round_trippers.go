@@ -243,6 +243,14 @@ func newDebuggingRoundTripper(rt http.RoundTripper, levels ...debugLevel) *debug
 	return drt
 }
 
+func (rt *debuggingRoundTripper) CancelRequest(req *http.Request) {
+	if canceler, ok := rt.delegatedRoundTripper.(requestCanceler); ok {
+		canceler.CancelRequest(req)
+	} else {
+		glog.Errorf("CancelRequest not implemented")
+	}
+}
+
 func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	reqInfo := newRequestInfo(req)
 
