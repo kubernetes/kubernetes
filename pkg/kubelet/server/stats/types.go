@@ -23,6 +23,9 @@ import (
 
 // Summary is a top-level container for holding NodeStats and PodStats.
 type Summary struct {
+	// The time the most recent data included in this summary was collect at, rounded to the nearest
+	// second.
+	Time unversioned.Time `json:"time"`
 	// Overall node stats.
 	Node NodeStats `json:"node"`
 	// Per-pod stats.
@@ -33,20 +36,24 @@ type Summary struct {
 type NodeStats struct {
 	// Reference to the measured Node.
 	NodeName string `json:"nodeName"`
-	// Overall node stats.
-	Total []NodeSample `json:"total,omitempty" patchStrategy:"merge" patchMergeKey:"sampleTime"`
 	// Stats of system daemons tracked as raw containers.
 	// The system containers are named according to the SystemContainer* constants.
 	SystemContainers []ContainerStats `json:"systemContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	// Stats pertaining to CPU resources.
+	CPU *CPUStats `json:"cpu,omitempty"`
+	// Stats pertaining to memory (RAM) resources.
+	Memory *MemoryStats `json:"memory,omitempty"`
+	// Stats pertaining to network resources.
+	Network *NetworkStats `json:"network,omitempty"`
 }
 
 const (
 	// Container name for the system container tracking Kubelet usage.
-	SystemContainerKubelet = "/kubelet"
+	SystemContainerKubelet = "kubelet"
 	// Container name for the system container tracking the runtime (e.g. docker or rkt) usage.
-	SystemContainerRuntime = "/runtime"
+	SystemContainerRuntime = "runtime"
 	// Container name for the system container tracking non-kubernetes processes.
-	SystemContainerMisc = "/misc"
+	SystemContainerMisc = "misc"
 )
 
 // PodStats holds pod-level unprocessed sample stats.
@@ -55,60 +62,24 @@ type PodStats struct {
 	PodRef NonLocalObjectReference `json:"podRef"`
 	// Stats of containers in the measured pod.
 	Containers []ContainerStats `json:"containers" patchStrategy:"merge" patchMergeKey:"name"`
-	// Historical stat samples of pod-level resources.
-	Samples []PodSample `json:"samples" patchStrategy:"merge" patchMergeKey:"sampleTime"`
+	// Stats pertaining to network resources.
+	Network *NetworkStats `json:"network,omitempty"`
 }
 
 // ContainerStats holds container-level unprocessed sample stats.
 type ContainerStats struct {
 	// Reference to the measured container.
 	Name string `json:"name"`
-	// Historical stat samples gathered from the container.
-	Samples []ContainerSample `json:"samples" patchStrategy:"merge" patchMergeKey:"sampleTime"`
+	// Stats pertaining to CPU resources.
+	CPU *CPUStats `json:"cpu,omitempty"`
+	// Stats pertaining to memory (RAM) resources.
+	Memory *MemoryStats `json:"memory,omitempty"`
 }
 
 // NonLocalObjectReference contains enough information to locate the referenced object.
 type NonLocalObjectReference struct {
 	Name      string `json:"name"`
 	Namespace string `json:"namespace"`
-}
-
-// Sample defines metadata common to all sample types.
-// Samples may not be nested within other samples.
-type Sample struct {
-	// The time this data point was collected at.
-	SampleTime unversioned.Time `json:"sampleTime"`
-}
-
-// NodeSample contains a sample point of data aggregated over a node.
-type NodeSample struct {
-	Sample `json:",inline"`
-	// Stats pertaining to CPU resources.
-	CPU *CPUStats `json:"cpu,omitempty"`
-	// Stats pertaining to memory (RAM) resources.
-	Memory *MemoryStats `json:"memory,omitempty"`
-	// Stats pertaining to network resources.
-	Network *NetworkStats `json:"network,omitempty"`
-	// Stats pertaining to filesystem resources. Reported per-device.
-	Filesystem []FilesystemStats `json:"filesystem,omitempty" patchStrategy:"merge" patchMergeKey:"device"`
-}
-
-// PodSample contains a sample point of pod-level resources.
-type PodSample struct {
-	Sample `json:",inline"`
-	// Stats pertaining to network resources.
-	Network *NetworkStats `json:"network,omitempty"`
-}
-
-// ContainerSample contains a sample point of container-level resources.
-type ContainerSample struct {
-	Sample `json:",inline"`
-	// Stats pertaining to CPU resources.
-	CPU *CPUStats `json:"cpu,omitempty"`
-	// Stats pertaining to memory (RAM) resources.
-	Memory *MemoryStats `json:"memory,omitempty"`
-	// Stats pertaining to filesystem resources. Reported per-device.
-	Filesystem []FilesystemStats `json:"filesystem,omitempty" patchStrategy:"merge" patchMergeKey:"device"`
 }
 
 // NetworkStats contains data about network resources.
@@ -143,27 +114,4 @@ type MemoryStats struct {
 	PageFaults *int64 `json:"pageFaults,omitempty"`
 	// Cumulative number of major page faults.
 	MajorPageFaults *int64 `json:"majorPageFaults,omitempty"`
-}
-
-// FilesystemStats contains data about filesystem usage.
-type FilesystemStats struct {
-	// The block device name associated with the filesystem.
-	Device string `json:"device"`
-	// Number of bytes that is consumed by the container on this filesystem.
-	UsageBytes *resource.Quantity `json:"usageBytes,omitempty"`
-	// Number of bytes that can be consumed by the container on this filesystem.
-	LimitBytes *resource.Quantity `json:"limitBytes,omitempty"`
-}
-
-// StatsOptions are the query options for raw stats endpoints.
-type StatsOptions struct {
-	// Only include samples with sampleTime equal to or more recent than this time.
-	// This does not affect cumulative values, which are cumulative from object creation.
-	SinceTime *unversioned.Time `json:"sinceTime,omitempty"`
-	// Only include samples with sampleTime less recent than this time.
-	UntilTime *unversioned.Time `json:"untilTime,omitempty"`
-	// Specifies the maximum number of elements in any list of samples.
-	// When the total number of samples exceeds the maximum the most recent MaxSamples samples are
-	// returned.
-	MaxSamples int `json:"maxSamples,omitempty"`
 }
