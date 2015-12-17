@@ -1131,7 +1131,6 @@ export TEST_CLUSTER_LOG_LEVEL=${TEST_CLUSTER_LOG_LEVEL:-}
 export TEST_CLUSTER_RESYNC_PERIOD=${TEST_CLUSTER_RESYNC_PERIOD:-}
 export PROJECT=${PROJECT:-}
 export NETWORK_PROVIDER=${NETWORK_PROVIDER:-}
-export JENKINS_EXPLICIT_VERSION=${JENKINS_EXPLICIT_VERSION:-}
 export JENKINS_PUBLISHED_VERSION=${JENKINS_PUBLISHED_VERSION:-'ci/latest'}
 
 export KUBE_ADMISSION_CONTROL=${ADMISSION_CONTROL:-}
@@ -1215,14 +1214,7 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
           gcloud components update beta -q || true
         ) 9>/var/run/lock/gcloud-components.lock
 
-        if [[ ! -z ${JENKINS_EXPLICIT_VERSION:-} ]]; then
-            # Use an explicit pinned version like "ci/v0.10.0-101-g6c814c4" or
-            # "release/v0.19.1"
-            IFS='/' read -a varr <<< "${JENKINS_EXPLICIT_VERSION}"
-            bucket="${varr[0]}"
-            build_version="${varr[1]}"
-            echo "Using explicit version $bucket/$build_version"
-        elif [[ ${JENKINS_USE_SERVER_VERSION:-}  =~ ^[yY]$ ]]; then
+        if [[ ${JENKINS_USE_SERVER_VERSION:-}  =~ ^[yY]$ ]]; then
             # for GKE we can use server default version.
             bucket="release"
             msg=$(gcloud ${CMD_GROUP} container get-server-config --project=${PROJECT} --zone=${ZONE} | grep defaultClusterVersion)
