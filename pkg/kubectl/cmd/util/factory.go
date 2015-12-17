@@ -201,7 +201,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if describer, ok := kubectl.DescriberFor(mapping.GroupVersionKind.GroupKind(), client); ok {
 				return describer, nil
 			}
-			return nil, fmt.Errorf("no description has been implemented for %q", mapping.Kind)
+			return nil, fmt.Errorf("no description has been implemented for %q", mapping.GroupVersionKind.Kind)
 		},
 		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, showAll bool, absoluteTimestamps bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return kubectl.NewHumanReadablePrinter(noHeaders, withNamespace, wide, showAll, absoluteTimestamps, columnLabels), nil

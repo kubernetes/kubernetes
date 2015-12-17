@@ -119,9 +119,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	}
 
 	if len(args) == 0 && len(options.Filenames) == 0 {
-		fmt.Fprint(out, "You must specify the type of resource to get. ", valid_resources, `   * componentstatuses (aka 'cs')
-   * endpoints (aka 'ep')
-`)
+		fmt.Fprint(out, "You must specify the type of resource to get. ", valid_resources)
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 
