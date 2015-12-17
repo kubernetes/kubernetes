@@ -127,6 +127,8 @@ __custom_func() {
    * quota
    * horizontalpodautoscalers (aka 'hpa')
    * serviceaccounts
+   * jobs
+   * ingresses
 `
 )
 
