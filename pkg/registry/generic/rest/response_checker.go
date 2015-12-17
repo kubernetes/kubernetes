@@ -23,6 +23,7 @@ import (
 	"net/http"
 
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // Check the http error status from a location URL.
@@ -39,8 +40,8 @@ const (
 
 // A generic http response checker to transform the error.
 type GenericHttpResponseChecker struct {
-	Kind string
-	Name string
+	QualifiedResource unversioned.GroupResource
+	Name              string
 }
 
 func (checker GenericHttpResponseChecker) Check(resp *http.Response) error {
@@ -58,13 +59,13 @@ func (checker GenericHttpResponseChecker) Check(resp *http.Response) error {
 		case resp.StatusCode == http.StatusBadRequest:
 			return errors.NewBadRequest(bodyText)
 		case resp.StatusCode == http.StatusNotFound:
-			return errors.NewGenericServerResponse(resp.StatusCode, "", checker.Kind, checker.Name, bodyText, 0, false)
+			return errors.NewGenericServerResponse(resp.StatusCode, "", checker.QualifiedResource, checker.Name, bodyText, 0, false)
 		}
-		return errors.NewGenericServerResponse(resp.StatusCode, "", checker.Kind, checker.Name, bodyText, 0, false)
+		return errors.NewGenericServerResponse(resp.StatusCode, "", checker.QualifiedResource, checker.Name, bodyText, 0, false)
 	}
 	return nil
 }
 
-func NewGenericHttpResponseChecker(kind, name string) GenericHttpResponseChecker {
-	return GenericHttpResponseChecker{Kind: kind, Name: name}
+func NewGenericHttpResponseChecker(qualifiedResource unversioned.GroupResource, name string) GenericHttpResponseChecker {
+	return GenericHttpResponseChecker{QualifiedResource: qualifiedResource, Name: name}
 }

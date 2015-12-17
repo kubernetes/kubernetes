@@ -57,7 +57,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator, ttl
 		TTLFunc: func(runtime.Object, uint64, bool) (uint64, error) {
 			return ttl, nil
 		},
-		EndpointName: "events",
+		QualifiedResource: api.Resource("events"),
 
 		CreateStrategy: event.Strategy,
 		UpdateStrategy: event.Strategy,

@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	k8serr "k8s.io/kubernetes/pkg/api/errors"
 	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/registry/service/allocator"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -47,8 +48,8 @@ type Etcd struct {
 	storage storage.Interface
 	last    string
 
-	baseKey string
-	kind    string
+	baseKey  string
+	resource unversioned.GroupResource
 }
 
 // Etcd implements allocator.Interface and service.RangeRegistry
@@ -57,12 +58,12 @@ var _ service.RangeRegistry = &Etcd{}
 
 // NewEtcd returns an allocator that is backed by Etcd and can manage
 // persisting the snapshot state of allocation after each allocation is made.
-func NewEtcd(alloc allocator.Snapshottable, baseKey string, kind string, storage storage.Interface) *Etcd {
+func NewEtcd(alloc allocator.Snapshottable, baseKey string, resource unversioned.GroupResource, storage storage.Interface) *Etcd {
 	return &Etcd{
-		alloc:   alloc,
-		storage: storage,
-		baseKey: baseKey,
-		kind:    kind,
+		alloc:    alloc,
+		storage:  storage,
+		baseKey:  baseKey,
+		resource: resource,
 	}
 }
 
@@ -146,7 +147,7 @@ func (e *Etcd) tryUpdate(fn func() error) error {
 		storage.SimpleUpdate(func(input runtime.Object) (output runtime.Object, err error) {
 			existing := input.(*api.RangeAllocation)
 			if len(existing.ResourceVersion) == 0 {
-				return nil, fmt.Errorf("cannot allocate resources of type %s at this time", e.kind)
+				return nil, fmt.Errorf("cannot allocate resources of type %s at this time", e.resource.String())
 			}
 			if existing.ResourceVersion != e.last {
 				if err := e.alloc.Restore(existing.Range, existing.Data); err != nil {
@@ -163,7 +164,7 @@ func (e *Etcd) tryUpdate(fn func() error) error {
 			return existing, nil
 		}),
 	)
-	return etcderr.InterpretUpdateError(err, e.kind, "")
+	return etcderr.InterpretUpdateError(err, e.resource, "")
 }
 
 // Refresh reloads the RangeAllocation from etcd.
@@ -176,7 +177,7 @@ func (e *Etcd) Refresh() (*api.RangeAllocation, error) {
 		if storage.IsNotFound(err) {
 			return nil, nil
 		}
-		return nil, etcderr.InterpretGetError(err, e.kind, "")
+		return nil, etcderr.InterpretGetError(err, e.resource, "")
 	}
 
 	return existing, nil
@@ -187,7 +188,7 @@ func (e *Etcd) Refresh() (*api.RangeAllocation, error) {
 func (e *Etcd) Get() (*api.RangeAllocation, error) {
 	existing := &api.RangeAllocation{}
 	if err := e.storage.Get(context.TODO(), e.baseKey, existing, true); err != nil {
-		return nil, etcderr.InterpretGetError(err, e.kind, "")
+		return nil, etcderr.InterpretGetError(err, e.resource, "")
 	}
 	return existing, nil
 }
@@ -205,17 +206,17 @@ func (e *Etcd) CreateOrUpdate(snapshot *api.RangeAllocation) error {
 			switch {
 			case len(snapshot.ResourceVersion) != 0 && len(existing.ResourceVersion) != 0:
 				if snapshot.ResourceVersion != existing.ResourceVersion {
-					return nil, k8serr.NewConflict(e.kind, "", fmt.Errorf("the provided resource version does not match"))
+					return nil, k8serr.NewConflict(e.resource, "", fmt.Errorf("the provided resource version does not match"))
 				}
 			case len(existing.ResourceVersion) != 0:
-				return nil, k8serr.NewConflict(e.kind, "", fmt.Errorf("another caller has already initialized the resource"))
+				return nil, k8serr.NewConflict(e.resource, "", fmt.Errorf("another caller has already initialized the resource"))
 			}
 			last = snapshot.ResourceVersion
 			return snapshot, nil
 		}),
 	)
 	if err != nil {
-		return etcderr.InterpretUpdateError(err, e.kind, "")
+		return etcderr.InterpretUpdateError(err, e.resource, "")
 	}
 	err = e.alloc.Restore(snapshot.Range, snapshot.Data)
 	if err == nil {

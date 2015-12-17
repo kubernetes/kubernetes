@@ -78,7 +78,7 @@ func (p *testPatcher) New() runtime.Object {
 func (p *testPatcher) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	inPod := obj.(*api.Pod)
 	if inPod.ResourceVersion != p.updatePod.ResourceVersion {
-		return nil, false, apierrors.NewConflict("Pod", inPod.Name, fmt.Errorf("existing %v, new %v", p.updatePod.ResourceVersion, inPod.ResourceVersion))
+		return nil, false, apierrors.NewConflict(api.Resource("pods"), inPod.Name, fmt.Errorf("existing %v, new %v", p.updatePod.ResourceVersion, inPod.ResourceVersion))
 	}
 
 	return inPod, false, nil
@@ -306,7 +306,7 @@ func TestPatchResourceWithConflict(t *testing.T) {
 		changedPod:  &api.Pod{},
 		updatePod:   &api.Pod{},
 
-		expectedError: `Pod "foo" cannot be updated: existing 2, new 1`,
+		expectedError: `pods "foo" cannot be updated: existing 2, new 1`,
 	}
 
 	tc.startingPod.Name = name

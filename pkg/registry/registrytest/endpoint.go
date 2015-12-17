@@ -57,7 +57,7 @@ func (e *EndpointRegistry) GetEndpoints(ctx api.Context, name string) (*api.Endp
 			}
 		}
 	}
-	return nil, errors.NewNotFound("Endpoints", name)
+	return nil, errors.NewNotFound(api.Resource("endpoints"), name)
 }
 
 func (e *EndpointRegistry) WatchEndpoints(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {

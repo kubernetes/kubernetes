@@ -33,8 +33,15 @@ func (gr GroupResource) WithVersion(version string) GroupVersionResource {
 	return GroupVersionResource{Group: gr.Group, Version: version, Resource: gr.Resource}
 }
 
+func (gr GroupResource) IsEmpty() bool {
+	return len(gr.Group) == 0 && len(gr.Resource) == 0
+}
+
 func (gr *GroupResource) String() string {
-	return strings.Join([]string{gr.Group, ", Resource=", gr.Resource}, "")
+	if len(gr.Group) == 0 {
+		return gr.Resource
+	}
+	return gr.Resource + "." + gr.Group
 }
 
 // GroupVersionResource unambiguously identifies a resource.  It doesn't anonymously include GroupVersion
@@ -66,12 +73,19 @@ type GroupKind struct {
 	Kind  string
 }
 
+func (gk GroupKind) IsEmpty() bool {
+	return len(gk.Group) == 0 && len(gk.Kind) == 0
+}
+
 func (gk GroupKind) WithVersion(version string) GroupVersionKind {
 	return GroupVersionKind{Group: gk.Group, Version: version, Kind: gk.Kind}
 }
 
 func (gk *GroupKind) String() string {
-	return gk.Group + ", Kind=" + gk.Kind
+	if len(gk.Group) == 0 {
+		return gk.Kind
+	}
+	return gk.Kind + "." + gk.Group
 }
 
 // GroupVersionKind unambiguously identifies a kind.  It doesn't anonymously include GroupVersion

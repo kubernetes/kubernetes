@@ -23,14 +23,14 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
-func extractKindName(a Attributes) (name string, kind unversioned.GroupKind, err error) {
+func extractResourceName(a Attributes) (name string, resource unversioned.GroupResource, err error) {
 	name = "Unknown"
-	kind = a.GetKind()
+	resource = a.GetResource()
 	obj := a.GetObject()
 	if obj != nil {
 		objectMeta, err := api.ObjectMetaFor(obj)
 		if err != nil {
-			return "", unversioned.GroupKind{}, err
+			return "", unversioned.GroupResource{}, err
 		}
 
 		// this is necessary because name object name generation has not occurred yet
@@ -40,7 +40,7 @@ func extractKindName(a Attributes) (name string, kind unversioned.GroupKind, err
 			name = objectMeta.GenerateName
 		}
 	}
-	return name, kind, nil
+	return name, resource, nil
 }
 
 // NewForbidden is a utility function to return a well-formatted admission control error response
@@ -49,18 +49,18 @@ func NewForbidden(a Attributes, internalError error) error {
 	if apierrors.IsForbidden(internalError) {
 		return internalError
 	}
-	name, kind, err := extractKindName(a)
+	name, resource, err := extractResourceName(a)
 	if err != nil {
 		return apierrors.NewInternalError(utilerrors.NewAggregate([]error{internalError, err}))
 	}
-	return apierrors.NewForbidden(kind.Kind, name, internalError)
+	return apierrors.NewForbidden(resource, name, internalError)
 }
 
 // NewNotFound is a utility function to return a well-formatted admission control error response
 func NewNotFound(a Attributes) error {
-	name, kind, err := extractKindName(a)
+	name, resource, err := extractResourceName(a)
 	if err != nil {
 		return apierrors.NewInternalError(err)
 	}
-	return apierrors.NewNotFound(kind.Kind, name)
+	return apierrors.NewNotFound(resource, name)
 }

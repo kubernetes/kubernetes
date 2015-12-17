@@ -18,17 +18,18 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
 // InterpretListError converts a generic error on a retrieval
 // operation into the appropriate API error.
-func InterpretListError(err error, kind string) error {
+func InterpretListError(err error, qualifiedResource unversioned.GroupResource) error {
 	switch {
 	case storage.IsNotFound(err):
-		return errors.NewNotFound(kind, "")
+		return errors.NewNotFound(qualifiedResource, "")
 	case storage.IsUnreachable(err):
-		return errors.NewServerTimeout(kind, "list", 2) // TODO: make configurable or handled at a higher level
+		return errors.NewServerTimeout(qualifiedResource, "list", 2) // TODO: make configurable or handled at a higher level
 	default:
 		return err
 	}
@@ -36,12 +37,12 @@ func InterpretListError(err error, kind string) error {
 
 // InterpretGetError converts a generic error on a retrieval
 // operation into the appropriate API error.
-func InterpretGetError(err error, kind, name string) error {
+func InterpretGetError(err error, qualifiedResource unversioned.GroupResource, name string) error {
 	switch {
 	case storage.IsNotFound(err):
-		return errors.NewNotFound(kind, name)
+		return errors.NewNotFound(qualifiedResource, name)
 	case storage.IsUnreachable(err):
-		return errors.NewServerTimeout(kind, "get", 2) // TODO: make configurable or handled at a higher level
+		return errors.NewServerTimeout(qualifiedResource, "get", 2) // TODO: make configurable or handled at a higher level
 	default:
 		return err
 	}
@@ -49,12 +50,12 @@ func InterpretGetError(err error, kind, name string) error {
 
 // InterpretCreateError converts a generic error on a create
 // operation into the appropriate API error.
-func InterpretCreateError(err error, kind, name string) error {
+func InterpretCreateError(err error, qualifiedResource unversioned.GroupResource, name string) error {
 	switch {
 	case storage.IsNodeExist(err):
-		return errors.NewAlreadyExists(kind, name)
+		return errors.NewAlreadyExists(qualifiedResource, name)
 	case storage.IsUnreachable(err):
-		return errors.NewServerTimeout(kind, "create", 2) // TODO: make configurable or handled at a higher level
+		return errors.NewServerTimeout(qualifiedResource, "create", 2) // TODO: make configurable or handled at a higher level
 	default:
 		return err
 	}
@@ -62,12 +63,12 @@ func InterpretCreateError(err error, kind, name string) error {
 
 // InterpretUpdateError converts a generic error on a update
 // operation into the appropriate API error.
-func InterpretUpdateError(err error, kind, name string) error {
+func InterpretUpdateError(err error, qualifiedResource unversioned.GroupResource, name string) error {
 	switch {
 	case storage.IsTestFailed(err), storage.IsNodeExist(err):
-		return errors.NewConflict(kind, name, err)
+		return errors.NewConflict(qualifiedResource, name, err)
 	case storage.IsUnreachable(err):
-		return errors.NewServerTimeout(kind, "update", 2) // TODO: make configurable or handled at a higher level
+		return errors.NewServerTimeout(qualifiedResource, "update", 2) // TODO: make configurable or handled at a higher level
 	default:
 		return err
 	}
@@ -75,12 +76,12 @@ func InterpretUpdateError(err error, kind, name string) error {
 
 // InterpretDeleteError converts a generic error on a delete
 // operation into the appropriate API error.
-func InterpretDeleteError(err error, kind, name string) error {
+func InterpretDeleteError(err error, qualifiedResource unversioned.GroupResource, name string) error {
 	switch {
 	case storage.IsNotFound(err):
-		return errors.NewNotFound(kind, name)
+		return errors.NewNotFound(qualifiedResource, name)
 	case storage.IsUnreachable(err):
-		return errors.NewServerTimeout(kind, "delete", 2) // TODO: make configurable or handled at a higher level
+		return errors.NewServerTimeout(qualifiedResource, "delete", 2) // TODO: make configurable or handled at a higher level
 	default:
 		return err
 	}

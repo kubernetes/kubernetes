@@ -88,7 +88,7 @@ func (s strategy) Export(obj runtime.Object, exact bool) error {
 		errs := []*field.Error{
 			field.Invalid(field.NewPath("type"), t, "can not export service account secrets"),
 		}
-		return errors.NewInvalid("Secret", t.Name, errs)
+		return errors.NewInvalid(api.Kind("Secret"), t.Name, errs)
 	}
 	return nil
 }

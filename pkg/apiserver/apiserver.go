@@ -211,7 +211,7 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 	glog.Errorln(buffer.String())
 
 	// TODO: make status unversioned or plumb enough of the request to deduce the requested API version
-	errorJSON(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", "", "", "", 0, false), latest.GroupOrDie(api.GroupName).Codec, httpWriter)
+	errorJSON(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", api.Resource(""), "", "", 0, false), latest.GroupOrDie(api.GroupName).Codec, httpWriter)
 }
 
 func InstallServiceErrorHandler(container *restful.Container, requestResolver *RequestInfoResolver, apiVersions []string) {
@@ -234,7 +234,7 @@ func serviceErrorHandler(requestResolver *RequestInfoResolver, apiVersions []str
 		}
 	}
 
-	errorJSON(apierrors.NewGenericServerResponse(serviceErr.Code, "", "", "", "", 0, false), codec, response.ResponseWriter)
+	errorJSON(apierrors.NewGenericServerResponse(serviceErr.Code, "", api.Resource(""), "", "", 0, false), codec, response.ResponseWriter)
 }
 
 // Adds a service to return the supported api versions at the legacy /api.
