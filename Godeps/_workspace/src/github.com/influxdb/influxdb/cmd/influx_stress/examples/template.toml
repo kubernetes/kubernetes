@@ -1,0 +1,92 @@
+# This section can be removed
+[provision]
+  # The basic provisioner simply deletes and creates database.
+  # If `reset_database` is false, it will not attempt to delete the database
+  [provision.basic]
+    # If enabled the provisioner will actually run
+    enabled = true
+    # Address of the instance that is to be provisioned
+    address = "localhost:8086"
+    # Database the will be created/deleted
+    database = "stress"
+    # Attempt to delete database
+    reset_database = true
+
+# This section cannot be commented out
+# To prevent writes set `enabled=false`
+# in [write.influx_client.basic]
+[write]
+  [write.point_generator]
+    # The basic point generator will generate points of the form
+    # `cpu,host=server-%v,location=us-west value=234 123456`
+    [write.point_generator.basic]
+      # number of points that will be written for each of the series
+      point_count = 100
+      # number of series
+      series_count = 100000
+      # How much time between each timestamp
+      tick = "10s"
+      # Randomize timestamp a bit (not functional)
+      jitter = true
+      # Precision of points that are being written
+      precision = "s"
+      # name of the measurement that will be written
+      measurement = "cpu"
+      # The date for the first point that is written into influx
+      start_date = "2006-Jan-02"
+      # Defines a tag for a series
+      [[write.point_generator.basic.tag]]
+        key = "host"
+        value = "server"
+      [[write.point_generator.basic.tag]]
+        key = "location"
+        value = "us-west"
+      # Defines a field for a series
+      [[write.point_generator.basic.field]]
+        key = "value"
+        value = "float64" # supported types: float64, int, bool
+
+
+  [write.influx_client]
+    [write.influx_client.basic]
+      # If enabled the writer will actually write
+      enabled = true
+      # Addresses is an array of the Influxdb instances
+      addresses = ["localhost:8086"] # stress_test_server runs on port 1234
+      # Database that is being written to
+      database = "stress"
+      # Precision of points that are being written
+      precision = "s"
+      # Size of batches that are sent to db
+      batch_size = 10000
+      # Interval between each batch
+      batch_interval = "0s"
+      # How many concurrent writers to the db
+      concurrency = 10
+      # ssl enabled?
+      ssl = false
+      # format of points that are written to influxdb
+      format = "line_http" # line_udp (not supported yet), graphite_tcp (not supported yet), graphite_udp (not supported yet)
+
+# This section can be removed
+[read]
+  [read.query_generator]
+    [read.query_generator.basic]
+      # Template of the query that will be ran against the instance
+      template = "SELECT count(value) FROM cpu where host='server-%v'"
+      # How many times the templated query will be ran
+      query_count = 250
+
+  [read.query_client]
+    [read.query_client.basic]
+      # if enabled the reader will actually read
+      enabled = true
+      # Address of the instance that will be queried
+      addresses = ["localhost:8086"]
+      # Database that will be queried
+      database = "stress"
+      # Interval bewteen queries
+      query_interval = "100ms"
+      # Number of concurrent queriers
+      concurrency = 1
+

@@ -1,0 +1,25 @@
+package internal;
+
+message WriteShardRequest {
+    required uint64 ShardID = 1;
+    repeated bytes Points = 2;
+}
+
+message WriteShardResponse {
+    required int32 Code = 1;
+    optional string Message = 2;
+}
+
+message MapShardRequest {
+    required uint64 ShardID = 1;
+    required string Query = 2;
+    required int32 ChunkSize = 3;
+}
+
+message MapShardResponse {
+    required int32 Code = 1;
+    optional string Message = 2;
+    optional bytes Data = 3;
+    repeated string TagSets = 4;
+    repeated string Fields = 5;
+}

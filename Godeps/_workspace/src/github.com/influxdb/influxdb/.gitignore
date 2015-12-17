@@ -1,0 +1,75 @@
+*~
+src/
+
+config.json
+/bin/
+
+TAGS
+
+# vim temp files
+*.swp
+
+*.test
+/query/a.out*
+.DS_Store
+
+# ignore generated files.
+cmd/influxd/version.go
+
+# executables
+
+influx_stress
+**/influx_stress
+!**/influx_stress/
+
+influxd
+**/influxd
+!**/influxd/
+
+influx
+**/influx
+!**/influx/
+
+influxdb
+**/influxdb
+!**/influxdb/
+
+influx_inspect
+**/influx_inspect
+!**/influx_inspect/
+
+/benchmark-tool
+/main
+/benchmark-storage
+godef
+gosym
+gocode
+inspect-raft
+
+# dependencies
+out_rpm/
+packages/
+
+# autconf
+autom4te.cache/
+config.log
+config.status
+
+# log file
+influxdb.log
+benchmark.log
+
+# config file
+config.toml
+
+# test data files
+integration/migration_data/
+
+# goide project files
+.idea
+
+# goconvey config files
+*.goconvey
+
+// Ingnore SourceGraph directory
+.srclib-store/

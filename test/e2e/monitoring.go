@@ -27,6 +27,8 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 
+	"github.com/golang/glog"
+
 	. "github.com/onsi/ginkgo"
 )
 
@@ -52,8 +54,8 @@ const (
 	influxdbDatabaseName = "k8s"
 	influxdbUser         = "root"
 	influxdbPW           = "root"
-	podlistQuery         = "select distinct(pod_id) from \"cpu/usage_ns_cumulative\""
-	nodelistQuery        = "select distinct(hostname) from \"cpu/usage_ns_cumulative\""
+	podlistQuery         = "select max(value),max(pod_name) from \"cpu/usage_ns_cumulative\" group by pod_name"
+	nodelistQuery        = "select max(value),max(hostname) from \"cpu/usage_ns_cumulative\" group by hostname"
 	sleepBetweenAttempts = 5 * time.Second
 	testTimeout          = 5 * time.Minute
 )
@@ -136,38 +138,38 @@ func getAllNodesInCluster(c *client.Client) ([]string, error) {
 }
 
 func getInfluxdbClient(c *client.Client) (*influxdb.Client, error) {
-	proxyUrl := fmt.Sprintf("%s/api/v1/proxy/namespaces/%s/services/%s:api/", getMasterHost(), api.NamespaceSystem, influxdbService)
-	config := &influxdb.ClientConfig{
-		Host: proxyUrl,
+	proxyUrl := fmt.Sprintf("http://%s/api/v1/proxy/namespaces/%s/services/%s:api/", getMasterHost(), api.NamespaceSystem, influxdbService)
+	url, _ := url.Parse(proxyUrl)
+	config := influxdb.Config{
+		URL: *url,
 		// TODO(vishh): Infer username and pw from the Pod spec.
-		Username:   influxdbUser,
-		Password:   influxdbPW,
-		Database:   influxdbDatabaseName,
-		HttpClient: c.Client,
-		IsSecure:   true,
+		Username: influxdbUser,
+		Password: influxdbPW,
 	}
+	glog.Infof("Creating client: %+v", config)
 	return influxdb.NewClient(config)
 }
 
 func getInfluxdbData(c *influxdb.Client, query string) (map[string]bool, error) {
-	series, err := c.Query(query, influxdb.Second)
+	response, err := c.Query(influxdb.Query{Command: query, Database: influxdbDatabaseName})
 	if err != nil {
 		return nil, err
 	}
-	if len(series) != 1 {
-		return nil, fmt.Errorf("expected only one series from Influxdb for query %q. Got %+v", query, series)
+	glog.Infof("Result %v series", response)
+	if len(response.Results[0].Series) != 1 {
+		return nil, fmt.Errorf("expected only one series from Influxdb for query %q. Got %+v", query, response)
 	}
-	if len(series[0].GetColumns()) != 2 {
-		Failf("Expected two columns for query %q. Found %v", query, series[0].GetColumns())
+	if len(response.Results[0].Series[0].Columns) != 2 {
+		Failf("Expected two columns for query %q. Found %v", query, response.Results[0].Series[0].Columns)
 	}
 	result := map[string]bool{}
-	for _, point := range series[0].GetPoints() {
-		if len(point) != 2 {
+	for _, point := range response.Results[0].Series {
+		if len(point.Columns) != 2 {
 			Failf("Expected only two entries in a point for query %q. Got %v", query, point)
 		}
-		name, ok := point[1].(string)
+		name, ok := point.Values[1][0].(string)
 		if !ok {
-			Failf("expected %v to be a string, but it is %T", point[1], point[1])
+			Failf("expected %v to be a string, but it is %T", point.Values[1][0], point.Values[1][0])
 		}
 		result[name] = false
 	}

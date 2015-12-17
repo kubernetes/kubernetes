@@ -354,16 +354,6 @@
 			"Rev": "2b27fe17a1b3fb8472fde96d768fa70996adf201"
 		},
 		{
-			"ImportPath": "github.com/docker/docker/pkg/timeutils",
-			"Comment": "v1.4.1-4045-g2b27fe1",
-			"Rev": "2b27fe17a1b3fb8472fde96d768fa70996adf201"
-		},
-		{
-			"ImportPath": "github.com/docker/docker/pkg/units",
-			"Comment": "v1.4.1-4045-g2b27fe1",
-			"Rev": "2b27fe17a1b3fb8472fde96d768fa70996adf201"
-		},
-		{
 			"ImportPath": "github.com/docker/libcontainer",
 			"Comment": "v2.2.1",
 			"Rev": "5dc7ba0f24332273461e45bc49edcb4d5aa6c44c"
@@ -544,9 +534,9 @@
 			"Rev": "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
 		},
 		{
-			"ImportPath": "github.com/influxdb/influxdb/client",
-			"Comment": "v0.8.8",
-			"Rev": "afde71eb1740fd763ab9450e1f700ba0e53c36d0"
+			"ImportPath": "github.com/influxdb/influxdb",
+			"Comment": "v0.9.6-rc1-117-gff12e83",
+			"Rev": "ff12e83e7f7de6052b3c3328ac82b835ffbc72c1"
 		},
 		{
 			"ImportPath": "github.com/jonboulle/clockwork",
@@ -743,10 +733,6 @@
 		{
 			"ImportPath": "golang.org/x/crypto/ssh",
 			"Rev": "c84e1f8e3a7e322d497cd16c0e8a13c7e127baf3"
-		},
-		{
-			"ImportPath": "golang.org/x/exp/inotify",
-			"Rev": "d00e13ec443927751b2bd49e97dea7bf3b6a6487"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
