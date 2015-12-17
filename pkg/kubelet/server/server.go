@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package server
 
 import (
 	"crypto/tls"
@@ -48,7 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/portforward"
+	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
@@ -1146,7 +1146,7 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	switch err {
 	case nil:
 		break
-	case ErrContainerNotFound:
+	case kubecontainer.ErrContainerNotFound:
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	default:

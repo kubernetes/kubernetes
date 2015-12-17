@@ -47,6 +47,10 @@ var (
 	// Required Image is absent on host and PullPolicy is NeverPullImage
 	ErrImageNeverPull = errors.New("ErrImageNeverPull")
 
+	// ErrContainerNotFound returned when a container in the given pod with the
+	// given container name was not found, amongst those managed by the kubelet.
+	ErrContainerNotFound = errors.New("no matching container")
+
 	// Get http error when pulling image from registry
 	RegistryUnavailable = errors.New("RegistryUnavailable")
 )
