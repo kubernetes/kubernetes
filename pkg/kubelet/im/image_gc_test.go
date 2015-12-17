@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package im
 
 import (
 	"fmt"
@@ -31,12 +31,13 @@ import (
 
 var zero time.Time
 
-func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *container.FakeRuntime, *cadvisor.Mock) {
+func newRealImageManager(policy ImageGCPolicy) (*realImageGC, *container.FakeRuntime, *cadvisor.Mock) {
 	fakeRuntime := &container.FakeRuntime{}
 	mockCadvisor := new(cadvisor.Mock)
-	return &realImageManager{
+	return &realImageGC{
 		runtime:      fakeRuntime,
 		policy:       policy,
+		minAge:       0,
 		imageRecords: make(map[string]*imageRecord),
 		cadvisor:     mockCadvisor,
 		recorder:     &record.FakeRecorder{},
@@ -44,12 +45,12 @@ func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *container.Fa
 }
 
 // Accessors used for thread-safe testing.
-func (im *realImageManager) imageRecordsLen() int {
+func (im *realImageGC) imageRecordsLen() int {
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()
 	return len(im.imageRecords)
 }
-func (im *realImageManager) getImageRecord(name string) (*imageRecord, bool) {
+func (im *realImageGC) getImageRecord(name string) (*imageRecord, bool) {
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()
 	v, ok := im.imageRecords[name]
@@ -99,11 +100,11 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 	assert.Equal(manager.imageRecordsLen(), 2)
 	noContainer, ok := manager.getImageRecord(imageName(0))
 	require.True(t, ok)
-	assert.Equal(zero, noContainer.detected)
+	assert.Equal(zero, noContainer.firstDetected)
 	assert.Equal(zero, noContainer.lastUsed)
 	withContainer, ok := manager.getImageRecord(imageName(1))
 	require.True(t, ok)
-	assert.Equal(zero, withContainer.detected)
+	assert.Equal(zero, withContainer.firstDetected)
 	assert.True(withContainer.lastUsed.After(startTime))
 }
 
@@ -134,22 +135,22 @@ func TestDetectImagesWithNewImage(t *testing.T) {
 		makeImage(2, 1024),
 	}
 
-	detectedTime := zero.Add(time.Second)
+	firstDetectedTime := zero.Add(time.Second)
 	startTime := time.Now().Add(-time.Millisecond)
-	err = manager.detectImages(detectedTime)
+	err = manager.detectImages(firstDetectedTime)
 	require.NoError(t, err)
 	assert.Equal(manager.imageRecordsLen(), 3)
 	noContainer, ok := manager.getImageRecord(imageName(0))
 	require.True(t, ok)
-	assert.Equal(zero, noContainer.detected)
+	assert.Equal(zero, noContainer.firstDetected)
 	assert.Equal(zero, noContainer.lastUsed)
 	withContainer, ok := manager.getImageRecord(imageName(1))
 	require.True(t, ok)
-	assert.Equal(zero, withContainer.detected)
+	assert.Equal(zero, withContainer.firstDetected)
 	assert.True(withContainer.lastUsed.After(startTime))
 	newContainer, ok := manager.getImageRecord(imageName(2))
 	require.True(t, ok)
-	assert.Equal(detectedTime, newContainer.detected)
+	assert.Equal(firstDetectedTime, newContainer.firstDetected)
 	assert.Equal(zero, noContainer.lastUsed)
 }
 
@@ -181,11 +182,11 @@ func TestDetectImagesContainerStopped(t *testing.T) {
 	assert.Equal(manager.imageRecordsLen(), 2)
 	container1, ok := manager.getImageRecord(imageName(0))
 	require.True(t, ok)
-	assert.Equal(zero, container1.detected)
+	assert.Equal(zero, container1.firstDetected)
 	assert.Equal(zero, container1.lastUsed)
 	container2, ok := manager.getImageRecord(imageName(1))
 	require.True(t, ok)
-	assert.Equal(zero, container2.detected)
+	assert.Equal(zero, container2.firstDetected)
 	assert.True(container2.lastUsed.Equal(withContainer.lastUsed))
 }
 
@@ -289,7 +290,7 @@ func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
 		},
 	}
 
-	// Make 1 more recently detected but used at the same time as 0.
+	// Make 1 more recently firstDetected but used at the same time as 0.
 	require.NoError(t, manager.detectImages(zero))
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
