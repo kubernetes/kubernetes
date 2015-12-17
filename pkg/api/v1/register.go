@@ -79,6 +79,7 @@ func addKnownTypes() {
 		&PersistentVolumeClaim{},
 		&PersistentVolumeClaimList{},
 		&DeleteOptions{},
+		&ExportOptions{},
 		&ListOptions{},
 		&PodAttachOptions{},
 		&PodLogOptions{},
@@ -135,3 +136,4 @@ func (obj *ComponentStatus) GetObjectKind() unversioned.ObjectKind           { r
 func (obj *ComponentStatusList) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }
 func (obj *SerializedReference) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }
 func (obj *RangeAllocation) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
+func (obj *ExportOptions) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
