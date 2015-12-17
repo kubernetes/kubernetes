@@ -83,7 +83,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: gcr.io/google_containers/cassandra:v6
+          image: gcr.io/google_containers/cassandra:v7
           name: cassandra
           ports:
             - containerPort: 9042
@@ -222,7 +222,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: gcr.io/google_containers/cassandra:v6
+          image: gcr.io/google_containers/cassandra:v7
           name: cassandra
           ports:
             - containerPort: 9042
@@ -339,7 +339,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: "gcr.io/google_containers/cassandra:v6"
+          image: "gcr.io/google_containers/cassandra:v7"
           name: cassandra
           ports:
             - containerPort: 9042
