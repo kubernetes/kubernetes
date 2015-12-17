@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -94,12 +93,9 @@ func readExpBackoffConfig() BackoffManager {
 
 	backoffBaseInt, errBase := strconv.ParseInt(backoffBase, 10, 64)
 	backoffDurationInt, errDuration := strconv.ParseInt(backoffDuration, 10, 64)
-
 	if errBase != nil || errDuration != nil {
-		glog.V(2).Infof("Configuring no exponential backoff.")
 		return &NoBackoff{}
 	} else {
-		glog.V(2).Infof("Configuring exponential backoff as %v, %v", backoffBaseInt, backoffDurationInt)
 		return &URLBackoff{
 			Backoff: util.NewBackOff(
 				time.Duration(backoffBaseInt)*time.Second,
