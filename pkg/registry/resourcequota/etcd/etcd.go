@@ -54,7 +54,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return resourcequota.MatchResourceQuota(label, field)
 		},
-		EndpointName: "resourcequotas",
+		QualifiedResource: api.Resource("resourcequotas"),
 
 		CreateStrategy:      resourcequota.Strategy,
 		UpdateStrategy:      resourcequota.Strategy,

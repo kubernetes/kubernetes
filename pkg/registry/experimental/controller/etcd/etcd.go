@@ -66,7 +66,7 @@ func (r *ScaleREST) New() runtime.Object {
 func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 	rc, err := (*r.registry).GetController(ctx, name)
 	if err != nil {
-		return nil, errors.NewNotFound("scale", name)
+		return nil, errors.NewNotFound(extensions.Resource("replicationcontrollers/scale"), name)
 	}
 	return &extensions.Scale{
 		ObjectMeta: api.ObjectMeta{
@@ -94,17 +94,17 @@ func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object,
 	}
 
 	if errs := extvalidation.ValidateScale(scale); len(errs) > 0 {
-		return nil, false, errors.NewInvalid("scale", scale.Name, errs)
+		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), scale.Name, errs)
 	}
 
 	rc, err := (*r.registry).GetController(ctx, scale.Name)
 	if err != nil {
-		return nil, false, errors.NewNotFound("scale", scale.Name)
+		return nil, false, errors.NewNotFound(extensions.Resource("replicationcontrollers/scale"), scale.Name)
 	}
 	rc.Spec.Replicas = scale.Spec.Replicas
 	rc, err = (*r.registry).UpdateController(ctx, rc)
 	if err != nil {
-		return nil, false, errors.NewConflict("scale", scale.Name, err)
+		return nil, false, errors.NewConflict(extensions.Resource("replicationcontrollers/scale"), scale.Name, err)
 	}
 	return &extensions.Scale{
 		ObjectMeta: api.ObjectMeta{

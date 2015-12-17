@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -47,7 +48,7 @@ func ParseWatchResourceVersion(resourceVersion string) (uint64, error) {
 	}
 	version, err := strconv.ParseUint(resourceVersion, 10, 64)
 	if err != nil {
-		return 0, errors.NewInvalid("", "", field.ErrorList{
+		return 0, errors.NewInvalid(unversioned.GroupKind{}, "", field.ErrorList{
 			// Validation errors are supposed to return version-specific field
 			// paths, but this is probably close enough.
 			field.Invalid(field.NewPath("resourceVersion"), resourceVersion, err.Error()),

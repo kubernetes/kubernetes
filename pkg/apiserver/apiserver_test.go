@@ -1489,7 +1489,7 @@ func TestGetNamespaceSelfLink(t *testing.T) {
 func TestGetMissing(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
-		errors: map[string]error{"get": apierrs.NewNotFound("simple", "id")},
+		errors: map[string]error{"get": apierrs.NewNotFound(api.Resource("simples"), "id")},
 	}
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
@@ -1590,7 +1590,7 @@ func TestConnectResponderError(t *testing.T) {
 	connectStorage := &ConnecterRESTStorage{}
 	connectStorage.handlerFunc = func() http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			connectStorage.receivedResponder.Error(apierrs.NewForbidden("simple", itemID, errors.New("you are terminated")))
+			connectStorage.receivedResponder.Error(apierrs.NewForbidden(api.Resource("simples"), itemID, errors.New("you are terminated")))
 		})
 	}
 	storage := map[string]rest.Storage{
@@ -1897,7 +1897,7 @@ func TestDeleteMissing(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	ID := "id"
 	simpleStorage := SimpleRESTStorage{
-		errors: map[string]error{"delete": apierrs.NewNotFound("simple", ID)},
+		errors: map[string]error{"delete": apierrs.NewNotFound(api.Resource("simples"), ID)},
 	}
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
@@ -2198,7 +2198,7 @@ func TestUpdateMissing(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	ID := "id"
 	simpleStorage := SimpleRESTStorage{
-		errors: map[string]error{"update": apierrs.NewNotFound("simple", ID)},
+		errors: map[string]error{"update": apierrs.NewNotFound(api.Resource("simples"), ID)},
 	}
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
@@ -2233,7 +2233,7 @@ func TestCreateNotFound(t *testing.T) {
 		"simple": &SimpleRESTStorage{
 			// storage.Create can fail with not found error in theory.
 			// See http://pr.k8s.io/486#discussion_r15037092.
-			errors: map[string]error{"create": apierrs.NewNotFound("simple", "id")},
+			errors: map[string]error{"create": apierrs.NewNotFound(api.Resource("simples"), "id")},
 		},
 	})
 	server := httptest.NewServer(handler)
@@ -2729,7 +2729,7 @@ func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *u
 func TestDelayReturnsError(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
-			return nil, apierrs.NewAlreadyExists("foo", "bar")
+			return nil, apierrs.NewAlreadyExists(api.Resource("foos"), "bar")
 		},
 	}
 	handler := handle(map[string]rest.Storage{"foo": &storage})

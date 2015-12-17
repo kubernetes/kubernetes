@@ -71,8 +71,8 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator, con
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Node).Name, nil
 		},
-		PredicateFunc: node.MatchNode,
-		EndpointName:  "node",
+		PredicateFunc:     node.MatchNode,
+		QualifiedResource: api.Resource("nodes"),
 
 		CreateStrategy: node.Strategy,
 		UpdateStrategy: node.Strategy,

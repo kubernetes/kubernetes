@@ -19,6 +19,7 @@ package rest
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -71,14 +72,14 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx api.Context, obj runtime.Obje
 	api.GenerateName(strategy, objectMeta)
 
 	if errs := strategy.Validate(ctx, obj); len(errs) > 0 {
-		return errors.NewInvalid(kind, objectMeta.Name, errs)
+		return errors.NewInvalid(kind.GroupKind(), objectMeta.Name, errs)
 	}
 
 	// Custom validation (including name validation) passed
 	// Now run common validation on object meta
 	// Do this *after* custom validation so that specific error messages are shown whenever possible
 	if errs := validation.ValidateObjectMeta(objectMeta, strategy.NamespaceScoped(), validation.ValidatePathSegmentName, field.NewPath("metadata")); len(errs) > 0 {
-		return errors.NewInvalid(kind, objectMeta.Name, errs)
+		return errors.NewInvalid(kind.GroupKind(), objectMeta.Name, errs)
 	}
 
 	strategy.Canonicalize(obj)
@@ -102,18 +103,18 @@ func CheckGeneratedNameError(strategy RESTCreateStrategy, err error, obj runtime
 		return err
 	}
 
-	return errors.NewServerTimeout(kind, "POST", 0)
+	return errors.NewServerTimeoutForKind(kind.GroupKind(), "POST", 0)
 }
 
 // objectMetaAndKind retrieves kind and ObjectMeta from a runtime object, or returns an error.
-func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (*api.ObjectMeta, string, error) {
+func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (*api.ObjectMeta, unversioned.GroupVersionKind, error) {
 	objectMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
-		return nil, "", errors.NewInternalError(err)
+		return nil, unversioned.GroupVersionKind{}, errors.NewInternalError(err)
 	}
-	gvk, err := typer.ObjectKind(obj)
+	kind, err := typer.ObjectKind(obj)
 	if err != nil {
-		return nil, "", errors.NewInternalError(err)
+		return nil, unversioned.GroupVersionKind{}, errors.NewInternalError(err)
 	}
-	return objectMeta, gvk.Kind, nil
+	return objectMeta, kind, nil
 }
