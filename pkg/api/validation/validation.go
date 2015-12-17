@@ -58,7 +58,6 @@ func InclusiveRangeErrorMsg(lo, hi int) string {
 	return fmt.Sprintf(`must be between %d and %d, inclusive`, lo, hi)
 }
 
-var DNSSubdomainErrorMsg string = fmt.Sprintf(`must be a DNS subdomain (at most %d characters, matching regex %s): e.g. "example.com"`, validation.DNS1123SubdomainMaxLength, validation.DNS1123SubdomainFmt)
 var DNS952LabelErrorMsg string = fmt.Sprintf(`must be a DNS 952 label (at most %d characters, matching regex %s): e.g. "my-name"`, validation.DNS952LabelMaxLength, validation.DNS952LabelFmt)
 var pdPartitionErrorMsg string = InclusiveRangeErrorMsg(1, 255)
 var PortRangeErrorMsg string = InclusiveRangeErrorMsg(1, 65535)
@@ -241,10 +240,7 @@ func NameIsDNSSubdomain(name string, prefix bool) []string {
 	if prefix {
 		name = maskTrailingDash(name)
 	}
-	if validation.IsDNS1123Subdomain(name) {
-		return nil
-	}
-	return []string{DNSSubdomainErrorMsg}
+	return validation.IsDNS1123Subdomain(name)
 }
 
 // NameIsDNSLabel is a ValidateNameFunc for names that must be a DNS 1123 label.
@@ -3014,7 +3010,7 @@ func ValidateLoadBalancerStatus(status *api.LoadBalancerStatus, fldPath *field.P
 			}
 		}
 		if len(ingress.Hostname) > 0 {
-			for _, msg := range NameIsDNSSubdomain(ingress.Hostname, false) {
+			for _, msg := range validation.IsDNS1123Subdomain(ingress.Hostname) {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, msg))
 			}
 			if isIP := (net.ParseIP(ingress.Hostname) != nil); isIP {

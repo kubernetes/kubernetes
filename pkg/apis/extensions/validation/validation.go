@@ -353,7 +353,7 @@ func validateIngressRules(IngressRules []extensions.IngressRule, fldPath *field.
 		if len(ih.Host) > 0 {
 			// TODO: Ports and ips are allowed in the host part of a url
 			// according to RFC 3986, consider allowing them.
-			for _, msg := range apivalidation.NameIsDNSSubdomain(ih.Host, false) {
+			for _, msg := range validation.IsDNS1123Subdomain(ih.Host) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, msg))
 			}
 			if isIP := (net.ParseIP(ih.Host) != nil); isIP {
