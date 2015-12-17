@@ -337,7 +337,7 @@ function find-release-tars() {
 
   # This tarball is only used by Ubuntu Trusty.
   KUBE_MANIFESTS_TAR=
-  if [[ "${KUBE_OS_DISTRIBUTION}" == "trusty" ]]; then
+  if [[ "${KUBE_OS_DISTRIBUTION:-}" == "trusty" ]]; then
     KUBE_MANIFESTS_TAR="${KUBE_ROOT}/server/kubernetes-manifests.tar.gz"
     if [[ ! -f "${KUBE_MANIFESTS_TAR}" ]]; then
       KUBE_MANIFESTS_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-manifests.tar.gz"
