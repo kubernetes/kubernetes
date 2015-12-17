@@ -105,6 +105,10 @@ function configure_upgrade_step() {
   if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
     DOGFOOD_GCLOUD="true"
     GKE_API_ENDPOINT="https://test-container.sandbox.googleapis.com/"
+  else
+    NUM_NODES=5
+    KUBE_ENABLE_DEPLOYMENTS=true
+    KUBE_ENABLE_DAEMONSETS=true
   fi
 
   E2E_CLUSTER_NAME="$cluster_name"
@@ -774,6 +778,28 @@ case ${JOB_NAME} in
 
   kubernetes-upgrade-gke-1.1-master-step7-e2e-new)
     configure_upgrade_step 'configured-in-release-1.1' 'ci/latest' 'upgrade-gke-1-1-master' 'kubernetes-jenkins-gke-upgrade'
+    ;;
+
+  # kubernetes-upgrade-gce-1.1-master
+  #
+  # Test upgrades from the latest release-1.1 build to the latest master build.
+  #
+  # Configurations for step1, step4, and step6 live in the release-1.1 branch.
+
+  kubernetes-upgrade-gce-1.1-master-step2-kubectl-e2e-new)
+    configure_upgrade_step 'configured-in-release-1.1' 'ci/latest' 'upgrade-gce-1-1-master' 'k8s-jkns-gce-upgrade'
+    ;;
+
+  kubernetes-upgrade-gce-1.1-master-step3-upgrade-master)
+    configure_upgrade_step 'configured-in-release-1.1' 'ci/latest' 'upgrade-gce-1-1-master' 'k8s-jkns-gce-upgrade'
+    ;;
+
+  kubernetes-upgrade-gce-1.1-master-step5-upgrade-cluster)
+    configure_upgrade_step 'configured-in-release-1.1' 'ci/latest' 'upgrade-gce-1-1-master' 'k8s-jkns-gce-upgrade'
+    ;;
+
+  kubernetes-upgrade-gce-1.1-master-step7-e2e-new)
+    configure_upgrade_step 'configured-in-release-1.1' 'ci/latest' 'upgrade-gce-1-1-master' 'k8s-jkns-gce-upgrade'
     ;;
 
   # kubernetes-upgrade-gce
