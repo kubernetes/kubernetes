@@ -45,11 +45,11 @@ type provision struct {
 }
 
 func (p *provision) Admit(a admission.Attributes) (err error) {
-	gvk, err := api.RESTMapper.KindFor(a.GetResource().Resource)
+	kind, err := api.RESTMapper.KindFor(a.GetResource().WithVersion(""))
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
-	mapping, err := api.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	mapping, err := api.RESTMapper.RESTMapping(kind.GroupKind(), kind.Version)
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
