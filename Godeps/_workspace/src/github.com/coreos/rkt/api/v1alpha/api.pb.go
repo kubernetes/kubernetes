@@ -325,19 +325,19 @@ func (m *KeyValue) String() string { return proto.CompactTextString(m) }
 func (*KeyValue) ProtoMessage()    {}
 
 // PodFilter defines the condition that the returned pods need to satisfy in ListPods().
-// The conditions are combined by 'AND'.
+// The conditions are combined by 'AND', and different filters are combined by 'OR'.
 type PodFilter struct {
 	// If not empty, the pods that have any of the ids will be returned.
 	Ids []string `protobuf:"bytes,1,rep,name=ids" json:"ids,omitempty"`
 	// If not empty, the pods that have any of the states will be returned.
 	States []PodState `protobuf:"varint,2,rep,name=states,enum=v1alpha.PodState" json:"states,omitempty"`
-	// If not empty, the pods that have any of the apps will be returned.
+	// If not empty, the pods that all of the apps will be returned.
 	AppNames []string `protobuf:"bytes,3,rep,name=app_names" json:"app_names,omitempty"`
-	// If not empty, the pods that have any of the images(in the apps) will be returned
+	// If not empty, the pods that have all of the images(in the apps) will be returned
 	ImageIds []string `protobuf:"bytes,4,rep,name=image_ids" json:"image_ids,omitempty"`
-	// If not empty, the pods that are in any of the networks will be returned.
+	// If not empty, the pods that are in all of the networks will be returned.
 	NetworkNames []string `protobuf:"bytes,5,rep,name=network_names" json:"network_names,omitempty"`
-	// If not empty, the pods that have any of the annotations will be returned.
+	// If not empty, the pods that have all of the annotations will be returned.
 	Annotations []*KeyValue `protobuf:"bytes,6,rep,name=annotations" json:"annotations,omitempty"`
 }
 
@@ -353,7 +353,7 @@ func (m *PodFilter) GetAnnotations() []*KeyValue {
 }
 
 // ImageFilter defines the condition that the returned images need to satisfy in ListImages().
-// The conditions are combined by 'AND'.
+// The conditions are combined by 'AND', and different filters are combined by 'OR'.
 type ImageFilter struct {
 	// If not empty, the images that have any of the ids will be returned.
 	Ids []string `protobuf:"bytes,1,rep,name=ids" json:"ids,omitempty"`
@@ -366,13 +366,13 @@ type ImageFilter struct {
 	// If not empty, the images that have any of the keywords in the name will be returned.
 	// For example, both 'kubernetes-etcd', 'etcd:latest' will be returned if 'etcd' is included,
 	Keywords []string `protobuf:"bytes,4,rep,name=keywords" json:"keywords,omitempty"`
-	// If not empty, the images that have any of the labels will be returned.
+	// If not empty, the images that have all of the labels will be returned.
 	Labels []*KeyValue `protobuf:"bytes,5,rep,name=labels" json:"labels,omitempty"`
 	// If set, the images that are imported after this timestamp will be returned.
 	ImportedAfter int64 `protobuf:"varint,6,opt,name=imported_after" json:"imported_after,omitempty"`
 	// If set, the images that are imported before this timestamp will be returned.
 	ImportedBefore int64 `protobuf:"varint,7,opt,name=imported_before" json:"imported_before,omitempty"`
-	// If not empty, the images that have any of the annotations will be returned.
+	// If not empty, the images that have all of the annotations will be returned.
 	Annotations []*KeyValue `protobuf:"bytes,8,rep,name=annotations" json:"annotations,omitempty"`
 }
 
@@ -486,16 +486,17 @@ func (m *GetInfoResponse) GetInfo() *Info {
 
 // Request for ListPods().
 type ListPodsRequest struct {
-	Filter *PodFilter `protobuf:"bytes,1,opt,name=filter" json:"filter,omitempty"`
+	Filters []*PodFilter `protobuf:"bytes,1,rep,name=filters" json:"filters,omitempty"`
+	Detail  bool         `protobuf:"varint,2,opt,name=detail" json:"detail,omitempty"`
 }
 
 func (m *ListPodsRequest) Reset()         { *m = ListPodsRequest{} }
 func (m *ListPodsRequest) String() string { return proto.CompactTextString(m) }
 func (*ListPodsRequest) ProtoMessage()    {}
 
-func (m *ListPodsRequest) GetFilter() *PodFilter {
+func (m *ListPodsRequest) GetFilters() []*PodFilter {
 	if m != nil {
-		return m.Filter
+		return m.Filters
 	}
 	return nil
 }
@@ -544,16 +545,17 @@ func (m *InspectPodResponse) GetPod() *Pod {
 
 // Request for ListImages().
 type ListImagesRequest struct {
-	Filter *ImageFilter `protobuf:"bytes,1,opt,name=filter" json:"filter,omitempty"`
+	Filters []*ImageFilter `protobuf:"bytes,1,rep,name=filters" json:"filters,omitempty"`
+	Detail  bool           `protobuf:"varint,2,opt,name=detail" json:"detail,omitempty"`
 }
 
 func (m *ListImagesRequest) Reset()         { *m = ListImagesRequest{} }
 func (m *ListImagesRequest) String() string { return proto.CompactTextString(m) }
 func (*ListImagesRequest) ProtoMessage()    {}
 
-func (m *ListImagesRequest) GetFilter() *ImageFilter {
+func (m *ListImagesRequest) GetFilters() []*ImageFilter {
 	if m != nil {
-		return m.Filter
+		return m.Filters
 	}
 	return nil
 }

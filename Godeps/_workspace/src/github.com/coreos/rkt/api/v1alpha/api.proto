@@ -162,7 +162,7 @@ message KeyValue {
 }
 
 // PodFilter defines the condition that the returned pods need to satisfy in ListPods().
-// The conditions are combined by 'AND'.
+// The conditions are combined by 'AND', and different filters are combined by 'OR'.
 message PodFilter {
         // If not empty, the pods that have any of the ids will be returned.
         repeated string ids = 1;
@@ -170,21 +170,21 @@ message PodFilter {
         // If not empty, the pods that have any of the states will be returned.
         repeated PodState states = 2;
 
-        // If not empty, the pods that have any of the apps will be returned.
+        // If not empty, the pods that all of the apps will be returned.
         repeated string app_names = 3;
 
-        // If not empty, the pods that have any of the images(in the apps) will be returned
+        // If not empty, the pods that have all of the images(in the apps) will be returned
         repeated string image_ids = 4;
 
-        // If not empty, the pods that are in any of the networks will be returned.
+        // If not empty, the pods that are in all of the networks will be returned.
         repeated string network_names = 5;
 
-        // If not empty, the pods that have any of the annotations will be returned.
+        // If not empty, the pods that have all of the annotations will be returned.
         repeated KeyValue annotations = 6;
 }
 
 // ImageFilter defines the condition that the returned images need to satisfy in ListImages().
-// The conditions are combined by 'AND'.
+// The conditions are combined by 'AND', and different filters are combined by 'OR'.
 message ImageFilter {
         // If not empty, the images that have any of the ids will be returned.
         repeated string ids = 1;
@@ -201,7 +201,7 @@ message ImageFilter {
         // For example, both 'kubernetes-etcd', 'etcd:latest' will be returned if 'etcd' is included,
         repeated string keywords = 4;
 
-        // If not empty, the images that have any of the labels will be returned.
+        // If not empty, the images that have all of the labels will be returned.
         repeated KeyValue labels = 5;
 
         // If set, the images that are imported after this timestamp will be returned.
@@ -210,7 +210,7 @@ message ImageFilter {
         // If set, the images that are imported before this timestamp will be returned.
         int64 imported_before = 7;
 
-        // If not empty, the images that have any of the annotations will be returned.
+        // If not empty, the images that have all of the annotations will be returned.
         repeated KeyValue annotations = 8;
 }
 
@@ -291,7 +291,6 @@ message EventFilter {
         int64 until_time = 5;
 }
 
-
 // Request for GetInfo().
 message GetInfoRequest {}
 
@@ -302,7 +301,8 @@ message GetInfoResponse {
 
 // Request for ListPods().
 message ListPodsRequest {
-        PodFilter filter = 1; // Optional.
+        repeated PodFilter filters = 1; // Optional.
+        bool detail = 2; // Optional.
 }
 
 // Response for ListPods().
@@ -323,7 +323,8 @@ message InspectPodResponse {
 
 // Request for ListImages().
 message ListImagesRequest {
-        ImageFilter filter = 1; // Optional.
+        repeated ImageFilter filters = 1; // Optional.
+        bool detail = 2; // Optional.
 }
 
 // Response for ListImages().

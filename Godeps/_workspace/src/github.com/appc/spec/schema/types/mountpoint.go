@@ -19,7 +19,8 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
-	"strings"
+
+	"github.com/appc/spec/schema/common"
 )
 
 type MountPoint struct {
@@ -48,7 +49,12 @@ func MountPointFromString(mp string) (*MountPoint, error) {
 	var mount MountPoint
 
 	mp = "name=" + mp
-	v, err := url.ParseQuery(strings.Replace(mp, ",", "&", -1))
+	mpQuery, err := common.MakeQueryString(mp)
+	if err != nil {
+		return nil, err
+	}
+
+	v, err := url.ParseQuery(mpQuery)
 	if err != nil {
 		return nil, err
 	}
