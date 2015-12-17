@@ -77,9 +77,9 @@ func main() {
 		u.Add(1)
 	}
 
-	w := sync.WaitGroup{}
-	for _, h := range strings.Split(*hosts, ",") {
-		w.Add(1)
+	results := make(chan error)
+	hs := strings.Split(*hosts, ",")
+	for _, h := range hs {
 		go func(host string) {
 			out, err := runTests(host)
 			if err != nil {
@@ -87,7 +87,7 @@ func main() {
 			} else {
 				glog.Infof("Success Finished Host %s Test Suite %s", host, out)
 			}
-			w.Done()
+			results <- err
 		}(h)
 	}
 
@@ -96,9 +96,19 @@ func main() {
 		WaitForUser()
 	}
 
-	// Wait for the tests to finish
-	w.Wait()
-	glog.Infof("Done")
+	// Wait for all tests to complete and check for failures
+	errCount := 0
+	for i := 0; i < len(hs); i++ {
+		if <-results != nil {
+			errCount++
+		}
+	}
+
+	// Set the exit code if there were failures
+	if errCount > 0 {
+		glog.Errorf("Failure: %d errors encountered.", errCount)
+		os.Exit(1)
+	}
 }
 
 func WaitForUser() {
