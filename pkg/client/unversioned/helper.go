@@ -248,14 +248,15 @@ func NegotiateVersion(client *Client, c *Config, requestedGV *unversioned.GroupV
 	for _, gv := range clientRegisteredGVs {
 		clientVersions.Insert(gv.String())
 	}
-	apiVersions, err := client.ServerAPIVersions()
+	groups, err := client.ServerGroups()
 	if err != nil {
 		// This is almost always a connection error, and higher level code should treat this as a generic error,
 		// not a negotiation specific error.
 		return nil, err
 	}
+	versions := ExtractGroupVersions(groups)
 	serverVersions := sets.String{}
-	for _, v := range apiVersions.Versions {
+	for _, v := range versions {
 		serverVersions.Insert(v)
 	}
 
@@ -362,10 +363,14 @@ func SetKubernetesDefaults(config *Config) error {
 	if len(config.UserAgent) == 0 {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil {
-		config.GroupVersion = defaultVersionFor(config)
+	g, err := latest.Group(api.GroupName)
+	if err != nil {
+		return err
 	}
-	versionInterfaces, err := latest.GroupOrDie(api.GroupName).InterfacesFor(*config.GroupVersion)
+	// TODO: Unconditionally set the config.Version, until we fix the config.
+	copyGroupVersion := g.GroupVersion
+	config.GroupVersion = &copyGroupVersion
+	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
 	if err != nil {
 		return fmt.Errorf("API version '%v' is not recognized (valid values: %v)", *config.GroupVersion, latest.GroupOrDie(api.GroupName).GroupVersions)
 	}
