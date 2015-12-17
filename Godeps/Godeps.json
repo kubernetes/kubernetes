@@ -44,8 +44,8 @@
 		},
 		{
 			"ImportPath": "github.com/appc/spec/schema",
-			"Comment": "v0.7.1",
-			"Rev": "818ac4d0073424f4e0a46f45abaa147ccc1b5a24"
+			"Comment": "v0.7.4",
+			"Rev": "0875c991a496fe2b65ed296551c667b199a6bfb8"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/aws",
@@ -114,6 +114,10 @@
 		{
 			"ImportPath": "github.com/bradfitz/http2",
 			"Rev": "3e36af6d3af0e56fa3da71099f864933dea3d9fb"
+		},
+		{
+			"ImportPath": "github.com/camlistore/camlistore/pkg/errorutil",
+			"Rev": "9868aa0f8d8a93ff0b30ff0de46cc351b6b88b30"
 		},
 		{
 			"ImportPath": "github.com/codegangsta/negroni",
@@ -312,8 +316,8 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/rkt/api/v1alpha",
-			"Comment": "v0.11.0-22-g71d7331",
-			"Rev": "71d7331e46f20aaa41bed05e861bfeca92249968"
+			"Comment": "v0.13.0-98-gddfa976",
+			"Rev": "ddfa97689c1f8e89aff51368300c34da4c74091b"
 		},
 		{
 			"ImportPath": "github.com/cpuguy83/go-md2man/md2man",

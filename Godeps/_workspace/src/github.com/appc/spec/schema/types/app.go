@@ -67,13 +67,13 @@ func (a *App) assertValid() error {
 		return err
 	}
 	if a.User == "" {
-		return errors.New(`User is required`)
+		return errors.New(`user is required`)
 	}
 	if a.Group == "" {
-		return errors.New(`Group is required`)
+		return errors.New(`group is required`)
 	}
 	if !path.IsAbs(a.WorkingDirectory) && a.WorkingDirectory != "" {
-		return errors.New("WorkingDirectory must be an absolute path")
+		return errors.New("workingDirectory must be an absolute path")
 	}
 	eh := make(map[string]bool)
 	for _, e := range a.EventHandlers {
