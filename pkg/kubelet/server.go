@@ -139,6 +139,7 @@ type AuthInterface interface {
 // HostInterface contains all the kubelet methods required by the server.
 // For testablitiy.
 type HostInterface interface {
+	DiffContainer(podFullName string, podUID types.UID, containerName string) ([]byte, error)
 	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
 	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
 	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
@@ -251,6 +252,13 @@ func (s *Server) InstallDebuggingHandlers() {
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}/{containerName}").
 		To(s.getRun).
 		Operation("getRun"))
+	s.restfulCont.Add(ws)
+
+	ws = new(restful.WebService)
+	ws.Path("/diff")
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
+		To(s.getDiff).
+		Operation("getDiff"))
 	s.restfulCont.Add(ws)
 
 	ws = new(restful.WebService)
@@ -384,6 +392,7 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 	podID := request.PathParameter("podID")
 	containerName := request.PathParameter("containerName")
 
+	// TODO: fix this to use getContainerCoordinates
 	if len(podID) == 0 {
 		// TODO: Why return JSON when the rest return plaintext errors?
 		// TODO: Why return plaintext errors?
@@ -572,6 +581,33 @@ func (s *Server) getRun(request *restful.Request, response *restful.Response) {
 	}
 	command := strings.Split(request.QueryParameter("cmd"), " ")
 	data, err := s.host.RunInContainer(kubecontainer.GetPodFullName(pod), uid, container, command)
+	if err != nil {
+		response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
+	response.Write(data)
+}
+
+// getDiff handles requests to execute a diff command against a container.
+func (s *Server) getDiff(request *restful.Request, response *restful.Response) {
+	podNamespace, podID, _, containerName := getContainerCoordinates(request)
+	pod, ok := s.host.GetPodByName(podNamespace, podID)
+	if !ok {
+		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
+		return
+	}
+	// Check if containerName is valid.
+	containerExists := false
+	for _, container := range pod.Spec.Containers {
+		if container.Name == containerName {
+			containerExists = true
+		}
+	}
+	if !containerExists {
+		response.WriteError(http.StatusNotFound, fmt.Errorf("Container %q not found in Pod %q", containerName, podID))
+		return
+	}
+	data, err := s.host.DiffContainer(kubecontainer.GetPodFullName(pod), pod.UID, containerName)
 	if err != nil {
 		response.WriteError(http.StatusInternalServerError, err)
 		return

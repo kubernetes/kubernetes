@@ -125,10 +125,15 @@ type Runtime interface {
 	ContainerCommandRunner
 	// ContainerAttach encapsulates the attaching to containers for testability
 	ContainerAttacher
+	ContainerDiffer
 }
 
 type ContainerAttacher interface {
 	AttachContainer(id ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) (err error)
+}
+
+type ContainerDiffer interface {
+	DiffContainer(id ContainerID) ([]byte, error)
 }
 
 // CommandRunner encapsulates the command runner interfaces for testability.

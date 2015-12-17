@@ -213,6 +213,17 @@ func (f *FakeDockerClient) InspectContainer(id string) (*docker.Container, error
 	return nil, err
 }
 
+// InspectContainer is a test-spy implementation of DockerInterface.InspectContainer.
+// It adds an entry "inspect" to the internal method call record.
+func (f *FakeDockerClient) ContainerChanges(id string) ([]docker.Change, error) {
+	f.Lock()
+	defer f.Unlock()
+	f.called = append(f.called, "diff_container")
+	err := f.popError("diff_container")
+	// TODO: is something better needed here
+	return nil, err
+}
+
 // InspectImage is a test-spy implementation of DockerInterface.InspectImage.
 // It adds an entry "inspect" to the internal method call record.
 func (f *FakeDockerClient) InspectImage(name string) (*docker.Image, error) {

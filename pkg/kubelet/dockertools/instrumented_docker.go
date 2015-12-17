@@ -55,6 +55,15 @@ func (in instrumentedDockerInterface) ListContainers(options docker.ListContaine
 	return out, err
 }
 
+func (in instrumentedDockerInterface) ContainerChanges(id string) ([]docker.Change, error) {
+	const operation = "diff_container"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.client.ContainerChanges(id)
+	recordError(operation, err)
+	return out, err
+}
+
 func (in instrumentedDockerInterface) InspectContainer(id string) (*docker.Container, error) {
 	const operation = "inspect_container"
 	defer recordOperation(operation, time.Now())

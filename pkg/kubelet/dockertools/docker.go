@@ -58,6 +58,7 @@ const (
 type DockerInterface interface {
 	ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error)
 	InspectContainer(id string) (*docker.Container, error)
+	ContainerChanges(id string) ([]docker.Change, error)
 	CreateContainer(docker.CreateContainerOptions) (*docker.Container, error)
 	StartContainer(id string, hostConfig *docker.HostConfig) error
 	StopContainer(id string, timeout uint) error

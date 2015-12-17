@@ -284,6 +284,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 		"pods/attach":      podStorage.Attach,
 		"pods/status":      podStorage.Status,
 		"pods/log":         podStorage.Log,
+		"pods/diff":        podStorage.Diff,
 		"pods/exec":        podStorage.Exec,
 		"pods/portforward": podStorage.PortForward,
 		"pods/proxy":       podStorage.Proxy,
