@@ -269,15 +269,22 @@ func TestListImages(t *testing.T) {
 	r := &Runtime{apisvc: fr, systemd: fs}
 
 	tests := []struct {
-		images []*rktapi.Image
+		images   []*rktapi.Image
+		expected []kubecontainer.Image
 	}{
-		{},
+		{nil, []kubecontainer.Image{}},
 		{
 			[]*rktapi.Image{
 				{
 					Id:      "sha512-a2fb8f390702",
 					Name:    "quay.io/coreos/alpine-sh",
 					Version: "latest",
+				},
+			},
+			[]kubecontainer.Image{
+				{
+					ID:   "sha512-a2fb8f390702",
+					Tags: []string{"quay.io/coreos/alpine-sh:latest"},
 				},
 			},
 		},
@@ -294,6 +301,16 @@ func TestListImages(t *testing.T) {
 					Version: "0.10.0",
 				},
 			},
+			[]kubecontainer.Image{
+				{
+					ID:   "sha512-a2fb8f390702",
+					Tags: []string{"quay.io/coreos/alpine-sh:latest"},
+				},
+				{
+					ID:   "sha512-c6b597f42816",
+					Tags: []string{"coreos.com/rkt/stage1-coreos:0.10.0"},
+				},
+			},
 		},
 	}
 
@@ -304,12 +321,7 @@ func TestListImages(t *testing.T) {
 		if err != nil {
 			t.Errorf("%v", err)
 		}
-		assert.Equal(t, len(images), len(tt.images), fmt.Sprintf("test case %d: mismatched number of images", i))
-		for i, image := range images {
-			assert.Equal(t, image.ID, tt.images[i].Id, fmt.Sprintf("test case %d: mismatched image IDs", i))
-			assert.Equal(t, []string{tt.images[i].Name}, image.Tags, fmt.Sprintf("test case %d: mismatched image tags", i))
-		}
-
+		assert.Equal(t, tt.expected, images)
 		assert.Equal(t, fr.called, []string{"ListImages"}, fmt.Sprintf("test case %d: unexpected called list", i))
 
 		fr.CleanCalls()
@@ -449,45 +461,44 @@ func TestGetPods(t *testing.T) {
 		}
 
 		assert.Equal(t, tt.result, pods, testCaseHint)
-
-		var inspectPodCalls []string
-		for range pods {
-			inspectPodCalls = append(inspectPodCalls, "InspectPod")
-		}
-		assert.Equal(t, append([]string{"ListPods"}, inspectPodCalls...), fr.called, fmt.Sprintf("test case %d: unexpected called list", i))
+		assert.Equal(t, []string{"ListPods"}, fr.called, fmt.Sprintf("test case %d: unexpected called list", i))
 
 		fr.CleanCalls()
 	}
 }
 
-func TestGetPodsFilter(t *testing.T) {
+func TestGetPodsFilters(t *testing.T) {
 	fr := newFakeRktInterface()
 	fs := newFakeSystemd()
 	r := &Runtime{apisvc: fr, systemd: fs}
 
 	for _, test := range []struct {
-		All            bool
-		ExpectedFilter *rktapi.PodFilter
+		All             bool
+		ExpectedFilters []*rktapi.PodFilter
 	}{
 		{
 			true,
-			&rktapi.PodFilter{
-				Annotations: []*rktapi.KeyValue{
-					{
-						Key:   k8sRktKubeletAnno,
-						Value: k8sRktKubeletAnnoValue,
+			[]*rktapi.PodFilter{
+				{
+					Annotations: []*rktapi.KeyValue{
+						{
+							Key:   k8sRktKubeletAnno,
+							Value: k8sRktKubeletAnnoValue,
+						},
 					},
 				},
 			},
 		},
 		{
 			false,
-			&rktapi.PodFilter{
-				States: []rktapi.PodState{rktapi.PodState_POD_STATE_RUNNING},
-				Annotations: []*rktapi.KeyValue{
-					{
-						Key:   k8sRktKubeletAnno,
-						Value: k8sRktKubeletAnnoValue,
+			[]*rktapi.PodFilter{
+				{
+					States: []rktapi.PodState{rktapi.PodState_POD_STATE_RUNNING},
+					Annotations: []*rktapi.KeyValue{
+						{
+							Key:   k8sRktKubeletAnno,
+							Value: k8sRktKubeletAnnoValue,
+						},
 					},
 				},
 			},
@@ -497,7 +508,7 @@ func TestGetPodsFilter(t *testing.T) {
 		if err != nil {
 			t.Errorf("%v", err)
 		}
-		assert.Equal(t, test.ExpectedFilter, fr.podFilter, "filters didn't match when all=%b", test.All)
+		assert.Equal(t, test.ExpectedFilters, fr.podFilters, "filters didn't match when all=%b", test.All)
 	}
 }
 
@@ -647,12 +658,7 @@ func TestGetPodStatus(t *testing.T) {
 		}
 
 		assert.Equal(t, tt.result, status, testCaseHint)
-
-		var inspectPodCalls []string
-		for range tt.pods {
-			inspectPodCalls = append(inspectPodCalls, "InspectPod")
-		}
-		assert.Equal(t, append([]string{"ListPods"}, inspectPodCalls...), fr.called, testCaseHint)
+		assert.Equal(t, []string{"ListPods"}, fr.called, testCaseHint)
 		fr.CleanCalls()
 	}
 }
