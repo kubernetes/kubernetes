@@ -34,7 +34,7 @@
               "--address=127.0.0.1",
               "--etcd-servers=http://127.0.0.1:4001",
               "--cluster-name=kubernetes",
-              "--admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ResourceQuota",
+              "--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,SecurityContextDeny,ResourceQuota",
               "--client-ca-file=/srv/kubernetes/ca.crt",
               "--basic-auth-file=/srv/kubernetes/basic_auth.csv",
               "--min-request-timeout=300",
