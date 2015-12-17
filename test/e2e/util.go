@@ -119,6 +119,9 @@ type CloudConfig struct {
 	Provider cloudprovider.Interface
 }
 
+// unique identifier of the e2e run
+var runId = util.NewUUID()
+
 type TestContextType struct {
 	KubeConfig            string
 	KubeContext           string
@@ -554,11 +557,17 @@ func waitForPersistentVolumePhase(phase api.PersistentVolumePhase, c *client.Cli
 
 // createTestingNS should be used by every test, note that we append a common prefix to the provided test name.
 // Please see NewFramework instead of using this directly.
-func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) {
+func createTestingNS(baseName string, c *client.Client, labels map[string]string) (*api.Namespace, error) {
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels["e2e-run"] = string(runId)
+
 	namespaceObj := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: fmt.Sprintf("e2e-tests-%v-", baseName),
 			Namespace:    "",
+			Labels:       labels,
 		},
 		Status: api.NamespaceStatus{},
 	}

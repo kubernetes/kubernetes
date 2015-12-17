@@ -40,7 +40,7 @@ func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSecond
 		go func(n int) {
 			defer wg.Done()
 			defer GinkgoRecover()
-			_, err = createTestingNS(fmt.Sprintf("nslifetest-%v", n), c)
+			_, err = createTestingNS(fmt.Sprintf("nslifetest-%v", n), c, nil)
 			Expect(err).NotTo(HaveOccurred())
 		}(n)
 	}
