@@ -22,34 +22,42 @@ import (
 	"math/rand"
 	"os"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
 )
 
-func newEtcdClient() *etcd.Client {
-	return etcd.NewClient([]string{})
+func newEtcdClient() etcd.Client {
+	cfg := etcd.Config{
+		Endpoints: []string{"http://127.0.0.1:4001"},
+	}
+	client, err := etcd.New(cfg)
+	if err != nil {
+		glog.Fatalf("unable to connect to etcd for testing: %v", err)
+	}
+	return client
 }
 
 func requireEtcd() {
-	if _, err := newEtcdClient().Get("/", false, false); err != nil {
+	if _, err := etcd.NewKeysAPI(newEtcdClient()).Get(context.TODO(), "/", nil); err != nil {
 		glog.Fatalf("unable to connect to etcd for integration testing: %v", err)
 	}
 }
 
 func withEtcdKey(f func(string)) {
 	prefix := fmt.Sprintf("/test-%d", rand.Int63())
-	defer newEtcdClient().Delete(prefix, true)
+	defer etcd.NewKeysAPI(newEtcdClient()).Delete(context.TODO(), prefix, &etcd.DeleteOptions{Recursive: true})
 	f(prefix)
 }
 
 func deleteAllEtcdKeys() {
-	client := newEtcdClient()
-	keys, err := client.Get("/", false, false)
+	keysAPI := etcd.NewKeysAPI(newEtcdClient())
+	keys, err := keysAPI.Get(context.TODO(), "/", nil)
 	if err != nil {
 		glog.Fatalf("Unable to list root etcd keys: %v", err)
 	}
 	for _, node := range keys.Node.Nodes {
-		if _, err := client.Delete(node.Key, true); err != nil {
+		if _, err := keysAPI.Delete(context.TODO(), node.Key, &etcd.DeleteOptions{Recursive: true}); err != nil {
 			glog.Fatalf("Unable delete key: %v", err)
 		}
 	}

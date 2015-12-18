@@ -196,14 +196,7 @@ func TestWatch(t *testing.T) {
 		t.Errorf("Expected 'error too old' error")
 	}
 
-	// Now test watch with initial state.
-	// We want to observe fooCreation too, so need to pass smaller resource version.
-	initialVersion, err := strconv.Atoi(fooCreated.ResourceVersion)
-	if err != nil {
-		t.Fatalf("Incorrect resourceVersion: %s", fooCreated.ResourceVersion)
-	}
-	initialVersion--
-	initialWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", strconv.Itoa(initialVersion), storage.Everything)
+	initialWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -282,13 +275,7 @@ func TestFiltering(t *testing.T) {
 		}
 		return selector.Matches(labels.Set(metadata.GetLabels()))
 	}
-	// We want to observe fooCreation too, so need to pass smaller resource version.
-	initialVersion, err := strconv.Atoi(fooCreated.ResourceVersion)
-	if err != nil {
-		t.Fatalf("Incorrect resourceVersion: %s", fooCreated.ResourceVersion)
-	}
-	initialVersion--
-	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", strconv.Itoa(initialVersion), filter)
+	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, filter)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -299,23 +286,3 @@ func TestFiltering(t *testing.T) {
 	verifyWatchEvent(t, watcher, watch.Modified, podFooPrime)
 	verifyWatchEvent(t, watcher, watch.Deleted, podFooPrime)
 }
-
-/* TODO: So believe it or not... but this test is flakey with the go-etcd client library
- * which I'm surprised by.  Apprently you can close the client that is performing the watch
- * and the watch *never returns.*  I would like to still keep this test here and re-enable
- * with the new 2.2+ client library.
-func TestStorageError(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
-	cacher := newTestCacher(etcdStorage)
-
-	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", 1, storage.Everything)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	server.Terminate(t)
-
-	got := <-watcher.ResultChan()
-	if got.Type != watch.Error {
-		t.Errorf("Unexpected non-error")
-	}
-} */

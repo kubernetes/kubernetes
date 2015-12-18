@@ -19,6 +19,9 @@ package election
 import (
 	"testing"
 
+	etcd "github.com/coreos/etcd/client"
+	"golang.org/x/net/context"
+
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -28,7 +31,8 @@ func TestEtcdMasterOther(t *testing.T) {
 	defer server.Terminate(t)
 
 	path := "foo"
-	if _, err := server.Client.Set(path, "baz", 0); err != nil {
+	keysAPI := etcd.NewKeysAPI(server.Client)
+	if _, err := keysAPI.Set(context.TODO(), path, "baz", nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	master := NewEtcdMasterElector(server.Client)
