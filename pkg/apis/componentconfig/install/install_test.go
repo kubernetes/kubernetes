@@ -57,7 +57,7 @@ func TestRESTMapper(t *testing.T) {
 	gv := unversioned.GroupVersion{Group: componentconfig.GroupName, Version: "v1alpha1"}
 	proxyGVK := gv.WithKind("KubeProxyConfiguration")
 
-	if gvk, err := latest.GroupOrDie(componentconfig.GroupName).RESTMapper.KindFor(gv.WithResource("kubeproxyconfiguration")); err != nil || gvk != proxyGVK {
+	if gvk, err := latest.GroupOrDie(componentconfig.GroupName).RESTMapper.KindFor("kubeproxyconfiguration"); err != nil || gvk != proxyGVK {
 		t.Errorf("unexpected version mapping: %v %v", gvk, err)
 	}
 

@@ -212,9 +212,9 @@ func TestResourceIsValid(t *testing.T) {
 	for _, test := range tests {
 		mapper := &thirdPartyResourceDataMapper{kind: test.kind}
 		mapper.mapper = api.RESTMapper
-		valid := mapper.ResourceIsValid(unversioned.GroupVersionResource{Resource: test.resource})
+		valid := mapper.ResourceIsValid(test.resource)
 		if valid != test.valid {
-			t.Errorf("%s: expected: %v, actual: %v", test.name, test.valid, valid)
+			t.Errorf("expected: %v, saw: %v for %s", test.valid, valid, test.name)
 		}
 	}
 }
