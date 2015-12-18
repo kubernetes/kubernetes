@@ -60,11 +60,8 @@ func GetOldRCs(deployment extensions.Deployment, c client.Interface) ([]*api.Rep
 		}
 	}
 	requiredRCs := []*api.ReplicationController{}
-	// Note that go reuses the same memory location for every iteration,
-	// which means the 'value' returned from range will have the same address.
-	// Therefore, we should use the returned 'index' instead.
-	for i := range oldRCs {
-		value := oldRCs[i]
+	for key := range oldRCs {
+		value := oldRCs[key]
 		requiredRCs = append(requiredRCs, &value)
 	}
 	return requiredRCs, nil
