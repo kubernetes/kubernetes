@@ -114,7 +114,7 @@ function get_latest_version_number {
 }
 
 latest_release=$(get_latest_version_number)
-release=${KUBE_VERSION:-latest_release}
+release=${KUBE_VERSION:-${latest_release}}
 
 uname=$(uname)
 if [[ "${uname}" == "Darwin" ]]; then
@@ -151,7 +151,7 @@ if [[ $(ls . | grep ^kubectl$ | wc -l) -lt 1 ]]; then
   if [[ $(which wget) ]]; then
     run "wget ${kubectl_url}"
   elif [[ $(which curl) ]]; then
-    run "curl -L ${kubectl_url}"
+    run "curl -OL ${kubectl_url}"
   else
     echo_red "Couldn't find curl or wget.  Bailing out."
     exit 1
