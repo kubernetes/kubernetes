@@ -39,7 +39,7 @@ const (
 	// this should not be a multiple of 5, because node status updates
 	// every 5 seconds. See https://github.com/kubernetes/kubernetes/pull/14915.
 	dsRetryPeriod  = 2 * time.Second
-	dsRetryTimeout = 1 * time.Minute
+	dsRetryTimeout = 3 * time.Minute
 
 	daemonsetLabelPrefix = "daemonset-"
 	daemonsetNameLabel   = daemonsetLabelPrefix + "name"
