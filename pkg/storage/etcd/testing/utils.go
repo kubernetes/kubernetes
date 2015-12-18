@@ -26,19 +26,19 @@ import (
 	"testing"
 	"time"
 
+	etcd "github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/etcdserver"
 	"github.com/coreos/etcd/etcdserver/etcdhttp"
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/rafthttp"
-	goetcd "github.com/coreos/go-etcd/etcd"
 )
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing
 type EtcdTestServer struct {
 	etcdserver.ServerConfig
 	PeerListeners, ClientListeners []net.Listener
-	Client                         *goetcd.Client
+	Client                         etcd.Client
 
 	raftHandler http.Handler
 	s           *etcdserver.EtcdServer
@@ -126,7 +126,7 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 
 // Terminate will shutdown the running etcd server
 func (m *EtcdTestServer) Terminate(t *testing.T) {
-	m.Client.Close()
+	m.Client = nil
 	m.s.Stop()
 	for _, hs := range m.hss {
 		hs.CloseClientConnections()
@@ -145,9 +145,12 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 		t.Fatal("Failed to start etcd server error=%v", err)
 		return nil
 	}
-	server.Client = goetcd.NewClient(server.ClientURLs.StringSlice())
-	if server.Client == nil {
-		t.Errorf("Failed to connect to local etcd server")
+	cfg := etcd.Config{
+		Endpoints: server.ClientURLs.StringSlice(),
+	}
+	server.Client, err = etcd.New(cfg)
+	if err != nil {
+		t.Errorf("Unexpected Error in NewEtcdTestClientServer (%v)", err)
 		defer server.Terminate(t)
 		return nil
 	}

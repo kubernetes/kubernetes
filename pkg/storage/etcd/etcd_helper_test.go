@@ -22,7 +22,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
@@ -55,7 +55,7 @@ func init() {
 	)
 }
 
-func newEtcdHelper(client *etcd.Client, codec runtime.Codec, prefix string) etcdHelper {
+func newEtcdHelper(client etcd.Client, codec runtime.Codec, prefix string) etcdHelper {
 	return *NewEtcdStorage(client, codec, prefix).(*etcdHelper)
 }
 

@@ -95,13 +95,15 @@ type Interface interface {
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items passing 'filter' are sent down to returned watch.Interface.
-	// resourceVersion may be used to specify what version to begin watching
+	// resourceVersion may be used to specify what version to begin watching,
+	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
 	Watch(ctx context.Context, key string, resourceVersion string, filter FilterFunc) (watch.Interface, error)
 
 	// WatchList begins watching the specified key's items. Items are decoded into API
 	// objects and any item passing 'filter' are sent down to returned watch.Interface.
-	// resourceVersion may be used to specify what version to begin watching
+	// resourceVersion may be used to specify what version to begin watching,
+	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
 	WatchList(ctx context.Context, key string, resourceVersion string, filter FilterFunc) (watch.Interface, error)
 
