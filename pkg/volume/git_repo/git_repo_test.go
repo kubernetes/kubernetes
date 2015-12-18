@@ -65,7 +65,7 @@ type expectedCommand struct {
 }
 
 func TestPlugin(t *testing.T) {
-	gitUrl := "https://github.com/GoogleCloudPlatform/kubernetes.git"
+	gitUrl := "https://github.com/kubernetes/kubernetes.git"
 	revision := "2a30ce65c5ab586b98916d83385c5983edd353a1"
 
 	scenarios := []struct {
