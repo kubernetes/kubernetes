@@ -18,6 +18,7 @@ package kubectl
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
@@ -476,7 +477,7 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 		for _, rc := range rcs {
 			matchingRCs = append(matchingRCs, &rc)
 		}
-		fmt.Fprintf(out, "Replication Controllers:\t%s\n", printReplicationControllersByLabels(matchingRCs))
+		fmt.Fprintf(out, "Controllers:\t%s\n", printControllers(pod.Annotations))
 		fmt.Fprintf(out, "Containers:\n")
 		describeContainers(pod, out)
 		if len(pod.Status.Conditions) > 0 {
@@ -493,6 +494,18 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 		}
 		return nil
 	})
+}
+
+func printControllers(annotation map[string]string) string {
+	value, ok := annotation["kubernetes.io/created-by"]
+	if ok {
+		var r api.SerializedReference
+		err := json.Unmarshal([]byte(value), &r)
+		if err == nil {
+			return fmt.Sprintf("%s/%s", r.Reference.Kind, r.Reference.Name)
+		}
+	}
+	return "<none>"
 }
 
 func describeVolumes(volumes []api.Volume, out io.Writer) {

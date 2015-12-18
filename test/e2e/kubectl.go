@@ -497,7 +497,7 @@ var _ = Describe("Kubectl client", func() {
 					{"Reason:"},
 					{"Message:"},
 					{"IP:"},
-					{"Replication Controllers:", "redis-master"}}
+					{"Controllers:", "ReplicationController/redis-master"}}
 				checkOutput(output, requiredStrings)
 			})
 
