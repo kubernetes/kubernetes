@@ -114,7 +114,7 @@ func TestDeleteObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../hack/testdata/guestbook/redis-master-controller.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -145,7 +145,7 @@ func TestDeleteObjectNotFound(t *testing.T) {
 
 	cmd := NewCmdDelete(f, buf)
 	options := &DeleteOptions{
-		Filenames: []string{"../../../examples/guestbook/redis-master-controller.yaml"},
+		Filenames: []string{"../../../hack/testdata/guestbook/redis-master-controller.yaml"},
 	}
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
@@ -174,7 +174,7 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../hack/testdata/guestbook/redis-master-controller.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("ignore-not-found", "true")
 	cmd.Flags().Set("output", "name")
@@ -290,8 +290,8 @@ func TestDeleteMultipleObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
+	cmd.Flags().Set("filename", "../../../hack/testdata/guestbook/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../hack/testdata/guestbook/frontend-service.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -325,7 +325,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 
 	cmd := NewCmdDelete(f, buf)
 	options := &DeleteOptions{
-		Filenames: []string{"../../../examples/guestbook/redis-master-controller.yaml", "../../../examples/guestbook/frontend-service.yaml"},
+		Filenames: []string{"../../../hack/testdata/guestbook/redis-master-controller.yaml", "../../../hack/testdata/guestbook/frontend-service.yaml"},
 	}
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
@@ -397,7 +397,7 @@ func TestDeleteDirectory(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook")
+	cmd.Flags().Set("filename", "../../../hack/testdata/guestbook/")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
