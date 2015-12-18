@@ -107,8 +107,8 @@ func (sv *secretVolume) GetAttributes() volume.Attributes {
 		SupportsSELinux:             true,
 	}
 }
-func (b *secretVolumeBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *secretVolumeBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 // This is the spec for the volume that this plugin wraps.
@@ -120,7 +120,7 @@ func (b *secretVolumeBuilder) getMetaDir() string {
 	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, util.EscapeQualifiedNameForDisk(secretPluginName)), b.volName)
 }
 
-func (b *secretVolumeBuilder) SetUpAt(dir string) error {
+func (b *secretVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
@@ -141,7 +141,7 @@ func (b *secretVolumeBuilder) SetUpAt(dir string) error {
 	if err != nil {
 		return err
 	}
-	if err := wrapped.SetUpAt(dir); err != nil {
+	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
 		return err
 	}
 

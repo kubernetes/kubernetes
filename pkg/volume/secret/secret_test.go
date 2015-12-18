@@ -98,7 +98,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -156,7 +156,7 @@ func TestPluginIdempotent(t *testing.T) {
 	}
 
 	volumePath := builder.GetPath()
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestPluginReboot(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}

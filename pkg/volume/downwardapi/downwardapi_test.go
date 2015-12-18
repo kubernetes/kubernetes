@@ -136,7 +136,7 @@ func TestLabels(t *testing.T) {
 
 	volumePath := builder.GetPath()
 
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestAnnotations(t *testing.T) {
 
 	volumePath := builder.GetPath()
 
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -270,7 +270,7 @@ func TestName(t *testing.T) {
 
 	volumePath := builder.GetPath()
 
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -336,7 +336,7 @@ func TestNamespace(t *testing.T) {
 
 	volumePath := builder.GetPath()
 
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -404,7 +404,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 	}
 
 	volumePath := builder.GetPath()
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -415,7 +415,7 @@ func TestWriteTwiceNoUpdate(t *testing.T) {
 		t.Errorf(".current should be a link... %s\n", err.Error())
 	}
 
-	err = builder.SetUp() // now re-run Setup
+	err = builder.SetUp(nil) // now re-run Setup
 	if err != nil {
 		t.Errorf("Failed to re-setup volume: %v", err)
 	}
@@ -493,7 +493,7 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 	}
 
 	volumePath := builder.GetPath()
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -520,7 +520,7 @@ func TestWriteTwiceWithUpdate(t *testing.T) {
 
 	// Now update the labels
 	pod.ObjectMeta.Labels = newLabels
-	err = builder.SetUp() // now re-run Setup
+	err = builder.SetUp(nil) // now re-run Setup
 	if err != nil {
 		t.Errorf("Failed to re-setup volume: %v", err)
 	}
@@ -604,7 +604,7 @@ func TestWriteWithUnixPath(t *testing.T) {
 	}
 
 	volumePath := builder.GetPath()
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -689,7 +689,7 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 	volumePath := builder.GetPath()
 	defer CleanEverything(plugin, testVolumeName, volumePath, testPodUID, t)
 
-	err = builder.SetUp()
+	err = builder.SetUp(nil)
 	if err != nil {
 		t.Fatalf("Failed to setup volume: %v", err)
 	}

@@ -70,14 +70,19 @@ type Attributes struct {
 type Builder interface {
 	// Uses Interface to provide the path for Docker binds.
 	Volume
-	// SetUp prepares and mounts/unpacks the volume to a self-determined
-	// directory path.  This may be called more than once, so
+	// SetUp prepares and mounts/unpacks the volume to a
+	// self-determined directory path. The mount point and its
+	// content should be owned by 'fsGroup' so that it can be
+	// accessed by the pod. This may be called more than once, so
 	// implementations must be idempotent.
-	SetUp() error
-	// SetUpAt prepares and mounts/unpacks the volume to the specified
-	// directory path, which may or may not exist yet.  This may be called
-	// more than once, so implementations must be idempotent.
-	SetUpAt(dir string) error
+	SetUp(fsGroup *int64) error
+	// SetUpAt prepares and mounts/unpacks the volume to the
+	// specified directory path, which may or may not exist yet.
+	// The mount point and its content should be owned by
+	// 'fsGroup' so that it can be accessed by the pod. This may
+	// be called more than once, so implementations must be
+	// idempotent.
+	SetUpAt(dir string, sGroup *int64) error
 	// GetAttributes returns the attributes of the builder.
 	GetAttributes() Attributes
 }

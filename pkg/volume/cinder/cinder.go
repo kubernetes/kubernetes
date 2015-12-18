@@ -223,12 +223,12 @@ func (b *cinderVolumeBuilder) GetAttributes() volume.Attributes {
 	}
 }
 
-func (b *cinderVolumeBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *cinderVolumeBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *cinderVolumeBuilder) SetUpAt(dir string) error {
+func (b *cinderVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	// TODO: handle failed mounts here.
 	notmnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, !notmnt, err)

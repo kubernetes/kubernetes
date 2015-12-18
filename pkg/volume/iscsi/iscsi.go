@@ -175,11 +175,11 @@ func (b *iscsiDiskBuilder) GetAttributes() volume.Attributes {
 	}
 }
 
-func (b *iscsiDiskBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *iscsiDiskBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *iscsiDiskBuilder) SetUpAt(dir string) error {
+func (b *iscsiDiskBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	err := diskSetUp(b.manager, *b, dir, b.mounter)
 	if err != nil {

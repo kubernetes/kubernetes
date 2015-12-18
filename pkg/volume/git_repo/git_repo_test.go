@@ -335,7 +335,7 @@ func doTestSetUp(scenario struct {
 	g := builder.(*gitRepoVolumeBuilder)
 	g.exec = &fake
 
-	g.SetUp()
+	g.SetUp(nil)
 
 	if fake.CommandCalls != len(expecteds) {
 		allErrs = append(allErrs,

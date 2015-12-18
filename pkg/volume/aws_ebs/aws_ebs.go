@@ -230,12 +230,12 @@ func (b *awsElasticBlockStoreBuilder) GetAttributes() volume.Attributes {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *awsElasticBlockStoreBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *awsElasticBlockStoreBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
-func (b *awsElasticBlockStoreBuilder) SetUpAt(dir string) error {
+func (b *awsElasticBlockStoreBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	// TODO: handle failed mounts here.
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, !notMnt, err)

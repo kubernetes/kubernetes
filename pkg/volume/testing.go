@@ -183,11 +183,11 @@ func (_ *FakeVolume) GetAttributes() Attributes {
 	}
 }
 
-func (fv *FakeVolume) SetUp() error {
-	return fv.SetUpAt(fv.GetPath())
+func (fv *FakeVolume) SetUp(fsGroup *int64) error {
+	return fv.SetUpAt(fv.GetPath(), fsGroup)
 }
 
-func (fv *FakeVolume) SetUpAt(dir string) error {
+func (fv *FakeVolume) SetUpAt(dir string, fsGroup *int64) error {
 	return os.MkdirAll(dir, 0750)
 }
 

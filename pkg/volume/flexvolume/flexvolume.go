@@ -223,8 +223,8 @@ type flexVolumeBuilder struct {
 }
 
 // SetUp creates new directory.
-func (f *flexVolumeBuilder) SetUp() error {
-	return f.SetUpAt(f.GetPath())
+func (f *flexVolumeBuilder) SetUp(fsGroup *int64) error {
+	return f.SetUpAt(f.GetPath(), fsGroup)
 }
 
 // GetAttributes get the flex volume attributes. The attributes will be queried
@@ -251,7 +251,7 @@ type flexVolumeManager interface {
 }
 
 // SetUpAt creates new directory.
-func (f *flexVolumeBuilder) SetUpAt(dir string) error {
+func (f *flexVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
 
 	notmnt, err := f.blockDeviceMounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {

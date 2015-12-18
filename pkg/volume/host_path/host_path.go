@@ -186,12 +186,12 @@ func (b *hostPathBuilder) GetAttributes() volume.Attributes {
 }
 
 // SetUp does nothing.
-func (b *hostPathBuilder) SetUp() error {
+func (b *hostPathBuilder) SetUp(fsGroup *int64) error {
 	return nil
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.
-func (b *hostPathBuilder) SetUpAt(dir string) error {
+func (b *hostPathBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	return fmt.Errorf("SetUpAt() does not make sense for host paths")
 }
 
