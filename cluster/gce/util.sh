@@ -234,7 +234,7 @@ function upload-server-tars() {
 function detect-node-names {
   detect-project
   INSTANCE_GROUPS=()
-  INSTANCE_GROUPS+=($(gcloud compute instance-groups managed list --zone "${ZONE}" --project "${PROJECT}" | grep ${NODE_INSTANCE_PREFIX} | cut -f1 -d" "))
+  INSTANCE_GROUPS+=($(gcloud compute instance-groups managed list --zone "${ZONE}" --project "${PROJECT}" | grep ${NODE_INSTANCE_PREFIX} | cut -f1 -d" " || true))
   NODE_NAMES=()
   if [[ -n "${INSTANCE_GROUPS[@]:-}" ]]; then
     for group in "${INSTANCE_GROUPS[@]}"; do
@@ -851,7 +851,7 @@ function kube-down {
                  | grep "${NODE_INSTANCE_PREFIX}-group" \
                  | awk '{print $7}') )
   if [[ "${autoscaler:-}" == "yes" ]]; then
-    for group in ${INSTANCE_GROUPS[@]}; do
+    for group in ${INSTANCE_GROUPS[@]:-}; do
       gcloud compute instance-groups managed stop-autoscaling "${group}" --zone "${ZONE}" --project "${PROJECT}"
     done
   fi
@@ -863,7 +863,7 @@ function kube-down {
 
   # The gcloud APIs don't return machine parseable error codes/retry information. Therefore the best we can
   # do is parse the output and special case particular responses we are interested in.
-  for group in ${INSTANCE_GROUPS[@]}; do 
+  for group in ${INSTANCE_GROUPS[@]:-}; do
     if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
       deleteCmdOutput=$(gcloud compute instance-groups managed delete --zone "${ZONE}" \
         --project "${PROJECT}" \
@@ -1126,7 +1126,7 @@ function prepare-push() {
     create-node-instance-template $tmp_template_name
 
     local template_name="${NODE_INSTANCE_PREFIX}-template"
-    for group in ${INSTANCE_GROUPS[@]}; do
+    for group in ${INSTANCE_GROUPS[@]:-}; do
       gcloud compute instance-groups managed \
         set-instance-template "${group}" \
         --template "$tmp_template_name" \
@@ -1141,7 +1141,7 @@ function prepare-push() {
 
     create-node-instance-template "$template_name"
 
-    for group in ${INSTANCE_GROUPS[@]}; do
+    for group in ${INSTANCE_GROUPS[@]:-}; do
       gcloud compute instance-groups managed \
         set-instance-template "${group}" \
         --template "$template_name" \
