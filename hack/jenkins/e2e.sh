@@ -1046,7 +1046,7 @@ case ${JOB_NAME} in
   kubernetes-kubemark-500-gce)
     : ${E2E_CLUSTER_NAME:="kubernetes-kubemark-500"}
     : ${E2E_NETWORK:="kubernetes-kubemark-500"}
-    : ${PROJECT:="k8s-jenkins-kubemark"}
+    : ${PROJECT:="kubernetes-scale"}
     : ${E2E_UP:="true"}
     : ${E2E_DOWN:="true"}
     : ${E2E_TEST:="false"}
@@ -1056,7 +1056,7 @@ case ${JOB_NAME} in
     MASTER_SIZE="n1-standard-4"
     NODE_SIZE="n1-standard-8"
     KUBE_GCE_INSTANCE_PREFIX="kubemark500"
-    E2E_ZONE="asia-east1-a"
+    E2E_ZONE="us-east1-b"
     KUBEMARK_MASTER_SIZE="n1-standard-16"
     KUBEMARK_NUM_NODES="500"
     ;;
