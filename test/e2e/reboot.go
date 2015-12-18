@@ -44,7 +44,7 @@ const (
 	rebootPodReadyAgainTimeout = 5 * time.Minute
 )
 
-var _ = Describe("Reboot", func() {
+var _ = Describe("Reboot [Disruptive]", func() {
 	var f *Framework
 
 	BeforeEach(func() {

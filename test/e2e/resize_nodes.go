@@ -388,7 +388,7 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	// network traffic is unblocked in a deferred function
 }
 
-var _ = Describe("Nodes", func() {
+var _ = Describe("Nodes [Disruptive]", func() {
 	framework := NewFramework("resize-nodes")
 	var systemPodsNo int
 	var c *client.Client

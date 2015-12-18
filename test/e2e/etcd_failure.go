@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Etcd failure", func() {
+var _ = Describe("Etcd failure [Disruptive]", func() {
 
 	var skipped bool
 	framework := NewFramework("etcd-failure")

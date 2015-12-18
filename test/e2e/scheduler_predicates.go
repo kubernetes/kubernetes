@@ -173,7 +173,7 @@ func waitForStableCluster(c *client.Client) int {
 	return len(scheduledPods)
 }
 
-var _ = Describe("SchedulerPredicates", func() {
+var _ = Describe("SchedulerPredicates [Serial]", func() {
 	var c *client.Client
 	var nodeList *api.NodeList
 	var totalPodCapacity int64
