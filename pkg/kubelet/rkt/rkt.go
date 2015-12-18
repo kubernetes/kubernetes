@@ -139,7 +139,7 @@ func New(config *Config,
 	livenessManager proberesults.Manager,
 	volumeGetter volumeGetter,
 	imageBackOff *util.Backoff,
-	serializeImagePulls bool,
+	serializeImagePulls util.BoolFlag,
 ) (*Runtime, error) {
 	// Create dbus connection.
 	systemd, err := newSystemd()
@@ -176,7 +176,7 @@ func New(config *Config,
 		livenessManager:     livenessManager,
 		volumeGetter:        volumeGetter,
 	}
-	if serializeImagePulls {
+	if serializeImagePulls.Provided() && serializeImagePulls.Value() {
 		rkt.imagePuller = kubecontainer.NewSerializedImagePuller(recorder, rkt, imageBackOff)
 	} else {
 		rkt.imagePuller = kubecontainer.NewImagePuller(recorder, rkt, imageBackOff)
