@@ -600,6 +600,24 @@ case ${JOB_NAME} in
     TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
     ;;
 
+  # Runs e2e on GCE with flannel and VXLAN.
+  kubernetes-e2e-gce-flannel)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-flannel"}
+    : ${E2E_PUBLISH_GREEN_VERSION:="true"}
+    : ${E2E_NETWORK:="e2e-gce-flannel"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
+          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-flannel"}
+    : ${PROJECT:="kubernetes-flannel"}
+    # Override GCE defaults.
+    NETWORK_PROVIDER="flannel"
+    ;;
+
   # Runs the performance/scalability test on huge 1000-node cluster on GCE.
   # Flannel is used as network provider.
   kubernetes-e2e-gce-enormous-cluster)
