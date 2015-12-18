@@ -360,9 +360,9 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, existingPods []*api
 			}
 			// consider only the pods that belong to the same namespace
 			nsServicePods := []*api.Pod{}
-			for _, nsPod := range servicePods {
+			for _, nsPod := range servicePods.Items {
 				if nsPod.Namespace == pod.Namespace {
-					nsServicePods = append(nsServicePods, nsPod)
+					nsServicePods = append(nsServicePods, &nsPod)
 				}
 			}
 			if len(nsServicePods) > 0 {
@@ -426,11 +426,11 @@ func getUsedPorts(pods ...*api.Pod) map[int]bool {
 	return ports
 }
 
-func filterNonRunningPods(pods []*api.Pod) []*api.Pod {
+func filterNonRunningPods(pods []api.Pod) []api.Pod {
 	if len(pods) == 0 {
 		return pods
 	}
-	result := []*api.Pod{}
+	result := []api.Pod{}
 	for _, pod := range pods {
 		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
 			continue
@@ -445,14 +445,14 @@ func filterNonRunningPods(pods []*api.Pod) []*api.Pod {
 func MapPodsToMachines(lister algorithm.PodLister) (map[string][]*api.Pod, error) {
 	machineToPods := map[string][]*api.Pod{}
 	// TODO: perform more targeted query...
-	pods, err := lister.List(labels.Everything())
+	podlist, err := lister.List(labels.Everything())
 	if err != nil {
 		return map[string][]*api.Pod{}, err
 	}
-	pods = filterNonRunningPods(pods)
+	pods := filterNonRunningPods(podlist.Items)
 	for _, scheduledPod := range pods {
 		host := scheduledPod.Spec.NodeName
-		machineToPods[host] = append(machineToPods[host], scheduledPod)
+		machineToPods[host] = append(machineToPods[host], &scheduledPod)
 	}
 	return machineToPods, nil
 }

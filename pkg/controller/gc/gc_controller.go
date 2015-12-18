@@ -89,8 +89,8 @@ func (gcc *GCController) Run(stop <-chan struct{}) {
 
 func (gcc *GCController) gc() {
 	terminatedPods, _ := gcc.podStore.List(labels.Everything())
-	terminatedPodCount := len(terminatedPods)
-	sort.Sort(byCreationTimestamp(terminatedPods))
+	terminatedPodCount := len(terminatedPods.Items)
+	sort.Sort(byCreationTimestamp(terminatedPods.Items))
 
 	deleteCount := terminatedPodCount - gcc.threshold
 
@@ -110,7 +110,7 @@ func (gcc *GCController) gc() {
 				// ignore not founds
 				defer util.HandleError(err)
 			}
-		}(terminatedPods[i].Namespace, terminatedPods[i].Name)
+		}(terminatedPods.Items[i].Namespace, terminatedPods.Items[i].Name)
 	}
 	wait.Wait()
 }
@@ -124,7 +124,7 @@ func compileTerminatedPodSelector() fields.Selector {
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
-type byCreationTimestamp []*api.Pod
+type byCreationTimestamp []api.Pod
 
 func (o byCreationTimestamp) Len() int      { return len(o) }
 func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }

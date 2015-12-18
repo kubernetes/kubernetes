@@ -30,10 +30,23 @@ type nn struct {
 
 type names []nn
 
-func (ids names) list() []*api.Pod {
+func (ids names) pods() []*api.Pod {
 	out := make([]*api.Pod, 0, len(ids))
 	for _, id := range ids {
 		out = append(out, &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Namespace: id.namespace,
+				Name:      id.name,
+			},
+		})
+	}
+	return out
+}
+
+func (ids names) list() api.PodList {
+	out := api.PodList{}
+	for _, id := range ids {
+		out.Items = append(out.Items, api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Namespace: id.namespace,
 				Name:      id.name,
@@ -60,19 +73,19 @@ func TestModeler(t *testing.T) {
 		expectPods    names
 	}{
 		{
-			queuedPods:    names{}.list(),
-			scheduledPods: names{{"default", "foo"}, {"custom", "foo"}}.list(),
-			assumedPods:   names{{"default", "foo"}}.list(),
+			queuedPods:    names{}.pods(),
+			scheduledPods: names{{"default", "foo"}, {"custom", "foo"}}.pods(),
+			assumedPods:   names{{"default", "foo"}}.pods(),
 			expectPods:    names{{"default", "foo"}, {"custom", "foo"}},
 		}, {
-			queuedPods:    names{}.list(),
-			scheduledPods: names{{"default", "foo"}}.list(),
-			assumedPods:   names{{"default", "foo"}, {"custom", "foo"}}.list(),
+			queuedPods:    names{}.pods(),
+			scheduledPods: names{{"default", "foo"}}.pods(),
+			assumedPods:   names{{"default", "foo"}, {"custom", "foo"}}.pods(),
 			expectPods:    names{{"default", "foo"}, {"custom", "foo"}},
 		}, {
-			queuedPods:    names{{"custom", "foo"}}.list(),
-			scheduledPods: names{{"default", "foo"}}.list(),
-			assumedPods:   names{{"default", "foo"}, {"custom", "foo"}}.list(),
+			queuedPods:    names{{"custom", "foo"}}.pods(),
+			scheduledPods: names{{"default", "foo"}}.pods(),
+			assumedPods:   names{{"default", "foo"}, {"custom", "foo"}}.pods(),
 			expectPods:    names{{"default", "foo"}},
 		},
 	}
@@ -97,15 +110,15 @@ func TestModeler(t *testing.T) {
 		}
 
 		found := 0
-		for _, pod := range list {
-			if item.expectPods.has(pod) {
+		for _, pod := range list.Items {
+			if item.expectPods.has(&pod) {
 				found++
 			} else {
 				t.Errorf("found unexpected pod %#v", pod)
 			}
 		}
 		if e, a := item.expectPods, found; len(e) != a {
-			t.Errorf("Expected pods:\n%+v\nFound pods:\n%s\n", podNames(e.list()), podNames(list))
+			t.Errorf("Expected pods:\n%+v\nFound pods:\n%s\n", podNames(e.list().Items), podNames(list.Items))
 		}
 	}
 }

@@ -165,7 +165,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		extenderPrioritizers []priorityConfig
 		nodes                []string
 		pod                  *api.Pod
-		pods                 []*api.Pod
+		pods                 []api.Pod
 		expectedHost         string
 		expectsErr           bool
 	}{

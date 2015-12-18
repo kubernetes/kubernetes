@@ -123,7 +123,7 @@ func (s *SimpleModeler) ForgetPodByKey(key string) {
 }
 
 // Extract names for readable logging.
-func podNames(pods []*api.Pod) []string {
+func podNames(pods []api.Pod) []string {
 	out := make([]string, len(pods))
 	for i := range pods {
 		out[i] = fmt.Sprintf("'%v/%v (%v)'", pods[i].Namespace, pods[i].Name, pods[i].UID)
@@ -131,51 +131,52 @@ func podNames(pods []*api.Pod) []string {
 	return out
 }
 
-func (s *SimpleModeler) listPods(selector labels.Selector) (pods []*api.Pod, err error) {
+func (s *SimpleModeler) listPods(selector labels.Selector) (pods api.PodList, err error) {
 	assumed, err := s.assumedPods.List(selector)
 	if err != nil {
-		return nil, err
+		return api.PodList{}, err
 	}
 	// Since the assumed list will be short, just check every one.
 	// Goal here is to stop making assumptions about a pod once it shows
 	// up in one of these other lists.
-	for _, pod := range assumed {
-		qExist, err := s.queuedPods.Exists(pod)
+	for _, pod := range assumed.Items {
+		qExist, err := s.queuedPods.Exists(&pod)
 		if err != nil {
-			return nil, err
+			return api.PodList{}, err
 		}
 		if qExist {
-			s.assumedPods.Store.Delete(pod)
+			s.assumedPods.Store.Delete(&pod)
 			continue
 		}
-		sExist, err := s.scheduledPods.Exists(pod)
+		sExist, err := s.scheduledPods.Exists(&pod)
 		if err != nil {
-			return nil, err
+			return api.PodList{}, err
 		}
 		if sExist {
-			s.assumedPods.Store.Delete(pod)
+			s.assumedPods.Store.Delete(&pod)
 			continue
 		}
 	}
 
 	scheduled, err := s.scheduledPods.List(selector)
 	if err != nil {
-		return nil, err
+		return api.PodList{}, err
 	}
 	// Listing purges the ttl cache and re-gets, in case we deleted any entries.
 	assumed, err = s.assumedPods.List(selector)
 	if err != nil {
-		return nil, err
+		return api.PodList{}, err
 	}
-	if len(assumed) == 0 {
+	if len(assumed.Items) == 0 {
 		return scheduled, nil
 	}
 	glog.V(2).Infof(
 		"listing pods: [%v] assumed to exist in addition to %v known pods.",
-		strings.Join(podNames(assumed), ","),
-		len(scheduled),
+		strings.Join(podNames(assumed.Items), ","),
+		len(scheduled.Items),
 	)
-	return append(scheduled, assumed...), nil
+	scheduled.Items = append(scheduled.Items, assumed.Items...)
+	return scheduled, nil
 }
 
 // PodLister returns a PodLister that will list pods that we think we have scheduled in
@@ -190,7 +191,7 @@ type simpleModelerPods struct {
 }
 
 // List returns pods known and assumed to exist.
-func (s simpleModelerPods) List(selector labels.Selector) (pods []*api.Pod, err error) {
+func (s simpleModelerPods) List(selector labels.Selector) (pods api.PodList, err error) {
 	s.simpleModeler.LockedAction(
 		func() { pods, err = s.simpleModeler.listPods(selector) })
 	return

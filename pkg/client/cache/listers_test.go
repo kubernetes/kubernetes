@@ -544,11 +544,12 @@ func TestStoreToPodLister(t *testing.T) {
 	spl := StoreToPodLister{store}
 
 	for _, id := range ids {
-		got, err := spl.List(labels.Set{"name": id}.AsSelector())
+		podList, err := spl.List(labels.Set{"name": id}.AsSelector())
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
+		got := podList.Items
 		if e, a := 1, len(got); e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 			continue
