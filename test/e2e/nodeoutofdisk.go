@@ -63,7 +63,7 @@ const (
 //    choose that node to be node with index 1.
 // 7. Observe that the pod in pending status schedules on that node.
 //
-var _ = Describe("NodeOutOfDisk", func() {
+var _ = Describe("NodeOutOfDisk [Serial]", func() {
 	var c *client.Client
 	var unfilledNodeName, recoveredNodeName string
 	framework := Framework{BaseName: "node-outofdisk"}
