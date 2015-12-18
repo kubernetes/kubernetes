@@ -14,23 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testgroup
-
-import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-)
-
-// +genclient=true
-
-type TestType struct {
-	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata,omitempty"`
-}
-
-type TestTypeList struct {
-	unversioned.TypeMeta `json:",inline"`
-	unversioned.ListMeta `json:"metadata,omitempty"`
-
-	Items []TestType `json:"items"`
-}
+// Package unversioned has the automatically generated clients for unversioned resources.
+package unversioned

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testoutput
+package unversioned
 
 import (
 	"fmt"
@@ -35,10 +35,10 @@ func (c *TestgroupClient) TestTypes(namespace string) TestTypeInterface {
 	return newTestTypes(c, namespace)
 }
 
-// NewTestgroup creates a new TestgroupClient for the given config.
-func NewTestgroup(c *unversioned.Config) (*TestgroupClient, error) {
+// NewForConfig creates a new TestgroupClient for the given config.
+func NewForConfig(c *unversioned.Config) (*TestgroupClient, error) {
 	config := *c
-	if err := setTestgroupDefaults(&config); err != nil {
+	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
 	client, err := unversioned.RESTClientFor(&config)
@@ -48,17 +48,22 @@ func NewTestgroup(c *unversioned.Config) (*TestgroupClient, error) {
 	return &TestgroupClient{client}, nil
 }
 
-// NewTestgroupOrDie creates a new TestgroupClient for the given config and
+// NewForConfigOrDie creates a new TestgroupClient for the given config and
 // panics if there is an error in the config.
-func NewTestgroupOrDie(c *unversioned.Config) *TestgroupClient {
-	client, err := NewTestgroup(c)
+func NewForConfigOrDie(c *unversioned.Config) *TestgroupClient {
+	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
 	}
 	return client
 }
 
-func setTestgroupDefaults(config *unversioned.Config) error {
+// New creates a new TestgroupClient for the given RESTClient.
+func New(c *unversioned.RESTClient) *TestgroupClient {
+	return &TestgroupClient{c}
+}
+
+func setConfigDefaults(config *unversioned.Config) error {
 	// if testgroup group is not registered, return an error
 	g, err := latest.Group("testgroup")
 	if err != nil {

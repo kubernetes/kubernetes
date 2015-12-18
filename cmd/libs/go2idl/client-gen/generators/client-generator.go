@@ -49,35 +49,11 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-// Packages makes the client package definition.
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
-	boilerplate, err := arguments.LoadGoBoilerplate()
-	if err != nil {
-		glog.Fatalf("Failed loading boilerplate: %v", err)
-	}
-
-	groupToTypes := map[string][]*types.Type{}
-	for _, inputDir := range arguments.InputDirs {
-		p := context.Universe.Package(inputDir)
-		for _, t := range p.Types {
-			if types.ExtractCommentTags("+", t.CommentLines)["genclient"] != "true" {
-				continue
-			}
-			group := filepath.Base(t.Name.Package)
-			// Special case for the legacy API.
-			if group == "api" {
-				group = ""
-			}
-			if _, found := groupToTypes[group]; !found {
-				groupToTypes[group] = []*types.Type{}
-			}
-			groupToTypes[group] = append(groupToTypes[group], t)
-		}
-	}
-
-	return generator.Packages{&generator.DefaultPackage{
-		PackageName: filepath.Base(arguments.OutputPackagePath),
-		PackagePath: arguments.OutputPackagePath,
+func packageForGroup(group string, version string, typeList []*types.Type, basePath string, boilerplate []byte) generator.Package {
+	outputPackagePath := filepath.Join(basePath, group, version)
+	return &generator.DefaultPackage{
+		PackageName: version,
+		PackagePath: outputPackagePath,
 		HeaderText:  boilerplate,
 		PackageDocumentation: []byte(
 			`// Package unversioned has the automatically generated clients for unversioned resources.
@@ -91,7 +67,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			}
 			// Since we want a file per type that we generate a client for, we
 			// have to provide a function for this.
-			for _, t := range c.Order {
+			for _, t := range typeList {
 				generators = append(generators, &genClientForType{
 					DefaultGen: generator.DefaultGen{
 						// Use the privatized version of the
@@ -102,27 +78,61 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 						// names?
 						OptionalName: c.Namers["private"].Name(t),
 					},
-					outputPackage: arguments.OutputPackagePath,
+					outputPackage: outputPackagePath,
+					group:         group,
 					typeToMatch:   t,
 					imports:       generator.NewImportTracker(),
 				})
 			}
 
-			for group, types := range groupToTypes {
-				generators = append(generators, &genGroup{
-					DefaultGen: generator.DefaultGen{
-						OptionalName: group,
-					},
-					outputPackage: arguments.OutputPackagePath,
-					group:         group,
-					types:         types,
-					imports:       generator.NewImportTracker(),
-				})
-			}
+			generators = append(generators, &genGroup{
+				DefaultGen: generator.DefaultGen{
+					OptionalName: group + "_client",
+				},
+				outputPackage: outputPackagePath,
+				group:         group,
+				types:         typeList,
+				imports:       generator.NewImportTracker(),
+			})
 			return generators
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
-			return types.ExtractCommentTags("+", t.CommentLines)["genclient"] == "true"
+			return types.ExtractCommentTags("+", t.SecondClosestCommentLines)["genclient"] == "true"
 		},
-	}}
+	}
+}
+
+// Packages makes the client package definition.
+func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
+	boilerplate, err := arguments.LoadGoBoilerplate()
+	if err != nil {
+		glog.Fatalf("Failed loading boilerplate: %v", err)
+	}
+
+	groupToTypes := map[string][]*types.Type{}
+	for _, inputDir := range arguments.InputDirs {
+		p := context.Universe.Package(inputDir)
+		for _, t := range p.Types {
+			if types.ExtractCommentTags("+", t.SecondClosestCommentLines)["genclient"] != "true" {
+				continue
+			}
+			group := filepath.Base(t.Name.Package)
+			// Special case for the legacy API.
+			if group == "api" {
+				group = "legacy"
+			}
+			if _, found := groupToTypes[group]; !found {
+				groupToTypes[group] = []*types.Type{}
+			}
+			groupToTypes[group] = append(groupToTypes[group], t)
+		}
+	}
+
+	var packageList []generator.Package
+	orderer := namer.Orderer{namer.NewPrivateNamer(0)}
+	for group, types := range groupToTypes {
+		packageList = append(packageList, packageForGroup(group, "unversioned", orderer.OrderTypes(types), arguments.OutputPackagePath, boilerplate))
+	}
+
+	return generator.Packages(packageList)
 }
