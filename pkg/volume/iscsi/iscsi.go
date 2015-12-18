@@ -181,7 +181,7 @@ func (b *iscsiDiskBuilder) SetUp(fsGroup *int64) error {
 
 func (b *iscsiDiskBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
-	err := diskSetUp(b.manager, *b, dir, b.mounter)
+	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
 	if err != nil {
 		glog.Errorf("iscsi: failed to setup")
 	}
