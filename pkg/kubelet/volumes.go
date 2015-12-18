@@ -119,10 +119,8 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 	podVolumes := make(kubecontainer.VolumeMap)
 	for i := range pod.Spec.Volumes {
 		volSpec := &pod.Spec.Volumes[i]
-		hasFSGroup := false
 		var fsGroup *int64
 		if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.FSGroup != nil {
-			hasFSGroup = true
 			fsGroup = pod.Spec.SecurityContext.FSGroup
 		}
 
@@ -144,17 +142,6 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 		err = builder.SetUp(fsGroup)
 		if err != nil {
 			return nil, err
-		}
-		if hasFSGroup &&
-			builder.GetAttributes().Managed &&
-			builder.GetAttributes().SupportsOwnershipManagement {
-			err := kl.manageVolumeOwnership(pod, internal, builder, fsGroup)
-			if err != nil {
-				glog.Errorf("Error managing ownership of volume %v for pod %v/%v: %v", internal.Name(), pod.Namespace, pod.Name, err)
-				return nil, err
-			} else {
-				glog.V(3).Infof("Managed ownership of volume %v for pod %v/%v", internal.Name(), pod.Namespace, pod.Name)
-			}
 		}
 		podVolumes[volSpec.Name] = kubecontainer.VolumeInfo{Builder: builder}
 	}

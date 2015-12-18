@@ -55,8 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/chmod"
-	"k8s.io/kubernetes/pkg/util/chown"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -133,9 +131,6 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		writer = &io.NsenterWriter{}
 	}
 
-	chmodRunner := chmod.New()
-	chownRunner := chown.New()
-
 	tlsOptions, err := InitializeTLS(s)
 	if err != nil {
 		return nil, err
@@ -210,8 +205,6 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		MaxPods:                   s.MaxPods,
 		MinimumGCAge:              s.MinimumGCAge,
 		Mounter:                   mounter,
-		ChownRunner:               chownRunner,
-		ChmodRunner:               chmodRunner,
 		NetworkPluginName:         s.NetworkPluginName,
 		NetworkPlugins:            ProbeNetworkPlugins(s.NetworkPluginDir),
 		NodeLabels:                s.NodeLabels,
@@ -503,8 +496,6 @@ func SimpleKubelet(client *client.Client,
 		MaxPods:                   maxPods,
 		MinimumGCAge:              minimumGCAge,
 		Mounter:                   mount.New(),
-		ChownRunner:               chown.New(),
-		ChmodRunner:               chmod.New(),
 		NodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
 		OOMAdjuster:               oom.NewFakeOOMAdjuster(),
 		OSInterface:               osInterface,
@@ -687,8 +678,6 @@ type KubeletConfig struct {
 	MaxPods                        int
 	MinimumGCAge                   time.Duration
 	Mounter                        mount.Interface
-	ChownRunner                    chown.Interface
-	ChmodRunner                    chmod.Interface
 	NetworkPluginName              string
 	NetworkPlugins                 []network.NetworkPlugin
 	NodeName                       string
@@ -793,8 +782,6 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.RktStage1Image,
 		kc.Mounter,
 		kc.Writer,
-		kc.ChownRunner,
-		kc.ChmodRunner,
 		kc.DockerDaemonContainer,
 		kc.SystemContainer,
 		kc.ConfigureCBR0,
