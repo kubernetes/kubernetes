@@ -44,7 +44,7 @@ func GetSwaggerSchema(version unversioned.GroupVersion, kubeClient client.Interf
 // SplitAndParseResourceRequest separates the users input into a model and fields
 func SplitAndParseResourceRequest(inResource string, mapper meta.RESTMapper) (string, []string, error) {
 	inResource, fieldsPath := splitDotNotation(inResource)
-	inResource, _ = mapper.ResourceSingularizer(expandResourceShortcut(unversioned.GroupVersionResource{Resource: inResource}).Resource)
+	inResource, _ = mapper.ResourceSingularizer(expandResourceShortcut(inResource))
 	return inResource, fieldsPath, nil
 }
 

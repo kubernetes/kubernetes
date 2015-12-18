@@ -80,7 +80,7 @@ func TestRESTMapper(t *testing.T) {
 	hpaGVK := gv.WithKind("HorizontalPodAutoscaler")
 	daemonSetGVK := gv.WithKind("DaemonSet")
 
-	if gvk, err := latest.GroupOrDie(extensions.GroupName).RESTMapper.KindFor(gv.WithResource("horizontalpodautoscalers")); err != nil || gvk != hpaGVK {
+	if gvk, err := latest.GroupOrDie(extensions.GroupName).RESTMapper.KindFor("horizontalpodautoscalers"); err != nil || gvk != hpaGVK {
 		t.Errorf("unexpected version mapping: %v %v", gvk, err)
 	}
 

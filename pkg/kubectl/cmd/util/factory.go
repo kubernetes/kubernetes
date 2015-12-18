@@ -175,12 +175,16 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return clients.ClientConfigForVersion(nil)
 		},
 		RESTClient: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+			gvk, err := api.RESTMapper.KindFor(mapping.Resource)
+			if err != nil {
+				return nil, err
+			}
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
 			client, err := clients.ClientForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
 			}
-			switch mapping.GroupVersionKind.Group {
+			switch gvk.Group {
 			case api.GroupName:
 				return client.RESTClient, nil
 			case extensions.GroupName:

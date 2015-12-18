@@ -203,24 +203,11 @@ type NamePrinter struct {
 // and print "resource/name" pair. If the object is a List, print all items in it.
 func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	objvalue := reflect.ValueOf(obj).Elem()
-	kindString := objvalue.FieldByName("Kind")
-	groupVersionString := objvalue.FieldByName("APIVersion")
-	kind := unversioned.GroupVersionKind{}
-	if !kindString.IsValid() {
-		kindString = reflect.ValueOf("<unknown>")
+	kind := objvalue.FieldByName("Kind")
+	if !kind.IsValid() {
+		kind = reflect.ValueOf("<unknown>")
 	}
-	kind.Kind = kindString.String()
-
-	if !groupVersionString.IsValid() {
-		groupVersionString = reflect.ValueOf("<unknown>/<unknown>")
-	}
-	gv, err := unversioned.ParseGroupVersion(groupVersionString.String())
-	if err != nil {
-		kind.Group = gv.Group
-		kind.Version = gv.Version
-	}
-
-	if kind.Kind == "List" {
+	if kind.String() == "List" {
 		items := objvalue.FieldByName("Items")
 		if items.Type().String() == "[]runtime.RawExtension" {
 			for i := 0; i < items.Len(); i++ {
@@ -250,9 +237,9 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		if !name.IsValid() {
 			name = reflect.ValueOf("<unknown>")
 		}
-		_, resource := meta.KindToResource(kind, false)
+		_, resource := meta.KindToResource(kind.String(), false)
 
-		fmt.Fprintf(w, "%s/%s\n", resource.Resource, name)
+		fmt.Fprintf(w, "%s/%s\n", resource, name)
 	}
 
 	return nil
