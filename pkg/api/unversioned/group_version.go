@@ -29,10 +29,6 @@ type GroupResource struct {
 	Resource string
 }
 
-func (gr GroupResource) WithVersion(version string) GroupVersionResource {
-	return GroupVersionResource{Group: gr.Group, Version: version, Resource: gr.Resource}
-}
-
 func (gr GroupResource) IsEmpty() bool {
 	return len(gr.Group) == 0 && len(gr.Resource) == 0
 }
