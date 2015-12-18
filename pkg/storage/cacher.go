@@ -178,6 +178,7 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	// need to retry it on errors under lock.
 	for {
 		if err := c.reflector.ListAndWatch(stopChannel); err != nil {
+			// TODO: This can tight loop log.
 			glog.Errorf("unexpected ListAndWatch error: %v", err)
 		} else {
 			break
