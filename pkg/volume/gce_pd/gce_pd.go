@@ -280,6 +280,10 @@ func (b *gcePersistentDiskBuilder) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
+	if !b.readOnly {
+		volume.SetVolumeOwnership(b, fsGroup)
+	}
+
 	return nil
 }
 

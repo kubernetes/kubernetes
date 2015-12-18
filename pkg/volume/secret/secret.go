@@ -173,6 +173,8 @@ func (b *secretVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
 		}
 	}
 
+	volume.SetVolumeOwnership(b, fsGroup)
+
 	volumeutil.SetReady(b.getMetaDir())
 
 	return nil

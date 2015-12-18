@@ -157,6 +157,9 @@ func (b *downwardAPIVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	glog.V(3).Infof("Data dumped for downwardAPI volume %v for pod %v/%v", b.volName, b.pod.Namespace, b.pod.Name)
+
+	volume.SetVolumeOwnership(b, fsGroup)
+
 	return nil
 }
 
