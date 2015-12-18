@@ -325,12 +325,7 @@ AWS_REQUIRED_SKIP_TESTS=(
 
 # Tests which kills or restarts components and/or nodes.
 DISRUPTIVE_TESTS=(
-    "DaemonRestart"
-    "Etcd\sfailure"
-    "Nodes\sNetwork"
-    "Nodes\sResize"
-    "Reboot"
-    "Services.*restarting"
+    "\[Disruptive\]"
 )
 
 # The following tests are known to be flaky, and are thus run only in their own
@@ -366,16 +361,12 @@ GCE_SLOW_TESTS=(
     )
 
 # Tests which are not able to be run in parallel.
+#
+# TODO(ihmccreery) I'd like to get these combined with DISRUPTIVE_TESTS.
 GCE_PARALLEL_SKIP_TESTS=(
-    "GCE\sL7\sLoadBalancer\sController" # namespaced watch flakes, issue: #17805
-    "Nodes\sNetwork"
-    "MaxPods"
-    "Resource\susage\sof\ssystem\scontainers"
-    "SchedulerPredicates"
-    "resource\susage\stracking"
-    "NodeOutOfDisk"
-    "${DISRUPTIVE_TESTS[@]}"
-    )
+    "\[Serial\]"
+    "\[Disruptive\]"
+)
 
 # Tests which are known to be flaky when run in parallel.
 GCE_PARALLEL_FLAKY_TESTS=(

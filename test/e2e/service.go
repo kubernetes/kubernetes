@@ -257,7 +257,7 @@ var _ = Describe("Services", func() {
 		expectNoError(stopServeHostnameService(c, ns, "service3"))
 	})
 
-	It("should work after restarting kube-proxy", func() {
+	It("should work after restarting kube-proxy [Disruptive]", func() {
 		SkipUnlessProviderIs("gce", "gke")
 
 		ns := f.Namespace.Name
@@ -308,7 +308,7 @@ var _ = Describe("Services", func() {
 		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
 	})
 
-	It("should work after restarting apiserver", func() {
+	It("should work after restarting apiserver [Disruptive]", func() {
 		// TODO: restartApiserver doesn't work in GKE - fix it and reenable this test.
 		SkipUnlessProviderIs("gce")
 
