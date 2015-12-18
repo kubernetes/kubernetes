@@ -46,6 +46,7 @@ release breaks down into four pieces:
 1. cutting/branching the release;
 1. building and pushing the binaries; and
 1. publishing binaries and release notes.
+1. updating the master branch.
 
 You should progress in this strict order.
 
@@ -215,6 +216,15 @@ console.developers.google.com/storage/browser/kubernetes-release/release/),
 Finally, from a clone of upstream/master, *make sure* you still have
 `RELEASE_VERSION` set correctly, and run `./build/mark-stable-release.sh
 ${RELEASE_VERSION}`.
+
+### Updating the master branch
+
+If you are cutting a new release series, please also update the master branch:
+change the `latestReleaseBranch` in `cmd/mungedocs/mungedocs.go` to the new
+release branch (`release-X.Y`), run `hack/update-generated-docs.sh`. This will
+let the unversioned warning in docs point to the latest release series. Please
+send the changes as a PR titled "Update the latestReleaseBranch to release-X.Y
+in the munger".
 
 ## Injecting Version into Binaries
 
