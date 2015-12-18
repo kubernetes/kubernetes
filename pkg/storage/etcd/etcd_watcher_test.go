@@ -227,8 +227,8 @@ func TestWatchEtcdError(t *testing.T) {
 	}
 	server.Terminate(t)
 
-	got := <-watching.ResultChan()
-	if got.Type != watch.Error {
+	got, ok := <-watching.ResultChan()
+	if ok && got.Type != watch.Error {
 		t.Fatalf("Unexpected non-error")
 	}
 	watching.Stop()
