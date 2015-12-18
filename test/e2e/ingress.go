@@ -376,7 +376,7 @@ func (cont *IngressController) Cleanup(del bool) error {
 	return fmt.Errorf(errMsg)
 }
 
-var _ = Describe("GCE L7 LoadBalancer Controller", func() {
+var _ = Describe("GCE L7 LoadBalancer Controller [Serial]", func() {
 	// These variables are initialized after framework's beforeEach.
 	var ns string
 	var addonDir string

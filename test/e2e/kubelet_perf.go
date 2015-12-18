@@ -138,7 +138,7 @@ func verifyCPULimits(expected containersCPUSummary, actual nodesCPUSummary) {
 	}
 }
 
-var _ = Describe("Kubelet", func() {
+var _ = Describe("Kubelet [Serial]", func() {
 	var nodeNames sets.String
 	framework := NewFramework("kubelet-perf")
 	var rm *resourceMonitor
