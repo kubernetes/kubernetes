@@ -167,8 +167,8 @@ Next, verify it has been created.  For example:
 
 ```console
 $ kubectl get secrets myregistrykey
-NAME             TYPE                      DATA
-myregistrykey    kubernetes.io/dockercfg   1
+NAME             TYPE                              DATA
+myregistrykey    kubernetes.io/.dockerconfigjson   1
 ```
 
 Next, read/modify/write the service account for the namespace to use this secret as an imagePullSecret

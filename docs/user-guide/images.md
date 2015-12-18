@@ -105,18 +105,18 @@ with credentials for Google Container Registry.  You cannot use this approach.
 will not work reliably on GCE, and any other cloud provider that does automatic
 node replacement.
 
-Docker stores keys for private registries in the `$HOME/.dockercfg` file.  If you put this
-in the `$HOME` of `root` on a kubelet, then docker will use it.
+Docker stores keys for private registries in the `$HOME/.dockercfg` or `$HOME/.docker/config.json` file.  If you put this
+in the `$HOME` of user `root` on a kubelet, then docker will use it.
 
 Here are the recommended steps to configuring your nodes to use a private registry.  In this
 example, run these on your desktop/laptop:
-   1. run `docker login [server]` for each set of credentials you want to use.
-   1. view `$HOME/.dockercfg` in an editor to ensure it contains just the credentials you want to use.
+   1. run `docker login [server]` for each set of credentials you want to use.  This updates `$HOME/.docker/config.json`.
+   1. view `$HOME/.docker/config.json` in an editor to ensure it contains just the credentials you want to use.
    1. get a list of your nodes, for example:
       - if you want the names: `nodes=$(kubectl get nodes -o jsonpath='{range.items[*].metadata}{.name} {end}')`
       - if you want to get the IPs: `nodes=$(kubectl get nodes -o jsonpath='{range .items[*].status.addresses[?(@.type=="ExternalIP")]}{.address} {end}')`
-   1. copy your local `.dockercfg` to the home directory of root on each node.
-      - for example: `for n in $nodes; do scp ~/.dockercfg root@$n:/root/.dockercfg; done`
+   1. copy your local `.docker/config.json` to the home directory of root on each node.
+      - for example: `for n in $nodes; do scp ~/.docker/config.json root@$n:/root/.docker/config.json; done`
 
 Verify by creating a pod that uses a private image, e.g.:
 
@@ -153,12 +153,12 @@ $ kubectl describe pods/private-image-test-1 | grep "Failed"
 ```
 
 
-You must ensure all nodes in the cluster have the same `.dockercfg`.  Otherwise, pods will run on
+You must ensure all nodes in the cluster have the same `.docker/config.json`.  Otherwise, pods will run on
 some nodes and fail to run on others.  For example, if you use node autoscaling, then each instance
-template needs to include the `.dockercfg` or mount a drive that contains it.
+template needs to include the `.docker/config.json` or mount a drive that contains it.
 
 All pods will have read access to images in any private registry once private
-registry keys are added to the `.dockercfg`.
+registry keys are added to the `.docker/config.json`.
 
 **This was tested with a private docker repository as of 26 June with Kubernetes version v0.19.3.
 It should also work for a private registry such as quay.io, but that has not been tested.**
@@ -190,21 +190,21 @@ where node creation is automated.
 
 Kubernetes supports specifying registry keys on a pod.
 
-First, create a `.dockercfg`, such as running `docker login <registry.domain>`.
-Then put the resulting `.dockercfg` file into a [secret resource](secrets.md).  For example:
+First, create a `.docker/config.json`, such as by running `docker login <registry.domain>`.
+Then put the resulting `.docker/config.json` file into a [secret resource](secrets.md).  For example:
 
 ```console
 $ docker login
 Username: janedoe
 Password: ●●●●●●●●●●●
 Email: jdoe@example.com
-WARNING: login credentials saved in /Users/jdoe/.dockercfg.
+WARNING: login credentials saved in /Users/jdoe/.docker/config.json.
 Login Succeeded
 
-$ echo $(cat ~/.dockercfg)
+$ echo $(cat ~/.docker/config.json)
 { "https://index.docker.io/v1/": { "auth": "ZmFrZXBhc3N3b3JkMTIK", "email": "jdoe@example.com" } }
 
-$ cat ~/.dockercfg | base64
+$ cat ~/.docker/config.json | base64
 eyAiaHR0cHM6Ly9pbmRleC5kb2NrZXIuaW8vdjEvIjogeyAiYXV0aCI6ICJabUZyWlhCaGMzTjNiM0prTVRJSyIsICJlbWFpbCI6ICJqZG9lQGV4YW1wbGUuY29tIiB9IH0K
 
 $ cat > /tmp/image-pull-secret.yaml <<EOF
@@ -213,20 +213,19 @@ kind: Secret
 metadata:
   name: myregistrykey
 data:
-  .dockercfg: eyAiaHR0cHM6Ly9pbmRleC5kb2NrZXIuaW8vdjEvIjogeyAiYXV0aCI6ICJabUZyWlhCaGMzTjNiM0prTVRJSyIsICJlbWFpbCI6ICJqZG9lQGV4YW1wbGUuY29tIiB9IH0K
-type: kubernetes.io/dockercfg
+  .dockerconfigjson: eyAiaHR0cHM6Ly9pbmRleC5kb2NrZXIuaW8vdjEvIjogeyAiYXV0aCI6ICJabUZyWlhCaGMzTjNiM0prTVRJSyIsICJlbWFpbCI6ICJqZG9lQGV4YW1wbGUuY29tIiB9IH0K
+type: kubernetes.io/dockerconfigjson
 EOF
 
 $ kubectl create -f /tmp/image-pull-secret.yaml
 secrets/myregistrykey
-$
 ```
 
 If you get the error message `error: no objects passed to create`, it may mean the base64 encoded string is invalid.
-If you get an error message like `Secret "myregistrykey" is invalid: data[.dockercfg]: invalid value ...` it means
-the data was successfully un-base64 encoded, but could not be parsed as a dockercfg file.
+If you get an error message like `Secret "myregistrykey" is invalid: data[.dockerconfigjson]: invalid value ...` it means
+the data was successfully un-base64 encoded, but could not be parsed as a `.docker/config.json` file.
 
-This process only needs to be done one time (per namespace).
+This process needs to be done one time per namespace, or to any non-default service accounts you create.
 
 Now, you can create pods which reference that secret by adding an `imagePullSecrets`
 section to a pod definition.
@@ -253,7 +252,7 @@ pulled using imagePullSecrets.  That is, imagePullSecrets does *NOT* protect you
 images from being seen by other users in the cluster.  Our intent
 is to fix that.
 
-You can use this in conjunction with a per-node `.dockerfile`.  The credentials
+You can use this in conjunction with a per-node `.docker/config.json`.  The credentials
 will be merged.  This approach will work on Google Container Engine (GKE).
 
 ### Use Cases
@@ -269,7 +268,7 @@ common use cases and suggested solutions.
    visible to all cluster users.
    - Use a hosted private [Docker registry](https://docs.docker.com/registry/)
      - may be hosted on the [Docker Hub](https://hub.docker.com/account/signup/), or elsewhere.
-     - manually configure .dockercfg on each node as described above
+     - manually configure .docker/config.json on each node as described above
    - Or, run an internal private registry behind your firewall with open read access.
      - no Kubernetes configuration required
    - Or, when on GCE/GKE, use the project's Google Container Registry.
