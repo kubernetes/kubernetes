@@ -1417,3 +1417,67 @@ function kube::release::gcs::publish() {
     return 1
   fi
 }
+
+# ---------------------------------------------------------------------------
+# Docker Release
+
+# Releases all docker images to a docker registry specified by KUBE_DOCKER_REGISTRY
+# using tag KUBE_DOCKER_IMAGE_TAG.
+#
+# Globals:
+#   KUBE_DOCKER_REGISTRY
+#   KUBE_DOCKER_IMAGE_TAG
+#   RELEASE_DIR
+# Returns:
+#   If new pushing docker images was successful.
+function kube::release::docker::release() {
+  SERVER_BINARY_TAR="${RELEASE_DIR}/kubernetes-server-linux-amd64.tar.gz"
+  kube::release::docker::release_server_images
+}
+
+# Releases kubernetes server docker images to a docker registry specified by
+# KUBE_DOCKER_REGISTRY using tag KUBE_DOCKER_IMAGE_TAG.
+#
+# Globals:
+#   KUBE_DOCKER_REGISTRY
+#   KUBE_DOCKER_IMAGE_TAG
+#   SERVER_BINARY_TAR
+# Returns:
+#   If new pushing docker images was successful.
+function kube::release::docker::release_server_images() {
+  local docker_wrapped_binaries=(
+    "kube-apiserver"
+    "kube-controller-manager"
+    "kube-scheduler"
+    "kube-proxy"
+  )
+
+  local docker_cmd=("docker")
+  local docker_push_cmd=$docker_cmd
+  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
+    docker_push_cmd=("gcloud" "docker")
+  fi
+
+  local temp_dir="$(mktemp -d -t 'kube-server-XXXX')"
+
+  tar xzfv "${SERVER_BINARY_TAR}" -C "${temp_dir}" &> /dev/null
+
+  for binary in "${docker_wrapped_binaries[@]}"; do
+    local docker_tag="$(cat ${temp_dir}/kubernetes/server/bin/${binary}.docker_tag)"
+    local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_DOCKER_IMAGE_TAG}"
+    kube::log::status "Pushing ${binary} to ${docker_target}"
+    (
+      "${docker_cmd[@]}" load -i "${temp_dir}/kubernetes/server/bin/${binary}.tar"
+      "${docker_cmd[@]}" tag -f "gcr.io/google_containers/${binary}:${docker_tag}" "${docker_target}"
+      "${docker_push_cmd[@]}" push "${docker_target}"
+    ) &> "${temp_dir}/${binary}-push.log" &
+  done
+
+  kube::util::wait-for-jobs || {
+    kube::log::error "unable to push images. see ${temp_dir}/*.log for more info."
+    return 1
+  }
+
+  rm -rf "${temp_dir}"
+  return 0
+}

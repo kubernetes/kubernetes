@@ -26,6 +26,7 @@ DEFAULT_KUBECONFIG="${HOME}/.kube/config"
 
 source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
+source "${KUBE_ROOT}/build/common.sh"
 # KUBE_RELEASE_VERSION_REGEX matches things like "v1.2.3" or "v1.2.3-alpha.4"
 #
 # NOTE This must match the version_regex in build/common.sh
@@ -376,37 +377,6 @@ function stage-images() {
 
   KUBE_IMAGE_TAG="$(echo """${KUBE_GIT_VERSION}""" | sed 's/+/-/g')"
 
-  local docker_wrapped_binaries=(
-    "kube-apiserver"
-    "kube-controller-manager"
-    "kube-scheduler"
-    "kube-proxy"
-  )
-
-  local docker_cmd=("docker")
-
-  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
-    local docker_push_cmd=("gcloud" "docker")
-  fi
-
-  local temp_dir="$(mktemp -d -t 'kube-server-XXXX')"
-
-  tar xzfv "${SERVER_BINARY_TAR}" -C "${temp_dir}" &> /dev/null
-
-  for binary in "${docker_wrapped_binaries[@]}"; do
-    local docker_tag="$(cat ${temp_dir}/kubernetes/server/bin/${binary}.docker_tag)"
-    (
-      "${docker_cmd[@]}" load -i "${temp_dir}/kubernetes/server/bin/${binary}.tar"
-      "${docker_cmd[@]}" tag -f "gcr.io/google_containers/${binary}:${docker_tag}" "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
-      "${docker_push_cmd[@]}" push "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
-    ) &> "${temp_dir}/${binary}-push.log" &
-  done
-
-  kube::util::wait-for-jobs || {
-    kube::log::error "unable to push images. see ${temp_dir}/*.log for more info."
-    return 1
-  }
-
-  rm -rf "${temp_dir}"
-  return 0
+  # We are using the same mechanism as during a regular release.
+  kube::release::docker::release_server_images
 }
