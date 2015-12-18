@@ -78,7 +78,7 @@ func TestRESTMapper(t *testing.T) {
 	rcGVK := gv.WithKind("ReplicationController")
 	podTemplateGVK := gv.WithKind("PodTemplate")
 
-	if gvk, err := latest.GroupOrDie(internal.GroupName).RESTMapper.KindFor(internal.SchemeGroupVersion.WithResource("replicationcontrollers")); err != nil || gvk != rcGVK {
+	if gvk, err := latest.GroupOrDie(internal.GroupName).RESTMapper.KindFor("replicationcontrollers"); err != nil || gvk != rcGVK {
 		t.Errorf("unexpected version mapping: %v %v", gvk, err)
 	}
 

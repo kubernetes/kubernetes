@@ -158,23 +158,12 @@ type RESTMapping struct {
 // TODO(caesarxuchao): Add proper multi-group support so that kinds & resources are
 // scoped to groups. See http://issues.k8s.io/12413 and http://issues.k8s.io/10009.
 type RESTMapper interface {
-	// KindFor takes a partial resource and returns back the single match.  Returns an error if there are multiple matches
-	KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error)
-
-	// KindsFor takes a partial resource and returns back the list of potential kinds in priority order
-	KindsFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionKind, error)
-
-	// ResourceFor takes a partial resource and returns back the single match.  Returns an error if there are multiple matches
-	ResourceFor(input unversioned.GroupVersionResource) (unversioned.GroupVersionResource, error)
-
-	// ResourcesFor takes a partial resource and returns back the list of potential resource in priority order
-	ResourcesFor(input unversioned.GroupVersionResource) ([]unversioned.GroupVersionResource, error)
+	// KindFor takes a resource and returns back the unambiguous Kind (GroupVersionKind)
+	KindFor(resource string) (unversioned.GroupVersionKind, error)
 
 	RESTMapping(gk unversioned.GroupKind, versions ...string) (*RESTMapping, error)
 
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)
-
-	// ResourceIsValid takes a partial resource and returns back whether or not the resource matches at least one kind
-	ResourceIsValid(resource unversioned.GroupVersionResource) bool
+	ResourceIsValid(resource string) bool
 }
