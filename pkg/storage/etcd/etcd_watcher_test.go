@@ -22,7 +22,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -31,6 +30,7 @@ import (
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/watch"
 
+	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 )
 
@@ -217,26 +217,22 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 	}
 }
 
-/* TODO: So believe it or not... but this test is flakey with the go-etcd client library
- * which I'm surprised by.  Apprently you can close the client that is performing the watch
- * and the watch *never returns.*  I would like to still keep this test here and re-enable
- * with the new 2.2+ client library.
 func TestWatchEtcdError(t *testing.T) {
 	codec := testapi.Default.Codec()
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
-	watching, err := h.Watch(context.TODO(), "/some/key", 4, storage.Everything)
+	watching, err := h.Watch(context.TODO(), "/some/key", "4", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	server.Terminate(t)
 
-	got := <-watching.ResultChan()
-	if got.Type != watch.Error {
+	got, ok := <-watching.ResultChan()
+	if !ok && got.Type != watch.Error {
 		t.Fatalf("Unexpected non-error")
 	}
 	watching.Stop()
-} */
+}
 
 func TestWatch(t *testing.T) {
 	codec := testapi.Default.Codec()
