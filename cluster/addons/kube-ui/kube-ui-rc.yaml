@@ -1,27 +1,27 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: kube-ui-v2
+  name: kube-ui-v4
   namespace: kube-system
   labels:
     k8s-app: kube-ui
-    version: v2
+    version: v4
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: 1
   selector:
     k8s-app: kube-ui
-    version: v2
+    version: v4
   template:
     metadata:
       labels:
         k8s-app: kube-ui
-        version: v2
+        version: v4
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
       - name: kube-ui
-        image: gcr.io/google_containers/kube-ui:v2
+        image: mesosphere/kube-ui:v4.d235186e5479341f842fdf18ce4765ebebdd1c94
         resources:
           limits:
             cpu: 100m
