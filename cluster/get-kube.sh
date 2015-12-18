@@ -98,9 +98,11 @@ elif [[ "${machine}" == "arm*" ]]; then
   arch="arm"
 elif [[ "${machine}" == "s390x*" ]]; then
   arch="s390x"
+elif [[ "${machine}" == "ppc64le" ]]; then
+  arch="ppc64le"
 else
   echo "Unknown, unsupported architecture (${machine})."
-  echo "Supported architectures x86_64, i686, arm, s390x."
+  echo "Supported architectures x86_64, i686, arm, s390x, ppc64le."
   echo "Bailing out."
   exit 3
 fi
