@@ -54,15 +54,23 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	const pkgUnversioned = "k8s.io/kubernetes/pkg/client/unversioned"
 	const pkgLatest = "k8s.io/kubernetes/pkg/api/latest"
 	prefix := func(group string) string {
-		if group == "" {
+		if group == "legacy" {
 			return `"/api"`
 		}
 		return `"/apis"`
 	}
 
+	canonize := func(group string) string {
+		if group == "legacy" {
+			return ""
+		}
+		return group
+	}
+
 	m := map[string]interface{}{
 		"group":                      g.group,
 		"Group":                      namer.IC(g.group),
+		"canonicalGroup":             canonize(g.group),
 		"types":                      g.types,
 		"Config":                     c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "Config"}),
 		"DefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "DefaultKubernetesUserAgent"}),
@@ -81,8 +89,9 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		}
 		sw.Do(namespacerImplTemplate, wrapper)
 	}
-	sw.Do(newClientTemplate, m)
-	sw.Do(newClientOrDieTemplate, m)
+	sw.Do(newClientForConfigTemplate, m)
+	sw.Do(newClientForConfigOrDieTemplate, m)
+	sw.Do(newClientForRESTClientTemplate, m)
 	sw.Do(setClientDefaultsTemplate, m)
 
 	return sw.Error()
@@ -90,8 +99,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 
 var groupInterfaceTemplate = `
 type $.Group$Interface interface {
-    $range .types$
-        $.Name.Name$Namespacer
+    $range .types$ $.Name.Name$Namespacer
     $end$
 }
 `
@@ -109,11 +117,11 @@ func (c *$.Group$Client) $.type|publicPlural$(namespace string) $.type.Name.Name
 }
 `
 
-var newClientTemplate = `
-// New$.Group$ creates a new $.Group$Client for the given config.
-func New$.Group$(c *$.Config|raw$) (*$.Group$Client, error) {
+var newClientForConfigTemplate = `
+// NewForConfig creates a new $.Group$Client for the given config.
+func NewForConfig(c *$.Config|raw$) (*$.Group$Client, error) {
 	config := *c
-	if err := set$.Group$Defaults(&config); err != nil {
+	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
 	client, err := $.RESTClientFor|raw$(&config)
@@ -124,11 +132,11 @@ func New$.Group$(c *$.Config|raw$) (*$.Group$Client, error) {
 }
 `
 
-var newClientOrDieTemplate = `
-// New$.Group$OrDie creates a new $.Group$Client for the given config and
+var newClientForConfigOrDieTemplate = `
+// NewForConfigOrDie creates a new $.Group$Client for the given config and
 // panics if there is an error in the config.
-func New$.Group$OrDie(c *$.Config|raw$) *$.Group$Client {
-	client, err := New$.Group$(c)
+func NewForConfigOrDie(c *$.Config|raw$) *$.Group$Client {
+	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
 	}
@@ -136,10 +144,16 @@ func New$.Group$OrDie(c *$.Config|raw$) *$.Group$Client {
 }
 `
 
+var newClientForRESTClientTemplate = `
+// New creates a new $.Group$Client for the given RESTClient.
+func New(c *$.RESTClient|raw$) *$.Group$Client {
+	return &$.Group$Client{c}
+}
+`
 var setClientDefaultsTemplate = `
-func set$.Group$Defaults(config *$.Config|raw$) error {
+func setConfigDefaults(config *$.Config|raw$) error {
 	// if $.group$ group is not registered, return an error
-	g, err := $.latestGroup|raw$("$.group$")
+	g, err := $.latestGroup|raw$("$.canonicalGroup$")
 	if err != nil {
 		return err
 	}

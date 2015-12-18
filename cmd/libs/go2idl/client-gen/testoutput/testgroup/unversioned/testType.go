@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testoutput
+package unversioned
 
 import (
 	testgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup"
