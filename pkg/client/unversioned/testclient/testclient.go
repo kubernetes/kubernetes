@@ -361,6 +361,10 @@ func (c *FakeExperimental) ThirdPartyResources(namespace string) client.ThirdPar
 	return &FakeThirdPartyResources{Fake: c, Namespace: namespace}
 }
 
+func (c *FakeExperimental) Generic(namespace string, gvk unversioned.GroupVersionKind) client.GenericResourceInterface {
+	return &FakeGenericResources{Fake: c, Namespace: namespace, GroupVersionKind: gvk}
+}
+
 type FakeDiscovery struct {
 	*Fake
 }
