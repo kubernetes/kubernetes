@@ -62,6 +62,16 @@ To avoid running into cloud provider quota issues, when creating a cluster with 
     * Target pools
 * Gating the setup script so that it brings up new node VMs in smaller batches with waits in between, because some cloud providers rate limit the creation of VMs.
 
+### Etcd storage
+
+To improve performance of large clusters, we store events in a separate dedicated etcd instance.
+
+When creating a cluster, existing salt scripts:
+* start and configure additional etcd instance
+* configure api-server to use it for storing events
+
+However, this is done only for clusters having more than 50 nodes.
+
 ### Addon Resources
 
 To prevent memory leaks or other resource issues in [cluster addons](../../cluster/addons/) from consuming all the resources available on a node, Kubernetes sets resource limits on addon containers to limit the CPU and Memory resources they can consume (See PR [#10653](http://pr.k8s.io/10653/files) and [#10778](http://pr.k8s.io/10778/files)).
