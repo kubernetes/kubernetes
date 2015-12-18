@@ -155,9 +155,9 @@ func (s *StoreToReplicationControllerLister) Exists(controller *api.ReplicationC
 
 // StoreToReplicationControllerLister lists all controllers in the store.
 // TODO: converge on the interface in pkg/client
-func (s *StoreToReplicationControllerLister) List() (controllers []api.ReplicationController, err error) {
+func (s *StoreToReplicationControllerLister) List() (controllers api.ReplicationControllerList, err error) {
 	for _, c := range s.Store.List() {
-		controllers = append(controllers, *(c.(*api.ReplicationController)))
+		controllers.Items = append(controllers.Items, *(c.(*api.ReplicationController)))
 	}
 	return controllers, nil
 }
