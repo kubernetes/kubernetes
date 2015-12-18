@@ -2695,16 +2695,19 @@ func (kl *Kubelet) syncNetworkStatus() {
 	var err error
 	switch network.GetPluginType(kl.networkPluginName) {
 	case network.BridgePluginName, network.KubeletDefaultPluginName:
+		// TODO: include bandwidth shaping for plugins. There is a chicken and egg
+		// problem till we've moved bandwidth shaping into the plugin.
 		err = kl.networkPlugin.ReloadConf(&cni.BridgeNetConf{podCIDR})
 	default:
-		err = kl.cbr0.reconcile(podCIDR)
+		if cbrErr := kl.cbr0.reconcile(podCIDR); cbrErr != nil {
+			err = fmt.Errorf("Failed to reconcile cbr0 for cidr %v", podCIDR, cbrErr)
+		} else if bwErr := kl.applyBandwidthShaping(); bwErr != nil {
+			// TODO: Is a failure here worthy of blocking pod creation?
+			err = fmt.Errorf("Failed to apply bandwidth shaping: %v", bwErr)
+		}
 	}
 	if err != nil {
 		err = fmt.Errorf("Failed to configure networking: %v", err)
-		glog.Warning(err)
-	} else if bwErr := kl.applyBandwidthShaping(); bwErr != nil {
-		// TODO: Is a failure here worthy of blocking pod creation?
-		err = fmt.Errorf("Failed to apply bandwidth shaping: %v", bwErr)
 		glog.Warning(err)
 	}
 	kl.runtimeState.setNetworkState(err)
