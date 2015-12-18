@@ -127,8 +127,8 @@ func (b flockerBuilder) GetPath() string {
 	return b.flocker.path
 }
 
-func (b flockerBuilder) SetUp() error {
-	return b.SetUpAt(b.flocker.datasetName)
+func (b flockerBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.flocker.datasetName, fsGroup)
 }
 
 // newFlockerClient uses environment variables and pod attributes to return a
@@ -168,7 +168,7 @@ control service:
    need to update the Primary UUID for this volume.
 5. Wait until the Primary UUID was updated or timeout.
 */
-func (b flockerBuilder) SetUpAt(dir string) error {
+func (b flockerBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	if volumeutil.IsReady(b.getMetaDir()) {
 		return nil
 	}

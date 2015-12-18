@@ -120,10 +120,10 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 	for i := range pod.Spec.Volumes {
 		volSpec := &pod.Spec.Volumes[i]
 		hasFSGroup := false
-		var fsGroup int64 = 0
+		var fsGroup *int64
 		if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.FSGroup != nil {
 			hasFSGroup = true
-			fsGroup = *pod.Spec.SecurityContext.FSGroup
+			fsGroup = pod.Spec.SecurityContext.FSGroup
 		}
 
 		rootContext, err := kl.getRootDirContext()
@@ -141,7 +141,7 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 		if builder == nil {
 			return nil, errUnsupportedVolumeType
 		}
-		err = builder.SetUp()
+		err = builder.SetUp(fsGroup)
 		if err != nil {
 			return nil, err
 		}

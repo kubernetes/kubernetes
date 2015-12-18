@@ -124,8 +124,8 @@ func (b *gitRepoVolumeBuilder) GetAttributes() volume.Attributes {
 }
 
 // SetUp creates new directory and clones a git repo.
-func (b *gitRepoVolumeBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *gitRepoVolumeBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 // This is the spec for the volume that this plugin wraps.
@@ -134,7 +134,7 @@ var wrappedVolumeSpec = &volume.Spec{
 }
 
 // SetUpAt creates new directory and clones a git repo.
-func (b *gitRepoVolumeBuilder) SetUpAt(dir string) error {
+func (b *gitRepoVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	if volumeutil.IsReady(b.getMetaDir()) {
 		return nil
 	}
@@ -144,7 +144,7 @@ func (b *gitRepoVolumeBuilder) SetUpAt(dir string) error {
 	if err != nil {
 		return err
 	}
-	if err := wrapped.SetUpAt(dir); err != nil {
+	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
 		return err
 	}
 

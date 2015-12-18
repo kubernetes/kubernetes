@@ -211,6 +211,6 @@ func TestSetUpAtInternal(t *testing.T) {
 	b := flockerBuilder{flocker: &flocker{pod: pod, plugin: plug.(*flockerPlugin)}}
 	b.client = newMockFlockerClient("dataset-id", "primary-uid", mockPath)
 
-	assert.NoError(b.SetUpAt(dir))
+	assert.NoError(b.SetUpAt(dir, nil))
 	assert.Equal(expectedPath, b.flocker.path)
 }

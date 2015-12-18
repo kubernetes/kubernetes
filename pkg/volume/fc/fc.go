@@ -176,11 +176,11 @@ func (b *fcDiskBuilder) GetAttributes() volume.Attributes {
 		SupportsSELinux:             true,
 	}
 }
-func (b *fcDiskBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *fcDiskBuilder) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *fcDiskBuilder) SetUpAt(dir string) error {
+func (b *fcDiskBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	err := diskSetUp(b.manager, *b, dir, b.mounter)
 	if err != nil {

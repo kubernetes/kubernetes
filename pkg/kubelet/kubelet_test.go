@@ -515,7 +515,7 @@ func TestGetPodVolumesFromDisk(t *testing.T) {
 	expectedPaths := []string{}
 	for i := range volsOnDisk {
 		fv := volume.FakeVolume{PodUID: volsOnDisk[i].podUID, VolName: volsOnDisk[i].volName, Plugin: plug}
-		fv.SetUp()
+		fv.SetUp(nil)
 		expectedPaths = append(expectedPaths, fv.GetPath())
 	}
 
@@ -550,11 +550,11 @@ func (f *stubVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{}
 }
 
-func (f *stubVolume) SetUp() error {
+func (f *stubVolume) SetUp(fsGroup *int64) error {
 	return nil
 }
 
-func (f *stubVolume) SetUpAt(dir string) error {
+func (f *stubVolume) SetUpAt(dir string, fsGroup *int64) error {
 	return nil
 }
 
