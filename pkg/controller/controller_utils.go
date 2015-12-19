@@ -234,7 +234,7 @@ type PodControlInterface interface {
 	DeletePod(namespace string, podID string) error
 }
 
-// RealPodControl is the default implementation of PodControllerInterface.
+// RealPodControl is the default implementation of PodControlInterface.
 type RealPodControl struct {
 	KubeClient client.Interface
 	Recorder   record.EventRecorder

@@ -60,6 +60,7 @@ kube-controller-manager
       --cloud-provider="": The provider for cloud services.  Empty string for no provider.
       --cluster-cidr=<nil>: CIDR Range for Pods in cluster.
       --cluster-name="kubernetes": The instance prefix for the cluster
+      --concurrent-deployment-syncs=5: The number of deployment objects that are allowed to sync concurrently. Larger number = more reponsive deployments, but more CPU (and network) load
       --concurrent-endpoint-syncs=5: The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load
       --concurrent-resource-quota-syncs=5: The number of resource quotas that are allowed to sync concurrently. Larger number = more responsive quota management, but more CPU (and network) load
       --concurrent_rc_syncs=5: The number of replication controllers that are allowed to sync concurrently. Larger number = more reponsive replica management, but more CPU (and network) load

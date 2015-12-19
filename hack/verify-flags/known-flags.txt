@@ -45,6 +45,7 @@ cluster-dns
 cluster-domain
 cluster-name
 cluster-tag
+concurrent-deployment-syncs
 concurrent-endpoint-syncs
 concurrent-resource-quota-syncs
 config-sync-period
