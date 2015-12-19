@@ -28,7 +28,11 @@ spec:
         - image: gcr.io/google_containers/heapster:v0.18.2
           name: heapster
           resources:
+            # keep request = limit to keep this container in guaranteed class
             limits:
+              cpu: 100m
+              memory: {{ heapster_memory }}
+            requests:
               cpu: 100m
               memory: {{ heapster_memory }}
           command:
