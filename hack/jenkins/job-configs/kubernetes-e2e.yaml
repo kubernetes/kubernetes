@@ -25,7 +25,6 @@
             colormap: xterm
         - timeout:
             timeout: '{timeout}'
-            abort: true
             fail: true
         - timestamps
         - workspace-cleanup
