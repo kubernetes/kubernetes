@@ -190,23 +190,24 @@ func podName(pod *api.Pod) string {
 
 // PodFitsResources calculates fit based on requested, rather than used resources
 func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
-	podRequest := getResourceRequest(pod)
 	info, err := r.info.GetNodeInfo(node)
 	if err != nil {
 		return false, err
 	}
-	if podRequest.milliCPU == 0 && podRequest.memory == 0 {
-		return int64(len(existingPods)) < info.Status.Capacity.Pods().Value(), nil
-	}
-	pods := []*api.Pod{}
-	copy(pods, existingPods)
-	pods = append(existingPods, pod)
-	_, exceedingCPU, exceedingMemory := CheckPodsExceedingFreeResources(pods, info.Status.Capacity)
-	if int64(len(pods)) > info.Status.Capacity.Pods().Value() {
-		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %+v is full, running %v out of %v Pods.", podName(pod), node, len(pods)-1, info.Status.Capacity.Pods().Value())
+
+	if int64(len(existingPods))+1 > info.Status.Capacity.Pods().Value() {
+		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %+v is full, running %v out of %v Pods.", podName(pod), node, len(existingPods), info.Status.Capacity.Pods().Value())
 		FailedResourceType = "PodExceedsMaxPodNumber"
 		return false, nil
 	}
+
+	podRequest := getResourceRequest(pod)
+	if podRequest.milliCPU == 0 && podRequest.memory == 0 {
+		return true, nil
+	}
+
+	pods := append(existingPods, pod)
+	_, exceedingCPU, exceedingMemory := CheckPodsExceedingFreeResources(pods, info.Status.Capacity)
 	if len(exceedingCPU) > 0 {
 		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient CPU", podName(pod), node)
 		FailedResourceType = "PodExceedsFreeCPU"
