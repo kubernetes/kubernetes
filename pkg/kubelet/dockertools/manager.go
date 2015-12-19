@@ -318,7 +318,7 @@ func (dm *DockerManager) determineContainerIP(podNamespace, podName string, cont
 		result = container.NetworkSettings.IPAddress
 	}
 
-	if dm.networkPlugin.Name() != network.DefaultPluginName {
+	if dm.networkPlugin.Name() != network.NoOpPluginName {
 		netStatus, err := dm.networkPlugin.Status(podNamespace, podName, kubetypes.DockerID(container.ID))
 		if err != nil {
 			glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", dm.networkPlugin.Name(), podName, err)
@@ -1572,7 +1572,14 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubetypes.Docker
 	netNamespace := ""
 	var ports []api.ContainerPort
 
-	if dm.networkPlugin.Name() == "cni" {
+	// CNI plugins run with net=none, unless they already have net=Host.
+	if dm.networkPlugin.Name() == network.CNIPluginName {
+		// TODO: This has deeper ramifications.
+		// 1. It will break host ports since we no longer get the docker
+		// userspace proxy, and we start docker with --iptables=false. We should
+		// forward the appropriate ports in the network plugin.
+		// 2. We should setup delegate /etc/hosts and resolvconf management
+		// to the plugin.
 		netNamespace = "none"
 	}
 
@@ -2007,6 +2014,18 @@ func getIPCMode(pod *api.Pod) string {
 		ipcMode = "host"
 	}
 	return ipcMode
+}
+
+// GetNetworkMode returns the network mode of the container, eg "host"
+// This method is used by network plugins to determine if a pod requires
+// additional setup. Pods running with host networking do not.
+func (dm *DockerManager) GetNetworkMode(containerID kubecontainer.ContainerID) (string, error) {
+	inspectResult, err := dm.client.InspectContainer(containerID.ID)
+	if err != nil {
+		glog.Errorf("Error inspecting container: '%v'", err)
+		return "", err
+	}
+	return inspectResult.HostConfig.NetworkMode, nil
 }
 
 // GetNetNs returns the network namespace path for the given container

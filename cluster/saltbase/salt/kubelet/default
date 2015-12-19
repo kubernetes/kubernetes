@@ -116,9 +116,13 @@
   {% set test_args=pillar['kubelet_test_args'] %}
 {% endif -%}
 
+{% set network_plugin_dir = "" -%}
 {% set network_plugin = "" -%}
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
   {% set network_plugin = "--network-plugin=opencontrail" %}
+{% elif pillar.get('network_provider', '').lower() == 'kubernetes' %}
+  {% set network_plugin_dir = "--network-plugin-dir=/etc/cni/net.d" -%}
+  {% set network_plugin = "--network-plugin=net.alpha.kubernetes.io/default" -%}
 {% endif -%}
 
 {% set kubelet_port = "" -%}
@@ -127,4 +131,4 @@
 {% endif -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{experimental_flannel_overlay}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{network_plugin_dir}} {{kubelet_port}} {{experimental_flannel_overlay}} {{test_args}}"

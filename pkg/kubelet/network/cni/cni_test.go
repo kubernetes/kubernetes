@@ -209,3 +209,22 @@ func TestCNIPlugin(t *testing.T) {
 		t.Errorf("Mismatch in expected output for setup hook. Expected '%s', got '%s'", expectedOutput, string(output))
 	}
 }
+
+func TestCNIAlwaysCreatesPlugin(t *testing.T) {
+	// Empty plugin directories
+	pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
+	tmpDir := tmpDirOrDie()
+	testNetworkConfigPath := path.Join(tmpDir, "plugins", "net", "cni")
+	testVendorCNIDirPrefix := tmpDir
+	defer tearDownPlugin(tmpDir)
+	// Probe will not find a net.conf but should create a "hollow" plugin anyway.
+	np := probeNetworkPluginsWithVendorCNIDirPrefix(path.Join(testNetworkConfigPath, pluginName), testVendorCNIDirPrefix)
+	// Hollow plugin should not get picked if Kubelet is passed a different --network-plugin-name, such as exec.
+	_, err := network.InitNetworkPlugin(np, "cni", NewFakeHost(nil))
+	if err != nil {
+		t.Fatalf("Failed to select the desired plugin: %v", err)
+	}
+	if _, err := network.InitNetworkPlugin(np, "exec", NewFakeHost(nil)); err == nil {
+		t.Fatalf("Loaded plugin for unknown type")
+	}
+}

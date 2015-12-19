@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network/cni"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
@@ -313,6 +314,7 @@ func NewMainKubelet(
 		containerManager:               containerManager,
 		flannelExperimentalOverlay:     flannelExperimentalOverlay,
 		flannelHelper:                  NewFlannelHelper(),
+		cbr0:                           newContainerBridgeReconciler("cbr0"),
 	}
 	if klet.flannelExperimentalOverlay {
 		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
@@ -325,11 +327,23 @@ func NewMainKubelet(
 		// even if the network changes. We only need it for the master proxy.
 		klet.flannelExperimentalOverlay = false
 	}
+	// TODO: remove this hack. The problem is as follows:
+	// We install all CNI plugins on a node. We allow users to pick a specific
+	// plugin by setting --network-plugin to net.alpha.kubernetes.io/specific-plugin.
+	// However *all* cni plugins only report a name of "cni". So we save the
+	// passed in plugin name, get a lazy loader for the CNI plugin, and use the
+	// saved name to write a net.conf after we've acquired a podCIDR.
+	klet.networkPluginName = networkPluginName
+	if network.GetPluginType(klet.networkPluginName) != "" {
+		glog.Infof("Creating CNI deferred loader for plugin %v.", klet.networkPluginName)
+		networkPluginName = network.CNIPluginName
+	}
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
 		return nil, err
 	} else {
 		klet.networkPlugin = plug
 	}
+	glog.Infof("Kubelet network plugin %v", klet.networkPlugin.Name())
 
 	machineInfo, err := klet.GetCachedMachineInfo()
 	if err != nil {
@@ -633,6 +647,10 @@ type Kubelet struct {
 	// Optionally shape the bandwidth of a pod
 	shaper bandwidth.BandwidthShaper
 
+	// Used to reconcile the container bridge and bootstrap basic node
+	// networking. Abstracted out for unittesting.
+	cbr0 *containerBridgeReconciler
+
 	// True if container cpu limits should be enforced via cgroup CFS quota
 	cpuCFSQuota bool
 
@@ -651,6 +669,9 @@ type Kubelet struct {
 	// on the fly if we're confident the dbus connetions it opens doesn't
 	// put the system under duress.
 	flannelHelper *FlannelHelper
+
+	// Name of network plugin responsible for pod networking setup.
+	networkPluginName string
 }
 
 func (kl *Kubelet) allSourcesReady() bool {
@@ -2584,24 +2605,10 @@ func (kl *Kubelet) updateRuntimeUp() {
 	kl.runtimeState.setRuntimeSync(time.Now())
 }
 
-func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
-	if podCIDR == "" {
-		glog.V(5).Info("PodCIDR not set. Will not configure cbr0.")
-		return nil
-	}
-	glog.V(5).Infof("PodCIDR is set to %q", podCIDR)
-	_, cidr, err := net.ParseCIDR(podCIDR)
-	if err != nil {
-		return err
-	}
-	// Set cbr0 interface address to first address in IPNet
-	cidr.IP.To4()[3] += 1
-	if err := ensureCbr0(cidr); err != nil {
-		return err
-	}
+func (kl *Kubelet) applyBandwidthShaping() error {
 	if kl.shaper == nil {
 		glog.V(5).Info("Shaper is nil, creating")
-		kl.shaper = bandwidth.NewTCShaper("cbr0")
+		kl.shaper = bandwidth.NewTCShaper(kl.cbr0.name)
 	}
 	return kl.shaper.ReconcileInterface()
 }
@@ -2625,31 +2632,78 @@ func (kl *Kubelet) recordNodeStatusEvent(eventtype, event string) {
 	kl.recorder.Eventf(kl.nodeRef, eventtype, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
+// syncNetworkStatus is responsible configuring networking as follows:
+// [Network state set to Unknown]
+// * If configureCBR0==false, the kubelet doesn't bother with node networking.
+// [Network state cleared]
+// * Step1: configure IPTables masquerade rules for node traffic.
+// * Step2: wait for podCIDR
+//	- If flannelExperimentalOverlay is set, this requires waiting on subnet.env
+//	- Otherwise it requires waiting on the nodecontroller to assign a podCIDR
+// * Step3: reconcile container bridge
+// - If --network-plugin-dir was set, and --network-plugin was set to
+//   network.kubernetesPluginPrefix/<type>, write out the configuration for
+//   plugin of <type>, and reload the plugin. The plugin is now responsible
+//   for configuring (or not configuring) the continer bridge.
+//  - Otherwise, configure container bridge via multiple exec calls and restart docker.
+// [Network state cleared]
+// The kubelet will not create static pods till the network state has been
+// cleared. It also won't accept new pods till it has updated the node to Ready.
 func (kl *Kubelet) syncNetworkStatus() {
-	var err error
-	if kl.configureCBR0 {
-		if kl.flannelExperimentalOverlay {
-			podCIDR, err := kl.flannelHelper.Handshake()
-			if err != nil {
-				glog.Infof("Flannel server handshake failed %v", err)
-				return
-			}
-			glog.Infof("Setting cidr: %v -> %v",
-				kl.runtimeState.podCIDR(), podCIDR)
-			kl.runtimeState.setPodCIDR(podCIDR)
-		}
-		if err := ensureIPTablesMasqRule(); err != nil {
-			err = fmt.Errorf("Error on adding ip table rules: %v", err)
-			glog.Error(err)
-		}
-		podCIDR := kl.runtimeState.podCIDR()
-		if len(podCIDR) == 0 {
-			err = fmt.Errorf("ConfigureCBR0 requested, but PodCIDR not set. Will not configure CBR0 right now")
+	if !kl.configureCBR0 {
+		kl.runtimeState.setNetworkState(nil)
+		return
+	}
+	// Step1: install iptables MASQ rules. This step is independent of podCIDR.
+	// TODO: Turn this into a plugin that we always invoke for every other
+	// Kubernets network plugin.
+	if err := ensureIPTablesMasqRule(kl.cbr0.execer); err != nil {
+		err = fmt.Errorf("Error on adding ip table rules: %v", err)
+		glog.Warning(err)
+		kl.runtimeState.setNetworkState(err)
+		return
+	}
+	// Step2: acquire a subnet/podCIDR.
+	// TODO: Re-implment this as --network-plugin=flannel.
+	if kl.flannelExperimentalOverlay {
+		podCIDR, err := kl.flannelHelper.Handshake()
+		if err != nil {
+			err = fmt.Errorf("Flannel handshake failed %v", err)
 			glog.Warning(err)
-		} else if err := kl.reconcileCBR0(podCIDR); err != nil {
-			err = fmt.Errorf("Error configuring cbr0: %v", err)
-			glog.Error(err)
+			kl.runtimeState.setNetworkState(err)
+			return
 		}
+		glog.Infof("Setting cidr: %v -> %v",
+			kl.runtimeState.podCIDR(), podCIDR)
+		kl.runtimeState.setPodCIDR(podCIDR)
+	}
+	// Step3: reconcile container bridge with podCIDR.
+	podCIDR := kl.runtimeState.podCIDR()
+	if len(podCIDR) == 0 {
+		err := fmt.Errorf("ConfigureCBR0 requested, but PodCIDR not set. Will not configure CBR0 right now")
+		glog.Warning(err)
+		kl.runtimeState.setNetworkState(err)
+		return
+	}
+	// TODO: Break this out into a meta Kubernetes plugin that the Kubelet
+	// communicates with by passing CNI_ARG=PluginName=<name>.
+	var err error
+	switch network.GetPluginType(kl.networkPluginName) {
+	case network.BridgePluginName, network.KubeletDefaultPluginName:
+		// TODO: include bandwidth shaping for plugins. There is a chicken and egg
+		// problem till we've moved bandwidth shaping into the plugin.
+		err = kl.networkPlugin.ReloadConf(&cni.BridgeNetConf{podCIDR})
+	default:
+		if cbrErr := kl.cbr0.reconcile(podCIDR); cbrErr != nil {
+			err = fmt.Errorf("Failed to reconcile cbr0 for cidr %v", podCIDR, cbrErr)
+		} else if bwErr := kl.applyBandwidthShaping(); bwErr != nil {
+			// TODO: Is a failure here worthy of blocking pod creation?
+			err = fmt.Errorf("Failed to apply bandwidth shaping: %v", bwErr)
+		}
+	}
+	if err != nil {
+		err = fmt.Errorf("Failed to configure networking: %v", err)
+		glog.Warning(err)
 	}
 	kl.runtimeState.setNetworkState(err)
 }

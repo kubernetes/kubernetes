@@ -18,9 +18,11 @@ package kubelet
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -31,6 +33,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/appc/cni/libcni"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
@@ -4176,5 +4179,175 @@ func TestGetPodsToSync(t *testing.T) {
 
 	} else {
 		t.Errorf("expected %d pods to sync, got %d", 3, len(podsToSync))
+	}
+}
+
+// fakeExecer implements execer for testing.
+type fakeExecer struct {
+	Cmd    map[string][]string
+	Output map[string]string
+	Err    error
+}
+
+func (f *fakeExecer) execCmd(name string, args ...string) (string, error) {
+	f.Cmd[name] = args
+	r, _ := f.Output[name]
+	return r, f.Err
+}
+
+// fakeShaper fakes out bandwidth shaper but returns a custom error for
+// ReconcileInterface alone.
+type fakeShaper struct {
+	bandwidth.FakeShaper
+	err error
+}
+
+func (f *fakeShaper) ReconcileInterface() error {
+	return f.err
+}
+
+func TestSyncNetworkStatus(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	kubelet.configureCBR0 = true
+	kubelet.flannelExperimentalOverlay = false
+	fe := &fakeExecer{
+		Cmd: map[string][]string{},
+		Err: fmt.Errorf("Error to test iptables appending."),
+	}
+	kubelet.cbr0 = &containerBridgeReconciler{fe, "cbr0", func(string) (bool, error) { return true, nil }}
+	currTime := time.Now()
+	kubelet.runtimeState.clock = &util.FakeClock{currTime}
+	kubelet.runtimeState.lastBaseRuntimeSync = currTime
+	kubelet.shaper = &fakeShaper{}
+
+	// Test step1: MASQ rule
+	log.Printf("First sync should throw error")
+	kubelet.syncNetworkStatus()
+	if len(kubelet.runtimeState.errors()) == 0 {
+		t.Fatalf("Expected error since iptables rule failed")
+	}
+	executedCmd := fe.Cmd["iptables"]
+	if !reflect.DeepEqual(executedCmd, iptablesMasqAppend) {
+		t.Fatalf("Unexpected iptables rule: %v", executedCmd)
+	}
+	log.Printf("Clearing error")
+	fe.Err = nil
+	kubelet.syncNetworkStatus()
+	// We should not be appending rules continuously.
+	executedCmd = fe.Cmd["iptables"]
+	if !reflect.DeepEqual(executedCmd, iptablesMasqCheck) {
+		t.Fatalf("Unexpected iptables rule: %v", executedCmd)
+	}
+
+	// Test step2: podCIDR
+	// Sync network status should always return error before podCIDR is initialized
+	kubelet.syncNetworkStatus()
+	if len(kubelet.runtimeState.errors()) == 0 {
+		t.Fatalf("Expected error since iptables rule failed")
+	}
+	// The first sync after podCIDR should clear errors.
+	podCIDR := "10.240.1.0/24"
+	kubelet.runtimeState.setPodCIDR(podCIDR)
+	kubelet.syncNetworkStatus()
+	errors := kubelet.runtimeState.errors()
+	if len(errors) != 0 {
+		t.Fatalf("Did not expect errors, got %v", errors)
+	}
+
+	// Test step3: container bridge reconciliation
+	// TODO: better container bridge reconciliation and bw shaping tests
+	// deferred till we have network plugins.
+	kubelet.cbr0.bridgeExistsFunc = func(string) (bool, error) { return false, nil }
+	kubelet.syncNetworkStatus()
+	executedCmd = fe.Cmd["ip"]
+	bridgeUp := []string{"link", "set", "dev", "cbr0", "mtu", "1460", "up"}
+	if !reflect.DeepEqual(executedCmd, bridgeUp) {
+		t.Fatalf("Unexpected bridge creation command %v", executedCmd)
+	}
+	kubelet.shaper = &fakeShaper{err: fmt.Errorf("TC not found")}
+	kubelet.syncNetworkStatus()
+	if len(kubelet.runtimeState.errors()) == 0 {
+		t.Fatalf("Expected bandwidth shaping error.")
+	}
+}
+
+type fakeBridgeNetworkPlugin struct {
+	confWriter io.Writer
+}
+
+func (f *fakeBridgeNetworkPlugin) Init(host network.Host) error {
+	return nil
+}
+
+func (f *fakeBridgeNetworkPlugin) SetUpPod(namespace string, name string, podInfraContainerID kubetypes.DockerID) error {
+	return nil
+}
+
+func (f *fakeBridgeNetworkPlugin) TearDownPod(namespace string, name string, podInfraContainerID kubetypes.DockerID) error {
+	return nil
+}
+
+func (f *fakeBridgeNetworkPlugin) Status(namespace string, name string, podInfraContainerID kubetypes.DockerID) (*network.PodNetworkStatus, error) {
+	return nil, nil
+}
+
+func (f *fakeBridgeNetworkPlugin) ReloadConf(ncw network.NetConfWriterTo) error {
+	_, err := ncw.WriteTo(f.confWriter)
+	return err
+}
+
+func (f *fakeBridgeNetworkPlugin) Name() string {
+	return ""
+}
+
+func TestSyncNetConf(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	kubelet.configureCBR0 = true
+	kubelet.flannelExperimentalOverlay = false
+	kubelet.cbr0 = &containerBridgeReconciler{
+		&fakeExecer{Cmd: map[string][]string{}},
+		"cbr0", func(string) (bool, error) {
+			return true, nil
+		}}
+	kubelet.networkPluginName = fmt.Sprintf("%v/%v", network.KubernetesPluginPrefix, network.KubeletDefaultPluginName)
+	kubelet.shaper = &fakeShaper{}
+
+	// Fake bridge plugin that writes netconf to a buffer.
+	var b bytes.Buffer
+	fBridge := &fakeBridgeNetworkPlugin{confWriter: &b}
+	kubelet.networkPlugin = fBridge
+
+	currTime := time.Now()
+	kubelet.runtimeState.clock = &util.FakeClock{currTime}
+	kubelet.runtimeState.lastBaseRuntimeSync = currTime
+
+	// Verify that the first sync after acquiring podCIDR writes out a netconf.
+	// Creation of pods is blocked till this happens.
+	podCIDR := "10.240.1.0/24"
+	kubelet.runtimeState.setPodCIDR(podCIDR)
+	kubelet.syncNetworkStatus()
+	errors := kubelet.runtimeState.errors()
+	if len(errors) != 0 {
+		t.Fatalf("Did not expect errors, got %v", errors)
+	}
+
+	// Make sure this is a valid CNI netconf, then reparse it as a generic map
+	// and check the pod CIDR.
+	nc, err := libcni.ConfFromBytes(b.Bytes())
+	if err != nil {
+		t.Fatalf("Unable to parse %v as a CNI netconf", b.String())
+	}
+	netConf := map[string]interface{}{}
+	if err := json.Unmarshal(nc.Bytes, &netConf); err != nil {
+		t.Fatalf("error parsing configuration: %s", err)
+	}
+	ipam, ok := netConf["ipam"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Failed to find ipam segment in %v", netConf)
+	}
+	if subnet, ok := ipam["subnet"].(string); !ok || subnet != podCIDR {
+		t.Fatalf("Failed to match podCIDR %v with netconf %v", podCIDR, netConf)
 	}
 }
