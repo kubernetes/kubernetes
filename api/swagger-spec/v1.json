@@ -14320,6 +14320,10 @@
       "type": "any",
       "description": "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: http://releases.k8s.io/HEAD/docs/user-guide/node-selection/README.md"
      },
+     "affinity": {
+      "$ref": "v1.Affinity",
+      "description": "Affinity is a group of affinity scheduling requirements of the pod, including node affinity and inter pod affinity."
+     },
      "serviceAccountName": {
       "type": "string",
       "description": "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md"
@@ -14922,6 +14926,95 @@
      "level": {
       "type": "string",
       "description": "Level is SELinux level label that applies to the container."
+     }
+    }
+   },
+   "v1.Affinity": {
+    "id": "v1.Affinity",
+    "description": "An Affinity is a group of affinity scheduling requirements, including node affinity and inter pod affinity.",
+    "properties": {
+     "hardNodeAffinity": {
+      "$ref": "v1.NodeSelector",
+      "description": "HardNodeAffinity specifies hard scheduling requirements for the pod. Additionally, Kubelet will (asynchronously) evict a pod that no longer meets its HardNodeAffinity for whatever reason, e.g. runtime changes to the node's labels."
+     },
+     "softNodeAffinity": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.SoftNodeAffinityTerm"
+      },
+      "description": "SoftNodeAffinity specifies which nodes are preferred among those that meet all of the hard scheduling requirements (resource request, HardNodeAffinity, etc.). The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the hard scheduling requirements, compute a sum by iterating through the elements of SoftNodeAffinity and adding \"weight\" to the sum if the node matches the corresponding MatchExpressions; the node(s) with the highest sum are the most preferred."
+     }
+    }
+   },
+   "v1.NodeSelector": {
+    "id": "v1.NodeSelector",
+    "description": "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the nodeSelectorTerms. An empty node selector matches all objects. A null node selector matches no objects.",
+    "properties": {
+     "nodeSelectorTerms": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.NodeSelectorTerm"
+      },
+      "description": "nodeSelectorTerms is a list of node selector terms. The terms are ORed."
+     }
+    }
+   },
+   "v1.NodeSelectorTerm": {
+    "id": "v1.NodeSelectorTerm",
+    "description": "An empty node selector term matches all objects. A null node selector term matches no objects.",
+    "properties": {
+     "matchExpressions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.NodeSelectorRequirement"
+      },
+      "description": "matchExpressions is a list of node selector requirements. The requirements are ANDed."
+     }
+    }
+   },
+   "v1.NodeSelectorRequirement": {
+    "id": "v1.NodeSelectorRequirement",
+    "description": "A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "key is the label key that the selector applies to."
+     },
+     "operator": {
+      "type": "string",
+      "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists, DoesNotExist. Gt, and Lt."
+     },
+     "values": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch."
+     }
+    }
+   },
+   "v1.SoftNodeAffinityTerm": {
+    "id": "v1.SoftNodeAffinityTerm",
+    "description": "A SoftNodeAffinityTerm is the AND of one or more NodeSelectorRequirements",
+    "required": [
+     "weight"
+    ],
+    "properties": {
+     "weight": {
+      "type": "integer",
+      "format": "int32",
+      "description": "weight is in the range 1-100"
+     },
+     "matchExpressions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.NodeSelectorRequirement"
+      },
+      "description": "matchExpressions is a list of node selector requirements. The requirements are ANDed."
      }
     }
    },

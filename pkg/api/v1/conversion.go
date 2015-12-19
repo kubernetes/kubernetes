@@ -312,6 +312,14 @@ func convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversi
 	} else {
 		out.NodeSelector = nil
 	}
+	if in.Affinity != nil {
+		out.Affinity = new(Affinity)
+		if err := autoconvert_api_Affinity_To_v1_Affinity(in.Affinity, out.Affinity, s); err != nil {
+			return err
+		}
+	} else {
+		out.Affinity = nil
+	}
 	out.ServiceAccountName = in.ServiceAccountName
 	// DeprecatedServiceAccount is an alias for ServiceAccountName.
 	out.DeprecatedServiceAccount = in.ServiceAccountName
@@ -386,6 +394,14 @@ func convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 		}
 	} else {
 		out.NodeSelector = nil
+	}
+	if in.Affinity != nil {
+		out.Affinity = new(api.Affinity)
+		if err := autoconvert_v1_Affinity_To_api_Affinity(in.Affinity, out.Affinity, s); err != nil {
+			return err
+		}
+	} else {
+		out.Affinity = nil
 	}
 	// We support DeprecatedServiceAccount as an alias for ServiceAccountName.
 	// If both are specified, ServiceAccountName (the new field) wins.

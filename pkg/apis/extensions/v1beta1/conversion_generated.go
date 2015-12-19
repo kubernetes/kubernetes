@@ -43,6 +43,35 @@ func convert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolu
 	return autoconvert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource(in, out, s)
 }
 
+func autoconvert_api_Affinity_To_v1_Affinity(in *api.Affinity, out *v1.Affinity, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.Affinity))(in)
+	}
+	if in.HardNodeAffinity != nil {
+		out.HardNodeAffinity = new(v1.NodeSelector)
+		if err := convert_api_NodeSelector_To_v1_NodeSelector(in.HardNodeAffinity, out.HardNodeAffinity, s); err != nil {
+			return err
+		}
+	} else {
+		out.HardNodeAffinity = nil
+	}
+	if in.SoftNodeAffinity != nil {
+		out.SoftNodeAffinity = make([]v1.SoftNodeAffinityTerm, len(in.SoftNodeAffinity))
+		for i := range in.SoftNodeAffinity {
+			if err := convert_api_SoftNodeAffinityTerm_To_v1_SoftNodeAffinityTerm(&in.SoftNodeAffinity[i], &out.SoftNodeAffinity[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.SoftNodeAffinity = nil
+	}
+	return nil
+}
+
+func convert_api_Affinity_To_v1_Affinity(in *api.Affinity, out *v1.Affinity, s conversion.Scope) error {
+	return autoconvert_api_Affinity_To_v1_Affinity(in, out, s)
+}
+
 func autoconvert_api_Capabilities_To_v1_Capabilities(in *api.Capabilities, out *v1.Capabilities, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Capabilities))(in)
@@ -615,6 +644,69 @@ func convert_api_NFSVolumeSource_To_v1_NFSVolumeSource(in *api.NFSVolumeSource, 
 	return autoconvert_api_NFSVolumeSource_To_v1_NFSVolumeSource(in, out, s)
 }
 
+func autoconvert_api_NodeSelector_To_v1_NodeSelector(in *api.NodeSelector, out *v1.NodeSelector, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.NodeSelector))(in)
+	}
+	if in.NodeSelectorTerms != nil {
+		out.NodeSelectorTerms = make([]v1.NodeSelectorTerm, len(in.NodeSelectorTerms))
+		for i := range in.NodeSelectorTerms {
+			if err := convert_api_NodeSelectorTerm_To_v1_NodeSelectorTerm(&in.NodeSelectorTerms[i], &out.NodeSelectorTerms[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.NodeSelectorTerms = nil
+	}
+	return nil
+}
+
+func convert_api_NodeSelector_To_v1_NodeSelector(in *api.NodeSelector, out *v1.NodeSelector, s conversion.Scope) error {
+	return autoconvert_api_NodeSelector_To_v1_NodeSelector(in, out, s)
+}
+
+func autoconvert_api_NodeSelectorRequirement_To_v1_NodeSelectorRequirement(in *api.NodeSelectorRequirement, out *v1.NodeSelectorRequirement, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.NodeSelectorRequirement))(in)
+	}
+	out.Key = in.Key
+	out.Operator = v1.NodeSelectorOperator(in.Operator)
+	if in.Values != nil {
+		out.Values = make([]string, len(in.Values))
+		for i := range in.Values {
+			out.Values[i] = in.Values[i]
+		}
+	} else {
+		out.Values = nil
+	}
+	return nil
+}
+
+func convert_api_NodeSelectorRequirement_To_v1_NodeSelectorRequirement(in *api.NodeSelectorRequirement, out *v1.NodeSelectorRequirement, s conversion.Scope) error {
+	return autoconvert_api_NodeSelectorRequirement_To_v1_NodeSelectorRequirement(in, out, s)
+}
+
+func autoconvert_api_NodeSelectorTerm_To_v1_NodeSelectorTerm(in *api.NodeSelectorTerm, out *v1.NodeSelectorTerm, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.NodeSelectorTerm))(in)
+	}
+	if in.MatchExpressions != nil {
+		out.MatchExpressions = make([]v1.NodeSelectorRequirement, len(in.MatchExpressions))
+		for i := range in.MatchExpressions {
+			if err := convert_api_NodeSelectorRequirement_To_v1_NodeSelectorRequirement(&in.MatchExpressions[i], &out.MatchExpressions[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.MatchExpressions = nil
+	}
+	return nil
+}
+
+func convert_api_NodeSelectorTerm_To_v1_NodeSelectorTerm(in *api.NodeSelectorTerm, out *v1.NodeSelectorTerm, s conversion.Scope) error {
+	return autoconvert_api_NodeSelectorTerm_To_v1_NodeSelectorTerm(in, out, s)
+}
+
 func autoconvert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector(in *api.ObjectFieldSelector, out *v1.ObjectFieldSelector, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ObjectFieldSelector))(in)
@@ -736,6 +828,14 @@ func autoconvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s c
 		}
 	} else {
 		out.NodeSelector = nil
+	}
+	if in.Affinity != nil {
+		out.Affinity = new(v1.Affinity)
+		if err := convert_api_Affinity_To_v1_Affinity(in.Affinity, out.Affinity, s); err != nil {
+			return err
+		}
+	} else {
+		out.Affinity = nil
 	}
 	out.ServiceAccountName = in.ServiceAccountName
 	out.NodeName = in.NodeName
@@ -935,6 +1035,28 @@ func convert_api_SecurityContext_To_v1_SecurityContext(in *api.SecurityContext, 
 	return autoconvert_api_SecurityContext_To_v1_SecurityContext(in, out, s)
 }
 
+func autoconvert_api_SoftNodeAffinityTerm_To_v1_SoftNodeAffinityTerm(in *api.SoftNodeAffinityTerm, out *v1.SoftNodeAffinityTerm, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.SoftNodeAffinityTerm))(in)
+	}
+	out.Weight = in.Weight
+	if in.MatchExpressions != nil {
+		out.MatchExpressions = make([]v1.NodeSelectorRequirement, len(in.MatchExpressions))
+		for i := range in.MatchExpressions {
+			if err := convert_api_NodeSelectorRequirement_To_v1_NodeSelectorRequirement(&in.MatchExpressions[i], &out.MatchExpressions[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.MatchExpressions = nil
+	}
+	return nil
+}
+
+func convert_api_SoftNodeAffinityTerm_To_v1_SoftNodeAffinityTerm(in *api.SoftNodeAffinityTerm, out *v1.SoftNodeAffinityTerm, s conversion.Scope) error {
+	return autoconvert_api_SoftNodeAffinityTerm_To_v1_SoftNodeAffinityTerm(in, out, s)
+}
+
 func autoconvert_api_TCPSocketAction_To_v1_TCPSocketAction(in *api.TCPSocketAction, out *v1.TCPSocketAction, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.TCPSocketAction))(in)
@@ -1130,6 +1252,35 @@ func autoconvert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStore
 
 func convert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource(in *v1.AWSElasticBlockStoreVolumeSource, out *api.AWSElasticBlockStoreVolumeSource, s conversion.Scope) error {
 	return autoconvert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource(in, out, s)
+}
+
+func autoconvert_v1_Affinity_To_api_Affinity(in *v1.Affinity, out *api.Affinity, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.Affinity))(in)
+	}
+	if in.HardNodeAffinity != nil {
+		out.HardNodeAffinity = new(api.NodeSelector)
+		if err := convert_v1_NodeSelector_To_api_NodeSelector(in.HardNodeAffinity, out.HardNodeAffinity, s); err != nil {
+			return err
+		}
+	} else {
+		out.HardNodeAffinity = nil
+	}
+	if in.SoftNodeAffinity != nil {
+		out.SoftNodeAffinity = make([]api.SoftNodeAffinityTerm, len(in.SoftNodeAffinity))
+		for i := range in.SoftNodeAffinity {
+			if err := convert_v1_SoftNodeAffinityTerm_To_api_SoftNodeAffinityTerm(&in.SoftNodeAffinity[i], &out.SoftNodeAffinity[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.SoftNodeAffinity = nil
+	}
+	return nil
+}
+
+func convert_v1_Affinity_To_api_Affinity(in *v1.Affinity, out *api.Affinity, s conversion.Scope) error {
+	return autoconvert_v1_Affinity_To_api_Affinity(in, out, s)
 }
 
 func autoconvert_v1_Capabilities_To_api_Capabilities(in *v1.Capabilities, out *api.Capabilities, s conversion.Scope) error {
@@ -1676,6 +1827,69 @@ func convert_v1_NFSVolumeSource_To_api_NFSVolumeSource(in *v1.NFSVolumeSource, o
 	return autoconvert_v1_NFSVolumeSource_To_api_NFSVolumeSource(in, out, s)
 }
 
+func autoconvert_v1_NodeSelector_To_api_NodeSelector(in *v1.NodeSelector, out *api.NodeSelector, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.NodeSelector))(in)
+	}
+	if in.NodeSelectorTerms != nil {
+		out.NodeSelectorTerms = make([]api.NodeSelectorTerm, len(in.NodeSelectorTerms))
+		for i := range in.NodeSelectorTerms {
+			if err := convert_v1_NodeSelectorTerm_To_api_NodeSelectorTerm(&in.NodeSelectorTerms[i], &out.NodeSelectorTerms[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.NodeSelectorTerms = nil
+	}
+	return nil
+}
+
+func convert_v1_NodeSelector_To_api_NodeSelector(in *v1.NodeSelector, out *api.NodeSelector, s conversion.Scope) error {
+	return autoconvert_v1_NodeSelector_To_api_NodeSelector(in, out, s)
+}
+
+func autoconvert_v1_NodeSelectorRequirement_To_api_NodeSelectorRequirement(in *v1.NodeSelectorRequirement, out *api.NodeSelectorRequirement, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.NodeSelectorRequirement))(in)
+	}
+	out.Key = in.Key
+	out.Operator = api.NodeSelectorOperator(in.Operator)
+	if in.Values != nil {
+		out.Values = make([]string, len(in.Values))
+		for i := range in.Values {
+			out.Values[i] = in.Values[i]
+		}
+	} else {
+		out.Values = nil
+	}
+	return nil
+}
+
+func convert_v1_NodeSelectorRequirement_To_api_NodeSelectorRequirement(in *v1.NodeSelectorRequirement, out *api.NodeSelectorRequirement, s conversion.Scope) error {
+	return autoconvert_v1_NodeSelectorRequirement_To_api_NodeSelectorRequirement(in, out, s)
+}
+
+func autoconvert_v1_NodeSelectorTerm_To_api_NodeSelectorTerm(in *v1.NodeSelectorTerm, out *api.NodeSelectorTerm, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.NodeSelectorTerm))(in)
+	}
+	if in.MatchExpressions != nil {
+		out.MatchExpressions = make([]api.NodeSelectorRequirement, len(in.MatchExpressions))
+		for i := range in.MatchExpressions {
+			if err := convert_v1_NodeSelectorRequirement_To_api_NodeSelectorRequirement(&in.MatchExpressions[i], &out.MatchExpressions[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.MatchExpressions = nil
+	}
+	return nil
+}
+
+func convert_v1_NodeSelectorTerm_To_api_NodeSelectorTerm(in *v1.NodeSelectorTerm, out *api.NodeSelectorTerm, s conversion.Scope) error {
+	return autoconvert_v1_NodeSelectorTerm_To_api_NodeSelectorTerm(in, out, s)
+}
+
 func autoconvert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(in *v1.ObjectFieldSelector, out *api.ObjectFieldSelector, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*v1.ObjectFieldSelector))(in)
@@ -1797,6 +2011,14 @@ func autoconvert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s c
 		}
 	} else {
 		out.NodeSelector = nil
+	}
+	if in.Affinity != nil {
+		out.Affinity = new(api.Affinity)
+		if err := convert_v1_Affinity_To_api_Affinity(in.Affinity, out.Affinity, s); err != nil {
+			return err
+		}
+	} else {
+		out.Affinity = nil
 	}
 	out.ServiceAccountName = in.ServiceAccountName
 	// in.DeprecatedServiceAccount has no peer in out
@@ -1998,6 +2220,28 @@ func autoconvert_v1_SecurityContext_To_api_SecurityContext(in *v1.SecurityContex
 
 func convert_v1_SecurityContext_To_api_SecurityContext(in *v1.SecurityContext, out *api.SecurityContext, s conversion.Scope) error {
 	return autoconvert_v1_SecurityContext_To_api_SecurityContext(in, out, s)
+}
+
+func autoconvert_v1_SoftNodeAffinityTerm_To_api_SoftNodeAffinityTerm(in *v1.SoftNodeAffinityTerm, out *api.SoftNodeAffinityTerm, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.SoftNodeAffinityTerm))(in)
+	}
+	out.Weight = in.Weight
+	if in.MatchExpressions != nil {
+		out.MatchExpressions = make([]api.NodeSelectorRequirement, len(in.MatchExpressions))
+		for i := range in.MatchExpressions {
+			if err := convert_v1_NodeSelectorRequirement_To_api_NodeSelectorRequirement(&in.MatchExpressions[i], &out.MatchExpressions[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.MatchExpressions = nil
+	}
+	return nil
+}
+
+func convert_v1_SoftNodeAffinityTerm_To_api_SoftNodeAffinityTerm(in *v1.SoftNodeAffinityTerm, out *api.SoftNodeAffinityTerm, s conversion.Scope) error {
+	return autoconvert_v1_SoftNodeAffinityTerm_To_api_SoftNodeAffinityTerm(in, out, s)
 }
 
 func autoconvert_v1_TCPSocketAction_To_api_TCPSocketAction(in *v1.TCPSocketAction, out *api.TCPSocketAction, s conversion.Scope) error {
@@ -4279,6 +4523,7 @@ func convert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResourceList
 func init() {
 	err := api.Scheme.AddGeneratedConversionFuncs(
 		autoconvert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource,
+		autoconvert_api_Affinity_To_v1_Affinity,
 		autoconvert_api_Capabilities_To_v1_Capabilities,
 		autoconvert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource,
 		autoconvert_api_CinderVolumeSource_To_v1_CinderVolumeSource,
@@ -4305,6 +4550,9 @@ func init() {
 		autoconvert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus,
 		autoconvert_api_LocalObjectReference_To_v1_LocalObjectReference,
 		autoconvert_api_NFSVolumeSource_To_v1_NFSVolumeSource,
+		autoconvert_api_NodeSelectorRequirement_To_v1_NodeSelectorRequirement,
+		autoconvert_api_NodeSelectorTerm_To_v1_NodeSelectorTerm,
+		autoconvert_api_NodeSelector_To_v1_NodeSelector,
 		autoconvert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector,
 		autoconvert_api_ObjectMeta_To_v1_ObjectMeta,
 		autoconvert_api_PersistentVolumeClaimVolumeSource_To_v1_PersistentVolumeClaimVolumeSource,
@@ -4316,6 +4564,7 @@ func init() {
 		autoconvert_api_SELinuxOptions_To_v1_SELinuxOptions,
 		autoconvert_api_SecretVolumeSource_To_v1_SecretVolumeSource,
 		autoconvert_api_SecurityContext_To_v1_SecurityContext,
+		autoconvert_api_SoftNodeAffinityTerm_To_v1_SoftNodeAffinityTerm,
 		autoconvert_api_TCPSocketAction_To_v1_TCPSocketAction,
 		autoconvert_api_VolumeMount_To_v1_VolumeMount,
 		autoconvert_api_VolumeSource_To_v1_VolumeSource,
@@ -4368,6 +4617,7 @@ func init() {
 		autoconvert_extensions_ThirdPartyResourceList_To_v1beta1_ThirdPartyResourceList,
 		autoconvert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource,
 		autoconvert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource,
+		autoconvert_v1_Affinity_To_api_Affinity,
 		autoconvert_v1_Capabilities_To_api_Capabilities,
 		autoconvert_v1_CephFSVolumeSource_To_api_CephFSVolumeSource,
 		autoconvert_v1_CinderVolumeSource_To_api_CinderVolumeSource,
@@ -4393,6 +4643,9 @@ func init() {
 		autoconvert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus,
 		autoconvert_v1_LocalObjectReference_To_api_LocalObjectReference,
 		autoconvert_v1_NFSVolumeSource_To_api_NFSVolumeSource,
+		autoconvert_v1_NodeSelectorRequirement_To_api_NodeSelectorRequirement,
+		autoconvert_v1_NodeSelectorTerm_To_api_NodeSelectorTerm,
+		autoconvert_v1_NodeSelector_To_api_NodeSelector,
 		autoconvert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector,
 		autoconvert_v1_ObjectMeta_To_api_ObjectMeta,
 		autoconvert_v1_PersistentVolumeClaimVolumeSource_To_api_PersistentVolumeClaimVolumeSource,
@@ -4404,6 +4657,7 @@ func init() {
 		autoconvert_v1_SELinuxOptions_To_api_SELinuxOptions,
 		autoconvert_v1_SecretVolumeSource_To_api_SecretVolumeSource,
 		autoconvert_v1_SecurityContext_To_api_SecurityContext,
+		autoconvert_v1_SoftNodeAffinityTerm_To_api_SoftNodeAffinityTerm,
 		autoconvert_v1_TCPSocketAction_To_api_TCPSocketAction,
 		autoconvert_v1_VolumeMount_To_api_VolumeMount,
 		autoconvert_v1_VolumeSource_To_api_VolumeSource,

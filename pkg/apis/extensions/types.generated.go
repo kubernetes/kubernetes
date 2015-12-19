@@ -14584,7 +14584,7 @@ func (x codecSelfer1234) decSliceDeployment(v *[]Deployment, d *codec1978.Decode
 
 			yyrg1210 := len(yyv1210) > 0
 			yyv21210 := yyv1210
-			yyrl1210, yyrt1210 = z.DecInferLen(yyl1210, z.DecBasicHandle().MaxInitLen, 592)
+			yyrl1210, yyrt1210 = z.DecInferLen(yyl1210, z.DecBasicHandle().MaxInitLen, 600)
 			if yyrt1210 {
 				if yyrl1210 <= cap(yyv1210) {
 					yyv1210 = yyv1210[:yyrl1210]
@@ -14932,7 +14932,7 @@ func (x codecSelfer1234) decSliceJob(v *[]Job, d *codec1978.Decoder) {
 
 			yyrg1228 := len(yyv1228) > 0
 			yyv21228 := yyv1228
-			yyrl1228, yyrt1228 = z.DecInferLen(yyl1228, z.DecBasicHandle().MaxInitLen, 616)
+			yyrl1228, yyrt1228 = z.DecInferLen(yyl1228, z.DecBasicHandle().MaxInitLen, 624)
 			if yyrt1228 {
 				if yyrl1228 <= cap(yyv1228) {
 					yyv1228 = yyv1228[:yyrl1228]
