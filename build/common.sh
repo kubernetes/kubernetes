@@ -820,6 +820,16 @@ function kube::release::write_addon_docker_images_for_server() {
       ) &
     done
 
+    if [[ ! -z "${BUILD_PYTHON_IMAGE:-}" ]]; then
+      (
+        kube::log::status "Building Docker python image"
+        
+        local img_name=python:2.7-slim-pyyaml
+        docker build -t "${img_name}" "${KUBE_ROOT}/cluster/addons/python-image"
+        docker save "${img_name}" > "${1}/${img_name}.tar"
+      ) &
+    fi
+
     kube::util::wait-for-jobs || { kube::log::error "unable to pull or write addon image"; return 1; }
     kube::log::status "Addon images done"
   )
