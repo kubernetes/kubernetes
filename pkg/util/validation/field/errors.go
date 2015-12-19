@@ -17,12 +17,11 @@ limitations under the License.
 package field
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 // Error is an implementation of the 'error' interface, which represents a
@@ -46,13 +45,20 @@ func (v *Error) Error() string {
 func (v *Error) ErrorBody() string {
 	var s string
 	switch v.Type {
-	case ErrorTypeRequired, ErrorTypeTooLong, ErrorTypeInternal:
-		s = spew.Sprintf("%s", v.Type)
+	case ErrorTypeRequired, ErrorTypeForbidden, ErrorTypeTooLong, ErrorTypeInternal:
+		s = fmt.Sprintf("%s", v.Type)
 	default:
-		s = spew.Sprintf("%s '%+v'", v.Type, v.BadValue)
+		var bad string
+		badBytes, err := json.Marshal(v.BadValue)
+		if err != nil {
+			bad = err.Error()
+		} else {
+			bad = string(badBytes)
+		}
+		s = fmt.Sprintf("%s: %s", v.Type, bad)
 	}
 	if len(v.Detail) != 0 {
-		s += fmt.Sprintf(", Details: %s", v.Detail)
+		s += fmt.Sprintf(": %s", v.Detail)
 	}
 	return s
 }
@@ -65,11 +71,11 @@ type ErrorType string
 // TODO: These values are duplicated in api/types.go, but there's a circular dep.  Fix it.
 const (
 	// ErrorTypeNotFound is used to report failure to find a requested value
-	// (e.g. looking up an ID).  See NewNotFoundError.
+	// (e.g. looking up an ID).  See NotFound().
 	ErrorTypeNotFound ErrorType = "FieldValueNotFound"
 	// ErrorTypeRequired is used to report required values that are not
 	// provided (e.g. empty strings, null values, or empty arrays).  See
-	// NewRequiredError.
+	// Required().
 	ErrorTypeRequired ErrorType = "FieldValueRequired"
 	// ErrorTypeDuplicate is used to report collisions of values that must be
 	// unique (e.g. unique IDs).  See Duplicate().
@@ -90,7 +96,7 @@ const (
 	// too-long value.  See TooLong().
 	ErrorTypeTooLong ErrorType = "FieldValueTooLong"
 	// ErrorTypeInternal is used to report other errors that are not related
-	// to user input.
+	// to user input.  See InternalError().
 	ErrorTypeInternal ErrorType = "InternalError"
 )
 
@@ -98,53 +104,53 @@ const (
 func (t ErrorType) String() string {
 	switch t {
 	case ErrorTypeNotFound:
-		return "not found"
+		return "Not found"
 	case ErrorTypeRequired:
-		return "required value"
+		return "Required value"
 	case ErrorTypeDuplicate:
-		return "duplicate value"
+		return "Duplicate value"
 	case ErrorTypeInvalid:
-		return "invalid value"
+		return "Invalid value"
 	case ErrorTypeNotSupported:
-		return "unsupported value"
+		return "Unsupported value"
 	case ErrorTypeForbidden:
-		return "forbidden"
+		return "Forbidden"
 	case ErrorTypeTooLong:
-		return "too long"
+		return "Too long"
 	case ErrorTypeInternal:
-		return "internal error"
+		return "Internal error"
 	default:
 		panic(fmt.Sprintf("unrecognized validation error: %q", t))
 		return ""
 	}
 }
 
-// NewNotFoundError returns a *Error indicating "value not found".  This is
+// NotFound returns a *Error indicating "value not found".  This is
 // used to report failure to find a requested value (e.g. looking up an ID).
 func NotFound(field *Path, value interface{}) *Error {
 	return &Error{ErrorTypeNotFound, field.String(), value, ""}
 }
 
-// NewRequiredError returns a *Error indicating "value required".  This is used
+// Required returns a *Error indicating "value required".  This is used
 // to report required values that are not provided (e.g. empty strings, null
 // values, or empty arrays).
-func Required(field *Path) *Error {
-	return &Error{ErrorTypeRequired, field.String(), "", ""}
+func Required(field *Path, detail string) *Error {
+	return &Error{ErrorTypeRequired, field.String(), "", detail}
 }
 
-// NewDuplicateError returns a *Error indicating "duplicate value".  This is
+// Duplicate returns a *Error indicating "duplicate value".  This is
 // used to report collisions of values that must be unique (e.g. names or IDs).
 func Duplicate(field *Path, value interface{}) *Error {
 	return &Error{ErrorTypeDuplicate, field.String(), value, ""}
 }
 
-// NewInvalidError returns a *Error indicating "invalid value".  This is used
+// Invalid returns a *Error indicating "invalid value".  This is used
 // to report malformed values (e.g. failed regex match, too long, out of bounds).
 func Invalid(field *Path, value interface{}, detail string) *Error {
 	return &Error{ErrorTypeInvalid, field.String(), value, detail}
 }
 
-// NewNotSupportedError returns a *Error indicating "unsupported value".
+// NotSupported returns a *Error indicating "unsupported value".
 // This is used to report unknown values for enumerated fields (e.g. a list of
 // valid values).
 func NotSupported(field *Path, value interface{}, validValues []string) *Error {
@@ -155,23 +161,23 @@ func NotSupported(field *Path, value interface{}, validValues []string) *Error {
 	return &Error{ErrorTypeNotSupported, field.String(), value, detail}
 }
 
-// NewForbiddenError returns a *Error indicating "forbidden".  This is used to
+// Forbidden returns a *Error indicating "forbidden".  This is used to
 // report valid (as per formatting rules) values which would be accepted under
 // some conditions, but which are not permitted by current conditions (e.g.
 // security policy).
-func Forbidden(field *Path, value interface{}) *Error {
-	return &Error{ErrorTypeForbidden, field.String(), value, ""}
+func Forbidden(field *Path, detail string) *Error {
+	return &Error{ErrorTypeForbidden, field.String(), "", detail}
 }
 
-// NewTooLongError returns a *Error indicating "too long".  This is used to
+// TooLong returns a *Error indicating "too long".  This is used to
 // report that the given value is too long.  This is similar to
-// NewInvalidError, but the returned error will not include the too-long
+// Invalid, but the returned error will not include the too-long
 // value.
 func TooLong(field *Path, value interface{}, maxLength int) *Error {
 	return &Error{ErrorTypeTooLong, field.String(), value, fmt.Sprintf("must have at most %d characters", maxLength)}
 }
 
-// NewInternalError returns a *Error indicating "internal error".  This is used
+// InternalError returns a *Error indicating "internal error".  This is used
 // to signal that an error was found that was not directly related to user
 // input.  The err argument must be non-nil.
 func InternalError(field *Path, err error) *Error {
