@@ -9,6 +9,8 @@
         - mail-watcher
     publishers:
         - claim-build
+        - gcs-uploader
+        - log-parser
         - email-ext:
             recipients: $DEFAULT_RECIPIENTS, cloud-kubernetes-team@google.com
             presend-script: $DEFAULT_PRESEND_SCRIPT
@@ -17,8 +19,6 @@
             send-to:
                 - culprits
                 - recipients
-        - gcs-uploader
-        - log-parser
     scm:
         - git:
             url: https://github.com/kubernetes/kubernetes
