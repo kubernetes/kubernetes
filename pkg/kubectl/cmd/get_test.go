@@ -589,6 +589,29 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 		t.Errorf("unexpected empty output")
 	}
 }
+
+func TestGetByNameForcesFlag(t *testing.T) {
+	pods, _, _ := testData()
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &fake.RESTClient{
+		Codec: codec,
+		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])},
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdGet(f, buf)
+	cmd.SetOutput(buf)
+	cmd.Run(cmd, []string{"pods", "foo"})
+
+	showAllFlag, _ := cmd.Flags().GetBool("show-all")
+	if !showAllFlag {
+		t.Errorf("expected showAll to be true when getting resource by name")
+	}
+}
+
 func watchTestData() ([]api.Pod, []watch.Event) {
 	pods := []api.Pod{
 		{

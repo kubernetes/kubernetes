@@ -123,6 +123,15 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 
+	// always show resources when getting by name or filename
+	argsHasNames, err := resource.HasNames(args)
+	if err != nil {
+		return err
+	}
+	if len(options.Filenames) > 0 || argsHasNames {
+		cmd.Flag("show-all").Value.Set("true")
+	}
+
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := cmdutil.GetFlagBool(cmd, "watch"), cmdutil.GetFlagBool(cmd, "watch-only")
 	if isWatch || isWatchOnly {
