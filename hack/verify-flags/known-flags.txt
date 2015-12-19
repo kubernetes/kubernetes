@@ -9,6 +9,7 @@ algorithm-provider
 all-namespaces
 allocate-node-cidrs
 allow-privileged
+apiserver-count
 api-server-address
 api-burst
 api-prefix

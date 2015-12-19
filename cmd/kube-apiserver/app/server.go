@@ -106,6 +106,7 @@ type APIServer struct {
 	ServiceNodePortRange       util.PortRange
 	EnableLogsSupport          bool
 	MasterServiceNamespace     string
+	MasterCount                int
 	RuntimeConfig              util.ConfigurationMap
 	KubeletConfig              kubeletclient.KubeletClientConfig
 	EnableProfiling            bool
@@ -134,6 +135,7 @@ func NewAPIServer() *APIServer {
 		EtcdPathPrefix:         genericapiserver.DefaultEtcdPathPrefix,
 		EnableLogsSupport:      true,
 		MasterServiceNamespace: api.NamespaceDefault,
+		MasterCount:            1,
 		CertDirectory:          "/var/run/kubernetes",
 		StorageVersions:        latest.AllPreferredGroupVersions(),
 
@@ -241,6 +243,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.ServiceNodePortRange, "service-node-ports", "Deprecated: see --service-node-port-range instead.")
 	fs.MarkDeprecated("service-node-ports", "see --service-node-port-range instead.")
 	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
+	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount, "The number of apiservers running in the cluster")
 	fs.Var(&s.RuntimeConfig, "runtime-config", "A set of key=value pairs that describe runtime configuration that may be passed to apiserver. apis/<groupVersion> key can be used to turn on/off specific api versions. apis/<groupVersion>/<resource> can be used to turn on/off specific resources. api/all and api/legacy are special keys to control all and legacy api versions respectively.")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	// TODO: enable cache in integration tests.
@@ -561,6 +564,7 @@ func (s *APIServer) Run(_ []string) error {
 			AdmissionControl:          admissionController,
 			APIGroupVersionOverrides:  apiGroupVersionOverrides,
 			MasterServiceNamespace:    s.MasterServiceNamespace,
+			MasterCount:               s.MasterCount,
 			ExternalHost:              s.ExternalHost,
 			MinRequestTimeout:         s.MinRequestTimeout,
 			ProxyDialer:               proxyDialerFn,
