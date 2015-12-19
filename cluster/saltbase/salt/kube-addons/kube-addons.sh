@@ -24,6 +24,16 @@ ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-600}
 SYSTEM_NAMESPACE=kube-system
 token_dir=${TOKEN_DIR:-/srv/kubernetes}
 
+function ensure_python() {
+  if ! python --version > /dev/null 2>&1; then    
+    echo "No python on the machine, will use a python image"
+    local -r PYTHON_IMAGE=python:2.7-slim-pyyaml
+    export PYTHON="docker run --interactive --rm --net=none ${PYTHON_IMAGE} python"
+  else
+    export PYTHON=python
+  fi
+}
+
 function create-kubeconfig-secret() {
   local -r token=$1
   local -r username=$2
@@ -152,11 +162,16 @@ function load-docker-images() {
 # managed result is of that. Start everything below that directory.
 echo "== Kubernetes addon manager started at $(date -Is) with ADDON_CHECK_INTERVAL_SEC=${ADDON_CHECK_INTERVAL_SEC} =="
 
+# Load any images that we may need
+load-docker-images /srv/salt/kube-addons-images
+
+ensure_python
+
 # Load the kube-env, which has all the environment variables we care
 # about, in a flat yaml format.
 kube_env_yaml="/var/cache/kubernetes-install/kube_env.yaml"
 if [ ! -e "${kubelet_kubeconfig_file}" ]; then
-  eval $(python -c '''
+  eval $(${PYTHON} -c '''
 import pipes,sys,yaml
 
 for k,v in yaml.load(sys.stdin).iteritems():
@@ -164,8 +179,6 @@ for k,v in yaml.load(sys.stdin).iteritems():
 ''' < "${kube_env_yaml}")
 fi
 
-# Load any images that we may need
-load-docker-images /srv/salt/kube-addons-images
 
 # Create the namespace that will be used to host the cluster-level add-ons.
 start_addon /etc/kubernetes/addons/namespace.yaml 100 10 "" &
