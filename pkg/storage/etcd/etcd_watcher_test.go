@@ -264,6 +264,8 @@ func TestWatch(t *testing.T) {
 	}
 
 	watching.Stop()
+	// give the other routines a chance to cleanup.
+	rt.Gosched()
 
 	if _, open := <-watching.ResultChan(); open {
 		t.Errorf("An injected error did not cause a graceful shutdown")
