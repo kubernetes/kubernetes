@@ -41,7 +41,7 @@ func Resource(resource string) unversioned.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-func init() {
+func AddToScheme() {
 	Scheme.AddKnownTypes(SchemeGroupVersion,
 		&Pod{},
 		&PodList{},
@@ -86,7 +86,7 @@ func init() {
 		&RangeAllocation{},
 	)
 
-	// Register Unversioned types
+	// Add the Unversioned types to Scheme.
 	// TODO this should not be done here
 	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.ExportOptions{})
 	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.Status{})

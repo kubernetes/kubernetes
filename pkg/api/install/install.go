@@ -25,10 +25,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -42,20 +42,32 @@ var accessor = meta.NewAccessor()
 var availableVersions = []unversioned.GroupVersion{v1.SchemeGroupVersion}
 
 func init() {
+	registered.RegisterVersions(availableVersions...)
+
 	externalVersions := []unversioned.GroupVersion{}
-	for _, allowedVersion := range registered.GroupVersionsForGroup(api.GroupName) {
-		for _, externalVersion := range availableVersions {
-			if externalVersion == allowedVersion {
-				externalVersions = append(externalVersions, externalVersion)
-			}
+	for _, v := range availableVersions {
+		if registered.IsAllowedVersion(v) {
+			externalVersions = append(externalVersions, v)
 		}
 	}
-
 	if len(externalVersions) == 0 {
 		glog.V(4).Infof("No version is registered for group %v", api.GroupName)
 		return
 	}
+	if err := registered.EnableVersions(externalVersions...); err != nil {
+		glog.V(4).Infof("%v", err)
+		return
+	}
+	if err := enableVersions(externalVersions); err != nil {
+		glog.V(4).Infof("%v", err)
+		return
+	}
+}
 
+// TODO: enableVersions should be centralized rather than spread in each API
+// group.
+func enableVersions(externalVersions []unversioned.GroupVersion) error {
+	addVersionsToScheme(externalVersions...)
 	preferredExternalVersion := externalVersions[0]
 
 	groupMeta := latest.GroupMeta{
@@ -68,11 +80,10 @@ func init() {
 	}
 
 	if err := latest.RegisterGroup(groupMeta); err != nil {
-		glog.V(4).Infof("%v", err)
-		return
+		return err
 	}
-
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
+	return nil
 }
 
 // userResources is a group of resources mostly used by a kubectl user
@@ -126,5 +137,21 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 	default:
 		g, _ := latest.Group(api.GroupName)
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
+	}
+}
+
+func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
+	// add the internal version to Scheme
+	api.AddToScheme()
+	// add the enabled external versions to Scheme
+	for _, v := range externalVersions {
+		if !registered.IsEnabledVersion(v) {
+			glog.Errorf("Version %s is not enabled, so it will not be added to the Scheme.", v)
+			continue
+		}
+		switch v {
+		case v1.SchemeGroupVersion:
+			v1.AddToScheme()
+		}
 	}
 }

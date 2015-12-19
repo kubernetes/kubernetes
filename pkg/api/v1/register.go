@@ -18,7 +18,6 @@ package v1
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -32,13 +31,8 @@ var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1
 // Codec encodes internal objects to the v1 scheme
 var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion)
 
-func init() {
-	// Check if v1 is in the list of supported API versions.
-	if !registered.IsRegisteredAPIGroupVersion(SchemeGroupVersion) {
-		return
-	}
-
-	// Register the API.
+func AddToScheme() {
+	// Add the API to Scheme.
 	addKnownTypes()
 	addConversionFuncs()
 	addDefaultingFuncs()
