@@ -74,6 +74,7 @@ type CMServer struct {
 	ConcurrentDSCSyncs                int
 	ConcurrentJobSyncs                int
 	ConcurrentResourceQuotaSyncs      int
+	ConcurrentDeploymentSyncs         int
 	ServiceSyncPeriod                 time.Duration
 	NodeSyncPeriod                    time.Duration
 	ResourceQuotaSyncPeriod           time.Duration
@@ -116,6 +117,7 @@ func NewCMServer() *CMServer {
 		ConcurrentDSCSyncs:                2,
 		ConcurrentJobSyncs:                5,
 		ConcurrentResourceQuotaSyncs:      5,
+		ConcurrentDeploymentSyncs:         5,
 		ServiceSyncPeriod:                 5 * time.Minute,
 		NodeSyncPeriod:                    10 * time.Second,
 		ResourceQuotaSyncPeriod:           5 * time.Minute,
@@ -189,6 +191,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.ConcurrentEndpointSyncs, "concurrent-endpoint-syncs", s.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.IntVar(&s.ConcurrentRCSyncs, "concurrent_rc_syncs", s.ConcurrentRCSyncs, "The number of replication controllers that are allowed to sync concurrently. Larger number = more reponsive replica management, but more CPU (and network) load")
 	fs.IntVar(&s.ConcurrentResourceQuotaSyncs, "concurrent-resource-quota-syncs", s.ConcurrentResourceQuotaSyncs, "The number of resource quotas that are allowed to sync concurrently. Larger number = more responsive quota management, but more CPU (and network) load")
+	fs.IntVar(&s.ConcurrentDeploymentSyncs, "concurrent-deployment-syncs", s.ConcurrentDeploymentSyncs, "The number of deployment objects that are allowed to sync concurrently. Larger number = more reponsive deployments, but more CPU (and network) load")
 	fs.DurationVar(&s.ServiceSyncPeriod, "service-sync-period", s.ServiceSyncPeriod, "The period for syncing services with their external load balancers")
 	fs.DurationVar(&s.NodeSyncPeriod, "node-sync-period", s.NodeSyncPeriod, ""+
 		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
@@ -383,8 +386,8 @@ func (s *CMServer) Run(_ []string) error {
 
 		if containsResource(resources, "deployments") {
 			glog.Infof("Starting deployment controller")
-			deployment.New(clientForUserAgentOrDie(*kubeconfig, "deployment-controller")).
-				Run(s.DeploymentControllerSyncPeriod)
+			go deployment.NewDeploymentController(clientForUserAgentOrDie(*kubeconfig, "deployment-controller"), s.ResyncPeriod).
+				Run(s.ConcurrentDeploymentSyncs, util.NeverStop)
 		}
 	}
 

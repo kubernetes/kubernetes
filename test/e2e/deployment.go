@@ -72,8 +72,14 @@ func testNewDeployment(f *Framework) {
 	})
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
+		deployment, err := c.Deployments(ns).Get(deploymentName)
+		Expect(err).NotTo(HaveOccurred())
 		Logf("deleting deployment %s", deploymentName)
 		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
+		// TODO: remove this once we can delete rcs with deployment
+		newRC, err := deploymentutil.GetNewRC(*deployment, c)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(c.ReplicationControllers(ns).Delete(newRC.Name)).NotTo(HaveOccurred())
 	}()
 	// Check that deployment is created fine.
 	deployment, err := c.Deployments(ns).Get(deploymentName)
@@ -166,8 +172,14 @@ func testRollingUpdateDeployment(f *Framework) {
 	_, err = c.Deployments(ns).Create(&newDeployment)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
+		deployment, err := c.Deployments(ns).Get(deploymentName)
+		Expect(err).NotTo(HaveOccurred())
 		Logf("deleting deployment %s", deploymentName)
 		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
+		// TODO: remove this once we can delete rcs with deployment
+		newRC, err := deploymentutil.GetNewRC(*deployment, c)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(c.ReplicationControllers(ns).Delete(newRC.Name)).NotTo(HaveOccurred())
 	}()
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, 3, 2, 4, 0)
@@ -178,9 +190,9 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	ns := f.Namespace.Name
 	c := f.Client
 	// Create nginx pods.
-	deploymentPodLabels := map[string]string{"name": "sample-pod"}
+	deploymentPodLabels := map[string]string{"name": "sample-pod-2"}
 	rcPodLabels := map[string]string{
-		"name": "sample-pod",
+		"name": "sample-pod-2",
 		"pod":  "nginx",
 	}
 	rcName := "nginx-controller"
@@ -212,14 +224,14 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 		Expect(c.ReplicationControllers(ns).Delete(rcName)).NotTo(HaveOccurred())
 	}()
 	// Verify that the required pods have come up.
-	err = verifyPods(c, ns, "sample-pod", false, 1)
+	err = verifyPods(c, ns, "sample-pod-2", false, 1)
 	if err != nil {
 		Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
-	deploymentName := "redis-deployment"
+	deploymentName := "redis-deployment-2"
 	Logf("Creating deployment %s", deploymentName)
 	newDeployment := extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
@@ -247,8 +259,14 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	_, err = c.Deployments(ns).Create(&newDeployment)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
+		deployment, err := c.Deployments(ns).Get(deploymentName)
+		Expect(err).NotTo(HaveOccurred())
 		Logf("deleting deployment %s", deploymentName)
 		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
+		// TODO: remove this once we can delete rcs with deployment
+		newRC, err := deploymentutil.GetNewRC(*deployment, c)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(c.ReplicationControllers(ns).Delete(newRC.Name)).NotTo(HaveOccurred())
 	}()
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, 1, 0, 2, 0)

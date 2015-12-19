@@ -21,10 +21,14 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	exp "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -190,7 +194,7 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 			client:        fake,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.reconcileOldRCs(allRcs, oldRcs, nil, deployment)
+		scaled, err := controller.reconcileOldRCs(allRcs, oldRcs, nil, deployment, false)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -257,4 +261,160 @@ func deployment(name string, replicas int, maxSurge, maxUnavailable intstr.IntOr
 			},
 		},
 	}
+}
+
+var alwaysReady = func() bool { return true }
+
+func newDeployment(replicas int) *exp.Deployment {
+	d := exp.Deployment{
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+		ObjectMeta: api.ObjectMeta{
+			UID:             util.NewUUID(),
+			Name:            "foobar",
+			Namespace:       api.NamespaceDefault,
+			ResourceVersion: "18",
+		},
+		Spec: exp.DeploymentSpec{
+			Strategy: exp.DeploymentStrategy{
+				Type:          exp.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &exp.RollingUpdateDeployment{},
+			},
+			Replicas: replicas,
+			Selector: map[string]string{"foo": "bar"},
+			Template: api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"name": "foo",
+						"type": "production",
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo/bar",
+						},
+					},
+				},
+			},
+		},
+	}
+	return &d
+}
+
+func getKey(d *exp.Deployment, t *testing.T) string {
+	if key, err := controller.KeyFunc(d); err != nil {
+		t.Errorf("Unexpected error getting key for deployment %v: %v", d.Name, err)
+		return ""
+	} else {
+		return key
+	}
+}
+
+func newReplicationController(d *exp.Deployment, name string, replicas int) *api.ReplicationController {
+	return &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:      name,
+			Namespace: api.NamespaceDefault,
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 0,
+			Template: &d.Spec.Template,
+		},
+	}
+
+}
+
+type fixture struct {
+	t *testing.T
+
+	client *testclient.Fake
+
+	// Objects to put in the store.
+	dStore   []*exp.Deployment
+	rcStore  []*api.ReplicationController
+	podStore []*api.Pod
+
+	// Actions expected to happen on the client. Objects from here are also
+	// preloaded into NewSimpleFake.
+	actions []testclient.Action
+	objects *api.List
+}
+
+func (f *fixture) expectUpdateDeploymentAction(d *exp.Deployment) {
+	f.actions = append(f.actions, testclient.NewUpdateAction("deployments", d.Namespace, d))
+	f.objects.Items = append(f.objects.Items, d)
+}
+
+func (f *fixture) expectCreateRCAction(rc *api.ReplicationController) {
+	f.actions = append(f.actions, testclient.NewCreateAction("replicationcontrollers", rc.Namespace, rc))
+	f.objects.Items = append(f.objects.Items, rc)
+}
+
+func (f *fixture) expectUpdateRCAction(rc *api.ReplicationController) {
+	f.actions = append(f.actions, testclient.NewUpdateAction("replicationcontrollers", rc.Namespace, rc))
+	f.objects.Items = append(f.objects.Items, rc)
+}
+
+func newFixture(t *testing.T) *fixture {
+	f := &fixture{}
+	f.t = t
+	f.objects = &api.List{}
+	return f
+}
+
+func (f *fixture) run(deploymentName string) {
+	f.client = testclient.NewSimpleFake(f.objects)
+	c := NewDeploymentController(f.client, controller.NoResyncPeriodFunc)
+	c.rcStoreSynced = alwaysReady
+	c.podStoreSynced = alwaysReady
+	for _, d := range f.dStore {
+		c.dStore.Store.Add(d)
+	}
+	for _, rc := range f.rcStore {
+		c.rcStore.Store.Add(rc)
+	}
+	for _, pod := range f.podStore {
+		c.podStore.Store.Add(pod)
+	}
+
+	err := c.syncDeployment(deploymentName)
+	if err != nil {
+		f.t.Errorf("error syncing deployment: %v", err)
+	}
+
+	actions := f.client.Actions()
+	for i, action := range actions {
+		if len(f.actions) < i+1 {
+			f.t.Errorf("%d unexpected actions: %+v", len(actions)-len(f.actions), actions[i:])
+			break
+		}
+
+		expectedAction := f.actions[i]
+		if !expectedAction.Matches(action.GetVerb(), action.GetResource()) {
+			f.t.Errorf("Expected\n\t%#v\ngot\n\t%#v", expectedAction, action)
+			continue
+		}
+	}
+
+	if len(f.actions) > len(actions) {
+		f.t.Errorf("%d additional expected actions:%+v", len(f.actions)-len(actions), f.actions[len(actions):])
+	}
+}
+
+func TestSyncDeploymentCreatesRC(t *testing.T) {
+	f := newFixture(t)
+
+	d := newDeployment(1)
+	f.dStore = append(f.dStore, d)
+
+	// expect that one rc with zero replicas is created
+	// then is updated to 1 replica
+	rc := newReplicationController(d, "deploymentrc-4186632231", 0)
+	updatedRC := newReplicationController(d, "deploymentrc-4186632231", 1)
+
+	f.expectCreateRCAction(rc)
+	f.expectUpdateRCAction(updatedRC)
+	f.expectUpdateDeploymentAction(d)
+
+	f.run(getKey(d, t))
 }
