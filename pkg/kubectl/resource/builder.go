@@ -281,23 +281,7 @@ func (b *Builder) SelectAllParam(selectAll bool) *Builder {
 // When two or more arguments are received, they must be a single type and resource name(s).
 // The allowEmptySelector permits to select all the resources (via Everything func).
 func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string) *Builder {
-	// convert multiple resources to resource tuples, a,b,c d as a transform to a/d b/d c/d
-	if len(args) >= 2 {
-		resources := []string{}
-		resources = append(resources, SplitResourceArgument(args[0])...)
-		if len(resources) > 1 {
-			names := []string{}
-			names = append(names, args[1:]...)
-			newArgs := []string{}
-			for _, resource := range resources {
-				for _, name := range names {
-					newArgs = append(newArgs, strings.Join([]string{resource, name}, "/"))
-				}
-			}
-			args = newArgs
-		}
-	}
-
+	args = normalizeMultipleResourcesArgs(args)
 	if ok, err := hasCombinedTypeArgs(args); ok {
 		if err != nil {
 			b.errs = append(b.errs, err)
@@ -366,6 +350,27 @@ func hasCombinedTypeArgs(args []string) (bool, error) {
 	default:
 		return false, nil
 	}
+}
+
+// Normalize args convert multiple resources to resource tuples, a,b,c d
+// as a transform to a/d b/d c/d
+func normalizeMultipleResourcesArgs(args []string) []string {
+	if len(args) >= 2 {
+		resources := []string{}
+		resources = append(resources, SplitResourceArgument(args[0])...)
+		if len(resources) > 1 {
+			names := []string{}
+			names = append(names, args[1:]...)
+			newArgs := []string{}
+			for _, resource := range resources {
+				for _, name := range names {
+					newArgs = append(newArgs, strings.Join([]string{resource, name}, "/"))
+				}
+			}
+			return newArgs
+		}
+	}
+	return args
 }
 
 // splitResourceTypeName handles type/name resource formats and returns a resource tuple
@@ -695,4 +700,14 @@ func SplitResourceArgument(arg string) []string {
 		out = append(out, s)
 	}
 	return out
+}
+
+// HasNames returns true if the provided args contain resource names
+func HasNames(args []string) (bool, error) {
+	args = normalizeMultipleResourcesArgs(args)
+	hasCombinedTypes, err := hasCombinedTypeArgs(args)
+	if err != nil {
+		return false, err
+	}
+	return hasCombinedTypes || len(args) > 1, nil
 }

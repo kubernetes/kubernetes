@@ -537,10 +537,10 @@ func translateTimestamp(timestamp unversioned.Time) string {
 }
 
 func printPod(pod *api.Pod, w io.Writer, options printOptions) error {
-	return printPodBase(pod, w, true, options)
+	return printPodBase(pod, w, options)
 }
 
-func printPodBase(pod *api.Pod, w io.Writer, showIfTerminating bool, options printOptions) error {
+func printPodBase(pod *api.Pod, w io.Writer, options printOptions) error {
 	name := pod.Name
 	namespace := pod.Namespace
 
@@ -550,7 +550,7 @@ func printPodBase(pod *api.Pod, w io.Writer, showIfTerminating bool, options pri
 
 	reason := string(pod.Status.Phase)
 	// if not printing all pods, skip terminated pods (default)
-	if !showIfTerminating && !options.showAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
+	if !options.showAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
 		return nil
 	}
 	if pod.Status.Reason != "" {
@@ -610,7 +610,7 @@ func printPodBase(pod *api.Pod, w io.Writer, showIfTerminating bool, options pri
 
 func printPodList(podList *api.PodList, w io.Writer, options printOptions) error {
 	for _, pod := range podList.Items {
-		if err := printPodBase(&pod, w, false, options); err != nil {
+		if err := printPodBase(&pod, w, options); err != nil {
 			return err
 		}
 	}
