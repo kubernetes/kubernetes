@@ -1292,6 +1292,17 @@ __EOF__
 
 
   ###########
+  # Explain #
+  ###########
+
+  kube::log::status "Testing kubectl(${version}:explain)"
+  kubectl explain pods
+  # shortcuts work
+  kubectl explain po
+  kubectl explain po.status.message
+
+
+  ###########
   # Swagger #
   ###########
 

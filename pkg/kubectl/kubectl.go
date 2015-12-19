@@ -91,6 +91,11 @@ func (e ShortcutExpander) ResourceIsValid(resource string) bool {
 	return e.RESTMapper.ResourceIsValid(expandResourceShortcut(resource))
 }
 
+// ResourceSingularizer expands the named resource and then singularizes it.
+func (e ShortcutExpander) ResourceSingularizer(resource string) (string, error) {
+	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(resource))
+}
+
 // expandResourceShortcut will return the expanded version of resource
 // (something that a pkg/api/meta.RESTMapper can understand), if it is
 // indeed a shortcut. Otherwise, will return resource unmodified.
