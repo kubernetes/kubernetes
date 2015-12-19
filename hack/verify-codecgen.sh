@@ -32,7 +32,6 @@ generated_files=($(
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
         -o -wholename '*/Godeps/*' \
-        -o -wholename '*/testdata/*' \
       \) -prune \
     \) -name '*.generated.go'))
 
