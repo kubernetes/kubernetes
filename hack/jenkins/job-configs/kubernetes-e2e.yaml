@@ -5,16 +5,15 @@
         daysToKeep: 7
     builders:
         - shell: |
-            curl -fsS -o upload-to-gcs.sh --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh" && source upload-to-gcs.sh; rm -f upload-to-gcs.sh
             curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
     properties:
         - mail-watcher
     publishers:
         - claim-build
-        - email-ext
+        - junit-publisher
         - gcs-uploader
         - log-parser
-        - junit-publisher
+        - email-ext
     triggers:
         - reverse:
             jobs: '{trigger-job}'

@@ -11,6 +11,7 @@
 - publisher:
     name: gcs-uploader
     publishers:
+        # Use the plugin for the build log, since it isn't available on Jenkins slaves.
         - google-cloud-storage:
             credentials-id: kubernetes-jenkins
             uploads:
@@ -19,6 +20,17 @@
                     storage-location: gs://kubernetes-jenkins/logs/$JOB_NAME/$BUILD_NUMBER
                     share-publicly: true
                     upload-for-failed-jobs: true
+        # Use our script for build artifacts, since it's more flexible.
+        - postbuildscript:
+            builders:
+                - shell: |
+                    if [[ -x ./hack/jenkins/upload-to-gcs.sh ]]; then
+                      ./hack/jenkins/upload-to-gcs.sh
+                    else
+                      curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh" | bash -
+                    fi
+            script-only-if-succeeded: False
+            script-only-if-failed: False
 
 # Default log parser rules.
 - publisher:
