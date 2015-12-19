@@ -254,8 +254,8 @@ func AddApiWebService(container *restful.Container, apiPrefix string, versions [
 }
 
 // Adds a service to return the supported api versions at /apis.
-func AddApisWebService(container *restful.Container, apiPrefix string, groups []unversioned.APIGroup) {
-	rootAPIHandler := RootAPIHandler(groups)
+func AddApisWebService(container *restful.Container, apiPrefix string, f func() []unversioned.APIGroup) {
+	rootAPIHandler := RootAPIHandler(f)
 	ws := new(restful.WebService)
 	ws.Path(apiPrefix)
 	ws.Doc("get available API versions")
@@ -308,10 +308,10 @@ func APIVersionHandler(versions ...string) restful.RouteFunction {
 }
 
 // RootAPIHandler returns a handler which will list the provided groups and versions as available.
-func RootAPIHandler(groups []unversioned.APIGroup) restful.RouteFunction {
+func RootAPIHandler(f func() []unversioned.APIGroup) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		// TODO: use restful's Response methods
-		writeJSON(http.StatusOK, api.Codec, &unversioned.APIGroupList{Groups: groups}, resp.ResponseWriter, true)
+		writeJSON(http.StatusOK, api.Codec, &unversioned.APIGroupList{Groups: f()}, resp.ResponseWriter, true)
 	}
 }
 

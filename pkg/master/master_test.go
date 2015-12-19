@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/endpoint"
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	thirdpartyresourcedatastorage "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
@@ -343,6 +342,36 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	assert.Equal(expectGroupName, groupList.Groups[0].Name)
 	assert.Equal(expectVersions, groupList.Groups[0].Versions)
 	assert.Equal(expectPreferredVersion, groupList.Groups[0].PreferredVersion)
+
+	thirdPartyGV := unversioned.GroupVersionForDiscovery{GroupVersion: "company.com/v1", Version: "v1"}
+	master.thirdPartyResources["/apis/company.com/v1"] = thirdPartyEntry{
+		nil,
+		unversioned.APIGroup{
+			Name:             "company.com",
+			Versions:         []unversioned.GroupVersionForDiscovery{thirdPartyGV},
+			PreferredVersion: thirdPartyGV,
+		},
+	}
+
+	resp, err = http.Get(server.URL + "/apis")
+	if !assert.NoError(err) {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	assert.NoError(decodeResponse(resp, &groupList))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	thirdPartyGroupName := "company.com"
+	thirdPartyExpectVersions := []unversioned.GroupVersionForDiscovery{thirdPartyGV}
+
+	assert.Equal(thirdPartyGroupName, groupList.Groups[1].Name)
+	assert.Equal(thirdPartyExpectVersions, groupList.Groups[1].Versions)
+	assert.Equal(thirdPartyGV, groupList.Groups[1].PreferredVersion)
+
 }
 
 var versionsToTest = []string{"v1", "v3"}
@@ -365,7 +394,7 @@ type FooList struct {
 func initThirdParty(t *testing.T, version string) (*Master, *etcdtesting.EtcdTestServer, *httptest.Server, *assert.Assertions) {
 	master, etcdserver, _, assert := setUp(t)
 
-	master.thirdPartyResources = map[string]*thirdpartyresourcedatastorage.REST{}
+	master.thirdPartyResources = map[string]thirdPartyEntry{}
 	api := &extensions.ThirdPartyResource{
 		ObjectMeta: api.ObjectMeta{
 			Name: "foo.company.com",
