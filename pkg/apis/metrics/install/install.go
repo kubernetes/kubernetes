@@ -42,20 +42,32 @@ var accessor = meta.NewAccessor()
 var availableVersions = []unversioned.GroupVersion{v1alpha1.SchemeGroupVersion}
 
 func init() {
+	registered.RegisterVersions(availableVersions...)
+
 	externalVersions := []unversioned.GroupVersion{}
-	for _, allowedVersion := range registered.GroupVersionsForGroup(metrics.GroupName) {
-		for _, externalVersion := range availableVersions {
-			if externalVersion == allowedVersion {
-				externalVersions = append(externalVersions, externalVersion)
-			}
+	for _, v := range availableVersions {
+		if registered.IsAllowedVersion(v) {
+			externalVersions = append(externalVersions, v)
 		}
 	}
-
 	if len(externalVersions) == 0 {
 		glog.V(4).Infof("No version is registered for group %v", metrics.GroupName)
 		return
 	}
+	if err := registered.EnableVersions(externalVersions...); err != nil {
+		glog.V(4).Infof("%v", err)
+		return
+	}
+	if err := enableVersions(externalVersions); err != nil {
+		glog.V(4).Infof("%v", err)
+		return
+	}
+}
 
+// TODO: enableVersions should be centralized rather than spread in each API
+// group.
+func enableVersions(externalVersions []unversioned.GroupVersion) error {
+	addVersionsToScheme(externalVersions...)
 	preferredExternalVersion := externalVersions[0]
 
 	groupMeta := latest.GroupMeta{
@@ -68,11 +80,10 @@ func init() {
 	}
 
 	if err := latest.RegisterGroup(groupMeta); err != nil {
-		glog.V(4).Infof("%v", err)
-		return
+		return err
 	}
-
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
+	return nil
 }
 
 func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper {
@@ -103,5 +114,21 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 	default:
 		g, _ := latest.Group(metrics.GroupName)
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
+	}
+}
+
+func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
+	// add the internal version to Scheme
+	metrics.AddToScheme()
+	// add the enabled external versions to Scheme
+	for _, v := range externalVersions {
+		if !registered.IsEnabledVersion(v) {
+			glog.Errorf("Version %s is not enabled, so it will not be added to the Scheme.", v)
+			continue
+		}
+		switch v {
+		case v1alpha1.SchemeGroupVersion:
+			v1alpha1.AddToScheme()
+		}
 	}
 }

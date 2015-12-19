@@ -99,7 +99,7 @@ func (o *ConvertOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.
 	if err != nil {
 		return err
 	}
-	if !registered.IsRegisteredAPIGroupVersion(o.outputVersion) {
+	if !registered.IsEnabledVersion(o.outputVersion) {
 		cmdutil.UsageError(cmd, "'%s' is not a registered version.", o.outputVersion)
 	}
 

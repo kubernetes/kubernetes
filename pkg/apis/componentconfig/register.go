@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-func init() {
+func AddToScheme() {
 	addKnownTypes()
 }
 

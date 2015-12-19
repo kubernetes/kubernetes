@@ -31,8 +31,8 @@ var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1
 
 var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion)
 
-func init() {
-	// Register the API.
+func AddToScheme() {
+	// Add the API to Scheme.
 	addKnownTypes()
 }
 

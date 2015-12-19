@@ -30,7 +30,7 @@ var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1
 
 var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion)
 
-func init() {
+func AddToScheme() {
 	addKnownTypes()
 	addDefaultingFuncs()
 }

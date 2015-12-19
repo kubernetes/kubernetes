@@ -23,8 +23,8 @@ import (
 
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "testgroup", Version: ""}
 
-func init() {
-	// Register the API.
+func AddToScheme() {
+	// Add the API to Scheme.
 	addKnownTypes()
 }
 

@@ -21,8 +21,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-func init() {
-	// Register the API.
+func AddToScheme() {
+	// Add the API to Scheme.
 	addKnownTypes()
 }
 

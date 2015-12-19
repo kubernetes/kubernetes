@@ -48,8 +48,8 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from %q: %v", source, err)
 	}
-	if ok := registered.IsRegisteredAPIGroupVersion(gvk.GroupVersion()); !ok {
-		return nil, fmt.Errorf("API version %q in %q isn't supported, only supports API versions %q", gvk.GroupVersion().String(), source, registered.RegisteredGroupVersions)
+	if ok := registered.IsEnabledVersion(gvk.GroupVersion()); !ok {
+		return nil, fmt.Errorf("API version %q in %q isn't supported, only supports API versions %q", gvk.GroupVersion().String(), source, registered.EnabledVersions())
 	}
 	if gvk.Kind == "" {
 		return nil, fmt.Errorf("kind not set in %q", source)

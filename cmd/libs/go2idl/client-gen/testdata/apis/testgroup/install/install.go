@@ -23,11 +23,11 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -43,10 +43,9 @@ const groupName = "testgroup"
 var availableVersions = []unversioned.GroupVersion{{Group: groupName, Version: "v1"}}
 
 func init() {
-	registered.RegisteredGroupVersions = append(registered.RegisteredGroupVersions, v1.SchemeGroupVersion)
-
 	externalVersions := availableVersions
 	preferredExternalVersion := externalVersions[0]
+	addVersionsToScheme(externalVersions...)
 
 	groupMeta := latest.GroupMeta{
 		GroupVersion:  preferredExternalVersion,
@@ -93,5 +92,17 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 	default:
 		g, _ := latest.Group(groupName)
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
+	}
+}
+
+func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
+	// add the internal version to Scheme
+	testgroup.AddToScheme()
+	// add the enabled external versions to Scheme
+	for _, v := range externalVersions {
+		switch v {
+		case v1.SchemeGroupVersion:
+			v1.AddToScheme()
+		}
 	}
 }

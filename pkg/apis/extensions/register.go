@@ -37,8 +37,8 @@ func Resource(resource string) unversioned.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-func init() {
-	// Register the API.
+func AddToScheme() {
+	// Add the API to Scheme.
 	addKnownTypes()
 }
 
