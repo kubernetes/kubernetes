@@ -111,13 +111,20 @@ type Master struct {
 
 	// storage for third party objects
 	thirdPartyStorage storage.Interface
-	// map from api path to storage for those objects
-	thirdPartyResources map[string]*thirdpartyresourcedataetcd.REST
+	// map from api path to a tuple of (storage for the objects, APIGroup)
+	thirdPartyResources map[string]thirdPartyEntry
 	// protects the map
 	thirdPartyResourcesLock sync.RWMutex
 
 	// Used to start and monitor tunneling
 	tunneler Tunneler
+}
+
+// thirdPartyEntry combines objects storage and API group into one struct
+// for easy lookup.
+type thirdPartyEntry struct {
+	storage *thirdpartyresourcedataetcd.REST
+	group   unversioned.APIGroup
 }
 
 // New returns a new instance of Master from the given config.
@@ -184,7 +191,7 @@ func (m *Master) InstallAPIs(c *Config) {
 	// Install extensions unless disabled.
 	if !m.ApiGroupVersionOverrides["extensions/v1beta1"].Disable {
 		m.thirdPartyStorage = c.StorageDestinations.APIGroups[extensions.GroupName].Default
-		m.thirdPartyResources = map[string]*thirdpartyresourcedataetcd.REST{}
+		m.thirdPartyResources = map[string]thirdPartyEntry{}
 
 		expVersion := m.experimental(c)
 
@@ -217,7 +224,20 @@ func (m *Master) InstallAPIs(c *Config) {
 
 	// This should be done after all groups are registered
 	// TODO: replace the hardcoded "apis".
-	apiserver.AddApisWebService(m.HandlerContainer, "/apis", allGroups)
+	apiserver.AddApisWebService(m.HandlerContainer, "/apis", func() []unversioned.APIGroup {
+		groups := []unversioned.APIGroup{}
+		for ix := range allGroups {
+			groups = append(groups, allGroups[ix])
+		}
+		m.thirdPartyResourcesLock.Lock()
+		defer m.thirdPartyResourcesLock.Unlock()
+		if m.thirdPartyResources != nil {
+			for key := range m.thirdPartyResources {
+				groups = append(groups, m.thirdPartyResources[key].group)
+			}
+		}
+		return groups
+	})
 }
 
 func (m *Master) initV1ResourcesStorage(c *Config) {
@@ -432,7 +452,7 @@ func (m *Master) removeThirdPartyStorage(path string) error {
 	defer m.thirdPartyResourcesLock.Unlock()
 	storage, found := m.thirdPartyResources[path]
 	if found {
-		if err := m.removeAllThirdPartyResources(storage); err != nil {
+		if err := m.removeAllThirdPartyResources(storage.storage); err != nil {
 			return err
 		}
 		delete(m.thirdPartyResources, path)
@@ -486,10 +506,10 @@ func (m *Master) ListThirdPartyResources() []string {
 	return result
 }
 
-func (m *Master) addThirdPartyResourceStorage(path string, storage *thirdpartyresourcedataetcd.REST) {
+func (m *Master) addThirdPartyResourceStorage(path string, storage *thirdpartyresourcedataetcd.REST, apiGroup unversioned.APIGroup) {
 	m.thirdPartyResourcesLock.Lock()
 	defer m.thirdPartyResourcesLock.Unlock()
-	m.thirdPartyResources[path] = storage
+	m.thirdPartyResources[path] = thirdPartyEntry{storage, apiGroup}
 }
 
 // InstallThirdPartyResource installs a third party resource specified by 'rsrc'.  When a resource is
@@ -518,7 +538,7 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 		Versions: []unversioned.GroupVersionForDiscovery{groupVersion},
 	}
 	apiserver.AddGroupWebService(m.HandlerContainer, path, apiGroup)
-	m.addThirdPartyResourceStorage(path, thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST))
+	m.addThirdPartyResourceStorage(path, thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST), apiGroup)
 	apiserver.InstallServiceErrorHandler(m.HandlerContainer, m.NewRequestInfoResolver(), []string{thirdparty.GroupVersion.String()})
 	return nil
 }
