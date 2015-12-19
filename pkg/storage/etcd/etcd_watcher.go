@@ -158,7 +158,9 @@ func (w *etcdWatcher) etcdWatch(ctx context.Context, client etcd.KeysAPI, key st
 		AfterIndex: resourceVersion,
 	}
 	watcher := client.Watcher(key, &opts)
+	w.stopLock.Lock()
 	w.ctx, w.cancel = context.WithCancel(ctx)
+	w.stopLock.Unlock()
 
 	for {
 		resp, err := watcher.Next(w.ctx)
