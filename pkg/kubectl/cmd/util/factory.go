@@ -29,6 +29,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/emicklei/go-restful/swagger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -88,6 +89,8 @@ type Factory struct {
 	LogsForObject func(object, options runtime.Object) (*client.Request, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator func(validate bool, cacheDir string) (validation.Schema, error)
+	// SwaggerSchema returns the schema declaration for the provided group version.
+	SwaggerSchema func(unversioned.GroupVersion) (*swagger.ApiDeclaration, error)
 	// Returns the default namespace to use in cases where no
 	// other namespace is specified and whether the namespace was
 	// overriden.
@@ -303,6 +306,13 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}, nil
 			}
 			return validation.NullSchema{}, nil
+		},
+		SwaggerSchema: func(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
+			client, err := clients.ClientForVersion(&version)
+			if err != nil {
+				return nil, err
+			}
+			return client.SwaggerSchema(version)
 		},
 		DefaultNamespace: func() (string, bool, error) {
 			return clientConfig.Namespace()
