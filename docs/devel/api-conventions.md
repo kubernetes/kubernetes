@@ -76,6 +76,7 @@ using resources with kubectl can be found in [Working with resources](../user-gu
   - [Naming conventions](#naming-conventions)
   - [Label, selector, and annotation conventions](#label-selector-and-annotation-conventions)
   - [WebSockets and SPDY](#websockets-and-spdy)
+  - [Validation](#validation)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -786,6 +787,35 @@ There are two primary protocols in use today:
 
 Clients should use the SPDY protocols if their clients have native support, or WebSockets as a fallback. Note that WebSockets is susceptible to Head-of-Line blocking and so clients must read and process each message sequentionally. In the future, an HTTP/2 implementation will be exposed that deprecates SPDY.
 
+
+## Validation
+
+API objects are validated upon receipt by the apiserver.  Validation errors are
+flagged and returned to the caller in a `Failure` status with `reason` set to
+`Invalid`.  In order to facilitate consistent error messages, we ask that
+validation logic adheres to the following guidelines whenever possible (though
+exceptional cases will exist).
+
+* Be as precise as possible.
+* Telling users what they CAN do is more useful than telling them what they
+  CANNOT do.
+* When asserting a requirement in the positive, use "must".  Examples: "must be
+  greater than 0", "must match regex '[a-z]+'".  Words like "should" imply that
+  the assertion is optional, and must be avoided.
+* When asserting a formatting requirement in the negative, use "must not".
+  Example: "must not contain '..'".  Words like "should not" imply that the
+  assertion is optional, and must be avoided.
+* When asserting a behavioral requirement in the negative, use "may not".
+  Examples: "may not be specified when otherField is empty", "only `name` may be
+  specified".
+* When referencing a literal string value, indicate the literal in
+  single-quotes. Example: "must not contain '..'".
+* When referencing another field name, indicate the name in back-quotes.
+  Example: "must be greater than `request`".
+* When specifying inequalities, use words rather than symbols.  Examples: "must
+  be less than 256", "must be greater than or equal to 0".  Do not use words
+  like "larger than", "bigger than", "more than", "higher than", etc.
+* When specifying numeric ranges, use inclusive ranges when possible.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/api-conventions.md?pixel)]()
