@@ -235,6 +235,8 @@ func (g *conversionGenerator) generateConversionsForMap(inType, outType reflect.
 func (g *conversionGenerator) generateConversionsForSlice(inType, outType reflect.Type) error {
 	inElem := inType.Elem()
 	outElem := outType.Elem()
+	// slice conversion requires the package for the destination type in order to instantiate the map
+	g.addImportByPath(outElem.PkgPath())
 	if err := g.generateConversionsBetween(inElem, outElem); err != nil {
 		return err
 	}
