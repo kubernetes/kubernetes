@@ -328,15 +328,28 @@ func (q *Quantity) Cmp(y Quantity) int {
 }
 
 func (q *Quantity) Add(y Quantity) error {
-	q.Amount.Add(q.Amount, y.Amount)
+	switch {
+	case y.Amount == nil:
+		// Adding 0: do nothing.
+	case q.Amount == nil:
+		q.Amount = &inf.Dec{}
+		return q.Add(y)
+	default:
+		q.Amount.Add(q.Amount, y.Amount)
+	}
 	return nil
 }
 
 func (q *Quantity) Sub(y Quantity) error {
-	if q.Format != y.Format {
-		return fmt.Errorf("format mismatch: %v vs. %v", q.Format, y.Format)
+	switch {
+	case y.Amount == nil:
+		// Subtracting 0: do nothing.
+	case q.Amount == nil:
+		q.Amount = &inf.Dec{}
+		return q.Sub(y)
+	default:
+		q.Amount.Sub(q.Amount, y.Amount)
 	}
-	q.Amount.Sub(q.Amount, y.Amount)
 	return nil
 }
 
