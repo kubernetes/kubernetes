@@ -85,8 +85,13 @@
   {% set configure_cbr0 = "--configure-cbr0=" + pillar['allocate_node_cidrs'] -%}
 {% endif -%}
 
+# The master kubelet cannot wait for the flannel daemon because it is responsible
+# for starting up the flannel server in a static pod. So even though the flannel
+# daemon runs on the master, it doesn't hold up cluster bootstrap. All the pods
+# on the master run with host networking, so the master flannel doesn't care
+# even if the network changes. We only need it for the master proxy.
 {% set experimental_flannel_overlay = "" -%}
-{% if pillar.get('network_provider', '').lower() == 'flannel' %}
+{% if pillar.get('network_provider', '').lower() == 'flannel' and grains['roles'][0] != 'kubernetes-master' %}
   {% set experimental_flannel_overlay = "--experimental-flannel-overlay=true" %}
 {% endif -%}
 
