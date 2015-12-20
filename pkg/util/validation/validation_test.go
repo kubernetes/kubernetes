@@ -92,8 +92,8 @@ func TestIsDNS952Label(t *testing.T) {
 		strings.Repeat("a", 24),
 	}
 	for _, val := range goodValues {
-		if !IsDNS952Label(val) {
-			t.Errorf("expected true for '%s'", val)
+		if msgs := IsDNS952Label(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%s': %v", val, msgs)
 		}
 	}
 
@@ -107,7 +107,7 @@ func TestIsDNS952Label(t *testing.T) {
 		strings.Repeat("a", 25),
 	}
 	for _, val := range badValues {
-		if IsDNS952Label(val) {
+		if msgs := IsDNS952Label(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%s'", val)
 		}
 	}
