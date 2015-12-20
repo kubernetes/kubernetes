@@ -52,8 +52,10 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
 
+	"github.com/blang/semver"
 	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/websocket"
@@ -105,6 +107,14 @@ const (
 	serviceRespondingTimeout = 2 * time.Minute
 	endpointRegisterTimeout  = time.Minute
 )
+
+// SubResource proxy should have been functional in v1.0.0, but SubResource
+// proxy via tunneling is known to be broken in v1.0.  See
+// https://github.com/kubernetes/kubernetes/pull/15224#issuecomment-146769463
+//
+// TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively
+// in v1.3).
+var subResourceProxyVersion = version.MustParse("v1.1.0")
 
 type CloudConfig struct {
 	ProjectID         string
@@ -899,13 +909,28 @@ func (r podResponseChecker) checkAllResponses() (done bool, err error) {
 		if !isElementOf(pod.UID, currentPods) {
 			return false, fmt.Errorf("pod with UID %s is no longer a member of the replica set.  Must have been restarted for some reason.  Current replica set: %v", pod.UID, currentPods)
 		}
-		body, err := r.c.Get().
-			Namespace(r.ns).
-			Resource("pods").
-			SubResource("proxy").
-			Name(string(pod.Name)).
-			Do().
-			Raw()
+		subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, r.c)
+		if err != nil {
+			return false, err
+		}
+		var body []byte
+		if subResourceProxyAvailable {
+			body, err = r.c.Get().
+				Namespace(r.ns).
+				Resource("pods").
+				SubResource("proxy").
+				Name(string(pod.Name)).
+				Do().
+				Raw()
+		} else {
+			body, err = r.c.Get().
+				Prefix("proxy").
+				Namespace(r.ns).
+				Resource("pods").
+				Name(string(pod.Name)).
+				Do().
+				Raw()
+		}
 		if err != nil {
 			Logf("Controller %s: Failed to GET from replica %d [%s]: %v:", r.controllerName, i+1, pod.Name, err)
 			continue
@@ -938,6 +963,22 @@ func (r podResponseChecker) checkAllResponses() (done bool, err error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+// serverVersionGTE returns true if v is greater than or equal to the server
+// version.
+//
+// TODO(18726): This should be incorporated into client.VersionInterface.
+func serverVersionGTE(v semver.Version, c client.VersionInterface) (bool, error) {
+	serverVersion, err := c.ServerVersion()
+	if err != nil {
+		return false, fmt.Errorf("Unable to get server version: %v", err)
+	}
+	sv, err := version.Parse(serverVersion.GitVersion)
+	if err != nil {
+		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
+	}
+	return sv.GTE(v), nil
 }
 
 func podsResponding(c *client.Client, ns, name string, wantName bool, pods *api.PodList) error {
