@@ -58,9 +58,8 @@ const (
 // TODO: pass the various interfaces on the factory directly into the command constructors (so the
 // commands are decoupled from the factory).
 type Factory struct {
-	clients    *ClientCache
-	flags      *pflag.FlagSet
-	generators map[string]kubectl.Generator
+	clients *ClientCache
+	flags   *pflag.FlagSet
 
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object func() (meta.RESTMapper, runtime.ObjectTyper)
@@ -95,8 +94,8 @@ type Factory struct {
 	// other namespace is specified and whether the namespace was
 	// overriden.
 	DefaultNamespace func() (string, bool, error)
-	// Returns the generator for the provided generator name
-	Generator func(name string) (kubectl.Generator, bool)
+	// Generators returns the generators for the provided command
+	Generators func(cmdName string) map[string]kubectl.Generator
 	// Check whether the kind of resources could be exposed
 	CanBeExposed func(kind unversioned.GroupKind) error
 	// Check whether the kind of resources could be autoscaled
@@ -123,19 +122,31 @@ const (
 )
 
 // DefaultGenerators returns the set of default generators for use in Factory instances
-func DefaultGenerators() map[string]kubectl.Generator {
-	return map[string]kubectl.Generator{
-		RunV1GeneratorName:                          kubectl.BasicReplicationController{},
-		RunPodV1GeneratorName:                       kubectl.BasicPod{},
-		ServiceV1GeneratorName:                      kubectl.ServiceGeneratorV1{},
-		ServiceV2GeneratorName:                      kubectl.ServiceGeneratorV2{},
-		HorizontalPodAutoscalerV1Beta1GeneratorName: kubectl.HorizontalPodAutoscalerV1Beta1{},
-		DeploymentV1Beta1GeneratorName:              kubectl.DeploymentV1Beta1{},
-		JobV1Beta1GeneratorName:                     kubectl.JobV1Beta1{},
-		NamespaceV1GeneratorName:                    kubectl.NamespaceGeneratorV1{},
-		SecretV1GeneratorName:                       kubectl.SecretGeneratorV1{},
-		SecretForDockerRegistryV1GeneratorName:      kubectl.SecretForDockerRegistryGeneratorV1{},
+func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
+	generators := map[string]map[string]kubectl.Generator{}
+	generators["expose"] = map[string]kubectl.Generator{
+		ServiceV1GeneratorName: kubectl.ServiceGeneratorV1{},
+		ServiceV2GeneratorName: kubectl.ServiceGeneratorV2{},
 	}
+	generators["run"] = map[string]kubectl.Generator{
+		RunV1GeneratorName:             kubectl.BasicReplicationController{},
+		RunPodV1GeneratorName:          kubectl.BasicPod{},
+		DeploymentV1Beta1GeneratorName: kubectl.DeploymentV1Beta1{},
+		JobV1Beta1GeneratorName:        kubectl.JobV1Beta1{},
+	}
+	generators["autoscale"] = map[string]kubectl.Generator{
+		HorizontalPodAutoscalerV1Beta1GeneratorName: kubectl.HorizontalPodAutoscalerV1Beta1{},
+	}
+	generators["namespace"] = map[string]kubectl.Generator{
+		NamespaceV1GeneratorName: kubectl.NamespaceGeneratorV1{},
+	}
+	generators["secret"] = map[string]kubectl.Generator{
+		SecretV1GeneratorName: kubectl.SecretGeneratorV1{},
+	}
+	generators["secret-for-docker-registry"] = map[string]kubectl.Generator{
+		SecretForDockerRegistryV1GeneratorName: kubectl.SecretForDockerRegistryGeneratorV1{},
+	}
+	return generators[cmdName]
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
@@ -147,8 +158,6 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SetNormalizeFunc(util.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
-	generators := DefaultGenerators()
-
 	clientConfig := optionalClientConfig
 	if optionalClientConfig == nil {
 		clientConfig = DefaultClientConfig(flags)
@@ -157,9 +166,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	clients := NewClientCache(clientConfig)
 
 	return &Factory{
-		clients:    clients,
-		flags:      flags,
-		generators: generators,
+		clients: clients,
+		flags:   flags,
 
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
@@ -317,9 +325,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		DefaultNamespace: func() (string, bool, error) {
 			return clientConfig.Namespace()
 		},
-		Generator: func(name string) (kubectl.Generator, bool) {
-			generator, ok := generators[name]
-			return generator, ok
+		Generators: func(cmdName string) map[string]kubectl.Generator {
+			return DefaultGenerators(cmdName)
 		},
 		CanBeExposed: func(kind unversioned.GroupKind) error {
 			switch kind {
