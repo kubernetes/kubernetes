@@ -145,8 +145,11 @@ var cIdentifierRegexp = regexp.MustCompile("^" + CIdentifierFmt + "$")
 
 // IsCIdentifier tests for a string that conforms the definition of an identifier
 // in C. This checks the format, but not the length.
-func IsCIdentifier(value string) bool {
-	return cIdentifierRegexp.MatchString(value)
+func IsCIdentifier(value string) []string {
+	if !cIdentifierRegexp.MatchString(value) {
+		return []string{RegexError(CIdentifierFmt, "my_name", "MY_NAME", "MyName")}
+	}
+	return nil
 }
 
 // IsValidPortNum tests that the argument is a valid, non-zero port number.
