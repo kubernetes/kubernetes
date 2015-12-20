@@ -635,7 +635,8 @@ var _ = Describe("Pods", func() {
 		}, 1, defaultObservationTimeout)
 	})
 
-	It("should have monotonically increasing restart count [Conformance]", func() {
+	// Slow by design (5 min)
+	It("should have monotonically increasing restart count [Conformance] [Slow]", func() {
 		runLivenessTest(framework.Client, framework.Namespace.Name, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-http",
@@ -936,7 +937,8 @@ var _ = Describe("Pods", func() {
 		}
 	})
 
-	It("should cap back-off at MaxContainerBackOff", func() {
+	// Slow issue #19027 (20 mins)
+	It("should cap back-off at MaxContainerBackOff [Slow]", func() {
 		podClient := framework.Client.Pods(framework.Namespace.Name)
 		podName := "back-off-cap"
 		containerName := "back-off-cap"
