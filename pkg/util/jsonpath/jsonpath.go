@@ -205,7 +205,7 @@ func (j *JSONPath) evalIdentifier(input []reflect.Value, node *IdentifierNode) (
 			return results, fmt.Errorf("not in range, nothing to end")
 		}
 	default:
-		return input, fmt.Errorf("unrecongnized identifier %v", node.Name)
+		return input, fmt.Errorf("unrecognized identifier %v", node.Name)
 	}
 	return results, nil
 }
@@ -216,7 +216,10 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 	for _, value := range input {
 
 		value, isNil := template.Indirect(value)
-		if isNil || (value.Kind() != reflect.Array && value.Kind() != reflect.Slice) {
+		if isNil {
+			continue
+		}
+		if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
 			return input, fmt.Errorf("%v is not array or slice", value.Type())
 		}
 		params := node.Params
@@ -404,7 +407,7 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 		value, _ = template.Indirect(value)
 
 		if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
-			return input, fmt.Errorf("%v is not array or slice", value)
+			return input, fmt.Errorf("%v is not array or slice and cannot be filtered", value)
 		}
 		for i := 0; i < value.Len(); i++ {
 			temp := []reflect.Value{value.Index(i)}
