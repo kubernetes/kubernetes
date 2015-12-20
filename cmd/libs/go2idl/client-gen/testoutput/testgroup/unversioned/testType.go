@@ -79,18 +79,11 @@ func (c *testTypes) Update(testType *testgroup.TestType) (result *testgroup.Test
 
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.
 func (c *testTypes) Delete(name string, options *api.DeleteOptions) error {
-	if options == nil {
-		return c.client.Delete().Namespace(c.ns).Resource("testTypes").Name(name).Do().Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
-	if err != nil {
-		return err
-	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("testTypes").
 		Name(name).
-		Body(body).
+		Body(options).
 		Do().
 		Error()
 }

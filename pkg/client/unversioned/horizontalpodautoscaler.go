@@ -68,15 +68,7 @@ func (c *horizontalPodAutoscalers) Get(name string) (result *extensions.Horizont
 
 // Delete takes the name of the horizontalPodAutoscaler and deletes it.  Returns an error if one occurs.
 func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOptions) error {
-	// TODO: to make this reusable in other client libraries
-	if options == nil {
-		return c.client.Delete().Namespace(c.ns).Resource("horizontalPodAutoscalers").Name(name).Do().Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
-	if err != nil {
-		return err
-	}
-	return c.client.Delete().Namespace(c.ns).Resource("horizontalPodAutoscalers").Name(name).Body(body).Do().Error()
+	return c.client.Delete().Namespace(c.ns).Resource("horizontalPodAutoscalers").Name(name).Body(options).Do().Error()
 }
 
 // Create takes the representation of a horizontalPodAutoscaler and creates it.  Returns the server's representation of the horizontalPodAutoscaler, and an error, if it occurs.

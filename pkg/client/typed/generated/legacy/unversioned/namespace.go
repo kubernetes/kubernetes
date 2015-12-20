@@ -78,41 +78,22 @@ func (c *namespaces) Update(namespace *api.Namespace) (result *api.Namespace, er
 
 // Delete takes name of the namespace and deletes it. Returns an error if one occurs.
 func (c *namespaces) Delete(name string, options *api.DeleteOptions) error {
-	if options == nil {
-		return c.client.Delete().Namespace(c.ns).Resource("namespaces").Name(name).Do().Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
-	if err != nil {
-		return err
-	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("namespaces").
 		Name(name).
-		Body(body).
+		Body(options).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
 func (c *namespaces) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	if options == nil {
-		return c.client.Delete().
-			NamespaceIfScoped(c.ns, len(c.ns) > 0).
-			Resource("namespaces").
-			VersionedParams(&listOptions, api.Scheme).
-			Do().
-			Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
-	if err != nil {
-		return err
-	}
 	return c.client.Delete().
 		NamespaceIfScoped(c.ns, len(c.ns) > 0).
 		Resource("namespaces").
 		VersionedParams(&listOptions, api.Scheme).
-		Body(body).
+		Body(options).
 		Do().
 		Error()
 }

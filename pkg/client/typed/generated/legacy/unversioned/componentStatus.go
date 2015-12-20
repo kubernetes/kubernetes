@@ -78,41 +78,22 @@ func (c *componentStatus) Update(componentStatus *api.ComponentStatus) (result *
 
 // Delete takes name of the componentStatus and deletes it. Returns an error if one occurs.
 func (c *componentStatus) Delete(name string, options *api.DeleteOptions) error {
-	if options == nil {
-		return c.client.Delete().Namespace(c.ns).Resource("componentStatus").Name(name).Do().Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
-	if err != nil {
-		return err
-	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("componentStatus").
 		Name(name).
-		Body(body).
+		Body(options).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
 func (c *componentStatus) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	if options == nil {
-		return c.client.Delete().
-			NamespaceIfScoped(c.ns, len(c.ns) > 0).
-			Resource("componentStatus").
-			VersionedParams(&listOptions, api.Scheme).
-			Do().
-			Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
-	if err != nil {
-		return err
-	}
 	return c.client.Delete().
 		NamespaceIfScoped(c.ns, len(c.ns) > 0).
 		Resource("componentStatus").
 		VersionedParams(&listOptions, api.Scheme).
-		Body(body).
+		Body(options).
 		Do().
 		Error()
 }
