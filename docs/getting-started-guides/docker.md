@@ -42,6 +42,7 @@ Running Kubernetes locally via Docker
 - [Test it out](#test-it-out)
 - [Run an application](#run-an-application)
 - [Expose it as a service](#expose-it-as-a-service)
+- [Deploy a DNS](#deploy-a-dns)
 - [A note on turning down your cluster](#a-note-on-turning-down-your-cluster)
 - [Troubleshooting](#troubleshooting)
 
@@ -79,12 +80,16 @@ docker run \
         --address="0.0.0.0" \
         --api-servers=http://localhost:8080 \
         --config=/etc/kubernetes/manifests \
+        --cluster-dns=10.0.0.10 \
+        --cluster-domain=cluster.local \
         --allow-privileged=true --v=10
 ```
 
+> Note that `--cluster-dns` and `--cluster-domain` is used to deploy dns, feel free to discard them if dns is not needed.
+
 This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.md) that contains the other master components.
 
-### Download ```kubectl```
+### Download `kubectl`
 
 At this point you should have a running Kubernetes cluster.  You can test this
 by downloading the kubectl binary for `${K8S_VERSION}` (look at the URL in the
@@ -117,8 +122,8 @@ $ kubectl config set-context test-doc --cluster=test-doc
 $ kubectl config use-context test-doc
 ```
 
-For Max OS X users instead of ```localhost``` you will have to use IP address of your docker machine,
-which you can find by running ```docker-machine env <machinename>``` (see [documentation](https://docs.docker.com/machine/reference/env/)
+For Max OS X users instead of `localhost` you will have to use IP address of your docker machine,
+which you can find by running `docker-machine env <machinename>` (see [documentation](https://docs.docker.com/machine/reference/env/)
 for details).
 
 ### Test it out
@@ -170,6 +175,10 @@ curl <insert-cluster-ip-here>
 
 Note that you will need run this curl command on your boot2docker VM if you are running on OS X.
 
+## Deploy a DNS
+
+See [here](docker-multinode/deployDNS.md) for instructions.
+
 ### A note on turning down your cluster
 
 Many of these containers run under the management of the `kubelet` binary, which attempts to keep containers running, even if they fail.  So, in order to turn down
@@ -179,9 +188,9 @@ You may use `docker kill $(docker ps -aq)`, note this removes _all_ containers r
 
 ### Troubleshooting
 
-#### Node is in ```NotReady``` state
+#### Node is in `NotReady` state
 
-If you see your node as ```NotReady``` it's possible that your OS does not have memcg and swap enabled.
+If you see your node as `NotReady` it's possible that your OS does not have memcg and swap enabled.
 
 1. Your kernel should support memory and swap accounting. Ensure that the
 following configs are turned on in your linux kernel:
