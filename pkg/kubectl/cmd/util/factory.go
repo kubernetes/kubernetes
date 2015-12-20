@@ -96,7 +96,7 @@ type Factory struct {
 	// overriden.
 	DefaultNamespace func() (string, bool, error)
 	// Returns the generator for the provided generator name
-	Generator func(name string) (kubectl.Generator, bool)
+	Generator func(name string) (kubectl.Generator, error)
 	// Check whether the kind of resources could be exposed
 	CanBeExposed func(kind unversioned.GroupKind) error
 	// Check whether the kind of resources could be autoscaled
@@ -317,9 +317,28 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		DefaultNamespace: func() (string, bool, error) {
 			return clientConfig.Namespace()
 		},
-		Generator: func(name string) (kubectl.Generator, bool) {
+		Generator: func(name string) (kubectl.Generator, error) {
 			generator, ok := generators[name]
-			return generator, ok
+
+			if ok {
+				return generator, nil
+			}
+			_, err := os.Stat(name)
+			if err != nil {
+				if os.IsNotExist(err) {
+					return nil, fmt.Errorf("failed to find generator for %s", name)
+				}
+				return nil, err
+			}
+			cfg, err := clientConfig.ClientConfig()
+			if err != nil {
+				return nil, err
+			}
+			generator, err = kubectl.NewGenericGeneratorFromFile(name, cfg.Codec)
+			if err != nil {
+				return nil, err
+			}
+			return generator, nil
 		},
 		CanBeExposed: func(kind unversioned.GroupKind) error {
 			switch kind {

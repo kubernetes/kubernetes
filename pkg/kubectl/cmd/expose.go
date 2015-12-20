@@ -131,9 +131,9 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 	// Get the generator, setup and validate all required parameters
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
-	generator, found := f.Generator(generatorName)
-	if !found {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generatorName))
+	generator, err := f.Generator(generatorName)
+	if err != nil {
+		return cmdutil.UsageError(cmd, fmt.Sprintf("error loading generator %q. (%v)", generatorName, err))
 	}
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
