@@ -368,7 +368,7 @@ func (s *CMServer) Run(_ []string) error {
 				metrics.DefaultHeapsterService,
 				metrics.DefaultHeapsterPort,
 			)
-			podautoscaler.NewHorizontalController(hpaClient, metricsClient).
+			podautoscaler.NewHorizontalController(hpaClient, hpaClient, hpaClient, metricsClient).
 				Run(s.HorizontalPodAutoscalerSyncPeriod)
 		}
 
