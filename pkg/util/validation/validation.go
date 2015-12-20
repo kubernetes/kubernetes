@@ -128,8 +128,15 @@ var dns952LabelRegexp = regexp.MustCompile("^" + DNS952LabelFmt + "$")
 
 // IsDNS952Label tests for a string that conforms to the definition of a label in
 // DNS (RFC 952).
-func IsDNS952Label(value string) bool {
-	return len(value) <= DNS952LabelMaxLength && dns952LabelRegexp.MatchString(value)
+func IsDNS952Label(value string) []string {
+	var errs []string
+	if len(value) > DNS952LabelMaxLength {
+		errs = append(errs, MaxLenError(DNS952LabelMaxLength))
+	}
+	if !dns952LabelRegexp.MatchString(value) {
+		errs = append(errs, RegexError(DNS952LabelFmt, "my-name", "abc-123"))
+	}
+	return errs
 }
 
 const CIdentifierFmt string = "[A-Za-z_][A-Za-z0-9_]*"

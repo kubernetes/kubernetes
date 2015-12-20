@@ -58,7 +58,6 @@ func InclusiveRangeErrorMsg(lo, hi int) string {
 	return fmt.Sprintf(`must be between %d and %d, inclusive`, lo, hi)
 }
 
-var DNS952LabelErrorMsg string = fmt.Sprintf(`must be a DNS 952 label (at most %d characters, matching regex %s): e.g. "my-name"`, validation.DNS952LabelMaxLength, validation.DNS952LabelFmt)
 var pdPartitionErrorMsg string = InclusiveRangeErrorMsg(1, 255)
 var PortRangeErrorMsg string = InclusiveRangeErrorMsg(1, 65535)
 var IdRangeErrorMsg string = InclusiveRangeErrorMsg(0, math.MaxInt32)
@@ -256,10 +255,7 @@ func NameIsDNS952Label(name string, prefix bool) []string {
 	if prefix {
 		name = maskTrailingDash(name)
 	}
-	if validation.IsDNS952Label(name) {
-		return nil
-	}
-	return []string{DNS952LabelErrorMsg}
+	return validation.IsDNS952Label(name)
 }
 
 // Validates that given value is not negative.
