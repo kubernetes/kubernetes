@@ -171,7 +171,7 @@ func TestGenericScheduler(t *testing.T) {
 		prioritizers []algorithm.PriorityConfig
 		nodes        []string
 		pod          *api.Pod
-		pods         []*api.Pod
+		pods         []api.Pod
 		expectedHost string
 		expectsErr   bool
 	}{
@@ -234,7 +234,7 @@ func TestGenericScheduler(t *testing.T) {
 				"nopods":  hasNoPodsPredicate,
 				"matches": matchesPredicate,
 			},
-			pods: []*api.Pod{
+			pods: []api.Pod{
 				{
 					ObjectMeta: api.ObjectMeta{Name: "2"},
 					Spec: api.PodSpec{
@@ -257,7 +257,7 @@ func TestGenericScheduler(t *testing.T) {
 				"nopods":  hasNoPodsPredicate,
 				"matches": matchesPredicate,
 			},
-			pods: []*api.Pod{
+			pods: []api.Pod{
 				{
 					ObjectMeta: api.ObjectMeta{Name: "2"},
 					Spec: api.PodSpec{

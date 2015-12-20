@@ -46,18 +46,8 @@ type StoreToPodLister struct {
 // that.
 //
 // TODO: converge on the interface in pkg/client.
-func (s *StoreToPodLister) List(selector labels.Selector) (pods []*api.Pod, err error) {
-	// TODO: it'd be great to just call
-	// s.Pods(api.NamespaceAll).List(selector), however then we'd have to
-	// remake the list.Items as a []*api.Pod. So leave this separate for
-	// now.
-	for _, m := range s.Store.List() {
-		pod := m.(*api.Pod)
-		if selector.Matches(labels.Set(pod.Labels)) {
-			pods = append(pods, pod)
-		}
-	}
-	return pods, nil
+func (s *StoreToPodLister) List(selector labels.Selector) (pods api.PodList, err error) {
+	return s.Pods(api.NamespaceAll).List(selector)
 }
 
 // Pods is taking baby steps to be more like the api in pkg/client
