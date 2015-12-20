@@ -1155,7 +1155,7 @@ func TestValidateEnv(t *testing.T) {
 		{
 			name:          "name not a C identifier",
 			envs:          []api.EnvVar{{Name: "a.b.c"}},
-			expectedError: `[0].name: Invalid value: "a.b.c": must be a C identifier (matching regex [A-Za-z_][A-Za-z0-9_]*): e.g. "my_name" or "MyName"`,
+			expectedError: `[0].name: Invalid value: "a.b.c": must match the regex`,
 		},
 		{
 			name: "value and valueFrom specified",

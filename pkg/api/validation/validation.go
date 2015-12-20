@@ -51,7 +51,6 @@ var RepairMalformedUpdates bool = true
 const isNegativeErrorMsg string = `must be greater than or equal to 0`
 const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = `field is immutable`
-const cIdentifierErrorMsg string = `must be a C identifier (matching regex ` + validation.CIdentifierFmt + `): e.g. "my_name" or "MyName"`
 const isNotIntegerErrorMsg string = `must be an integer`
 
 func InclusiveRangeErrorMsg(lo, hi int) string {
@@ -1087,8 +1086,10 @@ func validateEnv(vars []api.EnvVar, fldPath *field.Path) field.ErrorList {
 		idxPath := fldPath.Index(i)
 		if len(ev.Name) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
-		} else if !validation.IsCIdentifier(ev.Name) {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ev.Name, cIdentifierErrorMsg))
+		} else {
+			for _, msg := range validation.IsCIdentifier(ev.Name) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ev.Name, msg))
+			}
 		}
 		allErrs = append(allErrs, validateEnvVarValueFrom(ev, idxPath.Child("valueFrom"))...)
 	}
