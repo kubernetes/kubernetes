@@ -183,7 +183,8 @@ func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Sele
 	return failedContainers, containerRestartNodes.List()
 }
 
-var _ = Describe("DaemonRestart [Disruptive]", func() {
+// Flaky issues #17829, #19023
+var _ = Describe("DaemonRestart [Disruptive] [Flaky]", func() {
 
 	framework := NewFramework("daemonrestart")
 	rcName := "daemonrestart" + strconv.Itoa(numPods) + "-" + string(util.NewUUID())

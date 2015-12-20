@@ -377,7 +377,8 @@ func (cont *IngressController) Cleanup(del bool) error {
 }
 
 // Slow by design (10 min)
-var _ = Describe("GCE L7 LoadBalancer Controller [Serial] [Slow]", func() {
+// Flaky issue #17518
+var _ = Describe("GCE L7 LoadBalancer Controller [Serial] [Slow] [Flaky]", func() {
 	// These variables are initialized after framework's beforeEach.
 	var ns string
 	var addonDir string

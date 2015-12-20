@@ -91,7 +91,9 @@ var _ = Describe("Namespaces", func() {
 
 	//Confirms that namespace draining is functioning reasonably
 	//at minute intervals.
-	It("should delete fast enough (90 percent of 100 namespaces in 150 seconds)",
+	//
+	// Flaky issue #19026
+	It("should delete fast enough (90 percent of 100 namespaces in 150 seconds) [Flaky]",
 		func() { extinguish(c, 100, 10, 150) })
 
 	//comprehensive draining ; uncomment after #7372
