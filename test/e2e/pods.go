@@ -897,7 +897,8 @@ var _ = Describe("Pods", func() {
 		}
 	})
 
-	It("should not back-off restarting a container on LivenessProbe failure", func() {
+	// Flaky issue #18293
+	It("should not back-off restarting a container on LivenessProbe failure [Flaky]", func() {
 		podClient := framework.Client.Pods(framework.Namespace.Name)
 		podName := "pod-back-off-liveness"
 		containerName := "back-off-liveness"

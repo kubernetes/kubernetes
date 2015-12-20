@@ -30,7 +30,8 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = Describe("ServiceAccounts", func() {
+// Flaky issue #19024
+var _ = Describe("ServiceAccounts [Flaky]", func() {
 	f := NewFramework("svcaccounts")
 
 	It("should mount an API token into pods [Conformance]", func() {

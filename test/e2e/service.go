@@ -778,7 +778,8 @@ var _ = Describe("Services", func() {
 	})
 
 	// This test hits several load-balancer cases because LB turnup is slow.
-	It("should serve identically named services in different namespaces on different load-balancers", func() {
+	// Flaky issue #18952
+	It("should serve identically named services in different namespaces on different load-balancers [Flaky]", func() {
 		// requires ExternalLoadBalancer
 		SkipUnlessProviderIs("gce", "gke", "aws")
 
