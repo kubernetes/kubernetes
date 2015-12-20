@@ -201,7 +201,12 @@ func (b flockerBuilder) SetUpAt(dir string) error {
 		}
 	}
 
-	b.flocker.path = s.Path
+	newState, err := b.client.GetDatasetState(datasetID)
+	if err != nil {
+		return fmt.Errorf("The volume '%s' is not available in Flocker after migration.", dir)
+	}
+
+	b.flocker.path = newState.Path
 	volumeutil.SetReady(b.getMetaDir())
 	return nil
 }
