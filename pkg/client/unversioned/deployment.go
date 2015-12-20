@@ -68,14 +68,7 @@ func (c *deployments) Get(name string) (result *extensions.Deployment, err error
 
 // Delete takes name of the deployment and deletes it. Returns an error if one occurs.
 func (c *deployments) Delete(name string, options *api.DeleteOptions) error {
-	if options == nil {
-		return c.client.Delete().Namespace(c.ns).Resource("deployments").Name(name).Do().Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
-	if err != nil {
-		return err
-	}
-	return c.client.Delete().Namespace(c.ns).Resource("deployments").Name(name).Body(body).Do().Error()
+	return c.client.Delete().Namespace(c.ns).Resource("deployments").Name(name).Body(options).Do().Error()
 }
 
 // Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.

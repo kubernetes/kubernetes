@@ -187,24 +187,11 @@ func (e *events) Delete(name string) error {
 
 // DeleteCollection deletes a collection of objects.
 func (e *events) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	// TODO: to make this reusable in other client libraries
-	if options == nil {
-		return e.client.Delete().
-			NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
-			Resource("events").
-			VersionedParams(&listOptions, api.Scheme).
-			Do().
-			Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, e.client.APIVersion().String())
-	if err != nil {
-		return err
-	}
 	return e.client.Delete().
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
 		VersionedParams(&listOptions, api.Scheme).
-		Body(body).
+		Body(options).
 		Do().
 		Error()
 }

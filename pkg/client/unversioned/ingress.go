@@ -79,15 +79,7 @@ func (c *ingress) Update(ingress *extensions.Ingress) (result *extensions.Ingres
 
 // Delete deletes a ingress, returns error if one occurs.
 func (c *ingress) Delete(name string, options *api.DeleteOptions) (err error) {
-	if options == nil {
-		return c.r.Delete().Namespace(c.ns).Resource("ingresses").Name(name).Do().Error()
-	}
-
-	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion().String())
-	if err != nil {
-		return err
-	}
-	return c.r.Delete().Namespace(c.ns).Resource("ingresses").Name(name).Body(body).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource("ingresses").Name(name).Body(options).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested ingress.

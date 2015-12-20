@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -512,6 +513,7 @@ func (r *Request) Timeout(d time.Duration) *Request {
 // If obj is a []byte, send it directly.
 // If obj is an io.Reader, use it directly.
 // If obj is a runtime.Object, marshal it correctly, and set Content-Type header.
+// If obj is a runtime.Object and nil, do nothing.
 // Otherwise, set an error.
 func (r *Request) Body(obj interface{}) *Request {
 	if r.err != nil {
@@ -532,7 +534,11 @@ func (r *Request) Body(obj interface{}) *Request {
 	case io.Reader:
 		r.body = t
 	case runtime.Object:
-		data, err := r.codec.Encode(t)
+		// callers may pass typed interface pointers, therefore we must check nil with reflection
+		if reflect.ValueOf(t).IsNil() {
+			return r
+		}
+		data, err := runtime.Encode(r.codec, t)
 		if err != nil {
 			r.err = err
 			return r
