@@ -34,6 +34,7 @@ import (
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -65,7 +66,8 @@ type JobController struct {
 	// Jobs that need to be updated
 	queue *workqueue.Type
 
-	recorder record.EventRecorder
+	recorder  record.EventRecorder
+	queuedJob sets.String
 }
 
 func NewJobController(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc) *JobController {
@@ -82,6 +84,7 @@ func NewJobController(kubeClient client.Interface, resyncPeriod controller.Resyn
 		expectations: controller.NewControllerExpectations(),
 		queue:        workqueue.New(),
 		recorder:     eventBroadcaster.NewRecorder(api.EventSource{Component: "job-controller"}),
+		queuedJob:    make(sets.String),
 	}
 
 	jm.jobStore.Store, jm.jobController = framework.NewInformer(
@@ -255,6 +258,16 @@ func (jm *JobController) enqueueController(obj interface{}) {
 	// all controllers there will still be some replica instability. One way to handle this is
 	// by querying the store for all controllers that this rc overlaps, as well as all
 	// controllers that overlap this rc, and sorting them.
+	// Instead of insert the key directly, check if this key is in the queue already
+	// If it isn't or this key is in the head of the queue, insert the key, otherwise, abort.
+	// If the controller fail and restart, both queue and queuedJob will be lost
+	// everything need to be start over.
+	if jm.queuedJob.Has(key) {
+		if jm.queue.Peek() != key {
+			return
+		}
+	}
+	jm.queuedJob.Insert(key)
 	jm.queue.Add(key)
 }
 
