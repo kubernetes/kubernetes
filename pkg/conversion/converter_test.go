@@ -221,6 +221,55 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	}
 }
 
+func TestConverter_IgnoredConversion(t *testing.T) {
+	type A struct{}
+	type B struct{}
+
+	count := 0
+	c := NewConverter()
+	if err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
+		count++
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if err := c.RegisterIgnoredConversion(&A{}, &B{}); err != nil {
+		t.Fatal(err)
+	}
+	a := A{}
+	b := B{}
+	if err := c.Convert(&a, &b, 0, nil); err != nil {
+		t.Errorf("%v", err)
+	}
+	if count != 0 {
+		t.Errorf("unexpected number of conversion invocations")
+	}
+}
+
+func TestConverter_IgnoredConversionNested(t *testing.T) {
+	type C string
+	type A struct {
+		C C
+	}
+	type B struct {
+		C C
+	}
+
+	c := NewConverter()
+	typed := C("")
+	if err := c.RegisterIgnoredConversion(&typed, &typed); err != nil {
+		t.Fatal(err)
+	}
+	a := A{C: C("test")}
+	b := B{C: C("other")}
+	if err := c.Convert(&a, &b, AllowDifferentFieldTypeNames, nil); err != nil {
+		t.Errorf("%v", err)
+	}
+	if b.C != C("other") {
+		t.Errorf("expected no conversion of field C: %#v", b)
+	}
+}
+
 func TestConverter_GeneratedConversionOverriden(t *testing.T) {
 	type A struct{}
 	type B struct{}
@@ -239,6 +288,37 @@ func TestConverter_GeneratedConversionOverriden(t *testing.T) {
 	a := A{}
 	b := B{}
 	if err := c.Convert(&a, &b, 0, nil); err != nil {
+		t.Errorf("%v", err)
+	}
+}
+
+func TestConverter_WithConversionOverriden(t *testing.T) {
+	type A struct{}
+	type B struct{}
+	c := NewConverter()
+	if err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
+		return fmt.Errorf("conversion function should be overriden")
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if err := c.RegisterGeneratedConversionFunc(func(in *A, out *B, s Scope) error {
+		return fmt.Errorf("generated function should be overriden")
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	ext := NewConversionFuncs()
+	ext.Register(func(in *A, out *B, s Scope) error {
+		return nil
+	})
+	newc := c.WithConversions(ext)
+
+	a := A{}
+	b := B{}
+	if err := c.Convert(&a, &b, 0, nil); err == nil || err.Error() != "conversion function should be overriden" {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := newc.Convert(&a, &b, 0, nil); err != nil {
 		t.Errorf("%v", err)
 	}
 }
