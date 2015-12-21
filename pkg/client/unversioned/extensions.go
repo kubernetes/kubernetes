@@ -17,8 +17,7 @@ limitations under the License.
 package unversioned
 
 import (
-	"fmt"
-
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
@@ -121,12 +120,7 @@ func setExtensionsDefaults(config *Config) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
-	if err != nil {
-		return fmt.Errorf("Extensions API group/version '%v' is not recognized (valid values: %v)",
-			config.GroupVersion, registered.GroupOrDie(extensions.GroupName).GroupVersions)
-	}
-	config.Codec = versionInterfaces.Codec
+	config.Codec = api.Codecs.LegacyCodec(*config.GroupVersion)
 	if config.QPS == 0 {
 		config.QPS = 5
 	}

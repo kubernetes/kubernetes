@@ -222,7 +222,7 @@ func TestSetsCodec(t *testing.T) {
 		if e, a := expected.Prefix, client.RESTClient.versionedAPIPath; e != a {
 			t.Errorf("expected %#v, got %#v", e, a)
 		}
-		if e, a := expected.Codec, client.RESTClient.Codec; e != a {
+		if e, a := expected.Codec, client.RESTClient.Codec; !reflect.DeepEqual(e, a) {
 			t.Errorf("expected %#v, got %#v", e, a)
 		}
 	}
