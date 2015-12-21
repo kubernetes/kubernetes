@@ -29,7 +29,7 @@ var logFlushFreq = pflag.Duration("log-flush-frequency", 5*time.Second, "Maximum
 
 // TODO(thockin): This is temporary until we agree on log dirs and put those into each cmd.
 func init() {
-	flag.Set("logtostderr", "true")
+	flag.Set("logtostderr", "false")
 }
 
 // GlogWriter serves as a bridge between the standard log package and the glog package.
