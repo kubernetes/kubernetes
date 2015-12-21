@@ -19,6 +19,7 @@ package v1
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -39,7 +40,7 @@ func addKnownTypes() {
 	)
 
 	api.Scheme.AddKnownTypes(SchemeGroupVersion,
-		&unversioned.ListOptions{})
+		&v1.ListOptions{})
 }
 
 func (obj *TestType) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }

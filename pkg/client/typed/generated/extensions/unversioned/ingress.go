@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -33,9 +32,10 @@ type IngressInterface interface {
 	Create(*extensions.Ingress) (*extensions.Ingress, error)
 	Update(*extensions.Ingress) (*extensions.Ingress, error)
 	Delete(name string, options *api.DeleteOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*extensions.Ingress, error)
-	List(opts unversioned.ListOptions) (*extensions.IngressList, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	List(opts api.ListOptions) (*extensions.IngressList, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // ingresses implements IngressInterface
@@ -95,6 +95,29 @@ func (c *ingresses) Delete(name string, options *api.DeleteOptions) error {
 		Error()
 }
 
+// DeleteCollection deletes a collection of objects.
+func (c *ingresses) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	if options == nil {
+		return c.client.Delete().
+			NamespaceIfScoped(c.ns, len(c.ns) > 0).
+			Resource("ingresses").
+			VersionedParams(&listOptions, api.Scheme).
+			Do().
+			Error()
+	}
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
+	if err != nil {
+		return err
+	}
+	return c.client.Delete().
+		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Resource("ingresses").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(body).
+		Do().
+		Error()
+}
+
 // Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
 func (c *ingresses) Get(name string) (result *extensions.Ingress, err error) {
 	result = &extensions.Ingress{}
@@ -108,7 +131,7 @@ func (c *ingresses) Get(name string) (result *extensions.Ingress, err error) {
 }
 
 // List takes label and field selectors, and returns the list of Ingresses that match those selectors.
-func (c *ingresses) List(opts unversioned.ListOptions) (result *extensions.IngressList, err error) {
+func (c *ingresses) List(opts api.ListOptions) (result *extensions.IngressList, err error) {
 	result = &extensions.IngressList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -120,7 +143,7 @@ func (c *ingresses) List(opts unversioned.ListOptions) (result *extensions.Ingre
 }
 
 // Watch returns a watch.Interface that watches the requested ingresses.
-func (c *ingresses) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *ingresses) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

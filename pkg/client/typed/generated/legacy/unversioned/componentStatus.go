@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,9 +31,10 @@ type ComponentStatusInterface interface {
 	Create(*api.ComponentStatus) (*api.ComponentStatus, error)
 	Update(*api.ComponentStatus) (*api.ComponentStatus, error)
 	Delete(name string, options *api.DeleteOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.ComponentStatus, error)
-	List(opts unversioned.ListOptions) (*api.ComponentStatusList, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	List(opts api.ListOptions) (*api.ComponentStatusList, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // componentStatus implements ComponentStatusInterface
@@ -94,6 +94,29 @@ func (c *componentStatus) Delete(name string, options *api.DeleteOptions) error 
 		Error()
 }
 
+// DeleteCollection deletes a collection of objects.
+func (c *componentStatus) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	if options == nil {
+		return c.client.Delete().
+			NamespaceIfScoped(c.ns, len(c.ns) > 0).
+			Resource("componentStatus").
+			VersionedParams(&listOptions, api.Scheme).
+			Do().
+			Error()
+	}
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
+	if err != nil {
+		return err
+	}
+	return c.client.Delete().
+		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Resource("componentStatus").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(body).
+		Do().
+		Error()
+}
+
 // Get takes name of the componentStatus, and returns the corresponding componentStatus object, and an error if there is any.
 func (c *componentStatus) Get(name string) (result *api.ComponentStatus, err error) {
 	result = &api.ComponentStatus{}
@@ -107,7 +130,7 @@ func (c *componentStatus) Get(name string) (result *api.ComponentStatus, err err
 }
 
 // List takes label and field selectors, and returns the list of ComponentStatus that match those selectors.
-func (c *componentStatus) List(opts unversioned.ListOptions) (result *api.ComponentStatusList, err error) {
+func (c *componentStatus) List(opts api.ListOptions) (result *api.ComponentStatusList, err error) {
 	result = &api.ComponentStatusList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -119,7 +142,7 @@ func (c *componentStatus) List(opts unversioned.ListOptions) (result *api.Compon
 }
 
 // Watch returns a watch.Interface that watches the requested componentStatus.
-func (c *componentStatus) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *componentStatus) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

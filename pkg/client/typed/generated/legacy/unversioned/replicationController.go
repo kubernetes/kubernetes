@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,9 +31,10 @@ type ReplicationControllerInterface interface {
 	Create(*api.ReplicationController) (*api.ReplicationController, error)
 	Update(*api.ReplicationController) (*api.ReplicationController, error)
 	Delete(name string, options *api.DeleteOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.ReplicationController, error)
-	List(opts unversioned.ListOptions) (*api.ReplicationControllerList, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	List(opts api.ListOptions) (*api.ReplicationControllerList, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // replicationControllers implements ReplicationControllerInterface
@@ -94,6 +94,29 @@ func (c *replicationControllers) Delete(name string, options *api.DeleteOptions)
 		Error()
 }
 
+// DeleteCollection deletes a collection of objects.
+func (c *replicationControllers) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	if options == nil {
+		return c.client.Delete().
+			NamespaceIfScoped(c.ns, len(c.ns) > 0).
+			Resource("replicationControllers").
+			VersionedParams(&listOptions, api.Scheme).
+			Do().
+			Error()
+	}
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
+	if err != nil {
+		return err
+	}
+	return c.client.Delete().
+		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Resource("replicationControllers").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(body).
+		Do().
+		Error()
+}
+
 // Get takes name of the replicationController, and returns the corresponding replicationController object, and an error if there is any.
 func (c *replicationControllers) Get(name string) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
@@ -107,7 +130,7 @@ func (c *replicationControllers) Get(name string) (result *api.ReplicationContro
 }
 
 // List takes label and field selectors, and returns the list of ReplicationControllers that match those selectors.
-func (c *replicationControllers) List(opts unversioned.ListOptions) (result *api.ReplicationControllerList, err error) {
+func (c *replicationControllers) List(opts api.ListOptions) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -119,7 +142,7 @@ func (c *replicationControllers) List(opts unversioned.ListOptions) (result *api
 }
 
 // Watch returns a watch.Interface that watches the requested replicationControllers.
-func (c *replicationControllers) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *replicationControllers) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
