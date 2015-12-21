@@ -186,7 +186,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	taskInfo, err := podTask.BuildTaskInfo()
 	assert.Equal(t, nil, err, "must be able to build task info")
 
-	data, err := testapi.Default.Codec().Encode(pod)
+	data, err := runtime.Encode(testapi.Default.Codec(), pod)
 	assert.Equal(t, nil, err, "must be able to encode a pod's spec data")
 	taskInfo.Data = data
 	var statusUpdateCalls sync.WaitGroup
@@ -400,7 +400,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 	taskInfo, err := podTask.BuildTaskInfo()
 	assert.Equal(t, nil, err, "must be able to build task info")
 
-	data, _ := testapi.Default.Codec().Encode(pod)
+	data, _ := runtime.Encode(testapi.Default.Codec(), pod)
 	taskInfo.Data = data
 
 	mockDriver.On(

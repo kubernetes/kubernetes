@@ -39,7 +39,7 @@ func TestDecoder(t *testing.T) {
 		expect := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 		encoder := json.NewEncoder(in)
 		go func() {
-			data, err := testapi.Default.Codec().Encode(expect)
+			data, err := runtime.Encode(testapi.Default.Codec(), expect)
 			if err != nil {
 				t.Fatalf("Unexpected error %v", err)
 			}
