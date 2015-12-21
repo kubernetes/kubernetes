@@ -21,13 +21,14 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestNewClient(t *testing.T) {
-	o := NewObjects(api.Scheme, api.Scheme)
-	if err := AddObjectsFromPath("../../../../examples/guestbook/frontend-service.yaml", o, api.Scheme); err != nil {
+	o := NewObjects(api.Scheme, latest.Codecs.UniversalDecoder())
+	if err := AddObjectsFromPath("../../../../examples/guestbook/frontend-service.yaml", o, latest.Codecs.UniversalDecoder()); err != nil {
 		t.Fatal(err)
 	}
 	client := &Fake{}
@@ -52,7 +53,7 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestErrors(t *testing.T) {
-	o := NewObjects(api.Scheme, api.Scheme)
+	o := NewObjects(api.Scheme, latest.Codecs.UniversalDecoder())
 	o.Add(&api.List{
 		Items: []runtime.Object{
 			// This first call to List will return this error

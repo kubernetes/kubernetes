@@ -30,6 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 )
 
+const nameRequiredError = "resource name may not be empty"
+
 func TestGetServerVersion(t *testing.T) {
 	expect := version.Info{
 		Major:     "foo",
@@ -73,7 +75,7 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 		}
 		output, err := json.Marshal(obj)
 		if err != nil {
-			t.Errorf("unexpected encoding error: %v", err)
+			t.Fatalf("unexpected encoding error: %v", err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -84,7 +86,7 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 	// ServerGroups should not return an error even if server returns error at /api and /apis
 	apiGroupList, err := client.Discovery().ServerGroups()
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	groupVersions := ExtractGroupVersions(apiGroupList)
 	if !reflect.DeepEqual(groupVersions, []string{"v1"}) {

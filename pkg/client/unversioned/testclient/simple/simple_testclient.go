@@ -208,7 +208,7 @@ func body(t *testing.T, obj runtime.Object, raw *string) *string {
 		if !found {
 			t.Errorf("Group %s is not registered in testapi", fqKind.GroupVersion().Group)
 		}
-		bs, err = g.Codec().Encode(obj)
+		bs, err = runtime.Encode(g.Codec(), obj)
 		if err != nil {
 			t.Errorf("unexpected encoding error: %v", err)
 		}

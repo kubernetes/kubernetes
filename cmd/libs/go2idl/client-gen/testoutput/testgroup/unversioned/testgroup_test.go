@@ -40,7 +40,7 @@ func init() {
 		return
 	}
 	testapi.Groups[testgroup.SchemeGroupVersion.Group] = testapi.NewTestGroup(
-		unversioned.GroupVersion{Group: testgroup.SchemeGroupVersion.Group, Version: latest.GroupOrDie(testgroup.SchemeGroupVersion.Group).GroupVersion.Version},
+		latest.GroupOrDie(testgroup.SchemeGroupVersion.Group).GroupVersion,
 		testgroup.SchemeGroupVersion)
 	testHelper = testapi.Groups[testgroup.SchemeGroupVersion.Group]
 }

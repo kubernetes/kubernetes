@@ -448,7 +448,7 @@ func (r *Request) VersionedParams(obj runtime.Object, convertor runtime.ObjectCo
 				continue
 			}
 			if k == unversioned.FieldSelectorQueryParam(r.groupVersion.String()) {
-				if value == "" {
+				if len(value) == 0 {
 					// Don't set an empty selector for backward compatibility.
 					// Since there is no way to get the difference between empty
 					// and unspecified string, we don't set it to avoid having
@@ -713,7 +713,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 			return nil, fmt.Errorf("%v while accessing %v", resp.Status, url)
 		}
 
-		if runtimeObject, err := r.codec.Decode(bodyBytes); err == nil {
+		if runtimeObject, err := runtime.Decode(r.codec, bodyBytes); err == nil {
 			statusError := errors.FromObject(runtimeObject)
 
 			if _, ok := statusError.(errors.APIStatus); ok {
@@ -842,8 +842,10 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 
 	// Did the server give us a status response?
 	isStatusResponse := false
-	var status unversioned.Status
-	if err := r.codec.DecodeInto(body, &status); err == nil && status.Status != "" {
+	var status *unversioned.Status
+	result, err := runtime.Decode(r.codec, body)
+	if out, ok := result.(*unversioned.Status); err == nil && ok && len(out.Status) > 0 {
+		status = out
 		isStatusResponse = true
 	}
 
@@ -854,14 +856,14 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		if !isStatusResponse {
 			return Result{err: r.transformUnstructuredResponseError(resp, req, body)}
 		}
-		return Result{err: errors.FromObject(&status)}
+		return Result{err: errors.FromObject(status)}
 	}
 
 	// If the server gave us a status back, look at what it was.
 	success := resp.StatusCode >= http.StatusOK && resp.StatusCode <= http.StatusPartialContent
 	if isStatusResponse && (status.Status != unversioned.StatusSuccess && !success) {
 		// "Failed" requests are clearly just an error and it makes sense to return them as such.
-		return Result{err: errors.FromObject(&status)}
+		return Result{err: errors.FromObject(status)}
 	}
 
 	return Result{
@@ -961,7 +963,8 @@ func (r Result) Get() (runtime.Object, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	return r.codec.Decode(r.body)
+	obj, err := runtime.Decode(r.codec, r.body)
+	return obj, err
 }
 
 // StatusCode returns the HTTP status code of the request. (Only valid if no
@@ -971,12 +974,12 @@ func (r Result) StatusCode(statusCode *int) Result {
 	return r
 }
 
-// Into stores the result into obj, if possible.
+// Into stores the result into obj, if possible. If obj is nil it is ignored.
 func (r Result) Into(obj runtime.Object) error {
 	if r.err != nil {
 		return r.err
 	}
-	return r.codec.DecodeInto(r.body, obj)
+	return runtime.DecodeInto(r.codec, r.body, obj)
 }
 
 // WasCreated updates the provided bool pointer to whether the server returned

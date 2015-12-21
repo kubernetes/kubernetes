@@ -17,7 +17,6 @@ limitations under the License.
 package unversioned
 
 import (
-	"fmt"
 	latest "k8s.io/kubernetes/pkg/api/latest"
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
 )
@@ -104,12 +103,7 @@ func setConfigDefaults(config *unversioned.Config) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
-	if err != nil {
-		return fmt.Errorf("Extensions API version '%s' is not recognized (valid values: %s)",
-			config.GroupVersion, g.GroupVersions)
-	}
-	config.Codec = versionInterfaces.Codec
+	config.Codec = latest.Codecs.LegacyCodec(*config.GroupVersion)
 	if config.QPS == 0 {
 		config.QPS = 5
 	}

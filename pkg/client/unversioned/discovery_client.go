@@ -19,9 +19,10 @@ package unversioned
 import (
 	"net/url"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // DiscoveryInterface holds the methods that discover server-supported API groups,
@@ -141,8 +142,7 @@ func (d *DiscoveryClient) ServerResources() (map[string]*unversioned.APIResource
 func setDiscoveryDefaults(config *Config) error {
 	config.Prefix = ""
 	config.GroupVersion = nil
-	// Discovery client deals with unversioned objects, so we use api.Codec.
-	config.Codec = api.Codec
+	config.Codec = runtime.NoopEncoder{latest.Codecs.UniversalDecoder()}
 	return nil
 }
 
