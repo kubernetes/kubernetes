@@ -102,15 +102,9 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("incorrect groupVersion: %v", mapping)
 		}
 
-<<<<<<< HEAD
 		interfaces, _ := registered.GroupOrDie(extensions.GroupName).InterfacesFor(version)
-		if mapping.Codec != interfaces.Codec {
-			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
-=======
-		interfaces, _ := latest.GroupOrDie(extensions.GroupName).InterfacesFor(version)
 		if mapping.ObjectConvertor != interfaces.ObjectConvertor {
 			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
->>>>>>> e776ada... Switch API objects to not register per version codecs
 		}
 
 		rc := &extensions.HorizontalPodAutoscaler{ObjectMeta: api.ObjectMeta{Name: "foo"}}

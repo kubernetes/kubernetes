@@ -83,6 +83,7 @@ func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.A
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	_, etcdserver, config, assert := setUp(t)
 
+	config.Serializer = api.Codecs
 	config.KubeletClient = client.FakeKubeletClient{}
 
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
@@ -496,7 +497,6 @@ func decodeResponse(resp *http.Response, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-
 	if err := json.Unmarshal(data, obj); err != nil {
 		return err
 	}
