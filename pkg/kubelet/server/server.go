@@ -119,6 +119,8 @@ func ListenAndServeKubeletServer(
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
+		ReadTimeout:    60 * time.Minute,
+		WriteTimeout:   60 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
 	if tlsOptions != nil {
@@ -137,6 +139,8 @@ func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer st
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &s,
+		ReadTimeout:    60 * time.Minute,
+		WriteTimeout:   60 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
 	glog.Fatal(server.ListenAndServe())
