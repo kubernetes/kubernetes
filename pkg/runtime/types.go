@@ -36,30 +36,10 @@ type TypeMeta struct {
 	Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
 }
 
-// PluginBase is like TypeMeta, but it's intended for plugin objects that won't ever be encoded
-// except while embedded in other objects.
-type PluginBase struct {
-	Kind string `json:"kind,omitempty"`
-}
-
-// EmbeddedObject has appropriate encoder and decoder functions, such that on the wire, it's
-// stored as a []byte, but in memory, the contained object is accessible as an Object
-// via the Get() function. Only valid API objects may be stored via EmbeddedObject.
-// The purpose of this is to allow an API object of type known only at runtime to be
-// embedded within other API objects.
-//
-// Note that object assumes that you've registered all of your api types with the api package.
-//
-// EmbeddedObject and RawExtension can be used together to allow for API object extensions:
-// see the comment for RawExtension.
-type EmbeddedObject struct {
-	Object
-}
-
-// RawExtension is used with EmbeddedObject to do a two-phase encoding of extension objects.
+// RawExtension is used to hold extensions in external versions.
 //
 // To use this, make a field which has RawExtension as its type in your external, versioned
-// struct, and EmbeddedObject in your internal struct. You also need to register your
+// struct, and Object in your internal struct. You also need to register your
 // various plugin types.
 //
 // // Internal package:
@@ -68,7 +48,6 @@ type EmbeddedObject struct {
 //	MyPlugin runtime.EmbeddedObject `json:"myPlugin"`
 // }
 // type PluginA struct {
-// 	runtime.PluginBase `json:",inline"`
 //	AOption string `json:"aOption"`
 // }
 //
@@ -78,7 +57,6 @@ type EmbeddedObject struct {
 //	MyPlugin runtime.RawExtension `json:"myPlugin"`
 // }
 // type PluginA struct {
-// 	runtime.PluginBase `json:",inline"`
 //	AOption string `json:"aOption"`
 // }
 //
@@ -102,7 +80,11 @@ type EmbeddedObject struct {
 //
 // +protobuf=true
 type RawExtension struct {
+	// RawJSON is the underlying serialization of this object.
 	RawJSON []byte
+	// Object can hold a representation of this extension - useful for working with versioned
+	// structs.
+	Object Object `json:"-"`
 }
 
 // Unknown allows api objects with unknown types to be passed-through. This can be used

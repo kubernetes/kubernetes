@@ -20,16 +20,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-// SetGroupVersionKind satisfies the ObjectKind interface for all objects that embed PluginBase
-func (obj *PluginBase) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
-	_, obj.Kind = gvk.ToAPIVersionAndKind()
-}
-
-// GroupVersionKind satisfies the ObjectKind interface for all objects that embed PluginBase
-func (obj *PluginBase) GroupVersionKind() *unversioned.GroupVersionKind {
-	return unversioned.FromAPIVersionAndKind("", obj.Kind)
-}
-
 // SetGroupVersionKind satisfies the ObjectKind interface for all objects that embed TypeMeta
 func (obj *TypeMeta) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()

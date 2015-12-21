@@ -23,6 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type TypeMeta struct {
@@ -60,11 +62,10 @@ func (obj *ExternalSimple) SetGroupVersionKind(gvk *unversioned.GroupVersionKind
 }
 
 func TestScheme(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
 	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "testExternal"}
 
 	scheme := runtime.NewScheme()
-	scheme.AddInternalGroupVersion(internalGV)
 	scheme.AddKnownTypeWithName(internalGV.WithKind("Simple"), &InternalSimple{})
 	scheme.AddKnownTypeWithName(externalGV.WithKind("Simple"), &ExternalSimple{})
 
@@ -102,19 +103,24 @@ func TestScheme(t *testing.T) {
 		},
 	)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
+
+	codecs := serializer.NewCodecFactory(scheme)
+	codec := codecs.LegacyCodec(externalGV)
+	jsonserializer, _ := codecs.SerializerForFileExtension("json")
+
 	simple := &InternalSimple{
 		TestString: "foo",
 	}
 
 	// Test Encode, Decode, DecodeInto, and DecodeToVersion
 	obj := runtime.Object(simple)
-	data, err := scheme.EncodeToVersion(obj, externalGV.String())
-	obj2, err2 := runtime.Decode(scheme, data)
+	data, err := runtime.Encode(codec, obj)
+	obj2, err2 := runtime.Decode(codec, data)
 	obj3 := &InternalSimple{}
-	err3 := runtime.DecodeInto(scheme, data, obj3)
-	obj4, err4 := scheme.DecodeToVersion(data, externalGV)
+	err3 := runtime.DecodeInto(codec, data, obj3)
+	obj4, err4 := runtime.Decode(jsonserializer, data)
 	if err != nil || err2 != nil || err3 != nil || err4 != nil {
 		t.Fatalf("Failure: '%v' '%v' '%v' '%v'", err, err2, err3, err4)
 	}
@@ -124,6 +130,7 @@ func TestScheme(t *testing.T) {
 	if e, a := simple, obj2; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
 	}
+	simple.TypeMeta = TypeMeta{Kind: "Simple", APIVersion: externalGV.String()}
 	if e, a := simple, obj3; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
 	}
@@ -135,7 +142,7 @@ func TestScheme(t *testing.T) {
 	external := &ExternalSimple{}
 	err = scheme.Convert(simple, external)
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 	if e, a := simple.TestString, external.TestString; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
@@ -145,36 +152,23 @@ func TestScheme(t *testing.T) {
 	if e, a := 2, internalToExternalCalls; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
-	// Decode and DecodeInto should each have caused an increment.
+	// DecodeInto and Decode should each have caused an increment because of a conversion
 	if e, a := 2, externalToInternalCalls; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 }
 
-func TestInvalidObjectValueKind(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Group: "", Version: ""}
-
-	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName(internalGV.WithKind("Simple"), &InternalSimple{})
-
-	embedded := &runtime.EmbeddedObject{}
-	switch obj := embedded.Object.(type) {
-	default:
-		_, err := scheme.ObjectKind(obj)
-		if err == nil {
-			t.Errorf("Expected error on invalid kind")
-		}
-	}
-}
-
 func TestBadJSONRejection(t *testing.T) {
 	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+	jsonserializer, _ := codecs.SerializerForFileExtension("json")
+
 	badJSONMissingKind := []byte(`{ }`)
-	if _, err := runtime.Decode(scheme, badJSONMissingKind); err == nil {
+	if _, err := runtime.Decode(jsonserializer, badJSONMissingKind); err == nil {
 		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
 	}
 	badJSONUnknownType := []byte(`{"kind": "bar"}`)
-	if _, err1 := runtime.Decode(scheme, badJSONUnknownType); err1 == nil {
+	if _, err1 := runtime.Decode(jsonserializer, badJSONUnknownType); err1 == nil {
 		t.Errorf("Did not reject despite use of unknown type: %s", badJSONUnknownType)
 	}
 	/*badJSONKindMismatch := []byte(`{"kind": "Pod"}`)
@@ -184,13 +178,13 @@ func TestBadJSONRejection(t *testing.T) {
 }
 
 type ExtensionA struct {
-	runtime.PluginBase `json:",inline"`
-	TestString         string `json:"testString"`
+	TypeMeta   `json:",inline"`
+	TestString string `json:"testString"`
 }
 
 type ExtensionB struct {
-	runtime.PluginBase `json:",inline"`
-	TestString         string `json:"testString"`
+	TypeMeta   `json:",inline"`
+	TestString string `json:"testString"`
 }
 
 type ExternalExtensionType struct {
@@ -200,7 +194,7 @@ type ExternalExtensionType struct {
 
 type InternalExtensionType struct {
 	TypeMeta  `json:",inline"`
-	Extension runtime.EmbeddedObject `json:"extension"`
+	Extension runtime.Object `json:"extension"`
 }
 
 type ExternalOptionalExtensionType struct {
@@ -210,143 +204,135 @@ type ExternalOptionalExtensionType struct {
 
 type InternalOptionalExtensionType struct {
 	TypeMeta  `json:",inline"`
-	Extension runtime.EmbeddedObject `json:"extension,omitempty"`
+	Extension runtime.Object `json:"extension,omitempty"`
 }
 
-func (obj *ExtensionA) GetObjectKind() unversioned.ObjectKind { return &obj.PluginBase }
-func (obj *ExtensionA) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
-	_, obj.PluginBase.Kind = gvk.ToAPIVersionAndKind()
-}
-func (obj *ExtensionB) GetObjectKind() unversioned.ObjectKind { return &obj.PluginBase }
-func (obj *ExtensionB) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
-	_, obj.PluginBase.Kind = gvk.ToAPIVersionAndKind()
-}
-func (obj *ExternalExtensionType) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
-func (obj *ExternalExtensionType) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
-	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
-}
-func (obj *InternalExtensionType) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
-func (obj *InternalExtensionType) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
-	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
-}
+func (obj *ExtensionA) GetObjectKind() unversioned.ObjectKind                    { return &obj.TypeMeta }
+func (obj *ExtensionB) GetObjectKind() unversioned.ObjectKind                    { return &obj.TypeMeta }
+func (obj *ExternalExtensionType) GetObjectKind() unversioned.ObjectKind         { return &obj.TypeMeta }
+func (obj *InternalExtensionType) GetObjectKind() unversioned.ObjectKind         { return &obj.TypeMeta }
 func (obj *ExternalOptionalExtensionType) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
-func (obj *ExternalOptionalExtensionType) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
-	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
-}
 func (obj *InternalOptionalExtensionType) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
-func (obj *InternalOptionalExtensionType) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
-	obj.TypeMeta.APIVersion, obj.TypeMeta.Kind = gvk.ToAPIVersionAndKind()
-}
 
 func TestExternalToInternalMapping(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
 	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "testExternal"}
 
 	scheme := runtime.NewScheme()
-	scheme.AddInternalGroupVersion(internalGV)
 	scheme.AddKnownTypeWithName(internalGV.WithKind("OptionalExtensionType"), &InternalOptionalExtensionType{})
 	scheme.AddKnownTypeWithName(externalGV.WithKind("OptionalExtensionType"), &ExternalOptionalExtensionType{})
+
+	codec := serializer.NewCodecFactory(scheme).LegacyCodec(externalGV)
 
 	table := []struct {
 		obj     runtime.Object
 		encoded string
 	}{
 		{
-			&InternalOptionalExtensionType{Extension: runtime.EmbeddedObject{Object: nil}},
+			&InternalOptionalExtensionType{Extension: nil},
 			`{"kind":"OptionalExtensionType","apiVersion":"` + externalGV.String() + `"}`,
 		},
 	}
 
-	for _, item := range table {
-		gotDecoded, err := runtime.Decode(scheme, []byte(item.encoded))
+	for i, item := range table {
+		gotDecoded, err := runtime.Decode(codec, []byte(item.encoded))
 		if err != nil {
 			t.Errorf("unexpected error '%v' (%v)", err, item.encoded)
 		} else if e, a := item.obj, gotDecoded; !reflect.DeepEqual(e, a) {
-			var eEx, aEx runtime.Object
-			if obj, ok := e.(*InternalOptionalExtensionType); ok {
-				eEx = obj.Extension.Object
-			}
-			if obj, ok := a.(*InternalOptionalExtensionType); ok {
-				aEx = obj.Extension.Object
-			}
-			t.Errorf("expected %#v, got %#v (%#v, %#v)", e, a, eEx, aEx)
+			t.Errorf("%d: unexpected objects:\n%s", i, util.ObjectGoPrintSideBySide(e, a))
 		}
 	}
 }
 
 func TestExtensionMapping(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
 	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "testExternal"}
 
 	scheme := runtime.NewScheme()
-	scheme.AddInternalGroupVersion(internalGV)
 	scheme.AddKnownTypeWithName(internalGV.WithKind("ExtensionType"), &InternalExtensionType{})
 	scheme.AddKnownTypeWithName(internalGV.WithKind("OptionalExtensionType"), &InternalOptionalExtensionType{})
-	scheme.AddKnownTypeWithName(internalGV.WithKind("A"), &ExtensionA{})
-	scheme.AddKnownTypeWithName(internalGV.WithKind("B"), &ExtensionB{})
 	scheme.AddKnownTypeWithName(externalGV.WithKind("ExtensionType"), &ExternalExtensionType{})
 	scheme.AddKnownTypeWithName(externalGV.WithKind("OptionalExtensionType"), &ExternalOptionalExtensionType{})
+
+	// register external first when the object is the same in both schemes, so ObjectVersionAndKind reports the
+	// external version.
 	scheme.AddKnownTypeWithName(externalGV.WithKind("A"), &ExtensionA{})
 	scheme.AddKnownTypeWithName(externalGV.WithKind("B"), &ExtensionB{})
+	scheme.AddKnownTypeWithName(internalGV.WithKind("A"), &ExtensionA{})
+	scheme.AddKnownTypeWithName(internalGV.WithKind("B"), &ExtensionB{})
+
+	codec := serializer.NewCodecFactory(scheme).LegacyCodec(externalGV)
 
 	table := []struct {
-		obj     runtime.Object
-		encoded string
+		obj      runtime.Object
+		expected runtime.Object
+		encoded  string
 	}{
 		{
-			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: &ExtensionA{TestString: "foo"}}},
-			`{"kind":"ExtensionType","apiVersion":"` + externalGV.String() + `","extension":{"kind":"A","testString":"foo"}}
+			&InternalExtensionType{
+				Extension: runtime.NewEncodable(codec, &ExtensionA{TestString: "foo"}),
+			},
+			&InternalExtensionType{
+				Extension: &runtime.Unknown{
+					RawJSON: []byte(`{"kind":"A","apiVersion":"test.group/testExternal","testString":"foo"}`),
+				},
+			},
+			// apiVersion is set in the serialized object for easier consumption by clients
+			`{"kind":"ExtensionType","apiVersion":"` + externalGV.String() + `","extension":{"kind":"A","apiVersion":"test.group/testExternal","testString":"foo"}}
 `,
 		}, {
-			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: &ExtensionB{TestString: "bar"}}},
-			`{"kind":"ExtensionType","apiVersion":"` + externalGV.String() + `","extension":{"kind":"B","testString":"bar"}}
+			&InternalExtensionType{Extension: runtime.NewEncodable(codec, &ExtensionB{TestString: "bar"})},
+			&InternalExtensionType{
+				Extension: &runtime.Unknown{
+					RawJSON: []byte(`{"kind":"B","apiVersion":"test.group/testExternal","testString":"bar"}`),
+				},
+			},
+			// apiVersion is set in the serialized object for easier consumption by clients
+			`{"kind":"ExtensionType","apiVersion":"` + externalGV.String() + `","extension":{"kind":"B","apiVersion":"test.group/testExternal","testString":"bar"}}
 `,
 		}, {
-			&InternalExtensionType{Extension: runtime.EmbeddedObject{Object: nil}},
+			&InternalExtensionType{Extension: nil},
+			&InternalExtensionType{
+				Extension: nil,
+			},
 			`{"kind":"ExtensionType","apiVersion":"` + externalGV.String() + `","extension":null}
 `,
 		},
 	}
 
-	for _, item := range table {
-		gotEncoded, err := scheme.EncodeToVersion(item.obj, externalGV.String())
+	for i, item := range table {
+		gotEncoded, err := runtime.Encode(codec, item.obj)
 		if err != nil {
 			t.Errorf("unexpected error '%v' (%#v)", err, item.obj)
 		} else if e, a := item.encoded, string(gotEncoded); e != a {
 			t.Errorf("expected\n%#v\ngot\n%#v\n", e, a)
 		}
 
-		gotDecoded, err := runtime.Decode(scheme, []byte(item.encoded))
+		gotDecoded, err := runtime.Decode(codec, []byte(item.encoded))
 		if err != nil {
 			t.Errorf("unexpected error '%v' (%v)", err, item.encoded)
-		} else if e, a := item.obj, gotDecoded; !reflect.DeepEqual(e, a) {
-			var eEx, aEx runtime.Object
-			if obj, ok := e.(*InternalExtensionType); ok {
-				eEx = obj.Extension.Object
-			}
-			if obj, ok := a.(*InternalExtensionType); ok {
-				aEx = obj.Extension.Object
-			}
-			t.Errorf("expected %#v, got %#v (%#v, %#v)", e, a, eEx, aEx)
+		} else if e, a := item.expected, gotDecoded; !reflect.DeepEqual(e, a) {
+			t.Errorf("%d: unexpected objects:\n%s", i, util.ObjectGoPrintSideBySide(e, a))
 		}
 	}
 }
 
 func TestEncode(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
 	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "testExternal"}
 
 	scheme := runtime.NewScheme()
-	scheme.AddInternalGroupVersion(internalGV)
 	scheme.AddKnownTypeWithName(internalGV.WithKind("Simple"), &InternalSimple{})
 	scheme.AddKnownTypeWithName(externalGV.WithKind("Simple"), &ExternalSimple{})
-	codec := runtime.CodecFor(scheme, externalGV)
+
+	codec := serializer.NewCodecFactory(scheme).LegacyCodec(externalGV)
+
 	test := &InternalSimple{
 		TestString: "I'm the same",
 	}
 	obj := runtime.Object(test)
 	data, err := runtime.Encode(codec, obj)
-	obj2, err2 := runtime.Decode(codec, data)
+	obj2, gvk, err2 := codec.Decode(data, nil, nil)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
@@ -354,6 +340,9 @@ func TestEncode(t *testing.T) {
 		t.Fatalf("Got wrong type")
 	}
 	if !reflect.DeepEqual(obj2, test) {
-		t.Errorf("Expected:\n %#v,\n Got:\n %#v", &test, obj2)
+		t.Errorf("Expected:\n %#v,\n Got:\n %#v", test, obj2)
+	}
+	if !reflect.DeepEqual(gvk, &unversioned.GroupVersionKind{Group: "test.group", Version: "testExternal", Kind: "Simple"}) {
+		t.Errorf("unexpected gvk returned by decode: %#v", gvk)
 	}
 }
