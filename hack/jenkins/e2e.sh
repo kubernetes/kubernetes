@@ -239,7 +239,6 @@ E2E_OPT=${E2E_OPT:-""}
 # Set environment variables shared for all of the GCE Jenkins projects.
 if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
   KUBERNETES_PROVIDER="gce"
-  : ${GCE_SERVICE_ACCOUNT:=$(gcloud auth list 2> /dev/null | grep active | cut -f3 -d' ')}
   : ${E2E_MIN_STARTUP_PODS:="1"}
   : ${E2E_ZONE:="us-central1-f"}
   : ${NUM_NODES_PARALLEL:="6"}  # Number of nodes required to run all of the tests in parallel
@@ -1112,7 +1111,7 @@ export KUBE_GCS_STAGING_PATH_SUFFIX=${KUBE_GCS_STAGING_PATH_SUFFIX:-}
 export KUBE_GCE_NODE_PROJECT=${KUBE_GCE_NODE_PROJECT:-}
 export KUBE_GCE_NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-}
 export KUBE_OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-}
-export GCE_SERVICE_ACCOUNT=${GCE_SERVICE_ACCOUNT:-}
+export GCE_SERVICE_ACCOUNT=$(gcloud auth list 2> /dev/null | grep active | cut -f3 -d' ')
 
 # GKE variables
 export CLUSTER_NAME=${E2E_CLUSTER_NAME}
