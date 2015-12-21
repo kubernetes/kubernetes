@@ -68,7 +68,7 @@
                 - cluster (k8s): ci/latest.txt<br>
                 - tests: ci/latest.txt
             timeout: 300
-        - 'gke-ci-reboot:':
+        - 'gke-ci-reboot':
             description: |
                 Run e2e tests using the following config:<br>
                 - provider: GKE<br>
