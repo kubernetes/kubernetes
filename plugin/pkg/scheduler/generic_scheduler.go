@@ -82,18 +82,17 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 	if err != nil {
 		return "", err
 	}
-
-	priorityList, err := PrioritizeNodes(pod, machinesToPods, g.pods, g.prioritizers, algorithm.FakeNodeLister(filteredNodes), g.extenders)
-	if err != nil {
-		return "", err
-	}
-	if len(priorityList) == 0 {
+	if len(filteredNodes.Items) == 0 {
 		return "", &FitError{
 			Pod:              pod,
 			FailedPredicates: failedPredicateMap,
 		}
 	}
 
+	priorityList, err := PrioritizeNodes(pod, machinesToPods, g.pods, g.prioritizers, algorithm.FakeNodeLister(filteredNodes), g.extenders)
+	if err != nil {
+		return "", err
+	}
 	return g.selectHost(priorityList)
 }
 
