@@ -29,8 +29,7 @@ import (
 type WorkQueue interface {
 	// GetWork dequeues and returns all ready items.
 	GetWork() []types.UID
-	// Enqueue inserts a new item or overwrites an existing item with the
-	// new timestamp (time.Now() + delay) if it is greater.
+	// Enqueue inserts a new item or overwrites an existing item.
 	Enqueue(item types.UID, delay time.Duration)
 }
 
@@ -64,10 +63,5 @@ func (q *basicWorkQueue) GetWork() []types.UID {
 func (q *basicWorkQueue) Enqueue(item types.UID, delay time.Duration) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
-	now := q.clock.Now()
-	timestamp := now.Add(delay)
-	existing, ok := q.queue[item]
-	if !ok || (ok && existing.Before(timestamp)) {
-		q.queue[item] = timestamp
-	}
+	q.queue[item] = q.clock.Now().Add(delay)
 }
