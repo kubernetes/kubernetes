@@ -25,10 +25,12 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"runtime"
+	goruntime "runtime"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/ghodss/yaml"
@@ -53,7 +55,7 @@ func isYAML(data []byte) bool {
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
+	goruntime.GOMAXPROCS(goruntime.NumCPU())
 	flag.CommandLine.SetNormalizeFunc(util.WordSepNormalizeFunc)
 	flag.Parse()
 
@@ -74,6 +76,11 @@ func main() {
 		in = f
 	}
 
+	version, err := unversioned.ParseGroupVersion(*outputVersion)
+	if err != nil {
+		log.Fatalf("Couldn't parse version: %q", err)
+	}
+
 	data, err := ioutil.ReadAll(in)
 	if err != nil {
 		log.Fatalf("Couldn't read from input: %q", err)
@@ -86,14 +93,14 @@ func main() {
 			log.Fatalf("Failed to convert YAML to JSON: %q", err)
 		}
 	}
-	obj, err := api.Scheme.Decode(data)
+	obj, err := runtime.Decode(latest.Codecs.UniversalDecoder(), data)
 	if err != nil {
 		log.Fatalf("Couldn't decode input: %q", err)
 	}
 
-	outData, err := api.Scheme.EncodeToVersion(obj, *outputVersion)
+	outData, err := runtime.Encode(latest.Codecs.LegacyCodec(version), obj)
 	if err != nil {
-		log.Fatalf("Failed to encode to version %q: %q", *outputVersion, err)
+		log.Fatalf("Failed to encode to version %q: %q", version, err)
 	}
 
 	if isYAML {

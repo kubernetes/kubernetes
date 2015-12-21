@@ -39,11 +39,13 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/executorinfo"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -343,7 +345,7 @@ func (k *Executor) LaunchTask(driver bindings.ExecutorDriver, taskInfo *mesos.Ta
 		return
 	}
 
-	obj, err := api.Codec.Decode(taskInfo.GetData())
+	obj, err := kruntime.Decode(latest.Codecs.UniversalDecoder(), taskInfo.GetData())
 	if err != nil {
 		log.Errorf("failed to extract yaml data from the taskInfo.data %v", err)
 		k.sendStatus(driver, newStatus(taskInfo.GetTaskId(), mesos.TaskState_TASK_FAILED,

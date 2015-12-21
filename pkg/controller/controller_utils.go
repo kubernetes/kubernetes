@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -259,7 +260,17 @@ func getPodsAnnotationSet(template *api.PodTemplateSpec, object runtime.Object) 
 	if err != nil {
 		return desiredAnnotations, fmt.Errorf("unable to get controller reference: %v", err)
 	}
-	createdByRefJson, err := latest.GroupOrDie(api.GroupName).Codec.Encode(&api.SerializedReference{
+
+	serializer, ok := latest.Codecs.SerializerForFileExtension("json")
+	if !ok {
+		return nil, fmt.Errorf("no JSON serialization available")
+	}
+	// TODO: this code was not safe previously - as soon as new code came along that switched to v2, old clients
+	//   would be broken upon reading it. This is explicitly hardcoded to v1 to guarantee predictable deployment.
+	//   We need to consistently handle this case of annotation versioning.
+	codec := latest.Codecs.CodecForVersions(serializer, []unversioned.GroupVersion{{Group: "", Version: "v1"}}, nil)
+
+	createdByRefJson, err := runtime.Encode(codec, &api.SerializedReference{
 		Reference: *createdByRef,
 	})
 	if err != nil {

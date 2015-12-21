@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
@@ -163,19 +164,18 @@ func (s *SchedulerServer) Run(_ []string) error {
 }
 
 func (s *SchedulerServer) createConfig(configFactory *factory.ConfigFactory) (*scheduler.Config, error) {
-	var policy schedulerapi.Policy
-	var configData []byte
-
 	if _, err := os.Stat(s.PolicyConfigFile); err == nil {
-		configData, err = ioutil.ReadFile(s.PolicyConfigFile)
+		var (
+			policy     schedulerapi.Policy
+			configData []byte
+		)
+		configData, err := ioutil.ReadFile(s.PolicyConfigFile)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to read policy config: %v", err)
+			return nil, fmt.Errorf("unable to read policy config: %v", err)
 		}
-		err = latestschedulerapi.Codec.DecodeInto(configData, &policy)
-		if err != nil {
-			return nil, fmt.Errorf("Invalid configuration: %v", err)
+		if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+			return nil, fmt.Errorf("invalid configuration: %v", err)
 		}
-
 		return configFactory.CreateFromConfig(policy)
 	}
 

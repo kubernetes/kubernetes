@@ -66,5 +66,5 @@ func main() {
 			"nginx.key": nginxKey,
 		},
 	}
-	fmt.Printf(runtime.EncodeOrDie(latest.GroupOrDie(api.GroupName).Codec, secret))
+	fmt.Printf(runtime.EncodeOrDie(latest.Codecs.LegacyCodec(latest.ExternalVersions...), secret))
 }

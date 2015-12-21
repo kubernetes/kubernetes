@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/httplog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
@@ -410,18 +411,11 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 			delete(query, "tailLines")
 		}
 	}
-	// container logs on the kubelet are locked to v1
-	versioned := &v1.PodLogOptions{}
-	if err := api.Scheme.Convert(&query, versioned); err != nil {
+	logOptions := &api.PodLogOptions{}
+	if err := api.ParameterCodec.DecodeParameters(query, v1.SchemeGroupVersion, logOptions); err != nil {
 		response.WriteError(http.StatusBadRequest, fmt.Errorf(`{"message": "Unable to decode query."}`))
 		return
 	}
-	out, err := api.Scheme.ConvertToVersion(versioned, "")
-	if err != nil {
-		response.WriteError(http.StatusBadRequest, fmt.Errorf(`{"message": "Unable to convert request query."}`))
-		return
-	}
-	logOptions := out.(*api.PodLogOptions)
 	logOptions.TypeMeta = unversioned.TypeMeta{}
 	if errs := validation.ValidatePodLogOptions(logOptions); len(errs) > 0 {
 		response.WriteError(apierrs.StatusUnprocessableEntity, fmt.Errorf(`{"message": "Invalid request."}`))
@@ -470,7 +464,15 @@ func encodePods(pods []*api.Pod) (data []byte, err error) {
 	for _, pod := range pods {
 		podList.Items = append(podList.Items, *pod)
 	}
-	return latest.GroupOrDie(api.GroupName).Codec.Encode(podList)
+	// TODO: this needs to be parameterized to the kubelet, not hardcoded. Depends on Kubelet
+	//   as API server refactor.
+	serializer, ok := latest.Codecs.SerializerForFileExtension("json")
+	if !ok {
+		return nil, fmt.Errorf("no JSON serializer defined")
+	}
+	// TODO: Locked to v1, needs to be made generic
+	codec := latest.Codecs.CodecForVersions(serializer, []unversioned.GroupVersion{{Group: api.GroupName, Version: "v1"}}, nil)
+	return runtime.Encode(codec, podList)
 }
 
 // getPods returns a list of pods bound to the Kubelet and their spec.

@@ -25,8 +25,10 @@ import (
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/runtime"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 )
 
@@ -41,7 +43,7 @@ func WriteToDir(pods <-chan *api.Pod, destDir string) error {
 			log.Warningf("skipping static pod %s/%s that had no filename", p.Namespace, p.Name)
 			continue
 		}
-		raw, err := v1.Codec.Encode(p)
+		raw, err := runtime.Encode(latest.Codecs.LegacyCodec(v1.SchemeGroupVersion), p)
 		if err != nil {
 			log.Errorf("failed to encode static pod as v1 object: %v", err)
 			continue
@@ -105,7 +107,7 @@ func tryDecodeSinglePod(data []byte) (parsed bool, pod *api.Pod, err error) {
 	if err != nil {
 		return false, nil, err
 	}
-	obj, err := api.Scheme.Decode(json)
+	obj, err := runtime.Decode(latest.Codecs.UniversalDecoder(), json)
 	if err != nil {
 		return false, pod, err
 	}

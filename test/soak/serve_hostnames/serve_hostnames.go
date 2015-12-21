@@ -32,9 +32,11 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -264,7 +266,7 @@ func main() {
 			continue
 		}
 		var r unversioned.Status
-		if err := api.Scheme.DecodeInto(hostname, &r); err != nil {
+		if err := runtime.DecodeInto(latest.Codecs.UniversalDecoder(), hostname, &r); err != nil {
 			break
 		}
 		if r.Status == unversioned.StatusFailure {

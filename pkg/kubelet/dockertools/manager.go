@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -659,12 +660,18 @@ func (dm *DockerManager) runContainer(
 	}
 	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
 		// TODO: This is kind of hacky, we should really just encode the bits we need.
-		data, err := latest.GroupOrDie(api.GroupName).Codec.Encode(pod)
-		if err != nil {
-			glog.Errorf("Failed to encode pod: %s for prestop hook", pod.Name)
+		// TODO: This is also kind of hacky because the Kubelet should be parameterized to encode a specific version
+		//   and needs to be able to migrate this whenever we deprecate v1. Should be a member of DockerManager.
+		if serializer, ok := latest.Codecs.SerializerForFileExtension("json"); ok {
+			codec := latest.Codecs.CodecForVersions(serializer, []unversioned.GroupVersion{latest.GroupOrDie(api.GroupName).GroupVersion}, nil)
+			if data, err := runtime.Encode(codec, pod); err == nil {
+				labels[kubernetesPodLabel] = string(data)
+				labels[kubernetesContainerLabel] = container.Name
+			} else {
+				glog.Errorf("Failed to encode pod: %s for prestop hook", pod.Name)
+			}
 		} else {
-			labels[kubernetesPodLabel] = string(data)
-			labels[kubernetesContainerLabel] = container.Name
+			glog.Errorf("Unable to find a JSON serializer for writing label hooks")
 		}
 	}
 	memoryLimit := container.Resources.Limits.Memory().Value()
@@ -1410,7 +1417,7 @@ func containerAndPodFromLabels(inspect *docker.Container) (pod *api.Pod, contain
 	// the pod data may not be set
 	if body, found := labels[kubernetesPodLabel]; found {
 		pod = &api.Pod{}
-		if err = latest.GroupOrDie(api.GroupName).Codec.DecodeInto([]byte(body), pod); err == nil {
+		if err = runtime.DecodeInto(latest.Codecs.UniversalDecoder(), []byte(body), pod); err == nil {
 			name := labels[kubernetesContainerLabel]
 			for ix := range pod.Spec.Containers {
 				if pod.Spec.Containers[ix].Name == name {

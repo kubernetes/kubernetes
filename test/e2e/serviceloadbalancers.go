@@ -23,8 +23,10 @@ import (
 	"path/filepath"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 
@@ -272,7 +274,7 @@ func rcFromManifest(fileName string) *api.ReplicationController {
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())
 
-	Expect(api.Scheme.DecodeInto(json, &controller)).NotTo(HaveOccurred())
+	Expect(runtime.DecodeInto(latest.Codecs.UniversalDecoder(), json, &controller)).NotTo(HaveOccurred())
 	return &controller
 }
 
@@ -286,6 +288,6 @@ func svcFromManifest(fileName string) *api.Service {
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())
 
-	Expect(api.Scheme.DecodeInto(json, &svc)).NotTo(HaveOccurred())
+	Expect(runtime.DecodeInto(latest.Codecs.UniversalDecoder(), json, &svc)).NotTo(HaveOccurred())
 	return &svc
 }
