@@ -158,6 +158,7 @@ kubelet-certificate-authority
 kubelet-client-certificate
 kubelet-client-key
 kubelet-docker-endpoint
+kubelet-enable-debugging-handlers
 kubelet-host-network-sources
 kubelet-https
 kubelet-network-plugin
