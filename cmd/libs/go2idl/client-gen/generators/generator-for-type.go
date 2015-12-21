@@ -165,19 +165,19 @@ var deleteCollectionTemplate = `
 // DeleteCollection deletes a collection of objects.
 func (c *$.type|privatePlural$) DeleteCollection(options *$.apiDeleteOptions|raw$, listOptions $.apiListOptions|raw$) error {
 	if options == nil {
-		return c.Client.Delete().
-			NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
+		return c.client.Delete().
+			NamespaceIfScoped(c.ns, len(c.ns) > 0).
 			Resource("$.type|privatePlural$").
 			VersionedParams(&listOptions, api.Scheme).
 			Do().
 			Error()
 	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion())
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
 	if err != nil {
 		return err
 	}
-	return c.Client.Delete().
-		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
+	return c.client.Delete().
+		NamespaceIfScoped(c.ns, len(c.ns) > 0).
 		Resource("$.type|privatePlural$").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(body).

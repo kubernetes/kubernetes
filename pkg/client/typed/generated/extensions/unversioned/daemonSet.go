@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -33,9 +32,10 @@ type DaemonSetInterface interface {
 	Create(*extensions.DaemonSet) (*extensions.DaemonSet, error)
 	Update(*extensions.DaemonSet) (*extensions.DaemonSet, error)
 	Delete(name string, options *api.DeleteOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*extensions.DaemonSet, error)
-	List(opts unversioned.ListOptions) (*extensions.DaemonSetList, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	List(opts api.ListOptions) (*extensions.DaemonSetList, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // daemonSets implements DaemonSetInterface
@@ -95,6 +95,29 @@ func (c *daemonSets) Delete(name string, options *api.DeleteOptions) error {
 		Error()
 }
 
+// DeleteCollection deletes a collection of objects.
+func (c *daemonSets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	if options == nil {
+		return c.client.Delete().
+			NamespaceIfScoped(c.ns, len(c.ns) > 0).
+			Resource("daemonSets").
+			VersionedParams(&listOptions, api.Scheme).
+			Do().
+			Error()
+	}
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
+	if err != nil {
+		return err
+	}
+	return c.client.Delete().
+		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Resource("daemonSets").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(body).
+		Do().
+		Error()
+}
+
 // Get takes name of the daemonSet, and returns the corresponding daemonSet object, and an error if there is any.
 func (c *daemonSets) Get(name string) (result *extensions.DaemonSet, err error) {
 	result = &extensions.DaemonSet{}
@@ -108,7 +131,7 @@ func (c *daemonSets) Get(name string) (result *extensions.DaemonSet, err error) 
 }
 
 // List takes label and field selectors, and returns the list of DaemonSets that match those selectors.
-func (c *daemonSets) List(opts unversioned.ListOptions) (result *extensions.DaemonSetList, err error) {
+func (c *daemonSets) List(opts api.ListOptions) (result *extensions.DaemonSetList, err error) {
 	result = &extensions.DaemonSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -120,7 +143,7 @@ func (c *daemonSets) List(opts unversioned.ListOptions) (result *extensions.Daem
 }
 
 // Watch returns a watch.Interface that watches the requested daemonSets.
-func (c *daemonSets) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *daemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

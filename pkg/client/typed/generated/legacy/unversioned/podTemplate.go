@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,9 +31,10 @@ type PodTemplateInterface interface {
 	Create(*api.PodTemplate) (*api.PodTemplate, error)
 	Update(*api.PodTemplate) (*api.PodTemplate, error)
 	Delete(name string, options *api.DeleteOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.PodTemplate, error)
-	List(opts unversioned.ListOptions) (*api.PodTemplateList, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	List(opts api.ListOptions) (*api.PodTemplateList, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // podTemplates implements PodTemplateInterface
@@ -94,6 +94,29 @@ func (c *podTemplates) Delete(name string, options *api.DeleteOptions) error {
 		Error()
 }
 
+// DeleteCollection deletes a collection of objects.
+func (c *podTemplates) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	if options == nil {
+		return c.client.Delete().
+			NamespaceIfScoped(c.ns, len(c.ns) > 0).
+			Resource("podTemplates").
+			VersionedParams(&listOptions, api.Scheme).
+			Do().
+			Error()
+	}
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
+	if err != nil {
+		return err
+	}
+	return c.client.Delete().
+		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Resource("podTemplates").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(body).
+		Do().
+		Error()
+}
+
 // Get takes name of the podTemplate, and returns the corresponding podTemplate object, and an error if there is any.
 func (c *podTemplates) Get(name string) (result *api.PodTemplate, err error) {
 	result = &api.PodTemplate{}
@@ -107,7 +130,7 @@ func (c *podTemplates) Get(name string) (result *api.PodTemplate, err error) {
 }
 
 // List takes label and field selectors, and returns the list of PodTemplates that match those selectors.
-func (c *podTemplates) List(opts unversioned.ListOptions) (result *api.PodTemplateList, err error) {
+func (c *podTemplates) List(opts api.ListOptions) (result *api.PodTemplateList, err error) {
 	result = &api.PodTemplateList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -119,7 +142,7 @@ func (c *podTemplates) List(opts unversioned.ListOptions) (result *api.PodTempla
 }
 
 // Watch returns a watch.Interface that watches the requested podTemplates.
-func (c *podTemplates) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *podTemplates) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

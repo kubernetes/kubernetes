@@ -36,7 +36,7 @@ func addKnownTypes() {
 	)
 
 	api.Scheme.AddKnownTypes(SchemeGroupVersion,
-		&unversioned.ListOptions{})
+		&api.ListOptions{})
 }
 
 func (obj *TestType) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
