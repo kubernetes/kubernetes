@@ -148,6 +148,15 @@ type APIGroupInfo struct {
 	// If nil, defaults to groupMeta.GroupVersion.
 	// TODO: Remove this when https://github.com/kubernetes/kubernetes/issues/19018 is fixed.
 	OptionsExternalVersion *unversioned.GroupVersion
+
+	// Scheme includes all of the types used by this group and how to convert between them (or
+	// to convert objects from outside of this group that are accepted in this API).
+	// TODO: replace with interfaces
+	Scheme *runtime.Scheme
+	// NegotiatedSerializer controls how this group encodes and decodes data
+	NegotiatedSerializer runtime.NegotiatedSerializer
+	// ParameterCodec performs conversions for query parameters passed to API calls
+	ParameterCodec runtime.ParameterCodec
 }
 
 // Config is a structure used to configure a GenericAPIServer.
@@ -274,6 +283,10 @@ type GenericAPIServer struct {
 
 	// storage contains the RESTful endpoints exposed by this GenericAPIServer
 	storage map[string]rest.Storage
+
+	// Serializer controls how common API objects not in a group/version prefix are serialized for this server.
+	// Individual APIGroups may define their own serializers.
+	Serializer runtime.NegotiatedSerializer
 
 	// "Outputs"
 	Handler         http.Handler
