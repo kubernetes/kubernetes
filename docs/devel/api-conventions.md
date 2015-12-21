@@ -256,6 +256,7 @@ This rule maintains the invariant that all JSON/YAML keys are fields in API obje
 * Do not use unsigned integers, due to inconsistent support across languages and libraries. Just validate that the integer is non-negative if that's the case.
 * Do not use enums. Use aliases for string instead (e.g., `NodeConditionType`).
 * Look at similar fields in the API (e.g., ports, durations) and follow the conventions of existing fields.
+* All public integer fields MUST use the Go `(u)int32` or Go `(u)int64` types, not `(u)int` (which is ambiguous depending on target platform). Internal types may use `(u)int`.
 
 #### Constants
 
