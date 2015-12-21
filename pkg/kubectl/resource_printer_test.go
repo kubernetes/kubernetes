@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -466,7 +465,7 @@ func TestPrinters(t *testing.T) {
 		"jsonpath":             jsonpathPrinter,
 		"name": &NamePrinter{
 			Typer:   runtime.ObjectTyperToTyper(api.Scheme),
-			Decoder: latest.Codecs.UniversalDecoder(),
+			Decoder: api.Codecs.UniversalDecoder(),
 		},
 	}
 	objects := map[string]runtime.Object{

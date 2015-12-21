@@ -189,7 +189,6 @@ func TestHelperCreate(t *testing.T) {
 		}
 		modifier := &Helper{
 			RESTClient:      client,
-			Codec:           testapi.Default.Codec(),
 			Versioner:       testapi.Default.MetadataAccessor(),
 			NamespaceScoped: true,
 		}
@@ -441,7 +440,6 @@ func TestHelperReplace(t *testing.T) {
 		}
 		modifier := &Helper{
 			RESTClient:      client,
-			Codec:           testapi.Default.Codec(),
 			Versioner:       testapi.Default.MetadataAccessor(),
 			NamespaceScoped: true,
 		}

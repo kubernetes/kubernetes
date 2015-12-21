@@ -345,7 +345,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		if errs := runtime.DecodeList(items, struct {
 			runtime.ObjectTyper
 			runtime.Decoder
-		}{v.Mapper, info.Mapping.Codec}); len(errs) > 0 {
+		}{v.Mapper, v.Mapper.Decoder}); len(errs) > 0 {
 			return utilerrors.NewAggregate(errs)
 		}
 		for i := range items {

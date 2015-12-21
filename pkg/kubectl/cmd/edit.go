@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
+	gruntime "runtime"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/jsonmerge"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/util/yaml"
@@ -94,7 +95,7 @@ func NewCmdEdit(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
 	cmd.Flags().StringP("output", "o", "yaml", "Output format. One of: yaml|json.")
 	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")
-	cmd.Flags().Bool("windows-line-endings", runtime.GOOS == "windows", "Use Windows line-endings (default Unix line-endings)")
+	cmd.Flags().Bool("windows-line-endings", gruntime.GOOS == "windows", "Use Windows line-endings (default Unix line-endings)")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	return cmd
 }
@@ -119,13 +120,14 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 	}
 
 	mapper, typer := f.Object()
-	rmap := &resource.Mapper{
+	resourceMapper := &resource.Mapper{
 		ObjectTyper:  typer,
 		RESTMapper:   mapper,
-		ClientMapper: f.ClientMapperForCommand(),
+		ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
+		Decoder:      f.Decoder(true),
 	}
 
-	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, filenames...).
 		ResourceTypeOrNameArgs(true, args...).
@@ -147,6 +149,8 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		return err
 	}
 
+	encoder := f.JSONEncoder()
+
 	windowsLineEndings := cmdutil.GetFlagBool(cmd, "windows-line-endings")
 	edit := editor.NewDefaultEditor(f.EditorEnvs())
 	defaultVersion, err := cmdutil.OutputVersion(cmd, clientConfig.GroupVersion)
@@ -155,7 +159,7 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 	}
 	results := editResults{}
 	for {
-		objs, err := resource.AsVersionedObjects(infos, defaultVersion.String())
+		objs, err := resource.AsVersionedObjects(infos, defaultVersion.String(), encoder)
 		if err != nil {
 			return preservedFile(err, results.file, out)
 		}
@@ -219,21 +223,21 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			}
 
 			// parse the edited file
-			updates, err := rmap.InfoForData(edited, "edited-file")
+			updates, err := resourceMapper.InfoForData(edited, "edited-file")
 			if err != nil {
 				return fmt.Errorf("The edited file had a syntax error: %v", err)
 			}
 
 			// put configuration annotation in "updates"
-			if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), updates); err != nil {
+			if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), updates, encoder); err != nil {
 				return preservedFile(err, file, out)
 			}
 			// encode updates back to "edited" since we'll only generate patch from "edited"
-			if edited, err = updates.Mapping.Codec.Encode(updates.Object); err != nil {
+			if edited, err = runtime.Encode(encoder, updates.Object); err != nil {
 				return preservedFile(err, file, out)
 			}
 
-			visitor := resource.NewFlattenListVisitor(updates, rmap)
+			visitor := resource.NewFlattenListVisitor(updates, resourceMapper)
 
 			// need to make sure the original namespace wasn't changed while editing
 			if err = visitor.Visit(resource.RequireNamespace(cmdNamespace)); err != nil {
