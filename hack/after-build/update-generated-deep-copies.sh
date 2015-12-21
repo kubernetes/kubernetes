@@ -52,11 +52,11 @@ function generate_deep_copies() {
     if [ -z ${ver##*/} ]; then
         apiVersions=""
     fi
-    KUBE_API_VERSIONS="${apiVersions}" generate_version "${ver}"
+    KUBE_API_VERSIONS="${apiVersions:-}" generate_version "${ver}"
   done
 }
 
 # v1 is in the group ""
-DEFAULT_VERSIONS="/ v1 extensions/ extensions/v1beta1 componentconfig/ componentconfig/v1alpha1 metrics/ metrics/v1alpha1"
+DEFAULT_VERSIONS="__internal v1 extensions/__internal extensions/v1beta1 componentconfig/__internal componentconfig/v1alpha1 metrics/__internal metrics/v1alpha1"
 VERSIONS=${VERSIONS:-$DEFAULT_VERSIONS}
 generate_deep_copies "$VERSIONS"
