@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
