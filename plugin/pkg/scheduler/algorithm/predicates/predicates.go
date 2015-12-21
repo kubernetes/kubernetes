@@ -427,20 +427,6 @@ func getUsedPorts(pods ...*api.Pod) map[int]bool {
 	return ports
 }
 
-func filterNonRunningPods(pods []*api.Pod) []*api.Pod {
-	if len(pods) == 0 {
-		return pods
-	}
-	result := []*api.Pod{}
-	for _, pod := range pods {
-		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
-			continue
-		}
-		result = append(result, pod)
-	}
-	return result
-}
-
 // MapPodsToMachines obtains a list of pods and pivots that list into a map where the keys are host names
 // and the values are the list of pods running on that host.
 func MapPodsToMachines(lister algorithm.PodLister) (map[string][]*api.Pod, error) {
@@ -450,7 +436,6 @@ func MapPodsToMachines(lister algorithm.PodLister) (map[string][]*api.Pod, error
 	if err != nil {
 		return map[string][]*api.Pod{}, err
 	}
-	pods = filterNonRunningPods(pods)
 	for _, scheduledPod := range pods {
 		host := scheduledPod.Spec.NodeName
 		machineToPods[host] = append(machineToPods[host], scheduledPod)
