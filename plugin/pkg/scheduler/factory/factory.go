@@ -90,7 +90,7 @@ func NewConfigFactory(client *client.Client, rateLimiter util.RateLimiter) *Conf
 	// ScheduledPodLister is something we provide to plug in functions that
 	// they may need to call.
 	c.ScheduledPodLister.Store, c.scheduledPodPopulator = framework.NewInformer(
-		c.createAssignedPodLW(),
+		c.createAssignedNonTerminatedPodLW(),
 		&api.Pod{},
 		0,
 		framework.ResourceEventHandlerFuncs{
@@ -190,7 +190,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	}
 
 	// Watch and queue pods that need scheduling.
-	cache.NewReflector(f.createUnassignedPodLW(), &api.Pod{}, f.PodQueue, 0).RunUntil(f.StopEverything)
+	cache.NewReflector(f.createUnassignedNonTerminatedPodLW(), &api.Pod{}, f.PodQueue, 0).RunUntil(f.StopEverything)
 
 	// Begin populating scheduled pods.
 	go f.scheduledPodPopulator.Run(f.StopEverything)
@@ -257,16 +257,17 @@ func getNodeConditionPredicate() cache.NodeConditionPredicate {
 
 // Returns a cache.ListWatch that finds all pods that need to be
 // scheduled.
-func (factory *ConfigFactory) createUnassignedPodLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, fields.Set{client.PodHost: ""}.AsSelector())
+func (factory *ConfigFactory) createUnassignedNonTerminatedPodLW() *cache.ListWatch {
+	selector := fields.ParseSelectorOrDie("spec.nodeName==" + "" + ",status.phase!=" + string(api.PodSucceeded) + ",status.phase!=" + string(api.PodFailed))
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, selector)
 }
 
 // Returns a cache.ListWatch that finds all pods that are
 // already scheduled.
 // TODO: return a ListerWatcher interface instead?
-func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll,
-		fields.ParseSelectorOrDie(client.PodHost+"!="))
+func (factory *ConfigFactory) createAssignedNonTerminatedPodLW() *cache.ListWatch {
+	selector := fields.ParseSelectorOrDie("spec.nodeName!=" + "" + ",status.phase!=" + string(api.PodSucceeded) + ",status.phase!=" + string(api.PodFailed))
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, selector)
 }
 
 // createNodeLW returns a cache.ListWatch that gets all changes to nodes.
