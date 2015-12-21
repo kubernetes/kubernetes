@@ -167,6 +167,34 @@ func TestWatchHTTP(t *testing.T) {
 	}
 }
 
+func TestWatchHTTPAccept(t *testing.T) {
+	simpleStorage := &SimpleRESTStorage{}
+	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	dest, _ := url.Parse(server.URL)
+	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
+	dest.RawQuery = ""
+
+	request, err := http.NewRequest("GET", dest.String(), nil)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	request.Header.Set("Accept", "application/yaml")
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// TODO: once this is fixed, this test will change
+	if response.StatusCode != http.StatusNotAcceptable {
+		t.Errorf("Unexpected response %#v", response)
+	}
+}
+
 func TestWatchParamParsing(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := handle(map[string]rest.Storage{
