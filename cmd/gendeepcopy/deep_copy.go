@@ -61,7 +61,7 @@ func pkgPath(group, version string) string {
 		group = "api"
 	}
 	gv := group
-	if version != "" {
+	if version != "__internal" {
 		gv = path.Join(group, version)
 	}
 	switch {
