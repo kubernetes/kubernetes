@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,9 +31,10 @@ type ResourceQuotaInterface interface {
 	Create(*api.ResourceQuota) (*api.ResourceQuota, error)
 	Update(*api.ResourceQuota) (*api.ResourceQuota, error)
 	Delete(name string, options *api.DeleteOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.ResourceQuota, error)
-	List(opts unversioned.ListOptions) (*api.ResourceQuotaList, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	List(opts api.ListOptions) (*api.ResourceQuotaList, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // resourceQuotas implements ResourceQuotaInterface
@@ -94,6 +94,29 @@ func (c *resourceQuotas) Delete(name string, options *api.DeleteOptions) error {
 		Error()
 }
 
+// DeleteCollection deletes a collection of objects.
+func (c *resourceQuotas) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	if options == nil {
+		return c.client.Delete().
+			NamespaceIfScoped(c.ns, len(c.ns) > 0).
+			Resource("resourceQuotas").
+			VersionedParams(&listOptions, api.Scheme).
+			Do().
+			Error()
+	}
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
+	if err != nil {
+		return err
+	}
+	return c.client.Delete().
+		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Resource("resourceQuotas").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(body).
+		Do().
+		Error()
+}
+
 // Get takes name of the resourceQuota, and returns the corresponding resourceQuota object, and an error if there is any.
 func (c *resourceQuotas) Get(name string) (result *api.ResourceQuota, err error) {
 	result = &api.ResourceQuota{}
@@ -107,7 +130,7 @@ func (c *resourceQuotas) Get(name string) (result *api.ResourceQuota, err error)
 }
 
 // List takes label and field selectors, and returns the list of ResourceQuotas that match those selectors.
-func (c *resourceQuotas) List(opts unversioned.ListOptions) (result *api.ResourceQuotaList, err error) {
+func (c *resourceQuotas) List(opts api.ListOptions) (result *api.ResourceQuotaList, err error) {
 	result = &api.ResourceQuotaList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -119,7 +142,7 @@ func (c *resourceQuotas) List(opts unversioned.ListOptions) (result *api.Resourc
 }
 
 // Watch returns a watch.Interface that watches the requested resourceQuotas.
-func (c *resourceQuotas) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *resourceQuotas) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

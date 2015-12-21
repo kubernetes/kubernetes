@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,9 +31,10 @@ type ServiceAccountInterface interface {
 	Create(*api.ServiceAccount) (*api.ServiceAccount, error)
 	Update(*api.ServiceAccount) (*api.ServiceAccount, error)
 	Delete(name string, options *api.DeleteOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.ServiceAccount, error)
-	List(opts unversioned.ListOptions) (*api.ServiceAccountList, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	List(opts api.ListOptions) (*api.ServiceAccountList, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // serviceAccounts implements ServiceAccountInterface
@@ -94,6 +94,29 @@ func (c *serviceAccounts) Delete(name string, options *api.DeleteOptions) error 
 		Error()
 }
 
+// DeleteCollection deletes a collection of objects.
+func (c *serviceAccounts) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	if options == nil {
+		return c.client.Delete().
+			NamespaceIfScoped(c.ns, len(c.ns) > 0).
+			Resource("serviceAccounts").
+			VersionedParams(&listOptions, api.Scheme).
+			Do().
+			Error()
+	}
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
+	if err != nil {
+		return err
+	}
+	return c.client.Delete().
+		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Resource("serviceAccounts").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(body).
+		Do().
+		Error()
+}
+
 // Get takes name of the serviceAccount, and returns the corresponding serviceAccount object, and an error if there is any.
 func (c *serviceAccounts) Get(name string) (result *api.ServiceAccount, err error) {
 	result = &api.ServiceAccount{}
@@ -107,7 +130,7 @@ func (c *serviceAccounts) Get(name string) (result *api.ServiceAccount, err erro
 }
 
 // List takes label and field selectors, and returns the list of ServiceAccounts that match those selectors.
-func (c *serviceAccounts) List(opts unversioned.ListOptions) (result *api.ServiceAccountList, err error) {
+func (c *serviceAccounts) List(opts api.ListOptions) (result *api.ServiceAccountList, err error) {
 	result = &api.ServiceAccountList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -119,7 +142,7 @@ func (c *serviceAccounts) List(opts unversioned.ListOptions) (result *api.Servic
 }
 
 // Watch returns a watch.Interface that watches the requested serviceAccounts.
-func (c *serviceAccounts) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *serviceAccounts) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

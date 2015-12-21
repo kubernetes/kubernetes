@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,9 +31,10 @@ type EventInterface interface {
 	Create(*api.Event) (*api.Event, error)
 	Update(*api.Event) (*api.Event, error)
 	Delete(name string, options *api.DeleteOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.Event, error)
-	List(opts unversioned.ListOptions) (*api.EventList, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	List(opts api.ListOptions) (*api.EventList, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // events implements EventInterface
@@ -94,6 +94,29 @@ func (c *events) Delete(name string, options *api.DeleteOptions) error {
 		Error()
 }
 
+// DeleteCollection deletes a collection of objects.
+func (c *events) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	if options == nil {
+		return c.client.Delete().
+			NamespaceIfScoped(c.ns, len(c.ns) > 0).
+			Resource("events").
+			VersionedParams(&listOptions, api.Scheme).
+			Do().
+			Error()
+	}
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
+	if err != nil {
+		return err
+	}
+	return c.client.Delete().
+		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Resource("events").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(body).
+		Do().
+		Error()
+}
+
 // Get takes name of the event, and returns the corresponding event object, and an error if there is any.
 func (c *events) Get(name string) (result *api.Event, err error) {
 	result = &api.Event{}
@@ -107,7 +130,7 @@ func (c *events) Get(name string) (result *api.Event, err error) {
 }
 
 // List takes label and field selectors, and returns the list of Events that match those selectors.
-func (c *events) List(opts unversioned.ListOptions) (result *api.EventList, err error) {
+func (c *events) List(opts api.ListOptions) (result *api.EventList, err error) {
 	result = &api.EventList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -119,7 +142,7 @@ func (c *events) List(opts unversioned.ListOptions) (result *api.EventList, err 
 }
 
 // Watch returns a watch.Interface that watches the requested events.
-func (c *events) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *events) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
