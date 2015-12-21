@@ -165,12 +165,6 @@ disown -a
 
 #### Validate KM Services
 
-Add the appropriate binary folder to your `PATH` to access kubectl:
-
-```bash
-export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
-```
-
 Interact with the kubernetes-mesos framework via `kubectl`:
 
 ```console
