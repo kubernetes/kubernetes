@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -70,10 +69,10 @@ var grouplessPrefix = "api"
 
 var groupVersions = []unversioned.GroupVersion{grouplessGroupVersion, testGroupVersion, newGroupVersion}
 
-var codec = latest.Codecs.LegacyCodec(groupVersions...)
-var grouplessCodec = latest.Codecs.LegacyCodec(grouplessGroupVersion)
-var testCodec = latest.Codecs.LegacyCodec(testGroupVersion)
-var newCodec = latest.Codecs.LegacyCodec(newGroupVersion)
+var codec = api.Codecs.LegacyCodec(groupVersions...)
+var grouplessCodec = api.Codecs.LegacyCodec(grouplessGroupVersion)
+var testCodec = api.Codecs.LegacyCodec(testGroupVersion)
+var newCodec = api.Codecs.LegacyCodec(newGroupVersion)
 
 var accessor = meta.NewAccessor()
 var versioner runtime.ResourceVersioner = accessor
@@ -265,7 +264,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.Root = "/" + grouplessPrefix
 		group.GroupVersion = grouplessGroupVersion
 		group.OptionsExternalVersion = &grouplessGroupVersion
-		group.Serializer = latest.Codecs
+		group.Serializer = api.Codecs
 		if err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
@@ -277,7 +276,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.Root = "/" + prefix
 		group.GroupVersion = testGroupVersion
 		group.OptionsExternalVersion = &testGroupVersion
-		group.Serializer = latest.Codecs
+		group.Serializer = api.Codecs
 		if err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
@@ -289,7 +288,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.Root = "/" + prefix
 		group.GroupVersion = newGroupVersion
 		group.OptionsExternalVersion = &newGroupVersion
-		group.Serializer = latest.Codecs
+		group.Serializer = api.Codecs
 		if err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
@@ -2391,7 +2390,7 @@ func TestUpdateREST(t *testing.T) {
 			GroupVersion:           newGroupVersion,
 			OptionsExternalVersion: &newGroupVersion,
 
-			Serializer:     latest.Codecs,
+			Serializer:     api.Codecs,
 			ParameterCodec: api.ParameterCodec,
 		}
 	}
@@ -2475,7 +2474,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		GroupVersion:           newGroupVersion,
 		OptionsExternalVersion: &newGroupVersion,
 
-		Serializer:     latest.Codecs,
+		Serializer:     api.Codecs,
 		ParameterCodec: api.ParameterCodec,
 	}
 	container := restful.NewContainer()
@@ -2506,7 +2505,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		GroupVersion:           newGroupVersion,
 		OptionsExternalVersion: &newGroupVersion,
 
-		Serializer:     latest.Codecs,
+		Serializer:     api.Codecs,
 		ParameterCodec: api.ParameterCodec,
 	}
 	container = restful.NewContainer()
@@ -2710,12 +2709,12 @@ func TestCreateYAML(t *testing.T) {
 	simple := &apiservertesting.Simple{
 		Other: "bar",
 	}
-	serializer, ok := latest.Codecs.SerializerForMediaType("application/yaml", nil)
+	serializer, ok := api.Codecs.SerializerForMediaType("application/yaml", nil)
 	if !ok {
 		t.Fatal("No yaml serializer")
 	}
-	encoder := latest.Codecs.EncoderForVersion(serializer, testGroupVersion)
-	decoder := latest.Codecs.DecoderToVersion(serializer, testInternalGroupVersion)
+	encoder := api.Codecs.EncoderForVersion(serializer, testGroupVersion)
+	decoder := api.Codecs.DecoderToVersion(serializer, testInternalGroupVersion)
 
 	data, err := runtime.Encode(encoder, simple)
 	if err != nil {
@@ -2913,7 +2912,7 @@ func (obj *UnregisteredAPIObject) GetObjectKind() unversioned.ObjectKind {
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		writeNegotiated(latest.Codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
+		writeNegotiated(api.Codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
 	}))
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()

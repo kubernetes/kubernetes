@@ -75,7 +75,6 @@ func enableVersions(externalVersions []unversioned.GroupVersion) error {
 	groupMeta := apimachinery.GroupMeta{
 		GroupVersion:  preferredExternalVersion,
 		GroupVersions: externalVersions,
-		Codec:         runtime.CodecFor(api.Scheme, preferredExternalVersion),
 		RESTMapper:    newRESTMapper(externalVersions),
 		SelfLinker:    runtime.SelfLinker(accessor),
 		InterfacesFor: interfacesFor,
@@ -119,7 +118,6 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 	switch version {
 	case v1beta1.SchemeGroupVersion:
 		return &meta.VersionInterfaces{
-			Codec:            v1beta1.Codec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil

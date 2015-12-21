@@ -18,15 +18,11 @@ package v0
 
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/abac"
-	"k8s.io/kubernetes/pkg/runtime"
+	api "k8s.io/kubernetes/pkg/apis/abac"
 )
 
 // GroupVersion is the API group and version for abac v0
 var GroupVersion = unversioned.GroupVersion{Group: api.Group, Version: "v0"}
-
-// Codec encodes internal objects to the v0 version for the abac group
-var Codec = runtime.CodecFor(api.Scheme, GroupVersion)
 
 func init() {
 	api.Scheme.AddKnownTypes(GroupVersion,

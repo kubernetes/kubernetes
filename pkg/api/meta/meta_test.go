@@ -73,7 +73,7 @@ func TestAPIObjectMeta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if e, a := "/a", typeAccessor.GetAPIVersion(); e != a {
+	if e, a := "a", typeAccessor.GetAPIVersion(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "b", typeAccessor.GetKind(); e != a {
@@ -102,7 +102,7 @@ func TestAPIObjectMeta(t *testing.T) {
 	if e, a := types.UID("other"), j.UID; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "/c", j.APIVersion; e != a {
+	if e, a := "c", j.APIVersion; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "d", j.Kind; e != a {
@@ -117,7 +117,7 @@ func TestAPIObjectMeta(t *testing.T) {
 
 	typeAccessor.SetAPIVersion("d")
 	typeAccessor.SetKind("e")
-	if e, a := "/d", j.APIVersion; e != a {
+	if e, a := "d", j.APIVersion; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "e", j.Kind; e != a {
@@ -308,7 +308,7 @@ func TestGenericTypeMetaAccessor(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if e, a := "/a", apiVersion; e != a {
+	if e, a := "a", apiVersion; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	kind, err := accessor.Kind(j)
@@ -392,7 +392,7 @@ func TestGenericTypeMetaAccessor(t *testing.T) {
 	if e, a := "other", j.TypeMeta.UID; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "/c", j.TypeMeta.APIVersion; e != a {
+	if e, a := "c", j.TypeMeta.APIVersion; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "d", j.TypeMeta.Kind; e != a {
@@ -757,7 +757,7 @@ func BenchmarkAccessorSetReflection(b *testing.B) {
 			Name:            "foo",
 			GenerateName:    "prefix",
 			UID:             "uid",
-			APIVersion:      "/a",
+			APIVersion:      "a",
 			Kind:            "b",
 			ResourceVersion: "1",
 			SelfLink:        "some/place/only/we/know",

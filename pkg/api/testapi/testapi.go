@@ -47,7 +47,7 @@ type TestGroup struct {
 
 func init() {
 	kubeTestAPI := os.Getenv("KUBE_TEST_API")
-	if kubeTestAPI != "" {
+	if len(kubeTestAPI) != 0 {
 		testGroupVersions := strings.Split(kubeTestAPI, ",")
 		for _, gvString := range testGroupVersions {
 			groupVersion, err := unversioned.ParseGroupVersion(gvString)
@@ -57,7 +57,7 @@ func init() {
 
 			Groups[groupVersion.Group] = TestGroup{
 				externalGroupVersion: groupVersion,
-				internalGroupVersion: unversioned.GroupVersion{Group: groupVersion.Group},
+				internalGroupVersion: unversioned.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal},
 			}
 		}
 	}
@@ -93,12 +93,7 @@ func (g TestGroup) InternalGroupVersion() unversioned.GroupVersion {
 // Codec returns the codec for the API version to test against, as set by the
 // KUBE_TEST_API env var.
 func (g TestGroup) Codec() runtime.Codec {
-	// TODO: caesarxuchao: Restructure the body once we have a central `registered`.
-	interfaces, err := registered.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion)
-	if err != nil {
-		panic(err)
-	}
-	return interfaces.Codec
+	return api.Codecs.LegacyCodec(g.externalGroupVersion)
 }
 
 // Converter returns the api.Scheme for the API version to test against, as set by the
@@ -199,7 +194,11 @@ func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 	}
 	// Codec used for unversioned types
 	if api.Scheme.Recognizes(kind) {
-		return api.Codec, nil
+		serializer, ok := api.Codecs.SerializerForFileExtension("json")
+		if !ok {
+			return nil, fmt.Errorf("no serializer registered for json")
+		}
+		return serializer, nil
 	}
 	return nil, fmt.Errorf("unexpected kind: %v", kind)
 }
