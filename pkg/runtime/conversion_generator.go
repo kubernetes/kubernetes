@@ -102,10 +102,8 @@ func (g *conversionGenerator) AddImport(pkg string) string {
 func (g *conversionGenerator) GenerateConversionsForType(gv unversioned.GroupVersion, reflection reflect.Type) error {
 	kind := reflection.Name()
 	// TODO this is equivalent to what it did before, but it needs to be fixed for the proper group
-	internalVersion, exists := g.scheme.InternalVersions[gv.Group]
-	if !exists {
-		return fmt.Errorf("no internal version for %v", gv)
-	}
+	internalVersion := gv
+	internalVersion.Version = APIVersionInternal
 
 	internalObj, err := g.scheme.NewObject(internalVersion.WithKind(kind))
 	if err != nil {
@@ -775,6 +773,10 @@ func (g *conversionGenerator) writeConversionForStruct(b *buffer, inType, outTyp
 			continue
 		}
 
+		if g.scheme.Converter().IsConversionIgnored(inField.Type, outField.Type) {
+			continue
+		}
+
 		existsConversion := g.scheme.Converter().HasConversionFunc(inField.Type, outField.Type)
 		_, hasPublicConversion := g.publicFuncs[typePair{inField.Type, outField.Type}]
 		// TODO: This allows a private conversion for a slice to take precedence over a public
@@ -895,12 +897,7 @@ type typePair struct {
 	outType reflect.Type
 }
 
-var defaultConversions []typePair = []typePair{
-	{reflect.TypeOf([]RawExtension{}), reflect.TypeOf([]Object{})},
-	{reflect.TypeOf([]Object{}), reflect.TypeOf([]RawExtension{})},
-	{reflect.TypeOf(RawExtension{}), reflect.TypeOf(EmbeddedObject{})},
-	{reflect.TypeOf(EmbeddedObject{}), reflect.TypeOf(RawExtension{})},
-}
+var defaultConversions []typePair = []typePair{}
 
 func (g *conversionGenerator) OverwritePackage(pkg, overwrite string) {
 	g.pkgOverwrites[pkg] = overwrite

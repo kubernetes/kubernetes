@@ -104,7 +104,7 @@ func main() {
 	} else {
 		pkgname = gv.Group
 	}
-	if len(gv.Version) != 0 {
+	if len(gv.Version) != 0 && gv.Version != kruntime.APIVersionInternal {
 		pkgname = gv.Version
 	}
 
