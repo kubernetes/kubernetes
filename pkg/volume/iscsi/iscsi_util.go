@@ -18,6 +18,7 @@ package iscsi
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path"
 	"strings"
@@ -60,7 +61,7 @@ func getDevicePrefixRefCount(mounter mount.Interface, deviceNamePrefix string) (
 	// Find the number of references to the device.
 	refCount := 0
 	for i := range mps {
-		if strings.HasPrefix(mps[i].Device, deviceNamePrefix) {
+		if strings.HasPrefix(mps[i].Path, deviceNamePrefix) {
 			refCount++
 		}
 	}
@@ -121,7 +122,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskBuilder) error {
 }
 
 func (util *ISCSIUtil) DetachDisk(c iscsiDiskCleaner, mntPath string) error {
-	device, cnt, err := mount.GetDeviceNameFromMount(c.mounter, mntPath)
+	_, cnt, err := mount.GetDeviceNameFromMount(c.mounter, mntPath)
 	if err != nil {
 		glog.Errorf("iscsi detach disk: failed to get device from mnt: %s\nError: %v", mntPath, err)
 		return err
@@ -133,18 +134,19 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskCleaner, mntPath string) error {
 	cnt--
 	// if device is no longer used, see if need to logout the target
 	if cnt == 0 {
-		// strip -lun- from device path
-		ind := strings.LastIndex(device, "-lun-")
-		prefix := device[:(ind - 1)]
+		device, prefix, err := extractDeviceAndPrefix(mntPath)
+		if err != nil {
+			return err
+		}
 		refCount, err := getDevicePrefixRefCount(c.mounter, prefix)
 
 		if err == nil && refCount == 0 {
 			// this portal/iqn are no longer referenced, log out
 			// extract portal and iqn from device path
-			ind1 := strings.LastIndex(device, "-iscsi-")
-			portal := device[(len("/dev/disk/by-path/ip-")):ind1]
-			iqn := device[ind1+len("-iscsi-") : ind]
-
+			portal, iqn, err := extractPortalAndIqn(device)
+			if err != nil {
+				return err
+			}
 			glog.Infof("iscsi: log out target %s iqn %s", portal, iqn)
 			out, err := c.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", portal, "-T", iqn, "--logout"})
 			if err != nil {
@@ -153,4 +155,34 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskCleaner, mntPath string) error {
 		}
 	}
 	return nil
+}
+
+func extractDeviceAndPrefix(mntPath string) (string, string, error) {
+	ind := strings.LastIndex(mntPath, "/")
+	if ind < 0 {
+		return "", "", fmt.Errorf("iscsi detach disk: malformatted mnt path: %s", mntPath)
+	}
+	device := mntPath[(ind + 1):]
+	// strip -lun- from device path
+	ind = strings.LastIndex(device, "-lun-")
+	if ind < 0 {
+		return "", "", fmt.Errorf("iscsi detach disk: malformatted mnt path: %s", mntPath)
+	}
+	prefix := device[:ind]
+	return device, prefix, nil
+}
+
+func extractPortalAndIqn(device string) (string, string, error) {
+	ind1 := strings.Index(device, "-")
+	if ind1 < 0 {
+		return "", "", fmt.Errorf("iscsi detach disk: no portal in %s", device)
+	}
+	portal := device[0:ind1]
+	ind2 := strings.Index(device, "iqn.")
+	if ind2 < 0 {
+		return "", "", fmt.Errorf("iscsi detach disk: no iqn in %s", device)
+	}
+	ind := strings.LastIndex(device, "-lun-")
+	iqn := device[ind2:ind]
+	return portal, iqn, nil
 }
