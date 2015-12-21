@@ -24,6 +24,8 @@ import (
 	"testing"
 
 	"github.com/google/gofuzz"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func testLogger(t *testing.T) DebugLogger {
@@ -221,6 +223,55 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	}
 }
 
+func TestConverter_IgnoredConversion(t *testing.T) {
+	type A struct{}
+	type B struct{}
+
+	count := 0
+	c := NewConverter()
+	if err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
+		count++
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if err := c.RegisterIgnoredConversion(&A{}, &B{}); err != nil {
+		t.Fatal(err)
+	}
+	a := A{}
+	b := B{}
+	if err := c.Convert(&a, &b, 0, nil); err != nil {
+		t.Errorf("%v", err)
+	}
+	if count != 0 {
+		t.Errorf("unexpected number of conversion invocations")
+	}
+}
+
+func TestConverter_IgnoredConversionNested(t *testing.T) {
+	type C string
+	type A struct {
+		C C
+	}
+	type B struct {
+		C C
+	}
+
+	c := NewConverter()
+	typed := C("")
+	if err := c.RegisterIgnoredConversion(&typed, &typed); err != nil {
+		t.Fatal(err)
+	}
+	a := A{C: C("test")}
+	b := B{C: C("other")}
+	if err := c.Convert(&a, &b, AllowDifferentFieldTypeNames, nil); err != nil {
+		t.Errorf("%v", err)
+	}
+	if b.C != C("other") {
+		t.Errorf("expected no conversion of field C: %#v", b)
+	}
+}
+
 func TestConverter_GeneratedConversionOverriden(t *testing.T) {
 	type A struct{}
 	type B struct{}
@@ -239,6 +290,37 @@ func TestConverter_GeneratedConversionOverriden(t *testing.T) {
 	a := A{}
 	b := B{}
 	if err := c.Convert(&a, &b, 0, nil); err != nil {
+		t.Errorf("%v", err)
+	}
+}
+
+func TestConverter_WithConversionOverriden(t *testing.T) {
+	type A struct{}
+	type B struct{}
+	c := NewConverter()
+	if err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
+		return fmt.Errorf("conversion function should be overriden")
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if err := c.RegisterGeneratedConversionFunc(func(in *A, out *B, s Scope) error {
+		return fmt.Errorf("generated function should be overriden")
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	ext := NewConversionFuncs()
+	ext.Add(func(in *A, out *B, s Scope) error {
+		return nil
+	})
+	newc := c.WithConversions(ext)
+
+	a := A{}
+	b := B{}
+	if err := c.Convert(&a, &b, 0, nil); err == nil || err.Error() != "conversion function should be overriden" {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := newc.Convert(&a, &b, 0, nil); err != nil {
 		t.Errorf("%v", err)
 	}
 }
@@ -679,5 +761,134 @@ func TestConverter_FieldRename(t *testing.T) {
 		if e, a := item.expect, item.to; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v: unexpected diff: %v", name, objDiff(e, a))
 		}
+	}
+}
+
+func TestMetaValues(t *testing.T) {
+	type InternalSimple struct {
+		APIVersion string `json:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty"`
+		TestString string `json:"testString"`
+	}
+	type ExternalSimple struct {
+		APIVersion string `json:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty"`
+		TestString string `json:"testString"`
+	}
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: "__internal"}
+	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "externalVersion"}
+
+	s := NewScheme()
+	s.AddKnownTypeWithName(internalGV.WithKind("Simple"), &InternalSimple{})
+	s.AddKnownTypeWithName(externalGV.WithKind("Simple"), &ExternalSimple{})
+
+	internalToExternalCalls := 0
+	externalToInternalCalls := 0
+
+	// Register functions to verify that scope.Meta() gets set correctly.
+	err := s.AddConversionFuncs(
+		func(in *InternalSimple, out *ExternalSimple, scope Scope) error {
+			t.Logf("internal -> external")
+			if e, a := internalGV.String(), scope.Meta().SrcVersion; e != a {
+				t.Fatalf("Expected '%v', got '%v'", e, a)
+			}
+			if e, a := externalGV.String(), scope.Meta().DestVersion; e != a {
+				t.Fatalf("Expected '%v', got '%v'", e, a)
+			}
+			scope.Convert(&in.TestString, &out.TestString, 0)
+			internalToExternalCalls++
+			return nil
+		},
+		func(in *ExternalSimple, out *InternalSimple, scope Scope) error {
+			t.Logf("external -> internal")
+			if e, a := externalGV.String(), scope.Meta().SrcVersion; e != a {
+				t.Errorf("Expected '%v', got '%v'", e, a)
+			}
+			if e, a := internalGV.String(), scope.Meta().DestVersion; e != a {
+				t.Fatalf("Expected '%v', got '%v'", e, a)
+			}
+			scope.Convert(&in.TestString, &out.TestString, 0)
+			externalToInternalCalls++
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	simple := &InternalSimple{
+		TestString: "foo",
+	}
+
+	s.Log(t)
+
+	out, err := s.ConvertToVersion(simple, externalGV.String())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	internal, err := s.ConvertToVersion(out, internalGV.String())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if e, a := simple, internal; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
+	}
+
+	if e, a := 1, internalToExternalCalls; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	if e, a := 1, externalToInternalCalls; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+}
+
+func TestMetaValuesUnregisteredConvert(t *testing.T) {
+	type InternalSimple struct {
+		Version    string `json:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty"`
+		TestString string `json:"testString"`
+	}
+	type ExternalSimple struct {
+		Version    string `json:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty"`
+		TestString string `json:"testString"`
+	}
+	s := NewScheme()
+	// We deliberately don't register the types.
+
+	internalToExternalCalls := 0
+
+	// Register functions to verify that scope.Meta() gets set correctly.
+	err := s.AddConversionFuncs(
+		func(in *InternalSimple, out *ExternalSimple, scope Scope) error {
+			if e, a := "unknown/unknown", scope.Meta().SrcVersion; e != a {
+				t.Fatalf("Expected '%v', got '%v'", e, a)
+			}
+			if e, a := "unknown/unknown", scope.Meta().DestVersion; e != a {
+				t.Fatalf("Expected '%v', got '%v'", e, a)
+			}
+			scope.Convert(&in.TestString, &out.TestString, 0)
+			internalToExternalCalls++
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	simple := &InternalSimple{TestString: "foo"}
+	external := &ExternalSimple{}
+	err = s.Convert(simple, external)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if e, a := simple.TestString, external.TestString; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+
+	// Verify that our conversion handler got called.
+	if e, a := 1, internalToExternalCalls; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
 	}
 }
