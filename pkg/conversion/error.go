@@ -28,6 +28,11 @@ type notRegisteredErr struct {
 	t   reflect.Type
 }
 
+// NewNotRegisteredErr is exposed for testing.
+func NewNotRegisteredErr(gvk unversioned.GroupVersionKind, t reflect.Type) error {
+	return &notRegisteredErr{gvk: gvk, t: t}
+}
+
 func (k *notRegisteredErr) Error() string {
 	if k.t != nil {
 		return fmt.Sprintf("no kind is registered for the type %v", k.t)

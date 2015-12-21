@@ -14,11 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package conversion provides go object versioning.
-//
-// Specifically, conversion provides a way for you to define multiple versions
-// of the same object. You may write functions which implement conversion logic,
-// but for the fields which did not change, copying is automated. This makes it
-// easy to modify the structures you use in memory without affecting the format
-// you store on disk or respond to in your external API calls.
 package conversion
+
+import "testing"
+
+func TestInvalidPtrValueKind(t *testing.T) {
+	var simple interface{}
+	switch obj := simple.(type) {
+	default:
+		_, err := EnforcePtr(obj)
+		if err == nil {
+			t.Errorf("Expected error on invalid kind")
+		}
+	}
+}
+
+func TestEnforceNilPtr(t *testing.T) {
+	var nilPtr *struct{}
+	_, err := EnforcePtr(nilPtr)
+	if err == nil {
+		t.Errorf("Expected error on nil pointer")
+	}
+}
