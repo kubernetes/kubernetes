@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
@@ -104,7 +105,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 
 	mapper, typer := f.Object()
-	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options.Filenames...).
@@ -192,13 +193,19 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 
 	if inline := cmdutil.GetFlagString(cmd, "overrides"); len(inline) > 0 {
-		object, err = cmdutil.Merge(object, inline, mapping.GroupVersionKind.Kind)
+		codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(true))
+		object, err = cmdutil.Merge(codec, object, inline, mapping.GroupVersionKind.Kind)
 		if err != nil {
 			return err
 		}
 	}
 
-	resourceMapper := &resource.Mapper{ObjectTyper: typer, RESTMapper: mapper, ClientMapper: f.ClientMapperForCommand()}
+	resourceMapper := &resource.Mapper{
+		ObjectTyper:  typer,
+		RESTMapper:   mapper,
+		ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
+		Decoder:      f.Decoder(true),
+	}
 	info, err = resourceMapper.InfoForObject(object)
 	if err != nil {
 		return err
@@ -207,7 +214,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	if cmdutil.GetFlagBool(cmd, "dry-run") {
 		return f.PrintObject(cmd, object, out)
 	}
-	if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info); err != nil {
+	if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
 		return err
 	}
 

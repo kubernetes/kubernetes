@@ -45,25 +45,25 @@ func NewCmdClusterInfo(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunClusterInfo(factory *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
+func RunClusterInfo(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	if len(os.Args) > 1 && os.Args[1] == "clusterinfo" {
 		printDeprecationWarning("cluster-info", "clusterinfo")
 	}
 
-	client, err := factory.ClientConfig()
+	client, err := f.ClientConfig()
 	if err != nil {
 		return err
 	}
 	printService(out, "Kubernetes master", client.Host)
 
-	mapper, typer := factory.Object()
+	mapper, typer := f.Object()
 	cmdNamespace := cmdutil.GetFlagString(cmd, "namespace")
 	if cmdNamespace == "" {
 		cmdNamespace = api.NamespaceSystem
 	}
 
 	// TODO use generalized labels once they are implemented (#341)
-	b := resource.NewBuilder(mapper, typer, factory.ClientMapperForCommand()).
+	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		SelectorParam("kubernetes.io/cluster-service=true").
 		ResourceTypeOrNameArgs(false, []string{"services"}...).

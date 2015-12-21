@@ -38,6 +38,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -94,22 +95,21 @@ func versionErrIfFalse(b bool) error {
 }
 
 var validVersion = testapi.Default.GroupVersion().Version
-var internalGV = unversioned.GroupVersion{Group: "apitest", Version: ""}
+var internalGV = unversioned.GroupVersion{Group: "apitest", Version: runtime.APIVersionInternal}
 var unlikelyGV = unversioned.GroupVersion{Group: "apitest", Version: "unlikelyversion"}
 var validVersionGV = unversioned.GroupVersion{Group: "apitest", Version: validVersion}
 
 func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme := runtime.NewScheme()
-	scheme.AddInternalGroupVersion(internalGV)
 	scheme.AddKnownTypeWithName(internalGV.WithKind("Type"), &internalType{})
 	scheme.AddKnownTypeWithName(unlikelyGV.WithKind("Type"), &externalType{})
 	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
 	scheme.AddKnownTypeWithName(validVersionGV.WithKind("Type"), &ExternalType2{})
 
-	codec := runtime.CodecFor(scheme, unlikelyGV)
+	codecs := serializer.NewCodecFactory(scheme)
+	codec := codecs.LegacyCodec(unlikelyGV)
 	mapper := meta.NewDefaultRESTMapper([]unversioned.GroupVersion{unlikelyGV, validVersionGV}, func(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
 		return &meta.VersionInterfaces{
-			Codec:            runtime.CodecFor(scheme, version),
 			ObjectConvertor:  scheme,
 			MetadataAccessor: meta.NewAccessor(),
 		}, versionErrIfFalse(version == validVersionGV || version == unlikelyGV)
@@ -177,8 +177,14 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			return t.Mapper, t.Typer
 		},
-		RESTClient: func(*meta.RESTMapping) (resource.RESTClient, error) {
+		ClientForMapping: func(*meta.RESTMapping) (resource.RESTClient, error) {
 			return t.Client, t.Err
+		},
+		Decoder: func(bool) runtime.Decoder {
+			return codec
+		},
+		JSONEncoder: func() runtime.Encoder {
+			return codec
 		},
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
@@ -203,7 +209,7 @@ func NewMixedFactory(apiClient resource.RESTClient) (*cmdutil.Factory, *testFact
 	f.Object = func() (meta.RESTMapper, runtime.ObjectTyper) {
 		return meta.MultiRESTMapper{t.Mapper, testapi.Default.RESTMapper()}, runtime.MultiObjectTyper{t.Typer, api.Scheme}
 	}
-	f.RESTClient = func(m *meta.RESTMapping) (resource.RESTClient, error) {
+	f.ClientForMapping = func(m *meta.RESTMapping) (resource.RESTClient, error) {
 		if m.ObjectConvertor == api.Scheme {
 			return apiClient, t.Err
 		}
@@ -228,8 +234,14 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 			c.Client = fakeClient.Client
 			return c, t.Err
 		},
-		RESTClient: func(*meta.RESTMapping) (resource.RESTClient, error) {
+		ClientForMapping: func(*meta.RESTMapping) (resource.RESTClient, error) {
 			return t.Client, t.Err
+		},
+		Decoder: func(bool) runtime.Decoder {
+			return testapi.Default.Codec()
+		},
+		JSONEncoder: func() runtime.Encoder {
+			return testapi.Default.Codec()
 		},
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
@@ -296,7 +308,7 @@ func stringBody(body string) io.ReadCloser {
 //	mapping := &meta.RESTMapping{
 //		APIVersion: version,
 //	}
-//	c, err := f.RESTClient(mapping)
+//	c, err := f.ClientForMapping(mapping)
 //	if err != nil {
 //		t.Errorf("unexpected error: %v", err)
 //	}

@@ -245,7 +245,7 @@ func TestValidateCachesSchema(t *testing.T) {
 	os.RemoveAll(dir)
 
 	obj := &api.Pod{}
-	data, err := testapi.Default.Codec().Encode(obj)
+	data, err := runtime.Encode(testapi.Default.Codec(), obj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		t.FailNow()
