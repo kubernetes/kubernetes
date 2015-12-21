@@ -33,7 +33,6 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -68,7 +67,7 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 	case "name":
 		printer = &NamePrinter{
 			Typer:   runtime.ObjectTyperToTyper(api.Scheme),
-			Decoder: latest.Codecs.UniversalDecoder(),
+			Decoder: api.Codecs.UniversalDecoder(),
 		}
 	case "template", "go-template":
 		if len(formatArgument) == 0 {

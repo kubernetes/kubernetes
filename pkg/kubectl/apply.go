@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type debugError interface {
@@ -80,7 +81,7 @@ func SetOriginalConfiguration(info *resource.Info, original []byte) error {
 // If annotate is true, it embeds the result as an anotation in the modified
 // configuration. If an object was read from the command input, it will use that
 // version of the object. Otherwise, it will use the version from the server.
-func GetModifiedConfiguration(info *resource.Info, annotate bool) ([]byte, error) {
+func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.Encoder) ([]byte, error) {
 	// First serialize the object without the annotation to prevent recursion,
 	// then add that serialization to it as the annotation and serialize it again.
 	var modified []byte
@@ -100,6 +101,8 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool) ([]byte, error
 		original := annotations[LastAppliedConfigAnnotation]
 		delete(annotations, LastAppliedConfigAnnotation)
 		accessor.SetAnnotations(annotations)
+		// TODO: this needs to be abstracted - there should be no assumption that versioned object
+		// can be marshalled to JSON.
 		modified, err = json.Marshal(info.VersionedObject)
 		if err != nil {
 			return nil, err
@@ -108,6 +111,8 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool) ([]byte, error
 		if annotate {
 			annotations[LastAppliedConfigAnnotation] = string(modified)
 			accessor.SetAnnotations(annotations)
+			// TODO: this needs to be abstracted - there should be no assumption that versioned object
+			// can be marshalled to JSON.
 			modified, err = json.Marshal(info.VersionedObject)
 			if err != nil {
 				return nil, err
@@ -136,7 +141,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool) ([]byte, error
 			return nil, err
 		}
 
-		modified, err = info.Mapping.Codec.Encode(info.Object)
+		modified, err = runtime.Encode(codec, info.Object)
 		if err != nil {
 			return nil, err
 		}
@@ -147,7 +152,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool) ([]byte, error
 				return nil, err
 			}
 
-			modified, err = info.Mapping.Codec.Encode(info.Object)
+			modified, err = runtime.Encode(codec, info.Object)
 			if err != nil {
 				return nil, err
 			}
@@ -165,17 +170,17 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool) ([]byte, error
 
 // UpdateApplyAnnotation calls CreateApplyAnnotation if the last applied
 // configuration annotation is already present. Otherwise, it does nothing.
-func UpdateApplyAnnotation(info *resource.Info) error {
+func UpdateApplyAnnotation(info *resource.Info, codec runtime.Encoder) error {
 	if original, err := GetOriginalConfiguration(info); err != nil || len(original) <= 0 {
 		return err
 	}
-	return CreateApplyAnnotation(info)
+	return CreateApplyAnnotation(info, codec)
 }
 
 // CreateApplyAnnotation gets the modified configuration of the object,
 // without embedding it again, and then sets it on the object as the annotation.
-func CreateApplyAnnotation(info *resource.Info) error {
-	modified, err := GetModifiedConfiguration(info, false)
+func CreateApplyAnnotation(info *resource.Info, codec runtime.Encoder) error {
+	modified, err := GetModifiedConfiguration(info, false, codec)
 	if err != nil {
 		return err
 	}
@@ -184,9 +189,9 @@ func CreateApplyAnnotation(info *resource.Info) error {
 
 // Create the annotation used by kubectl apply only when createAnnotation is true
 // Otherwise, only update the annotation when it already exists
-func CreateOrUpdateAnnotation(createAnnotation bool, info *resource.Info) error {
+func CreateOrUpdateAnnotation(createAnnotation bool, info *resource.Info, codec runtime.Encoder) error {
 	if createAnnotation {
-		return CreateApplyAnnotation(info)
+		return CreateApplyAnnotation(info, codec)
 	}
-	return UpdateApplyAnnotation(info)
+	return UpdateApplyAnnotation(info, codec)
 }

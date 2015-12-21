@@ -151,7 +151,7 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra
 	}
 
 	mapper, typer := f.Object()
-	o.builder = resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+	o.builder = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, o.filenames...).
@@ -211,7 +211,7 @@ func (o AnnotateOptions) RunAnnotate() error {
 		}
 
 		mapping := info.ResourceMapping()
-		client, err := o.f.RESTClient(mapping)
+		client, err := o.f.ClientForMapping(mapping)
 		if err != nil {
 			return err
 		}
