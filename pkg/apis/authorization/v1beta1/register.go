@@ -17,7 +17,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -27,8 +26,6 @@ const GroupName = "authorization.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1beta1"}
-
-var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion)
 
 func AddToScheme(scheme *runtime.Scheme) {
 	// Add the API to Scheme.

@@ -94,7 +94,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	config.ProxyTLSClientConfig = &tls.Config{}
 	config.APIPrefix = "/apiPrefix"
 	config.APIGroupPrefix = "/apiGroupPrefix"
-	config.Serializer = latest.Codecs
+	config.Serializer = api.Codecs
 
 	s := New(&config)
 	apiGroupMeta := registered.GroupOrDie(api.GroupName)
