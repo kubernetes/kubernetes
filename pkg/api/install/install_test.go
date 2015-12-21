@@ -23,6 +23,7 @@ import (
 	internal "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestResourceVersioner(t *testing.T) {
@@ -49,7 +50,7 @@ func TestCodec(t *testing.T) {
 	pod := internal.Pod{}
 	// We do want to use package latest rather than testapi here, because we
 	// want to test if the package install and package latest work as expected.
-	data, err := latest.GroupOrDie(internal.GroupName).Codec.Encode(&pod)
+	data, err := runtime.Encode(latest.Codecs.LegacyCodec(latest.GroupOrDie(internal.GroupName).GroupVersion), &pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -100,8 +101,8 @@ func TestRESTMapper(t *testing.T) {
 		}
 
 		interfaces, _ := latest.GroupOrDie(internal.GroupName).InterfacesFor(version)
-		if mapping.Codec != interfaces.Codec {
-			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
+		if mapping.ObjectConvertor != interfaces.ObjectConvertor {
+			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
 		}
 
 		rc := &internal.ReplicationController{ObjectMeta: internal.ObjectMeta{Name: "foo"}}

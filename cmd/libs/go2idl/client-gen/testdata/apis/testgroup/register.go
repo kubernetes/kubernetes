@@ -19,9 +19,10 @@ package testgroup
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
-var SchemeGroupVersion = unversioned.GroupVersion{Group: "testgroup", Version: ""}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "testgroup", Version: runtime.APIVersionInternal}
 
 func init() {
 	// Register the API.

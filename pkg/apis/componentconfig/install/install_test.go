@@ -23,13 +23,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestCodec(t *testing.T) {
 	daemonSet := componentconfig.KubeProxyConfiguration{}
 	// We do want to use package latest rather than testapi here, because we
 	// want to test if the package install and package latest work as expected.
-	data, err := latest.GroupOrDie(componentconfig.GroupName).Codec.Encode(&daemonSet)
+	data, err := runtime.Encode(latest.Codecs.LegacyCodec(latest.GroupOrDie(componentconfig.GroupName).GroupVersion), &daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -80,8 +81,8 @@ func TestRESTMapper(t *testing.T) {
 		}
 
 		interfaces, _ := latest.GroupOrDie(componentconfig.GroupName).InterfacesFor(version)
-		if mapping.Codec != interfaces.Codec {
-			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
+		if mapping.ObjectConvertor != interfaces.ObjectConvertor {
+			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
 		}
 	}
 }

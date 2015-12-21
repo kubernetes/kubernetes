@@ -22,12 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
 )
-
-// Codec is the identity codec for this package - it can only convert itself
-// to itself.
-var Codec = runtime.CodecFor(Scheme, unversioned.GroupVersion{})
 
 func init() {
 	Scheme.AddDefaultingFuncs(

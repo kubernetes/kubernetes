@@ -21,9 +21,11 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
 var (
@@ -46,6 +48,9 @@ var (
 var ExternalVersions = []unversioned.GroupVersion{
 	{Group: "", Version: "v1"},
 }
+
+// Codecs provides access to encoding and decoding for the scheme
+var Codecs = serializer.NewCodecFactory(api.Scheme)
 
 // GroupMetaMap is a map between group names and their metadata.
 type GroupMetaMap map[string]*GroupMeta
@@ -117,12 +122,6 @@ type GroupMeta struct {
 	// GroupVersions is Group + Versions. This is to avoid string concatenation
 	// in many places.
 	GroupVersions []unversioned.GroupVersion
-
-	// Codec is the default codec for serializing output that should use
-	// the latest supported version.  Use this Codec when writing to
-	// disk, a data store that is not dynamically versioned, or in tests.
-	// This codec can decode any object that Kubernetes is aware of.
-	Codec runtime.Codec
 
 	// SelfLinker can set or get the SelfLink field of all API types.
 	// TODO: when versioning changes, make this part of each API definition.

@@ -20,12 +20,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "testgroup", Version: "v1"}
-
-var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion)
 
 func init() {
 	// Register the API.

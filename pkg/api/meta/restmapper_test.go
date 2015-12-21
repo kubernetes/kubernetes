@@ -19,7 +19,6 @@ package meta
 import (
 	"errors"
 	"io"
-	"net/url"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -30,32 +29,12 @@ type fakeCodec struct{}
 
 var _ runtime.Decoder = fakeCodec{}
 
-func (fakeCodec) Encode(runtime.Object) ([]byte, error) {
-	return []byte{}, nil
-}
-
-func (fakeCodec) EncodeToStream(runtime.Object, io.Writer) error {
+func (fakeCodec) EncodeToStream(runtime.Object, io.Writer, ...unversioned.GroupVersion) error {
 	return nil
 }
 
-func (fakeCodec) Decode([]byte) (runtime.Object, error) {
-	return nil, nil
-}
-
-func (fakeCodec) DecodeToVersion([]byte, unversioned.GroupVersion) (runtime.Object, error) {
-	return nil, nil
-}
-
-func (fakeCodec) DecodeInto([]byte, runtime.Object) error {
-	return nil
-}
-
-func (fakeCodec) DecodeIntoWithSpecifiedVersionKind([]byte, runtime.Object, unversioned.GroupVersionKind) error {
-	return nil
-}
-
-func (fakeCodec) DecodeParametersInto(parameters url.Values, obj runtime.Object) error {
-	return nil
+func (fakeCodec) Decode([]byte, *unversioned.GroupVersionKind, runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+	return nil, nil, nil
 }
 
 type fakeConvertor struct{}
@@ -77,7 +56,7 @@ var validAccessor = resourceAccessor{}
 var validConvertor = fakeConvertor{}
 
 func fakeInterfaces(version unversioned.GroupVersion) (*VersionInterfaces, error) {
-	return &VersionInterfaces{Codec: validCodec, ObjectConvertor: validConvertor, MetadataAccessor: validAccessor}, nil
+	return &VersionInterfaces{ObjectConvertor: validConvertor, MetadataAccessor: validAccessor}, nil
 }
 
 var unmatchedErr = errors.New("no version")
@@ -283,7 +262,7 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 			t.Errorf("%d: unexpected resource: %#v", i, mapping)
 		}
 
-		if mapping.Codec == nil || mapping.MetadataAccessor == nil || mapping.ObjectConvertor == nil {
+		if mapping.MetadataAccessor == nil || mapping.ObjectConvertor == nil {
 			t.Errorf("%d: missing codec and accessor: %#v", i, mapping)
 		}
 

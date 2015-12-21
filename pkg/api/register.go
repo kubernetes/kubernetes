@@ -29,7 +29,14 @@ var Scheme = runtime.NewScheme()
 const GroupName = ""
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: ""}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
+
+// Unversiond is group version for unversioned API objects
+// TODO: this should be v1 probably
+var Unversioned = unversioned.GroupVersion{Group: "", Version: "v1"}
+
+// ParameterCodec handles versioning of objects that are converted to query parameters.
+var ParameterCodec = runtime.NewParameterCodec(Scheme)
 
 // Kind takes an unqualified kind and returns back a Group qualified GroupKind
 func Kind(kind string) unversioned.GroupKind {
@@ -42,6 +49,9 @@ func Resource(resource string) unversioned.GroupResource {
 }
 
 func init() {
+	if err := Scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
+		panic(err)
+	}
 	Scheme.AddKnownTypes(SchemeGroupVersion,
 		&Pod{},
 		&PodList{},
@@ -86,14 +96,15 @@ func init() {
 		&RangeAllocation{},
 	)
 
-	// Register Unversioned types
-	// TODO this should not be done here
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.ExportOptions{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.Status{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIVersions{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIGroupList{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIGroup{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIResourceList{})
+	// Register Unversioned types under their own special group
+	Scheme.AddUnversionedTypes(Unversioned,
+		&unversioned.ExportOptions{},
+		&unversioned.Status{},
+		&unversioned.APIVersions{},
+		&unversioned.APIGroupList{},
+		&unversioned.APIGroup{},
+		&unversioned.APIResourceList{},
+	)
 }
 
 func (obj *Pod) GetObjectMeta() meta.Object                                  { return &obj.ObjectMeta }

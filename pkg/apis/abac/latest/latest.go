@@ -17,8 +17,11 @@ limitations under the License.
 package latest
 
 import (
-	"k8s.io/kubernetes/pkg/apis/abac/v1beta1"
+	api "k8s.io/kubernetes/pkg/apis/abac"
+	_ "k8s.io/kubernetes/pkg/apis/abac/v0"
+	_ "k8s.io/kubernetes/pkg/apis/abac/v1beta1"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
-// Codec is the default codec for serializing input that should use the latest supported version.
-var Codec = v1beta1.Codec
+// Codecs provides access to encoding and decoding for the scheme
+var Codecs = serializer.NewCodecFactory(api.Scheme)

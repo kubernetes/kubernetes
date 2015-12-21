@@ -24,7 +24,6 @@ import (
 
 // VersionInterfaces contains the interfaces one should use for dealing with types of a particular version.
 type VersionInterfaces struct {
-	runtime.Codec
 	runtime.ObjectConvertor
 	MetadataAccessor
 }
@@ -142,7 +141,6 @@ type RESTMapping struct {
 	// Scope contains the information needed to deal with REST Resources that are in a resource hierarchy
 	Scope RESTScope
 
-	runtime.Codec
 	runtime.ObjectConvertor
 	MetadataAccessor
 }

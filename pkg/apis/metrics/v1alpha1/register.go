@@ -20,7 +20,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // GroupName is the group name use in this package
@@ -28,8 +27,6 @@ const GroupName = "metrics"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1alpha1"}
-
-var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion)
 
 func init() {
 	// Register the API.

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package abac
 
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -28,8 +28,7 @@ const Group = "abac.authorization.kubernetes.io"
 var Scheme = runtime.NewScheme()
 
 func init() {
-	Scheme.AddInternalGroupVersion(unversioned.GroupVersion{Group: Group, Version: ""})
-	Scheme.AddKnownTypes(unversioned.GroupVersion{Group: Group, Version: ""},
+	Scheme.AddKnownTypes(unversioned.GroupVersion{Group: Group, Version: runtime.APIVersionInternal},
 		&Policy{},
 	)
 }

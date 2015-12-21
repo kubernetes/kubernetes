@@ -120,7 +120,7 @@ func SetList(list runtime.Object, objects []runtime.Object) error {
 		} else if src.Type().ConvertibleTo(dest.Type()) {
 			dest.Set(src.Convert(dest.Type()))
 		} else {
-			return fmt.Errorf("item[%d]: Type mismatch: Expected %v, got %v", i, dest.Type(), src.Type())
+			return fmt.Errorf("item[%d]: can't assign or convert %v into %v", i, src.Type(), dest.Type())
 		}
 	}
 	items.Set(slice)

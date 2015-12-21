@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // Implements RESTScope interface
@@ -82,7 +83,7 @@ type DefaultRESTMapper struct {
 
 var _ RESTMapper = &DefaultRESTMapper{}
 
-// VersionInterfacesFunc returns the appropriate codec, typer, and metadata accessor for a
+// VersionInterfacesFunc returns the appropriate typer, and metadata accessor for a
 // given api version, or an error if no such api version exists.
 type VersionInterfacesFunc func(version unversioned.GroupVersion) (*VersionInterfaces, error)
 
@@ -90,7 +91,7 @@ type VersionInterfacesFunc func(version unversioned.GroupVersion) (*VersionInter
 // to a resource name and back based on the objects in a runtime.Scheme
 // and the Kubernetes API conventions. Takes a group name, a priority list of the versions
 // to search when an object has no default version (set empty to return an error),
-// and a function that retrieves the correct codec and metadata for a given version.
+// and a function that retrieves the correct metadata for a given version.
 func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, f VersionInterfacesFunc) *DefaultRESTMapper {
 	resourceToKind := make(map[string]unversioned.GroupVersionKind)
 	kindToPluralResource := make(map[unversioned.GroupVersionKind]string)
@@ -182,7 +183,7 @@ func (m *DefaultRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...st
 	var gvk *unversioned.GroupVersionKind
 	hadVersion := false
 	for _, version := range versions {
-		if len(version) == 0 {
+		if len(version) == 0 || version == runtime.APIVersionInternal {
 			continue
 		}
 
@@ -242,7 +243,6 @@ func (m *DefaultRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...st
 		GroupVersionKind: *gvk,
 		Scope:            scope,
 
-		Codec:            interfaces.Codec,
 		ObjectConvertor:  interfaces.ObjectConvertor,
 		MetadataAccessor: interfaces.MetadataAccessor,
 	}

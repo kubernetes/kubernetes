@@ -56,9 +56,6 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				*j = nil
 			}
 		},
-		func(j *runtime.PluginBase, c fuzz.Continue) {
-			// Do nothing; this struct has only a Kind field and it must stay blank in memory.
-		},
 		func(j *runtime.TypeMeta, c fuzz.Continue) {
 			// We have to customize the randomization of TypeMetas because their
 			// APIVersion and Kind must remain blank in memory.
@@ -174,10 +171,8 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			// TODO: uncomment when round trip starts from a versioned object
 			if true { //c.RandBool() {
 				*j = &runtime.Unknown{
-					// apiVersion has rules now.  Since it includes <group>/<version> and only `v1` can be bare,
-					// then this must choose a valid format to deserialize
-					TypeMeta: runtime.TypeMeta{Kind: "Something", APIVersion: "unknown.group/unknown"},
-					RawJSON:  []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`),
+					// We do not set TypeMeta here because it is not carried through a round trip
+					RawJSON: []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`),
 				}
 			} else {
 				types := []runtime.Object{&api.Pod{}, &api.ReplicationController{}}
