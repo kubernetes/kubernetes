@@ -18,38 +18,10 @@ limitations under the License.
 
 package metrics
 
-import (
-	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-)
-
-func deepCopy_unversioned_TypeMeta(in unversioned.TypeMeta, out *unversioned.TypeMeta, c *conversion.Cloner) error {
-	out.Kind = in.Kind
-	out.APIVersion = in.APIVersion
-	return nil
-}
-
-func deepCopy_metrics_RawNode(in RawNode, out *RawNode, c *conversion.Cloner) error {
-	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	return nil
-}
-
-func deepCopy_metrics_RawPod(in RawPod, out *RawPod, c *conversion.Cloner) error {
-	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	return nil
-}
+import api "k8s.io/kubernetes/pkg/api"
 
 func init() {
-	err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		deepCopy_unversioned_TypeMeta,
-		deepCopy_metrics_RawNode,
-		deepCopy_metrics_RawPod,
-	)
+	err := api.Scheme.AddGeneratedDeepCopyFuncs()
 	if err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)

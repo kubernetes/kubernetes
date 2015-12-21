@@ -48803,7 +48803,7 @@ func (x codecSelfer1234) decSliceruntime_RawExtension(v *[]pkg6_runtime.RawExten
 
 			yyrg3828 := len(yyv3828) > 0
 			yyv23828 := yyv3828
-			yyrl3828, yyrt3828 = z.DecInferLen(yyl3828, z.DecBasicHandle().MaxInitLen, 24)
+			yyrl3828, yyrt3828 = z.DecInferLen(yyl3828, z.DecBasicHandle().MaxInitLen, 40)
 			if yyrt3828 {
 				if yyrl3828 <= cap(yyv3828) {
 					yyv3828 = yyv3828[:yyrl3828]
