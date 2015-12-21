@@ -17,8 +17,7 @@ limitations under the License.
 package unversioned
 
 import (
-	"fmt"
-
+	api "k8s.io/kubernetes/pkg/api"
 	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
 )

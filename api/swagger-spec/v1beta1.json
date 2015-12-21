@@ -79,7 +79,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -124,7 +125,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -201,7 +203,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -351,7 +354,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -404,7 +408,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -457,7 +462,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -512,7 +518,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -678,7 +685,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -836,7 +844,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -881,7 +890,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -958,7 +968,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -1108,7 +1119,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -1161,7 +1173,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -1214,7 +1227,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -1269,7 +1283,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -1435,7 +1450,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -1569,7 +1585,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -1652,7 +1669,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -1697,7 +1715,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -1774,7 +1793,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -1924,7 +1944,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -1977,7 +1998,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -2030,7 +2052,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -2085,7 +2108,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -2251,7 +2275,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -2385,7 +2410,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -2468,7 +2494,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -2513,7 +2540,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -2590,7 +2618,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -2740,7 +2769,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -2793,7 +2823,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -2846,7 +2877,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -2901,7 +2933,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -3067,7 +3100,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -3201,7 +3235,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -3252,7 +3287,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -3305,7 +3341,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "*/*"
@@ -3358,7 +3395,8 @@
        }
       ],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
        "application/json-patch+json",
@@ -3379,10 +3417,12 @@
       "nickname": "getAPIResources",
       "parameters": [],
       "produces": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ],
       "consumes": [
-       "application/json"
+       "application/json",
+       "application/yaml"
       ]
      }
     ]
