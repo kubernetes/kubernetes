@@ -27,12 +27,14 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	kubectltesting "k8s.io/kubernetes/pkg/kubectl/testing"
 	"k8s.io/kubernetes/pkg/runtime"
+	yamlserializer "k8s.io/kubernetes/pkg/runtime/serializer/yaml"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -121,17 +123,17 @@ func TestPrinter(t *testing.T) {
 		{"test jsonpath", "jsonpath", "{.metadata.name}", podTest, "foo"},
 		{"test jsonpath list", "jsonpath", "{.items[*].metadata.name}", podListTest, "foo bar"},
 		{"test jsonpath empty list", "jsonpath", "{.items[*].metadata.name}", emptyListTest, ""},
-		{"test name", "name", "", podTest, "/foo\n"},
+		{"test name", "name", "", podTest, "pod/foo\n"},
 		{"emits versioned objects", "template", "{{.kind}}", testapi, "Pod"},
 	}
 	for _, test := range printerTests {
 		buf := bytes.NewBuffer([]byte{})
 		printer, found, err := GetPrinter(test.Format, test.FormatArgument)
 		if err != nil || !found {
-			t.Errorf("unexpected error: %#v", err)
+			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
 		}
 		if err := printer.PrintObj(test.Input, buf); err != nil {
-			t.Errorf("unexpected error: %#v", err)
+			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
 		}
 		if buf.String() != test.Expect {
 			t.Errorf("in %s, expect %q, got %q", test.Name, test.Expect, buf.String())
@@ -175,8 +177,8 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	}
 	// Use real decode function to undo the versioning process.
 	poutput = kubectltesting.TestStruct{}
-	err = runtime.YAMLDecoder(testapi.Default.Codec()).DecodeInto(buf.Bytes(), &poutput)
-	if err != nil {
+	s := yamlserializer.NewDecodingSerializer(testapi.Default.Codec())
+	if err := runtime.DecodeInto(s, buf.Bytes(), &poutput); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(testData, poutput) {
@@ -196,8 +198,7 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	}
 	// Use real decode function to undo the versioning process.
 	objOut = api.Pod{}
-	err = runtime.YAMLDecoder(testapi.Default.Codec()).DecodeInto(buf.Bytes(), &objOut)
-	if err != nil {
+	if err := runtime.DecodeInto(s, buf.Bytes(), &objOut); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(obj, &objOut) {
@@ -463,7 +464,10 @@ func TestPrinters(t *testing.T) {
 		"template":             templatePrinter,
 		"template2":            templatePrinter2,
 		"jsonpath":             jsonpathPrinter,
-		"name":                 &NamePrinter{},
+		"name": &NamePrinter{
+			Typer:   runtime.ObjectTyperToTyper(api.Scheme),
+			Decoder: latest.Codecs.UniversalDecoder(),
+		},
 	}
 	objects := map[string]runtime.Object{
 		"pod":             &api.Pod{ObjectMeta: om("pod")},
