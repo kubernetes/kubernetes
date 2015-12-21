@@ -25,6 +25,7 @@ import (
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func autoconvert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource(in *api.AWSElasticBlockStoreVolumeSource, out *AWSElasticBlockStoreVolumeSource, s conversion.Scope) error {
@@ -1106,8 +1107,15 @@ func autoconvert_api_List_To_v1_List(in *api.List, out *List, s conversion.Scope
 	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
-	if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
-		return err
+	if in.Items != nil {
+		out.Items = make([]runtime.RawExtension, len(in.Items))
+		for i := range in.Items {
+			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -4177,8 +4185,15 @@ func autoconvert_v1_List_To_api_List(in *List, out *api.List, s conversion.Scope
 	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
 		return err
 	}
-	if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
-		return err
+	if in.Items != nil {
+		out.Items = make([]runtime.Object, len(in.Items))
+		for i := range in.Items {
+			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
