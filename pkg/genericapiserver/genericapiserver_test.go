@@ -85,7 +85,7 @@ func TestNew(t *testing.T) {
 func TestNewHandlerContainer(t *testing.T) {
 	assert := assert.New(t)
 	mux := http.NewServeMux()
-	container := NewHandlerContainer(mux)
+	container := NewHandlerContainer(mux, nil)
 	assert.Equal(mux, container.ServeMux, "ServerMux's do not match")
 }
 
@@ -124,7 +124,7 @@ func TestInstallSwaggerAPI(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	mux := http.NewServeMux()
-	server.HandlerContainer = NewHandlerContainer(mux)
+	server.HandlerContainer = NewHandlerContainer(mux, nil)
 
 	// Ensure swagger isn't installed without the call
 	ws := server.HandlerContainer.RegisteredWebServices()
@@ -143,7 +143,7 @@ func TestInstallSwaggerAPI(t *testing.T) {
 
 	// Empty externalHost verification
 	mux = http.NewServeMux()
-	server.HandlerContainer = NewHandlerContainer(mux)
+	server.HandlerContainer = NewHandlerContainer(mux, nil)
 	server.externalHost = ""
 	server.ClusterIP = net.IPv4(10, 10, 10, 10)
 	server.PublicReadWritePort = 1010

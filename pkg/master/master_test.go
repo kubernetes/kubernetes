@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -84,6 +83,7 @@ func setUp(t *testing.T) (Master, *etcdtesting.EtcdTestServer, Config, *assert.A
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	_, etcdserver, config, assert := setUp(t)
 
+	config.Serializer = latest.Codecs
 	config.KubeletClient = client.FakeKubeletClient{}
 
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
@@ -179,7 +179,6 @@ func TestApi_v1(t *testing.T) {
 
 	version := master.api_v1(&config)
 	assert.Equal(unversioned.GroupVersion{Version: "v1"}, version.GroupVersion, "Version was not v1: %s", version.GroupVersion)
-	assert.Equal(v1.Codec, version.Codec, "version.Codec was not for v1: %s", version.Codec)
 	// Verify that version storage has all the resources.
 	for k, v := range master.v1ResourcesStorage {
 		k = strings.ToLower(k)
@@ -273,7 +272,8 @@ func TestExpapi(t *testing.T) {
 	expAPIGroup := master.experimental(&config)
 	assert.Equal(expAPIGroup.Root, master.ApiGroupPrefix)
 	assert.Equal(expAPIGroup.Mapper, extensionsGroupMeta.RESTMapper)
-	assert.Equal(expAPIGroup.Codec, extensionsGroupMeta.Codec)
+	assert.Equal(expAPIGroup.Serializer, latest.Codecs)
+	assert.Equal(expAPIGroup.ParameterCodec, api.ParameterCodec)
 	assert.Equal(expAPIGroup.Linker, extensionsGroupMeta.SelfLinker)
 	assert.Equal(expAPIGroup.GroupVersion, extensionsGroupMeta.GroupVersion)
 }
@@ -555,7 +555,6 @@ func decodeResponse(resp *http.Response, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-
 	if err := json.Unmarshal(data, obj); err != nil {
 		return err
 	}

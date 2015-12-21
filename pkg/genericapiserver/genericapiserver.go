@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericetcd "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
@@ -157,6 +158,9 @@ type Config struct {
 	// Map requests to contexts. Exported so downstream consumers can provider their own mappers
 	RequestContextMapper api.RequestContextMapper
 
+	// Required, the interface for serializing and converting objects to and from the wire
+	Serializer runtime.NegotiatedSerializer
+
 	// If specified, all web services will be registered into this container
 	RestfulContainer *restful.Container
 
@@ -252,6 +256,8 @@ type GenericAPIServer struct {
 
 	// storage contains the RESTful endpoints exposed by this GenericAPIServer
 	storage map[string]rest.Storage
+
+	Serializer runtime.NegotiatedSerializer
 
 	// "Outputs"
 	Handler         http.Handler
@@ -359,6 +365,7 @@ func New(c *Config) *GenericAPIServer {
 		AdmissionControl:         c.AdmissionControl,
 		ApiGroupVersionOverrides: c.APIGroupVersionOverrides,
 		RequestContextMapper:     c.RequestContextMapper,
+		Serializer:               c.Serializer,
 
 		cacheTimeout:      c.CacheTimeout,
 		MinRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
@@ -383,7 +390,7 @@ func New(c *Config) *GenericAPIServer {
 	} else {
 		mux := http.NewServeMux()
 		s.mux = mux
-		handlerContainer = NewHandlerContainer(mux)
+		handlerContainer = NewHandlerContainer(mux, c.Serializer)
 	}
 	s.HandlerContainer = handlerContainer
 	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
@@ -422,10 +429,10 @@ func (s *GenericAPIServer) HandleFuncWithAuth(pattern string, handler func(http.
 	s.MuxHelper.HandleFunc(pattern, handler)
 }
 
-func NewHandlerContainer(mux *http.ServeMux) *restful.Container {
+func NewHandlerContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer) *restful.Container {
 	container := restful.NewContainer()
 	container.ServeMux = mux
-	apiserver.InstallRecoverHandler(container)
+	apiserver.InstallRecoverHandler(s, container)
 	return container
 }
 

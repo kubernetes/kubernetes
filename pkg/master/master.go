@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -67,6 +66,7 @@ import (
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
@@ -183,8 +183,8 @@ func (m *Master) InstallAPIs(c *Config) {
 	// Install root web services
 	m.HandlerContainer.Add(m.RootWebService)
 
-	apiserver.AddApiWebService(m.HandlerContainer, c.APIPrefix, apiVersions)
-	apiserver.InstallServiceErrorHandler(m.HandlerContainer, m.NewRequestInfoResolver(), apiVersions)
+	apiserver.AddApiWebService(m.Serializer, m.HandlerContainer, c.APIPrefix, apiVersions)
+	apiserver.InstallServiceErrorHandler(m.Serializer, m.HandlerContainer, m.NewRequestInfoResolver(), apiVersions)
 
 	// allGroups records all supported groups at /apis
 	allGroups := []unversioned.APIGroup{}
@@ -217,14 +217,14 @@ func (m *Master) InstallAPIs(c *Config) {
 			Versions:         expAPIVersions,
 			PreferredVersion: unversioned.GroupVersionForDiscovery{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
 		}
-		apiserver.AddGroupWebService(m.HandlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie(extensions.GroupName).GroupVersion.Group, group)
+		apiserver.AddGroupWebService(m.Serializer, m.HandlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie(extensions.GroupName).GroupVersion.Group, group)
 		allGroups = append(allGroups, group)
-		apiserver.InstallServiceErrorHandler(m.HandlerContainer, m.NewRequestInfoResolver(), []string{expVersion.GroupVersion.String()})
+		apiserver.InstallServiceErrorHandler(m.Serializer, m.HandlerContainer, m.NewRequestInfoResolver(), []string{expVersion.GroupVersion.String()})
 	}
 
 	// This should be done after all groups are registered
 	// TODO: replace the hardcoded "apis".
-	apiserver.AddApisWebService(m.HandlerContainer, "/apis", func() []unversioned.APIGroup {
+	apiserver.AddApisWebService(m.Serializer, m.HandlerContainer, "/apis", func() []unversioned.APIGroup {
 		groups := []unversioned.APIGroup{}
 		for ix := range allGroups {
 			groups = append(groups, allGroups[ix])
@@ -405,6 +405,8 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 
 		Mapper: latest.GroupOrDie(api.GroupName).RESTMapper,
 
+		ParameterCodec: api.ParameterCodec,
+
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
@@ -427,7 +429,7 @@ func (m *Master) api_v1(c *Config) *apiserver.APIGroupVersion {
 	version := m.defaultAPIGroupVersion()
 	version.Storage = storage
 	version.GroupVersion = unversioned.GroupVersion{Version: "v1"}
-	version.Codec = v1.Codec
+	version.Serializer = latest.Codecs
 	return version
 }
 
@@ -537,9 +539,9 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 		Name:     group,
 		Versions: []unversioned.GroupVersionForDiscovery{groupVersion},
 	}
-	apiserver.AddGroupWebService(m.HandlerContainer, path, apiGroup)
+	apiserver.AddGroupWebService(latest.Codecs, m.HandlerContainer, path, apiGroup)
 	m.addThirdPartyResourceStorage(path, thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST), apiGroup)
-	apiserver.InstallServiceErrorHandler(m.HandlerContainer, m.NewRequestInfoResolver(), []string{thirdparty.GroupVersion.String()})
+	apiserver.InstallServiceErrorHandler(latest.Codecs, m.HandlerContainer, m.NewRequestInfoResolver(), []string{thirdparty.GroupVersion.String()})
 	return nil
 }
 
@@ -553,10 +555,12 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 	}
 
 	optionsExternalVersion := latest.GroupOrDie(api.GroupName).GroupVersion
+	internalVersion := unversioned.GroupVersion{Group: group, Version: runtime.APIVersionInternal}
+	externalVersion := unversioned.GroupVersion{Group: group, Version: version}
 
 	return &apiserver.APIGroupVersion{
 		Root:                apiRoot,
-		GroupVersion:        unversioned.GroupVersion{Group: group, Version: version},
+		GroupVersion:        externalVersion,
 		RequestInfoResolver: m.NewRequestInfoResolver(),
 
 		Creater:   thirdpartyresourcedata.NewObjectCreator(group, version, api.Scheme),
@@ -564,10 +568,12 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 		Typer:     api.Scheme,
 
 		Mapper:                 thirdpartyresourcedata.NewMapper(latest.GroupOrDie(extensions.GroupName).RESTMapper, kind, version, group),
-		Codec:                  thirdpartyresourcedata.NewCodec(latest.GroupOrDie(extensions.GroupName).Codec, kind),
 		Linker:                 latest.GroupOrDie(extensions.GroupName).SelfLinker,
 		Storage:                storage,
 		OptionsExternalVersion: &optionsExternalVersion,
+
+		Serializer:     thirdpartyresourcedata.NewNegotiatedSerializer(latest.Codecs, kind, externalVersion, internalVersion),
+		ParameterCodec: api.ParameterCodec,
 
 		Context: m.RequestContextMapper,
 
@@ -653,11 +659,13 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		Typer:     api.Scheme,
 
 		Mapper:                 extensionsGroup.RESTMapper,
-		Codec:                  extensionsGroup.Codec,
 		Linker:                 extensionsGroup.SelfLinker,
 		Storage:                storage,
 		GroupVersion:           extensionsGroup.GroupVersion,
 		OptionsExternalVersion: &optionsExternalVersion,
+
+		Serializer:     latest.Codecs,
+		ParameterCodec: runtime.NewParameterCodec(api.Scheme),
 
 		Admit:   m.AdmissionControl,
 		Context: m.RequestContextMapper,

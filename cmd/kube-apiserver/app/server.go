@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -48,6 +47,7 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/util"
@@ -280,9 +280,9 @@ func (s *APIServer) verifyClusterIPFlags() {
 	}
 }
 
-type newEtcdFunc func([]string, meta.VersionInterfacesFunc, string, string) (storage.Interface, error)
+type newEtcdFunc func([]string, runtime.NegotiatedSerializer, string, string) (storage.Interface, error)
 
-func newEtcd(etcdServerList []string, interfacesFunc meta.VersionInterfacesFunc, storageGroupVersionString, pathPrefix string) (etcdStorage storage.Interface, err error) {
+func newEtcd(etcdServerList []string, ns runtime.NegotiatedSerializer, storageGroupVersionString, pathPrefix string) (etcdStorage storage.Interface, err error) {
 	if storageGroupVersionString == "" {
 		return etcdStorage, fmt.Errorf("storageVersion is required to create a etcd storage")
 	}
@@ -294,11 +294,11 @@ func newEtcd(etcdServerList []string, interfacesFunc meta.VersionInterfacesFunc,
 	var storageConfig etcdstorage.EtcdConfig
 	storageConfig.ServerList = etcdServerList
 	storageConfig.Prefix = pathPrefix
-	versionedInterface, err := interfacesFunc(storageVersion)
-	if err != nil {
-		return nil, err
+	s, ok := ns.SerializerForMediaType("application/json", nil)
+	if !ok {
+		return nil, fmt.Errorf("unable to find serializer for JSON")
 	}
-	storageConfig.Codec = versionedInterface.Codec
+	storageConfig.Codec = runtime.NewCodec(ns.EncoderForVersion(s, storageVersion), ns.DecoderToVersion(s, unversioned.GroupVersion{Group: storageVersion.Group, Version: runtime.APIVersionInternal}))
 	return storageConfig.NewStorage()
 }
 
@@ -347,7 +347,7 @@ func updateEtcdOverrides(overrides []string, storageVersions map[string]string, 
 		}
 
 		servers := strings.Split(tokens[1], ";")
-		etcdOverrideStorage, err := newEtcdFn(servers, apigroup.InterfacesFor, storageVersions[apigroup.GroupVersion.Group], prefix)
+		etcdOverrideStorage, err := newEtcdFn(servers, latest.Codecs, storageVersions[apigroup.GroupVersion.Group], prefix)
 		if err != nil {
 			glog.Fatalf("Invalid storage version or misconfigured etcd for %s: %v", tokens[0], err)
 		}
@@ -458,7 +458,7 @@ func (s *APIServer) Run(_ []string) error {
 	if _, found := storageVersions[legacyV1Group.GroupVersion.Group]; !found {
 		glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", legacyV1Group.GroupVersion.Group, storageVersions)
 	}
-	etcdStorage, err := newEtcd(s.EtcdServerList, legacyV1Group.InterfacesFor, storageVersions[legacyV1Group.GroupVersion.Group], s.EtcdPathPrefix)
+	etcdStorage, err := newEtcd(s.EtcdServerList, latest.Codecs, storageVersions[legacyV1Group.GroupVersion.Group], s.EtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
@@ -472,7 +472,7 @@ func (s *APIServer) Run(_ []string) error {
 		if _, found := storageVersions[expGroup.GroupVersion.Group]; !found {
 			glog.Fatalf("Couldn't find the storage version for group: %q in storageVersions: %v", expGroup.GroupVersion.Group, storageVersions)
 		}
-		expEtcdStorage, err := newEtcd(s.EtcdServerList, expGroup.InterfacesFor, storageVersions[expGroup.GroupVersion.Group], s.EtcdPathPrefix)
+		expEtcdStorage, err := newEtcd(s.EtcdServerList, latest.Codecs, storageVersions[expGroup.GroupVersion.Group], s.EtcdPathPrefix)
 		if err != nil {
 			glog.Fatalf("Invalid extensions storage version or misconfigured etcd: %v", err)
 		}
@@ -571,6 +571,7 @@ func (s *APIServer) Run(_ []string) error {
 			ProxyTLSClientConfig:      proxyTLSClientConfig,
 			ServiceNodePortRange:      s.ServiceNodePortRange,
 			KubernetesServiceNodePort: s.KubernetesServiceNodePort,
+			Serializer:                latest.Codecs,
 		},
 		EnableCoreControllers: true,
 		EventTTL:              s.EventTTL,
