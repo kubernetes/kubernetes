@@ -19,7 +19,6 @@ package unversioned
 import (
 	testgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup"
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -33,9 +32,10 @@ type TestTypeInterface interface {
 	Create(*testgroup.TestType) (*testgroup.TestType, error)
 	Update(*testgroup.TestType) (*testgroup.TestType, error)
 	Delete(name string, options *api.DeleteOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*testgroup.TestType, error)
-	List(opts unversioned.ListOptions) (*testgroup.TestTypeList, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	List(opts api.ListOptions) (*testgroup.TestTypeList, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // testTypes implements TestTypeInterface
@@ -95,6 +95,29 @@ func (c *testTypes) Delete(name string, options *api.DeleteOptions) error {
 		Error()
 }
 
+// DeleteCollection deletes a collection of objects.
+func (c *testTypes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	if options == nil {
+		return c.client.Delete().
+			NamespaceIfScoped(c.ns, len(c.ns) > 0).
+			Resource("testTypes").
+			VersionedParams(&listOptions, api.Scheme).
+			Do().
+			Error()
+	}
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
+	if err != nil {
+		return err
+	}
+	return c.client.Delete().
+		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Resource("testTypes").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(body).
+		Do().
+		Error()
+}
+
 // Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
 func (c *testTypes) Get(name string) (result *testgroup.TestType, err error) {
 	result = &testgroup.TestType{}
@@ -108,7 +131,7 @@ func (c *testTypes) Get(name string) (result *testgroup.TestType, err error) {
 }
 
 // List takes label and field selectors, and returns the list of TestTypes that match those selectors.
-func (c *testTypes) List(opts unversioned.ListOptions) (result *testgroup.TestTypeList, err error) {
+func (c *testTypes) List(opts api.ListOptions) (result *testgroup.TestTypeList, err error) {
 	result = &testgroup.TestTypeList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -120,7 +143,7 @@ func (c *testTypes) List(opts unversioned.ListOptions) (result *testgroup.TestTy
 }
 
 // Watch returns a watch.Interface that watches the requested testTypes.
-func (c *testTypes) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *testTypes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

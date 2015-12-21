@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,9 +31,10 @@ type ServiceInterface interface {
 	Create(*api.Service) (*api.Service, error)
 	Update(*api.Service) (*api.Service, error)
 	Delete(name string, options *api.DeleteOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.Service, error)
-	List(opts unversioned.ListOptions) (*api.ServiceList, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	List(opts api.ListOptions) (*api.ServiceList, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // services implements ServiceInterface
@@ -94,6 +94,29 @@ func (c *services) Delete(name string, options *api.DeleteOptions) error {
 		Error()
 }
 
+// DeleteCollection deletes a collection of objects.
+func (c *services) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	if options == nil {
+		return c.client.Delete().
+			NamespaceIfScoped(c.ns, len(c.ns) > 0).
+			Resource("services").
+			VersionedParams(&listOptions, api.Scheme).
+			Do().
+			Error()
+	}
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
+	if err != nil {
+		return err
+	}
+	return c.client.Delete().
+		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Resource("services").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(body).
+		Do().
+		Error()
+}
+
 // Get takes name of the service, and returns the corresponding service object, and an error if there is any.
 func (c *services) Get(name string) (result *api.Service, err error) {
 	result = &api.Service{}
@@ -107,7 +130,7 @@ func (c *services) Get(name string) (result *api.Service, err error) {
 }
 
 // List takes label and field selectors, and returns the list of Services that match those selectors.
-func (c *services) List(opts unversioned.ListOptions) (result *api.ServiceList, err error) {
+func (c *services) List(opts api.ListOptions) (result *api.ServiceList, err error) {
 	result = &api.ServiceList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -119,7 +142,7 @@ func (c *services) List(opts unversioned.ListOptions) (result *api.ServiceList, 
 }
 
 // Watch returns a watch.Interface that watches the requested services.
-func (c *services) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *services) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

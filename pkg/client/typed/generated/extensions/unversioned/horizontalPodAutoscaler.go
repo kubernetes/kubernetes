@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -33,9 +32,10 @@ type HorizontalPodAutoscalerInterface interface {
 	Create(*extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
 	Update(*extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
 	Delete(name string, options *api.DeleteOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*extensions.HorizontalPodAutoscaler, error)
-	List(opts unversioned.ListOptions) (*extensions.HorizontalPodAutoscalerList, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	List(opts api.ListOptions) (*extensions.HorizontalPodAutoscalerList, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // horizontalPodAutoscalers implements HorizontalPodAutoscalerInterface
@@ -95,6 +95,29 @@ func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOption
 		Error()
 }
 
+// DeleteCollection deletes a collection of objects.
+func (c *horizontalPodAutoscalers) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	if options == nil {
+		return c.client.Delete().
+			NamespaceIfScoped(c.ns, len(c.ns) > 0).
+			Resource("horizontalPodAutoscalers").
+			VersionedParams(&listOptions, api.Scheme).
+			Do().
+			Error()
+	}
+	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
+	if err != nil {
+		return err
+	}
+	return c.client.Delete().
+		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Resource("horizontalPodAutoscalers").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(body).
+		Do().
+		Error()
+}
+
 // Get takes name of the horizontalPodAutoscaler, and returns the corresponding horizontalPodAutoscaler object, and an error if there is any.
 func (c *horizontalPodAutoscalers) Get(name string) (result *extensions.HorizontalPodAutoscaler, err error) {
 	result = &extensions.HorizontalPodAutoscaler{}
@@ -108,7 +131,7 @@ func (c *horizontalPodAutoscalers) Get(name string) (result *extensions.Horizont
 }
 
 // List takes label and field selectors, and returns the list of HorizontalPodAutoscalers that match those selectors.
-func (c *horizontalPodAutoscalers) List(opts unversioned.ListOptions) (result *extensions.HorizontalPodAutoscalerList, err error) {
+func (c *horizontalPodAutoscalers) List(opts api.ListOptions) (result *extensions.HorizontalPodAutoscalerList, err error) {
 	result = &extensions.HorizontalPodAutoscalerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -120,7 +143,7 @@ func (c *horizontalPodAutoscalers) List(opts unversioned.ListOptions) (result *e
 }
 
 // Watch returns a watch.Interface that watches the requested horizontalPodAutoscalers.
-func (c *horizontalPodAutoscalers) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *horizontalPodAutoscalers) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
