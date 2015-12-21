@@ -105,11 +105,6 @@ type thirdPartyResourceDataCodecFactory struct {
 	decodeGV unversioned.GroupVersion
 }
 
-type codec struct {
-	runtime.Encoder
-	runtime.Decoder
-}
-
 func NewNegotiatedSerializer(s runtime.NegotiatedSerializer, kind string, encodeGV, decodeGV unversioned.GroupVersion) runtime.NegotiatedSerializer {
 	return &thirdPartyResourceDataCodecFactory{
 		NegotiatedSerializer: s,
@@ -121,10 +116,10 @@ func NewNegotiatedSerializer(s runtime.NegotiatedSerializer, kind string, encode
 }
 
 func (t *thirdPartyResourceDataCodecFactory) EncoderForVersion(s runtime.Serializer, gv unversioned.GroupVersion) runtime.Encoder {
-	return NewCodec(codec{
+	return NewCodec(runtime.NewCodec(
 		t.NegotiatedSerializer.EncoderForVersion(s, gv),
 		t.NegotiatedSerializer.DecoderToVersion(s, t.decodeGV),
-	}, t.kind)
+	), t.kind)
 }
 
 func (t *thirdPartyResourceDataCodecFactory) DecoderToVersion(s runtime.Serializer, gv unversioned.GroupVersion) runtime.Decoder {
