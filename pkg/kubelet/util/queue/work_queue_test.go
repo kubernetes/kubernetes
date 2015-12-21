@@ -63,15 +63,3 @@ func TestGetWork(t *testing.T) {
 	compareResults(t, expected, q.GetWork())
 	compareResults(t, []types.UID{}, q.GetWork())
 }
-
-func TestEnqueueKeepGreaterTimestamp(t *testing.T) {
-	q, _ := newTestBasicWorkQueue()
-	item := types.UID("foo")
-	q.Enqueue(item, -7*time.Hour)
-	q.Enqueue(item, 3*time.Hour)
-	compareResults(t, []types.UID{}, q.GetWork())
-
-	q.Enqueue(item, 3*time.Hour)
-	q.Enqueue(item, -7*time.Hour)
-	compareResults(t, []types.UID{}, q.GetWork())
-}
