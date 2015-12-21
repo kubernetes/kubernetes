@@ -698,7 +698,7 @@ func TestDoRequestNewWay(t *testing.T) {
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
 	}}}}
-	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
+	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -861,13 +861,13 @@ func BenchmarkCheckRetryClosesBody(b *testing.B) {
 
 func TestDoRequestNewWayReader(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, _ := testapi.Default.Codec().Encode(reqObj)
+	reqBodyExpected, _ := runtime.Encode(testapi.Default.Codec(), reqObj)
 	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
 	}}}}
-	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
+	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -902,13 +902,13 @@ func TestDoRequestNewWayReader(t *testing.T) {
 
 func TestDoRequestNewWayObj(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, _ := testapi.Default.Codec().Encode(reqObj)
+	reqBodyExpected, _ := runtime.Encode(testapi.Default.Codec(), reqObj)
 	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
 	}}}}
-	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
+	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -943,7 +943,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 
 func TestDoRequestNewWayFile(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, err := testapi.Default.Codec().Encode(reqObj)
+	reqBodyExpected, err := runtime.Encode(testapi.Default.Codec(), reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -964,7 +964,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
 	}}}}
-	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
+	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -1000,7 +1000,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 
 func TestWasCreated(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, err := testapi.Default.Codec().Encode(reqObj)
+	reqBodyExpected, err := runtime.Encode(testapi.Default.Codec(), reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1010,7 +1010,7 @@ func TestWasCreated(t *testing.T) {
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
 	}}}}
-	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
+	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   201,
 		ResponseBody: string(expectedBody),
@@ -1138,7 +1138,7 @@ func TestBody(t *testing.T) {
 	const data = "test payload"
 
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	bodyExpected, _ := testapi.Default.Codec().Encode(obj)
+	bodyExpected, _ := runtime.Encode(testapi.Default.Codec(), obj)
 
 	f, err := ioutil.TempFile("", "test_body")
 	if err != nil {
