@@ -49,7 +49,7 @@ func TestSet(t *testing.T) {
 		if err != nil || resp.Node == nil {
 			t.Fatalf("unexpected error: %v %v", err, resp)
 		}
-		decoded, err := testapi.Default.Codec().Decode([]byte(resp.Node.Value))
+		decoded, err := runtime.Decode(testapi.Default.Codec(), []byte(resp.Node.Value))
 		if err != nil {
 			t.Fatalf("unexpected response: %#v", resp.Node)
 		}
@@ -67,7 +67,7 @@ func TestGet(t *testing.T) {
 	ctx := context.TODO()
 	framework.WithEtcdKey(func(key string) {
 		testObject := api.ServiceAccount{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-		coded, err := testapi.Default.Codec().Encode(&testObject)
+		coded, err := runtime.Encode(testapi.Default.Codec(), &testObject)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

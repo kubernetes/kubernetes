@@ -23,7 +23,6 @@ import (
 
 	// TODO: Ideally we should create the necessary package structure in e.g.,
 	// pkg/conversion/test/... instead of importing pkg/api here.
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"

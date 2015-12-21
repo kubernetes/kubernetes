@@ -19,8 +19,12 @@ limitations under the License.
 package integration
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"testing"
+
+	"github.com/ghodss/yaml"
 
 	"k8s.io/kubernetes/test/integration/framework"
 )

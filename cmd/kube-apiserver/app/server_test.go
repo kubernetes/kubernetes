@@ -24,9 +24,9 @@ import (
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
@@ -133,7 +133,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		newEtcd := func(serverList []string, _ meta.VersionInterfacesFunc, _, _ string) (storage.Interface, error) {
+		newEtcd := func(serverList []string, _ runtime.NegotiatedSerializer, _, _ string) (storage.Interface, error) {
 			if !reflect.DeepEqual(test.servers, serverList) {
 				t.Errorf("unexpected server list, expected: %#v, got: %#v", test.servers, serverList)
 			}
