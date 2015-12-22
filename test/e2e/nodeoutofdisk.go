@@ -133,7 +133,7 @@ var _ = Describe("NodeOutOfDisk [Serial]", func() {
 				"involvedObject.kind":      "Pod",
 				"involvedObject.name":      pendingPodName,
 				"involvedObject.namespace": ns,
-				"source":                   "scheduler",
+				"source":                   api.DefaultSchedulerName,
 				"reason":                   "FailedScheduling",
 			}.AsSelector()
 			options := api.ListOptions{FieldSelector: selector}
