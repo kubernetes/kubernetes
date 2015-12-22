@@ -91,7 +91,7 @@ var _ = Describe("Events", func() {
 				"involvedObject.kind":      "Pod",
 				"involvedObject.uid":       string(podWithUid.UID),
 				"involvedObject.namespace": framework.Namespace.Name,
-				"source":                   "scheduler",
+				"source":                   api.DefaultSchedulerName,
 			}.AsSelector()
 			options := api.ListOptions{FieldSelector: selector}
 			events, err := framework.Client.Events(framework.Namespace.Name).List(options)

@@ -2624,3 +2624,8 @@ type RangeAllocation struct {
 	// Data is a bit array containing all allocated addresses in the previous segment.
 	Data []byte `json:"data"`
 }
+
+const (
+	// "default-scheduler" is the name of default scheduler.
+	DefaultSchedulerName = "default-scheduler"
+)
