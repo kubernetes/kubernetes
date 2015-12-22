@@ -605,6 +605,7 @@ func TestEtcdWatch(t *testing.T) {
 					}
 				}
 			}
+			wi.Stop()
 		}
 
 		server.Terminate(t)

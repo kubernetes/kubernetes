@@ -246,6 +246,7 @@ func TestWatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watching.Stop()
 
 	// Test normal case
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
@@ -292,6 +293,7 @@ func TestWatchEtcdState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watching.Stop()
 
 	endpoint := &api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
@@ -356,6 +358,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watching.Stop()
 
 	// marked as modified b/c of concatenation
 	event := <-watching.ResultChan()
@@ -391,6 +394,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watching.Stop()
 
 	// creates key/foo which should trigger the WatchList for "key"
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
@@ -423,6 +427,7 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watching.Stop()
 
 	// creates key/foo which should trigger the WatchList for "key"
 	err = h.Create(context.TODO(), key, pod, pod, 0)
