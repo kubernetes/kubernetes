@@ -1595,7 +1595,8 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubetypes.Docker
 
 	// No pod secrets for the infra container.
 	// The message isnt needed for the Infra container
-	if err, _ := dm.imagePuller.PullImage(pod, container, nil); err != nil {
+	if err, msg := dm.imagePuller.PullImage(pod, container, nil); err != nil {
+		glog.Errorf("Failed to pull image: %v; %s", err, msg)
 		return "", err
 	}
 
