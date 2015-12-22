@@ -58,6 +58,9 @@
         - 'gce-slow':
             description: 'Run slow E2E tests on GCE using the latest successful build.'
             timeout: 270
+        - 'gce-flannel':
+            description: 'Run E2E tests on GCE using Flannel and the latest successful build. This suite is quarantined in a dedicated project because Flannel integration is experimental.'
+            timeout: 90
         - 'gke-ci':
             description: |
                 Run e2e tests using the following config:<br>
