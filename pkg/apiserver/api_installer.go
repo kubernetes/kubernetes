@@ -78,7 +78,7 @@ func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversion
 	for _, path := range paths {
 		apiResource, err := a.registerResourceHandlers(path, a.group.Storage[path], ws, proxyHandler)
 		if err != nil {
-			errors = append(errors, err)
+			errors = append(errors, fmt.Errorf("error in registering resource: %s, %v", path, err))
 		}
 		if apiResource != nil {
 			apiResources = append(apiResources, *apiResource)
