@@ -303,8 +303,9 @@ GKE_REQUIRED_SKIP_TESTS=(
     )
 
 # Tests wchich are known to be flaky on GKE
+# TODO(ihmccreery): fold this into GCE_FLAKY_TESTS
 GKE_FLAKY_TESTS=(
-    "NodeOutOfDisk"
+    "\[Flaky\]"
   )
 
 # Specialized tests which should be skipped by default for GKE.
@@ -330,12 +331,7 @@ DISRUPTIVE_TESTS=(
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
 GCE_FLAKY_TESTS=(
-    "GCE\sL7\sLoadBalancer\sController" # issue: #17518
-    "DaemonRestart\sController\sManager" # issue: #17829
-    "Daemon\sset\sshould\srun\sand\sstop\scomplex\sdaemon" # issue: #16623
-    "Resource\susage\sof\ssystem\scontainers" # issue: #13931
-    "NodeOutOfDisk" # issue: #17687
-    "Cluster\slevel\slogging\susing\sElasticsearch" # issue: #17873
+    "\[Flaky\]"
     )
 
 # The following tests are known to be slow running (> 2 min), and are
@@ -349,14 +345,7 @@ GCE_SLOW_TESTS=(
     # make sure the associated project has enough quota. At the time of this
     # writing a GCE project is allowed 3 backend services by default. This
     # test requires at least 5.
-    "GCE\sL7\sLoadBalancer\sController"               # 10 min,       file: ingress.go,              slow by design
-    "SchedulerPredicates\svalidates\sMaxPods\slimit " # 8 min,        file: scheduler_predicates.go, PR:    #13315
-    "Nodes\sResize"                                   # 3 min 30 sec, file: resize_nodes.go,         issue: #13323
-    "resource\susage\stracking"                       # 1 hour,       file: kubelet_perf.go,         slow by design
-    "monotonically\sincreasing\srestart\scount"       # 1.5 to 5 min, file: pods.go,                 slow by design
-    "Garbage\scollector\sshould"                      # 7 min,        file: garbage_collector.go,    slow by design
-    "KubeProxy\sshould\stest\skube-proxy"             # 9 min 30 sec, file: kubeproxy.go,            issue: #14204
-    "cap\sback-off\sat\sMaxContainerBackOff"          # 20 mins       file: manager.go,              PR:    #12648
+    "\[Slow\]"
     )
 
 # Tests which are not able to be run in parallel.
@@ -368,13 +357,9 @@ GCE_PARALLEL_SKIP_TESTS=(
 )
 
 # Tests which are known to be flaky when run in parallel.
+# TODO(ihmccreery) this can be folded into Flaky/Disruptive (ack "parallel-flaky")
 GCE_PARALLEL_FLAKY_TESTS=(
-    "DaemonRestart"
-    "Elasticsearch"
-    "Namespaces.*should\sdelete\sfast"
-    "Pods.*back-off\srestarting.*LivenessProbe" # issue: #18293
-    "ServiceAccounts"
-    "Services.*identically\snamed" # error waiting for reachability, issue: #16285
+    "\[Flaky\]"
     )
 
 # Tests that should not run on soak cluster.
