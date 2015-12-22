@@ -45,7 +45,7 @@ func TestCreate(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	defer server.Close()
 	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
-	factory := NewConfigFactory(client, nil)
+	factory := NewConfigFactory(client, nil, api.DefaultSchedulerName)
 	factory.Create()
 }
 
@@ -63,7 +63,7 @@ func TestCreateFromConfig(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	defer server.Close()
 	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
-	factory := NewConfigFactory(client, nil)
+	factory := NewConfigFactory(client, nil, api.DefaultSchedulerName)
 
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
@@ -105,7 +105,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	defer server.Close()
 	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
-	factory := NewConfigFactory(client, nil)
+	factory := NewConfigFactory(client, nil, api.DefaultSchedulerName)
 
 	configData = []byte(`{}`)
 	err := latestschedulerapi.Codec.DecodeInto(configData, &policy)
@@ -148,7 +148,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	mux.Handle(testapi.Default.ResourcePath("pods", "bar", "foo"), &handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()
-	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()}), nil)
+	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()}), nil, api.DefaultSchedulerName)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := podBackoff{
 		perPodBackoff:   map[types.NamespacedName]*backoffEntry{},
@@ -300,5 +300,73 @@ func TestBackoff(t *testing.T) {
 	duration = backoff.getEntry(fooID).getBackoff(backoff.maxDuration)
 	if duration != 1*time.Second {
 		t.Errorf("expected: 1, got %s", duration.String())
+	}
+}
+
+// TestResponsibleForPod tests if a pod with an annotation that should cause it to
+// be picked up by the default scheduler, is in fact picked by the default scheduler
+// Two schedulers are made in the test: one is default scheduler and other scheduler
+// is of name "foo-scheduler". A pod must be picked up by at most one of the two
+// schedulers.
+func TestResponsibleForPod(t *testing.T) {
+	handler := util.FakeHandler{
+		StatusCode:   500,
+		ResponseBody: "",
+		T:            t,
+	}
+	server := httptest.NewServer(&handler)
+	defer server.Close()
+	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
+	// factory of "default-scheduler"
+	factoryDefaultScheduler := NewConfigFactory(client, nil, api.DefaultSchedulerName)
+	// factory of "foo-scheduler"
+	factoryFooScheduler := NewConfigFactory(client, nil, "foo-scheduler")
+	// scheduler annotaions to be tested
+	schedulerAnnotationFitsDefault := map[string]string{"scheduler.alpha.kubernetes.io/name": "default-scheduler"}
+	schedulerAnnotationFitsFoo := map[string]string{"scheduler.alpha.kubernetes.io/name": "foo-scheduler"}
+	schedulerAnnotationFitsNone := map[string]string{"scheduler.alpha.kubernetes.io/name": "bar-scheduler"}
+	tests := []struct {
+		pod             *api.Pod
+		pickedByDefault bool
+		pickedByFoo     bool
+	}{
+		{
+			// pod with no annotation "scheduler.alpha.kubernetes.io/name=<scheduler-name>" should be
+			// picked by the default scheduler, NOT by the one of name "foo-scheduler"
+			pod:             &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"}},
+			pickedByDefault: true,
+			pickedByFoo:     false,
+		},
+		{
+			// pod with annotation "scheduler.alpha.kubernetes.io/name=default-scheduler" should be picked
+			// by the scheduler of name "default-scheduler", NOT by the one of name "foo-scheduler"
+			pod:             &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsDefault}},
+			pickedByDefault: true,
+			pickedByFoo:     false,
+		},
+		{
+			// pod with annotataion "scheduler.alpha.kubernetes.io/name=foo-scheduler" should be NOT
+			// be picked by the scheduler of name "default-scheduler", but by the one of name "foo-scheduler"
+			pod:             &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsFoo}},
+			pickedByDefault: false,
+			pickedByFoo:     true,
+		},
+		{
+			// pod with annotataion "scheduler.alpha.kubernetes.io/name=foo-scheduler" should be NOT
+			// be picked by niether the scheduler of name "default-scheduler" nor the one of name "foo-scheduler"
+			pod:             &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsNone}},
+			pickedByDefault: false,
+			pickedByFoo:     false,
+		},
+	}
+
+	for _, test := range tests {
+		podOfDefault := factoryDefaultScheduler.responsibleForPod(test.pod)
+		podOfFoo := factoryFooScheduler.responsibleForPod(test.pod)
+		results := []bool{podOfDefault, podOfFoo}
+		expected := []bool{test.pickedByDefault, test.pickedByFoo}
+		if !reflect.DeepEqual(results, expected) {
+			t.Errorf("expected: {%v, %v}, got {%v, %v}", test.pickedByDefault, test.pickedByFoo, podOfDefault, podOfFoo)
+		}
 	}
 }
