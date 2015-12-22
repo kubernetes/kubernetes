@@ -17,7 +17,7 @@ package healthz
 import (
 	"net/http"
 
-	httpMux "github.com/google/cadvisor/http/mux"
+	httpmux "github.com/google/cadvisor/http/mux"
 )
 
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +26,7 @@ func handleHealthz(w http.ResponseWriter, r *http.Request) {
 }
 
 // Register simple HTTP /healthz handler to return "ok".
-func RegisterHandler(mux httpMux.Mux) error {
+func RegisterHandler(mux httpmux.Mux) error {
 	mux.HandleFunc("/healthz", handleHealthz)
 	return nil
 }

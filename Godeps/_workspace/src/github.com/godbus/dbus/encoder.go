@@ -16,22 +16,41 @@ type encoder struct {
 
 // NewEncoder returns a new encoder that writes to out in the given byte order.
 func newEncoder(out io.Writer, order binary.ByteOrder) *encoder {
+	return newEncoderAtOffset(out, 0, order)
+}
+
+// newEncoderAtOffset returns a new encoder that writes to out in the given
+// byte order. Specify the offset to initialize pos for proper alignment
+// computation.
+func newEncoderAtOffset(out io.Writer, offset int, order binary.ByteOrder) *encoder {
 	enc := new(encoder)
 	enc.out = out
 	enc.order = order
+	enc.pos = offset
 	return enc
 }
 
 // Aligns the next output to be on a multiple of n. Panics on write errors.
 func (enc *encoder) align(n int) {
-	if enc.pos%n != 0 {
-		newpos := (enc.pos + n - 1) & ^(n - 1)
-		empty := make([]byte, newpos-enc.pos)
+	pad := enc.padding(0, n)
+	if pad > 0 {
+		empty := make([]byte, pad)
 		if _, err := enc.out.Write(empty); err != nil {
 			panic(err)
 		}
-		enc.pos = newpos
+		enc.pos += pad
 	}
+}
+
+// pad returns the number of bytes of padding, based on current position and additional offset.
+// and alignment.
+func (enc *encoder) padding(offset, algn int) int {
+	abs := enc.pos + offset
+	if abs%algn != 0 {
+		newabs := (abs + algn - 1) & ^(algn - 1)
+		return newabs - abs
+	}
+	return 0
 }
 
 // Calls binary.Write(enc.out, enc.order, v) and panics on write errors.
@@ -108,8 +127,13 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		if depth >= 64 {
 			panic(FormatError("input exceeds container depth limit"))
 		}
+		// Lookahead offset: 4 bytes for uint32 length (with alignment),
+		// plus alignment for elements.
+		n := enc.padding(0, 4) + 4
+		offset := enc.pos + n + enc.padding(n, alignment(v.Type().Elem()))
+
 		var buf bytes.Buffer
-		bufenc := newEncoder(&buf, enc.order)
+		bufenc := newEncoderAtOffset(&buf, offset, enc.order)
 
 		for i := 0; i < v.Len(); i++ {
 			bufenc.encode(v.Index(i), depth+1)
@@ -159,8 +183,13 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 			panic(InvalidTypeError{v.Type()})
 		}
 		keys := v.MapKeys()
+		// Lookahead offset: 4 bytes for uint32 length (with alignment),
+		// plus 8-byte alignment
+		n := enc.padding(0, 4) + 4
+		offset := enc.pos + n + enc.padding(n, 8)
+
 		var buf bytes.Buffer
-		bufenc := newEncoder(&buf, enc.order)
+		bufenc := newEncoderAtOffset(&buf, offset, enc.order)
 		for _, k := range keys {
 			bufenc.align(8)
 			bufenc.encode(k, depth+2)

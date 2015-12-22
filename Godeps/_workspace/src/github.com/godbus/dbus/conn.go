@@ -32,7 +32,7 @@ var ErrClosed = errors.New("dbus: connection closed by user")
 type Conn struct {
 	transport
 
-	busObj *Object
+	busObj BusObject
 	unixFD bool
 	uuid   string
 
@@ -46,7 +46,7 @@ type Conn struct {
 	calls    map[uint32]*Call
 	callsLck sync.RWMutex
 
-	handlers    map[ObjectPath]map[string]interface{}
+	handlers    map[ObjectPath]map[string]exportWithMapping
 	handlersLck sync.RWMutex
 
 	out    chan *Message
@@ -157,7 +157,7 @@ func newConn(tr transport) (*Conn, error) {
 	conn.transport = tr
 	conn.calls = make(map[uint32]*Call)
 	conn.out = make(chan *Message, 10)
-	conn.handlers = make(map[ObjectPath]map[string]interface{})
+	conn.handlers = make(map[ObjectPath]map[string]exportWithMapping)
 	conn.nextSerial = 1
 	conn.serialUsed = map[uint32]bool{0: true}
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
@@ -166,7 +166,7 @@ func newConn(tr transport) (*Conn, error) {
 
 // BusObject returns the object owned by the bus daemon which handles
 // administrative requests.
-func (conn *Conn) BusObject() *Object {
+func (conn *Conn) BusObject() BusObject {
 	return conn.busObj
 }
 
@@ -175,6 +175,13 @@ func (conn *Conn) BusObject() *Object {
 // not be called on shared connections.
 func (conn *Conn) Close() error {
 	conn.outLck.Lock()
+	if conn.closed {
+		// inWorker calls Close on read error, the read error may
+		// be caused by another caller calling Close to shutdown the
+		// dbus connection, a double-close scenario we prevent here.
+		conn.outLck.Unlock()
+		return nil
+	}
 	close(conn.out)
 	conn.closed = true
 	conn.outLck.Unlock()
@@ -296,18 +303,33 @@ func (conn *Conn) inWorker() {
 				// as per http://dbus.freedesktop.org/doc/dbus-specification.html ,
 				// sender is optional for signals.
 				sender, _ := msg.Headers[FieldSender].value.(string)
-				if iface == "org.freedesktop.DBus" && member == "NameLost" &&
-					sender == "org.freedesktop.DBus" {
-
-					name, _ := msg.Body[0].(string)
-					conn.namesLck.Lock()
-					for i, v := range conn.names {
-						if v == name {
-							copy(conn.names[i:], conn.names[i+1:])
-							conn.names = conn.names[:len(conn.names)-1]
+				if iface == "org.freedesktop.DBus" && sender == "org.freedesktop.DBus" {
+					if member == "NameLost" {
+						// If we lost the name on the bus, remove it from our
+						// tracking list.
+						name, ok := msg.Body[0].(string)
+						if !ok {
+							panic("Unable to read the lost name")
 						}
+						conn.namesLck.Lock()
+						for i, v := range conn.names {
+							if v == name {
+								conn.names = append(conn.names[:i],
+									conn.names[i+1:]...)
+							}
+						}
+						conn.namesLck.Unlock()
+					} else if member == "NameAcquired" {
+						// If we acquired the name on the bus, add it to our
+						// tracking list.
+						name, ok := msg.Body[0].(string)
+						if !ok {
+							panic("Unable to read the acquired name")
+						}
+						conn.namesLck.Lock()
+						conn.names = append(conn.names, name)
+						conn.namesLck.Unlock()
 					}
-					conn.namesLck.Unlock()
 				}
 				signal := &Signal{
 					Sender: sender,
@@ -317,11 +339,7 @@ func (conn *Conn) inWorker() {
 				}
 				conn.signalsLck.Lock()
 				for _, ch := range conn.signals {
-					// don't block trying to send a signal
-					select {
-					case ch <- signal:
-					default:
-					}
+					ch <- signal
 				}
 				conn.signalsLck.Unlock()
 			case TypeMethodCall:
@@ -357,7 +375,7 @@ func (conn *Conn) Names() []string {
 }
 
 // Object returns the object identified by the given destination name and path.
-func (conn *Conn) Object(dest string, path ObjectPath) *Object {
+func (conn *Conn) Object(dest string, path ObjectPath) BusObject {
 	return &Object{conn, dest, path}
 }
 
@@ -508,6 +526,10 @@ type Error struct {
 	Body []interface{}
 }
 
+func NewError(name string, body []interface{}) *Error {
+	return &Error{name, body}
+}
+
 func (e Error) Error() string {
 	if len(e.Body) >= 1 {
 		s, ok := e.Body[0].(string)
@@ -547,7 +569,7 @@ type transport interface {
 }
 
 var (
-	transports map[string]func(string) (transport, error) = make(map[string]func(string) (transport, error))
+	transports = make(map[string]func(string) (transport, error))
 )
 
 func getTransport(address string) (transport, error) {
@@ -564,6 +586,7 @@ func getTransport(address string) (transport, error) {
 		f := transports[v[:i]]
 		if f == nil {
 			err = errors.New("dbus: invalid bus address (invalid or unsupported transport)")
+			continue
 		}
 		t, err = f(v[i+1:])
 		if err == nil {

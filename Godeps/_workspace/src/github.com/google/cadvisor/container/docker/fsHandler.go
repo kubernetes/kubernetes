@@ -19,8 +19,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/fs"
+
+	"github.com/golang/glog"
 )
 
 type fsHandler interface {
