@@ -84,3 +84,6 @@ doc_tmp/
 # Config directories created by gcloud and gsutil on Jenkins
 /.config/gcloud/
 /.gsutil/
+
+# CoreOS stuff
+cluster/libvirt-coreos/coreos_*.img
