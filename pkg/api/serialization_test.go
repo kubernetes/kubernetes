@@ -324,7 +324,7 @@ func BenchmarkDecodeCodec(b *testing.B) {
 	b.StopTimer()
 }
 
-func BenchmarkDecodeIntoCodec(b *testing.B) {
+func BenchmarkDecodeIntoExternalCodec(b *testing.B) {
 	codec := testapi.Default.Codec()
 	items := benchmarkItems()
 	width := len(items)
@@ -340,6 +340,29 @@ func BenchmarkDecodeIntoCodec(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
+		if err := runtime.DecodeInto(codec, encoded[i%width], &obj); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+func BenchmarkDecodeIntoInternalCodec(b *testing.B) {
+	codec := testapi.Default.Codec()
+	items := benchmarkItems()
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := runtime.Encode(codec, &items[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		obj := api.Pod{}
 		if err := runtime.DecodeInto(codec, encoded[i%width], &obj); err != nil {
 			b.Fatal(err)
 		}

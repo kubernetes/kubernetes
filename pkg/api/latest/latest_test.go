@@ -132,7 +132,7 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 func TestUnversioned(t *testing.T) {
 	for _, obj := range []runtime.Object{
 		&unversioned.Status{},
-		&unversioned.ListOptions{},
+		&unversioned.ExportOptions{},
 	} {
 		if unversioned, ok := api.Scheme.IsUnversioned(obj); !unversioned || !ok {
 			t.Errorf("%v is expected to be unversioned", reflect.TypeOf(obj))

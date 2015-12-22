@@ -35,6 +35,7 @@ type serializerType struct {
 // NewCodecFactory enables the standard serializers to be enabled for a given scheme, performing transformation
 // of input and output into the wire formats supported.
 // TODO: allow other codecs to be compiled in?
+// TODO: accept a scheme interface
 func NewCodecFactory(scheme *runtime.Scheme) CodecFactory {
 	return newCodecFactory(scheme, json.DefaultMetaFactory)
 }
@@ -82,6 +83,8 @@ func newCodecFactory(scheme *runtime.Scheme, mf json.MetaFactory) CodecFactory {
 	}
 }
 
+// CodecFactory provides methods for retrieving codecs and serializers for specific
+// versions and content types.
 type CodecFactory struct {
 	scheme      *runtime.Scheme
 	serializers []serializerType
@@ -130,10 +133,12 @@ func (f CodecFactory) CodecForVersions(serializer runtime.Serializer, encode []u
 	return versioning.NewCodec(f.scheme, serializer, f.scheme, runtime.ObjectTyperToTyper(f.scheme), encode, decode)
 }
 
+// DecoderToVersion returns a decoder that targets the provided group version.
 func (f CodecFactory) DecoderToVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Decoder {
 	return f.CodecForVersions(serializer, nil, []unversioned.GroupVersion{gv})
 }
 
+// EncoderForVersion returns an encoder that targets the provided group version.
 func (f CodecFactory) EncoderForVersion(serializer runtime.Serializer, gv unversioned.GroupVersion) runtime.Encoder {
 	return f.CodecForVersions(serializer, []unversioned.GroupVersion{gv}, nil)
 }

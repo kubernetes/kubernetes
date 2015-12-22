@@ -17,7 +17,6 @@ limitations under the License.
 package versioning
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
@@ -79,7 +78,9 @@ type codec struct {
 	decodeVersion map[string]unversioned.GroupVersion
 }
 
-// Decode attempts a decode of the object, then tries to convert it to the internal version.
+// Decode attempts a decode of the object, then tries to convert it to the internal version. If into is provided and the decoding is
+// successful, the returned runtime.Object will be the value passed as into. Note that this may bypass conversion if you pass an
+// into that matches the serialized version.
 func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
 	obj, gvk, err := c.serializer.Decode(data, defaultGVK, into)
 	if err != nil {
@@ -128,7 +129,8 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 	return out, gvk, nil
 }
 
-// EncodeToStream ensures the provided object is output in the right scheme
+// EncodeToStream ensures the provided object is output in the right scheme. If overrides are specified, when
+// encoding the object the first override that matches the object's group is used. Other overrides are ignored.
 func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
 	if _, ok := obj.(*runtime.Unknown); ok {
 		return c.serializer.EncodeToStream(obj, w, overrides...)
@@ -191,6 +193,9 @@ func (c *codec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unv
 	return c.serializer.EncodeToStream(obj, w, overrides...)
 }
 
+// promoteOrPrependGroupVersion finds the group version in the provided group versions that has the same group as target.
+// If the group is found the returned array will have that group version in the first position - if the group is not found
+// the returned array will have target in the first position.
 func promoteOrPrependGroupVersion(target unversioned.GroupVersion, gvs []unversioned.GroupVersion) []unversioned.GroupVersion {
 	for i, gv := range gvs {
 		if gv.Group == target.Group {
@@ -199,53 +204,4 @@ func promoteOrPrependGroupVersion(target unversioned.GroupVersion, gvs []unversi
 		}
 	}
 	return append([]unversioned.GroupVersion{target}, gvs...)
-}
-
-func NewEnforcingDecoder(codec runtime.Codec) runtime.Codec {
-	return enforcingDecoder{Codec: codec}
-}
-
-type enforcingDecoder struct {
-	runtime.Codec
-}
-
-func (c enforcingDecoder) Decode(data []byte, requestedGVK *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
-	out, gvk, err := c.Codec.Decode(data, requestedGVK, into)
-	if err != nil {
-		return nil, gvk, err
-	}
-	if requestedGVK != nil {
-		if (len(requestedGVK.Group) > 0 || len(requestedGVK.Version) > 0) && gvk.GroupVersion() != requestedGVK.GroupVersion() {
-			return nil, gvk, errors.New(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%v)", gvk.Kind, requestedGVK.GroupVersion()))
-		}
-		if len(requestedGVK.Kind) > 0 && (gvk.Kind != requestedGVK.Kind) {
-			return nil, gvk, errors.New(fmt.Sprintf("the kind in the data (%s) does not match the expected kind (%v)", gvk.Kind, requestedGVK))
-		}
-	}
-	return out, gvk, nil
-}
-
-// DefaultGroupVersionKindForObject calculates the expected outcome type for an object.
-func DefaultGroupVersionKindForObject(typer runtime.Typer, obj runtime.Object, defaults ...unversioned.GroupVersionKind) (*unversioned.GroupVersionKind, error) {
-	gvk, _, err := typer.ObjectKind(obj)
-	if err != nil {
-		return gvk, err
-	}
-	for _, d := range defaults {
-		if len(gvk.Kind) == 0 {
-			// Assume objects with unset Kind fields are being unmarshalled into the
-			// correct type.
-			gvk.Kind = d.Kind
-		}
-		if len(gvk.Version) == 0 && len(gvk.Group) == 0 {
-			// Assume objects with unset Version fields are being unmarshalled into the
-			// correct type.
-			gvk.Version = d.Version
-			gvk.Group = d.Group
-		}
-		if len(gvk.Kind) > 0 && len(gvk.Version) > 0 {
-			break
-		}
-	}
-	return gvk, nil
 }

@@ -1202,7 +1202,7 @@ func TestMetadata(t *testing.T) {
 			matches[s] = i + 1
 		}
 	}
-	if matches["text/plain,application/json"] == 0 ||
+	if matches["text/plain,application/json,application/yaml"] == 0 ||
 		matches["application/json,application/yaml"] == 0 ||
 		matches["application/json"] == 0 ||
 		matches["*/*"] == 0 ||

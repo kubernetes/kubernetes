@@ -18,24 +18,165 @@ package json_test
 
 import (
 	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
 )
 
-func TestDecodeJSON(t *testing.T) {
-	s := json.NewSerializer(json.DefaultMetaFactory, nil, nil, false)
-	obj, gvk, err := s.Decode([]byte("{}"), nil, nil)
-	if err == nil {
-		t.Fatal("expected error")
+type testDecodable struct {
+	Other string
+	Value int `json:"value"`
+	gvk   *unversioned.GroupVersionKind
+}
+
+func (d *testDecodable) GetObjectKind() unversioned.ObjectKind                 { return d }
+func (d *testDecodable) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) { d.gvk = gvk }
+func (d *testDecodable) GroupVersionKind() *unversioned.GroupVersionKind       { return d.gvk }
+
+func TestDecode(t *testing.T) {
+	testCases := []struct {
+		creater runtime.ObjectCreater
+		typer   runtime.Typer
+		yaml    bool
+		pretty  bool
+
+		data       []byte
+		defaultGVK *unversioned.GroupVersionKind
+		into       runtime.Object
+
+		errFn          func(error) bool
+		expectedObject runtime.Object
+		expectedGVK    *unversioned.GroupVersionKind
+	}{
+		{
+			data: []byte("{}"),
+
+			expectedGVK: &unversioned.GroupVersionKind{},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+		},
+		{
+			data:       []byte("{}"),
+			defaultGVK: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			creater:    &mockCreater{err: fmt.Errorf("fake error")},
+
+			expectedGVK: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			errFn:       func(err error) bool { return err.Error() == "fake error" },
+		},
+		{
+			data:       []byte("{}"),
+			defaultGVK: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			creater:    &mockCreater{err: fmt.Errorf("fake error")},
+
+			expectedGVK: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			errFn:       func(err error) bool { return err.Error() == "fake error" },
+		},
+		{
+			data:       []byte("{}"),
+			defaultGVK: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			creater:    &mockCreater{obj: &testDecodable{}},
+			expectedObject: &testDecodable{
+				gvk: nil, // json serializer does NOT set GVK
+			},
+			expectedGVK: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+		},
+
+		// accept runtime.Unknown as into and bypass creator
+		{
+			data: []byte(`{}`),
+			into: &runtime.Unknown{},
+
+			expectedGVK: &unversioned.GroupVersionKind{},
+			expectedObject: &runtime.Unknown{
+				RawJSON: []byte(`{}`),
+			},
+		},
+		{
+			data: []byte(`{"test":"object"}`),
+			into: &runtime.Unknown{},
+
+			expectedGVK: &unversioned.GroupVersionKind{},
+			expectedObject: &runtime.Unknown{
+				RawJSON: []byte(`{"test":"object"}`),
+			},
+		},
+		{
+			data:        []byte(`{"test":"object"}`),
+			into:        &runtime.Unknown{},
+			defaultGVK:  &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedGVK: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &runtime.Unknown{
+				TypeMeta: runtime.TypeMeta{APIVersion: "other/blah", Kind: "Test"},
+				RawJSON:  []byte(`{"test":"object"}`),
+			},
+		},
+
+		// unregistered objects can be decoded into directly
+		{
+			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","value":1,"Other":"test"}`),
+			into:        &testDecodable{},
+			typer:       &mockTyper{err: conversion.NewNotRegisteredErr(unversioned.GroupVersionKind{}, nil)},
+			expectedGVK: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodable{
+				Other: "test",
+				Value: 1,
+			},
+		},
+		// registered types get defaulted by the into object kind
+		{
+			data:        []byte(`{"value":1,"Other":"test"}`),
+			into:        &testDecodable{},
+			typer:       &mockTyper{gvk: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodable{
+				Other: "test",
+				Value: 1,
+			},
+		},
 	}
-	if (*gvk != unversioned.GroupVersionKind{}) {
-		t.Fatalf("unexpected gvk: %#v", gvk)
-	}
-	if obj != nil {
-		t.Fatalf("unexpected object: %#v", obj)
+
+	for i, test := range testCases {
+		var s runtime.Serializer
+		if test.yaml {
+			s = json.NewYAMLSerializer(json.DefaultMetaFactory, test.creater, test.typer)
+		} else {
+			s = json.NewSerializer(json.DefaultMetaFactory, test.creater, test.typer, test.pretty)
+		}
+		obj, gvk, err := s.Decode([]byte(test.data), test.defaultGVK, test.into)
+
+		if !reflect.DeepEqual(test.expectedGVK, gvk) {
+			t.Errorf("%d: unexpected GVK: %v", i, gvk)
+		}
+
+		switch {
+		case err == nil && test.errFn != nil:
+			t.Errorf("%d: failed: %v", i, err)
+			continue
+		case err != nil && test.errFn == nil:
+			t.Errorf("%d: failed: %v", i, err)
+			continue
+		case err != nil:
+			if !test.errFn(err) {
+				t.Errorf("%d: failed: %v", i, err)
+			}
+			if obj != nil {
+				t.Errorf("%d: should have returned nil object", i)
+			}
+			continue
+		}
+
+		if test.into != nil && test.into != obj {
+			t.Errorf("%d: expected into to be returned: %v", i, obj)
+			continue
+		}
+
+		if !reflect.DeepEqual(test.expectedObject, obj) {
+			t.Errorf("%d: unexpected object: %#v", i, obj)
+		}
 	}
 }
 
@@ -43,28 +184,19 @@ type mockCreater struct {
 	apiVersion string
 	kind       string
 	err        error
+	obj        runtime.Object
 }
 
 func (c *mockCreater) New(kind unversioned.GroupVersionKind) (runtime.Object, error) {
 	c.apiVersion, c.kind = kind.GroupVersion().String(), kind.Kind
-	return nil, c.err
+	return c.obj, c.err
 }
 
-func TestDecodeJSONDefaultKind(t *testing.T) {
-	creater := &mockCreater{err: fmt.Errorf("fake error")}
-	s := json.NewSerializer(json.DefaultMetaFactory, creater, nil, false)
-	defaultGVK := unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}
-	obj, gvk, err := s.Decode([]byte("{}"), &defaultGVK, nil)
-	if err != creater.err {
-		t.Fatal("expected error")
-	}
-	if creater.apiVersion != "other/blah" || creater.kind != "Test" {
-		t.Fatalf("creater should be called with defaults: %#v", creater)
-	}
-	if gvk == nil || (*gvk != defaultGVK) {
-		t.Fatalf("unexpected gvk: %#v", gvk)
-	}
-	if obj != nil {
-		t.Fatalf("unexpected object: %#v", obj)
-	}
+type mockTyper struct {
+	gvk *unversioned.GroupVersionKind
+	err error
+}
+
+func (t *mockTyper) ObjectKind(obj runtime.Object) (*unversioned.GroupVersionKind, bool, error) {
+	return t.gvk, false, t.err
 }

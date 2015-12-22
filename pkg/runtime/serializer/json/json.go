@@ -60,6 +60,11 @@ type Serializer struct {
 	pretty  bool
 }
 
+// Decode attempts to convert the provided data into YAML or JSON, extract the stored schema kind, apply the provided default gvk, and then
+// load that data into an object matching the desired schema kind or the provided into. If into is *runtime.Unknown, the raw data will be
+// extracted and no decoding will be performed. If into is not registered with the typer, then the object will be straight decoded using
+// normal JSON/YAML unmarshalling. If into is provided and the original data is not fully qualified with kind/version/group, the type of
+// the into will be used to alter the returned gvk. On success or most errors, the method will return the calculated schema kind.
 func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
 	data := originalData
 	if s.yaml {
@@ -75,12 +80,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKi
 		return nil, nil, err
 	}
 
-	if unk, ok := into.(*runtime.Unknown); ok && unk != nil {
-		unk.GetObjectKind().SetGroupVersionKind(actual)
-		return unk, actual, nil
-	}
-
-	if gvk != nil && (len(actual.Kind) == 0 || len(actual.Version) == 0) {
+	if gvk != nil {
 		// apply kind and version defaulting from provided default
 		if len(actual.Kind) == 0 {
 			actual.Kind = gvk.Kind
@@ -89,6 +89,13 @@ func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKi
 			actual.Group = gvk.Group
 			actual.Version = gvk.Version
 		}
+	}
+
+	if unk, ok := into.(*runtime.Unknown); ok && unk != nil {
+		unk.RawJSON = originalData
+		// TODO: set content type here
+		unk.GetObjectKind().SetGroupVersionKind(actual)
+		return unk, actual, nil
 	}
 
 	if into != nil {
@@ -133,6 +140,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKi
 	return obj, actual, nil
 }
 
+// EncodeToStream serializes the provided object to the given writer. Overrides is ignored.
 func (s *Serializer) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
 	if s.yaml {
 		json, err := json.Marshal(obj)
@@ -159,6 +167,7 @@ func (s *Serializer) EncodeToStream(obj runtime.Object, w io.Writer, overrides .
 	return encoder.Encode(obj)
 }
 
+// RecognizesData implements the RecognizingDecoder interface.
 func (s *Serializer) RecognizesData(peek io.Reader) (bool, error) {
 	_, ok := utilyaml.GuessJSONStream(peek, 2048)
 	if s.yaml {

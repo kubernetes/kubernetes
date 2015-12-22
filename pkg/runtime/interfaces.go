@@ -33,6 +33,7 @@ type Typer interface {
 	// ObjectKind returns the version and kind of the provided object, or an
 	// error if the object is not recognized (IsNotRegisteredError will return true).
 	// It returns whether the object is considered unversioned at the same time.
+	// TODO: align the signature of ObjectTyper with this interface
 	ObjectKind(Object) (*unversioned.GroupVersionKind, bool, error)
 }
 
