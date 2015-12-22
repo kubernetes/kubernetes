@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -50,6 +51,8 @@ type GenericPLEG struct {
 	eventChannel chan *PodLifecycleEvent
 	// The internal cache for container information.
 	containers map[string]containerInfo
+	// Time of the last relisting.
+	lastRelistTime time.Time
 }
 
 type containerInfo struct {
@@ -101,6 +104,17 @@ func generateEvent(podID types.UID, cid string, oldState, newState kubecontainer
 // with the internal pods/containers, and generats events accordingly.
 func (g *GenericPLEG) relist() {
 	glog.V(5).Infof("GenericPLEG: Relisting")
+	timestamp := time.Now()
+
+	if !g.lastRelistTime.IsZero() {
+		metrics.PLEGRelistInterval.Observe(metrics.SinceInMicroseconds(g.lastRelistTime))
+	}
+	defer func() {
+		// Update the relist time.
+		g.lastRelistTime = timestamp
+		metrics.PLEGRelistLatency.Observe(metrics.SinceInMicroseconds(timestamp))
+	}()
+
 	// Get all the pods.
 	pods, err := g.runtime.GetPods(true)
 	if err != nil {
