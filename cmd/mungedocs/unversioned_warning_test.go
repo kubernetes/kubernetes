@@ -26,7 +26,7 @@ func TestUnversionedWarning(t *testing.T) {
 	beginMark := beginMungeTag(unversionedWarningTag)
 	endMark := endMungeTag(unversionedWarningTag)
 
-	warningString := makeUnversionedWarning("filename.md").String()
+	warningString := makeUnversionedWarning("filename.md", false).String()
 	warningBlock := beginMark + "\n" + warningString + endMark + "\n"
 	var cases = []struct {
 		in       string
@@ -65,6 +65,85 @@ func TestUnversionedWarning(t *testing.T) {
 		assert.NoError(t, err)
 		if !expected.Equal(actual) {
 			t.Errorf("case[%d]: expected %v got %v", i, expected.String(), actual.String())
+		}
+	}
+}
+
+func TestMakeUnversionedWarning(t *testing.T) {
+	const fileName = "filename.md"
+	var cases = []struct {
+		linkToReleaseDoc bool
+		expected         string
+	}{
+		{
+			true,
+			`
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/filename.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+`,
+		},
+		{
+			false,
+			`
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+`,
+		},
+	}
+	for i, c := range cases {
+		if e, a := c.expected, makeUnversionedWarning(fileName, c.linkToReleaseDoc).String(); e != a {
+			t.Errorf("case[%d]: \nexpected %s\ngot %s", i, e, a)
 		}
 	}
 }
