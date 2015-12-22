@@ -243,7 +243,7 @@ __Default Backends__: An Ingress with no rules, like the one shown in the previo
 
 ### Loadbalancing
 
-An Ingress controller is bootstrapped with some loadbalancing policy settings that it applies to all Ingress, such as the loadbalancing algorithm, backend weight scheme etc. More advanced loadbalancing concepts (eg: persistent sessions, dynamic weights) are not yet exposed through the Ingress. You can still get these features through the [service loadbalancer](https://github.com/kubernetes/contrib/tree/master/service-loadbalancer). With time, we plan to distil loadbalancing patterns that are applicable cross platform into the Ingress resource.
+An Ingress controller is bootstrapped with some loadbalancing policy settings that it applies to all Ingress, such as the loadbalancing algorithm, backend weight scheme etc. More advanced loadbalancing concepts (eg: persistent sessions, dynamic weights) are not yet exposed through the Ingress. You can still get these features through the [service loadbalancer](https://github.com/kubernetes/contrib/tree/master/service-loadbalancer). With time, we plan to distill loadbalancing patterns that are applicable cross platform into the Ingress resource.
 
 It's also worth noting that even though health checks are not exposed directly through the Ingress, there exist parallel concepts in Kubernetes such as [readiness probes](https://github.com/kubernetes/kubernetes/blob/release-1.0/docs/user-guide/production-pods.md#liveness-and-readiness-probes-aka-health-checks) which allow you to achieve the same end result.
 

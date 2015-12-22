@@ -403,7 +403,7 @@ Using the `omitempty` tag causes swagger documentation to reflect that the field
 
 Using a pointer allows distinguishing unset from the zero value for that type.
 There are some cases where, in principle, a pointer is not needed for an optional field
-since the zero value is forbidden, and thus imples unset.   There are examples of this in the
+since the zero value is forbidden, and thus implies unset.   There are examples of this in the
 codebase.  However:
 
 - it can be difficult for implementors to anticipate all cases where an empty value might need to be

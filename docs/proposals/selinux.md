@@ -64,7 +64,7 @@ Goals of this design:
 ### Docker
 
 Docker uses a base SELinux context and calculates a unique MCS label per container.  The SELinux
-context of a container can be overriden with the `SecurityOpt` api that allows setting the different
+context of a container can be overridden with the `SecurityOpt` api that allows setting the different
 parts of the SELinux context individually.
 
 Docker has functionality to relabel bind-mounts with a usable SElinux and supports two different
@@ -73,7 +73,7 @@ use-cases:
 1.  The `:Z` bind-mount flag, which tells Docker to relabel a bind-mount with the container's
     SELinux context
 2.  The `:z` bind-mount flag, which tells Docker to relabel a bind-mount with the container's
-    SElinux context, but remove the MCS labels, making the volume shareable beween containers
+    SElinux context, but remove the MCS labels, making the volume shareable between containers
 
 We should avoid using the `:z` flag, because it relaxes the SELinux context so that any container
 (from an SELinux standpoint) can use the volume.
@@ -200,7 +200,7 @@ From the above, we know that label management must be applied:
 Volumes should be relabeled with the correct SELinux context.  Docker has this capability today; it
 is desireable for other container runtime implementations to provide similar functionality.
 
-Relabeling should be an optional aspect of a volume plugin to accomodate:
+Relabeling should be an optional aspect of a volume plugin to accommodate:
 
 1.  volume types for which generalized relabeling support is not sufficient
 2.  testing for each volume plugin individually

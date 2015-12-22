@@ -207,7 +207,7 @@ mister-red,mister-red,2
 
 Also, since we have other users who validate using **other** mechanisms, the api-server would have probably been launched with other authentication options (there are many such options, make sure you understand which ones YOU care about before crafting a kubeconfig file, as nobody needs to implement all the different permutations of possible authentication schemes).
 
-- Since the user for the current context is "green-user", any client of the api-server using this kubeconfig file would naturally be able to log in succesfully, because we are providigin the green-user's client credentials.
+- Since the user for the current context is "green-user", any client of the api-server using this kubeconfig file would naturally be able to log in successfully, because we are providing the green-user's client credentials.
 - Similarly, we can operate as the "blue-user" if we choose to change the value of current-context.
 
 In the above scenario, green-user would have to log in by providing certificates, whereas blue-user would just provide the token.  All this information would be handled for us by the

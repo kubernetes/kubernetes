@@ -35,7 +35,7 @@ Documentation for other releases can be found at
 
 ## Overview
 
-Kubernetes uses a variety of automated tools in an attempt to relieve developers of repeptitive, low
+Kubernetes uses a variety of automated tools in an attempt to relieve developers of repetitive, low
 brain power work.  This document attempts to describe these processes.
 
 
