@@ -302,6 +302,13 @@ func (t *thirdPartyResourceDataCreator) New(kind unversioned.GroupVersionKind) (
 			return nil, fmt.Errorf("unknown kind %v", kind)
 		}
 		return &extensions.ThirdPartyResourceDataList{}, nil
+	case "ListOptions":
+		if apiutil.GetGroupVersion(t.group, t.version) == kind.GroupVersion().String() {
+			// Translate third party group to external group.
+			gvk := latest.ExternalVersions[0].WithKind(kind.Kind)
+			return t.delegate.New(gvk)
+		}
+		return t.delegate.New(kind)
 	default:
 		return t.delegate.New(kind)
 	}

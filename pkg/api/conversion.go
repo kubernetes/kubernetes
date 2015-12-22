@@ -39,14 +39,6 @@ func init() {
 				obj.FieldSelector = fields.Everything()
 			}
 		},
-		func(obj *unversioned.ListOptions) {
-			if obj.LabelSelector.Selector == nil {
-				obj.LabelSelector = unversioned.LabelSelector{labels.Everything()}
-			}
-			if obj.FieldSelector.Selector == nil {
-				obj.FieldSelector = unversioned.FieldSelector{fields.Everything()}
-			}
-		},
 	)
 	Scheme.AddConversionFuncs(
 		func(in *unversioned.Time, out *unversioned.Time, s conversion.Scope) error {

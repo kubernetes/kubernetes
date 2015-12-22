@@ -20,7 +20,6 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -46,7 +45,7 @@ func (r *ServiceRegistry) SetError(err error) {
 	r.Err = err
 }
 
-func (r *ServiceRegistry) ListServices(ctx api.Context, options *unversioned.ListOptions) (*api.ServiceList, error) {
+func (r *ServiceRegistry) ListServices(ctx api.Context, options *api.ListOptions) (*api.ServiceList, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -107,7 +106,7 @@ func (r *ServiceRegistry) UpdateService(ctx api.Context, svc *api.Service) (*api
 	return svc, r.Err
 }
 
-func (r *ServiceRegistry) WatchServices(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
+func (r *ServiceRegistry) WatchServices(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

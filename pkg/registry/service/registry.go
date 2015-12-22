@@ -19,18 +19,17 @@ package service
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store services.
 type Registry interface {
-	ListServices(ctx api.Context, options *unversioned.ListOptions) (*api.ServiceList, error)
+	ListServices(ctx api.Context, options *api.ListOptions) (*api.ServiceList, error)
 	CreateService(ctx api.Context, svc *api.Service) (*api.Service, error)
 	GetService(ctx api.Context, name string) (*api.Service, error)
 	DeleteService(ctx api.Context, name string) error
 	UpdateService(ctx api.Context, svc *api.Service) (*api.Service, error)
-	WatchServices(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error)
+	WatchServices(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -44,7 +43,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListServices(ctx api.Context, options *unversioned.ListOptions) (*api.ServiceList, error) {
+func (s *storage) ListServices(ctx api.Context, options *api.ListOptions) (*api.ServiceList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -81,7 +80,7 @@ func (s *storage) UpdateService(ctx api.Context, svc *api.Service) (*api.Service
 	return obj.(*api.Service), nil
 }
 
-func (s *storage) WatchServices(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchServices(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
