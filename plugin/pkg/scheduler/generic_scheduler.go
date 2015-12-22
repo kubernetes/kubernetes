@@ -260,11 +260,39 @@ func PrioritizeNodes(pod *api.Pod, machinesToPods map[string][]*api.Pod, podList
 	}
 
 	combinedScores := map[string]int{}
-
 	wg := sync.WaitGroup{}
 	lock := sync.Mutex{}
-	wg.Add(len(priorityConfigs) + len(extenders))
+
+	for ix := range priorityConfigs {
+		if priorityConfigs[ix].Weight == 0 {
+			continue
+		}
+
+		wg.Add(1)
+		go func(ix int) {
+			defer wg.Done()
+			weight := priorityConfigs[ix].Weight
+			// skip the priority function if the weight is specified as 0
+			if weight == 0 {
+				return
+			}
+			priorityFunc := priorityConfigs[ix].Function
+			prioritizedList, err := priorityFunc(pod, machinesToPods, podLister, c.Sub[ix])
+			if err != nil {
+				c.PResult.Err <- err
+				return
+			}
+
+			lock.Lock()
+			defer lock.Unlock()
+			for _, hostEntry := range prioritizedList {
+				combinedScores[hostEntry.Host] += hostEntry.Score * weight
+			}
+		}(ix)
+	}
+
 	if len(extenders) != 0 {
+		wg.Add(len(extenders))
 		go func() {
 			var nodes api.NodeList
 			for node := range c.Sub[len(priorityConfigs)] {
@@ -290,28 +318,6 @@ func PrioritizeNodes(pod *api.Pod, machinesToPods map[string][]*api.Pod, podList
 		}()
 	}
 
-	for ix := range priorityConfigs {
-		go func(ix int) {
-			defer wg.Done()
-			weight := priorityConfigs[ix].Weight
-			// skip the priority function if the weight is specified as 0
-			if weight == 0 {
-				return
-			}
-			priorityFunc := priorityConfigs[ix].Function
-			prioritizedList, err := priorityFunc(pod, machinesToPods, podLister, c.Sub[ix])
-			if err != nil {
-				c.PResult.Err <- err
-				return
-			}
-
-			lock.Lock()
-			defer lock.Unlock()
-			for _, hostEntry := range prioritizedList {
-				combinedScores[hostEntry.Host] += hostEntry.Score * weight
-			}
-		}(ix)
-	}
 	wg.Wait()
 
 	for host, score := range combinedScores {
