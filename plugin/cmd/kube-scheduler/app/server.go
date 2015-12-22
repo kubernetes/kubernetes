@@ -69,8 +69,8 @@ func NewSchedulerServer() *SchedulerServer {
 		AlgorithmProvider: factory.DefaultProvider,
 		BindPodsQPS:       50.0,
 		BindPodsBurst:     100,
-		KubeAPIQPS:        50.0,
-		KubeAPIBurst:      100,
+		KubeAPIQPS:        100.0,
+		KubeAPIBurst:      200,
 		SchedulerName:     api.DefaultSchedulerName,
 	}
 	return &s
