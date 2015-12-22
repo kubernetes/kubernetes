@@ -51,7 +51,11 @@ If the resource is scalable it will be scaled to 0 before deletion.
 
 .PP
 \fB\-\-timeout\fP=0
-    The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object
+    The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object.
+
+.PP
+\fB\-\-write\-protect\fP=true
+    If true, prevents the users from manipulating resources that shouldn't be changed, such as add\-ons and auto\-generated resources. Note that changing this flag may cause problems to your cluster. Default true.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS

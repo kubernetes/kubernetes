@@ -244,7 +244,7 @@ function stop-object() {
     local -r obj_name=$3
     log INFO "Stopping ${obj_type} ${namespace}/${obj_name}"
 
-    run-until-success "${KUBECTL} stop --namespace=${namespace} ${obj_type} ${obj_name}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
+    run-until-success "${KUBECTL} stop --write-protect=false --namespace=${namespace} ${obj_type} ${obj_name}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
 }
 
 function create-object() {

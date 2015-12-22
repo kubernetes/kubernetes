@@ -60,6 +60,10 @@ will be lost along with the rest of the resource.
 \fB\-\-timeout\fP=0
     The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object
 
+.PP
+\fB\-\-write\-protect\fP=true
+    If true, prevents the users from manipulating resources that shouldn't be changed, such as add\-ons and auto\-generated resources. Note that changing this flag may cause problems to your cluster. Default true.
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP

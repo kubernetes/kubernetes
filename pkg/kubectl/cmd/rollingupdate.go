@@ -102,6 +102,7 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Bool("rollback", false, "If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout")
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
+	cmdutil.AddWriteProtectFlag(cmd)
 	return cmd
 }
 
@@ -187,6 +188,12 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		return kubectl.Rename(client, newRc, oldName)
 	}
 
+	writeProtect := cmdutil.GetWriteProtectFlag(cmd)
+	if writeProtect {
+		if value, ok := oldRc.Labels[cmdutil.AddOnLabel]; ok && value == "true" {
+			return fmt.Errorf("replication controller %q is a cluster service and should not be mutated. See http://releases.k8s.io/HEAD/cluster/addons for more info.", oldRc.Name)
+		}
+	}
 	var keepOldName bool
 	var replicasDefaulted bool
 

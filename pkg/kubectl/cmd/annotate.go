@@ -192,7 +192,6 @@ func (o AnnotateOptions) RunAnnotate() error {
 		if err != nil {
 			return err
 		}
-
 		name, namespace, obj := info.Name, info.Namespace, info.Object
 		oldData, err := json.Marshal(obj)
 		if err != nil {

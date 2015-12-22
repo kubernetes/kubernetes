@@ -46,6 +46,7 @@ import (
 
 const (
 	ApplyAnnotationsFlag = "save-config"
+	AddOnLabel           = "kubernetes.io/cluster-service"
 )
 
 type debugError interface {
@@ -454,4 +455,40 @@ func UpdateObject(info *resource.Info, updateFn func(runtime.Object) error) (run
 	}
 
 	return info.Object, nil
+}
+
+// isClusterService checks the resource's label to see if it's a cluster service (add-on)
+func isClusterService(info *resource.Info) (bool, error) {
+	if info.Object == nil {
+		info.Get()
+	}
+	labels, err := info.Mapping.MetadataAccessor.Labels(info.Object)
+	if err != nil {
+		return false, err
+	}
+	if value, ok := labels[AddOnLabel]; ok && value == "true" {
+		return true, nil
+	}
+	return false, nil
+}
+
+// MutateClusterServiceError returns an error when the input resource is a cluster service (add-on)
+// This function should only be called before mutating an existing resource
+func MutateClusterServiceError(info *resource.Info) error {
+	if isAddon, err := isClusterService(info); err != nil {
+		return err
+	} else if isAddon {
+		return fmt.Errorf("%q is a cluster service and should not be mutated. See http://releases.k8s.io/HEAD/cluster/addons for more info.", info.Name)
+	}
+	return nil
+}
+
+// AddWriteProtectFlag adds a flag that prevents the manipulation on things that they shouldn't touch, such as add-ons.
+func AddWriteProtectFlag(cmd *cobra.Command) {
+	cmd.Flags().BoolP("write-protect", "", true, "If true, prevents the users from manipulating resources that shouldn't be changed, such as add-ons and auto-generated resources. Note that changing this flag may cause problems to your cluster. Default true.")
+}
+
+// GetWriteProtectFlag returns the value of the addon-check flag
+func GetWriteProtectFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "write-protect")
 }

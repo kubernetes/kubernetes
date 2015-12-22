@@ -4,7 +4,7 @@ Cluster add-ons are Services and Replication Controllers (with pods) that are
 shipped with the Kubernetes binaries and are considered an inherent part of the
 Kubernetes clusters. The add-ons are visible through the API (they can be listed
 using ```kubectl```), but manipulation of these objects is discouraged because
-the system will bring them back to the original state, in particular:
+the system will bring them back to the original state (the manipulation is forbidden in `kubectl`), in particular:
 * if an add-on is stopped, it will be restarted automatically
 * if an add-on is rolling-updated (for Replication Controllers), the system will stop the new version and
   start the old one again (or perform rolling update to the old version, in the

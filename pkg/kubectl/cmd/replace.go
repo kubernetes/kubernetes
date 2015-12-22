@@ -84,6 +84,7 @@ func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
+	cmdutil.AddWriteProtectFlag(cmd)
 	return cmd
 }
 
@@ -187,12 +188,13 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	}
 	//Replace will create a resource if it doesn't exist already, so ignore not found error
 	ignoreNotFound := true
+	writeProtect := cmdutil.GetWriteProtectFlag(cmd)
 	// By default use a reaper to delete all related resources.
 	if cmdutil.GetFlagBool(cmd, "cascade") {
 		glog.Warningf("\"cascade\" is set, kubectl will delete and re-create all resources managed by this resource (e.g. Pods created by a ReplicationController). Consider using \"kubectl rolling-update\" if you want to update a ReplicationController together with its Pods.")
-		err = ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagDuration(cmd, "timeout"), cmdutil.GetFlagInt(cmd, "grace-period"), shortOutput, mapper)
+		err = ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagDuration(cmd, "timeout"), cmdutil.GetFlagInt(cmd, "grace-period"), shortOutput, mapper, writeProtect)
 	} else {
-		err = DeleteResult(r, out, ignoreNotFound, shortOutput, mapper)
+		err = DeleteResult(r, out, ignoreNotFound, shortOutput, mapper, writeProtect)
 	}
 	if err != nil {
 		return err

@@ -1058,6 +1058,33 @@ __EOF__
   kubectl delete deployment nginx-deployment "${kube_flags[@]}"
   kubectl delete rc -l deployment.kubernetes.io/podTemplateHash "${kube_flags[@]}"
 
+  ### Prevents the users from manipulating add-ons
+  # Pre-condition: no rc is running
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command 
+  kubectl create -f hack/testdata/add-on-rc.yaml
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'addon:'
+  # deleting add-on should fail
+  ! kubectl delete -f hack/testdata/add-on-rc.yaml
+  ! kubectl delete rc addon
+  # deleting add-on should fail (cascade)
+  ! kubectl delete -f hack/testdata/add-on-rc.yaml --cascade
+  ! kubectl delete rc addon --cascade
+  # stopping add-on should fail
+  ! kubectl stop -f hack/testdata/add-on-rc.yaml
+  ! kubectl stop rc addon
+  # rolling-updating add-on should fail
+  ! kubectl rolling-update addon -f hack/testdata/add-on-rc.yaml
+  ! kubectl rolling-update addon --image=nginx
+  # force replacing add-on should fail 
+  ! kubectl replace --force -f hack/testdata/add-on-rc.yaml
+  # force replacing add-on should fail (cascade)
+  ! kubectl replace --force -f hack/testdata/add-on-rc.yaml --cascade
+  # Cleanup
+  kubectl delete rc addon --write-protect=false
+  # Post-condition: no rc is running
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
+
   ######################
   # Multiple Resources #
   ######################

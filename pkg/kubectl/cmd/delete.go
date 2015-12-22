@@ -98,6 +98,7 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Int("grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
 	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
 	cmdutil.AddOutputFlagsForMutation(cmd)
+	cmdutil.AddWriteProtectFlag(cmd)
 	return cmd
 }
 
@@ -136,14 +137,15 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 
 	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
+	writeProtect := cmdutil.GetWriteProtectFlag(cmd)
 	// By default use a reaper to delete all related resources.
 	if cmdutil.GetFlagBool(cmd, "cascade") {
-		return ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagDuration(cmd, "timeout"), cmdutil.GetFlagInt(cmd, "grace-period"), shortOutput, mapper)
+		return ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagDuration(cmd, "timeout"), cmdutil.GetFlagInt(cmd, "grace-period"), shortOutput, mapper, writeProtect)
 	}
-	return DeleteResult(r, out, ignoreNotFound, shortOutput, mapper)
+	return DeleteResult(r, out, ignoreNotFound, shortOutput, mapper, writeProtect)
 }
 
-func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefaultDelete, ignoreNotFound bool, timeout time.Duration, gracePeriod int, shortOutput bool, mapper meta.RESTMapper) error {
+func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefaultDelete, ignoreNotFound bool, timeout time.Duration, gracePeriod int, shortOutput bool, mapper meta.RESTMapper, writeProtect bool) error {
 	found := 0
 	if ignoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
@@ -151,6 +153,11 @@ func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefault
 	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
+		}
+		if writeProtect {
+			if err = cmdutil.MutateClusterServiceError(info); err != nil {
+				return err
+			}
 		}
 		found++
 		reaper, err := f.Reaper(info.Mapping)
@@ -180,7 +187,7 @@ func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefault
 	return nil
 }
 
-func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortOutput bool, mapper meta.RESTMapper) error {
+func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortOutput bool, mapper meta.RESTMapper, writeProtect bool) error {
 	found := 0
 	if ignoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
@@ -188,6 +195,11 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
+		}
+		if writeProtect {
+			if err = cmdutil.MutateClusterServiceError(info); err != nil {
+				return err
+			}
 		}
 		found++
 		return deleteResource(info, out, shortOutput, mapper)

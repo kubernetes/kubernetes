@@ -341,5 +341,6 @@ watch-cache
 watch-only
 whitelist-override-label
 windows-line-endings
+write-protect
 www-prefix
 experimental-flannel-overlay
