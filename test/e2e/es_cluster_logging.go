@@ -30,7 +30,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Cluster level logging using Elasticsearch", func() {
+// Flaky issue #17873
+var _ = Describe("Cluster level logging using Elasticsearch [Flaky]", func() {
 	f := NewFramework("es-logging")
 
 	BeforeEach(func() {

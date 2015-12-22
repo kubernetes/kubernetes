@@ -65,7 +65,6 @@ function join_regex_no_empty() {
 #   $GCE_DEFAULT_SKIP_TESTS
 #   $GCE_FLAKY_TESTS
 #   $GCE_SLOW_TESTS
-#   $GKE_FLAKY_TESTS
 #
 # Args:
 #   $1 old_version:  the version to deploy a cluster at, and old e2e tests to run
@@ -99,7 +98,6 @@ function configure_upgrade_step() {
         ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
         ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
         ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-        ${GKE_FLAKY_TESTS[@]:+${GKE_FLAKY_TESTS[@]}} \
         )"
 
   if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
@@ -302,11 +300,6 @@ GKE_REQUIRED_SKIP_TESTS=(
     "Deployment"
     )
 
-# Tests wchich are known to be flaky on GKE
-GKE_FLAKY_TESTS=(
-    "NodeOutOfDisk"
-  )
-
 # Specialized tests which should be skipped by default for GKE.
 GKE_DEFAULT_SKIP_TESTS=(
     "Autoscaling\sSuite"
@@ -330,12 +323,7 @@ DISRUPTIVE_TESTS=(
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
 GCE_FLAKY_TESTS=(
-    "GCE\sL7\sLoadBalancer\sController" # issue: #17518
-    "DaemonRestart\sController\sManager" # issue: #17829
-    "Daemon\sset\sshould\srun\sand\sstop\scomplex\sdaemon" # issue: #16623
-    "Resource\susage\sof\ssystem\scontainers" # issue: #13931
-    "NodeOutOfDisk" # issue: #17687
-    "Cluster\slevel\slogging\susing\sElasticsearch" # issue: #17873
+    "\[Flaky\]"
     )
 
 # The following tests are known to be slow running (> 2 min), and are
@@ -349,14 +337,7 @@ GCE_SLOW_TESTS=(
     # make sure the associated project has enough quota. At the time of this
     # writing a GCE project is allowed 3 backend services by default. This
     # test requires at least 5.
-    "GCE\sL7\sLoadBalancer\sController"               # 10 min,       file: ingress.go,              slow by design
-    "SchedulerPredicates\svalidates\sMaxPods\slimit " # 8 min,        file: scheduler_predicates.go, PR:    #13315
-    "Nodes\sResize"                                   # 3 min 30 sec, file: resize_nodes.go,         issue: #13323
-    "resource\susage\stracking"                       # 1 hour,       file: kubelet_perf.go,         slow by design
-    "monotonically\sincreasing\srestart\scount"       # 1.5 to 5 min, file: pods.go,                 slow by design
-    "Garbage\scollector\sshould"                      # 7 min,        file: garbage_collector.go,    slow by design
-    "KubeProxy\sshould\stest\skube-proxy"             # 9 min 30 sec, file: kubeproxy.go,            issue: #14204
-    "cap\sback-off\sat\sMaxContainerBackOff"          # 20 mins       file: manager.go,              PR:    #12648
+    "\[Slow\]"
     )
 
 # Tests which are not able to be run in parallel.
@@ -366,16 +347,6 @@ GCE_PARALLEL_SKIP_TESTS=(
     "\[Serial\]"
     "\[Disruptive\]"
 )
-
-# Tests which are known to be flaky when run in parallel.
-GCE_PARALLEL_FLAKY_TESTS=(
-    "DaemonRestart"
-    "Elasticsearch"
-    "Namespaces.*should\sdelete\sfast"
-    "Pods.*back-off\srestarting.*LivenessProbe" # issue: #18293
-    "ServiceAccounts"
-    "Services.*identically\snamed" # error waiting for reachability, issue: #16285
-    )
 
 # Tests that should not run on soak cluster.
 GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
@@ -496,7 +467,6 @@ case ${JOB_NAME} in
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
@@ -516,7 +486,6 @@ case ${JOB_NAME} in
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-test-parallel"}
@@ -535,7 +504,6 @@ case ${JOB_NAME} in
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           ${AWS_REQUIRED_SKIP_TESTS[@]:+${AWS_REQUIRED_SKIP_TESTS[@]}} \
           )"}
     : ${ENABLE_DEPLOYMENTS:=true}
@@ -553,7 +521,6 @@ case ${JOB_NAME} in
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
           ) --ginkgo.focus=$(join_regex_no_empty \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-prl-flaky"}
@@ -597,7 +564,6 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="e2e-gce-flannel"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
@@ -672,7 +638,6 @@ case ${JOB_NAME} in
           ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GKE_FLAKY_TESTS[@]:+${GKE_FLAKY_TESTS[@]}} \
           )"}
     ;;
 
@@ -687,7 +652,6 @@ case ${JOB_NAME} in
           ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
           ${REBOOT_SKIP_TESTS[@]:+${REBOOT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GKE_FLAKY_TESTS[@]:+${GKE_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
     ;;
@@ -701,7 +665,6 @@ case ${JOB_NAME} in
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}}) \
           --ginkgo.focus=$(join_regex_no_empty \
-          ${GKE_FLAKY_TESTS[@]:+${GKE_FLAKY_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           )"}
     ;;
@@ -734,7 +697,6 @@ case ${JOB_NAME} in
           ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GKE_FLAKY_TESTS[@]:+${GKE_FLAKY_TESTS[@]}} \
           ${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]:+${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]}} \
           )"}
     ;;

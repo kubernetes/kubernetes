@@ -402,7 +402,8 @@ var _ = Describe("Nodes [Disruptive]", func() {
 		systemPodsNo = len(systemPods.Items)
 	})
 
-	Describe("Resize", func() {
+	// Slow issue #13323 (8 min)
+	Describe("Resize [Slow]", func() {
 		var skipped bool
 
 		BeforeEach(func() {
