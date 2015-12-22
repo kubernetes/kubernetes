@@ -146,7 +146,7 @@ LIST and WATCH operations may specify label selectors to filter the sets of obje
     * _equality-based_ requirements: `?labelSelector=environment%3Dproduction,tier%3Dfrontend`
     * _set-based_ requirements: `?labelSelector=environment+in+%28production%2Cqa%29%2Ctier+in+%28frontend%29`
 
-Both label selector styles can be used to list or watch resources via a REST client. For example targetting `apiserver` with `kubectl` and using _equality-based_ one may write:
+Both label selector styles can be used to list or watch resources via a REST client. For example targeting `apiserver` with `kubectl` and using _equality-based_ one may write:
 
 ```console
 $ kubectl get pods -l environment=production,tier=frontend

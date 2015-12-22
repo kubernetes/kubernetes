@@ -131,7 +131,7 @@ For more complete applications, please look in the [examples directory](../../..
 
 ### Debugging
 
-Here are severals tips for you when you run into any issues.
+Here are several tips for you when you run into any issues.
 
 ##### Check logs
 
