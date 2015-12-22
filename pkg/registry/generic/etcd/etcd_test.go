@@ -500,7 +500,7 @@ func TestEtcdDeleteCollection(t *testing.T) {
 	}
 
 	// Delete all pods.
-	deleted, err := registry.DeleteCollection(testContext, nil, &unversioned.ListOptions{})
+	deleted, err := registry.DeleteCollection(testContext, nil, &api.ListOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -537,7 +537,7 @@ func TestEtcdDeleteCollectionWithWatch(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if _, err := registry.DeleteCollection(testContext, nil, &unversioned.ListOptions{}); err != nil {
+	if _, err := registry.DeleteCollection(testContext, nil, &api.ListOptions{}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 

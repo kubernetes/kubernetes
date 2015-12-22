@@ -19,15 +19,14 @@ package configmap
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store ConfigMaps.
 type Registry interface {
-	ListConfigMaps(ctx api.Context, options *unversioned.ListOptions) (*extensions.ConfigMapList, error)
-	WatchConfigMaps(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error)
+	ListConfigMaps(ctx api.Context, options *api.ListOptions) (*extensions.ConfigMapList, error)
+	WatchConfigMaps(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 	GetConfigMap(ctx api.Context, name string) (*extensions.ConfigMap, error)
 	CreateConfigMap(ctx api.Context, cfg *extensions.ConfigMap) (*extensions.ConfigMap, error)
 	UpdateConfigMap(ctx api.Context, cfg *extensions.ConfigMap) (*extensions.ConfigMap, error)
@@ -45,7 +44,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListConfigMaps(ctx api.Context, options *unversioned.ListOptions) (*extensions.ConfigMapList, error) {
+func (s *storage) ListConfigMaps(ctx api.Context, options *api.ListOptions) (*extensions.ConfigMapList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -54,7 +53,7 @@ func (s *storage) ListConfigMaps(ctx api.Context, options *unversioned.ListOptio
 	return obj.(*extensions.ConfigMapList), err
 }
 
-func (s *storage) WatchConfigMaps(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchConfigMaps(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

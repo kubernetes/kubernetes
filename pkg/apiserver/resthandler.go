@@ -264,19 +264,29 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
-		opts := unversioned.ListOptions{}
-		if err := scope.Codec.DecodeParametersInto(req.Request.URL.Query(), &opts); err != nil {
+		listOptionsGVK := scope.Kind.GroupVersion().WithKind("ListOptions")
+		versioned, err := scope.Creater.New(listOptionsGVK)
+		if err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+		if err := scope.Codec.DecodeParametersInto(req.Request.URL.Query(), versioned); err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+		opts := api.ListOptions{}
+		if err := scope.Convertor.Convert(versioned, &opts); err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
 
 		// transform fields
 		// TODO: DecodeParametersInto should do this.
-		if opts.FieldSelector.Selector != nil {
+		if opts.FieldSelector != nil {
 			fn := func(label, value string) (newLabel, newValue string, err error) {
 				return scope.Convertor.ConvertFieldLabel(scope.Kind.GroupVersion().String(), scope.Kind.Kind, label, value)
 			}
-			if opts.FieldSelector.Selector, err = opts.FieldSelector.Selector.Transform(fn); err != nil {
+			if opts.FieldSelector, err = opts.FieldSelector.Transform(fn); err != nil {
 				// TODO: allow bad request to set field causes based on query parameters
 				err = errors.NewBadRequest(err.Error())
 				errorJSON(err, scope.Codec, w)
@@ -290,7 +300,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			// a request for a single object and optimize the
 			// storage query accordingly.
 			nameSelector := fields.OneTermEqualSelector("metadata.name", name)
-			if opts.FieldSelector.Selector != nil && !opts.FieldSelector.Selector.Empty() {
+			if opts.FieldSelector != nil && !opts.FieldSelector.Empty() {
 				// It doesn't make sense to ask for both a name
 				// and a field selector, since just the name is
 				// sufficient to narrow down the request to a
@@ -302,7 +312,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 				)
 				return
 			}
-			opts.FieldSelector.Selector = nameSelector
+			opts.FieldSelector = nameSelector
 		}
 
 		if (opts.Watch || forceWatch) && rw != nil {
@@ -777,19 +787,29 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			}
 		}
 
-		listOptions := unversioned.ListOptions{}
-		if err := scope.Codec.DecodeParametersInto(req.Request.URL.Query(), &listOptions); err != nil {
+		listOptionsGVK := scope.Kind.GroupVersion().WithKind("ListOptions")
+		versioned, err := scope.Creater.New(listOptionsGVK)
+		if err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+		if err := scope.Codec.DecodeParametersInto(req.Request.URL.Query(), versioned); err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+		listOptions := api.ListOptions{}
+		if err := scope.Convertor.Convert(versioned, &listOptions); err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
 
 		// transform fields
 		// TODO: DecodeParametersInto should do this.
-		if listOptions.FieldSelector.Selector != nil {
+		if listOptions.FieldSelector != nil {
 			fn := func(label, value string) (newLabel, newValue string, err error) {
 				return scope.Convertor.ConvertFieldLabel(scope.Kind.GroupVersion().String(), scope.Kind.Kind, label, value)
 			}
-			if listOptions.FieldSelector.Selector, err = listOptions.FieldSelector.Selector.Transform(fn); err != nil {
+			if listOptions.FieldSelector, err = listOptions.FieldSelector.Transform(fn); err != nil {
 				// TODO: allow bad request to set field causes based on query parameters
 				err = errors.NewBadRequest(err.Error())
 				errorJSON(err, scope.Codec, w)

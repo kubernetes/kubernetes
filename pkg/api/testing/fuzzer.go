@@ -103,13 +103,6 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			field, _ := fields.ParseSelector("a=b")
 			j.FieldSelector = field
 		},
-		func(j *unversioned.ListOptions, c fuzz.Continue) {
-			// TODO: add some parsing
-			label, _ := labels.Parse("a=b")
-			j.LabelSelector = unversioned.LabelSelector{label}
-			field, _ := fields.ParseSelector("a=b")
-			j.FieldSelector = unversioned.FieldSelector{field}
-		},
 		func(j *api.PodExecOptions, c fuzz.Continue) {
 			j.Stdout = true
 			j.Stderr = true
