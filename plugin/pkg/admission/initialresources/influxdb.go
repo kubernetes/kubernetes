@@ -18,6 +18,7 @@ package initialresources
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -36,31 +37,37 @@ const (
 
 // TODO(piosz): rewrite this once we will migrate into InfluxDB v0.9.
 type influxdbSource struct {
-	conf *influxdb.ClientConfig
+	conf *influxdb.Config
+	db   string
 }
 
-func newInfluxdbSource(host, user, password, db string) (dataSource, error) {
-	conf := &influxdb.ClientConfig{
-		Host:     host,
-		Username: user,
-		Password: password,
-		Database: db,
+func newInfluxdbSource(rawurl, user, password, db string) (dataSource, error) {
+	parsedurl, err := url.Parse(rawurl)
+	if err != nil {
+		return nil, err
+	}
+	conf := &influxdb.Config{
+		URL:       *parsedurl,
+		Username:  user,
+		Password:  password,
+		Precision: "s",
 	}
 	source := &influxdbSource{
 		conf: conf,
+		db:   db,
 	}
 	go source.ensureAutoscalingSeriesExist()
 	return source, nil
 }
 
-func ensureSeriesExists(conn *influxdb.Client, existingQueries *influxdb.Series, seriesName, contQuery string) error {
+func ensureSeriesExists(conn *influxdb.Client, existingQueries *influxdb.Result, seriesName, contQuery, db string) error {
 	queryExists := false
-	for _, p := range existingQueries.GetPoints() {
-		id := p[1].(float64)
-		query := p[2].(string)
+	for _, p := range existingQueries.Series {
+		id := p.Values[1][0].(float64)
+		query := p.Values[2][0].(string)
 		if strings.Contains(query, "into "+seriesName) {
 			if query != contQuery {
-				if _, err := conn.Query(fmt.Sprintf("drop continuous query %v", id), influxdb.Second); err != nil {
+				if _, err := conn.Query(influxdb.Query{Command: fmt.Sprintf("drop continuous query %v", id), Database: db}); err != nil {
 					return err
 				}
 			} else {
@@ -69,10 +76,10 @@ func ensureSeriesExists(conn *influxdb.Client, existingQueries *influxdb.Series,
 		}
 	}
 	if !queryExists {
-		if _, err := conn.Query("drop series "+seriesName, influxdb.Second); err != nil {
+		if _, err := conn.Query(influxdb.Query{Command: "drop series " + seriesName, Database: db}); err != nil {
 			return err
 		}
-		if _, err := conn.Query(contQuery, influxdb.Second); err != nil {
+		if _, err := conn.Query(influxdb.Query{Command: contQuery, Database: db}); err != nil {
 			return err
 		}
 	}
@@ -82,21 +89,21 @@ func ensureSeriesExists(conn *influxdb.Client, existingQueries *influxdb.Series,
 func (s *influxdbSource) ensureAutoscalingSeriesExist() {
 	for {
 		time.Sleep(30 * time.Second)
-		client, err := influxdb.NewClient(s.conf)
+		client, err := influxdb.NewClient(*s.conf)
 		if err != nil {
 			glog.Errorf("Error while trying to create InfluxDB client: %v", err)
 			continue
 		}
-		series, err := client.Query("list continuous queries", influxdb.Second)
+		result, err := client.Query(influxdb.Query{Command: "list continuous queries", Database: s.db})
 		if err != nil {
 			glog.Errorf("Error while trying to list continuous queries: %v", err)
 			continue
 		}
-		if err := ensureSeriesExists(client, series[0], cpuSeriesName, cpuContinuousQuery); err != nil {
+		if err := ensureSeriesExists(client, &result.Results[0], cpuSeriesName, cpuContinuousQuery, s.db); err != nil {
 			glog.Errorf("Error while trying to create create autoscaling series: %v", err)
 			continue
 		}
-		if err := ensureSeriesExists(client, series[0], memSeriesName, memContinuousQuery); err != nil {
+		if err := ensureSeriesExists(client, &result.Results[0], memSeriesName, memContinuousQuery, s.db); err != nil {
 			glog.Errorf("Error while trying to create create autoscaling series: %v", err)
 			continue
 		}
@@ -104,12 +111,12 @@ func (s *influxdbSource) ensureAutoscalingSeriesExist() {
 	}
 }
 
-func (s *influxdbSource) query(query string, precision ...influxdb.TimePrecision) ([]*influxdb.Series, error) {
-	client, err := influxdb.NewClient(s.conf)
+func (s *influxdbSource) query(query string) (*influxdb.Response, error) {
+	client, err := influxdb.NewClient(*s.conf)
 	if err != nil {
 		return nil, err
 	}
-	return client.Query(query, precision...)
+	return client.Query(influxdb.Query{Command: query, Database: s.db})
 }
 
 func (s *influxdbSource) GetUsagePercentile(kind api.ResourceName, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (int64, int64, error) {
@@ -133,23 +140,29 @@ func (s *influxdbSource) GetUsagePercentile(kind api.ResourceName, perc int64, i
 	}
 
 	query := fmt.Sprintf("select percentile(value, %v), count(pod_id) from %v where container_base_image%v%v and time > '%v' and time < '%v'", perc, series, imgPattern, namespaceCond, start.UTC().Format(timeFormat), end.UTC().Format(timeFormat))
-	var res []*influxdb.Series
+	var response *influxdb.Response
 	var err error
-	if res, err = s.query(query, influxdb.Second); err != nil {
+	if response, err = s.query(query); err != nil {
 		return 0, 0, fmt.Errorf("Error while trying to query InfluxDB: %v", err)
 	}
 
 	// TODO(pszczesniak): fix issue with dropped data base
-	if len(res) == 0 {
+	if response.Err != nil {
+		return 0, 0, fmt.Errorf("Error while trying to query InfluxDB: %v", response.Err)
+	}
+	if len(response.Results) == 0 {
 		return 0, 0, fmt.Errorf("Missing data in series %v in InfluxDB", series)
 	}
-	points := res[0].GetPoints()
+	if response.Results[0].Err != nil {
+		return 0, 0, fmt.Errorf("Error while trying to query InfluxDB: %v", response.Results[0].Err)
+	}
+	points := response.Results[0].Series
 	if len(points) == 0 {
 		return 0, 0, fmt.Errorf("Missing data in series %v in InfluxDB", series)
 	}
 	p := points[0]
-	usage := p[1].(float64)
-	count := p[2].(float64)
+	usage := p.Values[0][1].(float64)
+	count := p.Values[0][2].(float64)
 	if kind == api.ResourceCPU {
 		// convert from ns to millicores
 		usage = usage / 1000000

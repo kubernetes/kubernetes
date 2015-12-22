@@ -1,0 +1,16 @@
+machine:
+    services:
+        - docker
+
+dependencies:
+    cache_directories:
+        - "~/docker"
+    override:
+      - ./test.sh save:
+          # building the docker images can take a long time, hence caching
+          timeout: 1800
+
+test:
+    override:
+        - bash circle-test.sh:
+            parallel: true

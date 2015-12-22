@@ -33,9 +33,9 @@ var _ = Describe("Initial Resources [Skipped] ", func() {
 		// Cleanup data in InfluxDB that left from previous tests.
 		influxdbClient, err := getInfluxdbClient(f.Client)
 		expectNoError(err, "failed to create influxdb client")
-		_, err = influxdbClient.Query("drop series autoscaling.cpu.usage.2m", influxdb.Second)
+		_, err = influxdbClient.Query(influxdb.Query{Command: "drop series autoscaling.cpu.usage.2m", Database: influxdbDatabaseName})
 		expectNoError(err)
-		_, err = influxdbClient.Query("drop series autoscaling.memory.usage.2m", influxdb.Second)
+		_, err = influxdbClient.Query(influxdb.Query{Command: "drop series autoscaling.memory.usage.2m", Database: influxdbDatabaseName})
 		expectNoError(err)
 
 		cpu := 100
