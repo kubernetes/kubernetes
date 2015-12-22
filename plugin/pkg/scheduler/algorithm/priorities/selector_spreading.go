@@ -73,7 +73,7 @@ func getZoneKey(node *api.Node) string {
 // i.e. it pushes the scheduler towards a node where there's the smallest number of
 // pods which match the same service selectors or RC selectors as the pod being scheduled.
 // Where zone information is included on the nodes, it favors nodes in zones with fewer existing matching pods.
-func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes chan *api.Node) (schedulerapi.HostPriorityList, error) {
 	var nsPods []*api.Pod
 
 	selectors := make([]labels.Selector, 0)
@@ -101,11 +101,6 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, machinesToPods ma
 				nsPods = append(nsPods, nsPod)
 			}
 		}
-	}
-
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return nil, err
 	}
 
 	// Count similar pods by node
@@ -143,9 +138,9 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, machinesToPods ma
 
 	// Count similar pods by zone, if zone information is present
 	countsByZone := map[string]int{}
-	for i := range nodes.Items {
-		node := &nodes.Items[i]
-
+	var tmpNodes []*api.Node
+	for node := range nodes {
+		tmpNodes = append(tmpNodes, node)
 		count, found := countsByNodeName[node.Name]
 		if !found {
 			continue
@@ -172,8 +167,7 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, machinesToPods ma
 	result := []schedulerapi.HostPriority{}
 	//score int - scale of 0-maxPriority
 	// 0 being the lowest priority and maxPriority being the highest
-	for i := range nodes.Items {
-		node := &nodes.Items[i]
+	for _, node := range tmpNodes {
 		// initializing to the default/max node score of maxPriority
 		fScore := float32(maxPriority)
 		if maxCountByNodeName > 0 {
@@ -213,7 +207,7 @@ func NewServiceAntiAffinityPriority(serviceLister algorithm.ServiceLister, label
 // CalculateAntiAffinityPriority spreads pods by minimizing the number of pods belonging to the same service
 // on machines with the same value for a particular label.
 // The label to be considered is provided to the struct (ServiceAntiAffinity).
-func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes chan *api.Node) (schedulerapi.HostPriorityList, error) {
 	var nsServicePods []*api.Pod
 
 	services, err := s.serviceLister.GetPodServices(pod)
@@ -233,15 +227,10 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, machin
 		}
 	}
 
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return nil, err
-	}
-
 	// separate out the nodes that have the label from the ones that don't
 	otherNodes := []string{}
 	labeledNodes := map[string]string{}
-	for _, node := range nodes.Items {
+	for node := range nodes {
 		if labels.Set(node.Labels).Has(s.label) {
 			label := labels.Set(node.Labels).Get(s.label)
 			labeledNodes[node.Name] = label
