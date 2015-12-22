@@ -126,8 +126,7 @@ var _ = Describe("Daemon set", func() {
 
 	})
 
-	// Flaky issue #16623
-	It("should run and stop complex daemon [Flaky]", func() {
+	It("should run and stop complex daemon", func() {
 		complexLabel := map[string]string{daemonsetNameLabel: dsName}
 		nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
 		Logf("Creating daemon with a node selector %s", dsName)
