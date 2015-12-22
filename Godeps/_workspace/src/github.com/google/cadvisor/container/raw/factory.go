@@ -18,11 +18,12 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
+
+	"github.com/golang/glog"
 )
 
 var dockerOnly = flag.Bool("docker_only", false, "Only report docker containers in addition to root stats")

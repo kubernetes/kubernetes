@@ -18,8 +18,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/golang/glog"
 	info "github.com/google/cadvisor/info/v1"
+
+	"github.com/golang/glog"
 )
 
 type NetlinkReader struct {

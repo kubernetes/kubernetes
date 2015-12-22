@@ -84,17 +84,11 @@ func (self *TimedStore) Add(timestamp time.Time, item interface{}) {
 }
 
 // Returns up to maxResult elements in the specified time period (inclusive).
-// Results are from first to last. maxResults of -1 means no limit. When first
-// and last are specified, maxResults is ignored.
+// Results are from first to last. maxResults of -1 means no limit.
 func (self *TimedStore) InTimeRange(start, end time.Time, maxResults int) []interface{} {
 	// No stats, return empty.
 	if len(self.buffer) == 0 {
 		return []interface{}{}
-	}
-
-	// Return all results in a time range if specified.
-	if !start.IsZero() && !end.IsZero() {
-		maxResults = -1
 	}
 
 	var startIndex int

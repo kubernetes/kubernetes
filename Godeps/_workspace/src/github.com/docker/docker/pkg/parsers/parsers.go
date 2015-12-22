@@ -2,6 +2,8 @@ package parsers
 
 import (
 	"fmt"
+	"net/url"
+	"path"
 	"runtime"
 	"strconv"
 	"strings"
@@ -52,7 +54,11 @@ func ParseTCPAddr(addr string, defaultAddr string) (string, error) {
 		return "", fmt.Errorf("Invalid proto, expected tcp: %s", addr)
 	}
 
-	hostParts := strings.Split(addr, ":")
+	u, err := url.Parse("tcp://" + addr)
+	if err != nil {
+		return "", err
+	}
+	hostParts := strings.Split(u.Host, ":")
 	if len(hostParts) != 2 {
 		return "", fmt.Errorf("Invalid bind address format: %s", addr)
 	}
@@ -65,7 +71,7 @@ func ParseTCPAddr(addr string, defaultAddr string) (string, error) {
 	if err != nil && p == 0 {
 		return "", fmt.Errorf("Invalid bind address format: %s", addr)
 	}
-	return fmt.Sprintf("tcp://%s:%d", host, p), nil
+	return fmt.Sprintf("tcp://%s:%d%s", host, p, u.Path), nil
 }
 
 // Get a repos name and returns the right reposName + tag|digest
@@ -152,6 +158,13 @@ func ParseLink(val string) (string, string, error) {
 	}
 	if len(arr) == 1 {
 		return val, val, nil
+	}
+	// This is kept because we can actually get an HostConfig with links
+	// from an already created container and the format is not `foo:bar`
+	// but `/foo:/c1/bar`
+	if strings.HasPrefix(arr[0], "/") {
+		_, alias := path.Split(arr[1])
+		return arr[0][1:], alias, nil
 	}
 	return arr[0], arr[1], nil
 }

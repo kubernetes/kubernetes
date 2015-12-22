@@ -19,7 +19,7 @@ limitations under the License.
 package kubelet
 
 import (
-	"github.com/docker/libcontainer/selinux"
+	"github.com/opencontainers/runc/libcontainer/selinux"
 )
 
 // getRootDirContext gets the SELinux context of the kubelet rootDir

@@ -35,6 +35,9 @@ type PrometheusCollector struct {
 
 	//holds information extracted from the config file for a collector
 	configFile Prometheus
+
+	// the metrics to gather (uses a map as a set)
+	metricsSet map[string]bool
 }
 
 //Returns a new collector using the information extracted from the configfile
@@ -54,11 +57,20 @@ func NewPrometheusCollector(collectorName string, configFile []byte) (*Prometheu
 		minPollingFrequency = minSupportedFrequency
 	}
 
+	var metricsSet map[string]bool
+	if len(configInJSON.MetricsConfig) > 0 {
+		metricsSet = make(map[string]bool, len(configInJSON.MetricsConfig))
+		for _, name := range configInJSON.MetricsConfig {
+			metricsSet[name] = true
+		}
+	}
+
 	//TODO : Add checks for validity of config file (eg : Accurate JSON fields)
 	return &PrometheusCollector{
 		name:             collectorName,
 		pollingFrequency: minPollingFrequency,
 		configFile:       configInJSON,
+		metricsSet:       metricsSet,
 	}, nil
 }
 
@@ -100,8 +112,12 @@ func (collector *PrometheusCollector) GetSpec() []v1.MetricSpec {
 			if stopIndex == -1 {
 				stopIndex = strings.Index(lines[i+2], " ")
 			}
+			name := strings.TrimSpace(lines[i+2][0:stopIndex])
+			if _, ok := collector.metricsSet[name]; collector.metricsSet != nil && !ok {
+				continue
+			}
 			spec := v1.MetricSpec{
-				Name:   strings.TrimSpace(lines[i+2][0:stopIndex]),
+				Name:   name,
 				Type:   v1.MetricType(getMetricData(lines[i+1])),
 				Format: "float",
 				Units:  getMetricData(lines[i]),
@@ -145,6 +161,9 @@ func (collector *PrometheusCollector) Collect(metrics map[string][]v1.MetricVal)
 			}
 
 			metName := strings.TrimSpace(line[0:startLabelIndex])
+			if _, ok := collector.metricsSet[metName]; collector.metricsSet != nil && !ok {
+				continue
+			}
 
 			if startLabelIndex+1 <= spaceIndex-1 {
 				metLabel = strings.TrimSpace(line[(startLabelIndex + 1):(spaceIndex - 1)])

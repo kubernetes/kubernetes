@@ -28,18 +28,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/events"
-	httpMux "github.com/google/cadvisor/http/mux"
+	httpmux "github.com/google/cadvisor/http/mux"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/manager"
+
+	"github.com/golang/glog"
 )
 
 const (
 	apiResource = "/api/"
 )
 
-func RegisterHandlers(mux httpMux.Mux, m manager.Manager) error {
+func RegisterHandlers(mux httpmux.Mux, m manager.Manager) error {
 	apiVersions := getApiVersions()
 	supportedApiVersions := make(map[string]ApiVersion, len(apiVersions))
 	for _, v := range apiVersions {
@@ -56,7 +57,7 @@ func RegisterHandlers(mux httpMux.Mux, m manager.Manager) error {
 }
 
 // Captures the API version, requestType [optional], and remaining request [optional].
-var apiRegexp = regexp.MustCompile("/api/([^/]+)/?([^/]+)?(.*)")
+var apiRegexp = regexp.MustCompile(`/api/([^/]+)/?([^/]+)?(.*)`)
 
 const (
 	apiVersion = iota + 1

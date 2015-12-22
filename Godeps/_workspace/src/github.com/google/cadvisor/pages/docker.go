@@ -22,10 +22,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/container/docker"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/manager"
+
+	"github.com/golang/glog"
 )
 
 const DockerPage = "/docker/"
