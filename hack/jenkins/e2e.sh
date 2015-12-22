@@ -856,31 +856,31 @@ case ${JOB_NAME} in
   # Test upgrades from the stable build to the latest current release build.
 
   kubernetes-upgrade-gce-stable-current-release-step1-deploy)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-stable-current-release' 'k8s-jkns-gce-upgrade'
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
     ;;
 
   kubernetes-upgrade-gce-stable-current-release-step2-kubectl-e2e-new)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-stable-current-release' 'k8s-jkns-gce-upgrade'
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
     ;;
 
   kubernetes-upgrade-gce-stable-current-release-step3-upgrade-master)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-stable-current-release' 'k8s-jkns-gce-upgrade'
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
     ;;
 
   kubernetes-upgrade-gce-stable-current-release-step4-e2e-old)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-stable-current-release' 'k8s-jkns-gce-upgrade'
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
     ;;
 
   kubernetes-upgrade-gce-stable-current-release-step5-upgrade-cluster)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-stable-current-release' 'k8s-jkns-gce-upgrade'
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
     ;;
 
   kubernetes-upgrade-gce-stable-current-release-step6-e2e-old)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-stable-current-release' 'k8s-jkns-gce-upgrade'
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
     ;;
 
   kubernetes-upgrade-gce-stable-current-release-step7-e2e-new)
-    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-stable-current-release' 'k8s-jkns-gce-upgrade'
+    configure_upgrade_step 'release/stable-1.1' 'ci/latest-1.1' 'upgrade-gce-st-cur-rel' 'k8s-jkns-gce-upgrade'
     ;;
 
   # kubernetes-upgrade-gke-stable-current-release
