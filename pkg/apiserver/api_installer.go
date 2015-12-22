@@ -144,10 +144,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 	}
 
+	kind := fqKindToRegister.Kind
+
 	if fqKindToRegister.IsEmpty() {
 		return nil, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
 	}
-	kind := fqKindToRegister.Kind
 
 	versionedPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind(kind))
 	if err != nil {
@@ -323,6 +324,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	params := []*restful.Parameter{}
 	actions := []action{}
 
+	var resourceKind string
+	kindProvider, ok := storage.(rest.KindProvider)
+	if ok {
+		resourceKind = kindProvider.Kind()
+	} else {
+		resourceKind = fqKindToRegister.Kind
+	}
+
 	var apiResource unversioned.APIResource
 	// Get the list of actions for the given scope.
 	switch scope.Name() {
@@ -340,6 +349,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		apiResource.Name = path
 		apiResource.Namespaced = false
+		apiResource.Kind = resourceKind
 		namer := rootScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath)}
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
@@ -382,6 +392,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		apiResource.Name = path
 		apiResource.Namespaced = true
+		apiResource.Kind = resourceKind
 		namer := scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), false}
 
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
