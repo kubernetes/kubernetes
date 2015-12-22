@@ -246,7 +246,7 @@ func TestWatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	defer watching.Stop()
+	// watching is explicitly closed below.
 
 	// Test normal case
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
@@ -327,8 +327,6 @@ func TestWatchEtcdState(t *testing.T) {
 	if e, a := endpoint, event.Object; !api.Semantic.DeepDerivative(e, a) {
 		t.Errorf("%s: expected %v, got %v", e, a)
 	}
-
-	watching.Stop()
 }
 
 func TestWatchFromZeroIndex(t *testing.T) {
@@ -379,8 +377,6 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
 		t.Errorf("%s: expected %v, got %v", e, a)
 	}
-
-	watching.Stop()
 }
 
 func TestWatchListFromZeroIndex(t *testing.T) {
@@ -411,8 +407,6 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 	if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
 		t.Errorf("%s: expected %v, got %v", e, a)
 	}
-
-	watching.Stop()
 }
 
 func TestWatchListIgnoresRootKey(t *testing.T) {
@@ -444,8 +438,6 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 	default:
 		// fall through, expected behavior
 	}
-
-	watching.Stop()
 }
 
 func TestWatchPurposefulShutdown(t *testing.T) {
