@@ -103,7 +103,7 @@ func verifyResult(c *client.Client, podName string, ns string) {
 		"involvedObject.kind":      "Pod",
 		"involvedObject.name":      podName,
 		"involvedObject.namespace": ns,
-		"source":                   "scheduler",
+		"source":                   api.DefaultSchedulerName,
 		"reason":                   "FailedScheduling",
 	}.AsSelector()
 	options := api.ListOptions{FieldSelector: selector}
