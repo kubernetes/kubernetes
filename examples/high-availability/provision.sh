@@ -68,7 +68,7 @@ function test_etcd {
     ( journalctl -u kubelet | grep -A 20 -B 20 Fail || echo "no failure in logs")
     echo "----------- END DEBUG OF KUBELET ----------------------------"
 
-    ( curl http://kube0.ha:2379 > /tmp/curl_output || echo "failed etcd!!!" )
+    ( curl http://kube0:2379 > /tmp/curl_output || echo "failed etcd!!!" )
     if [ -s /tmp/curl_output ]; then
          echo "etcd success"
     else
@@ -136,7 +136,7 @@ function poll {
 function install_components {
     ### etcd node - this node only runs etcd in a kubelet, no flannel.
     ### we dont want circular dependency of docker -> flannel -> etcd -> docker
-    if [ "`hostname`" == "kube0.ha" ]; then
+    if [ "`hostname`" == "kube0" ]; then
             write_etcd_manifest
             start_kubelet
 
@@ -153,7 +153,7 @@ function install_components {
         /vagrant/provision-flannel.sh
 
         echo "Now pulling down flannel nodes. "
-        curl -L http://kube0.ha:2379/v2/keys/coreos.com/network/subnets | python -mjson.tool
+        curl -L http://kube0:2379/v2/keys/coreos.com/network/subnets | python -mjson.tool
 
         echo " Inspect the above lines carefully ^."
         ### All nodes run api server
@@ -173,7 +173,7 @@ initialize
 install_components
 iptables -F
 
-if [ "`hostname`" == "kube2.ha" ]; then
+if [ "`hostname`" == "kube2" ]; then
     poll
     k8petstore
 fi

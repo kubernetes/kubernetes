@@ -22,11 +22,11 @@ function setup_flannel {
     yum install -y flannel
 
     ### Write this k/v to etcd.  Flannel will grab it to setup its networking.
-    curl --silent -s -L http://kube0.ha:2379/v2/keys/coreos.com/network/config -XPUT -d value='{"Network": "172.31.255.0/24", "SubnetLen": 27, "Backend": {"Type": "vxlan"}}'
+    curl --silent -s -L http://kube0:2379/v2/keys/coreos.com/network/config -XPUT -d value='{"Network": "172.31.255.0/24", "SubnetLen": 27, "Backend": {"Type": "vxlan"}}'
 
 ### Write flannel etcd file
 cat >> /etc/sysconfig/flanneld << EOF
-FLANNEL_ETCD="http://kube0.ha:2379"
+FLANNEL_ETCD="http://kube0:2379"
 FLANNEL_ETCD_KEY="/coreos.com/network"
 FLANNEL_OPTIONS="--iface=eth1"
 EOF
