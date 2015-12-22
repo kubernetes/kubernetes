@@ -71,7 +71,8 @@ var _ = Describe("KubeProxy", func() {
 		f: f,
 	}
 
-	It("should test kube-proxy", func() {
+	// Slow issue #14204 (10 min)
+	It("should test kube-proxy [Slow]", func() {
 		By("cleaning up any pre-existing namespaces used by this test")
 		config.cleanup()
 

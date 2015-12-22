@@ -27,7 +27,9 @@ import (
 )
 
 // This test requires that --terminated-pod-gc-threshold=100 be set on the controller manager
-var _ = Describe("Garbage collector", func() {
+//
+// Slow by design (7 min)
+var _ = Describe("Garbage collector [Slow]", func() {
 	f := NewFramework("garbage-collector")
 	It("should handle the creation of 1000 pods", func() {
 		SkipUnlessProviderIs("gce")
