@@ -192,7 +192,7 @@ func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 	selector := fields.Set{
 		"involvedObject.kind":      "Pod",
 		"involvedObject.namespace": ns,
-		"source":                   "scheduler",
+		"source":                   api.DefaultSchedulerName,
 	}.AsSelector()
 	options := api.ListOptions{FieldSelector: selector}
 	schedEvents, err := c.Events(ns).List(options)
