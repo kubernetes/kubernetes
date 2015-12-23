@@ -118,7 +118,10 @@ func main() {
 
 	b, err := imports.Process("", data.Bytes(), nil)
 	if err != nil {
-		glog.Fatalf("Error while update imports: %v", err)
+		for i, s := range bytes.Split(data.Bytes(), []byte("\n")) {
+			glog.Infof("%d:\t%s", i, s)
+		}
+		glog.Fatalf("Error while update imports: %v\n", err)
 	}
 	if _, err := funcOut.Write(b); err != nil {
 		glog.Fatalf("Error while writing out the resulting file: %v", err)
