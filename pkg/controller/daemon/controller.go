@@ -416,7 +416,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 
 	glog.V(4).Infof("Pods to delete for daemon set %s: %+v", ds.Name, podsToDelete)
 	for i := range podsToDelete {
-		if err := dsc.podControl.DeletePod(ds.Namespace, podsToDelete[i]); err != nil {
+		if err := dsc.podControl.DeletePod(ds.Namespace, podsToDelete[i], ds); err != nil {
 			glog.V(2).Infof("Failed deletion, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
 			dsc.expectations.DeletionObserved(dsKey)
 			util.HandleError(err)
