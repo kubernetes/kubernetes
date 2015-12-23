@@ -87,12 +87,12 @@ func NewConverter() *Converter {
 		inputFieldMappingFuncs: map[reflect.Type]FieldMappingFunc{},
 		inputDefaultFlags:      map[reflect.Type]FieldMatchingFlags{},
 	}
-	c.RegisterConversionFunc(byteSliceCopy)
+	c.RegisterConversionFunc(ByteSliceCopy)
 	return c
 }
 
-// Prevent recursing into every byte...
-func byteSliceCopy(in *[]byte, out *[]byte, s Scope) error {
+// ByteSliceCopy prevents recursing into every byte
+func ByteSliceCopy(in *[]byte, out *[]byte, s Scope) error {
 	*out = make([]byte, len(*in))
 	copy(*out, *in)
 	return nil
@@ -320,6 +320,11 @@ func (c *Converter) RegisterGeneratedConversionFunc(conversionFunc interface{}) 
 func (c *Converter) HasConversionFunc(inType, outType reflect.Type) bool {
 	_, found := c.conversionFuncs[typePair{inType, outType}]
 	return found
+}
+
+func (c *Converter) ConversionFuncValue(inType, outType reflect.Type) (reflect.Value, bool) {
+	value, found := c.conversionFuncs[typePair{inType, outType}]
+	return value, found
 }
 
 // SetStructFieldCopy registers a correspondence. Whenever a struct field is encountered
