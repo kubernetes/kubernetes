@@ -30,7 +30,7 @@ import (
 
 const (
 	// Minimal period between polling log sizes from components
-	pollingPeriod            = 5 * time.Second
+	pollingPeriod            = 60 * time.Second
 	workersNo                = 5
 	kubeletLogsPath          = "/var/log/kubelet.log"
 	kubeProxyLogsPath        = "/var/log/kube-proxy.log"
@@ -211,7 +211,7 @@ func (g *LogSizeGatherer) Work() bool {
 		testContext.Provider,
 	)
 	if err != nil {
-		Logf("Error while trying to SSH to %v, skipping probe.", workItem.ip)
+		Logf("Error while trying to SSH to %v, skipping probe. Error: %v", workItem.ip, err)
 		g.workChannel <- workItem
 		return true
 	}
@@ -222,7 +222,7 @@ func (g *LogSizeGatherer) Work() bool {
 		path := results[i]
 		size, err := strconv.Atoi(results[i+1])
 		if err != nil {
-			Logf("Error during conversion to int: %v, skipping data", results[i+1])
+			Logf("Error during conversion to int: %v, skipping data. Error: %v", results[i+1], err)
 			continue
 		}
 		g.data.AddNewData(workItem.ip, path, now, size)
