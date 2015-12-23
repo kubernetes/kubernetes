@@ -16,14 +16,6 @@
 
 # This script will download latest version of kubectl command line tool and will
 # bring up a local Kubernetes cluster with a single node.
-#
-# Usage:
-#   wget -q -O - https://get.k8s.io/local | bash
-# or
-#   curl -sS https://get.k8s.io/local | bash
-#
-# On Mac OS X you'll have to additionally pass env variable:
-#   wget -q -O - https://get.k8s.io/local | KUBE_HOST=<docker_machine_ip> bash -c
 set -o errexit
 set -o nounset
 set -o pipefail
