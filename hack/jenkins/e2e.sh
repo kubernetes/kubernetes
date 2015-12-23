@@ -967,6 +967,7 @@ export KUBE_ADMISSION_CONTROL=${ADMISSION_CONTROL:-}
 
 export KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER}
 export PATH=${PATH}:/usr/local/go/bin
+export KUBE_SKIP_UPDATE=y
 export KUBE_SKIP_CONFIRMATIONS=y
 
 # E2E Control Variables
@@ -1004,45 +1005,6 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
             find .
             exit 1
         fi
-
-        # Tell kube-up.sh to skip the update, it doesn't lock. An internal
-        # gcloud bug can cause racing component updates to stomp on each
-        # other.
-        export KUBE_SKIP_UPDATE=y
-        (
-          # ----------- WARNING! DO NOT TOUCH THIS CODE -----------
-          #
-          # The purpose of this block is to ensure that only one job attempts to
-          # update gcloud at a time.
-          #
-          # PLEASE DO NOT TOUCH THIS CODE unless you are certain you understand
-          # implications. Please cc jlowdermilk@ or brendandburns@ on changes.
-
-          # If jenkins was recently restarted and jobs are failing with
-          #
-          # flock: 9: Permission denied
-          #
-          # ssh into the jenkins master and run
-          # $ sudo chown jenkins:jenkins /var/run/lock/gcloud-components.lock
-          #
-          # Note, flock -n would prevent parallel runs from having to wait
-          # here, but because we've set -o errexit, the err gets caught
-          # despite running in a subshell. If a run has to wait, the subsequent
-          # component update commands will be no-op, so no added delay.
-          flock -x -w 60 9
-          # We do NOT want to run gcloud components update under sudo, as that causes
-          # the gcloud files to get chown'd by root, which makes them undeletable in
-          # the case where we are installing gcloud under the workspace (e.g. for gke-ci
-          # and friends). If we can't cleanup old workspaces, jenkins runs out of disk.
-          #
-          # If the update commands are failing with permission denied, ssh into
-          # the jenkins master and run
-          #
-          # $ sudo chown -R jenkins:jenkins /usr/local/share/google/google-cloud-sdk
-          gcloud components update -q || true
-          gcloud components update alpha -q || true
-          gcloud components update beta -q || true
-        ) 9>/var/run/lock/gcloud-components.lock
 
         if [[ ! -z ${JENKINS_EXPLICIT_VERSION:-} ]]; then
             # Use an explicit pinned version like "ci/v0.10.0-101-g6c814c4" or
