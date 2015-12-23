@@ -64,7 +64,6 @@ Here's a diagram of what the final result will look like:
 
 ```sh
 docker run \
-    --volume=/:/rootfs:ro \
     --volume=/sys:/sys:ro \
     --volume=/dev:/dev \
     --volume=/var/lib/docker/:/var/lib/docker:rw \
@@ -75,15 +74,14 @@ docker run \
     --privileged=true \
     -d \
     gcr.io/google_containers/hyperkube-amd64:v${K8S_VERSION} \
-    /hyperkube kubelet \
-        --containerized \
+    /kubelet-runner.sh \
         --hostname-override="127.0.0.1" \
         --address="0.0.0.0" \
         --api-servers=http://localhost:8080 \
-        --config=/etc/kubernetes/manifests \
+        --config=etc/kubernetes/manifests \
         --cluster-dns=10.0.0.10 \
         --cluster-domain=cluster.local \
-        --allow-privileged=true --v=10
+        --allow-privileged=true --v=2
 ```
 
 > Note that `--cluster-dns` and `--cluster-domain` is used to deploy dns, feel free to discard them if dns is not needed.

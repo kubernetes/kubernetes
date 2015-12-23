@@ -57,7 +57,6 @@ function create_cluster {
   echo "Creating a local cluster:"
   echo -e -n "\tStarting kubelet..."
   run "docker run \
-  --volume=/:/rootfs:ro \
   --volume=/sys:/sys:ro \
   --volume=/dev:/dev \
   --volume=/var/lib/docker/:/var/lib/docker:rw \
@@ -68,12 +67,11 @@ function create_cluster {
   --privileged=true \
   -d \
   gcr.io/google_containers/hyperkube-${arch}:${release} \
-    /hyperkube kubelet \
-      --containerized \
+    /kubelet-runner.sh \
       --hostname-override="127.0.0.1" \
       --address="0.0.0.0" \
       --api-servers=http://localhost:8080 \
-      --config=/etc/kubernetes/manifests \
+      --config=etc/kubernetes/manifests \
       --allow-privileged=true \
       --cluster-dns=10.0.0.10 \
       --cluster-domain=cluster.local \
