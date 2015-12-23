@@ -365,6 +365,7 @@ func newFixture(t *testing.T) *fixture {
 func (f *fixture) run(deploymentName string) {
 	f.client = testclient.NewSimpleFake(f.objects)
 	c := NewDeploymentController(f.client, controller.NoResyncPeriodFunc)
+	c.eventRecorder = &record.FakeRecorder{}
 	c.rcStoreSynced = alwaysReady
 	c.podStoreSynced = alwaysReady
 	for _, d := range f.dStore {
