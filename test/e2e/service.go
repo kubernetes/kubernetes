@@ -1335,9 +1335,11 @@ func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPod
 	defer func() {
 		deletePodOrFail(c, ns, execPodName)
 	}()
+	// Loop a bunch of times - the proxy is randomized, so we want a good
+	// chance of hitting each backend at least once.
 	command := fmt.Sprintf(
 		"for i in $(seq 1 %d); do wget -q -T 1 -O - http://%s:%d || true; echo; done",
-		3*len(expectedPods), serviceIP, servicePort)
+		50*len(expectedPods), serviceIP, servicePort)
 
 	commands := []func() string{
 		// verify service from node
@@ -1367,9 +1369,7 @@ func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPod
 	for _, cmdFunc := range commands {
 		passed := false
 		pods := []string{}
-		// Retry cmdFunc for upto 5 minutes.
-		// TODO: make this stricter. Ideally hitting a Service with n pods n
-		// times should round robing to each pod, and one pass should suffice.
+		// Retry cmdFunc for a while
 		for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
 			pods = strings.Split(strings.TrimSpace(cmdFunc()), "\n")
 			// Uniq pods before the sort because inserting them into a set
