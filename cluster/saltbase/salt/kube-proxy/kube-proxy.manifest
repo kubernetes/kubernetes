@@ -15,6 +15,11 @@
   {% set test_args=pillar['kubeproxy_test_args'] %}
 {% endif -%}
 
+{% set log_level = pillar['log_level'] -%}
+{% if pillar['kubeproxy_test_log_level'] is defined -%}
+  {% set log_level = pillar['kubeproxy_test_log_level'] -%}
+{% endif -%}
+
 # kube-proxy podspec
 apiVersion: v1
 kind: Pod
@@ -29,7 +34,7 @@ spec:
     command:
     - /bin/sh
     - -c
-    - kube-proxy {{api_servers_with_port}} {{kubeconfig}} --resource-container="" {{pillar['log_level']}} {{test_args}} 1>>/var/log/kube-proxy.log 2>&1
+    - kube-proxy {{api_servers_with_port}} {{kubeconfig}} --resource-container="" {{log_level}} {{test_args}} 1>>/var/log/kube-proxy.log 2>&1
     securityContext:
       privileged: true
     volumeMounts:
