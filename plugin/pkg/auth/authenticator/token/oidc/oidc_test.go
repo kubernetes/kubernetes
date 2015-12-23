@@ -391,5 +391,6 @@ func TestOIDCAuthentication(t *testing.T) {
 		if !reflect.DeepEqual(tt.userInfo, user) {
 			t.Errorf("#%d: Expecting: %v, but got: %v", i, tt.userInfo, user)
 		}
+		client.Close()
 	}
 }

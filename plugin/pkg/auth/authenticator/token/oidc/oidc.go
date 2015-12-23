@@ -38,9 +38,10 @@ var (
 )
 
 type OIDCAuthenticator struct {
-	clientConfig  oidc.ClientConfig
-	client        *oidc.Client
-	usernameClaim string
+	clientConfig     oidc.ClientConfig
+	client           *oidc.Client
+	usernameClaim    string
+	stopSyncProvider chan struct{}
 }
 
 // New creates a new OpenID Connect client with the given issuerURL and clientID.
@@ -113,9 +114,9 @@ func New(issuerURL, clientID, caFile, usernameClaim string) (*OIDCAuthenticator,
 	// SyncProviderConfig will start a goroutine to periodically synchronize the provider config.
 	// The synchronization interval is set by the expiration length of the config, and has a mininum
 	// and maximum threshold.
-	client.SyncProviderConfig(issuerURL)
+	stop := client.SyncProviderConfig(issuerURL)
 
-	return &OIDCAuthenticator{ccfg, client, usernameClaim}, nil
+	return &OIDCAuthenticator{ccfg, client, usernameClaim, stop}, nil
 }
 
 // AuthenticateToken decodes and verifies a JWT using the OIDC client, if the verification succeeds,
@@ -155,4 +156,13 @@ func (a *OIDCAuthenticator) AuthenticateToken(value string) (user.Info, bool, er
 
 	// TODO(yifan): Add UID and Group, also populate the issuer to upper layer.
 	return &user.DefaultInfo{Name: username}, true, nil
+}
+
+// Close closes the OIDC authenticator, this will close the provider sync goroutine.
+func (a *OIDCAuthenticator) Close() {
+	// This assumes the s.stopSyncProvider is an unbuffered channel.
+	// So instead of closing the channel, we send am empty struct here.
+	// This guarantees that when this function returns, there is no flying requests,
+	// because a send to an unbuffered channel happens after the receive from the channel.
+	a.stopSyncProvider <- struct{}{}
 }
