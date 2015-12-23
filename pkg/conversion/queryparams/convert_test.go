@@ -51,6 +51,7 @@ type foo struct {
 	NamedBool namedBool         `json:"namedBool,omitempty"`
 	Foobar    bar               `json:"foobar,omitempty"`
 	Testmap   map[string]string `json:"testmap,omitempty"`
+	TestEnv   []testEnv         `json:"env,omitempty"`
 }
 
 func (obj *foo) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
@@ -61,6 +62,13 @@ type baz struct {
 }
 
 func (obj *baz) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+
+type testEnv struct {
+	Name  string `json:"name"`
+	Value string `json:"value,omitempty"`
+}
+
+func (*testEnv) IsAnAPIObject() {}
 
 func validateResult(t *testing.T, input interface{}, actual, expected url.Values) {
 	local := url.Values{}
@@ -118,7 +126,7 @@ func TestConvert(t *testing.T) {
 					Float1: 5.0,
 				},
 			},
-			expected: url.Values{"str": {"don't ignore embedded struct"}, "float1": {"5"}, "float2": {"0"}},
+			expected: url.Values{"str": {"don't ignore embedded struct"}, "foobar.float1": {"5"}, "foobar.float2": {"0"}},
 		},
 		{
 			// Ignore untagged fields
@@ -158,6 +166,14 @@ func TestConvert(t *testing.T) {
 				Ptr: intp(5),
 			},
 			expected: url.Values{"ptr": {"5"}},
+		},
+		{
+			input: &foo{
+				TestEnv: []testEnv{
+					{Name: "foo", Value: "bar"},
+				},
+			},
+			expected: url.Values{"env.0.name": {"foo"}, "env.0.value": {"bar"}, "str": {""}},
 		},
 	}
 
