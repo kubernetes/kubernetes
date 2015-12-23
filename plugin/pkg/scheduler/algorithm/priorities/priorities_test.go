@@ -89,9 +89,9 @@ func TestZeroRequest(t *testing.T) {
 	large2 := large
 	large2.NodeName = "machine2"
 	nodesMap := map[int][]api.Node{
-		0: []api.Node{makeNode("machine1", 1000, defaultMemoryRequest*10), makeNode("machine2", 1000, defaultMemoryRequest*10)},
-		1: []api.Node{makeNode("machine1", 1000, defaultMemoryRequest*10), makeNode("machine2", 1000, defaultMemoryRequest*10)},
-		2: []api.Node{makeNode("machine1", 1000, defaultMemoryRequest*10), makeNode("machine2", 1000, defaultMemoryRequest*10)},
+		0: {makeNode("machine1", 1000, defaultMemoryRequest*10), makeNode("machine2", 1000, defaultMemoryRequest*10)},
+		1: {makeNode("machine1", 1000, defaultMemoryRequest*10), makeNode("machine2", 1000, defaultMemoryRequest*10)},
+		2: {makeNode("machine1", 1000, defaultMemoryRequest*10), makeNode("machine2", 1000, defaultMemoryRequest*10)},
 	}
 
 	tests := []struct {
@@ -241,14 +241,14 @@ func TestLeastRequested(t *testing.T) {
 		},
 	}
 	nodesMap := map[int][]api.Node{
-		0: []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
-		1: []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
-		2: []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
-		3: []api.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
-		4: []api.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
-		5: []api.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 50000)},
-		6: []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
-		7: []api.Node{makeNode("machine1", 0, 0), makeNode("machine2", 0, 0)},
+		0: {makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+		1: {makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
+		2: {makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+		3: {makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+		4: {makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+		5: {makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 50000)},
+		6: {makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+		7: {makeNode("machine1", 0, 0), makeNode("machine2", 0, 0)},
 	}
 	tests := []struct {
 		pod          *api.Pod
@@ -583,14 +583,14 @@ func TestBalancedResourceAllocation(t *testing.T) {
 		},
 	}
 	nodesMap := map[int][]api.Node{
-		0: []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
-		1: []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
-		2: []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
-		3: []api.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
-		4: []api.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
-		5: []api.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 50000)},
-		6: []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
-		7: []api.Node{makeNode("machine1", 0, 0), makeNode("machine2", 0, 0)},
+		0: {makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+		1: {makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
+		2: {makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+		3: {makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+		4: {makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+		5: {makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 50000)},
+		6: {makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+		7: {makeNode("machine1", 0, 0), makeNode("machine2", 0, 0)},
 	}
 	tests := []struct {
 		pod          *api.Pod
