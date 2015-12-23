@@ -15,10 +15,14 @@
 package schema
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/appc/spec/schema/types"
+
+	"github.com/camlistore/camlistore/pkg/errorutil"
 )
 
 const (
@@ -49,6 +53,10 @@ func (im *ImageManifest) UnmarshalJSON(data []byte) error {
 	a := imageManifest(*im)
 	err := json.Unmarshal(data, &a)
 	if err != nil {
+		if serr, ok := err.(*json.SyntaxError); ok {
+			line, col, highlight := errorutil.HighlightBytePosition(bytes.NewReader(data), serr.Offset)
+			return fmt.Errorf("\nError at line %d, column %d\n%s%v", line, col, highlight, err)
+		}
 		return err
 	}
 	nim := ImageManifest(a)
