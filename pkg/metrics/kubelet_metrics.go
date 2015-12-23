@@ -116,11 +116,11 @@ func parseKubeletMetrics(data string, unknownMetrics sets.String) (KubeletMetric
 	return result, nil
 }
 
-func (g *MetricsGrabber) getMetricsFromNode(nodeName string) (string, error) {
+func (g *MetricsGrabber) getMetricsFromNode(nodeName string, kubeletPort int) (string, error) {
 	rawOutput, err := g.client.Get().
 		Prefix("proxy").
 		Resource("nodes").
-		Name(fmt.Sprintf("%v:%v", nodeName, g.kubeletPort)).
+		Name(fmt.Sprintf("%v:%v", nodeName, kubeletPort)).
 		Suffix("metrics").
 		Do().Raw()
 	if err != nil {
