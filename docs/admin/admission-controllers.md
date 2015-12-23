@@ -43,6 +43,7 @@ Documentation for other releases can be found at
   - [How do I turn on an admission control plug-in?](#how-do-i-turn-on-an-admission-control-plug-in)
   - [What does each plug-in do?](#what-does-each-plug-in-do)
     - [AlwaysAdmit](#alwaysadmit)
+    - [AlwaysPullImages](#alwayspullimages)
     - [AlwaysDeny](#alwaysdeny)
     - [DenyExecOnPrivileged (deprecated)](#denyexeconprivileged-deprecated)
     - [DenyEscalatingExec](#denyescalatingexec)
@@ -90,6 +91,16 @@ ordered list of admission control choices to invoke prior to modifying objects i
 ### AlwaysAdmit
 
 Use this plugin by itself to pass-through all requests.
+
+### AlwaysPullImages
+
+This plug-in modifies every new Pod to force the image pull policy to Always. This is useful in a
+multitenant cluster so that users can be assured that their private images can only be used by those
+who have the credentials to pull them. Without this plug-in, once an image has been pulled to a
+node, any pod from any user can use it simply by knowing the image's name (assuming the Pod is
+scheduled onto the right node), without any authorization check against the image. When this plug-in
+is enabled, images are always pulled prior to starting containers, which means valid credentials are
+required.
 
 ### AlwaysDeny
 
