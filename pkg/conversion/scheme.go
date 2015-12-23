@@ -35,7 +35,9 @@ type Scheme struct {
 
 	// unversionedTypes are transformed without conversion in ConvertToVersion.
 	unversionedTypes map[reflect.Type]unversioned.GroupVersionKind
-	// unversionedKinds are the names of kinds that exist in all versions
+	// unversionedKinds are the names of kinds that can be created in the context of any group
+	// or version
+	// TODO: resolve the status of unversioned types.
 	unversionedKinds map[string]reflect.Type
 
 	// converter stores all registered conversion functions. It also has
@@ -96,11 +98,11 @@ func (s *Scheme) nameFunc(t reflect.Type) string {
 // and marks them as being convertible to all API versions.
 // All objects passed to types should be pointers to structs. The name that go reports for
 // the struct becomes the "kind" field when encoding.
-func (s *Scheme) AddUnversionedTypes(gv unversioned.GroupVersion, types ...interface{}) {
-	s.AddKnownTypes(gv, types...)
+func (s *Scheme) AddUnversionedTypes(version unversioned.GroupVersion, types ...interface{}) {
+	s.AddKnownTypes(version, types...)
 	for _, obj := range types {
 		t := reflect.TypeOf(obj).Elem()
-		gvk := gv.WithKind(t.Name())
+		gvk := version.WithKind(t.Name())
 		s.unversionedTypes[t] = gvk
 		if _, ok := s.unversionedKinds[gvk.Kind]; ok {
 			panic(fmt.Sprintf("%v has already been registered as unversioned kind %q - kind name must be unique", reflect.TypeOf(t), gvk.Kind))
@@ -231,6 +233,9 @@ func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) err
 	return nil
 }
 
+// AddIgnoredConversionType identifies a pair of types that should be skipped by
+// dynamic conversion (because the data inside them is explicitly dropped during
+// conversion).
 func (s *Scheme) AddIgnoredConversionType(from, to interface{}) error {
 	return s.converter.RegisterIgnoredConversion(from, to)
 }
@@ -296,7 +301,9 @@ func (s *Scheme) Recognizes(gvk unversioned.GroupVersionKind) bool {
 	return exists
 }
 
-func (s *Scheme) IsUnversioned(obj interface{}) (bool, bool) {
+// IsUnversioned returns true if the Go object is registered as an unversioned type, or sets
+// ok to false if the provided object is not registered in the scheme.
+func (s *Scheme) IsUnversioned(obj interface{}) (unversioned bool, registered bool) {
 	v, err := EnforcePtr(obj)
 	if err != nil {
 		return false, false

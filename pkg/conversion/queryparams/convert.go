@@ -91,9 +91,9 @@ func addListOfParams(values url.Values, tag string, omitempty bool, list reflect
 	}
 }
 
-// Convert takes a versioned runtime.Object and serializes it to a url.Values object
-// using JSON tags as parameter names. Only top-level simple values, arrays, and slices
-// are serialized. Embedded structs, maps, etc. will not be serialized.
+// Convert takes an object and converts it to a url.Values object using JSON tags as
+// parameter names. Only top-level simple values, arrays, and slices are serialized.
+// Embedded structs, maps, etc. will not be serialized.
 func Convert(obj interface{}) (url.Values, error) {
 	result := url.Values{}
 	if obj == nil {

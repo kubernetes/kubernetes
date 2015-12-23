@@ -308,7 +308,7 @@ func TestConverter_WithConversionOverriden(t *testing.T) {
 	}
 
 	ext := NewConversionFuncs()
-	ext.Register(func(in *A, out *B, s Scope) error {
+	ext.Add(func(in *A, out *B, s Scope) error {
 		return nil
 	})
 	newc := c.WithConversions(ext)

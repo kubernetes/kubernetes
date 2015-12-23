@@ -150,7 +150,10 @@ type ConversionFuncs struct {
 	fns map[typePair]reflect.Value
 }
 
-func (c ConversionFuncs) Register(fns ...interface{}) error {
+// Add adds the provided conversion functions to the lookup table - they must have the signature
+// `func(type1, type2, Scope) error`. Functions are added in the order passed and will override
+// previously registered pairs.
+func (c ConversionFuncs) Add(fns ...interface{}) error {
 	for _, fn := range fns {
 		fv := reflect.ValueOf(fn)
 		ft := fv.Type()
@@ -341,13 +344,13 @@ func verifyConversionFunctionSignature(ft reflect.Type) error {
 //                 return nil
 //          })
 func (c *Converter) RegisterConversionFunc(conversionFunc interface{}) error {
-	return c.conversionFuncs.Register(conversionFunc)
+	return c.conversionFuncs.Add(conversionFunc)
 }
 
 // Similar to RegisterConversionFunc, but registers conversion function that were
 // automatically generated.
 func (c *Converter) RegisterGeneratedConversionFunc(conversionFunc interface{}) error {
-	return c.generatedConversionFuncs.Register(conversionFunc)
+	return c.generatedConversionFuncs.Add(conversionFunc)
 }
 
 // RegisterIgnoredConversion registers a "no-op" for conversion, where any requested
