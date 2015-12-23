@@ -252,38 +252,6 @@ func TestGenericScheduler(t *testing.T) {
 			expectsErr:   true,
 			name:         "test 8",
 		},
-		{
-			predicates: map[string]algorithm.FitPredicate{
-				"nopods":  hasNoPodsPredicate,
-				"matches": matchesPredicate,
-			},
-			pods: []*api.Pod{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "2"},
-					Spec: api.PodSpec{
-						NodeName: "2",
-					},
-					Status: api.PodStatus{
-						Phase: api.PodFailed,
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{Name: "3"},
-					Spec: api.PodSpec{
-						NodeName: "2",
-					},
-					Status: api.PodStatus{
-						Phase: api.PodSucceeded,
-					},
-				},
-			},
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
-
-			prioritizers: []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
-			nodes:        []string{"1", "2"},
-			expectedHost: "2",
-			name:         "test 9",
-		},
 	}
 
 	for _, test := range tests {
