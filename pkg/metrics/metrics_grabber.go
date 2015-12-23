@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -41,7 +42,6 @@ type MetricsGrabber struct {
 	grabFromControllerManager bool
 	grabFromKubelets          bool
 	grabFromScheduler         bool
-	kubeletPort               int
 	masterName                string
 	registeredMaster          bool
 }
@@ -52,7 +52,6 @@ func isMasterNode(node *api.Node) bool {
 }
 
 func NewMetricsGrabber(c *client.Client, kubelets bool, scheduler bool, controllers bool, apiServer bool) (*MetricsGrabber, error) {
-	kubeletPort := 0
 	registeredMaster := false
 	masterName := ""
 	nodeList, err := c.Nodes().List(api.ListOptions{})
@@ -66,10 +65,7 @@ func NewMetricsGrabber(c *client.Client, kubelets bool, scheduler bool, controll
 		if isMasterNode(&node) {
 			registeredMaster = true
 			masterName = node.Name
-		} else {
-			// We assume that all Kubelets run on the same port, except possibly Master's Kubelet.
-			// This will need to get change if assumption is prover wrong.
-			kubeletPort = node.Status.DaemonEndpoints.KubeletEndpoint.Port
+			break
 		}
 	}
 	if !registeredMaster {
@@ -84,17 +80,28 @@ func NewMetricsGrabber(c *client.Client, kubelets bool, scheduler bool, controll
 		grabFromControllerManager: controllers,
 		grabFromKubelets:          kubelets,
 		grabFromScheduler:         scheduler,
-		kubeletPort:               kubeletPort,
 		masterName:                masterName,
 		registeredMaster:          registeredMaster,
 	}, nil
 }
 
 func (g *MetricsGrabber) GrabFromKubelet(nodeName string, unknownMetrics sets.String) (KubeletMetrics, error) {
-	if g.kubeletPort == 0 {
-		return KubeletMetrics{}, fmt.Errorf("MetricsGrabber wasn't able to find Kubelet port during startup. Skipping Kubelet's metrics gathering.")
+	nodes, err := g.client.Nodes().List(api.ListOptions{FieldSelector: fields.Set{client.ObjectNameField: nodeName}.AsSelector()})
+	if err != nil {
+		return KubeletMetrics{}, err
 	}
-	output, err := g.getMetricsFromNode(nodeName)
+	if len(nodes.Items) != 1 {
+		return KubeletMetrics{}, fmt.Errorf("Error listing nodes with name %v, got %v", nodeName, nodes.Items)
+	}
+	kubeletPort := nodes.Items[0].Status.DaemonEndpoints.KubeletEndpoint.Port
+	return g.grabFromKubeletInternal(nodeName, kubeletPort, unknownMetrics)
+}
+
+func (g *MetricsGrabber) grabFromKubeletInternal(nodeName string, kubeletPort int, unknownMetrics sets.String) (KubeletMetrics, error) {
+	if kubeletPort <= 0 || kubeletPort > 65535 {
+		return KubeletMetrics{}, fmt.Errorf("Invalid Kubelet port %v. Skipping Kubelet's metrics gathering.", kubeletPort)
+	}
+	output, err := g.getMetricsFromNode(nodeName, kubeletPort)
 	if err != nil {
 		return KubeletMetrics{}, err
 	}
@@ -132,5 +139,50 @@ func (g *MetricsGrabber) GrabFromApiServer(unknownMetrics sets.String) (ApiServe
 }
 
 func (g *MetricsGrabber) Grab(unknownMetrics sets.String) (MetricsCollection, error) {
-	return MetricsCollection{}, nil
+	result := MetricsCollection{}
+	var errs []error
+	if g.grabFromApiServer {
+		metrics, err := g.GrabFromApiServer(nil)
+		if err != nil {
+			errs = append(errs, err)
+		} else {
+			result.ApiServerMetrics = metrics
+		}
+	}
+	if g.grabFromScheduler {
+		metrics, err := g.GrabFromScheduler(nil)
+		if err != nil {
+			errs = append(errs, err)
+		} else {
+			result.SchedulerMetrics = metrics
+		}
+	}
+	if g.grabFromControllerManager {
+		metrics, err := g.GrabFromControllerManager(nil)
+		if err != nil {
+			errs = append(errs, err)
+		} else {
+			result.ControllerManagerMetrics = metrics
+		}
+	}
+	if g.grabFromKubelets {
+		result.KubeletMetrics = make(map[string]KubeletMetrics)
+		nodes, err := g.client.Nodes().List(api.ListOptions{})
+		if err != nil {
+			errs = append(errs, err)
+		} else {
+			for _, node := range nodes.Items {
+				kubeletPort := node.Status.DaemonEndpoints.KubeletEndpoint.Port
+				metrics, err := g.grabFromKubeletInternal(node.Name, kubeletPort, nil)
+				if err != nil {
+					errs = append(errs, err)
+				}
+				result.KubeletMetrics[node.Name] = metrics
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return MetricsCollection{}, fmt.Errorf("Errors while grabbing metrics: %v", errs)
+	}
+	return result, nil
 }
