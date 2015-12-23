@@ -166,14 +166,15 @@ func TestSelectHost(t *testing.T) {
 
 func TestGenericScheduler(t *testing.T) {
 	tests := []struct {
-		name         string
-		predicates   map[string]algorithm.FitPredicate
-		prioritizers []algorithm.PriorityConfig
-		nodes        []string
-		pod          *api.Pod
-		pods         []*api.Pod
-		expectedHost string
-		expectsErr   bool
+		name            string
+		predicates      map[string]algorithm.FitPredicate
+		prioritizers    []algorithm.PriorityConfig
+		nodes           []string
+		pod             *api.Pod
+		pods            []*api.Pod
+		podsLookupTable LookupTable
+		expectedHost    string
+		expectsErr      bool
 	}{
 		{
 			predicates:   map[string]algorithm.FitPredicate{"false": falsePredicate},
@@ -249,18 +250,27 @@ func TestGenericScheduler(t *testing.T) {
 
 			prioritizers: []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
 			nodes:        []string{"1", "2"},
-			expectsErr:   true,
-			name:         "test 8",
+
+			podsLookupTable: LookupTable{
+				nodeToPods: map[string]PodSet{
+					"1": {},
+					"2": {
+						&api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}}: sets.Empty{},
+					},
+				},
+			},
+			expectsErr: true,
+			name:       "test 8",
 		},
 	}
 
 	for _, test := range tests {
 		random := rand.New(rand.NewSource(0))
-		scheduler := NewGenericScheduler(test.predicates, test.prioritizers, []algorithm.SchedulerExtender{}, algorithm.FakePodLister(test.pods), random)
+		scheduler := NewGenericScheduler(test.predicates, test.prioritizers, []algorithm.SchedulerExtender{}, algorithm.FakePodLister(test.pods), test.podsLookupTable, random)
 		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {
-				t.Error("Unexpected non-error")
+				t.Error("%s: Unexpected non-error", test.name)
 			}
 		} else {
 			if err != nil {

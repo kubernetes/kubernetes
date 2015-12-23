@@ -192,6 +192,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 		[]algorithm.PriorityConfig{},
 		[]algorithm.SchedulerExtender{},
 		modeler.PodLister(),
+		LookupTable{},
 		rand.New(rand.NewSource(time.Now().UnixNano())))
 
 	var gotBinding *api.Binding
@@ -329,6 +330,7 @@ func TestSchedulerRateLimitsBinding(t *testing.T) {
 		[]algorithm.PriorityConfig{},
 		[]algorithm.SchedulerExtender{},
 		modeler.PodLister(),
+		LookupTable{},
 		rand.New(rand.NewSource(time.Now().UnixNano())))
 
 	// Rate limit to 1 pod
