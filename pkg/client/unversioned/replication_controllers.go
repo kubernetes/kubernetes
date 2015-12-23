@@ -21,6 +21,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	replicationControllerResourceName string = "replicationControllers"
+)
+
 // ReplicationControllersNamespacer has methods to work with ReplicationController resources in a namespace
 type ReplicationControllersNamespacer interface {
 	ReplicationControllers(namespace string) ReplicationControllerInterface
@@ -51,41 +55,41 @@ func newReplicationControllers(c *Client, namespace string) *replicationControll
 // List takes a selector, and returns the list of replication controllers that match that selector.
 func (c *replicationControllers) List(opts api.ListOptions) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
-	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(replicationControllerResourceName).VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
 }
 
 // Get returns information about a particular replication controller.
 func (c *replicationControllers) Get(name string) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
-	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").Name(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(replicationControllerResourceName).Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new replication controller.
 func (c *replicationControllers) Create(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
-	err = c.r.Post().Namespace(c.ns).Resource("replicationControllers").Body(controller).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource(replicationControllerResourceName).Body(controller).Do().Into(result)
 	return
 }
 
 // Update updates an existing replication controller.
 func (c *replicationControllers) Update(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
-	err = c.r.Put().Namespace(c.ns).Resource("replicationControllers").Name(controller.Name).Body(controller).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(replicationControllerResourceName).Name(controller.Name).Body(controller).Do().Into(result)
 	return
 }
 
 // UpdateStatus updates an existing replication controller status
 func (c *replicationControllers) UpdateStatus(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
-	err = c.r.Put().Namespace(c.ns).Resource("replicationControllers").Name(controller.Name).SubResource("status").Body(controller).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(replicationControllerResourceName).Name(controller.Name).SubResource("status").Body(controller).Do().Into(result)
 	return
 }
 
 // Delete deletes an existing replication controller.
 func (c *replicationControllers) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Resource("replicationControllers").Name(name).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource(replicationControllerResourceName).Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested controllers.
@@ -93,7 +97,7 @@ func (c *replicationControllers) Watch(opts api.ListOptions) (watch.Interface, e
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("replicationControllers").
+		Resource(replicationControllerResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

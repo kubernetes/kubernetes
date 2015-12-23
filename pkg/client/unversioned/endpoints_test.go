@@ -28,10 +28,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
+const (
+	endpointResourceName string = "endpoints"
+)
+
 func TestListEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath("endpoints", ns, ""), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath(endpointResourceName, ns, ""), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200,
 			Body: &api.EndpointsList{
 				Items: []api.Endpoints{
@@ -53,7 +57,7 @@ func TestListEndpoints(t *testing.T) {
 func TestGetEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request:  simple.Request{Method: "GET", Path: testapi.Default.ResourcePath("endpoints", ns, "endpoint-1"), Query: simple.BuildQueryValues(nil)},
+		Request:  simple.Request{Method: "GET", Path: testapi.Default.ResourcePath(endpointResourceName, ns, "endpoint-1"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200, Body: &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "endpoint-1"}}},
 	}
 	response, err := c.Setup(t).Endpoints(ns).Get("endpoint-1")

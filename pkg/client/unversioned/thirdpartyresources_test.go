@@ -26,16 +26,16 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
-func getThirdPartyResourceName() string {
-	return "thirdpartyresources"
-}
+const (
+	thirdPartyResourceName = "thirdpartyresources"
+)
 
 func TestListThirdPartyResources(t *testing.T) {
 	ns := api.NamespaceAll
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getThirdPartyResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(thirdPartyResourceName, ns, ""),
 		},
 		Response: simple.Response{StatusCode: 200,
 			Body: &extensions.ThirdPartyResourceList{
@@ -62,7 +62,7 @@ func TestListThirdPartyResources(t *testing.T) {
 func TestGetThirdPartyResource(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request: simple.Request{Method: "GET", Path: testapi.Extensions.ResourcePath(getThirdPartyResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "GET", Path: testapi.Extensions.ResourcePath(thirdPartyResourceName, ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.ThirdPartyResource{
@@ -98,7 +98,7 @@ func TestUpdateThirdPartyResource(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(getThirdPartyResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(thirdPartyResourceName, ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.ThirdPartyResource{
@@ -123,7 +123,7 @@ func TestUpdateThirdPartyResourceUpdateStatus(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(getThirdPartyResourceName(), ns, "foo") + "/status", Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(thirdPartyResourceName, ns, "foo") + "/status", Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.ThirdPartyResource{
@@ -145,7 +145,7 @@ func TestUpdateThirdPartyResourceUpdateStatus(t *testing.T) {
 func TestDeleteThirdPartyResource(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request:  simple.Request{Method: "DELETE", Path: testapi.Extensions.ResourcePath(getThirdPartyResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request:  simple.Request{Method: "DELETE", Path: testapi.Extensions.ResourcePath(thirdPartyResourceName, ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Extensions().ThirdPartyResources(ns).Delete("foo")
@@ -158,7 +158,7 @@ func TestCreateThirdPartyResource(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "POST", Path: testapi.Extensions.ResourcePath(getThirdPartyResourceName(), ns, ""), Body: requestThirdPartyResource, Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "POST", Path: testapi.Extensions.ResourcePath(thirdPartyResourceName, ns, ""), Body: requestThirdPartyResource, Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.ThirdPartyResource{

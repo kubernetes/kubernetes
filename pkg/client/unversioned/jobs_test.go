@@ -29,16 +29,16 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
-func getJobResourceName() string {
-	return "jobs"
-}
+const (
+	jobResourceName string = "jobs"
+)
 
 func TestListJobs(t *testing.T) {
 	ns := api.NamespaceAll
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(jobResourceName, ns, ""),
 		},
 		Response: simple.Response{StatusCode: 200,
 			Body: &extensions.JobList{
@@ -68,7 +68,7 @@ func TestGetJob(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(jobResourceName, ns, "foo"),
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{
@@ -114,7 +114,7 @@ func TestUpdateJob(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(jobResourceName, ns, "foo"),
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{
@@ -149,7 +149,7 @@ func TestUpdateJobStatus(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo") + "/status",
+			Path:   testapi.Extensions.ResourcePath(jobResourceName, ns, "foo") + "/status",
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{
@@ -180,7 +180,7 @@ func TestDeleteJob(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "DELETE",
-			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(jobResourceName, ns, "foo"),
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{StatusCode: 200},
@@ -200,7 +200,7 @@ func TestCreateJob(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Extensions.ResourcePath(getJobResourceName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(jobResourceName, ns, ""),
 			Body:   requestJob,
 			Query:  simple.BuildQueryValues(nil),
 		},

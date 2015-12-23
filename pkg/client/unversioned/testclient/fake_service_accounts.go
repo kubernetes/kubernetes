@@ -21,6 +21,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	serviceAccountResourceName string = "serviceaccounts"
+)
+
 // FakeServiceAccounts implements ServiceAccountsInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type FakeServiceAccounts struct {
@@ -29,7 +33,7 @@ type FakeServiceAccounts struct {
 }
 
 func (c *FakeServiceAccounts) Get(name string) (*api.ServiceAccount, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("serviceaccounts", c.Namespace, name), &api.ServiceAccount{})
+	obj, err := c.Fake.Invokes(NewGetAction(serviceAccountResourceName, c.Namespace, name), &api.ServiceAccount{})
 	if obj == nil {
 		return nil, err
 	}
@@ -38,7 +42,7 @@ func (c *FakeServiceAccounts) Get(name string) (*api.ServiceAccount, error) {
 }
 
 func (c *FakeServiceAccounts) List(opts api.ListOptions) (*api.ServiceAccountList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("serviceaccounts", c.Namespace, opts), &api.ServiceAccountList{})
+	obj, err := c.Fake.Invokes(NewListAction(serviceAccountResourceName, c.Namespace, opts), &api.ServiceAccountList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -47,7 +51,7 @@ func (c *FakeServiceAccounts) List(opts api.ListOptions) (*api.ServiceAccountLis
 }
 
 func (c *FakeServiceAccounts) Create(serviceAccount *api.ServiceAccount) (*api.ServiceAccount, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("serviceaccounts", c.Namespace, serviceAccount), serviceAccount)
+	obj, err := c.Fake.Invokes(NewCreateAction(serviceAccountResourceName, c.Namespace, serviceAccount), serviceAccount)
 	if obj == nil {
 		return nil, err
 	}
@@ -56,7 +60,7 @@ func (c *FakeServiceAccounts) Create(serviceAccount *api.ServiceAccount) (*api.S
 }
 
 func (c *FakeServiceAccounts) Update(serviceAccount *api.ServiceAccount) (*api.ServiceAccount, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("serviceaccounts", c.Namespace, serviceAccount), serviceAccount)
+	obj, err := c.Fake.Invokes(NewUpdateAction(serviceAccountResourceName, c.Namespace, serviceAccount), serviceAccount)
 	if obj == nil {
 		return nil, err
 	}
@@ -65,10 +69,10 @@ func (c *FakeServiceAccounts) Update(serviceAccount *api.ServiceAccount) (*api.S
 }
 
 func (c *FakeServiceAccounts) Delete(name string) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("serviceaccounts", c.Namespace, name), &api.ServiceAccount{})
+	_, err := c.Fake.Invokes(NewDeleteAction(serviceAccountResourceName, c.Namespace, name), &api.ServiceAccount{})
 	return err
 }
 
 func (c *FakeServiceAccounts) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("serviceaccounts", c.Namespace, opts))
+	return c.Fake.InvokesWatch(NewWatchAction(serviceAccountResourceName, c.Namespace, opts))
 }

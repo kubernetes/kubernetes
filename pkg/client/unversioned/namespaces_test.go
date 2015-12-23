@@ -29,6 +29,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
+const (
+	namespaceResourceName string = "namespaces"
+)
+
 func TestNamespaceCreate(t *testing.T) {
 	// we create a namespace relative to another namespace
 	namespace := &api.Namespace{
@@ -37,7 +41,7 @@ func TestNamespaceCreate(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Default.ResourcePath("namespaces", "", ""),
+			Path:   testapi.Default.ResourcePath(namespaceResourceName, "", ""),
 			Body:   namespace,
 		},
 		Response: simple.Response{StatusCode: 200, Body: namespace},
@@ -62,7 +66,7 @@ func TestNamespaceGet(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath("namespaces", "", "foo"),
+			Path:   testapi.Default.ResourcePath(namespaceResourceName, "", "foo"),
 			Body:   nil,
 		},
 		Response: simple.Response{StatusCode: 200, Body: namespace},
@@ -90,7 +94,7 @@ func TestNamespaceList(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath("namespaces", "", ""),
+			Path:   testapi.Default.ResourcePath(namespaceResourceName, "", ""),
 			Body:   nil,
 		},
 		Response: simple.Response{StatusCode: 200, Body: namespaceList},
@@ -128,7 +132,7 @@ func TestNamespaceUpdate(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Default.ResourcePath("namespaces", "", "foo")},
+			Path:   testapi.Default.ResourcePath(namespaceResourceName, "", "foo")},
 		Response: simple.Response{StatusCode: 200, Body: requestNamespace},
 	}
 	receivedNamespace, err := c.Setup(t).Namespaces().Update(requestNamespace)
@@ -152,7 +156,7 @@ func TestNamespaceFinalize(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Default.ResourcePath("namespaces", "", "foo") + "/finalize",
+			Path:   testapi.Default.ResourcePath(namespaceResourceName, "", "foo") + "/finalize",
 		},
 		Response: simple.Response{StatusCode: 200, Body: requestNamespace},
 	}
@@ -162,7 +166,7 @@ func TestNamespaceFinalize(t *testing.T) {
 
 func TestNamespaceDelete(t *testing.T) {
 	c := &simple.Client{
-		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath("namespaces", "", "foo")},
+		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(namespaceResourceName, "", "foo")},
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Namespaces().Delete("foo")
@@ -173,7 +177,7 @@ func TestNamespaceWatch(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePathWithPrefix("watch", "namespaces", "", ""),
+			Path:   testapi.Default.ResourcePathWithPrefix("watch", namespaceResourceName, "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: simple.Response{StatusCode: 200},
 	}

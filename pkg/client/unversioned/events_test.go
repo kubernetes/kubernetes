@@ -31,11 +31,15 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
+const (
+	eventResourceName string = "events"
+)
+
 func TestEventSearch(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath("events", "baz", ""),
+			Path:   testapi.Default.ResourcePath(eventResourceName, "baz", ""),
 			Query: url.Values{
 				unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String()): []string{
 					GetInvolvedObjectNameFieldLabel(testapi.Default.GroupVersion().String()) + "=foo,",
@@ -82,7 +86,7 @@ func TestEventCreate(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Default.ResourcePath("events", api.NamespaceDefault, ""),
+			Path:   testapi.Default.ResourcePath(eventResourceName, api.NamespaceDefault, ""),
 			Body:   event,
 		},
 		Response: simple.Response{StatusCode: 200, Body: event},
@@ -122,7 +126,7 @@ func TestEventGet(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath("events", "other", "1"),
+			Path:   testapi.Default.ResourcePath(eventResourceName, "other", "1"),
 			Body:   nil,
 		},
 		Response: simple.Response{StatusCode: 200, Body: event},
@@ -164,7 +168,7 @@ func TestEventList(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath("events", ns, ""),
+			Path:   testapi.Default.ResourcePath(eventResourceName, ns, ""),
 			Body:   nil,
 		},
 		Response: simple.Response{StatusCode: 200, Body: eventList},
@@ -191,7 +195,7 @@ func TestEventDelete(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "DELETE",
-			Path:   testapi.Default.ResourcePath("events", ns, "foo"),
+			Path:   testapi.Default.ResourcePath(eventResourceName, ns, "foo"),
 		},
 		Response: simple.Response{StatusCode: 200},
 	}

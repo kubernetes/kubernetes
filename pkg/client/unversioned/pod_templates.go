@@ -21,6 +21,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	podTemplateResourceName string = "podTemplates"
+)
+
 // PodTemplatesNamespacer has methods to work with PodTemplate resources in a namespace
 type PodTemplatesNamespacer interface {
 	PodTemplates(namespace string) PodTemplateInterface
@@ -53,14 +57,14 @@ func newPodTemplates(c *Client, namespace string) *podTemplates {
 // List takes label and field selectors, and returns the list of podTemplates that match those selectors.
 func (c *podTemplates) List(opts api.ListOptions) (result *api.PodTemplateList, err error) {
 	result = &api.PodTemplateList{}
-	err = c.r.Get().Namespace(c.ns).Resource("podTemplates").VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(podTemplateResourceName).VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
 }
 
 // Get takes the name of the podTemplate, and returns the corresponding PodTemplate object, and an error if it occurs
 func (c *podTemplates) Get(name string) (result *api.PodTemplate, err error) {
 	result = &api.PodTemplate{}
-	err = c.r.Get().Namespace(c.ns).Resource("podTemplates").Name(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(podTemplateResourceName).Name(name).Do().Into(result)
 	return
 }
 
@@ -68,26 +72,26 @@ func (c *podTemplates) Get(name string) (result *api.PodTemplate, err error) {
 func (c *podTemplates) Delete(name string, options *api.DeleteOptions) error {
 	// TODO: to make this reusable in other client libraries
 	if options == nil {
-		return c.r.Delete().Namespace(c.ns).Resource("podTemplates").Name(name).Do().Error()
+		return c.r.Delete().Namespace(c.ns).Resource(podTemplateResourceName).Name(name).Do().Error()
 	}
 	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion().String())
 	if err != nil {
 		return err
 	}
-	return c.r.Delete().Namespace(c.ns).Resource("podTemplates").Name(name).Body(body).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource(podTemplateResourceName).Name(name).Body(body).Do().Error()
 }
 
 // Create takes the representation of a podTemplate.  Returns the server's representation of the podTemplate, and an error, if it occurs.
 func (c *podTemplates) Create(podTemplate *api.PodTemplate) (result *api.PodTemplate, err error) {
 	result = &api.PodTemplate{}
-	err = c.r.Post().Namespace(c.ns).Resource("podTemplates").Body(podTemplate).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource(podTemplateResourceName).Body(podTemplate).Do().Into(result)
 	return
 }
 
 // Update takes the representation of a podTemplate to update.  Returns the server's representation of the podTemplate, and an error, if it occurs.
 func (c *podTemplates) Update(podTemplate *api.PodTemplate) (result *api.PodTemplate, err error) {
 	result = &api.PodTemplate{}
-	err = c.r.Put().Namespace(c.ns).Resource("podTemplates").Name(podTemplate.Name).Body(podTemplate).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource(podTemplateResourceName).Name(podTemplate.Name).Body(podTemplate).Do().Into(result)
 	return
 }
 
@@ -96,7 +100,7 @@ func (c *podTemplates) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("podTemplates").
+		Resource(podTemplateResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

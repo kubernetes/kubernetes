@@ -23,6 +23,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	endpointResourceName string = "endpoints"
+)
+
 // EndpointsNamespacer has methods to work with Endpoints resources in a namespace
 type EndpointsNamespacer interface {
 	Endpoints(namespace string) EndpointsInterface
@@ -52,7 +56,7 @@ func newEndpoints(c *Client, namespace string) *endpoints {
 // Create creates a new endpoint.
 func (c *endpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
 	result := &api.Endpoints{}
-	err := c.r.Post().Namespace(c.ns).Resource("endpoints").Body(endpoints).Do().Into(result)
+	err := c.r.Post().Namespace(c.ns).Resource(endpointResourceName).Body(endpoints).Do().Into(result)
 	return result, err
 }
 
@@ -61,7 +65,7 @@ func (c *endpoints) List(opts api.ListOptions) (result *api.EndpointsList, err e
 	result = &api.EndpointsList{}
 	err = c.r.Get().
 		Namespace(c.ns).
-		Resource("endpoints").
+		Resource(endpointResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -71,13 +75,13 @@ func (c *endpoints) List(opts api.ListOptions) (result *api.EndpointsList, err e
 // Get returns information about the endpoints for a particular service.
 func (c *endpoints) Get(name string) (result *api.Endpoints, err error) {
 	result = &api.Endpoints{}
-	err = c.r.Get().Namespace(c.ns).Resource("endpoints").Name(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource(endpointResourceName).Name(name).Do().Into(result)
 	return
 }
 
 // Delete takes the name of the endpoint, and returns an error if one occurs
 func (c *endpoints) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Resource("endpoints").Name(name).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource(endpointResourceName).Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints for a service.
@@ -85,7 +89,7 @@ func (c *endpoints) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("endpoints").
+		Resource(endpointResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }
@@ -97,7 +101,7 @@ func (c *endpoints) Update(endpoints *api.Endpoints) (*api.Endpoints, error) {
 	}
 	err := c.r.Put().
 		Namespace(c.ns).
-		Resource("endpoints").
+		Resource(endpointResourceName).
 		Name(endpoints.Name).
 		Body(endpoints).
 		Do().

@@ -22,6 +22,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	deploymentResourceName string = "deployments"
+)
+
 // DeploymentsNamespacer has methods to work with Deployment resources in a namespace
 type DeploymentsNamespacer interface {
 	Deployments(namespace string) DeploymentInterface
@@ -55,46 +59,46 @@ func newDeployments(c *ExtensionsClient, namespace string) *deployments {
 // List takes label and field selectors, and returns the list of Deployments that match those selectors.
 func (c *deployments) List(opts api.ListOptions) (result *extensions.DeploymentList, err error) {
 	result = &extensions.DeploymentList{}
-	err = c.client.Get().Namespace(c.ns).Resource("deployments").VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err = c.client.Get().Namespace(c.ns).Resource(deploymentResourceName).VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
 }
 
 // Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
 func (c *deployments) Get(name string) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
-	err = c.client.Get().Namespace(c.ns).Resource("deployments").Name(name).Do().Into(result)
+	err = c.client.Get().Namespace(c.ns).Resource(deploymentResourceName).Name(name).Do().Into(result)
 	return
 }
 
 // Delete takes name of the deployment and deletes it. Returns an error if one occurs.
 func (c *deployments) Delete(name string, options *api.DeleteOptions) error {
 	if options == nil {
-		return c.client.Delete().Namespace(c.ns).Resource("deployments").Name(name).Do().Error()
+		return c.client.Delete().Namespace(c.ns).Resource(deploymentResourceName).Name(name).Do().Error()
 	}
 	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
 	if err != nil {
 		return err
 	}
-	return c.client.Delete().Namespace(c.ns).Resource("deployments").Name(name).Body(body).Do().Error()
+	return c.client.Delete().Namespace(c.ns).Resource(deploymentResourceName).Name(name).Body(body).Do().Error()
 }
 
 // Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
 func (c *deployments) Create(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
-	err = c.client.Post().Namespace(c.ns).Resource("deployments").Body(deployment).Do().Into(result)
+	err = c.client.Post().Namespace(c.ns).Resource(deploymentResourceName).Body(deployment).Do().Into(result)
 	return
 }
 
 // Update takes the representation of a deployment and updates it. Returns the server's representation of the deployment, and an error, if there is any.
 func (c *deployments) Update(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
-	err = c.client.Put().Namespace(c.ns).Resource("deployments").Name(deployment.Name).Body(deployment).Do().Into(result)
+	err = c.client.Put().Namespace(c.ns).Resource(deploymentResourceName).Name(deployment.Name).Body(deployment).Do().Into(result)
 	return
 }
 
 func (c *deployments) UpdateStatus(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
-	err = c.client.Put().Namespace(c.ns).Resource("deployments").Name(deployment.Name).SubResource("status").Body(deployment).Do().Into(result)
+	err = c.client.Put().Namespace(c.ns).Resource(deploymentResourceName).Name(deployment.Name).SubResource("status").Body(deployment).Do().Into(result)
 	return
 }
 
@@ -103,7 +107,7 @@ func (c *deployments) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("deployments").
+		Resource(deploymentResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

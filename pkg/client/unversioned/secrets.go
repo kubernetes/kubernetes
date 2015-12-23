@@ -21,6 +21,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	secretResourceName string = "secrets"
+)
+
 type SecretsNamespacer interface {
 	Secrets(namespace string) SecretsInterface
 }
@@ -52,7 +56,7 @@ func (s *secrets) Create(secret *api.Secret) (*api.Secret, error) {
 	result := &api.Secret{}
 	err := s.client.Post().
 		Namespace(s.namespace).
-		Resource("secrets").
+		Resource(secretResourceName).
 		Body(secret).
 		Do().
 		Into(result)
@@ -66,7 +70,7 @@ func (s *secrets) List(opts api.ListOptions) (*api.SecretList, error) {
 
 	err := s.client.Get().
 		Namespace(s.namespace).
-		Resource("secrets").
+		Resource(secretResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -79,7 +83,7 @@ func (s *secrets) Get(name string) (*api.Secret, error) {
 	result := &api.Secret{}
 	err := s.client.Get().
 		Namespace(s.namespace).
-		Resource("secrets").
+		Resource(secretResourceName).
 		Name(name).
 		Do().
 		Into(result)
@@ -92,7 +96,7 @@ func (s *secrets) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return s.client.Get().
 		Prefix("watch").
 		Namespace(s.namespace).
-		Resource("secrets").
+		Resource(secretResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }
@@ -100,7 +104,7 @@ func (s *secrets) Watch(opts api.ListOptions) (watch.Interface, error) {
 func (s *secrets) Delete(name string) error {
 	return s.client.Delete().
 		Namespace(s.namespace).
-		Resource("secrets").
+		Resource(secretResourceName).
 		Name(name).
 		Do().
 		Error()
@@ -110,7 +114,7 @@ func (s *secrets) Update(secret *api.Secret) (result *api.Secret, err error) {
 	result = &api.Secret{}
 	err = s.client.Put().
 		Namespace(s.namespace).
-		Resource("secrets").
+		Resource(secretResourceName).
 		Name(secret.Name).
 		Body(secret).
 		Do().

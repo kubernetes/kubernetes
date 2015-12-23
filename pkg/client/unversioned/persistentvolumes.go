@@ -23,6 +23,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	persistentVolumeResourceName string = "persistentVolumes"
+)
+
 type PersistentVolumesInterface interface {
 	PersistentVolumes() PersistentVolumeInterface
 }
@@ -50,7 +54,7 @@ func newPersistentVolumes(c *Client) *persistentVolumes {
 func (c *persistentVolumes) List(opts api.ListOptions) (result *api.PersistentVolumeList, err error) {
 	result = &api.PersistentVolumeList{}
 	err = c.client.Get().
-		Resource("persistentVolumes").
+		Resource(persistentVolumeResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -60,13 +64,13 @@ func (c *persistentVolumes) List(opts api.ListOptions) (result *api.PersistentVo
 
 func (c *persistentVolumes) Get(name string) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
-	err = c.client.Get().Resource("persistentVolumes").Name(name).Do().Into(result)
+	err = c.client.Get().Resource(persistentVolumeResourceName).Name(name).Do().Into(result)
 	return
 }
 
 func (c *persistentVolumes) Create(volume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
-	err = c.client.Post().Resource("persistentVolumes").Body(volume).Do().Into(result)
+	err = c.client.Post().Resource(persistentVolumeResourceName).Body(volume).Do().Into(result)
 	return
 }
 
@@ -76,24 +80,24 @@ func (c *persistentVolumes) Update(volume *api.PersistentVolume) (result *api.Pe
 		err = fmt.Errorf("invalid update object, missing resource version: %v", volume)
 		return
 	}
-	err = c.client.Put().Resource("persistentVolumes").Name(volume.Name).Body(volume).Do().Into(result)
+	err = c.client.Put().Resource(persistentVolumeResourceName).Name(volume.Name).Body(volume).Do().Into(result)
 	return
 }
 
 func (c *persistentVolumes) UpdateStatus(volume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
-	err = c.client.Put().Resource("persistentVolumes").Name(volume.Name).SubResource("status").Body(volume).Do().Into(result)
+	err = c.client.Put().Resource(persistentVolumeResourceName).Name(volume.Name).SubResource("status").Body(volume).Do().Into(result)
 	return
 }
 
 func (c *persistentVolumes) Delete(name string) error {
-	return c.client.Delete().Resource("persistentVolumes").Name(name).Do().Error()
+	return c.client.Delete().Resource(persistentVolumeResourceName).Name(name).Do().Error()
 }
 
 func (c *persistentVolumes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
-		Resource("persistentVolumes").
+		Resource(persistentVolumeResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

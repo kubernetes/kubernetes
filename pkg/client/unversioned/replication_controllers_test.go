@@ -28,16 +28,16 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
-func getRCResourceName() string {
-	return "replicationcontrollers"
-}
+const (
+	replicationControllerResourceName string = "replicationControllers"
+)
 
 func TestListControllers(t *testing.T) {
 	ns := api.NamespaceAll
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath(getRCResourceName(), ns, ""),
+			Path:   testapi.Default.ResourcePath(replicationControllerResourceName, ns, ""),
 		},
 		Response: simple.Response{StatusCode: 200,
 			Body: &api.ReplicationControllerList{
@@ -67,7 +67,7 @@ func TestListControllers(t *testing.T) {
 func TestGetController(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath(replicationControllerResourceName, ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{
@@ -106,7 +106,7 @@ func TestUpdateController(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(replicationControllerResourceName, ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{
@@ -134,7 +134,7 @@ func TestUpdateStatusController(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, "foo") + "/status", Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(replicationControllerResourceName, ns, "foo") + "/status", Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{
@@ -161,7 +161,7 @@ func TestUpdateStatusController(t *testing.T) {
 func TestDeleteController(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(replicationControllerResourceName, ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).ReplicationControllers(ns).Delete("foo")
@@ -174,7 +174,7 @@ func TestCreateController(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "POST", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, ""), Body: requestController, Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "POST", Path: testapi.Default.ResourcePath(replicationControllerResourceName, ns, ""), Body: requestController, Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{

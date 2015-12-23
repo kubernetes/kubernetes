@@ -25,6 +25,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	eventResourceName string = "events"
+)
+
 // EventNamespacer can return an EventInterface for the given namespace.
 type EventNamespacer interface {
 	Events(namespace string) EventInterface
@@ -73,7 +77,7 @@ func (e *events) Create(event *api.Event) (*api.Event, error) {
 	result := &api.Event{}
 	err := e.client.Post().
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
-		Resource("events").
+		Resource(eventResourceName).
 		Body(event).
 		Do().
 		Into(result)
@@ -92,7 +96,7 @@ func (e *events) Update(event *api.Event) (*api.Event, error) {
 	result := &api.Event{}
 	err := e.client.Put().
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
-		Resource("events").
+		Resource(eventResourceName).
 		Name(event.Name).
 		Body(event).
 		Do().
@@ -108,7 +112,7 @@ func (e *events) Patch(incompleteEvent *api.Event, data []byte) (*api.Event, err
 	result := &api.Event{}
 	err := e.client.Patch(api.StrategicMergePatchType).
 		NamespaceIfScoped(incompleteEvent.Namespace, len(incompleteEvent.Namespace) > 0).
-		Resource("events").
+		Resource(eventResourceName).
 		Name(incompleteEvent.Name).
 		Body(data).
 		Do().
@@ -121,7 +125,7 @@ func (e *events) List(opts api.ListOptions) (*api.EventList, error) {
 	result := &api.EventList{}
 	err := e.client.Get().
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
-		Resource("events").
+		Resource(eventResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -133,7 +137,7 @@ func (e *events) Get(name string) (*api.Event, error) {
 	result := &api.Event{}
 	err := e.client.Get().
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
-		Resource("events").
+		Resource(eventResourceName).
 		Name(name).
 		Do().
 		Into(result)
@@ -145,7 +149,7 @@ func (e *events) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return e.client.Get().
 		Prefix("watch").
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
-		Resource("events").
+		Resource(eventResourceName).
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }
@@ -179,7 +183,7 @@ func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
 func (e *events) Delete(name string) error {
 	return e.client.Delete().
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
-		Resource("events").
+		Resource(eventResourceName).
 		Name(name).
 		Do().
 		Error()

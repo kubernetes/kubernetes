@@ -21,6 +21,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	resourceQuotaResourceName string = "resourceQuotas"
+)
+
 // FakeResourceQuotas implements ResourceQuotaInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the methods you want to test easier.
 type FakeResourceQuotas struct {
@@ -29,7 +33,7 @@ type FakeResourceQuotas struct {
 }
 
 func (c *FakeResourceQuotas) Get(name string) (*api.ResourceQuota, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("resourcequotas", c.Namespace, name), &api.ResourceQuota{})
+	obj, err := c.Fake.Invokes(NewGetAction(resourceQuotaResourceName, c.Namespace, name), &api.ResourceQuota{})
 	if obj == nil {
 		return nil, err
 	}
@@ -38,7 +42,7 @@ func (c *FakeResourceQuotas) Get(name string) (*api.ResourceQuota, error) {
 }
 
 func (c *FakeResourceQuotas) List(opts api.ListOptions) (*api.ResourceQuotaList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("resourcequotas", c.Namespace, opts), &api.ResourceQuotaList{})
+	obj, err := c.Fake.Invokes(NewListAction(resourceQuotaResourceName, c.Namespace, opts), &api.ResourceQuotaList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -47,7 +51,7 @@ func (c *FakeResourceQuotas) List(opts api.ListOptions) (*api.ResourceQuotaList,
 }
 
 func (c *FakeResourceQuotas) Create(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("resourcequotas", c.Namespace, resourceQuota), resourceQuota)
+	obj, err := c.Fake.Invokes(NewCreateAction(resourceQuotaResourceName, c.Namespace, resourceQuota), resourceQuota)
 	if obj == nil {
 		return nil, err
 	}
@@ -56,7 +60,7 @@ func (c *FakeResourceQuotas) Create(resourceQuota *api.ResourceQuota) (*api.Reso
 }
 
 func (c *FakeResourceQuotas) Update(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("resourcequotas", c.Namespace, resourceQuota), resourceQuota)
+	obj, err := c.Fake.Invokes(NewUpdateAction(resourceQuotaResourceName, c.Namespace, resourceQuota), resourceQuota)
 	if obj == nil {
 		return nil, err
 	}
@@ -65,16 +69,16 @@ func (c *FakeResourceQuotas) Update(resourceQuota *api.ResourceQuota) (*api.Reso
 }
 
 func (c *FakeResourceQuotas) Delete(name string) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("resourcequotas", c.Namespace, name), &api.ResourceQuota{})
+	_, err := c.Fake.Invokes(NewDeleteAction(resourceQuotaResourceName, c.Namespace, name), &api.ResourceQuota{})
 	return err
 }
 
 func (c *FakeResourceQuotas) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("resourcequotas", c.Namespace, opts))
+	return c.Fake.InvokesWatch(NewWatchAction(resourceQuotaResourceName, c.Namespace, opts))
 }
 
 func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("resourcequotas", "status", c.Namespace, resourceQuota), resourceQuota)
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction(resourceQuotaResourceName, "status", c.Namespace, resourceQuota), resourceQuota)
 	if obj == nil {
 		return nil, err
 	}

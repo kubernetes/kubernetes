@@ -30,9 +30,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
-func getPersistentVolumeClaimsResoureName() string {
-	return "persistentvolumeclaims"
-}
+const (
+	persistentVolumeClaimResourceName string = "persistentVolumeClaims"
+)
 
 func TestPersistentVolumeClaimCreate(t *testing.T) {
 	ns := api.NamespaceDefault
@@ -56,7 +56,7 @@ func TestPersistentVolumeClaimCreate(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Default.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, ""),
+			Path:   testapi.Default.ResourcePath(persistentVolumeClaimResourceName, ns, ""),
 			Query:  simple.BuildQueryValues(nil),
 			Body:   pv,
 		},
@@ -89,7 +89,7 @@ func TestPersistentVolumeClaimGet(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, "abc"),
+			Path:   testapi.Default.ResourcePath(persistentVolumeClaimResourceName, ns, "abc"),
 			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
@@ -112,7 +112,7 @@ func TestPersistentVolumeClaimList(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, ""),
+			Path:   testapi.Default.ResourcePath(persistentVolumeClaimResourceName, ns, ""),
 			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
@@ -142,7 +142,7 @@ func TestPersistentVolumeClaimUpdate(t *testing.T) {
 		},
 	}
 	c := &simple.Client{
-		Request:  simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, "abc"), Query: simple.BuildQueryValues(nil)},
+		Request:  simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(persistentVolumeClaimResourceName, ns, "abc"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200, Body: persistentVolumeClaim},
 	}
 	response, err := c.Setup(t).PersistentVolumeClaims(ns).Update(persistentVolumeClaim)
@@ -174,7 +174,7 @@ func TestPersistentVolumeClaimStatusUpdate(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Default.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, "abc") + "/status",
+			Path:   testapi.Default.ResourcePath(persistentVolumeClaimResourceName, ns, "abc") + "/status",
 			Query:  simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200, Body: persistentVolumeClaim},
 	}
@@ -185,7 +185,7 @@ func TestPersistentVolumeClaimStatusUpdate(t *testing.T) {
 func TestPersistentVolumeClaimDelete(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{
-		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(persistentVolumeClaimResourceName, ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).PersistentVolumeClaims(ns).Delete("foo")
@@ -196,7 +196,7 @@ func TestPersistentVolumeClaimWatch(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Default.ResourcePathWithPrefix("watch", getPersistentVolumeClaimsResoureName(), "", ""),
+			Path:   testapi.Default.ResourcePathWithPrefix("watch", persistentVolumeClaimResourceName, "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: simple.Response{StatusCode: 200},
 	}

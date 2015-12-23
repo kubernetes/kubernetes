@@ -120,7 +120,7 @@ func validateSyncReplication(t *testing.T, fakePodControl *controller.FakePodCon
 }
 
 func replicationControllerResourceName() string {
-	return "replicationcontrollers"
+	return "replicationControllers"
 }
 
 type serverResponse struct {
@@ -592,7 +592,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	rc := newReplicationController(1)
 	fakeClient := &testclient.Fake{}
-	fakeClient.AddReactor("get", "replicationcontrollers", func(action testclient.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("get", "replicationControllers", func(action testclient.Action) (bool, runtime.Object, error) {
 		return true, rc, nil
 	})
 	fakeClient.AddReactor("*", "*", func(action testclient.Action) (bool, runtime.Object, error) {
@@ -603,7 +603,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	updateReplicaCount(fakeRCClient, *rc, numReplicas)
 	updates, gets := 0, 0
 	for _, a := range fakeClient.Actions() {
-		if a.GetResource() != "replicationcontrollers" {
+		if a.GetResource() != "replicationControllers" {
 			t.Errorf("Unexpected action %+v", a)
 			continue
 		}

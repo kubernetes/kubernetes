@@ -20,6 +20,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
+const (
+	scaleSubResourceName string = "scale"
+)
+
 // FakeScales implements ScaleInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the methods you want to test easier.
 type FakeScales struct {
@@ -32,7 +36,7 @@ func (c *FakeScales) Get(kind string, name string) (result *extensions.Scale, er
 	action.Verb = "get"
 	action.Namespace = c.Namespace
 	action.Resource = kind
-	action.Subresource = "scale"
+	action.Subresource = scaleSubResourceName
 	action.Name = name
 	obj, err := c.Fake.Invokes(action, &extensions.Scale{})
 	result = obj.(*extensions.Scale)
@@ -44,7 +48,7 @@ func (c *FakeScales) Update(kind string, scale *extensions.Scale) (result *exten
 	action.Verb = "update"
 	action.Namespace = c.Namespace
 	action.Resource = kind
-	action.Subresource = "scale"
+	action.Subresource = scaleSubResourceName
 	action.Object = scale
 	obj, err := c.Fake.Invokes(action, scale)
 	result = obj.(*extensions.Scale)

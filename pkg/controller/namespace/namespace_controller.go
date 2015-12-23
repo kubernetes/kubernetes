@@ -203,7 +203,7 @@ func deleteAllContent(kubeClient client.Interface, versions *unversioned.APIVers
 		if err != nil {
 			return estimate, err
 		}
-		if containsResource(resources, "horizontalpodautoscalers") {
+		if containsResource(resources, "horizontalPodAutoscalers") {
 			err = deleteHorizontalPodAutoscalers(kubeClient.Extensions(), namespace)
 			if err != nil {
 				return estimate, err

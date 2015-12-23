@@ -21,6 +21,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	podTemplateResourceName string = "podTemplates"
+)
+
 // FakePodTemplates implements PodTemplatesInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the methods you want to test easier.
 type FakePodTemplates struct {
@@ -29,7 +33,7 @@ type FakePodTemplates struct {
 }
 
 func (c *FakePodTemplates) Get(name string) (*api.PodTemplate, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("podtemplates", c.Namespace, name), &api.PodTemplate{})
+	obj, err := c.Fake.Invokes(NewGetAction(podTemplateResourceName, c.Namespace, name), &api.PodTemplate{})
 	if obj == nil {
 		return nil, err
 	}
@@ -38,7 +42,7 @@ func (c *FakePodTemplates) Get(name string) (*api.PodTemplate, error) {
 }
 
 func (c *FakePodTemplates) List(opts api.ListOptions) (*api.PodTemplateList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("podtemplates", c.Namespace, opts), &api.PodTemplateList{})
+	obj, err := c.Fake.Invokes(NewListAction(podTemplateResourceName, c.Namespace, opts), &api.PodTemplateList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -47,7 +51,7 @@ func (c *FakePodTemplates) List(opts api.ListOptions) (*api.PodTemplateList, err
 }
 
 func (c *FakePodTemplates) Create(pod *api.PodTemplate) (*api.PodTemplate, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("podtemplates", c.Namespace, pod), pod)
+	obj, err := c.Fake.Invokes(NewCreateAction(podTemplateResourceName, c.Namespace, pod), pod)
 	if obj == nil {
 		return nil, err
 	}
@@ -56,7 +60,7 @@ func (c *FakePodTemplates) Create(pod *api.PodTemplate) (*api.PodTemplate, error
 }
 
 func (c *FakePodTemplates) Update(pod *api.PodTemplate) (*api.PodTemplate, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("podtemplates", c.Namespace, pod), pod)
+	obj, err := c.Fake.Invokes(NewUpdateAction(podTemplateResourceName, c.Namespace, pod), pod)
 	if obj == nil {
 		return nil, err
 	}
@@ -65,10 +69,10 @@ func (c *FakePodTemplates) Update(pod *api.PodTemplate) (*api.PodTemplate, error
 }
 
 func (c *FakePodTemplates) Delete(name string, options *api.DeleteOptions) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("podtemplates", c.Namespace, name), &api.PodTemplate{})
+	_, err := c.Fake.Invokes(NewDeleteAction(podTemplateResourceName, c.Namespace, name), &api.PodTemplate{})
 	return err
 }
 
 func (c *FakePodTemplates) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("podtemplates", c.Namespace, opts))
+	return c.Fake.InvokesWatch(NewWatchAction(podTemplateResourceName, c.Namespace, opts))
 }

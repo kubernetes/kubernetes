@@ -21,6 +21,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
+const (
+	scaleSubResourceName string = "scale"
+)
+
 type ScaleNamespacer interface {
 	Scales(namespace string) ScaleInterface
 }
@@ -49,7 +53,7 @@ func newScales(c *ExtensionsClient, namespace string) *scales {
 func (c *scales) Get(kind string, name string) (result *extensions.Scale, err error) {
 	result = &extensions.Scale{}
 	resource, _ := meta.KindToResource(kind, false)
-	err = c.client.Get().Namespace(c.ns).Resource(resource).Name(name).SubResource("scale").Do().Into(result)
+	err = c.client.Get().Namespace(c.ns).Resource(resource).Name(name).SubResource(scaleSubResourceName).Do().Into(result)
 	return
 }
 
@@ -60,7 +64,7 @@ func (c *scales) Update(kind string, scale *extensions.Scale) (result *extension
 		Namespace(scale.Namespace).
 		Resource(resource).
 		Name(scale.Name).
-		SubResource("scale").
+		SubResource(scaleSubResourceName).
 		Body(scale).
 		Do().
 		Into(result)

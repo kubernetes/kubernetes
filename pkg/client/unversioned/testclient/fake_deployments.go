@@ -23,6 +23,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	deploymentResourceName string = "deployments"
+)
+
 // FakeDeployments implements DeploymentsInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the methods you want to test easier.
 type FakeDeployments struct {
@@ -31,7 +35,7 @@ type FakeDeployments struct {
 }
 
 func (c *FakeDeployments) Get(name string) (*extensions.Deployment, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("deployments", c.Namespace, name), &extensions.Deployment{})
+	obj, err := c.Fake.Invokes(NewGetAction(deploymentResourceName, c.Namespace, name), &extensions.Deployment{})
 	if obj == nil {
 		return nil, err
 	}
@@ -40,7 +44,7 @@ func (c *FakeDeployments) Get(name string) (*extensions.Deployment, error) {
 }
 
 func (c *FakeDeployments) List(opts api.ListOptions) (*extensions.DeploymentList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("deployments", c.Namespace, opts), &extensions.DeploymentList{})
+	obj, err := c.Fake.Invokes(NewListAction(deploymentResourceName, c.Namespace, opts), &extensions.DeploymentList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -58,7 +62,7 @@ func (c *FakeDeployments) List(opts api.ListOptions) (*extensions.DeploymentList
 }
 
 func (c *FakeDeployments) Create(deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("deployments", c.Namespace, deployment), deployment)
+	obj, err := c.Fake.Invokes(NewCreateAction(deploymentResourceName, c.Namespace, deployment), deployment)
 	if obj == nil {
 		return nil, err
 	}
@@ -67,7 +71,7 @@ func (c *FakeDeployments) Create(deployment *extensions.Deployment) (*extensions
 }
 
 func (c *FakeDeployments) Update(deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("deployments", c.Namespace, deployment), deployment)
+	obj, err := c.Fake.Invokes(NewUpdateAction(deploymentResourceName, c.Namespace, deployment), deployment)
 	if obj == nil {
 		return nil, err
 	}
@@ -76,7 +80,7 @@ func (c *FakeDeployments) Update(deployment *extensions.Deployment) (*extensions
 }
 
 func (c *FakeDeployments) UpdateStatus(deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("deployments", "status", c.Namespace, deployment), deployment)
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction(deploymentResourceName, "status", c.Namespace, deployment), deployment)
 	if obj == nil {
 		return nil, err
 	}
@@ -85,10 +89,10 @@ func (c *FakeDeployments) UpdateStatus(deployment *extensions.Deployment) (*exte
 }
 
 func (c *FakeDeployments) Delete(name string, options *api.DeleteOptions) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("deployments", c.Namespace, name), &extensions.Deployment{})
+	_, err := c.Fake.Invokes(NewDeleteAction(deploymentResourceName, c.Namespace, name), &extensions.Deployment{})
 	return err
 }
 
 func (c *FakeDeployments) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("deployments", c.Namespace, opts))
+	return c.Fake.InvokesWatch(NewWatchAction(deploymentResourceName, c.Namespace, opts))
 }

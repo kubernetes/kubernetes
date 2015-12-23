@@ -77,7 +77,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 	tc.eventCreated = false
 
 	fakeClient := &testclient.Fake{}
-	fakeClient.AddReactor("list", "horizontalpodautoscalers", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.AddReactor("list", "horizontalPodAutoscalers", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &extensions.HorizontalPodAutoscalerList{
 			Items: []extensions.HorizontalPodAutoscaler{
 				{
@@ -175,7 +175,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 		return true, obj, nil
 	})
 
-	fakeClient.AddReactor("update", "horizontalpodautoscalers", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.AddReactor("update", "horizontalPodAutoscalers", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
 		obj := action.(testclient.UpdateAction).GetObject().(*extensions.HorizontalPodAutoscaler)
 		assert.Equal(t, namespace, obj.Namespace)
 		assert.Equal(t, hpaName, obj.Name)

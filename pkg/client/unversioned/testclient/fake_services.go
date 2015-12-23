@@ -22,6 +22,10 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	serviceResourceName string = "services"
+)
+
 // Fake implements ServiceInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type FakeServices struct {
@@ -30,7 +34,7 @@ type FakeServices struct {
 }
 
 func (c *FakeServices) Get(name string) (*api.Service, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("services", c.Namespace, name), &api.Service{})
+	obj, err := c.Fake.Invokes(NewGetAction(serviceResourceName, c.Namespace, name), &api.Service{})
 	if obj == nil {
 		return nil, err
 	}
@@ -39,7 +43,7 @@ func (c *FakeServices) Get(name string) (*api.Service, error) {
 }
 
 func (c *FakeServices) List(opts api.ListOptions) (*api.ServiceList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("services", c.Namespace, opts), &api.ServiceList{})
+	obj, err := c.Fake.Invokes(NewListAction(serviceResourceName, c.Namespace, opts), &api.ServiceList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,7 +52,7 @@ func (c *FakeServices) List(opts api.ListOptions) (*api.ServiceList, error) {
 }
 
 func (c *FakeServices) Create(service *api.Service) (*api.Service, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("services", c.Namespace, service), service)
+	obj, err := c.Fake.Invokes(NewCreateAction(serviceResourceName, c.Namespace, service), service)
 	if obj == nil {
 		return nil, err
 	}
@@ -57,7 +61,7 @@ func (c *FakeServices) Create(service *api.Service) (*api.Service, error) {
 }
 
 func (c *FakeServices) Update(service *api.Service) (*api.Service, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("services", c.Namespace, service), service)
+	obj, err := c.Fake.Invokes(NewUpdateAction(serviceResourceName, c.Namespace, service), service)
 	if obj == nil {
 		return nil, err
 	}
@@ -66,14 +70,14 @@ func (c *FakeServices) Update(service *api.Service) (*api.Service, error) {
 }
 
 func (c *FakeServices) Delete(name string) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("services", c.Namespace, name), &api.Service{})
+	_, err := c.Fake.Invokes(NewDeleteAction(serviceResourceName, c.Namespace, name), &api.Service{})
 	return err
 }
 
 func (c *FakeServices) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("services", c.Namespace, opts))
+	return c.Fake.InvokesWatch(NewWatchAction(serviceResourceName, c.Namespace, opts))
 }
 
 func (c *FakeServices) ProxyGet(scheme, name, port, path string, params map[string]string) client.ResponseWrapper {
-	return c.Fake.InvokesProxy(NewProxyGetAction("services", c.Namespace, scheme, name, port, path, params))
+	return c.Fake.InvokesProxy(NewProxyGetAction(serviceResourceName, c.Namespace, scheme, name, port, path, params))
 }
