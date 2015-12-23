@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/metrics"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -152,6 +153,38 @@ func (f *Framework) afterEach() {
 		close(f.logsSizeCloseChannel)
 		f.logsSizeWaitGroup.Wait()
 	}
+
+	if testContext.GatherMetricsAfterTest {
+		// TODO: enable Scheduler and ControllerManager metrics grabbing when Master's Kubelet will be registered.
+		grabber, err := metrics.NewMetricsGrabber(f.Client, true, false, false, true)
+		if err != nil {
+			Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
+		} else {
+			received, err := grabber.Grab(nil)
+			if err != nil {
+				Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
+			} else {
+				buf := bytes.Buffer{}
+				for interestingMetric := range InterestingApiServerMetrics {
+					buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
+					for _, sample := range received.ApiServerMetrics[interestingMetric] {
+						buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+					}
+				}
+				for kubelet, grabbed := range received.KubeletMetrics {
+					buf.WriteString(fmt.Sprintf("For %v:\n", kubelet))
+					for interestingMetric := range InterestingKubeletMetrics {
+						buf.WriteString(fmt.Sprintf("\tFor %v:\n", interestingMetric))
+						for _, sample := range grabbed[interestingMetric] {
+							buf.WriteString(fmt.Sprintf("\t\t%v\n", metrics.PrintSample(sample)))
+						}
+					}
+				}
+				Logf("%v", buf.String())
+			}
+		}
+	}
+
 	// Paranoia-- prevent reuse!
 	f.Namespace = nil
 	f.Client = nil

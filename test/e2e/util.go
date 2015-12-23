@@ -153,6 +153,7 @@ type TestContextType struct {
 	// It will read the data every 30 seconds from all Nodes and print summary during afterEach.
 	GatherKubeSystemResourceUsageData bool
 	GatherLogsSizes                   bool
+	GatherMetricsAfterTest            bool
 }
 
 var testContext TestContextType

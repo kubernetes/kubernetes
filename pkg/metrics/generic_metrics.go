@@ -29,37 +29,54 @@ import (
 )
 
 var CommonMetrics = map[string][]string{
-	"process_start_time_seconds":    {},
-	"process_resident_memory_bytes": {},
-	"process_virtual_memory_bytes":  {},
-	"process_cpu_seconds_total":     {},
-	"process_max_fds":               {},
-	"process_open_fds":              {},
-
-	"http_request_size_bytes":                  {"handler", "quantile"},
-	"http_request_size_bytes_count":            {"handler"},
-	"http_request_size_bytes_sum":              {"handler"},
+	"get_token_count":                          {},
+	"get_token_fail_count":                     {},
+	"go_gc_duration_seconds":                   {"quantile"},
+	"go_gc_duration_seconds_count":             {},
+	"go_gc_duration_seconds_sum":               {},
+	"go_goroutines":                            {},
 	"http_request_duration_microseconds":       {"handler", "quantile"},
 	"http_request_duration_microseconds_count": {"handler"},
 	"http_request_duration_microseconds_sum":   {"handler"},
+	"http_request_size_bytes":                  {"handler", "quantile"},
+	"http_request_size_bytes_count":            {"handler"},
+	"http_request_size_bytes_sum":              {"handler"},
 	"http_requests_total":                      {"handler", "method", "code"},
-
-	"http_response_size_bytes":       {"handler", "quantile"},
-	"http_response_size_bytes_count": {"handler"},
-	"http_response_size_bytes_sum":   {"handler"},
-
-	"ssh_tunnel_open_fail_count": {},
-	"ssh_tunnel_open_count":      {},
-
-	"go_gc_duration_seconds":       {"quantile"},
-	"go_gc_duration_seconds_count": {},
-	"go_gc_duration_seconds_sum":   {},
-	"go_goroutines":                {},
-
-	"kubernetes_build_info": {"major", "minor", "gitCommit", "gitTreeState", "gitVersion"},
+	"http_response_size_bytes":                 {"handler", "quantile"},
+	"http_response_size_bytes_count":           {"handler"},
+	"http_response_size_bytes_sum":             {"handler"},
+	"kubernetes_build_info":                    {"major", "minor", "gitCommit", "gitTreeState", "gitVersion"},
+	"process_cpu_seconds_total":                {},
+	"process_max_fds":                          {},
+	"process_open_fds":                         {},
+	"process_resident_memory_bytes":            {},
+	"process_start_time_seconds":               {},
+	"process_virtual_memory_bytes":             {},
+	"ssh_tunnel_open_count":                    {},
+	"ssh_tunnel_open_fail_count":               {},
 }
 
 type Metrics map[string]model.Samples
+
+func PrintSample(sample *model.Sample) string {
+	buf := make([]string, 0)
+	// Id is a VERY special label. For 'normal' container it's usless, but it's necessary
+	// for 'system' containers (e.g. /docker-daemon, /kubelet, etc.). We know if that's the
+	// case by checking if there's a label "kubernetes_container_name" present. It's hacky
+	// but it works...
+	_, normalContainer := sample.Metric["kubernetes_container_name"]
+	for k, v := range sample.Metric {
+		if strings.HasPrefix(string(k), "__") || KubeletMetricsLabelsToSkip.Has(string(k)) {
+			continue
+		}
+
+		if string(k) == "id" && normalContainer {
+			continue
+		}
+		buf = append(buf, fmt.Sprintf("%v=%v", string(k), v))
+	}
+	return fmt.Sprintf("[%v] = %v", strings.Join(buf, ","), sample.Value)
+}
 
 func NewMetrics() Metrics {
 	result := make(Metrics)
