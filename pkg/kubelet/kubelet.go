@@ -51,6 +51,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
+	"k8s.io/kubernetes/pkg/kubelet/hyper"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
@@ -381,6 +382,20 @@ func NewMainKubelet(
 		}
 		klet.containerRuntime = rktRuntime
 		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod)
+
+		// No Docker daemon to put in a container.
+		dockerDaemonContainer = ""
+	case "hyper":
+		hyperRuntime, err := hyper.New(
+			klet,
+			recorder,
+			containerRefManager,
+			readinessManager,
+			klet.volumeManager)
+		if err != nil {
+			return nil, err
+		}
+		klet.containerRuntime = hyperRuntime
 
 		// No Docker daemon to put in a container.
 		dockerDaemonContainer = ""
