@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -177,9 +178,9 @@ func (v *testVisitor) Objects() []runtime.Object {
 	return objects
 }
 
-func TestPathBuilder(t *testing.T) {
+func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec()).
-		FilenameParam(false, "../../../examples/guestbook/redis-master-controller.yaml")
+		FilenameParam(false, "../../../docs/user-guide/update-demo/kitten-rc.yaml")
 
 	test := &testVisitor{}
 	singular := false
@@ -190,8 +191,13 @@ func TestPathBuilder(t *testing.T) {
 	}
 
 	info := test.Infos[0]
-	if info.Name != "redis-master" || info.Namespace != "" || info.Object == nil {
+	if info.Name != "update-demo-kitten" || info.Namespace != "" || info.Object == nil {
 		t.Errorf("unexpected info: %#v", info)
+	}
+	version, ok := info.VersionedObject.(*v1.ReplicationController)
+	// versioned object does not have defaulting applied
+	if info.VersionedObject == nil || !ok || version.Spec.Replicas != nil {
+		t.Errorf("unexpected versioned object: %#v", info.VersionedObject)
 	}
 }
 

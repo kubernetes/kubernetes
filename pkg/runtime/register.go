@@ -32,3 +32,28 @@ func (obj *TypeMeta) GroupVersionKind() *unversioned.GroupVersionKind {
 
 func (obj *Unknown) GetObjectKind() unversioned.ObjectKind      { return &obj.TypeMeta }
 func (obj *Unstructured) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+
+// GetObjectKind implements Object for VersionedObjects, returning an empty ObjectKind
+// interface if no objects are provided, or the ObjectKind interface of the object in the
+// highest array position.
+func (obj *VersionedObjects) GetObjectKind() unversioned.ObjectKind {
+	last := obj.Last()
+	if last == nil {
+		return unversioned.EmptyObjectKind
+	}
+	return last.GetObjectKind()
+}
+
+func (obj *VersionedObjects) First() Object {
+	if len(obj.Objects) == 0 {
+		return nil
+	}
+	return obj.Objects[0]
+}
+
+func (obj *VersionedObjects) Last() Object {
+	if len(obj.Objects) == 0 {
+		return nil
+	}
+	return obj.Objects[len(obj.Objects)-1]
+}

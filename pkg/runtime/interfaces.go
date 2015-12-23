@@ -94,7 +94,11 @@ type ObjectVersioner interface {
 
 // ObjectConvertor converts an object to a different version.
 type ObjectConvertor interface {
+	// Convert attempts to convert one object into another, or returns an error. This method does
+	// not guarantee the in object is not mutated.
 	Convert(in, out interface{}) error
+	// ConvertToVersion takes the provided object and converts it the provided version. This
+	// method does not guarantee that the in object is not mutated.
 	ConvertToVersion(in Object, outVersion string) (out Object, err error)
 	ConvertFieldLabel(version, kind, label, value string) (string, string, error)
 }

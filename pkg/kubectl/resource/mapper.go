@@ -47,7 +47,8 @@ type Mapper struct {
 // if any of the decoding or client lookup steps fail. Name and namespace will be
 // set into Info if the mapping's MetadataAccessor can retrieve them.
 func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
-	obj, gvk, err := m.Decode(data, nil, nil)
+	versions := &runtime.VersionedObjects{}
+	_, gvk, err := m.Decode(data, nil, versions)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode %q: %v", source, err)
 	}
@@ -61,20 +62,13 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 		return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
 	}
 
+	// TODO: decoding the version object is convenient, but questionable. This is used by apply
+	// and rolling-update today, but both of those cases should probably be requesting the raw
+	// object and performing their own decoding.
+	obj, versioned := versions.Last(), versions.First()
 	name, _ := mapping.MetadataAccessor.Name(obj)
 	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
 	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)
-
-	versioned, _, err := m.Decode(data, gvk, nil)
-	if err != nil {
-		versioned = &runtime.Unknown{
-			TypeMeta: runtime.TypeMeta{
-				APIVersion: gvk.GroupVersion().String(),
-				Kind:       gvk.Kind,
-			},
-			RawJSON: data,
-		}
-	}
 
 	return &Info{
 		Mapping:         mapping,

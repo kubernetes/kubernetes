@@ -130,7 +130,7 @@ func (f CodecFactory) UniversalDecoder(versions ...unversioned.GroupVersion) run
 // it will default to runtiem.APIVersionInternal. If encode is not specified for an object's group, the object is not
 // converted. If encode or decode are nil, no conversion is performed.
 func (f CodecFactory) CodecForVersions(serializer runtime.Serializer, encode []unversioned.GroupVersion, decode []unversioned.GroupVersion) runtime.Codec {
-	return versioning.NewCodec(f.scheme, serializer, f.scheme, runtime.ObjectTyperToTyper(f.scheme), encode, decode)
+	return versioning.NewCodecForScheme(f.scheme, serializer, encode, decode)
 }
 
 // DecoderToVersion returns a decoder that targets the provided group version.

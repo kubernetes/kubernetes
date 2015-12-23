@@ -32,16 +32,17 @@ func NewCodecForScheme(
 	encodeVersion []unversioned.GroupVersion,
 	decodeVersion []unversioned.GroupVersion,
 ) runtime.Codec {
-	return NewCodec(scheme, serializer, scheme, runtime.ObjectTyperToTyper(scheme), encodeVersion, decodeVersion)
+	return NewCodec(serializer, scheme, scheme, scheme, runtime.ObjectTyperToTyper(scheme), encodeVersion, decodeVersion)
 }
 
 // NewCodec takes objects in their internal versions and converts them to external versions before
 // serializing them. It assumes the serializer provided to it only deals with external versions.
 // This class is also a serializer, but is generally used with a specific version.
 func NewCodec(
-	convertor runtime.ObjectConvertor,
 	serializer runtime.Serializer,
+	convertor runtime.ObjectConvertor,
 	creater runtime.ObjectCreater,
+	copier runtime.ObjectCopier,
 	typer runtime.Typer,
 	encodeVersion []unversioned.GroupVersion,
 	decodeVersion []unversioned.GroupVersion,
@@ -50,6 +51,7 @@ func NewCodec(
 		serializer: serializer,
 		convertor:  convertor,
 		creater:    creater,
+		copier:     copier,
 		typer:      typer,
 	}
 	if encodeVersion != nil {
@@ -72,6 +74,7 @@ type codec struct {
 	serializer runtime.Serializer
 	convertor  runtime.ObjectConvertor
 	creater    runtime.ObjectCreater
+	copier     runtime.ObjectCopier
 	typer      runtime.Typer
 
 	encodeVersion map[string]unversioned.GroupVersion
@@ -82,6 +85,11 @@ type codec struct {
 // successful, the returned runtime.Object will be the value passed as into. Note that this may bypass conversion if you pass an
 // into that matches the serialized version.
 func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+	versioned, isVersioned := into.(*runtime.VersionedObjects)
+	if isVersioned {
+		into = versioned.Last()
+	}
+
 	obj, gvk, err := c.serializer.Decode(data, defaultGVK, into)
 	if err != nil {
 		return nil, gvk, err
@@ -90,10 +98,17 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 	// if we specify a target, use generic conversion.
 	if into != nil {
 		if into == obj {
+			if isVersioned {
+				return versioned, gvk, nil
+			}
 			return into, gvk, nil
 		}
 		if err := c.convertor.Convert(obj, into); err != nil {
 			return nil, gvk, err
+		}
+		if isVersioned {
+			versioned.Objects = []runtime.Object{obj, into}
+			return versioned, gvk, nil
 		}
 		return into, gvk, nil
 	}
@@ -118,13 +133,30 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 	}
 
 	if gvk.GroupVersion() == targetGV {
+		if isVersioned {
+			versioned.Objects = []runtime.Object{obj}
+			return versioned, gvk, nil
+		}
 		return obj, gvk, nil
+	}
+
+	if isVersioned {
+		// create a copy, because ConvertToVersion does not guarantee non-mutation of objects
+		copied, err := c.copier.Copy(obj)
+		if err != nil {
+			copied = obj
+		}
+		versioned.Objects = []runtime.Object{copied}
 	}
 
 	// Convert if needed.
 	out, err := c.convertor.ConvertToVersion(obj, targetGV.String())
 	if err != nil {
 		return nil, gvk, err
+	}
+	if isVersioned {
+		versioned.Objects = append(versioned.Objects, out)
+		return versioned, gvk, nil
 	}
 	return out, gvk, nil
 }

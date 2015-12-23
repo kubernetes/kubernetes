@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 type testDecodable struct {
@@ -137,6 +138,39 @@ func TestDecode(t *testing.T) {
 				Value: 1,
 			},
 		},
+
+		// runtime.VersionedObjects are decoded
+		{
+			data:        []byte(`{"value":1,"Other":"test"}`),
+			into:        &runtime.VersionedObjects{Objects: []runtime.Object{}},
+			creater:     &mockCreater{obj: &testDecodable{}},
+			typer:       &mockTyper{gvk: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			defaultGVK:  &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedGVK: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &runtime.VersionedObjects{
+				Objects: []runtime.Object{
+					&testDecodable{
+						Other: "test",
+						Value: 1,
+					},
+				},
+			},
+		},
+		// runtime.VersionedObjects with an object are decoded into
+		{
+			data:        []byte(`{"Other":"test"}`),
+			into:        &runtime.VersionedObjects{Objects: []runtime.Object{&testDecodable{Value: 2}}},
+			typer:       &mockTyper{gvk: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK: &unversioned.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &runtime.VersionedObjects{
+				Objects: []runtime.Object{
+					&testDecodable{
+						Other: "test",
+						Value: 2,
+					},
+				},
+			},
+		},
 	}
 
 	for i, test := range testCases {
@@ -175,7 +209,7 @@ func TestDecode(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(test.expectedObject, obj) {
-			t.Errorf("%d: unexpected object: %#v", i, obj)
+			t.Errorf("%d: unexpected object:\n%s", i, util.ObjectGoPrintSideBySide(test.expectedObject, obj))
 		}
 	}
 }
