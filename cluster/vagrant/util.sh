@@ -82,7 +82,7 @@ function verify-prereqs {
   done
 
   if [ -z "${provider_found}" ]; then
-    if [ -n "${VAGRANT_DEFAULT_PROVIDER}" ]; then
+    if [ -n "${VAGRANT_DEFAULT_PROVIDER:-}" ]; then
       echo "Can't find the necessary components for the ${VAGRANT_DEFAULT_PROVIDER} vagrant provider."
       echo "Possible reasons could be: "
       echo -e "\t- vmrun utility is not in your path"
