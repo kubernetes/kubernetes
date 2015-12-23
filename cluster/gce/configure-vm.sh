@@ -294,9 +294,15 @@ EOF
 kubelet_port: '$(echo "$KUBELET_PORT" | sed -e "s/'/''/g")'
 EOF
     fi
+    # Configuration changes for test clusters
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 apiserver_test_args: '$(echo "$APISERVER_TEST_ARGS" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${API_SERVER_TEST_LOG_LEVEL:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+api_server_test_log_level: '$(echo "$API_SERVER_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
 EOF
     fi
     if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
@@ -304,9 +310,19 @@ EOF
 kubelet_test_args: '$(echo "$KUBELET_TEST_ARGS" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+kubelet_test_log_level: '$(echo "$KUBELET_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 controller_manager_test_args: '$(echo "$CONTROLLER_MANAGER_TEST_ARGS" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+controller_manager_test_log_level: '$(echo "$CONTROLLER_MANAGER_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
 EOF
     fi
     if [ -n "${SCHEDULER_TEST_ARGS:-}" ]; then
@@ -314,9 +330,19 @@ EOF
 scheduler_test_args: '$(echo "$SCHEDULER_TEST_ARGS" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${SCHEDULER_TEST_LOG_LEVEL:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+scheduler_test_log_level: '$(echo "$SCHEDULER_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 kubeproxy_test_args: '$(echo "$KUBEPROXY_TEST_ARGS" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${KUBEPROXY_TEST_LOG_LEVEL:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+kubeproxy_test_log_level: '$(echo "$KUBEPROXY_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
 EOF
     fi
     # TODO: Replace this  with a persistent volume (and create it).
