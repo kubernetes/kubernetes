@@ -41,8 +41,8 @@ func Resource(resource string) unversioned.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-func AddToScheme() {
-	Scheme.AddKnownTypes(SchemeGroupVersion,
+func AddToScheme(scheme *runtime.Scheme) {
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Pod{},
 		&PodList{},
 		&PodStatusResult{},
@@ -86,14 +86,14 @@ func AddToScheme() {
 		&RangeAllocation{},
 	)
 
-	// Add the Unversioned types to Scheme.
+	// Add the Unversioned types to scheme.
 	// TODO this should not be done here
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.ExportOptions{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.Status{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIVersions{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIGroupList{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIGroup{})
-	Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIResourceList{})
+	scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.ExportOptions{})
+	scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.Status{})
+	scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIVersions{})
+	scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIGroupList{})
+	scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIGroup{})
+	scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.APIResourceList{})
 }
 
 func (obj *Pod) GetObjectMeta() meta.Object                                  { return &obj.ObjectMeta }

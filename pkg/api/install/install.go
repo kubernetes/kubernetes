@@ -142,7 +142,7 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 
 func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 	// add the internal version to Scheme
-	api.AddToScheme()
+	api.AddToScheme(api.Scheme)
 	// add the enabled external versions to Scheme
 	for _, v := range externalVersions {
 		if !registered.IsEnabledVersion(v) {
@@ -151,7 +151,7 @@ func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 		}
 		switch v {
 		case v1.SchemeGroupVersion:
-			v1.AddToScheme()
+			v1.AddToScheme(api.Scheme)
 		}
 	}
 }

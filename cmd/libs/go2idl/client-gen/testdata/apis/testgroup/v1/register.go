@@ -27,19 +27,19 @@ var SchemeGroupVersion = unversioned.GroupVersion{Group: "testgroup", Version: "
 
 var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion)
 
-func AddToScheme() {
+func AddToScheme(scheme *runtime.Scheme) {
 	// Add the API to Scheme.
-	addKnownTypes()
+	addKnownTypes(scheme)
 }
 
 // Adds the list of known types to api.Scheme.
-func addKnownTypes() {
-	api.Scheme.AddKnownTypes(SchemeGroupVersion,
+func addKnownTypes(scheme *runtime.Scheme) {
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&TestType{},
 		&TestTypeList{},
 	)
 
-	api.Scheme.AddKnownTypes(SchemeGroupVersion,
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&v1.ListOptions{})
 }
 
