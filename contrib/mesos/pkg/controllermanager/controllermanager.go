@@ -26,6 +26,7 @@ import (
 	"time"
 
 	kubecontrollermanager "k8s.io/kubernetes/cmd/kube-controller-manager/app"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -58,14 +59,14 @@ import (
 
 // CMServer is the main context object for the controller manager.
 type CMServer struct {
-	*kubecontrollermanager.CMServer
+	*options.CMServer
 	UseHostPortEndpoints bool
 }
 
 // NewCMServer creates a new CMServer with a default config.
 func NewCMServer() *CMServer {
 	s := &CMServer{
-		CMServer: kubecontrollermanager.NewCMServer(),
+		CMServer: options.NewCMServer(),
 	}
 	s.CloudProvider = mesos.ProviderName
 	s.UseHostPortEndpoints = true
