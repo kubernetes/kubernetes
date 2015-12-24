@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
@@ -46,13 +45,13 @@ type NetworkPlugin interface {
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
 	// pod are launched.
-	SetUpPod(namespace string, name string, podInfraContainerID kubetypes.DockerID) error
+	SetUpPod(namespace string, name string, podInfraContainerID kubecontainer.DockerID) error
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
-	TearDownPod(namespace string, name string, podInfraContainerID kubetypes.DockerID) error
+	TearDownPod(namespace string, name string, podInfraContainerID kubecontainer.DockerID) error
 
 	// Status is the method called to obtain the ipv4 or ipv6 addresses of the container
-	Status(namespace string, name string, podInfraContainerID kubetypes.DockerID) (*PodNetworkStatus, error)
+	Status(namespace string, name string, podInfraContainerID kubecontainer.DockerID) (*PodNetworkStatus, error)
 }
 
 // PodNetworkStatus stores the network status of a pod (currently just the primary IP address)
@@ -134,14 +133,14 @@ func (plugin *noopNetworkPlugin) Name() string {
 	return DefaultPluginName
 }
 
-func (plugin *noopNetworkPlugin) SetUpPod(namespace string, name string, id kubetypes.DockerID) error {
+func (plugin *noopNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.DockerID) error {
 	return nil
 }
 
-func (plugin *noopNetworkPlugin) TearDownPod(namespace string, name string, id kubetypes.DockerID) error {
+func (plugin *noopNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.DockerID) error {
 	return nil
 }
 
-func (plugin *noopNetworkPlugin) Status(namespace string, name string, id kubetypes.DockerID) (*PodNetworkStatus, error) {
+func (plugin *noopNetworkPlugin) Status(namespace string, name string, id kubecontainer.DockerID) (*PodNetworkStatus, error) {
 	return nil, nil
 }

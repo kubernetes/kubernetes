@@ -106,9 +106,6 @@ const (
 	// not block on anything else.
 	podKillingChannelCapacity = 50
 
-	// system default DNS resolver configuration
-	ResolvConfDefault = "/etc/resolv.conf"
-
 	// Period for performing global cleanup tasks.
 	housekeepingPeriod = time.Second * 2
 

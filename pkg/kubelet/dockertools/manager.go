@@ -319,7 +319,7 @@ func (dm *DockerManager) determineContainerIP(podNamespace, podName string, cont
 	}
 
 	if dm.networkPlugin.Name() != network.DefaultPluginName {
-		netStatus, err := dm.networkPlugin.Status(podNamespace, podName, kubetypes.DockerID(container.ID))
+		netStatus, err := dm.networkPlugin.Status(podNamespace, podName, kubecontainer.DockerID(container.ID))
 		if err != nil {
 			glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", dm.networkPlugin.Name(), podName, err)
 		} else if netStatus != nil {
@@ -354,7 +354,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		RestartCount: containerInfo.RestartCount,
 		Image:        iResult.Config.Image,
 		ImageID:      DockerPrefix + iResult.Image,
-		ID:           kubetypes.DockerID(id).ContainerID(),
+		ID:           kubecontainer.DockerID(id).ContainerID(),
 		ExitCode:     iResult.State.ExitCode,
 		CreatedAt:    iResult.Created,
 		Hash:         hash,
@@ -771,7 +771,7 @@ func (dm *DockerManager) runContainer(
 	}
 	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.StartedContainer, "Started container with docker id %v", util.ShortenString(dockerContainer.ID, 12))
 
-	return kubetypes.DockerID(dockerContainer.ID).ContainerID(), nil
+	return kubecontainer.DockerID(dockerContainer.ID).ContainerID(), nil
 }
 
 func setEntrypointAndCommand(container *api.Container, opts *kubecontainer.RunContainerOptions, dockerOpts *docker.CreateContainerOptions) {
@@ -1266,7 +1266,7 @@ func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) err
 	}
 	wg.Wait()
 	if networkContainer != nil {
-		if err := dm.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, kubetypes.DockerID(networkContainer.ID.ID)); err != nil {
+		if err := dm.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, kubecontainer.DockerID(networkContainer.ID.ID)); err != nil {
 			glog.Errorf("Failed tearing down the infra container: %v", err)
 			errs <- err
 		}
@@ -1559,7 +1559,7 @@ func appendToFile(filePath, stringToAppend string) error {
 }
 
 // createPodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.
-func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubetypes.DockerID, error) {
+func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.DockerID, error) {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("createPodInfraContainer").Observe(metrics.SinceInMicroseconds(start))
@@ -1601,7 +1601,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubetypes.Docker
 		return "", err
 	}
 
-	return kubetypes.DockerID(id.ID), nil
+	return kubecontainer.DockerID(id.ID), nil
 }
 
 // Structure keeping information on changes that need to happen for a pod. The semantics is as follows:
@@ -1617,9 +1617,9 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubetypes.Docker
 type podContainerChangesSpec struct {
 	StartInfraContainer bool
 	InfraChanged        bool
-	InfraContainerId    kubetypes.DockerID
+	InfraContainerId    kubecontainer.DockerID
 	ContainersToStart   map[int]string
-	ContainersToKeep    map[kubetypes.DockerID]int
+	ContainersToKeep    map[kubecontainer.DockerID]int
 }
 
 func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kubecontainer.PodStatus) (podContainerChangesSpec, error) {
@@ -1630,10 +1630,10 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kub
 	glog.V(4).Infof("Syncing Pod %q: %+v", format.Pod(pod), pod)
 
 	containersToStart := make(map[int]string)
-	containersToKeep := make(map[kubetypes.DockerID]int)
+	containersToKeep := make(map[kubecontainer.DockerID]int)
 
 	var err error
-	var podInfraContainerID kubetypes.DockerID
+	var podInfraContainerID kubecontainer.DockerID
 	var changed bool
 	podInfraContainerStatus := podStatus.FindContainerStatusByName(PodInfraContainerName)
 	if podInfraContainerStatus != nil && podInfraContainerStatus.State == kubecontainer.ContainerStateRunning {
@@ -1652,7 +1652,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kub
 	} else {
 		glog.V(4).Infof("Pod infra container looks good, keep it %q", format.Pod(pod))
 		createPodInfraContainer = false
-		podInfraContainerID = kubetypes.DockerID(podInfraContainerStatus.ID.ID)
+		podInfraContainerID = kubecontainer.DockerID(podInfraContainerStatus.ID.ID)
 		containersToKeep[podInfraContainerID] = -1
 	}
 
@@ -1672,7 +1672,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kub
 			continue
 		}
 
-		containerID := kubetypes.DockerID(containerStatus.ID.ID)
+		containerID := kubecontainer.DockerID(containerStatus.ID.ID)
 		hash := containerStatus.Hash
 		glog.V(3).Infof("pod %q container %q exists as %v", format.Pod(pod), container.Name, containerID)
 
@@ -1718,7 +1718,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kub
 
 	// If Infra container is the last running one, we don't want to keep it.
 	if !createPodInfraContainer && len(containersToStart) == 0 && len(containersToKeep) == 1 {
-		containersToKeep = make(map[kubetypes.DockerID]int)
+		containersToKeep = make(map[kubecontainer.DockerID]int)
 	}
 
 	return podContainerChangesSpec{
@@ -1780,7 +1780,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		// Otherwise kill any running containers in this pod which are not specified as ones to keep.
 		runningContainerStatues := podStatus.GetRunningContainerStatuses()
 		for _, containerStatus := range runningContainerStatues {
-			_, keep := containerChanges.ContainersToKeep[kubetypes.DockerID(containerStatus.ID.ID)]
+			_, keep := containerChanges.ContainersToKeep[kubecontainer.DockerID(containerStatus.ID.ID)]
 			if !keep {
 				// NOTE(random-liu): Just log ID or log container status here?
 				glog.V(3).Infof("Killing unwanted container %+v", containerStatus)

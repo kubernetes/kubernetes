@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
-	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
+	cmapp "k8s.io/kubernetes/cmd/kube-controller-manager/app"
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
@@ -46,8 +46,8 @@ func Test_nodeWithUpdatedStatus(t *testing.T) {
 		}
 	}
 
-	cm := app.NewCMServer()
-	kubecfg := kubeletapp.NewKubeletServer()
+	cm := cmapp.NewCMServer()
+	kubecfg := options.NewKubeletServer()
 	assert.True(t, kubecfg.NodeStatusUpdateFrequency*3 < cm.NodeMonitorGracePeriod) // sanity check for defaults
 
 	n := testNode(0, api.ConditionTrue, "KubeletReady")
