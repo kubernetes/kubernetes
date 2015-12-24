@@ -42,7 +42,7 @@ We plan on improving the way the types are factored in the future; see [#16062](
 
 2. Create pkg/apis/`<group>`/{register.go, `<version>`/register.go} to register this group's API objects to the encoding/decoding scheme (e.g., [pkg/apis/extensions/register.go](../../pkg/apis/extensions/register.go) and [pkg/apis/extensions/v1beta1/register.go](../../pkg/apis/extensions/v1beta1/register.go);
 
-3. Add a pkg/apis/`<group>`/install/install.go, which is responsible for adding the group to the `latest` package, so that other packages can access the group's meta through `latest.Group`. You probably only need to change the name of group and version in the [example](../../pkg/apis/extensions/install/install.go)). You need to import this `install` package in {pkg/master, pkg/client/unversioned, cmd/kube-version-change}/import_known_versions.go, if you want to make your group accessible to other packages in the kube-apiserver binary, binaries that uses the client package, or the kube-version-change tool.
+3. Add a pkg/apis/`<group>`/install/install.go, which is responsible for adding the group to the `latest` package, so that other packages can access the group's meta through `latest.Group`. You probably only need to change the name of group and version in the [example](../../pkg/apis/extensions/install/install.go)). You need to import this `install` package in {pkg/master, pkg/client/unversioned}/import_known_versions.go, if you want to make your group accessible to other packages in the kube-apiserver binary, binaries that uses the client package.
 
 Step 2 and 3 are mechanical, we plan on autogenerate these using the cmd/libs/go2idl/ tool.
 
