@@ -21,9 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -343,72 +340,6 @@ func prettyPrintJSON(metrics interface{}) string {
 		return ""
 	}
 	return string(formatted.Bytes())
-}
-
-// Retrieves debug information.
-func getDebugInfo(c *client.Client) (map[string]string, error) {
-	data := make(map[string]string)
-	for _, key := range []string{"block", "goroutine", "heap", "threadcreate"} {
-		resp, err := http.Get(c.Get().AbsPath(fmt.Sprintf("debug/pprof/%s", key)).URL().String() + "?debug=2")
-		if err != nil {
-			Logf("Warning: Error trying to fetch %s debug data: %v", key, err)
-			continue
-		}
-		body, err := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			Logf("Warning: Error trying to read %s debug data: %v", key, err)
-		}
-		data[key] = string(body)
-	}
-	return data, nil
-}
-
-func writePerfData(c *client.Client, dirName string, postfix string) error {
-	fname := fmt.Sprintf("%s/metrics_%s.txt", dirName, postfix)
-
-	handler, err := os.Create(fname)
-	if err != nil {
-		return fmt.Errorf("Error creating file '%s': %v", fname, err)
-	}
-
-	metrics, err := getMetrics(c)
-	if err != nil {
-		return fmt.Errorf("Error retrieving metrics: %v", err)
-	}
-
-	_, err = handler.WriteString(metrics)
-	if err != nil {
-		return fmt.Errorf("Error writing metrics: %v", err)
-	}
-
-	err = handler.Close()
-	if err != nil {
-		return fmt.Errorf("Error closing '%s': %v", fname, err)
-	}
-
-	debug, err := getDebugInfo(c)
-	if err != nil {
-		return fmt.Errorf("Error retrieving debug information: %v", err)
-	}
-
-	for key, value := range debug {
-		fname := fmt.Sprintf("%s/%s_%s.txt", dirName, key, postfix)
-		handler, err = os.Create(fname)
-		if err != nil {
-			return fmt.Errorf("Error creating file '%s': %v", fname, err)
-		}
-		_, err = handler.WriteString(value)
-		if err != nil {
-			return fmt.Errorf("Error writing %s: %v", key, err)
-		}
-
-		err = handler.Close()
-		if err != nil {
-			return fmt.Errorf("Error closing '%s': %v", fname, err)
-		}
-	}
-	return nil
 }
 
 // extractMetricSamples parses the prometheus metric samples from the input string.
