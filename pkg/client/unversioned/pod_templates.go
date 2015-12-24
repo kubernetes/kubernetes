@@ -66,15 +66,7 @@ func (c *podTemplates) Get(name string) (result *api.PodTemplate, err error) {
 
 // Delete takes the name of the podTemplate, and returns an error if one occurs
 func (c *podTemplates) Delete(name string, options *api.DeleteOptions) error {
-	// TODO: to make this reusable in other client libraries
-	if options == nil {
-		return c.r.Delete().Namespace(c.ns).Resource("podTemplates").Name(name).Do().Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion().String())
-	if err != nil {
-		return err
-	}
-	return c.r.Delete().Namespace(c.ns).Resource("podTemplates").Name(name).Body(body).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource("podTemplates").Name(name).Body(options).Do().Error()
 }
 
 // Create takes the representation of a podTemplate.  Returns the server's representation of the podTemplate, and an error, if it occurs.

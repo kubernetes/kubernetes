@@ -69,15 +69,7 @@ func (c *pods) Get(name string) (result *api.Pod, err error) {
 
 // Delete takes the name of the pod, and returns an error if one occurs
 func (c *pods) Delete(name string, options *api.DeleteOptions) error {
-	// TODO: to make this reusable in other client libraries
-	if options == nil {
-		return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Do().Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion().String())
-	if err != nil {
-		return err
-	}
-	return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Body(body).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Body(options).Do().Error()
 }
 
 // Create takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.
