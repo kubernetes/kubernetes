@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -48,23 +47,18 @@ type lifecycle struct {
 }
 
 func (l *lifecycle) Admit(a admission.Attributes) (err error) {
-
 	// prevent deletion of immortal namespaces
 	if a.GetOperation() == admission.Delete && a.GetKind() == api.Kind("Namespace") && l.immortalNamespaces.Has(a.GetName()) {
 		return errors.NewForbidden(a.GetResource(), a.GetName(), fmt.Errorf("this namespace may not be deleted"))
 	}
 
-	gvk, err := api.RESTMapper.KindFor(a.GetResource().Resource)
-	if err != nil {
-		return errors.NewInternalError(err)
-	}
-	mapping, err := api.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-	if err != nil {
-		return errors.NewInternalError(err)
-	}
-	if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
+	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
+	// its a namespaced resource.
+	if len(a.GetNamespace()) == 0 || a.GetKind() == api.Kind("Namespace") {
 		return nil
 	}
+
 	namespaceObj, exists, err := l.store.Get(&api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:      a.GetNamespace(),

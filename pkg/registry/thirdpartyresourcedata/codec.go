@@ -41,14 +41,55 @@ type thirdPartyResourceDataMapper struct {
 
 var _ meta.RESTMapper = &thirdPartyResourceDataMapper{}
 
-func (t *thirdPartyResourceDataMapper) isThirdPartyResource(resource string) bool {
-	plural, _ := meta.KindToResource(t.kind, false)
-	return resource == plural
+func (t *thirdPartyResourceDataMapper) getResource() unversioned.GroupVersionResource {
+	plural, _ := meta.KindToResource(t.getKind(), false)
+
+	return plural
 }
 
-func (t *thirdPartyResourceDataMapper) KindFor(resource string) (unversioned.GroupVersionKind, error) {
+func (t *thirdPartyResourceDataMapper) getKind() unversioned.GroupVersionKind {
+	return unversioned.GroupVersionKind{Group: t.group, Version: t.version, Kind: t.kind}
+}
+
+func (t *thirdPartyResourceDataMapper) isThirdPartyResource(partialResource unversioned.GroupVersionResource) bool {
+	actualResource := t.getResource()
+	if strings.ToLower(partialResource.Resource) != strings.ToLower(actualResource.Resource) {
+		return false
+	}
+	if len(partialResource.Group) != 0 && partialResource.Group != actualResource.Group {
+		return false
+	}
+	if len(partialResource.Version) != 0 && partialResource.Version != actualResource.Version {
+		return false
+	}
+
+	return true
+}
+
+func (t *thirdPartyResourceDataMapper) ResourcesFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionResource, error) {
 	if t.isThirdPartyResource(resource) {
-		return unversioned.GroupVersionKind{Group: t.group, Version: t.version, Kind: t.kind}, nil
+		return []unversioned.GroupVersionResource{t.getResource()}, nil
+	}
+	return t.mapper.ResourcesFor(resource)
+}
+
+func (t *thirdPartyResourceDataMapper) KindsFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionKind, error) {
+	if t.isThirdPartyResource(resource) {
+		return []unversioned.GroupVersionKind{t.getKind()}, nil
+	}
+	return t.mapper.KindsFor(resource)
+}
+
+func (t *thirdPartyResourceDataMapper) ResourceFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionResource, error) {
+	if t.isThirdPartyResource(resource) {
+		return t.getResource(), nil
+	}
+	return t.mapper.ResourceFor(resource)
+}
+
+func (t *thirdPartyResourceDataMapper) KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error) {
+	if t.isThirdPartyResource(resource) {
+		return t.getKind(), nil
 	}
 	return t.mapper.KindFor(resource)
 }
@@ -86,8 +127,7 @@ func (t *thirdPartyResourceDataMapper) ResourceSingularizer(resource string) (si
 	return t.mapper.ResourceSingularizer(resource)
 }
 
-// ResourceIsValid takes a string (kind) and checks if it's a valid resource
-func (t *thirdPartyResourceDataMapper) ResourceIsValid(resource string) bool {
+func (t *thirdPartyResourceDataMapper) ResourceIsValid(resource unversioned.GroupVersionResource) bool {
 	return t.isThirdPartyResource(resource) || t.mapper.ResourceIsValid(resource)
 }
 
