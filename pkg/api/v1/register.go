@@ -31,16 +31,16 @@ var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1
 // Codec encodes internal objects to the v1 scheme
 var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion)
 
-func AddToScheme() {
+func AddToScheme(scheme *runtime.Scheme) {
 	// Add the API to Scheme.
-	addKnownTypes()
-	addConversionFuncs()
-	addDefaultingFuncs()
+	addKnownTypes(scheme)
+	addConversionFuncs(scheme)
+	addDefaultingFuncs(scheme)
 }
 
 // Adds the list of known types to api.Scheme.
-func addKnownTypes() {
-	api.Scheme.AddKnownTypes(SchemeGroupVersion,
+func addKnownTypes(scheme *runtime.Scheme) {
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Pod{},
 		&PodList{},
 		&PodStatusResult{},
@@ -86,7 +86,7 @@ func addKnownTypes() {
 	)
 
 	// Add common types
-	api.Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.Status{})
+	scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.Status{})
 }
 
 func (obj *Pod) GetObjectKind() unversioned.ObjectKind                       { return &obj.TypeMeta }

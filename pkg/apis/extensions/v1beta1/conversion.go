@@ -23,12 +23,13 @@ import (
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
-func addConversionFuncs() {
+func addConversionFuncs(scheme *runtime.Scheme) {
 	// Add non-generated conversion functions
-	err := api.Scheme.AddConversionFuncs(
+	err := scheme.AddConversionFuncs(
 		convert_api_PodSpec_To_v1_PodSpec,
 		convert_v1_PodSpec_To_api_PodSpec,
 		convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec,

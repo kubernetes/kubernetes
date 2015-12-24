@@ -17,12 +17,12 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func addDefaultingFuncs() {
-	api.Scheme.AddDefaultingFuncs(
+func addDefaultingFuncs(scheme *runtime.Scheme) {
+	scheme.AddDefaultingFuncs(
 		func(obj *KubeProxyConfiguration) {
 			if obj.BindAddress == "" {
 				obj.BindAddress = "0.0.0.0"

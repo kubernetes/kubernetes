@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 const (
@@ -32,9 +33,9 @@ const (
 	mirrorAnnotationValue_1_0 = "mirror"
 )
 
-func addConversionFuncs() {
+func addConversionFuncs(scheme *runtime.Scheme) {
 	// Add non-generated conversion functions
-	err := api.Scheme.AddConversionFuncs(
+	err := scheme.AddConversionFuncs(
 		convert_api_Pod_To_v1_Pod,
 		convert_api_PodSpec_To_v1_PodSpec,
 		convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
