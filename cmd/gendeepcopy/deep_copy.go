@@ -94,7 +94,10 @@ func main() {
 
 	data := new(bytes.Buffer)
 
-	gv := unversioned.ParseGroupVersionOrDie(*groupVersion)
+	gv, err := unversioned.ParseGroupVersion(*groupVersion)
+	if err != nil {
+		glog.Fatalf("Error parsing groupversion %v: %v", *groupVersion, err)
+	}
 
 	registerTo := destScheme(gv)
 	var pkgname string
@@ -108,7 +111,7 @@ func main() {
 		pkgname = gv.Version
 	}
 
-	_, err := data.WriteString(fmt.Sprintf("package %s\n", pkgname))
+	_, err = data.WriteString(fmt.Sprintf("package %s\n", pkgname))
 	if err != nil {
 		glog.Fatalf("Error while writing package line: %v", err)
 	}

@@ -84,9 +84,12 @@ func main() {
 
 	data := new(bytes.Buffer)
 
-	gv := unversioned.ParseGroupVersionOrDie(*groupVersion)
+	gv, err := unversioned.ParseGroupVersion(*groupVersion)
+	if err != nil {
+		glog.Fatalf("Error parsing groupversion %v: %v", *groupVersion, err)
+	}
 
-	_, err := data.WriteString(fmt.Sprintf("package %v\n", gv.Version))
+	_, err = data.WriteString(fmt.Sprintf("package %v\n", gv.Version))
 	if err != nil {
 		glog.Fatalf("Error while writing package line: %v", err)
 	}
