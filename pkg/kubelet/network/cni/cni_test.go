@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // The temp dir where test plugins will be stored.
@@ -156,7 +157,7 @@ func newTestDockerManager() (*dockertools.DockerManager, *dockertools.FakeDocker
 		proberesults.NewManager(),
 		containerRefManager,
 		&cadvisorapi.MachineInfo{},
-		dockertools.PodInfraContainerImage,
+		kubetypes.PodInfraContainerImage,
 		0, 0, "",
 		kubecontainer.FakeOS{},
 		networkPlugin,

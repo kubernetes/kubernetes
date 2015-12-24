@@ -66,8 +66,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
 
@@ -132,19 +132,19 @@ func (plugin *execNetworkPlugin) validate() error {
 	return nil
 }
 
-func (plugin *execNetworkPlugin) SetUpPod(namespace string, name string, id kubetypes.DockerID) error {
+func (plugin *execNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.DockerID) error {
 	out, err := utilexec.New().Command(plugin.getExecutable(), setUpCmd, namespace, name, string(id)).CombinedOutput()
 	glog.V(5).Infof("SetUpPod 'exec' network plugin output: %s, %v", string(out), err)
 	return err
 }
 
-func (plugin *execNetworkPlugin) TearDownPod(namespace string, name string, id kubetypes.DockerID) error {
+func (plugin *execNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.DockerID) error {
 	out, err := utilexec.New().Command(plugin.getExecutable(), tearDownCmd, namespace, name, string(id)).CombinedOutput()
 	glog.V(5).Infof("TearDownPod 'exec' network plugin output: %s, %v", string(out), err)
 	return err
 }
 
-func (plugin *execNetworkPlugin) Status(namespace string, name string, id kubetypes.DockerID) (*network.PodNetworkStatus, error) {
+func (plugin *execNetworkPlugin) Status(namespace string, name string, id kubecontainer.DockerID) (*network.PodNetworkStatus, error) {
 	out, err := utilexec.New().Command(plugin.getExecutable(), statusCmd, namespace, name, string(id)).CombinedOutput()
 	glog.V(5).Infof("Status 'exec' network plugin output: %s, %v", string(out), err)
 	if err != nil {
