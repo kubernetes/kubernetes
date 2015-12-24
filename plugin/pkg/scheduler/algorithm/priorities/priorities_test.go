@@ -138,9 +138,9 @@ func TestZeroRequest(t *testing.T) {
 
 		pris := []algorithm.PriorityConfig{{Function: LeastRequestedPriority, Weight: 1}, {Function: BalancedResourceAllocation, Weight: 1}, {Function: NewSelectorSpreadPriority(algorithm.FakeServiceLister([]api.Service{}), algorithm.FakeControllerLister([]api.ReplicationController{})), Weight: 1}}
 		extenders := []algorithm.SchedulerExtender{}
-		c := scheduler.NewScheduleCache(2, len(pris), len(extenders))
+		c := scheduler.NewResultChannel(2, len(pris), len(extenders))
 
-		go func(index int, c *scheduler.ScheduleCache) {
+		go func(index int, c *scheduler.ResultChannel) {
 			for ix := range nodesMap[index] {
 				c.Insert(&nodesMap[index][ix])
 			}

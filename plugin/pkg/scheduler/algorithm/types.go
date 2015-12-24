@@ -24,7 +24,11 @@ import (
 // FitPredicate is a function that indicates if a pod fits into an existing node.
 type FitPredicate func(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error)
 
-type PriorityFunction func(pod *api.Pod, machineToPods map[string][]*api.Pod, podLister PodLister, nodes chan *api.Node) (schedulerapi.HostPriorityList, error)
+//change 'nodeLister NodeLister' to 'nodes <-chan *api.Node'
+//every caller can read the nodes channel to get fit nodes
+//don't worry the channel blocked, it will be closed until
+//there is no data
+type PriorityFunction func(pod *api.Pod, machineToPods map[string][]*api.Pod, podLister PodLister, nodes <-chan *api.Node) (schedulerapi.HostPriorityList, error)
 
 type PriorityConfig struct {
 	Function PriorityFunction

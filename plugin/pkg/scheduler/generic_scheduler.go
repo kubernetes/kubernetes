@@ -44,17 +44,22 @@ type PriorityResult struct {
 	PrioritizeNodes schedulerapi.HostPriorityList
 }
 
-type ScheduleCache struct {
-	//channel size
+//parallel for findNodesThatFit and PrioritizeNodes
+//pass the fits results to priorities via async channel
+type ResultChannel struct {
+	//channel array size
 	Size int
-	Sub  []chan *api.Node
+	//every priorityFunc/extenders read its own channel to get fit node
+	Sub []chan *api.Node
 
+	//output for findNodesThatFit
 	FResult FitResult
+	//output for PrioritizeNodes
 	PResult PriorityResult
 }
 
-func NewScheduleCache(nodeLen, priLen, extenderLen int) *ScheduleCache {
-	sCache := &ScheduleCache{
+func NewResultChannel(nodeLen, priLen, extenderLen int) *ResultChannel {
+	c := &ResultChannel{
 		Size: priLen,
 		FResult: FitResult{
 			Err:              make(chan error),
@@ -66,31 +71,33 @@ func NewScheduleCache(nodeLen, priLen, extenderLen int) *ScheduleCache {
 		},
 	}
 
-	sCache.FResult.FailedPredicates = FailedPredicateMap{}
-	sCache.PResult.PrioritizeNodes = schedulerapi.HostPriorityList{}
+	c.FResult.FailedPredicates = FailedPredicateMap{}
+	c.PResult.PrioritizeNodes = schedulerapi.HostPriorityList{}
 
 	if extenderLen != 0 {
-		sCache.Size += 1
+		c.Size += 1
 	}
 
-	if sCache.Size == 0 {
-		sCache.Size = 1
+	if c.Size == 0 {
+		c.Size = 1
 	}
 
-	for i := 0; i < sCache.Size; i++ {
-		sCache.Sub = append(sCache.Sub, make(chan *api.Node, nodeLen))
+	for i := 0; i < c.Size; i++ {
+		c.Sub = append(c.Sub, make(chan *api.Node, nodeLen))
 	}
 
-	return sCache
+	return c
 }
 
-func (c *ScheduleCache) Insert(a *api.Node) {
+//use for findNodesThatFit to insert the fited node.
+func (c *ResultChannel) Insert(a *api.Node) {
 	for _, s := range c.Sub {
 		s <- a
 	}
 }
 
-func (c *ScheduleCache) Close() {
+//close util findNodesThatFit finsh
+func (c *ResultChannel) Close() {
 	for _, s := range c.Sub {
 		close(s)
 	}
@@ -139,7 +146,7 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 		return "", err
 	}
 
-	c := NewScheduleCache(len(nodes.Items), len(g.prioritizers), len(g.extenders))
+	c := NewResultChannel(len(nodes.Items), len(g.prioritizers), len(g.extenders))
 
 	go findNodesThatFit(pod, machinesToPods, g.predicates, nodes, g.extenders, c)
 
@@ -204,7 +211,7 @@ func testNodeFit(pod *api.Pod, node *api.Node, machineToPods map[string][]*api.P
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
 // Each node is passed through the predicate functions to determine if it is a fit
-func findNodesThatFit(pod *api.Pod, machineToPods map[string][]*api.Pod, predicateFuncs map[string]algorithm.FitPredicate, nodes api.NodeList, extenders []algorithm.SchedulerExtender, c *ScheduleCache) {
+func findNodesThatFit(pod *api.Pod, machineToPods map[string][]*api.Pod, predicateFuncs map[string]algorithm.FitPredicate, nodes api.NodeList, extenders []algorithm.SchedulerExtender, c *ResultChannel) {
 	if len(extenders) != 0 {
 		for _, extender := range extenders {
 			filteredList, err := extender.Filter(pod, &nodes)
@@ -248,7 +255,7 @@ func findNodesThatFit(pod *api.Pod, machineToPods map[string][]*api.Pod, predica
 // Each priority function can also have its own weight
 // The node scores returned by the priority function are multiplied by the weights to get weighted scores
 // All scores are finally combined (added) to get the total weighted scores of all nodes
-func PrioritizeNodes(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, priorityConfigs []algorithm.PriorityConfig, extenders []algorithm.SchedulerExtender, c *ScheduleCache) {
+func PrioritizeNodes(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, priorityConfigs []algorithm.PriorityConfig, extenders []algorithm.SchedulerExtender, c *ResultChannel) {
 
 	// If no priority configs are provided, then the EqualPriority function is applied
 	// This is required to generate the priority list in the required format
@@ -341,7 +348,7 @@ func getBestHosts(list schedulerapi.HostPriorityList) []string {
 }
 
 // EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
-func EqualPriority(_ *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes chan *api.Node) (schedulerapi.HostPriorityList, error) {
+func EqualPriority(_ *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes <-chan *api.Node) (schedulerapi.HostPriorityList, error) {
 	result := []schedulerapi.HostPriority{}
 
 	for node := range nodes {

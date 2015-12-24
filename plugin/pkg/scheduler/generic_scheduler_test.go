@@ -44,7 +44,7 @@ func hasNoPodsPredicate(pod *api.Pod, existingPods []*api.Pod, node string) (boo
 	return len(existingPods) == 0, nil
 }
 
-func numericPriority(pod *api.Pod, machineToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes chan *api.Node) (schedulerapi.HostPriorityList, error) {
+func numericPriority(pod *api.Pod, machineToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes <-chan *api.Node) (schedulerapi.HostPriorityList, error) {
 	result := []schedulerapi.HostPriority{}
 
 	for node := range nodes {
@@ -60,7 +60,7 @@ func numericPriority(pod *api.Pod, machineToPods map[string][]*api.Pod, podListe
 	return result, nil
 }
 
-func reverseNumericPriority(pod *api.Pod, machineToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes chan *api.Node) (schedulerapi.HostPriorityList, error) {
+func reverseNumericPriority(pod *api.Pod, machineToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes <-chan *api.Node) (schedulerapi.HostPriorityList, error) {
 	var maxScore float64
 	minScore := math.MaxFloat64
 	reverseResult := []schedulerapi.HostPriority{}
@@ -269,7 +269,7 @@ func TestGenericScheduler(t *testing.T) {
 }
 
 func TestFindFitAllError(t *testing.T) {
-	sCache := &ScheduleCache{
+	c := &ResultChannel{
 		Size: 1,
 		FResult: FitResult{
 			Err:              make(chan error),
@@ -280,8 +280,8 @@ func TestFindFitAllError(t *testing.T) {
 			PrioritizeNodes: schedulerapi.HostPriorityList{},
 		},
 	}
-	for i := 0; i < sCache.Size; i++ {
-		sCache.Sub = append(sCache.Sub, make(chan *api.Node, 3))
+	for i := 0; i < c.Size; i++ {
+		c.Sub = append(c.Sub, make(chan *api.Node, 3))
 	}
 	nodes := []string{"3", "2", "1"}
 	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "false": falsePredicate}
@@ -291,31 +291,31 @@ func TestFindFitAllError(t *testing.T) {
 		"1": {},
 	}
 
-	go findNodesThatFit(&api.Pod{}, machineToPods, predicates, makeNodeList(nodes), nil, sCache)
+	go findNodesThatFit(&api.Pod{}, machineToPods, predicates, makeNodeList(nodes), nil, c)
 
 	flag := true
 	for flag {
 		select {
-		case err := <-sCache.FResult.Err:
+		case err := <-c.FResult.Err:
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 				flag = false
 			}
-		case _, ok := <-sCache.Sub[0]:
+		case _, ok := <-c.Sub[0]:
 			if !ok {
 				flag = false
 			}
 		}
 	}
 
-	if len(sCache.FResult.FailedPredicates) != len(nodes) {
-		t.Errorf("unexpected failed predicate map: %v", sCache.FResult.FailedPredicates)
+	if len(c.FResult.FailedPredicates) != len(nodes) {
+		t.Errorf("unexpected failed predicate map: %v", c.FResult.FailedPredicates)
 	}
 
 	for _, node := range nodes {
-		failures, found := sCache.FResult.FailedPredicates[node]
+		failures, found := c.FResult.FailedPredicates[node]
 		if !found {
-			t.Errorf("failed to find node: %s in %v", node, sCache.FResult.FailedPredicates)
+			t.Errorf("failed to find node: %s in %v", node, c.FResult.FailedPredicates)
 		}
 		if len(failures) != 1 || !failures.Has("false") {
 			t.Errorf("unexpected failures: %v", failures)
@@ -324,7 +324,7 @@ func TestFindFitAllError(t *testing.T) {
 }
 
 func TestFindFitSomeError(t *testing.T) {
-	sCache := &ScheduleCache{
+	c := &ResultChannel{
 		Size: 1,
 		FResult: FitResult{
 			Err:              make(chan error),
@@ -335,8 +335,8 @@ func TestFindFitSomeError(t *testing.T) {
 			PrioritizeNodes: schedulerapi.HostPriorityList{},
 		},
 	}
-	for i := 0; i < sCache.Size; i++ {
-		sCache.Sub = append(sCache.Sub, make(chan *api.Node, 3))
+	for i := 0; i < c.Size; i++ {
+		c.Sub = append(c.Sub, make(chan *api.Node, 3))
 	}
 	nodes := []string{"3", "2", "1"}
 	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "match": matchesPredicate}
@@ -347,34 +347,34 @@ func TestFindFitSomeError(t *testing.T) {
 		"1": {pod},
 	}
 
-	go findNodesThatFit(pod, machineToPods, predicates, makeNodeList(nodes), nil, sCache)
+	go findNodesThatFit(pod, machineToPods, predicates, makeNodeList(nodes), nil, c)
 
 	flag := true
 	for flag {
 		select {
-		case err := <-sCache.FResult.Err:
+		case err := <-c.FResult.Err:
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 				flag = false
 			}
-		case _, ok := <-sCache.Sub[0]:
+		case _, ok := <-c.Sub[0]:
 			if !ok {
 				flag = false
 			}
 		}
 	}
 
-	if len(sCache.FResult.FailedPredicates) != (len(nodes) - 1) {
-		t.Errorf("unexpected failed predicate map: %v", sCache.FResult.FailedPredicates)
+	if len(c.FResult.FailedPredicates) != (len(nodes) - 1) {
+		t.Errorf("unexpected failed predicate map: %v", c.FResult.FailedPredicates)
 	}
 
 	for _, node := range nodes {
 		if node == pod.Name {
 			continue
 		}
-		failures, found := sCache.FResult.FailedPredicates[node]
+		failures, found := c.FResult.FailedPredicates[node]
 		if !found {
-			t.Errorf("failed to find node: %s in %v", node, sCache.FResult.FailedPredicates)
+			t.Errorf("failed to find node: %s in %v", node, c.FResult.FailedPredicates)
 		}
 		if len(failures) != 1 || !failures.Has("match") {
 			t.Errorf("unexpected failures: %v", failures)

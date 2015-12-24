@@ -114,7 +114,7 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) sc
 // It calculates the percentage of memory and CPU requested by pods scheduled on the node, and prioritizes
 // based on the minimum of the average of the fraction of requested to capacity.
 // Details: cpu((capacity - sum(requested)) * 10 / capacity) + memory((capacity - sum(requested)) * 10 / capacity) / 2
-func LeastRequestedPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes chan *api.Node) (schedulerapi.HostPriorityList, error) {
+func LeastRequestedPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes <-chan *api.Node) (schedulerapi.HostPriorityList, error) {
 
 	list := schedulerapi.HostPriorityList{}
 	for node := range nodes {
@@ -139,7 +139,7 @@ func NewNodeLabelPriority(label string, presence bool) algorithm.PriorityFunctio
 // CalculateNodeLabelPriority checks whether a particular label exists on a node or not, regardless of its value.
 // If presence is true, prioritizes nodes that have the specified label, regardless of value.
 // If presence is false, prioritizes nodes that do not have the specified label.
-func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes chan *api.Node) (schedulerapi.HostPriorityList, error) {
+func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes <-chan *api.Node) (schedulerapi.HostPriorityList, error) {
 	var score int
 
 	labeledNodes := map[string]bool{}
@@ -168,7 +168,7 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, machines
 // close the two metrics are to each other.
 // Detail: score = 10 - abs(cpuFraction-memoryFraction)*10. The algorithm is partly inspired by:
 // "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-func BalancedResourceAllocation(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes chan *api.Node) (schedulerapi.HostPriorityList, error) {
+func BalancedResourceAllocation(pod *api.Pod, machinesToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes <-chan *api.Node) (schedulerapi.HostPriorityList, error) {
 
 	list := schedulerapi.HostPriorityList{}
 	for node := range nodes {
