@@ -144,18 +144,11 @@ func (c *$.type|privatePlural$) Get(name string) (result *$.type|raw$, err error
 var deleteTemplate = `
 // Delete takes name of the $.type|private$ and deletes it. Returns an error if one occurs.
 func (c *$.type|privatePlural$) Delete(name string, options *$.apiDeleteOptions|raw$) error {
-	if options == nil {
-		return c.client.Delete().Namespace(c.ns).Resource("$.type|privatePlural$").Name(name).Do().Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
-	if err != nil {
-		return err
-	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("$.type|privatePlural$").
 		Name(name).
-		Body(body).
+		Body(options).
 		Do().
 		Error()
 }
@@ -164,23 +157,11 @@ func (c *$.type|privatePlural$) Delete(name string, options *$.apiDeleteOptions|
 var deleteCollectionTemplate = `
 // DeleteCollection deletes a collection of objects.
 func (c *$.type|privatePlural$) DeleteCollection(options *$.apiDeleteOptions|raw$, listOptions $.apiListOptions|raw$) error {
-	if options == nil {
-		return c.client.Delete().
-			NamespaceIfScoped(c.ns, len(c.ns) > 0).
-			Resource("$.type|privatePlural$").
-			VersionedParams(&listOptions, api.Scheme).
-			Do().
-			Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
-	if err != nil {
-		return err
-	}
 	return c.client.Delete().
 		NamespaceIfScoped(c.ns, len(c.ns) > 0).
 		Resource("$.type|privatePlural$").
 		VersionedParams(&listOptions, api.Scheme).
-		Body(body).
+		Body(options).
 		Do().
 		Error()
 }
