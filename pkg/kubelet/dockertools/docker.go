@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,7 +39,7 @@ import (
 
 const (
 	PodInfraContainerName  = leaky.PodInfraContainerName
-	DockerPrefix           = "docker://"
+	DockerPrefix = "docker://"
 	PodInfraContainerImage = "gcr.io/google_containers/pause:2.0"
 	LogSuffix              = "log"
 )
@@ -54,7 +54,7 @@ const (
 	quotaPeriod = 100000
 )
 
-// DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
+// DockerInterface is an abstract interface for testability. It abstracts the interface of docker.Client.
 type DockerInterface interface {
 	ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error)
 	InspectContainer(id string) (*docker.Container, error)
@@ -82,7 +82,7 @@ type KubeletContainerName struct {
 	ContainerName string
 }
 
-// DockerPuller is an abstract interface for testability.  It abstracts image pull operations.
+// DockerPuller is an abstract interface for testability. It abstracts image pull operations.
 type DockerPuller interface {
 	Pull(image string, secrets []api.Secret) error
 	IsImagePresent(image string) (bool, error)
@@ -165,7 +165,7 @@ func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 		// Image spec: [<registry>/]<repository>/<image>[:<version] so we count '/'
 		explicitRegistry := (strings.Count(image, "/") == 2)
 		// Hack, look for a private registry, and decorate the error with the lack of
-		// credentials.  This is heuristic, and really probably could be done better
+		// credentials. This is heuristic, and really probably could be done better
 		// by talking to the registry API directly from the kubelet here.
 		if explicitRegistry {
 			return fmt.Errorf("image pull failed for %s, this may be because there are no credentials on this request.  details: (%v)", image, err)
@@ -236,7 +236,7 @@ func ParseDockerName(name string) (dockerName *KubeletContainerName, hash uint64
 		return nil, 0, err
 	}
 	if len(parts) < 6 {
-		// We have at least 5 fields.  We may have more in the future.
+		// We have at least 5 fields. We may have more in the future.
 		// Anything with less fields than this is not something we can
 		// manage.
 		glog.Warningf("found a container with the %q prefix, but too few fields (%d): %q", containerNamePrefix, len(parts), name)
@@ -289,8 +289,8 @@ func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 // milliCPUToQuota converts milliCPU to CFS quota and period values
 func milliCPUToQuota(milliCPU int64) (quota int64, period int64) {
 	// CFS quota is measured in two values:
-	//  - cfs_period_us=100ms (the amount of time to measure usage across)
-	//  - cfs_quota=20ms (the amount of cpu time allowed to be used across a period)
+	// - cfs_period_us=100ms (the amount of time to measure usage across)
+	// - cfs_quota=20ms (the amount of cpu time allowed to be used across a period)
 	// so in the above example, you are limited to 20% of a single CPU
 	// for multi-cpu environments, you just scale equivalent amounts
 

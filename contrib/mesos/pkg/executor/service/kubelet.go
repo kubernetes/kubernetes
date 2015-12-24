@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,7 +27,7 @@ import (
 // executor by closing kubeletDone before entering blocking state.
 type executorKubelet struct {
 	*kubelet.Kubelet
-	kubeletDone  chan<- struct{} // closed once kubelet.Run() returns
+	kubeletDone chan<- struct{} // closed once kubelet.Run() returns
 	executorDone <-chan struct{} // closed when executor terminates
 }
 
@@ -39,7 +39,7 @@ func (kl *executorKubelet) Run(mergedUpdates <-chan kubetypes.PodUpdate) {
 		// Otherwise, KubeletExecutorServer.runKubelet will.
 		close(kl.kubeletDone)
 		util.HandleCrash()
-		log.Infoln("kubelet run terminated") //TODO(jdef) turn down verbosity
+		log.Infoln("kubelet run terminated") // TODO(jdef) turn down verbosity
 		// important: never return! this is in our contract
 		select {}
 	}()
@@ -77,7 +77,7 @@ func (kl *executorKubelet) Run(mergedUpdates <-chan kubetypes.PodUpdate) {
 	// us going forward, time will tell.
 	util.Until(func() { kl.Kubelet.Run(closableUpdates) }, 0, kl.executorDone)
 
-	//TODO(jdef) revisit this if/when executor failover lands
+	// TODO(jdef) revisit this if/when executor failover lands
 	// Force kubelet to delete all pods.
 	kl.HandlePodDeletions(kl.GetPods())
 }

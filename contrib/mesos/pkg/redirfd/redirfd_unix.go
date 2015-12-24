@@ -7,7 +7,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,12 +27,12 @@ import (
 type RedirectMode int
 
 const (
-	Read           RedirectMode = iota // open file for reading
-	Write                              // open file for writing, truncating if it exists
-	Update                             // open file for read & write
-	Append                             // open file for append, create if it does not exist
-	AppendExisting                     // open file for append, do not create if it does not already exist
-	WriteNew                           // open file for writing, creating it, failing if it already exists
+	Read RedirectMode = iota // open file for reading
+	Write // open file for writing, truncating if it exists
+	Update // open file for read & write
+	Append // open file for append, create if it does not exist
+	AppendExisting // open file for append, do not create if it does not already exist
+	WriteNew // open file for writing, creating it, failing if it already exists
 )
 
 // see https://github.com/skarnet/execline/blob/master/src/execline/redirfd.c

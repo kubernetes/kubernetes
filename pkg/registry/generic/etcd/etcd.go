@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -54,7 +54,7 @@ import (
 //
 // TODO: make the default exposed methods exactly match a generic RESTStorage
 // TODO: because all aspects of etcd have been removed it should really
-//       just be called a registry implementation.
+// just be called a registry implementation.
 type Etcd struct {
 	// Called to make a new object, should return e.g., &api.Pod{}
 	NewFunc func() runtime.Object

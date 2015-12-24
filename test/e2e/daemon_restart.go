@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,9 +40,9 @@ import (
 // This test primarily checks 2 things:
 // 1. Daemons restart automatically within some sane time (10m).
 // 2. They don't take abnormal actions when restarted in the steady state.
-//	- Controller manager shouldn't overshoot replicas
-//	- Kubelet shouldn't restart containers
-//	- Scheduler should continue assigning hosts to new pods
+// 	- Controller manager shouldn't overshoot replicas
+// 	- Kubelet shouldn't restart containers
+// 	- Scheduler should continue assigning hosts to new pods
 
 const (
 	restartPollInterval = 5 * time.Second

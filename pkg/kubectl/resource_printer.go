@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -368,7 +368,7 @@ func (h *HumanReadablePrinter) Handler(columns []string, printFunc interface{}) 
 // validatePrintHandlerFunc validates print handler signature.
 // printFunc is the function that will be called to print an object.
 // It must be of the following type:
-//  func printFunc(object ObjectType, w io.Writer, options PrintOptions) error
+// func printFunc(object ObjectType, w io.Writer, options PrintOptions) error
 // where ObjectType is the type of the object that will be printed.
 func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value) error {
 	if printFunc.Kind() != reflect.Func {
@@ -1477,7 +1477,7 @@ func appendLabels(itemLabels map[string]string, columnLabels []string) string {
 	return buffer.String()
 }
 
-// Append a set of tabs for each label column.  We need this in the case where
+// Append a set of tabs for each label column. We need this in the case where
 // we have extra lines so that the tabwriter will still line things up.
 func appendLabelTabs(columnLabels []string) string {
 	var buffer bytes.Buffer
@@ -1635,7 +1635,7 @@ func tabbedString(f func(io.Writer) error) (string, error) {
 // TODO: how to document this for users?
 //
 // index returns the result of indexing its first argument by the following
-// arguments.  Thus "index x 1 2 3" is, in Go syntax, x[1][2][3]. Each
+// arguments. Thus "index x 1 2 3" is, in Go syntax, x[1][2][3]. Each
 // indexed item must be a map, slice, or array.
 func exists(item interface{}, indices ...interface{}) bool {
 	v := reflect.ValueOf(item)

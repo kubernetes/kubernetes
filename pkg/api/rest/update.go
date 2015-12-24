@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -37,16 +37,16 @@ type RESTUpdateStrategy interface {
 	// AllowCreateOnUpdate returns true if the object can be created by a PUT.
 	AllowCreateOnUpdate() bool
 	// PrepareForUpdate is invoked on update before validation to normalize
-	// the object.  For example: remove fields that are not to be persisted,
-	// sort order-insensitive list fields, etc.  This should not remove fields
+	// the object. For example: remove fields that are not to be persisted,
+	// sort order-insensitive list fields, etc. This should not remove fields
 	// whose presence would be considered a validation error.
 	PrepareForUpdate(obj, old runtime.Object)
 	// ValidateUpdate is invoked after default fields in the object have been
-	// filled in before the object is persisted.  This method should not mutate
+	// filled in before the object is persisted. This method should not mutate
 	// the object.
 	ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList
 	// Canonicalize is invoked after validation has succeeded but before the
-	// object has been persisted.  This method may mutate the object.
+	// object has been persisted. This method may mutate the object.
 	Canonicalize(obj runtime.Object)
 	// AllowUnconditionalUpdate returns true if the object can be updated
 	// unconditionally (irrespective of the latest resource version), when

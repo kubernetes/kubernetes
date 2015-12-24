@@ -9,12 +9,12 @@ import "a"
 // ----------------------------------------------------------------------------
 // Basic declarations
 
-const Pi = 3.14   // Pi
-var MaxInt int    // MaxInt
-type T struct{}   // T
-var V T           // v
+const Pi = 3.14 // Pi
+var MaxInt int // MaxInt
+type T struct{} // T
+var V T // v
 func F(x int) int {} // F
-func (x *T) M()   {} // M
+func (x *T) M() {} // M
 
 // Corner cases: association with (presumed) predeclared types
 

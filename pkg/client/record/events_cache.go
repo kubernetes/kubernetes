@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -289,9 +289,9 @@ func (e *eventLogger) lastEventObservationFromCache(key string) eventLog {
 	return eventLog{}
 }
 
-// EventCorrelator processes all incoming events and performs analysis to avoid overwhelming the system.  It can filter all
-// incoming events to see if the event should be filtered from further processing.  It can aggregate similar events that occur
-// frequently to protect the system from spamming events that are difficult for users to distinguish.  It performs de-duplication
+// EventCorrelator processes all incoming events and performs analysis to avoid overwhelming the system. It can filter all
+// incoming events to see if the event should be filtered from further processing. It can aggregate similar events that occur
+// frequently to protect the system from spamming events that are difficult for users to distinguish. It performs de-duplication
 // to ensure events that are observed multiple times are compacted into a single event with increasing counts.
 type EventCorrelator struct {
 	// the function to filter the event
@@ -318,14 +318,14 @@ type EventCorrelateResult struct {
 // prior to interacting with the API server to record the event.
 //
 // The default behavior is as follows:
-//   * No events are filtered from being recorded
-//   * Aggregation is performed if a similar event is recorded 10 times in a
-//     in a 10 minute rolling interval.  A similar event is an event that varies only by
-//     the Event.Message field.  Rather than recording the precise event, aggregation
-//     will create a new event whose message reports that it has combined events with
-//     the same reason.
-//   * Events are incrementally counted if the exact same event is encountered multiple
-//     times.
+// * No events are filtered from being recorded
+// * Aggregation is performed if a similar event is recorded 10 times in a
+// in a 10 minute rolling interval. A similar event is an event that varies only by
+// the Event.Message field. Rather than recording the precise event, aggregation
+// will create a new event whose message reports that it has combined events with
+// the same reason.
+// * Events are incrementally counted if the exact same event is encountered multiple
+// times.
 func NewEventCorrelator(clock util.Clock) *EventCorrelator {
 	cacheSize := maxLruCacheEntries
 	return &EventCorrelator{

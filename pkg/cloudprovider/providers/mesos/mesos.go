@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -190,7 +190,7 @@ func ipAddress(name string) (net.IP, error) {
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (c *MesosCloud) ExternalID(instance string) (string, error) {
-	//TODO(jdef) use a timeout here? 15s?
+	// TODO(jdef) use a timeout here? 15s?
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
@@ -217,7 +217,7 @@ func (c *MesosCloud) InstanceID(name string) (string, error) {
 }
 
 func (c *MesosCloud) listNodes() (map[string]*slaveNode, error) {
-	//TODO(jdef) use a timeout here? 15s?
+	// TODO(jdef) use a timeout here? 15s?
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 

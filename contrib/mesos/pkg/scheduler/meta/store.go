@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,7 @@ package meta
 
 // keys for things that we store
 const (
-	//TODO(jdef) this should also be a format instead of a fixed path
+	// TODO(jdef) this should also be a format instead of a fixed path
 	FrameworkIDKey        = "/mesos/k8sm/frameworkid"
 	DefaultElectionFormat = "/mesos/k8sm/framework/%s/leader"
 )

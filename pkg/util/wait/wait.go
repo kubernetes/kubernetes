@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,7 +23,7 @@ import (
 )
 
 // Jitter returns a time.Duration between duration and duration + maxFactor * duration,
-// to allow clients to avoid converging on periodic behavior.  If maxFactor is 0.0, a
+// to allow clients to avoid converging on periodic behavior. If maxFactor is 0.0, a
 // suggested default value will be chosen.
 func Jitter(duration time.Duration, maxFactor float64) time.Duration {
 	if maxFactor <= 0.0 {
@@ -82,7 +82,7 @@ func PollInfinite(interval time.Duration, condition ConditionFunc) error {
 type WaitFunc func(done <-chan struct{}) <-chan struct{}
 
 // WaitFor gets a channel from wait(), and then invokes fn once for every value
-// placed on the channel and once more when the channel is closed.  If fn
+// placed on the channel and once more when the channel is closed. If fn
 // returns an error the loop ends and that error is returned, and if fn returns
 // true the loop ends and nil is returned. ErrWaitTimeout will be returned if
 // the channel is closed without fn ever returning true.
@@ -107,7 +107,7 @@ func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
 // poller returns a WaitFunc that will send to the channel every
 // interval until timeout has elapsed and then close the channel.
 // Over very short intervals you may receive no ticks before
-// the channel is closed.  If timeout is 0, the channel
+// the channel is closed. If timeout is 0, the channel
 // will never be closed.
 func poller(interval, timeout time.Duration) WaitFunc {
 	return WaitFunc(func(done <-chan struct{}) <-chan struct{} {

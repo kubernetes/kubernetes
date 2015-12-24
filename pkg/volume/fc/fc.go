@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -59,7 +59,7 @@ func (plugin *fcPlugin) CanSupport(spec *volume.Spec) bool {
 	if (spec.Volume != nil && spec.Volume.FC == nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FC == nil) {
 		return false
 	}
-	// TODO:  turn this into a func so CanSupport can be unit tested without
+	// TODO: turn this into a func so CanSupport can be unit tested without
 	// having to make system calls
 	// see if /sys/class/fc_transport is there, which indicates fc is connected
 	_, err := plugin.execCommand("ls", []string{"/sys/class/fc_transport"})

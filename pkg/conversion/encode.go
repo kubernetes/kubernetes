@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,22 +32,22 @@ import (
 // struct. The type must have been registered.
 //
 // Memory/wire format differences:
-//  * Having to keep track of the Kind and Version fields makes tests
-//    very annoying, so the rule is that they are set only in wire format
-//    (json), not when in native (memory) format. This is possible because
-//    both pieces of information are implicit in the go typed object.
-//     * An exception: note that, if there are embedded API objects of known
-//       type, for example, PodList{... Items []Pod ...}, these embedded
-//       objects must be of the same version of the object they are embedded
-//       within, and their Version and Kind must both be empty.
-//     * Note that the exception does not apply to a generic APIObject type
-//       which recursively does Encode()/Decode(), and is capable of
-//       expressing any API object.
-//  * Only versioned objects should be encoded. This means that, if you pass
-//    a native object, Encode will convert it to a versioned object. For
-//    example, an api.Pod will get converted to a v1.Pod. However, if
-//    you pass in an object that's already versioned (v1.Pod), Encode
-//    will not modify it.
+// * Having to keep track of the Kind and Version fields makes tests
+// very annoying, so the rule is that they are set only in wire format
+// (json), not when in native (memory) format. This is possible because
+// both pieces of information are implicit in the go typed object.
+// * An exception: note that, if there are embedded API objects of known
+// type, for example, PodList{... Items []Pod ...}, these embedded
+// objects must be of the same version of the object they are embedded
+// within, and their Version and Kind must both be empty.
+// * Note that the exception does not apply to a generic APIObject type
+// which recursively does Encode()/Decode(), and is capable of
+// expressing any API object.
+// * Only versioned objects should be encoded. This means that, if you pass
+// a native object, Encode will convert it to a versioned object. For
+// example, an api.Pod will get converted to a v1.Pod. However, if
+// you pass in an object that's already versioned (v1.Pod), Encode
+// will not modify it.
 //
 // The purpose of the above complex conversion behavior is to allow us to
 // change the memory format yet not break compatibility with any stored

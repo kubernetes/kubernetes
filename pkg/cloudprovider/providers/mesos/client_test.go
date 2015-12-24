@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,7 +35,7 @@ import (
 
 const (
 	TEST_MASTER_ID   = "master-12345"
-	TEST_MASTER_IP   = 177048842 // 10.141.141.10
+	TEST_MASTER_IP = 177048842 // 10.141.141.10
 	TEST_MASTER_PORT = 5050
 
 	TEST_STATE_JSON = `

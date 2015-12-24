@@ -118,16 +118,16 @@ type embeddedSet map[*namedType]bool
 // reader.lookupType.
 //
 type namedType struct {
-	doc  string       // doc comment for type
-	name string       // type name
+	doc string // doc comment for type
+	name string // type name
 	decl *ast.GenDecl // nil if declaration hasn't been seen yet
 
-	isEmbedded bool        // true if this type is embedded
-	isStruct   bool        // true if this type is a struct
-	embedded   embeddedSet // true if the embedded type is a pointer
+	isEmbedded bool // true if this type is embedded
+	isStruct bool // true if this type is a struct
+	embedded embeddedSet // true if the embedded type is a pointer
 
 	// associated declarations
-	values  []*Value // consts and vars
+	values []*Value // consts and vars
 	funcs   methodSet
 	methods methodSet
 }
@@ -146,19 +146,19 @@ type reader struct {
 	mode Mode
 
 	// package properties
-	doc       string // package documentation, if any
+	doc string // package documentation, if any
 	filenames []string
 	notes     map[string][]*Note
 
 	// declarations
 	imports map[string]int
-	values  []*Value // consts and vars
+	values []*Value // consts and vars
 	types   map[string]*namedType
 	funcs   methodSet
 
 	// support for package-local error type declarations
-	errorDecl bool                 // if set, type "error" was declared locally
-	fixlist   []*ast.InterfaceType // list of interfaces containing anonymous field "error"
+	errorDecl bool // if set, type "error" was declared locally
+	fixlist []*ast.InterfaceType // list of interfaces containing anonymous field "error"
 }
 
 func (r *reader) isVisible(name string) bool {
@@ -237,8 +237,8 @@ func specNames(specs []ast.Spec) []string {
 func (r *reader) readValue(decl *ast.GenDecl) {
 	// determine if decl should be associated with a type
 	// Heuristic: For each typed entry, determine the type name, if any.
-	//            If there is exactly one type name that is sufficiently
-	//            frequent, associate the decl with the respective type.
+	// If there is exactly one type name that is sufficiently
+	// frequent, associate the decl with the respective type.
 	domName := ""
 	domFreq := 0
 	prev := ""
@@ -400,8 +400,8 @@ func (r *reader) readFunc(fun *ast.FuncDecl) {
 }
 
 var (
-	noteMarker    = `([A-Z][A-Z]+)\(([^)]+)\):?`                    // MARKER(uid), MARKER at least 2 chars, uid at least 1 char
-	noteMarkerRx  = regexp.MustCompile(`^[ \t]*` + noteMarker)      // MARKER(uid) at text start
+	noteMarker = `([A-Z][A-Z]+)\(([^)]+)\):?` // MARKER(uid), MARKER at least 2 chars, uid at least 1 char
+	noteMarkerRx = regexp.MustCompile(`^[ \t]*` + noteMarker) // MARKER(uid) at text start
 	noteCommentRx = regexp.MustCompile(`^/[/*][ \t]*` + noteMarker) // MARKER(uid) at comment start
 )
 
@@ -429,7 +429,7 @@ func (r *reader) readNote(list []*ast.Comment) {
 
 // readNotes extracts notes from comments.
 // A note must start at the beginning of a comment with "MARKER(uid):"
-// and is followed by the note body (e.g., "// BUG(gri): fix this").
+// and is followed by the note body (e.g., "//   BUG(gri): fix this").
 // The note ends at the end of the comment group or at the start of
 // another note in the same comment group, whichever comes first.
 //

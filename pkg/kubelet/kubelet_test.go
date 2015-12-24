@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -1180,12 +1180,12 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name            string                 // the name of the test case
-		ns              string                 // the namespace to generate environment for
-		container       *api.Container         // the container to use
-		masterServiceNs string                 // the namespace to read master service info from
-		nilLister       bool                   // whether the lister should be nil
-		expectedEnvs    []kubecontainer.EnvVar // a set of expected environment vars
+		name string // the name of the test case
+		ns string // the namespace to generate environment for
+		container *api.Container // the container to use
+		masterServiceNs string // the namespace to read master service info from
+		nilLister bool // whether the lister should be nil
+		expectedEnvs []kubecontainer.EnvVar // a set of expected environment vars
 	}{
 		{
 			name: "api server = Y, kubelet = Y",
@@ -2766,7 +2766,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 					Status:             api.ConditionTrue,
 					Reason:             "KubeletOutOfDisk",
 					Message:            "out of disk space",
-					LastHeartbeatTime:  unversioned.Time{}, // placeholder
+					LastHeartbeatTime: unversioned.Time{}, // placeholder
 					LastTransitionTime: unversioned.Time{}, // placeholder
 				},
 				{
@@ -2774,7 +2774,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 					Status:             api.ConditionTrue,
 					Reason:             "KubeletReady",
 					Message:            fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  unversioned.Time{}, // placeholder
+					LastHeartbeatTime: unversioned.Time{}, // placeholder
 					LastTransitionTime: unversioned.Time{}, // placeholder
 				},
 			},
@@ -3575,13 +3575,13 @@ func TestMakePortMappings(t *testing.T) {
 						HostPort:      5555,
 					},
 					{
-						Name:          "foo", // Duplicated, should be ignored.
+						Name: "foo", // Duplicated, should be ignored.
 						Protocol:      api.ProtocolUDP,
 						ContainerPort: 888,
 						HostPort:      8888,
 					},
 					{
-						Protocol:      api.ProtocolTCP, // Duplicated, should be ignored.
+						Protocol: api.ProtocolTCP, // Duplicated, should be ignored.
 						ContainerPort: 80,
 						HostPort:      8888,
 					},

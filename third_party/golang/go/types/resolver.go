@@ -17,14 +17,14 @@ import (
 
 // A declInfo describes a package-level const, type, var, or func declaration.
 type declInfo struct {
-	file  *Scope        // scope of file containing this declaration
-	lhs   []*Var        // lhs of n:1 variable declarations, or nil
-	typ   ast.Expr      // type, or nil
-	init  ast.Expr      // init expression, or nil
+	file *Scope // scope of file containing this declaration
+	lhs []*Var // lhs of n:1 variable declarations, or nil
+	typ ast.Expr // type, or nil
+	init ast.Expr // init expression, or nil
 	fdecl *ast.FuncDecl // func declaration, or nil
 
 	deps map[Object]bool // type and init dependencies; lazily allocated
-	mark int             // for dependency analysis
+	mark int // for dependency analysis
 }
 
 // hasInitializer reports whether the declared object has an initialization

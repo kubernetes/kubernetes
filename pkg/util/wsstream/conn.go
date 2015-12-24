@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,10 +39,10 @@ import (
 //
 // Example client session:
 //
-//    CONNECT http://server.com with subprotocol "channel.k8s.io"
-//    WRITE []byte{0, 102, 111, 111, 10} # send "foo\n" on channel 0 (STDIN)
-//    READ  []byte{1, 10}                # receive "\n" on channel 1 (STDOUT)
-//    CLOSE
+// CONNECT http://server.com with subprotocol "channel.k8s.io"
+// WRITE []byte{0, 102, 111, 111, 10} # send "foo\n" on channel 0 (STDIN)
+// READ []byte{1, 10} # receive "\n" on channel 1 (STDOUT)
+// CLOSE
 //
 const channelWebSocketProtocol = "channel.k8s.io"
 
@@ -55,10 +55,10 @@ const channelWebSocketProtocol = "channel.k8s.io"
 //
 // Example client session:
 //
-//    CONNECT http://server.com with subprotocol "base64.channel.k8s.io"
-//    WRITE []byte{48, 90, 109, 57, 118, 67, 103, 111, 61} # send "foo\n" (base64: "Zm9vCgo=") on channel '0' (STDIN)
-//    READ  []byte{49, 67, 103, 61, 61} # receive "\n" (base64: "Cg==") on channel '1' (STDOUT)
-//    CLOSE
+// CONNECT http://server.com with subprotocol "base64.channel.k8s.io"
+// WRITE []byte{48, 90, 109, 57, 118, 67, 103, 111, 61} # send "foo\n" (base64: "Zm9vCgo=") on channel '0' (STDIN)
+// READ []byte{49, 67, 103, 61, 61} # receive "\n" (base64: "Cg==") on channel '1' (STDOUT)
+// CLOSE
 //
 const base64ChannelWebSocketProtocol = "base64.channel.k8s.io"
 

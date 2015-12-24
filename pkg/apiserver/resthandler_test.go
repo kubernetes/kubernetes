@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -135,7 +135,7 @@ type patchTestCase struct {
 
 	// startingPod is used for the first Get
 	startingPod *api.Pod
-	// changedPod is the "destination" pod for the patch.  The test will create a patch from the startingPod to the changedPod
+	// changedPod is the "destination" pod for the patch. The test will create a patch from the startingPod to the changedPod
 	// to use when calling the patch operation
 	changedPod *api.Pod
 	// updatePod is the pod that is used for conflict comparison and returned for the SECOND Get

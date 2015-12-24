@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -45,7 +45,7 @@ func updateTOC(filePath string, mlines mungeLines) (mungeLines, error) {
 // builds table of contents for markdown file
 //
 // First scans for all section headers (lines that begin with "#" but not within code quotes)
-// and builds a table of contents from those.  Assumes bookmarks for those will be
+// and builds a table of contents from those. Assumes bookmarks for those will be
 // like #each-word-in-heading-in-lowercases-with-dashes-instead-of-spaces.
 // builds the ToC.
 

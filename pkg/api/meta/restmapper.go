@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -167,7 +167,7 @@ func KindToResource(kind unversioned.GroupVersionKind, mixedCase bool) (plural, 
 
 // ResourceSingularizer implements RESTMapper
 // It converts a resource name from plural to singular (e.g., from pods to pod)
-// It must have exactly one match and it must match case perfectly.  This is congruent with old functionality
+// It must have exactly one match and it must match case perfectly. This is congruent with old functionality
 func (m *DefaultRESTMapper) ResourceSingularizer(resourceType string) (string, error) {
 	partialResource := unversioned.GroupVersionResource{Resource: resourceType}
 	resource, err := m.ResourceFor(partialResource)
@@ -193,7 +193,7 @@ func (m *DefaultRESTMapper) ResourcesFor(resource unversioned.GroupVersionResour
 
 	ret := []unversioned.GroupVersionResource{}
 	switch {
-	// fully qualified.  Find the exact match
+	// fully qualified. Find the exact match
 	case hasGroup && hasVersion:
 		for plural, singular := range m.pluralToSingular {
 			if singular == resource {
@@ -262,7 +262,7 @@ func (m *DefaultRESTMapper) KindsFor(input unversioned.GroupVersionResource) ([]
 
 	ret := []unversioned.GroupVersionKind{}
 	switch {
-	// fully qualified.  Find the exact match
+	// fully qualified. Find the exact match
 	case hasGroup && hasVersion:
 		kind, exists := m.resourceToKind[resource]
 		if exists {
@@ -306,7 +306,7 @@ func (m *DefaultRESTMapper) KindFor(resource unversioned.GroupVersionResource) (
 		return unversioned.GroupVersionKind{}, err
 	}
 
-	// TODO for each group, choose the most preferred (first) version.  This keeps us consistent with code today.
+	// TODO for each group, choose the most preferred (first) version. This keeps us consistent with code today.
 	// eventually, we'll need a RESTMapper that is aware of what's available server-side and deconflicts that with
 	// user preferences
 	oneKindPerGroup := []unversioned.GroupVersionKind{}

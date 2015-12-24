@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -93,7 +93,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 		client := &testclient.Fake{}
 		controller := New(cloud, client, "test-cluster")
 		controller.init()
-		cloud.Calls = nil     // ignore any cloud calls made in init()
+		cloud.Calls = nil // ignore any cloud calls made in init()
 		client.ClearActions() // ignore any client calls made in init()
 		err, _ := controller.createLoadBalancerIfNeeded(types.NamespacedName{Namespace: "foo", Name: "bar"}, item.service, nil)
 		if !item.expectErr && err != nil {

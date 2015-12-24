@@ -187,7 +187,7 @@ func f() { L: }
 	}
 
 	objects := map[string]ast.ObjKind{
-		"p":   ast.Bad, // not in a scope
+		"p": ast.Bad, // not in a scope
 		"fmt": ast.Bad, // not resolved yet
 		"pi":  ast.Con,
 		"T":   ast.Typ,
@@ -326,7 +326,7 @@ func TestImports(t *testing.T) {
 
 func TestCommentGroups(t *testing.T) {
 	f, err := ParseFile(token.NewFileSet(), "", `
-package p /* 1a */ /* 1b */      /* 1c */ // 1d
+package p /* 1a */ /* 1b */ /* 1c */ // 1d
 /* 2a
 */
 // 2b
@@ -352,7 +352,7 @@ func ExampleCount() {
 		{"/* 3a */", "// 3b", "/* 3c */"},
 		{"// Example from issue 3139"},
 		{"// before & after each rune"},
-		{"// Output:", "// 3", "// 5"},
+		{"// Output:", "//   3", "//   5"},
 	}
 	if len(f.Comments) != len(expected) {
 		t.Fatalf("got %d comment groups; expected %d", len(f.Comments), len(expected))
@@ -424,23 +424,23 @@ package p
 type T struct {
 	/* F1 lead comment */
 	//
-	F1 int  /* F1 */ // line comment
+	F1 int /* F1 */ // line comment
 	// F2 lead
 	// comment
-	F2 int  // F2 line comment
+	F2 int // F2 line comment
 	// f3 lead comment
-	f3 int  // f3 line comment
+	f3 int // f3 line comment
 }
 `, ParseComments)
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkFieldComments(t, f, "T.F1", "/* F1 lead comment *///", "/* F1 */// line comment")
-	checkFieldComments(t, f, "T.F2", "// F2 lead// comment", "// F2 line comment")
-	checkFieldComments(t, f, "T.f3", "// f3 lead comment", "// f3 line comment")
+	checkFieldComments(t, f, "T.F1", "/* F1 lead comment *// /", "/* F1 *//   / line comment")
+	checkFieldComments(t, f, "T.F2", "// F2 lead//   comment", "//   F2 line comment")
+	checkFieldComments(t, f, "T.f3", "// f3 lead comment", "//   f3 line comment")
 	ast.FileExports(f)
-	checkFieldComments(t, f, "T.F1", "/* F1 lead comment *///", "/* F1 */// line comment")
-	checkFieldComments(t, f, "T.F2", "// F2 lead// comment", "// F2 line comment")
+	checkFieldComments(t, f, "T.F1", "/* F1 lead comment *// /", "/* F1 *//   / line comment")
+	checkFieldComments(t, f, "T.F2", "// F2 lead//   comment", "//   F2 line comment")
 	if getField(f, "T.f3") != nil {
 		t.Error("not expected to find T.f3")
 	}
@@ -498,7 +498,7 @@ func TestIssue9979(t *testing.T) {
 // *ast.BadExpr.
 func TestIncompleteSelection(t *testing.T) {
 	for _, src := range []string{
-		"package p; var _ = fmt.",             // at EOF
+		"package p; var _ = fmt.", // at EOF
 		"package p; var _ = fmt.\ntype X int", // not at EOF
 	} {
 		fset := token.NewFileSet()

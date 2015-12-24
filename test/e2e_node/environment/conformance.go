@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Build the binary with `go build conformance.go`, then run the conformance binary on a node candidate.  If compiled
+// Build the binary with `go build conformance.go`, then run the conformance binary on a node candidate. If compiled
 // on a non-linux machine, must be cross compiled for the host.
 package main
 
@@ -41,7 +41,7 @@ var checkFlag = flag.String(
 	"check", "all", "what to check for conformance.  One or more of all,container-runtime,daemons,dns,firewall,kernel")
 
 func init() {
-	// Set this to false to undo util/logs.go settings it to true.  Prevents cadvisor log spam.
+	// Set this to false to undo util/logs.go settings it to true. Prevents cadvisor log spam.
 	// Remove this once util/logs.go stops setting the flag to true.
 	flag.Set("logtostderr", "false")
 	flag.Parse()
@@ -58,7 +58,7 @@ func main() {
 	}
 }
 
-// check returns errors found while checking the provided components.  Will prevent errors to stdout.
+// check returns errors found while checking the provided components. Will prevent errors to stdout.
 func check(options ...string) []error {
 	errs := []error{}
 	for _, c := range options {

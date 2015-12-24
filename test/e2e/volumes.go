@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -344,9 +344,9 @@ var _ = Describe("Volumes [Skipped]", func() {
 		namespace = framework.Namespace
 	})
 
-	////////////////////////////////////////////////////////////////////////
+	// //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   
 	// NFS
-	////////////////////////////////////////////////////////////////////////
+	// //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   
 
 	Describe("NFS", func() {
 		It("should be mountable", func() {
@@ -378,9 +378,9 @@ var _ = Describe("Volumes [Skipped]", func() {
 		})
 	})
 
-	////////////////////////////////////////////////////////////////////////
+	// //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   
 	// Gluster
-	////////////////////////////////////////////////////////////////////////
+	// //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   
 
 	Describe("GlusterFS", func() {
 		It("should be mountable", func() {
@@ -452,9 +452,9 @@ var _ = Describe("Volumes [Skipped]", func() {
 		})
 	})
 
-	////////////////////////////////////////////////////////////////////////
+	// //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   
 	// iSCSI
-	////////////////////////////////////////////////////////////////////////
+	// //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   
 
 	// The test needs privileged containers, which are disabled by default.
 	// Also, make sure that iscsiadm utility and iscsi target kernel modules
@@ -498,9 +498,9 @@ var _ = Describe("Volumes [Skipped]", func() {
 		})
 	})
 
-	////////////////////////////////////////////////////////////////////////
+	// //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   
 	// Ceph RBD
-	////////////////////////////////////////////////////////////////////////
+	// //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   
 
 	Describe("Ceph RBD", func() {
 		It("should be mountable", func() {
@@ -570,9 +570,9 @@ var _ = Describe("Volumes [Skipped]", func() {
 
 		})
 	})
-	////////////////////////////////////////////////////////////////////////
+	// //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   
 	// Ceph
-	////////////////////////////////////////////////////////////////////////
+	// //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   
 
 	Describe("CephFS", func() {
 		It("should be mountable", func() {
@@ -636,9 +636,9 @@ var _ = Describe("Volumes [Skipped]", func() {
 		})
 	})
 
-	////////////////////////////////////////////////////////////////////////
+	// //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   
 	// OpenStack Cinder
-	////////////////////////////////////////////////////////////////////////
+	// //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   //   
 
 	// This test assumes that OpenStack client tools are installed
 	// (/usr/bin/nova, /usr/bin/cinder and /usr/bin/keystone)
@@ -667,10 +667,10 @@ var _ = Describe("Volumes [Skipped]", func() {
 			}()
 
 			// Parse 'id'' from stdout. Expected format:
-			// |     attachments     |                  []                  |
-			// |  availability_zone  |                 nova                 |
+			// | attachments | [] |
+			// | availability_zone | nova |
 			// ...
-			// |          id         | 1d6ff08f-5d1c-41a4-ad72-4ef872cae685 |
+			// | id | 1d6ff08f-5d1c-41a4-ad72-4ef872cae685 |
 			volumeID := ""
 			for _, line := range strings.Split(outputString, "\n") {
 				fields := strings.Fields(line)

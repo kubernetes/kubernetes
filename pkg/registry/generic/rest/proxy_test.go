@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -417,24 +417,24 @@ func TestDefaultProxyTransport(t *testing.T) {
 
 		{
 			name:                "simple path",
-			url:                 "http://test.server:8080/a/test/location",
-			location:            "http://localhost/location",
+			url: "http://test.server:8080/a/test/location",
+			location: "http://localhost/location",
 			expectedScheme:      "http",
 			expectedHost:        "test.server:8080",
 			expectedPathPrepend: "/a/test",
 		},
 		{
 			name:                "empty path",
-			url:                 "http://test.server:8080/a/test/",
-			location:            "http://localhost",
+			url: "http://test.server:8080/a/test/",
+			location: "http://localhost",
 			expectedScheme:      "http",
 			expectedHost:        "test.server:8080",
 			expectedPathPrepend: "/a/test",
 		},
 		{
 			name:                "location ending in slash",
-			url:                 "http://test.server:8080/a/test/",
-			location:            "http://localhost/",
+			url: "http://test.server:8080/a/test/",
+			location: "http://localhost/",
 			expectedScheme:      "http",
 			expectedHost:        "test.server:8080",
 			expectedPathPrepend: "/a/test",
@@ -502,7 +502,7 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 
 			expectedHeaders: http.Header{
 				"Content-Length":    []string{"5"},
-				"Content-Encoding":  nil, // none set
+				"Content-Encoding": nil, // none set
 				"Transfer-Encoding": nil, // none set
 			},
 			expectedBody: sampleData,
@@ -517,7 +517,7 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 
 			expectedHeaders: http.Header{
 				"Content-Length":    []string{"5"},
-				"Content-Encoding":  nil, // none set
+				"Content-Encoding": nil, // none set
 				"Transfer-Encoding": nil, // gets removed
 			},
 			expectedBody: sampleData,
@@ -545,8 +545,8 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 			reqBody: chunk(sampleData),
 
 			expectedHeaders: http.Header{
-				"Content-Length":    nil, // none set
-				"Content-Encoding":  nil, // none set
+				"Content-Length": nil, // none set
+				"Content-Encoding": nil, // none set
 				"Transfer-Encoding": nil, // Transfer-Encoding gets removed
 			},
 			expectedBody: sampleData, // sample data is unchunked
@@ -560,7 +560,7 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 			reqBody: chunk(zip(sampleData)),
 
 			expectedHeaders: http.Header{
-				"Content-Length":    nil, // none set
+				"Content-Length": nil, // none set
 				"Content-Encoding":  []string{"gzip"},
 				"Transfer-Encoding": nil, // gets removed
 			},
@@ -578,8 +578,8 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 		// 	reqBody: chunk(zip(sampleData)),
 		//
 		// 	expectedHeaders: http.Header{
-		// 		"Content-Length":    nil, // no content-length headers
-		// 		"Transfer-Encoding": nil, // Transfer-Encoding gets removed
+		// 		"Content-Length": nil, //   no content-length headers
+		// 		"Transfer-Encoding": nil, //   Transfer-Encoding gets removed
 		// 	},
 		// 	expectedBody: sampleData,
 		// },
@@ -677,7 +677,7 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 }
 
 // exampleCert was generated from crypto/tls/generate_cert.go with the following command:
-//    go run generate_cert.go  --rsa-bits 512 --host example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+// go run generate_cert.go --rsa-bits 512 --host example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
 var exampleCert = []byte(`-----BEGIN CERTIFICATE-----
 MIIBcjCCAR6gAwIBAgIQBOUTYowZaENkZi0faI9DgTALBgkqhkiG9w0BAQswEjEQ
 MA4GA1UEChMHQWNtZSBDbzAgFw03MDAxMDEwMDAwMDBaGA8yMDg0MDEyOTE2MDAw
@@ -700,7 +700,7 @@ j4139pf8Re1J50zBxS/JlQfgDQi9sO9pYeiHIxNs
 -----END RSA PRIVATE KEY-----`)
 
 // localhostCert was generated from crypto/tls/generate_cert.go with the following command:
-//     go run generate_cert.go  --rsa-bits 512 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+// go run generate_cert.go --rsa-bits 512 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
 var localhostCert = []byte(`-----BEGIN CERTIFICATE-----
 MIIBdzCCASOgAwIBAgIBADALBgkqhkiG9w0BAQUwEjEQMA4GA1UEChMHQWNtZSBD
 bzAeFw03MDAxMDEwMDAwMDBaFw00OTEyMzEyMzU5NTlaMBIxEDAOBgNVBAoTB0Fj

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -84,7 +84,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		// Allocate next available.
 		ip, err := rs.serviceIPs.AllocateNext()
 		if err != nil {
-			// TODO: what error should be returned here?  It's not a
+			// TODO: what error should be returned here? It's not a
 			// field-level validation failure (the field is valid), and it's
 			// not really an internal error.
 			return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a serviceIP: %v", err))
@@ -114,7 +114,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		} else if assignNodePorts {
 			nodePort, err := nodePortOp.AllocateNext()
 			if err != nil {
-				// TODO: what error should be returned here?  It's not a
+				// TODO: what error should be returned here? It's not a
 				// field-level validation failure (the field is valid), and it's
 				// not really an internal error.
 				return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
@@ -236,7 +236,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 			} else {
 				nodePort, err = nodePortOp.AllocateNext()
 				if err != nil {
-					// TODO: what error should be returned here?  It's not a
+					// TODO: what error should be returned here? It's not a
 					// field-level validation failure (the field is valid), and it's
 					// not really an internal error.
 					return nil, false, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))

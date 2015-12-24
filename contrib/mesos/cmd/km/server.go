@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,9 +30,9 @@ type serverRunFunc func(s *Server, args []string) error
 
 // Server describes a server that this binary can morph into.
 type Server struct {
-	SimpleUsage string        // One line description of the server.
-	Long        string        // Longer free form description of the server
-	Run         serverRunFunc // Run the server.  This is not expected to return.
+	SimpleUsage string // One line description of the server.
+	Long string // Longer free form description of the server
+	Run serverRunFunc // Run the server. This is not expected to return.
 
 	flags *pflag.FlagSet // Flags for the command (and all dependents)
 	name  string

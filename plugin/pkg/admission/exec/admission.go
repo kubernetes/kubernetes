@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,7 +32,7 @@ func init() {
 		return NewDenyEscalatingExec(client), nil
 	})
 
-	// This is for legacy support of the DenyExecOnPrivileged admission controller.  Most
+	// This is for legacy support of the DenyExecOnPrivileged admission controller. Most
 	// of the time DenyEscalatingExec should be preferred.
 	admission.RegisterPlugin("DenyExecOnPrivileged", func(client client.Interface, config io.Reader) (admission.Interface, error) {
 		return NewDenyExecOnPrivileged(client), nil
@@ -64,7 +64,7 @@ func NewDenyEscalatingExec(client client.Interface) admission.Interface {
 }
 
 // NewDenyExecOnPrivileged creates a new admission controller that is only checking the privileged
-// option.  This is for legacy support of the DenyExecOnPrivileged admission controller.  Most
+// option. This is for legacy support of the DenyExecOnPrivileged admission controller. Most
 // of the time NewDenyEscalatingExec should be preferred.
 func NewDenyExecOnPrivileged(client client.Interface) admission.Interface {
 	return &denyExec{

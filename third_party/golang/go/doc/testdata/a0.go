@@ -5,13 +5,13 @@
 // comment 0
 package a
 
-//BUG(uid): bug0
+// BUG(uid): bug0
 
-//TODO(uid): todo0
+// TODO(uid): todo0
 
 // A note with some spaces after it, should be ignored (watch out for
 // emacs modes that remove trailing whitespace).
-//NOTE(uid):
+// NOTE(uid):
 
 // SECBUG(uid): sec hole 0
 // need to fix asap
@@ -32,9 +32,9 @@ package a
 //
 
 // NOTE(bam): This note which contains a (parenthesized) subphrase
-//            must appear in its entirety.
+// must appear in its entirety.
 
 // NOTE(xxx) The ':' after the marker and uid is optional.
 
 // NOTE(): NO uid - should not show up.
-// NOTE()  NO uid - should not show up.
+// NOTE() NO uid - should not show up.

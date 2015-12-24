@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -37,7 +37,7 @@ import (
 // servers.
 type HyperKube struct {
 	Name string // The executable name, used for help and soft-link invocation
-	Long string // A long description of the binary.  It will be world wrapped before output.
+	Long string // A long description of the binary. It will be world wrapped before output.
 
 	servers     []Server
 	baseFlags   *pflag.FlagSet
@@ -110,10 +110,10 @@ func (hk *HyperKube) Printf(format string, i ...interface{}) {
 	fmt.Fprintf(hk.Out(), format, i...)
 }
 
-// Run the server.  This will pick the appropriate server and run it.
+// Run the server. This will pick the appropriate server and run it.
 func (hk *HyperKube) Run(args []string) error {
 	// If we are called directly, parse all flags up to the first real
-	// argument.  That should be the server to run.
+	// argument. That should be the server to run.
 	baseCommand := path.Base(args[0])
 	serverName := baseCommand
 	if serverName == hk.Name {

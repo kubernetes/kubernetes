@@ -304,10 +304,10 @@ func nameOf(f *FuncDecl) string {
 	return f.Name.Name
 }
 
-// separator is an empty //-style comment that is interspersed between
+// separator is an empty //   -style comment that is interspersed between
 // different comment groups when they are concatenated into a single group
 //
-var separator = &Comment{token.NoPos, "//"}
+var separator = &Comment{token.NoPos, "// "}
 
 // MergePackageFiles creates a file AST by merging the ASTs of the
 // files belonging to a package. The mode flags control merging behavior.
@@ -369,8 +369,8 @@ func MergePackageFiles(pkg *Package, mode MergeMode) *File {
 	if ndecls > 0 {
 		decls = make([]Decl, ndecls)
 		funcs := make(map[string]int) // map of func name -> decls index
-		i := 0                        // current index
-		n := 0                        // number of filtered entries
+		i := 0 // current index
+		n := 0 // number of filtered entries
 		for _, filename := range filenames {
 			f := pkg.Files[filename]
 			for _, d := range f.Decls {
@@ -382,8 +382,8 @@ func MergePackageFiles(pkg *Package, mode MergeMode) *File {
 					// functions - keep the one with documentation.
 					//
 					// TODO(gri): Expand this filtering to other
-					//            entities (const, type, vars) if
-					//            multiple declarations are common.
+					// entities (const, type, vars) if
+					// multiple declarations are common.
 					if f, isFun := d.(*FuncDecl); isFun {
 						name := nameOf(f)
 						if j, exists := funcs[name]; exists {
@@ -434,11 +434,11 @@ func MergePackageFiles(pkg *Package, mode MergeMode) *File {
 				if path := imp.Path.Value; !seen[path] {
 					// TODO: consider handling cases where:
 					// - 2 imports exist with the same import path but
-					//   have different local names (one should probably
-					//   keep both of them)
+					// have different local names (one should probably
+					// keep both of them)
 					// - 2 imports exist but only one has a comment
 					// - 2 imports exist and they both have (possibly
-					//   different) comments
+					// different) comments
 					imports = append(imports, imp)
 					seen[path] = true
 				}

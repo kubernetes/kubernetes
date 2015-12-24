@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,7 +38,7 @@ const OldestVersion = "v1"
 var Versions = []string{"v1"}
 
 // Codec is the default codec for serializing output that should use
-// the latest supported version.  Use this Codec when writing to
+// the latest supported version. Use this Codec when writing to
 // disk, a data store that is not dynamically versioned, or in tests.
 // This codec can decode any object that Kubernetes is aware of.
 var Codec = runtime.YAMLDecoder(v1.Codec)

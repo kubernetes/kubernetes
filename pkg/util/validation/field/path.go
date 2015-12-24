@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,9 +24,9 @@ import (
 
 // Path represents the path from some root to a particular field.
 type Path struct {
-	name   string // the name of this field or "" if this is an index
-	index  string // if name == "", this is a subscript (index or map key) of the previous element
-	parent *Path  // nil if this is the root element
+	name string // the name of this field or "" if this is an index
+	index string // if name == "", this is a subscript (index or map key) of the previous element
+	parent *Path // nil if this is the root element
 }
 
 // NewPath creates a root Path object.

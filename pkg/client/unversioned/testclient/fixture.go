@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -140,7 +140,7 @@ var _ ObjectRetriever = &objects{}
 // to the "PodList" kind. If no PodList is added, the retriever will take any loaded
 // Pods and return them in a list. If an api.Status is added, and the Details.Kind field
 // is set, that status will be returned instead (as an error if Status != Success, or
-// as a runtime.Object if Status == Success).  If multiple PodLists are provided, they
+// as a runtime.Object if Status == Success). If multiple PodLists are provided, they
 // will be returned in order by the Kind call, and the last PodList will be reused for
 // subsequent calls.
 func NewObjects(scheme ObjectScheme, decoder runtime.ObjectDecoder) ObjectRetriever {
@@ -153,7 +153,7 @@ func NewObjects(scheme ObjectScheme, decoder runtime.ObjectDecoder) ObjectRetrie
 }
 
 func (o objects) Kind(kind unversioned.GroupVersionKind, name string) (runtime.Object, error) {
-	// TODO our test clients deal in internal versions.  We need to plumb that knowledge down here
+	// TODO our test clients deal in internal versions. We need to plumb that knowledge down here
 	// we might do this via an extra function to the scheme to allow getting internal group versions
 	// I'm punting for now
 	kind.Version = ""
@@ -250,8 +250,8 @@ func DefaultWatchReactor(watchInterface watch.Interface, err error) WatchReactio
 	}
 }
 
-// SimpleReactor is a Reactor.  Each reaction function is attached to a given verb,resource tuple.  "*" in either field matches everything for that value.
-// For instance, *,pods matches all verbs on pods.  This allows for easier composition of reaction functions
+// SimpleReactor is a Reactor. Each reaction function is attached to a given verb,resource tuple. "*" in either field matches everything for that value.
+// For instance, *,pods matches all verbs on pods. This allows for easier composition of reaction functions
 type SimpleReactor struct {
 	Verb     string
 	Resource string
@@ -276,8 +276,8 @@ func (r *SimpleReactor) React(action Action) (bool, runtime.Object, error) {
 	return r.Reaction(action)
 }
 
-// SimpleWatchReactor is a WatchReactor.  Each reaction function is attached to a given resource.  "*" matches everything for that value.
-// For instance, *,pods matches all verbs on pods.  This allows for easier composition of reaction functions
+// SimpleWatchReactor is a WatchReactor. Each reaction function is attached to a given resource. "*" matches everything for that value.
+// For instance, *,pods matches all verbs on pods. This allows for easier composition of reaction functions
 type SimpleWatchReactor struct {
 	Resource string
 
@@ -297,8 +297,8 @@ func (r *SimpleWatchReactor) React(action Action) (bool, watch.Interface, error)
 	return r.Reaction(action)
 }
 
-// SimpleProxyReactor is a ProxyReactor.  Each reaction function is attached to a given resource.  "*" matches everything for that value.
-// For instance, *,pods matches all verbs on pods.  This allows for easier composition of reaction functions.
+// SimpleProxyReactor is a ProxyReactor. Each reaction function is attached to a given resource. "*" matches everything for that value.
+// For instance, *,pods matches all verbs on pods. This allows for easier composition of reaction functions.
 type SimpleProxyReactor struct {
 	Resource string
 

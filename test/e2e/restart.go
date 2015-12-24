@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -224,23 +224,23 @@ func restartNodes(provider string, nt time.Duration) error {
 // TODO(marekbiskup): Switch this to MIG recreate-instances. This can be done
 // with the following bash, but needs to be written in Go:
 //
-//   # Step 1: Get instance names.
-//   list=$(gcloud compute instance-groups --project=${PROJECT} --zone=${ZONE} instances --group=${GROUP} list)
-//   i=""
-//   for l in $list; do
-// 	  i="${l##*/},${i}"
-//   done
+// # Step 1: Get instance names.
+// list=$(gcloud compute instance-groups --project=${PROJECT} --zone=${ZONE} instances --group=${GROUP} list)
+// i=""
+// for l in $list; do
+// 	 i="${l##*/},${i}"
+// done
 //
-//   # Step 2: Start the recreate.
-//   output=$(gcloud compute instance-groups managed --project=${PROJECT} --zone=${ZONE} recreate-instances ${GROUP} --instance="${i}")
-//   op=${output##*:}
+// # Step 2: Start the recreate.
+// output=$(gcloud compute instance-groups managed --project=${PROJECT} --zone=${ZONE} recreate-instances ${GROUP} --instance="${i}")
+// op=${output##*:}
 //
-//   # Step 3: Wait until it's complete.
-//   status=""
-//   while [[ "${status}" != "DONE" ]]; do
-// 	  output=$(gcloud compute instance-groups managed --zone="${ZONE}" get-operation ${op} | grep status)
-// 	  status=${output##*:}
-//   done
+// # Step 3: Wait until it's complete.
+// status=""
+// while [[ "${status}" != "DONE" ]]; do
+// 	 output=$(gcloud compute instance-groups managed --zone="${ZONE}" get-operation ${op} | grep status)
+// 	 status=${output##*:}
+// done
 func migRollingUpdateSelf(nt time.Duration) error {
 	By("getting the name of the template for the managed instance group")
 	tmpl, err := migTemplate()

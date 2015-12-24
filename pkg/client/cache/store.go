@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -106,8 +106,8 @@ func SplitMetaNamespaceKey(key string) (namespace, name string, err error) {
 }
 
 // cache responsibilities are limited to:
-//	1. Computing keys for objects via keyFunc
-//  2. Invoking methods of a ThreadSafeStorage interface
+// 	1. Computing keys for objects via keyFunc
+// 2. Invoking methods of a ThreadSafeStorage interface
 type cache struct {
 	// cacheStorage bears the burden of thread safety for the cache
 	cacheStorage ThreadSafeStore

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -89,8 +89,8 @@ func (s *stateType) transitionTo(to stateType, unless ...stateType) bool {
 
 type kuberTask struct {
 	mesosTaskInfo *mesos.TaskInfo
-	launchTimer   *time.Timer // launchTimer expires when the launch-task process duration exceeds launchGracePeriod
-	podName       string      // empty until pod is sent to kubelet and registed in KubernetesExecutor.pods
+	launchTimer *time.Timer // launchTimer expires when the launch-task process duration exceeds launchGracePeriod
+	podName string // empty until pod is sent to kubelet and registed in KubernetesExecutor.pods
 }
 
 type podStatusFunc func() (*api.PodStatus, error)
@@ -98,38 +98,38 @@ type podStatusFunc func() (*api.PodStatus, error)
 // KubernetesExecutor is an mesos executor that runs pods
 // in a minion machine.
 type Executor struct {
-	updateChan           chan<- kubetypes.PodUpdate // sent to the kubelet, closed on shutdown
+	updateChan chan<- kubetypes.PodUpdate // sent to the kubelet, closed on shutdown
 	state                stateType
 	tasks                map[string]*kuberTask
 	pods                 map[string]*api.Pod
 	lock                 sync.Mutex
 	client               *client.Client
-	terminate            chan struct{}                     // signals that the executor should shutdown
-	outgoing             chan func() (mesos.Status, error) // outgoing queue to the mesos driver
+	terminate chan struct{} // signals that the executor should shutdown
+	outgoing chan func() (mesos.Status, error) // outgoing queue to the mesos driver
 	dockerClient         dockertools.DockerInterface
 	suicideWatch         suicideWatcher
 	suicideTimeout       time.Duration
-	shutdownAlert        func()          // invoked just prior to executor shutdown
-	kubeletFinished      <-chan struct{} // signals that kubelet Run() died
+	shutdownAlert func() // invoked just prior to executor shutdown
+	kubeletFinished <-chan struct{} // signals that kubelet Run() died
 	exitFunc             func(int)
 	podStatusFunc        func(*api.Pod) (*api.PodStatus, error)
 	staticPodsConfigPath string
 	launchGracePeriod    time.Duration
 	nodeInfos            chan<- NodeInfo
-	initCompleted        chan struct{} // closes upon completion of Init()
+	initCompleted chan struct{} // closes upon completion of Init()
 }
 
 type Config struct {
-	Updates              chan<- kubetypes.PodUpdate // to send pod config updates to the kubelet
+	Updates chan<- kubetypes.PodUpdate // to send pod config updates to the kubelet
 	APIClient            *client.Client
 	Docker               dockertools.DockerInterface
 	ShutdownAlert        func()
 	SuicideTimeout       time.Duration
-	KubeletFinished      <-chan struct{} // signals that kubelet Run() died
+	KubeletFinished <-chan struct{} // signals that kubelet Run() died
 	ExitFunc             func(int)
 	PodStatusFunc        func(*api.Pod) (*api.PodStatus, error)
 	StaticPodsConfigPath string
-	PodLW                cache.ListerWatcher // mandatory, otherwise initialiation will panic
+	PodLW cache.ListerWatcher // mandatory, otherwise initialiation will panic
 	LaunchGracePeriod    time.Duration
 	NodeInfos            chan<- NodeInfo
 }
@@ -179,7 +179,7 @@ func (k *Executor) Init(driver bindings.ExecutorDriver) {
 	defer close(k.initCompleted)
 	k.killKubeletContainers()
 	k.resetSuicideWatch(driver)
-	//TODO(jdef) monitor kubeletFinished and shutdown if it happens
+	// TODO(jdef) monitor kubeletFinished and shutdown if it happens
 }
 
 func (k *Executor) isDone() bool {
@@ -407,7 +407,7 @@ func (k *Executor) resetSuicideWatch(driver bindings.ExecutorDriver) <-chan stru
 			}
 		}
 
-		//TODO(jdef) reduce verbosity here once we're convinced that suicide watch is working properly
+		// TODO(jdef) reduce verbosity here once we're convinced that suicide watch is working properly
 		log.Infof("resetting suicide watch timer for %v", k.suicideTimeout)
 
 		k.suicideWatch = k.suicideWatch.Next(k.suicideTimeout, driver, jumper(k.attemptSuicide))
@@ -422,7 +422,7 @@ func (k *Executor) attemptSuicide(driver bindings.ExecutorDriver, abort <-chan s
 	// this attempt may have been queued and since been aborted
 	select {
 	case <-abort:
-		//TODO(jdef) reduce verbosity once suicide watch is working properly
+		// TODO(jdef) reduce verbosity once suicide watch is working properly
 		log.Infof("aborting suicide attempt since watch was cancelled")
 		return
 	default: // continue
@@ -440,8 +440,8 @@ func (k *Executor) attemptSuicide(driver bindings.ExecutorDriver, abort <-chan s
 
 	log.Infoln("Attempting suicide")
 	if (&k.state).transitionTo(suicidalState, suicidalState, terminalState) {
-		//TODO(jdef) let the scheduler know?
-		//TODO(jdef) is suicide more graceful than slave-demanded shutdown?
+		// TODO(jdef) let the scheduler know?
+		// TODO(jdef) is suicide more graceful than slave-demanded shutdown?
 		k.doShutdown(driver)
 	}
 }
@@ -458,7 +458,7 @@ func (k *Executor) launchTask(driver bindings.ExecutorDriver, taskId string, pod
 	// TODO(k8s): use Pods interface for binding once clusters are upgraded
 	// return b.Pods(binding.Namespace).Bind(binding)
 	if pod.Spec.NodeName == "" {
-		//HACK(jdef): cloned binding construction from k8s plugin/pkg/scheduler/framework.go
+		// HACK(jdef): cloned binding construction from k8s plugin/pkg/scheduler/framework.go
 		binding := &api.Binding{
 			ObjectMeta: api.ObjectMeta{
 				Namespace:   pod.Namespace,
@@ -537,7 +537,7 @@ func (k *Executor) launchTask(driver bindings.ExecutorDriver, taskId string, pod
 		return
 	}
 
-	//TODO(jdef) check for duplicate pod name, if found send TASK_ERROR
+	// TODO(jdef) check for duplicate pod name, if found send TASK_ERROR
 
 	// send the new pod to the kubelet which will spin it up
 	task.podName = podFullName
@@ -707,7 +707,7 @@ func (k *Executor) KillTask(driver bindings.ExecutorDriver, taskId *mesos.TaskID
 	log.Infof("Kill task %v\n", taskId)
 
 	if !k.isConnected() {
-		//TODO(jdefelice) sent TASK_LOST here?
+		// TODO(jdefelice) sent TASK_LOST here?
 		log.Warningf("Ignore kill task because the executor is disconnected\n")
 		return
 	}
@@ -761,7 +761,7 @@ func (k *Executor) FrameworkMessage(driver bindings.ExecutorDriver, message stri
 	}
 
 	log.Infof("Receives message from framework %v\n", message)
-	//TODO(jdef) master reported a lost task, reconcile this! @see framework.go:handleTaskLost
+	// TODO(jdef) master reported a lost task, reconcile this! @see framework.go:handleTaskLost
 	if strings.HasPrefix(message, messages.TaskLost+":") {
 		taskId := message[len(messages.TaskLost)+1:]
 		if taskId != "" {
@@ -826,7 +826,7 @@ func (k *Executor) doShutdown(driver bindings.ExecutorDriver) {
 	// clean up resources (pods, volumes, etc).
 	case <-k.kubeletFinished:
 
-	//TODO(jdef) attempt to wait for events to propagate to API server?
+	// TODO(jdef) attempt to wait for events to propagate to API server?
 
 	// TODO(jdef) extract constant, should be smaller than whatever the
 	// slave graceful shutdown timeout period is.

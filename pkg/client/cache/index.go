@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -37,8 +37,8 @@ type Indexer interface {
 // IndexFunc knows how to provide an indexed value for an object.
 type IndexFunc func(obj interface{}) ([]string, error)
 
-// IndexFuncToKeyFuncAdapter adapts an indexFunc to a keyFunc.  This is only useful if your index function returns
-// unique values for every object.  This is conversion can create errors when more than one key is found.  You
+// IndexFuncToKeyFuncAdapter adapts an indexFunc to a keyFunc. This is only useful if your index function returns
+// unique values for every object. This is conversion can create errors when more than one key is found. You
 // should prefer to make proper key and index functions.
 func IndexFuncToKeyFuncAdapter(indexFunc IndexFunc) KeyFunc {
 	return func(obj interface{}) (string, error) {

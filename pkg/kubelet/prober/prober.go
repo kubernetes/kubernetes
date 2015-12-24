@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -191,7 +191,7 @@ func findPortByName(container api.Container, portName string) (int, error) {
 	return 0, fmt.Errorf("port %s not found", portName)
 }
 
-// formatURL formats a URL from args.  For testability.
+// formatURL formats a URL from args. For testability.
 func formatURL(scheme string, host string, port int, path string) *url.URL {
 	return &url.URL{
 		Scheme: scheme,
@@ -215,5 +215,5 @@ func (eic execInContainer) CombinedOutput() ([]byte, error) {
 }
 
 func (eic execInContainer) SetDir(dir string) {
-	//unimplemented
+	// unimplemented
 }

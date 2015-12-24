@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -129,13 +129,13 @@ func (f *IdentifierNode) String() string {
 // ParamsEntry holds param information for ArrayNode
 type ParamsEntry struct {
 	Value int
-	Known bool //whether the value is known when parse it
+	Known bool // whether the value is known when parse it
 }
 
 // ArrayNode holds start, end, step information for array index selection
 type ArrayNode struct {
 	NodeType
-	Params [3]ParamsEntry //start, end, step
+	Params [3]ParamsEntry // start, end, step
 }
 
 func newArray(params [3]ParamsEntry) *ArrayNode {

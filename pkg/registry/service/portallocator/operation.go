@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,11 +23,11 @@ package portallocator
 // On rollback we best-effort release any allocations we did.
 //
 // Pattern for use:
-//   op := StartPortAllocationOperation(...)
-//   defer op.Finish
-//   ...
-//   write(updatedOwner)
-///  op.Commit()
+// op := StartPortAllocationOperation(...)
+// defer op.Finish
+// ...
+// write(updatedOwner)
+// / op.Commit()
 type portAllocationOperation struct {
 	pa              Interface
 	allocated       []int
@@ -45,7 +45,7 @@ func StartOperation(pa Interface) *portAllocationOperation {
 	return op
 }
 
-// Will rollback unless marked as shouldRollback = false by a Commit().  Call from a defer block
+// Will rollback unless marked as shouldRollback = false by a Commit(). Call from a defer block
 func (op *portAllocationOperation) Finish() {
 	if op.shouldRollback {
 		op.Rollback()

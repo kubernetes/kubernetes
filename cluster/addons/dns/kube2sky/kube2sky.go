@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// kube2sky is a bridge between Kubernetes and SkyDNS.  It watches the
+// kube2sky is a bridge between Kubernetes and SkyDNS. It watches the
 // Kubernetes master for changes in Services and manifests them into etcd for
 // SkyDNS to serve as DNS records.
 package main
@@ -50,7 +50,7 @@ var (
 	// TODO: switch to pflag and make - and _ equivalent.
 	argDomain              = flag.String("domain", "cluster.local", "domain under which to create names")
 	argEtcdMutationTimeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
-	argEtcdServer          = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
+	argEtcdServer = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
 	argKubecfgFile         = flag.String("kubecfg_file", "", "Location of kubecfg file for access to kubernetes master service; --kube_master_url overrides the URL part of this; if neither this nor --kube_master_url are provided, defaults to service account tokens")
 	argKubeMasterURL       = flag.String("kube_master_url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
 )
@@ -487,13 +487,13 @@ func newKubeClient() (*kclient.Client, error) {
 		}
 	} else {
 		// We either have:
-		//  1) --kube_master_url and --kubecfg_file
-		//  2) just --kubecfg_file
-		//  3) neither flag
-		// In any case, the logic is the same.  If (3), this will automatically
+		// 1) --kube_master_url and --kubecfg_file
+		// 2) just --kubecfg_file
+		// 3) neither flag
+		// In any case, the logic is the same. If (3), this will automatically
 		// fall back on the service account token.
 		overrides := &kclientcmd.ConfigOverrides{}
-		overrides.ClusterInfo.Server = masterURL                                     // might be "", but that is OK
+		overrides.ClusterInfo.Server = masterURL // might be "", but that is OK
 		rules := &kclientcmd.ClientConfigLoadingRules{ExplicitPath: *argKubecfgFile} // might be "", but that is OK
 		if config, err = kclientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig(); err != nil {
 			return nil, err

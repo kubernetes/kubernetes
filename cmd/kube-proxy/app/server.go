@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -63,7 +63,7 @@ type ProxyServerConfig struct {
 	ProxyMode          string
 	IptablesSyncPeriod time.Duration
 	ConfigSyncPeriod   time.Duration
-	NodeRef            *api.ObjectReference // Reference to this node.
+	NodeRef *api.ObjectReference // Reference to this node.
 	MasqueradeAll      bool
 	CleanupAndExit     bool
 	KubeAPIQPS         float32
@@ -296,7 +296,7 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 	return NewProxyServer(client, config, iptInterface, proxier, eventBroadcaster, recorder)
 }
 
-// Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
+// Run runs the specified ProxyServer. This should never exit (unless CleanupAndExit is set).
 func (s *ProxyServer) Run(_ []string) error {
 	// remove iptables rules and exit
 	if s.Config.CleanupAndExit {

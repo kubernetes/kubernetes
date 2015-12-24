@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,7 +42,7 @@ func TestDefaultHostPortMatching(t *testing.T) {
 		t.Fatalf("Found mappings for a pod without ports: %v", pod)
 	}
 
-	//--
+	// --
 	pod.Spec = api.PodSpec{
 		Containers: []api.Container{{
 			Ports: []api.ContainerPort{{
@@ -78,7 +78,7 @@ func TestWildcardHostPortMatching(t *testing.T) {
 		t.Fatalf("Found mappings for an empty offer and a pod without ports: %v", pod)
 	}
 
-	//--
+	// --
 	offer = &mesos.Offer{
 		Resources: []*mesos.Resource{
 			newPortsResource("*", 1, 1),
@@ -92,7 +92,7 @@ func TestWildcardHostPortMatching(t *testing.T) {
 		t.Fatalf("Found mappings for a pod without ports: %v", pod)
 	}
 
-	//--
+	// --
 	pod.Spec = api.PodSpec{
 		Containers: []api.Container{{
 			Ports: []api.ContainerPort{{
@@ -113,7 +113,7 @@ func TestWildcardHostPortMatching(t *testing.T) {
 		t.Fatal("Expected port allocation error for host port 123")
 	}
 
-	//--
+	// --
 	pod.Spec = api.PodSpec{
 		Containers: []api.Container{{
 			Ports: []api.ContainerPort{{
@@ -134,7 +134,7 @@ func TestWildcardHostPortMatching(t *testing.T) {
 		t.Fatal("Expected port allocation error for host port 123")
 	}
 
-	//--
+	// --
 	pod.Spec = api.PodSpec{
 		Containers: []api.Container{{
 			Ports: []api.ContainerPort{{
@@ -155,7 +155,7 @@ func TestWildcardHostPortMatching(t *testing.T) {
 		t.Fatal("Expected port allocation error for wildcard port")
 	}
 
-	//--
+	// --
 	offer = &mesos.Offer{
 		Resources: []*mesos.Resource{
 			newPortsResource("*", 1, 2),
@@ -180,7 +180,7 @@ func TestWildcardHostPortMatching(t *testing.T) {
 		t.Fatalf("Expected 2 valid port mappings, not %d", valid)
 	}
 
-	//-- port mapping in case of multiple discontinuous port ranges in mesos offer
+	// -- port mapping in case of multiple discontinuous port ranges in mesos offer
 	pod.Spec = api.PodSpec{
 		Containers: []api.Container{{
 			Ports: []api.ContainerPort{{

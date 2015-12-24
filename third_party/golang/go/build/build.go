@@ -1,4 +1,4 @@
-// Copyright 2011 The Go Authors.  All rights reserved.
+// Copyright 2011 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -29,13 +29,13 @@ import (
 
 // A Context specifies the supporting context for a build.
 type Context struct {
-	GOARCH      string // target architecture
-	GOOS        string // target operating system
-	GOROOT      string // Go root
-	GOPATH      string // Go path
-	CgoEnabled  bool   // whether cgo can be used
-	UseAllFiles bool   // use files regardless of +build lines, file names
-	Compiler    string // compiler to assume when computing target paths
+	GOARCH string // target architecture
+	GOOS string // target operating system
+	GOROOT string // Go root
+	GOPATH string // Go path
+	CgoEnabled bool // whether cgo can be used
+	UseAllFiles bool // use files regardless of +build lines, file names
+	Compiler string // compiler to assume when computing target paths
 
 	// The build and release tags specify build constraints
 	// that should be considered satisfied when processing +build lines.
@@ -56,8 +56,8 @@ type Context struct {
 	InstallSuffix string
 
 	// By default, Import uses the operating system's file system calls
-	// to read directories and files.  To read from other sources,
-	// callers can set the following functions.  They all have default
+	// to read directories and files. To read from other sources,
+	// callers can set the following functions. They all have default
 	// behaviors that use the local file system, so clients need only set
 	// the functions whose behaviors they wish to change.
 
@@ -331,7 +331,7 @@ type ImportMode uint
 
 const (
 	// If FindOnly is set, Import stops after locating the directory
-	// that should contain the sources for a package.  It does not
+	// that should contain the sources for a package. It does not
 	// read any files in the directory.
 	FindOnly ImportMode = 1 << iota
 
@@ -348,51 +348,51 @@ const (
 
 // A Package describes the Go package found in a directory.
 type Package struct {
-	Dir           string   // directory containing package sources
-	Name          string   // package name
-	ImportComment string   // path in import comment on package statement
-	Doc           string   // documentation synopsis
-	ImportPath    string   // import path of package ("" if unknown)
-	Root          string   // root of Go tree where this package lives
-	SrcRoot       string   // package source root directory ("" if unknown)
-	PkgRoot       string   // package install root directory ("" if unknown)
-	PkgTargetRoot string   // architecture dependent install root directory ("" if unknown)
-	BinDir        string   // command install directory ("" if unknown)
-	Goroot        bool     // package found in Go root
-	PkgObj        string   // installed .a file
-	AllTags       []string // tags that can influence file selection in this directory
-	ConflictDir   string   // this directory shadows Dir in $GOPATH
+	Dir string // directory containing package sources
+	Name string // package name
+	ImportComment string // path in import comment on package statement
+	Doc string // documentation synopsis
+	ImportPath string // import path of package ("" if unknown)
+	Root string // root of Go tree where this package lives
+	SrcRoot string // package source root directory ("" if unknown)
+	PkgRoot string // package install root directory ("" if unknown)
+	PkgTargetRoot string // architecture dependent install root directory ("" if unknown)
+	BinDir string // command install directory ("" if unknown)
+	Goroot bool // package found in Go root
+	PkgObj string // installed .a file
+	AllTags []string // tags that can influence file selection in this directory
+	ConflictDir string // this directory shadows Dir in $GOPATH
 
 	// Source files
-	GoFiles        []string // .go source files (excluding CgoFiles, TestGoFiles, XTestGoFiles)
-	CgoFiles       []string // .go source files that import "C"
+	GoFiles []string // .go source files (excluding CgoFiles, TestGoFiles, XTestGoFiles)
+	CgoFiles []string // .go source files that import "C"
 	IgnoredGoFiles []string // .go source files ignored for this build
-	CFiles         []string // .c source files
-	CXXFiles       []string // .cc, .cpp and .cxx source files
-	MFiles         []string // .m (Objective-C) source files
-	HFiles         []string // .h, .hh, .hpp and .hxx source files
-	SFiles         []string // .s source files
-	SwigFiles      []string // .swig files
-	SwigCXXFiles   []string // .swigcxx files
-	SysoFiles      []string // .syso system object files to add to archive
+	CFiles []string // .c source files
+	CXXFiles []string // .cc, .cpp and .cxx source files
+	MFiles []string // .m (Objective-C) source files
+	HFiles []string // .h, .hh, .hpp and .hxx source files
+	SFiles []string // .s source files
+	SwigFiles []string // .swig files
+	SwigCXXFiles []string // .swigcxx files
+	SysoFiles []string // .syso system object files to add to archive
 
 	// Cgo directives
-	CgoCFLAGS    []string // Cgo CFLAGS directives
-	CgoCPPFLAGS  []string // Cgo CPPFLAGS directives
-	CgoCXXFLAGS  []string // Cgo CXXFLAGS directives
-	CgoLDFLAGS   []string // Cgo LDFLAGS directives
+	CgoCFLAGS []string // Cgo CFLAGS directives
+	CgoCPPFLAGS []string // Cgo CPPFLAGS directives
+	CgoCXXFLAGS []string // Cgo CXXFLAGS directives
+	CgoLDFLAGS []string // Cgo LDFLAGS directives
 	CgoPkgConfig []string // Cgo pkg-config directives
 
 	// Dependency information
-	Imports   []string                    // imports from GoFiles, CgoFiles
+	Imports []string // imports from GoFiles, CgoFiles
 	ImportPos map[string][]token.Position // line information for Imports
 
 	// Test information
-	TestGoFiles    []string                    // _test.go files in package
-	TestImports    []string                    // imports from TestGoFiles
-	TestImportPos  map[string][]token.Position // line information for TestImports
-	XTestGoFiles   []string                    // _test.go files outside package
-	XTestImports   []string                    // imports from XTestGoFiles
+	TestGoFiles []string // _test.go files in package
+	TestImports []string // imports from TestGoFiles
+	TestImportPos map[string][]token.Position // line information for TestImports
+	XTestGoFiles []string // _test.go files outside package
+	XTestImports []string // imports from XTestGoFiles
 	XTestImportPos map[string][]token.Position // line information for XTestImports
 }
 
@@ -423,9 +423,9 @@ func (e *NoGoError) Error() string {
 // MultiplePackageError describes a directory containing
 // multiple buildable Go source files for multiple packages.
 type MultiplePackageError struct {
-	Dir      string   // directory containing files
+	Dir string // directory containing files
 	Packages []string // package names found
-	Files    []string // corresponding files: Files[i] declares package Packages[i]
+	Files []string // corresponding files: Files[i] declares package Packages[i]
 }
 
 func (e *MultiplePackageError) Error() string {
@@ -450,9 +450,9 @@ func nameExt(name string) string {
 // In the directory containing the package, .go, .c, .h, and .s files are
 // considered part of the package except for:
 //
-//	- .go files in package documentation
-//	- files starting with _ or . (likely editor temporary files)
-//	- files with build constraints not satisfied by the context
+// 	- .go files in package documentation
+// 	- files starting with _ or . (likely editor temporary files)
+// 	- files with build constraints not satisfied by the context
 //
 // If an error occurs, Import returns a non-nil error and a non-nil
 // *Package containing partial information.
@@ -643,7 +643,7 @@ Found:
 			continue
 		}
 
-		// Going to save the file.  For non-Go files, can stop here.
+		// Going to save the file. For non-Go files, can stop here.
 		switch ext {
 		case ".c":
 			p.CFiles = append(p.CFiles, name)
@@ -815,7 +815,7 @@ func findImportComment(data []byte) (s string, line int) {
 	// expect package name
 	_, data = parseWord(data)
 
-	// now ready for import comment, a // or /* */ comment
+	// now ready for import comment, a //   or /* */ comment
 	// beginning and ending on the current line.
 	for len(data) > 0 && (data[0] == ' ' || data[0] == '\t' || data[0] == '\r') {
 		data = data[1:]
@@ -854,7 +854,7 @@ func findImportComment(data []byte) (s string, line int) {
 }
 
 var (
-	slashSlash = []byte("//")
+	slashSlash = []byte("// ")
 	slashStar  = []byte("/*")
 	starSlash  = []byte("*/")
 	newline    = []byte("\n")
@@ -1008,23 +1008,23 @@ func ImportDir(dir string, mode ImportMode) (*Package, error) {
 	return Default.ImportDir(dir, mode)
 }
 
-var slashslash = []byte("//")
+var slashslash = []byte("// ")
 
 // shouldBuild reports whether it is okay to use this file,
-// The rule is that in the file's leading run of // comments
+// The rule is that in the file's leading run of //   comments
 // and blank lines, which must be followed by a blank line
 // (to avoid including a Go package clause doc comment),
-// lines beginning with '// +build' are taken as build directives.
+// lines beginning with '//   +build' are taken as build directives.
 //
 // The file is accepted only if each such line lists something
-// matching the file.  For example:
+// matching the file. For example:
 //
-//	// +build windows linux
+// 	//   +build windows linux
 //
 // marks the file as applicable only on Windows and Linux.
 //
 func (ctxt *Context) shouldBuild(content []byte, allTags map[string]bool) bool {
-	// Pass 1. Identify leading run of // comments and blank lines,
+	// Pass 1. Identify leading run of //   comments and blank lines,
 	// which must be followed by a blank line.
 	end := 0
 	p := content
@@ -1046,7 +1046,7 @@ func (ctxt *Context) shouldBuild(content []byte, allTags map[string]bool) bool {
 	}
 	content = content[:end]
 
-	// Pass 2.  Process each line in the run.
+	// Pass 2. Process each line in the run.
 	p = content
 	allok := true
 	for len(p) > 0 {
@@ -1089,7 +1089,7 @@ func (ctxt *Context) saveCgo(filename string, di *Package, cg *ast.CommentGroup)
 		orig := line
 
 		// Line is
-		//	#cgo [GOOS/GOARCH...] LDFLAGS: stuff
+		// 	#cgo [GOOS/GOARCH...] LDFLAGS: stuff
 		//
 		line = strings.TrimSpace(line)
 		if len(line) < 5 || line[:4] != "#cgo" || (line[4] != ' ' && line[4] != '\t') {
@@ -1185,15 +1185,15 @@ func safeCgoName(s string) bool {
 // Single quotes and double quotes are recognized to prevent splitting within the
 // quoted region, and are removed from the resulting substrings. If a quote in s
 // isn't closed err will be set and r will have the unclosed argument as the
-// last element.  The backslash is used for escaping.
+// last element. The backslash is used for escaping.
 //
 // For example, the following string:
 //
-//     a b:"c d" 'e''f'  "g\""
+// a b:"c d" 'e''f' "g\""
 //
 // Would be parsed as:
 //
-//     []string{"a", "b:c d", "ef", `g"`}
+// []string{"a", "b:c d", "ef", `g"`}
 //
 func splitQuoted(s string) (r []string, err error) {
 	var args []string
@@ -1242,15 +1242,15 @@ func splitQuoted(s string) (r []string, err error) {
 
 // match reports whether the name is one of:
 //
-//	$GOOS
-//	$GOARCH
-//	cgo (if cgo is enabled)
-//	!cgo (if cgo is disabled)
-//	ctxt.Compiler
-//	!ctxt.Compiler
-//	tag (if tag is listed in ctxt.BuildTags or ctxt.ReleaseTags)
-//	!tag (if tag is not listed in ctxt.BuildTags or ctxt.ReleaseTags)
-//	a comma-separated list of any of these
+// 	$GOOS
+// 	$GOARCH
+// 	cgo (if cgo is enabled)
+// 	!cgo (if cgo is disabled)
+// 	ctxt.Compiler
+// 	!ctxt.Compiler
+// 	tag (if tag is listed in ctxt.BuildTags or ctxt.ReleaseTags)
+// 	!tag (if tag is not listed in ctxt.BuildTags or ctxt.ReleaseTags)
+// 	a comma-separated list of any of these
 //
 func (ctxt *Context) match(name string, allTags map[string]bool) bool {
 	if name == "" {
@@ -1314,12 +1314,12 @@ func (ctxt *Context) match(name string, allTags map[string]bool) bool {
 // suffix which does not match the current system.
 // The recognized name formats are:
 //
-//     name_$(GOOS).*
-//     name_$(GOARCH).*
-//     name_$(GOOS)_$(GOARCH).*
-//     name_$(GOOS)_test.*
-//     name_$(GOARCH)_test.*
-//     name_$(GOOS)_$(GOARCH)_test.*
+// name_$(GOOS).*
+// name_$(GOARCH).*
+// name_$(GOOS)_$(GOARCH).*
+// name_$(GOOS)_test.*
+// name_$(GOARCH)_test.*
+// name_$(GOOS)_$(GOARCH)_test.*
 //
 // An exception: if GOOS=android, then files with GOOS=linux are also matched.
 func (ctxt *Context) goodOSArchFile(name string, allTags map[string]bool) bool {

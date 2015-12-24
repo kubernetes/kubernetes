@@ -53,7 +53,7 @@ func (p ErrorList) Less(i, j int) bool {
 	e := &p[i].Pos
 	f := &p[j].Pos
 	// Note that it is not sufficient to simply compare file offsets because
-	// the offsets do not reflect modified line information (through //line
+	// the offsets do not reflect modified line information (through //   line
 	// comments).
 	if e.Filename != f.Filename {
 		return e.Filename < f.Filename

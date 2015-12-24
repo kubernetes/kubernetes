@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -69,7 +69,7 @@ type Fake struct {
 type Reactor interface {
 	// Handles indicates whether or not this Reactor deals with a given action
 	Handles(action Action) bool
-	// React handles the action and returns results.  It may choose to delegate by indicated handled=false
+	// React handles the action and returns results. It may choose to delegate by indicated handled=false
 	React(action Action) (handled bool, ret runtime.Object, err error)
 }
 
@@ -77,7 +77,7 @@ type Reactor interface {
 type WatchReactor interface {
 	// Handles indicates whether or not this Reactor deals with a given action
 	Handles(action Action) bool
-	// React handles a watch action and returns results.  It may choose to delegate by indicated handled=false
+	// React handles a watch action and returns results. It may choose to delegate by indicated handled=false
 	React(action Action) (handled bool, ret watch.Interface, err error)
 }
 
@@ -85,19 +85,19 @@ type WatchReactor interface {
 type ProxyReactor interface {
 	// Handles indicates whether or not this Reactor deals with a given action
 	Handles(action Action) bool
-	// React handles a watch action and returns results.  It may choose to delegate by indicated handled=false
+	// React handles a watch action and returns results. It may choose to delegate by indicated handled=false
 	React(action Action) (handled bool, ret client.ResponseWrapper, err error)
 }
 
-// ReactionFunc is a function that returns an object or error for a given Action.  If "handled" is false,
+// ReactionFunc is a function that returns an object or error for a given Action. If "handled" is false,
 // then the test client will continue ignore the results and continue to the next ReactionFunc
 type ReactionFunc func(action Action) (handled bool, ret runtime.Object, err error)
 
-// WatchReactionFunc is a function that returns a watch interface.  If "handled" is false,
+// WatchReactionFunc is a function that returns a watch interface. If "handled" is false,
 // then the test client will continue ignore the results and continue to the next ReactionFunc
 type WatchReactionFunc func(action Action) (handled bool, ret watch.Interface, err error)
 
-// ProxyReactionFunc is a function that returns a ResponseWrapper interface for a given Action.  If "handled" is false,
+// ProxyReactionFunc is a function that returns a ResponseWrapper interface for a given Action. If "handled" is false,
 // then the test client will continue ignore the results and continue to the next ProxyReactionFunc
 type ProxyReactionFunc func(action Action) (handled bool, ret client.ResponseWrapper, err error)
 

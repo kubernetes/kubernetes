@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -81,7 +81,7 @@ func (d *MyDuration) UnmarshalText(text []byte) error {
 }
 
 type LoadBalancerOpts struct {
-	SubnetId          string     `gcfg:"subnet-id"` // required
+	SubnetId string `gcfg:"subnet-id"` // required
 	FloatingNetworkId string     `gcfg:"floating-network-id"`
 	LBMethod          string     `gfcg:"lb-method"`
 	CreateMonitor     bool       `gcfg:"create-monitor"`
@@ -646,7 +646,7 @@ func (lb *LoadBalancer) GetTCPLoadBalancer(name, region string) (*api.LoadBalanc
 }
 
 // TODO: This code currently ignores 'region' and always creates a
-// loadbalancer in only the current OpenStack region.  We should take
+// loadbalancer in only the current OpenStack region. We should take
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
@@ -704,7 +704,7 @@ func (lb *LoadBalancer) EnsureTCPLoadBalancer(name, region string, loadBalancerI
 
 		_, err = members.Create(lb.network, members.CreateOpts{
 			PoolID:       pool.ID,
-			ProtocolPort: ports[0].NodePort, //TODO: need to handle multi-port
+			ProtocolPort: ports[0].NodePort, // TODO: need to handle multi-port
 			Address:      addr,
 		}).Extract()
 		if err != nil {
@@ -738,7 +738,7 @@ func (lb *LoadBalancer) EnsureTCPLoadBalancer(name, region string, loadBalancerI
 		Name:         name,
 		Description:  fmt.Sprintf("Kubernetes external service %s", name),
 		Protocol:     "TCP",
-		ProtocolPort: ports[0].Port, //TODO: need to handle multi-port
+		ProtocolPort: ports[0].Port, // TODO: need to handle multi-port
 		PoolID:       pool.ID,
 		SubnetID:     lb.opts.SubnetId,
 		Persistence:  persistence,
@@ -877,7 +877,7 @@ func (lb *LoadBalancer) EnsureTCPLoadBalancerDeleted(name, region string) error 
 	} else {
 		// The VIP is gone, but it is conceivable that a Pool
 		// still exists that we failed to delete on some
-		// previous occasion.  Make a best effort attempt to
+		// previous occasion. Make a best effort attempt to
 		// cleanup any pools with the same name as the VIP.
 		pool, err = getPoolByName(lb.network, name)
 		if err != nil && err != ErrNotFound {

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
-// DeleteOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
+// DeleteOptions is the start of the data required to perform the operation. As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type DeleteOptions struct {
 	Filenames []string

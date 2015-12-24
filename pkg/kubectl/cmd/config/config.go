@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -50,13 +50,13 @@ type PathOptions struct {
 type ConfigAccess interface {
 	// GetLoadingPrecedence returns the slice of files that should be used for loading and inspecting the config
 	GetLoadingPrecedence() []string
-	// GetStartingConfig returns the config that subcommands should being operating against.  It may or may not be merged depending on loading rules
+	// GetStartingConfig returns the config that subcommands should being operating against. It may or may not be merged depending on loading rules
 	GetStartingConfig() (*clientcmdapi.Config, error)
 	// GetDefaultFilename returns the name of the file you should write into (create if necessary), if you're trying to create a new stanza as opposed to updating an existing one.
 	GetDefaultFilename() string
-	// IsExplicitFile indicates whether or not this command is interested in exactly one file.  This implementation only ever does that  via a flag, but implementations that handle local, global, and flags may have more
+	// IsExplicitFile indicates whether or not this command is interested in exactly one file. This implementation only ever does that via a flag, but implementations that handle local, global, and flags may have more
 	IsExplicitFile() bool
-	// GetExplicitFile returns the particular file this command is operating against.  This implementation only ever has one, but implementations that handle local, global, and flags may have more
+	// GetExplicitFile returns the particular file this command is operating against. This implementation only ever has one, but implementations that handle local, global, and flags may have more
 	GetExplicitFile() string
 }
 
@@ -184,10 +184,10 @@ func (o *PathOptions) GetExplicitFile() string {
 }
 
 // ModifyConfig takes a Config object, iterates through Clusters, AuthInfos, and Contexts, uses the LocationOfOrigin if specified or
-// uses the default destination file to write the results into.  This results in multiple file reads, but it's very easy to follow.
-// Preferences and CurrentContext should always be set in the default destination file.  Since we can't distinguish between empty and missing values
-// (no nil strings), we're forced have separate handling for them.  In the kubeconfig cases, newConfig should have at most one difference,
-// that means that this code will only write into a single file.  If you want to relativizePaths, you must provide a fully qualified path in any
+// uses the default destination file to write the results into. This results in multiple file reads, but it's very easy to follow.
+// Preferences and CurrentContext should always be set in the default destination file. Since we can't distinguish between empty and missing values
+// (no nil strings), we're forced have separate handling for them. In the kubeconfig cases, newConfig should have at most one difference,
+// that means that this code will only write into a single file. If you want to relativizePaths, you must provide a fully qualified path in any
 // modified element.
 func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, relativizePaths bool) error {
 	startingConfig, err := configAccess.GetStartingConfig()
@@ -214,7 +214,7 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 		}
 	}
 
-	// Search every cluster, authInfo, and context.  First from new to old for differences, then from old to new for deletions
+	// Search every cluster, authInfo, and context. First from new to old for differences, then from old to new for deletions
 	for key, cluster := range newConfig.Clusters {
 		startingCluster, exists := startingConfig.Clusters[key]
 		if !reflect.DeepEqual(cluster, startingCluster) || !exists {
@@ -366,7 +366,7 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 		return nil
 	}
 
-	// we're supposed to be clearing the current context.  We need to find the first spot in the chain that is setting it and clear it
+	// we're supposed to be clearing the current context. We need to find the first spot in the chain that is setting it and clear it
 	for _, file := range configAccess.GetLoadingPrecedence() {
 		if _, err := os.Stat(file); err == nil {
 			currConfig := getConfigFromFileOrDie(file)
@@ -419,7 +419,7 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 	return errors.New("no config found to write preferences")
 }
 
-// getConfigFromFileOrDie tries to read a kubeconfig file and if it can't, it calls exit.  One exception, missing files result in empty configs, not an exit
+// getConfigFromFileOrDie tries to read a kubeconfig file and if it can't, it calls exit. One exception, missing files result in empty configs, not an exit
 func getConfigFromFileOrDie(filename string) *clientcmdapi.Config {
 	config, err := clientcmd.LoadFromFile(filename)
 	if err != nil && !os.IsNotExist(err) {

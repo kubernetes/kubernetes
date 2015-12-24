@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -55,7 +55,7 @@ func (n *NoBackoff) CalculateBackoff(actualUrl *url.URL) time.Duration {
 	return 0 * time.Second
 }
 
-// Disable makes the backoff trivial, i.e., sets it to zero.  This might be used
+// Disable makes the backoff trivial, i.e., sets it to zero. This might be used
 // by tests which want to run 1000s of mock requests without slowing down.
 func (b *URLBackoff) Disable() {
 	glog.V(4).Infof("Disabling backoff strategy")
@@ -86,7 +86,7 @@ func (b *URLBackoff) UpdateBackoff(actualUrl *url.URL, err error, responseCode i
 		glog.V(4).Infof("Client is returning errors: code %v, error %v", responseCode, err)
 	}
 
-	//If we got this far, there is no backoff required for this URL anymore.
+	// If we got this far, there is no backoff required for this URL anymore.
 	b.Backoff.Reset(b.baseUrlKey(actualUrl))
 }
 

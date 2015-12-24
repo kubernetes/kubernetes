@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,7 +30,7 @@ import (
 )
 
 // This is the primary entrypoint for volume plugins.
-// The volumeConfig arg provides the ability to configure recycler behavior.  It is implemented as a pointer to allow nils.
+// The volumeConfig arg provides the ability to configure recycler behavior. It is implemented as a pointer to allow nils.
 // The nfsPlugin is used to store the volumeConfig and give it, when needed, to the func that creates NFS Recyclers.
 // Tests that exercise recycling should not use this func but instead use ProbeRecyclablePlugins() to override default behavior.
 func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin {
@@ -45,7 +45,7 @@ func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin 
 
 type nfsPlugin struct {
 	host volume.VolumeHost
-	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
+	// decouple creating recyclers by deferring to a function. Allows for easier testing.
 	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
 	config          volume.VolumeConfig
 }
@@ -130,7 +130,7 @@ type nfs struct {
 	pod     *api.Pod
 	mounter mount.Interface
 	plugin  *nfsPlugin
-	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
+	// decouple creating recyclers by deferring to a function. Allows for easier testing.
 	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
 	volume.MetricsNil
 }
@@ -196,7 +196,7 @@ func (b *nfsBuilder) SetUpAt(dir string) error {
 				return err
 			}
 			if !notMnt {
-				// This is very odd, we don't expect it.  We'll try again next sync loop.
+				// This is very odd, we don't expect it. We'll try again next sync loop.
 				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
 				return err
 			}
@@ -208,10 +208,10 @@ func (b *nfsBuilder) SetUpAt(dir string) error {
 }
 
 //
-//func (c *nfsCleaner) GetPath() string {
-//	name := nfsPluginName
-//	return c.plugin.host.GetPodVolumeDir(c.pod.UID, util.EscapeQualifiedNameForDisk(name), c.volName)
-//}
+// func (c *nfsCleaner) GetPath() string {
+// 	name := nfsPluginName
+// 	return c.plugin.host.GetPodVolumeDir(c.pod.UID, util.EscapeQualifiedNameForDisk(name), c.volName)
+// }
 
 var _ volume.Cleaner = &nfsCleaner{}
 

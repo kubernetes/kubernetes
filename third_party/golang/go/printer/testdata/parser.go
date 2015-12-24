@@ -22,10 +22,10 @@ import (
 //
 const (
 	PackageClauseOnly uint = 1 << iota // parsing stops after package clause
-	ImportsOnly                        // parsing stops after import declarations
-	ParseComments                      // parse comments and add them to AST
-	Trace                              // print a trace of parsed productions
-	DeclarationErrors                  // report declaration errors
+	ImportsOnly // parsing stops after import declarations
+	ParseComments // parse comments and add them to AST
+	Trace // print a trace of parsed productions
+	DeclarationErrors // report declaration errors
 )
 
 // The parser structure holds the parser's internal state.
@@ -35,8 +35,8 @@ type parser struct {
 	scanner scanner.Scanner
 
 	// Tracing/debugging
-	mode   uint // parsing mode
-	trace  bool // == (mode & Trace != 0)
+	mode uint // parsing mode
+	trace bool // == (mode & Trace != 0)
 	indent uint // indentation used for tracing output
 
 	// Comments
@@ -45,22 +45,22 @@ type parser struct {
 	lineComment *ast.CommentGroup // last line comment
 
 	// Next token
-	pos token.Pos   // token position
+	pos token.Pos // token position
 	tok token.Token // one token look-ahead
-	lit string      // token literal
+	lit string // token literal
 
 	// Non-syntactic parser control
 	exprLev int // < 0: in control clause, >= 0: in expression
 
 	// Ordinary identifier scopes
-	pkgScope   *ast.Scope        // pkgScope.Outer == nil
-	topScope   *ast.Scope        // top-most scope; may be pkgScope
-	unresolved []*ast.Ident      // unresolved identifiers
-	imports    []*ast.ImportSpec // list of imports
+	pkgScope *ast.Scope // pkgScope.Outer == nil
+	topScope *ast.Scope // top-most scope; may be pkgScope
+	unresolved []*ast.Ident // unresolved identifiers
+	imports []*ast.ImportSpec // list of imports
 
 	// Label scope
 	// (maintained by open/close LabelScope)
-	labelScope  *ast.Scope     // label scope for current function
+	labelScope *ast.Scope // label scope for current function
 	targetStack [][]*ast.Ident // stack of unresolved labels
 }
 
@@ -439,8 +439,8 @@ func (p *parser) parseLhsList() []ast.Expr {
 		// of a switch statement):
 		// - labels are declared by the caller of parseLhsList
 		// - for communication clauses, if there is a stand-alone identifier
-		//   followed by a colon, we have a syntax error; there is no need
-		//   to resolve the identifier in that case
+		// followed by a colon, we have a syntax error; there is no need
+		// to resolve the identifier in that case
 	default:
 		// identifiers must be declared elsewhere
 		for _, x := range list {
@@ -1352,7 +1352,7 @@ func (p *parser) parseBinaryExpr(lhs bool, prec1 int) ast.Expr {
 
 // If lhs is set and the result is an identifier, it is not resolved.
 // TODO(gri): parseExpr may return a type or even a raw type ([..]int) -
-//            should reject when a type/raw type is obviously not allowed
+// should reject when a type/raw type is obviously not allowed
 func (p *parser) parseExpr(lhs bool) ast.Expr {
 	if p.trace {
 		defer un(trace(p, "Expression"))

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,24 +27,24 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-//TODO:
+// TODO:
 // Storage interfaces need to be separated into two groups; those that operate
 // on collections and those that operate on individually named items.
 // Collection interfaces:
 // (Method: Current -> Proposed)
-//    GET: Lister -> CollectionGetter
-//    WATCH: Watcher -> CollectionWatcher
-//    CREATE: Creater -> CollectionCreater
-//    DELETE: (n/a) -> CollectionDeleter
-//    UPDATE: (n/a) -> CollectionUpdater
+// GET: Lister -> CollectionGetter
+// WATCH: Watcher -> CollectionWatcher
+// CREATE: Creater -> CollectionCreater
+// DELETE: (n/a) -> CollectionDeleter
+// UPDATE: (n/a) -> CollectionUpdater
 //
 // Single item interfaces:
 // (Method: Current -> Proposed)
-//    GET: Getter -> NamedGetter
-//    WATCH: (n/a) -> NamedWatcher
-//    CREATE: (n/a) -> NamedCreater
-//    DELETE: Deleter -> NamedDeleter
-//    UPDATE: Update -> NamedUpdater
+// GET: Getter -> NamedGetter
+// WATCH: (n/a) -> NamedWatcher
+// CREATE: (n/a) -> NamedCreater
+// DELETE: Deleter -> NamedDeleter
+// UPDATE: Update -> NamedUpdater
 
 // Storage is a generic interface for RESTful storage services.
 // Resources which are exported to the RESTful API of apiserver need to implement this interface. It is expected
@@ -66,8 +66,8 @@ type Lister interface {
 
 // Exporter is an object that knows how to strip a RESTful resource for export
 type Exporter interface {
-	// Export an object.  Fields that are not user specified (e.g. Status, ObjectMeta.ResourceVersion) are stripped out
-	// Returns the stripped object.  If 'exact' is true, fields that are specific to the cluster (e.g. namespace) are
+	// Export an object. Fields that are not user specified (e.g. Status, ObjectMeta.ResourceVersion) are stripped out
+	// Returns the stripped object. If 'exact' is true, fields that are specific to the cluster (e.g. namespace) are
 	// retained, otherwise they are stripped also.
 	Export(ctx api.Context, name string, opts unversioned.ExportOptions) (runtime.Object, error)
 }

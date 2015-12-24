@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -65,7 +65,7 @@ func (c *namespaces) List(opts api.ListOptions) (*api.NamespaceList, error) {
 	return result, err
 }
 
-// Update takes the representation of a namespace to update.  Returns the server's representation of the namespace, and an error, if it occurs.
+// Update takes the representation of a namespace to update. Returns the server's representation of the namespace, and an error, if it occurs.
 func (c *namespaces) Update(namespace *api.Namespace) (result *api.Namespace, err error) {
 	result = &api.Namespace{}
 	if len(namespace.ResourceVersion) == 0 {
@@ -76,7 +76,7 @@ func (c *namespaces) Update(namespace *api.Namespace) (result *api.Namespace, er
 	return
 }
 
-// Finalize takes the representation of a namespace to update.  Returns the server's representation of the namespace, and an error, if it occurs.
+// Finalize takes the representation of a namespace to update. Returns the server's representation of the namespace, and an error, if it occurs.
 func (c *namespaces) Finalize(namespace *api.Namespace) (result *api.Namespace, err error) {
 	result = &api.Namespace{}
 	if len(namespace.ResourceVersion) == 0 {
@@ -87,7 +87,7 @@ func (c *namespaces) Finalize(namespace *api.Namespace) (result *api.Namespace, 
 	return
 }
 
-// Status takes the representation of a namespace to update.  Returns the server's representation of the namespace, and an error, if it occurs.
+// Status takes the representation of a namespace to update. Returns the server's representation of the namespace, and an error, if it occurs.
 func (c *namespaces) Status(namespace *api.Namespace) (result *api.Namespace, err error) {
 	result = &api.Namespace{}
 	if len(namespace.ResourceVersion) == 0 {

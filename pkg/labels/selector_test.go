@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -148,10 +148,10 @@ func TestSetMatches(t *testing.T) {
 	expectMatchDirect(t, Set{"baz": "blah"}, labelset)
 	expectMatchDirect(t, Set{"foo": "bar", "baz": "blah"}, labelset)
 
-	//TODO: bad values not handled for the moment in SelectorFromSet
-	//expectNoMatchDirect(t, Set{"foo": "=blah"}, labelset)
-	//expectNoMatchDirect(t, Set{"baz": "=bar"}, labelset)
-	//expectNoMatchDirect(t, Set{"foo": "=bar", "foobar": "bar", "baz": "blah"}, labelset)
+	// TODO: bad values not handled for the moment in SelectorFromSet
+	// expectNoMatchDirect(t, Set{"foo": "=blah"}, labelset)
+	// expectNoMatchDirect(t, Set{"baz": "=bar"}, labelset)
+	// expectNoMatchDirect(t, Set{"foo": "=bar", "foobar": "bar", "baz": "blah"}, labelset)
 }
 
 func TestNilMapIsValid(t *testing.T) {
@@ -184,12 +184,12 @@ func TestLexer(t *testing.T) {
 		{"in", InToken},
 		{"=", EqualsToken},
 		{"==", DoubleEqualsToken},
-		//Note that Lex returns the longest valid token found
+		// Note that Lex returns the longest valid token found
 		{"!", DoesNotExistToken},
 		{"!=", NotEqualsToken},
 		{"(", OpenParToken},
 		{")", ClosedParToken},
-		//Non-"special" characters are considered part of an identifier
+		// Non-"special" characters are considered part of an identifier
 		{"~", IdentifierToken},
 		{"||", IdentifierToken},
 	}
@@ -299,7 +299,7 @@ func TestRequirementConstructor(t *testing.T) {
 		{"x", DoesNotExistOperator, nil, true},
 		{"1foo", InOperator, sets.NewString("bar"), true},
 		{"1234", InOperator, sets.NewString("bar"), true},
-		{strings.Repeat("a", 254), ExistsOperator, nil, false}, //breaks DNS rule that len(key) <= 253
+		{strings.Repeat("a", 254), ExistsOperator, nil, false}, // breaks DNS rule that len(key) <= 253
 	}
 	for _, rc := range requirementConstructorTests {
 		if _, err := NewRequirement(rc.Key, rc.Op, rc.Vals); err == nil && !rc.Success {
@@ -473,9 +473,9 @@ func TestSetSelectorParser(t *testing.T) {
 			getRequirement("a", InOperator, sets.NewString("in", "notin", "x", "y", "z"), t),
 		}, true, true}, // operator 'in' inside list of identifiers
 		{"a in (xyz abc)", nil, false, false}, // no comma
-		{"a notin(", nil, true, false},        // bad formed
-		{"a (", nil, false, false},            // cpar
-		{"(", nil, false, false},              // opar
+		{"a notin(", nil, true, false}, // bad formed
+		{"a (", nil, false, false}, // cpar
+		{"(", nil, false, false}, // opar
 	}
 
 	for _, ssp := range setSelectorParserTests {

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -69,15 +69,15 @@ func StaticResyncPeriodFunc(resyncPeriod time.Duration) ResyncPeriodFunc {
 }
 
 // Expectations are a way for controllers to tell the controller manager what they expect. eg:
-//	ControllerExpectations: {
-//		controller1: expects  2 adds in 2 minutes
-//		controller2: expects  2 dels in 2 minutes
-//		controller3: expects -1 adds in 2 minutes => controller3's expectations have already been met
-//	}
+// 	ControllerExpectations: {
+// 		controller1: expects 2 adds in 2 minutes
+// 		controller2: expects 2 dels in 2 minutes
+// 		controller3: expects -1 adds in 2 minutes => controller3's expectations have already been met
+// 	}
 //
 // Implementation:
-//	PodExpectation = pair of atomic counters to track pod creation/deletion
-//	ControllerExpectationsStore = TTLStore + a PodExpectation per controller
+// 	PodExpectation = pair of atomic counters to track pod creation/deletion
+// 	ControllerExpectationsStore = TTLStore + a PodExpectation per controller
 //
 // * Once set expectations can only be lowered
 // * A controller isn't synced till its expectations are either fulfilled, or expire
@@ -145,9 +145,9 @@ func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) boo
 	} else {
 		// When a new controller is created, it doesn't have expectations.
 		// When it doesn't see expected watch events for > TTL, the expectations expire.
-		//	- In this case it wakes up, creates/deletes pods, and sets expectations again.
+		// 	- In this case it wakes up, creates/deletes pods, and sets expectations again.
 		// When it has satisfied expectations and no pods need to be created/destroyed > TTL, the expectations expire.
-		//	- In this case it continues without setting expectations till it needs to create/delete pods.
+		// 	- In this case it continues without setting expectations till it needs to create/delete pods.
 		glog.V(4).Infof("Controller %v either never recorded expectations, or the ttl expired.", controllerKey)
 	}
 	// Trigger a sync if we either encountered and error (which shouldn't happen since we're

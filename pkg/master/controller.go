@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -153,8 +153,8 @@ func (c *Controller) CreateNamespaceIfNeeded(ns string) error {
 // createPortAndServiceSpec creates an array of service ports.
 // If the NodePort value is 0, just the servicePort is used, otherwise, a node port is exposed.
 func createPortAndServiceSpec(servicePort int, nodePort int, servicePortName string, extraServicePorts []api.ServicePort) ([]api.ServicePort, api.ServiceType) {
-	//Use the Cluster IP type for the service port if NodePort isn't provided.
-	//Otherwise, we will be binding the master service to a NodePort.
+	// Use the Cluster IP type for the service port if NodePort isn't provided.
+	// Otherwise, we will be binding the master service to a NodePort.
 	servicePorts := []api.ServicePort{{Protocol: api.ProtocolTCP,
 		Port:       servicePort,
 		Name:       servicePortName,
@@ -229,12 +229,12 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 // understand the requirements and the body of this function.
 //
 // Requirements:
-//  * All apiservers MUST use the same ports for their {rw, ro} services.
-//  * All apiservers MUST use ReconcileEndpoints and only ReconcileEndpoints to manage the
-//      endpoints for their {rw, ro} services.
-//  * All apiservers MUST know and agree on the number of apiservers expected
-//      to be running (c.masterCount).
-//  * ReconcileEndpoints is called periodically from all apiservers.
+// * All apiservers MUST use the same ports for their {rw, ro} services.
+// * All apiservers MUST use ReconcileEndpoints and only ReconcileEndpoints to manage the
+// endpoints for their {rw, ro} services.
+// * All apiservers MUST know and agree on the number of apiservers expected
+// to be running (c.masterCount).
+// * ReconcileEndpoints is called periodically from all apiservers.
 //
 func (c *Controller) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
 	ctx := api.NewDefaultContext()
@@ -271,7 +271,7 @@ func (c *Controller) ReconcileEndpoints(serviceName string, ip net.IP, endpointP
 		e.Subsets = endpoints.RepackSubsets(e.Subsets)
 
 		// If too many IP addresses, remove the ones lexicographically after our
-		// own IP address.  Given the requirements stated at the top of
+		// own IP address. Given the requirements stated at the top of
 		// this function, this should cause the list of IP addresses to
 		// become eventually correct.
 		if addrs := &e.Subsets[0].Addresses; len(*addrs) > c.MasterCount {
@@ -301,9 +301,9 @@ func (c *Controller) ReconcileEndpoints(serviceName string, ip net.IP, endpointP
 // Return values:
 // * formatCorrect is true if exactly one subset is found.
 // * ipCorrect is true when current master's IP is found and the number
-//     of addresses is less than or equal to the master count.
+// of addresses is less than or equal to the master count.
 // * portsCorrect is true when endpoint ports exactly match provided ports.
-//     portsCorrect is only evaluated when reconcilePorts is set to true.
+// portsCorrect is only evaluated when reconcilePorts is set to true.
 func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.EndpointPort, count int, reconcilePorts bool) (formatCorrect bool, ipCorrect bool, portsCorrect bool) {
 	if len(e.Subsets) != 1 {
 		return false, false, false
@@ -331,17 +331,17 @@ func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.Endpoint
 }
 
 // * getMasterServiceUpdateIfNeeded sets service attributes for the
-//     given apiserver service.
+// given apiserver service.
 // * getMasterServiceUpdateIfNeeded expects that the service object it
-//     manages will be managed only by getMasterServiceUpdateIfNeeded;
-//     therefore, to understand this, you need only understand the
-//     requirements and the body of this function.
+// manages will be managed only by getMasterServiceUpdateIfNeeded;
+// therefore, to understand this, you need only understand the
+// requirements and the body of this function.
 // * getMasterServiceUpdateIfNeeded ensures that the correct ports are
-//     are set.
+// are set.
 //
 // Requirements:
 // * All apiservers MUST use getMasterServiceUpdateIfNeeded and only
-//     getMasterServiceUpdateIfNeeded to manage service attributes
+// getMasterServiceUpdateIfNeeded to manage service attributes
 // * updateMasterService is called periodically from all apiservers.
 func getMasterServiceUpdateIfNeeded(svc *api.Service, servicePorts []api.ServicePort, serviceType api.ServiceType) (s *api.Service, updated bool) {
 	// Determine if the service is in the format we expect

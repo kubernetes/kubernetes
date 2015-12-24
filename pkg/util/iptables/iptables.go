@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,17 +39,17 @@ const (
 	Append  RulePosition = "-A"
 )
 
-// An injectable interface for running iptables commands.  Implementations must be goroutine-safe.
+// An injectable interface for running iptables commands. Implementations must be goroutine-safe.
 type Interface interface {
 	// GetVersion returns the "X.Y.Z" semver string for iptables.
 	GetVersion() (string, error)
-	// EnsureChain checks if the specified chain exists and, if not, creates it.  If the chain existed, return true.
+	// EnsureChain checks if the specified chain exists and, if not, creates it. If the chain existed, return true.
 	EnsureChain(table Table, chain Chain) (bool, error)
-	// FlushChain clears the specified chain.  If the chain did not exist, return error.
+	// FlushChain clears the specified chain. If the chain did not exist, return error.
 	FlushChain(table Table, chain Chain) error
-	// DeleteChain deletes the specified chain.  If the chain did not exist, return error.
+	// DeleteChain deletes the specified chain. If the chain did not exist, return error.
 	DeleteChain(table Table, chain Chain) error
-	// EnsureRule checks if the specified rule is present and, if not, creates it.  If the rule existed, return true.
+	// EnsureRule checks if the specified rule is present and, if not, creates it. If the rule existed, return true.
 	EnsureRule(position RulePosition, table Table, chain Chain, args ...string) (bool, error)
 	// DeleteRule checks if the specified rule is present and, if so, deletes it.
 	DeleteRule(table Table, chain Chain, args ...string) error
@@ -388,8 +388,8 @@ func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool,
 }
 
 // Executes the rule check without using the "-C" flag, instead parsing iptables-save.
-// Present for compatibility with <1.4.11 versions of iptables.  This is full
-// of hack and half-measures.  We should nix this ASAP.
+// Present for compatibility with <1.4.11 versions of iptables. This is full
+// of hack and half-measures. We should nix this ASAP.
 func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...string) (bool, error) {
 	glog.V(1).Infof("running iptables-save -t %s", string(table))
 	out, err := runner.exec.Command(cmdIptablesSave, "-t", string(table)).CombinedOutput()

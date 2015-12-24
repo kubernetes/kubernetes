@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -71,13 +71,13 @@ func (stage stageType) Do(p *SchedulerProcess, a proc.Action) <-chan error {
 	errOuter := p.Do(proc.Action(func() {
 		switch stage {
 		case standbyStage:
-			//await standby signal or death
+			// await standby signal or death
 			select {
 			case <-p.standby:
 			case <-p.Done():
 			}
 		case masterStage:
-			//await elected signal or death
+			// await elected signal or death
 			select {
 			case <-p.elected:
 			case <-p.Done():
@@ -106,7 +106,7 @@ type SchedulerProcess struct {
 	proc.Process
 	bindings.Scheduler
 	stage    stageType
-	elected  chan struct{} // upon close we've been elected
+	elected chan struct{} // upon close we've been elected
 	failover chan struct{} // closed indicates that we should failover upon End()
 	standby  chan struct{}
 	fin      chan struct{}

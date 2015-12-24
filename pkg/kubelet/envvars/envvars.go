@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -62,8 +62,8 @@ func FromServices(services *api.ServiceList) []api.EnvVar {
 func makeEnvVariableName(str string) string {
 	// TODO: If we simplify to "all names are DNS1123Subdomains" this
 	// will need two tweaks:
-	//   1) Handle leading digits
-	//   2) Handle dots
+	// 1) Handle leading digits
+	// 2) Handle dots
 	return strings.ToUpper(strings.Replace(str, "-", "_", -1))
 }
 

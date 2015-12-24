@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,7 +27,7 @@ import (
 
 // MasterElector is an interface for services that can elect masters.
 // Important Note: MasterElectors are not inter-operable, all participants in the election need to be
-//  using the same underlying implementation of this interface for correct behavior.
+// using the same underlying implementation of this interface for correct behavior.
 type MasterElector interface {
 	// Elect makes the caller represented by 'id' enter into a master election for the
 	// distributed lock defined by 'path'
@@ -53,7 +53,7 @@ type notifier struct {
 	// might be needed. This handles the case where mastership flops
 	// around without calling Start()/Stop() excessively.
 	desired, current Master
-	lock             sync.Mutex // to protect the desired variable
+	lock sync.Mutex // to protect the desired variable
 
 	// for comparison, to see if we are master.
 	id Master

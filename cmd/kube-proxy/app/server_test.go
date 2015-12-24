@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,7 +35,7 @@ func (fake *fakeNodeInterface) Get(hostname string) (*api.Node, error) {
 
 type fakeIptablesVersioner struct {
 	version string // what to return
-	err     error  // what to return
+	err error // what to return
 }
 
 func (fake *fakeIptablesVersioner) GetVersion() (string, error) {
@@ -207,21 +207,21 @@ func Test_getProxyMode(t *testing.T) {
 	}
 }
 
-//This test verifies that Proxy Server does not crash that means
-//Config and iptinterface are not nil when CleanupAndExit is true.
-//To avoid proxy crash: https://github.com/kubernetes/kubernetes/pull/14736
+// This test verifies that Proxy Server does not crash that means
+// Config and iptinterface are not nil when CleanupAndExit is true.
+// To avoid proxy crash: https://github.com/kubernetes/kubernetes/pull/14736
 func TestProxyServerWithCleanupAndExit(t *testing.T) {
 
-	//creates default config
+	// creates default config
 	config := NewProxyConfig()
 
-	//sets CleanupAndExit manually
+	// sets CleanupAndExit manually
 	config.CleanupAndExit = true
 
-	//creates new proxy server
+	// creates new proxy server
 	proxyserver, err := NewProxyServerDefault(config)
 
-	//verifies that nothing is nill except error
+	// verifies that nothing is nill except error
 	assert.Nil(t, err)
 	assert.NotNil(t, proxyserver)
 	assert.NotNil(t, proxyserver.Config)

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -618,7 +618,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	podOut := obj.(*api.Pod)
-	// Check to verify the Spec and Label updates match from change above.  Those are the fields changed.
+	// Check to verify the Spec and Label updates match from change above. Those are the fields changed.
 	if !api.Semantic.DeepEqual(podOut.Spec, podIn.Spec) || !api.Semantic.DeepEqual(podOut.Labels, podIn.Labels) {
 		t.Errorf("objects differ: %v", util.ObjectDiff(podOut, podIn))
 	}
@@ -698,7 +698,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	podOut := obj.(*api.Pod)
-	// Check to verify the Spec, Label, and Status updates match from change above.  Those are the fields changed.
+	// Check to verify the Spec, Label, and Status updates match from change above. Those are the fields changed.
 	if !api.Semantic.DeepEqual(podOut.Spec, podIn.Spec) ||
 		!api.Semantic.DeepEqual(podOut.Labels, podIn.Labels) ||
 		!api.Semantic.DeepEqual(podOut.Status, podIn.Status) {

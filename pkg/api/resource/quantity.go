@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,18 +33,18 @@ import (
 //
 // The serialization format is:
 //
-// <quantity>        ::= <signedNumber><suffix>
-//   (Note that <suffix> may be empty, from the "" case in <decimalSI>.)
-// <digit>           ::= 0 | 1 | ... | 9
-// <digits>          ::= <digit> | <digit><digits>
-// <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits>
-// <sign>            ::= "+" | "-"
-// <signedNumber>    ::= <number> | <sign><number>
-// <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI>
-// <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei
-//   (International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)
-// <decimalSI>       ::= m | "" | k | M | G | T | P | E
-//   (Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)
+// <quantity> ::= <signedNumber><suffix>
+// (Note that <suffix> may be empty, from the "" case in <decimalSI>.)
+// <digit> ::= 0 | 1 | ... | 9
+// <digits> ::= <digit> | <digit><digits>
+// <number> ::= <digits> | <digits>.<digits> | <digits>. | .<digits>
+// <sign> ::= "+" | "-"
+// <signedNumber> ::= <number> | <sign><number>
+// <suffix> ::= <binarySI> | <decimalExponent> | <decimalSI>
+// <binarySI> ::= Ki | Mi | Gi | Ti | Pi | Ei
+// (International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)
+// <decimalSI> ::= m | "" | k | M | G | T | P | E
+// (Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)
 // <decimalExponent> ::= "e" <signedNumber> | "E" <signedNumber>
 //
 // No matter which of the three exponent forms is used, no quantity may represent
@@ -59,19 +59,19 @@ import (
 // Before serializing, Quantity will be put in "canonical form".
 // This means that Exponent/suffix will be adjusted up or down (with a
 // corresponding increase or decrease in Mantissa) such that:
-//   a. No precision is lost
-//   b. No fractional digits will be emitted
-//   c. The exponent (or suffix) is as large as possible.
+// a. No precision is lost
+// b. No fractional digits will be emitted
+// c. The exponent (or suffix) is as large as possible.
 // The sign will be omitted unless the number is negative.
 //
 // Examples:
-//   1.5 will be serialized as "1500m"
-//   1.5Gi will be serialized as "1536Mi"
+// 1.5 will be serialized as "1500m"
+// 1.5Gi will be serialized as "1536Mi"
 //
 // NOTE: We reserve the right to amend this canonical format, perhaps to
-//   allow 1.5 to be canonical.
+// allow 1.5 to be canonical.
 // TODO: Remove above disclaimer after all bikeshedding about format is over,
-//   or after March 2015.
+// or after March 2015.
 //
 // Note that the quantity will NEVER be internally represented by a
 // floating point number. That is the whole point of this exercise.
@@ -103,8 +103,8 @@ type Format string
 
 const (
 	DecimalExponent = Format("DecimalExponent") // e.g., 12e6
-	BinarySI        = Format("BinarySI")        // e.g., 12Mi (12 * 2^20)
-	DecimalSI       = Format("DecimalSI")       // e.g., 12M  (12 * 10^6)
+	BinarySI = Format("BinarySI") // e.g., 12Mi (12 * 2^20)
+	DecimalSI = Format("DecimalSI") // e.g., 12M (12 * 10^6)
 )
 
 // MustParse turns the given string into a quantity or panics; for tests
@@ -236,9 +236,9 @@ func removeFactors(d, factor *big.Int) (result *big.Int, times int) {
 //
 // Note about BinarySI:
 // * If q.Format is set to BinarySI and q.Amount represents a non-zero value between
-//   -1 and +1, it will be emitted as if q.Format were DecimalSI.
+// -1 and +1, it will be emitted as if q.Format were DecimalSI.
 // * Otherwise, if q.Format is set to BinarySI, frational parts of q.Amount will be
-//   rounded up. (1.1i becomes 2i.)
+// rounded up. (1.1i becomes 2i.)
 func (q *Quantity) Canonicalize() (string, suffix) {
 	if q.Amount == nil {
 		return "0", ""
@@ -308,9 +308,9 @@ func (q *Quantity) String() string {
 
 // Cmp compares q and y and returns:
 //
-//   -1 if q <  y
-//    0 if q == y
-//   +1 if q >  y
+// -1 if q < y
+// 0 if q == y
+// +1 if q > y
 //
 func (q *Quantity) Cmp(y Quantity) int {
 	num1 := q.Value()

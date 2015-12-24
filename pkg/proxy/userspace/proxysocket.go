@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -75,7 +75,7 @@ func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, er
 // How long we wait for a connection to a backend in seconds
 var endpointDialTimeout = []time.Duration{250 * time.Millisecond, 500 * time.Millisecond, 1 * time.Second, 2 * time.Second}
 
-// tcpProxySocket implements proxySocket.  Close() is implemented by net.Listener.  When Close() is called,
+// tcpProxySocket implements proxySocket. Close() is implemented by net.Listener. When Close() is called,
 // no new connections are allowed but existing connections are left untouched.
 type tcpProxySocket struct {
 	net.Listener
@@ -169,7 +169,7 @@ func copyBytes(direction string, dest, src *net.TCPConn, wg *sync.WaitGroup) {
 	src.Close()
 }
 
-// udpProxySocket implements proxySocket.  Close() is implemented by net.UDPConn.  When Close() is called,
+// udpProxySocket implements proxySocket. Close() is implemented by net.UDPConn. When Close() is called,
 // no new connections are allowed and existing connections are broken.
 // TODO: We could lame-duck this ourselves, if it becomes important.
 type udpProxySocket struct {
@@ -222,7 +222,7 @@ func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serv
 			continue
 		}
 		// TODO: It would be nice to let the goroutine handle this write, but we don't
-		// really want to copy the buffer.  We could do a pool of buffers or something.
+		// really want to copy the buffer. We could do a pool of buffers or something.
 		_, err = svrConn.Write(buffer[0:n])
 		if err != nil {
 			if !logTimeout(err) {

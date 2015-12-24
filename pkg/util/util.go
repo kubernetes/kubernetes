@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,9 +42,9 @@ import (
 var ReallyCrash bool
 
 // For any test of the style:
-//   ...
-//   <- time.After(timeout):
-//      t.Errorf("Timed out")
+// ...
+// <- time.After(timeout):
+// t.Errorf("Timed out")
 // The value for timeout should effectively be "forever." Obviously we don't want our tests to truly lock up forever, but 30s
 // is long enough that it is effectively forever for the things that can slow down a run on a heavily contended machine
 // (GC, seeks, etc), but not so long as to make a developer ctrl-c a test run if they do happen to break that test.
@@ -179,12 +179,12 @@ func UsingSystemdInitSystem() bool {
 	return false
 }
 
-// Tests whether all pointer fields in a struct are nil.  This is useful when,
+// Tests whether all pointer fields in a struct are nil. This is useful when,
 // for example, an API struct is handled by plugins which need to distinguish
 // "no plugin accepted this spec" from "this spec is empty".
 //
-// This function is only valid for structs and pointers to structs.  Any other
-// type will cause a panic.  Passing a typed nil pointer will return true.
+// This function is only valid for structs and pointers to structs. Any other
+// type will cause a panic. Passing a typed nil pointer will return true.
 func AllPtrFieldsNil(obj interface{}) bool {
 	v := reflect.ValueOf(obj)
 	if !v.IsValid() {
@@ -239,7 +239,7 @@ func getRoutes(input io.Reader) ([]Route, error) {
 		if err == io.EOF {
 			break
 		}
-		//ignore the headers in the route info
+		// ignore the headers in the route info
 		if strings.HasPrefix(line, "Iface") {
 			continue
 		}
@@ -269,7 +269,7 @@ func parseIP(str string) (net.IP, error) {
 	if err != nil {
 		return nil, err
 	}
-	//TODO add ipv6 support
+	// TODO add ipv6 support
 	if len(bytes) != net.IPv4len {
 		return nil, fmt.Errorf("only IPv4 is supported")
 	}
@@ -288,9 +288,9 @@ func isInterfaceUp(intf *net.Interface) bool {
 	return false
 }
 
-//getFinalIP method receives all the IP addrs of a Interface
-//and returns a nil if the address is Loopback, Ipv6, link-local or nil.
-//It returns a valid IPv4 if an Ipv4 address is found in the array.
+// getFinalIP method receives all the IP addrs of a Interface
+// and returns a nil if the address is Loopback, Ipv6, link-local or nil.
+// It returns a valid IPv4 if an Ipv4 address is found in the array.
 func getFinalIP(addrs []net.Addr) (net.IP, error) {
 	if len(addrs) > 0 {
 		for i := range addrs {
@@ -299,8 +299,8 @@ func getFinalIP(addrs []net.Addr) (net.IP, error) {
 			if err != nil {
 				return nil, err
 			}
-			//Only IPv4
-			//TODO : add IPv6 support
+			// Only IPv4
+			// TODO : add IPv6 support
 			if ip.To4() != nil {
 				if !ip.IsLoopback() && !ip.IsLinkLocalMulticast() && !ip.IsLinkLocalUnicast() {
 					glog.V(4).Infof("IP found %v", ip)
@@ -387,10 +387,10 @@ func chooseHostInterfaceNativeGo() (net.IP, error) {
 	return ip, nil
 }
 
-//ChooseHostInterface is a method used fetch an IP for a daemon.
-//It uses data from /proc/net/route file.
-//For a node with no internet connection ,it returns error
-//For a multi n/w interface node it returns the IP of the interface with gateway on it.
+// ChooseHostInterface is a method used fetch an IP for a daemon.
+// It uses data from /proc/net/route file.
+// For a node with no internet connection ,it returns error
+// For a multi n/w interface node it returns the IP of the interface with gateway on it.
 func ChooseHostInterface() (net.IP, error) {
 	inFile, err := os.Open("/proc/net/route")
 	if err != nil {
@@ -435,7 +435,7 @@ func chooseHostInterfaceFromRoute(inFile io.Reader, nw networkInterfacer) (net.I
 	zero := net.IP{0, 0, 0, 0}
 	var finalIP net.IP
 	for i := range routes {
-		//find interface with gateway
+		// find interface with gateway
 		if routes[i].Destination.Equal(zero) {
 			glog.V(4).Infof("Default route transits interface %q", routes[i].Interface)
 			finalIP, err := getIPFromInterface(routes[i].Interface, nw)

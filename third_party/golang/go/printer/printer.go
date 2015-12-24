@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	maxNewlines = 2     // max. number of newlines between source text
-	debug       = false // enable for debugging
+	maxNewlines = 2 // max. number of newlines between source text
+	debug = false // enable for debugging
 	infinity    = 1 << 30
 )
 
@@ -40,15 +40,15 @@ const (
 type pmode int
 
 const (
-	noExtraBlank     pmode = 1 << iota // disables extra blank after /*-style comment
-	noExtraLinebreak                   // disables extra line break after /*-style comment
+	noExtraBlank pmode = 1 << iota // disables extra blank after /*-style comment
+	noExtraLinebreak // disables extra line break after /*-style comment
 )
 
 type commentInfo struct {
-	cindex         int               // current comment index
-	comment        *ast.CommentGroup // = printer.comments[cindex]; or nil
-	commentOffset  int               // = printer.posFor(printer.comments[cindex].List[0].Pos()).Offset; or infinity
-	commentNewline bool              // true if the comment group contains newlines
+	cindex int // current comment index
+	comment *ast.CommentGroup // = printer.comments[cindex]; or nil
+	commentOffset int // = printer.posFor(printer.comments[cindex].List[0].Pos()).Offset; or infinity
+	commentNewline bool // true if the comment group contains newlines
 }
 
 type printer struct {
@@ -57,28 +57,28 @@ type printer struct {
 	fset *token.FileSet
 
 	// Current state
-	output      []byte       // raw printer result
-	indent      int          // current indentation
-	mode        pmode        // current printer mode
-	impliedSemi bool         // if set, a linebreak implies a semicolon
-	lastTok     token.Token  // last token printed (token.ILLEGAL if it's whitespace)
-	prevOpen    token.Token  // previous non-brace "open" token (, [, or token.ILLEGAL
-	wsbuf       []whiteSpace // delayed white space
+	output []byte // raw printer result
+	indent int // current indentation
+	mode pmode // current printer mode
+	impliedSemi bool // if set, a linebreak implies a semicolon
+	lastTok token.Token // last token printed (token.ILLEGAL if it's whitespace)
+	prevOpen token.Token // previous non-brace "open" token (, [, or token.ILLEGAL
+	wsbuf []whiteSpace // delayed white space
 
 	// Positions
 	// The out position differs from the pos position when the result
 	// formatting differs from the source formatting (in the amount of
 	// white space). If there's a difference and SourcePos is set in
-	// ConfigMode, //line comments are used in the output to restore
+	// ConfigMode, //   line comments are used in the output to restore
 	// original source positions for a reader.
-	pos     token.Position // current position in AST (source) space
-	out     token.Position // current position in output space
-	last    token.Position // value of pos after calling writeString
-	linePtr *int           // if set, record out.Line for the next token in *linePtr
+	pos token.Position // current position in AST (source) space
+	out token.Position // current position in output space
+	last token.Position // value of pos after calling writeString
+	linePtr *int // if set, record out.Line for the next token in *linePtr
 
 	// The list of all source comments, in order of appearance.
-	comments        []*ast.CommentGroup // may be nil
-	useNodeComments bool                // if not set, ignore lead and line comments of nodes
+	comments []*ast.CommentGroup // may be nil
+	useNodeComments bool // if not set, ignore lead and line comments of nodes
 
 	// Information about p.comments[p.cindex]; set up by nextComment.
 	commentInfo
@@ -203,14 +203,14 @@ func (p *printer) lineFor(pos token.Pos) int {
 	return p.cachedLine
 }
 
-// atLineBegin emits a //line comment if necessary and prints indentation.
+// atLineBegin emits a //   line comment if necessary and prints indentation.
 func (p *printer) atLineBegin(pos token.Position) {
-	// write a //line comment if necessary
+	// write a //   line comment if necessary
 	if p.Config.Mode&SourcePos != 0 && pos.IsValid() && (p.out.Line != pos.Line || p.out.Filename != pos.Filename) {
-		p.output = append(p.output, tabwriter.Escape) // protect '\n' in //line from tabwriter interpretation
-		p.output = append(p.output, fmt.Sprintf("//line %s:%d\n", pos.Filename, pos.Line)...)
+		p.output = append(p.output, tabwriter.Escape) // protect '\n' in //   line from tabwriter interpretation
+		p.output = append(p.output, fmt.Sprintf("// line %s:%d\n", pos.Filename, pos.Line)...)
 		p.output = append(p.output, tabwriter.Escape)
-		// p.out must match the //line comment
+		// p.out must match the //   line comment
 		p.out.Filename = pos.Filename
 		p.out.Line = pos.Line
 	}
@@ -614,7 +614,7 @@ func (p *printer) writeComment(comment *ast.Comment) {
 	text := comment.Text
 	pos := p.posFor(comment.Pos())
 
-	const linePrefix = "//line "
+	const linePrefix = "// line "
 	if strings.HasPrefix(text, linePrefix) && (!pos.IsValid() || pos.Column == 1) {
 		// possibly a line directive
 		ldir := strings.TrimSpace(text[len(linePrefix):])
@@ -636,7 +636,7 @@ func (p *printer) writeComment(comment *ast.Comment) {
 		}
 	}
 
-	// shortcut common case of //-style comments
+	// shortcut common case of //   -style comments
 	if text[1] == '/' {
 		p.writeString(pos, trimRight(text), true)
 		return
@@ -742,7 +742,7 @@ func (p *printer) intersperseComments(next token.Position, tok token.Token) (wro
 			(tok != token.RBRACK || p.prevOpen == token.LBRACK) {
 			p.writeByte(' ', 1)
 		}
-		// ensure that there is a line break after a //-style comment,
+		// ensure that there is a line break after a //   -style comment,
 		// before a closing '}' unless explicitly disabled, or at eof
 		needsLinebreak :=
 			last.Text[1] == '/' ||
@@ -1118,9 +1118,9 @@ type trimmer struct {
 // trimmer is implemented as a state machine.
 // It can be in one of the following states:
 const (
-	inSpace  = iota // inside space
-	inEscape        // inside text bracketed by tabwriter.Escapes
-	inText          // inside text
+	inSpace = iota // inside space
+	inEscape // inside text bracketed by tabwriter.Escapes
+	inText // inside text
 )
 
 func (p *trimmer) resetSpace() {
@@ -1129,19 +1129,19 @@ func (p *trimmer) resetSpace() {
 }
 
 // Design note: It is tempting to eliminate extra blanks occurring in
-//              whitespace in this function as it could simplify some
-//              of the blanks logic in the node printing functions.
-//              However, this would mess up any formatting done by
-//              the tabwriter.
+// whitespace in this function as it could simplify some
+// of the blanks logic in the node printing functions.
+// However, this would mess up any formatting done by
+// the tabwriter.
 
 var aNewline = []byte("\n")
 
 func (p *trimmer) Write(data []byte) (n int, err error) {
 	// invariants:
 	// p.state == inSpace:
-	//	p.space is unwritten
+	// 	p.space is unwritten
 	// p.state == inEscape, inText:
-	//	data[m:n] is unwritten
+	// 	data[m:n] is unwritten
 	m := 0
 	var b byte
 	for n, b = range data {
@@ -1211,16 +1211,16 @@ type Mode uint
 
 const (
 	RawFormat Mode = 1 << iota // do not use a tabwriter; if set, UseSpaces is ignored
-	TabIndent                  // use tabs for indentation independent of UseSpaces
-	UseSpaces                  // use spaces instead of tabs for alignment
-	SourcePos                  // emit //line comments to preserve original source positions
+	TabIndent // use tabs for indentation independent of UseSpaces
+	UseSpaces // use spaces instead of tabs for alignment
+	SourcePos // emit //   line comments to preserve original source positions
 )
 
 // A Config node controls the output of Fprint.
 type Config struct {
-	Mode     Mode // default: 0
-	Tabwidth int  // default: 8
-	Indent   int  // default: 0 (all code is indented at least by this much)
+	Mode Mode // default: 0
+	Tabwidth int // default: 8
+	Indent int // default: 0 (all code is indented at least by this much)
 }
 
 // fprint implements Fprint and takes a nodesSizes map for setting up the printer state.
@@ -1276,7 +1276,7 @@ func (cfg *Config) fprint(output io.Writer, fset *token.FileSet, node interface{
 // It may be provided as argument to any of the Fprint functions.
 //
 type CommentedNode struct {
-	Node     interface{} // *ast.File, or ast.Expr, ast.Decl, ast.Spec, or ast.Stmt
+	Node interface{} // *ast.File, or ast.Expr, ast.Decl, ast.Spec, or ast.Stmt
 	Comments []*ast.CommentGroup
 }
 

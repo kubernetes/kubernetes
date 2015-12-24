@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -72,9 +72,9 @@ func dead(msg Entry) {
 type HistoricalFIFO struct {
 	lock      sync.RWMutex
 	cond      sync.Cond
-	items     map[string]Entry // We depend on the property that items in the queue are in the set.
+	items map[string]Entry // We depend on the property that items in the queue are in the set.
 	queue     []string
-	carrier   pigeon // may be dead, but never nil
+	carrier pigeon // may be dead, but never nil
 	gcc       int
 	lingerTTL time.Duration
 }
@@ -370,8 +370,8 @@ func (f *HistoricalFIFO) merge(id string, obj UniqueCopyable) (notifications []E
 			f.items[id] = e2
 			notifications = append(notifications, e1, e2)
 		} else if !reflect.DeepEqual(obj, item.Value()) {
-			//TODO(jdef): it would be nice if we could rely on resource versions
-			//instead of doing a DeepEqual. Maybe someday we'll be able to.
+			// TODO(jdef): it would be nice if we could rely on resource versions
+			// instead of doing a DeepEqual. Maybe someday we'll be able to.
 			e := &entry{obj.Copy().(UniqueCopyable), UPDATE_EVENT}
 			f.items[id] = e
 			notifications = append(notifications, e)
@@ -379,7 +379,7 @@ func (f *HistoricalFIFO) merge(id string, obj UniqueCopyable) (notifications []E
 	}
 	// check for garbage collection
 	f.gcc++
-	if f.gcc%256 == 0 { //TODO(jdef): extract constant
+	if f.gcc%256 == 0 { // TODO(jdef): extract constant
 		f.gcc = 0
 		f.gc()
 	}

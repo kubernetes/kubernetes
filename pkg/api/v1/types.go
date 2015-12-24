@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,29 +39,29 @@ import (
 // Many fields in this API have formatting requirements. The commonly used
 // formats are defined here.
 //
-// C_IDENTIFIER:  This is a string that conforms to the definition of an "identifier"
-//     in the C language. This is captured by the following regex:
-//         [A-Za-z_][A-Za-z0-9_]*
-//     This defines the format, but not the length restriction, which should be
-//     specified at the definition of any field of this type.
+// C_IDENTIFIER: This is a string that conforms to the definition of an "identifier"
+// in the C language. This is captured by the following regex:
+// [A-Za-z_][A-Za-z0-9_]*
+// This defines the format, but not the length restriction, which should be
+// specified at the definition of any field of this type.
 //
-// DNS_LABEL:  This is a string, no more than 63 characters long, that conforms
-//     to the definition of a "label" in RFCs 1035 and 1123. This is captured
-//     by the following regex:
-//         [a-z0-9]([-a-z0-9]*[a-z0-9])?
+// DNS_LABEL: This is a string, no more than 63 characters long, that conforms
+// to the definition of a "label" in RFCs 1035 and 1123. This is captured
+// by the following regex:
+// [a-z0-9]([-a-z0-9]*[a-z0-9])?
 //
-// DNS_SUBDOMAIN:  This is a string, no more than 253 characters long, that conforms
-//      to the definition of a "subdomain" in RFCs 1035 and 1123. This is captured
-//      by the following regex:
-//         [a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
-//     or more simply:
-//         DNS_LABEL(\.DNS_LABEL)*
+// DNS_SUBDOMAIN: This is a string, no more than 253 characters long, that conforms
+// to the definition of a "subdomain" in RFCs 1035 and 1123. This is captured
+// by the following regex:
+// [a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
+// or more simply:
+// DNS_LABEL(\.DNS_LABEL)*
 //
 // IANA_SVC_NAME: This is a string, no more than 15 characters long, that
-//      conforms to the definition of IANA service name in RFC 6335.
-//      It must contains at least one letter [a-z] and it must contains only [a-z0-9-].
-//      Hypens ('-') cannot be leading or trailing character of the string
-//      and cannot be adjacent to other hyphens.
+// conforms to the definition of IANA service name in RFC 6335.
+// It must contains at least one letter [a-z] and it must contains only [a-z0-9-].
+// Hypens ('-') cannot be leading or trailing character of the string
+// and cannot be adjacent to other hyphens.
 
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
 // users must create.
@@ -616,8 +616,8 @@ type FlockerVolumeSource struct {
 type StorageMedium string
 
 const (
-	StorageMediumDefault StorageMedium = ""       // use whatever the default is for the node
-	StorageMediumMemory  StorageMedium = "Memory" // use memory (tmpfs)
+	StorageMediumDefault StorageMedium = "" // use whatever the default is for the node
+	StorageMediumMemory StorageMedium = "Memory" // use memory (tmpfs)
 )
 
 // Protocol defines network protocols supported for things like conatiner ports.
@@ -712,8 +712,8 @@ type GitRepoVolumeSource struct {
 	// Commit hash for the specified revision.
 	Revision string `json:"revision,omitempty"`
 	// Target directory name.
-	// Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the
-	// git repository.  Otherwise, if specified, the volume will contain the git repository in
+	// Must not contain or start with '..'. If '.' is supplied, the volume directory will be the
+	// git repository. Otherwise, if specified, the volume will contain the git repository in
 	// the subdirectory with the given name.
 	Directory string `json:"directory,omitempty"`
 }
@@ -891,7 +891,7 @@ type TCPSocketAction struct {
 // ExecAction describes a "run in container" action.
 type ExecAction struct {
 	// Command is the command line to execute inside the container, the working directory for the
-	// command  is root ('/') in the container's filesystem. The command is simply exec'd, it is
+	// command is root ('/') in the container's filesystem. The command is simply exec'd, it is
 	// not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use
 	// a shell, you need to explicitly call out to that shell.
 	// Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
@@ -1310,7 +1310,7 @@ type PodSpec struct {
 	// Optional: Default to false.
 	HostIPC bool `json:"hostIPC,omitempty"`
 	// SecurityContext holds pod-level security attributes and common container settings.
-	// Optional: Defaults to empty.  See type description for default values of each field.
+	// Optional: Defaults to empty. See type description for default values of each field.
 	SecurityContext *PodSecurityContext `json:"securityContext,omitempty"`
 	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
 	// If specified, these secrets will be passed to individual puller implementations for them to use. For example,
@@ -1320,18 +1320,18 @@ type PodSpec struct {
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
-// Some fields are also present in container.securityContext.  Field values of
+// Some fields are also present in container.securityContext. Field values of
 // container.securityContext take precedence over field values of PodSecurityContext.
 type PodSecurityContext struct {
 	// The SELinux context to be applied to all containers.
 	// If unspecified, the container runtime will allocate a random SELinux context for each
-	// container.  May also be set in SecurityContext.  If set in
+	// container. May also be set in SecurityContext. If set in
 	// both SecurityContext and PodSecurityContext, the value specified in SecurityContext
 	// takes precedence for that container.
 	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty"`
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
-	// May also be set in SecurityContext.  If set in both SecurityContext and
+	// May also be set in SecurityContext. If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence
 	// for that container.
 	RunAsUser *int64 `json:"runAsUser,omitempty"`
@@ -1339,11 +1339,11 @@ type PodSecurityContext struct {
 	// If true, the Kubelet will validate the image at runtime to ensure that it
 	// does not run as UID 0 (root) and fail to start the container if it does.
 	// If unset or false, no such validation will be performed.
-	// May also be set in SecurityContext.  If set in both SecurityContext and
+	// May also be set in SecurityContext. If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	RunAsNonRoot *bool `json:"runAsNonRoot,omitempty"`
 	// A list of groups applied to the first process run in each container, in addition
-	// to the container's primary GID.  If unspecified, no groups will be added to
+	// to the container's primary GID. If unspecified, no groups will be added to
 	// any container.
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty"`
 	// A special supplemental group that applies to all containers in a pod.
@@ -1621,18 +1621,18 @@ type ServiceSpec struct {
 	Type ServiceType `json:"type,omitempty"`
 
 	// externalIPs is a list of IP addresses for which nodes in the cluster
-	// will also accept traffic for this service.  These IPs are not managed by
-	// Kubernetes.  The user is responsible for ensuring that traffic arrives
-	// at a node with this IP.  A common example is external load-balancers
-	// that are not part of the Kubernetes system.  A previous form of this
-	// functionality exists as the deprecatedPublicIPs field.  When using this
+	// will also accept traffic for this service. These IPs are not managed by
+	// Kubernetes. The user is responsible for ensuring that traffic arrives
+	// at a node with this IP. A common example is external load-balancers
+	// that are not part of the Kubernetes system. A previous form of this
+	// functionality exists as the deprecatedPublicIPs field. When using this
 	// field, callers should also clear the deprecatedPublicIPs field.
 	ExternalIPs []string `json:"externalIPs,omitempty"`
 
 	// deprecatedPublicIPs is deprecated and replaced by the externalIPs field
-	// with almost the exact same semantics.  This field is retained in the v1
-	// API for compatibility until at least 8/20/2016.  It will be removed from
-	// any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are
+	// with almost the exact same semantics. This field is retained in the v1
+	// API for compatibility until at least 8/20/2016. It will be removed from
+	// any new API revisions. If both deprecatedPublicIPs *and* externalIPs are
 	// set, deprecatedPublicIPs is used.
 	DeprecatedPublicIPs []string `json:"deprecatedPublicIPs,omitempty"`
 
@@ -1754,17 +1754,17 @@ type ServiceAccountList struct {
 }
 
 // Endpoints is a collection of endpoints that implement the actual service. Example:
-//   Name: "mysvc",
-//   Subsets: [
-//     {
-//       Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
-//       Ports: [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
-//     },
-//     {
-//       Addresses: [{"ip": "10.10.3.3"}],
-//       Ports: [{"name": "a", "port": 93}, {"name": "b", "port": 76}]
-//     },
-//  ]
+// Name: "mysvc",
+// Subsets: [
+// {
+// Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+// Ports: [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+// },
+// {
+// Addresses: [{"ip": "10.10.3.3"}],
+// Ports: [{"name": "a", "port": 93}, {"name": "b", "port": 76}]
+// },
+// ]
 type Endpoints struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -1784,13 +1784,13 @@ type Endpoints struct {
 // EndpointSubset is a group of addresses with a common set of ports. The
 // expanded set of endpoints is the Cartesian product of Addresses x Ports.
 // For example, given:
-//   {
-//     Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
-//     Ports:     [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
-//   }
+// {
+// Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+// Ports: [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+// }
 // The resulting set of endpoints can be viewed as:
-//     a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
-//     b: [ 10.10.1.1:309, 10.10.2.2:309 ]
+// a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
+// b: [ 10.10.1.1:309, 10.10.2.2:309 ]
 type EndpointSubset struct {
 	// IP addresses which offer the related ports that are marked as ready. These endpoints
 	// should be considered safe for load balancers and clients to utilize.
@@ -2103,9 +2103,9 @@ type DeleteOptions struct {
 type ExportOptions struct {
 	unversioned.TypeMeta `json:",inline"`
 
-	// Should this value be exported.  Export strips fields that a user can not specify.
+	// Should this value be exported. Export strips fields that a user can not specify.
 	Export bool `json:"export"`
-	// Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'
+	// Should the export be exact. Exact export maintains cluster-specific fields like 'Namespace'
 	Exact bool `json:"exact"`
 }
 
@@ -2590,14 +2590,14 @@ type DownwardAPIVolumeSource struct {
 
 // DownwardAPIVolumeFile represents information to create the file containing the pod field
 type DownwardAPIVolumeFile struct {
-	// Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
+	// Required: Path is the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
 	Path string `json:"path"`
 	// Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.
 	FieldRef ObjectFieldSelector `json:"fieldRef"`
 }
 
 // SecurityContext holds security configuration that will be applied to a container.
-// Some fields are present in both SecurityContext and PodSecurityContext.  When both
+// Some fields are present in both SecurityContext and PodSecurityContext. When both
 // are set, the values in SecurityContext take precedence.
 type SecurityContext struct {
 	// The capabilities to add/drop when running containers.
@@ -2609,19 +2609,19 @@ type SecurityContext struct {
 	Privileged *bool `json:"privileged,omitempty"`
 	// The SELinux context to be applied to the container.
 	// If unspecified, the container runtime will allocate a random SELinux context for each
-	// container.  May also be set in PodSecurityContext.  If set in both SecurityContext and
+	// container. May also be set in PodSecurityContext. If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty"`
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
-	// May also be set in PodSecurityContext.  If set in both SecurityContext and
+	// May also be set in PodSecurityContext. If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	RunAsUser *int64 `json:"runAsUser,omitempty"`
 	// Indicates that the container must run as a non-root user.
 	// If true, the Kubelet will validate the image at runtime to ensure that it
 	// does not run as UID 0 (root) and fail to start the container if it does.
 	// If unset or false, no such validation will be performed.
-	// May also be set in PodSecurityContext.  If set in both SecurityContext and
+	// May also be set in PodSecurityContext. If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	RunAsNonRoot *bool `json:"runAsNonRoot,omitempty"`
 }

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,7 +31,7 @@ type KubeProxyConfiguration struct {
 	HealthzPort int32 `json:"healthzPort"`
 	// hostnameOverride, if non-empty, will be used as the identity instead of the actual hostname.
 	HostnameOverride string `json:"hostnameOverride"`
-	// iptablesSyncPeriodSeconds is the period that iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.
+	// iptablesSyncPeriodSeconds is the period that iptables rules are refreshed (e.g. '5s', '1m', '2h22m'). Must be greater than 0.
 	IPTablesSyncePeriodSeconds int32 `json:"iptablesSyncPeriodSeconds"`
 	// kubeAPIBurst is the burst to use while talking with kubernetes apiserver
 	KubeAPIBurst int32 `json:"kubeAPIBurst"`
@@ -51,11 +51,11 @@ type KubeProxyConfiguration struct {
 	PortRange string `json:"portRange"`
 	// resourceContainer is the bsolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).
 	ResourceContainer string `json:"resourceContainer"`
-	// udpTimeoutMilliseconds is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxyMode=userspace.
+	// udpTimeoutMilliseconds is how long an idle UDP connection will be kept open (e.g. '250ms', '2s'). Must be greater than 0. Only applicable for proxyMode=userspace.
 	UDPTimeoutMilliseconds int32 `json:"udpTimeoutMilliseconds"`
 }
 
-// Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables' (experimental). If blank, look at the Node object on the Kubernetes API and respect the 'net.experimental.kubernetes.io/proxy-mode' annotation if provided.  Otherwise use the best-available proxy (currently userspace, but may change in future versions).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.
+// Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables' (experimental). If blank, look at the Node object on the Kubernetes API and respect the 'net.experimental.kubernetes.io/proxy-mode' annotation if provided. Otherwise use the best-available proxy (currently userspace, but may change in future versions). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.
 type ProxyMode string
 
 const (

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -287,14 +287,14 @@ func verifyConversionFunctionSignature(ft reflect.Type) error {
 // RegisterConversionFunc registers a conversion func with the
 // Converter. conversionFunc must take three parameters: a pointer to the input
 // type, a pointer to the output type, and a conversion.Scope (which should be
-// used if recursive conversion calls are desired).  It must return an error.
+// used if recursive conversion calls are desired). It must return an error.
 //
 // Example:
 // c.RegisterConversionFunc(
-//         func(in *Pod, out *v1.Pod, s Scope) error {
-//                 // conversion logic...
-//                 return nil
-//          })
+// func(in *Pod, out *v1.Pod, s Scope) error {
+// //   conversion logic...
+// return nil
+// })
 func (c *Converter) RegisterConversionFunc(conversionFunc interface{}) error {
 	fv := reflect.ValueOf(conversionFunc)
 	ft := fv.Type()
@@ -348,9 +348,9 @@ func (c *Converter) SetStructFieldCopy(srcFieldType interface{}, srcFieldName st
 //
 // Example:
 // c.RegisteDefaultingFunc(
-//         func(in *v1.Pod) {
-//                 // defaulting logic...
-//          })
+// func(in *v1.Pod) {
+// //   defaulting logic...
+// })
 func (c *Converter) RegisterDefaultingFunc(defaultingFunc interface{}) error {
 	fv := reflect.ValueOf(defaultingFunc)
 	ft := fv.Type()
@@ -608,7 +608,7 @@ func (c *Converter) defaultConvert(sv, dv reflect.Value, scope *scope) error {
 			}
 			dkv := reflect.New(dt.Elem()).Elem()
 			scope.setKeys(sk.Interface(), dk.Interface())
-			// TODO:  sv.MapIndex(sk) may return a value with CanAddr() == false,
+			// TODO: sv.MapIndex(sk) may return a value with CanAddr() == false,
 			// because a map[string]struct{} does not allow a pointer reference.
 			// Calling a custom conversion function defined for the map value
 			// will panic. Example is PodInfo map[string]ContainerStatus.

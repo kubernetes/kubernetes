@@ -7,7 +7,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,7 +42,7 @@ const (
 )
 
 // Mounter provides the default implementation of mount.Interface
-// for the linux platform.  This implementation assumes that the
+// for the linux platform. This implementation assumes that the
 // kubelet is running in the host's root mount namespace.
 type Mounter struct{}
 
@@ -70,7 +70,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 // isBind detects whether a bind mount is being requested and makes the remount options to
 // use in case of bind mount, due to the fact that bind mount doesn't respect mount options.
 // The list equals:
-//   options - 'bind' + 'remount' (no duplicate)
+// options - 'bind' + 'remount' (no duplicate)
 func isBind(options []string) (bool, []string) {
 	bindRemountOpts := []string{"remount"}
 	bind := false
@@ -108,7 +108,7 @@ func doMount(source string, target string, fstype string, options []string) erro
 // makeMountArgs makes the arguments to the mount(8) command.
 func makeMountArgs(source, target, fstype string, options []string) []string {
 	// Build mount command as follows:
-	//   mount [-t $fstype] [-o $options] [$source] $target
+	// mount [-t $fstype] [-o $options] [$source] $target
 	mountArgs := []string{}
 	if len(fstype) > 0 {
 		mountArgs = append(mountArgs, "-t", fstype)
@@ -185,7 +185,7 @@ func listProcMounts(mountFilePath string) ([]MountPoint, error) {
 }
 
 // readProcMounts reads the given mountFilePath (normally /proc/mounts) and produces a hash
-// of the contents.  If the out argument is not nil, this fills it with MountPoint structs.
+// of the contents. If the out argument is not nil, this fills it with MountPoint structs.
 func readProcMounts(mountFilePath string, out *[]MountPoint) (uint32, error) {
 	file, err := os.Open(mountFilePath)
 	if err != nil {

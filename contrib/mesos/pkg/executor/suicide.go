@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -48,7 +48,7 @@ func (w *suicideTimer) Next(d time.Duration, driver bindings.ExecutorDriver, f j
 
 func (w *suicideTimer) Stop() (result bool) {
 	if w != nil && w.timer != nil {
-		log.Infoln("stopping suicide watch") //TODO(jdef) debug
+		log.Infoln("stopping suicide watch") // TODO(jdef) debug
 		result = w.timer.Stop()
 	}
 	return
@@ -57,7 +57,7 @@ func (w *suicideTimer) Stop() (result bool) {
 // return true if the timer was successfully reset
 func (w *suicideTimer) Reset(d time.Duration) bool {
 	if w != nil && w.timer != nil {
-		log.Infoln("resetting suicide watch") //TODO(jdef) debug
+		log.Infoln("resetting suicide watch") // TODO(jdef) debug
 		w.timer.Reset(d)
 		return true
 	}

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -130,7 +130,7 @@ func Max(a int64, b int64) int64 {
 }
 
 // Limit enforces resource requirements of incoming resources against enumerated constraints
-// on the LimitRange.  It may modify the incoming object to apply default resource requirements
+// on the LimitRange. It may modify the incoming object to apply default resource requirements
 // if not specified, and enumerated on the LimitRange
 func Limit(limitRange *api.LimitRange, resourceName string, obj runtime.Object) error {
 	switch resourceName {
@@ -332,7 +332,7 @@ func sum(inputs []api.ResourceList) api.ResourceList {
 }
 
 // PodLimitFunc enforces resource requirements enumerated by the pod against
-// the specified LimitRange.  The pod may be modified to apply default resource
+// the specified LimitRange. The pod may be modified to apply default resource
 // requirements if not specified, and enumerated on the LimitRange
 func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 	var errs []error

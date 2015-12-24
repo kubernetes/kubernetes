@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//This command checks if the hyperlinks in files are valid. It checks the files
-//with 'fileSuffix' in 'rootDir' for URLs that match 'prefix'. It trims the
-//'prefix' from the URL, uses what's left as the relative path to repoRoot to
-//verify if the link is valid. For example:
-//$ linkcheck --root-dir=${TYPEROOT} --repo-root=${KUBE_ROOT} \
-//  --file-suffix=types.go --prefix=http://releases.k8s.io/HEAD
+// This command checks if the hyperlinks in files are valid. It checks the files
+// with 'fileSuffix' in 'rootDir' for URLs that match 'prefix'. It trims the
+// 'prefix' from the URL, uses what's left as the relative path to repoRoot to
+// verify if the link is valid. For example:
+// $ linkcheck --root-dir=${TYPEROOT} --repo-root=${KUBE_ROOT} \
+// --file-suffix=types.go --prefix=http://releases.k8s.io/HEAD
 
 package main
 
@@ -41,7 +41,7 @@ var (
 	rootDir    = flag.String("root-dir", "", "Root directory containing documents to be processed.")
 	repoRoot   = flag.String("repo-root", "", `Root directory of k8s repository.`)
 	fileSuffix = flag.String("file-suffix", "", "suffix of files to be checked")
-	prefix     = flag.String("prefix", "", "Longest common prefix of the link URL, e.g., http://release.k8s.io/HEAD/ for links in pkg/api/types.go")
+	prefix = flag.String("prefix", "", "Longest common prefix of the link URL, e.g., http://release.k8s.io/HEAD/ for links in pkg/api/types.go")
 )
 
 func newWalkFunc(invalidLink *bool) filepath.WalkFunc {
@@ -56,7 +56,7 @@ func newWalkFunc(invalidLink *bool) filepath.WalkFunc {
 		foundInvalid := false
 		matches := httpRE.FindAllSubmatch(fileBytes, -1)
 		for _, match := range matches {
-			//match[1] should look like docs/devel/api-conventions.md
+			// match[1] should look like docs/devel/api-conventions.md
 			if _, err := os.Stat(path.Join(*repoRoot, string(match[1]))); err != nil {
 				fmt.Fprintf(os.Stderr, "Link is not valid: %s\n", string(match[0]))
 				foundInvalid = true

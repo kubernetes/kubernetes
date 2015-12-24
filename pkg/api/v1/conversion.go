@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -214,14 +214,14 @@ func Convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *a
 	} else {
 		out.Selector = nil
 	}
-	//if in.TemplateRef != nil {
-	//	out.TemplateRef = new(ObjectReference)
-	//	if err := Convert_api_ObjectReference_To_v1_ObjectReference(in.TemplateRef, out.TemplateRef, s); err != nil {
-	//		return err
-	//	}
-	//} else {
-	//	out.TemplateRef = nil
-	//}
+	// if in.TemplateRef != nil {
+	// 	out.TemplateRef = new(ObjectReference)
+	// 	if err := Convert_api_ObjectReference_To_v1_ObjectReference(in.TemplateRef, out.TemplateRef, s); err != nil {
+	// 		return err
+	// 	}
+	// } else {
+	// 	out.TemplateRef = nil
+	// }
 	if in.Template != nil {
 		out.Template = new(PodTemplateSpec)
 		if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
@@ -246,14 +246,14 @@ func Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *R
 	} else {
 		out.Selector = nil
 	}
-	//if in.TemplateRef != nil {
-	//	out.TemplateRef = new(api.ObjectReference)
-	//	if err := Convert_v1_ObjectReference_To_api_ObjectReference(in.TemplateRef, out.TemplateRef, s); err != nil {
-	//		return err
-	//	}
-	//} else {
-	//	out.TemplateRef = nil
-	//}
+	// if in.TemplateRef != nil {
+	// 	out.TemplateRef = new(api.ObjectReference)
+	// 	if err := Convert_v1_ObjectReference_To_api_ObjectReference(in.TemplateRef, out.TemplateRef, s); err != nil {
+	// 		return err
+	// 	}
+	// } else {
+	// 	out.TemplateRef = nil
+	// }
 	if in.Template != nil {
 		out.Template = new(api.PodTemplateSpec)
 		if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {

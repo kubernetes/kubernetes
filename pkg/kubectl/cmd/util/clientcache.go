@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -83,7 +83,7 @@ func (c *ClientCache) ClientConfigForVersion(version *unversioned.GroupVersion) 
 		c.configs[*version] = &config
 	}
 
-	// `version` does not necessarily equal `config.Version`.  However, we know that we call this method again with
+	// `version` does not necessarily equal `config.Version`. However, we know that we call this method again with
 	// `config.Version`, we should get the the config we've just built.
 	configCopy := config
 	c.configs[*config.GroupVersion] = &configCopy
@@ -110,8 +110,8 @@ func (c *ClientCache) ClientForVersion(version *unversioned.GroupVersion) (*clie
 	}
 	c.clients[*config.GroupVersion] = kubeclient
 
-	// `version` does not necessarily equal `config.Version`.  However, we know that if we call this method again with
-	// `version`, we should get a client based on the same config we just found.  There's no guarantee that a client
+	// `version` does not necessarily equal `config.Version`. However, we know that if we call this method again with
+	// `version`, we should get a client based on the same config we just found. There's no guarantee that a client
 	// is copiable, so create a new client and save it in the cache.
 	if version != nil {
 		configCopy := *config

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -100,7 +100,7 @@ func IsConfigurationInvalid(err error) bool {
 	return IsContextNotFound(err)
 }
 
-// Validate checks for errors in the Config.  It does not return early so that it can find as many errors as possible.
+// Validate checks for errors in the Config. It does not return early so that it can find as many errors as possible.
 func Validate(config clientcmdapi.Config) error {
 	validationErrors := make([]error, 0)
 
@@ -129,8 +129,8 @@ func Validate(config clientcmdapi.Config) error {
 	return newErrConfigurationInvalid(validationErrors)
 }
 
-// ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,
-// but no errors in the sections requested or referenced.  It does not return early so that it can find as many errors as possible.
+// ConfirmUsable looks a particular context and determines if that particular part of the config is useable. There might still be errors in the config,
+// but no errors in the sections requested or referenced. It does not return early so that it can find as many errors as possible.
 func ConfirmUsable(config clientcmdapi.Config, passedContextName string) error {
 	validationErrors := make([]error, 0)
 
@@ -244,7 +244,7 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 	return validationErrors
 }
 
-// validateContext looks for errors in the context.  It is not transitive, so errors in the reference authInfo or cluster configs are not included in this return
+// validateContext looks for errors in the context. It is not transitive, so errors in the reference authInfo or cluster configs are not included in this return
 func validateContext(contextName string, context clientcmdapi.Context, config clientcmdapi.Config) []error {
 	validationErrors := make([]error, 0)
 

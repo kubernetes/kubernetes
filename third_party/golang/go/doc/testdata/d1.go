@@ -15,8 +15,8 @@ var V2 int
 // CBx constants should appear before CAx constants.
 const (
 	CB2 = iota // before CB1
-	CB1        // before CB0
-	CB0        // at end
+	CB1 // before CB0
+	CB0 // at end
 )
 
 // VBx variables should appear before VAx variables.

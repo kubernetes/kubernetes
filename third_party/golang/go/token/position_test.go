@@ -38,7 +38,7 @@ func TestNoPos(t *testing.T) {
 
 var tests = []struct {
 	filename string
-	source   []byte // may be nil
+	source []byte // may be nil
 	size     int
 	lines    []int
 }{
@@ -242,9 +242,9 @@ func TestPositionFor(t *testing.T) {
 foo
 b
 ar
-//line :100
+// line :100
 foobar
-//line bar:3
+// line bar:3
 done
 `)
 
@@ -264,7 +264,7 @@ done
 		checkPos(t, "1. Position", got3, want)
 	}
 
-	// manually add //line info on lines l1, l2
+	// manually add //   line info on lines l1, l2
 	const l1, l2 = 5, 7
 	f.AddLineInfo(f.lines[l1-1], "", 100)
 	f.AddLineInfo(f.lines[l2-1], "bar", 3)

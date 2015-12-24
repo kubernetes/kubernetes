@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,8 +29,8 @@ import (
 type JSONPath struct {
 	name       string
 	parser     *Parser
-	stack      [][]reflect.Value //push and pop values in different scopes
-	cur        []reflect.Value   //current scope values
+	stack [][]reflect.Value // push and pop values in different scopes
+	cur []reflect.Value // current scope values
 	beginRange int
 	inRange    int
 	endRange   int
@@ -80,12 +80,12 @@ func (j *JSONPath) FindResults(data interface{}) ([][]reflect.Value, error) {
 			return nil, err
 		}
 
-		//encounter an end node, break the current block
+		// encounter an end node, break the current block
 		if j.endRange > 0 && j.endRange <= j.inRange {
 			j.endRange -= 1
 			break
 		}
-		//encounter a range node, start a range loop
+		// encounter a range node, start a range loop
 		if j.beginRange > 0 {
 			j.beginRange -= 1
 			j.inRange += 1
@@ -194,7 +194,7 @@ func (j *JSONPath) evalIdentifier(input []reflect.Value, node *IdentifierNode) (
 		j.beginRange += 1
 		results = input
 	case "end":
-		if j.endRange < j.inRange { //inside a loop, break the current block
+		if j.endRange < j.inRange { // inside a loop, break the current block
 			j.endRange += 1
 			break
 		}
@@ -410,7 +410,7 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 			temp := []reflect.Value{value.Index(i)}
 			lefts, err := j.evalList(temp, node.Left)
 
-			//case exists
+			// case exists
 			if node.Operator == "exists" {
 				if len(lefts) > 0 {
 					results = append(results, value.Index(i))

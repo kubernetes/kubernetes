@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,7 +52,7 @@ func newIngresses(c *ExtensionsClient, namespace string) *ingresses {
 	}
 }
 
-// Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
+// Create takes the representation of a ingress and creates it. Returns the server's representation of the ingress, and an error, if there is any.
 func (c *ingresses) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	result = &extensions.Ingress{}
 	err = c.client.Post().

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,7 +42,7 @@ func newMergedConfig(certFile, certContent, keyFile, keyContent, caFile, caConte
 			"red-user":  {Token: "red-token", ClientCertificateData: []byte(certContent), ClientKeyData: []byte(keyContent)},
 			"blue-user": {Token: "blue-token", ClientCertificate: certFile, ClientKey: keyFile}},
 		Clusters: map[string]*Cluster{
-			"cow-cluster":     {Server: "http://cow.org:8080", CertificateAuthorityData: []byte(caContent)},
+			"cow-cluster": {Server: "http://cow.org:8080", CertificateAuthorityData: []byte(caContent)},
 			"chicken-cluster": {Server: "http://chicken.org:8080", CertificateAuthority: caFile}},
 		Contexts: map[string]*Context{
 			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster"},
@@ -227,23 +227,23 @@ func ExampleMinifyAndShorten() {
 	fmt.Printf("%s", string(output))
 	// Output:
 	// clusters:
-	//   cow-cluster:
-	//     LocationOfOrigin: ""
-	//     certificate-authority-data: REDACTED
-	//     server: http://cow.org:8080
+	// cow-cluster:
+	// LocationOfOrigin: ""
+	// certificate-authority-data: REDACTED
+	// server: http://cow.org:8080
 	// contexts:
-	//   federal-context:
-	//     LocationOfOrigin: ""
-	//     cluster: cow-cluster
-	//     user: red-user
+	// federal-context:
+	// LocationOfOrigin: ""
+	// cluster: cow-cluster
+	// user: red-user
 	// current-context: federal-context
 	// preferences: {}
 	// users:
-	//   red-user:
-	//     LocationOfOrigin: ""
-	//     client-certificate-data: REDACTED
-	//     client-key-data: REDACTED
-	//     token: red-token
+	// red-user:
+	// LocationOfOrigin: ""
+	// client-certificate-data: REDACTED
+	// client-key-data: REDACTED
+	// token: red-token
 }
 
 func TestShortenSuccess(t *testing.T) {

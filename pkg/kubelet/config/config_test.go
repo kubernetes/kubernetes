@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -55,7 +55,7 @@ func (s sortedPods) Less(i, j int) bool {
 func CreateValidPod(name, namespace string) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			UID:       types.UID(name), // for the purpose of testing, this is unique enough
+			UID: types.UID(name), // for the purpose of testing, this is unique enough
 			Name:      name,
 			Namespace: namespace,
 		},

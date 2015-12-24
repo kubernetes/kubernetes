@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -66,26 +66,26 @@ func (c *horizontalPodAutoscalers) Get(name string) (result *extensions.Horizont
 	return
 }
 
-// Delete takes the name of the horizontalPodAutoscaler and deletes it.  Returns an error if one occurs.
+// Delete takes the name of the horizontalPodAutoscaler and deletes it. Returns an error if one occurs.
 func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().Namespace(c.ns).Resource("horizontalPodAutoscalers").Name(name).Body(options).Do().Error()
 }
 
-// Create takes the representation of a horizontalPodAutoscaler and creates it.  Returns the server's representation of the horizontalPodAutoscaler, and an error, if it occurs.
+// Create takes the representation of a horizontalPodAutoscaler and creates it. Returns the server's representation of the horizontalPodAutoscaler, and an error, if it occurs.
 func (c *horizontalPodAutoscalers) Create(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
 	result = &extensions.HorizontalPodAutoscaler{}
 	err = c.client.Post().Namespace(c.ns).Resource("horizontalPodAutoscalers").Body(horizontalPodAutoscaler).Do().Into(result)
 	return
 }
 
-// Update takes the representation of a horizontalPodAutoscaler and updates it.  Returns the server's representation of the horizontalPodAutoscaler, and an error, if it occurs.
+// Update takes the representation of a horizontalPodAutoscaler and updates it. Returns the server's representation of the horizontalPodAutoscaler, and an error, if it occurs.
 func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
 	result = &extensions.HorizontalPodAutoscaler{}
 	err = c.client.Put().Namespace(c.ns).Resource("horizontalPodAutoscalers").Name(horizontalPodAutoscaler.Name).Body(horizontalPodAutoscaler).Do().Into(result)
 	return
 }
 
-// UpdateStatus takes the representation of a horizontalPodAutoscaler and updates it.  Returns the server's representation of the horizontalPodAutoscaler, and an error, if it occurs.
+// UpdateStatus takes the representation of a horizontalPodAutoscaler and updates it. Returns the server's representation of the horizontalPodAutoscaler, and an error, if it occurs.
 func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
 	result = &extensions.HorizontalPodAutoscaler{}
 	err = c.client.Put().Namespace(c.ns).Resource("horizontalPodAutoscalers").Name(horizontalPodAutoscaler.Name).SubResource("status").Body(horizontalPodAutoscaler).Do().Into(result)

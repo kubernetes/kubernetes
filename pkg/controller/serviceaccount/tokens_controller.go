@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -341,7 +341,7 @@ func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) erro
 		}
 	}
 	if apierrors.IsConflict(err) {
-		// nothing to do.  We got a conflict, that means that the service account was updated.  We simply need to return because we'll get an update notification later
+		// nothing to do. We got a conflict, that means that the service account was updated. We simply need to return because we'll get an update notification later
 		return nil
 	}
 

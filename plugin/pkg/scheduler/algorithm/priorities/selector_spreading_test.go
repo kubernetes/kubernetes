@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -411,11 +411,11 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				// pod on m1.z2 and putting a pod on m2.z2, but the ordering is correct.
 				// This is also consistent with what we have already.
 				{nodeMachine1Zone1, 10}, // No pods in zone
-				{nodeMachine1Zone2, 5},  // Pod on node
-				{nodeMachine2Zone2, 6},  // Pod in zone
-				{nodeMachine1Zone3, 0},  // Two pods on node
-				{nodeMachine2Zone3, 3},  // Pod in zone
-				{nodeMachine3Zone3, 3},  // Pod in zone
+				{nodeMachine1Zone2, 5}, // Pod on node
+				{nodeMachine2Zone2, 6}, // Pod in zone
+				{nodeMachine1Zone3, 0}, // Two pods on node
+				{nodeMachine2Zone3, 3}, // Pod in zone
+				{nodeMachine3Zone3, 3}, // Pod in zone
 			},
 			test: "Replication controller spreading (z1=0, z2=1, z3=2)",
 		},

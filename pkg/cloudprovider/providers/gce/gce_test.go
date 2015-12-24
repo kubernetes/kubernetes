@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -46,43 +46,43 @@ func TestComparingHostURLs(t *testing.T) {
 		expectEqual bool
 	}{
 		{
-			host1:       "https://www.googleapis.com/compute/v1/projects/1234567/zones/us-central1-f/instances/kubernetes-node-fhx1",
+			host1: "https://www.googleapis.com/compute/v1/projects/1234567/zones/us-central1-f/instances/kubernetes-node-fhx1",
 			zone:        "us-central1-f",
 			name:        "kubernetes-node-fhx1",
 			expectEqual: true,
 		},
 		{
-			host1:       "https://www.googleapis.com/compute/v1/projects/cool-project/zones/us-central1-f/instances/kubernetes-node-fhx1",
+			host1: "https://www.googleapis.com/compute/v1/projects/cool-project/zones/us-central1-f/instances/kubernetes-node-fhx1",
 			zone:        "us-central1-f",
 			name:        "kubernetes-node-fhx1",
 			expectEqual: true,
 		},
 		{
-			host1:       "https://www.googleapis.com/compute/v23/projects/1234567/zones/us-central1-f/instances/kubernetes-node-fhx1",
+			host1: "https://www.googleapis.com/compute/v23/projects/1234567/zones/us-central1-f/instances/kubernetes-node-fhx1",
 			zone:        "us-central1-f",
 			name:        "kubernetes-node-fhx1",
 			expectEqual: true,
 		},
 		{
-			host1:       "https://www.googleapis.com/compute/v24/projects/1234567/regions/us-central1/zones/us-central1-f/instances/kubernetes-node-fhx1",
+			host1: "https://www.googleapis.com/compute/v24/projects/1234567/regions/us-central1/zones/us-central1-f/instances/kubernetes-node-fhx1",
 			zone:        "us-central1-f",
 			name:        "kubernetes-node-fhx1",
 			expectEqual: true,
 		},
 		{
-			host1:       "https://www.googleapis.com/compute/v1/projects/1234567/zones/us-central1-f/instances/kubernetes-node-fhx1",
+			host1: "https://www.googleapis.com/compute/v1/projects/1234567/zones/us-central1-f/instances/kubernetes-node-fhx1",
 			zone:        "us-central1-c",
 			name:        "kubernetes-node-fhx1",
 			expectEqual: false,
 		},
 		{
-			host1:       "https://www.googleapis.com/compute/v1/projects/1234567/zones/us-central1-f/instances/kubernetes-node-fhx",
+			host1: "https://www.googleapis.com/compute/v1/projects/1234567/zones/us-central1-f/instances/kubernetes-node-fhx",
 			zone:        "us-central1-f",
 			name:        "kubernetes-node-fhx1",
 			expectEqual: false,
 		},
 		{
-			host1:       "https://www.googleapis.com/compute/v1/projects/1234567/zones/us-central1-f/instances/kubernetes-node-fhx1",
+			host1: "https://www.googleapis.com/compute/v1/projects/1234567/zones/us-central1-f/instances/kubernetes-node-fhx1",
 			zone:        "us-central1-f",
 			name:        "kubernetes-node-fhx",
 			expectEqual: false,

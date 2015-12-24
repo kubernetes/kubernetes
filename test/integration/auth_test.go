@@ -7,7 +7,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,8 +52,8 @@ import (
 )
 
 const (
-	AliceToken   string = "abc123" // username: alice.  Present in token file.
-	BobToken     string = "xyz987" // username: bob.  Present in token file.
+	AliceToken string = "abc123" // username: alice. Present in token file.
+	BobToken string = "xyz987" // username: bob. Present in token file.
 	UnknownToken string = "qwerty" // Not present in token file.
 )
 
@@ -236,7 +236,7 @@ var deleteNow string = `
 }
 `
 
-// Requests to try.  Each one should be forbidden or not forbidden
+// Requests to try. Each one should be forbidden or not forbidden
 // depending on the authentication and authorization setup of the master.
 var code200 = map[int]bool{200: true}
 var code201 = map[int]bool{201: true}
@@ -377,8 +377,8 @@ func getTestRequests() []struct {
 }
 
 // The TestAuthMode* tests tests a large number of URLs and checks that they
-// are FORBIDDEN or not, depending on the mode.  They do not attempt to do
-// detailed verification of behaviour beyond authorization.  They are not
+// are FORBIDDEN or not, depending on the mode. They do not attempt to do
+// detailed verification of behaviour beyond authorization. They are not
 // fuzz tests.
 //
 // TODO(etune): write a fuzz test of the REST API.

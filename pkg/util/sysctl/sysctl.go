@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,10 +30,10 @@ const (
 	KernelPanic        = "kernel/panic"
 	KernelPanicOnOops  = "kernel/panic_on_oops"
 
-	VmOvercommitMemoryAlways    = 1 // kernel performs no memory over-commit handling
+	VmOvercommitMemoryAlways = 1 // kernel performs no memory over-commit handling
 	VmPanicOnOOMInvokeOOMKiller = 0 // kernel calls the oom_killer function when OOM occurs
 
-	KernelPanicOnOopsAlways  = 1  // kernel panics on kernel oops
+	KernelPanicOnOopsAlways = 1 // kernel panics on kernel oops
 	KernelPanicRebootTimeout = 10 // seconds after a panic for the kernel to reboot
 )
 

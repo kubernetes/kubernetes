@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -68,7 +68,7 @@ type framework struct {
 	sched             scheduler.Scheduler
 	schedulerConfig   *schedcfg.Config
 	client            *client.Client
-	failoverTimeout   float64 // in seconds
+	failoverTimeout float64 // in seconds
 	reconcileInterval int64
 	nodeRegistrator   node.Registrator
 	storeFrameworkId  func(id string)
@@ -76,11 +76,11 @@ type framework struct {
 	executorId        *mesos.ExecutorID
 
 	// Mesos context
-	driver         bindings.SchedulerDriver // late initialization
+	driver bindings.SchedulerDriver // late initialization
 	frameworkId    *mesos.FrameworkID
 	masterInfo     *mesos.MasterInfo
 	registered     bool
-	registration   chan struct{} // signal chan that closes upon first successful registration
+	registration chan struct{} // signal chan that closes upon first successful registration
 	onRegistration sync.Once
 	offers         offers.Registry
 	slaveHostNames *slaveRegistry
@@ -90,7 +90,7 @@ type framework struct {
 	mux                *http.ServeMux
 	reconcileCooldown  time.Duration
 	asRegisteredMaster proc.Doer
-	terminate          <-chan struct{} // signal chan, closes when we should kill background tasks
+	terminate <-chan struct{} // signal chan, closes when we should kill background tasks
 }
 
 type Config struct {
@@ -427,12 +427,12 @@ func (k *framework) StatusUpdate(driver bindings.SchedulerDriver, taskStatus *me
 	case mesos.TaskState_TASK_RUNNING, mesos.TaskState_TASK_FINISHED, mesos.TaskState_TASK_STARTING, mesos.TaskState_TASK_STAGING:
 		if _, state := k.sched.Tasks().UpdateStatus(taskStatus); state == podtask.StateUnknown {
 			if taskState != mesos.TaskState_TASK_FINISHED {
-				//TODO(jdef) what if I receive this after a TASK_LOST or TASK_KILLED?
-				//I don't want to reincarnate then..  TASK_LOST is a special case because
-				//the master is stateless and there are scenarios where I may get TASK_LOST
-				//followed by TASK_RUNNING.
-				//TODO(jdef) consider running this asynchronously since there are API server
-				//calls that may be made
+				// TODO(jdef) what if I receive this after a TASK_LOST or TASK_KILLED?
+				// I don't want to reincarnate then.. TASK_LOST is a special case because
+				// the master is stateless and there are scenarios where I may get TASK_LOST
+				// followed by TASK_RUNNING.
+				// TODO(jdef) consider running this asynchronously since there are API server
+				// calls that may be made
 				k.reconcileNonTerminalTask(driver, taskStatus)
 			} // else, we don't really care about FINISHED tasks that aren't registered
 			return
@@ -481,7 +481,7 @@ func (k *framework) reconcileTerminalTask(driver bindings.SchedulerDriver, taskS
 			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_EXECUTOR && taskStatus.GetMessage() == messages.ContainersDisappeared) ||
 			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_EXECUTOR && taskStatus.GetMessage() == messages.KubeletPodLaunchFailed) ||
 			(taskStatus.GetSource() == mesos.TaskStatus_SOURCE_EXECUTOR && taskStatus.GetMessage() == messages.TaskKilled && !task.Has(podtask.Deleted))) {
-		//--
+		// --
 		// pod-task has metadata that refers to:
 		// (1) a task that Mesos no longer knows about, or else
 		// (2) a pod that the Kubelet will never report as "failed"
@@ -500,14 +500,14 @@ func (k *framework) reconcileTerminalTask(driver bindings.SchedulerDriver, taskS
 		log.V(1).Infof("request explicit reconciliation to clean up for task %v after executor reported (terminated/unregistered)", taskStatus.TaskId.GetValue())
 		k.tasksReconciler.RequestExplicit()
 	} else if taskStatus.GetState() == mesos.TaskState_TASK_LOST && state == podtask.StateRunning && taskStatus.ExecutorId != nil && taskStatus.SlaveId != nil {
-		//TODO(jdef) this may not be meaningful once we have proper checkpointing and master detection
-		//If we're reconciling and receive this then the executor may be
-		//running a task that we need it to kill. It's possible that the framework
-		//is unrecognized by the master at this point, so KillTask is not guaranteed
-		//to do anything. The underlying driver transport may be able to send a
-		//FrameworkMessage directly to the slave to terminate the task.
+		// TODO(jdef) this may not be meaningful once we have proper checkpointing and master detection
+		// If we're reconciling and receive this then the executor may be
+		// running a task that we need it to kill. It's possible that the framework
+		// is unrecognized by the master at this point, so KillTask is not guaranteed
+		// to do anything. The underlying driver transport may be able to send a
+		// FrameworkMessage directly to the slave to terminate the task.
 		log.V(2).Info("forwarding TASK_LOST message to executor %v on slave %v", taskStatus.ExecutorId, taskStatus.SlaveId)
-		data := fmt.Sprintf("%s:%s", messages.TaskLost, task.ID) //TODO(jdef) use a real message type
+		data := fmt.Sprintf("%s:%s", messages.TaskLost, task.ID) // TODO(jdef) use a real message type
 		if _, err := driver.SendFrameworkMessage(taskStatus.ExecutorId, taskStatus.SlaveId, data); err != nil {
 			log.Error(err.Error())
 		}
@@ -527,7 +527,7 @@ func (k *framework) reconcileNonTerminalTask(driver bindings.SchedulerDriver, ta
 		switch taskStatus.GetState() {
 		case mesos.TaskState_TASK_STAGING:
 			// there is still hope for this task, don't kill it just yet
-			//TODO(jdef) there should probably be a limit for how long we tolerate tasks stuck in this state
+			// TODO(jdef) there should probably be a limit for how long we tolerate tasks stuck in this state
 			return
 		default:
 			// for TASK_{STARTING,RUNNING} we should have already attempted to recoverTasks() for.
@@ -557,18 +557,18 @@ func (k *framework) reconcileNonTerminalTask(driver bindings.SchedulerDriver, ta
 			}
 			return
 		} else if err != nil {
-			//should kill the pod and the task
+			// should kill the pod and the task
 			log.Errorf("killing pod, failed to recover task from pod %v/%v: %v", namespace, name, err)
 			if err := k.client.Pods(namespace).Delete(name, nil); err != nil {
 				log.Errorf("failed to delete pod %v/%v: %v", namespace, name, err)
 			}
 		} else {
-			//this is pretty unexpected: we received a TASK_{STARTING,RUNNING} message, but the apiserver's pod
-			//metadata is not appropriate for task reconstruction -- which should almost certainly never
-			//be the case unless someone swapped out the pod on us (and kept the same namespace/name) while
-			//we were failed over.
+			// this is pretty unexpected: we received a TASK_{STARTING,RUNNING} message, but the apiserver's pod
+			// metadata is not appropriate for task reconstruction -- which should almost certainly never
+			// be the case unless someone swapped out the pod on us (and kept the same namespace/name) while
+			// we were failed over.
 
-			//kill this task, allow the newly launched scheduler to schedule the new pod
+			// kill this task, allow the newly launched scheduler to schedule the new pod
 			log.Warningf("unexpected pod metadata for task %v in apiserver, assuming new unscheduled pod spec: %+v", taskId, pod)
 		}
 	} else if errors.IsNotFound(err) {
@@ -687,7 +687,7 @@ func (k *framework) explicitlyReconcileTasks(driver bindings.SchedulerDriver, ta
 		statusList = append(statusList, &mesos.TaskStatus{
 			TaskId:  mutil.NewTaskID(taskId),
 			SlaveId: mutil.NewSlaveID(slaveId),
-			State:   mesos.TaskState_TASK_RUNNING.Enum(), // req'd field, doesn't have to reflect reality
+			State: mesos.TaskState_TASK_RUNNING.Enum(), // req'd field, doesn't have to reflect reality
 		})
 	}
 
@@ -745,7 +745,7 @@ func (ks *framework) recoverTasks() error {
 		if t, ok, err := podtask.RecoverFrom(pod); err != nil {
 			log.Errorf("failed to recover task from pod, will attempt to delete '%v/%v': %v", pod.Namespace, pod.Name, err)
 			err := ks.client.Pods(pod.Namespace).Delete(pod.Name, nil)
-			//TODO(jdef) check for temporary or not-found errors
+			// TODO(jdef) check for temporary or not-found errors
 			if err != nil {
 				log.Errorf("failed to delete pod '%v/%v': %v", pod.Namespace, pod.Name, err)
 			}

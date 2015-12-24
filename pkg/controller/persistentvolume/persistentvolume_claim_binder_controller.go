@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -179,7 +179,7 @@ func (binder *PersistentVolumeClaimBinder) deleteClaim(obj interface{}) {
 		}
 	}
 
-	// sync the volume when its claim is deleted.  Explicitly sync'ing the volume here in response to
+	// sync the volume when its claim is deleted. Explicitly sync'ing the volume here in response to
 	// claim deletion prevents the volume from waiting until the next sync period for its Release.
 	if volume != nil {
 		err := syncVolume(binder.volumeIndex, binder.client, volume)
@@ -196,7 +196,7 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 	//
 	// VolumePending -- default value -- not bound to a claim and not yet processed through this controller.
 	// VolumeAvailable -- not bound to a claim, but processed at least once and found in this controller's volumeIndex.
-	// VolumeBound -- bound to a claim because volume.Spec.ClaimRef != nil.   Claim status may not be correct.
+	// VolumeBound -- bound to a claim because volume.Spec.ClaimRef != nil. Claim status may not be correct.
 	// VolumeReleased -- volume.Spec.ClaimRef != nil but the claim has been deleted by the user.
 	// VolumeFailed -- volume.Spec.ClaimRef != nil and the volume failed processing in the recycler
 	currentPhase := volume.Status.Phase
@@ -219,9 +219,9 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 	case api.VolumePending:
 
 		// 3 possible states:
-		//  1.  ClaimRef != nil and Claim exists:   Prebound to claim. Make volume available for binding (it will match PVC).
-		//  2.  ClaimRef != nil and Claim !exists:  Recently recycled. Remove bind. Make volume available for new claim.
-		//  3.  ClaimRef == nil: Neither recycled nor prebound.  Make volume available for binding.
+		// 1. ClaimRef != nil and Claim exists: Prebound to claim. Make volume available for binding (it will match PVC).
+		// 2. ClaimRef != nil and Claim !exists: Recently recycled. Remove bind. Make volume available for new claim.
+		// 3. ClaimRef == nil: Neither recycled nor prebound. Make volume available for binding.
 		nextPhase = api.VolumeAvailable
 
 		if volume.Spec.ClaimRef != nil {
@@ -267,7 +267,7 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 			}
 		}
 
-	//bound volumes require verification of their bound claims
+	// bound volumes require verification of their bound claims
 	case api.VolumeBound:
 		if volume.Spec.ClaimRef == nil {
 			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume.Name, volume)
@@ -289,8 +289,8 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 		} else {
 			// another process is watching for released volumes.
 			// PersistentVolumeReclaimPolicy is set per PersistentVolume
-			//  Recycle - sets the PV to Pending and back under this controller's management
-			//  Delete - delete events are handled by this controller's watch. PVs are removed from the index.
+			// Recycle - sets the PV to Pending and back under this controller's management
+			// Delete - delete events are handled by this controller's watch. PVs are removed from the index.
 		}
 
 	// volumes are removed by processes external to this binder and must be removed from the cluster
@@ -386,7 +386,7 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 		}
 
 	case api.ClaimBound:
-		// no-op.  Claim is bound, values from PV are set.  PVCs are technically mutable in the API server
+		// no-op. Claim is bound, values from PV are set. PVCs are technically mutable in the API server
 		// and we don't want to handle those changes at this time.
 
 	default:

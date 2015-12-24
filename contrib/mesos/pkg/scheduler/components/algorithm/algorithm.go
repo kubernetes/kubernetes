@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -122,14 +122,14 @@ func (k *schedulerAlgorithm) Schedule(pod *api.Pod) (string, error) {
 
 		return k.doSchedule(podTask)
 
-	//TODO(jdef) it's possible that the pod state has diverged from what
-	//we knew previously, we should probably update the task.Pod state here
-	//before proceeding with scheduling
+	// TODO(jdef) it's possible that the pod state has diverged from what
+	// we knew previously, we should probably update the task.Pod state here
+	// before proceeding with scheduling
 	case podtask.StatePending:
 		if pod.UID != task.Pod.UID {
 			// we're dealing with a brand new pod spec here, so the old one must have been
 			// deleted -- and so our task store is out of sync w/ respect to reality
-			//TODO(jdef) reconcile task
+			// TODO(jdef) reconcile task
 			return "", fmt.Errorf("task %v spec is out of sync with pod %v spec, aborting schedule", task.ID, pod.Name)
 		} else if task.Has(podtask.Launched) {
 			// task has been marked as "launched" but the pod binding creation may have failed in k8s,

@@ -30,7 +30,7 @@ func (check *Checker) builtin(x *operand, call *ast.CallExpr, id builtinId) (_ b
 	// receive operations. Save/restore current setting and set hasCallOrRecv to
 	// false for the evaluation of x so that we can check it afterwards.
 	// Note: We must do this _before_ calling unpack because unpack evaluates the
-	//       first argument before we even call arg(x, 0)!
+	// first argument before we even call arg(x, 0)!
 	if id == _Len || id == _Cap {
 		defer func(b bool) {
 			check.hasCallOrRecv = b
