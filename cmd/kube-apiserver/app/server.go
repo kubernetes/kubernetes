@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -485,13 +486,13 @@ func (s *APIServer) Run(_ []string) error {
 
 	// Default to the private server key for service account token signing
 	if s.ServiceAccountKeyFile == "" && s.TLSPrivateKeyFile != "" {
-		if apiserver.IsValidServiceAccountKeyFile(s.TLSPrivateKeyFile) {
+		if authenticator.IsValidServiceAccountKeyFile(s.TLSPrivateKeyFile) {
 			s.ServiceAccountKeyFile = s.TLSPrivateKeyFile
 		} else {
 			glog.Warning("No RSA key provided, service account token authentication disabled")
 		}
 	}
-	authenticator, err := apiserver.NewAuthenticator(apiserver.AuthenticatorConfig{
+	authenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
 		BasicAuthFile:         s.BasicAuthFile,
 		ClientCAFile:          s.ClientCAFile,
 		TokenAuthFile:         s.TokenAuthFile,

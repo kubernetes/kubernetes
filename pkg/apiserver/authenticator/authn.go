@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package authenticator
 
 import (
 	"crypto/rsa"
@@ -47,8 +47,9 @@ type AuthenticatorConfig struct {
 	KeystoneURL           string
 }
 
-// NewAuthenticator returns an authenticator.Request or an error
-func NewAuthenticator(config AuthenticatorConfig) (authenticator.Request, error) {
+// New returns an authenticator.Request or an error that supports the standard
+// Kubernetes authentication mechanisms.
+func New(config AuthenticatorConfig) (authenticator.Request, error) {
 	var authenticators []authenticator.Request
 
 	if len(config.BasicAuthFile) > 0 {
