@@ -38,6 +38,10 @@ func makeNode(node string, milliCPU, memory int64) api.Node {
 				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 				"memory": *resource.NewQuantity(memory, resource.BinarySI),
 			},
+			Allocatable: api.ResourceList{
+				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+				"memory": *resource.NewQuantity(memory, resource.BinarySI),
+			},
 		},
 	}
 }
