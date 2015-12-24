@@ -41,10 +41,10 @@ func RelativeTo(pkg *Package) Qualifier {
 // If gcCompatibilityMode is set, printing of types is modified
 // to match the representation of some types in the gc compiler:
 //
-//	- byte and rune lose their alias name and simply stand for
-//	  uint8 and int32 respectively
-//	- embedded interfaces get flattened (the embedding info is lost,
-//	  and certain recursive interface types cannot be printed anymore)
+// 	- byte and rune lose their alias name and simply stand for
+// 	 uint8 and int32 respectively
+// 	- embedded interfaces get flattened (the embedding info is lost,
+// 	 and certain recursive interface types cannot be printed anymore)
 //
 // This makes it easier to compare packages computed with the type-
 // checker vs packages imported from gc export data.
@@ -150,9 +150,9 @@ func writeType(buf *bytes.Buffer, typ Type, qf Qualifier, visited []Type) {
 		// current interface. For instance, consider the result type
 		// of m:
 		//
-		//     type T interface{
-		//         m() interface{ T }
-		//     }
+		// type T interface{
+		// m() interface{ T }
+		// }
 		//
 		buf.WriteString("interface{")
 		if gcCompatibilityMode {

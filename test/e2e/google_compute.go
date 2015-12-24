@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,7 +33,7 @@ func createGCEStaticIP(name string) (string, error) {
 	// gcloud compute --project "abshah-kubernetes-001" addresses create "test-static-ip" --region "us-central1"
 	// abshah@abhidesk:~/go/src/code.google.com/p/google-api-go-client/compute/v1$ gcloud compute --project "abshah-kubernetes-001" addresses create "test-static-ip" --region "us-central1"
 	// Created [https://www.googleapis.com/compute/v1/projects/abshah-kubernetes-001/regions/us-central1/addresses/test-static-ip].
-	// NAME           REGION      ADDRESS       STATUS
+	// NAME REGION ADDRESS STATUS
 	// test-static-ip us-central1 104.197.143.7 RESERVED
 
 	glog.Infof("Creating static IP with name %q in project %q", name, testContext.CloudConfig.ProjectID)
@@ -72,7 +72,7 @@ func deleteGCEStaticIP(name string) error {
 	// gcloud compute --project "abshah-kubernetes-001" addresses create "test-static-ip" --region "us-central1"
 	// abshah@abhidesk:~/go/src/code.google.com/p/google-api-go-client/compute/v1$ gcloud compute --project "abshah-kubernetes-001" addresses create "test-static-ip" --region "us-central1"
 	// Created [https://www.googleapis.com/compute/v1/projects/abshah-kubernetes-001/regions/us-central1/addresses/test-static-ip].
-	// NAME           REGION      ADDRESS       STATUS
+	// NAME REGION ADDRESS STATUS
 	// test-static-ip us-central1 104.197.143.7 RESERVED
 
 	outputBytes, err := exec.Command("gcloud", "compute", "addresses", "delete",

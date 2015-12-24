@@ -15,9 +15,9 @@ package types
 // The last index entry is the field or method index in the (possibly embedded)
 // type where the entry was found, either:
 //
-//	1) the list of declared methods of a named type; or
-//	2) the list of all methods (method set) of an interface type; or
-//	3) the list of fields of a struct type.
+// 	1) the list of declared methods of a named type; or
+// 	2) the list of all methods (method set) of an interface type; or
+// 	3) the list of fields of a struct type.
 //
 // The earlier index entries are the indices of the anonymous struct fields
 // traversed to get to the found entry, starting at depth 0.
@@ -25,12 +25,12 @@ package types
 // If no entry is found, a nil object is returned. In this case, the returned
 // index and indirect values have the following meaning:
 //
-//	- If index != nil, the index sequence points to an ambiguous entry
-//	(the same name appeared more than once at the same embedding level).
+// 	- If index != nil, the index sequence points to an ambiguous entry
+// 	(the same name appeared more than once at the same embedding level).
 //
-//	- If indirect is set, a method with a pointer receiver type was found
-//      but there was no pointer on the path from the actual receiver type to
-//	the method's formal receiver base type, nor was the receiver addressable.
+// 	- If indirect is set, a method with a pointer receiver type was found
+// but there was no pointer on the path from the actual receiver type to
+// 	the method's formal receiver base type, nor was the receiver addressable.
 //
 func LookupFieldOrMethod(T Type, addressable bool, pkg *Package, name string) (obj Object, index []int, indirect bool) {
 	// Methods cannot be associated to a named pointer type
@@ -54,13 +54,13 @@ func LookupFieldOrMethod(T Type, addressable bool, pkg *Package, name string) (o
 }
 
 // TODO(gri) The named type consolidation and seen maps below must be
-//           indexed by unique keys for a given type. Verify that named
-//           types always have only one representation (even when imported
-//           indirectly via different packages.)
+// indexed by unique keys for a given type. Verify that named
+// types always have only one representation (even when imported
+// indirectly via different packages.)
 
 func lookupFieldOrMethod(T Type, addressable bool, pkg *Package, name string) (obj Object, index []int, indirect bool) {
 	// WARNING: The code in this function is extremely subtle - do not modify casually!
-	//          This function and NewMethodSet should be kept in sync.
+	// This function and NewMethodSet should be kept in sync.
 
 	if name == "_" {
 		return // blank fields/methods are never found
@@ -178,9 +178,9 @@ func lookupFieldOrMethod(T Type, addressable bool, pkg *Package, name string) (o
 		if obj != nil {
 			// found a potential match
 			// spec: "A method call x.m() is valid if the method set of (the type of) x
-			//        contains m and the argument list can be assigned to the parameter
-			//        list of m. If x is addressable and &x's method set contains m, x.m()
-			//        is shorthand for (&x).m()".
+			// contains m and the argument list can be assigned to the parameter
+			// list of m. If x is addressable and &x's method set contains m, x.m()
+			// is shorthand for (&x).m()".
 			if f, _ := obj.(*Func); f != nil && ptrRecv(f) && !indirect && !addressable {
 				return nil, nil, true // pointer/addressable receiver required
 			}
@@ -195,10 +195,10 @@ func lookupFieldOrMethod(T Type, addressable bool, pkg *Package, name string) (o
 
 // embeddedType represents an embedded named type
 type embeddedType struct {
-	typ       *Named // nil means use the outer typ variable instead
-	index     []int  // embedded field indices, starting with index at depth 0
-	indirect  bool   // if set, there was a pointer indirection on the path to this field
-	multiples bool   // if set, typ appears multiple times at this depth
+	typ *Named // nil means use the outer typ variable instead
+	index []int // embedded field indices, starting with index at depth 0
+	indirect bool // if set, there was a pointer indirection on the path to this field
+	multiples bool // if set, typ appears multiple times at this depth
 }
 
 // consolidateMultiples collects multiple list entries with the same type
@@ -209,7 +209,7 @@ func consolidateMultiples(list []embeddedType) []embeddedType {
 		return list // at most one entry - nothing to do
 	}
 
-	n := 0                       // number of entries w/ unique type
+	n := 0 // number of entries w/ unique type
 	prev := make(map[*Named]int) // index at which type was previously seen
 	for _, e := range list {
 		if i, found := prev[e.typ]; found {
@@ -281,7 +281,7 @@ func MissingMethod(V Type, T *Interface, static bool) (method *Func, wrongType b
 func assertableTo(V *Interface, T Type) (method *Func, wrongType bool) {
 	// no static check is required if T is an interface
 	// spec: "If T is an interface type, x.(T) asserts that the
-	//        dynamic type of x implements the interface T."
+	// dynamic type of x implements the interface T."
 	if _, ok := T.Underlying().(*Interface); ok && !strict {
 		return
 	}

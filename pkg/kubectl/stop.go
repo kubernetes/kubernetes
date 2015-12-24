@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -145,14 +145,14 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 	//
 	// If there are rcs with a superset of labels, eg:
 	// deleting: (k1=v1), superset: (k2=v2, k1=v1)
-	//	- It isn't safe to delete the rc because there could be a pod with labels
-	//	  (k1=v1) that isn't managed by the superset rc. We can't scale it down
-	//	  either, because there could be a pod (k2=v2, k1=v1) that it deletes
-	//	  causing a fight with the superset rc.
+	// 	- It isn't safe to delete the rc because there could be a pod with labels
+	// 	 (k1=v1) that isn't managed by the superset rc. We can't scale it down
+	// 	 either, because there could be a pod (k2=v2, k1=v1) that it deletes
+	// 	 causing a fight with the superset rc.
 	// If there are rcs with a subset of labels, eg:
 	// deleting: (k2=v2, k1=v1), subset: (k1=v1), superset: (k2=v2, k1=v1, k3=v3)
-	//  - Even if it's safe to delete this rc without a scale down because all it's pods
-	//	  are being controlled by the subset rc the code returns an error.
+	// - Even if it's safe to delete this rc without a scale down because all it's pods
+	// 	 are being controlled by the subset rc the code returns an error.
 
 	// In theory, creating overlapping controllers is user error, so the loop below
 	// tries to account for this logic only in the common case, where we end up

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -428,7 +428,7 @@ var _ = Describe("Nodes [Disruptive]", func() {
 			if err := waitForClusterSize(c, testContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
 				Failf("Couldn't restore the original cluster size: %v", err)
 			}
-			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
+			// Many e2e tests assume that the cluster is fully healthy before they start. Wait until
 			// the cluster is restored to health.
 			By("waiting for system pods to successfully restart")
 

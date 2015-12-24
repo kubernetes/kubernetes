@@ -51,7 +51,7 @@ func newServiceAccounts(c *LegacyClient, namespace string) *serviceAccounts {
 	}
 }
 
-// Create takes the representation of a serviceAccount and creates it.  Returns the server's representation of the serviceAccount, and an error, if there is any.
+// Create takes the representation of a serviceAccount and creates it. Returns the server's representation of the serviceAccount, and an error, if there is any.
 func (c *serviceAccounts) Create(serviceAccount *api.ServiceAccount) (result *api.ServiceAccount, err error) {
 	result = &api.ServiceAccount{}
 	err = c.client.Post().

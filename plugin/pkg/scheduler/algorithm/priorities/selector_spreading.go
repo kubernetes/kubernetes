@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -112,7 +112,7 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, machinesToPods ma
 	countsByNodeName := map[string]int{}
 	for _, pod := range nsPods {
 		// When we are replacing a failed pod, we often see the previous deleted version
-		// while scheduling the replacement.  Ignore the previous deleted version for spreading
+		// while scheduling the replacement. Ignore the previous deleted version for spreading
 		// purposes (it can still be considered for resource restrictions etc.)
 		if pod.DeletionTimestamp != nil {
 			glog.V(2).Infof("skipping pending-deleted pod: %s/%s", pod.Namespace, pod.Name)
@@ -170,7 +170,7 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, machinesToPods ma
 	}
 
 	result := []schedulerapi.HostPriority{}
-	//score int - scale of 0-maxPriority
+	// score int - scale of 0-maxPriority
 	// 0 being the lowest priority and maxPriority being the highest
 	for i := range nodes.Items {
 		node := &nodes.Items[i]
@@ -261,7 +261,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, machin
 
 	numServicePods := len(nsServicePods)
 	result := []schedulerapi.HostPriority{}
-	//score int - scale of 0-maxPriority
+	// score int - scale of 0-maxPriority
 	// 0 being the lowest priority and maxPriority being the highest
 	for node := range labeledNodes {
 		// initializing to the default/max node score of maxPriority

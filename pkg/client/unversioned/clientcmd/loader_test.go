@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -71,7 +71,7 @@ var (
 			"red-user":    {Token: "a-different-red-token"},
 			"yellow-user": {Token: "yellow-token"}},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			"cow-cluster":    {Server: "http://a-different-cow.org:8080", InsecureSkipTLSVerify: true},
+			"cow-cluster": {Server: "http://a-different-cow.org:8080", InsecureSkipTLSVerify: true},
 			"donkey-cluster": {Server: "http://donkey.org:8080", InsecureSkipTLSVerify: true}},
 		CurrentContext: "federal-context",
 	}
@@ -405,21 +405,21 @@ func ExampleNoMergingOnExplicitPaths() {
 	// apiVersion: v1
 	// clusters:
 	// - cluster:
-	//     server: http://cow.org:8080
-	//   name: cow-cluster
+	// server: http://cow.org:8080
+	// name: cow-cluster
 	// contexts:
 	// - context:
-	//     cluster: cow-cluster
-	//     namespace: hammer-ns
-	//     user: red-user
-	//   name: federal-context
+	// cluster: cow-cluster
+	// namespace: hammer-ns
+	// user: red-user
+	// name: federal-context
 	// current-context: ""
 	// kind: Config
 	// preferences: {}
 	// users:
 	// - name: red-user
-	//   user:
-	//     token: red-token
+	// user:
+	// token: red-token
 }
 
 func ExampleMergingSomeWithConflict() {
@@ -451,28 +451,28 @@ func ExampleMergingSomeWithConflict() {
 	// apiVersion: v1
 	// clusters:
 	// - cluster:
-	//     server: http://cow.org:8080
-	//   name: cow-cluster
+	// server: http://cow.org:8080
+	// name: cow-cluster
 	// - cluster:
-	//     insecure-skip-tls-verify: true
-	//     server: http://donkey.org:8080
-	//   name: donkey-cluster
+	// insecure-skip-tls-verify: true
+	// server: http://donkey.org:8080
+	// name: donkey-cluster
 	// contexts:
 	// - context:
-	//     cluster: cow-cluster
-	//     namespace: hammer-ns
-	//     user: red-user
-	//   name: federal-context
+	// cluster: cow-cluster
+	// namespace: hammer-ns
+	// user: red-user
+	// name: federal-context
 	// current-context: federal-context
 	// kind: Config
 	// preferences: {}
 	// users:
 	// - name: red-user
-	//   user:
-	//     token: red-token
+	// user:
+	// token: red-token
 	// - name: yellow-user
-	//   user:
-	//     token: yellow-token
+	// user:
+	// token: yellow-token
 }
 
 func ExampleMergingEverythingNoConflicts() {
@@ -510,52 +510,52 @@ func ExampleMergingEverythingNoConflicts() {
 	// 	apiVersion: v1
 	// clusters:
 	// - cluster:
-	//     server: http://chicken.org:8080
-	//   name: chicken-cluster
+	// server: http://chicken.org:8080
+	// name: chicken-cluster
 	// - cluster:
-	//     server: http://cow.org:8080
-	//   name: cow-cluster
+	// server: http://cow.org:8080
+	// name: cow-cluster
 	// - cluster:
-	//     server: http://horse.org:8080
-	//   name: horse-cluster
+	// server: http://horse.org:8080
+	// name: horse-cluster
 	// - cluster:
-	//     server: http://pig.org:8080
-	//   name: pig-cluster
+	// server: http://pig.org:8080
+	// name: pig-cluster
 	// contexts:
 	// - context:
-	//     cluster: cow-cluster
-	//     namespace: hammer-ns
-	//     user: red-user
-	//   name: federal-context
+	// cluster: cow-cluster
+	// namespace: hammer-ns
+	// user: red-user
+	// name: federal-context
 	// - context:
-	//     cluster: chicken-cluster
-	//     namespace: plane-ns
-	//     user: blue-user
-	//   name: gothic-context
+	// cluster: chicken-cluster
+	// namespace: plane-ns
+	// user: blue-user
+	// name: gothic-context
 	// - context:
-	//     cluster: pig-cluster
-	//     namespace: saw-ns
-	//     user: black-user
-	//   name: queen-anne-context
+	// cluster: pig-cluster
+	// namespace: saw-ns
+	// user: black-user
+	// name: queen-anne-context
 	// - context:
-	//     cluster: horse-cluster
-	//     namespace: chisel-ns
-	//     user: green-user
-	//   name: shaker-context
+	// cluster: horse-cluster
+	// namespace: chisel-ns
+	// user: green-user
+	// name: shaker-context
 	// current-context: ""
 	// kind: Config
 	// preferences: {}
 	// users:
 	// - name: black-user
-	//   user:
-	//     token: black-token
+	// user:
+	// token: black-token
 	// - name: blue-user
-	//   user:
-	//     token: blue-token
+	// user:
+	// token: blue-token
 	// - name: green-user
-	//   user:
-	//     token: green-token
+	// user:
+	// token: green-token
 	// - name: red-user
-	//   user:
-	//     token: red-token
+	// user:
+	// token: red-token
 }

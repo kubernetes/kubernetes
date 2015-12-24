@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -345,7 +345,7 @@ func ReadConfigData(location string) ([]byte, error) {
 
 // TODO: replace with resource.Builder
 func ReadConfigDataFromLocation(location string) ([]byte, error) {
-	// we look for http:// or https:// to determine if valid URL, otherwise do normal file IO
+	// we look for http://or https://to determine if valid URL, otherwise do normal file IO
 	if strings.Index(location, "http://") == 0 || strings.Index(location, "https://") == 0 {
 		resp, err := http.Get(location)
 		if err != nil {

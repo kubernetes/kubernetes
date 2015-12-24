@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,8 +32,8 @@ func New(authRequestHandlers ...authenticator.Request) authenticator.Request {
 	return unionAuthRequestHandler(authRequestHandlers)
 }
 
-// AuthenticateRequest authenticates the request using a chain of authenticator.Request objects.  The first
-// success returns that identity.  Errors are only returned if no matches are found.
+// AuthenticateRequest authenticates the request using a chain of authenticator.Request objects. The first
+// success returns that identity. Errors are only returned if no matches are found.
 func (authHandler unionAuthRequestHandler) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
 	var errlist []error
 	for _, currAuthRequestHandler := range authHandler {

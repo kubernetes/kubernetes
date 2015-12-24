@@ -144,10 +144,10 @@ func setConfigDefaults(config *unversioned.Config) error {
 		config.UserAgent = unversioned.DefaultKubernetesUserAgent()
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
-	//if config.Version == "" {
+	// if config.Version == "" {
 	copyGroupVersion := g.GroupVersion
 	config.GroupVersion = &copyGroupVersion
-	//}
+	// }
 
 	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
 	if err != nil {

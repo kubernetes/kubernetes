@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -552,7 +552,7 @@ func TestGetPodStatus(t *testing.T) {
 						CreatedAt:    time.Unix(100000, 0),
 						StartedAt:    time.Unix(100000, 0),
 						Image:        "img-name-1",
-						ImageID:      "rkt://img-id-1",
+						ImageID: "rkt://img-id-1",
 						Hash:         1001,
 						RestartCount: 7,
 					},
@@ -563,7 +563,7 @@ func TestGetPodStatus(t *testing.T) {
 						CreatedAt:    time.Unix(100000, 0),
 						StartedAt:    time.Unix(100000, 0),
 						Image:        "img-name-2",
-						ImageID:      "rkt://img-id-2",
+						ImageID: "rkt://img-id-2",
 						Hash:         1002,
 						RestartCount: 7,
 					},
@@ -606,7 +606,7 @@ func TestGetPodStatus(t *testing.T) {
 						CreatedAt:    time.Unix(90000, 0),
 						StartedAt:    time.Unix(90000, 0),
 						Image:        "img-name-1",
-						ImageID:      "rkt://img-id-1",
+						ImageID: "rkt://img-id-1",
 						Hash:         1001,
 						RestartCount: 7,
 					},
@@ -617,7 +617,7 @@ func TestGetPodStatus(t *testing.T) {
 						CreatedAt:    time.Unix(90000, 0),
 						StartedAt:    time.Unix(90000, 0),
 						Image:        "img-name-2",
-						ImageID:      "rkt://img-id-2",
+						ImageID: "rkt://img-id-2",
 						Hash:         1002,
 						RestartCount: 7,
 					},
@@ -628,7 +628,7 @@ func TestGetPodStatus(t *testing.T) {
 						CreatedAt:    time.Unix(100000, 0),
 						StartedAt:    time.Unix(100000, 0),
 						Image:        "img-name-1",
-						ImageID:      "rkt://img-id-1",
+						ImageID: "rkt://img-id-1",
 						Hash:         1001,
 						RestartCount: 10,
 					},
@@ -639,7 +639,7 @@ func TestGetPodStatus(t *testing.T) {
 						CreatedAt:    time.Unix(100000, 0),
 						StartedAt:    time.Unix(100000, 0),
 						Image:        "img-name-2",
-						ImageID:      "rkt://img-id-2",
+						ImageID: "rkt://img-id-2",
 						Hash:         1002,
 						RestartCount: 10,
 					},

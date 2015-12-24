@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,7 +29,7 @@ const (
 	TaskKilled               = "task-killed"
 	TaskLost                 = "task-lost"
 	UnmarshalTaskDataFailure = "unmarshal-task-data-failure"
-	TaskLostAck              = "task-lost-ack" // executor acknowledgement of forwarded TASK_LOST framework message
+	TaskLostAck = "task-lost-ack" // executor acknowledgement of forwarded TASK_LOST framework message
 	Kamikaze                 = "kamikaze"
 	WrongSlaveFailure        = "pod-for-wrong-slave-failure"
 	AnnotationUpdateFailure  = "annotation-update-failure"

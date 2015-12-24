@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -133,7 +133,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
 	updates := make(chan kubetypes.PodUpdate, 1024)
 	config := Config{
-		Docker:    dockertools.ConnectToDockerOrDie("fake://"),
+		Docker: dockertools.ConnectToDockerOrDie("fake://"),
 		Updates:   updates,
 		NodeInfos: make(chan NodeInfo, 1),
 		APIClient: client.NewOrDie(&client.Config{
@@ -335,8 +335,8 @@ func TestExecutorInitializeStaticPodsSource(t *testing.T) {
 
 // TestExecutorFrameworkMessage ensures that the executor is able to
 // handle messages from the framework, specifically about lost tasks
-// and Kamikaze.  When a task is lost, the executor needs to clean up
-// its state.  When a Kamikaze message is received, the executor should
+// and Kamikaze. When a task is lost, the executor needs to clean up
+// its state. When a Kamikaze message is received, the executor should
 // attempt suicide.
 func TestExecutorFrameworkMessage(t *testing.T) {
 	// create fake apiserver
@@ -348,7 +348,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
 	kubeletFinished := make(chan struct{})
 	config := Config{
-		Docker:    dockertools.ConnectToDockerOrDie("fake://"),
+		Docker: dockertools.ConnectToDockerOrDie("fake://"),
 		Updates:   make(chan kubetypes.PodUpdate, 1024),
 		NodeInfos: make(chan NodeInfo, 1),
 		APIClient: client.NewOrDie(&client.Config{
@@ -417,7 +417,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 	executor.LaunchTask(mockDriver, taskInfo)
 
 	// waiting until the pod is really running b/c otherwise a TASK_FAILED could be
-	// triggered by the asynchronously running  _launchTask, __launchTask methods
+	// triggered by the asynchronously running _launchTask, __launchTask methods
 	// when removing the task from k.tasks through the "task-lost:foo" message below.
 	select {
 	case <-called:
@@ -540,7 +540,7 @@ func TestExecutorShutdown(t *testing.T) {
 	var exitCalled int32 = 0
 	updates := make(chan kubetypes.PodUpdate, 1024)
 	config := Config{
-		Docker:    dockertools.ConnectToDockerOrDie("fake://"),
+		Docker: dockertools.ConnectToDockerOrDie("fake://"),
 		Updates:   updates,
 		NodeInfos: make(chan NodeInfo, 1),
 		ShutdownAlert: func() {

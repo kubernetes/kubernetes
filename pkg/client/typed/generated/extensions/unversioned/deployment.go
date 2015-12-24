@@ -52,7 +52,7 @@ func newDeployments(c *ExtensionsClient, namespace string) *deployments {
 	}
 }
 
-// Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
+// Create takes the representation of a deployment and creates it. Returns the server's representation of the deployment, and an error, if there is any.
 func (c *deployments) Create(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
 	err = c.client.Post().

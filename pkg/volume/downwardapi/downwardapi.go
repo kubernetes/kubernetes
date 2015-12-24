@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -89,7 +89,7 @@ type downwardAPIVolume struct {
 	volName                 string
 	fieldReferenceFileNames map[string]string
 	pod                     *api.Pod
-	podUID                  types.UID // TODO: remove this redundancy as soon NewCleaner func will have *api.POD and not only types.UID
+	podUID types.UID // TODO: remove this redundancy as soon NewCleaner func will have *api.POD and not only types.UID
 	plugin                  *downwardAPIPlugin
 	volume.MetricsNil
 }
@@ -213,20 +213,20 @@ const (
 // data is available:
 //
 // 1.  A new timestamped dir is created by writeDataInTimestampDir and requested data
-//     is written inside new timestamped directory
+// is written inside new timestamped directory
 // 2.  Symlinks and directory for new files are created (if needed).
-//     For example for files:
-//       <volume-dir>/user_space/labels
-//       <volume-dir>/k8s_space/annotations
-//       <volume-dir>/podName
-//     This structure is created:
-//       <volume-dir>/podName               -> ..downwardapi/podName
-//       <volume-dir>/user_space/labels     -> ../..downwardapi/user_space/labels
-//       <volume-dir>/k8s_space/annotations -> ../..downwardapi/k8s_space/annotations
-//       <volume-dir>/..downwardapi         -> ..downwardapi.12345678
-//     where ..downwardapi.12345678 is a randomly generated directory which contains
-//     the real data. If a file has to be dumped in subdirectory (for example <volume-dir>/user_space/labels)
-//     plugin builds a relative symlink (<volume-dir>/user_space/labels -> ../..downwardapi/user_space/labels)
+// For example for files:
+// <volume-dir>/user_space/labels
+// <volume-dir>/k8s_space/annotations
+// <volume-dir>/podName
+// This structure is created:
+// <volume-dir>/podName -> ..downwardapi/podName
+// <volume-dir>/user_space/labels -> ../..downwardapi/user_space/labels
+// <volume-dir>/k8s_space/annotations -> ../..downwardapi/k8s_space/annotations
+// <volume-dir>/..downwardapi -> ..downwardapi.12345678
+// where ..downwardapi.12345678 is a randomly generated directory which contains
+// the real data. If a file has to be dumped in subdirectory (for example <volume-dir>/user_space/labels)
+// plugin builds a relative symlink (<volume-dir>/user_space/labels -> ../..downwardapi/user_space/labels)
 // 3.  The previous timestamped directory is detected reading the '..downwardapi' symlink
 // 4.  In case no symlink exists then it's created
 // 5.  In case symlink exists a new temporary symlink is created ..downwardapi_tmp
@@ -298,9 +298,9 @@ func (d *downwardAPIVolume) writeDataInTimestampDir(data map[string]string) (str
 //
 // For example for files: "bar", "foo/bar", "baz/bar", "foo/baz/blah"
 // the following symlinks and subdirectory are created:
-// bar          -> ..downwardapi/bar
-// baz/bar      -> ../..downwardapi/baz/bar
-// foo/bar      -> ../..downwardapi/foo/bar
+// bar -> ..downwardapi/bar
+// baz/bar -> ../..downwardapi/baz/bar
+// foo/bar -> ../..downwardapi/foo/bar
 // foo/baz/blah -> ../../..downwardapi/foo/baz/blah
 func (d *downwardAPIVolume) updateSymlinksToCurrentDir() error {
 	for _, f := range d.fieldReferenceFileNames {
@@ -308,7 +308,7 @@ func (d *downwardAPIVolume) updateSymlinksToCurrentDir() error {
 		nbOfSubdir := 0
 		if len(dir) > 0 {
 			// if dir is not empty f contains at least a subdirectory (for example: f="foo/bar")
-			// since filepath.Split leaves a trailing '/'  we have dir="foo/"
+			// since filepath.Split leaves a trailing '/' we have dir="foo/"
 			// and since len(strings.Split"foo/")=2 to count the number
 			// of sub directory you need to remove 1
 			nbOfSubdir = len(strings.Split(dir, "/")) - 1

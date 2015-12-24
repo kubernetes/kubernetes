@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -1246,7 +1246,7 @@ func validateHostNetwork(hostNetwork bool, containers []api.Container, fldPath *
 }
 
 // validateImagePullSecrets checks to make sure the pull secrets are well
-// formed.  Right now, we only expect name to be set (it's the only field).  If
+// formed. Right now, we only expect name to be set (it's the only field). If
 // this ever changes and someone decides to set those fields, we'd like to
 // know.
 func validateImagePullSecrets(imagePullSecrets []api.LocalObjectReference, fldPath *field.Path) field.ErrorList {
@@ -1269,7 +1269,7 @@ func ValidatePod(pod *api.Pod) field.ErrorList {
 }
 
 // ValidatePodSpec tests that the specified PodSpec has valid data.
-// This includes checking formatting and uniqueness.  It also canonicalizes the
+// This includes checking formatting and uniqueness. It also canonicalizes the
 // structure by setting default values and implementing any backwards-compatibility
 // tricks.
 func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
@@ -1321,7 +1321,7 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 
 	specPath := field.NewPath("spec")
 	if len(newPod.Spec.Containers) != len(oldPod.Spec.Containers) {
-		//TODO: Pinpoint the specific container that causes the invalid error after we have strategic merge diff
+		// TODO: Pinpoint the specific container that causes the invalid error after we have strategic merge diff
 		allErrs = append(allErrs, field.Forbidden(specPath.Child("containers"), "pod updates may not add or remove containers"))
 		return allErrs
 	}
@@ -1334,7 +1334,7 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 	}
 	pod.Spec.Containers = newContainers
 	if !api.Semantic.DeepEqual(pod.Spec, oldPod.Spec) {
-		//TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
+		// TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
 		allErrs = append(allErrs, field.Forbidden(specPath, "pod updates may not change fields other than `containers[*].image`"))
 	}
 
@@ -1405,7 +1405,7 @@ func ValidateService(service *api.Service) field.ErrorList {
 		for ix := range service.Spec.Ports {
 			port := &service.Spec.Ports[ix]
 			// This is a workaround for broken cloud environments that
-			// over-open firewalls.  Hopefully it can go away when more clouds
+			// over-open firewalls. Hopefully it can go away when more clouds
 			// understand containers better.
 			if port.Port == 10250 {
 				portPath := specPath.Child("ports").Index(ix)
@@ -1635,7 +1635,7 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume, fldPath *field.Path) 
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("gcePersistentDisk", "readOnly"), false, "must be true for replicated pods > 1; GCE PD can only be mounted on multiple machines if it is read-only"))
 			}
 		}
-		// TODO: What to do for AWS?  It doesn't support replicas
+		// TODO: What to do for AWS? It doesn't support replicas
 	}
 	return allErrs
 }
@@ -1655,7 +1655,7 @@ func ValidateNode(node *api.Node) field.ErrorList {
 	return allErrs
 }
 
-// ValidateNodeUpdate tests to make sure a node update can be applied.  Modifies oldNode.
+// ValidateNodeUpdate tests to make sure a node update can be applied. Modifies oldNode.
 func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&node.ObjectMeta, &oldNode.ObjectMeta, field.NewPath("metadata"))
 
@@ -2106,7 +2106,7 @@ func validateEndpointSubsets(subsets []api.EndpointSubset, fldPath *field.Path) 
 		idxPath := fldPath.Index(i)
 
 		if len(ss.Addresses) == 0 && len(ss.NotReadyAddresses) == 0 {
-			//TODO: consider adding a RequiredOneOf() error for this and similar cases
+			// TODO: consider adding a RequiredOneOf() error for this and similar cases
 			allErrs = append(allErrs, field.Required(idxPath, "must specify `addresses` or `notReadyAddresses`"))
 		}
 		if len(ss.Ports) == 0 {
@@ -2133,7 +2133,7 @@ func validateEndpointAddress(address *api.EndpointAddress, fldPath *field.Path) 
 }
 
 func validateIpIsNotLinkLocalOrLoopback(ipAddress string, fldPath *field.Path) field.ErrorList {
-	// We disallow some IPs as endpoints or external-ips.  Specifically, loopback addresses are
+	// We disallow some IPs as endpoints or external-ips. Specifically, loopback addresses are
 	// nonsensical and link-local addresses tend to be used for node-centric purposes (e.g. metadata service).
 	allErrs := field.ErrorList{}
 	ip := net.ParseIP(ipAddress)
@@ -2183,7 +2183,7 @@ func ValidateEndpointsUpdate(newEndpoints, oldEndpoints *api.Endpoints) field.Er
 // ValidateSecurityContext ensure the security context contains valid settings
 func ValidateSecurityContext(sc *api.SecurityContext, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	//this should only be true for testing since SecurityContext is defaulted by the api
+	// this should only be true for testing since SecurityContext is defaulted by the api
 	if sc == nil {
 		return allErrs
 	}

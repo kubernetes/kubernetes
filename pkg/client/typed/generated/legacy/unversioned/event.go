@@ -51,7 +51,7 @@ func newEvents(c *LegacyClient, namespace string) *events {
 	}
 }
 
-// Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
+// Create takes the representation of a event and creates it. Returns the server's representation of the event, and an error, if there is any.
 func (c *events) Create(event *api.Event) (result *api.Event, err error) {
 	result = &api.Event{}
 	err = c.client.Post().

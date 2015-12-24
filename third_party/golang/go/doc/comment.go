@@ -51,8 +51,8 @@ const (
 	protocol = `https?|ftp|file|gopher|mailto|news|nntp|telnet|wais|prospero`
 	hostPart = `[a-zA-Z0-9_@\-]+`
 	filePart = `[a-zA-Z0-9_?%#~&/\-+=()]+` // parentheses may not be matching; see pairedParensPrefixLen
-	urlRx    = `(` + protocol + `)://` +   // http://
-		hostPart + `([.:]` + hostPart + `)*/?` + // //www.google.com:8080/
+	urlRx = `(` + protocol + `)://` + //   http://
+		hostPart + `([.:]` + hostPart + `)*/?` + // //   www.google.com:8080/
 		filePart + `([:.,]` + filePart + `)*`
 )
 
@@ -398,7 +398,7 @@ func blocks(text string) []block {
 
 // ToText prepares comment text for presentation in textual output.
 // It wraps paragraphs of text to width or fewer Unicode code points
-// and then prefixes each line with the indent.  In preformatted sections
+// and then prefixes each line with the indent. In preformatted sections
 // (such as program text), it prefixes each non-blank line with preIndent.
 func ToText(w io.Writer, text string, indent, preIndent string, width int) {
 	l := lineWrapper{

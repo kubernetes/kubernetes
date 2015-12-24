@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -145,7 +145,7 @@ type HorizontalPodAutoscalerList struct {
 // +genclient=true
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
-// types to the API.  It consists of one or more Versions of the api.
+// types to the API. It consists of one or more Versions of the api.
 type ThirdPartyResource struct {
 	unversioned.TypeMeta `json:",inline"`
 
@@ -179,7 +179,7 @@ type APIVersion struct {
 	APIGroup string `json:"apiGroup,omitempty"`
 }
 
-// An internal object, used for versioned storage in etcd.  Not exposed to the end user.
+// An internal object, used for versioned storage in etcd. Not exposed to the end user.
 type ThirdPartyResourceData struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object metadata.
@@ -242,7 +242,7 @@ type DeploymentStrategy struct {
 
 	// Rolling update config params. Present only if DeploymentStrategyType =
 	// RollingUpdate.
-	//---
+	// ---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
 	// to be.
 	RollingUpdate *RollingUpdateDeployment `json:"rollingUpdate,omitempty"`
@@ -543,10 +543,10 @@ type IngressRule struct {
 	// by RFC 3986. Note the following deviations from the "host" part of the
 	// URI as defined in the RFC:
 	// 1. IPs are not allowed. Currently an IngressRuleValue can only apply to the
-	//	  IP in the Spec of the parent Ingress.
+	// 	 IP in the Spec of the parent Ingress.
 	// 2. The `:` delimiter is not respected because ports are not allowed.
-	//	  Currently the port of an Ingress is implicitly :80 for http and
-	//	  :443 for https.
+	// 	 Currently the port of an Ingress is implicitly :80 for http and
+	// 	 :443 for https.
 	// Both these may change in the future.
 	// Incoming requests are matched against the host before the IngressRuleValue.
 	// If the host is unspecified, the Ingress routes all traffic based on the
@@ -565,7 +565,7 @@ type IngressRule struct {
 // mixing different types of rules in a single Ingress is disallowed, so exactly
 // one of the following must be set.
 type IngressRuleValue struct {
-	//TODO:
+	// TODO:
 	// 1. Consider renaming this resource and the associated rules so they
 	// aren't tied to Ingress. They can be used to route intra-cluster traffic.
 	// 2. Consider adding fields for ingress-type specific global options

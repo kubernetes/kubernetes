@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,7 +31,7 @@ type SchedulerExtender interface {
 
 	// Prioritize based on extender-implemented priority functions. The returned scores & weight
 	// are used to compute the weighted score for an extender. The weighted scores are added to
-	// the scores computed  by Kubernetes scheduler. The total scores are used to do the host selection.
+	// the scores computed by Kubernetes scheduler. The total scores are used to do the host selection.
 	Prioritize(pod *api.Pod, nodes *api.NodeList) (hostPriorities *schedulerapi.HostPriorityList, weight int, err error)
 }
 

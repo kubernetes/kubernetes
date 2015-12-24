@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -51,16 +51,16 @@ const (
 
 // Plan:
 // 1. Fill disk space on all nodes except one. One node is left out so that we can schedule pods
-//    on that node. Arbitrarily choose that node to be node with index 0.
+// on that node. Arbitrarily choose that node to be node with index 0.
 // 2. Get the CPU capacity on unfilled node.
 // 3. Divide the available CPU into one less than the number of pods we want to schedule. We want
-//    to schedule 3 pods, so divide CPU capacity by 2.
+// to schedule 3 pods, so divide CPU capacity by 2.
 // 4. Request the divided CPU for each pod.
 // 5. Observe that 2 of the pods schedule onto the node whose disk is not full, and the remaining
-//    pod stays pending and does not schedule onto the nodes whose disks are full nor the node
-//    with the other two pods, since there is not enough free CPU capacity there.
+// pod stays pending and does not schedule onto the nodes whose disks are full nor the node
+// with the other two pods, since there is not enough free CPU capacity there.
 // 6. Recover disk space from one of the nodes whose disk space was previously filled. Arbritrarily
-//    choose that node to be node with index 1.
+// choose that node to be node with index 1.
 // 7. Observe that the pod in pending status schedules on that node.
 //
 // Flaky issue #17687

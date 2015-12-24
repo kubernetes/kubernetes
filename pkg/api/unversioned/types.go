@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -57,9 +57,9 @@ type ListMeta struct {
 // ExportOptions is the query options to the standard REST get call.
 type ExportOptions struct {
 	TypeMeta `json:",inline"`
-	// Should this value be exported.  Export strips fields that a user can not specify.`
+	// Should this value be exported. Export strips fields that a user can not specify.`
 	Export bool `json:"export"`
-	// Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'
+	// Should the export be exact. Exact export maintains cluster-specific fields like 'Namespace'
 	Exact bool `json:"exact"`
 }
 
@@ -81,7 +81,7 @@ type Status struct {
 	// is no information available. A Reason clarifies an HTTP status
 	// code but does not override it.
 	Reason StatusReason `json:"reason,omitempty"`
-	// Extended data associated with the reason.  Each reason may define its
+	// Extended data associated with the reason. Each reason may define its
 	// own extended details. This field is optional and the data returned
 	// is not guaranteed to conform to any schema except that defined by
 	// the reason type.
@@ -119,7 +119,7 @@ const (
 	StatusFailure = "Failure"
 )
 
-// StatusReason is an enumeration of possible failure causes.  Each StatusReason
+// StatusReason is an enumeration of possible failure causes. Each StatusReason
 // must map to a single HTTP status code, but multiple reasons may map
 // to the same HTTP status code.
 // TODO: move to apiserver
@@ -139,30 +139,30 @@ const (
 	StatusReasonUnauthorized StatusReason = "Unauthorized"
 
 	// StatusReasonForbidden means the server can be reached and understood the request, but refuses
-	// to take any further action.  It is the result of the server being configured to deny access for some reason
+	// to take any further action. It is the result of the server being configured to deny access for some reason
 	// to the requested resource by the client.
 	// Details (optional):
-	//   "kind" string - the kind attribute of the forbidden resource
-	//                   on some operations may differ from the requested
-	//                   resource.
-	//   "id"   string - the identifier of the forbidden resource
+	// "kind" string - the kind attribute of the forbidden resource
+	// on some operations may differ from the requested
+	// resource.
+	// "id" string - the identifier of the forbidden resource
 	// Status code 403
 	StatusReasonForbidden StatusReason = "Forbidden"
 
 	// StatusReasonNotFound means one or more resources required for this operation
 	// could not be found.
 	// Details (optional):
-	//   "kind" string - the kind attribute of the missing resource
-	//                   on some operations may differ from the requested
-	//                   resource.
-	//   "id"   string - the identifier of the missing resource
+	// "kind" string - the kind attribute of the missing resource
+	// on some operations may differ from the requested
+	// resource.
+	// "id" string - the identifier of the missing resource
 	// Status code 404
 	StatusReasonNotFound StatusReason = "NotFound"
 
 	// StatusReasonAlreadyExists means the resource you are creating already exists.
 	// Details (optional):
-	//   "kind" string - the kind attribute of the conflicting resource
-	//   "id"   string - the identifier of the conflicting resource
+	// "kind" string - the kind attribute of the conflicting resource
+	// "id" string - the identifier of the conflicting resource
 	// Status code 409
 	StatusReasonAlreadyExists StatusReason = "AlreadyExists"
 
@@ -183,11 +183,11 @@ const (
 	// need to alter the request. When set, the client may use the StatusDetails
 	// message field as a summary of the issues encountered.
 	// Details (optional):
-	//   "kind" string - the kind attribute of the invalid resource
-	//   "id"   string - the identifier of the invalid resource
-	//   "causes"      - one or more StatusCause entries indicating the data in the
-	//                   provided resource that was invalid.  The code, message, and
-	//                   field attributes will be set.
+	// "kind" string - the kind attribute of the invalid resource
+	// "id" string - the identifier of the invalid resource
+	// "causes" - one or more StatusCause entries indicating the data in the
+	// provided resource that was invalid. The code, message, and
+	// field attributes will be set.
 	// Status code 422
 	StatusReasonInvalid StatusReason = "Invalid"
 
@@ -197,9 +197,9 @@ const (
 	// another server. Status code 500 is used because the HTTP spec provides no suitable
 	// server-requested client retry and the 5xx class represents actionable errors.
 	// Details (optional):
-	//   "kind" string - the kind attribute of the resource being acted on.
-	//   "id"   string - the operation that is being attempted.
-	//   "retryAfterSeconds" int32 - the number of seconds before the operation should be retried
+	// "kind" string - the kind attribute of the resource being acted on.
+	// "id" string - the operation that is being attempted.
+	// "retryAfterSeconds" int32 - the number of seconds before the operation should be retried
 	// Status code 500
 	StatusReasonServerTimeout StatusReason = "ServerTimeout"
 
@@ -209,14 +209,14 @@ const (
 	// The request might succeed with an increased value of timeout param. The client *should*
 	// wait at least the number of seconds specified by the retryAfterSeconds field.
 	// Details (optional):
-	//   "retryAfterSeconds" int32 - the number of seconds before the operation should be retried
+	// "retryAfterSeconds" int32 - the number of seconds before the operation should be retried
 	// Status code 504
 	StatusReasonTimeout StatusReason = "Timeout"
 
 	// StatusReasonBadRequest means that the request itself was invalid, because the request
-	// doesn't make any sense, for example deleting a read-only object.  This is different than
+	// doesn't make any sense, for example deleting a read-only object. This is different than
 	// StatusReasonInvalid above which indicates that the API call could possibly succeed, but the
-	// data was invalid.  API calls that return BadRequest can never succeed.
+	// data was invalid. API calls that return BadRequest can never succeed.
 	StatusReasonBadRequest StatusReason = "BadRequest"
 
 	// StatusReasonMethodNotAllowed means that the action the client attempted to perform on the
@@ -227,7 +227,7 @@ const (
 	// StatusReasonInternalError indicates that an internal error occurred, it is unexpected
 	// and the outcome of the call is unknown.
 	// Details (optional):
-	//   "causes" - The original error
+	// "causes" - The original error
 	// Status code 500
 	StatusReasonInternalError StatusReason = "InternalError"
 
@@ -250,18 +250,18 @@ type StatusCause struct {
 	// A machine-readable description of the cause of the error. If this value is
 	// empty there is no information available.
 	Type CauseType `json:"reason,omitempty"`
-	// A human-readable description of the cause of the error.  This field may be
+	// A human-readable description of the cause of the error. This field may be
 	// presented as-is to a reader.
 	Message string `json:"message,omitempty"`
 	// The field of the resource that has caused this error, as named by its JSON
 	// serialization. May include dot and postfix notation for nested attributes.
-	// Arrays are zero-indexed.  Fields may appear more than once in an array of
+	// Arrays are zero-indexed. Fields may appear more than once in an array of
 	// causes due to fields having multiple errors.
 	// Optional.
 	//
 	// Examples:
-	//   "name" - the field "name" on the current resource
-	//   "items[0].name" - the field "name" on the first array entry in "items"
+	// "name" - the field "name" on the current resource
+	// "items[0].name" - the field "name" on the first array entry in "items"
 	Field string `json:"field,omitempty"`
 }
 

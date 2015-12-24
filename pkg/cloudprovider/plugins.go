@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,7 +35,7 @@ type Factory func(config io.Reader) (Interface, error)
 var providersMutex sync.Mutex
 var providers = make(map[string]Factory)
 
-// RegisterCloudProvider registers a cloudprovider.Factory by name.  This
+// RegisterCloudProvider registers a cloudprovider.Factory by name. This
 // is expected to happen during app startup.
 func RegisterCloudProvider(name string, cloud Factory) {
 	providersMutex.Lock()
@@ -48,7 +48,7 @@ func RegisterCloudProvider(name string, cloud Factory) {
 }
 
 // GetCloudProvider creates an instance of the named cloud provider, or nil if
-// the name is not known.  The error return is only used if the named provider
+// the name is not known. The error return is only used if the named provider
 // was known but failed to initialize. The config parameter specifies the
 // io.Reader handler of the configuration file for the cloud provider, or nil
 // for no configuation.

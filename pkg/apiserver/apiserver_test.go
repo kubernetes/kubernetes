@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -698,7 +698,7 @@ func TestNotFound(t *testing.T) {
 
 		// Positive checks to make sure everything is wired correctly
 		"GET root": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusOK},
-		// TODO: JTL: "GET root item":       {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar", http.StatusOK},
+		// TODO: JTL: "GET root item": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar", http.StatusOK},
 		"GET namespaced": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusOK},
 		// TODO: JTL: "GET namespaced item": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar", http.StatusOK},
 
@@ -707,13 +707,13 @@ func TestNotFound(t *testing.T) {
 		"root PATCH method":           {"PATCH", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
 		"root GET missing storage":    {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/blah", http.StatusNotFound},
 		"root GET with extra segment": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
-		// TODO: JTL: "root POST with extra segment":      {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar", http.StatusMethodNotAllowed},
+		// TODO: JTL: "root POST with extra segment": {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar", http.StatusMethodNotAllowed},
 		"root DELETE without extra segment": {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
 		"root DELETE with extra segment":    {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
 		"root PUT without extra segment":    {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
 		"root PUT with extra segment":       {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
 		"root watch missing storage":        {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/", http.StatusNotFound},
-		// TODO: JTL: "root watch with bad method":        {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simpleroot/bar", http.StatusMethodNotAllowed},
+		// TODO: JTL: "root watch with bad method": {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simpleroot/bar", http.StatusMethodNotAllowed},
 
 		"namespaced PATCH method":                 {"PATCH", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
 		"namespaced GET long prefix":              {"GET", "/" + prefix + "/", http.StatusNotFound},
@@ -759,9 +759,9 @@ func (UnimplementedRESTStorage) New() runtime.Object {
 }
 
 // TestUnimplementedRESTStorage ensures that if a rest.Storage does not implement a given
-// method, that it is literally not registered with the server.  In the past,
+// method, that it is literally not registered with the server. In the past,
 // we registered everything, and returned method not supported if it didn't support
-// a verb.  Now we literally do not register a storage if it does not implement anything.
+// a verb. Now we literally do not register a storage if it does not implement anything.
 // TODO: in future, we should update proxy/redirect
 func TestUnimplementedRESTStorage(t *testing.T) {
 	type T struct {
@@ -2370,7 +2370,7 @@ func TestUpdateREST(t *testing.T) {
 
 	container := restful.NewContainer()
 
-	// install group1.  Ensure that
+	// install group1. Ensure that
 	// 1. Foo storage is accessible
 	// 2. Bar storage is not accessible
 	if err := group1.InstallREST(container); err != nil {
@@ -2378,9 +2378,9 @@ func TestUpdateREST(t *testing.T) {
 	}
 	testREST(t, container, http.StatusNotFound)
 
-	// update with group2.  Ensure that
-	// 1.  Foo storage is still accessible
-	// 2.  Bar storage is now accessible
+	// update with group2. Ensure that
+	// 1. Foo storage is still accessible
+	// 2. Bar storage is now accessible
 	if err := group2.UpdateREST(container); err != nil {
 		t.Fatal(err)
 	}
@@ -2783,7 +2783,7 @@ func TestWriteJSONDecodeError(t *testing.T) {
 	}))
 	defer server.Close()
 	// We send a 200 status code before we encode the object, so we expect OK, but there will
-	// still be an error object.  This seems ok, the alternative is to validate the object before
+	// still be an error object. This seems ok, the alternative is to validate the object before
 	// encoding, but this really should never happen, so it's wasted compute for every API request.
 	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusOK)
 	if status.Reason != unversioned.StatusReasonUnknown {
@@ -2926,7 +2926,7 @@ func TestCreateChecksAPIVersion(t *testing.T) {
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{}
-	//using newCodec and send the request to testVersion URL shall cause a discrepancy in apiVersion
+	// using newCodec and send the request to testVersion URL shall cause a discrepancy in apiVersion
 	data, err := runtime.Encode(newCodec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

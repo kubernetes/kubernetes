@@ -95,7 +95,7 @@ func tryReadVariableName(input string) (string, bool, int) {
 		return string(operator) + string(referenceOpener), false, 1
 	default:
 		// Not the beginning of an expression, ie, an operator
-		// that doesn't begin an expression.  Return the operator
+		// that doesn't begin an expression. Return the operator
 		// and the first rune in the string.
 		return (string(operator) + string(input[0])), false, 1
 	}

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -76,7 +76,7 @@ type KubeletServer struct {
 	Address                        net.IP
 	AllowPrivileged                bool
 	APIServerList                  []string
-	AuthPath                       util.StringFlag // Deprecated -- use KubeConfig instead
+	AuthPath util.StringFlag // Deprecated -- use KubeConfig instead
 	CAdvisorPort                   uint
 	CertDirectory                  string
 	CgroupRoot                     string
@@ -177,7 +177,7 @@ type KubeletBuilder func(kc *KubeletConfig) (KubeletBootstrap, *config.PodConfig
 func NewKubeletServer() *KubeletServer {
 	return &KubeletServer{
 		Address:                     net.ParseIP("0.0.0.0"),
-		AuthPath:                    util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
+		AuthPath: util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
 		CAdvisorPort:                4194,
 		CertDirectory:               "/var/run/kubernetes",
 		CgroupRoot:                  "",
@@ -217,7 +217,7 @@ func NewKubeletServer() *KubeletServer {
 		PodInfraContainerImage:      dockertools.PodInfraContainerImage,
 		Port:                           ports.KubeletPort,
 		ReadOnlyPort:                   ports.KubeletReadOnlyPort,
-		RegisterNode:                   true, // will be ignored if no apiserver is configured
+		RegisterNode: true, // will be ignored if no apiserver is configured
 		RegisterSchedulable:            true,
 		RegistryBurst:                  10,
 		RegistryPullQPS:                5.0,
@@ -352,7 +352,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 }
 
 // UnsecuredKubeletConfig returns a KubeletConfig suitable for being run, or an error if the server setup
-// is not valid.  It will not start any background processes, and does not include authentication/authorization
+// is not valid. It will not start any background processes, and does not include authentication/authorization
 func (s *KubeletServer) UnsecuredKubeletConfig() (*KubeletConfig, error) {
 	hostNetworkSources, err := kubetypes.GetValidatedSources(strings.Split(s.HostNetworkSources, ","))
 	if err != nil {
@@ -418,10 +418,10 @@ func (s *KubeletServer) UnsecuredKubeletConfig() (*KubeletConfig, error) {
 	return &KubeletConfig{
 		Address:                   s.Address,
 		AllowPrivileged:           s.AllowPrivileged,
-		Auth:                      nil, // default does not enforce auth[nz]
-		CAdvisorInterface:         nil, // launches background processes, not set here
+		Auth: nil, // default does not enforce auth[nz]
+		CAdvisorInterface: nil, // launches background processes, not set here
 		CgroupRoot:                s.CgroupRoot,
-		Cloud:                     nil, // cloud provider might start background processes
+		Cloud: nil, // cloud provider might start background processes
 		ClusterDNS:                s.ClusterDNS,
 		ClusterDomain:             s.ClusterDomain,
 		ConfigFile:                s.Config,
@@ -491,7 +491,7 @@ func (s *KubeletServer) UnsecuredKubeletConfig() (*KubeletConfig, error) {
 	}, nil
 }
 
-// Run runs the specified KubeletServer for the given KubeletConfig.  This should never exit.
+// Run runs the specified KubeletServer for the given KubeletConfig. This should never exit.
 // The kcfg argument may be nil - if so, it is initialized from the settings on KubeletServer.
 // Otherwise, the caller is assumed to have set up the KubeletConfig object and all defaults
 // will be ignored.
@@ -769,10 +769,10 @@ func SimpleKubelet(client *client.Client,
 	return &kcfg
 }
 
-// RunKubelet is responsible for setting up and running a kubelet.  It is used in three different applications:
-//   1 Integration tests
-//   2 Kubelet binary
-//   3 Standalone 'kubernetes' binary
+// RunKubelet is responsible for setting up and running a kubelet. It is used in three different applications:
+// 1 Integration tests
+// 2 Kubelet binary
+// 3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kcfg *KubeletConfig) error {
 	kcfg.Hostname = nodeutil.GetHostname(kcfg.HostnameOverride)
@@ -884,7 +884,7 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 }
 
 // KubeletConfig is all of the parameters necessary for running a kubelet.
-// TODO: This should probably be merged with KubeletServer.  The extra object is a consequence of refactoring.
+// TODO: This should probably be merged with KubeletServer. The extra object is a consequence of refactoring.
 type KubeletConfig struct {
 	Address                        net.IP
 	AllowPrivileged                bool

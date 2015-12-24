@@ -52,7 +52,7 @@ func newThirdPartyResources(c *ExtensionsClient, namespace string) *thirdPartyRe
 	}
 }
 
-// Create takes the representation of a thirdPartyResource and creates it.  Returns the server's representation of the thirdPartyResource, and an error, if there is any.
+// Create takes the representation of a thirdPartyResource and creates it. Returns the server's representation of the thirdPartyResource, and an error, if there is any.
 func (c *thirdPartyResources) Create(thirdPartyResource *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
 	result = &extensions.ThirdPartyResource{}
 	err = c.client.Post().

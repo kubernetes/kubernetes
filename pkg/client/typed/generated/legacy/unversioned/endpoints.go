@@ -51,7 +51,7 @@ func newEndpoints(c *LegacyClient, namespace string) *endpoints {
 	}
 }
 
-// Create takes the representation of a endpoints and creates it.  Returns the server's representation of the endpoints, and an error, if there is any.
+// Create takes the representation of a endpoints and creates it. Returns the server's representation of the endpoints, and an error, if there is any.
 func (c *endpoints) Create(endpoints *api.Endpoints) (result *api.Endpoints, err error) {
 	result = &api.Endpoints{}
 	err = c.client.Post().

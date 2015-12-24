@@ -15,10 +15,10 @@
 // For instance, the following test file indicates that a "not declared"
 // error should be reported for the undeclared variable x:
 //
-//	package p
-//	func f() {
-//		_ = x /* ERROR "not declared" */ + 1
-//	}
+// 	package p
+// 	func f() {
+// 		_ = x /* ERROR "not declared" */ + 1
+// 	}
 
 package parser
 

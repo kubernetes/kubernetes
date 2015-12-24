@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -44,12 +44,12 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 	for currPartIndex < len(individualParts) {
 		switch currType.Kind() {
 		case reflect.Map:
-			// if we're in a map, we need to locate a name.  That name may contain dots, so we need to know what tokens are legal for the map's value type
-			// for example, we could have a set request like: `set clusters.10.10.12.56.insecure-skip-tls-verify true`.  We enter this case with
-			// steps representing 10, 10, 12, 56, insecure-skip-tls-verify.  The name is "10.10.12.56", so we want to collect all those parts together and
-			// store them as a single step.  In order to do that, we need to determine what set of tokens is a legal step AFTER the name of the map key
-			// This set of reflective code pulls the type of the map values, uses that type to look up the set of legal tags.  Those legal tags are used to
-			// walk the list of remaining parts until we find a match to a legal tag or the end of the string.  That name is used to burn all the used parts.
+			// if we're in a map, we need to locate a name. That name may contain dots, so we need to know what tokens are legal for the map's value type
+			// for example, we could have a set request like: `set clusters.10.10.12.56.insecure-skip-tls-verify true`. We enter this case with
+			// steps representing 10, 10, 12, 56, insecure-skip-tls-verify. The name is "10.10.12.56", so we want to collect all those parts together and
+			// store them as a single step. In order to do that, we need to determine what set of tokens is a legal step AFTER the name of the map key
+			// This set of reflective code pulls the type of the map values, uses that type to look up the set of legal tags. Those legal tags are used to
+			// walk the list of remaining parts until we find a match to a legal tag or the end of the string. That name is used to burn all the used parts.
 			mapValueType := currType.Elem().Elem()
 			mapValueOptions, err := getPotentialTypeValues(mapValueType)
 			if err != nil {
@@ -101,7 +101,7 @@ func (s *navigationSteps) moreStepsRemaining() bool {
 	return len(s.steps) > s.currentStepIndex
 }
 
-// findNameStep takes the list of parts and a set of valid tags that can be used after the name.  It then walks the list of parts
+// findNameStep takes the list of parts and a set of valid tags that can be used after the name. It then walks the list of parts
 // until it find a valid "next" tag or until it reaches the end of the parts and then builds the name back up out of the individual parts
 func findNameStep(parts []string, typeOptions sets.String) string {
 	if len(parts) == 0 {

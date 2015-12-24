@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -46,7 +46,7 @@ type deadlockDetector struct {
 	stopChannel <-chan bool
 }
 
-// DeadlockWatchdogReadLock creates a watchdog on read/write mutex.  If the mutex can not be acquired
+// DeadlockWatchdogReadLock creates a watchdog on read/write mutex. If the mutex can not be acquired
 // for read access within 'maxLockPeriod', the program exits via glog.Exitf() or os.Exit() if that fails
 // 'name' is a semantic name that is useful for the user and is printed on exit.
 func DeadlockWatchdogReadLock(lock *sync.RWMutex, name string, maxLockPeriod time.Duration) {

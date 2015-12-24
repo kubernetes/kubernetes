@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,7 +28,7 @@ import (
 
 // DeferredLoadingClientConfig is a ClientConfig interface that is backed by a set of loading rules
 // It is used in cases where the loading rules may change after you've instantiated them and you want to be sure that
-// the most recent rules are used.  This is useful in cases where you bind flags to loading rule parameters before
+// the most recent rules are used. This is useful in cases where you bind flags to loading rule parameters before
 // the parse happens and you want your calling code to be ignorant of how the values are being mutated to avoid
 // passing extraneous information down a call stack
 type DeferredLoadingClientConfig struct {

@@ -51,7 +51,7 @@ func newSecrets(c *LegacyClient, namespace string) *secrets {
 	}
 }
 
-// Create takes the representation of a secret and creates it.  Returns the server's representation of the secret, and an error, if there is any.
+// Create takes the representation of a secret and creates it. Returns the server's representation of the secret, and an error, if there is any.
 func (c *secrets) Create(secret *api.Secret) (result *api.Secret, err error) {
 	result = &api.Secret{}
 	err = c.client.Post().

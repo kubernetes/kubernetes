@@ -1,4 +1,4 @@
-// Copyright 2012 The Go Authors.  All rights reserved.
+// Copyright 2012 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -21,7 +21,7 @@ import (
 )
 
 // pkgDeps defines the expected dependencies between packages in
-// the Go source tree.  It is a statement of policy.
+// the Go source tree. It is a statement of policy.
 // Changes should not be made to this map without prior discussion.
 //
 // The map contains two kinds of entries:
@@ -90,19 +90,19 @@ var pkgDeps = map[string][]string{
 	// L3 adds reflection and some basic utility packages
 	// and interface definitions, but nothing that makes
 	// system calls.
-	"crypto":              {"L2", "hash"},          // interfaces
-	"crypto/cipher":       {"L2", "crypto/subtle"}, // interfaces
+	"crypto": {"L2", "hash"}, // interfaces
+	"crypto/cipher": {"L2", "crypto/subtle"}, // interfaces
 	"crypto/subtle":       {},
 	"encoding/base32":     {"L2"},
 	"encoding/base64":     {"L2"},
 	"encoding/binary":     {"L2", "reflect"},
-	"hash":                {"L2"}, // interfaces
+	"hash": {"L2"}, // interfaces
 	"hash/adler32":        {"L2", "hash"},
 	"hash/crc32":          {"L2", "hash"},
 	"hash/crc64":          {"L2", "hash"},
 	"hash/fnv":            {"L2", "hash"},
-	"image":               {"L2", "image/color"}, // interfaces
-	"image/color":         {"L2"},                // interfaces
+	"image": {"L2", "image/color"}, // interfaces
+	"image/color": {"L2"}, // interfaces
 	"image/color/palette": {"L2", "image/color"},
 	"reflect":             {"L2"},
 

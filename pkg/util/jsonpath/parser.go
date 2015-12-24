@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -155,7 +155,7 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 		return fmt.Errorf("unclosed action")
 	case r == ' ':
 		p.consumeText()
-	case r == '@' || r == '$': //the current object, just pass it
+	case r == '@' || r == '$': // the current object, just pass it
 		p.consumeText()
 	case r == '[':
 		return p.parseArray(cur)
@@ -253,7 +253,7 @@ Loop:
 		text = ":"
 	}
 
-	//union operator
+	// union operator
 	strs := strings.Split(text, ",")
 	if len(strs) > 1 {
 		union := []*ListNode{}
@@ -282,7 +282,7 @@ Loop:
 		return p.parseInsideAction(cur)
 	}
 
-	//slice operator
+	// slice operator
 	reg = regexp.MustCompile(`^(-?[\d]*)(:-?[\d]*)?(:[\d]*)?$`)
 	value = reg.FindStringSubmatch(text)
 	if value == nil {

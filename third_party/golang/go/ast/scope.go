@@ -70,15 +70,15 @@ func (s *Scope) String() string {
 //
 // The Data fields contains object-specific data:
 //
-//	Kind    Data type         Data value
-//	Pkg	*types.Package    package scope
-//	Con     int               iota for the respective declaration
-//	Con     != nil            constant value
-//	Typ     *Scope            (used as method scope during type checking - transient)
+// 	Kind Data type Data value
+// 	Pkg	*types.Package package scope
+// 	Con int iota for the respective declaration
+// 	Con != nil constant value
+// 	Typ *Scope (used as method scope during type checking - transient)
 //
 type Object struct {
 	Kind ObjKind
-	Name string      // declared name
+	Name string // declared name
 	Decl interface{} // corresponding Field, XxxSpec, FuncDecl, LabeledStmt, AssignStmt, Scope; or nil
 	Data interface{} // object-specific data; or nil
 	Type interface{} // placeholder for type information; may be nil
@@ -142,12 +142,12 @@ type ObjKind int
 // The list of possible Object kinds.
 const (
 	Bad ObjKind = iota // for error handling
-	Pkg                // package
-	Con                // constant
-	Typ                // type
-	Var                // variable
-	Fun                // function or method
-	Lbl                // label
+	Pkg // package
+	Con // constant
+	Typ // type
+	Var // variable
+	Fun // function or method
+	Lbl // label
 )
 
 var objKindStrings = [...]string{

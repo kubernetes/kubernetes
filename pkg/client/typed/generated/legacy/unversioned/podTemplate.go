@@ -51,7 +51,7 @@ func newPodTemplates(c *LegacyClient, namespace string) *podTemplates {
 	}
 }
 
-// Create takes the representation of a podTemplate and creates it.  Returns the server's representation of the podTemplate, and an error, if there is any.
+// Create takes the representation of a podTemplate and creates it. Returns the server's representation of the podTemplate, and an error, if there is any.
 func (c *podTemplates) Create(podTemplate *api.PodTemplate) (result *api.PodTemplate, err error) {
 	result = &api.PodTemplate{}
 	err = c.client.Post().

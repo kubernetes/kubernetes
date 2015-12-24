@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -75,12 +75,12 @@ type NodeController struct {
 	// Note: be cautious when changing the constant, it must work with nodeStatusUpdateFrequency
 	// in kubelet. There are several constraints:
 	// 1. nodeMonitorGracePeriod must be N times more than nodeStatusUpdateFrequency, where
-	//    N means number of retries allowed for kubelet to post node status. It is pointless
-	//    to make nodeMonitorGracePeriod be less than nodeStatusUpdateFrequency, since there
-	//    will only be fresh values from Kubelet at an interval of nodeStatusUpdateFrequency.
-	//    The constant must be less than podEvictionTimeout.
+	// N means number of retries allowed for kubelet to post node status. It is pointless
+	// to make nodeMonitorGracePeriod be less than nodeStatusUpdateFrequency, since there
+	// will only be fresh values from Kubelet at an interval of nodeStatusUpdateFrequency.
+	// The constant must be less than podEvictionTimeout.
 	// 2. nodeMonitorGracePeriod can't be too large for user experience - larger value takes
-	//    longer for user to see up-to-date node status.
+	// longer for user to see up-to-date node status.
 	nodeMonitorGracePeriod time.Duration
 	// Value controlling NodeController monitoring period, i.e. how often does NodeController
 	// check node status posted from kubelet. This value should be lower than nodeMonitorGracePeriod.
@@ -205,16 +205,16 @@ func (nc *NodeController) Run(period time.Duration) {
 
 	// Managing eviction of nodes:
 	// 1. when we delete pods off a node, if the node was not empty at the time we then
-	//    queue a termination watcher
-	//    a. If we hit an error, retry deletion
+	// queue a termination watcher
+	// a. If we hit an error, retry deletion
 	// 2. The terminator loop ensures that pods are eventually cleaned and we never
-	//    terminate a pod in a time period less than nc.maximumGracePeriod. AddedAt
-	//    is the time from which we measure "has this pod been terminating too long",
-	//    after which we will delete the pod with grace period 0 (force delete).
-	//    a. If we hit errors, retry instantly
-	//    b. If there are no pods left terminating, exit
-	//    c. If there are pods still terminating, wait for their estimated completion
-	//       before retrying
+	// terminate a pod in a time period less than nc.maximumGracePeriod. AddedAt
+	// is the time from which we measure "has this pod been terminating too long",
+	// after which we will delete the pod with grace period 0 (force delete).
+	// a. If we hit errors, retry instantly
+	// b. If there are no pods left terminating, exit
+	// c. If there are pods still terminating, wait for their estimated completion
+	// before retrying
 	go util.Until(func() {
 		nc.evictorLock.Lock()
 		defer nc.evictorLock.Unlock()
@@ -560,15 +560,15 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 	// - saved status have no Ready Condition, but current one does - NodeController was restarted with Node data already present in etcd,
 	// - saved status have some Ready Condition, but current one does not - it's an error, but we fill it up because that's probably a good thing to do,
 	// - both saved and current statuses have Ready Conditions and they have the same LastProbeTime - nothing happened on that Node, it may be
-	//   unresponsive, so we leave it as it is,
+	// unresponsive, so we leave it as it is,
 	// - both saved and current statuses have Ready Conditions, they have different LastProbeTimes, but the same Ready Condition State -
-	//   everything's in order, no transition occurred, we update only probeTimestamp,
+	// everything's in order, no transition occurred, we update only probeTimestamp,
 	// - both saved and current statuses have Ready Conditions, different LastProbeTimes and different Ready Condition State -
-	//   Ready Condition changed it state since we last seen it, so we update both probeTimestamp and readyTransitionTimestamp.
+	// Ready Condition changed it state since we last seen it, so we update both probeTimestamp and readyTransitionTimestamp.
 	// TODO: things to consider:
-	//   - if 'LastProbeTime' have gone back in time its probably an error, currently we ignore it,
-	//   - currently only correct Ready State transition outside of Node Controller is marking it ready by Kubelet, we don't check
-	//     if that's the case, but it does not seem necessary.
+	// - if 'LastProbeTime' have gone back in time its probably an error, currently we ignore it,
+	// - currently only correct Ready State transition outside of Node Controller is marking it ready by Kubelet, we don't check
+	// if that's the case, but it does not seem necessary.
 	var savedCondition *api.NodeCondition
 	if found {
 		savedCondition = nc.getCondition(&savedNodeStatus.status, api.NodeReady)

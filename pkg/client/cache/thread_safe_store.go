@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -141,7 +141,7 @@ func (c *threadSafeMap) Index(indexName string, obj interface{}) ([]interface{},
 	}
 	index := c.indices[indexName]
 
-	// need to de-dupe the return list.  Since multiple keys are allowed, this can happen.
+	// need to de-dupe the return list. Since multiple keys are allowed, this can happen.
 	returnKeySet := sets.String{}
 	for _, indexKey := range indexKeys {
 		set := index[indexKey]

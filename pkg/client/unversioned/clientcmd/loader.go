@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -54,16 +54,16 @@ type ClientConfigLoadingRules struct {
 	ExplicitPath string
 	Precedence   []string
 
-	// MigrationRules is a map of destination files to source files.  If a destination file is not present, then the source file is checked.
+	// MigrationRules is a map of destination files to source files. If a destination file is not present, then the source file is checked.
 	// If the source file is present, then it is copied to the destination file BEFORE any further loading happens.
 	MigrationRules map[string]string
 
-	// DoNotResolvePaths indicates whether or not to resolve paths with respect to the originating files.  This is phrased as a negative so
+	// DoNotResolvePaths indicates whether or not to resolve paths with respect to the originating files. This is phrased as a negative so
 	// that a default object that doesn't set this will usually get the behavior it wants.
 	DoNotResolvePaths bool
 }
 
-// NewDefaultClientConfigLoadingRules returns a ClientConfigLoadingRules object with default fields filled in.  You are not required to
+// NewDefaultClientConfigLoadingRules returns a ClientConfigLoadingRules object with default fields filled in. You are not required to
 // use this constructor
 func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 	chain := []string{}
@@ -87,14 +87,14 @@ func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 
 // Load starts by running the MigrationRules and then
 // takes the loading rules and returns a Config object based on following rules.
-//   if the ExplicitPath, return the unmerged explicit file
-//   Otherwise, return a merged config based on the Precedence slice
+// if the ExplicitPath, return the unmerged explicit file
+// Otherwise, return a merged config based on the Precedence slice
 // A missing ExplicitPath file produces an error. Empty filenames or other missing files are ignored.
 // Read errors or files with non-deserializable content produce errors.
 // The first file to set a particular map key wins and map key's value is never changed.
 // BUT, if you set a struct value that is NOT contained inside of map, the value WILL be changed.
 // This results in some odd looking logic to merge in one direction, merge in the other, and then merge the two.
-// It also means that if two files specify a "red-user", only values from the first file's red-user are used.  Even
+// It also means that if two files specify a "red-user", only values from the first file's red-user are used. Even
 // non-conflicting entries from the second file's "red-user" are discarded.
 // Relative paths inside of the .kubeconfig files are resolved against the .kubeconfig file's parent folder
 // and only absolute file paths are returned.
@@ -150,7 +150,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	return config, utilerrors.NewAggregate(errlist)
 }
 
-// Migrate uses the MigrationRules map.  If a destination file is not present, then the source file is checked.
+// Migrate uses the MigrationRules map. If a destination file is not present, then the source file is checked.
 // If the source file is present, then it is copied to the destination file BEFORE any further loading happens.
 func (rules *ClientConfigLoadingRules) Migrate() error {
 	if rules.MigrationRules == nil {
@@ -270,7 +270,7 @@ func Load(data []byte) (*clientcmdapi.Config, error) {
 	return config, nil
 }
 
-// WriteToFile serializes the config to yaml and writes it out to a file.  If not present, it creates the file with the mode 0600.  If it is present
+// WriteToFile serializes the config to yaml and writes it out to a file. If not present, it creates the file with the mode 0600. If it is present
 // it stomps the contents
 func WriteToFile(config clientcmdapi.Config, filename string) error {
 	content, err := Write(config)
@@ -341,7 +341,7 @@ func ResolveLocalPaths(config *clientcmdapi.Config) error {
 	return nil
 }
 
-// RelativizeClusterLocalPaths first absolutizes the paths by calling ResolveLocalPaths.  This assumes that any NEW path is already
+// RelativizeClusterLocalPaths first absolutizes the paths by calling ResolveLocalPaths. This assumes that any NEW path is already
 // absolute, but any existing path will be resolved relative to LocationOfOrigin
 func RelativizeClusterLocalPaths(cluster *clientcmdapi.Cluster) error {
 	if len(cluster.LocationOfOrigin) == 0 {
@@ -362,7 +362,7 @@ func RelativizeClusterLocalPaths(cluster *clientcmdapi.Cluster) error {
 	return nil
 }
 
-// RelativizeAuthInfoLocalPaths first absolutizes the paths by calling ResolveLocalPaths.  This assumes that any NEW path is already
+// RelativizeAuthInfoLocalPaths first absolutizes the paths by calling ResolveLocalPaths. This assumes that any NEW path is already
 // absolute, but any existing path will be resolved relative to LocationOfOrigin
 func RelativizeAuthInfoLocalPaths(authInfo *clientcmdapi.AuthInfo) error {
 	if len(authInfo.LocationOfOrigin) == 0 {
@@ -427,7 +427,7 @@ func ResolvePaths(refs []*string, base string) error {
 }
 
 // RelativizePathWithNoBacksteps updates the given refs to be relative paths, relative to the given base directory as long as they do not require backsteps.
-// Any path requiring a backstep is left as-is as long it is absolute.  Any non-absolute path that can't be relativized produces an error
+// Any path requiring a backstep is left as-is as long it is absolute. Any non-absolute path that can't be relativized produces an error
 func RelativizePathWithNoBacksteps(refs []*string, base string) error {
 	for _, ref := range refs {
 		// Don't relativize empty paths

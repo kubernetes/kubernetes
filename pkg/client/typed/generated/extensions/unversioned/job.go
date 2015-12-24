@@ -52,7 +52,7 @@ func newJobs(c *ExtensionsClient, namespace string) *jobs {
 	}
 }
 
-// Create takes the representation of a job and creates it.  Returns the server's representation of the job, and an error, if there is any.
+// Create takes the representation of a job and creates it. Returns the server's representation of the job, and an error, if there is any.
 func (c *jobs) Create(job *extensions.Job) (result *extensions.Job, err error) {
 	result = &extensions.Job{}
 	err = c.client.Post().

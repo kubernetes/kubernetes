@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -76,7 +76,7 @@ func ValidateOutputArgs(cmd *cobra.Command) error {
 }
 
 // OutputVersion returns the preferred output version for generic content (JSON, YAML, or templates)
-// defaultVersion is never mutated.  Nil simply allows clean passing in common usage from client.Config
+// defaultVersion is never mutated. Nil simply allows clean passing in common usage from client.Config
 func OutputVersion(cmd *cobra.Command, defaultVersion *unversioned.GroupVersion) (unversioned.GroupVersion, error) {
 	outputVersionString := GetFlagString(cmd, "output-version")
 	if len(outputVersionString) == 0 {
@@ -123,7 +123,7 @@ func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error
 func maybeWrapSortingPrinter(cmd *cobra.Command, printer kubectl.ResourcePrinter) kubectl.ResourcePrinter {
 	sorting, err := cmd.Flags().GetString("sort-by")
 	if err != nil {
-		// error can happen on missing flag or bad flag type.  In either case, this command didn't intent to sort
+		// error can happen on missing flag or bad flag type. In either case, this command didn't intent to sort
 		return printer
 	}
 

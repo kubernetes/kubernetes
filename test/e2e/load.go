@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -108,15 +108,15 @@ var _ = Describe("Load capacity [Skipped]", func() {
 			configs = generateRCConfigs(itArg.podsPerNode*nodeCount, itArg.image, itArg.command, c, ns)
 
 			// Simulate lifetime of RC:
-			//  * create with initial size
-			//  * scale RC to a random size and list all pods
-			//  * scale RC to a random size and list all pods
-			//  * delete it
+			// * create with initial size
+			// * scale RC to a random size and list all pods
+			// * scale RC to a random size and list all pods
+			// * delete it
 			//
 			// This will generate ~5 creations/deletions per second assuming:
-			//  - 300 small RCs each 5 pods
-			//  - 25 medium RCs each 30 pods
-			//  - 3 big RCs each 250 pods
+			// - 300 small RCs each 5 pods
+			// - 25 medium RCs each 30 pods
+			// - 3 big RCs each 250 pods
 			createAllRC(configs)
 			// TODO add reseting latency metrics here, once it would be supported.
 			By("============================================================================")
@@ -131,9 +131,9 @@ var _ = Describe("Load capacity [Skipped]", func() {
 func computeRCCounts(total int) (int, int, int) {
 	// Small RCs owns ~0.5 of total number of pods, medium and big RCs ~0.25 each.
 	// For example for 3000 pods (100 nodes, 30 pods per node) there are:
-	//  - 300 small RCs each 5 pods
-	//  - 25 medium RCs each 30 pods
-	//  - 3 big RCs each 250 pods
+	// - 300 small RCs each 5 pods
+	// - 25 medium RCs each 30 pods
+	// - 3 big RCs each 250 pods
 	bigRCCount := total / 4 / bigRCSize
 	total -= bigRCCount * bigRCSize
 	mediumRCCount := total / 3 / mediumRCSize

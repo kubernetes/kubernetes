@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,17 +21,17 @@ limitations under the License.
 // 1. Your code refers to an internal set of API objects.
 // 2. In a separate package, you have an external set of API objects.
 // 3. The external set is considered to be versioned, and no breaking
-//    changes are ever made to it (fields may be added but not changed
-//    or removed).
+// changes are ever made to it (fields may be added but not changed
+// or removed).
 // 4. As your api evolves, you'll make an additional versioned package
-//    with every major change.
+// with every major change.
 // 5. Versioned packages have conversion functions which convert to
-//    and from the internal version.
+// and from the internal version.
 // 6. You'll continue to support older versions according to your
-//    deprecation policy, and you can easily provide a program/library
-//    to update old versions into new versions because of 5.
+// deprecation policy, and you can easily provide a program/library
+// to update old versions into new versions because of 5.
 // 7. All of your serializations and deserializations are handled in a
-//    centralized place.
+// centralized place.
 //
 // Package runtime provides a conversion helper to make 5 easy, and the
 // Encode/Decode/DecodeInto trio to accomplish 7. You can also register

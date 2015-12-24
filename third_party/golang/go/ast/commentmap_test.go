@@ -24,8 +24,8 @@ package p /* the name is p */
 
 // imports
 import (
-	"bytes"     // bytes
-	"fmt"       // fmt
+	"bytes" // bytes
+	"fmt" // fmt
 	"k8s.io/kubernetes/third_party/golang/go/ast"
 	"k8s.io/kubernetes/third_party/golang/go/parser"
 )
@@ -34,8 +34,8 @@ import (
 type T struct {
 	a, b, c int // associated with a, b, c
 	// associated with x, y
-	x, y float64    // float values
-	z    complex128 // complex value
+	x, y float64 // float values
+	z complex128 // complex value
 }
 // also associated with T
 

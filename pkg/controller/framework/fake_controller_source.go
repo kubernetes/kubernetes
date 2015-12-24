@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,7 +40,7 @@ func NewFakeControllerSource() *FakeControllerSource {
 type FakeControllerSource struct {
 	lock        sync.RWMutex
 	items       map[nnu]runtime.Object
-	changes     []watch.Event // one change per resourceVersion
+	changes []watch.Event // one change per resourceVersion
 	broadcaster *watch.Broadcaster
 }
 
@@ -162,7 +162,7 @@ func (f *FakeControllerSource) Watch(options api.ListOptions) (watch.Interface, 
 		changes := []watch.Event{}
 		for _, c := range f.changes[rc:] {
 			// Must make a copy to allow clients to modify the
-			// object.  Otherwise, if they make a change and write
+			// object. Otherwise, if they make a change and write
 			// it back, they will inadvertently change the our
 			// canonical copy (in addition to racing with other
 			// clients).

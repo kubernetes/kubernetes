@@ -52,7 +52,7 @@ func newTestTypes(c *TestgroupClient, namespace string) *testTypes {
 	}
 }
 
-// Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
+// Create takes the representation of a testType and creates it. Returns the server's representation of the testType, and an error, if there is any.
 func (c *testTypes) Create(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
 	result = &testgroup.TestType{}
 	err = c.client.Post().

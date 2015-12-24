@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -458,9 +458,9 @@ func runReplicationControllerTest(c *client.Client) {
 
 	// Poll till we can retrieve the status of all pods matching the given label selector from their nodes.
 	// This involves 3 operations:
-	//	- The scheduler must assign all pods to a node
-	//	- The assignment must reflect in a `List` operation against the apiserver, for labels matching the selector
-	//  - We need to be able to query the kubelet on that node for information about the pod
+	// 	- The scheduler must assign all pods to a node
+	// 	- The assignment must reflect in a `List` operation against the apiserver, for labels matching the selector
+	// - We need to be able to query the kubelet on that node for information about the pod
 	if err := wait.Poll(
 		time.Second, longTestTimeout, podsOnNodes(c, "test", labels.Set(updated.Spec.Selector).AsSelector())); err != nil {
 		glog.Fatalf("FAILED: pods never started running %v", err)
@@ -1031,9 +1031,9 @@ func main() {
 		}
 	}
 	// We expect 9: 2 pod infra containers + 2 containers from the replication controller +
-	//              1 pod infra container + 2 containers from the URL on first Kubelet +
-	//              1 pod infra container + 2 containers from the URL on second Kubelet +
-	//              1 pod infra container + 1 container from the service test.
+	// 1 pod infra container + 2 containers from the URL on first Kubelet +
+	// 1 pod infra container + 2 containers from the URL on second Kubelet +
+	// 1 pod infra container + 1 container from the service test.
 	// The total number of container created is 9
 
 	if len(createdConts) != 12 {

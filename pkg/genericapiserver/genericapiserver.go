@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -320,25 +320,25 @@ func setDefaults(c *Config) {
 // New returns a new instance of GenericAPIServer from the given config.
 // Certain config fields will be set to a default value if unset,
 // including:
-//   ServiceClusterIPRange
-//   ServiceNodePortRange
-//   MasterCount
-//   ReadWritePort
-//   PublicAddress
+// ServiceClusterIPRange
+// ServiceNodePortRange
+// MasterCount
+// ReadWritePort
+// PublicAddress
 // Public fields:
-//   Handler -- The returned GenericAPIServer has a field TopHandler which is an
-//   http.Handler which handles all the endpoints provided by the GenericAPIServer,
-//   including the API, the UI, and miscellaneous debugging endpoints.  All
-//   these are subject to authorization and authentication.
-//   InsecureHandler -- an http.Handler which handles all the same
-//   endpoints as Handler, but no authorization and authentication is done.
+// Handler -- The returned GenericAPIServer has a field TopHandler which is an
+// http.Handler which handles all the endpoints provided by the GenericAPIServer,
+// including the API, the UI, and miscellaneous debugging endpoints. All
+// these are subject to authorization and authentication.
+// InsecureHandler -- an http.Handler which handles all the same
+// endpoints as Handler, but no authorization and authentication is done.
 // Public methods:
-//   HandleWithAuth -- Allows caller to add an http.Handler for an endpoint
-//   that uses the same authentication and authorization (if any is configured)
-//   as the GenericAPIServer's built-in endpoints.
-//   If the caller wants to add additional endpoints not using the GenericAPIServer's
-//   auth, then the caller should create a handler for those endpoints, which delegates the
-//   any unhandled paths to "Handler".
+// HandleWithAuth -- Allows caller to add an http.Handler for an endpoint
+// that uses the same authentication and authorization (if any is configured)
+// as the GenericAPIServer's built-in endpoints.
+// If the caller wants to add additional endpoints not using the GenericAPIServer's
+// auth, then the caller should create a handler for those endpoints, which delegates the
+// any unhandled paths to "Handler".
 func New(c *Config) *GenericAPIServer {
 	setDefaults(c)
 
@@ -398,7 +398,7 @@ func New(c *Config) *GenericAPIServer {
 func (s *GenericAPIServer) NewRequestInfoResolver() *apiserver.RequestInfoResolver {
 	return &apiserver.RequestInfoResolver{
 		sets.NewString(strings.Trim(s.ApiPrefix, "/"), strings.Trim(s.ApiGroupPrefix, "/")), // all possible API prefixes
-		sets.NewString(strings.Trim(s.ApiPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
+		sets.NewString(strings.Trim(s.ApiPrefix, "/")), // APIPrefixes that won't have groups (legacy)
 	}
 }
 
@@ -408,7 +408,7 @@ func (s *GenericAPIServer) NewRequestInfoResolver() *apiserver.RequestInfoResolv
 func (s *GenericAPIServer) HandleWithAuth(pattern string, handler http.Handler) {
 	// TODO: Add a way for plugged-in endpoints to translate their
 	// URLs into attributes that an Authorizer can understand, and have
-	// sensible policy defaults for plugged-in endpoints.  This will be different
+	// sensible policy defaults for plugged-in endpoints. This will be different
 	// for generic endpoints versus REST object endpoints.
 	// TODO: convert to go-restful
 	s.MuxHelper.Handle(pattern, handler)
@@ -487,7 +487,7 @@ func (s *GenericAPIServer) init(c *Config) {
 		handler = authenticatedHandler
 	}
 
-	// TODO: Make this optional?  Consumers of GenericAPIServer depend on this currently.
+	// TODO: Make this optional? Consumers of GenericAPIServer depend on this currently.
 	s.Handler = handler
 
 	// After all wrapping is done, put a context filter around both handlers
@@ -505,7 +505,7 @@ func (s *GenericAPIServer) init(c *Config) {
 }
 
 // InstallSwaggerAPI installs the /swaggerapi/ endpoint to allow schema discovery
-// and traversal.  It is optional to allow consumers of the Kubernetes GenericAPIServer to
+// and traversal. It is optional to allow consumers of the Kubernetes GenericAPIServer to
 // register their own web services into the Kubernetes mux prior to initialization
 // of swagger, so that other resource types show up in the documentation.
 func (s *GenericAPIServer) InstallSwaggerAPI() {

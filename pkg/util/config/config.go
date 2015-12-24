@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,8 +23,8 @@ import (
 )
 
 type Merger interface {
-	// Invoked when a change from a source is received.  May also function as an incremental
-	// merger if you wish to consume changes incrementally.  Must be reentrant when more than
+	// Invoked when a change from a source is received. May also function as an incremental
+	// merger if you wish to consume changes incrementally. Must be reentrant when more than
 	// one source is defined.
 	Merge(source string, update interface{}) error
 }
@@ -36,7 +36,7 @@ func (f MergeFunc) Merge(source string, update interface{}) error {
 	return f(source, update)
 }
 
-// Mux is a class for merging configuration from multiple sources.  Changes are
+// Mux is a class for merging configuration from multiple sources. Changes are
 // pushed via channels and sent to the merge function.
 type Mux struct {
 	// Invoked when an update is sent to a source.

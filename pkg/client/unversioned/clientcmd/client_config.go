@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -129,12 +129,12 @@ func (config DirectClientConfig) ClientConfig() (*client.Config, error) {
 	return clientConfig, nil
 }
 
-// clientauth.Info object contain both user identification and server identification.  We want different precedence orders for
+// clientauth.Info object contain both user identification and server identification. We want different precedence orders for
 // both, so we have to split the objects and merge them separately
 // we want this order of precedence for the server identification
-// 1.  configClusterInfo (the final result of command line flags and merged .kubeconfig files)
-// 2.  configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
-// 3.  load the ~/.kubernetes_auth file as a default
+// 1. configClusterInfo (the final result of command line flags and merged .kubeconfig files)
+// 2. configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
+// 3. load the ~/.kubernetes_auth file as a default
 func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, configClusterInfo clientcmdapi.Cluster) (*client.Config, error) {
 	mergedConfig := &client.Config{}
 
@@ -148,13 +148,13 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, 
 	return mergedConfig, nil
 }
 
-// clientauth.Info object contain both user identification and server identification.  We want different precedence orders for
+// clientauth.Info object contain both user identification and server identification. We want different precedence orders for
 // both, so we have to split the objects and merge them separately
 // we want this order of precedence for user identifcation
-// 1.  configAuthInfo minus auth-path (the final result of command line flags and merged .kubeconfig files)
-// 2.  configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
-// 3.  if there is not enough information to idenfity the user, load try the ~/.kubernetes_auth file
-// 4.  if there is not enough information to identify the user, prompt if possible
+// 1. configAuthInfo minus auth-path (the final result of command line flags and merged .kubeconfig files)
+// 2. configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
+// 3. if there is not enough information to idenfity the user, load try the ~/.kubernetes_auth file
+// 4. if there is not enough information to identify the user, prompt if possible
 func getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fallbackReader io.Reader) (*client.Config, error) {
 	mergedConfig := &client.Config{}
 
@@ -235,8 +235,8 @@ func (config DirectClientConfig) Namespace() (string, bool, error) {
 	return configContext.Namespace, overridden, nil
 }
 
-// ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,
-// but no errors in the sections requested or referenced.  It does not return early so that it can find as many errors as possible.
+// ConfirmUsable looks a particular context and determines if that particular part of the config is useable. There might still be errors in the config,
+// but no errors in the sections requested or referenced. It does not return early so that it can find as many errors as possible.
 func (config DirectClientConfig) ConfirmUsable() error {
 	validationErrors := make([]error, 0)
 	validationErrors = append(validationErrors, validateAuthInfo(config.getAuthInfoName(), config.getAuthInfo())...)

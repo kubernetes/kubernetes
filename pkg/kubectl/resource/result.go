@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -70,7 +70,7 @@ func (r *Result) Err() error {
 
 // Visit implements the Visitor interface on the items described in the Builder.
 // Note that some visitor sources are not traversable more than once, or may
-// return different results.  If you wish to operate on the same set of resources
+// return different results. If you wish to operate on the same set of resources
 // multiple times, use the Infos() method.
 func (r *Result) Visit(fn VisitorFunc) error {
 	if r.err != nil {
@@ -113,9 +113,9 @@ func (r *Result) Infos() ([]*Info, error) {
 }
 
 // Object returns a single object representing the output of a single visit to all
-// found resources.  If the Builder was a singular context (expected to return a
+// found resources. If the Builder was a singular context (expected to return a
 // single resource by user input) and only a single resource was found, the resource
-// will be returned as is.  Otherwise, the returned resources will be part of an
+// will be returned as is. Otherwise, the returned resources will be part of an
 // api.List. The ResourceVersion of the api.List will be set only if it is identical
 // across all infos returned.
 func (r *Result) Object() (runtime.Object, error) {

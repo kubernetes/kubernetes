@@ -437,7 +437,7 @@ func (check *Checker) stmt(ctxt stmtContext, s ast.Stmt) {
 
 		// A type switch guard must be of the form:
 		//
-		//     TypeSwitchGuard = [ identifier ":=" ] PrimaryExpr "." "(" "type" ")" .
+		// TypeSwitchGuard = [ identifier ":=" ] PrimaryExpr "." "(" "type" ")" .
 		//
 		// The parser is checking syntactic correctness;
 		// remaining syntactic errors are considered AST errors here.
@@ -494,7 +494,7 @@ func (check *Checker) stmt(ctxt stmtContext, s ast.Stmt) {
 
 		check.multipleDefaults(s.Body.List)
 
-		var lhsVars []*Var               // list of implicitly declared lhs variables
+		var lhsVars []*Var // list of implicitly declared lhs variables
 		seen := make(map[Type]token.Pos) // map of seen types to positions
 		for _, s := range s.Body.List {
 			clause, _ := s.(*ast.CaseClause)

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -120,8 +120,8 @@ type LeaderElectionConfig struct {
 // lifecycle events of the LeaderElector. These are invoked asynchronously.
 //
 // possible future callbacks:
-//  * OnChallenge()
-//  * OnNewLeader()
+// * OnChallenge()
+// * OnNewLeader()
 type LeaderCallbacks struct {
 	// OnStartedLeading is called when a LeaderElector client starts leading
 	OnStartedLeading func(stop <-chan struct{})
@@ -132,8 +132,8 @@ type LeaderCallbacks struct {
 // LeaderElector is a leader election client.
 //
 // possible future methods:
-//  * (le *LeaderElector) IsLeader()
-//  * (le *LeaderElector) GetLeader()
+// * (le *LeaderElector) IsLeader()
+// * (le *LeaderElector) GetLeader()
 type LeaderElector struct {
 	config LeaderElectionConfig
 	// internal bookkeeping

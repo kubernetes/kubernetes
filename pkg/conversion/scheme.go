@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -64,7 +64,7 @@ func NewScheme() *Scheme {
 		typeToGVK: map[reflect.Type][]unversioned.GroupVersionKind{},
 		converter: NewConverter(),
 		cloner:    NewCloner(),
-		// TODO remove this hard coded list.  As step one, hardcode it here so this pull doesn't become even bigger
+		// TODO remove this hard coded list. As step one, hardcode it here so this pull doesn't become even bigger
 		InternalVersions: map[string]unversioned.GroupVersion{
 			"":                {},
 			"componentconfig": {Group: "componentconfig"},
@@ -182,17 +182,17 @@ func (s *Scheme) NewObject(kind unversioned.GroupVersionKind) (interface{}, erro
 // DestVersion fields on the Meta object. Example:
 //
 // s.AddConversionFuncs(
-//	func(in *InternalObject, out *ExternalObject, scope conversion.Scope) error {
-//		// You can depend on Meta() being non-nil, and this being set to
-//		// the source version, e.g., ""
-//		s.Meta().SrcVersion
-//		// You can depend on this being set to the destination version,
-//		// e.g., "v1".
-//		s.Meta().DestVersion
-//		// Call scope.Convert to copy sub-fields.
-//		s.Convert(&in.SubFieldThatMoved, &out.NewLocation.NewName, 0)
-//		return nil
-//	},
+// 	func(in *InternalObject, out *ExternalObject, scope conversion.Scope) error {
+// 		//   You can depend on Meta() being non-nil, and this being set to
+// 		//   the source version, e.g., ""
+// 		s.Meta().SrcVersion
+// 		//   You can depend on this being set to the destination version,
+// 		//   e.g., "v1".
+// 		s.Meta().DestVersion
+// 		//   Call scope.Convert to copy sub-fields.
+// 		s.Convert(&in.SubFieldThatMoved, &out.NewLocation.NewName, 0)
+// 		return nil
+// 	},
 // )
 //
 // (For more detail about conversion functions, see Converter.Register's comment.)
@@ -255,15 +255,15 @@ func (s *Scheme) AddStructFieldConversion(srcFieldType interface{}, srcFieldName
 // AddDefaultingFuncs adds functions to the list of default-value functions.
 // Each of the given functions is responsible for applying default values
 // when converting an instance of a versioned API object into an internal
-// API object.  These functions do not need to handle sub-objects. We deduce
+// API object. These functions do not need to handle sub-objects. We deduce
 // how to call these functions from the types of their two parameters.
 //
 // s.AddDefaultingFuncs(
-//	func(obj *v1.Pod) {
-//		if obj.OptionalField == "" {
-//			obj.OptionalField = "DefaultValue"
-//		}
-//	},
+// 	func(obj *v1.Pod) {
+// 		if obj.OptionalField == "" {
+// 			obj.OptionalField = "DefaultValue"
+// 		}
+// 	},
 // )
 func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
 	for _, f := range defaultingFuncs {
@@ -283,7 +283,7 @@ func (s *Scheme) Recognizes(gvk unversioned.GroupVersionKind) bool {
 }
 
 // RegisterInputDefaults sets the provided field mapping function and field matching
-// as the defaults for the provided input type.  The fn may be nil, in which case no
+// as the defaults for the provided input type. The fn may be nil, in which case no
 // mapping will happen by default. Use this method to register a mechanism for handling
 // a specific input type in conversion, such as a map[string]string to structs.
 func (s *Scheme) RegisterInputDefaults(in interface{}, fn FieldMappingFunc, defaultFlags FieldMatchingFlags) error {

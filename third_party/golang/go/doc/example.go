@@ -20,14 +20,14 @@ import (
 
 // An Example represents an example function found in a source files.
 type Example struct {
-	Name        string // name of the item being exemplified
-	Doc         string // example function doc string
+	Name string // name of the item being exemplified
+	Doc string // example function doc string
 	Code        ast.Node
-	Play        *ast.File // a whole program version of the example
+	Play *ast.File // a whole program version of the example
 	Comments    []*ast.CommentGroup
-	Output      string // expected output
-	EmptyOutput bool   // expect empty output
-	Order       int    // original source code order
+	Output string // expected output
+	EmptyOutput bool // expect empty output
+	Order int // original source code order
 }
 
 // Examples returns the examples found in the files, sorted by Name field.
@@ -36,18 +36,18 @@ type Example struct {
 // Playable Examples must be in a package whose name ends in "_test".
 // An Example is "playable" (the Play field is non-nil) in either of these
 // circumstances:
-//   - The example function is self-contained: the function references only
-//     identifiers from other packages (or predeclared identifiers, such as
-//     "int") and the test file does not include a dot import.
-//   - The entire test file is the example: the file contains exactly one
-//     example function, zero test or benchmark functions, and at least one
-//     top-level function, type, variable, or constant declaration other
-//     than the example function.
+// - The example function is self-contained: the function references only
+// identifiers from other packages (or predeclared identifiers, such as
+// "int") and the test file does not include a dot import.
+// - The entire test file is the example: the file contains exactly one
+// example function, zero test or benchmark functions, and at least one
+// top-level function, type, variable, or constant declaration other
+// than the example function.
 func Examples(files ...*ast.File) []*Example {
 	var list []*Example
 	for _, file := range files {
 		hasTests := false // file contains tests or benchmarks
-		numDecl := 0      // number of non-import declarations in the file
+		numDecl := 0 // number of non-import declarations in the file
 		var flist []*Example
 		for _, decl := range file.Decls {
 			if g, ok := decl.(*ast.GenDecl); ok && g.Tok != token.IMPORT {
@@ -210,7 +210,7 @@ func playExample(file *ast.File, body *ast.BlockStmt) *ast.File {
 	// example. The heuristic assumes package names match base import
 	// paths for imports w/o renames (should be good enough most of the time).
 	namedImports := make(map[string]string) // [name]path
-	var blankImports []ast.Spec             // _ imports
+	var blankImports []ast.Spec // _ imports
 	for _, s := range file.Imports {
 		p, err := strconv.Unquote(s.Path.Value)
 		if err != nil {

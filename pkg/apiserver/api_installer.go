@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,14 +41,14 @@ import (
 type APIInstaller struct {
 	group             *APIGroupVersion
 	info              *RequestInfoResolver
-	prefix            string // Path prefix where API resources are to be registered.
+	prefix string // Path prefix where API resources are to be registered.
 	minRequestTimeout time.Duration
 }
 
 // Struct capturing information about an action ("GET", "POST", "WATCH", PROXY", etc).
 type action struct {
-	Verb   string               // Verb identifying the action ("GET", "POST", "WATCH", PROXY", etc).
-	Path   string               // The path of the action
+	Verb string // Verb identifying the action ("GET", "POST", "WATCH", PROXY", etc).
+	Path string // The path of the action
 	Params []*restful.Parameter // List of parameters associated with the action.
 	Namer  ScopeNamer
 }
@@ -127,7 +127,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if err != nil {
 		return nil, err
 	}
-	// a given go type can have multiple potential fully qualified kinds.  Find the one that corresponds with the group
+	// a given go type can have multiple potential fully qualified kinds. Find the one that corresponds with the group
 	// we're trying to register here
 	fqKindToRegister := unversioned.GroupVersionKind{}
 	for _, fqKind := range fqKinds {
@@ -172,7 +172,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return nil, err
 		}
-		// a given go type can have multiple potential fully qualified kinds.  Find the one that corresponds with the group
+		// a given go type can have multiple potential fully qualified kinds. Find the one that corresponds with the group
 		// we're trying to register here
 		parentFQKindToRegister := unversioned.GroupVersionKind{}
 		for _, fqKind := range parentFQKinds {

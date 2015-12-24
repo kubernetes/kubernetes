@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -132,7 +132,7 @@ func TestInMemoryRegistry_State(t *testing.T) {
 	// update the status
 	assert.Equal(a_clone.State, StatePending)
 	a_clone, state := registry.UpdateStatus(fakeStatusUpdate(a.ID, mesos.TaskState_TASK_RUNNING))
-	assert.Equal(state, StatePending)         // old state
+	assert.Equal(state, StatePending) // old state
 	assert.Equal(a_clone.State, StateRunning) // new state
 
 	// update unknown task

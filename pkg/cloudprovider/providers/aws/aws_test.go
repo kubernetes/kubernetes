@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -498,7 +498,7 @@ func TestList(t *testing.T) {
 	var instance2 ec2.Instance
 	var instance3 ec2.Instance
 
-	//0
+	// 0
 	tag0 := ec2.Tag{
 		Key:   aws.String("Name"),
 		Value: aws.String("foo"),
@@ -511,7 +511,7 @@ func TestList(t *testing.T) {
 	}
 	instance0.State = &state0
 
-	//1
+	// 1
 	tag1 := ec2.Tag{
 		Key:   aws.String("Name"),
 		Value: aws.String("bar"),
@@ -524,7 +524,7 @@ func TestList(t *testing.T) {
 	}
 	instance1.State = &state1
 
-	//2
+	// 2
 	tag2 := ec2.Tag{
 		Key:   aws.String("Name"),
 		Value: aws.String("baz"),
@@ -537,7 +537,7 @@ func TestList(t *testing.T) {
 	}
 	instance2.State = &state2
 
-	//3
+	// 3
 	tag3 := ec2.Tag{
 		Key:   aws.String("Name"),
 		Value: aws.String("quux"),
@@ -588,7 +588,7 @@ func TestNodeAddresses(t *testing.T) {
 	var instance0 ec2.Instance
 	var instance1 ec2.Instance
 
-	//0
+	// 0
 	instance0.InstanceId = aws.String("instance-same")
 	instance0.PrivateDnsName = aws.String("instance-same.ec2.internal")
 	instance0.PrivateIpAddress = aws.String("192.168.0.1")
@@ -599,7 +599,7 @@ func TestNodeAddresses(t *testing.T) {
 	}
 	instance0.State = &state0
 
-	//1
+	// 1
 	instance1.InstanceId = aws.String("instance-same")
 	instance1.PrivateDnsName = aws.String("instance-same.ec2.internal")
 	instance1.PrivateIpAddress = aws.String("192.168.0.2")

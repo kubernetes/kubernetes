@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +20,7 @@ import (
 	godbus "github.com/godbus/dbus"
 )
 
-// Interface is an interface that presents a subset of the godbus/dbus API.  Use this
+// Interface is an interface that presents a subset of the godbus/dbus API. Use this
 // when you want to inject fakeable/mockable D-Bus behavior.
 type Interface interface {
 	// SystemBus returns a connection to the system bus, connecting to it

@@ -331,9 +331,9 @@ func (check *Checker) representable(x *operand, typ *Basic) {
 			// numeric conversion : error msg
 			//
 			// integer -> integer : overflows
-			// integer -> float   : overflows (actually not possible)
-			// float   -> integer : truncated
-			// float   -> float   : overflows
+			// integer -> float : overflows (actually not possible)
+			// float -> integer : truncated
+			// float -> float : overflows
 			//
 			if !isInteger(x.typ) && isInteger(typ) {
 				msg = "%s truncated to %s"
@@ -472,7 +472,7 @@ func (check *Checker) convertUntyped(x *operand, target Type) {
 	}
 
 	// TODO(gri) Sloppy code - clean up. This function is central
-	//           to assignment and expression checking.
+	// to assignment and expression checking.
 
 	if isUntyped(target) {
 		// both x and target are untyped
@@ -614,7 +614,7 @@ func (check *Checker) comparison(x, y *operand, op token.Token) {
 	}
 
 	// spec: "Comparison operators compare two operands and yield
-	//        an untyped boolean value."
+	// an untyped boolean value."
 	x.typ = Typ[UntypedBool]
 }
 

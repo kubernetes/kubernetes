@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -53,7 +53,7 @@ type policyList []*api.Policy
 
 // TODO: Have policies be created via an API call and stored in REST storage.
 func NewFromFile(path string) (policyList, error) {
-	// File format is one map per line.  This allows easy concatentation of files,
+	// File format is one map per line. This allows easy concatentation of files,
 	// comments in files, and identification of errors by line number.
 	file, err := os.Open(path)
 	if err != nil {

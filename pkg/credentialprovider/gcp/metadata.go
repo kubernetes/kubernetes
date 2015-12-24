@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,14 +27,14 @@ import (
 )
 
 const (
-	metadataUrl              = "http://metadata.google.internal./computeMetadata/v1/"
+	metadataUrl = "http://metadata.google.internal./computeMetadata/v1/"
 	metadataAttributes       = metadataUrl + "instance/attributes/"
 	dockerConfigKey          = metadataAttributes + "google-dockercfg"
 	dockerConfigUrlKey       = metadataAttributes + "google-dockercfg-url"
 	metadataScopes           = metadataUrl + "instance/service-accounts/default/scopes"
 	metadataToken            = metadataUrl + "instance/service-accounts/default/token"
 	metadataEmail            = metadataUrl + "instance/service-accounts/default/email"
-	storageScopePrefix       = "https://www.googleapis.com/auth/devstorage"
+	storageScopePrefix = "https://www.googleapis.com/auth/devstorage"
 	cloudPlatformScopePrefix = "https://www.googleapis.com/auth/cloud-platform"
 )
 
@@ -65,8 +65,8 @@ type dockerConfigUrlKeyProvider struct {
 }
 
 // A DockerConfigProvider that provides a dockercfg with:
-//    Username: "_token"
-//    Password: "{access token from metadata}"
+// Username: "_token"
+// Password: "{access token from metadata}"
 type containerRegistryProvider struct {
 	metadataProvider
 }
@@ -91,7 +91,7 @@ func init() {
 		})
 
 	credentialprovider.RegisterCredentialProvider("google-container-registry",
-		// Never cache this.  The access token is already
+		// Never cache this. The access token is already
 		// cached by the metadata service.
 		&containerRegistryProvider{
 			metadataProvider{Client: http.DefaultClient},
@@ -130,7 +130,7 @@ func (g *dockerConfigUrlKeyProvider) Provide() credentialprovider.DockerConfig {
 				return cfg
 			}
 		} else {
-			// TODO(mattmoor): support reading alternate scheme URLs (e.g. gs:// or s3://)
+			// TODO(mattmoor): support reading alternate scheme URLs (e.g. gs://or s3://)
 			glog.Errorf("Unsupported URL scheme: %s", string(url))
 		}
 	}

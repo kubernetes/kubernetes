@@ -17,15 +17,15 @@ import (
 type operandMode byte
 
 const (
-	invalid   operandMode = iota // operand is invalid
-	novalue                      // operand represents no value (result of a function call w/o result)
-	builtin                      // operand is a built-in function
-	typexpr                      // operand is a type
-	constant_                    // operand is a constant; the operand's typ is a Basic type
-	variable                     // operand is an addressable variable
-	mapindex                     // operand is a map index expression (acts like a variable on lhs, commaok on rhs of an assignment)
-	value                        // operand is a computed value
-	commaok                      // like value, but operand may be used in a comma,ok expression
+	invalid operandMode = iota // operand is invalid
+	novalue // operand represents no value (result of a function call w/o result)
+	builtin // operand is a built-in function
+	typexpr // operand is a type
+	constant_ // operand is a constant; the operand's typ is a Basic type
+	variable // operand is an addressable variable
+	mapindex // operand is a map index expression (acts like a variable on lhs, commaok on rhs of an assignment)
+	value // operand is a computed value
+	commaok // like value, but operand may be used in a comma,ok expression
 )
 
 var operandModeString = [...]string{
@@ -69,29 +69,29 @@ func (x *operand) pos() token.Pos {
 // (not all "untyped" cases can appear due to the type system,
 // but they fall out naturally here)
 //
-// mode       format
+// mode format
 //
-// invalid    <expr> (               <mode>                    )
-// novalue    <expr> (               <mode>                    )
-// builtin    <expr> (               <mode>                    )
-// typexpr    <expr> (               <mode>                    )
+// invalid <expr> ( <mode> )
+// novalue <expr> ( <mode> )
+// builtin <expr> ( <mode> )
+// typexpr <expr> ( <mode> )
 //
-// constant   <expr> (<untyped kind> <mode>                    )
-// constant   <expr> (               <mode>       of type <typ>)
-// constant   <expr> (<untyped kind> <mode> <val>              )
-// constant   <expr> (               <mode> <val> of type <typ>)
+// constant <expr> (<untyped kind> <mode> )
+// constant <expr> ( <mode> of type <typ>)
+// constant <expr> (<untyped kind> <mode> <val> )
+// constant <expr> ( <mode> <val> of type <typ>)
 //
-// variable   <expr> (<untyped kind> <mode>                    )
-// variable   <expr> (               <mode>       of type <typ>)
+// variable <expr> (<untyped kind> <mode> )
+// variable <expr> ( <mode> of type <typ>)
 //
-// mapindex   <expr> (<untyped kind> <mode>                    )
-// mapindex   <expr> (               <mode>       of type <typ>)
+// mapindex <expr> (<untyped kind> <mode> )
+// mapindex <expr> ( <mode> of type <typ>)
 //
-// value      <expr> (<untyped kind> <mode>                    )
-// value      <expr> (               <mode>       of type <typ>)
+// value <expr> (<untyped kind> <mode> )
+// value <expr> ( <mode> of type <typ>)
 //
-// commaok    <expr> (<untyped kind> <mode>                    )
-// commaok    <expr> (               <mode>       of type <typ>)
+// commaok <expr> (<untyped kind> <mode> )
+// commaok <expr> ( <mode> of type <typ>)
 //
 func operandString(x *operand, qf Qualifier) string {
 	var buf bytes.Buffer
@@ -198,8 +198,8 @@ func (x *operand) isNil() bool {
 }
 
 // TODO(gri) The functions operand.assignableTo, checker.convertUntyped,
-//           checker.representable, and checker.assignment are
-//           overlapping in functionality. Need to simplify and clean up.
+// checker.representable, and checker.assignment are
+// overlapping in functionality. Need to simplify and clean up.
 
 // assignableTo reports whether x is assignable to a variable of type T.
 func (x *operand) assignableTo(conf *Config, T Type) bool {
@@ -256,7 +256,7 @@ func (x *operand) assignableTo(conf *Config, T Type) bool {
 
 	// x is an untyped constant representable by a value of type T
 	// TODO(gri) This is borrowing from checker.convertUntyped and
-	//           checker.representable. Need to clean up.
+	// checker.representable. Need to clean up.
 	if isUntyped(Vu) {
 		switch t := Tu.(type) {
 		case *Basic:

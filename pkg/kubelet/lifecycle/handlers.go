@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -62,9 +62,9 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *api.Pod
 
 // resolvePort attempts to turn a IntOrString port reference into a concrete port number.
 // If portReference has an int value, it is treated as a literal, and simply returns that value.
-// If portReference is a string, an attempt is first made to parse it as an integer.  If that fails,
+// If portReference is a string, an attempt is first made to parse it as an integer. If that fails,
 // an attempt is made to find a port with the same name in the container spec.
-// If a port with the same name is found, it's ContainerPort value is returned.  If no matching
+// If a port with the same name is found, it's ContainerPort value is returned. If no matching
 // port is found, an error is returned.
 func resolvePort(portReference intstr.IntOrString, container *api.Container) (int, error) {
 	if portReference.Type == intstr.Int {

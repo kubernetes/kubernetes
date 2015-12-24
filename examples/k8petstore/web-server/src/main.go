@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,10 +28,10 @@ import (
 	"github.com/xyproto/simpleredis"
 )
 
-//return the path to static assets (i.e. index.html)
+// return the path to static assets (i.e. index.html)
 func pathToStaticContents() string {
 	var static_content = os.Getenv("STATIC_FILES")
-	// Take a wild guess.  This will work in dev environment.
+	// Take a wild guess. This will work in dev environment.
 	if static_content == "" {
 		println("*********** WARNING: DIDNT FIND ENV VAR 'STATIC_FILES', guessing your running in dev.")
 		static_content = "../../static/"
@@ -39,7 +39,7 @@ func pathToStaticContents() string {
 		println("=========== Read ENV 'STATIC_FILES', path to assets : " + static_content)
 	}
 
-	//Die if no the static files are missing.
+	// Die if no the static files are missing.
 	_, err := os.Stat(static_content)
 	if err != nil {
 		println("*********** os.Stat failed on " + static_content + " This means no static files are available.  Dying...")
@@ -64,7 +64,7 @@ func main() {
 	println("Now connecting to : " + connection)
 	/**
 	 *  Create a connection pool.  ?The pool pointer will otherwise
-	 *  not be of any use.?https://gist.github.com/jayunit100/1d00e6d343056401ef00
+	 * not be of any use.?https://gist.github.com/jayunit100/1d00e6d343056401ef00
 	 */
 	pool = simpleredis.NewConnectionPoolHost(connection)
 
@@ -86,7 +86,7 @@ func main() {
 	r.Path("/rpush/{key}/{value}").Methods("GET").HandlerFunc(ListPushHandler)
 	r.Path("/llen").Methods("GET").HandlerFunc(LLENHandler)
 
-	//for dev environment, the site is one level up...
+	// for dev environment, the site is one level up...
 
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir(pathToStaticContents())))
 
@@ -134,7 +134,7 @@ func ListRangeHandler(rw http.ResponseWriter, req *http.Request) {
 
 	list := simpleredis.NewList(pool, key)
 
-	//members := HandleError(list.GetAll()).([]string)
+	// members := HandleError(list.GetAll()).([]string)
 	members := HandleError(list.GetLastN(4)).([]string)
 
 	print(members)
@@ -198,7 +198,7 @@ func EnvHandler(rw http.ResponseWriter, req *http.Request) {
 func HandleError(result interface{}, err error) (r interface{}) {
 	if err != nil {
 		print("ERROR :  " + err.Error())
-		//panic(err)
+		// panic(err)
 	}
 	return result
 }

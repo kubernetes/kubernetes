@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -120,7 +120,7 @@ var _ = Describe("Density [Skipped]", func() {
 	AfterEach(func() {
 		// Remove any remaining pods from this test if the
 		// replication controller still exists and the replica count
-		// isn't 0.  This means the controller wasn't cleaned up
+		// isn't 0. This means the controller wasn't cleaned up
 		// during the test so clean it up here. We want to do it separately
 		// to not cause a timeout on Namespace removal.
 		rc, err := c.ReplicationControllers(ns).Get(RCName)

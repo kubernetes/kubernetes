@@ -51,7 +51,7 @@ func newServices(c *LegacyClient, namespace string) *services {
 	}
 }
 
-// Create takes the representation of a service and creates it.  Returns the server's representation of the service, and an error, if there is any.
+// Create takes the representation of a service and creates it. Returns the server's representation of the service, and an error, if there is any.
 func (c *services) Create(service *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
 	err = c.client.Post().

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,11 +24,11 @@ import (
 )
 
 // ExpirationCache implements the store interface
-//	1. All entries are automatically time stamped on insert
-//		a. The key is computed based off the original item/keyFunc
-//		b. The value inserted under that key is the timestamped item
-//	2. Expiration happens lazily on read based on the expiration policy
-//	3. Time-stamps are stripped off unexpired entries before return
+// 	1. All entries are automatically time stamped on insert
+// 		a. The key is computed based off the original item/keyFunc
+// 		b. The value inserted under that key is the timestamped item
+// 	2. Expiration happens lazily on read based on the expiration policy
+// 	3. Time-stamps are stripped off unexpired entries before return
 type ExpirationCache struct {
 	cacheStorage     ThreadSafeStore
 	keyFunc          KeyFunc
@@ -44,8 +44,8 @@ type ExpirationPolicy interface {
 
 // TTLPolicy implements a ttl based ExpirationPolicy.
 type TTLPolicy struct {
-	//	 >0: Expire entries with an age > ttl
-	//	<=0: Don't expire any entry
+	// 	 >0: Expire entries with an age > ttl
+	// 	<=0: Don't expire any entry
 	Ttl time.Duration
 
 	// Clock used to calculate ttl expiration

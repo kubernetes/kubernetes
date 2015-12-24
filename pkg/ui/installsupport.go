@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -34,7 +34,7 @@ type MuxInterface interface {
 
 func InstallSupport(mux MuxInterface, enableSwaggerSupport bool) {
 
-	// Send correct mime type for .svg files.  TODO: remove when
+	// Send correct mime type for .svg files. TODO: remove when
 	// https://github.com/golang/go/commit/21e47d831bafb59f22b1ea8098f709677ec8ce33
 	// makes it into all of our supported go versions.
 	mime.AddExtensionType(".svg", "image/svg+xml")

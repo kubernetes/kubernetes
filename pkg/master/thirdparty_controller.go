@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,7 +38,7 @@ func makeThirdPartyPath(group string) string {
 }
 
 // resourceInterface is the interface for the parts of the master that know how to add/remove
-// third party resources.  Extracted into an interface for injection for testing.
+// third party resources. Extracted into an interface for injection for testing.
 type resourceInterface interface {
 	// Remove a third party resource based on the RESTful path for that resource
 	RemoveThirdPartyResource(path string) error
@@ -60,7 +60,7 @@ type ThirdPartyController struct {
 // Synchronize a single resource with RESTful resources on the master
 func (t *ThirdPartyController) SyncOneResource(rsrc *expapi.ThirdPartyResource) error {
 	// TODO: we also need to test if the existing installed resource matches the resource we are sync-ing.
-	// Currently, if there is an older, incompatible resource installed, we won't remove it.  We should detect
+	// Currently, if there is an older, incompatible resource installed, we won't remove it. We should detect
 	// older, incompatible resources and remove them before testing if the resource exists.
 	hasResource, err := t.master.HasThirdPartyResource(rsrc)
 	if err != nil {

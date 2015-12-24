@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -233,8 +233,8 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 				}
 
 				// if the previous version of the resource made a resource request, we need to subtract the old request
-				// from the current to get the actual resource request delta.  if the previous version of the pod
-				// made no request on the resource, then we get an err value.  we ignore the err value, and delta
+				// from the current to get the actual resource request delta. if the previous version of the pod
+				// made no request on the resource, then we get an err value. we ignore the err value, and delta
 				// will just be equal to the total resource request on the pod since there is nothing to subtract.
 				oldRequest, err := resourcequotacontroller.PodRequests(oldPod, resourceName)
 				if err == nil {

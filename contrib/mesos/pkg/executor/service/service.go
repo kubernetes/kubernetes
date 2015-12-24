@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -48,8 +48,8 @@ type KubeletExecutorServer struct {
 
 	// TODO(sttts): remove necessity to access the kubelet from the executor
 
-	klet      *kubelet.Kubelet // once set, immutable
-	kletReady chan struct{}    // once closed, klet is guaranteed to be valid and concurrently readable
+	klet *kubelet.Kubelet // once set, immutable
+	kletReady chan struct{} // once closed, klet is guaranteed to be valid and concurrently readable
 }
 
 func NewKubeletExecutorServer() *KubeletExecutorServer {
@@ -239,9 +239,9 @@ func (s *KubeletExecutorServer) runKubelet(
 
 	// run the kubelet, until execUpdates is closed
 	// NOTE: because kcfg != nil holds, the upstream Run function will not
-	//       initialize the cloud provider. We explicitly wouldn't want
-	//       that because then every kubelet instance would query the master
-	//       state.json which does not scale.
+	// initialize the cloud provider. We explicitly wouldn't want
+	// that because then every kubelet instance would query the master
+	// state.json which does not scale.
 	err = s.KubeletServer.Run(kcfg)
 
 	return

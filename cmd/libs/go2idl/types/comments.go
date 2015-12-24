@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,17 +24,17 @@ import (
 
 // ExtractCommentTags parses comments for lines of the form:
 //
-//   'marker'+"key1=value1,key2=value2".
+// 'marker'+"key1=value1,key2=value2".
 //
 // Values are optional; 'true' is the default. If a key is set multiple times,
 // the last one wins.
 //
 // Example: if you pass "+" for 'marker', and the following two lines are in
 // the comments:
-//   +foo=value1,bar
-//   +foo=value2,baz="frobber"
+// +foo=value1,bar
+// +foo=value2,baz="frobber"
 // Then this function will return:
-//   map[string]string{"foo":"value2", "bar": "true", "baz": "frobber"}
+// map[string]string{"foo":"value2", "bar": "true", "baz": "frobber"}
 //
 // TODO: Basically we need to define a standard way of giving instructions to
 // autogenerators in the comments of a type. This is a first iteration of that.

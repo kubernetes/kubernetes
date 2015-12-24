@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -84,7 +84,7 @@ func TestValidatePathSegmentName(t *testing.T) {
 		"dot,prefix": {
 			Name:        ".",
 			Prefix:      true,
-			ExpectedOK:  true, // allowed because a suffix could make it valid
+			ExpectedOK: true, // allowed because a suffix could make it valid
 			ExpectedMsg: "",
 		},
 
@@ -103,7 +103,7 @@ func TestValidatePathSegmentName(t *testing.T) {
 		"dot dot,prefix": {
 			Name:        "..",
 			Prefix:      true,
-			ExpectedOK:  true, // allowed because a suffix could make it valid
+			ExpectedOK: true, // allowed because a suffix could make it valid
 			ExpectedMsg: "",
 		},
 

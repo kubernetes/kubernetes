@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -177,7 +177,7 @@ func (diskmounter *cinderSafeFormatAndMount) Mount(device string, target string,
 	fmtRequired, err := isFormatRequired(device, fstype, diskmounter)
 	if err != nil {
 		glog.Warningf("Failed to determine if formating is required: %v\n", err)
-		//return err
+		// return err
 	}
 	if fmtRequired {
 		glog.V(2).Infof("Formatting of the vol required")

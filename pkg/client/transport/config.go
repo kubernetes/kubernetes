@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -69,13 +69,13 @@ func (c *Config) HasCertAuth() bool {
 
 // TLSConfig holds the information needed to set up a TLS transport.
 type TLSConfig struct {
-	CAFile   string // Path of the PEM-encoded server trusted root certificates.
+	CAFile string // Path of the PEM-encoded server trusted root certificates.
 	CertFile string // Path of the PEM-encoded client certificate.
-	KeyFile  string // Path of the PEM-encoded client key.
+	KeyFile string // Path of the PEM-encoded client key.
 
 	Insecure bool // Server should be accessed without verifying the certificate. For testing only.
 
-	CAData   []byte // Bytes of the PEM-encoded server trusted root certificates. Supercedes CAFile.
+	CAData []byte // Bytes of the PEM-encoded server trusted root certificates. Supercedes CAFile.
 	CertData []byte // Bytes of the PEM-encoded client certificate. Supercedes CertFile.
-	KeyData  []byte // Bytes of the PEM-encoded client key. Supercedes KeyFile.
+	KeyData []byte // Bytes of the PEM-encoded client key. Supercedes KeyFile.
 }

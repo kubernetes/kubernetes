@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -54,10 +54,10 @@ func (f HostPortMapperFunc) Map(t *T, offer *mesos.Offer) ([]HostPortMapping, er
 // ports offered by mesos. It references the k8s' container and port
 // and specifies the offered mesos port and the offered port's role
 type HostPortMapping struct {
-	ContainerIdx int    // index of the container in the pod spec
-	PortIdx      int    // index of the port in a container's port spec
-	OfferPort    uint64 // the port offered by mesos
-	Role         string // the role asssociated with the offered port
+	ContainerIdx int // index of the container in the pod spec
+	PortIdx int // index of the port in a container's port spec
+	OfferPort uint64 // the port offered by mesos
+	Role string // the role asssociated with the offered port
 }
 
 type PortAllocationError struct {

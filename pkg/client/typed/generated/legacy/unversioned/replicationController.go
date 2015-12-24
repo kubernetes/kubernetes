@@ -51,7 +51,7 @@ func newReplicationControllers(c *LegacyClient, namespace string) *replicationCo
 	}
 }
 
-// Create takes the representation of a replicationController and creates it.  Returns the server's representation of the replicationController, and an error, if there is any.
+// Create takes the representation of a replicationController and creates it. Returns the server's representation of the replicationController, and an error, if there is any.
 func (c *replicationControllers) Create(replicationController *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
 	err = c.client.Post().

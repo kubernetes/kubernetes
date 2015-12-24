@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,11 +31,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 )
 
-// RecycleVolumeByWatchingPodUntilCompletion is intended for use with volume Recyclers.  This function will
+// RecycleVolumeByWatchingPodUntilCompletion is intended for use with volume Recyclers. This function will
 // save the given Pod to the API and watch it until it completes, fails, or the pod's ActiveDeadlineSeconds is exceeded, whichever comes first.
 // An attempt to delete a recycler pod is always attempted before returning.
 // 	pod - the pod designed by a volume plugin to recycle the volume
-//	client - kube client for API operations.
+// 	client - kube client for API operations.
 func RecycleVolumeByWatchingPodUntilCompletion(pod *api.Pod, kubeClient client.Interface) error {
 	return internalRecycleVolumeByWatchingPodUntilCompletion(pod, newRecyclerClient(kubeClient))
 }
@@ -100,8 +100,8 @@ func (c *realRecyclerClient) DeletePod(name, namespace string) error {
 	return c.client.Pods(namespace).Delete(name, nil)
 }
 
-// WatchPod returns a ListWatch for watching a pod.  The stopChannel is used
-// to close the reflector backing the watch.  The caller is responsible for derring a close on the channel to
+// WatchPod returns a ListWatch for watching a pod. The stopChannel is used
+// to close the reflector backing the watch. The caller is responsible for derring a close on the channel to
 // stop the reflector.
 func (c *realRecyclerClient) WatchPod(name, namespace, resourceVersion string, stopChannel chan struct{}) func() *api.Pod {
 	fieldSelector, _ := fields.ParseSelector("metadata.name=" + name)

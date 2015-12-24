@@ -48,7 +48,7 @@ func format(src []byte, mode checkMode) ([]byte, error) {
 	// filter exports if necessary
 	if mode&export != 0 {
 		ast.FileExports(f) // ignore result
-		f.Comments = nil   // don't print comments that are not in AST
+		f.Comments = nil // don't print comments that are not in AST
 	}
 
 	// determine printer configuration
@@ -201,7 +201,7 @@ func TestFiles(t *testing.T) {
 		golden := filepath.Join(dataDir, e.golden)
 		check(t, source, golden, e.mode)
 		// TODO(gri) check that golden is idempotent
-		//check(t, golden, golden, e.mode)
+		// check(t, golden, golden, e.mode)
 	}
 }
 
@@ -322,7 +322,7 @@ func fibo(n int) {
 		t.Error("expected offset 1") // error in test
 	}
 
-	testComment(t, f, len(src), &ast.Comment{Slash: pos, Text: "//-style comment"})
+	testComment(t, f, len(src), &ast.Comment{Slash: pos, Text: "// -style comment"})
 	testComment(t, f, len(src), &ast.Comment{Slash: pos, Text: "/*-style comment */"})
 	testComment(t, f, len(src), &ast.Comment{Slash: pos, Text: "/*-style \n comment */"})
 	testComment(t, f, len(src), &ast.Comment{Slash: pos, Text: "/*-style comment \n\n\n */"})
@@ -356,7 +356,7 @@ func identCount(f *ast.File) int {
 	return n
 }
 
-// Verify that the SourcePos mode emits correct //line comments
+// Verify that the SourcePos mode emits correct //   line comments
 // by testing that position information for matching identifiers
 // is maintained.
 func TestSourcePos(t *testing.T) {
@@ -387,7 +387,7 @@ func (t *t) foo(a, b, c int) int {
 	}
 
 	// parse pretty printed original
-	// (//line comments must be interpreted even w/o parser.ParseComments set)
+	// (//   line comments must be interpreted even w/o parser.ParseComments set)
 	f2, err := parser.ParseFile(fset, "", buf.Bytes(), 0)
 	if err != nil {
 		t.Fatalf("%s\n%s", err, buf.Bytes())

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -1292,9 +1292,9 @@ var binPrefixes = []string{
 	"platforms",
 }
 
-// findBinary searches through likely paths to find the specified binary.  It
-// takes the one that has been built most recently.  Platform should be
-// specified as '<os>/<arch>'.  For example: 'linux/amd64'.
+// findBinary searches through likely paths to find the specified binary. It
+// takes the one that has been built most recently. Platform should be
+// specified as '<os>/<arch>'. For example: 'linux/amd64'.
 func findBinary(binName string, platform string) (string, error) {
 	var binTime time.Time
 	var binPath string

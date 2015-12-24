@@ -51,7 +51,7 @@ func newResourceQuotas(c *LegacyClient, namespace string) *resourceQuotas {
 	}
 }
 
-// Create takes the representation of a resourceQuota and creates it.  Returns the server's representation of the resourceQuota, and an error, if there is any.
+// Create takes the representation of a resourceQuota and creates it. Returns the server's representation of the resourceQuota, and an error, if there is any.
 func (c *resourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
 	result = &api.ResourceQuota{}
 	err = c.client.Post().

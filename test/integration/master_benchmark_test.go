@@ -7,7 +7,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,10 +33,10 @@ import (
 )
 
 // Command line flag globals, parsed in init and used by the benchmarks:
-//	* pods && !tasks: Start -pods, scale number of parallel tasks with b.N
-//  * !pods && tasks: Start -tasks, scale pods with b.N
-//  * pods && tasks: Ignore b.N, benchmark behaves like a test constrained by -benchtime.
-//  * !pods && !tasks: scale pods and workers with b.N.
+// 	* pods && !tasks: Start -pods, scale number of parallel tasks with b.N
+// * !pods && tasks: Start -tasks, scale pods with b.N
+// * pods && tasks: Ignore b.N, benchmark behaves like a test constrained by -benchtime.
+// * !pods && !tasks: scale pods and workers with b.N.
 // -workers specifies the number of workers to shard tasks across.
 // Eg: go test bench . -bench-pods 3000 -bench-tasks 100 -bench-tasks 10:
 // Create 100 tasks each listing 3000 pods, and run them 10 at a time.

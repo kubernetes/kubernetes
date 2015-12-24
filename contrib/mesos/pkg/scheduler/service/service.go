@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -83,15 +83,15 @@ import (
 
 const (
 	defaultMesosMaster           = "localhost:5050"
-	defaultMesosUser             = "root" // should have privs to execute docker and iptables commands
+	defaultMesosUser = "root" // should have privs to execute docker and iptables commands
 	defaultFrameworkRoles        = "*"
 	defaultPodRoles              = "*"
-	defaultReconcileInterval     = 300 // 5m default task reconciliation interval
+	defaultReconcileInterval = 300 // 5m default task reconciliation interval
 	defaultReconcileCooldown     = 15 * time.Second
 	defaultNodeRelistPeriod      = 5 * time.Minute
 	defaultFrameworkName         = "Kubernetes"
-	defaultExecutorCPUs          = mresource.CPUShares(0.25)  // initial CPU allocated for executor
-	defaultExecutorMem           = mresource.MegaBytes(128.0) // initial memory allocated for executor
+	defaultExecutorCPUs = mresource.CPUShares(0.25) // initial CPU allocated for executor
+	defaultExecutorMem = mresource.MegaBytes(128.0) // initial memory allocated for executor
 	defaultExecutorInfoCacheSize = 10000
 )
 
@@ -164,7 +164,7 @@ type SchedulerServer struct {
 	nodeRelistPeriod              time.Duration
 	sandboxOverlay                string
 
-	executable  string // path to the binary running this service
+	executable string // path to the binary running this service
 	client      *client.Client
 	driver      bindings.SchedulerDriver
 	driverMutex sync.RWMutex
@@ -241,7 +241,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.clusterDNS, "cluster-dns", s.clusterDNS, "IP address for a cluster DNS server. If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
 	fs.StringVar(&s.staticPodsConfigPath, "static-pods-config", s.staticPodsConfigPath, "Path for specification of static pods. Path should point to dir containing the staticPods configuration files. Defaults to none.")
 
-	fs.StringVar(&s.mesosMaster, "mesos-master", s.mesosMaster, "Location of the Mesos master. The format is a comma-delimited list of of hosts like zk://host1:port,host2:port/mesos. If using ZooKeeper, pay particular attention to the leading zk:// and trailing /mesos! If not using ZooKeeper, standard URLs like http://localhost are also acceptable.")
+	fs.StringVar(&s.mesosMaster, "mesos-master", s.mesosMaster, "Location of the Mesos master. The format is a comma-delimited list of of hosts like zk://host1:port,host2:port/mesos. If using ZooKeeper, pay particular attention to the leading zk://and trailing /mesos! If not using ZooKeeper, standard URLs like http://localhost are also acceptable.")
 	fs.StringVar(&s.mesosUser, "mesos-user", s.mesosUser, "Mesos user for this framework, defaults to root.")
 	fs.StringSliceVar(&s.frameworkRoles, "mesos-framework-roles", s.frameworkRoles, "Mesos framework roles that the scheduler receives offers for. Currently only \"*\" and optionally one additional role are supported.")
 	fs.StringSliceVar(&s.defaultPodRoles, "mesos-default-pod-roles", s.defaultPodRoles, "Roles that will be used to launch pods having no "+meta.RolesKey+" label.")
@@ -295,8 +295,8 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.kubeletNetworkPluginName, "kubelet-network-plugin", s.kubeletNetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
 	fs.BoolVar(&s.kubeletEnableDebuggingHandlers, "kubelet-enable-debugging-handlers", s.kubeletEnableDebuggingHandlers, "Enables kubelet endpoints for log collection and local running of containers and commands")
 
-	//TODO(jdef) support this flag once we have a better handle on mesos-dns and k8s DNS integration
-	//fs.StringVar(&s.HADomain, "ha-domain", s.HADomain, "Domain of the HA scheduler service, only used in HA mode. If specified may be used to construct artifact download URIs.")
+	// TODO(jdef) support this flag once we have a better handle on mesos-dns and k8s DNS integration
+	// fs.StringVar(&s.HADomain, "ha-domain", s.HADomain, "Domain of the HA scheduler service, only used in HA mode. If specified may be used to construct artifact download URIs.")
 }
 
 func (s *SchedulerServer) AddStandaloneFlags(fs *pflag.FlagSet) {
@@ -391,8 +391,8 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri), Executable: proto.Bool(false), Extract: proto.Bool(false)})
 	}
 
-	//TODO(jdef): provide some way (env var?) for users to customize executor config
-	//TODO(jdef): set -address to 127.0.0.1 if `address` is 127.0.0.1
+	// TODO(jdef): provide some way (env var?) for users to customize executor config
+	// TODO(jdef): set -address to 127.0.0.1 if `address` is 127.0.0.1
 
 	apiServerArgs := strings.Join(s.apiServerList, ",")
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--api-servers=%s", apiServerArgs))
@@ -402,9 +402,9 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--mesos-launch-grace-period=%v", s.launchGracePeriod))
 
 	if s.executorBindall {
-		//TODO(jdef) determine whether hostname-override is really needed for bindall because
-		//it conflicts with kubelet node status checks/updates
-		//ci.Arguments = append(ci.Arguments, "--hostname-override=0.0.0.0")
+		// TODO(jdef) determine whether hostname-override is really needed for bindall because
+		// it conflicts with kubelet node status checks/updates
+		// ci.Arguments = append(ci.Arguments, "--hostname-override=0.0.0.0")
 		ci.Arguments = append(ci.Arguments, "--address=0.0.0.0")
 	}
 
@@ -415,7 +415,7 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--enable-debugging-handlers=%t", s.kubeletEnableDebuggingHandlers))
 
 	if s.authPath != "" {
-		//TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file
+		// TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file
 		uri, basename := s.serveFrameworkArtifact(s.authPath)
 		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri)})
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--auth-path=%s", basename))
@@ -837,7 +837,7 @@ func (s *SchedulerServer) failover(driver bindings.SchedulerDriver, hks hyperkub
 	// signals, so we'll need to restart if we want to really stop everything
 
 	// run the same command that we were launched with
-	//TODO(jdef) assumption here is that the sheduler is the only service running in this process, we should probably validate that somehow
+	// TODO(jdef) assumption here is that the sheduler is the only service running in this process, we should probably validate that somehow
 	args := []string{}
 	flags := pflag.CommandLine
 	if hks != nil {
@@ -869,12 +869,12 @@ func (s *SchedulerServer) failover(driver bindings.SchedulerDriver, hks hyperkub
 	cmd.SysProcAttr = makeDisownedProcAttr()
 
 	// TODO(jdef) pass in a pipe FD so that we can block, waiting for the child proc to be ready
-	//cmd.ExtraFiles = []*os.File{}
+	// cmd.ExtraFiles = []*os.File{}
 
 	exitcode := 0
 	log.Flush() // TODO(jdef) it would be really nice to ensure that no one else in our process was still logging
 	if err := cmd.Start(); err != nil {
-		//log to stdtout here to avoid conflicts with normal stderr logging
+		// log to stdtout here to avoid conflicts with normal stderr logging
 		fmt.Fprintf(os.Stdout, "failed to spawn failover process: %v\n", err)
 		os.Exit(1)
 	}
@@ -940,7 +940,7 @@ func (s *SchedulerServer) fetchFrameworkID(client etcd.KeysAPI) (*mesos.Framewor
 			return mutil.NewFrameworkID(response.Node.Value), nil
 		}
 	} else {
-		//TODO(jdef) this seems like a totally hackish way to clean up the framework ID
+		// TODO(jdef) this seems like a totally hackish way to clean up the framework ID
 		if _, err := client.Delete(context.TODO(), meta.FrameworkIDKey, &etcd.DeleteOptions{Recursive: true}); err != nil {
 			if !etcdutil.IsEtcdNotFound(err) {
 				return nil, fmt.Errorf("failed to delete framework ID from etcd: %v", err)

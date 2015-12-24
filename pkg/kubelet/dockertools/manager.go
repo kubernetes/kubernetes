@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -96,10 +96,10 @@ type DockerManager struct {
 	// and/or start in a string, keyed by <pod_UID>_<container_name>. The goal
 	// is to propagate this reason to the container status. This endeavor is
 	// "best-effort" for two reasons:
-	//   1. The cache is not persisted.
-	//   2. We use an LRU cache to avoid extra garbage collection work. This
-	//      means that some entries may be recycled before a pod has been
-	//      deleted.
+	// 1. The cache is not persisted.
+	// 2. We use an LRU cache to avoid extra garbage collection work. This
+	// means that some entries may be recycled before a pod has been
+	// deleted.
 	reasonCache reasonInfoCache
 	// TODO(yifan): Record the pull failure so we can eliminate the image checking
 	// in GetAPIPodStatus()?
@@ -267,7 +267,7 @@ func (sc *reasonInfoCache) Get(uid types.UID, name string) (reasonInfo, bool) {
 // default, it returns a snapshot of the container log. Set 'follow' to true to
 // stream the log. Set 'follow' to false and specify the number of lines (e.g.
 // "100" or "all") to tail the log.
-// TODO: Make 'RawTerminal' option  flagable.
+// TODO: Make 'RawTerminal' option flagable.
 func (dm *DockerManager) GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	var since int64
 	if logOptions.SinceSeconds != nil {
@@ -308,7 +308,7 @@ var (
 	ErrContainerCannotRun = errors.New("ContainerCannotRun")
 )
 
-// determineContainerIP determines the IP address of the given container.  It is expected
+// determineContainerIP determines the IP address of the given container. It is expected
 // that the container passed is the infrastructure container of a pod and the responsibility
 // of the caller to ensure that the correct container is passed.
 func (dm *DockerManager) determineContainerIP(podNamespace, podName string, container *docker.Container) string {
@@ -1144,9 +1144,9 @@ func noPodInfraContainerError(podName, podNamespace string) error {
 // computer) and the specified port in the container.
 //
 // TODO:
-//  - match cgroups of container
-//  - should we support nsenter + socat on the host? (current impl)
-//  - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
+// - match cgroups of container
+// - should we support nsenter + socat on the host? (current impl)
+// - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
 func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
 	podInfraContainer := pod.FindContainerByName(PodInfraContainerName)
 	if podInfraContainer == nil {
@@ -1579,7 +1579,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubetypes.Docker
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork {
 		netNamespace = "host"
 	} else {
-		// Docker only exports ports from the pod infra container.  Let's
+		// Docker only exports ports from the pod infra container. Let's
 		// collect all of the relevant ports and export them.
 		for _, container := range pod.Spec.Containers {
 			ports = append(ports, container.Ports...)
@@ -1610,13 +1610,13 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubetypes.Docker
 
 // Structure keeping information on changes that need to happen for a pod. The semantics is as follows:
 // - startInfraContainer is true if new Infra Containers have to be started and old one (if running) killed.
-//   Additionally if it is true then containersToKeep have to be empty
+// Additionally if it is true then containersToKeep have to be empty
 // - infraContainerId have to be set if and only if startInfraContainer is false. It stores dockerID of running Infra Container
 // - containersToStart keeps indices of Specs of containers that have to be started and reasons why containers will be started.
 // - containersToKeep stores mapping from dockerIDs of running containers to indices of their Specs for containers that
-//   should be kept running. If startInfraContainer is false then it contains an entry for infraContainerId (mapped to -1).
-//   It shouldn't be the case where containersToStart is empty and containersToKeep contains only infraContainerId. In such case
-//   Infra Container should be killed, hence it's removed from this map.
+// should be kept running. If startInfraContainer is false then it contains an entry for infraContainerId (mapped to -1).
+// It shouldn't be the case where containersToStart is empty and containersToKeep contains only infraContainerId. In such case
+// Infra Container should be killed, hence it's removed from this map.
 // - all running containers which are NOT contained in containersToKeep should be killed.
 type podContainerChangesSpec struct {
 	StartInfraContainer bool
@@ -1882,8 +1882,8 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ kubecontainer.Pod, _ api.PodSta
 
 		// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
 		// Note: when configuring the pod's containers anything that can be configured by pointing
-		// to the namespace of the infra container should use namespaceMode.  This includes things like the net namespace
-		// and IPC namespace.  PID mode cannot point to another container right now.
+		// to the namespace of the infra container should use namespaceMode. This includes things like the net namespace
+		// and IPC namespace. PID mode cannot point to another container right now.
 		// See createPodInfraContainer for infra container setup.
 		namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
 		_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, getPidMode(pod), restartCount)
@@ -1926,7 +1926,7 @@ func (dm *DockerManager) verifyNonRoot(container *api.Container) error {
 }
 
 // isImageRoot returns true if the user directive is not set on the image, the user is set to 0
-// or the user is set to root.  If there is an error inspecting the image this method will return
+// or the user is set to root. If there is an error inspecting the image this method will return
 // false and return the error.
 func (dm *DockerManager) isImageRoot(image string) (bool, error) {
 	img, err := dm.client.InspectImage(image)
@@ -2032,11 +2032,11 @@ func (dm *DockerManager) GetPodStatus(uid types.UID, name, namespace string) (*k
 	// it to get the new restart count, and then add a label with the new restart count on
 	// the newly started container.
 	// However, there are some limitations of this method:
-	//	1. When all dead containers were garbage collected, the container status could
-	//	not get the historical value and would be *inaccurate*. Fortunately, the chance
-	//	is really slim.
-	//	2. When working with old version containers which have no restart count label,
-	//	we can only assume their restart count is 0.
+	// 	1. When all dead containers were garbage collected, the container status could
+	// 	not get the historical value and would be *inaccurate*. Fortunately, the chance
+	// 	is really slim.
+	// 	2. When working with old version containers which have no restart count label,
+	// 	we can only assume their restart count is 0.
 	// Anyhow, we only promised "best-effort" restart count reporting, we can just ignore
 	// these limitations now.
 	var containerStatuses []*kubecontainer.ContainerStatus

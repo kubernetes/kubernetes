@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -63,7 +63,7 @@ func NewSerializedImagePuller(recorder record.EventRecorder, runtime Runtime, im
 	return imagePuller
 }
 
-// records an event using ref, event msg.  log to glog using prefix, msg, logFn
+// records an event using ref, event msg. log to glog using prefix, msg, logFn
 func (puller *serializedImagePuller) logIt(ref *api.ObjectReference, eventtype, event, prefix, msg string, logFn func(args ...interface{})) {
 	if ref != nil {
 		puller.recorder.Event(ref, eventtype, event, msg)

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,12 +43,12 @@ const (
 var jsonRegexp = regexp.MustCompile("^\\{\\.?([^{}]+)\\}$|^\\.?([^{}]+)$")
 
 // MassageJSONPath attempts to be flexible with JSONPath expressions, it accepts:
-//   * metadata.name (no leading '.' or curly brances '{...}'
-//   * {metadata.name} (no leading '.')
-//   * .metadata.name (no curly braces '{...}')
-//   * {.metadata.name} (complete expression)
+// * metadata.name (no leading '.' or curly brances '{...}'
+// * {metadata.name} (no leading '.')
+// * .metadata.name (no curly braces '{...}')
+// * {.metadata.name} (complete expression)
 // And transforms them all into a valid jsonpat expression:
-//   {.metadata.name}
+// {.metadata.name}
 func massageJSONPath(pathExpression string) (string, error) {
 	if len(pathExpression) == 0 {
 		return pathExpression, nil
@@ -72,8 +72,8 @@ func massageJSONPath(pathExpression string) (string, error) {
 // NewCustomColumnsPrinterFromSpec creates a custom columns printer from a comma separated list of <header>:<jsonpath-field-spec> pairs.
 // e.g. NAME:metadata.name,API_VERSION:apiVersion creates a printer that prints:
 //
-//      NAME               API_VERSION
-//      foo                bar
+// NAME API_VERSION
+// foo bar
 func NewCustomColumnsPrinterFromSpec(spec string) (*CustomColumnsPrinter, error) {
 	if len(spec) == 0 {
 		return nil, fmt.Errorf("custom-columns format specified but no custom columns given")
@@ -104,11 +104,11 @@ func splitOnWhitespace(line string) []string {
 	return result
 }
 
-// NewCustomColumnsPrinterFromTemplate creates a custom columns printer from a template stream.  The template is expected
-// to consist of two lines, whitespace separated.  The first line is the header line, the second line is the jsonpath field spec
+// NewCustomColumnsPrinterFromTemplate creates a custom columns printer from a template stream. The template is expected
+// to consist of two lines, whitespace separated. The first line is the header line, the second line is the jsonpath field spec
 // For example the template below:
-// NAME               API_VERSION
-// {metadata.name}    {apiVersion}
+// NAME API_VERSION
+// {metadata.name} {apiVersion}
 func NewCustomColumnsPrinterFromTemplate(templateReader io.Reader) (*CustomColumnsPrinter, error) {
 	scanner := bufio.NewScanner(templateReader)
 	if !scanner.Scan() {

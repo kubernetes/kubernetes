@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,7 +35,7 @@ const DefaultPluginName = "kubernetes.io/no-op"
 
 // Plugin is an interface to network plugins for the kubelet
 type NetworkPlugin interface {
-	// Init initializes the plugin.  This will be called exactly once
+	// Init initializes the plugin. This will be called exactly once
 	// before any other methods are called.
 	Init(host Host) error
 
@@ -61,9 +61,9 @@ type PodNetworkStatus struct {
 	unversioned.TypeMeta `json:",inline"`
 
 	// IP is the primary ipv4/ipv6 address of the pod. Among other things it is the address that -
-	//   - kube expects to be reachable across the cluster
-	//   - service endpoints are constructed with
-	//   - will be reported in the PodStatus.PodIP field (will override the IP reported by docker)
+	// - kube expects to be reachable across the cluster
+	// - service endpoints are constructed with
+	// - will be reported in the PodStatus.PodIP field (will override the IP reported by docker)
 	IP net.IP `json:"ip" description:"Primary IP address of the pod"`
 }
 

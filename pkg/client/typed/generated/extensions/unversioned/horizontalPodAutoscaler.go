@@ -52,7 +52,7 @@ func newHorizontalPodAutoscalers(c *ExtensionsClient, namespace string) *horizon
 	}
 }
 
-// Create takes the representation of a horizontalPodAutoscaler and creates it.  Returns the server's representation of the horizontalPodAutoscaler, and an error, if there is any.
+// Create takes the representation of a horizontalPodAutoscaler and creates it. Returns the server's representation of the horizontalPodAutoscaler, and an error, if there is any.
 func (c *horizontalPodAutoscalers) Create(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
 	result = &extensions.HorizontalPodAutoscaler{}
 	err = c.client.Post().

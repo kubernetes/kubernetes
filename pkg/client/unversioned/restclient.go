@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,14 +32,14 @@ import (
 
 const (
 	// Environment variables: Note that the duration should be long enough that the backoff
-	// persists for some reasonable time (i.e. 120 seconds).  The typical base might be "1".
+	// persists for some reasonable time (i.e. 120 seconds). The typical base might be "1".
 	envBackoffBase     = "KUBE_CLIENT_BACKOFF_BASE"
 	envBackoffDuration = "KUBE_CLIENT_BACKOFF_DURATION"
 )
 
 // RESTClient imposes common Kubernetes API conventions on a set of resource paths.
 // The baseURL is expected to point to an HTTP or HTTPS path that is the parent
-// of one or more resources.  The server should return a decodable API resource
+// of one or more resources. The server should return a decodable API resource
 // object, or an api.Status object which contains information about the reason for
 // any failure.
 //
@@ -53,7 +53,7 @@ type RESTClient struct {
 	// REST resources.
 	Codec runtime.Codec
 
-	// Set specific behavior of the client.  If not set http.DefaultClient will be
+	// Set specific behavior of the client. If not set http.DefaultClient will be
 	// used.
 	Client *http.Client
 
@@ -62,7 +62,7 @@ type RESTClient struct {
 }
 
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
-// such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
+// such as Get, Put, Post, and Delete on specified paths. Codec controls encoding and
 // decoding of responses from the server.
 func NewRESTClient(baseURL *url.URL, groupVersion unversioned.GroupVersion, c runtime.Codec, maxQPS float32, maxBurst int) *RESTClient {
 	base := *baseURL
@@ -85,7 +85,7 @@ func NewRESTClient(baseURL *url.URL, groupVersion unversioned.GroupVersion, c ru
 }
 
 // readExpBackoffConfig handles the internal logic of determining what the
-// backoff policy is.  By default if no information is available, NoBackoff.
+// backoff policy is. By default if no information is available, NoBackoff.
 // TODO Generalize this see #17727 .
 func readExpBackoffConfig() BackoffManager {
 	backoffBase := os.Getenv(envBackoffBase)
@@ -108,10 +108,10 @@ func readExpBackoffConfig() BackoffManager {
 // Example usage of RESTClient's request building interface:
 // c := NewRESTClient(url, codec)
 // resp, err := c.Verb("GET").
-//  Path("pods").
-//  SelectorParam("labels", "area=staging").
-//  Timeout(10*time.Second).
-//  Do()
+// Path("pods").
+// SelectorParam("labels", "area=staging").
+// Timeout(10*time.Second).
+// Do()
 // if err != nil { ... }
 // list, ok := resp.(*api.PodList)
 //

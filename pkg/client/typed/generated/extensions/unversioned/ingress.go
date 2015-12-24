@@ -52,7 +52,7 @@ func newIngresses(c *ExtensionsClient, namespace string) *ingresses {
 	}
 }
 
-// Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
+// Create takes the representation of a ingress and creates it. Returns the server's representation of the ingress, and an error, if there is any.
 func (c *ingresses) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	result = &extensions.Ingress{}
 	err = c.client.Post().

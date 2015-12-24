@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,11 +41,11 @@ import (
 // when Replace() is called; 'Deleted' deltas are produced for these items.
 // It may be nil if you don't need to detect all deletions.
 // TODO: consider merging keyLister with this object, tracking a list of
-//       "known" keys when Pop() is called. Have to think about how that
-//       affects error retrying.
+// "known" keys when Pop() is called. Have to think about how that
+// affects error retrying.
 // TODO(lavalamp): I believe there is a possible race only when using an
-//                 external known object source that the above TODO would
-//                 fix.
+// external known object source that the above TODO would
+// fix.
 //
 // Also see the comment on DeltaFIFO.
 func NewDeltaFIFO(keyFunc KeyFunc, compressor DeltaCompressor, knownObjects KeyListerGetter) *DeltaFIFO {
@@ -67,11 +67,11 @@ func NewDeltaFIFO(keyFunc KeyFunc, compressor DeltaCompressor, knownObjects KeyL
 // the Pop() method.
 //
 // DeltaFIFO solves this use case:
-//  * You want to process every object change (delta) at most once.
-//  * When you process an object, you want to see everything
-//    that's happened to it since you last processed it.
-//  * You want to process the deletion of objects.
-//  * You might want to periodically reprocess objects.
+// * You want to process every object change (delta) at most once.
+// * When you process an object, you want to see everything
+// that's happened to it since you last processed it.
+// * You want to process the deletion of objects.
+// * You might want to periodically reprocess objects.
 //
 // DeltaFIFO's Pop(), Get(), and GetByKey() methods return
 // interface{} to satisfy the Store/Queue interfaces, but it
@@ -336,7 +336,7 @@ func (f *DeltaFIFO) GetByKey(key string) (item interface{}, exists bool, err err
 	return d, exists, nil
 }
 
-// Pop blocks until an item is added to the queue, and then returns it.  If
+// Pop blocks until an item is added to the queue, and then returns it. If
 // multiple items are ready, they are returned in the order in which they were
 // added/updated. The item is removed from the queue (and the store) before it
 // is returned, so if you don't successfully process it, you need to add it back
@@ -466,8 +466,8 @@ const (
 	Updated DeltaType = "Updated"
 	Deleted DeltaType = "Deleted"
 	// The other types are obvious. You'll get Sync deltas when:
-	//  * A watch expires/errors out and a new list/watch cycle is started.
-	//  * You've turned on periodic syncs.
+	// * A watch expires/errors out and a new list/watch cycle is started.
+	// * You've turned on periodic syncs.
 	// (Anything that trigger's DeltaFIFO's Replace() method.)
 	Sync DeltaType = "Sync"
 )
@@ -476,7 +476,7 @@ const (
 // happened, and the object's state after* that change.
 //
 // [*] Unless the change is a deletion, and then you'll get the final
-//     state of the object before it was deleted.
+// state of the object before it was deleted.
 type Delta struct {
 	Type   DeltaType
 	Object interface{}

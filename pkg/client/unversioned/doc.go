@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,23 +31,23 @@ Most consumers should use the Config object to create a Client:
     [...]
 
     config := &client.Config{
-      Host:     "http://localhost:8080",
+ Host: "http://localhost:8080",
       Username: "test",
       Password: "password",
     }
     client, err := client.New(config)
     if err != nil {
-      // handle error
+ // handle error
     }
     pods, err := client.Pods(api.NamespaceDefault).List(labels.Everything(), fields.Everything())
     if err != nil {
-      // handle error
+ // handle error
     }
 
 More advanced consumers may wish to provide their own transport via a http.RoundTripper:
 
     config := &client.Config{
-      Host:      "https://localhost:8080",
+ Host: "https://localhost:8080",
       Transport: oauthclient.Transport(),
     }
     client, err := client.New(config)

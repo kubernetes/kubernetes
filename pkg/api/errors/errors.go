@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -190,7 +190,7 @@ func NewInvalid(qualifiedKind unversioned.GroupKind, name string, errs field.Err
 	}
 	return &StatusError{unversioned.Status{
 		Status: unversioned.StatusFailure,
-		Code:   StatusUnprocessableEntity, // RFC 4918: StatusUnprocessableEntity
+		Code: StatusUnprocessableEntity, // RFC 4918: StatusUnprocessableEntity
 		Reason: unversioned.StatusReasonInvalid,
 		Details: &unversioned.StatusDetails{
 			Group:  qualifiedKind.Group,
@@ -253,8 +253,8 @@ func NewServerTimeout(qualifiedResource unversioned.GroupResource, operation str
 	}}
 }
 
-// NewServerTimeoutForKind should not exist.  Server timeouts happen when accessing resources, the Kind is just what we
-// happened to be looking at when the request failed.  This delegates to keep code sane, but we should work towards removing this.
+// NewServerTimeoutForKind should not exist. Server timeouts happen when accessing resources, the Kind is just what we
+// happened to be looking at when the request failed. This delegates to keep code sane, but we should work towards removing this.
 func NewServerTimeoutForKind(qualifiedKind unversioned.GroupKind, operation string, retryAfterSeconds int) error {
 	return NewServerTimeout(unversioned.GroupResource{Group: qualifiedKind.Group, Resource: qualifiedKind.Kind}, operation, retryAfterSeconds)
 }
@@ -273,7 +273,7 @@ func NewInternalError(err error) error {
 }
 
 // NewTimeoutError returns an error indicating that a timeout occurred before the request
-// could be completed.  Clients may retry, but the operation may still complete.
+// could be completed. Clients may retry, but the operation may still complete.
 func NewTimeoutError(message string, retryAfterSeconds int) error {
 	return &StatusError{unversioned.Status{
 		Status:  unversioned.StatusFailure,

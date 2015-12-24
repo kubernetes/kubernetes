@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -124,7 +124,7 @@ func getHostPortFromString(data string) (*hostPort, error) {
 func assertDnsServiceEntryInEtcd(t *testing.T, ec *fakeEtcdClient, serviceName, namespace string, expectedHostPort *hostPort) {
 	key := getEtcdPathForA(serviceName, namespace, serviceSubDomain)
 	values := ec.Get(key)
-	//require.True(t, exists)
+	// require.True(t, exists)
 	require.True(t, len(values) > 0, "entry not found.")
 	actualHostPort, err := getHostPortFromString(values[0])
 	require.NoError(t, err)
@@ -134,14 +134,14 @@ func assertDnsServiceEntryInEtcd(t *testing.T, ec *fakeEtcdClient, serviceName, 
 func assertDnsPodEntryInEtcd(t *testing.T, ec *fakeEtcdClient, podIP, namespace string) {
 	key := getEtcdPathForA(podIP, namespace, podSubDomain)
 	values := ec.Get(key)
-	//require.True(t, exists)
+	// require.True(t, exists)
 	require.True(t, len(values) > 0, "entry not found.")
 }
 
 func assertDnsPodEntryNotInEtcd(t *testing.T, ec *fakeEtcdClient, podIP, namespace string) {
 	key := getEtcdPathForA(podIP, namespace, podSubDomain)
 	values := ec.Get(key)
-	//require.True(t, exists)
+	// require.True(t, exists)
 	require.True(t, len(values) == 0, "entry found.")
 }
 

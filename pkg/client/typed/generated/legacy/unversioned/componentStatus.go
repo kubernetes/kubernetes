@@ -51,7 +51,7 @@ func newComponentStatus(c *LegacyClient, namespace string) *componentStatus {
 	}
 }
 
-// Create takes the representation of a componentStatus and creates it.  Returns the server's representation of the componentStatus, and an error, if there is any.
+// Create takes the representation of a componentStatus and creates it. Returns the server's representation of the componentStatus, and an error, if there is any.
 func (c *componentStatus) Create(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
 	result = &api.ComponentStatus{}
 	err = c.client.Post().

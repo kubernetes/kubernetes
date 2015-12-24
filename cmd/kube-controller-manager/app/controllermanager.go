@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +15,11 @@ limitations under the License.
 */
 
 // Package app implements a server that runs a set of active
-// components.  This includes replication controllers, service endpoints and
+// components. This includes replication controllers, service endpoints and
 // nodes.
 //
 // CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/pkg/controllermanager/controllermanager.go
+// in contrib/mesos/pkg/controllermanager/controllermanager.go
 package app
 
 import (
@@ -168,8 +168,8 @@ controller, and serviceaccounts controller.`,
 	return cmd
 }
 
-// VolumeConfigFlags is used to bind CLI flags to variables.  This top-level struct contains *all* enumerated
-// CLI flags meant to configure all volume plugins.  From this config, the binary will create many instances
+// VolumeConfigFlags is used to bind CLI flags to variables. This top-level struct contains *all* enumerated
+// CLI flags meant to configure all volume plugins. From this config, the binary will create many instances
 // of volume.VolumeConfig which are then passed to the appropriate plugin. The ControllerManager binary is the only
 // part of the code which knows what plugins are supported and which CLI flags correspond to each plugin.
 type VolumeConfigFlags struct {
@@ -251,7 +251,7 @@ func clientForUserAgentOrDie(config client.Config, userAgent string) *client.Cli
 	return kubeClient
 }
 
-// Run runs the CMServer.  This should never exit.
+// Run runs the CMServer. This should never exit.
 func (s *CMServer) Run(_ []string) error {
 	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
 	if err != nil {

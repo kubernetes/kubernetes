@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -58,7 +58,7 @@ func Create(
 			// WORKAROUND(sttts): make sure that the Ready condition is the
 			// first one. The kube-ui v3 depends on this assumption.
 			// TODO(sttts): remove this workaround when kube-ui v4 is used or we
-			//              merge this with the statusupdate in the controller manager.
+			// merge this with the statusupdate in the controller manager.
 			Conditions: []api.NodeCondition{
 				{
 					Type:              api.NodeReady,

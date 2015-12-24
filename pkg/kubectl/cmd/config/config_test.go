@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -59,20 +59,20 @@ func ExampleView() {
 	// apiVersion: v1
 	// clusters:
 	// - cluster:
-	//     server: http://cow.org:8080
-	//   name: cow-cluster
+	// server: http://cow.org:8080
+	// name: cow-cluster
 	// contexts:
 	// - context:
-	//     cluster: cow-cluster
-	//     user: red-user
-	//   name: federal-context
+	// cluster: cow-cluster
+	// user: red-user
+	// name: federal-context
 	// current-context: federal-context
 	// kind: Config
 	// preferences: {}
 	// users:
 	// - name: red-user
-	//   user:
-	//     token: red-token
+	// user:
+	// token: red-token
 }
 
 func TestSetCurrentContext(t *testing.T) {
@@ -122,7 +122,7 @@ func TestSetWithPathPrefixIntoExistingStruct(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	expectedConfig.Clusters["cow-cluster"].Server = "http://cow.org:8080/foo/baz"
 	test := configCommandTest{
-		args:           []string{"set", "clusters.cow-cluster.server", "http://cow.org:8080/foo/baz"},
+		args: []string{"set", "clusters.cow-cluster.server", "http://cow.org:8080/foo/baz"},
 		startingConfig: newRedFederalCowHammerConfig(),
 		expectedConfig: expectedConfig,
 	}

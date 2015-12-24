@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -79,7 +79,7 @@ var _ = Describe("KubeProxy", func() {
 		By("Setting up for the tests")
 		config.setup()
 
-		//TODO Need to add hit externalIPs test
+		// TODO Need to add hit externalIPs test
 		By("TODO: Need to add hit externalIPs test")
 
 		By("Hit Test with All Endpoints")
@@ -169,7 +169,7 @@ func (config *KubeProxyTestConfig) hitClusterIP(epCount int) {
 
 func (config *KubeProxyTestConfig) hitNodePort(epCount int) {
 	node1_IP := config.externalAddrs[0]
-	tries := epCount*epCount + 15 //  if epCount == 0
+	tries := epCount*epCount + 15 // if epCount == 0
 	By("dialing(udp) node1 --> node1:nodeUdpPort")
 	config.dialFromNode("udp", node1_IP, nodeUdpPort, tries, epCount)
 	By("dialing(http) node1  --> node1:nodeHttpPort")
@@ -187,10 +187,10 @@ func (config *KubeProxyTestConfig) hitNodePort(epCount int) {
 
 	// TODO: doesn't work because masquerading is not done
 	By("TODO: Test disabled. dialing(udp) node --> 127.0.0.1:nodeUdpPort")
-	//config.dialFromNode("udp", "127.0.0.1", nodeUdpPort, tries, epCount)
+	// config.dialFromNode("udp", "127.0.0.1", nodeUdpPort, tries, epCount)
 	// TODO: doesn't work because masquerading is not done
 	By("Test disabled. dialing(http) node --> 127.0.0.1:nodeHttpPort")
-	//config.dialFromNode("http", "127.0.0.1", nodeHttpPort, tries, epCount)
+	// config.dialFromNode("http", "127.0.0.1", nodeHttpPort, tries, epCount)
 
 	node2_IP := config.externalAddrs[1]
 	By("dialing(udp) node1 --> node2:nodeUdpPort")

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -79,10 +79,10 @@ func NewResourceQuotaController(kubeClient client.Interface, resyncPeriod contro
 				// We are only interested in observing updates to quota.spec to drive updates to quota.status.
 				// We ignore all updates to quota.Status because they are all driven by this controller.
 				// IMPORTANT:
-				// We do not use this function to queue up a full quota recalculation.  To do so, would require
+				// We do not use this function to queue up a full quota recalculation. To do so, would require
 				// us to enqueue all quota.Status updates, and since quota.Status updates involve additional queries
 				// that cannot be backed by a cache and result in a full query of a namespace's content, we do not
-				// want to pay the price on spurious status updates.  As a result, we have a separate routine that is
+				// want to pay the price on spurious status updates. As a result, we have a separate routine that is
 				// responsible for enqueue of all resource quotas when doing a full resync (enqueueAll)
 				oldResourceQuota := old.(*api.ResourceQuota)
 				curResourceQuota := cur.(*api.ResourceQuota)

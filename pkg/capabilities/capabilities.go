@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,7 @@ import (
 )
 
 // Capabilities defines the set of capabilities available within the system.
-// For now these are global.  Eventually they may be per-user
+// For now these are global. Eventually they may be per-user
 type Capabilities struct {
 	AllowPrivileged bool
 
@@ -51,7 +51,7 @@ var once sync.Once
 var lock sync.Mutex
 var capabilities *Capabilities
 
-// Initialize the capability set.  This can only be done once per binary, subsequent calls are ignored.
+// Initialize the capability set. This can only be done once per binary, subsequent calls are ignored.
 func Initialize(c Capabilities) {
 	// Only do this once
 	once.Do(func() {
@@ -59,7 +59,7 @@ func Initialize(c Capabilities) {
 	})
 }
 
-// Setup the capability set.  It wraps Initialize for improving usibility.
+// Setup the capability set. It wraps Initialize for improving usibility.
 func Setup(allowPrivileged bool, privilegedSources PrivilegedSources, perConnectionBytesPerSec int64) {
 	Initialize(Capabilities{
 		AllowPrivileged:                        allowPrivileged,
@@ -68,7 +68,7 @@ func Setup(allowPrivileged bool, privilegedSources PrivilegedSources, perConnect
 	})
 }
 
-// SetCapabilitiesForTests.  Convenience method for testing.  This should only be called from tests.
+// SetCapabilitiesForTests. Convenience method for testing. This should only be called from tests.
 func SetForTests(c Capabilities) {
 	lock.Lock()
 	defer lock.Unlock()

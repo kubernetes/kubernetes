@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,8 +38,8 @@ import (
 // multiplexed streams. After RoundTrip() is invoked, Conn will be set
 // and usable. SpdyRoundTripper implements the UpgradeRoundTripper interface.
 type SpdyRoundTripper struct {
-	//tlsConfig holds the TLS configuration settings to use when connecting
-	//to the remote server.
+	// tlsConfig holds the TLS configuration settings to use when connecting
+	// to the remote server.
 	tlsConfig *tls.Config
 
 	/* TODO according to http://golang.org/pkg/net/http/#RoundTripper, a RoundTripper
@@ -51,7 +51,7 @@ type SpdyRoundTripper struct {
 	// conn is the underlying network connection to the remote server.
 	conn net.Conn
 
-	// Dialer is the dialer used to connect.  Used if non-nil.
+	// Dialer is the dialer used to connect. Used if non-nil.
 	Dialer *net.Dialer
 }
 

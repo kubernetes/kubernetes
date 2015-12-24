@@ -51,7 +51,7 @@ func newNamespaces(c *LegacyClient, namespace string) *namespaces {
 	}
 }
 
-// Create takes the representation of a namespace and creates it.  Returns the server's representation of the namespace, and an error, if there is any.
+// Create takes the representation of a namespace and creates it. Returns the server's representation of the namespace, and an error, if there is any.
 func (c *namespaces) Create(namespace *api.Namespace) (result *api.Namespace, err error) {
 	result = &api.Namespace{}
 	err = c.client.Post().

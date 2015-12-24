@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -163,13 +163,13 @@ func (e *etcdMasterElector) handleMaster(path, id string, ttl uint64) (string, e
 // master provices a distributed master election lock, maintains lock until failure, or someone sends something in the done channel.
 // The basic algorithm is:
 // while !done
-//   Get the current master
-//   If there is no current master
-//      Try to become the master
-//   Otherwise
-//      If we are the master, extend the lease
-//      If the master is different than the last time through the loop, report the master
-//   Sleep 80% of TTL
+// Get the current master
+// If there is no current master
+// Try to become the master
+// Otherwise
+// If we are the master, extend the lease
+// If the master is different than the last time through the loop, report the master
+// Sleep 80% of TTL
 func (e *etcdMasterElector) master(path, id string, ttl uint64, masters chan<- string, errors chan<- error, done <-chan empty) {
 	lastMaster := ""
 	for {

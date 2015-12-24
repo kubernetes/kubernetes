@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -51,11 +51,11 @@ type Queuer interface {
 }
 
 type queuer struct {
-	lock            sync.Mutex       // shared by condition variables of this struct
-	updates         queue.FIFO       // queue of pod updates to be processed
-	queue           *queue.DelayFIFO // queue of pods to be scheduled
-	deltaCond       sync.Cond        // pod changes are available for processing
-	unscheduledCond sync.Cond        // there are unscheduled pods for processing
+	lock sync.Mutex // shared by condition variables of this struct
+	updates queue.FIFO // queue of pod updates to be processed
+	queue *queue.DelayFIFO // queue of pods to be scheduled
+	deltaCond sync.Cond // pod changes are available for processing
+	unscheduledCond sync.Cond // there are unscheduled pods for processing
 }
 
 func New(queue *queue.DelayFIFO, updates queue.FIFO) Queuer {
@@ -131,7 +131,7 @@ func (q *queuer) Run(done <-chan struct{}) {
 				select {
 				case <-time.After(enqueueWaitTimeout):
 					q.deltaCond.Broadcast() // abort Wait()
-					<-signalled             // wait for lock re-acquisition
+					<-signalled // wait for lock re-acquisition
 					log.V(4).Infoln("timed out waiting for a pod update")
 				case <-signalled:
 					// we've acquired the lock and there may be
@@ -176,7 +176,7 @@ func (q *queuer) Yield() *api.Pod {
 			select {
 			case <-time.After(yieldWaitTimeout):
 				q.unscheduledCond.Broadcast() // abort Wait()
-				<-signalled                   // wait for the go-routine, and the lock
+				<-signalled // wait for the go-routine, and the lock
 				log.V(4).Infoln("timed out waiting for a pod to yield")
 			case <-signalled:
 				// we have acquired the lock, and there

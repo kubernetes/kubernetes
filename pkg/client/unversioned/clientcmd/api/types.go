@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,7 @@ import (
 )
 
 // Where possible, json tags match the cli argument names.
-// Top level config objects and all values required for proper functioning are not "omitempty".  Any truly optional piece of config is allowed to be omitted.
+// Top level config objects and all values required for proper functioning are not "omitempty". Any truly optional piece of config is allowed to be omitted.
 
 // Config holds the information needed to build connect to remote kubernetes clusters as a given user
 // IMPORTANT if you add fields to this struct, please update IsConfigEmpty()
@@ -54,7 +54,7 @@ type Preferences struct {
 
 // Cluster contains information about how to communicate with a kubernetes cluster
 type Cluster struct {
-	// LocationOfOrigin indicates where this object came from.  It is used for round tripping config post-merge, but never serialized.
+	// LocationOfOrigin indicates where this object came from. It is used for round tripping config post-merge, but never serialized.
 	LocationOfOrigin string
 	// Server is the address of the kubernetes cluster (https://hostname:port).
 	Server string `json:"server"`
@@ -70,9 +70,9 @@ type Cluster struct {
 	Extensions map[string]*runtime.EmbeddedObject `json:"extensions,omitempty"`
 }
 
-// AuthInfo contains information that describes identity information.  This is use to tell the kubernetes cluster who you are.
+// AuthInfo contains information that describes identity information. This is use to tell the kubernetes cluster who you are.
 type AuthInfo struct {
-	// LocationOfOrigin indicates where this object came from.  It is used for round tripping config post-merge, but never serialized.
+	// LocationOfOrigin indicates where this object came from. It is used for round tripping config post-merge, but never serialized.
 	LocationOfOrigin string
 	// ClientCertificate is the path to a client cert file for TLS.
 	ClientCertificate string `json:"client-certificate,omitempty"`
@@ -94,7 +94,7 @@ type AuthInfo struct {
 
 // Context is a tuple of references to a cluster (how do I communicate with a kubernetes cluster), a user (how do I identify myself), and a namespace (what subset of resources do I want to work with)
 type Context struct {
-	// LocationOfOrigin indicates where this object came from.  It is used for round tripping config post-merge, but never serialized.
+	// LocationOfOrigin indicates where this object came from. It is used for round tripping config post-merge, but never serialized.
 	LocationOfOrigin string
 	// Cluster is the name of the cluster for this context
 	Cluster string `json:"cluster"`

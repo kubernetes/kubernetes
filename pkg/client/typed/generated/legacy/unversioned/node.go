@@ -51,7 +51,7 @@ func newNodes(c *LegacyClient, namespace string) *nodes {
 	}
 }
 
-// Create takes the representation of a node and creates it.  Returns the server's representation of the node, and an error, if there is any.
+// Create takes the representation of a node and creates it. Returns the server's representation of the node, and an error, if there is any.
 func (c *nodes) Create(node *api.Node) (result *api.Node, err error) {
 	result = &api.Node{}
 	err = c.client.Post().

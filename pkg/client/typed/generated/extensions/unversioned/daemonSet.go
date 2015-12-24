@@ -52,7 +52,7 @@ func newDaemonSets(c *ExtensionsClient, namespace string) *daemonSets {
 	}
 }
 
-// Create takes the representation of a daemonSet and creates it.  Returns the server's representation of the daemonSet, and an error, if there is any.
+// Create takes the representation of a daemonSet and creates it. Returns the server's representation of the daemonSet, and an error, if there is any.
 func (c *daemonSets) Create(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
 	result = &extensions.DaemonSet{}
 	err = c.client.Post().

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,7 +33,7 @@ type Interface interface {
 	Instances() (Instances, bool)
 	// Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
 	Zones() (Zones, bool)
-	// Clusters returns a clusters interface.  Also returns true if the interface is supported, false otherwise.
+	// Clusters returns a clusters interface. Also returns true if the interface is supported, false otherwise.
 	Clusters() (Clusters, bool)
 	// Routes returns a routes interface along with whether the interface is supported.
 	Routes() (Routes, bool)
@@ -54,10 +54,10 @@ type Clusters interface {
 // TODO(#6812): Use a shorter name that's less likely to be longer than cloud
 // providers' name length limits.
 func GetLoadBalancerName(service *api.Service) string {
-	//GCE requires that the name of a load balancer starts with a lower case letter.
+	// GCE requires that the name of a load balancer starts with a lower case letter.
 	ret := "a" + string(service.UID)
 	ret = strings.Replace(ret, "-", "", -1)
-	//AWS requires that the name of a load balancer is shorter than 32 bytes.
+	// AWS requires that the name of a load balancer is shorter than 32 bytes.
 	if len(ret) > 32 {
 		ret = ret[:32]
 	}

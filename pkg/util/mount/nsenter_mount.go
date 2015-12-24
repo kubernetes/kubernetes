@@ -7,7 +7,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,31 +28,31 @@ import (
 )
 
 // NsenterMounter is part of experimental support for running the kubelet
-// in a container.  Currently, all docker containers receive their own mount
-// namespaces.  NsenterMounter works by executing nsenter to run commands in
+// in a container. Currently, all docker containers receive their own mount
+// namespaces. NsenterMounter works by executing nsenter to run commands in
 // the host's mount namespace.
 //
 // NsenterMounter requires:
 //
-// 1.  Docker >= 1.6 due to the dependency on the slave propagation mode
-//     of the bind-mount of the kubelet root directory in the container.
-//     Docker 1.5 used a private propagation mode for bind-mounts, so mounts
-//     performed in the host's mount namespace do not propagate out to the
-//     bind-mount in this docker version.
-// 2.  The host's root filesystem must be available at /rootfs
-// 3.  The nsenter binary must be on the Kubelet process' PATH in the container's
-//     filesystem.
-// 4.  The Kubelet process must have CAP_SYS_ADMIN (required by nsenter); at
-//     the present, this effectively means that the kubelet is running in a
-//     privileged container.
-// 5.  The volume path used by the Kubelet must be the same inside and outside
-//     the container and be writable by the container (to initialize volume)
-//     contents. TODO: remove this requirement.
-// 6.  The host image must have mount, findmnt, and umount binaries in /bin,
-//     /usr/sbin, or /usr/bin
+// 1. Docker >= 1.6 due to the dependency on the slave propagation mode
+// of the bind-mount of the kubelet root directory in the container.
+// Docker 1.5 used a private propagation mode for bind-mounts, so mounts
+// performed in the host's mount namespace do not propagate out to the
+// bind-mount in this docker version.
+// 2. The host's root filesystem must be available at /rootfs
+// 3. The nsenter binary must be on the Kubelet process' PATH in the container's
+// filesystem.
+// 4. The Kubelet process must have CAP_SYS_ADMIN (required by nsenter); at
+// the present, this effectively means that the kubelet is running in a
+// privileged container.
+// 5. The volume path used by the Kubelet must be the same inside and outside
+// the container and be writable by the container (to initialize volume)
+// contents. TODO: remove this requirement.
+// 6. The host image must have mount, findmnt, and umount binaries in /bin,
+// /usr/sbin, or /usr/bin
 //
 // For more information about mount propagation modes, see:
-//   https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt
+// https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt
 type NsenterMounter struct {
 	// a map of commands to their paths on the host filesystem
 	paths map[string]string
@@ -92,7 +92,7 @@ const (
 	nsenterPath        = "nsenter"
 )
 
-// Mount runs mount(8) in the host's root mount namespace.  Aside from this
+// Mount runs mount(8) in the host's root mount namespace. Aside from this
 // aspect, Mount has the same semantics as the mounter returned by mount.New()
 func (n *NsenterMounter) Mount(source string, target string, fstype string, options []string) error {
 	bind, bindRemountOpts := isBind(options)

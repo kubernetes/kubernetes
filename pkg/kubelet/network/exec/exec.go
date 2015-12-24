@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,27 +17,27 @@ limitations under the License.
 // Package exec scans and loads networking plugins that are installed
 // under /usr/libexec/kubernetes/kubelet-plugins/net/exec/
 // The layout convention for a plugin is:
-//   plugin-name/            (plugins have to be directories first)
-//   plugin-name/plugin-name (executable that will be called out, see Vendoring Note for more nuances)
-//   plugin-name/<other-files>
-//   where, 'executable' has the following requirements:
-//     - should have exec permissions
-//     - should give non-zero exit code on failure, and zero on success
-//     - the arguments will be <action> <pod_namespace> <pod_name> <docker_id_of_infra_container>
-//       whereupon, <action> will be one of:
-//         - init, called when the kubelet loads the plugin
-//         - setup, called after the infra container of a pod is
-//                created, but before other containers of the pod are created
-//         - teardown, called before the pod infra container is killed
-//         - status, called at regular intervals and is supposed to return a json
-//                formatted output indicating the pod's IPAddress(v4/v6). An empty string value or an erroneous output
-//                will mean the container runtime (docker) will be asked for the PodIP
-//                e.g. {
-//                         "apiVersion" : "v1beta1",
-//                         "kind" : "PodNetworkStatus",
-//                         "ip" : "10.20.30.40"
-//                     }
-//                The fields "apiVersion" and "kind" are optional in version v1beta1
+// plugin-name/ (plugins have to be directories first)
+// plugin-name/plugin-name (executable that will be called out, see Vendoring Note for more nuances)
+// plugin-name/<other-files>
+// where, 'executable' has the following requirements:
+// - should have exec permissions
+// - should give non-zero exit code on failure, and zero on success
+// - the arguments will be <action> <pod_namespace> <pod_name> <docker_id_of_infra_container>
+// whereupon, <action> will be one of:
+// - init, called when the kubelet loads the plugin
+// - setup, called after the infra container of a pod is
+// created, but before other containers of the pod are created
+// - teardown, called before the pod infra container is killed
+// - status, called at regular intervals and is supposed to return a json
+// formatted output indicating the pod's IPAddress(v4/v6). An empty string value or an erroneous output
+// will mean the container runtime (docker) will be asked for the PodIP
+// e.g. {
+// "apiVersion" : "v1beta1",
+// "kind" : "PodNetworkStatus",
+// "ip" : "10.20.30.40"
+// }
+// The fields "apiVersion" and "kind" are optional in version v1beta1
 // As the executables are called, the file-descriptors stdin, stdout, stderr
 // remain open. The combined output of stdout/stderr is captured and logged.
 //
@@ -45,15 +45,15 @@ limitations under the License.
 // the entire pod lifecycle will be restarted, but teardown will not be called.
 //
 // Vendoring Note:
-//      Plugin Names can be vendored also. Use '~' as the escaped name for plugin directories.
-//      And expect command line argument to call vendored plugins as 'vendor/pluginName'
-//      e.g. pluginName = mysdn
-//           vendorname = mycompany
-//      then, plugin layout should be
-//           mycompany~mysdn/
-//           mycompany~mysdn/mysdn (this becomes the executable)
-//           mycompany~mysdn/<other-files>
-//      and, call the kubelet with '--network-plugin=mycompany/mysdn'
+// Plugin Names can be vendored also. Use '~' as the escaped name for plugin directories.
+// And expect command line argument to call vendored plugins as 'vendor/pluginName'
+// e.g. pluginName = mysdn
+// vendorname = mycompany
+// then, plugin layout should be
+// mycompany~mysdn/
+// mycompany~mysdn/mysdn (this becomes the executable)
+// mycompany~mysdn/<other-files>
+// and, call the kubelet with '--network-plugin=mycompany/mysdn'
 package exec
 
 import (

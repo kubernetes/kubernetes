@@ -12,7 +12,7 @@ import (
 // initOrder computes the Info.InitOrder for package variables.
 func (check *Checker) initOrder() {
 	// An InitOrder may already have been computed if a package is
-	// built from several calls to (*Checker).Files.  Clear it.
+	// built from several calls to (*Checker).Files. Clear it.
 	check.Info.InitOrder = check.Info.InitOrder[:0]
 
 	// compute the object dependency graph and
@@ -154,11 +154,11 @@ func (check *Checker) reportCycle(cycle []*objNode, i int) {
 // Nodes may be marked for cycle detection. A node n is marked
 // if n.mark corresponds to the current mark value.
 type objNode struct {
-	obj   Object     // object represented by this node
-	in    int        // number of nodes this node depends on
-	out   []*objNode // list of nodes that depend on this node
-	index int        // node index in list of nodes
-	mark  int        // for cycle detection
+	obj Object // object represented by this node
+	in int // number of nodes this node depends on
+	out []*objNode // list of nodes that depend on this node
+	index int // node index in list of nodes
+	mark int // for cycle detection
 }
 
 // dependencyGraph computes the transposed object dependency graph
@@ -178,7 +178,7 @@ func dependencyGraph(objMap map[Object]*declInfo) []*objNode {
 		deps := objMap[obj].deps
 		n.in = len(deps)
 		for d := range deps {
-			d := M[d]                // node n depends on node d
+			d := M[d] // node n depends on node d
 			d.out = append(d.out, n) // add edge d->n
 		}
 

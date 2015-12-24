@@ -51,7 +51,7 @@ func newPersistentVolumes(c *LegacyClient, namespace string) *persistentVolumes 
 	}
 }
 
-// Create takes the representation of a persistentVolume and creates it.  Returns the server's representation of the persistentVolume, and an error, if there is any.
+// Create takes the representation of a persistentVolume and creates it. Returns the server's representation of the persistentVolume, and an error, if there is any.
 func (c *persistentVolumes) Create(persistentVolume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
 	err = c.client.Post().

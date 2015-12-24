@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -548,9 +548,9 @@ func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.
 		for i := 0; i < MaxPatchConflicts && (errors.IsConflict(updateErr)); i++ {
 
 			// on a conflict,
-			// 1. build a strategic merge patch from originalJS and the patchedJS.  Different patch types can
-			//    be specified, but a strategic merge patch should be expressive enough handle them.  Build the
-			//    patch with this type to handle those cases.
+			// 1. build a strategic merge patch from originalJS and the patchedJS. Different patch types can
+			// be specified, but a strategic merge patch should be expressive enough handle them. Build the
+			// patch with this type to handle those cases.
 			// 2. build a strategic merge patch from originalJS and the currentJS
 			// 3. ensure no conflicts between the two patches
 			// 4. apply the #1 patch to the currentJS object

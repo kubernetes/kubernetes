@@ -220,9 +220,9 @@ func identical(x, y Type, p *ifacePair) bool {
 				// anonymous interfaces (directly or indirectly) embedding
 				// the current interface. Example:
 				//
-				//    type T interface {
-				//        m() interface{T}
-				//    }
+				// type T interface {
+				// m() interface{T}
+				// }
 				//
 				// If two such (differently named) interfaces are compared,
 				// endless recursion occurs if the cycle is not detected.

@@ -51,7 +51,7 @@ func newLimitRanges(c *LegacyClient, namespace string) *limitRanges {
 	}
 }
 
-// Create takes the representation of a limitRange and creates it.  Returns the server's representation of the limitRange, and an error, if there is any.
+// Create takes the representation of a limitRange and creates it. Returns the server's representation of the limitRange, and an error, if there is any.
 func (c *limitRanges) Create(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
 	result = &api.LimitRange{}
 	err = c.client.Post().

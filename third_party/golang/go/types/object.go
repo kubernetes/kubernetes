@@ -21,11 +21,11 @@ import (
 type Object interface {
 	Parent() *Scope // scope in which this object is declared
 	Pos() token.Pos // position of object identifier in declaration
-	Pkg() *Package  // nil for objects in the Universe scope and labels
-	Name() string   // package local object name
-	Type() Type     // object type
+	Pkg() *Package // nil for objects in the Universe scope and labels
+	Name() string // package local object name
+	Type() Type // object type
 	Exported() bool // reports whether the name starts with a capital letter
-	Id() string     // object id (see Id below)
+	Id() string // object id (see Id below)
 
 	// String returns a human-readable string of the object.
 	String() string
@@ -129,7 +129,7 @@ func (obj *object) sameId(pkg *Package, name string) bool {
 type PkgName struct {
 	object
 	imported *Package
-	used     bool // set if the package was used
+	used bool // set if the package was used
 }
 
 func NewPkgName(pos token.Pos, pkg *Package, name string, imported *Package) *PkgName {
@@ -166,9 +166,9 @@ func NewTypeName(pos token.Pos, pkg *Package, name string, typ Type) *TypeName {
 type Var struct {
 	object
 	anonymous bool // if set, the variable is an anonymous struct field, and name is the type name
-	visited   bool // for initialization cycle detection
-	isField   bool // var is struct field
-	used      bool // set if the variable was used
+	visited bool // for initialization cycle detection
+	isField bool // var is struct field
+	used bool // set if the variable was used
 }
 
 func NewVar(pos token.Pos, pkg *Package, name string, typ Type) *Var {
@@ -188,7 +188,7 @@ func (obj *Var) Anonymous() bool { return obj.anonymous }
 func (obj *Var) IsField() bool { return obj.isField }
 
 // A Func represents a declared function, concrete method, or abstract
-// (interface) method.  Its Type() is always a *Signature.
+// (interface) method. Its Type() is always a *Signature.
 // An abstract method may belong to many interfaces due to embedding.
 type Func struct {
 	object

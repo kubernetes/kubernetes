@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,7 +25,7 @@ import (
 
 // AllocationBitmap is a contiguous block of resources that can be allocated atomically.
 //
-// Each resource has an offset.  The internal structure is a bitmap, with a bit for each offset.
+// Each resource has an offset. The internal structure is a bitmap, with a bit for each offset.
 //
 // If a resource is taken, the bit at that offset is set to one.
 // r.count is always equal to the number of set bits and can be recalculated at any time

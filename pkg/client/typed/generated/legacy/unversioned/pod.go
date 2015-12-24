@@ -51,7 +51,7 @@ func newPods(c *LegacyClient, namespace string) *pods {
 	}
 }
 
-// Create takes the representation of a pod and creates it.  Returns the server's representation of the pod, and an error, if there is any.
+// Create takes the representation of a pod and creates it. Returns the server's representation of the pod, and an error, if there is any.
 func (c *pods) Create(pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	err = c.client.Post().

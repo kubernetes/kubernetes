@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -85,7 +85,7 @@ func (s *Scheme) DecodeToVersion(data []byte, targetVersion unversioned.GroupVer
 	}
 
 	// if the targetVersion is empty, then we want the internal version, but the internal version varies by
-	// group.  We can lookup the group now because we have knowledge of the group
+	// group. We can lookup the group now because we have knowledge of the group
 	if targetVersion.IsEmpty() {
 		exists := false
 		targetVersion, exists = s.InternalVersions[sourceKind.Group]

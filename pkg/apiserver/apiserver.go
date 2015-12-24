@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -84,7 +84,7 @@ type APIGroupVersion struct {
 	// GroupVersion is the external group version
 	GroupVersion unversioned.GroupVersion
 
-	// RequestInfoResolver is used to parse URLs for the legacy proxy handler.  Don't use this for anything else
+	// RequestInfoResolver is used to parse URLs for the legacy proxy handler. Don't use this for anything else
 	// TODO: refactor proxy handler to use sub resources
 	RequestInfoResolver *RequestInfoResolver
 
@@ -131,8 +131,8 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 }
 
 // UpdateREST registers the REST handlers for this APIGroupVersion to an existing web service
-// in the restful Container.  It will use the prefix (root/version) to find the existing
-// web service.  If a web service does not exist within the container to support the prefix
+// in the restful Container. It will use the prefix (root/version) to find the existing
+// web service. If a web service does not exist within the container to support the prefix
 // this method will return an error.
 func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 	installer := g.newInstaller()
@@ -153,7 +153,7 @@ func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 	return utilerrors.NewAggregate(registrationErrors)
 }
 
-// newInstaller is a helper to create the installer.  Used by InstallREST and UpdateREST.
+// newInstaller is a helper to create the installer. Used by InstallREST and UpdateREST.
 func (g *APIGroupVersion) newInstaller() *APIInstaller {
 	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
 	installer := &APIInstaller{
@@ -197,7 +197,7 @@ func InstallRecoverHandler(container *restful.Container) {
 	container.RecoverHandler(logStackOnRecover)
 }
 
-//TODO: Unify with RecoverPanics?
+// TODO: Unify with RecoverPanics?
 func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) {
 	var buffer bytes.Buffer
 	buffer.WriteString(fmt.Sprintf("recover from panic situation: - %v\r\n", panicReason))
@@ -392,7 +392,7 @@ func isPrettyPrint(req *http.Request) bool {
 func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w http.ResponseWriter, pretty bool) {
 	w.Header().Set("Content-Type", "application/json")
 	// We send the status code before we encode the object, so if we error, the status code stays but there will
-	// still be an error object.  This seems ok, the alternative is to validate the object before
+	// still be an error object. This seems ok, the alternative is to validate the object before
 	// encoding, but this really should never happen, so it's wasted compute for every API request.
 	w.WriteHeader(statusCode)
 	if pretty {

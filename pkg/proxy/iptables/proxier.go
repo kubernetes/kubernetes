@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -45,9 +45,9 @@ import (
 )
 
 // iptablesMinVersion is the minimum version of iptables for which we will use the Proxier
-// from this package instead of the userspace Proxier.  While most of the
+// from this package instead of the userspace Proxier. While most of the
 // features we need were available earlier, the '-C' flag was added more
-// recently.  We use that indirectly in Ensure* functions, and if we don't
+// recently. We use that indirectly in Ensure* functions, and if we don't
 // have it, we have to be extra careful about the exact args we feed in being
 // the same as the args we read back (iptables itself normalizes some args).
 // This is the "new" Proxier, so we require "new" versions of tools.
@@ -69,7 +69,7 @@ type IptablesVersioner interface {
 }
 
 // CanUseIptablesProxier returns true if we should use the iptables Proxier
-// instead of the "classic" userspace Proxier.  This is determined by checking
+// instead of the "classic" userspace Proxier. This is determined by checking
 // the iptables version and for the existence of kernel features. It may return
 // an error if it fails to get the iptables version without error, in which
 // case it will also return false.
@@ -91,8 +91,8 @@ func CanUseIptablesProxier(iptver IptablesVersioner) (bool, error) {
 		return false, nil
 	}
 
-	// Check for the required sysctls.  We don't care about the value, just
-	// that it exists.  If this Proxier is chosen, we'll iniialize it as we
+	// Check for the required sysctls. We don't care about the value, just
+	// that it exists. If this Proxier is chosen, we'll iniialize it as we
 	// need.
 	// TODO: we should inject a sysctl.Interface like we do for iptables
 	_, err = utilsysctl.GetSysctl(sysctlRouteLocalnet)
@@ -123,18 +123,18 @@ type serviceInfo struct {
 func newServiceInfo(service proxy.ServicePortName) *serviceInfo {
 	return &serviceInfo{
 		sessionAffinityType: api.ServiceAffinityNone, // default
-		stickyMaxAgeSeconds: 180,                     // TODO: paramaterize this in the API.
+		stickyMaxAgeSeconds: 180, // TODO: paramaterize this in the API.
 	}
 }
 
 // Proxier is an iptables based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {
-	mu                          sync.Mutex // protects the following fields
+	mu sync.Mutex // protects the following fields
 	serviceMap                  map[proxy.ServicePortName]*serviceInfo
 	endpointsMap                map[proxy.ServicePortName][]string
 	portsMap                    map[localPort]closeable
-	haveReceivedServiceUpdate   bool // true once we've seen an OnServiceUpdate event
+	haveReceivedServiceUpdate bool // true once we've seen an OnServiceUpdate event
 	haveReceivedEndpointsUpdate bool // true once we've seen an OnEndpointsUpdate event
 
 	// These are effectively const and do not need the mutex to be held.
@@ -172,7 +172,7 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
 	}
 
-	// Load the module.  It's OK if this fails (e.g. the module is not present)
+	// Load the module. It's OK if this fails (e.g. the module is not present)
 	// because we'll catch the error on the sysctl, which is what we actually
 	// care about.
 	exec.Command("modprobe", "br-netfilter").CombinedOutput()
@@ -193,7 +193,7 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
 func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
-	//TODO: actually tear down all rules and chains.
+	// TODO: actually tear down all rules and chains.
 	args := []string{"-m", "comment", "--comment", "kubernetes service portals", "-j", string(iptablesServicesChain)}
 	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainOutput, args...); err != nil {
 		glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
@@ -265,7 +265,7 @@ func (proxier *Proxier) Sync() {
 	proxier.syncProxyRules()
 }
 
-// SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
+// SyncLoop runs periodic work. This is expected to run as a goroutine or as the main loop of the app. It does not return.
 func (proxier *Proxier) SyncLoop() {
 	t := time.NewTicker(proxier.syncPeriod)
 	defer t.Stop()
@@ -358,7 +358,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 		svcEndpoints := &allEndpoints[i]
 
 		// We need to build a map of portname -> all ip:ports for that
-		// portname.  Explode Endpoints.Subsets[*] into this structure.
+		// portname. Explode Endpoints.Subsets[*] into this structure.
 		portsToEndpoints := map[string][]hostPortPair{}
 		for i := range svcEndpoints.Subsets {
 			ss := &svcEndpoints.Subsets[i]
@@ -404,7 +404,7 @@ func isValidEndpoint(hpp *hostPortPair) bool {
 	return hpp.host != "" && hpp.port > 0
 }
 
-// Tests whether two slices are equivalent.  This sorts both slices in-place.
+// Tests whether two slices are equivalent. This sorts both slices in-place.
 func slicesEquiv(lhs, rhs []string) bool {
 	if len(lhs) != len(rhs) {
 		return false
@@ -430,8 +430,8 @@ func flattenValidEndpoints(endpoints []hostPortPair) []string {
 }
 
 // servicePortChainName takes the ServicePortName for a service and
-// returns the associated iptables chain.  This is computed by hashing (sha256)
-// then encoding to base32 and truncating with the prefix "KUBE-SVC-".  We do
+// returns the associated iptables chain. This is computed by hashing (sha256)
+// then encoding to base32 and truncating with the prefix "KUBE-SVC-". We do
 // this because Iptables Chain Names must be <= 28 chars long, and the longer
 // they are the harder they are to read.
 func servicePortChainName(s proxy.ServicePortName, protocol string) utiliptables.Chain {
@@ -616,7 +616,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 
-		// Capture nodeports.  If we had more than 2 rules it might be
+		// Capture nodeports. If we had more than 2 rules it might be
 		// worthwhile to make a new per-service chain for nodeport rules, but
 		// with just 2 rules it ends up being a waste and a cognitive burden.
 		if svcInfo.nodePort != 0 {
@@ -654,7 +654,7 @@ func (proxier *Proxier) syncProxyRules() {
 				"-j", string(svcChain))
 		}
 
-		// Generate the per-endpoint chains.  We do this in multiple passes so we
+		// Generate the per-endpoint chains. We do this in multiple passes so we
 		// can group rules together.
 		endpoints := make([]string, 0)
 		endpointChains := make([]utiliptables.Chain, 0)
@@ -738,14 +738,14 @@ func (proxier *Proxier) syncProxyRules() {
 				continue
 			}
 			// We must (as per iptables) write a chain-line for it, which has
-			// the nice effect of flushing the chain.  Then we can remove the
+			// the nice effect of flushing the chain. Then we can remove the
 			// chain.
 			writeLine(chainsLines, existingChains[chain])
 			writeLine(rulesLines, "-X", chainString)
 		}
 	}
 
-	// Finally, tail-call to the nodeports chain.  This needs to be after all
+	// Finally, tail-call to the nodeports chain. This needs to be after all
 	// other service portal rules.
 	writeLine(rulesLines,
 		"-A", string(iptablesServicesChain),
@@ -891,13 +891,13 @@ func openLocalPort(lp *localPort) (closeable, error) {
 	// For ports on node IPs, open the actual port and hold it, even though we
 	// use iptables to redirect traffic.
 	// This ensures a) that it's safe to use that port and b) that (a) stays
-	// true.  The risk is that some process on the node (e.g. sshd or kubelet)
-	// is using a port and we give that same port out to a Service.  That would
+	// true. The risk is that some process on the node (e.g. sshd or kubelet)
+	// is using a port and we give that same port out to a Service. That would
 	// be bad because iptables would silently claim the traffic but the process
 	// would never know.
 	// NOTE: We should not need to have a real listen()ing socket - bind()
 	// should be enough, but I can't figure out a way to e2e test without
-	// it.  Tools like 'ss' and 'netstat' do not show sockets that are
+	// it. Tools like 'ss' and 'netstat' do not show sockets that are
 	// bind()ed but not listen()ed, and at least the default debian netcat
 	// has no way to avoid about 10 seconds of retries.
 	var socket closeable

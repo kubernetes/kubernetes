@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,15 +25,15 @@ import (
 // Attributes is an interface used by AdmissionController to get information about a request
 // that is used to make an admission decision.
 type Attributes interface {
-	// GetName returns the name of the object as presented in the request.  On a CREATE operation, the client
-	// may omit name and rely on the server to generate the name.  If that is the case, this method will return
+	// GetName returns the name of the object as presented in the request. On a CREATE operation, the client
+	// may omit name and rely on the server to generate the name. If that is the case, this method will return
 	// the empty string
 	GetName() string
 	// GetNamespace is the namespace associated with the request (if any)
 	GetNamespace() string
-	// GetResource is the name of the resource being requested.  This is not the kind.  For example: pods
+	// GetResource is the name of the resource being requested. This is not the kind. For example: pods
 	GetResource() unversioned.GroupResource
-	// GetSubresource is the name of the subresource being requested.  This is a different resource, scoped to the parent resource, but it may have a different kind.
+	// GetSubresource is the name of the subresource being requested. This is a different resource, scoped to the parent resource, but it may have a different kind.
 	// For instance, /pods has the resource "pods" and the kind "Pod", while /pods/foo/status has the resource "pods", the sub resource "status", and the kind "Pod"
 	// (because status operates on pods). The binding resource for a pod though may be /pods/foo/binding, which has resource "pods", subresource "binding", and kind "Binding".
 	GetSubresource() string
@@ -41,7 +41,7 @@ type Attributes interface {
 	GetOperation() Operation
 	// GetObject is the object from the incoming request prior to default values being applied
 	GetObject() runtime.Object
-	// GetKind is the type of object being manipulated.  For example: Pod
+	// GetKind is the type of object being manipulated. For example: Pod
 	GetKind() unversioned.GroupKind
 	// GetUserInfo is information about the requesting user
 	GetUserInfo() user.Info

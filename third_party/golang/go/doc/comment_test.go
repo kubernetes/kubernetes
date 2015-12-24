@@ -160,7 +160,7 @@ var emphasizeTests = []struct {
 	{"http://gmail.com ((http://gmail.com)) ()", `<a href="http://gmail.com">http://gmail.com</a> ((<a href="http://gmail.com">http://gmail.com</a>)) ()`},
 	{"Foo bar http://example.com/ quux!", `Foo bar <a href="http://example.com/">http://example.com/</a> quux!`},
 	{"Hello http://example.com/%2f/ /world.", `Hello <a href="http://example.com/%2f/">http://example.com/%2f/</a> /world.`},
-	{"Lorem http: ipsum //host/path", "Lorem http: ipsum //host/path"},
+	{"Lorem http: ipsum // host/path", "Lorem http: ipsum //   host/path"},
 	{"javascript://is/not/linked", "javascript://is/not/linked"},
 }
 

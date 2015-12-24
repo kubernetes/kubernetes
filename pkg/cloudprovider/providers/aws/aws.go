@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -195,7 +195,7 @@ type AWSCloud struct {
 
 type AWSCloudConfig struct {
 	Global struct {
-		// TODO: Is there any use for this?  We can get it from the instance metadata service
+		// TODO: Is there any use for this? We can get it from the instance metadata service
 		// Maybe if we're not running on AWS, e.g. bootstrap; for now it is not very useful
 		Zone string
 
@@ -975,7 +975,7 @@ func newAWSDisk(aws *AWSCloud, name string) (*awsDisk, error) {
 	}
 	az := url.Host
 	// TODO: Better validation?
-	// TODO: Default to our AZ?  Look it up?
+	// TODO: Default to our AZ? Look it up?
 	// TODO: Should this be a region or an AZ?
 	if az == "" {
 		return nil, fmt.Errorf("Invalid format for AWS volume (%s)", name)
@@ -1651,7 +1651,7 @@ func (s *AWSCloud) listSubnetIDsinVPC(vpcId string) ([]string, error) {
 }
 
 // EnsureTCPLoadBalancer implements TCPLoadBalancer.EnsureTCPLoadBalancer
-// TODO(justinsb) It is weird that these take a region.  I suspect it won't work cross-region anyway.
+// TODO(justinsb) It is weird that these take a region. I suspect it won't work cross-region anyway.
 func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
 	glog.V(2).Infof("EnsureTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, publicIP, ports, hosts)
 
@@ -1974,7 +1974,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 	{
 		// Delete the security group(s) for the load balancer
 		// Note that this is annoying: the load balancer disappears from the API immediately, but it is still
-		// deleting in the background.  We get a DependencyViolation until the load balancer has deleted itself
+		// deleting in the background. We get a DependencyViolation until the load balancer has deleted itself
 
 		// Collect the security groups to delete
 		securityGroupIDs := map[string]struct{}{}

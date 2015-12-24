@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -194,7 +194,7 @@ type cinderVolume struct {
 	// Filesystem type, optional.
 	fsType string
 	// Specifies the partition to mount
-	//partition string
+	// partition string
 	// Specifies whether the disk will be attached as read-only.
 	readOnly bool
 	// Utility interface that provides API calls to the provider to attach/detach disks.
@@ -273,7 +273,7 @@ func (b *cinderVolumeBuilder) SetUpAt(dir string) error {
 				return err
 			}
 			if !notmnt {
-				// This is very odd, we don't expect it.  We'll try again next sync loop.
+				// This is very odd, we don't expect it. We'll try again next sync loop.
 				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", b.GetPath())
 				return err
 			}

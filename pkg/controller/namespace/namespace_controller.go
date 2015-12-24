@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -62,8 +62,8 @@ func NewNamespaceController(kubeClient client.Interface, versions *unversioned.A
 					if estimate, ok := err.(*contentRemainingError); ok {
 						go func() {
 							// Estimate is the aggregate total of TerminationGracePeriodSeconds, which defaults to 30s
-							// for pods.  However, most processes will terminate faster - within a few seconds, probably
-							// with a peak within 5-10s.  So this division is a heuristic that avoids waiting the full
+							// for pods. However, most processes will terminate faster - within a few seconds, probably
+							// with a peak within 5-10s. So this division is a heuristic that avoids waiting the full
 							// duration when in many cases things complete more quickly. The extra second added is to
 							// ensure we never wait 0 seconds.
 							t := estimate.Estimate/2 + 1
@@ -103,7 +103,7 @@ func NewNamespaceController(kubeClient client.Interface, versions *unversioned.A
 	}
 }
 
-// Run begins observing the system.  It starts a goroutine and returns immediately.
+// Run begins observing the system. It starts a goroutine and returns immediately.
 func (nm *NamespaceController) Run() {
 	if nm.StopEverything == nil {
 		nm.StopEverything = make(chan struct{})
@@ -537,7 +537,7 @@ func deleteIngress(expClient client.ExtensionsInterface, ns string) error {
 	return nil
 }
 
-// TODO: this is duplicated logic.  Move it somewhere central?
+// TODO: this is duplicated logic. Move it somewhere central?
 func containsVersion(versions *unversioned.APIVersions, version string) bool {
 	for ix := range versions.Versions {
 		if versions.Versions[ix] == version {
@@ -547,7 +547,7 @@ func containsVersion(versions *unversioned.APIVersions, version string) bool {
 	return false
 }
 
-// TODO: this is duplicated logic.  Move it somewhere central?
+// TODO: this is duplicated logic. Move it somewhere central?
 func containsResource(resources *unversioned.APIResourceList, resourceName string) bool {
 	if resources == nil {
 		return false

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -101,7 +101,7 @@ func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UI
 	ed := &emptyDir{
 		pod:             &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
 		volName:         volName,
-		medium:          api.StorageMediumDefault, // might be changed later
+		medium: api.StorageMediumDefault, // might be changed later
 		mounter:         mounter,
 		mountDetector:   mountDetector,
 		plugin:          plugin,
@@ -113,7 +113,7 @@ func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UI
 // mountDetector abstracts how to find what kind of mount a path is backed by.
 type mountDetector interface {
 	// GetMountMedium determines what type of medium a given path is backed
-	// by and whether that path is a mount point.  For example, if this
+	// by and whether that path is a mount point. For example, if this
 	// returns (mediumMemory, false, nil), the caller knows that the path is
 	// on a memory FS (tmpfs on Linux) but is not the root mountpoint of
 	// that tmpfs.
@@ -124,7 +124,7 @@ type storageMedium int
 
 const (
 	mediumUnknown storageMedium = 0 // assume anything we don't explicitly handle is this
-	mediumMemory  storageMedium = 1 // memory (e.g. tmpfs on linux)
+	mediumMemory storageMedium = 1 // memory (e.g. tmpfs on linux)
 )
 
 // EmptyDir volumes are temporary directories exposed to the pod.
@@ -164,7 +164,7 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 	}
 
 	// If the plugin readiness file is present for this volume, and the
-	// storage medium is the default, then the volume is ready.  If the
+	// storage medium is the default, then the volume is ready. If the
 	// medium is memory, and a mountpoint is present, then the volume is
 	// ready.
 	if volumeutil.IsReady(ed.getMetaDir()) {
@@ -246,7 +246,7 @@ func (ed *emptyDir) setupDir(dir string) error {
 
 	if fileinfo.Mode().Perm() != perm.Perm() {
 		// If the permissions on the created directory are wrong, the
-		// kubelet is probably running with a umask set.  In order to
+		// kubelet is probably running with a umask set. In order to
 		// avoid clearing the umask for the entire process or locking
 		// the thread, clearing the umask, creating the dir, restoring
 		// the umask, and unlocking the thread, we do a chmod to set

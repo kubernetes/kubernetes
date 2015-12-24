@@ -1,4 +1,4 @@
-// Copyright 2013 The Go Authors.  All rights reserved.
+// Copyright 2013 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -42,8 +42,8 @@ func (check *Checker) labels(body *ast.BlockStmt) {
 
 // A block tracks label declarations in a block and its enclosing blocks.
 type block struct {
-	parent *block                      // enclosing block
-	lstmt  *ast.LabeledStmt            // labeled statement to which this block belongs, or nil
+	parent *block // enclosing block
+	lstmt *ast.LabeledStmt // labeled statement to which this block belongs, or nil
 	labels map[string]*ast.LabeledStmt // allocated lazily
 }
 

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,9 +52,9 @@ func (svcStrategy) PrepareForCreate(obj runtime.Object) {
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (svcStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	// TODO: once service has a status sub-resource we can enable this.
-	//newService := obj.(*api.Service)
-	//oldService := old.(*api.Service)
-	//newService.Status = oldService.Status
+	// newService := obj.(*api.Service)
+	// oldService := old.(*api.Service)
+	// newService.Status = oldService.Status
 }
 
 // Validate validates a new service.

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,14 +52,14 @@ func New(sched scheduler.Scheduler, client *client.Client, qr queuer.Queuer, del
 }
 
 // this pod may be out of sync with respect to the API server registry:
-//      this pod   |  apiserver registry
-//    -------------|----------------------
-//      host=.*    |  404           ; pod was deleted
-//      host=.*    |  5xx           ; failed to sync, try again later?
-//      host=""    |  host=""       ; perhaps no updates to process?
-//      host=""    |  host="..."    ; pod has been scheduled and assigned, is there a task assigned? (check TaskIdKey in binding?)
-//      host="..." |  host=""       ; pod is no longer scheduled, does it need to be re-queued?
-//      host="..." |  host="..."    ; perhaps no updates to process?
+// this pod | apiserver registry
+// -------------|----------------------
+// host=.* | 404 ; pod was deleted
+// host=.* | 5xx ; failed to sync, try again later?
+// host="" | host="" ; perhaps no updates to process?
+// host="" | host="..." ; pod has been scheduled and assigned, is there a task assigned? (check TaskIdKey in binding?)
+// host="..." | host="" ; pod is no longer scheduled, does it need to be re-queued?
+// host="..." | host="..." ; perhaps no updates to process?
 //
 // TODO(jdef) this needs an integration test
 func (s *podReconciler) Reconcile(t *podtask.T) {
@@ -73,8 +73,8 @@ func (s *podReconciler) Reconcile(t *podtask.T) {
 				log.Errorf("failed to delete pod: %v: %v", t.Pod.Name, err)
 			}
 		} else {
-			//TODO(jdef) other errors should probably trigger a retry (w/ backoff).
-			//For now, drop the pod on the floor
+			// TODO(jdef) other errors should probably trigger a retry (w/ backoff).
+			// For now, drop the pod on the floor
 			log.Warning("aborting reconciliation for pod %v: %v", t.Pod.Name, err)
 		}
 		return
@@ -97,7 +97,7 @@ func (s *podReconciler) Reconcile(t *podtask.T) {
 			defer s.sched.Unlock()
 
 			if _, state := s.sched.Tasks().ForPod(podKey); state != podtask.StateUnknown {
-				//TODO(jdef) reconcile the task
+				// TODO(jdef) reconcile the task
 				log.Errorf("task already registered for pod %v", pod.Name)
 				return
 			}
@@ -109,12 +109,12 @@ func (s *podReconciler) Reconcile(t *podtask.T) {
 			// pod is scheduled.
 			// not sure how this happened behind our backs. attempt to reconstruct
 			// at least a partial podtask.T record.
-			//TODO(jdef) reconcile the task
+			// TODO(jdef) reconcile the task
 			log.Errorf("pod already scheduled: %v", pod.Name)
 		}
 	} else {
-		//TODO(jdef) for now, ignore the fact that the rest of the spec may be different
-		//and assume that our knowledge of the pod aligns with that of the apiserver
+		// TODO(jdef) for now, ignore the fact that the rest of the spec may be different
+		// and assume that our knowledge of the pod aligns with that of the apiserver
 		log.Error("pod reconciliation does not support updates; not yet implemented")
 	}
 }

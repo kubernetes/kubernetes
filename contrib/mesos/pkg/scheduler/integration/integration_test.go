@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -58,7 +58,7 @@ import (
 type TestServer struct {
 	stats map[string]uint
 	nodes map[string]*api.Node
-	lock  sync.Mutex // guards above fields
+	lock sync.Mutex // guards above fields
 
 	server *httptest.Server
 	t      *testing.T
@@ -268,7 +268,7 @@ func NewTestPod() (*api.Pod, int) {
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
-			SelfLink:  fmt.Sprintf("http://1.2.3.4/api/v1beta1/pods/%s", name),
+			SelfLink: fmt.Sprintf("http://1.2.3.4/api/v1beta1/pods/%s", name),
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -814,7 +814,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 	}
 
 	// 1. with pod deleted from the apiserver
-	//    expected: pod is removed from internal task registry
+	// expected: pod is removed from internal task registry
 	pod, launchedTask, _ = launchTestPod()
 	lt.podsListWatch.Delete(pod, false) // not notifying the watchers
 	failPodFromExecutor(launchedTask.taskInfo)
@@ -826,7 +826,7 @@ func TestScheduler_LifeCycle(t *testing.T) {
 	})
 
 	// 2. with pod still on the apiserver, not bound
-	//    expected: pod is rescheduled
+	// expected: pod is rescheduled
 	pod, launchedTask, _ = launchTestPod()
 	failPodFromExecutor(launchedTask.taskInfo)
 

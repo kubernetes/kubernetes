@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -80,7 +80,7 @@ type etcdWatcher struct {
 	versioner storage.Versioner
 	transform TransformFunc
 
-	list    bool // If we're doing a recursive watch, should be true.
+	list bool // If we're doing a recursive watch, should be true.
 	include includeFunc
 	filter  storage.FilterFunc
 
@@ -106,7 +106,7 @@ type etcdWatcher struct {
 // watchWaitDuration is the amount of time to wait for an error from watch.
 const watchWaitDuration = 100 * time.Millisecond
 
-// newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.  If you provide a transform
+// newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes. If you provide a transform
 // and a versioner, the versioner must be able to handle the objects that transform creates.
 func newEtcdWatcher(list bool, include includeFunc, filter storage.FilterFunc, encoding runtime.Codec, versioner storage.Versioner, transform TransformFunc, cache etcdCache) *etcdWatcher {
 	w := &etcdWatcher{
@@ -224,7 +224,7 @@ func etcdGetInitialWatchState(ctx context.Context, client etcd.KeysAPI, key stri
 }
 
 // convertRecursiveResponse turns a recursive get response from etcd into individual response objects
-// by copying the original response.  This emulates the behavior of a recursive watch.
+// by copying the original response. This emulates the behavior of a recursive watch.
 func convertRecursiveResponse(node *etcd.Node, response *etcd.Response, incoming chan<- *etcd.Response) {
 	if node.Dir {
 		for i := range node.Nodes {
@@ -258,13 +258,13 @@ func (w *etcdWatcher) translate() {
 					status = &unversioned.Status{
 						Status:  unversioned.StatusFailure,
 						Message: err.Error(),
-						Code:    http.StatusGone, // Gone
+						Code: http.StatusGone, // Gone
 						Reason:  unversioned.StatusReasonExpired,
 					}
 				// TODO: need to generate errors using api/errors which has a circular dependency on this package
-				//   no other way to inject errors
+				// no other way to inject errors
 				// case etcdutil.IsEtcdUnreachable(err):
-				//   status = errors.NewServerTimeout(...)
+				// status = errors.NewServerTimeout(...)
 				default:
 					status = &unversioned.Status{
 						Status:  unversioned.StatusFailure,

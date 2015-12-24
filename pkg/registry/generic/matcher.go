@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -94,8 +94,8 @@ type Matcher interface {
 	MatchesSingle() (key string, matchesSingleObject bool)
 
 	// TODO: when we start indexing objects, add something like the below:
-	//         MatchesIndices() (indexName []string, indexValue []string)
-	//       where indexName/indexValue are the same length.
+	// MatchesIndices() (indexName []string, indexValue []string)
+	// where indexName/indexValue are the same length.
 }
 
 // MatcherFunc makes a matcher from the provided function. For easy definition

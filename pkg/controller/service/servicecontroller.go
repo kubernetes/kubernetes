@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -61,7 +61,7 @@ type cachedService struct {
 }
 
 type serviceCache struct {
-	mu         sync.Mutex // protects serviceMap
+	mu sync.Mutex // protects serviceMap
 	serviceMap map[string]*cachedService
 }
 
@@ -278,8 +278,8 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 		return nil, notRetryable
 	}
 
-	// Note: It is safe to just call EnsureTCPLoadBalancer.  But, on some clouds that requires a delete & create,
-	// which may involve service interruption.  Also, we would like user-friendly events.
+	// Note: It is safe to just call EnsureTCPLoadBalancer. But, on some clouds that requires a delete & create,
+	// which may involve service interruption. Also, we would like user-friendly events.
 
 	// Save the state so we can avoid a write if it doesn't change
 	previousState := api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
@@ -521,7 +521,7 @@ func portSlicesEqualForLB(x, y []*api.ServicePort) bool {
 }
 
 func portEqualForLB(x, y *api.ServicePort) bool {
-	// TODO: Should we check name?  (In theory, an LB could expose it)
+	// TODO: Should we check name? (In theory, an LB could expose it)
 	if x.Name != y.Name {
 		return false
 	}
@@ -539,7 +539,7 @@ func portEqualForLB(x, y *api.ServicePort) bool {
 	}
 
 	// We don't check TargetPort; that is not relevant for load balancing
-	// TODO: Should we blank it out?  Or just check it anyway?
+	// TODO: Should we blank it out? Or just check it anyway?
 
 	return true
 }
@@ -593,7 +593,7 @@ func hostsFromNodeList(list *api.NodeList) []string {
 
 func getNodeConditionPredicate() cache.NodeConditionPredicate {
 	return func(node api.Node) bool {
-		// We add the master to the node list, but its unschedulable.  So we use this to filter
+		// We add the master to the node list, but its unschedulable. So we use this to filter
 		// the master.
 		// TODO: Use a node annotation to indicate the master
 		if node.Spec.Unschedulable {

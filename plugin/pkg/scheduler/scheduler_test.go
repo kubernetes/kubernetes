@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -273,7 +273,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 
 	// Second scheduling pass will fail to schedule if the store hasn't expired
 	// the deleted pod. This would normally happen with a timeout.
-	//expirationPolicy.NeverExpire = util.NewStringSet()
+	// expirationPolicy.NeverExpire = util.NewStringSet()
 	fakeClock.Time = fakeClock.Time.Add(ttl + 1)
 
 	called = make(chan struct{})

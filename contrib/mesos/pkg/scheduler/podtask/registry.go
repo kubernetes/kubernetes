@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	//TODO(jdef) move this somewhere else
+	// TODO(jdef) move this somewhere else
 	PodPath = "/pods"
 
 	// length of historical record of finished tasks
@@ -255,7 +255,7 @@ func fillRunningPodInfo(task *T, taskStatus *mesos.TaskStatus) {
 		// there is no data..
 		return
 	}
-	//TODO(jdef) determine the usefullness of this information (if any)
+	// TODO(jdef) determine the usefullness of this information (if any)
 	if result, err := ParsePodStatusResult(taskStatus); err != nil {
 		log.Errorf("invalid TaskStatus.Data for task '%v': %v", task.ID, err)
 	} else {

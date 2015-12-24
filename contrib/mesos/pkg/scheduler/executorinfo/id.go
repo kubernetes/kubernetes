@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,11 +41,11 @@ func NewID(info *mesosproto.ExecutorInfo) *mesosproto.ExecutorID {
 // secondary scheduler doesn't match that of the primary scheduler.
 //
 // Note: We intentionally leave out the Resources in this hash because they are
-//       set during procurement and should not lead to a different ExecutorId.
-//       This also means that the Resources do not contribute to offer
-//       compatibility checking. But as we persist and restore the Resources
-//       through node anotation we make sure that the right resources are chosen
-//       during task launch.
+// set during procurement and should not lead to a different ExecutorId.
+// This also means that the Resources do not contribute to offer
+// compatibility checking. But as we persist and restore the Resources
+// through node anotation we make sure that the right resources are chosen
+// during task launch.
 //
 // see https://github.com/apache/mesos/blob/0.22.0/src/common/type_utils.cpp#L110
 func hash(info *mesos.ExecutorInfo) uint64 {
@@ -96,7 +96,7 @@ func hash(info *mesos.ExecutorInfo) uint64 {
 				buf.WriteString(uri)
 			}
 		}
-		//TODO(jdef) add support for Container
+		// TODO(jdef) add support for Container
 	}
 	table := crc64.MakeTable(crc64.ECMA)
 	return crc64.Checksum(buf.Bytes(), table)

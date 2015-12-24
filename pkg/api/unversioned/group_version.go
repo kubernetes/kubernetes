@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,7 +22,7 @@ import (
 	"strings"
 )
 
-// GroupResource specifies a Group and a Resource, but does not force a version.  This is useful for identifying
+// GroupResource specifies a Group and a Resource, but does not force a version. This is useful for identifying
 // concepts during lookup stages without having partially valid types
 type GroupResource struct {
 	Group    string
@@ -44,8 +44,8 @@ func (gr *GroupResource) String() string {
 	return gr.Resource + "." + gr.Group
 }
 
-// GroupVersionResource unambiguously identifies a resource.  It doesn't anonymously include GroupVersion
-// to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
+// GroupVersionResource unambiguously identifies a resource. It doesn't anonymously include GroupVersion
+// to avoid automatic coersion. It doesn't use a GroupVersion to avoid custom marshalling
 type GroupVersionResource struct {
 	Group    string
 	Version  string
@@ -64,7 +64,7 @@ func (gvr *GroupVersionResource) String() string {
 	return strings.Join([]string{gvr.Group, "/", gvr.Version, ", Resource=", gvr.Resource}, "")
 }
 
-// GroupKind specifies a Group and a Kind, but does not force a version.  This is useful for identifying
+// GroupKind specifies a Group and a Kind, but does not force a version. This is useful for identifying
 // concepts during lookup stages without having partially valid types
 //
 // +protobuf.options.(gogoproto.goproto_stringer)=false
@@ -88,8 +88,8 @@ func (gk *GroupKind) String() string {
 	return gk.Kind + "." + gk.Group
 }
 
-// GroupVersionKind unambiguously identifies a kind.  It doesn't anonymously include GroupVersion
-// to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
+// GroupVersionKind unambiguously identifies a kind. It doesn't anonymously include GroupVersion
+// to avoid automatic coersion. It doesn't use a GroupVersion to avoid custom marshalling
 //
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 type GroupVersionKind struct {

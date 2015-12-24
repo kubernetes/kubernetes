@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,7 @@ import (
 )
 
 // Where possible, json tags match the cli argument names.
-// Top level config objects and all values required for proper functioning are not "omitempty".  Any truly optional piece of config is allowed to be omitted.
+// Top level config objects and all values required for proper functioning are not "omitempty". Any truly optional piece of config is allowed to be omitted.
 
 // Config holds the information needed to build connect to remote kubernetes clusters as a given user
 type Config struct {
@@ -66,7 +66,7 @@ type Cluster struct {
 	Extensions []NamedExtension `json:"extensions,omitempty"`
 }
 
-// AuthInfo contains information that describes identity information.  This is use to tell the kubernetes cluster who you are.
+// AuthInfo contains information that describes identity information. This is use to tell the kubernetes cluster who you are.
 type AuthInfo struct {
 	// ClientCertificate is the path to a client cert file for TLS.
 	ClientCertificate string `json:"client-certificate,omitempty"`

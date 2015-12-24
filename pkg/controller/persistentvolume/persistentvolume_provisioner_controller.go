@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -216,7 +216,7 @@ func (controller *PersistentVolumeProvisionerController) reconcileVolume(pv *api
 		return nil
 	}
 
-	// TODO:  fix this leaky abstraction.  Had to make our own store key because ClaimRef fails the default keyfunc (no Meta on object).
+	// TODO: fix this leaky abstraction. Had to make our own store key because ClaimRef fails the default keyfunc (no Meta on object).
 	obj, exists, _ := controller.claimStore.GetByKey(fmt.Sprintf("%s/%s", pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name))
 	if !exists {
 		return fmt.Errorf("PersistentVolumeClaim[%s/%s] not found in local cache", pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name)
@@ -242,7 +242,7 @@ func (controller *PersistentVolumeProvisionerController) reconcileVolume(pv *api
 		return nil
 	}
 
-	// provisioning is incomplete.  Attempt to provision the volume.
+	// provisioning is incomplete. Attempt to provision the volume.
 	glog.V(5).Infof("PersistentVolume[%s] provisioning in progress", pv.Name)
 	err := provisionVolume(pv, controller)
 	if err != nil {
@@ -295,7 +295,7 @@ func provisionVolume(pv *api.PersistentVolume, controller *PersistentVolumeProvi
 
 	pv, err = controller.client.UpdatePersistentVolume(volumeClone)
 	if err != nil {
-		// TODO:  https://github.com/kubernetes/kubernetes/issues/14443
+		// TODO: https://github.com/kubernetes/kubernetes/issues/14443
 		// the volume was created in the infrastructure and likely has a PV name on it,
 		// but we failed to save the annotation that marks the volume as provisioned.
 		return fmt.Errorf("Error updating PersistentVolume[%s] with provisioning completed annotation. There is a potential for dupes and orphans.", volumeClone.Name)
@@ -345,7 +345,7 @@ func newProvisioner(plugin volume.ProvisionableVolumePlugin, claim *api.Persiste
 	return provisioner, err
 }
 
-// controllerClient abstracts access to PVs and PVCs.  Easy to mock for testing and wrap for real client.
+// controllerClient abstracts access to PVs and PVCs. Easy to mock for testing and wrap for real client.
 type controllerClient interface {
 	CreatePersistentVolume(pv *api.PersistentVolume) (*api.PersistentVolume, error)
 	ListPersistentVolumes(options api.ListOptions) (*api.PersistentVolumeList, error)
@@ -494,7 +494,7 @@ func (c *PersistentVolumeProvisionerController) GetHostName() string {
 const (
 	// these pair of constants are used by the provisioner.
 	// The key is a kube namespaced key that denotes a volume requires provisioning.
-	// The value is set only when provisioning is completed.  Any other value will tell the provisioner
+	// The value is set only when provisioning is completed. Any other value will tell the provisioner
 	// that provisioning has not yet occurred.
 	pvProvisioningRequiredAnnotationKey    = "volume.experimental.kubernetes.io/provisioning-required"
 	pvProvisioningCompletedAnnotationValue = "volume.experimental.kubernetes.io/provisioning-completed"

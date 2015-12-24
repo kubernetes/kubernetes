@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,9 +36,9 @@ var _ = Describe("Networking", func() {
 	var svcname = "nettest"
 
 	BeforeEach(func() {
-		//Assert basic external connectivity.
-		//Since this is not really a test of kubernetes in any way, we
-		//leave it as a pre-test assertion, rather than a Ginko test.
+		// Assert basic external connectivity.
+		// Since this is not really a test of kubernetes in any way, we
+		// leave it as a pre-test assertion, rather than a Ginko test.
 		By("Executing a successful http request from the external internet")
 		resp, err := http.Get("http://google.com")
 		if err != nil {
@@ -100,7 +100,7 @@ var _ = Describe("Networking", func() {
 		}
 	})
 
-	//Now we can proceed with the test.
+	// Now we can proceed with the test.
 	It("should function for intra-pod communication [Conformance]", func() {
 
 		By(fmt.Sprintf("Creating a service named %q in namespace %q", svcname, f.Namespace.Name))
@@ -178,7 +178,7 @@ var _ = Describe("Networking", func() {
 		By("Waiting for connectivity to be verified")
 		passed := false
 
-		//once response OK, evaluate response body for pass/fail.
+		// once response OK, evaluate response body for pass/fail.
 		var body []byte
 		getDetails := func() ([]byte, error) {
 			return f.Client.Get().
@@ -265,8 +265,8 @@ func LaunchNetTestPodPerNode(f *Framework, nodes *api.NodeList, name, version st
 						Image: "gcr.io/google_containers/nettest:" + version,
 						Args: []string{
 							"-service=" + name,
-							//peers >= totalPods should be asserted by the container.
-							//the nettest container finds peers by looking up list of svc endpoints.
+							// peers >= totalPods should be asserted by the container.
+							// the nettest container finds peers by looking up list of svc endpoints.
 							fmt.Sprintf("-peers=%d", totalPods),
 							"-namespace=" + f.Namespace.Name},
 						Ports: []api.ContainerPort{{ContainerPort: 8080}},

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -230,12 +230,12 @@ var _ = Describe("Addon update", func() {
 		// providers that provide those capabilities.
 		SkipUnlessProviderIs("gce")
 
-		//these tests are long, so I squeezed several cases in one scenario
+		// these tests are long, so I squeezed several cases in one scenario
 		Expect(sshClient).NotTo(BeNil())
 		dir = f.Namespace.Name // we use it only to give a unique string for each test execution
 
 		temporaryRemotePathPrefix := "addon-test-dir"
-		temporaryRemotePath := temporaryRemotePathPrefix + "/" + dir                  // in home directory on kubernetes-master
+		temporaryRemotePath := temporaryRemotePathPrefix + "/" + dir // in home directory on kubernetes-master
 		defer sshExec(sshClient, fmt.Sprintf("rm -rf %s", temporaryRemotePathPrefix)) // ignore the result in cleanup
 		sshExecAndVerify(sshClient, fmt.Sprintf("mkdir -p %s", temporaryRemotePath))
 
