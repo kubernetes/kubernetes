@@ -39,8 +39,9 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/controller/serviceaccount"
+	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	serviceaccountadmission "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
@@ -358,7 +359,7 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 		return nil, false, nil
 	})
 	serviceAccountKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	serviceAccountTokenGetter := serviceaccount.NewGetterFromClient(rootClient)
+	serviceAccountTokenGetter := serviceaccountcontroller.NewGetterFromClient(rootClient)
 	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator([]*rsa.PublicKey{&serviceAccountKey.PublicKey}, true, serviceAccountTokenGetter)
 	authenticator := union.New(
 		bearertoken.New(rootTokenAuth),
@@ -410,9 +411,9 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	m = master.New(masterConfig)
 
 	// Start the service account and service account token controllers
-	tokenController := serviceaccount.NewTokensController(rootClient, serviceaccount.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
+	tokenController := serviceaccountcontroller.NewTokensController(rootClient, serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
 	tokenController.Run()
-	serviceAccountController := serviceaccount.NewServiceAccountsController(rootClient, serviceaccount.DefaultServiceAccountsControllerOptions())
+	serviceAccountController := serviceaccountcontroller.NewServiceAccountsController(rootClient, serviceaccountcontroller.DefaultServiceAccountsControllerOptions())
 	serviceAccountController.Run()
 	// Start the admission plugin reflectors
 	serviceAccountAdmission.Run()

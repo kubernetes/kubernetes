@@ -42,6 +42,12 @@ const (
 	NamespaceClaim          = "kubernetes.io/serviceaccount/namespace"
 )
 
+// ServiceAccountTokenGetter defines functions to retrieve a named service account and secret
+type ServiceAccountTokenGetter interface {
+	GetServiceAccount(namespace, name string) (*api.ServiceAccount, error)
+	GetSecret(namespace, name string) (*api.Secret, error)
+}
+
 type TokenGenerator interface {
 	// GenerateToken generates a token which will identify the given ServiceAccount.
 	// The returned token will be stored in the given (and yet-unpersisted) Secret.
