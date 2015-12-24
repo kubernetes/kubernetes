@@ -21,8 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
-	"k8s.io/kubernetes/pkg/controller/serviceaccount"
-	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/passwordfile"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/basicauth"
@@ -34,17 +33,17 @@ import (
 )
 
 type AuthenticatorConfig struct {
-	BasicAuthFile         string
-	ClientCAFile          string
-	TokenAuthFile         string
-	OIDCIssuerURL         string
-	OIDCClientID          string
-	OIDCCAFile            string
-	OIDCUsernameClaim     string
-	ServiceAccountKeyFile string
-	ServiceAccountLookup  bool
-	Storage               storage.Interface
-	KeystoneURL           string
+	BasicAuthFile             string
+	ClientCAFile              string
+	TokenAuthFile             string
+	OIDCIssuerURL             string
+	OIDCClientID              string
+	OIDCCAFile                string
+	OIDCUsernameClaim         string
+	ServiceAccountKeyFile     string
+	ServiceAccountLookup      bool
+	ServiceAccountTokenGetter serviceaccount.ServiceAccountTokenGetter
+	KeystoneURL               string
 }
 
 // New returns an authenticator.Request or an error that supports the standard
@@ -85,7 +84,7 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 	}
 
 	if len(config.ServiceAccountKeyFile) > 0 {
-		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountKeyFile, config.ServiceAccountLookup, config.Storage)
+		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountKeyFile, config.ServiceAccountLookup, config.ServiceAccountTokenGetter)
 		if err != nil {
 			return nil, err
 		}
@@ -147,17 +146,10 @@ func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClai
 }
 
 // newServiceAccountAuthenticator returns an authenticator.Request or an error
-func newServiceAccountAuthenticator(keyfile string, lookup bool, storage storage.Interface) (authenticator.Request, error) {
+func newServiceAccountAuthenticator(keyfile string, lookup bool, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Request, error) {
 	publicKey, err := serviceaccount.ReadPublicKey(keyfile)
 	if err != nil {
 		return nil, err
-	}
-
-	var serviceAccountGetter serviceaccount.ServiceAccountTokenGetter
-	if lookup {
-		// If we need to look up service accounts and tokens,
-		// go directly to etcd to avoid recursive auth insanity
-		serviceAccountGetter = serviceaccount.NewGetterFromStorageInterface(storage)
 	}
 
 	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator([]*rsa.PublicKey{publicKey}, lookup, serviceAccountGetter)

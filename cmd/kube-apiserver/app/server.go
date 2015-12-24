@@ -45,10 +45,12 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/util"
@@ -492,18 +494,26 @@ func (s *APIServer) Run(_ []string) error {
 			glog.Warning("No RSA key provided, service account token authentication disabled")
 		}
 	}
+
+	var serviceAccountGetter serviceaccount.ServiceAccountTokenGetter
+	if s.ServiceAccountLookup {
+		// If we need to look up service accounts and tokens,
+		// go directly to etcd to avoid recursive auth insanity
+		serviceAccountGetter = serviceaccountcontroller.NewGetterFromStorageInterface(etcdStorage)
+	}
+
 	authenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
-		BasicAuthFile:         s.BasicAuthFile,
-		ClientCAFile:          s.ClientCAFile,
-		TokenAuthFile:         s.TokenAuthFile,
-		OIDCIssuerURL:         s.OIDCIssuerURL,
-		OIDCClientID:          s.OIDCClientID,
-		OIDCCAFile:            s.OIDCCAFile,
-		OIDCUsernameClaim:     s.OIDCUsernameClaim,
-		ServiceAccountKeyFile: s.ServiceAccountKeyFile,
-		ServiceAccountLookup:  s.ServiceAccountLookup,
-		Storage:               etcdStorage,
-		KeystoneURL:           s.KeystoneURL,
+		BasicAuthFile:             s.BasicAuthFile,
+		ClientCAFile:              s.ClientCAFile,
+		TokenAuthFile:             s.TokenAuthFile,
+		OIDCIssuerURL:             s.OIDCIssuerURL,
+		OIDCClientID:              s.OIDCClientID,
+		OIDCCAFile:                s.OIDCCAFile,
+		OIDCUsernameClaim:         s.OIDCUsernameClaim,
+		ServiceAccountKeyFile:     s.ServiceAccountKeyFile,
+		ServiceAccountLookup:      s.ServiceAccountLookup,
+		ServiceAccountTokenGetter: serviceAccountGetter,
+		KeystoneURL:               s.KeystoneURL,
 	})
 
 	if err != nil {
