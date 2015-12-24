@@ -55,12 +55,13 @@ func (f *FitError) Error() string {
 }
 
 type genericScheduler struct {
-	predicates   map[string]algorithm.FitPredicate
-	prioritizers []algorithm.PriorityConfig
-	extenders    []algorithm.SchedulerExtender
-	pods         algorithm.PodLister
-	random       *rand.Rand
-	randomLock   sync.Mutex
+	predicates      map[string]algorithm.FitPredicate
+	prioritizers    []algorithm.PriorityConfig
+	extenders       []algorithm.SchedulerExtender
+	pods            algorithm.PodLister
+	podsLookupTable LookupTable
+	random          *rand.Rand
+	randomLock      sync.Mutex
 }
 
 // Schedule tries to schedule the given pod to one of node in the node list.
@@ -75,11 +76,13 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 		return "", ErrNoNodesAvailable
 	}
 
-	// TODO: we should compute this once and dynamically update it using Watch, not constantly re-compute.
-	// But at least we're now only doing it in one place
-	machinesToPods, err := predicates.MapPodsToMachines(g.pods)
-	if err != nil {
-		return "", err
+	// TODO(mqliang): refactor FitPredicate to take PodSet, instead of []*api.Pod, so that this conversion could be removed
+	machinesToPods := map[string][]*api.Pod{}
+	for node := range g.podsLookupTable.nodeToPods {
+		pods := g.podsLookupTable.GetPodsOnNode(node)
+		for _, pod := range pods {
+			machinesToPods[node] = append(machinesToPods[node], pod)
+		}
 	}
 
 	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, machinesToPods, g.predicates, nodes, g.extenders)
@@ -282,12 +285,13 @@ func EqualPriority(_ *api.Pod, machinesToPods map[string][]*api.Pod, podLister a
 	return result, nil
 }
 
-func NewGenericScheduler(predicates map[string]algorithm.FitPredicate, prioritizers []algorithm.PriorityConfig, extenders []algorithm.SchedulerExtender, pods algorithm.PodLister, random *rand.Rand) algorithm.ScheduleAlgorithm {
+func NewGenericScheduler(predicates map[string]algorithm.FitPredicate, prioritizers []algorithm.PriorityConfig, extenders []algorithm.SchedulerExtender, pods algorithm.PodLister, podsLookupTable LookupTable, random *rand.Rand) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
-		predicates:   predicates,
-		prioritizers: prioritizers,
-		extenders:    extenders,
-		pods:         pods,
-		random:       random,
+		predicates:      predicates,
+		prioritizers:    prioritizers,
+		extenders:       extenders,
+		pods:            pods,
+		podsLookupTable: podsLookupTable,
+		random:          random,
 	}
 }

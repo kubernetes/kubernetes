@@ -70,6 +70,7 @@ type ConfigFactory struct {
 
 	scheduledPodPopulator *framework.Controller
 	modeler               scheduler.SystemModeler
+	podsLookupTable       scheduler.LookupTable
 
 	// SchedulerName of a scheduler is used to select which pods will be
 	// processed by this scheduler, based on pods's annotation key:
@@ -94,6 +95,7 @@ func NewConfigFactory(client *client.Client, rateLimiter util.RateLimiter, sched
 	c.modeler = modeler
 	c.PodLister = modeler.PodLister()
 	c.BindPodsRateLimiter = rateLimiter
+	c.podsLookupTable = scheduler.LookupTable{}
 
 	// On add/delete to the scheduled pods, remove from the assumed pods.
 	// We construct this here instead of in CreateFromKeys because
@@ -109,6 +111,9 @@ func NewConfigFactory(client *client.Client, rateLimiter util.RateLimiter, sched
 					c.modeler.LockedAction(func() {
 						c.modeler.ForgetPod(pod)
 					})
+					c.podsLookupTable.LockedAction(func() {
+						c.podsLookupTable.AddPod(pod)
+					})
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
@@ -119,6 +124,24 @@ func NewConfigFactory(client *client.Client, rateLimiter util.RateLimiter, sched
 					case cache.DeletedFinalStateUnknown:
 						c.modeler.ForgetPodByKey(t.Key)
 					}
+				})
+
+				c.podsLookupTable.LockedAction(func() {
+					var pod *api.Pod
+					switch t := obj.(type) {
+					case *api.Pod:
+						pod = t
+					case cache.DeletedFinalStateUnknown:
+						pod = t.Obj.(*api.Pod)
+					}
+					c.podsLookupTable.RemovePod(pod)
+				})
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				oldPod := oldObj.(*api.Pod)
+				newPod := newObj.(*api.Pod)
+				c.podsLookupTable.LockedAction(func() {
+					c.podsLookupTable.Update(oldPod, newPod)
 				})
 			},
 		},
@@ -221,7 +244,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	algo := scheduler.NewGenericScheduler(predicateFuncs, priorityConfigs, extenders, f.PodLister, r)
+	algo := scheduler.NewGenericScheduler(predicateFuncs, priorityConfigs, extenders, f.PodLister, f.podsLookupTable, r)
 
 	podBackoff := podBackoff{
 		perPodBackoff: map[types.NamespacedName]*backoffEntry{},
