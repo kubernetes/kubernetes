@@ -296,7 +296,7 @@ func (c *Fake) ServerAPIVersions() (*unversioned.APIVersions, error) {
 
 	c.Invokes(action, nil)
 	gvStrings := []string{}
-	for _, gv := range registered.RegisteredGroupVersions {
+	for _, gv := range registered.EnabledVersions() {
 		gvStrings = append(gvStrings, gv.String())
 	}
 	return &unversioned.APIVersions{Versions: gvStrings}, nil

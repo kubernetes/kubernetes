@@ -17,12 +17,12 @@ limitations under the License.
 package componentconfig
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func init() {
-	addKnownTypes()
+func AddToScheme(scheme *runtime.Scheme) {
+	addKnownTypes(scheme)
 }
 
 // GroupName is the group name use in this package
@@ -41,9 +41,9 @@ func Resource(resource string) unversioned.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-func addKnownTypes() {
+func addKnownTypes(scheme *runtime.Scheme) {
 	// TODO this will get cleaned up with the scheme types are fixed
-	api.Scheme.AddKnownTypes(SchemeGroupVersion,
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&KubeProxyConfiguration{},
 	)
 }

@@ -72,7 +72,7 @@ func (c *ClientCache) ClientConfigForVersion(version *unversioned.GroupVersion) 
 		preferredGV = &versionCopy
 	}
 
-	negotiatedVersion, err := client.NegotiateVersion(c.defaultClient, &config, preferredGV, registered.RegisteredGroupVersions)
+	negotiatedVersion, err := client.NegotiateVersion(c.defaultClient, &config, preferredGV, registered.EnabledVersions())
 	if err != nil {
 		return nil, err
 	}

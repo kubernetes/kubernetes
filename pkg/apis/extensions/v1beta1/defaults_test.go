@@ -14,14 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta1_test
 
 import (
 	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/v1"
+	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	. "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )

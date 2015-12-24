@@ -17,12 +17,12 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
-func addDefaultingFuncs() {
-	api.Scheme.AddDefaultingFuncs(
+func addDefaultingFuncs(scheme *runtime.Scheme) {
+	scheme.AddDefaultingFuncs(
 		func(obj *APIVersion) {
 			if len(obj.APIGroup) == 0 {
 				obj.APIGroup = GroupName
