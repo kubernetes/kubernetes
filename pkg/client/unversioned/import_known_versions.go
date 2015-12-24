@@ -18,8 +18,17 @@ package unversioned
 
 // These imports are the API groups the client will support.
 import (
+	"fmt"
+
 	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/api/registered"
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
 )
+
+func init() {
+	if missingVersions := registered.ValidateEnvRequestedVersions(); len(missingVersions) != 0 {
+		panic(fmt.Sprintf("KUBE_API_VERSIONS contains versions that are not installed: %q.", missingVersions))
+	}
+}

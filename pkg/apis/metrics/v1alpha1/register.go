@@ -31,14 +31,14 @@ var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1
 
 var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion)
 
-func init() {
-	// Register the API.
-	addKnownTypes()
+func AddToScheme(scheme *runtime.Scheme) {
+	// Add the API to Scheme.
+	addKnownTypes(scheme)
 }
 
 // Adds the list of known types to api.Scheme.
-func addKnownTypes() {
-	api.Scheme.AddKnownTypes(SchemeGroupVersion,
+func addKnownTypes(scheme *runtime.Scheme) {
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&RawNode{},
 		&RawPod{},
 		&v1.DeleteOptions{},
