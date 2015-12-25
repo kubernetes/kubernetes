@@ -20,6 +20,7 @@ import (
 	"time"
 
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
+	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -57,7 +58,7 @@ func NewHollowProxyOrDie(
 	recorder record.EventRecorder,
 ) *HollowProxy {
 	// Create and start Hollow Proxy
-	config := proxyapp.NewProxyConfig()
+	config := options.NewProxyConfig()
 	config.OOMScoreAdj = 0
 	config.ResourceContainer = ""
 	config.NodeRef = &api.ObjectReference{
@@ -83,7 +84,7 @@ func NewHollowProxyOrDie(
 }
 
 func (hp *HollowProxy) Run() {
-	if err := hp.ProxyServer.Run(make([]string, 0)); err != nil {
+	if err := hp.ProxyServer.Run(); err != nil {
 		glog.Fatalf("Error while running proxy: %v\n", err)
 	}
 }
