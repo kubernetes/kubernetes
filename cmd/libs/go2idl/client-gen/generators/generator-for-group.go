@@ -82,7 +82,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"latestGroup":                c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "Group"}),
 		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "GroupOrDie"}),
 		"apiPath":                    apiPath(g.group),
-		"latestCodecs":               c.Universe.Variable(types.Name{Package: pkgAPI, Name: "Codecs"}),
+		"codecs":                     c.Universe.Variable(types.Name{Package: pkgAPI, Name: "Codecs"}),
 	}
 	sw.Do(groupInterfaceTemplate, m)
 	sw.Do(groupClientTemplate, m)
@@ -183,7 +183,7 @@ func setConfigDefaults(config *$.Config|raw$) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	config.Codec = $.latestCodecs|raw$.LegacyCodec(*config.GroupVersion)
+	config.Codec = $.codecs|raw$.LegacyCodec(*config.GroupVersion)
 	if config.QPS == 0 {
 		config.QPS = 5
 	}

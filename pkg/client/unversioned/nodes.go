@@ -62,7 +62,7 @@ func (c *nodes) Create(node *api.Node) (*api.Node, error) {
 // List takes a selector, and returns the list of nodes that match that selector in the cluster.
 func (c *nodes) List(opts api.ListOptions) (*api.NodeList, error) {
 	result := &api.NodeList{}
-	err := c.r.Get().Resource(c.resourceName()).VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err := c.r.Get().Resource(c.resourceName()).VersionedParams(&opts, api.ParameterCodec).Do().Into(result)
 	return result, err
 }
 
@@ -105,6 +105,6 @@ func (c *nodes) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(api.NamespaceAll).
 		Resource(c.resourceName()).
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

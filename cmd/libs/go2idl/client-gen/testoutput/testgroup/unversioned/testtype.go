@@ -109,7 +109,7 @@ func (c *testTypes) DeleteCollection(options *api.DeleteOptions, listOptions api
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("testtypes").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -133,7 +133,7 @@ func (c *testTypes) List(opts api.ListOptions) (result *testgroup.TestTypeList, 
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("testtypes").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -145,6 +145,6 @@ func (c *testTypes) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("testtypes").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

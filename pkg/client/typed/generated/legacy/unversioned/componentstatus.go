@@ -88,7 +88,7 @@ func (c *componentStatuses) Delete(name string, options *api.DeleteOptions) erro
 func (c *componentStatuses) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Resource("componentstatuses").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -110,7 +110,7 @@ func (c *componentStatuses) List(opts api.ListOptions) (result *api.ComponentSta
 	result = &api.ComponentStatusList{}
 	err = c.client.Get().
 		Resource("componentstatuses").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -121,6 +121,6 @@ func (c *componentStatuses) Watch(opts api.ListOptions) (watch.Interface, error)
 	return c.client.Get().
 		Prefix("watch").
 		Resource("componentstatuses").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

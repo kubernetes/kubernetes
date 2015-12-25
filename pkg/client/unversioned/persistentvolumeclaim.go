@@ -56,7 +56,7 @@ func (c *persistentVolumeClaims) List(opts api.ListOptions) (result *api.Persist
 	err = c.client.Get().
 		Namespace(c.namespace).
 		Resource("persistentVolumeClaims").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 
@@ -100,6 +100,6 @@ func (c *persistentVolumeClaims) Watch(opts api.ListOptions) (watch.Interface, e
 		Prefix("watch").
 		Namespace(c.namespace).
 		Resource("persistentVolumeClaims").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
