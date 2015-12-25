@@ -190,7 +190,7 @@ func TestCreatePods(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	podControl := RealPodControl{
 		KubeClient: client,
@@ -210,7 +210,7 @@ func TestCreatePods(t *testing.T) {
 		Spec: controllerSpec.Spec.Template.Spec,
 	}
 	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath("pods", api.NamespaceDefault, ""), "POST", nil)
-	actualPod, err := runtime.Decode(client.Codec, []byte(fakeHandler.RequestBody))
+	actualPod, err := runtime.Decode(client.ContentConfig.Codec, []byte(fakeHandler.RequestBody))
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}

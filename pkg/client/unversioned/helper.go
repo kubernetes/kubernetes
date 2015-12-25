@@ -48,14 +48,10 @@ type Config struct {
 	// Prefix is the sub path of the server. If not specified, the client will set
 	// a default value.  Use "/" to indicate the server root should be used
 	Prefix string
-	// GroupVersion is the API version to talk to. Must be provided when initializing
-	// a RESTClient directly. When initializing a Client, will be set with the default
-	// code version.
-	GroupVersion *unversioned.GroupVersion
-	// Codec specifies the encoding and decoding behavior for runtime.Objects passed
-	// to a RESTClient or Client. Required when initializing a RESTClient, optional
-	// when initializing a Client.
-	Codec runtime.Codec
+
+	// ContentConfig contains settings that affect how objects are transformed when
+	// sent to the server.
+	ContentConfig
 
 	// Server requires Basic authentication
 	Username string
@@ -111,6 +107,22 @@ type TLSClientConfig struct {
 	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
 	// CAData takes precedence over CAFile
 	CAData []byte
+}
+
+type ContentConfig struct {
+	// ContentType specifies the wire format used to communicate with the server.
+	// This value will be set as the Accept header on requests made to the server, and
+	// as the default content type on any object sent to the server. If not set,
+	// "application/json" is used.
+	ContentType string
+	// GroupVersion is the API version to talk to. Must be provided when initializing
+	// a RESTClient directly. When initializing a Client, will be set with the default
+	// code version.
+	GroupVersion *unversioned.GroupVersion
+	// Codec specifies the encoding and decoding behavior for runtime.Objects passed
+	// to a RESTClient or Client. Required when initializing a RESTClient, optional
+	// when initializing a Client.
+	Codec runtime.Codec
 }
 
 // New creates a Kubernetes client for the given config. This client works with pods,
@@ -399,7 +411,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, *config.GroupVersion, config.Codec, config.QPS, config.Burst)
+	client := NewRESTClient(baseURL, config.ContentConfig, config.QPS, config.Burst)
 
 	transport, err := TransportFor(config)
 	if err != nil {
@@ -424,7 +436,13 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, unversioned.SchemeGroupVersion, config.Codec, config.QPS, config.Burst)
+	versionConfig := config.ContentConfig
+	if versionConfig.GroupVersion == nil {
+		v := unversioned.SchemeGroupVersion
+		versionConfig.GroupVersion = &v
+	}
+
+	client := NewRESTClient(baseURL, versionConfig, config.QPS, config.Burst)
 
 	transport, err := TransportFor(config)
 	if err != nil {

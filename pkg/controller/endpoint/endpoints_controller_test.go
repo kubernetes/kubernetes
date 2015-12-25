@@ -103,7 +103,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 			}},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
@@ -135,7 +135,7 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 			}},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	endpoints.checkLeftoverEndpoints()
 
@@ -163,7 +163,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 			}},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
@@ -191,7 +191,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 			}},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
@@ -216,7 +216,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			Subsets: []api.EndpointSubset{},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, ns, 1, 1, 0)
 	endpoints.serviceStore.Store.Add(&api.Service{
@@ -253,7 +253,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 			Subsets: []api.EndpointSubset{},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, ns, 0, 1, 1)
 	endpoints.serviceStore.Store.Add(&api.Service{
@@ -290,7 +290,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 			Subsets: []api.EndpointSubset{},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, ns, 1, 1, 1)
 	endpoints.serviceStore.Store.Add(&api.Service{
@@ -331,7 +331,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			}},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, ns, 1, 1, 0)
 	endpoints.serviceStore.Store.Add(&api.Service{
@@ -371,7 +371,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 			}},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, api.NamespaceDefault, 1, 1, 0)
 	endpoints.serviceStore.Store.Add(&api.Service{
@@ -390,7 +390,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	testServer, endpointsHandler := makeTestServer(t, ns,
 		serverResponse{http.StatusOK, &api.Endpoints{}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, ns, 3, 2, 0)
 	addPods(endpoints.podStore.Store, "blah", 5, 2, 0) // make sure these aren't found!
@@ -432,7 +432,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	testServer, endpointsHandler := makeTestServer(t, ns,
 		serverResponse{http.StatusOK, &api.Endpoints{}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, ns, 3, 2, 0)
 	serviceLabels := map[string]string{"foo": "bar"}
@@ -492,7 +492,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 			}},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
 	addPods(endpoints.podStore.Store, ns, 1, 1, 0)
 	serviceLabels := map[string]string{"baz": "blah"}

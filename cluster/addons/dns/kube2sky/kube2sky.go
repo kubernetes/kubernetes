@@ -482,8 +482,8 @@ func newKubeClient() (*kclient.Client, error) {
 	if masterURL != "" && *argKubecfgFile == "" {
 		// Only --kube_master_url was provided.
 		config = &kclient.Config{
-			Host:         masterURL,
-			GroupVersion: &unversioned.GroupVersion{Version: "v1"},
+			Host:          masterURL,
+			ContentConfig: kclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}},
 		}
 	} else {
 		// We either have:

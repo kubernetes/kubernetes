@@ -132,11 +132,11 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		glog.Fatalf("Failed to connect to etcd")
 	}
 
-	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 	// We will fix this by supporting multiple group versions in Config
-	cl.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{Host: apiServer.URL, GroupVersion: testapi.Extensions.GroupVersion()})
+	cl.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{Host: apiServer.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()}})
 
 	// Master
 	host, port, err := net.SplitHostPort(strings.TrimLeft(apiServer.URL, "http://"))
@@ -975,10 +975,10 @@ func main() {
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, GroupVersion: testapi.Default.GroupVersion()})
+	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 	// We will fix this by supporting multiple group versions in Config
-	kubeClient.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{Host: apiServerURL, GroupVersion: testapi.Extensions.GroupVersion()})
+	kubeClient.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{Host: apiServerURL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()}})
 
 	// Run tests in parallel
 	testFuncs := []testFunc{

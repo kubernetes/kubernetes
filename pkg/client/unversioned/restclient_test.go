@@ -43,11 +43,13 @@ func TestDoRequestSuccess(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	c, err := RESTClientFor(&Config{
-		Host:         testServer.URL,
-		GroupVersion: testapi.Default.GroupVersion(),
-		Codec:        testapi.Default.Codec(),
-		Username:     "user",
-		Password:     "pass",
+		Host: testServer.URL,
+		ContentConfig: ContentConfig{
+			GroupVersion: testapi.Default.GroupVersion(),
+			Codec:        testapi.Default.Codec(),
+		},
+		Username: "user",
+		Password: "pass",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -86,9 +88,11 @@ func TestDoRequestFailed(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	c, err := RESTClientFor(&Config{
-		Host:         testServer.URL,
-		GroupVersion: testapi.Default.GroupVersion(),
-		Codec:        testapi.Default.Codec(),
+		Host: testServer.URL,
+		ContentConfig: ContentConfig{
+			GroupVersion: testapi.Default.GroupVersion(),
+			Codec:        testapi.Default.Codec(),
+		},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -118,11 +122,13 @@ func TestDoRequestCreated(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	c, err := RESTClientFor(&Config{
-		Host:         testServer.URL,
-		GroupVersion: testapi.Default.GroupVersion(),
-		Codec:        testapi.Default.Codec(),
-		Username:     "user",
-		Password:     "pass",
+		Host: testServer.URL,
+		ContentConfig: ContentConfig{
+			GroupVersion: testapi.Default.GroupVersion(),
+			Codec:        testapi.Default.Codec(),
+		},
+		Username: "user",
+		Password: "pass",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

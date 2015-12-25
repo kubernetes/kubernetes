@@ -77,6 +77,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"RESTClient":                 c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "RESTClient"}),
 		"RESTClientFor":              c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "RESTClientFor"}),
 		"latestGroup":                c.Universe.Variable(types.Name{Package: pkgLatest, Name: "Group"}),
+		"codecs":                     c.Universe.Variable(types.Name{Package: pkgLatest, Name: "Codecs"}),
 		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgLatest, Name: "GroupOrDie"}),
 		"prefix":                     prefix(g.group),
 	}

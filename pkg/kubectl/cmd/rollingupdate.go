@@ -248,14 +248,14 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			if oldRc.Spec.Template.Spec.Containers[0].Image == image {
 				return cmdutil.UsageError(cmd, "Specified --image must be distinct from existing container image")
 			}
-			newRc, err = kubectl.CreateNewControllerFromCurrentController(client, client.Codec, cmdNamespace, oldName, newName, image, container, deploymentKey)
+			newRc, err = kubectl.CreateNewControllerFromCurrentController(client, client.ContentConfig.Codec, cmdNamespace, oldName, newName, image, container, deploymentKey)
 			if err != nil {
 				return err
 			}
 		}
 		// Update the existing replication controller with pointers to the 'next' controller
 		// and adding the <deploymentKey> label if necessary to distinguish it from the 'next' controller.
-		oldHash, err := api.HashObject(oldRc, client.Codec)
+		oldHash, err := api.HashObject(oldRc, client.ContentConfig.Codec)
 		if err != nil {
 			return err
 		}

@@ -1251,7 +1251,7 @@ func TestUpdateWithRetries(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &client.Config{GroupVersion: testapi.Default.GroupVersion()}
+	clientConfig := &client.Config{ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 	client := client.NewOrDie(clientConfig)
 	client.Client = fakeClient.Client
 
@@ -1348,7 +1348,7 @@ func TestAddDeploymentHash(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &client.Config{GroupVersion: testapi.Default.GroupVersion()}
+	clientConfig := &client.Config{ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 	client := client.NewOrDie(clientConfig)
 	client.Client = fakeClient.Client
 
