@@ -92,7 +92,7 @@ func (c *resourceQuotas) DeleteCollection(options *api.DeleteOptions, listOption
 	return c.client.Delete().
 		NamespaceIfScoped(c.ns, len(c.ns) > 0).
 		Resource("resourceQuotas").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -116,7 +116,7 @@ func (c *resourceQuotas) List(opts api.ListOptions) (result *api.ResourceQuotaLi
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("resourceQuotas").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -128,6 +128,6 @@ func (c *resourceQuotas) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("resourceQuotas").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

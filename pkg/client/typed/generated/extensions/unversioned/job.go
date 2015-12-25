@@ -93,7 +93,7 @@ func (c *jobs) DeleteCollection(options *api.DeleteOptions, listOptions api.List
 	return c.client.Delete().
 		NamespaceIfScoped(c.ns, len(c.ns) > 0).
 		Resource("jobs").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -117,7 +117,7 @@ func (c *jobs) List(opts api.ListOptions) (result *extensions.JobList, err error
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("jobs").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -129,6 +129,6 @@ func (c *jobs) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("jobs").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

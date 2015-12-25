@@ -67,7 +67,7 @@ func (s *serviceAccounts) List(opts api.ListOptions) (*api.ServiceAccountList, e
 	err := s.client.Get().
 		Namespace(s.namespace).
 		Resource("serviceAccounts").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 
@@ -93,7 +93,7 @@ func (s *serviceAccounts) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(s.namespace).
 		Resource("serviceAccounts").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
 

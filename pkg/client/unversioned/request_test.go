@@ -182,7 +182,7 @@ func TestRequestVersionedParams(t *testing.T) {
 	if !reflect.DeepEqual(r.params, url.Values{"foo": []string{"a"}}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
-	r.VersionedParams(&api.PodLogOptions{Follow: true, Container: "bar"}, api.Scheme)
+	r.VersionedParams(&api.PodLogOptions{Follow: true, Container: "bar"}, api.ParameterCodec)
 
 	if !reflect.DeepEqual(r.params, url.Values{
 		"foo":       []string{"a"},
@@ -194,8 +194,8 @@ func TestRequestVersionedParams(t *testing.T) {
 }
 
 func TestRequestVersionedParamsFromListOptions(t *testing.T) {
-	r := &Request{groupVersion: v1.SchemeGroupVersion}
-	r.VersionedParams(&api.ListOptions{ResourceVersion: "1"}, api.Scheme)
+	r := &Request{content: ContentConfig{GroupVersion: &v1.SchemeGroupVersion}}
+	r.VersionedParams(&api.ListOptions{ResourceVersion: "1"}, api.ParameterCodec)
 	if !reflect.DeepEqual(r.params, url.Values{
 		"resourceVersion": []string{"1"},
 	}) {
@@ -203,7 +203,7 @@ func TestRequestVersionedParamsFromListOptions(t *testing.T) {
 	}
 
 	var timeout int64 = 10
-	r.VersionedParams(&api.ListOptions{ResourceVersion: "2", TimeoutSeconds: &timeout}, api.Scheme)
+	r.VersionedParams(&api.ListOptions{ResourceVersion: "2", TimeoutSeconds: &timeout}, api.ParameterCodec)
 	if !reflect.DeepEqual(r.params, url.Values{
 		"resourceVersion": []string{"1", "2"},
 		"timeoutSeconds":  []string{"10"},

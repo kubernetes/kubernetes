@@ -92,7 +92,7 @@ func (c *namespaces) DeleteCollection(options *api.DeleteOptions, listOptions ap
 	return c.client.Delete().
 		NamespaceIfScoped(c.ns, len(c.ns) > 0).
 		Resource("namespaces").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -116,7 +116,7 @@ func (c *namespaces) List(opts api.ListOptions) (result *api.NamespaceList, err 
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("namespaces").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -128,6 +128,6 @@ func (c *namespaces) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("namespaces").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

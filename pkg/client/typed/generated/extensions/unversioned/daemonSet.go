@@ -93,7 +93,7 @@ func (c *daemonSets) DeleteCollection(options *api.DeleteOptions, listOptions ap
 	return c.client.Delete().
 		NamespaceIfScoped(c.ns, len(c.ns) > 0).
 		Resource("daemonSets").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -117,7 +117,7 @@ func (c *daemonSets) List(opts api.ListOptions) (result *extensions.DaemonSetLis
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("daemonSets").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -129,6 +129,6 @@ func (c *daemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("daemonSets").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

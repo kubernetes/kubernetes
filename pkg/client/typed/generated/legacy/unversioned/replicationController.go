@@ -92,7 +92,7 @@ func (c *replicationControllers) DeleteCollection(options *api.DeleteOptions, li
 	return c.client.Delete().
 		NamespaceIfScoped(c.ns, len(c.ns) > 0).
 		Resource("replicationControllers").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -116,7 +116,7 @@ func (c *replicationControllers) List(opts api.ListOptions) (result *api.Replica
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("replicationControllers").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -128,6 +128,6 @@ func (c *replicationControllers) Watch(opts api.ListOptions) (watch.Interface, e
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("replicationControllers").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

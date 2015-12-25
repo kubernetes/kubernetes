@@ -52,13 +52,14 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	pkg := filepath.Base(t.Name.Package)
 	m := map[string]interface{}{
-		"type":             t,
-		"package":          pkg,
-		"Package":          namer.IC(pkg),
-		"Group":            namer.IC(g.group),
-		"watchInterface":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
-		"apiDeleteOptions": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
-		"apiListOptions":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
+		"type":              t,
+		"package":           pkg,
+		"Package":           namer.IC(pkg),
+		"Group":             namer.IC(g.group),
+		"watchInterface":    c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
+		"apiDeleteOptions":  c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
+		"apiListOptions":    c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
+		"apiParameterCodec": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ParameterCodec"}),
 	}
 	sw.Do(namespacerTemplate, m)
 	sw.Do(interfaceTemplate, m)
@@ -121,7 +122,7 @@ func (c *$.type|privatePlural$) List(opts $.apiListOptions|raw$) (result *$.type
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("$.type|privatePlural$").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, $.apiParameterCodec|raw$).
 		Do().
 		Into(result)
 	return
@@ -160,7 +161,7 @@ func (c *$.type|privatePlural$) DeleteCollection(options *$.apiDeleteOptions|raw
 	return c.client.Delete().
 		NamespaceIfScoped(c.ns, len(c.ns) > 0).
 		Resource("$.type|privatePlural$").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, $.apiParameterCodec|raw$).
 		Body(options).
 		Do().
 		Error()
@@ -203,7 +204,7 @@ func (c *$.type|privatePlural$) Watch(opts $.apiListOptions|raw$) ($.watchInterf
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("$.type|privatePlural$").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
 `

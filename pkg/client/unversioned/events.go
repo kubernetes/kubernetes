@@ -122,7 +122,7 @@ func (e *events) List(opts api.ListOptions) (*api.EventList, error) {
 	err := e.client.Get().
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return result, err
@@ -146,7 +146,7 @@ func (e *events) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
 
@@ -190,7 +190,7 @@ func (e *events) DeleteCollection(options *api.DeleteOptions, listOptions api.Li
 	return e.client.Delete().
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()

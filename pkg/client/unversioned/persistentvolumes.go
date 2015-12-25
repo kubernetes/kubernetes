@@ -51,7 +51,7 @@ func (c *persistentVolumes) List(opts api.ListOptions) (result *api.PersistentVo
 	result = &api.PersistentVolumeList{}
 	err = c.client.Get().
 		Resource("persistentVolumes").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 
@@ -94,6 +94,6 @@ func (c *persistentVolumes) Watch(opts api.ListOptions) (watch.Interface, error)
 	return c.client.Get().
 		Prefix("watch").
 		Resource("persistentVolumes").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
