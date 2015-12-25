@@ -76,15 +76,15 @@ func (c *Client) Setup(t *testing.T) *Client {
 	c.server = httptest.NewServer(c.handler)
 	if c.Client == nil {
 		c.Client = client.NewOrDie(&client.Config{
-			Host:         c.server.URL,
-			GroupVersion: testapi.Default.GroupVersion(),
+			Host:          c.server.URL,
+			ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
 		})
 
 		// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 		// We will fix this by supporting multiple group versions in Config
 		c.ExtensionsClient = client.NewExtensionsOrDie(&client.Config{
-			Host:         c.server.URL,
-			GroupVersion: testapi.Extensions.GroupVersion(),
+			Host:          c.server.URL,
+			ContentConfig: client.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()},
 		})
 	}
 	c.QueryValidator = map[string]func(string, string) bool{}

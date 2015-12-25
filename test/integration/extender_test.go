@@ -197,7 +197,7 @@ func TestSchedulerExtender(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	m = master.New(masterConfig)
 
-	restClient := client.NewOrDie(&client.Config{Host: s.URL, GroupVersion: testapi.Default.GroupVersion()})
+	restClient := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	extender1 := &Extender{
 		name:         "extender1",
