@@ -92,11 +92,13 @@ func TestSetKubernetesDefaults(t *testing.T) {
 		{
 			Config{},
 			Config{
-				APIPath:      "/api",
-				GroupVersion: testapi.Default.GroupVersion(),
-				Codec:        testapi.Default.Codec(),
-				QPS:          5,
-				Burst:        10,
+				APIPath: "/api",
+				ContentConfig: ContentConfig{
+					GroupVersion: testapi.Default.GroupVersion(),
+					Codec:        testapi.Default.Codec(),
+				},
+				QPS:   5,
+				Burst: 10,
 			},
 			false,
 		},
@@ -188,7 +190,7 @@ func TestHelperGetServerAPIVersions(t *testing.T) {
 	}))
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	got, err := ServerAPIVersions(&Config{Host: server.URL, GroupVersion: &unversioned.GroupVersion{Group: "invalid version", Version: "one"}, Codec: testapi.Default.Codec()})
+	got, err := ServerAPIVersions(&Config{Host: server.URL, ContentConfig: ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "invalid version", Version: "one"}, Codec: testapi.Default.Codec()}})
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
@@ -208,7 +210,7 @@ func TestSetsCodec(t *testing.T) {
 		// "invalidVersion":                       {true, "", nil},
 	}
 	for version, expected := range testCases {
-		client, err := New(&Config{Host: "127.0.0.1", GroupVersion: &unversioned.GroupVersion{Version: version}})
+		client, err := New(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: version}}})
 		switch {
 		case err == nil && expected.Err:
 			t.Errorf("expected error but was nil")
@@ -222,20 +224,20 @@ func TestSetsCodec(t *testing.T) {
 		if e, a := expected.Prefix, client.RESTClient.versionedAPIPath; e != a {
 			t.Errorf("expected %#v, got %#v", e, a)
 		}
-		if e, a := expected.Codec, client.RESTClient.Codec; !reflect.DeepEqual(e, a) {
+		if e, a := expected.Codec, client.RESTClient.contentConfig.Codec; !reflect.DeepEqual(e, a) {
 			t.Errorf("expected %#v, got %#v", e, a)
 		}
 	}
 }
 
 func TestRESTClientRequires(t *testing.T) {
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Codec: testapi.Default.Codec()}); err == nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{Codec: testapi.Default.Codec()}}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", GroupVersion: testapi.Default.GroupVersion()}); err == nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", GroupVersion: testapi.Default.GroupVersion(), Codec: testapi.Default.Codec()}); err != nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: testapi.Default.GroupVersion(), Codec: testapi.Default.Codec()}}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }

@@ -45,7 +45,7 @@ func TestCreate(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: server.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	factory := NewConfigFactory(client, api.DefaultSchedulerName)
 	factory.Create()
 }
@@ -64,7 +64,7 @@ func TestCreateFromConfig(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: server.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	factory := NewConfigFactory(client, api.DefaultSchedulerName)
 
 	// Pre-register some predicate and priority functions
@@ -106,7 +106,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: server.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	factory := NewConfigFactory(client, api.DefaultSchedulerName)
 
 	configData = []byte(`{}`)
@@ -150,7 +150,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	server := httptest.NewServer(mux)
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()}), api.DefaultSchedulerName)
+	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}), api.DefaultSchedulerName)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := podBackoff{
 		perPodBackoff:   map[types.NamespacedName]*backoffEntry{},
@@ -234,7 +234,7 @@ func TestBind(t *testing.T) {
 		server := httptest.NewServer(&handler)
 		// TODO: Uncomment when fix #19254
 		// defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
+		client := client.NewOrDie(&client.Config{Host: server.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 		b := binder{client}
 
 		if err := b.Bind(item.binding); err != nil {
@@ -320,7 +320,7 @@ func TestResponsibleForPod(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
+	client := client.NewOrDie(&client.Config{Host: server.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	// factory of "default-scheduler"
 	factoryDefaultScheduler := NewConfigFactory(client, api.DefaultSchedulerName)
 	// factory of "foo-scheduler"
