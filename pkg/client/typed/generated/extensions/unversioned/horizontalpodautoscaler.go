@@ -109,7 +109,7 @@ func (c *horizontalPodAutoscalers) DeleteCollection(options *api.DeleteOptions, 
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -133,7 +133,7 @@ func (c *horizontalPodAutoscalers) List(opts api.ListOptions) (result *extension
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -145,6 +145,6 @@ func (c *horizontalPodAutoscalers) Watch(opts api.ListOptions) (watch.Interface,
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

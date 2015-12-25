@@ -52,7 +52,7 @@ var _ DaemonSetInterface = &daemonSets{}
 
 func (c *daemonSets) List(opts api.ListOptions) (result *extensions.DaemonSetList, err error) {
 	result = &extensions.DaemonSetList{}
-	err = c.r.Get().Namespace(c.ns).Resource("daemonsets").VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("daemonsets").VersionedParams(&opts, api.ParameterCodec).Do().Into(result)
 	return
 }
 
@@ -95,6 +95,6 @@ func (c *daemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("daemonsets").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

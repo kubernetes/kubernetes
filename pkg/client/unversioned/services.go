@@ -55,7 +55,7 @@ func (c *services) List(opts api.ListOptions) (result *api.ServiceList, err erro
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("services").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -93,7 +93,7 @@ func (c *services) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("services").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
 

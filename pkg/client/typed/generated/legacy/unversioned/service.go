@@ -108,7 +108,7 @@ func (c *services) DeleteCollection(options *api.DeleteOptions, listOptions api.
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("services").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -132,7 +132,7 @@ func (c *services) List(opts api.ListOptions) (result *api.ServiceList, err erro
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("services").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -144,6 +144,6 @@ func (c *services) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("services").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

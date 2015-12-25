@@ -101,7 +101,7 @@ func (c *persistentVolumes) Delete(name string, options *api.DeleteOptions) erro
 func (c *persistentVolumes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Resource("persistentvolumes").
-		VersionedParams(&listOptions, api.Scheme).
+		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -123,7 +123,7 @@ func (c *persistentVolumes) List(opts api.ListOptions) (result *api.PersistentVo
 	result = &api.PersistentVolumeList{}
 	err = c.client.Get().
 		Resource("persistentvolumes").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -134,6 +134,6 @@ func (c *persistentVolumes) Watch(opts api.ListOptions) (watch.Interface, error)
 	return c.client.Get().
 		Prefix("watch").
 		Resource("persistentvolumes").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
