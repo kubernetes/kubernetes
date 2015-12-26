@@ -25,18 +25,21 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/protobuf"
+	"k8s.io/kubernetes/pkg/runtime/serializer/protobuf"
 	"k8s.io/kubernetes/pkg/util"
 )
 
 func init() {
 	codecsToTest = append(codecsToTest, func(version string, item runtime.Object) (runtime.Codec, error) {
-		return protobuf.NewCodec(version, api.Scheme, api.Scheme, api.Scheme), nil
+		s := protobuf.NewSerializer(api.Scheme, runtime.ObjectTyperToTyper(api.Scheme))
+		return latest.Codecs.CodecForVersions(s, testapi.ExternalGroupVersions(), nil), nil
 	})
 }
 
@@ -55,6 +58,43 @@ func TestProtobufRoundTrip(t *testing.T) {
 		t.Logf("marshal\n%s", hex.Dump(data))
 		t.Fatalf("Unmarshal is unequal\n%s", util.ObjectGoPrintSideBySide(out, obj))
 	}
+}
+
+// BenchmarkEncodeCodec measures the cost of performing a codec encode, which includes
+// reflection (to clear APIVersion and Kind)
+func BenchmarkEncodeCodecProtobuf(b *testing.B) {
+	items := benchmarkItems()
+	width := len(items)
+	s := protobuf.NewSerializer(nil, nil)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := runtime.Encode(s, &items[i%width]); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkEncodeCodecFromInternalProtobuf measures the cost of performing a codec encode,
+// including conversions and any type setting. This is a "full" encode.
+func BenchmarkEncodeCodecFromInternalProtobuf(b *testing.B) {
+	items := benchmarkItems()
+	width := len(items)
+	encodable := make([]api.Pod, width)
+	for i := range items {
+		if err := api.Scheme.Convert(&items[i], &encodable[i]); err != nil {
+			b.Fatal(err)
+		}
+	}
+	s := protobuf.NewSerializer(nil, nil)
+	codec := latest.Codecs.EncoderForVersion(s, v1.SchemeGroupVersion)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := runtime.Encode(codec, &encodable[i%width]); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
 }
 
 func BenchmarkEncodeProtobufGeneratedMarshal(b *testing.B) {

@@ -1,0 +1,277 @@
+// +build proto
+
+/*
+Copyright 2015 The Kubernetes Authors All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package protobuf
+
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"reflect"
+	"sync"
+
+	"github.com/gogo/protobuf/proto"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+)
+
+var (
+	// protoEncodingPrefix serves as a magic number for an encoded protobuf message on this serializer. All
+	// proto messages serialized by this schema will be preceeded by the bytes 0x6b 0x38 0x73, with the fourth
+	// byte being reserved for the encoding style. The only encoding style defined is 0x00, which means that
+	// the rest of the byte stream is a message of type k8s.io.kubernetes.pkg.runtime.Unknown (proto2).
+	//
+	// See k8s.io/kubernetes/pkg/runtime/generated.proto for details of the runtime.Unknown message.
+	//
+	// This encoding scheme is experimental, and is subject to change at any time.
+	protoEncodingPrefix = []byte{0x6b, 0x38, 0x73, 0x00}
+
+	bufferSize       = uint64(16384)
+	availableBuffers = sync.Pool{New: func() interface{} {
+		return make([]byte, bufferSize)
+	}}
+)
+
+type errNotMarshalable struct {
+	t reflect.Type
+}
+
+func (e errNotMarshalable) Error() string {
+	return fmt.Sprintf("object %v does not implement the protobuf marshalling interface and cannot be encoded to a protobuf message", e.t)
+}
+
+func IsNotMarshalable(err error) bool {
+	_, ok := err.(errNotMarshalable)
+	return err != nil && ok
+}
+
+// NewSerializer creates a Protobuf serializer that handles encoding versioned objects into the proper wire form. If typer
+// is not nil, the object has the group, version, and kind fields set.
+//
+// This encoding scheme is experimental, and is subject to change at any time.
+func NewSerializer(creater runtime.ObjectCreater, typer runtime.Typer) *Serializer {
+	return &Serializer{
+		prefix:  protoEncodingPrefix,
+		creater: creater,
+		typer:   typer,
+	}
+}
+
+type Serializer struct {
+	prefix  []byte
+	creater runtime.ObjectCreater
+	typer   runtime.Typer
+}
+
+// Decode attempts to convert the provided data into a protobuf message, extract the stored schema kind, apply the provided default
+// gvk, and then load that data into an object matching the desired schema kind or the provided into. If into is *runtime.Unknown,
+// the raw data will be extracted and no decoding will be performed. If into is not registered with the typer, then the object will
+// be straight decoded using normal protobuf unmarshalling (the MarshalTo interface). If into is provided and the original data is
+// not fully qualified with kind/version/group, the type of the into will be used to alter the returned gvk. On success or most
+// errors, the method will return the calculated schema kind.
+func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+	if versioned, ok := into.(*runtime.VersionedObjects); ok {
+		into = versioned.Last()
+		obj, actual, err := s.Decode(originalData, gvk, into)
+		if err != nil {
+			return nil, actual, err
+		}
+		if into != nil && into != obj {
+			versioned.Objects = []runtime.Object{obj, into}
+		} else {
+			versioned.Objects = []runtime.Object{obj}
+		}
+		return versioned, actual, err
+	}
+
+	prefixLen := len(s.prefix)
+	switch {
+	case len(originalData) == 0:
+		// TODO: treat like decoding {} from JSON with defaulting
+		return nil, nil, fmt.Errorf("empty data")
+	case len(originalData) < prefixLen || !bytes.Equal(s.prefix, originalData[:prefixLen]):
+		return nil, nil, fmt.Errorf("provided data does not appear to be a protobuf message, expected prefix %v", s.prefix)
+	case len(originalData) == prefixLen:
+		// TODO: treat like decoding {} from JSON with defaulting
+		return nil, nil, fmt.Errorf("empty body")
+	}
+
+	data := originalData[prefixLen:]
+	unk := runtime.Unknown{}
+	if err := unk.Unmarshal(data); err != nil {
+		return nil, nil, err
+	}
+
+	actual := unk.GroupVersionKind()
+	copyKindDefaults(actual, gvk)
+
+	if intoUnknown, ok := into.(*runtime.Unknown); ok && intoUnknown != nil {
+		*intoUnknown = unk
+		// TODO: set content type here
+		return intoUnknown, actual, nil
+	}
+
+	if into != nil {
+		typed, _, err := s.typer.ObjectKind(into)
+		switch {
+		case runtime.IsNotRegisteredError(err):
+			pb, ok := into.(proto.Message)
+			if !ok {
+				return nil, actual, errNotMarshalable{reflect.TypeOf(into)}
+			}
+			if err := proto.Unmarshal(unk.RawJSON, pb); err != nil {
+				return nil, actual, err
+			}
+			return into, actual, nil
+		case err != nil:
+			return nil, actual, err
+		default:
+			copyKindDefaults(actual, typed)
+			if len(actual.Version) == 0 && len(actual.Group) == 0 {
+				actual.Group = typed.Group
+			}
+		}
+	}
+
+	if len(actual.Kind) == 0 {
+		return nil, actual, runtime.NewMissingKindErr(fmt.Sprintf("%#v", unk.TypeMeta))
+	}
+	if len(actual.Version) == 0 {
+		return nil, actual, runtime.NewMissingVersionErr(fmt.Sprintf("%#v", unk.TypeMeta))
+	}
+
+	// use the target if necessary
+	obj, err := runtime.UseOrCreateObject(s.typer, s.creater, *actual, into)
+	if err != nil {
+		return nil, actual, err
+	}
+
+	pb, ok := obj.(proto.Message)
+	if !ok {
+		return nil, actual, errNotMarshalable{reflect.TypeOf(obj)}
+	}
+	if err := proto.Unmarshal(unk.RawJSON, pb); err != nil {
+		return nil, actual, err
+	}
+	return obj, actual, nil
+}
+
+func copyKindDefaults(dst, src *unversioned.GroupVersionKind) {
+	if src == nil {
+		return
+	}
+	// apply kind and version defaulting from provided default
+	if len(dst.Kind) == 0 {
+		dst.Kind = src.Kind
+	}
+	if len(dst.Version) == 0 && len(src.Version) > 0 {
+		dst.Group = src.Group
+		dst.Version = src.Version
+	}
+}
+
+type bufferedMarshaller interface {
+	proto.Sizer
+	runtime.ProtobufMarshaller
+}
+
+// EncodeToStream serializes the provided object to the given writer. Overrides is ignored.
+func (s *Serializer) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
+	var unk runtime.Unknown
+	if kind := obj.GetObjectKind().GroupVersionKind(); kind != nil {
+		unk = runtime.Unknown{
+			TypeMeta: runtime.TypeMeta{
+				Kind:       kind.Kind,
+				APIVersion: kind.GroupVersion().String(),
+			},
+		}
+	}
+
+	prefixSize := uint64(len(s.prefix))
+
+	switch t := obj.(type) {
+	case bufferedMarshaller:
+		// this path performs a single allocation during write but requires the caller to implement
+		// the more efficient Size and MarshalTo methods
+		encodedSize := uint64(t.Size())
+		estimatedSize := prefixSize + estimateUnknownSize(&unk, encodedSize)
+		data := make([]byte, estimatedSize)
+
+		i, err := unk.NestedMarshalTo(data[prefixSize:], t, encodedSize)
+		if err != nil {
+			return err
+		}
+
+		copy(data, s.prefix)
+
+		_, err = w.Write(data[:prefixSize+uint64(i)])
+		return err
+
+	case proto.Marshaler:
+		// this path performs extra allocations
+		data, err := t.Marshal()
+		if err != nil {
+			return err
+		}
+		unk.RawJSON = data
+
+		estimatedSize := prefixSize + uint64(unk.Size())
+		data = make([]byte, estimatedSize)
+
+		i, err := unk.MarshalTo(data[prefixSize:])
+		if err != nil {
+			return err
+		}
+
+		copy(data, s.prefix)
+
+		_, err = w.Write(data[:prefixSize+uint64(i)])
+		return err
+
+	default:
+		return errNotMarshalable{reflect.TypeOf(obj)}
+	}
+}
+
+// RecognizesData implements the RecognizingDecoder interface.
+func (s *Serializer) RecognizesData(peek io.Reader) (bool, error) {
+	prefix := make([]byte, 4)
+	n, err := peek.Read(prefix)
+	if err != nil {
+		if err == io.EOF {
+			return false, nil
+		}
+		return false, err
+	}
+	if n != 4 {
+		return false, nil
+	}
+	return bytes.Equal(s.prefix, prefix), nil
+}
+
+// estimateUnknownSize returns the expected bytes consumed by a given runtime.Unknown
+// object with a nil RawJSON struct and the expected size of the provided buffer. The
+// returned size will not be correct if RawJSOn is set on unk.
+func estimateUnknownSize(unk *runtime.Unknown, byteSize uint64) uint64 {
+	size := uint64(unk.Size())
+	// protobuf uses 1 byte for the tag, a varint for the length of the array (at most 8 bytes - uint64 - here),
+	// and the size of the array.
+	size += 1 + 8 + byteSize
+	return size
+}
