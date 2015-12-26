@@ -188,3 +188,40 @@ func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.Roun
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler
 }
+
+// CommitREST implements the commit subresource for a Pod
+type CommitREST struct {
+	Store       *etcdgeneric.Etcd
+	KubeletConn client.ConnectionInfoGetter
+}
+
+// Implement Connecter
+var _ = rest.Connecter(&CommitREST{})
+
+// New creates a new Pod object
+func (r *CommitREST) New() runtime.Object {
+	return &api.Pod{}
+}
+
+// Connect returns a handler for the pod commit proxy
+func (r *CommitREST) Connect(ctx api.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+	execOpts, ok := opts.(*api.PodCommitOptions)
+	if !ok {
+		return nil, fmt.Errorf("invalid options object: %#v", opts)
+	}
+	location, transport, err := pod.CommitLocation(r.Store, r.KubeletConn, ctx, name, execOpts)
+	if err != nil {
+		return nil, err
+	}
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
+}
+
+// NewConnectOptions returns the versioned object that represents commit parameters
+func (r *CommitREST) NewConnectOptions() (runtime.Object, bool, string) {
+	return &api.PodCommitOptions{}, false, ""
+}
+
+// ConnectMethods returns the methods supported by exec
+func (r *CommitREST) ConnectMethods() []string {
+	return upgradeableMethods
+}
