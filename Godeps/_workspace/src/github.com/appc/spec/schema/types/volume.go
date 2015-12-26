@@ -22,6 +22,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/appc/spec/schema/common"
+)
+
+const (
+	emptyVolumeDefaultMode = "0755"
+	emptyVolumeDefaultUID  = 0
+	emptyVolumeDefaultGID  = 0
 )
 
 // Volume encapsulates a volume which should be mounted into the filesystem
@@ -34,6 +42,11 @@ type Volume struct {
 	// TODO(jonboulle): factor out?
 	Source   string `json:"source,omitempty"`
 	ReadOnly *bool  `json:"readOnly,omitempty"`
+
+	// currently used only by "empty"
+	Mode *string `json:"mode,omitempty"`
+	UID  *int    `json:"uid,omitempty"`
+	GID  *int    `json:"gid,omitempty"`
 }
 
 type volume Volume
@@ -48,10 +61,28 @@ func (v Volume) assertValid() error {
 		if v.Source != "" {
 			return errors.New("source for empty volume must be empty")
 		}
+		if v.Mode == nil {
+			return errors.New("mode for empty volume must be set")
+		}
+		if v.UID == nil {
+			return errors.New("uid for empty volume must be set")
+		}
+		if v.GID == nil {
+			return errors.New("gid for empty volume must be set")
+		}
 		return nil
 	case "host":
 		if v.Source == "" {
 			return errors.New("source for host volume cannot be empty")
+		}
+		if v.Mode != nil {
+			return errors.New("mode for host volume cannot be set")
+		}
+		if v.UID != nil {
+			return errors.New("uid for host volume cannot be set")
+		}
+		if v.GID != nil {
+			return errors.New("gid for host volume cannot be set")
 		}
 		if !filepath.IsAbs(v.Source) {
 			return errors.New("source for host volume must be absolute path")
@@ -68,6 +99,7 @@ func (v *Volume) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	nv := Volume(vv)
+	maybeSetDefaults(&nv)
 	if err := nv.assertValid(); err != nil {
 		return err
 	}
@@ -83,11 +115,35 @@ func (v Volume) MarshalJSON() ([]byte, error) {
 }
 
 func (v Volume) String() string {
-	s := fmt.Sprintf("%s,kind=%s,readOnly=%t", v.Name, v.Kind, *v.ReadOnly)
-	if v.Source != "" {
-		s = s + fmt.Sprintf("source=%s", v.Source)
+	s := []string{
+		v.Name.String(),
+		",kind=",
+		v.Kind,
 	}
-	return s
+	if v.Source != "" {
+		s = append(s, ",source=")
+		s = append(s, v.Source)
+	}
+	if v.ReadOnly != nil {
+		s = append(s, ",readOnly=")
+		s = append(s, strconv.FormatBool(*v.ReadOnly))
+	}
+	switch v.Kind {
+	case "empty":
+		if *v.Mode != emptyVolumeDefaultMode {
+			s = append(s, ",mode=")
+			s = append(s, *v.Mode)
+		}
+		if *v.UID != emptyVolumeDefaultUID {
+			s = append(s, ",uid=")
+			s = append(s, strconv.Itoa(*v.UID))
+		}
+		if *v.GID != emptyVolumeDefaultGID {
+			s = append(s, ",gid=")
+			s = append(s, strconv.Itoa(*v.GID))
+		}
+	}
+	return strings.Join(s, "")
 }
 
 // VolumeFromString takes a command line volume parameter and returns a volume
@@ -98,11 +154,17 @@ func VolumeFromString(vp string) (*Volume, error) {
 	var vol Volume
 
 	vp = "name=" + vp
-	v, err := url.ParseQuery(strings.Replace(vp, ",", "&", -1))
+	vpQuery, err := common.MakeQueryString(vp)
+	if err != nil {
+		return nil, err
+	}
+
+	v, err := url.ParseQuery(vpQuery)
 	if err != nil {
 		return nil, err
 	}
 	for key, val := range v {
+		val := val
 		if len(val) > 1 {
 			return nil, fmt.Errorf("label %s with multiple values %q", key, val)
 		}
@@ -124,14 +186,51 @@ func VolumeFromString(vp string) (*Volume, error) {
 				return nil, err
 			}
 			vol.ReadOnly = &ro
+		case "mode":
+			vol.Mode = &val[0]
+		case "uid":
+			u, err := strconv.Atoi(val[0])
+			if err != nil {
+				return nil, err
+			}
+			vol.UID = &u
+		case "gid":
+			g, err := strconv.Atoi(val[0])
+			if err != nil {
+				return nil, err
+			}
+			vol.GID = &g
 		default:
 			return nil, fmt.Errorf("unknown volume parameter %q", key)
 		}
 	}
+
+	maybeSetDefaults(&vol)
+
 	err = vol.assertValid()
 	if err != nil {
 		return nil, err
 	}
 
 	return &vol, nil
+}
+
+// maybeSetDefaults sets the correct default values for certain fields on a
+// Volume if they are not already been set. These fields are not
+// pre-populated on all Volumes as the Volume type is polymorphic.
+func maybeSetDefaults(vol *Volume) {
+	if vol.Kind == "empty" {
+		if vol.Mode == nil {
+			m := emptyVolumeDefaultMode
+			vol.Mode = &m
+		}
+		if vol.UID == nil {
+			u := emptyVolumeDefaultUID
+			vol.UID = &u
+		}
+		if vol.GID == nil {
+			g := emptyVolumeDefaultGID
+			vol.GID = &g
+		}
+	}
 }

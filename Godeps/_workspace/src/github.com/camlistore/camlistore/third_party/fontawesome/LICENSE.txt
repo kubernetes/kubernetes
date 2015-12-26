@@ -1,0 +1,4 @@
+fonts/*: SIL OFL 1.1 (http://scripts.sil.org/OFL)
+css/*: MIT (http://opensource.org/licenses/mit-license.html)
+
+Details at http://fortawesome.github.io/Font-Awesome/license/

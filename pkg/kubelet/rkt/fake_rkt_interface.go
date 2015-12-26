@@ -30,12 +30,12 @@ import (
 // fakeRktInterface mocks the rktapi.PublicAPIClient interface for testing purpose.
 type fakeRktInterface struct {
 	sync.Mutex
-	info      rktapi.Info
-	images    []*rktapi.Image
-	podFilter *rktapi.PodFilter
-	pods      []*rktapi.Pod
-	called    []string
-	err       error
+	info       rktapi.Info
+	images     []*rktapi.Image
+	podFilters []*rktapi.PodFilter
+	pods       []*rktapi.Pod
+	called     []string
+	err        error
 }
 
 func newFakeRktInterface() *fakeRktInterface {
@@ -61,7 +61,7 @@ func (f *fakeRktInterface) ListPods(ctx context.Context, in *rktapi.ListPodsRequ
 	defer f.Unlock()
 
 	f.called = append(f.called, "ListPods")
-	f.podFilter = in.Filter
+	f.podFilters = in.Filters
 	return &rktapi.ListPodsResponse{f.pods}, f.err
 }
 
