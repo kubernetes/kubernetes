@@ -4,11 +4,15 @@ VERSION=v7
 
 all: build
 
-# TODO: build the jar and copy it in
-build:
-        docker build -t gcr.io/google_containers/cassandra:${VERSION} .
+kubernetes-cassandra.jar: ../java/* ../java/src/io/k8s/cassandra/*.java
+	cd ../java && mvn package
+	mv ../java/target/kubernetes-cassandra*.jar kubernetes-cassandra.jar
+	cd ../java && mvn clean
+
+build: kubernetes-cassandra.jar
+	docker build -t gcr.io/google_containers/cassandra:${VERSION} .
 
 push: build
-        gcloud docker push gcr.io/google_containers/cassandra:${VERSION}
+	gcloud docker push gcr.io/google_containers/cassandra:${VERSION}
 
-.PHONY: all
+.PHONY: all build push
