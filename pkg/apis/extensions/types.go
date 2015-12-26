@@ -202,10 +202,22 @@ type Deployment struct {
 	Status DeploymentStatus `json:"status,omitempty"`
 }
 
+type DeploymentTarget string
+
+const(
+	// the Deployment is ReplicationController-oriented
+	DeploymentTargetController DeploymentTarget  = "ReplicationController"
+	// the Deployment is DaemonSet-oriented
+	DeploymentTargetDaemonSet  DeploymentTarget  = "DaemonSet"
+)
+
 type DeploymentSpec struct {
 	// Number of desired pods. This is a pointer to distinguish between explicit
 	// zero and not specified. Defaults to 1.
 	Replicas int `json:"replicas,omitempty"`
+
+	// The target of the deployment(ReplicationController/Daemonset by now)
+	Target DeploymentTarget `json:"target,omitempty"`
 
 	// Label selector for pods. Existing ReplicationControllers whose pods are
 	// selected by this will be the ones affected by this deployment.
