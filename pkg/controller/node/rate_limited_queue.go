@@ -87,8 +87,8 @@ func (q *UniqueQueue) Replace(value TimedValue) bool {
 		if q.queue[i].Value != value.Value {
 			continue
 		}
-		heap.Remove(&q.queue, i)
-		heap.Push(&q.queue, &value)
+		*(q.queue[i]) = value
+		heap.Fix(&q.queue, i)
 		return true
 	}
 	return false
