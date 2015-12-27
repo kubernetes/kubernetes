@@ -320,8 +320,15 @@ func (s *CMServer) Run(_ []string) error {
 		} else if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("allocate-node-cidrs is set, but cloud provider does not support routes. Will not manage routes.")
 		} else {
-			routeController := routecontroller.New(routes, clientForUserAgentOrDie(*kubeconfig, "route-controller"), s.ClusterName, &s.ClusterCIDR)
-			routeController.Run(s.NodeSyncPeriod)
+			routeController := routecontroller.NewRouteController(
+				routes,
+				clientForUserAgentOrDie(*kubeconfig, "route-controller"),
+				s.ResyncPeriod,
+				s.ClusterName,
+				&s.ClusterCIDR)
+			if err := routeController.Run(util.NeverStop); err != nil {
+				glog.Errorf("Failed to start route controller: %v", err)
+			}
 		}
 	} else {
 		glog.Infof("allocate-node-cidrs set to %v, node controller not creating routes", s.AllocateNodeCIDRs)
