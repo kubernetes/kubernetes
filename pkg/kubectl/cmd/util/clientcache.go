@@ -49,6 +49,7 @@ func (c *ClientCache) ClientConfigForVersion(version *unversioned.GroupVersion) 
 		if err != nil {
 			return nil, err
 		}
+		config.ContentConfig.ContentType = "application/x-protobuf"
 		c.defaultConfig = config
 		if c.matchVersion {
 			if err := client.MatchesServerVersion(c.defaultClient, config); err != nil {
