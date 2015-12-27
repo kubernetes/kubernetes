@@ -22,8 +22,11 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 func TestIsResponsibleForRoute(t *testing.T) {
@@ -53,7 +56,7 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		if err != nil {
 			t.Errorf("%d. Error in test case: unparsable cidr %q", i, testCase.clusterCIDR)
 		}
-		rc := New(nil, nil, myClusterName, cidr)
+		rc := NewRouteController(nil, nil, controller.NoResyncPeriodFunc, myClusterName, cidr)
 		route := &cloudprovider.Route{
 			Name:            testCase.routeName,
 			TargetInstance:  "doesnt-matter-for-this-test",
@@ -65,7 +68,7 @@ func TestIsResponsibleForRoute(t *testing.T) {
 	}
 }
 
-func TestReconcile(t *testing.T) {
+func TestReconcileRoute(t *testing.T) {
 	cluster := "my-k8s"
 	testCases := []struct {
 		nodes          []api.Node
@@ -146,6 +149,7 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 	}
+
 	for i, testCase := range testCases {
 		cloud := &fakecloud.FakeCloud{RouteMap: make(map[string]*fakecloud.FakeRoute)}
 		for _, route := range testCase.initialRoutes {
@@ -159,10 +163,21 @@ func TestReconcile(t *testing.T) {
 			t.Error("Error in test: fakecloud doesn't support Routes()")
 		}
 		_, cidr, _ := net.ParseCIDR("10.120.0.0/16")
-		rc := New(routes, nil, cluster, cidr)
-		if err := rc.reconcile(testCase.nodes, testCase.initialRoutes); err != nil {
-			t.Errorf("%d. Error from rc.reconcile(): %v", i, err)
+
+		client := client.NewOrDie(&client.Config{Host: "", GroupVersion: testapi.Default.GroupVersion()})
+		rc := NewRouteController(routes, client, controller.NoResyncPeriodFunc, cluster, cidr)
+
+		rc.init()
+
+		for _, node := range testCase.nodes {
+			rc.nodeStore.Add(&node)
+			if err := rc.syncNodeRoute(getKey(&node, t)); err != nil {
+				t.Errorf("%d. Error from rc.reconcile(): %v", i, err)
+			}
 		}
+
+		rc.checkLeftoverRoutes()
+
 		var finalRoutes []*cloudprovider.Route
 		var err error
 		timeoutChan := time.After(200 * time.Millisecond)
@@ -180,6 +195,15 @@ func TestReconcile(t *testing.T) {
 				break poll
 			}
 		}
+	}
+}
+
+func getKey(node *api.Node, t *testing.T) string {
+	if key, err := controller.KeyFunc(node); err != nil {
+		t.Errorf("Unexpected error getting key for rc %v: %v", node.Name, err)
+		return ""
+	} else {
+		return key
 	}
 }
 

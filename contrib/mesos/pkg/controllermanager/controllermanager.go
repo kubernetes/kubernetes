@@ -157,8 +157,15 @@ func (s *CMServer) Run(_ []string) error {
 		if !ok {
 			glog.Fatal("Cloud provider must support routes if allocate-node-cidrs is set")
 		}
-		routeController := routecontroller.New(routes, kubeClient, s.ClusterName, (*net.IPNet)(&s.ClusterCIDR))
-		routeController.Run(s.NodeSyncPeriod)
+		routeController := routecontroller.NewRouteController(
+			routes,
+			kubeClient,
+			s.NodeSyncPeriod,
+			s.ClusterName,
+			(*net.IPNet)&s.ClusterCIDR)
+		if err := routeController.Run(util.NeverStop); err != nil {
+			glog.Errorf("Failed to start route controller: %v", err)
+		}
 	}
 
 	go resourcequotacontroller.NewResourceQuotaController(
