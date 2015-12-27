@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
+	"k8s.io/kubernetes/pkg/runtime/serializer/protobuf"
 	"k8s.io/kubernetes/pkg/runtime/serializer/recognizer"
 	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 )
@@ -45,6 +46,7 @@ func newCodecFactory(scheme *runtime.Scheme, mf json.MetaFactory) CodecFactory {
 	jsonSerializer := json.NewSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme), false)
 	jsonPrettySerializer := json.NewSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme), true)
 	yamlSerializer := json.NewYAMLSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme))
+	protoSerializer := protobuf.NewSerializer(scheme, runtime.ObjectTyperToTyper(scheme))
 	serializers := []serializerType{
 		{
 			AcceptContentTypes: []string{"application/json"},
@@ -52,6 +54,12 @@ func newCodecFactory(scheme *runtime.Scheme, mf json.MetaFactory) CodecFactory {
 			FileExtensions:     []string{"json"},
 			Serializer:         jsonSerializer,
 			PrettySerializer:   jsonPrettySerializer,
+		},
+		{
+			AcceptContentTypes: []string{"application/x-protobuf"},
+			ContentType:        "application/x-protobuf",
+			FileExtensions:     []string{"pb"},
+			Serializer:         protoSerializer,
 		},
 		{
 			AcceptContentTypes: []string{"application/yaml"},
