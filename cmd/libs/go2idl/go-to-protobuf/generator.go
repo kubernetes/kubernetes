@@ -78,7 +78,8 @@ func (g *genProtoIDL) Filter(c *generator.Context, t *types.Type) bool {
 		return false
 	}
 	seen := map[*types.Type]bool{}
-	return isProtoable(seen, t)
+	ok := isProtoable(seen, t)
+	return ok
 }
 
 func isProtoable(seen map[*types.Type]bool, t *types.Type) bool {
@@ -98,11 +99,11 @@ func isProtoable(seen map[*types.Type]bool, t *types.Type) bool {
 		return isProtoable(seen, t.Key) && isProtoable(seen, t.Elem)
 	case types.Struct:
 		for _, m := range t.Members {
-			if !isProtoable(seen, m.Type) {
-				return false
+			if isProtoable(seen, m.Type) {
+				return true
 			}
 		}
-		return true
+		return false
 	case types.Func, types.Chan:
 		return false
 	case types.DeclarationOf, types.Unknown, types.Unsupported:
@@ -529,20 +530,9 @@ func membersToFields(locator ProtobufLocator, t *types.Type, localPackage types.
 			if len(field.Name) == 0 && len(parts[0]) != 0 {
 				field.Name = parts[0]
 			}
-			/*if len(parts) > 1 {
-				for _, s := range parts[1:] {
-					switch s {
-					case "omitempty":
-						// TODO: make this nullable
-						//if !field.OptionalSet {
-						//	field.Optional = true
-						//	field.OptionalSet = true
-						//}
-					case "inline":
-						// TODO: inline all members, give them contextual tag that is non-conflicting
-					}
-				}
-			}*/
+			if field.Name == "-" {
+				continue
+			}
 		}
 
 		if field.Type == nil {
