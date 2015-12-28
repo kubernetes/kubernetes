@@ -37,8 +37,6 @@ type SchedulerServer struct {
 	EnableProfiling   bool
 	Master            string
 	Kubeconfig        string
-	BindPodsQPS       float32
-	BindPodsBurst     int
 	KubeAPIQPS        float32
 	KubeAPIBurst      int
 	SchedulerName     string
@@ -51,8 +49,6 @@ func NewSchedulerServer() *SchedulerServer {
 		Port:              ports.SchedulerPort,
 		Address:           net.ParseIP("0.0.0.0"),
 		AlgorithmProvider: factory.DefaultProvider,
-		BindPodsQPS:       50.0,
-		BindPodsBurst:     100,
 		KubeAPIQPS:        50.0,
 		KubeAPIBurst:      100,
 		SchedulerName:     api.DefaultSchedulerName,
@@ -70,8 +66,6 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
-	fs.Float32Var(&s.BindPodsQPS, "bind-pods-qps", s.BindPodsQPS, "Number of bindings per second scheduler is allowed to continuously make")
-	fs.IntVar(&s.BindPodsBurst, "bind-pods-burst", s.BindPodsBurst, "Number of bindings per second scheduler is allowed to make during bursts")
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.StringVar(&s.SchedulerName, "scheduler-name", s.SchedulerName, "Name of the scheduler, used to select which pods will be processed by this scheduler, based on pod's annotation with key 'scheduler.alpha.kubernetes.io/name'")
