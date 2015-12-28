@@ -45,7 +45,7 @@ func Default() *GeneratorArgs {
 	return generatorArgs
 }
 
-// GeneratorArgs has arguments common to most generators.
+// GeneratorArgs has arguments that are passed to generators.
 type GeneratorArgs struct {
 	// Which directories to parse.
 	InputDirs []string
@@ -61,6 +61,9 @@ type GeneratorArgs struct {
 
 	// If true, only verify, don't write anything.
 	VerifyOnly bool
+
+	// Any custom arguments go here
+	CustomArgs interface{}
 }
 
 func (g *GeneratorArgs) AddFlags(fs *pflag.FlagSet) {
