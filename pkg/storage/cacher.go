@@ -293,7 +293,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, f
 		return err
 	}
 
-	// To avoid situation when List is proceesed before the underlying
+	// To avoid situation when List is processed before the underlying
 	// watchCache is propagated for the first time, we acquire and immediately
 	// release the 'usable' lock.
 	// We don't need to hold it all the time, because watchCache is thread-safe
@@ -399,6 +399,11 @@ func filterFunction(key string, keyFunc func(runtime.Object) (string, error), fi
 
 // Returns resource version to which the underlying cache is synced.
 func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
+	// To avoid situation when LastSyncResourceVersion is processed before the
+	// underlying watchCache is propagated, we acquire 'usable' lock.
+	c.usable.RLock()
+	defer c.usable.RUnlock()
+
 	c.RLock()
 	defer c.RUnlock()
 
