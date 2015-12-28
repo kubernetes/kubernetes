@@ -462,8 +462,15 @@ func TestWatchPurposefulShutdown(t *testing.T) {
 	watching.Stop()
 	rt.Gosched()
 
-	if _, open := <-watching.ResultChan(); open {
-		t.Errorf("Channel should be closed")
+	// There is a race in etcdWatcher so that after calling Stop() one of
+	// two things can happen:
+	// - ResultChan() may be closed (triggered by closing userStop channel)
+	// - an Error "context cancelled" may be emitted (triggered by cancelling request
+	//   to etcd and putting that error to etcdError channel)
+	// We need to be prepared for both here.
+	event, open := <-watching.ResultChan()
+	if open && event.Type != watch.Error {
+		t.Errorf("Unexpected event from stopped watcher: %#v", event)
 	}
 }
 
