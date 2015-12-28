@@ -61,8 +61,6 @@ var KnownKubeletMetrics = map[string][]string{
 	"container_spec_memory_swap_limit_bytes":                 {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
 	"container_start_time_seconds":                           {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
 	"container_tasks_state":                                  {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name", "state"},
-	"get_token_count":                                        {},
-	"get_token_fail_count":                                   {},
 	"kubelet_container_manager_latency_microseconds":         {"operation_type", "quantile"},
 	"kubelet_container_manager_latency_microseconds_count":   {"operation_type"},
 	"kubelet_container_manager_latency_microseconds_sum":     {"operation_type"},
@@ -97,6 +95,12 @@ var KnownKubeletMetrics = map[string][]string{
 	"rest_client_request_latency_microseconds_sum":           {"url", "verb"},
 	"rest_client_request_status_codes":                       {"code", "host", "method"},
 }
+
+var KubeletMetricsLabelsToSkip = sets.NewString(
+	"kubernetes_namespace",
+	"image",
+	"name",
+)
 
 type KubeletMetrics Metrics
 
