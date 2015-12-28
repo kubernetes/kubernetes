@@ -178,8 +178,16 @@ func TestWatch(t *testing.T) {
 	podFooBis := makeTestPod("foo")
 	podFooBis.Spec.NodeName = "anotherFakeNode"
 
+	// initialVersion is used to initate the watcher at the beginning of the world,
+	// which is not defined precisely in etcd.
+	initialVersion, err := cacher.LastSyncResourceVersion()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	startVersion := strconv.Itoa(int(initialVersion))
+
 	// Set up Watch for object "podFoo".
-	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", "1", storage.Everything)
+	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", startVersion, storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -227,15 +235,23 @@ func TestWatcherTimeout(t *testing.T) {
 	cacher := newTestCacher(etcdStorage)
 	defer cacher.Stop()
 
+	// initialVersion is used to initate the watcher at the beginning of the world,
+	// which is not defined precisely in etcd.
+	initialVersion, err := cacher.LastSyncResourceVersion()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	startVersion := strconv.Itoa(int(initialVersion))
+
 	// Create a watcher that will not be reading any result.
-	watcher, err := cacher.WatchList(context.TODO(), "pods/ns", "1", storage.Everything)
+	watcher, err := cacher.WatchList(context.TODO(), "pods/ns", startVersion, storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	defer watcher.Stop()
 
 	// Create a second watcher that will be reading result.
-	readingWatcher, err := cacher.WatchList(context.TODO(), "pods/ns", "1", storage.Everything)
+	readingWatcher, err := cacher.WatchList(context.TODO(), "pods/ns", startVersion, storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
