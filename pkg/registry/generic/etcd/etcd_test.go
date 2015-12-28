@@ -536,6 +536,7 @@ func TestEtcdDeleteCollectionWithWatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watcher.Stop()
 
 	if _, err := registry.DeleteCollection(testContext, nil, &api.ListOptions{}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
