@@ -49,7 +49,7 @@ godep go install ./...
 
 ./hack/verify-all.sh -v
 
-./hack/test-go.sh -- -p=2
+./hack/test-go.sh
 ./hack/test-cmd.sh
 ./hack/test-integration.sh
 ./hack/test-update-storage-objects.sh
