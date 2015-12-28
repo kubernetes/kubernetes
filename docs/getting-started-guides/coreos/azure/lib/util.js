@@ -28,6 +28,27 @@ exports.rand_string = function () {
 
 exports.rand_suffix = exports.rand_string().substring(50);
 
+exports.getazdnsname=function(name) {
+  var azDnsName;
+  if (process.env['AZ_DNS_NAME']) {
+    azDnsName=process.env['AZ_DNS_NAME'];
+  }else{
+    azDnsName=[name,exports.rand_string().substring(50)].join('-');
+  }
+  return azDnsName; 
+};
+
+
+exports.getvnet=function(name){
+  var azVnet;
+  if (process.env['AZ_VNET']) {
+    azVnet=process.env['AZ_VNET'];
+  }else{
+    azVnet=[name, 'internal-vnet', exports.rand_suffix].join('-');
+  }
+  return azVnet; 
+};
+
 exports.join_output_file_path = function(prefix, suffix) {
   return './output/' + [prefix, exports.rand_suffix, suffix].join('_');
 };
