@@ -1869,7 +1869,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ kubecontainer.Pod, _ api.PodSta
 			err := dm.verifyNonRoot(container)
 			dm.updateReasonCache(pod, container, "VerifyNonRootError", err)
 			if err != nil {
-				glog.Errorf("Error running pod %q container %q: %v", kubecontainer.GetPodFullName(pod), container.Name, err)
+				glog.Errorf("Error running pod %q container %q: %v", format.Pod(pod), container.Name, err)
 				continue
 			}
 		}
@@ -1890,7 +1890,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ kubecontainer.Pod, _ api.PodSta
 		dm.updateReasonCache(pod, container, kubecontainer.ErrRunContainer.Error(), err)
 		if err != nil {
 			// TODO(bburns) : Perhaps blacklist a container after N failures?
-			glog.Errorf("Error running pod %q container %q: %v", kubecontainer.GetPodFullName(pod), container.Name, err)
+			glog.Errorf("Error running pod %q container %q: %v", format.Pod(pod), container.Name, err)
 			continue
 		}
 		containersStarted++
@@ -1979,7 +1979,7 @@ func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podSt
 			if ref, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
 				dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.BackOffStartContainer, "Back-off restarting failed docker container")
 			}
-			err := fmt.Errorf("Back-off %s restarting failed container=%s pod=%s", backOff.Get(stableName), container.Name, kubecontainer.GetPodFullName(pod))
+			err := fmt.Errorf("Back-off %s restarting failed container=%s pod=%s", backOff.Get(stableName), container.Name, format.Pod(pod))
 			dm.updateReasonCache(pod, container, kubecontainer.ErrCrashLoopBackOff.Error(), err)
 			glog.Infof("%s", err.Error())
 			return true
