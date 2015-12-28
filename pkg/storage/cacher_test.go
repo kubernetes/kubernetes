@@ -56,7 +56,6 @@ func newTestCacher(s storage.Interface) *storage.Cacher {
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
 		NewListFunc:    func() runtime.Object { return &api.PodList{} },
-		StopChannel:    util.NeverStop,
 	}
 	return storage.NewCacherFromConfig(config)
 }
@@ -91,6 +90,7 @@ func TestList(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
 	defer server.Terminate(t)
 	cacher := newTestCacher(etcdStorage)
+	defer cacher.Stop()
 
 	podFoo := makeTestPod("foo")
 	podBar := makeTestPod("bar")
@@ -167,6 +167,7 @@ func TestWatch(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
 	defer server.Terminate(t)
 	cacher := newTestCacher(etcdStorage)
+	defer cacher.Stop()
 
 	podFoo := makeTestPod("foo")
 	podBar := makeTestPod("bar")
@@ -182,6 +183,7 @@ func TestWatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watcher.Stop()
 
 	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
 	_ = updatePod(t, etcdStorage, podBar, nil)
@@ -200,6 +202,7 @@ func TestWatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer initialWatcher.Stop()
 
 	verifyWatchEvent(t, initialWatcher, watch.Added, podFoo)
 	verifyWatchEvent(t, initialWatcher, watch.Modified, podFooPrime)
@@ -209,6 +212,7 @@ func TestWatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer nowWatcher.Stop()
 
 	verifyWatchEvent(t, nowWatcher, watch.Added, podFooPrime)
 
@@ -221,6 +225,7 @@ func TestWatcherTimeout(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
 	defer server.Terminate(t)
 	cacher := newTestCacher(etcdStorage)
+	defer cacher.Stop()
 
 	// Create a watcher that will not be reading any result.
 	watcher, err := cacher.WatchList(context.TODO(), "pods/ns", "1", storage.Everything)
@@ -247,6 +252,7 @@ func TestFiltering(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
 	defer server.Terminate(t)
 	cacher := newTestCacher(etcdStorage)
+	defer cacher.Stop()
 
 	podFoo := makeTestPod("foo")
 	podFoo.Labels = map[string]string{"filter": "foo"}
@@ -279,6 +285,7 @@ func TestFiltering(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watcher.Stop()
 
 	verifyWatchEvent(t, watcher, watch.Added, podFoo)
 	verifyWatchEvent(t, watcher, watch.Deleted, podFooFiltered)
