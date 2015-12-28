@@ -97,7 +97,9 @@ func parseMetrics(data string, knownMetrics map[string][]string, output *Metrics
 				(*output)[name] = append((*output)[name], metric)
 			} else {
 				glog.Warning("Unknown metric %v", metric)
-				unknownMetrics.Insert(name)
+				if unknownMetrics != nil {
+					unknownMetrics.Insert(name)
+				}
 			}
 		}
 	}
