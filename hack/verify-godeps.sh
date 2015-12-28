@@ -71,6 +71,9 @@ GODEP="${_tmpdir}/bin/godep"
 # fill out that nice clean place with the kube godeps
 echo "Starting to download all kubernetes godeps. This takes a while"
 
+# Remove once either godep works properly or we bump docker version
+preload-dep github.com/docker docker 0f5c9d301b9b1cca66b3ea0f9dec3b5317d3686d
+
 "${GODEP}" restore
 echo "Download finished"
 

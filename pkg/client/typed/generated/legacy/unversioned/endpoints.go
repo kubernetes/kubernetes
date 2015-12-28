@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,9 +31,10 @@ type EndpointsInterface interface {
 	Create(*api.Endpoints) (*api.Endpoints, error)
 	Update(*api.Endpoints) (*api.Endpoints, error)
 	Delete(name string, options *api.DeleteOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.Endpoints, error)
-	List(opts unversioned.ListOptions) (*api.EndpointsList, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	List(opts api.ListOptions) (*api.EndpointsList, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // endpoints implements EndpointsInterface
@@ -78,18 +78,22 @@ func (c *endpoints) Update(endpoints *api.Endpoints) (result *api.Endpoints, err
 
 // Delete takes name of the endpoints and deletes it. Returns an error if one occurs.
 func (c *endpoints) Delete(name string, options *api.DeleteOptions) error {
-	if options == nil {
-		return c.client.Delete().Namespace(c.ns).Resource("endpoints").Name(name).Do().Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
-	if err != nil {
-		return err
-	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(name).
-		Body(body).
+		Body(options).
+		Do().
+		Error()
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *endpoints) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	return c.client.Delete().
+		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Resource("endpoints").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(options).
 		Do().
 		Error()
 }
@@ -107,7 +111,7 @@ func (c *endpoints) Get(name string) (result *api.Endpoints, err error) {
 }
 
 // List takes label and field selectors, and returns the list of Endpoints that match those selectors.
-func (c *endpoints) List(opts unversioned.ListOptions) (result *api.EndpointsList, err error) {
+func (c *endpoints) List(opts api.ListOptions) (result *api.EndpointsList, err error) {
 	result = &api.EndpointsList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -119,7 +123,7 @@ func (c *endpoints) List(opts unversioned.ListOptions) (result *api.EndpointsLis
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints.
-func (c *endpoints) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *endpoints) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

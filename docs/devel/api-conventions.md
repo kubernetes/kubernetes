@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/devel/api-conventions.md).
@@ -256,6 +257,7 @@ This rule maintains the invariant that all JSON/YAML keys are fields in API obje
 * Do not use unsigned integers, due to inconsistent support across languages and libraries. Just validate that the integer is non-negative if that's the case.
 * Do not use enums. Use aliases for string instead (e.g., `NodeConditionType`).
 * Look at similar fields in the API (e.g., ports, durations) and follow the conventions of existing fields.
+* All public integer fields MUST use the Go `(u)int32` or Go `(u)int64` types, not `(u)int` (which is ambiguous depending on target platform). Internal types may use `(u)int`.
 
 #### Constants
 
@@ -402,7 +404,7 @@ Using the `omitempty` tag causes swagger documentation to reflect that the field
 
 Using a pointer allows distinguishing unset from the zero value for that type.
 There are some cases where, in principle, a pointer is not needed for an optional field
-since the zero value is forbidden, and thus imples unset.   There are examples of this in the
+since the zero value is forbidden, and thus implies unset.   There are examples of this in the
 codebase.  However:
 
 - it can be difficult for implementors to anticipate all cases where an empty value might need to be

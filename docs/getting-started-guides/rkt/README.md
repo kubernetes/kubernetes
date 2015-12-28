@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/rkt/README.md).
@@ -131,7 +132,7 @@ For more complete applications, please look in the [examples directory](../../..
 
 ### Debugging
 
-Here are severals tips for you when you run into any issues.
+Here are several tips for you when you run into any issues.
 
 ##### Check logs
 

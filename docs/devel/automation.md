@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/devel/automation.md).
@@ -35,7 +36,7 @@ Documentation for other releases can be found at
 
 ## Overview
 
-Kubernetes uses a variety of automated tools in an attempt to relieve developers of repeptitive, low
+Kubernetes uses a variety of automated tools in an attempt to relieve developers of repetitive, low
 brain power work.  This document attempts to describe these processes.
 
 

@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -30,15 +31,15 @@ var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1
 
 var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion)
 
-func init() {
-	addKnownTypes()
-	addDefaultingFuncs()
-	addConversionFuncs()
+func AddToScheme(scheme *runtime.Scheme) {
+	addKnownTypes(scheme)
+	addDefaultingFuncs(scheme)
+	addConversionFuncs(scheme)
 }
 
 // Adds the list of known types to api.Scheme.
-func addKnownTypes() {
-	api.Scheme.AddKnownTypes(SchemeGroupVersion,
+func addKnownTypes(scheme *runtime.Scheme) {
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&ClusterAutoscaler{},
 		&ClusterAutoscalerList{},
 		&Deployment{},
@@ -60,6 +61,7 @@ func addKnownTypes() {
 		&ListOptions{},
 		&ConfigMap{},
 		&ConfigMapList{},
+		&v1.DeleteOptions{},
 	)
 }
 

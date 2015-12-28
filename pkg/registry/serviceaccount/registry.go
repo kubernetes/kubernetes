@@ -19,14 +19,13 @@ package serviceaccount
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface implemented by things that know how to store ServiceAccount objects.
 type Registry interface {
-	ListServiceAccounts(ctx api.Context, options *unversioned.ListOptions) (*api.ServiceAccountList, error)
-	WatchServiceAccounts(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error)
+	ListServiceAccounts(ctx api.Context, options *api.ListOptions) (*api.ServiceAccountList, error)
+	WatchServiceAccounts(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 	GetServiceAccount(ctx api.Context, name string) (*api.ServiceAccount, error)
 	CreateServiceAccount(ctx api.Context, ServiceAccount *api.ServiceAccount) error
 	UpdateServiceAccount(ctx api.Context, ServiceAccount *api.ServiceAccount) error
@@ -44,7 +43,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListServiceAccounts(ctx api.Context, options *unversioned.ListOptions) (*api.ServiceAccountList, error) {
+func (s *storage) ListServiceAccounts(ctx api.Context, options *api.ListOptions) (*api.ServiceAccountList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -52,7 +51,7 @@ func (s *storage) ListServiceAccounts(ctx api.Context, options *unversioned.List
 	return obj.(*api.ServiceAccountList), nil
 }
 
-func (s *storage) WatchServiceAccounts(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchServiceAccounts(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

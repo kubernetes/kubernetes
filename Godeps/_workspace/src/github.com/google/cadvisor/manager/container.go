@@ -28,8 +28,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/docker/pkg/units"
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
@@ -37,15 +35,15 @@ import (
 	"github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/summary"
 	"github.com/google/cadvisor/utils/cpuload"
+
+	"github.com/docker/docker/pkg/units"
+	"github.com/golang/glog"
 )
 
 // Housekeeping interval.
 var HousekeepingInterval = flag.Duration("housekeeping_interval", 1*time.Second, "Interval between container housekeepings")
 
-var cgroupPathRegExp = regexp.MustCompile(".*devices.*:(.*?)[,;$].*")
-
-// Decay value used for load average smoothing. Interval length of 10 seconds is used.
-var loadDecay = math.Exp(float64(-1 * (*HousekeepingInterval).Seconds() / 10))
+var cgroupPathRegExp = regexp.MustCompile(`.*devices.*:(.*?)[,;$].*`)
 
 type containerInfo struct {
 	info.ContainerReference
@@ -66,6 +64,9 @@ type containerData struct {
 	allowDynamicHousekeeping bool
 	lastUpdatedTime          time.Time
 	lastErrorTime            time.Time
+
+	// Decay value used for load average smoothing. Interval length of 10 seconds is used.
+	loadDecay float64
 
 	// Whether to log the usage of this container when it is updated.
 	logUsage bool
@@ -316,6 +317,8 @@ func newContainerData(containerName string, memoryCache *memory.InMemoryCache, h
 	}
 	cont.info.ContainerReference = ref
 
+	cont.loadDecay = math.Exp(float64(-cont.housekeepingInterval.Seconds() / 10))
+
 	err = cont.updateSpec()
 	if err != nil {
 		return nil, err
@@ -445,6 +448,9 @@ func (c *containerData) updateSpec() error {
 	}
 
 	customMetrics, err := c.collectorManager.GetSpec()
+	if err != nil {
+		return err
+	}
 	if len(customMetrics) > 0 {
 		spec.HasCustomMetrics = true
 		spec.CustomMetrics = customMetrics
@@ -462,7 +468,7 @@ func (c *containerData) updateLoad(newLoad uint64) {
 	if c.loadAvg < 0 {
 		c.loadAvg = float64(newLoad) // initialize to the first seen sample for faster stabilization.
 	} else {
-		c.loadAvg = c.loadAvg*loadDecay + float64(newLoad)*(1.0-loadDecay)
+		c.loadAvg = c.loadAvg*c.loadDecay + float64(newLoad)*(1.0-c.loadDecay)
 	}
 }
 

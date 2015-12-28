@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -33,9 +32,10 @@ type JobInterface interface {
 	Create(*extensions.Job) (*extensions.Job, error)
 	Update(*extensions.Job) (*extensions.Job, error)
 	Delete(name string, options *api.DeleteOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*extensions.Job, error)
-	List(opts unversioned.ListOptions) (*extensions.JobList, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	List(opts api.ListOptions) (*extensions.JobList, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // jobs implements JobInterface
@@ -79,18 +79,22 @@ func (c *jobs) Update(job *extensions.Job) (result *extensions.Job, err error) {
 
 // Delete takes name of the job and deletes it. Returns an error if one occurs.
 func (c *jobs) Delete(name string, options *api.DeleteOptions) error {
-	if options == nil {
-		return c.client.Delete().Namespace(c.ns).Resource("jobs").Name(name).Do().Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
-	if err != nil {
-		return err
-	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").
 		Name(name).
-		Body(body).
+		Body(options).
+		Do().
+		Error()
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *jobs) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	return c.client.Delete().
+		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Resource("jobs").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(options).
 		Do().
 		Error()
 }
@@ -108,7 +112,7 @@ func (c *jobs) Get(name string) (result *extensions.Job, err error) {
 }
 
 // List takes label and field selectors, and returns the list of Jobs that match those selectors.
-func (c *jobs) List(opts unversioned.ListOptions) (result *extensions.JobList, err error) {
+func (c *jobs) List(opts api.ListOptions) (result *extensions.JobList, err error) {
 	result = &extensions.JobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -120,7 +124,7 @@ func (c *jobs) List(opts unversioned.ListOptions) (result *extensions.JobList, e
 }
 
 // Watch returns a watch.Interface that watches the requested jobs.
-func (c *jobs) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *jobs) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

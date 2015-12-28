@@ -19,15 +19,14 @@ package endpoint
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store endpoints.
 type Registry interface {
-	ListEndpoints(ctx api.Context, options *unversioned.ListOptions) (*api.EndpointsList, error)
+	ListEndpoints(ctx api.Context, options *api.ListOptions) (*api.EndpointsList, error)
 	GetEndpoints(ctx api.Context, name string) (*api.Endpoints, error)
-	WatchEndpoints(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error)
+	WatchEndpoints(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 	UpdateEndpoints(ctx api.Context, e *api.Endpoints) error
 	DeleteEndpoints(ctx api.Context, name string) error
 }
@@ -43,7 +42,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListEndpoints(ctx api.Context, options *unversioned.ListOptions) (*api.EndpointsList, error) {
+func (s *storage) ListEndpoints(ctx api.Context, options *api.ListOptions) (*api.EndpointsList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -51,7 +50,7 @@ func (s *storage) ListEndpoints(ctx api.Context, options *unversioned.ListOption
 	return obj.(*api.EndpointsList), nil
 }
 
-func (s *storage) WatchEndpoints(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchEndpoints(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

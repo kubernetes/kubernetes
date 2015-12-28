@@ -103,7 +103,7 @@ func verifyResult(c *client.Client, podName string, ns string) {
 		"involvedObject.kind":      "Pod",
 		"involvedObject.name":      podName,
 		"involvedObject.namespace": ns,
-		"source":                   "scheduler",
+		"source":                   api.DefaultSchedulerName,
 		"reason":                   "FailedScheduling",
 	}.AsSelector()
 	options := api.ListOptions{FieldSelector: selector}
@@ -200,7 +200,9 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 	// This test verifies that max-pods flag works as advertised. It assumes that cluster add-on pods stay stable
 	// and cannot be run in parallel with any other test that touches Nodes or Pods. It is so because to check
 	// if max-pods is working we need to fully saturate the cluster and keep it in this state for few seconds.
-	It("validates MaxPods limit number of pods that are allowed to run", func() {
+	//
+	// Slow PR #13315 (8 min)
+	It("validates MaxPods limit number of pods that are allowed to run [Slow]", func() {
 		totalPodCapacity = 0
 
 		for _, node := range nodeList.Items {

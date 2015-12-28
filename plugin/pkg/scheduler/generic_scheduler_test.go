@@ -17,7 +17,6 @@ limitations under the License.
 package scheduler
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 	"strconv"
@@ -45,14 +44,10 @@ func hasNoPodsPredicate(pod *api.Pod, existingPods []*api.Pod, node string) (boo
 	return len(existingPods) == 0, nil
 }
 
-func numericPriority(pod *api.Pod, machineToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
-	nodes, err := nodeLister.List()
+func numericPriority(pod *api.Pod, machineToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes <-chan *api.Node) (schedulerapi.HostPriorityList, error) {
 	result := []schedulerapi.HostPriority{}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to list nodes: %v", err)
-	}
-	for _, node := range nodes.Items {
+	for node := range nodes {
 		score, err := strconv.Atoi(node.Name)
 		if err != nil {
 			return nil, err
@@ -65,11 +60,11 @@ func numericPriority(pod *api.Pod, machineToPods map[string][]*api.Pod, podListe
 	return result, nil
 }
 
-func reverseNumericPriority(pod *api.Pod, machineToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func reverseNumericPriority(pod *api.Pod, machineToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes <-chan *api.Node) (schedulerapi.HostPriorityList, error) {
 	var maxScore float64
 	minScore := math.MaxFloat64
 	reverseResult := []schedulerapi.HostPriority{}
-	result, err := numericPriority(pod, machineToPods, podLister, nodeLister)
+	result, err := numericPriority(pod, machineToPods, podLister, nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -252,38 +247,6 @@ func TestGenericScheduler(t *testing.T) {
 			expectsErr:   true,
 			name:         "test 8",
 		},
-		{
-			predicates: map[string]algorithm.FitPredicate{
-				"nopods":  hasNoPodsPredicate,
-				"matches": matchesPredicate,
-			},
-			pods: []*api.Pod{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "2"},
-					Spec: api.PodSpec{
-						NodeName: "2",
-					},
-					Status: api.PodStatus{
-						Phase: api.PodFailed,
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{Name: "3"},
-					Spec: api.PodSpec{
-						NodeName: "2",
-					},
-					Status: api.PodStatus{
-						Phase: api.PodSucceeded,
-					},
-				},
-			},
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
-
-			prioritizers: []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
-			nodes:        []string{"1", "2"},
-			expectedHost: "2",
-			name:         "test 9",
-		},
 	}
 
 	for _, test := range tests {
@@ -306,6 +269,20 @@ func TestGenericScheduler(t *testing.T) {
 }
 
 func TestFindFitAllError(t *testing.T) {
+	c := &ResultChannel{
+		Size: 1,
+		FResult: FitResult{
+			Err:              make(chan error),
+			FailedPredicates: FailedPredicateMap{},
+		},
+		PResult: PriorityResult{
+			Err:             make(chan error),
+			PrioritizeNodes: schedulerapi.HostPriorityList{},
+		},
+	}
+	for i := 0; i < c.Size; i++ {
+		c.Sub = append(c.Sub, make(chan *api.Node, 3))
+	}
 	nodes := []string{"3", "2", "1"}
 	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "false": falsePredicate}
 	machineToPods := map[string][]*api.Pod{
@@ -313,20 +290,32 @@ func TestFindFitAllError(t *testing.T) {
 		"2": {},
 		"1": {},
 	}
-	_, predicateMap, err := findNodesThatFit(&api.Pod{}, machineToPods, predicates, makeNodeList(nodes), nil)
 
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	go findNodesThatFit(&api.Pod{}, machineToPods, predicates, makeNodeList(nodes), nil, c)
+
+	flag := true
+	for flag {
+		select {
+		case err := <-c.FResult.Err:
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				flag = false
+			}
+		case _, ok := <-c.Sub[0]:
+			if !ok {
+				flag = false
+			}
+		}
 	}
 
-	if len(predicateMap) != len(nodes) {
-		t.Errorf("unexpected failed predicate map: %v", predicateMap)
+	if len(c.FResult.FailedPredicates) != len(nodes) {
+		t.Errorf("unexpected failed predicate map: %v", c.FResult.FailedPredicates)
 	}
 
 	for _, node := range nodes {
-		failures, found := predicateMap[node]
+		failures, found := c.FResult.FailedPredicates[node]
 		if !found {
-			t.Errorf("failed to find node: %s in %v", node, predicateMap)
+			t.Errorf("failed to find node: %s in %v", node, c.FResult.FailedPredicates)
 		}
 		if len(failures) != 1 || !failures.Has("false") {
 			t.Errorf("unexpected failures: %v", failures)
@@ -335,6 +324,20 @@ func TestFindFitAllError(t *testing.T) {
 }
 
 func TestFindFitSomeError(t *testing.T) {
+	c := &ResultChannel{
+		Size: 1,
+		FResult: FitResult{
+			Err:              make(chan error),
+			FailedPredicates: FailedPredicateMap{},
+		},
+		PResult: PriorityResult{
+			Err:             make(chan error),
+			PrioritizeNodes: schedulerapi.HostPriorityList{},
+		},
+	}
+	for i := 0; i < c.Size; i++ {
+		c.Sub = append(c.Sub, make(chan *api.Node, 3))
+	}
 	nodes := []string{"3", "2", "1"}
 	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "match": matchesPredicate}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}}
@@ -343,23 +346,35 @@ func TestFindFitSomeError(t *testing.T) {
 		"2": {},
 		"1": {pod},
 	}
-	_, predicateMap, err := findNodesThatFit(pod, machineToPods, predicates, makeNodeList(nodes), nil)
 
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	go findNodesThatFit(pod, machineToPods, predicates, makeNodeList(nodes), nil, c)
+
+	flag := true
+	for flag {
+		select {
+		case err := <-c.FResult.Err:
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				flag = false
+			}
+		case _, ok := <-c.Sub[0]:
+			if !ok {
+				flag = false
+			}
+		}
 	}
 
-	if len(predicateMap) != (len(nodes) - 1) {
-		t.Errorf("unexpected failed predicate map: %v", predicateMap)
+	if len(c.FResult.FailedPredicates) != (len(nodes) - 1) {
+		t.Errorf("unexpected failed predicate map: %v", c.FResult.FailedPredicates)
 	}
 
 	for _, node := range nodes {
 		if node == pod.Name {
 			continue
 		}
-		failures, found := predicateMap[node]
+		failures, found := c.FResult.FailedPredicates[node]
 		if !found {
-			t.Errorf("failed to find node: %s in %v", node, predicateMap)
+			t.Errorf("failed to find node: %s in %v", node, c.FResult.FailedPredicates)
 		}
 		if len(failures) != 1 || !failures.Has("match") {
 			t.Errorf("unexpected failures: %v", failures)

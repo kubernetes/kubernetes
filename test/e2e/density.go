@@ -135,8 +135,6 @@ var _ = Describe("Density [Skipped]", func() {
 			c.Pods(ns).Delete(name, nil)
 		}
 
-		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
-
 		// Verify latency metrics.
 		highLatencyRequests, err := HighLatencyRequests(c)
 		expectNoError(err)
@@ -172,7 +170,6 @@ var _ = Describe("Density [Skipped]", func() {
 
 		expectNoError(resetMetrics(c))
 		expectNoError(os.Mkdir(fmt.Sprintf(testContext.OutputDir+"/%s", uuid), 0777))
-		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "before"))
 
 		Logf("Listing nodes for easy debugging:\n")
 		for _, node := range nodes.Items {
@@ -369,7 +366,7 @@ var _ = Describe("Density [Skipped]", func() {
 				selector := fields.Set{
 					"involvedObject.kind":      "Pod",
 					"involvedObject.namespace": ns,
-					"source":                   "scheduler",
+					"source":                   api.DefaultSchedulerName,
 				}.AsSelector()
 				options := api.ListOptions{FieldSelector: selector}
 				schedEvents, err := c.Events(ns).List(options)

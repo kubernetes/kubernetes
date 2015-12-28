@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 const kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
@@ -80,45 +81,45 @@ var _ meta.RESTMapper = &ShortcutExpander{}
 
 // KindFor implements meta.RESTMapper. It expands the resource first, then invokes the wrapped
 // mapper.
-func (e ShortcutExpander) KindFor(resource string) (unversioned.GroupVersionKind, error) {
+func (e ShortcutExpander) KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error) {
 	resource = expandResourceShortcut(resource)
 	return e.RESTMapper.KindFor(resource)
 }
 
 // ResourceIsValid takes a string (kind) and checks if it's a valid resource.
 // It expands the resource first, then invokes the wrapped mapper.
-func (e ShortcutExpander) ResourceIsValid(resource string) bool {
+func (e ShortcutExpander) ResourceIsValid(resource unversioned.GroupVersionResource) bool {
 	return e.RESTMapper.ResourceIsValid(expandResourceShortcut(resource))
 }
 
 // ResourceSingularizer expands the named resource and then singularizes it.
 func (e ShortcutExpander) ResourceSingularizer(resource string) (string, error) {
-	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(resource))
+	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource)
 }
 
 // expandResourceShortcut will return the expanded version of resource
 // (something that a pkg/api/meta.RESTMapper can understand), if it is
 // indeed a shortcut. Otherwise, will return resource unmodified.
-func expandResourceShortcut(resource string) string {
-	shortForms := map[string]string{
+func expandResourceShortcut(resource unversioned.GroupVersionResource) unversioned.GroupVersionResource {
+	shortForms := map[string]unversioned.GroupVersionResource{
 		// Please keep this alphabetized
-		"cs":     "componentstatuses",
-		"ds":     "daemonsets",
-		"ep":     "endpoints",
-		"ev":     "events",
-		"hpa":    "horizontalpodautoscalers",
-		"ing":    "ingresses",
-		"limits": "limitranges",
-		"no":     "nodes",
-		"ns":     "namespaces",
-		"po":     "pods",
-		"pvc":    "persistentvolumeclaims",
-		"pv":     "persistentvolumes",
-		"quota":  "resourcequotas",
-		"rc":     "replicationcontrollers",
-		"svc":    "services",
+		"cs":     api.SchemeGroupVersion.WithResource("componentstatuses"),
+		"ds":     extensions.SchemeGroupVersion.WithResource("daemonsets"),
+		"ep":     api.SchemeGroupVersion.WithResource("endpoints"),
+		"ev":     api.SchemeGroupVersion.WithResource("events"),
+		"hpa":    extensions.SchemeGroupVersion.WithResource("horizontalpodautoscalers"),
+		"ing":    extensions.SchemeGroupVersion.WithResource("ingresses"),
+		"limits": api.SchemeGroupVersion.WithResource("limitranges"),
+		"no":     api.SchemeGroupVersion.WithResource("nodes"),
+		"ns":     api.SchemeGroupVersion.WithResource("namespaces"),
+		"po":     api.SchemeGroupVersion.WithResource("pods"),
+		"pvc":    api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
+		"pv":     api.SchemeGroupVersion.WithResource("persistentvolumes"),
+		"quota":  api.SchemeGroupVersion.WithResource("resourcequotas"),
+		"rc":     api.SchemeGroupVersion.WithResource("replicationcontrollers"),
+		"svc":    api.SchemeGroupVersion.WithResource("services"),
 	}
-	if expanded, ok := shortForms[resource]; ok {
+	if expanded, ok := shortForms[resource.Resource]; ok {
 		return expanded
 	}
 	return resource

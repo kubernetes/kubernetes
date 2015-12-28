@@ -152,7 +152,7 @@ func TestListEmptyTestTypes(t *testing.T) {
 			Response: simple.Response{StatusCode: http.StatusOK, Body: &testgroup.TestTypeList{}},
 		},
 	}
-	podList, err := c.Setup(t).TestTypes(ns).List(unversioned.ListOptions{})
+	podList, err := c.Setup(t).TestTypes(ns).List(api.ListOptions{})
 	c.simpleClient.Validate(t, podList, err)
 }
 
@@ -177,7 +177,7 @@ func TestListTestTypes(t *testing.T) {
 			},
 		},
 	}
-	receivedTestTypeList, err := c.Setup(t).TestTypes(ns).List(unversioned.ListOptions{})
+	receivedTestTypeList, err := c.Setup(t).TestTypes(ns).List(api.ListOptions{})
 	c.simpleClient.Validate(t, receivedTestTypeList, err)
 }
 
@@ -210,7 +210,7 @@ func TestListTestTypesLabels(t *testing.T) {
 	c.Setup(t)
 	c.simpleClient.QueryValidator[labelSelectorQueryParamName] = simple.ValidateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	options := api.ListOptions{LabelSelector: selector}
 	receivedTestTypeList, err := c.TestTypes(ns).List(options)
 	c.simpleClient.Validate(t, receivedTestTypeList, err)
 }

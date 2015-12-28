@@ -88,14 +88,9 @@ func machine2PrioritizerExtender(pod *api.Pod, nodes *api.NodeList) (*schedulera
 	return &result, nil
 }
 
-func machine2Prioritizer(_ *api.Pod, machineToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return []schedulerapi.HostPriority{}, err
-	}
-
+func machine2Prioritizer(_ *api.Pod, machineToPods map[string][]*api.Pod, podLister algorithm.PodLister, nodes <-chan *api.Node) (schedulerapi.HostPriorityList, error) {
 	result := []schedulerapi.HostPriority{}
-	for _, node := range nodes.Items {
+	for node := range nodes {
 		score := 1
 		if node.Name == "machine2" {
 			score = 10

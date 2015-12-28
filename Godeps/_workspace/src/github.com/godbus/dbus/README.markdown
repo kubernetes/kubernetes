@@ -27,6 +27,9 @@ The complete package documentation and some simple examples are available at
 [_examples](https://github.com/godbus/dbus/tree/master/_examples) directory
 gives a short overview over the basic usage. 
 
+#### Projects using godbus
+- [notify](https://github.com/esiqveland/notify) provides desktop notifications over dbus into a library.
+
 Please note that the API is considered unstable for now and may change without
 further notice.
 

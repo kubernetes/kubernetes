@@ -19,14 +19,13 @@ package namespace
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface implemented by things that know how to store Namespace objects.
 type Registry interface {
-	ListNamespaces(ctx api.Context, options *unversioned.ListOptions) (*api.NamespaceList, error)
-	WatchNamespaces(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error)
+	ListNamespaces(ctx api.Context, options *api.ListOptions) (*api.NamespaceList, error)
+	WatchNamespaces(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 	GetNamespace(ctx api.Context, namespaceID string) (*api.Namespace, error)
 	CreateNamespace(ctx api.Context, namespace *api.Namespace) error
 	UpdateNamespace(ctx api.Context, namespace *api.Namespace) error
@@ -44,7 +43,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListNamespaces(ctx api.Context, options *unversioned.ListOptions) (*api.NamespaceList, error) {
+func (s *storage) ListNamespaces(ctx api.Context, options *api.ListOptions) (*api.NamespaceList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -52,7 +51,7 @@ func (s *storage) ListNamespaces(ctx api.Context, options *unversioned.ListOptio
 	return obj.(*api.NamespaceList), nil
 }
 
-func (s *storage) WatchNamespaces(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchNamespaces(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

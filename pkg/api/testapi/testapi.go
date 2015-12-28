@@ -50,7 +50,10 @@ func init() {
 	if kubeTestAPI != "" {
 		testGroupVersions := strings.Split(kubeTestAPI, ",")
 		for _, gvString := range testGroupVersions {
-			groupVersion := unversioned.ParseGroupVersionOrDie(gvString)
+			groupVersion, err := unversioned.ParseGroupVersion(gvString)
+			if err != nil {
+				panic(fmt.Sprintf("Error parsing groupversion %v: %v", gvString, err))
+			}
 
 			Groups[groupVersion.Group] = TestGroup{
 				externalGroupVersion: groupVersion,

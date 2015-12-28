@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/devel/api_changes.md).
@@ -558,7 +559,7 @@ New feature development proceeds through a series of stages of increasing maturi
 
 - Development level
   - Object Versioning: no convention
-  - Availability: not commited to main kubernetes repo, and thus not available in offical releases
+  - Availability: not committed to main kubernetes repo, and thus not available in official releases
   - Audience: other developers closely collaborating on a feature or proof-of-concept
   - Upgradeability, Reliability, Completeness, and Support: no requirements or guarantees
 - Alpha level
@@ -590,7 +591,7 @@ New feature development proceeds through a series of stages of increasing maturi
     tests complete; the API has had a thorough API review and is thought to be complete, though use
     during beta may frequently turn up API issues not thought of during review
   - Upgradeability: the object schema and semantics may change in a later software release; when
-    this happens, an upgrade path will be documentedr; in some cases, objects will be automatically
+    this happens, an upgrade path will be documented; in some cases, objects will be automatically
     converted to the new version; in other cases, a manual upgrade may be necessary;  a manual
     upgrade may require downtime for anything relying on the new feature, and may require
     manual conversion of objects to the new version; when manual conversion is necessary, the

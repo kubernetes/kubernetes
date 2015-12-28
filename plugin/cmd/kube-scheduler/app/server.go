@@ -58,6 +58,7 @@ type SchedulerServer struct {
 	BindPodsBurst     int
 	KubeAPIQPS        float32
 	KubeAPIBurst      int
+	SchedulerName     string
 }
 
 // NewSchedulerServer creates a new SchedulerServer with default parameters
@@ -70,6 +71,7 @@ func NewSchedulerServer() *SchedulerServer {
 		BindPodsBurst:     100,
 		KubeAPIQPS:        50.0,
 		KubeAPIBurst:      100,
+		SchedulerName:     api.DefaultSchedulerName,
 	}
 	return &s
 }
@@ -107,6 +109,7 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.BindPodsBurst, "bind-pods-burst", s.BindPodsBurst, "Number of bindings per second scheduler is allowed to make during bursts")
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
+	fs.StringVar(&s.SchedulerName, "scheduler-name", s.SchedulerName, "Name of the scheduler, used to select which pods will be processed by this scheduler, based on pod's annotation with key 'scheduler.alpha.kubernetes.io/name'")
 }
 
 // Run runs the specified SchedulerServer.  This should never exit.
@@ -142,14 +145,14 @@ func (s *SchedulerServer) Run(_ []string) error {
 		glog.Fatal(server.ListenAndServe())
 	}()
 
-	configFactory := factory.NewConfigFactory(kubeClient, util.NewTokenBucketRateLimiter(s.BindPodsQPS, s.BindPodsBurst))
+	configFactory := factory.NewConfigFactory(kubeClient, util.NewTokenBucketRateLimiter(s.BindPodsQPS, s.BindPodsBurst), s.SchedulerName)
 	config, err := s.createConfig(configFactory)
 	if err != nil {
 		glog.Fatalf("Failed to create scheduler configuration: %v", err)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	config.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
+	config.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: s.SchedulerName})
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
 

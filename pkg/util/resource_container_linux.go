@@ -22,8 +22,8 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/docker/libcontainer/cgroups/fs"
-	"github.com/docker/libcontainer/configs"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
 // Creates resource-only containerName if it does not already exist and moves

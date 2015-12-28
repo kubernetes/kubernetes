@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -45,17 +44,13 @@ type provision struct {
 }
 
 func (p *provision) Admit(a admission.Attributes) (err error) {
-	gvk, err := api.RESTMapper.KindFor(a.GetResource().Resource)
-	if err != nil {
-		return admission.NewForbidden(a, err)
-	}
-	mapping, err := api.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-	if err != nil {
-		return admission.NewForbidden(a, err)
-	}
-	if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
+	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
+	// its a namespaced resource.
+	if len(a.GetNamespace()) == 0 || a.GetKind() == api.Kind("Namespace") {
 		return nil
 	}
+
 	namespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:      a.GetNamespace(),

@@ -26,10 +26,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/libcontainer/cgroups"
-	"github.com/docker/libcontainer/cgroups/fs"
-	"github.com/docker/libcontainer/configs"
 	"github.com/golang/glog"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	"github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -339,13 +339,17 @@ func ensureDockerInContainer(cadvisor cadvisor.Interface, oomScoreAdj int, manag
 
 // Gets the (CPU) container the specified pid is in.
 func getContainer(pid int) (string, error) {
-	f, err := os.Open(fmt.Sprintf("/proc/%d/cgroup", pid))
+	cgs, err := cgroups.ParseCgroupFile(fmt.Sprintf("/proc/%d/cgroup", pid))
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
 
-	return cgroups.ParseCgroupFile("cpu", f)
+	cg, ok := cgs["cpu"]
+	if ok {
+		return cg, nil
+	}
+
+	return "", cgroups.NewNotFoundError("cpu")
 }
 
 // Ensures the system container is created and all non-kernel threads and process 1
@@ -373,6 +377,19 @@ func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error
 			continue
 		}
 
+		// Get PIDs already in target group so we can remove them from the list of
+		// PIDs to move.
+		systemCgroupPIDs, err := manager.GetPids()
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to list PIDs for %s: %v", manager.Cgroups.Name, err))
+			continue
+		}
+
+		systemCgroupPIDMap := make(map[int]struct{}, len(systemCgroupPIDs))
+		for _, pid := range systemCgroupPIDs {
+			systemCgroupPIDMap[pid] = struct{}{}
+		}
+
 		// Remove kernel pids and process 1
 		pids := make([]int, 0, len(allPids))
 		for _, pid := range allPids {
@@ -380,11 +397,10 @@ func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error
 				continue
 			}
 
-			// TODO(dawnchen): Remove this once the hard dependency on process 1 is removed
-			// on systemd node.
-			if pid == 1 {
+			if _, ok := systemCgroupPIDMap[pid]; ok {
 				continue
 			}
+
 			pids = append(pids, pid)
 		}
 		glog.Infof("Found %d PIDs in root, %d of them are kernel related", len(allPids), len(allPids)-len(pids))
@@ -399,7 +415,6 @@ func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error
 			err := manager.Apply(pid)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to move PID %d into the system container %q: %v", pid, manager.Cgroups.Name, err))
-				continue
 			}
 		}
 

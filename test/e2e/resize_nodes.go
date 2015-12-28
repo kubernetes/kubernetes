@@ -188,7 +188,7 @@ func rcByNameContainer(name string, replicas int, image string, labels map[strin
 	return &api.ReplicationController{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "ReplicationController",
-			APIVersion: latest.GroupOrDie(api.GroupName).GroupVersion.Version,
+			APIVersion: latest.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -402,7 +402,8 @@ var _ = Describe("Nodes [Disruptive]", func() {
 		systemPodsNo = len(systemPods.Items)
 	})
 
-	Describe("Resize", func() {
+	// Slow issue #13323 (8 min)
+	Describe("Resize [Slow]", func() {
 		var skipped bool
 
 		BeforeEach(func() {

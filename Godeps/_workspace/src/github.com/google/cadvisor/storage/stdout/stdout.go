@@ -19,7 +19,12 @@ import (
 	"fmt"
 
 	info "github.com/google/cadvisor/info/v1"
+	"github.com/google/cadvisor/storage"
 )
+
+func init() {
+	storage.RegisterStorageDriver("stdout", new)
+}
 
 type stdoutStorage struct {
 	Namespace string
@@ -46,6 +51,10 @@ const (
 	// Filesystem usage.
 	colFsUsage = "fs_usage"
 )
+
+func new() (storage.StorageDriver, error) {
+	return newStorage(*storage.ArgDbHost)
+}
 
 func (driver *stdoutStorage) containerStatsToValues(stats *info.ContainerStats) (series map[string]uint64) {
 	series = make(map[string]uint64)
@@ -108,7 +117,7 @@ func (driver *stdoutStorage) Close() error {
 	return nil
 }
 
-func New(namespace string) (*stdoutStorage, error) {
+func newStorage(namespace string) (*stdoutStorage, error) {
 	stdoutStorage := &stdoutStorage{
 		Namespace: namespace,
 	}

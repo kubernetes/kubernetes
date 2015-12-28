@@ -531,8 +531,8 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	if err != nil {
 		return err
 	}
-	if ok := registered.IsRegisteredAPIGroupVersion(gvk.GroupVersion()); !ok {
-		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", gvk.GroupVersion().String(), registered.RegisteredGroupVersions)
+	if ok := registered.IsEnabledVersion(gvk.GroupVersion()); !ok {
+		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", gvk.GroupVersion().String(), registered.EnabledVersions())
 	}
 	if gvk.Group == extensions.GroupName {
 		if c.c.ExtensionsClient == nil {

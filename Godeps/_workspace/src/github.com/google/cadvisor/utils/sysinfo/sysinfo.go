@@ -24,7 +24,7 @@ import (
 	"github.com/google/cadvisor/utils/sysfs"
 )
 
-var schedulerRegExp = regexp.MustCompile(".*\\[(.*)\\].*")
+var schedulerRegExp = regexp.MustCompile(`.*\[(.*)\].*`)
 
 // Get information about block devices present on the system.
 // Uses the passed in system interface to retrieve the low level OS information.
@@ -65,18 +65,14 @@ func GetBlockDeviceInfo(sysfs sysfs.SysFs) (map[string]info.DiskInfo, error) {
 		// size is in 512 bytes blocks.
 		disk_info.Size = size * 512
 
-		sched, err := sysfs.GetBlockDeviceScheduler(name)
-		if err != nil {
-			sched = "none"
-		} else {
-			matches := schedulerRegExp.FindSubmatch([]byte(sched))
-			if len(matches) < 2 {
-				sched = "none"
-			} else {
-				sched = string(matches[1])
+		disk_info.Scheduler = "none"
+		blkSched, err := sysfs.GetBlockDeviceScheduler(name)
+		if err == nil {
+			matches := schedulerRegExp.FindSubmatch([]byte(blkSched))
+			if len(matches) >= 2 {
+				disk_info.Scheduler = string(matches[1])
 			}
 		}
-		disk_info.Scheduler = sched
 		device := fmt.Sprintf("%d:%d", disk_info.Major, disk_info.Minor)
 		diskMap[device] = disk_info
 	}

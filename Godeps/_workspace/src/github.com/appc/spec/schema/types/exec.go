@@ -14,23 +14,13 @@
 
 package types
 
-import (
-	"encoding/json"
-	"errors"
-	"path/filepath"
-)
+import "encoding/json"
 
 type Exec []string
 
 type exec Exec
 
 func (e Exec) assertValid() error {
-	if len(e) < 1 {
-		return errors.New(`Exec cannot be empty`)
-	}
-	if !filepath.IsAbs(e[0]) {
-		return errors.New(`Exec[0] must be absolute path`)
-	}
 	return nil
 }
 

@@ -43,6 +43,10 @@ import (
 	"github.com/golang/glog"
 )
 
+const (
+	SchedulerAnnotationKey = "scheduler.alpha.kubernetes.io/name"
+)
+
 // ConfigFactory knows how to fill out a scheduler config with its support functions.
 type ConfigFactory struct {
 	Client *client.Client
@@ -66,10 +70,15 @@ type ConfigFactory struct {
 
 	scheduledPodPopulator *framework.Controller
 	modeler               scheduler.SystemModeler
+
+	// SchedulerName of a scheduler is used to select which pods will be
+	// processed by this scheduler, based on pods's annotation key:
+	// 'scheduler.alpha.kubernetes.io/name'
+	SchedulerName string
 }
 
 // Initializes the factory.
-func NewConfigFactory(client *client.Client, rateLimiter util.RateLimiter) *ConfigFactory {
+func NewConfigFactory(client *client.Client, rateLimiter util.RateLimiter, schedulerName string) *ConfigFactory {
 	c := &ConfigFactory{
 		Client:             client,
 		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
@@ -79,6 +88,7 @@ func NewConfigFactory(client *client.Client, rateLimiter util.RateLimiter) *Conf
 		ServiceLister:    &cache.StoreToServiceLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		ControllerLister: &cache.StoreToReplicationControllerLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		StopEverything:   make(chan struct{}),
+		SchedulerName:    schedulerName,
 	}
 	modeler := scheduler.NewSimpleModeler(&cache.StoreToPodLister{Store: c.PodQueue}, c.ScheduledPodLister)
 	c.modeler = modeler
@@ -90,7 +100,7 @@ func NewConfigFactory(client *client.Client, rateLimiter util.RateLimiter) *Conf
 	// ScheduledPodLister is something we provide to plug in functions that
 	// they may need to call.
 	c.ScheduledPodLister.Store, c.scheduledPodPopulator = framework.NewInformer(
-		c.createAssignedPodLW(),
+		c.createAssignedNonTerminatedPodLW(),
 		&api.Pod{},
 		0,
 		framework.ResourceEventHandlerFuncs{
@@ -190,7 +200,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	}
 
 	// Watch and queue pods that need scheduling.
-	cache.NewReflector(f.createUnassignedPodLW(), &api.Pod{}, f.PodQueue, 0).RunUntil(f.StopEverything)
+	cache.NewReflector(f.createUnassignedNonTerminatedPodLW(), &api.Pod{}, f.PodQueue, 0).RunUntil(f.StopEverything)
 
 	// Begin populating scheduled pods.
 	go f.scheduledPodPopulator.Run(f.StopEverything)
@@ -228,14 +238,30 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		Algorithm:  algo,
 		Binder:     &binder{f.Client},
 		NextPod: func() *api.Pod {
-			pod := f.PodQueue.Pop().(*api.Pod)
-			glog.V(2).Infof("About to try and schedule pod %v", pod.Name)
-			return pod
+			return f.getNextPod()
 		},
 		Error:               f.makeDefaultErrorFunc(&podBackoff, f.PodQueue),
 		BindPodsRateLimiter: f.BindPodsRateLimiter,
 		StopEverything:      f.StopEverything,
 	}, nil
+}
+
+func (f *ConfigFactory) getNextPod() *api.Pod {
+	for {
+		pod := f.PodQueue.Pop().(*api.Pod)
+		if f.responsibleForPod(pod) {
+			glog.V(4).Infof("About to try and schedule pod %v", pod.Name)
+			return pod
+		}
+	}
+}
+
+func (f *ConfigFactory) responsibleForPod(pod *api.Pod) bool {
+	if f.SchedulerName == api.DefaultSchedulerName {
+		return pod.Annotations[SchedulerAnnotationKey] == f.SchedulerName || pod.Annotations[SchedulerAnnotationKey] == ""
+	} else {
+		return pod.Annotations[SchedulerAnnotationKey] == f.SchedulerName
+	}
 }
 
 func getNodeConditionPredicate() cache.NodeConditionPredicate {
@@ -257,16 +283,17 @@ func getNodeConditionPredicate() cache.NodeConditionPredicate {
 
 // Returns a cache.ListWatch that finds all pods that need to be
 // scheduled.
-func (factory *ConfigFactory) createUnassignedPodLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, fields.Set{client.PodHost: ""}.AsSelector())
+func (factory *ConfigFactory) createUnassignedNonTerminatedPodLW() *cache.ListWatch {
+	selector := fields.ParseSelectorOrDie("spec.nodeName==" + "" + ",status.phase!=" + string(api.PodSucceeded) + ",status.phase!=" + string(api.PodFailed))
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, selector)
 }
 
 // Returns a cache.ListWatch that finds all pods that are
 // already scheduled.
 // TODO: return a ListerWatcher interface instead?
-func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll,
-		fields.ParseSelectorOrDie(client.PodHost+"!="))
+func (factory *ConfigFactory) createAssignedNonTerminatedPodLW() *cache.ListWatch {
+	selector := fields.ParseSelectorOrDie("spec.nodeName!=" + "" + ",status.phase!=" + string(api.PodSucceeded) + ",status.phase!=" + string(api.PodFailed))
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, selector)
 }
 
 // createNodeLW returns a cache.ListWatch that gets all changes to nodes.

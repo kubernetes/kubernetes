@@ -34,7 +34,6 @@ func (obj *TypeMeta) GroupVersionKind() *GroupVersionKind {
 	return FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
 
-func (obj *ListOptions) GetObjectKind() ObjectKind     { return &obj.TypeMeta }
 func (obj *Status) GetObjectKind() ObjectKind          { return &obj.TypeMeta }
 func (obj *APIVersions) GetObjectKind() ObjectKind     { return &obj.TypeMeta }
 func (obj *APIGroupList) GetObjectKind() ObjectKind    { return &obj.TypeMeta }

@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,9 +31,10 @@ type SecretInterface interface {
 	Create(*api.Secret) (*api.Secret, error)
 	Update(*api.Secret) (*api.Secret, error)
 	Delete(name string, options *api.DeleteOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.Secret, error)
-	List(opts unversioned.ListOptions) (*api.SecretList, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	List(opts api.ListOptions) (*api.SecretList, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // secrets implements SecretInterface
@@ -78,18 +78,22 @@ func (c *secrets) Update(secret *api.Secret) (result *api.Secret, err error) {
 
 // Delete takes name of the secret and deletes it. Returns an error if one occurs.
 func (c *secrets) Delete(name string, options *api.DeleteOptions) error {
-	if options == nil {
-		return c.client.Delete().Namespace(c.ns).Resource("secrets").Name(name).Do().Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion().String())
-	if err != nil {
-		return err
-	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("secrets").
 		Name(name).
-		Body(body).
+		Body(options).
+		Do().
+		Error()
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *secrets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	return c.client.Delete().
+		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Resource("secrets").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(options).
 		Do().
 		Error()
 }
@@ -107,7 +111,7 @@ func (c *secrets) Get(name string) (result *api.Secret, err error) {
 }
 
 // List takes label and field selectors, and returns the list of Secrets that match those selectors.
-func (c *secrets) List(opts unversioned.ListOptions) (result *api.SecretList, err error) {
+func (c *secrets) List(opts api.ListOptions) (result *api.SecretList, err error) {
 	result = &api.SecretList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -119,7 +123,7 @@ func (c *secrets) List(opts unversioned.ListOptions) (result *api.SecretList, er
 }
 
 // Watch returns a watch.Interface that watches the requested secrets.
-func (c *secrets) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *secrets) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

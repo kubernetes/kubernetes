@@ -30,7 +30,7 @@ import (
 
 const (
 	// Minimal period between polling log sizes from components
-	pollingPeriod            = 5 * time.Second
+	pollingPeriod            = 60 * time.Second
 	workersNo                = 5
 	kubeletLogsPath          = "/var/log/kubelet.log"
 	kubeProxyLogsPath        = "/var/log/kube-proxy.log"
@@ -196,7 +196,7 @@ func (g *LogSizeGatherer) Run() {
 
 // Work does a single unit of work: tries to take out a WorkItem from the queue, ssh-es into a given machine,
 // gathers data, writes it to the shared <data> map, and creates a gorouting which reinserts work item into
-// the queue with a <pollingPeriod> delay.
+// the queue with a <pollingPeriod> delay. Returns false if worker should exit.
 func (g *LogSizeGatherer) Work() bool {
 	var workItem WorkItem
 	select {
@@ -210,14 +210,21 @@ func (g *LogSizeGatherer) Work() bool {
 		workItem.ip,
 		testContext.Provider,
 	)
-	expectNoError(err)
+	if err != nil {
+		Logf("Error while trying to SSH to %v, skipping probe. Error: %v", workItem.ip, err)
+		g.workChannel <- workItem
+		return true
+	}
 	results := strings.Split(sshResult.Stdout, " ")
 
 	now := time.Now()
 	for i := 0; i+1 < len(results); i = i + 2 {
 		path := results[i]
 		size, err := strconv.Atoi(results[i+1])
-		expectNoError(err)
+		if err != nil {
+			Logf("Error during conversion to int: %v, skipping data. Error: %v", results[i+1], err)
+			continue
+		}
 		g.data.AddNewData(workItem.ip, path, now, size)
 	}
 	go func() {

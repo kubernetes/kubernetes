@@ -246,6 +246,7 @@ func TestWatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	// watching is explicitly closed below.
 
 	// Test normal case
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
@@ -265,8 +266,15 @@ func TestWatch(t *testing.T) {
 
 	watching.Stop()
 
-	if _, open := <-watching.ResultChan(); open {
-		t.Errorf("An injected error did not cause a graceful shutdown")
+	// There is a race in etcdWatcher so that after calling Stop() one of
+	// two things can happen:
+	// - ResultChan() may be closed (triggered by closing userStop channel)
+	// - an Error "context cancelled" may be emitted (triggered by cancelling request
+	//   to etcd and putting that error to etcdError channel)
+	// We need to be prepared for both here.
+	event, open := <-watching.ResultChan()
+	if open && event.Type != watch.Error {
+		t.Errorf("Unexpected event from stopped watcher: %#v", event)
 	}
 }
 
@@ -292,6 +300,7 @@ func TestWatchEtcdState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watching.Stop()
 
 	endpoint := &api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
@@ -325,8 +334,6 @@ func TestWatchEtcdState(t *testing.T) {
 	if e, a := endpoint, event.Object; !api.Semantic.DeepDerivative(e, a) {
 		t.Errorf("%s: expected %v, got %v", e, a)
 	}
-
-	watching.Stop()
 }
 
 func TestWatchFromZeroIndex(t *testing.T) {
@@ -356,6 +363,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watching.Stop()
 
 	// marked as modified b/c of concatenation
 	event := <-watching.ResultChan()
@@ -376,8 +384,6 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
 		t.Errorf("%s: expected %v, got %v", e, a)
 	}
-
-	watching.Stop()
 }
 
 func TestWatchListFromZeroIndex(t *testing.T) {
@@ -391,6 +397,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watching.Stop()
 
 	// creates key/foo which should trigger the WatchList for "key"
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
@@ -407,8 +414,6 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 	if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
 		t.Errorf("%s: expected %v, got %v", e, a)
 	}
-
-	watching.Stop()
 }
 
 func TestWatchListIgnoresRootKey(t *testing.T) {
@@ -423,6 +428,7 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watching.Stop()
 
 	// creates key/foo which should trigger the WatchList for "key"
 	err = h.Create(context.TODO(), key, pod, pod, 0)
@@ -439,8 +445,6 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 	default:
 		// fall through, expected behavior
 	}
-
-	watching.Stop()
 }
 
 func TestWatchPurposefulShutdown(t *testing.T) {

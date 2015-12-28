@@ -17,6 +17,7 @@ limitations under the License.
 package priorities
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -46,7 +47,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 	tests := []struct {
 		pod          *api.Pod
 		pods         []*api.Pod
-		nodes        []string
+		nodes        chan *api.Node
 		rcs          []api.ReplicationController
 		services     []api.Service
 		expectedList schedulerapi.HostPriorityList
@@ -54,21 +55,21 @@ func TestSelectorSpreadPriority(t *testing.T) {
 	}{
 		{
 			pod:          new(api.Pod),
-			nodes:        []string{"machine1", "machine2"},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "nothing scheduled",
 		},
 		{
 			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods:         []*api.Pod{{Spec: zone1Spec}},
-			nodes:        []string{"machine1", "machine2"},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "no services",
 		},
 		{
 			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods:         []*api.Pod{{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
-			nodes:        []string{"machine1", "machine2"},
+			nodes:        make(chan *api.Node, 2),
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "different services",
@@ -79,7 +80,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes:        []string{"machine1", "machine2"},
+			nodes:        make(chan *api.Node, 2),
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 0}},
 			test:         "two pods, one service pod",
@@ -93,7 +94,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 			},
-			nodes:        []string{"machine1", "machine2"},
+			nodes:        make(chan *api.Node, 2),
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 0}},
 			test:         "five pods, one service pod in no namespace",
@@ -106,7 +107,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 			},
-			nodes:        []string{"machine1", "machine2"},
+			nodes:        make(chan *api.Node, 2),
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: labels1}, ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault}}},
 			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 0}},
 			test:         "four pods, one service pod in default namespace",
@@ -120,7 +121,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 			},
-			nodes:        []string{"machine1", "machine2"},
+			nodes:        make(chan *api.Node, 2),
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: labels1}, ObjectMeta: api.ObjectMeta{Namespace: "ns1"}}},
 			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 0}},
 			test:         "five pods, one service pod in specific namespace",
@@ -132,7 +133,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes:        []string{"machine1", "machine2"},
+			nodes:        make(chan *api.Node, 2),
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 0}},
 			test:         "three pods, two service pods on different machines",
@@ -145,7 +146,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes:        []string{"machine1", "machine2"},
+			nodes:        make(chan *api.Node, 2),
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{"machine1", 5}, {"machine2", 0}},
 			test:         "four pods, three service pods",
@@ -157,7 +158,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes:        []string{"machine1", "machine2"},
+			nodes:        make(chan *api.Node, 2),
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
 			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 5}},
 			test:         "service with partial pod label matches",
@@ -169,7 +170,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes:    []string{"machine1", "machine2"},
+			nodes:    make(chan *api.Node, 2),
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
 			rcs:      []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
 			// "baz=blah" matches both labels1 and labels2, and "foo=bar" matches only labels 1. This means that we assume that we want to
@@ -184,7 +185,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes:    []string{"machine1", "machine2"},
+			nodes:    make(chan *api.Node, 2),
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
 			rcs:      []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
 			// Taken together Service and Replication Controller should match all Pods, hence result should be equal to one above.
@@ -198,7 +199,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes: []string{"machine1", "machine2"},
+			nodes: make(chan *api.Node, 2),
 			rcs:   []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
 			// Both Nodes have one pod from the given RC, hence both get 0 score.
 			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 0}},
@@ -211,7 +212,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes:        []string{"machine1", "machine2"},
+			nodes:        make(chan *api.Node, 2),
 			rcs:          []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"baz": "blah"}}}},
 			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 5}},
 			test:         "Replication controller with partial pod label matches",
@@ -223,8 +224,19 @@ func TestSelectorSpreadPriority(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
+		go func(nodes chan *api.Node) {
+			for i := 1; i < 3; i++ {
+				node := &api.Node{
+					ObjectMeta: api.ObjectMeta{
+						Name: fmt.Sprintf("machine%d", i),
+					},
+				}
+				nodes <- node
+			}
+			close(nodes)
+		}(test.nodes)
 		selectorSpread := SelectorSpread{serviceLister: algorithm.FakeServiceLister(test.services), controllerLister: algorithm.FakeControllerLister(test.rcs)}
-		list, err := selectorSpread.CalculateSpreadPriority(test.pod, m2p, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(makeNodeList(test.nodes)))
+		list, err := selectorSpread.CalculateSpreadPriority(test.pod, m2p, algorithm.FakePodLister(test.pods), test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -274,14 +286,15 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 	tests := []struct {
 		pod          *api.Pod
 		pods         []*api.Pod
-		nodes        []string
+		nodes        chan *api.Node
 		rcs          []api.ReplicationController
 		services     []api.Service
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
 		{
-			pod: new(api.Pod),
+			pod:   new(api.Pod),
+			nodes: make(chan *api.Node, 6),
 			expectedList: []schedulerapi.HostPriority{
 				{nodeMachine1Zone1, 10},
 				{nodeMachine1Zone2, 10},
@@ -293,8 +306,9 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			test: "nothing scheduled",
 		},
 		{
-			pod:  buildPod("", labels1),
-			pods: []*api.Pod{buildPod(nodeMachine1Zone1, nil)},
+			pod:   buildPod("", labels1),
+			nodes: make(chan *api.Node, 6),
+			pods:  []*api.Pod{buildPod(nodeMachine1Zone1, nil)},
 			expectedList: []schedulerapi.HostPriority{
 				{nodeMachine1Zone1, 10},
 				{nodeMachine1Zone2, 10},
@@ -307,6 +321,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		},
 		{
 			pod:      buildPod("", labels1),
+			nodes:    make(chan *api.Node, 6),
 			pods:     []*api.Pod{buildPod(nodeMachine1Zone1, labels2)},
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []schedulerapi.HostPriority{
@@ -320,7 +335,8 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			test: "different services",
 		},
 		{
-			pod: buildPod("", labels1),
+			pod:   buildPod("", labels1),
+			nodes: make(chan *api.Node, 6),
 			pods: []*api.Pod{
 				buildPod(nodeMachine1Zone1, labels2),
 				buildPod(nodeMachine1Zone2, labels1),
@@ -337,7 +353,8 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			test: "two pods, 1 matching (in z2)",
 		},
 		{
-			pod: buildPod("", labels1),
+			pod:   buildPod("", labels1),
+			nodes: make(chan *api.Node, 6),
 			pods: []*api.Pod{
 				buildPod(nodeMachine1Zone1, labels2),
 				buildPod(nodeMachine1Zone2, labels1),
@@ -357,7 +374,8 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			test: "five pods, 3 matching (z2=2, z3=1)",
 		},
 		{
-			pod: buildPod("", labels1),
+			pod:   buildPod("", labels1),
+			nodes: make(chan *api.Node, 6),
 			pods: []*api.Pod{
 				buildPod(nodeMachine1Zone1, labels1),
 				buildPod(nodeMachine1Zone2, labels1),
@@ -376,7 +394,8 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			test: "four pods, 3 matching (z1=1, z2=1, z3=1)",
 		},
 		{
-			pod: buildPod("", labels1),
+			pod:   buildPod("", labels1),
+			nodes: make(chan *api.Node, 6),
 			pods: []*api.Pod{
 				buildPod(nodeMachine1Zone1, labels1),
 				buildPod(nodeMachine1Zone2, labels1),
@@ -395,7 +414,8 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			test: "four pods, 3 matching (z1=1, z2=1, z3=1)",
 		},
 		{
-			pod: buildPod("", labels1),
+			pod:   buildPod("", labels1),
+			nodes: make(chan *api.Node, 6),
 			pods: []*api.Pod{
 				buildPod(nodeMachine1Zone3, labels1),
 				buildPod(nodeMachine1Zone2, labels1),
@@ -427,7 +447,13 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		list, err := selectorSpread.CalculateSpreadPriority(test.pod, m2p, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(makeLabeledNodeList(labeledNodes)))
+		go func(nodes chan *api.Node) {
+			for nodeName, labels := range labeledNodes {
+				nodes <- &api.Node{ObjectMeta: api.ObjectMeta{Name: nodeName, Labels: labels}}
+			}
+			close(nodes)
+		}(test.nodes)
+		list, err := selectorSpread.CalculateSpreadPriority(test.pod, m2p, algorithm.FakePodLister(test.pods), test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -475,14 +501,14 @@ func TestZoneSpreadPriority(t *testing.T) {
 	tests := []struct {
 		pod          *api.Pod
 		pods         []*api.Pod
-		nodes        map[string]map[string]string
+		nodes        chan *api.Node
 		services     []api.Service
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
 		{
 			pod:   new(api.Pod),
-			nodes: labeledNodes,
+			nodes: make(chan *api.Node, 6),
 			expectedList: []schedulerapi.HostPriority{{"machine11", 10}, {"machine12", 10},
 				{"machine21", 10}, {"machine22", 10},
 				{"machine01", 0}, {"machine02", 0}},
@@ -491,7 +517,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 		{
 			pod:   &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods:  []*api.Pod{{Spec: zone1Spec}},
-			nodes: labeledNodes,
+			nodes: make(chan *api.Node, 6),
 			expectedList: []schedulerapi.HostPriority{{"machine11", 10}, {"machine12", 10},
 				{"machine21", 10}, {"machine22", 10},
 				{"machine01", 0}, {"machine02", 0}},
@@ -500,7 +526,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods:     []*api.Pod{{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
-			nodes:    labeledNodes,
+			nodes:    make(chan *api.Node, 6),
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []schedulerapi.HostPriority{{"machine11", 10}, {"machine12", 10},
 				{"machine21", 10}, {"machine22", 10},
@@ -514,7 +540,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes:    labeledNodes,
+			nodes:    make(chan *api.Node, 6),
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{"machine11", 10}, {"machine12", 10},
 				{"machine21", 0}, {"machine22", 0},
@@ -528,7 +554,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes:    labeledNodes,
+			nodes:    make(chan *api.Node, 6),
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{"machine11", 5}, {"machine12", 5},
 				{"machine21", 5}, {"machine22", 5},
@@ -543,7 +569,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
 			},
-			nodes:    labeledNodes,
+			nodes:    make(chan *api.Node, 6),
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}, ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault}}},
 			expectedList: []schedulerapi.HostPriority{{"machine11", 0}, {"machine12", 0},
 				{"machine21", 10}, {"machine22", 10},
@@ -558,7 +584,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes:    labeledNodes,
+			nodes:    make(chan *api.Node, 6),
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{"machine11", 6}, {"machine12", 6},
 				{"machine21", 3}, {"machine22", 3},
@@ -572,7 +598,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes:    labeledNodes,
+			nodes:    make(chan *api.Node, 6),
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
 			expectedList: []schedulerapi.HostPriority{{"machine11", 3}, {"machine12", 3},
 				{"machine21", 6}, {"machine22", 6},
@@ -587,7 +613,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes:    labeledNodes,
+			nodes:    make(chan *api.Node, 6),
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{"machine11", 7}, {"machine12", 7},
 				{"machine21", 5}, {"machine22", 5},
@@ -601,8 +627,14 @@ func TestZoneSpreadPriority(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
+		go func(nodes chan *api.Node) {
+			for nodeName, labels := range labeledNodes {
+				nodes <- &api.Node{ObjectMeta: api.ObjectMeta{Name: nodeName, Labels: labels}}
+			}
+			close(nodes)
+		}(test.nodes)
 		zoneSpread := ServiceAntiAffinity{serviceLister: algorithm.FakeServiceLister(test.services), label: "zone"}
-		list, err := zoneSpread.CalculateAntiAffinityPriority(test.pod, m2p, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(makeLabeledNodeList(test.nodes)))
+		list, err := zoneSpread.CalculateAntiAffinityPriority(test.pod, m2p, algorithm.FakePodLister(test.pods), test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

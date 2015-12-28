@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/admin/cluster-management.md).
@@ -203,13 +204,13 @@ for changes to this variable to take effect.
 
 ### Switching your config files to a new API version
 
-You can use the `kube-version-change` utility to convert config files between different API versions.
+You can use `kubectl convert` command to convert config files between different API versions.
 
 ```console
-$ hack/build-go.sh cmd/kube-version-change
-$ _output/local/go/bin/kube-version-change -i myPod.v1beta3.yaml -o myPod.v1.yaml
+$ kubectl convert -f pod.yaml --output-version v1
 ```
 
+For more options, please refer to the usage of [kubectl convert](../user-guide/kubectl/kubectl_convert.md) command.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/cluster-management.md?pixel)]()

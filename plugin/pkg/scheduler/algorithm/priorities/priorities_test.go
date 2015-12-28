@@ -17,6 +17,7 @@ limitations under the License.
 package priorities
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"strconv"
@@ -87,28 +88,31 @@ func TestZeroRequest(t *testing.T) {
 	large1.NodeName = "machine1"
 	large2 := large
 	large2.NodeName = "machine2"
+	nodesMap := map[int][]api.Node{
+		0: {makeNode("machine1", 1000, defaultMemoryRequest*10), makeNode("machine2", 1000, defaultMemoryRequest*10)},
+		1: {makeNode("machine1", 1000, defaultMemoryRequest*10), makeNode("machine2", 1000, defaultMemoryRequest*10)},
+		2: {makeNode("machine1", 1000, defaultMemoryRequest*10), makeNode("machine2", 1000, defaultMemoryRequest*10)},
+	}
+
 	tests := []struct {
-		pod   *api.Pod
-		pods  []*api.Pod
-		nodes []api.Node
-		test  string
+		pod  *api.Pod
+		pods []*api.Pod
+		test string
 	}{
 		// The point of these next two tests is to show you get the same priority for a zero-request pod
 		// as for a pod with the defaults requests, both when the zero-request pod is already on the machine
 		// and when the zero-request pod is the one being scheduled.
 		{
-			pod:   &api.Pod{Spec: noResources},
-			nodes: []api.Node{makeNode("machine1", 1000, defaultMemoryRequest*10), makeNode("machine2", 1000, defaultMemoryRequest*10)},
-			test:  "test priority of zero-request pod with machine with zero-request pod",
+			pod:  &api.Pod{Spec: noResources},
+			test: "test priority of zero-request pod with machine with zero-request pod",
 			pods: []*api.Pod{
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
 			},
 		},
 		{
-			pod:   &api.Pod{Spec: small},
-			nodes: []api.Node{makeNode("machine1", 1000, defaultMemoryRequest*10), makeNode("machine2", 1000, defaultMemoryRequest*10)},
-			test:  "test priority of nonzero-request pod with machine with zero-request pod",
+			pod:  &api.Pod{Spec: small},
+			test: "test priority of nonzero-request pod with machine with zero-request pod",
 			pods: []*api.Pod{
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
@@ -116,9 +120,8 @@ func TestZeroRequest(t *testing.T) {
 		},
 		// The point of this test is to verify that we're not just getting the same score no matter what we schedule.
 		{
-			pod:   &api.Pod{Spec: large},
-			nodes: []api.Node{makeNode("machine1", 1000, defaultMemoryRequest*10), makeNode("machine2", 1000, defaultMemoryRequest*10)},
-			test:  "test priority of larger pod with machine with zero-request pod",
+			pod:  &api.Pod{Spec: large},
+			test: "test priority of larger pod with machine with zero-request pod",
 			pods: []*api.Pod{
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
@@ -127,31 +130,48 @@ func TestZeroRequest(t *testing.T) {
 	}
 
 	const expectedPriority int = 25
-	for _, test := range tests {
+	for i, test := range tests {
 		m2p, err := predicates.MapPodsToMachines(algorithm.FakePodLister(test.pods))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		list, err := scheduler.PrioritizeNodes(
+
+		pris := []algorithm.PriorityConfig{{Function: LeastRequestedPriority, Weight: 1}, {Function: BalancedResourceAllocation, Weight: 1}, {Function: NewSelectorSpreadPriority(algorithm.FakeServiceLister([]api.Service{}), algorithm.FakeControllerLister([]api.ReplicationController{})), Weight: 1}}
+		extenders := []algorithm.SchedulerExtender{}
+		c := scheduler.NewResultChannel(2, len(pris), len(extenders))
+
+		go func(index int, c *scheduler.ResultChannel) {
+			for ix := range nodesMap[index] {
+				c.Insert(&nodesMap[index][ix])
+			}
+			c.Close()
+		}(i, c)
+
+		go scheduler.PrioritizeNodes(
 			test.pod,
 			m2p,
 			algorithm.FakePodLister(test.pods),
 			// This should match the configuration in defaultPriorities() in
 			// plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go if you want
 			// to test what's actually in production.
-			[]algorithm.PriorityConfig{{Function: LeastRequestedPriority, Weight: 1}, {Function: BalancedResourceAllocation, Weight: 1}, {Function: NewSelectorSpreadPriority(algorithm.FakeServiceLister([]api.Service{}), algorithm.FakeControllerLister([]api.ReplicationController{})), Weight: 1}},
-			algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}), []algorithm.SchedulerExtender{})
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		for _, hp := range list {
-			if test.test == "test priority of larger pod with machine with zero-request pod" {
-				if hp.Score == expectedPriority {
-					t.Errorf("%s: expected non-%d for all priorities, got list %#v", test.test, expectedPriority, list)
-				}
-			} else {
-				if hp.Score != expectedPriority {
-					t.Errorf("%s: expected %d for all priorities, got list %#v", test.test, expectedPriority, list)
+			pris,
+			extenders, c)
+
+		select {
+		case err := <-c.PResult.Err:
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			for _, hp := range c.PResult.PrioritizeNodes {
+				if test.test == "test priority of larger pod with machine with zero-request pod" {
+					if hp.Score == expectedPriority {
+						t.Errorf("%s: expected non-%d for all priorities, got list %#v", test.test, expectedPriority, c.PResult.PrioritizeNodes)
+					}
+				} else {
+					if hp.Score != expectedPriority {
+						t.Errorf("%s: expected %d for all priorities, got list %#v", test.test, expectedPriority, c.PResult.PrioritizeNodes)
+					}
 				}
 			}
 		}
@@ -220,10 +240,20 @@ func TestLeastRequested(t *testing.T) {
 			},
 		},
 	}
+	nodesMap := map[int][]api.Node{
+		0: {makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+		1: {makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
+		2: {makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+		3: {makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+		4: {makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+		5: {makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 50000)},
+		6: {makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+		7: {makeNode("machine1", 0, 0), makeNode("machine2", 0, 0)},
+	}
 	tests := []struct {
 		pod          *api.Pod
 		pods         []*api.Pod
-		nodes        []api.Node
+		nodes        chan *api.Node
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
@@ -240,7 +270,7 @@ func TestLeastRequested(t *testing.T) {
 				Node2 Score: (10 + 10) / 2 = 10
 			*/
 			pod:          &api.Pod{Spec: noResources},
-			nodes:        []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "nothing scheduled, nothing requested",
 		},
@@ -257,7 +287,7 @@ func TestLeastRequested(t *testing.T) {
 				Node2 Score: (5 + 5) / 2 = 5
 			*/
 			pod:          &api.Pod{Spec: cpuAndMemory},
-			nodes:        []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 3}, {"machine2", 5}},
 			test:         "nothing scheduled, resources requested, differently sized machines",
 		},
@@ -274,7 +304,7 @@ func TestLeastRequested(t *testing.T) {
 				Node2 Score: (10 + 10) / 2 = 10
 			*/
 			pod:          &api.Pod{Spec: noResources},
-			nodes:        []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "no resources requested, pods scheduled",
 			pods: []*api.Pod{
@@ -297,7 +327,7 @@ func TestLeastRequested(t *testing.T) {
 				Node2 Score: (4 + 7.5) / 2 = 5
 			*/
 			pod:          &api.Pod{Spec: noResources},
-			nodes:        []api.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 7}, {"machine2", 5}},
 			test:         "no resources requested, pods scheduled with resources",
 			pods: []*api.Pod{
@@ -320,7 +350,7 @@ func TestLeastRequested(t *testing.T) {
 				Node2 Score: (4 + 5) / 2 = 4
 			*/
 			pod:          &api.Pod{Spec: cpuAndMemory},
-			nodes:        []api.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 5}, {"machine2", 4}},
 			test:         "resources requested, pods scheduled with resources",
 			pods: []*api.Pod{
@@ -341,7 +371,7 @@ func TestLeastRequested(t *testing.T) {
 				Node2 Score: (4 + 8) / 2 = 6
 			*/
 			pod:          &api.Pod{Spec: cpuAndMemory},
-			nodes:        []api.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 50000)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 5}, {"machine2", 6}},
 			test:         "resources requested, pods scheduled with resources, differently sized machines",
 			pods: []*api.Pod{
@@ -362,7 +392,7 @@ func TestLeastRequested(t *testing.T) {
 				Node2 Score: (0 + 5) / 2 = 2
 			*/
 			pod:          &api.Pod{Spec: cpuOnly},
-			nodes:        []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 5}, {"machine2", 2}},
 			test:         "requested resources exceed node capacity",
 			pods: []*api.Pod{
@@ -372,7 +402,7 @@ func TestLeastRequested(t *testing.T) {
 		},
 		{
 			pod:          &api.Pod{Spec: noResources},
-			nodes:        []api.Node{makeNode("machine1", 0, 0), makeNode("machine2", 0, 0)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 0}},
 			test:         "zero node resources, pods scheduled with resources",
 			pods: []*api.Pod{
@@ -382,12 +412,18 @@ func TestLeastRequested(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		m2p, err := predicates.MapPodsToMachines(algorithm.FakePodLister(test.pods))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		list, err := LeastRequestedPriority(test.pod, m2p, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
+		go func(index int, nodes chan *api.Node) {
+			for ix := range nodesMap[index] {
+				nodes <- &nodesMap[index][ix]
+			}
+			close(nodes)
+		}(i, test.nodes)
+		list, err := LeastRequestedPriority(test.pod, m2p, algorithm.FakePodLister(test.pods), test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -398,77 +434,55 @@ func TestLeastRequested(t *testing.T) {
 }
 
 func TestNewNodeLabelPriority(t *testing.T) {
-	label1 := map[string]string{"foo": "bar"}
-	label2 := map[string]string{"bar": "foo"}
-	label3 := map[string]string{"bar": "baz"}
+	labels := []map[string]string{
+		{"foo": "bar"},
+		{"bar": "foo"},
+		{"bar": "baz"},
+	}
 	tests := []struct {
-		nodes        []api.Node
+		nodes        chan *api.Node
 		label        string
 		presence     bool
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
 		{
-			nodes: []api.Node{
-				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: label3}},
-			},
+			nodes:        make(chan *api.Node, 3),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 0}, {"machine3", 0}},
 			label:        "baz",
 			presence:     true,
 			test:         "no match found, presence true",
 		},
 		{
-			nodes: []api.Node{
-				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: label3}},
-			},
+			nodes:        make(chan *api.Node, 3),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 10}, {"machine3", 10}},
 			label:        "baz",
 			presence:     false,
 			test:         "no match found, presence false",
 		},
 		{
-			nodes: []api.Node{
-				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: label3}},
-			},
+			nodes:        make(chan *api.Node, 3),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 0}, {"machine3", 0}},
 			label:        "foo",
 			presence:     true,
 			test:         "one match found, presence true",
 		},
 		{
-			nodes: []api.Node{
-				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: label3}},
-			},
+			nodes:        make(chan *api.Node, 3),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 10}, {"machine3", 10}},
 			label:        "foo",
 			presence:     false,
 			test:         "one match found, presence false",
 		},
 		{
-			nodes: []api.Node{
-				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: label3}},
-			},
+			nodes:        make(chan *api.Node, 3),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 10}, {"machine3", 10}},
 			label:        "bar",
 			presence:     true,
 			test:         "two matches found, presence true",
 		},
 		{
-			nodes: []api.Node{
-				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: label3}},
-			},
+			nodes:        make(chan *api.Node, 3),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 0}, {"machine3", 0}},
 			label:        "bar",
 			presence:     false,
@@ -481,7 +495,19 @@ func TestNewNodeLabelPriority(t *testing.T) {
 			label:    test.label,
 			presence: test.presence,
 		}
-		list, err := prioritizer.CalculateNodeLabelPriority(nil, map[string][]*api.Pod{}, nil, algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
+		go func(nodes chan *api.Node) {
+			for i := 0; i < 3; i++ {
+				node := &api.Node{
+					ObjectMeta: api.ObjectMeta{
+						Name:   fmt.Sprintf("machine%d", i+1),
+						Labels: labels[i],
+					},
+				}
+				nodes <- node
+			}
+			close(nodes)
+		}(test.nodes)
+		list, err := prioritizer.CalculateNodeLabelPriority(nil, map[string][]*api.Pod{}, nil, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -556,10 +582,20 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			},
 		},
 	}
+	nodesMap := map[int][]api.Node{
+		0: {makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+		1: {makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
+		2: {makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+		3: {makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+		4: {makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+		5: {makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 50000)},
+		6: {makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+		7: {makeNode("machine1", 0, 0), makeNode("machine2", 0, 0)},
+	}
 	tests := []struct {
 		pod          *api.Pod
 		pods         []*api.Pod
-		nodes        []api.Node
+		nodes        chan *api.Node
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
@@ -576,7 +612,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Node2 Score: 10 - (0-0)*10 = 10
 			*/
 			pod:          &api.Pod{Spec: noResources},
-			nodes:        []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "nothing scheduled, nothing requested",
 		},
@@ -593,7 +629,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Node2 Score: 10 - (0.5-0.5)*10 = 10
 			*/
 			pod:          &api.Pod{Spec: cpuAndMemory},
-			nodes:        []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 7}, {"machine2", 10}},
 			test:         "nothing scheduled, resources requested, differently sized machines",
 		},
@@ -610,7 +646,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Node2 Score: 10 - (0-0)*10 = 10
 			*/
 			pod:          &api.Pod{Spec: noResources},
-			nodes:        []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "no resources requested, pods scheduled",
 			pods: []*api.Pod{
@@ -633,7 +669,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Node2 Score: 10 - (0.6-0.25)*10 = 6
 			*/
 			pod:          &api.Pod{Spec: noResources},
-			nodes:        []api.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 4}, {"machine2", 6}},
 			test:         "no resources requested, pods scheduled with resources",
 			pods: []*api.Pod{
@@ -656,7 +692,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Node2 Score: 10 - (0.6-0.5)*10 = 9
 			*/
 			pod:          &api.Pod{Spec: cpuAndMemory},
-			nodes:        []api.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 6}, {"machine2", 9}},
 			test:         "resources requested, pods scheduled with resources",
 			pods: []*api.Pod{
@@ -677,7 +713,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Node2 Score: 10 - (0.6-0.2)*10 = 6
 			*/
 			pod:          &api.Pod{Spec: cpuAndMemory},
-			nodes:        []api.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 50000)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 6}, {"machine2", 6}},
 			test:         "resources requested, pods scheduled with resources, differently sized machines",
 			pods: []*api.Pod{
@@ -698,7 +734,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Node2 Score: 0
 			*/
 			pod:          &api.Pod{Spec: cpuOnly},
-			nodes:        []api.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 0}},
 			test:         "requested resources exceed node capacity",
 			pods: []*api.Pod{
@@ -708,7 +744,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 		},
 		{
 			pod:          &api.Pod{Spec: noResources},
-			nodes:        []api.Node{makeNode("machine1", 0, 0), makeNode("machine2", 0, 0)},
+			nodes:        make(chan *api.Node, 2),
 			expectedList: []schedulerapi.HostPriority{{"machine1", 0}, {"machine2", 0}},
 			test:         "zero node resources, pods scheduled with resources",
 			pods: []*api.Pod{
@@ -718,12 +754,18 @@ func TestBalancedResourceAllocation(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		m2p, err := predicates.MapPodsToMachines(algorithm.FakePodLister(test.pods))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		list, err := BalancedResourceAllocation(test.pod, m2p, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
+		go func(index int, nodes chan *api.Node) {
+			for ix := range nodesMap[index] {
+				nodes <- &nodesMap[index][ix]
+			}
+			close(nodes)
+		}(i, test.nodes)
+		list, err := BalancedResourceAllocation(test.pod, m2p, algorithm.FakePodLister(test.pods), test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

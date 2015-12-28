@@ -15,11 +15,18 @@
 package bigquery
 
 import (
+	"os"
+
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/storage"
 	"github.com/google/cadvisor/storage/bigquery/client"
+
 	bigquery "google.golang.org/api/bigquery/v2"
 )
+
+func init() {
+	storage.RegisterStorageDriver("bigquery", new)
+}
 
 type bigqueryStorage struct {
 	client      *client.Client
@@ -66,6 +73,18 @@ const (
 	// Filesystem available space.
 	colFsUsage = "fs_usage"
 )
+
+func new() (storage.StorageDriver, error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return nil, err
+	}
+	return newStorage(
+		hostname,
+		*storage.ArgDbTable,
+		*storage.ArgDbName,
+	)
+}
 
 // TODO(jnagal): Infer schema through reflection. (See bigquery/client/example)
 func (self *bigqueryStorage) GetSchema() *bigquery.TableSchema {
@@ -270,10 +289,7 @@ func (self *bigqueryStorage) Close() error {
 // machineName: A unique identifier to identify the host that current cAdvisor
 // instance is running on.
 // tableName: BigQuery table used for storing stats.
-func New(machineName,
-	datasetId,
-	tableName string,
-) (storage.StorageDriver, error) {
+func newStorage(machineName, datasetId, tableName string) (storage.StorageDriver, error) {
 	bqClient, err := client.NewClient()
 	if err != nil {
 		return nil, err

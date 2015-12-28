@@ -29,6 +29,10 @@ type GroupResource struct {
 	Resource string
 }
 
+func (gr GroupResource) WithVersion(version string) GroupVersionResource {
+	return GroupVersionResource{Group: gr.Group, Version: version, Resource: gr.Resource}
+}
+
 func (gr GroupResource) IsEmpty() bool {
 	return len(gr.Group) == 0 && len(gr.Resource) == 0
 }
@@ -160,15 +164,6 @@ func ParseGroupVersion(gv string) (GroupVersion, error) {
 	default:
 		return GroupVersion{}, fmt.Errorf("Unexpected GroupVersion string: %v", gv)
 	}
-}
-
-func ParseGroupVersionOrDie(gv string) GroupVersion {
-	ret, err := ParseGroupVersion(gv)
-	if err != nil {
-		panic(err)
-	}
-
-	return ret
 }
 
 // WithKind creates a GroupVersionKind based on the method receiver's GroupVersion and the passed Kind.

@@ -65,7 +65,6 @@ function join_regex_no_empty() {
 #   $GCE_DEFAULT_SKIP_TESTS
 #   $GCE_FLAKY_TESTS
 #   $GCE_SLOW_TESTS
-#   $GKE_FLAKY_TESTS
 #
 # Args:
 #   $1 old_version:  the version to deploy a cluster at, and old e2e tests to run
@@ -99,7 +98,6 @@ function configure_upgrade_step() {
         ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
         ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
         ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
-        ${GKE_FLAKY_TESTS[@]:+${GKE_FLAKY_TESTS[@]}} \
         )"
 
   if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
@@ -239,7 +237,6 @@ E2E_OPT=${E2E_OPT:-""}
 # Set environment variables shared for all of the GCE Jenkins projects.
 if [[ ${JOB_NAME} =~ ^kubernetes-.*-gce ]]; then
   KUBERNETES_PROVIDER="gce"
-  : ${GCE_SERVICE_ACCOUNT:=$(gcloud auth list 2> /dev/null | grep active | cut -f3 -d' ')}
   : ${E2E_MIN_STARTUP_PODS:="1"}
   : ${E2E_ZONE:="us-central1-f"}
   : ${NUM_NODES_PARALLEL:="6"}  # Number of nodes required to run all of the tests in parallel
@@ -303,11 +300,6 @@ GKE_REQUIRED_SKIP_TESTS=(
     "Deployment"
     )
 
-# Tests wchich are known to be flaky on GKE
-GKE_FLAKY_TESTS=(
-    "NodeOutOfDisk"
-  )
-
 # Specialized tests which should be skipped by default for GKE.
 GKE_DEFAULT_SKIP_TESTS=(
     "Autoscaling\sSuite"
@@ -331,12 +323,7 @@ DISRUPTIVE_TESTS=(
 # The following tests are known to be flaky, and are thus run only in their own
 # -flaky- build variants.
 GCE_FLAKY_TESTS=(
-    "GCE\sL7\sLoadBalancer\sController" # issue: #17518
-    "DaemonRestart\sController\sManager" # issue: #17829
-    "Daemon\sset\sshould\srun\sand\sstop\scomplex\sdaemon" # issue: #16623
-    "Resource\susage\sof\ssystem\scontainers" # issue: #13931
-    "NodeOutOfDisk" # issue: #17687
-    "Cluster\slevel\slogging\susing\sElasticsearch" # issue: #17873
+    "\[Flaky\]"
     )
 
 # The following tests are known to be slow running (> 2 min), and are
@@ -350,14 +337,7 @@ GCE_SLOW_TESTS=(
     # make sure the associated project has enough quota. At the time of this
     # writing a GCE project is allowed 3 backend services by default. This
     # test requires at least 5.
-    "GCE\sL7\sLoadBalancer\sController"               # 10 min,       file: ingress.go,              slow by design
-    "SchedulerPredicates\svalidates\sMaxPods\slimit " # 8 min,        file: scheduler_predicates.go, PR:    #13315
-    "Nodes\sResize"                                   # 3 min 30 sec, file: resize_nodes.go,         issue: #13323
-    "resource\susage\stracking"                       # 1 hour,       file: kubelet_perf.go,         slow by design
-    "monotonically\sincreasing\srestart\scount"       # 1.5 to 5 min, file: pods.go,                 slow by design
-    "Garbage\scollector\sshould"                      # 7 min,        file: garbage_collector.go,    slow by design
-    "KubeProxy\sshould\stest\skube-proxy"             # 9 min 30 sec, file: kubeproxy.go,            issue: #14204
-    "cap\sback-off\sat\sMaxContainerBackOff"          # 20 mins       file: manager.go,              PR:    #12648
+    "\[Slow\]"
     )
 
 # Tests which are not able to be run in parallel.
@@ -367,16 +347,6 @@ GCE_PARALLEL_SKIP_TESTS=(
     "\[Serial\]"
     "\[Disruptive\]"
 )
-
-# Tests which are known to be flaky when run in parallel.
-GCE_PARALLEL_FLAKY_TESTS=(
-    "DaemonRestart"
-    "Elasticsearch"
-    "Namespaces.*should\sdelete\sfast"
-    "Pods.*back-off\srestarting.*LivenessProbe" # issue: #18293
-    "ServiceAccounts"
-    "Services.*identically\snamed" # error waiting for reachability, issue: #16285
-    )
 
 # Tests that should not run on soak cluster.
 GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
@@ -497,7 +467,6 @@ case ${JOB_NAME} in
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-gce-${NODE_NAME}-${EXECUTOR_NUMBER}"}
@@ -517,7 +486,6 @@ case ${JOB_NAME} in
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-test-parallel"}
@@ -536,7 +504,6 @@ case ${JOB_NAME} in
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           ${AWS_REQUIRED_SKIP_TESTS[@]:+${AWS_REQUIRED_SKIP_TESTS[@]}} \
           )"}
     : ${ENABLE_DEPLOYMENTS:=true}
@@ -554,7 +521,6 @@ case ${JOB_NAME} in
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
           ) --ginkgo.focus=$(join_regex_no_empty \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="parallel-flaky"}
     : ${PROJECT:="k8s-jkns-e2e-gce-prl-flaky"}
@@ -577,7 +543,8 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-scalability"}
     : ${E2E_NETWORK:="e2e-scalability"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\] \
-        --gather-resource-usage=true"}
+        --gather-resource-usage=true \
+        --gather-logs-sizes=true"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-scalability"}
     : ${PROJECT:="kubernetes-jenkins"}
     # Override GCE defaults.
@@ -598,7 +565,6 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="e2e-gce-flannel"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_PARALLEL_FLAKY_TESTS[@]:+${GCE_PARALLEL_FLAKY_TESTS[@]}} \
           ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
@@ -673,7 +639,6 @@ case ${JOB_NAME} in
           ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GKE_FLAKY_TESTS[@]:+${GKE_FLAKY_TESTS[@]}} \
           )"}
     ;;
 
@@ -688,7 +653,6 @@ case ${JOB_NAME} in
           ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
           ${REBOOT_SKIP_TESTS[@]:+${REBOOT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GKE_FLAKY_TESTS[@]:+${GKE_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
     ;;
@@ -702,7 +666,6 @@ case ${JOB_NAME} in
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}}) \
           --ginkgo.focus=$(join_regex_no_empty \
-          ${GKE_FLAKY_TESTS[@]:+${GKE_FLAKY_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           )"}
     ;;
@@ -735,7 +698,6 @@ case ${JOB_NAME} in
           ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GKE_FLAKY_TESTS[@]:+${GKE_FLAKY_TESTS[@]}} \
           ${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]:+${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]}} \
           )"}
     ;;
@@ -1112,7 +1074,7 @@ export KUBE_GCS_STAGING_PATH_SUFFIX=${KUBE_GCS_STAGING_PATH_SUFFIX:-}
 export KUBE_GCE_NODE_PROJECT=${KUBE_GCE_NODE_PROJECT:-}
 export KUBE_GCE_NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-}
 export KUBE_OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-}
-export GCE_SERVICE_ACCOUNT=${GCE_SERVICE_ACCOUNT:-}
+export GCE_SERVICE_ACCOUNT=$(gcloud auth list 2> /dev/null | grep active | cut -f3 -d' ')
 
 # GKE variables
 export CLUSTER_NAME=${E2E_CLUSTER_NAME}
@@ -1147,6 +1109,7 @@ export KUBE_ADMISSION_CONTROL=${ADMISSION_CONTROL:-}
 
 export KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER}
 export PATH=${PATH}:/usr/local/go/bin
+export KUBE_SKIP_UPDATE=y
 export KUBE_SKIP_CONFIRMATIONS=y
 
 # E2E Control Variables
@@ -1184,45 +1147,6 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
             find .
             exit 1
         fi
-
-        # Tell kube-up.sh to skip the update, it doesn't lock. An internal
-        # gcloud bug can cause racing component updates to stomp on each
-        # other.
-        export KUBE_SKIP_UPDATE=y
-        (
-          # ----------- WARNING! DO NOT TOUCH THIS CODE -----------
-          #
-          # The purpose of this block is to ensure that only one job attempts to
-          # update gcloud at a time.
-          #
-          # PLEASE DO NOT TOUCH THIS CODE unless you are certain you understand
-          # implications. Please cc jlowdermilk@ or brendandburns@ on changes.
-
-          # If jenkins was recently restarted and jobs are failing with
-          #
-          # flock: 9: Permission denied
-          #
-          # ssh into the jenkins master and run
-          # $ sudo chown jenkins:jenkins /var/run/lock/gcloud-components.lock
-          #
-          # Note, flock -n would prevent parallel runs from having to wait
-          # here, but because we've set -o errexit, the err gets caught
-          # despite running in a subshell. If a run has to wait, the subsequent
-          # component update commands will be no-op, so no added delay.
-          flock -x -w 60 9
-          # We do NOT want to run gcloud components update under sudo, as that causes
-          # the gcloud files to get chown'd by root, which makes them undeletable in
-          # the case where we are installing gcloud under the workspace (e.g. for gke-ci
-          # and friends). If we can't cleanup old workspaces, jenkins runs out of disk.
-          #
-          # If the update commands are failing with permission denied, ssh into
-          # the jenkins master and run
-          #
-          # $ sudo chown -R jenkins:jenkins /usr/local/share/google/google-cloud-sdk
-          gcloud components update -q || true
-          gcloud components update alpha -q || true
-          gcloud components update beta -q || true
-        ) 9>/var/run/lock/gcloud-components.lock
 
         if [[ ${JENKINS_USE_SERVER_VERSION:-}  =~ ^[yY]$ ]]; then
             # for GKE we can use server default version.
