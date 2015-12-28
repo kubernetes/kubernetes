@@ -25,6 +25,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
+"${KUBE_ROOT}/hack/build-go.sh" cmd/libs/go2idl/client-gen
 "${KUBE_ROOT}/hack/build-go.sh" cmd/libs/go2idl/set-gen
 
 "${KUBE_ROOT}/hack/after-build/run-codegen.sh" --verify-only
