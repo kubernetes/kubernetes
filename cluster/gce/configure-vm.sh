@@ -279,14 +279,14 @@ dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
-network_provider: '$(echo "$NETWORK_PROVIDER")'
-opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG")'
+network_provider: '$(echo "$NETWORK_PROVIDER" | sed -e "s/'/''/g")'
+opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG" | sed -e "s/'/''/g")'
 opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG")'
 opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
 enable_manifest_url: '$(echo "$ENABLE_MANIFEST_URL" | sed -e "s/'/''/g")'
 manifest_url: '$(echo "$MANIFEST_URL" | sed -e "s/'/''/g")'
 manifest_url_header: '$(echo "$MANIFEST_URL_HEADER" | sed -e "s/'/''/g")'
-num_nodes: $(echo "${NUM_NODES}")
+num_nodes: $(echo "${NUM_NODES}" | sed -e "s/'/''/g")
 e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
 EOF
     if [ -n "${KUBELET_PORT:-}" ]; then
@@ -323,8 +323,8 @@ EOF
     if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 cluster_registry_disk_type: gce
-cluster_registry_disk_size: $(convert-bytes-gce-kube ${CLUSTER_REGISTRY_DISK_SIZE})
-cluster_registry_disk_name: ${CLUSTER_REGISTRY_DISK}
+cluster_registry_disk_size: $(echo $(convert-bytes-gce-kube ${CLUSTER_REGISTRY_DISK_SIZE}) | sed -e "s/'/''/g")
+cluster_registry_disk_name: $(echo ${CLUSTER_REGISTRY_DISK} | sed -e "s/'/''/g")
 EOF
     fi
     if [ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]; then
