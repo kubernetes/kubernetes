@@ -47,10 +47,15 @@ We still have [a bunch of work](http://issue.k8s.io/8262) to do to make the expe
 
 - Note that for rkt version later than v0.7.0, `metadata service` is not required for running pods in private networks. So now rkt pods will not register the metadata service be default.
 
+- Since release [v1.2.0-alpha.5](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.5), [rkt API service](https://github.com/coreos/rkt/blob/master/api/v1alpha/README.md)
+  is required to be running on the machine.
+
 ### Local cluster
 
-To use rkt as the container runtime, we need to supply `--container-runtime=rkt` and `--rkt-path=$PATH_TO_RKT_BINARY` to kubelet. Additionally we can provide `--rkt-stage1-image` flag
-as well to select which [stage1 image](https://github.com/coreos/rkt/blob/master/Documentation/running-lkvm-stage1.md) we want to use.
+To use rkt as the container runtime, we need to supply the following flags to kubelet:
+- `--container-runtime=rkt` chooses the container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.
+- `--rkt-path=$PATH_TO_RKT_BINARY` sets the path of rkt binary. Leave empty to use the first rkt in $PATH.
+- `--rkt-stage1-image` sets the path of the stage1 image. Local paths and http/https URLs are supported. Leave empty to use the 'stage1.aci' that locates in the same directory as the rkt binary.
 
 If you are using the [hack/local-up-cluster.sh](../../../hack/local-up-cluster.sh) script to launch the local cluster, then you can edit the environment variable `CONTAINER_RUNTIME`, `RKT_PATH` and `RKT_STAGE1_IMAGE` to
 set these flags:
