@@ -5,15 +5,10 @@
         numToKeep: 200
     builders:
         - shell: |
-            # Once updates are removed elsewhere, remove the flock (#18846)
-            sudo chown jenkins:jenkins /var/run/lock/gcloud-components.lock
             sudo chown -R jenkins:jenkins /usr/local/share/google
-            (
-              flock -x -w 60 9
-              gcloud components update
-              gcloud components update alpha
-              gcloud components update beta
-            ) 9> /var/run/lock/gcloud-components.lock
+            gcloud components update
+            gcloud components update alpha
+            gcloud components update beta
 
 - job:
     name: 'jenkins-gcloud-update-all'
