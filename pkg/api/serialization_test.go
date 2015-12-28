@@ -63,9 +63,6 @@ func fuzzInternalObject(t *testing.T, forVersion unversioned.GroupVersion, item 
 func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 	printer := spew.ConfigState{DisableMethods: true}
 
-	gvk, err := api.Scheme.ObjectKind(item)
-	t.Logf("fully qualified kind for %v is %v with codec %v", reflect.TypeOf(item), gvk, codec)
-
 	name := reflect.TypeOf(item).Elem().Name()
 	data, err := runtime.Encode(codec, item)
 	if err != nil {
@@ -122,8 +119,8 @@ func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
 
 // For debugging problems
 func TestSpecificKind(t *testing.T) {
-	api.Scheme.Log(t)
-	defer api.Scheme.Log(nil)
+	// api.Scheme.Log(t)
+	// defer api.Scheme.Log(nil)
 
 	kind := "Pod"
 	for i := 0; i < *fuzzIters; i++ {
@@ -135,8 +132,8 @@ func TestSpecificKind(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	api.Scheme.Log(t)
-	defer api.Scheme.Log(nil)
+	// api.Scheme.Log(t)
+	// defer api.Scheme.Log(nil)
 
 	kind := "List"
 	item, err := api.Scheme.New(api.SchemeGroupVersion.WithKind(kind))
