@@ -74,6 +74,9 @@ echo "Starting to download all kubernetes godeps. This takes a while"
 # Remove once either godep works properly or we bump docker version
 preload-dep github.com/docker docker 0f5c9d301b9b1cca66b3ea0f9dec3b5317d3686d
 
+# Remove once either godep works properly or we bump camlistore deps
+preload-dep github.com/camlistore camlistore 9868aa0f8d8a93ff0b30ff0de46cc351b6b88b30
+
 "${GODEP}" restore
 echo "Download finished"
 
