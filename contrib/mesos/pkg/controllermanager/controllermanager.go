@@ -168,8 +168,8 @@ func (s *CMServer) Run(_ []string) error {
 		if !ok {
 			glog.Fatal("Cloud provider must support routes if allocate-node-cidrs is set")
 		}
-		routeController := routecontroller.New(routes, clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "route-controller")), s.ClusterName, (*net.IPNet)(&s.ClusterCIDR))
-		routeController.Run(s.NodeSyncPeriod)
+		go routecontroller.NewRouteController(routes, clientset.NewForConfigOrDie(client.AddUserAgent(kubeconfig, "route-controller")), s.resyncPeriod, s.ClusterName, (*net.IPNet)(&s.ClusterCIDR)).
+			Run(wait.NeverStop)
 	}
 
 	go resourcequotacontroller.NewResourceQuotaController(

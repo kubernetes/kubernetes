@@ -22,8 +22,12 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 func TestIsResponsibleForRoute(t *testing.T) {
@@ -53,7 +57,7 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		if err != nil {
 			t.Errorf("%d. Error in test case: unparsable cidr %q", i, testCase.clusterCIDR)
 		}
-		rc := New(nil, nil, myClusterName, cidr)
+		rc := NewRouteController(nil, nil, controller.NoResyncPeriodFunc, myClusterName, cidr)
 		route := &cloudprovider.Route{
 			Name:            testCase.routeName,
 			TargetInstance:  "doesnt-matter-for-this-test",
@@ -65,16 +69,21 @@ func TestIsResponsibleForRoute(t *testing.T) {
 	}
 }
 
-func TestReconcile(t *testing.T) {
+func TestSyncNodeRoute(t *testing.T) {
 	cluster := "my-k8s"
 	testCases := []struct {
-		nodes          []api.Node
+		storeNodes     []*api.Node
+		syncNodes      []*api.Node
 		initialRoutes  []*cloudprovider.Route
 		expectedRoutes []*cloudprovider.Route
 	}{
 		// 2 nodes, routes already there
 		{
-			nodes: []api.Node{
+			storeNodes: []*api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}},
+				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
+			},
+			syncNodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}},
 				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
 			},
@@ -89,7 +98,11 @@ func TestReconcile(t *testing.T) {
 		},
 		// 2 nodes, one route already there
 		{
-			nodes: []api.Node{
+			storeNodes: []*api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}},
+				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
+			},
+			syncNodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}},
 				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
 			},
@@ -103,7 +116,11 @@ func TestReconcile(t *testing.T) {
 		},
 		// 2 nodes, no routes yet
 		{
-			nodes: []api.Node{
+			storeNodes: []*api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}},
+				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
+			},
+			syncNodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}},
 				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
 			},
@@ -115,9 +132,15 @@ func TestReconcile(t *testing.T) {
 		},
 		// 2 nodes, a few too many routes
 		{
-			nodes: []api.Node{
+			storeNodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}},
 				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
+			},
+			syncNodes: []*api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}},
+				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
+				{ObjectMeta: api.ObjectMeta{Name: "node-3", UID: "03"}, Spec: api.NodeSpec{PodCIDR: "10.120.2.0/24"}},
+				{ObjectMeta: api.ObjectMeta{Name: "node-4", UID: "04"}, Spec: api.NodeSpec{PodCIDR: "10.120.3.0/24"}},
 			},
 			initialRoutes: []*cloudprovider.Route{
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
@@ -132,13 +155,17 @@ func TestReconcile(t *testing.T) {
 		},
 		// 2 nodes, 2 routes, but only 1 is right
 		{
-			nodes: []api.Node{
+			storeNodes: []*api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}},
+				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
+			},
+			syncNodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}},
 				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
 			},
 			initialRoutes: []*cloudprovider.Route{
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-03", "node-3", "10.120.2.0/24"},
+				{cluster + "-02", "node-2", "10.120.2.0/24"}, // the route for node-2 is incorrect
 			},
 			expectedRoutes: []*cloudprovider.Route{
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
@@ -146,6 +173,7 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 	}
+
 	for i, testCase := range testCases {
 		cloud := &fakecloud.FakeCloud{RouteMap: make(map[string]*fakecloud.FakeRoute)}
 		for _, route := range testCase.initialRoutes {
@@ -159,10 +187,19 @@ func TestReconcile(t *testing.T) {
 			t.Error("Error in test: fakecloud doesn't support Routes()")
 		}
 		_, cidr, _ := net.ParseCIDR("10.120.0.0/16")
-		rc := New(routes, nil, cluster, cidr)
-		if err := rc.reconcile(testCase.nodes, testCase.initialRoutes); err != nil {
-			t.Errorf("%d. Error from rc.reconcile(): %v", i, err)
+
+		client := clientset.NewForConfigOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+		rc := NewRouteController(routes, client, controller.NoResyncPeriodFunc, cluster, cidr)
+
+		for _, node := range testCase.storeNodes {
+			rc.nodeStore.Add(node)
 		}
+		for _, node := range testCase.syncNodes {
+			if err := rc.syncNodeRoute(getKey(node, t)); err != nil {
+				t.Errorf("%d. Error from rc.reconcile(): %v", i, err)
+			}
+		}
+
 		var finalRoutes []*cloudprovider.Route
 		var err error
 		timeoutChan := time.After(200 * time.Millisecond)
@@ -180,6 +217,118 @@ func TestReconcile(t *testing.T) {
 				break poll
 			}
 		}
+	}
+}
+
+func TestCheckLeftoverRoutes(t *testing.T) {
+	cluster := "my-k8s"
+	testCases := []struct {
+		storeNodes     []*api.Node
+		initialRoutes  []*cloudprovider.Route
+		expectedRoutes []*cloudprovider.Route
+	}{
+		// 2 nodes, no leftover routes
+		{
+			storeNodes: []*api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}},
+				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
+				{cluster + "-02", "node-2", "10.120.1.0/24"},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
+				{cluster + "-02", "node-2", "10.120.1.0/24"},
+			},
+		},
+		// 1 nodes, one leftover route
+		{
+			storeNodes: []*api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}},
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
+				{cluster + "-02", "node-2", "10.120.1.0/24"},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
+			},
+		},
+		// 2 nodes, no routes yet
+		{
+			storeNodes: []*api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}},
+				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
+			},
+			initialRoutes:  []*cloudprovider.Route{},
+			expectedRoutes: []*cloudprovider.Route{},
+		},
+		// 2 nodes, 2 routes, but only 1 is right, the incorrect one should be removed
+		{
+			storeNodes: []*api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "node-1", UID: "01"}, Spec: api.NodeSpec{PodCIDR: "10.120.0.0/24"}},
+				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
+				{cluster + "-02", "node-2", "10.120.2.0/24"}, // the route for node-2 is incorrect
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
+			},
+		},
+	}
+
+	for i, testCase := range testCases {
+		cloud := &fakecloud.FakeCloud{RouteMap: make(map[string]*fakecloud.FakeRoute)}
+		for _, route := range testCase.initialRoutes {
+			fakeRoute := &fakecloud.FakeRoute{}
+			fakeRoute.ClusterName = cluster
+			fakeRoute.Route = *route
+			cloud.RouteMap[route.Name] = fakeRoute
+		}
+		routes, ok := cloud.Routes()
+		if !ok {
+			t.Error("Error in test: fakecloud doesn't support Routes()")
+		}
+		_, cidr, _ := net.ParseCIDR("10.120.0.0/16")
+
+		client := clientset.NewForConfigOrDie(&client.Config{Host: "", ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+		rc := NewRouteController(routes, client, controller.NoResyncPeriodFunc, cluster, cidr)
+
+		for _, node := range testCase.storeNodes {
+			rc.nodeStore.Add(node)
+		}
+
+		rc.checkLeftoverRoutes()
+
+		var finalRoutes []*cloudprovider.Route
+		var err error
+		timeoutChan := time.After(200 * time.Millisecond)
+		tick := time.NewTicker(10 * time.Millisecond)
+		defer tick.Stop()
+	poll:
+		for {
+			select {
+			case <-tick.C:
+				if finalRoutes, err = routes.ListRoutes(cluster); err == nil && routeListEqual(finalRoutes, testCase.expectedRoutes) {
+					break poll
+				}
+			case <-timeoutChan:
+				t.Errorf("%d. rc.reconcile() = %v, routes:\n%v\nexpected: nil, routes:\n%v\n", i, err, flatten(finalRoutes), flatten(testCase.expectedRoutes))
+				break poll
+			}
+		}
+	}
+}
+
+func getKey(node *api.Node, t *testing.T) string {
+	if key, err := controller.KeyFunc(node); err != nil {
+		t.Errorf("Unexpected error getting key for rc %v: %v", node.Name, err)
+		return ""
+	} else {
+		return key
 	}
 }
 
