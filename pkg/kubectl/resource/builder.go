@@ -69,6 +69,8 @@ type Builder struct {
 	singleResourceType bool
 	continueOnError    bool
 
+	export bool
+
 	schema validation.Schema
 }
 
@@ -232,6 +234,12 @@ func (b *Builder) SelectorParam(s string) *Builder {
 // Selector accepts a selector directly, and if non nil will trigger a list action.
 func (b *Builder) Selector(selector labels.Selector) *Builder {
 	b.selector = selector
+	return b
+}
+
+// ExportParam accepts the export boolean for these resources
+func (b *Builder) ExportParam(export bool) *Builder {
+	b.export = export
 	return b
 }
 
@@ -513,7 +521,7 @@ func (b *Builder) visitorResult() *Result {
 			if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 				selectorNamespace = ""
 			}
-			visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector))
+			visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector, b.export))
 		}
 		if b.continueOnError {
 			return &Result{visitor: EagerVisitorList(visitors), sources: visitors}
@@ -571,7 +579,7 @@ func (b *Builder) visitorResult() *Result {
 				}
 			}
 
-			info := NewInfo(client, mapping, selectorNamespace, tuple.Name)
+			info := NewInfo(client, mapping, selectorNamespace, tuple.Name, b.export)
 			items = append(items, info)
 		}
 
@@ -620,7 +628,7 @@ func (b *Builder) visitorResult() *Result {
 
 		visitors := []Visitor{}
 		for _, name := range b.names {
-			info := NewInfo(client, mapping, selectorNamespace, name)
+			info := NewInfo(client, mapping, selectorNamespace, name, b.export)
 			visitors = append(visitors, info)
 		}
 		return &Result{singular: isSingular, visitor: VisitorList(visitors), sources: visitors}
