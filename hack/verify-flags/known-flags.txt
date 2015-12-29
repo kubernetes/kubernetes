@@ -236,6 +236,7 @@ oidc-username-claim
 oom-score-adj
 output-base
 output-package
+output-print-type
 output-version
 out-version
 path-override
