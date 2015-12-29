@@ -155,7 +155,7 @@ type KubeletServer struct {
 	KubeAPIBurst int
 
 	// Pull images one at a time.
-	SerializeImagePulls        bool
+	SerializeImagePulls        util.BoolFlag
 	ExperimentalFlannelOverlay bool
 }
 
@@ -174,6 +174,8 @@ type KubeletBuilder func(kc *KubeletConfig) (KubeletBootstrap, *config.PodConfig
 
 // NewKubeletServer will create a new KubeletServer with default values.
 func NewKubeletServer() *KubeletServer {
+	var serializeImagePulls util.BoolFlag
+	serializeImagePulls.Default(true)
 	return &KubeletServer{
 		Address:                     net.ParseIP("0.0.0.0"),
 		AuthPath:                    util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
@@ -223,7 +225,7 @@ func NewKubeletServer() *KubeletServer {
 		RktPath:                        "",
 		RktStage1Image:                 "",
 		RootDirectory:                  defaultRootDir,
-		SerializeImagePulls:            true,
+		SerializeImagePulls:            serializeImagePulls,
 		StreamingConnectionIdleTimeout: 5 * time.Minute,
 		SyncFrequency:                  1 * time.Minute,
 		SystemContainer:                "",
@@ -344,7 +346,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.RegisterSchedulable, "register-schedulable", s.RegisterSchedulable, "Register the node as schedulable. No-op if register-node is false. [default=true]")
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
-	fs.BoolVar(&s.SerializeImagePulls, "serialize-image-pulls", s.SerializeImagePulls, "Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]")
+	fs.Var(&s.SerializeImagePulls, "serialize-image-pulls", "Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]")
 	fs.BoolVar(&s.ExperimentalFlannelOverlay, "experimental-flannel-overlay", s.ExperimentalFlannelOverlay, "Experimental support for starting the kubelet with the default overlay network (flannel). Assumes flanneld is already running in client mode. [default=false]")
 }
 
@@ -712,6 +714,8 @@ func SimpleKubelet(client *client.Client,
 		RootFreeDiskMB:   256,
 	}
 
+	var serializeImagePulls util.BoolFlag
+	serializeImagePulls.Default(true)
 	kcfg := KubeletConfig{
 		Address:                   net.ParseIP(address),
 		CAdvisorInterface:         cadvisorInterface,
@@ -756,7 +760,7 @@ func SimpleKubelet(client *client.Client,
 		ResolverConfig:      kubelet.ResolvConfDefault,
 		ResourceContainer:   "/kubelet",
 		RootDirectory:       rootDir,
-		SerializeImagePulls: true,
+		SerializeImagePulls: serializeImagePulls,
 		SyncFrequency:       syncFrequency,
 		SystemContainer:     "",
 		TLSOptions:          tlsOptions,
@@ -951,7 +955,7 @@ type KubeletConfig struct {
 	RktStage1Image                 string
 	RootDirectory                  string
 	Runonce                        bool
-	SerializeImagePulls            bool
+	SerializeImagePulls            util.BoolFlag
 	StandaloneMode                 bool
 	StreamingConnectionIdleTimeout time.Duration
 	SyncFrequency                  time.Duration

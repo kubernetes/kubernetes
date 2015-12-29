@@ -61,6 +61,8 @@ const (
 
 	MinimumDockerAPIVersion = "1.18"
 
+	minimumDockerAPIVersionForParallelPulls = "1.21"
+
 	maxReasonCacheEntries = 200
 
 	// ndots specifies the minimum number of dots that a domain name must contain for the resolver to consider it as FQDN (fully-qualified)
@@ -162,7 +164,7 @@ func NewDockerManager(
 	procFs procfs.ProcFSInterface,
 	cpuCFSQuota bool,
 	imageBackOff *util.Backoff,
-	serializeImagePulls bool) *DockerManager {
+	serializeImagePulls util.BoolFlag) *DockerManager {
 
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
 	// if there are any problems.
@@ -216,13 +218,13 @@ func NewDockerManager(
 		cpuCFSQuota:            cpuCFSQuota,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
-	if serializeImagePulls {
-		dm.imagePuller = kubecontainer.NewSerializedImagePuller(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff)
-	} else {
-		dm.imagePuller = kubecontainer.NewImagePuller(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff)
-	}
 	dm.containerGC = NewContainerGC(client, containerLogsDir)
 
+	if dm.shouldPullInParallel(serializeImagePulls) {
+		dm.imagePuller = kubecontainer.NewImagePuller(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff)
+	} else {
+		dm.imagePuller = kubecontainer.NewSerializedImagePuller(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff)
+	}
 	return dm
 }
 
@@ -261,6 +263,34 @@ func (sc *reasonInfoCache) Get(uid types.UID, name string) (reasonInfo, bool) {
 	} else {
 		return reasonInfo{"", ""}, ok
 	}
+}
+
+// shouldPullInParallel returns true if docker API version >= 1.21 and user has not set
+// serializeImagePulls or the user has set serializeImagePulls to false, otherwise it
+// returns false.
+func (dm *DockerManager) shouldPullInParallel(serializeImagePulls util.BoolFlag) bool {
+	canParallelPull, err := dm.isDockerAPIVersionCompatible(minimumDockerAPIVersionForParallelPulls)
+	if err != nil {
+		return false
+	}
+	if canParallelPull {
+		return !serializeImagePulls.Provided() || !serializeImagePulls.Value()
+	} else {
+		return !serializeImagePulls.Value()
+	}
+}
+
+// isDockerAPIVersion returns true if the current docker API version >= the input
+// version, otherwise it returns false.
+func (dm *DockerManager) isDockerAPIVersionCompatible(input string) (bool, error) {
+	version, err := dm.Version()
+	if err != nil {
+		return false, err
+	}
+	if result, err := version.Compare(input); err == nil && result >= 0 {
+		return true, nil
+	}
+	return false, err
 }
 
 // GetContainerLogs returns logs of a specific container. By
@@ -998,15 +1028,7 @@ func (dm *DockerManager) Version() (kubecontainer.Version, error) {
 var dockerAPIVersionWithExec = "1.15"
 
 func (dm *DockerManager) nativeExecSupportExists() (bool, error) {
-	version, err := dm.Version()
-	if err != nil {
-		return false, err
-	}
-	result, err := version.Compare(dockerAPIVersionWithExec)
-	if result >= 0 {
-		return true, err
-	}
-	return false, err
+	return dm.isDockerAPIVersionCompatible(dockerAPIVersionWithExec)
 }
 
 func (dm *DockerManager) getRunInContainerCommand(containerID kubecontainer.ContainerID, cmd []string) (*exec.Cmd, error) {

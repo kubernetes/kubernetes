@@ -194,7 +194,7 @@ func NewMainKubelet(
 	cpuCFSQuota bool,
 	daemonEndpoints *api.NodeDaemonEndpoints,
 	oomAdjuster *oom.OOMAdjuster,
-	serializeImagePulls bool,
+	serializeImagePulls util.BoolFlag,
 	containerManager cm.ContainerManager,
 	flannelExperimentalOverlay bool,
 ) (*Kubelet, error) {

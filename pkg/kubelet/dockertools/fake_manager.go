@@ -42,12 +42,13 @@ func NewFakeDockerManager(
 	networkPlugin network.NetworkPlugin,
 	generator kubecontainer.RunContainerOptionsGenerator,
 	httpClient kubetypes.HttpGetter, imageBackOff *util.Backoff) *DockerManager {
-
+	var serializeImagePulls util.BoolFlag
+	serializeImagePulls.Default(true)
 	fakeOOMAdjuster := oom.NewFakeOOMAdjuster()
 	fakeProcFs := procfs.NewFakeProcFS()
 	dm := NewDockerManager(client, recorder, livenessManager, containerRefManager, machineInfo, podInfraContainerImage, qps,
 		burst, containerLogsDir, osInterface, networkPlugin, generator, httpClient, &NativeExecHandler{},
-		fakeOOMAdjuster, fakeProcFs, false, imageBackOff, true)
+		fakeOOMAdjuster, fakeProcFs, false, imageBackOff, serializeImagePulls)
 	dm.dockerPuller = &FakeDockerPuller{}
 	return dm
 }
