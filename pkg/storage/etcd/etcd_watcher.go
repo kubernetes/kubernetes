@@ -459,6 +459,7 @@ func (w *etcdWatcher) ResultChan() <-chan watch.Event {
 
 // Stop implements watch.Interface.
 func (w *etcdWatcher) Stop() {
+	glog.Errorf("Stopping watcher")
 	w.stopLock.Lock()
 	if w.cancel != nil {
 		w.cancel()
@@ -473,4 +474,5 @@ func (w *etcdWatcher) Stop() {
 	// Wait until all calls to etcd are finished and no other
 	// will be issued.
 	w.wg.Wait()
+	glog.Errorf("Watcher stopped")
 }
