@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // Codec is the identity codec for this package - it can only convert itself
@@ -41,45 +42,75 @@ func init() {
 		},
 	)
 	Scheme.AddConversionFuncs(
-		func(in *unversioned.Time, out *unversioned.Time, s conversion.Scope) error {
-			// Cannot deep copy these, because time.Time has unexported fields.
-			*out = *in
-			return nil
-		},
-		func(in *string, out *labels.Selector, s conversion.Scope) error {
-			selector, err := labels.Parse(*in)
-			if err != nil {
-				return err
-			}
-			*out = selector
-			return nil
-		},
-		func(in *string, out *fields.Selector, s conversion.Scope) error {
-			selector, err := fields.ParseSelector(*in)
-			if err != nil {
-				return err
-			}
-			*out = selector
-			return nil
-		},
-		func(in *labels.Selector, out *string, s conversion.Scope) error {
-			if *in == nil {
-				return nil
-			}
-			*out = (*in).String()
-			return nil
-		},
-		func(in *fields.Selector, out *string, s conversion.Scope) error {
-			if *in == nil {
-				return nil
-			}
-			*out = (*in).String()
-			return nil
-		},
-		func(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
-			// Cannot deep copy these, because inf.Dec has unexported fields.
-			*out = *in.Copy()
-			return nil
-		},
+		Convert_unversioned_TypeMeta_To_unversioned_TypeMeta,
+		Convert_unversioned_ListMeta_To_unversioned_ListMeta,
+		Convert_intstr_IntOrString_To_intstr_IntOrString,
+		Convert_unversioned_Time_To_unversioned_Time,
+		Convert_string_To_labels_Selector,
+		Convert_string_To_fields_Selector,
+		Convert_labels_Selector_To_string,
+		Convert_fields_Selector_To_string,
+		Convert_resource_Quantity_To_resource_Quantity,
 	)
+}
+
+func Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(in, out *unversioned.TypeMeta, s conversion.Scope) error {
+	// These values are explicitly not copied
+	//out.APIVersion = in.APIVersion
+	//out.Kind = in.Kind
+	return nil
+}
+
+func Convert_unversioned_ListMeta_To_unversioned_ListMeta(in, out *unversioned.ListMeta, s conversion.Scope) error {
+	out.ResourceVersion = in.ResourceVersion
+	out.SelfLink = in.SelfLink
+	return nil
+}
+
+func Convert_intstr_IntOrString_To_intstr_IntOrString(in, out *intstr.IntOrString, s conversion.Scope) error {
+	out.Type = in.Type
+	out.IntVal = in.IntVal
+	out.StrVal = in.StrVal
+	return nil
+}
+
+func Convert_unversioned_Time_To_unversioned_Time(in *unversioned.Time, out *unversioned.Time, s conversion.Scope) error {
+	// Cannot deep copy these, because time.Time has unexported fields.
+	*out = *in
+	return nil
+}
+func Convert_string_To_labels_Selector(in *string, out *labels.Selector, s conversion.Scope) error {
+	selector, err := labels.Parse(*in)
+	if err != nil {
+		return err
+	}
+	*out = selector
+	return nil
+}
+func Convert_string_To_fields_Selector(in *string, out *fields.Selector, s conversion.Scope) error {
+	selector, err := fields.ParseSelector(*in)
+	if err != nil {
+		return err
+	}
+	*out = selector
+	return nil
+}
+func Convert_labels_Selector_To_string(in *labels.Selector, out *string, s conversion.Scope) error {
+	if *in == nil {
+		return nil
+	}
+	*out = (*in).String()
+	return nil
+}
+func Convert_fields_Selector_To_string(in *fields.Selector, out *string, s conversion.Scope) error {
+	if *in == nil {
+		return nil
+	}
+	*out = (*in).String()
+	return nil
+}
+func Convert_resource_Quantity_To_resource_Quantity(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
+	// Cannot deep copy these, because inf.Dec has unexported fields.
+	*out = *in.Copy()
+	return nil
 }
