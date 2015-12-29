@@ -475,5 +475,4 @@ func (w *etcdWatcher) Stop() {
 	// Wait until all calls to etcd are finished and no other
 	// will be issued.
 	w.wg.Wait()
-	glog.Errorf("Watcher stopped")
 }
