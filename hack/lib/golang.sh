@@ -263,9 +263,13 @@ EOF
   # Append the tree maintained by `godep` to the GOPATH unless KUBE_NO_GODEPS
   # is defined.
   if [[ -z ${KUBE_NO_GODEPS:-} ]]; then
+    # While we still support go v1.4, symlink an old-style godeps workspace.
+    GODEPS_WORKSPACE="${KUBE_ROOT}/Godeps/_workspace"
+    ln -s ../../vendor "${GODEPS_WORKSPACE}/src"
     GOPATH="${GOPATH}:${KUBE_ROOT}/Godeps/_workspace"
   fi
   export GOPATH
+  export GO15VENDOREXPERIMENT=1
 
   # Unset GOBIN in case it already exists in the current session.
   unset GOBIN

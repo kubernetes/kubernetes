@@ -141,7 +141,7 @@ See [Faster Reviews](faster_reviews.md) for more details.
 
 ## godep and dependency management
 
-Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. It is not strictly required for building Kubernetes but it is required when managing dependencies under the Godeps/ tree, and is required by a number of the build and test scripts. Please make sure that ``godep`` is installed and in your ``$PATH``.
+Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. It is not strictly required for building Kubernetes but it is required when managing dependencies, and is required by a number of the build and test scripts. Please make sure that a recent `godep` is installed and in your `$PATH`.
 
 ### Installing godep
 
@@ -151,7 +151,7 @@ There are many ways to build and host go binaries. Here is an easy way to get ut
 source control system).  Use `apt-get install mercurial` or `yum install mercurial` on Linux, or [brew.sh](http://brew.sh) on OS X, or download
 directly from mercurial.
 
-2) Create a new GOPATH for your tools and install godep:
+2) Create a new `GOPATH` for your tools and install godep:
 
 ```sh
 export GOPATH=$HOME/go-tools
@@ -168,7 +168,7 @@ export PATH=$PATH:$GOPATH/bin
 
 ### Using godep
 
-Here's a quick walkthrough of one way to use godeps to add or update a Kubernetes dependency into Godeps/_workspace. For more details, please see the instructions in [godep's documentation](https://github.com/tools/godep).
+Here's a quick walkthrough of one way to use godeps to add or update a Kubernetes dependency. For more details, please see the instructions in [godep's documentation](https://github.com/tools/godep).  We use the "new" vendoring convention introduced in Go v1.5, which means you must have Go v1.5.x installed (or at least ensure that `go version` reports 1.5.x).
 
 1) Devote a directory to this endeavor:
 
@@ -185,11 +185,8 @@ git clone https://path/to/your/fork .
 2) Set up your GOPATH.
 
 ```sh
-# Option A: this will let your builds see packages that exist elsewhere on your system.
-export GOPATH=$KPATH:$GOPATH
-# Option B: This will *not* let your local builds see packages that exist elsewhere on your system.
+# This will *not* let your local builds see packages that exist elsewhere on your system.
 export GOPATH=$KPATH
-# Option B is recommended if you're going to mess with the dependencies.
 ```
 
 3) Populate your new GOPATH.
@@ -204,15 +201,15 @@ godep restore
 ```sh
 # To add a new dependency, do:
 cd $KPATH/src/k8s.io/kubernetes
-go get path/to/dependency
+go get example.com/path/to/dependency
 # Change code in Kubernetes to use the dependency.
-godep save ./...
+GO15VENDOREXPERIMENT=1 godep save ./...
 
 # To update an existing dependency, do:
 cd $KPATH/src/k8s.io/kubernetes
 go get -u path/to/dependency
 # Change code in Kubernetes accordingly if necessary.
-godep update path/to/dependency/...
+GO15VENDOREXPERIMENT=1 godep update path/to/dependency/...
 ```
 
 _If `go get -u path/to/dependency` fails with compilation errors, instead try `go get -d -u path/to/dependency`
