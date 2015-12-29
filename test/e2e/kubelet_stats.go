@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -39,8 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
-
-	. "github.com/onsi/gomega"
 )
 
 // KubeletMetric stores metrics scraped from the kubelet server's /metric endpoint.
@@ -269,52 +266,6 @@ func getOneTimeResourceUsageOnNode(
 	return usageMap, nil
 }
 
-func getKubeSystemContainersResourceUsage(c *client.Client) (resourceUsagePerContainer, error) {
-	pods, err := c.Pods("kube-system").List(api.ListOptions{})
-	if err != nil {
-		return resourceUsagePerContainer{}, err
-	}
-	nodes, err := c.Nodes().List(api.ListOptions{})
-	if err != nil {
-		return resourceUsagePerContainer{}, err
-	}
-	containerIDToNameMap := make(map[string]string)
-	containerIDs := make([]string, 0)
-	for _, pod := range pods.Items {
-		for _, container := range pod.Status.ContainerStatuses {
-			containerID := strings.TrimPrefix(container.ContainerID, "docker:/")
-			containerIDToNameMap[containerID] = pod.Name + "/" + container.Name
-			containerIDs = append(containerIDs, containerID)
-		}
-	}
-
-	mutex := sync.Mutex{}
-	wg := sync.WaitGroup{}
-	wg.Add(len(nodes.Items))
-	errors := make([]error, 0)
-	nameToUsageMap := make(resourceUsagePerContainer, len(containerIDToNameMap))
-	for _, node := range nodes.Items {
-		go func(nodeName string) {
-			defer wg.Done()
-			nodeUsage, err := getOneTimeResourceUsageOnNode(c, nodeName, 15*time.Second, func() []string { return containerIDs }, true)
-			mutex.Lock()
-			defer mutex.Unlock()
-			if err != nil {
-				errors = append(errors, err)
-				return
-			}
-			for k, v := range nodeUsage {
-				nameToUsageMap[containerIDToNameMap[k]] = v
-			}
-		}(node.Name)
-	}
-	wg.Wait()
-	if len(errors) != 0 {
-		return resourceUsagePerContainer{}, fmt.Errorf("Errors while gathering usage data: %v", errors)
-	}
-	return nameToUsageMap, nil
-}
-
 // logOneTimeResourceUsageSummary collects container resource for the list of
 // nodes, formats and logs the stats.
 func logOneTimeResourceUsageSummary(c *client.Client, nodeNames []string, cpuInterval time.Duration) {
@@ -359,139 +310,6 @@ type usageDataPerContainer struct {
 	cpuData        []float64
 	memUseData     []int64
 	memWorkSetData []int64
-}
-
-func computePercentiles(timeSeries map[time.Time]resourceUsagePerContainer, percentilesToCompute []int) map[int]resourceUsagePerContainer {
-	if len(timeSeries) == 0 {
-		return make(map[int]resourceUsagePerContainer)
-	}
-	dataMap := make(map[string]*usageDataPerContainer)
-	for _, singleStatistic := range timeSeries {
-		for name, data := range singleStatistic {
-			if dataMap[name] == nil {
-				dataMap[name] = &usageDataPerContainer{
-					cpuData:        make([]float64, len(timeSeries)),
-					memUseData:     make([]int64, len(timeSeries)),
-					memWorkSetData: make([]int64, len(timeSeries)),
-				}
-			}
-			dataMap[name].cpuData = append(dataMap[name].cpuData, data.CPUUsageInCores)
-			dataMap[name].memUseData = append(dataMap[name].memUseData, data.MemoryUsageInBytes)
-			dataMap[name].memWorkSetData = append(dataMap[name].memWorkSetData, data.MemoryWorkingSetInBytes)
-		}
-	}
-	for _, v := range dataMap {
-		sort.Float64s(v.cpuData)
-		sort.Sort(int64arr(v.memUseData))
-		sort.Sort(int64arr(v.memWorkSetData))
-	}
-
-	result := make(map[int]resourceUsagePerContainer)
-	for _, perc := range percentilesToCompute {
-		data := make(resourceUsagePerContainer)
-		for k, v := range dataMap {
-			percentileIndex := int(math.Ceil(float64(len(v.cpuData)*perc)/100)) - 1
-			data[k] = &containerResourceUsage{
-				Name:                    k,
-				CPUUsageInCores:         v.cpuData[percentileIndex],
-				MemoryUsageInBytes:      v.memUseData[percentileIndex],
-				MemoryWorkingSetInBytes: v.memWorkSetData[percentileIndex],
-			}
-		}
-		result[perc] = data
-	}
-	return result
-}
-
-type resourceConstraint struct {
-	cpuConstraint    float64
-	memoryConstraint int64
-}
-
-type containerResourceGatherer struct {
-	usageTimeseries map[time.Time]resourceUsagePerContainer
-	stopCh          chan struct{}
-	timer           *time.Ticker
-	wg              sync.WaitGroup
-}
-
-func (g *containerResourceGatherer) startGatheringData(c *client.Client, period time.Duration) {
-	g.usageTimeseries = make(map[time.Time]resourceUsagePerContainer)
-	g.wg.Add(1)
-	g.stopCh = make(chan struct{})
-	g.timer = time.NewTicker(period)
-	go func() error {
-		for {
-			select {
-			case <-g.timer.C:
-				now := time.Now()
-				data, err := getKubeSystemContainersResourceUsage(c)
-				if err != nil {
-					return err
-				}
-				g.usageTimeseries[now] = data
-			case <-g.stopCh:
-				g.wg.Done()
-				return nil
-			}
-		}
-	}()
-}
-
-func (g *containerResourceGatherer) stopAndPrintData(percentiles []int, constraints map[string]resourceConstraint) {
-	close(g.stopCh)
-	g.timer.Stop()
-	g.wg.Wait()
-	if len(percentiles) == 0 {
-		Logf("Warning! Empty percentile list for stopAndPrintData.")
-		return
-	}
-	stats := computePercentiles(g.usageTimeseries, percentiles)
-	sortedKeys := []string{}
-	for name := range stats[percentiles[0]] {
-		sortedKeys = append(sortedKeys, name)
-	}
-	sort.Strings(sortedKeys)
-	violatedConstraints := make([]string, 0)
-	for _, perc := range percentiles {
-		buf := &bytes.Buffer{}
-		w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
-		fmt.Fprintf(w, "container\tcpu(cores)\tmemory(MB)\n")
-		for _, name := range sortedKeys {
-			usage := stats[perc][name]
-			fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", name, usage.CPUUsageInCores, float64(usage.MemoryWorkingSetInBytes)/(1024*1024))
-			// Verifying 99th percentile of resource usage
-			if perc == 99 {
-				// Name has a form: <pod_name>/<container_name>
-				containerName := strings.Split(name, "/")[1]
-				if constraint, ok := constraints[containerName]; ok {
-					if usage.CPUUsageInCores > constraint.cpuConstraint {
-						violatedConstraints = append(
-							violatedConstraints,
-							fmt.Sprintf("Container %v is using %v/%v CPU",
-								name,
-								usage.CPUUsageInCores,
-								constraint.cpuConstraint,
-							),
-						)
-					}
-					if usage.MemoryWorkingSetInBytes > constraint.memoryConstraint {
-						violatedConstraints = append(
-							violatedConstraints,
-							fmt.Sprintf("Container %v is using %v/%v MB of memory",
-								name,
-								float64(usage.MemoryWorkingSetInBytes)/(1024*1024),
-								float64(constraint.memoryConstraint)/(1024*1024),
-							),
-						)
-					}
-				}
-			}
-		}
-		w.Flush()
-		Logf("%v percentile:\n%v", perc, buf.String())
-	}
-	Expect(violatedConstraints).To(BeEmpty())
 }
 
 // Performs a get on a node proxy endpoint given the nodename and rest client.
