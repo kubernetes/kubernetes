@@ -1225,6 +1225,77 @@ const (
 	DefaultTerminationGracePeriodSeconds = 30
 )
 
+// A node selector represents the union of the results of one or more label queries
+// over a set of nodes; that is, it represents the OR of the selectors represented
+// by the nodeSelectorTerms. An empty node selector matches all objects. A null
+// node selector matches no objects.
+type NodeSelector struct {
+	// nodeSelectorTerms is a list of node selector terms. The terms are ORed.
+	NodeSelectorTerms []NodeSelectorTerm `json:"nodeSelectorTerms,omitempty"`
+}
+
+// An empty node selector term matches all objects. A null node selector term
+// matches no objects.
+type NodeSelectorTerm struct {
+	// matchExpressions is a list of node selector requirements. The requirements are ANDed.
+	MatchExpressions []NodeSelectorRequirement `json:"matchExpressions,omitempty"`
+}
+
+// A node selector requirement is a selector that contains values, a key, and an operator
+// that relates the key and values.
+type NodeSelectorRequirement struct {
+	// key is the label key that the selector applies to.
+	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key"`
+	// operator represents a key's relationship to a set of values.
+	// Valid operators ard In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+	Operator NodeSelectorOperator `json:"operator"`
+	// values is an array of string values. If the operator is In or NotIn,
+	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
+	// the values array must be empty. If the operator is Gt or Lt, the values
+	// array must have a single element, which will be interpreted as an integer.
+	// This array is replaced during a strategic merge patch.
+	Values []string `json:"values,omitempty"`
+}
+
+// A node selector operator is the set of operators that can be used in
+// a node selector requirement.
+type NodeSelectorOperator string
+
+const (
+	NodeSelectorOpIn           NodeSelectorOperator = "In"
+	NodeSelectorOpNotIn        NodeSelectorOperator = "NotIn"
+	NodeSelectorOpExists       NodeSelectorOperator = "Exists"
+	NodeSelectorOpDoesNotExist NodeSelectorOperator = "DoesNotExist"
+	NodeSelectorOpGt           NodeSelectorOperator = "Gt"
+	NodeSelectorOpLt           NodeSelectorOperator = "Lt"
+)
+
+// An Affinity is a group of affinity scheduling requirements,
+// including node affinity and inter pod affinity.
+type Affinity struct {
+	// HardNodeAffinity specifies hard scheduling requirements for the pod.
+	// Additionally, Kubelet will (asynchronously) evict a pod that no longer
+	// meets its HardNodeAffinity for whatever reason, e.g. runtime changes
+	// to the node's labels.
+	HardNodeAffinity *NodeSelector `json:"hardNodeAffinity,omitempty"`
+	// SoftNodeAffinity specifies which nodes are preferred among those that meet all
+	// of the hard scheduling requirements (resource request, HardNodeAffinity, etc.).
+	// The node that is most preferred is the one with the greatest sum of weights,
+	// i.e. for each node that meets all of the hard scheduling requirements,
+	// compute a sum by iterating through the elements of SoftNodeAffinity and adding
+	// "weight" to the sum if the node matches the corresponding MatchExpressions; the
+	// node(s) with the highest sum are the most preferred.
+	SoftNodeAffinity []SoftNodeAffinityTerm `json:"softNodeAffinity,omitempty"`
+}
+
+// A SoftNodeAffinityTerm is the AND of one or more NodeSelectorRequirements
+type SoftNodeAffinityTerm struct {
+	// weight is in the range 1-100
+	Weight int `json:"weight"`
+	// matchExpressions is a list of node selector requirements. The requirements are ANDed.
+	MatchExpressions []NodeSelectorRequirement `json:"matchExpressions,omitempty"`
+}
+
 // PodSpec is a description of a pod.
 type PodSpec struct {
 	// List of volumes that can be mounted by containers belonging to the pod.
@@ -1262,6 +1333,8 @@ type PodSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/node-selection/README.md
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
+	// Affinity is a group of affinity scheduling requirements of the pod, including node affinity and inter pod affinity.
+	Affinity *Affinity `json:"affinity,omitempty"`
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod.
 	// More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`

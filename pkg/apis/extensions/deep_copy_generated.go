@@ -37,6 +37,28 @@ func deepCopy_api_AWSElasticBlockStoreVolumeSource(in api.AWSElasticBlockStoreVo
 	return nil
 }
 
+func deepCopy_api_Affinity(in api.Affinity, out *api.Affinity, c *conversion.Cloner) error {
+	if in.HardNodeAffinity != nil {
+		out.HardNodeAffinity = new(api.NodeSelector)
+		if err := deepCopy_api_NodeSelector(*in.HardNodeAffinity, out.HardNodeAffinity, c); err != nil {
+			return err
+		}
+	} else {
+		out.HardNodeAffinity = nil
+	}
+	if in.SoftNodeAffinity != nil {
+		out.SoftNodeAffinity = make([]api.SoftNodeAffinityTerm, len(in.SoftNodeAffinity))
+		for i := range in.SoftNodeAffinity {
+			if err := deepCopy_api_SoftNodeAffinityTerm(in.SoftNodeAffinity[i], &out.SoftNodeAffinity[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.SoftNodeAffinity = nil
+	}
+	return nil
+}
+
 func deepCopy_api_Capabilities(in api.Capabilities, out *api.Capabilities, c *conversion.Cloner) error {
 	if in.Add != nil {
 		out.Add = make([]api.Capability, len(in.Add))
@@ -406,6 +428,48 @@ func deepCopy_api_NFSVolumeSource(in api.NFSVolumeSource, out *api.NFSVolumeSour
 	return nil
 }
 
+func deepCopy_api_NodeSelector(in api.NodeSelector, out *api.NodeSelector, c *conversion.Cloner) error {
+	if in.NodeSelectorTerms != nil {
+		out.NodeSelectorTerms = make([]api.NodeSelectorTerm, len(in.NodeSelectorTerms))
+		for i := range in.NodeSelectorTerms {
+			if err := deepCopy_api_NodeSelectorTerm(in.NodeSelectorTerms[i], &out.NodeSelectorTerms[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.NodeSelectorTerms = nil
+	}
+	return nil
+}
+
+func deepCopy_api_NodeSelectorRequirement(in api.NodeSelectorRequirement, out *api.NodeSelectorRequirement, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	if in.Values != nil {
+		out.Values = make([]string, len(in.Values))
+		for i := range in.Values {
+			out.Values[i] = in.Values[i]
+		}
+	} else {
+		out.Values = nil
+	}
+	return nil
+}
+
+func deepCopy_api_NodeSelectorTerm(in api.NodeSelectorTerm, out *api.NodeSelectorTerm, c *conversion.Cloner) error {
+	if in.MatchExpressions != nil {
+		out.MatchExpressions = make([]api.NodeSelectorRequirement, len(in.MatchExpressions))
+		for i := range in.MatchExpressions {
+			if err := deepCopy_api_NodeSelectorRequirement(in.MatchExpressions[i], &out.MatchExpressions[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.MatchExpressions = nil
+	}
+	return nil
+}
+
 func deepCopy_api_ObjectFieldSelector(in api.ObjectFieldSelector, out *api.ObjectFieldSelector, c *conversion.Cloner) error {
 	out.APIVersion = in.APIVersion
 	out.FieldPath = in.FieldPath
@@ -545,6 +609,14 @@ func deepCopy_api_PodSpec(in api.PodSpec, out *api.PodSpec, c *conversion.Cloner
 		}
 	} else {
 		out.NodeSelector = nil
+	}
+	if in.Affinity != nil {
+		out.Affinity = new(api.Affinity)
+		if err := deepCopy_api_Affinity(*in.Affinity, out.Affinity, c); err != nil {
+			return err
+		}
+	} else {
+		out.Affinity = nil
 	}
 	out.ServiceAccountName = in.ServiceAccountName
 	out.NodeName = in.NodeName
@@ -692,6 +764,21 @@ func deepCopy_api_SecurityContext(in api.SecurityContext, out *api.SecurityConte
 		*out.RunAsNonRoot = *in.RunAsNonRoot
 	} else {
 		out.RunAsNonRoot = nil
+	}
+	return nil
+}
+
+func deepCopy_api_SoftNodeAffinityTerm(in api.SoftNodeAffinityTerm, out *api.SoftNodeAffinityTerm, c *conversion.Cloner) error {
+	out.Weight = in.Weight
+	if in.MatchExpressions != nil {
+		out.MatchExpressions = make([]api.NodeSelectorRequirement, len(in.MatchExpressions))
+		for i := range in.MatchExpressions {
+			if err := deepCopy_api_NodeSelectorRequirement(in.MatchExpressions[i], &out.MatchExpressions[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.MatchExpressions = nil
 	}
 	return nil
 }
@@ -1627,6 +1714,7 @@ func deepCopy_intstr_IntOrString(in intstr.IntOrString, out *intstr.IntOrString,
 func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		deepCopy_api_AWSElasticBlockStoreVolumeSource,
+		deepCopy_api_Affinity,
 		deepCopy_api_Capabilities,
 		deepCopy_api_CephFSVolumeSource,
 		deepCopy_api_CinderVolumeSource,
@@ -1652,6 +1740,9 @@ func init() {
 		deepCopy_api_LoadBalancerStatus,
 		deepCopy_api_LocalObjectReference,
 		deepCopy_api_NFSVolumeSource,
+		deepCopy_api_NodeSelector,
+		deepCopy_api_NodeSelectorRequirement,
+		deepCopy_api_NodeSelectorTerm,
 		deepCopy_api_ObjectFieldSelector,
 		deepCopy_api_ObjectMeta,
 		deepCopy_api_PersistentVolumeClaimVolumeSource,
@@ -1664,6 +1755,7 @@ func init() {
 		deepCopy_api_SELinuxOptions,
 		deepCopy_api_SecretVolumeSource,
 		deepCopy_api_SecurityContext,
+		deepCopy_api_SoftNodeAffinityTerm,
 		deepCopy_api_TCPSocketAction,
 		deepCopy_api_Volume,
 		deepCopy_api_VolumeMount,

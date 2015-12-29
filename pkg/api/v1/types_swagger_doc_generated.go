@@ -39,6 +39,16 @@ func (AWSElasticBlockStoreVolumeSource) SwaggerDoc() map[string]string {
 	return map_AWSElasticBlockStoreVolumeSource
 }
 
+var map_Affinity = map[string]string{
+	"":                 "An Affinity is a group of affinity scheduling requirements, including node affinity and inter pod affinity.",
+	"hardNodeAffinity": "HardNodeAffinity specifies hard scheduling requirements for the pod. Additionally, Kubelet will (asynchronously) evict a pod that no longer meets its HardNodeAffinity for whatever reason, e.g. runtime changes to the node's labels.",
+	"softNodeAffinity": "SoftNodeAffinity specifies which nodes are preferred among those that meet all of the hard scheduling requirements (resource request, HardNodeAffinity, etc.). The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the hard scheduling requirements, compute a sum by iterating through the elements of SoftNodeAffinity and adding \"weight\" to the sum if the node matches the corresponding MatchExpressions; the node(s) with the highest sum are the most preferred.",
+}
+
+func (Affinity) SwaggerDoc() map[string]string {
+	return map_Affinity
+}
+
 var map_Binding = map[string]string{
 	"":         "Binding ties one object to another. For example, a pod is bound to a node by a scheduler.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -698,6 +708,35 @@ func (NodeList) SwaggerDoc() map[string]string {
 	return map_NodeList
 }
 
+var map_NodeSelector = map[string]string{
+	"":                  "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the nodeSelectorTerms. An empty node selector matches all objects. A null node selector matches no objects.",
+	"nodeSelectorTerms": "nodeSelectorTerms is a list of node selector terms. The terms are ORed.",
+}
+
+func (NodeSelector) SwaggerDoc() map[string]string {
+	return map_NodeSelector
+}
+
+var map_NodeSelectorRequirement = map[string]string{
+	"":         "A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+	"key":      "key is the label key that the selector applies to.",
+	"operator": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists, DoesNotExist. Gt, and Lt.",
+	"values":   "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.",
+}
+
+func (NodeSelectorRequirement) SwaggerDoc() map[string]string {
+	return map_NodeSelectorRequirement
+}
+
+var map_NodeSelectorTerm = map[string]string{
+	"":                 "An empty node selector term matches all objects. A null node selector term matches no objects.",
+	"matchExpressions": "matchExpressions is a list of node selector requirements. The requirements are ANDed.",
+}
+
+func (NodeSelectorTerm) SwaggerDoc() map[string]string {
+	return map_NodeSelectorTerm
+}
+
 var map_NodeSpec = map[string]string{
 	"":              "NodeSpec describes the attributes that a node is created with.",
 	"podCIDR":       "PodCIDR represents the pod IP range assigned to the node.",
@@ -1011,6 +1050,7 @@ var map_PodSpec = map[string]string{
 	"activeDeadlineSeconds":         "Optional duration in seconds the pod may be active on the node relative to StartTime before the system will actively try to mark it failed and kill associated containers. Value must be a positive integer.",
 	"dnsPolicy":                     "Set DNS policy for containers within the pod. One of 'ClusterFirst' or 'Default'. Defaults to \"ClusterFirst\".",
 	"nodeSelector":                  "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: http://releases.k8s.io/HEAD/docs/user-guide/node-selection/README.md",
+	"affinity":                      "Affinity is a group of affinity scheduling requirements of the pod, including node affinity and inter pod affinity.",
 	"serviceAccountName":            "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md",
 	"serviceAccount":                "DeprecatedServiceAccount is a depreciated alias for ServiceAccountName. Deprecated: Use serviceAccountName instead.",
 	"nodeName":                      "NodeName is a request to schedule this pod onto a specific node. If it is non-empty, the scheduler simply schedules this pod onto that node, assuming that it fits resource requirements.",
@@ -1355,6 +1395,16 @@ var map_ServiceStatus = map[string]string{
 
 func (ServiceStatus) SwaggerDoc() map[string]string {
 	return map_ServiceStatus
+}
+
+var map_SoftNodeAffinityTerm = map[string]string{
+	"":                 "A SoftNodeAffinityTerm is the AND of one or more NodeSelectorRequirements",
+	"weight":           "weight is in the range 1-100",
+	"matchExpressions": "matchExpressions is a list of node selector requirements. The requirements are ANDed.",
+}
+
+func (SoftNodeAffinityTerm) SwaggerDoc() map[string]string {
+	return map_SoftNodeAffinityTerm
 }
 
 var map_TCPSocketAction = map[string]string{
