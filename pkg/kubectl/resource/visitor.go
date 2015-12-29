@@ -85,15 +85,18 @@ type Info struct {
 	// but if set it should be equal to or newer than the resource version of the
 	// object (however the server defines resource version).
 	ResourceVersion string
+	// Optional, should this resource be exported, stripped of cluster-specific and instance specific fields
+	Export bool
 }
 
 // NewInfo returns a new info object
-func NewInfo(client RESTClient, mapping *meta.RESTMapping, namespace, name string) *Info {
+func NewInfo(client RESTClient, mapping *meta.RESTMapping, namespace, name string, export bool) *Info {
 	return &Info{
 		Client:    client,
 		Mapping:   mapping,
 		Namespace: namespace,
 		Name:      name,
+		Export:    export,
 	}
 }
 
@@ -103,8 +106,8 @@ func (i *Info) Visit(fn VisitorFunc) error {
 }
 
 // Get retrieves the object from the Namespace and Name fields
-func (i *Info) Get() error {
-	obj, err := NewHelper(i.Client, i.Mapping).Get(i.Namespace, i.Name)
+func (i *Info) Get() (err error) {
+	obj, err := NewHelper(i.Client, i.Mapping).Get(i.Namespace, i.Name, i.Export)
 	if err != nil {
 		return err
 	}
@@ -573,7 +576,7 @@ func RetrieveLatest(info *Info, err error) error {
 	if info.Namespaced() && len(info.Namespace) == 0 {
 		return fmt.Errorf("no namespace set on resource %s %q", info.Mapping.Resource, info.Name)
 	}
-	obj, err := NewHelper(info.Client, info.Mapping).Get(info.Namespace, info.Name)
+	obj, err := NewHelper(info.Client, info.Mapping).Get(info.Namespace, info.Name, info.Export)
 	if err != nil {
 		return err
 	}
