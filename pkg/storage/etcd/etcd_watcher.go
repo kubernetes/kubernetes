@@ -182,6 +182,7 @@ func (w *etcdWatcher) etcdWatch(ctx context.Context, client etcd.KeysAPI, key st
 			Recursive:  w.list,
 			AfterIndex: resourceVersion,
 		}
+		glog.Errorf("new watcher")
 		watcher = client.Watcher(key, &opts)
 		w.ctx, w.cancel = context.WithCancel(ctx)
 		return false
@@ -192,6 +193,7 @@ func (w *etcdWatcher) etcdWatch(ctx context.Context, client etcd.KeysAPI, key st
 	}
 
 	for {
+		glog.Errorf("calling Next")
 		resp, err := watcher.Next(w.ctx)
 		if err != nil {
 			w.etcdError <- err
@@ -207,6 +209,7 @@ func etcdGetInitialWatchState(ctx context.Context, client etcd.KeysAPI, key stri
 		Recursive: recursive,
 		Sort:      false,
 	}
+	glog.Errorf("client Get")
 	resp, err := client.Get(ctx, key, &opts)
 	if err != nil {
 		if !etcdutil.IsEtcdNotFound(err) {

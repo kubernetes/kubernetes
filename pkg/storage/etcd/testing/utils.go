@@ -32,6 +32,8 @@ import (
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/rafthttp"
+
+	"github.com/golang/glog"
 )
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing
@@ -127,11 +129,14 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 // Terminate will shutdown the running etcd server
 func (m *EtcdTestServer) Terminate(t *testing.T) {
 	m.Client = nil
+	glog.Errorf("closing client connections")
 	for _, hs := range m.hss {
 		hs.CloseClientConnections()
 		hs.Close()
 	}
+	glog.Errorf("stopping etcd server")
 	m.s.Stop()
+	glog.Errorf("stopped")
 	if err := os.RemoveAll(m.ServerConfig.DataDir); err != nil {
 		t.Fatal(err)
 	}
