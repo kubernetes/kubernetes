@@ -82,6 +82,7 @@ kubelet
       --cpu-cfs-quota[=false]: Enable CPU CFS quota enforcement for containers that specify CPU limits
       --docker-endpoint="": If non-empty, use this for the docker endpoint to communicate with
       --docker-exec-handler="native": Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.
+      --enable-custom-metrics[=false]: Experimental support for gathering custom metrics from pods. [default=false]
       --enable-debugging-handlers[=true]: Enables server endpoints for log collection and local running of containers and commands
       --enable-server[=true]: Enable the Kubelet's server
       --event-burst=10: Maximum size of a bursty event records, temporarily allows event records to burst to this number, while still not exceeding event-qps. Only used if --event-qps > 0
@@ -106,6 +107,7 @@ kubelet
       --manifest-url="": URL for accessing the container manifest
       --manifest-url-header="": HTTP header to use when accessing the manifest URL, with the key separated from the value with a ':', as in 'key:value'
       --master-service-namespace="default": The namespace from which the kubernetes master services should be injected into pods
+      --max-custom-metrics-per-pod=5: Number of custom metrics that each pod can expose.
       --max-open-files=1000000: Number of files that can be opened by Kubelet process. [default=1000000]
       --max-pods=40: Number of Pods that can run on this Kubelet.
       --maximum-dead-containers=100: Maximum number of old instances of containers to retain globally.  Each container takes up some disk space.  Default: 100.

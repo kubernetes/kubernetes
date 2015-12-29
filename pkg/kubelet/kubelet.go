@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/custommetrics"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -197,6 +198,8 @@ func NewMainKubelet(
 	serializeImagePulls bool,
 	containerManager cm.ContainerManager,
 	flannelExperimentalOverlay bool,
+	enableCustomMetrics bool,
+	maxCustomMetricsPerPod int,
 ) (*Kubelet, error) {
 
 	if rootDirectory == "" {
@@ -313,6 +316,8 @@ func NewMainKubelet(
 		containerManager:               containerManager,
 		flannelExperimentalOverlay:     flannelExperimentalOverlay,
 		flannelHelper:                  NewFlannelHelper(),
+		enableCustomMetrics:            enableCustomMetrics,
+		maxCustomMetricsPerPod:         maxCustomMetricsPerPod,
 	}
 	if klet.flannelExperimentalOverlay {
 		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
@@ -357,6 +362,7 @@ func NewMainKubelet(
 			klet.cpuCFSQuota,
 			imageBackOff,
 			serializeImagePulls,
+			enableCustomMetrics,
 		)
 
 		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod)
@@ -643,6 +649,9 @@ type Kubelet struct {
 	// on the fly if we're confident the dbus connetions it opens doesn't
 	// put the system under duress.
 	flannelHelper *FlannelHelper
+
+	enableCustomMetrics    bool
+	maxCustomMetricsPerPod int
 }
 
 func (kl *Kubelet) allSourcesReady() bool {
@@ -845,17 +854,17 @@ func (kl *Kubelet) initializeModules() error {
 
 	// Step 4: Start the image manager.
 	if err := kl.imageManager.Start(); err != nil {
-		return fmt.Errorf("Failed to start ImageManager, images may not be garbage collected: %v", err)
+		return fmt.Errorf("failed to start ImageManager, images may not be garbage collected: %v", err)
 	}
 
 	// Step 5: Start container manager.
 	if err := kl.containerManager.Start(kl.nodeConfig); err != nil {
-		return fmt.Errorf("Failed to start ContainerManager %v", err)
+		return fmt.Errorf("failed to start ContainerManager %v", err)
 	}
 
 	// Step 6: Start out of memory watcher.
 	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
-		return fmt.Errorf("Failed to start OOM watcher %v", err)
+		return fmt.Errorf("failed to start OOM watcher %v", err)
 	}
 	return nil
 }
@@ -863,7 +872,7 @@ func (kl *Kubelet) initializeModules() error {
 // initializeRuntimeDependentModules will initialize internal modules that require the container runtime to be up.
 func (kl *Kubelet) initializeRuntimeDependentModules() {
 	if err := kl.cadvisor.Start(); err != nil {
-		kl.runtimeState.setInternalError(fmt.Errorf("Failed to start cAdvisor %v", err))
+		kl.runtimeState.setInternalError(fmt.Errorf("failed to start cAdvisor %v", err))
 	}
 }
 
@@ -1199,6 +1208,7 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, podVolume
 		}
 		mounts = append(mounts, *hostsMount)
 	}
+
 	return mounts, nil
 }
 
@@ -1288,6 +1298,19 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 	if err != nil {
 		return nil, err
 	}
+
+	// If required, create special mounts to order cAdvisor to gather custom metrics.
+	if kl.enableCustomMetrics {
+		customMetricsMount, err := custommetrics.MakeCustomMetricsMountIfRequired(
+			pod, container, kl.getPodContainerDir(pod.UID, container.Name), kl.maxCustomMetricsPerPod)
+		if err != nil {
+			return nil, err
+		}
+		if customMetricsMount != nil {
+			opts.Mounts = append(opts.Mounts, *customMetricsMount)
+		}
+	}
+
 	opts.Envs, err = kl.makeEnvironmentVariables(pod, container)
 	if err != nil {
 		return nil, err
@@ -1596,7 +1619,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}()
 
 	// Kill pods we can't run.
-	if err := canRunPod(pod); err != nil || pod.DeletionTimestamp != nil {
+	if err := canRunPod(pod, kl.enableCustomMetrics, kl.maxCustomMetricsPerPod); err != nil || pod.DeletionTimestamp != nil {
 		if err := kl.killPod(pod, runningPod); err != nil {
 			util.HandleError(err)
 		}
@@ -2509,13 +2532,13 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName string, lo
 
 	if err := kl.validatePodPhase(&podStatus); err != nil {
 		// No log is available if pod is not in a "known" phase (e.g. Unknown).
-		return fmt.Errorf("Pod %q in namespace %q : %v", name, namespace, err)
+		return fmt.Errorf("pod %q in namespace %q : %v", name, namespace, err)
 	}
 	containerID, err := kl.validateContainerStatus(&podStatus, containerName, logOptions.Previous)
 	if err != nil {
 		// No log is available if the container status is missing or is in the
 		// waiting state.
-		return fmt.Errorf("Pod %q in namespace %q: %v", name, namespace, err)
+		return fmt.Errorf("pod %q in namespace %q: %v", name, namespace, err)
 	}
 	return kl.containerRuntime.GetContainerLogs(pod, containerID, logOptions, stdout, stderr)
 }
@@ -2631,15 +2654,15 @@ func (kl *Kubelet) syncNetworkStatus() {
 			kl.runtimeState.setPodCIDR(podCIDR)
 		}
 		if err := ensureIPTablesMasqRule(); err != nil {
-			err = fmt.Errorf("Error on adding ip table rules: %v", err)
+			err = fmt.Errorf("error on adding ip table rules: %v", err)
 			glog.Error(err)
 		}
 		podCIDR := kl.runtimeState.podCIDR()
 		if len(podCIDR) == 0 {
-			err = fmt.Errorf("ConfigureCBR0 requested, but PodCIDR not set. Will not configure CBR0 right now")
+			err = fmt.Errorf("configureCBR0 requested, but PodCIDR not set. Will not configure CBR0 right now")
 			glog.Warning(err)
 		} else if err := kl.reconcileCBR0(podCIDR); err != nil {
-			err = fmt.Errorf("Error configuring cbr0: %v", err)
+			err = fmt.Errorf("error configuring cbr0: %v", err)
 			glog.Error(err)
 		}
 	}

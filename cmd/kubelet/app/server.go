@@ -157,6 +157,8 @@ type KubeletServer struct {
 	// Pull images one at a time.
 	SerializeImagePulls        bool
 	ExperimentalFlannelOverlay bool
+	EnableCustomMetrics        bool
+	MaxCustomMetricsPerPod     int
 }
 
 // bootstrapping interface for kubelet, targets the initialization protocol
@@ -231,6 +233,8 @@ func NewKubeletServer() *KubeletServer {
 		KubeAPIQPS:                     5.0,
 		KubeAPIBurst:                   10,
 		ExperimentalFlannelOverlay:     experimentalFlannelOverlay,
+		EnableCustomMetrics:            false,
+		MaxCustomMetricsPerPod:         5,
 	}
 }
 
@@ -346,6 +350,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.BoolVar(&s.SerializeImagePulls, "serialize-image-pulls", s.SerializeImagePulls, "Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]")
 	fs.BoolVar(&s.ExperimentalFlannelOverlay, "experimental-flannel-overlay", s.ExperimentalFlannelOverlay, "Experimental support for starting the kubelet with the default overlay network (flannel). Assumes flanneld is already running in client mode. [default=false]")
+	fs.BoolVar(&s.EnableCustomMetrics, "enable-custom-metrics", s.EnableCustomMetrics, "Experimental support for gathering custom metrics from pods. [default=false]")
+	fs.IntVar(&s.MaxCustomMetricsPerPod, "max-custom-metrics-per-pod", s.MaxCustomMetricsPerPod, "Number of custom metrics that each pod can expose.")
 }
 
 // UnsecuredKubeletConfig returns a KubeletConfig suitable for being run, or an error if the server setup
@@ -485,6 +491,8 @@ func (s *KubeletServer) UnsecuredKubeletConfig() (*KubeletConfig, error) {
 		VolumePlugins:                  ProbeVolumePlugins(),
 
 		ExperimentalFlannelOverlay: s.ExperimentalFlannelOverlay,
+		EnableCustomMetrics:        s.EnableCustomMetrics,
+		MaxCustomMetricsPerPod:     s.MaxCustomMetricsPerPod,
 	}, nil
 }
 
@@ -961,6 +969,8 @@ type KubeletConfig struct {
 	VolumePlugins                  []volume.VolumePlugin
 
 	ExperimentalFlannelOverlay bool
+	EnableCustomMetrics        bool
+	MaxCustomMetricsPerPod     int
 }
 
 func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -1044,6 +1054,8 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.SerializeImagePulls,
 		kc.ContainerManager,
 		kc.ExperimentalFlannelOverlay,
+		kc.EnableCustomMetrics,
+		kc.MaxCustomMetricsPerPod,
 	)
 
 	if err != nil {
