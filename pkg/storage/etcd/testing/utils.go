@@ -127,11 +127,11 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 // Terminate will shutdown the running etcd server
 func (m *EtcdTestServer) Terminate(t *testing.T) {
 	m.Client = nil
-	m.s.Stop()
 	for _, hs := range m.hss {
 		hs.CloseClientConnections()
 		hs.Close()
 	}
+	m.s.Stop()
 	if err := os.RemoveAll(m.ServerConfig.DataDir); err != nil {
 		t.Fatal(err)
 	}
