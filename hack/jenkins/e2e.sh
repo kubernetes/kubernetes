@@ -544,6 +544,7 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="e2e-scalability"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\] \
         --gather-resource-usage=true \
+        --gather-metrics-at-teardown=true \
         --gather-logs-sizes=true"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-scalability"}
     : ${PROJECT:="kubernetes-jenkins"}
