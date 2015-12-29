@@ -83,8 +83,9 @@ type LogsSizeData struct {
 // WorkItem is a command for a worker that contains an IP of machine from which we want to
 // gather data and paths to all files we're interested in.
 type WorkItem struct {
-	ip    string
-	paths []string
+	ip                string
+	paths             []string
+	backoffMultiplier int
 }
 
 func prepareData(masterAddress string, nodeAddresses []string) LogsSizeData {
@@ -171,13 +172,15 @@ func (v *LogsSizeVerifier) PrintData() string {
 // Run starts log size gathering. It starts a gorouting for every worker and then blocks until stopChannel is closed
 func (v *LogsSizeVerifier) Run() {
 	v.workChannel <- WorkItem{
-		ip:    v.masterAddress,
-		paths: masterLogsToCheck,
+		ip:                v.masterAddress,
+		paths:             masterLogsToCheck,
+		backoffMultiplier: 1,
 	}
 	for _, node := range v.nodeAddresses {
 		v.workChannel <- WorkItem{
-			ip:    node,
-			paths: nodeLogsToCheck,
+			ip:                node,
+			paths:             nodeLogsToCheck,
+			backoffMultiplier: 1,
 		}
 	}
 	for _, worker := range v.workers {
@@ -212,9 +215,13 @@ func (g *LogSizeGatherer) Work() bool {
 	)
 	if err != nil {
 		Logf("Error while trying to SSH to %v, skipping probe. Error: %v", workItem.ip, err)
+		if workItem.backoffMultiplier < 128 {
+			workItem.backoffMultiplier *= 2
+		}
 		g.workChannel <- workItem
 		return true
 	}
+	workItem.backoffMultiplier = 1
 	results := strings.Split(sshResult.Stdout, " ")
 
 	now := time.Now()
@@ -228,8 +235,12 @@ func (g *LogSizeGatherer) Work() bool {
 		g.data.AddNewData(workItem.ip, path, now, size)
 	}
 	go func() {
-		time.Sleep(pollingPeriod)
-		g.workChannel <- workItem
+		select {
+		case <-time.After(time.Duration(workItem.backoffMultiplier) * pollingPeriod):
+			g.workChannel <- workItem
+		case <-g.stopChannel:
+			return
+		}
 	}()
 	return true
 }
