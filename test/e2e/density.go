@@ -77,8 +77,9 @@ func density30AddonResourceVerifier() map[string]resourceConstraint {
 		memoryConstraint: 250 * (1024 * 1024),
 	}
 	constraints["elasticsearch-logging"] = resourceConstraint{
-		cpuConstraint:    2,
-		memoryConstraint: 750 * (1024 * 1024),
+		cpuConstraint: 2,
+		// TODO: bring it down to 750MB again, when we lower Kubelet verbosity level. I.e. revert #19164
+		memoryConstraint: 2000 * (1024 * 1024),
 	}
 	constraints["heapster"] = resourceConstraint{
 		cpuConstraint:    2,
