@@ -98,6 +98,15 @@ func configureTestCluster(t *testing.T, name string) *EtcdTestServer {
 	return m
 }
 
+type handler struct {
+	internal http.Handler
+}
+
+func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	glog.Errorf("request: %v", *r)
+	h.internal.ServeHTTP(w, r)
+}
+
 // launch will attempt to start the etcd server
 func (m *EtcdTestServer) launch(t *testing.T) error {
 	var err error
@@ -106,7 +115,9 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 	}
 	m.s.SyncTicker = time.Tick(500 * time.Millisecond)
 	m.s.Start()
-	m.raftHandler = etcdhttp.NewPeerHandler(m.s.Cluster(), m.s.RaftHandler())
+	m.raftHandler = &handler{
+		internal: etcdhttp.NewPeerHandler(m.s.Cluster(), m.s.RaftHandler()),
+	}
 	for _, ln := range m.PeerListeners {
 		hs := &httptest.Server{
 			Listener: ln,
@@ -118,7 +129,7 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 	for _, ln := range m.ClientListeners {
 		hs := &httptest.Server{
 			Listener: ln,
-			Config:   &http.Server{Handler: etcdhttp.NewClientHandler(m.s, m.ServerConfig.ReqTimeout())},
+			Config:   &http.Server{Handler: &handler{internal: etcdhttp.NewClientHandler(m.s, m.ServerConfig.ReqTimeout())}},
 		}
 		hs.Start()
 		m.hss = append(m.hss, hs)
