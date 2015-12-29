@@ -195,6 +195,7 @@ func (w *etcdWatcher) etcdWatch(ctx context.Context, client etcd.KeysAPI, key st
 	for {
 		glog.Errorf("calling Next")
 		resp, err := watcher.Next(w.ctx)
+		glog.Errorf("Next finished")
 		if err != nil {
 			w.etcdError <- err
 			return
