@@ -555,6 +555,8 @@ case ${JOB_NAME} in
     NUM_NODES="100"
     # Reduce logs verbosity
     TEST_CLUSTER_LOG_LEVEL="--v=2"
+    # TODO: Remove when we figure out the reason for ocassional failures #19048
+    KUBELET_TEST_LOG_LEVEL="--v=4"
     # Increase resync period to simulate production
     TEST_CLUSTER_RESYNC_PERIOD="--min-resync-period=12h"
     ;;
@@ -1101,6 +1103,7 @@ export NODE_SIZE=${NODE_SIZE:-}
 export NODE_DISK_SIZE=${NODE_DISK_SIZE:-}
 export NUM_NODES=${NUM_NODES:-}
 export TEST_CLUSTER_LOG_LEVEL=${TEST_CLUSTER_LOG_LEVEL:-}
+export KUBELET_TEST_LOG_LEVEL=${KUBELET_TEST_LOG_LEVEL:-}
 export TEST_CLUSTER_RESYNC_PERIOD=${TEST_CLUSTER_RESYNC_PERIOD:-}
 export PROJECT=${PROJECT:-}
 export NETWORK_PROVIDER=${NETWORK_PROVIDER:-}
