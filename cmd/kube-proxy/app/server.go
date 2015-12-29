@@ -51,24 +51,26 @@ import (
 
 // ProxyServerConfig contains configures and runs a Kubernetes proxy server
 type ProxyServerConfig struct {
-	BindAddress        net.IP
-	HealthzPort        int
-	HealthzBindAddress net.IP
-	OOMScoreAdj        int
-	ResourceContainer  string
-	Master             string
-	Kubeconfig         string
-	PortRange          util.PortRange
-	HostnameOverride   string
-	ProxyMode          string
-	IptablesSyncPeriod time.Duration
-	ConfigSyncPeriod   time.Duration
-	NodeRef            *api.ObjectReference // Reference to this node.
-	MasqueradeAll      bool
-	CleanupAndExit     bool
-	KubeAPIQPS         float32
-	KubeAPIBurst       int
-	UDPIdleTimeout     time.Duration
+	BindAddress                    net.IP
+	HealthzPort                    int
+	HealthzBindAddress             net.IP
+	OOMScoreAdj                    int
+	ResourceContainer              string
+	Master                         string
+	Kubeconfig                     string
+	PortRange                      util.PortRange
+	HostnameOverride               string
+	ProxyMode                      string
+	IptablesSyncPeriod             time.Duration
+	ConfigSyncPeriod               time.Duration
+	NodeRef                        *api.ObjectReference // Reference to this node.
+	MasqueradeAll                  bool
+	CleanupAndExit                 bool
+	KubeAPIQPS                     float32
+	KubeAPIBurst                   int
+	UDPIdleTimeout                 time.Duration
+	ConntrackMax                   int
+	ConntrackTCPTimeoutEstablished int // seconds
 }
 
 type ProxyServer struct {
@@ -78,6 +80,7 @@ type ProxyServer struct {
 	Proxier      proxy.ProxyProvider
 	Broadcaster  record.EventBroadcaster
 	Recorder     record.EventRecorder
+	Conntracker  Conntracker // if nil, ignored
 }
 
 // AddFlags adds flags for a specific ProxyServer to the specified FlagSet
@@ -100,6 +103,8 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.DurationVar(&s.UDPIdleTimeout, "udp-timeout", s.UDPIdleTimeout, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
+	fs.IntVar(&s.ConntrackMax, "conntrack-max", s.ConntrackMax, "Maximum number of NAT connections to track (0 to leave as-is)")
+	fs.IntVar(&s.ConntrackTCPTimeoutEstablished, "conntrack-tcp-timeout-established", s.ConntrackTCPTimeoutEstablished, "Idle timeout for established TCP connections (0 to leave as-is)")
 }
 
 const (
@@ -119,16 +124,18 @@ func checkKnownProxyMode(proxyMode string) bool {
 
 func NewProxyConfig() *ProxyServerConfig {
 	return &ProxyServerConfig{
-		BindAddress:        net.ParseIP("0.0.0.0"),
-		HealthzPort:        10249,
-		HealthzBindAddress: net.ParseIP("127.0.0.1"),
-		OOMScoreAdj:        qos.KubeProxyOOMScoreAdj,
-		ResourceContainer:  "/kube-proxy",
-		IptablesSyncPeriod: 30 * time.Second,
-		ConfigSyncPeriod:   15 * time.Minute,
-		KubeAPIQPS:         5.0,
-		KubeAPIBurst:       10,
-		UDPIdleTimeout:     250 * time.Millisecond,
+		BindAddress:                    net.ParseIP("0.0.0.0"),
+		HealthzPort:                    10249,
+		HealthzBindAddress:             net.ParseIP("127.0.0.1"),
+		OOMScoreAdj:                    qos.KubeProxyOOMScoreAdj,
+		ResourceContainer:              "/kube-proxy",
+		IptablesSyncPeriod:             30 * time.Second,
+		ConfigSyncPeriod:               15 * time.Minute,
+		KubeAPIQPS:                     5.0,
+		KubeAPIBurst:                   10,
+		UDPIdleTimeout:                 250 * time.Millisecond,
+		ConntrackMax:                   256 * 1024, // 4x default (64k)
+		ConntrackTCPTimeoutEstablished: 86400,      // 1 day (1/5 default)
 	}
 }
 
@@ -139,6 +146,7 @@ func NewProxyServer(
 	proxier proxy.ProxyProvider,
 	broadcaster record.EventBroadcaster,
 	recorder record.EventRecorder,
+	conntracker Conntracker,
 ) (*ProxyServer, error) {
 	return &ProxyServer{
 		Client:       client,
@@ -147,6 +155,7 @@ func NewProxyServer(
 		Proxier:      proxier,
 		Broadcaster:  broadcaster,
 		Recorder:     recorder,
+		Conntracker:  conntracker,
 	}, nil
 }
 
@@ -182,7 +191,7 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 	dbus := utildbus.New()
 	iptInterface := utiliptables.New(execer, dbus, protocol)
 
-	// We ommit creation of pretty much everything if we run in cleanup mode
+	// We omit creation of pretty much everything if we run in cleanup mode
 	if config.CleanupAndExit {
 		return &ProxyServer{
 			Config:       config,
@@ -293,7 +302,10 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 		UID:       types.UID(hostname),
 		Namespace: "",
 	}
-	return NewProxyServer(client, config, iptInterface, proxier, eventBroadcaster, recorder)
+
+	conntracker := realConntracker{}
+
+	return NewProxyServer(client, config, iptInterface, proxier, eventBroadcaster, recorder, conntracker)
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
@@ -310,9 +322,6 @@ func (s *ProxyServer) Run(_ []string) error {
 
 	s.Broadcaster.StartRecordingToSink(s.Client.Events(""))
 
-	// Birth Cry after the birth is successful
-	s.birthCry()
-
 	// Start up Healthz service if requested
 	if s.Config.HealthzPort > 0 {
 		go util.Until(func() {
@@ -322,6 +331,23 @@ func (s *ProxyServer) Run(_ []string) error {
 			}
 		}, 5*time.Second, util.NeverStop)
 	}
+
+	// Tune conntrack, if requested
+	if s.Conntracker != nil {
+		if s.Config.ConntrackMax > 0 {
+			if err := s.Conntracker.SetMax(s.Config.ConntrackMax); err != nil {
+				return err
+			}
+		}
+		if s.Config.ConntrackTCPTimeoutEstablished > 0 {
+			if err := s.Conntracker.SetTCPEstablishedTimeout(s.Config.ConntrackTCPTimeoutEstablished); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Birth Cry after the birth is successful
+	s.birthCry()
 
 	// Just loop forever for now...
 	s.Proxier.SyncLoop()
