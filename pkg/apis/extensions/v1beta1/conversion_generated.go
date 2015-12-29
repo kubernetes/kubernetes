@@ -364,6 +364,36 @@ func convert_api_FCVolumeSource_To_v1_FCVolumeSource(in *api.FCVolumeSource, out
 	return autoconvert_api_FCVolumeSource_To_v1_FCVolumeSource(in, out, s)
 }
 
+func autoconvert_api_FlexVolumeSource_To_v1_FlexVolumeSource(in *api.FlexVolumeSource, out *v1.FlexVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.FlexVolumeSource))(in)
+	}
+	out.Driver = in.Driver
+	out.FSType = in.FSType
+	if in.SecretRef != nil {
+		out.SecretRef = new(v1.LocalObjectReference)
+		if err := convert_api_LocalObjectReference_To_v1_LocalObjectReference(in.SecretRef, out.SecretRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.SecretRef = nil
+	}
+	out.ReadOnly = in.ReadOnly
+	if in.Options != nil {
+		out.Options = make(map[string]string)
+		for key, val := range in.Options {
+			out.Options[key] = val
+		}
+	} else {
+		out.Options = nil
+	}
+	return nil
+}
+
+func convert_api_FlexVolumeSource_To_v1_FlexVolumeSource(in *api.FlexVolumeSource, out *v1.FlexVolumeSource, s conversion.Scope) error {
+	return autoconvert_api_FlexVolumeSource_To_v1_FlexVolumeSource(in, out, s)
+}
+
 func autoconvert_api_FlockerVolumeSource_To_v1_FlockerVolumeSource(in *api.FlockerVolumeSource, out *v1.FlockerVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.FlockerVolumeSource))(in)
@@ -1070,6 +1100,14 @@ func autoconvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	} else {
 		out.RBD = nil
 	}
+	if in.FlexVolume != nil {
+		out.FlexVolume = new(v1.FlexVolumeSource)
+		if err := convert_api_FlexVolumeSource_To_v1_FlexVolumeSource(in.FlexVolume, out.FlexVolume, s); err != nil {
+			return err
+		}
+	} else {
+		out.FlexVolume = nil
+	}
 	if in.Cinder != nil {
 		out.Cinder = new(v1.CinderVolumeSource)
 		if err := convert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in.Cinder, out.Cinder, s); err != nil {
@@ -1451,6 +1489,36 @@ func autoconvert_v1_FCVolumeSource_To_api_FCVolumeSource(in *v1.FCVolumeSource, 
 
 func convert_v1_FCVolumeSource_To_api_FCVolumeSource(in *v1.FCVolumeSource, out *api.FCVolumeSource, s conversion.Scope) error {
 	return autoconvert_v1_FCVolumeSource_To_api_FCVolumeSource(in, out, s)
+}
+
+func autoconvert_v1_FlexVolumeSource_To_api_FlexVolumeSource(in *v1.FlexVolumeSource, out *api.FlexVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.FlexVolumeSource))(in)
+	}
+	out.Driver = in.Driver
+	out.FSType = in.FSType
+	if in.SecretRef != nil {
+		out.SecretRef = new(api.LocalObjectReference)
+		if err := convert_v1_LocalObjectReference_To_api_LocalObjectReference(in.SecretRef, out.SecretRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.SecretRef = nil
+	}
+	out.ReadOnly = in.ReadOnly
+	if in.Options != nil {
+		out.Options = make(map[string]string)
+		for key, val := range in.Options {
+			out.Options[key] = val
+		}
+	} else {
+		out.Options = nil
+	}
+	return nil
+}
+
+func convert_v1_FlexVolumeSource_To_api_FlexVolumeSource(in *v1.FlexVolumeSource, out *api.FlexVolumeSource, s conversion.Scope) error {
+	return autoconvert_v1_FlexVolumeSource_To_api_FlexVolumeSource(in, out, s)
 }
 
 func autoconvert_v1_FlockerVolumeSource_To_api_FlockerVolumeSource(in *v1.FlockerVolumeSource, out *api.FlockerVolumeSource, s conversion.Scope) error {
@@ -2134,6 +2202,14 @@ func autoconvert_v1_VolumeSource_To_api_VolumeSource(in *v1.VolumeSource, out *a
 		}
 	} else {
 		out.RBD = nil
+	}
+	if in.FlexVolume != nil {
+		out.FlexVolume = new(api.FlexVolumeSource)
+		if err := convert_v1_FlexVolumeSource_To_api_FlexVolumeSource(in.FlexVolume, out.FlexVolume, s); err != nil {
+			return err
+		}
+	} else {
+		out.FlexVolume = nil
 	}
 	if in.Cinder != nil {
 		out.Cinder = new(api.CinderVolumeSource)
@@ -4291,6 +4367,7 @@ func init() {
 		autoconvert_api_EnvVar_To_v1_EnvVar,
 		autoconvert_api_ExecAction_To_v1_ExecAction,
 		autoconvert_api_FCVolumeSource_To_v1_FCVolumeSource,
+		autoconvert_api_FlexVolumeSource_To_v1_FlexVolumeSource,
 		autoconvert_api_FlockerVolumeSource_To_v1_FlockerVolumeSource,
 		autoconvert_api_GCEPersistentDiskVolumeSource_To_v1_GCEPersistentDiskVolumeSource,
 		autoconvert_api_GitRepoVolumeSource_To_v1_GitRepoVolumeSource,
@@ -4380,6 +4457,7 @@ func init() {
 		autoconvert_v1_EnvVar_To_api_EnvVar,
 		autoconvert_v1_ExecAction_To_api_ExecAction,
 		autoconvert_v1_FCVolumeSource_To_api_FCVolumeSource,
+		autoconvert_v1_FlexVolumeSource_To_api_FlexVolumeSource,
 		autoconvert_v1_FlockerVolumeSource_To_api_FlockerVolumeSource,
 		autoconvert_v1_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolumeSource,
 		autoconvert_v1_GitRepoVolumeSource_To_api_GitRepoVolumeSource,

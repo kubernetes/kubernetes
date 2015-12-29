@@ -51,8 +51,9 @@ const (
 	cinderVolumePluginName = "kubernetes.io/cinder"
 )
 
-func (plugin *cinderPlugin) Init(host volume.VolumeHost) {
+func (plugin *cinderPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *cinderPlugin) Name() string {

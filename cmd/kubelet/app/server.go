@@ -116,6 +116,7 @@ type KubeletServer struct {
 	MaxPods                        int
 	MinimumGCAge                   time.Duration
 	NetworkPluginDir               string
+	VolumePluginDir                string
 	NetworkPluginName              string
 	NodeLabels                     []string
 	NodeLabelsFile                 string
@@ -207,6 +208,7 @@ func NewKubeletServer() *KubeletServer {
 		MaxPods:                     40,
 		MinimumGCAge:                1 * time.Minute,
 		NetworkPluginDir:            "/usr/libexec/kubernetes/kubelet-plugins/net/exec/",
+		VolumePluginDir:             "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
 		NetworkPluginName:           "",
 		NodeLabels:                  []string{},
 		NodeLabelsFile:              "",
@@ -321,6 +323,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.LowDiskSpaceThresholdMB, "low-diskspace-threshold-mb", s.LowDiskSpaceThresholdMB, "The absolute free disk space, in MB, to maintain. When disk space falls below this threshold, new pods would be rejected. Default: 256")
 	fs.StringVar(&s.NetworkPluginName, "network-plugin", s.NetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
 	fs.StringVar(&s.NetworkPluginDir, "network-plugin-dir", s.NetworkPluginDir, "<Warning: Alpha feature> The full path of the directory in which to search for network plugins")
+	fs.StringVar(&s.VolumePluginDir, "volume-plugin-dir", s.VolumePluginDir, "<Warning: Alpha feature> The full path of the directory in which to search for additional third party volume plugins")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).")
@@ -482,7 +485,7 @@ func (s *KubeletServer) UnsecuredKubeletConfig() (*KubeletConfig, error) {
 		SystemContainer:                s.SystemContainer,
 		TLSOptions:                     tlsOptions,
 		Writer:                         writer,
-		VolumePlugins:                  ProbeVolumePlugins(),
+		VolumePlugins:                  ProbeVolumePlugins(s.VolumePluginDir),
 
 		ExperimentalFlannelOverlay: s.ExperimentalFlannelOverlay,
 	}, nil

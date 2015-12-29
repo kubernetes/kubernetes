@@ -573,6 +573,29 @@ func deepCopy_api_FCVolumeSource(in FCVolumeSource, out *FCVolumeSource, c *conv
 	return nil
 }
 
+func deepCopy_api_FlexVolumeSource(in FlexVolumeSource, out *FlexVolumeSource, c *conversion.Cloner) error {
+	out.Driver = in.Driver
+	out.FSType = in.FSType
+	if in.SecretRef != nil {
+		out.SecretRef = new(LocalObjectReference)
+		if err := deepCopy_api_LocalObjectReference(*in.SecretRef, out.SecretRef, c); err != nil {
+			return err
+		}
+	} else {
+		out.SecretRef = nil
+	}
+	out.ReadOnly = in.ReadOnly
+	if in.Options != nil {
+		out.Options = make(map[string]string)
+		for key, val := range in.Options {
+			out.Options[key] = val
+		}
+	} else {
+		out.Options = nil
+	}
+	return nil
+}
+
 func deepCopy_api_FlockerVolumeSource(in FlockerVolumeSource, out *FlockerVolumeSource, c *conversion.Cloner) error {
 	out.DatasetName = in.DatasetName
 	return nil
@@ -1297,6 +1320,14 @@ func deepCopy_api_PersistentVolumeSource(in PersistentVolumeSource, out *Persist
 		}
 	} else {
 		out.ISCSI = nil
+	}
+	if in.FlexVolume != nil {
+		out.FlexVolume = new(FlexVolumeSource)
+		if err := deepCopy_api_FlexVolumeSource(*in.FlexVolume, out.FlexVolume, c); err != nil {
+			return err
+		}
+	} else {
+		out.FlexVolume = nil
 	}
 	if in.Cinder != nil {
 		out.Cinder = new(CinderVolumeSource)
@@ -2284,6 +2315,14 @@ func deepCopy_api_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion
 	} else {
 		out.RBD = nil
 	}
+	if in.FlexVolume != nil {
+		out.FlexVolume = new(FlexVolumeSource)
+		if err := deepCopy_api_FlexVolumeSource(*in.FlexVolume, out.FlexVolume, c); err != nil {
+			return err
+		}
+	} else {
+		out.FlexVolume = nil
+	}
 	if in.Cinder != nil {
 		out.Cinder = new(CinderVolumeSource)
 		if err := deepCopy_api_CinderVolumeSource(*in.Cinder, out.Cinder, c); err != nil {
@@ -2403,6 +2442,7 @@ func init() {
 		deepCopy_api_EventSource,
 		deepCopy_api_ExecAction,
 		deepCopy_api_FCVolumeSource,
+		deepCopy_api_FlexVolumeSource,
 		deepCopy_api_FlockerVolumeSource,
 		deepCopy_api_GCEPersistentDiskVolumeSource,
 		deepCopy_api_GitRepoVolumeSource,

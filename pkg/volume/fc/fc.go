@@ -46,8 +46,9 @@ const (
 	fcPluginName = "kubernetes.io/fc"
 )
 
-func (plugin *fcPlugin) Init(host volume.VolumeHost) {
+func (plugin *fcPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *fcPlugin) Name() string {
