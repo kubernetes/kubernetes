@@ -214,6 +214,7 @@ func NewSchedulerServer() *SchedulerServer {
 		kubeletSyncFrequency: 10 * time.Second,
 		containPodResources:  true,
 		nodeRelistPeriod:     defaultNodeRelistPeriod,
+		enableProfiling:      true,
 	}
 	// cache this for later use. also useful in case the original binary gets deleted, e.g.
 	// during upgrades, development deployments, etc.
