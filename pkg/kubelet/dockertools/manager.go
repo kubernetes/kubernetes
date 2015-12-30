@@ -347,9 +347,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 	containerName := dockerName.ContainerName
 
 	var containerInfo *labelledContainerInfo
-	if containerInfo, err = getContainerInfoFromLabel(iResult.Config.Labels); err != nil {
-		glog.Errorf("Get labelled container info error for container %v: %v", id, err)
-	}
+	containerInfo = getContainerInfoFromLabel(iResult.Config.Labels)
 
 	status := kubecontainer.ContainerStatus{
 		Name:         containerName,
@@ -649,14 +647,11 @@ func (dm *DockerManager) runContainer(
 	}
 
 	// Pod information is recorded on the container as labels to preserve it in the event the pod is deleted
-	// while the Kubelet is down and there is no information available to recover the pod. This includes
-	// termination information like the termination grace period and the pre stop hooks.
+	// while the Kubelet is down and there is no information available to recover the pod.
 	// TODO: keep these labels up to date if the pod changes
 	labels := newLabels(container, pod, restartCount)
 
-	if pod.Spec.TerminationGracePeriodSeconds != nil {
-		labels[kubernetesTerminationGracePeriodLabel] = strconv.FormatInt(*pod.Spec.TerminationGracePeriodSeconds, 10)
-	}
+	// TODO(random-liu): Remove this when we start to use new labels for KillContainerInPod
 	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
 		// TODO: This is kind of hacky, we should really just encode the bits we need.
 		data, err := latest.GroupOrDie(api.GroupName).Codec.Encode(pod)
@@ -664,7 +659,6 @@ func (dm *DockerManager) runContainer(
 			glog.Errorf("Failed to encode pod: %s for prestop hook", pod.Name)
 		} else {
 			labels[kubernetesPodLabel] = string(data)
-			labels[kubernetesContainerLabel] = container.Name
 		}
 	}
 	memoryLimit := container.Resources.Limits.Memory().Value()
@@ -1226,6 +1220,8 @@ func (dm *DockerManager) GetContainerIP(containerID, interfaceName string) (stri
 
 // TODO(random-liu): Change running pod to pod status in the future. We can't do it now, because kubelet also uses this function without pod status.
 // We can only deprecate this after refactoring kubelet.
+// TODO(random-liu): After using pod status for KillPod(), we can also remove the kubernetesPodLabel, because all the needed information should have
+// been extract from new labels and stored in pod status.
 func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 	// Send the kills in parallel since they may take a long time. Len + 1 since there
 	// can be Len errors + the networkPlugin teardown error.
@@ -1411,7 +1407,7 @@ func containerAndPodFromLabels(inspect *docker.Container) (pod *api.Pod, contain
 	if body, found := labels[kubernetesPodLabel]; found {
 		pod = &api.Pod{}
 		if err = latest.GroupOrDie(api.GroupName).Codec.DecodeInto([]byte(body), pod); err == nil {
-			name := labels[kubernetesContainerLabel]
+			name := labels[kubernetesContainerNameLabel]
 			for ix := range pod.Spec.Containers {
 				if pod.Spec.Containers[ix].Name == name {
 					container = &pod.Spec.Containers[ix]
@@ -1429,7 +1425,7 @@ func containerAndPodFromLabels(inspect *docker.Container) (pod *api.Pod, contain
 	// attempt to find the default grace period if we didn't commit a pod, but set the generic metadata
 	// field (the one used by kill)
 	if pod == nil {
-		if period, ok := labels[kubernetesTerminationGracePeriodLabel]; ok {
+		if period, ok := labels[kubernetesPodTerminationGracePeriodLabel]; ok {
 			if seconds, err := strconv.ParseInt(period, 10, 64); err == nil {
 				pod = &api.Pod{}
 				pod.DeletionGracePeriodSeconds = &seconds
