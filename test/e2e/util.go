@@ -2266,16 +2266,19 @@ func waitForNodeToBeNotReady(c *client.Client, name string, timeout time.Duratio
 
 func isNodeConditionSetAsExpected(node *api.Node, conditionType api.NodeConditionType, wantTrue bool) bool {
 	// Check the node readiness condition (logging all).
-	for i, cond := range node.Status.Conditions {
-		Logf("Node %s condition %d/%d: type: %v, status: %v, reason: %q, message: %q, last transition time: %v",
-			node.Name, i+1, len(node.Status.Conditions), cond.Type, cond.Status,
-			cond.Reason, cond.Message, cond.LastTransitionTime)
+	for _, cond := range node.Status.Conditions {
 		// Ensure that the condition type and the status matches as desired.
-		if cond.Type == conditionType && (cond.Status == api.ConditionTrue) == wantTrue {
-			Logf("Successfully found condition %s of node %s to be %t", conditionType, node.Name, wantTrue)
-			return true
+		if cond.Type == conditionType {
+			if (cond.Status == api.ConditionTrue) == wantTrue {
+				return true
+			} else {
+				Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+					conditionType, node.Name, cond.Status == api.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+				return false
+			}
 		}
 	}
+	Logf("Couldn't find condition %v on node %v", conditionType, node.Name)
 	return false
 }
 
