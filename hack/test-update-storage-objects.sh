@@ -57,7 +57,7 @@ function startApiServer() {
   APISERVER_PID=$!
 
   # url, prefix, wait, times
-  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: " 1 45
+  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: " 1 120
 }
 
 function killApiServer() {
