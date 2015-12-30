@@ -73,6 +73,8 @@ Guide](../admin/README.md).
 * **Coding Conventions** ([coding-conventions.md](coding-conventions.md)):
   Coding style advice for contributors.
 
+* **Running a cluster locally** ([running-locally.md](running-locally.md)):
+  A fast and lightweight local cluster deployment for developement.
 
 ## Developing against the Kubernetes API
 
