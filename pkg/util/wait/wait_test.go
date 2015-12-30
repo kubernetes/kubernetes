@@ -185,13 +185,12 @@ func TestPollForever(t *testing.T) {
 		}
 	}
 
-	// at most two poll notifications should be sent once we return from the condition
+	// at most one poll notification should be sent once we return from the condition
 	done <- struct{}{}
 	go func() {
 		for i := 0; i < 2; i++ {
 			_, open := <-ch
-			if open {
-				<-complete
+			if !open {
 				return
 			}
 		}
