@@ -130,10 +130,7 @@ func (h *etcdHelper) Backends(ctx context.Context) []string {
 		glog.Errorf("Error obtaining etcd members list: %q", err)
 		return nil
 	}
-	if 0 == len(members) {
-		return nil
-	}
-	mlist := []string{""}
+	mlist := []string{}
 	for _, member := range members {
 		mlist = append(mlist, member.ClientURLs...)
 	}
