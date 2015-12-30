@@ -31,6 +31,11 @@ import (
 func main() {
 	arguments := args.Default()
 
+	// Override defaults. These are Kubernetes specific input locations.
+	arguments.InputDirs = []string{
+		"k8s.io/kubernetes/pkg/api",
+	}
+
 	if err := arguments.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
@@ -38,4 +43,5 @@ func main() {
 	); err != nil {
 		glog.Fatalf("Error: %v", err)
 	}
+	glog.Info("Completed successfully.")
 }
