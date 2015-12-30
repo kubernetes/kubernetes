@@ -18,11 +18,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# release v33 fails because of godep: error restoring dep (github.com/google/btree): found packages btree (btree.go) and main (btree_mem.go) in /tmp/gopath.aSHREx/src/github.com/google/btree
-# release v34 fails because godep save just hangs forever
-# release v35 fails because of godep: error restoring dep (github.com/Sirupsen/logrus): Unable to find dependent package golang.org/x/sys/unix in context of /tmp/gopath.aSHREx/src/github.com/Sirupsen/logrus
-# https://github.com/tools/godep/issues/359
-GODEP_RELEASE=v32
+# Lock this to a release that is known to work.  We can bump this as needed.
+GODEP_RELEASE=v45
 
 #### HACK ####
 # Sometimes godep just can't handle things. This lets use manually put
