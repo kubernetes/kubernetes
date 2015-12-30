@@ -298,3 +298,13 @@ func (w *watchCache) GetAllEventsSince(resourceVersion uint64) ([]watchCacheEven
 	defer w.RUnlock()
 	return w.GetAllEventsSinceThreadUnsafe(resourceVersion)
 }
+
+// For debugging #18794 only.
+func (w *watchCache) getAllCachedEvents() ([]watchCacheEvent, error) {
+	w.RLock()
+	defer w.RUnlock()
+	if w.startIndex == w.endIndex {
+		return make([]watchCacheEvent, 0), nil
+	}
+	return w.GetAllEventsSinceThreadUnsafe(w.cache[w.startIndex%w.capacity].resourceVersion)
+}

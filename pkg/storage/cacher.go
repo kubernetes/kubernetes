@@ -414,6 +414,11 @@ func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
 	return strconv.ParseUint(resourceVersion, 10, 64)
 }
 
+// For debugging #18794 only.
+func (c *Cacher) GetAllCachedEvents() ([]watchCacheEvent, error) {
+	return c.watchCache.getAllCachedEvents()
+}
+
 // cacherListerWatcher opaques storage.Interface to expose cache.ListerWatcher.
 type cacherListerWatcher struct {
 	storage        Interface
