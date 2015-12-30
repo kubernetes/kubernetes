@@ -26,6 +26,14 @@ ALLOW_SECURITY_CONTEXT=${ALLOW_SECURITY_CONTEXT:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 NET_PLUGIN=${NET_PLUGIN:-""}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-true}
+DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
+DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
+DNS_REPLICAS=${KUBE_DNS_REPLICAS:-1}
+KUBECTL=${KUBECTL:-cluster/kubectl.sh}
+WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-10}
+ENABLE_DAEMON=${ENABLE_DAEMON:-false}
+
 cd "${KUBE_ROOT}"
 
 if [ "$(id -u)" != "0" ]; then
@@ -169,6 +177,14 @@ cleanup_dockerized_kubelet()
 cleanup()
 {
   echo "Cleaning up..."
+  # delete running images
+  # if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
+  # Still need to figure why this commands throw an error: Error from server: client: etcd cluster is unavailable or misconfigured
+  #     ${KUBECTL} --namespace=kube-system delete service kube-dns
+  # And this one hang forever:
+  #     ${KUBECTL} --namespace=kube-system delete rc kube-dns-v10
+  # fi
+
   # Check if the API server is still running
   [[ -n "${APISERVER_PID-}" ]] && APISERVER_PIDS=$(pgrep -P ${APISERVER_PID} ; ps -o pid= -p ${APISERVER_PID})
   [[ -n "${APISERVER_PIDS-}" ]] && sudo kill ${APISERVER_PIDS}
@@ -252,7 +268,7 @@ function start_apiserver {
 
     # Wait for kube-apiserver to come up before launching the rest of the components.
     echo "Waiting for apiserver to come up"
-    kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/api/v1/pods" "apiserver: " 1 10 || exit 1
+    kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/api/v1/pods" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
 }
 
 function start_controller_manager {
@@ -289,6 +305,13 @@ function start_kubelet {
             fi
 	 fi
       fi
+      # Enable dns
+      if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
+         dns_args="--cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
+      else
+         dns_args="--cluster-dns=127.0.0.1"
+      fi
+echo dns_args=$dns_args
 
       net_plugin_args=""
       if [[ -n "${NET_PLUGIN}" ]]; then
@@ -310,7 +333,7 @@ function start_kubelet {
         --address="127.0.0.1" \
         --api-servers="${API_HOST}:${API_PORT}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
-        --cluster-dns="127.0.0.1" \
+        ${dns_args} \
         ${net_plugin_args} \
         ${kubenet_plugin_args} \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
@@ -351,6 +374,31 @@ function start_kubeproxy {
     SCHEDULER_PID=$!
 }
 
+function start_kubedns {
+
+    if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
+        echo "Creating kube-system namespace"
+        sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" >| skydns-rc.yaml
+        sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" >| skydns-svc.yaml
+        cat <<EOF >namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kube-system
+EOF
+        ${KUBECTL} config set-cluster local --server=http://127.0.0.1:8080 --insecure-skip-tls-verify=true
+        ${KUBECTL} config set-context local --cluster=local
+        ${KUBECTL} config use-context local
+
+        ${KUBECTL} create -f namespace.yaml
+        # use kubectl to create skydns rc and service
+        ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml 
+        ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
+        echo "Kube-dns rc and service successfully deployed."
+    fi
+
+}
+
 function print_success {
 cat <<EOF
 Local Kubernetes cluster is running. Press Ctrl-C to shut it down.
@@ -381,7 +429,9 @@ fi
 echo "Detected host and ready to start services.  Doing some housekeeping first..."
 echo "Using GO_OUT $GO_OUT"
 KUBELET_CIDFILE=/tmp/kubelet.cid
+if [[ "${ENABLE_DAEMON}" = false ]]; then
 trap cleanup EXIT
+fi
 echo "Starting services now!"
 startETCD
 set_service_accounts
@@ -389,6 +439,9 @@ start_apiserver
 start_controller_manager
 start_kubelet
 start_kubeproxy
+start_kubedns
 print_success
 
-while true; do sleep 1; done
+if [[ "${ENABLE_DAEMON}" = false ]]; then
+   while true; do sleep 1; done
+fi
