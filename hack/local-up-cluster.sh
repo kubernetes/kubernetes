@@ -311,7 +311,6 @@ function start_kubelet {
       else
          dns_args="--cluster-dns=127.0.0.1"
       fi
-echo dns_args=$dns_args
 
       net_plugin_args=""
       if [[ -n "${NET_PLUGIN}" ]]; then
