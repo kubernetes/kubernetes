@@ -47,13 +47,13 @@ type containerResourceGatherer struct {
 	wg              sync.WaitGroup
 }
 
-type singleContainerSummary struct {
-	name string
-	cpu  float64
-	mem  int64
+type SingleContainerSummary struct {
+	Name string
+	Cpu  float64
+	Mem  int64
 }
 
-type ResourceUsageSummary map[int][]singleContainerSummary
+type ResourceUsageSummary map[int][]SingleContainerSummary
 
 func (s *ResourceUsageSummary) PrintHumanReadable() string {
 	buf := &bytes.Buffer{}
@@ -62,7 +62,7 @@ func (s *ResourceUsageSummary) PrintHumanReadable() string {
 		buf.WriteString(fmt.Sprintf("%v percentile:\n", perc))
 		fmt.Fprintf(w, "container\tcpu(cores)\tmemory(MB)\n")
 		for _, summary := range summaries {
-			fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", summary.name, summary.cpu, float64(summary.mem)/(1024*1024))
+			fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", summary.Name, summary.Cpu, float64(summary.Mem)/(1024*1024))
 		}
 		w.Flush()
 	}
@@ -115,10 +115,10 @@ func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constrai
 	for _, perc := range percentiles {
 		for _, name := range sortedKeys {
 			usage := stats[perc][name]
-			summary[perc] = append(summary[perc], singleContainerSummary{
-				name: name,
-				cpu:  usage.CPUUsageInCores,
-				mem:  usage.MemoryWorkingSetInBytes,
+			summary[perc] = append(summary[perc], SingleContainerSummary{
+				Name: name,
+				Cpu:  usage.CPUUsageInCores,
+				Mem:  usage.MemoryWorkingSetInBytes,
 			})
 			// Verifying 99th percentile of resource usage
 			if perc == 99 {
