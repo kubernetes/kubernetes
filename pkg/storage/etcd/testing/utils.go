@@ -32,6 +32,8 @@ import (
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/rafthttp"
+	"github.com/golang/glog"
+	"golang.org/x/net/context"
 )
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing
@@ -124,6 +126,22 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 	return nil
 }
 
+// waitForEtcd wait until etcd is propagated correctly
+func (m *EtcdTestServer) waitUntilUp() error {
+	membersAPI := etcd.NewMembersAPI(m.Client)
+	for start := time.Now(); time.Since(start) < 5*time.Second; time.Sleep(10 * time.Millisecond) {
+		members, err := membersAPI.List(context.TODO())
+		if err != nil {
+			glog.Errorf("Error when getting etcd cluster members")
+			continue
+		}
+		if len(members) == 1 && len(members[0].ClientURLs) > 0 {
+			return nil
+		}
+	}
+	return fmt.Errorf("timeout on waiting for etcd cluster")
+}
+
 // Terminate will shutdown the running etcd server
 func (m *EtcdTestServer) Terminate(t *testing.T) {
 	m.Client = nil
@@ -150,8 +168,13 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 	}
 	server.Client, err = etcd.New(cfg)
 	if err != nil {
-		t.Errorf("Unexpected Error in NewEtcdTestClientServer (%v)", err)
-		defer server.Terminate(t)
+		t.Errorf("Unexpected error in NewEtcdTestClientServer (%v)", err)
+		server.Terminate(t)
+		return nil
+	}
+	if err := server.waitUntilUp(); err != nil {
+		t.Errorf("Unexpected error in waitUntilUp (%v)", err)
+		server.Terminate(t)
 		return nil
 	}
 	return server
