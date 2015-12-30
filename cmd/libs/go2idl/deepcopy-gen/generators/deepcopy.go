@@ -223,7 +223,6 @@ func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
 
 // GenerateType makes the body of a file implementing a set for type t.
 func (g *genDeepCopy) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
-	glog.Errorf("--> %v", t)
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	sw.Do("func deepCopy_$.|public$(in $.|raw$, out *$.|raw$, c *conversion.Cloner) error {\n", t)
 	g.generateFor(t, sw)
