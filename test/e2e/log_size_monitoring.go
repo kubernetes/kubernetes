@@ -75,8 +75,35 @@ type LogsSizeVerifier struct {
 	workers       []*LogSizeGatherer
 }
 
+// node -> file -> data
+type LogsSizeDataSummary map[string]map[string][]TimestampedSize
+
+// TODO: make sure that we don't need locking here
+func (s *LogsSizeDataSummary) PrintHumanReadable() string {
+	buf := &bytes.Buffer{}
+	w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
+	fmt.Fprintf(w, "host\tlog_file\taverage_rate (B/s)\tnumber_of_probes\n")
+	for k, v := range *s {
+		fmt.Fprintf(w, "%v\t\t\t\n", k)
+		for path, data := range v {
+			if len(data) > 1 {
+				last := data[len(data)-1]
+				first := data[0]
+				rate := (last.size - first.size) / int(last.timestamp.Sub(first.timestamp)/time.Second)
+				fmt.Fprintf(w, "\t%v\t%v\t%v\n", path, rate, len(data))
+			}
+		}
+	}
+	w.Flush()
+	return buf.String()
+}
+
+func (s *LogsSizeDataSummary) PrintJSON() string {
+	return "JSON printer not implemented for LogsSizeDataSummary"
+}
+
 type LogsSizeData struct {
-	data map[string]map[string][]TimestampedSize
+	data LogsSizeDataSummary
 	lock sync.Mutex
 }
 
@@ -89,7 +116,7 @@ type WorkItem struct {
 }
 
 func prepareData(masterAddress string, nodeAddresses []string) LogsSizeData {
-	data := make(map[string]map[string][]TimestampedSize)
+	data := make(LogsSizeDataSummary)
 	ips := append(nodeAddresses, masterAddress)
 	for _, ip := range ips {
 		data[ip] = make(map[string][]TimestampedSize)
@@ -110,27 +137,6 @@ func (d *LogsSizeData) AddNewData(ip, path string, timestamp time.Time, size int
 			size:      size,
 		},
 	)
-}
-
-func (d *LogsSizeData) PrintData() string {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	buf := &bytes.Buffer{}
-	w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
-	fmt.Fprintf(w, "host\tlog_file\taverage_rate (B/s)\tnumber_of_probes\n")
-	for k, v := range d.data {
-		fmt.Fprintf(w, "%v\t\t\t\n", k)
-		for path, data := range v {
-			if len(data) > 1 {
-				last := data[len(data)-1]
-				first := data[0]
-				rate := (last.size - first.size) / int(last.timestamp.Sub(first.timestamp)/time.Second)
-				fmt.Fprintf(w, "\t%v\t%v\t%v\n", path, rate, len(data))
-			}
-		}
-	}
-	w.Flush()
-	return buf.String()
 }
 
 // NewLogsVerifier creates a new LogsSizeVerifier which will stop when stopChannel is closed
@@ -165,8 +171,8 @@ func NewLogsVerifier(c *client.Client, stopChannel chan bool) *LogsSizeVerifier 
 }
 
 // PrintData returns a string with formated results
-func (v *LogsSizeVerifier) PrintData() string {
-	return v.data.PrintData()
+func (v *LogsSizeVerifier) GetSummary() *LogsSizeDataSummary {
+	return &v.data.data
 }
 
 // Run starts log size gathering. It starts a gorouting for every worker and then blocks until stopChannel is closed
@@ -188,8 +194,6 @@ func (v *LogsSizeVerifier) Run() {
 	}
 	<-v.stopChannel
 	v.wg.Wait()
-
-	Logf("\n%v", v.PrintData())
 }
 
 func (g *LogSizeGatherer) Run() {

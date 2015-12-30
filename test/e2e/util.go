@@ -154,6 +154,8 @@ type TestContextType struct {
 	GatherKubeSystemResourceUsageData bool
 	GatherLogsSizes                   bool
 	GatherMetricsAfterTest            bool
+	// Currently supported values are 'hr' for human-readable and 'json'. It's a comma separated list.
+	OutputPrintType string
 }
 
 var testContext TestContextType
