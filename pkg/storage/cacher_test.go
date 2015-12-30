@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 
+	"github.com/golang/glog"
 	"golang.org/x/net/context"
 )
 
@@ -299,6 +300,15 @@ func TestFiltering(t *testing.T) {
 	}
 	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, filter)
 	if err != nil {
+		// For debugging #18794 only.
+		events, err := cacher.GetAllCachedEvents()
+		if err != nil {
+			glog.Error("Unexpected error: %v", err)
+		} else {
+			for _, event := range events {
+				glog.Errorf("cached event: %s %#v", event.Type, event.Object)
+			}
+		}
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	defer watcher.Stop()
