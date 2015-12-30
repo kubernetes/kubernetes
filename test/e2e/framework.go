@@ -52,6 +52,11 @@ type Framework struct {
 	logsSizeVerifier     *LogsSizeVerifier
 }
 
+type TestDataSummary interface {
+	PrintHumanReadable() string
+	PrintJSON() string
+}
+
 // NewFramework makes a new framework and sets up a BeforeEach/AfterEach for
 // you (you can write additional before/after each functions).
 func NewFramework(baseName string) *Framework {
@@ -91,7 +96,7 @@ func (f *Framework) beforeEach() {
 	}
 
 	if testContext.GatherKubeSystemResourceUsageData {
-		f.gatherer.startGatheringData(c, time.Minute)
+		f.gatherer.startGatheringData(c, resourceDataGatheringPeriodSeconds*time.Second)
 	}
 
 	if testContext.GatherLogsSizes {
@@ -145,13 +150,31 @@ func (f *Framework) afterEach() {
 		Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 	}
 
+	summaries := make([]TestDataSummary, 0)
 	if testContext.GatherKubeSystemResourceUsageData {
-		f.gatherer.stopAndPrintData([]int{50, 90, 99, 100}, f.addonResourceConstraints)
+		summaries = append(summaries, f.gatherer.stopAndSummarize([]int{50, 90, 99, 100}, f.addonResourceConstraints))
 	}
 
 	if testContext.GatherLogsSizes {
 		close(f.logsSizeCloseChannel)
 		f.logsSizeWaitGroup.Wait()
+		summaries = append(summaries, f.logsSizeVerifier.GetSummary())
+	}
+
+	outputTypes := strings.Split(testContext.OutputPrintType, ",")
+	for _, printType := range outputTypes {
+		switch printType {
+		case "hr":
+			for i := range summaries {
+				Logf(summaries[i].PrintHumanReadable())
+			}
+		case "json":
+			for i := range summaries {
+				Logf(summaries[i].PrintJSON())
+			}
+		default:
+			Logf("Unknown ouptut type: %v. Skipping.", printType)
+		}
 	}
 
 	if testContext.GatherMetricsAfterTest {
