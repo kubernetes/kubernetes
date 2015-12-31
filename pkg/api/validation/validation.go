@@ -486,7 +486,7 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 	}
 	if source.FlexVolume != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateFlexVolumeSource(source.FlexVolume, fldPath.Child("FlexVolume"))...)
+		allErrs = append(allErrs, validateFlexVolumeSource(source.FlexVolume, fldPath.Child("flexVolume"))...)
 	}
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
