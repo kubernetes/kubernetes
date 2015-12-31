@@ -16,15 +16,10 @@
 
 # A library of helper functions and constant for coreos os distro
 
-# By sourcing debian's helper.sh, we use the same create-master-instance
-# functions as debian. But we overwrite the create-node-instance-template
-# function to use coreos.
-source "${KUBE_ROOT}/cluster/gce/debian/helper.sh"
-
 # TODO(dawnchen): Check $CONTAINER_RUNTIME to decide which
 # cloud_config yaml file should be passed
 # $1: template name (required)
-function create-node-instance-template {
+function nodes::create-instance-template {
   local template_name="$1"
   create-node-template "$template_name" "${scope_flags}" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \

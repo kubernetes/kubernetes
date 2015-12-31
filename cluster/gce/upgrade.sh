@@ -84,7 +84,8 @@ function upgrade-master() {
     --zone "${ZONE}" \
     "${MASTER_NAME}"
 
-  create-master-instance "${MASTER_NAME}-ip"
+  master::create-instance "${MASTER_NAME}-ip"
+  master::deploy
   wait-for-master
 }
 
@@ -209,9 +210,9 @@ function prepare-node-upgrade() {
   write-node-env
 
   # TODO(zmerlynn): Get configure-vm script from ${version}. (Must plumb this
-  #                 through all create-node-instance-template implementations).
+  #                 through all nodes::create-instance-template implementations).
   local template_name=$(get-template-name-from-version ${SANITIZED_VERSION})
-  create-node-instance-template "${template_name}"
+  nodes::create-instance-template "${template_name}"
   # The following is echo'd so that callers can get the template name.
   echo $template_name
   echo "== Finished preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
