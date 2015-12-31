@@ -71,7 +71,7 @@ func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 	return true
 }
 
-// TODO (random-liu) This should be removed soon after rkt implements GetPodStatus.
+// TODO(random-liu): This should be removed soon after rkt implements GetPodStatus.
 func ShouldContainerBeRestartedOldVersion(container *api.Container, pod *api.Pod, podStatus *api.PodStatus) bool {
 	// Get all dead container status.
 	var resultStatus []*api.ContainerStatus
@@ -99,7 +99,7 @@ func ShouldContainerBeRestartedOldVersion(container *api.Container, pod *api.Pod
 	return true
 }
 
-// TODO (random-liu) Convert PodStatus to running Pod, should be deprecated soon
+// TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon
 func ConvertPodStatusToRunningPod(podStatus *PodStatus) Pod {
 	runningPod := Pod{
 		ID:        podStatus.ID,
