@@ -441,7 +441,7 @@ func (dm *DockerManager) ConvertPodStatusToAPIPodStatus(pod *api.Pod, podStatus 
 	}
 
 	containerDone := sets.NewString()
-	// NOTE: (random-liu) The Pod IP is generated in kubelet.generatePodStatus(), we have no podStatus.IP now
+	// NOTE(random-liu): The Pod IP is generated in kubelet.generatePodStatus(), we have no podStatus.IP now
 	apiPodStatus.PodIP = podStatus.IP
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		cName := containerStatus.Name
@@ -1224,7 +1224,7 @@ func (dm *DockerManager) GetContainerIP(containerID, interfaceName string) (stri
 	return string(out), nil
 }
 
-// TODO: (random-liu) Change running pod to pod status in the future. We can't do it now, because kubelet also uses this function without pod status.
+// TODO(random-liu): Change running pod to pod status in the future. We can't do it now, because kubelet also uses this function without pod status.
 // We can only deprecate this after refactoring kubelet.
 func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
 	// Send the kills in parallel since they may take a long time. Len + 1 since there
@@ -1776,7 +1776,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ kubecontainer.Pod, _ api.PodSta
 		}
 
 		// Killing phase: if we want to start new infra container, or nothing is running kill everything (including infra container)
-		// TODO: (random-liu) We'll use pod status directly in the future
+		// TODO(random-liu): We'll use pod status directly in the future
 		if err := dm.KillPod(pod, kubecontainer.ConvertPodStatusToRunningPod(podStatus)); err != nil {
 			return err
 		}
@@ -1786,7 +1786,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ kubecontainer.Pod, _ api.PodSta
 		for _, containerStatus := range runningContainerStatues {
 			_, keep := containerChanges.ContainersToKeep[kubetypes.DockerID(containerStatus.ID.ID)]
 			if !keep {
-				// NOTE: (random-liu) Just log ID or log container status here?
+				// NOTE(random-liu): Just log ID or log container status here?
 				glog.V(3).Infof("Killing unwanted container %+v", containerStatus)
 				// attempt to find the appropriate container policy
 				var podContainer *api.Container
@@ -2042,8 +2042,8 @@ func (dm *DockerManager) GetPodStatus(uid types.UID, name, namespace string) (*k
 	var containerStatuses []*kubecontainer.ContainerStatus
 	// We have added labels like pod name and pod namespace, it seems that we can do filtered list here.
 	// However, there may be some old containers without these labels, so at least now we can't do that.
-	// TODO (random-liu) Do only one list and pass in the list result in the future
-	// TODO (random-liu) Add filter when we are sure that all the containers have the labels
+	// TODO(random-liu): Do only one list and pass in the list result in the future
+	// TODO(random-liu): Add filter when we are sure that all the containers have the labels
 	containers, err := dm.client.ListContainers(docker.ListContainersOptions{All: true})
 	if err != nil {
 		return podStatus, err

@@ -194,7 +194,7 @@ func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) 
 	if options.All {
 		// Althought the container is not sorted, but the container with the same name should be in order,
 		// that is enough for us now.
-		// TODO (random-liu) Is a fully sorted array needed?
+		// TODO(random-liu): Is a fully sorted array needed?
 		containerList = append(containerList, f.ExitedContainerList...)
 	}
 	return containerList, err
