@@ -3040,7 +3040,7 @@ func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 
 // By passing the pod directly, this method avoids pod lookup, which requires
 // grabbing a lock.
-// TODO (random-liu) api.PodStatus is named as podStatus, this maybe confusing, this may happen in other functions
+// TODO(random-liu): api.PodStatus is named as podStatus, this maybe confusing, this may happen in other functions
 // after refactoring, modify them later.
 func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 

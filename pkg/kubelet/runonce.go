@@ -144,7 +144,7 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 
 // isPodRunning returns true if all containers of a manifest are running.
 func (kl *Kubelet) isPodRunning(pod *api.Pod, runningPod container.Pod) (bool, error) {
-	// TODO (random-liu) Change this to new pod status
+	// TODO(random-liu): Change this to new pod status
 	status, err := kl.containerRuntime.GetAPIPodStatus(pod)
 	if err != nil {
 		glog.Infof("Failed to get the status of pod %q: %v", format.Pod(pod), err)
