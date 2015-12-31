@@ -56,7 +56,7 @@ type labelledContainerInfo struct {
 }
 
 func newLabels(container *api.Container, pod *api.Pod, restartCount int) map[string]string {
-	// TODO (random-liu) Move more label initialization here
+	// TODO(random-liu): Move more label initialization here
 	labels := map[string]string{}
 	labels[kubernetesPodNameLabel] = pod.Name
 	labels[kubernetesPodNamespaceLabel] = pod.Namespace
