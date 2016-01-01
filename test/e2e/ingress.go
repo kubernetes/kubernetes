@@ -94,6 +94,10 @@ var (
 	// GCE only allows names < 64 characters, and the loadbalancer controller inserts
 	// a single character of padding.
 	nameLenLimit = 62
+
+	// Timing out requests will lead to retries, and more importantly, the test
+	// finishing in a deterministic manner.
+	timeoutClient = &http.Client{Timeout: 60 * time.Second}
 )
 
 // timeSlice allows sorting of time.Duration
@@ -521,7 +525,7 @@ var _ = Describe("GCE L7 LoadBalancer Controller [Serial] [Slow] [Flaky]", func(
 					var lastBody string
 					pollErr := wait.Poll(lbPollInterval, lbPollTimeout, func() (bool, error) {
 						var err error
-						lastBody, err = simpleGET(http.DefaultClient, route, rules.Host)
+						lastBody, err = simpleGET(timeoutClient, route, rules.Host)
 						if err != nil {
 							Logf("host %v path %v: %v", rules.Host, route, err)
 							return false, nil
@@ -569,7 +573,7 @@ func curlServiceNodePort(client *client.Client, ns, name string, port int) error
 	if err != nil {
 		return err
 	}
-	svcCurlBody, err := simpleGET(http.DefaultClient, u, "")
+	svcCurlBody, err := simpleGET(timeoutClient, u, "")
 	if err != nil {
 		return fmt.Errorf("Failed to curl service node port, body: %v\nerror %v", svcCurlBody, err)
 	}
