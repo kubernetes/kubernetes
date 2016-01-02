@@ -131,6 +131,7 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-controller-manager
   kube-scheduler
   kube-proxy
+  kubectl
 )
 
 kube::golang::is_statically_linked_library() {
