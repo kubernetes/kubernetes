@@ -34,76 +34,6 @@ import (
 
 const TestClusterId = "clusterid.test"
 
-func TestReadAWSCloudConfig(t *testing.T) {
-	tests := []struct {
-		name string
-
-		reader io.Reader
-		aws    AWSServices
-
-		expectError bool
-		zone        string
-	}{
-		{
-			"No config reader",
-			nil, nil,
-			true, "",
-		},
-		{
-			"Empty config, no metadata",
-			strings.NewReader(""), nil,
-			true, "",
-		},
-		{
-			"No zone in config, no metadata",
-			strings.NewReader("[global]\n"), nil,
-			true, "",
-		},
-		{
-			"Zone in config, no metadata",
-			strings.NewReader("[global]\nzone = eu-west-1a"), nil,
-			false, "eu-west-1a",
-		},
-		{
-			"No zone in config, metadata does not have zone",
-			strings.NewReader("[global]\n"), NewFakeAWSServices().withAz(""),
-			true, "",
-		},
-		{
-			"No zone in config, metadata has zone",
-			strings.NewReader("[global]\n"), NewFakeAWSServices(),
-			false, "us-east-1a",
-		},
-		{
-			"Zone in config should take precedence over metadata",
-			strings.NewReader("[global]\nzone = eu-west-1a"), NewFakeAWSServices(),
-			false, "eu-west-1a",
-		},
-	}
-
-	for _, test := range tests {
-		t.Logf("Running test case %s", test.name)
-		var metadata EC2Metadata
-		if test.aws != nil {
-			metadata, _ = test.aws.Metadata()
-		}
-		cfg, err := readAWSCloudConfig(test.reader, metadata)
-		if test.expectError {
-			if err == nil {
-				t.Errorf("Should error for case %s (cfg=%v)", test.name, cfg)
-			}
-		} else {
-			if err != nil {
-				t.Errorf("Should succeed for case: %s", test.name)
-			}
-			if cfg.Global.Zone != test.zone {
-				t.Errorf("Incorrect zone value (%s vs %s) for case: %s",
-					cfg.Global.Zone, test.zone, test.name)
-			}
-		}
-	}
-}
-
 type FakeAWSServices struct {
 	availabilityZone        string
 	instances               []*ec2.Instance
@@ -207,20 +137,21 @@ func TestNewAWSCloud(t *testing.T) {
 		},
 		{
 			"Config specified invalid zone",
-			strings.NewReader("[global]\nzone = blahonga"), NewFakeAWSServices(),
-			true, "",
+			strings.NewReader("[global]\nzone = blahonga"),
+			NewFakeAWSServices(),
+			false, "us-east-1a",
 		},
 		{
 			"Config specifies valid zone",
-			strings.NewReader("[global]\nzone = eu-west-1a"), NewFakeAWSServices(),
-			false, "eu-west-1a",
+			strings.NewReader("[global]\nzone = eu-west-1a"),
+			NewFakeAWSServices(),
+			false, "us-east-1a",
 		},
 		{
 			"Gets zone from metadata when not in config",
-
 			strings.NewReader("[global]\n"),
-			NewFakeAWSServices(),
-			false, "us-east-1a",
+			NewFakeAWSServices().withAz("us-west-2a"),
+			false, "us-west-2a",
 		},
 		{
 			"No zone in config or metadata",

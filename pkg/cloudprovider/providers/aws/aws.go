@@ -195,11 +195,13 @@ type AWSCloud struct {
 
 type AWSCloudConfig struct {
 	Global struct {
-		// TODO: Is there any use for this?  We can get it from the instance metadata service
-		// Maybe if we're not running on AWS, e.g. bootstrap; for now it is not very useful
-		Zone string
-
 		KubernetesClusterTag string
+
+		// DEPRECATED
+		//
+		// A cluster can only be tied to a single region (e.g. eu-west-1, us-east-1, us-west-2).
+		// The region and availability zones are fetched using the EC2 metadata service.
+		Zone string
 	}
 }
 
@@ -456,83 +458,19 @@ func init() {
 	})
 }
 
-// readAWSCloudConfig reads an instance of AWSCloudConfig from config reader.
-func readAWSCloudConfig(config io.Reader, metadata EC2Metadata) (*AWSCloudConfig, error) {
-	var cfg AWSCloudConfig
-	var err error
-
-	if config != nil {
-		err = gcfg.ReadInto(&cfg, config)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if cfg.Global.Zone == "" {
-		if metadata != nil {
-			glog.Info("Zone not specified in configuration file; querying AWS metadata service")
-			cfg.Global.Zone, err = getAvailabilityZone(metadata)
-			if err != nil {
-				return nil, err
-			}
-		}
-		if cfg.Global.Zone == "" {
-			return nil, fmt.Errorf("no zone specified in configuration file")
-		}
-	}
-
-	return &cfg, nil
-}
-
-func getAvailabilityZone(metadata EC2Metadata) (string, error) {
-	return metadata.GetMetadata("placement/availability-zone")
-}
-
-func isRegionValid(region string) bool {
-	regions := [...]string{
-		"us-east-1",
-		"us-west-1",
-		"us-west-2",
-		"eu-west-1",
-		"eu-central-1",
-		"ap-southeast-1",
-		"ap-southeast-2",
-		"ap-northeast-1",
-		"cn-north-1",
-		"us-gov-west-1",
-		"sa-east-1",
-	}
-	for _, r := range regions {
-		if r == region {
-			return true
-		}
-	}
-	return false
-}
-
 // newAWSCloud creates a new instance of AWSCloud.
 // AWSProvider and instanceId are primarily for tests
 func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 	metadata, err := awsServices.Metadata()
 	if err != nil {
-		return nil, fmt.Errorf("error creating AWS metadata client: %v", err)
+		return nil, fmt.Errorf("error creating EC2 metadata client: %v", err)
 	}
 
-	cfg, err := readAWSCloudConfig(config, metadata)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read AWS cloud provider config file: %v", err)
-	}
-
-	zone := cfg.Global.Zone
-	if len(zone) <= 1 {
-		return nil, fmt.Errorf("invalid AWS zone in config file: %s", zone)
+	zone, err := metadata.GetMetadata("placement/availability-zone")
+	if err != nil || len(zone) < 1 {
+		return nil, fmt.Errorf("cannot query EC2 metadata service for availability zone: %v", err)
 	}
 	regionName := zone[:len(zone)-1]
-
-	valid := isRegionValid(regionName)
-	if !valid {
-		return nil, fmt.Errorf("not a valid AWS zone (unknown region): %s", zone)
-	}
 
 	ec2, err := awsServices.Compute(regionName)
 	if err != nil {
@@ -549,12 +487,18 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 		return nil, fmt.Errorf("error creating AWS autoscaling client: %v", err)
 	}
 
+	var cfg AWSCloudConfig
+	err = gcfg.ReadInto(&cfg, config)
+	if err != nil {
+		return nil, err
+	}
+
 	awsCloud := &AWSCloud{
 		ec2:              ec2,
 		elb:              elb,
 		asg:              asg,
 		metadata:         metadata,
-		cfg:              cfg,
+		cfg:              &cfg,
 		region:           regionName,
 		availabilityZone: zone,
 	}
@@ -576,6 +520,10 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 				filterTags[TagNameKubernetesCluster] = orEmpty(tag.Value)
 			}
 		}
+	}
+
+	if cfg.Global.Zone != "" {
+		glog.Warningf("Zone cannot be manually configured. Using '%s' from EC2 metadata instead of '%s'", regionName, cfg.Global.Zone)
 	}
 
 	awsCloud.filterTags = filterTags
