@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -60,7 +60,7 @@ func TestWatchInterpretations(t *testing.T) {
 
 	// All of these test cases will be run with the firstLetterIsB FilterFunc.
 	table := map[string]struct {
-		actions       []string // Run this test item for every action here.
+		actions []string // Run this test item for every action here.
 		prevNodeValue string
 		nodeValue     string
 		expectEmit    bool
@@ -112,7 +112,7 @@ func TestWatchInterpretations(t *testing.T) {
 			nodeValue:     runtime.EncodeOrDie(codec, podFoo),
 			expectEmit:    true,
 			expectType:    watch.Deleted,
-			expectObject:  podBar, // Should return last state that passed the filter!
+			expectObject: podBar, // Should return last state that passed the filter!
 		},
 		"modify modifies": {
 			actions:       []string{"set", "compareAndSwap"},
@@ -270,7 +270,7 @@ func TestWatch(t *testing.T) {
 	// two things can happen:
 	// - ResultChan() may be closed (triggered by closing userStop channel)
 	// - an Error "context cancelled" may be emitted (triggered by cancelling request
-	//   to etcd and putting that error to etcdError channel)
+	// to etcd and putting that error to etcdError channel)
 	// We need to be prepared for both here.
 	event, open := <-watching.ResultChan()
 	if open && event.Type != watch.Error {
@@ -466,7 +466,7 @@ func TestWatchPurposefulShutdown(t *testing.T) {
 	// two things can happen:
 	// - ResultChan() may be closed (triggered by closing userStop channel)
 	// - an Error "context cancelled" may be emitted (triggered by cancelling request
-	//   to etcd and putting that error to etcdError channel)
+	// to etcd and putting that error to etcdError channel)
 	// We need to be prepared for both here.
 	event, open := <-watching.ResultChan()
 	if open && event.Type != watch.Error {

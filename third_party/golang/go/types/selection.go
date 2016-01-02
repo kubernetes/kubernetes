@@ -16,33 +16,33 @@ import (
 type SelectionKind int
 
 const (
-	FieldVal   SelectionKind = iota // x.f is a struct field selector
-	MethodVal                       // x.f is a method selector
-	MethodExpr                      // x.f is a method expression
+	FieldVal SelectionKind = iota // x.f is a struct field selector
+	MethodVal // x.f is a method selector
+	MethodExpr // x.f is a method expression
 )
 
 // A Selection describes a selector expression x.f.
 // For the declarations:
 //
-//	type T struct{ x int; E }
-//	type E struct{}
-//	func (e E) m() {}
-//	var p *T
+// 	type T struct{ x int; E }
+// 	type E struct{}
+// 	func (e E) m() {}
+// 	var p *T
 //
 // the following relations exist:
 //
-//	Selector    Kind          Recv    Obj    Type               Index     Indirect
+// 	Selector Kind Recv Obj Type Index Indirect
 //
-//	p.x         FieldVal      T       x      int                {0}       true
-//	p.m         MethodVal     *T      m      func (e *T) m()    {1, 0}    true
-//	T.m         MethodExpr    T       m      func m(_ T)        {1, 0}    false
+// 	p.x FieldVal T x int {0} true
+// 	p.m MethodVal *T m func (e *T) m() {1, 0} true
+// 	T.m MethodExpr T m func m(_ T) {1, 0} false
 //
 type Selection struct {
 	kind     SelectionKind
-	recv     Type   // type of x
-	obj      Object // object denoted by x.f
-	index    []int  // path from x to x.f
-	indirect bool   // set if there was any pointer indirection on the path
+	recv Type // type of x
+	obj Object // object denoted by x.f
+	index []int // path from x to x.f
+	indirect bool // set if there was any pointer indirection on the path
 }
 
 // Kind returns the selection kind.
@@ -93,9 +93,9 @@ func (s *Selection) Type() Type {
 // The last index entry is the field or method index of the type declaring f;
 // either:
 //
-//	1) the list of declared methods of a named type; or
-//	2) the list of methods of an interface type; or
-//	3) the list of fields of a struct type.
+// 	1) the list of declared methods of a named type; or
+// 	2) the list of methods of an interface type; or
+// 	3) the list of fields of a struct type.
 //
 // The earlier index entries are the indices of the embedded fields implicitly
 // traversed to get from (the type of) x to f, starting at embedding depth 0.
@@ -112,9 +112,9 @@ func (s *Selection) String() string { return SelectionString(s, nil) }
 // package-level objects, and may be nil.
 //
 // Examples:
-//	"field (T) f int"
-//	"method (T) f(X) Y"
-//	"method expr (T) f(X) Y"
+// 	"field (T) f int"
+// 	"method (T) f(X) Y"
+// 	"method expr (T) f(X) Y"
 //
 func SelectionString(s *Selection, qf Qualifier) string {
 	var k string

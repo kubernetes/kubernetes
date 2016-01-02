@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -285,11 +285,11 @@ func formatResourceUsageStats(nodeName string, containerStats resourceUsagePerCo
 	// Example output:
 	//
 	// Resource usage for node "e2e-test-foo-minion-abcde":
-	// container        cpu(cores)  memory(MB)
-	// "/"              0.363       2942.09
-	// "/docker-daemon" 0.088       521.80
-	// "/kubelet"       0.086       424.37
-	// "/system"        0.007       119.88
+	// container cpu(cores) memory(MB)
+	// "/" 0.363 2942.09
+	// "/docker-daemon" 0.088 521.80
+	// "/kubelet" 0.086 424.37
+	// "/system" 0.007 119.88
 	buf := &bytes.Buffer{}
 	w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
 	fmt.Fprintf(w, "container\tcpu(cores)\tmemory(MB)\n")
@@ -550,11 +550,11 @@ type nodesCPUSummary map[string]containersCPUSummary
 func (r *resourceMonitor) FormatCPUSummary(summary nodesCPUSummary) string {
 	// Example output for a node (the percentiles may differ):
 	// CPU usage of containers on node "e2e-test-foo-minion-0vj7":
-	// container        5th%  50th% 90th% 95th%
-	// "/"              0.051 0.159 0.387 0.455
+	// container 5th% 50th% 90th% 95th%
+	// "/" 0.051 0.159 0.387 0.455
 	// "/docker-daemon" 0.000 0.000 0.146 0.166
-	// "/kubelet"       0.036 0.053 0.091 0.154
-	// "/system"        0.001 0.001 0.001 0.002
+	// "/kubelet" 0.036 0.053 0.091 0.154
+	// "/system" 0.001 0.001 0.001 0.002
 	var summaryStrings []string
 	var header []string
 	header = append(header, "container")

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -46,7 +46,7 @@ func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSecond
 	}
 	wg.Wait()
 
-	//Wait 10 seconds, then SEND delete requests for all the namespaces.
+	// Wait 10 seconds, then SEND delete requests for all the namespaces.
 	By("Waiting 10 seconds")
 	time.Sleep(time.Duration(10 * time.Second))
 	deleted, err := deleteNamespaces(c, []string{"nslifetest"}, nil /* skipFilter */)
@@ -54,7 +54,7 @@ func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSecond
 	Expect(len(deleted)).To(Equal(totalNS))
 
 	By("Waiting for namespaces to vanish")
-	//Now POLL until all namespaces have been eradicated.
+	// Now POLL until all namespaces have been eradicated.
 	expectNoError(wait.Poll(2*time.Second, time.Duration(maxSeconds)*time.Second,
 		func() (bool, error) {
 			var cnt = 0
@@ -77,7 +77,7 @@ func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSecond
 
 var _ = Describe("Namespaces", func() {
 
-	//This namespace is modified throughout the course of the test.
+	// This namespace is modified throughout the course of the test.
 	var c *client.Client
 	var err error = nil
 	BeforeEach(func() {
@@ -89,14 +89,14 @@ var _ = Describe("Namespaces", func() {
 	AfterEach(func() {
 	})
 
-	//Confirms that namespace draining is functioning reasonably
-	//at minute intervals.
+	// Confirms that namespace draining is functioning reasonably
+	// at minute intervals.
 	//
 	// Flaky issue #19026
 	It("should delete fast enough (90 percent of 100 namespaces in 150 seconds) [Flaky]",
 		func() { extinguish(c, 100, 10, 150) })
 
-	//comprehensive draining ; uncomment after #7372
+	// comprehensive draining ; uncomment after #7372
 	PIt("should always delete fast (ALL of 100 namespaces in 150 seconds)",
 		func() { extinguish(c, 100, 0, 150) })
 })

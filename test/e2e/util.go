@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -109,7 +109,7 @@ const (
 )
 
 // SubResource proxy should have been functional in v1.0.0, but SubResource
-// proxy via tunneling is known to be broken in v1.0.  See
+// proxy via tunneling is known to be broken in v1.0. See
 // https://github.com/kubernetes/kubernetes/pull/15224#issuecomment-146769463
 //
 // TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively
@@ -217,10 +217,10 @@ type RCConfig struct {
 	Timeout       time.Duration
 	PodStatusFile *os.File
 	Replicas      int
-	CpuRequest    int64 // millicores
-	CpuLimit      int64 // millicores
-	MemRequest    int64 // bytes
-	MemLimit      int64 // bytes
+	CpuRequest int64 // millicores
+	CpuLimit int64 // millicores
+	MemRequest int64 // bytes
+	MemLimit int64 // bytes
 
 	// Env vars, set the same for every pod.
 	Env map[string]string
@@ -414,7 +414,7 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 					Logf("Pod %s is Failed, but it's not controlled by a ReplicationController", pod.ObjectMeta.Name)
 					badPods = append(badPods, pod)
 				}
-				//ignore failed pods that are controlled by a replication controller
+				// ignore failed pods that are controlled by a replication controller
 			}
 		}
 
@@ -482,7 +482,7 @@ func waitForNamespacesDeleted(c *client.Client, namespaces []string, timeout tim
 	for _, ns := range namespaces {
 		nsMap[ns] = true
 	}
-	//Now POLL until all namespaces have been eradicated.
+	// Now POLL until all namespaces have been eradicated.
 	return wait.Poll(2*time.Second, timeout,
 		func() (bool, error) {
 			nsList, err := c.Namespaces().List(api.ListOptions{})
@@ -832,7 +832,7 @@ func waitForService(c *client.Client, namespace, name string, exist bool, interv
 	return nil
 }
 
-//waitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
+// waitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
 func waitForServiceEndpointsNum(c *client.Client, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
 	return wait.Poll(interval, timeout, func() (bool, error) {
 		Logf("Waiting for amount of service:%s endpoints to %d", serviceName, expectNum)
@@ -897,7 +897,7 @@ type podResponseChecker struct {
 	ns             string
 	label          labels.Selector
 	controllerName string
-	respondName    bool // Whether the pod should respond with its own name.
+	respondName bool // Whether the pod should respond with its own name.
 	pods           *api.PodList
 }
 
@@ -1050,9 +1050,9 @@ func loadClient() (*client.Client, error) {
 
 // randomSuffix provides a random string to append to pods,services,rcs.
 // TODO: Allow service names to have the same form as names
-//       for pods and replication controllers so we don't
-//       need to use such a function and can instead
-//       use the UUID utility function.
+// for pods and replication controllers so we don't
+// need to use such a function and can instead
+// use the UUID utility function.
 func randomSuffix() string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return strconv.Itoa(r.Int() % 10000)
@@ -1093,8 +1093,8 @@ type validatorFn func(c *client.Client, podID string) error
 // validateController is a generic mechanism for testing RC's that are running.
 // It takes a container name, a test name, and a validator function which is plugged in by a specific test.
 // "containername": this is grepped for.
-// "containerImage" : this is the name of the image we expect to be launched.  Not to confuse w/ images (kitten.jpg)  which are validated.
-// "testname":  which gets bubbled up to the logging/failure messages if errors happen.
+// "containerImage" : this is the name of the image we expect to be launched. Not to confuse w/ images (kitten.jpg) which are validated.
+// "testname": which gets bubbled up to the logging/failure messages if errors happen.
 // "validator" function: This function is given a podID and a client, and it can do some specific validations that way.
 func validateController(c *client.Client, containerImage string, replicas int, containername string, testname string, validator validatorFn, ns string) {
 	getPodsTemplate := "--template={{range.items}}{{.metadata.name}} {{end}}"
@@ -1110,7 +1110,7 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 
 	getImageTemplate := fmt.Sprintf(`--template={{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if eq .name "%s"}}{{.image}}{{end}}{{end}}{{end}}`, containername)
 
-	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
+	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) // testname should be selector
 waitLoop:
 	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
 		getPodsOutput := runKubectlOrDie("get", "pods", "-o", "template", getPodsTemplate, "--api-version=v1", "-l", testname, fmt.Sprintf("--namespace=%v", ns))
@@ -1148,7 +1148,7 @@ waitLoop:
 			return
 		}
 	}
-	// Reaching here means that one of more checks failed multiple times.  Assuming its not a race condition, something is broken.
+	// Reaching here means that one of more checks failed multiple times. Assuming its not a race condition, something is broken.
 	Failf("Timed out after %v seconds waiting for %s pods to reach valid state", podStartTimeout.Seconds(), testname)
 }
 
@@ -1178,11 +1178,11 @@ func kubectlCmd(args ...string) *exec.Cmd {
 	}
 	kubectlArgs := append(defaultArgs, args...)
 
-	//We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
-	//and so on.
+	// We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
+	// and so on.
 	cmd := exec.Command(testContext.KubectlPath, kubectlArgs...)
 
-	//caller will invoke this and wait on it.
+	// caller will invoke this and wait on it.
 	return cmd
 }
 
@@ -1307,7 +1307,7 @@ func testContainerOutputMatcher(scenarioName string,
 		Failf("Invalid container index: %d", containerIndex)
 	}
 
-	// Grab its logs.  Get host first.
+	// Grab its logs. Get host first.
 	podStatus, err := c.Pods(ns).Get(pod.Name)
 	if err != nil {
 		Failf("Failed to get pod status: %v", err)
@@ -1653,9 +1653,9 @@ func (config *RCConfig) start() error {
 		if len(pods) < len(oldPods) || len(pods) > config.Replicas {
 			// This failure mode includes:
 			// kubelet is dead, so node controller deleted pods and rc creates more
-			//	- diagnose by noting the pod diff below.
+			// 	- diagnose by noting the pod diff below.
 			// pod is unhealthy, so replication controller creates another to take its place
-			//	- diagnose by comparing the previous "2 Pod states" lines for inactive pods
+			// 	- diagnose by comparing the previous "2 Pod states" lines for inactive pods
 			errorStr := fmt.Sprintf("Number of reported pods changed: %d vs %d", len(pods), len(oldPods))
 			Logf("%v, pods that changed since the last iteration:", errorStr)
 			Diff(oldPods, pods).Print(sets.NewString())

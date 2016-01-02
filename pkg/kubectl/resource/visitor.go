@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -288,7 +288,7 @@ type ContinueOnErrorVisitor struct {
 
 // Visit returns nil if no error occurs during traversal, a regular
 // error if one occurs, or if multiple errors occur, an aggregate
-// error.  If the provided visitor fails on any individual item it
+// error. If the provided visitor fails on any individual item it
 // will not prevent the remaining items from being visited. An error
 // returned by the visitor directly may still result in some items
 // not being visited.

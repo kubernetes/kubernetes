@@ -1,6 +1,6 @@
-//This package is copied from Go library text/template.
-//The original private functions indirect and printableValue
-//are exported as public functions.
+// This package is copied from Go library text/template.
+// The original private functions indirect and printableValue
+// are exported as public functions.
 package template
 
 import (

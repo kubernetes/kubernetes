@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -56,7 +56,7 @@ func Perm(n int) []int {
 	return rng.rand.Perm(n)
 }
 
-// String generates a random alphanumeric string n characters long.  This will
+// String generates a random alphanumeric string n characters long. This will
 // panic if n is less than zero.
 func String(length int) string {
 	b := make([]rune, length)

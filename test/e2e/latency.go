@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -97,11 +97,11 @@ var _ = Describe("Latency [Skipped]", func() {
 
 func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 	var (
-		nodes              = make(map[string]string, 0)           // pod name -> node name
-		createTimestamps   = make(map[string]unversioned.Time, 0) // pod name -> create time
+		nodes = make(map[string]string, 0) // pod name -> node name
+		createTimestamps = make(map[string]unversioned.Time, 0) // pod name -> create time
 		scheduleTimestamps = make(map[string]unversioned.Time, 0) // pod name -> schedule time
-		startTimestamps    = make(map[string]unversioned.Time, 0) // pod name -> time to run
-		watchTimestamps    = make(map[string]unversioned.Time, 0) // pod name -> time to read from informer
+		startTimestamps = make(map[string]unversioned.Time, 0) // pod name -> time to run
+		watchTimestamps = make(map[string]unversioned.Time, 0) // pod name -> time to read from informer
 
 		additionalPodsPrefix = "latency-pod-" + string(util.NewUUID())
 	)
@@ -164,7 +164,7 @@ func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 	)
 	go informer.Run(stopCh)
 
-	// Create  additional pods with throughput ~5 pods/sec.
+	// Create additional pods with throughput ~5 pods/sec.
 	var wg sync.WaitGroup
 	wg.Add(nodeCount)
 	podLabels := map[string]string{

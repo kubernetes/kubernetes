@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,7 +41,7 @@ type portal struct {
 }
 
 type serviceInfo struct {
-	isAliveAtomic       int32 // Only access this with atomic ops
+	isAliveAtomic int32 // Only access this with atomic ops
 	portal              portal
 	protocol            api.Protocol
 	proxyPort           int
@@ -82,13 +82,13 @@ func logTimeout(err error) bool {
 // and services that provide the actual implementations.
 type Proxier struct {
 	loadBalancer   LoadBalancer
-	mu             sync.Mutex // protects serviceMap
+	mu sync.Mutex // protects serviceMap
 	serviceMap     map[proxy.ServicePortName]*serviceInfo
 	syncPeriod     time.Duration
 	udpIdleTimeout time.Duration
 	portMapMutex   sync.Mutex
 	portMap        map[portMapKey]*portMapValue
-	numProxyLoops  int32 // use atomic ops to access this; mostly for testing
+	numProxyLoops int32 // use atomic ops to access this; mostly for testing
 	listenIP       net.IP
 	iptables       iptables.Interface
 	hostIP         net.IP
@@ -98,7 +98,7 @@ type Proxier struct {
 // assert Proxier is a ProxyProvider
 var _ proxy.ProxyProvider = &Proxier{}
 
-// A key for the portMap.  The ip has to be a string because slices can't be map
+// A key for the portMap. The ip has to be a string because slices can't be map
 // keys.
 type portMapKey struct {
 	ip       string
@@ -131,7 +131,7 @@ func IsProxyLocked(err error) bool {
 }
 
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
-// which to listen.  Because of the iptables logic, It is assumed that there
+// which to listen. Because of the iptables logic, It is assumed that there
 // is only a single Proxier active on a machine. An error will be returned if
 // the proxier cannot be started due to an invalid ListenIP (loopback) or
 // if iptables fails to update or acquire the initial lock. Once a proxier is
@@ -238,7 +238,7 @@ func (proxier *Proxier) Sync() {
 	proxier.cleanupStaleStickySessions()
 }
 
-// SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
+// SyncLoop runs periodic work. This is expected to run as a goroutine or as the main loop of the app. It does not return.
 func (proxier *Proxier) SyncLoop() {
 	t := time.NewTicker(proxier.syncPeriod)
 	defer t.Stop()
@@ -327,7 +327,7 @@ func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol
 		timeout:             timeout,
 		activeClients:       newClientCache(),
 		sessionAffinityType: api.ServiceAffinityNone, // default
-		stickyMaxAgeMinutes: 180,                     // TODO: parameterize this in the API.
+		stickyMaxAgeMinutes: 180, // TODO: parameterize this in the API.
 	}
 	proxier.setServiceInfo(service, si)
 
@@ -363,7 +363,7 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 			activeServices[serviceName] = true
 			serviceIP := net.ParseIP(service.Spec.ClusterIP)
 			info, exists := proxier.getServiceInfo(serviceName)
-			// TODO: check health of the socket?  What if ProxyLoop exited?
+			// TODO: check health of the socket? What if ProxyLoop exited?
 			if exists && sameConfig(info, service, servicePort) {
 				// Nothing changed.
 				continue
@@ -552,10 +552,10 @@ func (proxier *Proxier) claimNodePort(ip net.IP, port int, protocol api.Protocol
 	existing, found := proxier.portMap[key]
 	if !found {
 		// Hold the actual port open, even though we use iptables to redirect
-		// it.  This ensures that a) it's safe to take and b) that stays true.
+		// it. This ensures that a) it's safe to take and b) that stays true.
 		// NOTE: We should not need to have a real listen()ing socket - bind()
 		// should be enough, but I can't figure out a way to e2e test without
-		// it.  Tools like 'ss' and 'netstat' do not show sockets that are
+		// it. Tools like 'ss' and 'netstat' do not show sockets that are
 		// bind()ed but not listen()ed, and at least the default debian netcat
 		// has no way to avoid about 10 seconds of retries.
 		socket, err := newProxySocket(protocol, ip, port)
@@ -573,7 +573,7 @@ func (proxier *Proxier) claimNodePort(ip net.IP, port int, protocol api.Protocol
 	return fmt.Errorf("Port conflict detected on port %s.  %v vs %v", key.String(), owner, existing)
 }
 
-// Release a claim on a port.  Returns an error if the owner does not match the claim.
+// Release a claim on a port. Returns an error if the owner does not match the claim.
 // Tolerates release on an unclaimed port, to simplify .
 func (proxier *Proxier) releaseNodePort(ip net.IP, port int, protocol api.Protocol, owner proxy.ServicePortName) error {
 	proxier.portMapMutex.Lock()
@@ -595,7 +595,7 @@ func (proxier *Proxier) releaseNodePort(ip net.IP, port int, protocol api.Protoc
 }
 
 func (proxier *Proxier) openNodePort(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
-	// TODO: Do we want to allow containers to access public services?  Probably yes.
+	// TODO: Do we want to allow containers to access public services? Probably yes.
 	// TODO: We could refactor this to be the same code as portal, but with IP == nil
 
 	err := proxier.claimNodePort(nil, nodePort, protocol, name)
@@ -742,15 +742,15 @@ var iptablesHostPortalChain iptables.Chain = "KUBE-PORTALS-HOST"
 var iptablesContainerNodePortChain iptables.Chain = "KUBE-NODEPORT-CONTAINER"
 var iptablesHostNodePortChain iptables.Chain = "KUBE-NODEPORT-HOST"
 
-// Ensure that the iptables infrastructure we use is set up.  This can safely be called periodically.
+// Ensure that the iptables infrastructure we use is set up. This can safely be called periodically.
 func iptablesInit(ipt iptables.Interface) error {
-	// TODO: There is almost certainly room for optimization here.  E.g. If
+	// TODO: There is almost certainly room for optimization here. E.g. If
 	// we knew the service-cluster-ip-range CIDR we could fast-track outbound packets not
 	// destined for a service. There's probably more, help wanted.
 
 	// Danger - order of these rules matters here:
 	//
-	// We match portal rules first, then NodePort rules.  For NodePort rules, we filter primarily on --dst-type LOCAL,
+	// We match portal rules first, then NodePort rules. For NodePort rules, we filter primarily on --dst-type LOCAL,
 	// because we want to listen on all local addresses, but don't match internet traffic with the same dst port number.
 	//
 	// There is one complication (per thockin):
@@ -831,9 +831,9 @@ var localhostIPv6 = net.ParseIP("::1")
 // Build a slice of iptables args that are common to from-container and from-host portal rules.
 func iptablesCommonPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, addDstLocalMatch bool, destPort int, protocol api.Protocol, service proxy.ServicePortName) []string {
 	// This list needs to include all fields as they are eventually spit out
-	// by iptables-save.  This is because some systems do not support the
+	// by iptables-save. This is because some systems do not support the
 	// 'iptables -C' arg, and so fall back on parsing iptables-save output.
-	// If this does not match, it will not pass the check.  For example:
+	// If this does not match, it will not pass the check. For example:
 	// adding the /32 on the destination IP arg is not strictly required,
 	// but causes this list to not match the final iptables-save output.
 	// This is fragile and I hope one day we can stop supporting such old
@@ -870,33 +870,33 @@ func (proxier *Proxier) iptablesContainerPortalArgs(destIP net.IP, addPhysicalIn
 	// If the proxy is bound (see Proxier.listenIP) to 0.0.0.0 ("any
 	// interface") we want to use REDIRECT, which sends traffic to the
 	// "primary address of the incoming interface" which means the container
-	// bridge, if there is one.  When the response comes, it comes from that
+	// bridge, if there is one. When the response comes, it comes from that
 	// same interface, so the NAT matches and the response packet is
-	// correct.  This matters for UDP, since there is no per-connection port
+	// correct. This matters for UDP, since there is no per-connection port
 	// number.
 	//
 	// The alternative would be to use DNAT, except that it doesn't work
 	// (empirically):
-	//   * DNAT to 127.0.0.1 = Packets just disappear - this seems to be a
-	//     well-known limitation of iptables.
-	//   * DNAT to eth0's IP = Response packets come from the bridge, which
-	//     breaks the NAT, and makes things like DNS not accept them.  If
-	//     this could be resolved, it would simplify all of this code.
+	// * DNAT to 127.0.0.1 = Packets just disappear - this seems to be a
+	// well-known limitation of iptables.
+	// * DNAT to eth0's IP = Response packets come from the bridge, which
+	// breaks the NAT, and makes things like DNS not accept them. If
+	// this could be resolved, it would simplify all of this code.
 	//
 	// If the proxy is bound to a specific IP, then we have to use DNAT to
-	// that IP.  Unlike the previous case, this works because the proxy is
+	// that IP. Unlike the previous case, this works because the proxy is
 	// ONLY listening on that IP, not the bridge.
 	//
 	// Why would anyone bind to an address that is not inclusive of
-	// localhost?  Apparently some cloud environments have their public IP
-	// exposed as a real network interface AND do not have firewalling.  We
+	// localhost? Apparently some cloud environments have their public IP
+	// exposed as a real network interface AND do not have firewalling. We
 	// don't want to expose everything out to the world.
 	//
 	// Unfortunately, I don't know of any way to listen on some (N > 1)
 	// interfaces but not ALL interfaces, short of doing it manually, and
 	// this is simpler than that.
 	//
-	// If the proxy is bound to localhost only, all of this is broken.  Not
+	// If the proxy is bound to localhost only, all of this is broken. Not
 	// allowed.
 	if proxyIP.Equal(zeroIPv4) || proxyIP.Equal(zeroIPv6) {
 		// TODO: Can we REDIRECT with IPv6?
@@ -916,19 +916,19 @@ func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, addDstLocalMatch b
 	//
 	// If the proxy is bound (see Proxier.listenIP) to 0.0.0.0 ("any
 	// interface") we want to do the same as from-container traffic and use
-	// REDIRECT.  Except that it doesn't work (empirically).  REDIRECT on
+	// REDIRECT. Except that it doesn't work (empirically). REDIRECT on
 	// local packets sends the traffic to localhost (special case, but it is
 	// documented) but the response comes from the eth0 IP (not sure why,
 	// truthfully), which makes DNS unhappy.
 	//
-	// So we have to use DNAT.  DNAT to 127.0.0.1 can't work for the same
+	// So we have to use DNAT. DNAT to 127.0.0.1 can't work for the same
 	// reason.
 	//
 	// So we do our best to find an interface that is not a loopback and
-	// DNAT to that.  This works (again, empirically).
+	// DNAT to that. This works (again, empirically).
 	//
 	// If the proxy is bound to a specific IP, then we have to use DNAT to
-	// that IP.  Unlike the previous case, this works because the proxy is
+	// that IP. Unlike the previous case, this works because the proxy is
 	// ONLY listening on that IP, not the bridge.
 	//
 	// If the proxy is bound to localhost only, this should work, but we

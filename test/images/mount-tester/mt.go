@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -71,9 +71,9 @@ func main() {
 	// NOTE: the ordering of execution of the various command line
 	// flags is intentional and allows a single command to:
 	//
-	// 1.  Check the fstype of a path
-	// 2.  Write a new file within that path
-	// 3.  Check that the file's content can be read
+	// 1. Check the fstype of a path
+	// 2. Write a new file within that path
+	// 3. Check that the file's content can be read
 	//
 	// Changing the ordering of the following code will break tests.
 

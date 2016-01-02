@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,10 +41,10 @@ type Queue interface {
 // processed. This can't be done with a channel.
 //
 // FIFO solves this use case:
-//  * You want to process every object (exactly) once.
-//  * You want to process the most recent version of the object when you process it.
-//  * You do not want to process deleted objects, they should be removed from the queue.
-//  * You do not want to periodically reprocess objects.
+// * You want to process every object (exactly) once.
+// * You want to process the most recent version of the object when you process it.
+// * You do not want to process deleted objects, they should be removed from the queue.
+// * You do not want to periodically reprocess objects.
 // Compare with DeltaFIFO for other use cases.
 type FIFO struct {
 	lock sync.RWMutex

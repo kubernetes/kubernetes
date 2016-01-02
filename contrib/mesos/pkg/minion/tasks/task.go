@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -47,8 +47,8 @@ const (
 // yield (barring drops because of an abort signal) exactly one Completion.
 type Completion struct {
 	name string // name of the task
-	code int    // exit code that the task process completed with
-	err  error  // process management errors are reported here
+	code int // exit code that the task process completed with
+	err error // process management errors are reported here
 }
 
 // systemProcess is a useful abstraction for testing
@@ -88,20 +88,20 @@ func (cp *cmdProcess) Kill(force bool) (int, error) {
 // logging and restart handling as well as provides event channels for communicating process
 // termination and errors related to process management.
 type Task struct {
-	Finished     func(restarting bool) bool // callback invoked when a task process has completed; if `restarting` then it will be restarted if it returns true
-	RestartDelay time.Duration              // interval between repeated task restarts
+	Finished func(restarting bool) bool // callback invoked when a task process has completed; if `restarting` then it will be restarted if it returns true
+	RestartDelay time.Duration // interval between repeated task restarts
 
-	name         string                // required: unique name for this task
-	bin          string                // required: path to executable
-	args         []string              // optional: process arguments
-	env          []string              // optional: process environment override
+	name string // required: unique name for this task
+	bin string // required: path to executable
+	args []string // optional: process arguments
+	env []string // optional: process environment override
 	createLogger func() io.WriteCloser // factory func that builds a log writer
-	cmd          systemProcess         // process that we started
-	completedCh  chan *Completion      // reports exit codes encountered when task processes exit, or errors during process management
-	shouldQuit   chan struct{}         // shouldQuit is closed to indicate that the task should stop its running process, if any
-	done         chan struct{}         // done closes when all processes related to the task have terminated
-	initialState taskStateFn           // prepare and start a new live process, defaults to notStartedTask; should be set by run()
-	runLatch     int32                 // guard against multiple Task.run calls
+	cmd systemProcess // process that we started
+	completedCh chan *Completion // reports exit codes encountered when task processes exit, or errors during process management
+	shouldQuit chan struct{} // shouldQuit is closed to indicate that the task should stop its running process, if any
+	done chan struct{} // done closes when all processes related to the task have terminated
+	initialState taskStateFn // prepare and start a new live process, defaults to notStartedTask; should be set by run()
+	runLatch int32 // guard against multiple Task.run calls
 	killFunc     func(bool) (int, error)
 }
 

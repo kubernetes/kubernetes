@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -49,7 +49,7 @@ func calculateScore(requested int64, capacity int64, node string) int {
 // consuming no resources whatsoever. We chose these values to be similar to the
 // resources that we give to cluster addon pods (#10653). But they are pretty arbitrary.
 // As described in #11713, we use request instead of limit to deal with resource requirements.
-const defaultMilliCpuRequest int64 = 100             // 0.1 core
+const defaultMilliCpuRequest int64 = 100 // 0.1 core
 const defaultMemoryRequest int64 = 200 * 1024 * 1024 // 200 MB
 
 // TODO: Consider setting default as a fixed fraction of machine capacity (take "capacity api.ResourceList"
@@ -71,7 +71,7 @@ func getNonzeroRequests(requests *api.ResourceList) (int64, int64) {
 	return out_millicpu, out_memory
 }
 
-// Calculate the resource occupancy on a node.  'node' has information about the resources on the node.
+// Calculate the resource occupancy on a node. 'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
 func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) schedulerapi.HostPriority {
 	totalMilliCPU := int64(0)
@@ -157,7 +157,7 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, machines
 	}
 
 	result := []schedulerapi.HostPriority{}
-	//score int - scale of 0-10
+	// score int - scale of 0-10
 	// 0 being the lowest priority and 10 being the highest
 	for nodeName, success := range labeledNodes {
 		if success {

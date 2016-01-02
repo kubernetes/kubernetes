@@ -21,8 +21,8 @@ func (a byPos) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 //
 func sortComments(list []*CommentGroup) {
 	// TODO(gri): Does it make sense to check for sorted-ness
-	//            first (because we know that sorted-ness is
-	//            very likely)?
+	// first (because we know that sorted-ness is
+	// very likely)?
 	if orderedList := byPos(list); !sort.IsSorted(orderedList) {
 		sort.Sort(orderedList)
 	}
@@ -67,9 +67,9 @@ func nodeList(n Node) []Node {
 		return true
 	})
 	// Note: The current implementation assumes that Inspect traverses the
-	//       AST in depth-first and thus _source_ order. If AST traversal
-	//       does not follow source order, the sorting call below will be
-	//       required.
+	// AST in depth-first and thus _source_ order. If AST traversal
+	// does not follow source order, the sorting call below will be
+	// required.
 	// sort.Sort(byInterval(list))
 	return list
 }
@@ -80,7 +80,7 @@ type commentListReader struct {
 	fset     *token.FileSet
 	list     []*CommentGroup
 	index    int
-	comment  *CommentGroup  // comment group at current index
+	comment *CommentGroup // comment group at current index
 	pos, end token.Position // source interval of comment group at current index
 }
 
@@ -129,11 +129,11 @@ func (s *nodeStack) pop(pos token.Pos) (top Node) {
 //
 // A comment group g is associated with a node n if:
 //
-//   - g starts on the same line as n ends
-//   - g starts on the line immediately following n, and there is
-//     at least one empty line after g and before the next node
-//   - g starts before n and is not associated to the node before n
-//     via the previous rules
+// - g starts on the same line as n ends
+// - g starts on the line immediately following n, and there is
+// at least one empty line after g and before the next node
+// - g starts before n and is not associated to the node before n
+// via the previous rules
 //
 // NewCommentMap tries to associate a comment group to the "largest"
 // node possible: For instance, if the comment is a line comment
@@ -160,11 +160,11 @@ func NewCommentMap(fset *token.FileSet, node Node, comments []*CommentGroup) Com
 
 	// set up iteration variables
 	var (
-		p     Node           // previous node
-		pend  token.Position // end of p
-		pg    Node           // previous node group (enclosing nodes of "importance")
+		p Node // previous node
+		pend token.Position // end of p
+		pg Node // previous node group (enclosing nodes of "importance")
 		pgend token.Position // end of pg
-		stack nodeStack      // stack of node groups
+		stack nodeStack // stack of node groups
 	)
 
 	for _, q := range nodes {
@@ -198,8 +198,8 @@ func NewCommentMap(fset *token.FileSet, node Node, comments []*CommentGroup) Com
 					pgend.Line+1 == r.pos.Line && r.end.Line+1 < qpos.Line):
 				// 1) comment starts on same line as previous node group ends, or
 				// 2) comment starts on the line immediately after the
-				//    previous node group and there is an empty line before
-				//    the current node
+				// previous node group and there is an empty line before
+				// the current node
 				// => associate comment with previous node group
 				assoc = pg
 			case p != nil &&
@@ -286,8 +286,8 @@ func summary(list []*CommentGroup) string {
 loop:
 	for _, group := range list {
 		// Note: CommentGroup.Text() does too much work for what we
-		//       need and would only replace this innermost loop.
-		//       Just do it explicitly.
+		// need and would only replace this innermost loop.
+		// Just do it explicitly.
 		for _, comment := range group.List {
 			if buf.Len() >= maxLen {
 				break loop

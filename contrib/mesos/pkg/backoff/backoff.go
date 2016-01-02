@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -75,7 +75,7 @@ func (p *Backoff) Get(id string) time.Duration {
 	if entry.backoff > p.maxDuration {
 		entry.backoff = p.maxDuration
 	}
-	//TODO(jdef) parameterize use of jitter?
+	// TODO(jdef) parameterize use of jitter?
 	// add jitter, get better backoff distribution
 	duration = time.Duration(rand.Int63n(int64(duration)))
 	log.V(3).Infof("Backing off %v for pod %s", duration, id)

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,7 +28,7 @@ import (
 )
 
 // This is the primary entrypoint for volume plugins.
-// The volumeConfig arg provides the ability to configure volume behavior.  It is implemented as a pointer to allow nils.
+// The volumeConfig arg provides the ability to configure volume behavior. It is implemented as a pointer to allow nils.
 // The hostPathPlugin is used to store the volumeConfig and give it, when needed, to the func that creates HostPath Recyclers.
 // Tests that exercise recycling should not use this func but instead use ProbeRecyclablePlugins() to override default behavior.
 func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin {
@@ -56,7 +56,7 @@ func ProbeRecyclableVolumePlugins(recyclerFunc func(spec *volume.Spec, host volu
 
 type hostPathPlugin struct {
 	host volume.VolumeHost
-	// decouple creating Recyclers/Deleters/Provisioners by deferring to a function.  Allows for easier testing.
+	// decouple creating Recyclers/Deleters/Provisioners by deferring to a function. Allows for easier testing.
 	newRecyclerFunc    func(spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
 	newDeleterFunc     func(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error)
 	newProvisionerFunc func(options volume.VolumeOptions, host volume.VolumeHost) (volume.Provisioner, error)
@@ -300,7 +300,7 @@ func (r *hostPathDeleter) GetPath() string {
 }
 
 // Delete for hostPath removes the local directory so long as it is beneath /tmp/*.
-// THIS IS FOR TESTING AND LOCAL DEVELOPMENT ONLY!  This message should scare you away from using
+// THIS IS FOR TESTING AND LOCAL DEVELOPMENT ONLY! This message should scare you away from using
 // this deleter for anything other than development and testing.
 func (r *hostPathDeleter) Delete() error {
 	regexp := regexp.MustCompile("/tmp/.+")

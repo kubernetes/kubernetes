@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,7 +32,7 @@ type ListFunc func(options api.ListOptions) (runtime.Object, error)
 // WatchFunc knows how to watch resources
 type WatchFunc func(options api.ListOptions) (watch.Interface, error)
 
-// ListWatch knows how to list and watch a set of apiserver resources.  It satisfies the ListerWatcher interface.
+// ListWatch knows how to list and watch a set of apiserver resources. It satisfies the ListerWatcher interface.
 // It is a convenience function for users of NewReflector, etc.
 // ListFunc and WatchFunc must not be nil
 type ListWatch struct {

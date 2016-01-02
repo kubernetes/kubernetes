@@ -38,9 +38,9 @@ import (
 // behavior if ignored.
 type Error struct {
 	Fset *token.FileSet // file set for interpretation of Pos
-	Pos  token.Pos      // error position
-	Msg  string         // error message
-	Soft bool           // if set, error is "soft"
+	Pos token.Pos // error position
+	Msg string // error message
+	Soft bool // if set, error is "soft"
 }
 
 // Error returns an error string formatted as follows:
@@ -72,7 +72,7 @@ type Config struct {
 	// This feature is intended for the standard library cmd/api tool.
 	//
 	// Caution: Effects may be unpredictable due to follow-up errors.
-	//          Do not use casually!
+	// Do not use casually!
 	FakeImportC bool
 
 	// If Error != nil, it is called with each error found
@@ -138,11 +138,11 @@ type Info struct {
 	// Implicits maps nodes to their implicitly declared objects, if any.
 	// The following node and object types may appear:
 	//
-	//	node               declared object
+	// 	node declared object
 	//
-	//	*ast.ImportSpec    *PkgName for dot-imports and imports without renames
-	//	*ast.CaseClause    type-specific *Var for each type switch case clause (incl. default)
-	//      *ast.Field         anonymous struct field or parameter *Var
+	// 	*ast.ImportSpec *PkgName for dot-imports and imports without renames
+	// 	*ast.CaseClause type-specific *Var for each type switch case clause (incl. default)
+	// *ast.Field anonymous struct field or parameter *Var
 	//
 	Implicits map[ast.Node]Object
 
@@ -162,16 +162,16 @@ type Info struct {
 	//
 	// The following node types may appear in Scopes:
 	//
-	//	*ast.File
-	//	*ast.FuncType
-	//	*ast.BlockStmt
-	//	*ast.IfStmt
-	//	*ast.SwitchStmt
-	//	*ast.TypeSwitchStmt
-	//	*ast.CaseClause
-	//	*ast.CommClause
-	//	*ast.ForStmt
-	//	*ast.RangeStmt
+	// 	*ast.File
+	// 	*ast.FuncType
+	// 	*ast.BlockStmt
+	// 	*ast.IfStmt
+	// 	*ast.SwitchStmt
+	// 	*ast.TypeSwitchStmt
+	// 	*ast.CaseClause
+	// 	*ast.CommClause
+	// 	*ast.ForStmt
+	// 	*ast.RangeStmt
 	//
 	Scopes map[ast.Node]*Scope
 

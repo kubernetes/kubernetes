@@ -19,9 +19,9 @@ import (
 //
 type Position struct {
 	Filename string // filename, if any
-	Offset   int    // offset, starting at 0
-	Line     int    // line number, starting at 1
-	Column   int    // column number, starting at 1 (byte count)
+	Offset int // offset, starting at 0
+	Line int // line number, starting at 1
+	Column int // column number, starting at 1 (byte count)
 }
 
 // IsValid reports whether the position is valid.
@@ -29,10 +29,10 @@ func (pos *Position) IsValid() bool { return pos.Line > 0 }
 
 // String returns a string in one of several forms:
 //
-//	file:line:column    valid position with file name
-//	line:column         valid position without file name
-//	file                invalid position with file name
-//	-                   invalid position without file name
+// 	file:line:column valid position with file name
+// 	line:column valid position without file name
+// 	file invalid position with file name
+// 	- invalid position without file name
 //
 func (pos Position) String() string {
 	s := pos.Filename
@@ -91,8 +91,8 @@ func (p Pos) IsValid() bool {
 type File struct {
 	set  *FileSet
 	name string // file name as provided to AddFile
-	base int    // Pos value range for this file is [base...base+size]
-	size int    // file size as provided to AddFile
+	base int // Pos value range for this file is [base...base+size]
+	size int // file size as provided to AddFile
 
 	// lines and infos are protected by set.mutex
 	lines []int // lines contains the offset of the first character for each line (the first entry is always 0)
@@ -182,7 +182,7 @@ func (f *File) SetLines(lines []int) bool {
 }
 
 // SetLinesForContent sets the line offsets for the given file content.
-// It ignores position-altering //line comments.
+// It ignores position-altering //   line comments.
 func (f *File) SetLinesForContent(content []byte) {
 	var lines []int
 	line := 0
@@ -203,7 +203,7 @@ func (f *File) SetLinesForContent(content []byte) {
 }
 
 // A lineInfo object describes alternative file and line number
-// information (such as provided via a //line comment in a .go
+// information (such as provided via a //   line comment in a .go
 // file) for a given file offset.
 type lineInfo struct {
 	// fields are exported to make them accessible to gob
@@ -218,7 +218,7 @@ type lineInfo struct {
 // file size; otherwise the information is ignored.
 //
 // AddLineInfo is typically used to register alternative position
-// information for //line filename:line comments in source files.
+// information for //   line filename:line comments in source files.
 //
 func (f *File) AddLineInfo(offset int, filename string, line int) {
 	f.set.mutex.Lock()
@@ -263,7 +263,7 @@ func searchLineInfos(a []lineInfo, x int) int {
 
 // unpack returns the filename and line and column number for a file offset.
 // If adjusted is set, unpack will return the filename and line information
-// possibly adjusted by //line comments; otherwise those comments are ignored.
+// possibly adjusted by //   line comments; otherwise those comments are ignored.
 //
 func (f *File) unpack(offset int, adjusted bool) (filename string, line, column int) {
 	filename = f.name
@@ -292,7 +292,7 @@ func (f *File) position(p Pos, adjusted bool) (pos Position) {
 
 // PositionFor returns the Position value for the given file position p.
 // If adjusted is set, the position may be adjusted by position-altering
-// //line comments; otherwise those comments are ignored.
+// //   line comments; otherwise those comments are ignored.
 // p must be a Pos value in f or NoPos.
 //
 func (f *File) PositionFor(p Pos, adjusted bool) (pos Position) {
@@ -321,9 +321,9 @@ func (f *File) Position(p Pos) (pos Position) {
 //
 type FileSet struct {
 	mutex sync.RWMutex // protects the file set
-	base  int          // base offset for the next file
-	files []*File      // list of files in the order added to the set
-	last  *File        // cache of last file looked up
+	base int // base offset for the next file
+	files []*File // list of files in the order added to the set
+	last *File // cache of last file looked up
 }
 
 // NewFileSet creates a new file set.
@@ -354,7 +354,7 @@ func (s *FileSet) Base() int {
 // as the minimum base value for the next file. The following relationship
 // exists between a Pos value p for a given file offset offs:
 //
-//	int(p) = base + offs
+// 	int(p) = base + offs
 //
 // with offs in the range [0, size] and thus p in the range [base, base+size].
 // For convenience, File.Pos may be used to create file-specific position
@@ -439,7 +439,7 @@ func (s *FileSet) File(p Pos) (f *File) {
 
 // PositionFor converts a Pos p in the fileset into a Position value.
 // If adjusted is set, the position may be adjusted by position-altering
-// //line comments; otherwise those comments are ignored.
+// //   line comments; otherwise those comments are ignored.
 // p must be a Pos value in s or NoPos.
 //
 func (s *FileSet) PositionFor(p Pos, adjusted bool) (pos Position) {
@@ -464,7 +464,7 @@ func (s *FileSet) Position(p Pos) (pos Position) {
 func searchInts(a []int, x int) int {
 	// This function body is a manually inlined version of:
 	//
-	//   return sort.Search(len(a), func(i int) bool { return a[i] > x }) - 1
+	// return sort.Search(len(a), func(i int) bool { return a[i] > x }) - 1
 	//
 	// With better compiler optimizations, this may not be needed in the
 	// future, but at the moment this change improves the go/printer

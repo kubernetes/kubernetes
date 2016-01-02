@@ -45,7 +45,7 @@ func Fprint(w io.Writer, fset *token.FileSet, x interface{}, f FieldFilter) (err
 		fset:   fset,
 		filter: f,
 		ptrmap: make(map[interface{}]int),
-		last:   '\n', // force printing of line number on first line
+		last: '\n', // force printing of line number on first line
 	}
 
 	// install error handler
@@ -77,9 +77,9 @@ type printer struct {
 	fset   *token.FileSet
 	filter FieldFilter
 	ptrmap map[interface{}]int // *T -> line number
-	indent int                 // current indentation level
-	last   byte                // the last byte processed by Write
-	line   int                 // current line number
+	indent int // current indentation level
+	last byte // the last byte processed by Write
+	line int // current line number
 }
 
 var indent = []byte(".  ")

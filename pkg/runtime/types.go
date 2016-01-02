@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,8 +22,8 @@ package runtime
 // TypeMeta is shared by all top level objects. The proper way to use it is to inline it in your type,
 // like this:
 // type MyAwesomeAPIObject struct {
-//      runtime.TypeMeta    `json:",inline"`
-//      ... // other fields
+// runtime.TypeMeta `json:",inline"`
+// ... //   other fields
 // }
 // func (obj *MyAwesomeAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) { unversioned.UpdateTypeMeta(obj,gvk) }; GroupVersionKind() *GroupVersionKind
 //
@@ -62,34 +62,34 @@ type EmbeddedObject struct {
 // struct, and EmbeddedObject in your internal struct. You also need to register your
 // various plugin types.
 //
-// // Internal package:
+// //   Internal package:
 // type MyAPIObject struct {
 // 	runtime.TypeMeta `json:",inline"`
-//	MyPlugin runtime.EmbeddedObject `json:"myPlugin"`
+// 	MyPlugin runtime.EmbeddedObject `json:"myPlugin"`
 // }
 // type PluginA struct {
 // 	runtime.PluginBase `json:",inline"`
-//	AOption string `json:"aOption"`
+// 	AOption string `json:"aOption"`
 // }
 //
-// // External package:
+// //   External package:
 // type MyAPIObject struct {
 // 	runtime.TypeMeta `json:",inline"`
-//	MyPlugin runtime.RawExtension `json:"myPlugin"`
+// 	MyPlugin runtime.RawExtension `json:"myPlugin"`
 // }
 // type PluginA struct {
 // 	runtime.PluginBase `json:",inline"`
-//	AOption string `json:"aOption"`
+// 	AOption string `json:"aOption"`
 // }
 //
-// // On the wire, the JSON will look something like this:
+// //   On the wire, the JSON will look something like this:
 // {
-//	"kind":"MyAPIObject",
-//	"apiVersion":"v1",
-//	"myPlugin": {
-//		"kind":"PluginA",
-//		"aOption":"foo",
-//	},
+// 	"kind":"MyAPIObject",
+// 	"apiVersion":"v1",
+// 	"myPlugin": {
+// 		"kind":"PluginA",
+// 		"aOption":"foo",
+// 	},
 // }
 //
 // So what happens? Decode first uses json or yaml to unmarshal the serialized data into

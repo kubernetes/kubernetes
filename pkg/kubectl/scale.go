@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -124,7 +124,7 @@ func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name s
 	}
 }
 
-// ValidateReplicationController ensures that the preconditions match.  Returns nil if they are valid, an error otherwise
+// ValidateReplicationController ensures that the preconditions match. Returns nil if they are valid, an error otherwise
 func (precondition *ScalePrecondition) ValidateReplicationController(controller *api.ReplicationController) error {
 	if precondition.Size != -1 && controller.Spec.Replicas != precondition.Size {
 		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(controller.Spec.Replicas)}
@@ -186,7 +186,7 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 	return nil
 }
 
-// ValidateJob ensures that the preconditions match.  Returns nil if they are valid, an error otherwise.
+// ValidateJob ensures that the preconditions match. Returns nil if they are valid, an error otherwise.
 func (precondition *ScalePrecondition) ValidateJob(job *extensions.Job) error {
 	if precondition.Size != -1 && job.Spec.Parallelism == nil {
 		return PreconditionError{"parallelism", strconv.Itoa(precondition.Size), "nil"}
@@ -252,7 +252,7 @@ func (scaler *JobScaler) Scale(namespace, name string, newSize uint, preconditio
 	return nil
 }
 
-// ValidateDeployment ensures that the preconditions match.  Returns nil if they are valid, an error otherwise.
+// ValidateDeployment ensures that the preconditions match. Returns nil if they are valid, an error otherwise.
 func (precondition *ScalePrecondition) ValidateDeployment(deployment *extensions.Deployment) error {
 	if precondition.Size != -1 && deployment.Spec.Replicas != precondition.Size {
 		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(deployment.Spec.Replicas)}

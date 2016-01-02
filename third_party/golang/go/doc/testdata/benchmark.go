@@ -33,7 +33,7 @@ type B struct {
 	result    BenchmarkResult
 }
 
-// StartTimer starts timing a test.  This function is called automatically
+// StartTimer starts timing a test. This function is called automatically
 // before a benchmark starts, but it can also used to resume timing after
 // a call to StopTimer.
 func (b *B) StartTimer() {
@@ -43,7 +43,7 @@ func (b *B) StartTimer() {
 	}
 }
 
-// StopTimer stops timing a test.  This can be used to pause the timer
+// StopTimer stops timing a test. This can be used to pause the timer
 // while performing complex initialization that you don't
 // want to measure.
 func (b *B) StopTimer() {
@@ -134,10 +134,10 @@ func (b *B) run() BenchmarkResult {
 	return b.result
 }
 
-// launch launches the benchmark function.  It gradually increases the number
+// launch launches the benchmark function. It gradually increases the number
 // of benchmark iterations until the benchmark runs for a second in order
-// to get a reasonable measurement.  It prints timing information in this form
-//		testing.BenchmarkHello	100000		19 ns/op
+// to get a reasonable measurement. It prints timing information in this form
+// 		testing.BenchmarkHello	100000		19 ns/op
 // launch is run by the fun function as a separate goroutine.
 func (b *B) launch() {
 	// Run the benchmark for a single iteration in case it's expensive.
@@ -173,9 +173,9 @@ func (b *B) launch() {
 
 // The results of a benchmark run.
 type BenchmarkResult struct {
-	N     int           // The number of iterations.
-	T     time.Duration // The total time taken.
-	Bytes int64         // Bytes processed in one iteration.
+	N int // The number of iterations.
+	T time.Duration // The total time taken.
+	Bytes int64 // Bytes processed in one iteration.
 }
 
 func (r BenchmarkResult) NsPerOp() int64 {

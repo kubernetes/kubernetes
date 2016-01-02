@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,7 +36,7 @@ import (
 // up of a host (e.g. registry.example.com), but it may also contain a path
 // (e.g. registry.example.com/foo) This index is important for two reasons:
 // - registry endpoints may overlap, and when this happens we must find the
-//   most specific match for a given image
+// most specific match for a given image
 // - iterating a map does not yield predictable results
 type DockerKeyring interface {
 	Lookup(image string) ([]docker.AuthConfiguration, bool)
@@ -74,9 +74,9 @@ func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 		}
 
 		// The docker client allows exact matches:
-		//    foo.bar.com/namespace
+		// foo.bar.com/namespace
 		// Or hostname matches:
-		//    foo.bar.com
+		// foo.bar.com
 		// See ResolveAuthConfig in docker/registry/auth.go.
 		if parsed.Host != "" {
 			// NOTE: foo.bar.com comes through as Path.
@@ -129,7 +129,7 @@ func isDefaultRegistryMatch(image string) bool {
 	return !strings.ContainsAny(parts[0], ".:")
 }
 
-// url.Parse require a scheme, but ours don't have schemes.  Adding a
+// url.Parse require a scheme, but ours don't have schemes. Adding a
 // scheme to make url.Parse happy, then clear out the resulting scheme.
 func parseSchemelessUrl(schemelessUrl string) (*url.URL, error) {
 	parsed, err := url.Parse("https://" + schemelessUrl)
@@ -168,8 +168,8 @@ func urlsMatchStr(glob string, target string) (bool, error) {
 // glob wild cards in the host name.
 //
 // Examples:
-//    globUrl=*.docker.io, targetUrl=blah.docker.io => match
-//    globUrl=*.docker.io, targetUrl=not.right.io   => no match
+// globUrl=*.docker.io, targetUrl=blah.docker.io => match
+// globUrl=*.docker.io, targetUrl=not.right.io => no match
 //
 // Note that we don't support wildcards in ports and paths yet.
 func urlsMatch(globUrl *url.URL, targetUrl *url.URL) (bool, error) {
@@ -204,7 +204,7 @@ func urlsMatch(globUrl *url.URL, targetUrl *url.URL) (bool, error) {
 
 // Lookup implements the DockerKeyring method for fetching credentials based on image name.
 // Multiple credentials may be returned if there are multiple potentially valid credentials
-// available.  This allows for rotation.
+// available. This allows for rotation.
 func (dk *BasicDockerKeyring) Lookup(image string) ([]docker.AuthConfiguration, bool) {
 	// range over the index as iterating over a map does not provide a predictable ordering
 	ret := []docker.AuthConfiguration{}
@@ -271,7 +271,7 @@ func (k *unionDockerKeyring) Lookup(image string) ([]docker.AuthConfiguration, b
 	return authConfigs, (len(authConfigs) > 0)
 }
 
-// MakeDockerKeyring inspects the passedSecrets to see if they contain any DockerConfig secrets.  If they do,
+// MakeDockerKeyring inspects the passedSecrets to see if they contain any DockerConfig secrets. If they do,
 // then a DockerKeyring is built based on every hit and unioned with the defaultKeyring.
 // If they do not, then the default keyring is returned
 func MakeDockerKeyring(passedSecrets []api.Secret, defaultKeyring DockerKeyring) (DockerKeyring, error) {

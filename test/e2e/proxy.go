@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -226,9 +226,9 @@ func doProxy(f *Framework, path string) (body []byte, statusCode int, d time.Dur
 	// About all of the proxy accesses in this file:
 	// * AbsPath is used because it preserves the trailing '/'.
 	// * Do().Raw() is used (instead of DoRaw()) because it will turn an
-	//   error from apiserver proxy into an actual error, and there is no
-	//   chance of the things we are talking to being confused for an error
-	//   that apiserver would have emitted.
+	// error from apiserver proxy into an actual error, and there is no
+	// chance of the things we are talking to being confused for an error
+	// that apiserver would have emitted.
 	start := time.Now()
 	body, err = f.Client.Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
 	d = time.Since(start)

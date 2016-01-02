@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -109,7 +109,7 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme.AddInternalGroupVersion(internalGV)
 	scheme.AddKnownTypeWithName(internalGV.WithKind("Type"), &internalType{})
 	scheme.AddKnownTypeWithName(unlikelyGV.WithKind("Type"), &externalType{})
-	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
+	// This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
 	scheme.AddKnownTypeWithName(validVersionGV.WithKind("Type"), &ExternalType2{})
 
 	codec := runtime.CodecFor(scheme, unlikelyGV)
@@ -295,22 +295,22 @@ func stringBody(body string) io.ReadCloser {
 // TODO(jlowdermilk): refactor the Factory so we can test client versions properly,
 // with different client/server version skew scenarios.
 // Verify that resource.RESTClients constructed from a factory respect mapping.APIVersion
-//func TestClientVersions(t *testing.T) {
-//	f := cmdutil.NewFactory(nil)
+// func TestClientVersions(t *testing.T) {
+// 	f := cmdutil.NewFactory(nil)
 //
-//	version := testapi.Default.Version()
-//	mapping := &meta.RESTMapping{
-//		APIVersion: version,
-//	}
-//	c, err := f.RESTClient(mapping)
-//	if err != nil {
-//		t.Errorf("unexpected error: %v", err)
-//	}
-//	client := c.(*client.RESTClient)
-//	if client.APIVersion() != version {
-//		t.Errorf("unexpected Client APIVersion: %s %v", client.APIVersion, client)
-//	}
-//}
+// 	version := testapi.Default.Version()
+// 	mapping := &meta.RESTMapping{
+// 		APIVersion: version,
+// 	}
+// 	c, err := f.RESTClient(mapping)
+// 	if err != nil {
+// 		t.Errorf("unexpected error: %v", err)
+// 	}
+// 	client := c.(*client.RESTClient)
+// 	if client.APIVersion() != version {
+// 		t.Errorf("unexpected Client APIVersion: %s %v", client.APIVersion, client)
+// 	}
+// }
 
 func ExamplePrintReplicationControllerWithNamespace() {
 	f, tf, codec := NewAPIFactory()
@@ -350,8 +350,8 @@ func ExamplePrintReplicationControllerWithNamespace() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAMESPACE   CONTROLLER   CONTAINER(S)   IMAGE(S)    SELECTOR   REPLICAS   AGE
-	// beep        foo          foo            someimage   foo=bar    1          10y
+	// NAMESPACE CONTROLLER CONTAINER(S) IMAGE(S) SELECTOR REPLICAS AGE
+	// beep foo foo someimage foo=bar 1 10y
 }
 
 func ExamplePrintPodWithWideFormat() {
@@ -385,8 +385,8 @@ func ExamplePrintPodWithWideFormat() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAME      READY     STATUS     RESTARTS   AGE       NODE
-	// test1     1/2       podPhase   6          10y       kubernetes-minion-abcd
+	// NAME READY STATUS RESTARTS AGE NODE
+	// test1 1/2 podPhase 6 10y kubernetes-minion-abcd
 }
 
 func newAllPhasePodList() *api.PodList {
@@ -495,10 +495,10 @@ func ExamplePrintPodHideTerminated() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAME      READY     STATUS    RESTARTS   AGE
-	// test1     1/2       Pending   6          10y
-	// test2     1/2       Running   6          10y
-	// test5     1/2       Unknown   6          10y
+	// NAME READY STATUS RESTARTS AGE
+	// test1 1/2 Pending 6 10y
+	// test2 1/2 Running 6 10y
+	// test5 1/2 Unknown 6 10y
 }
 
 func ExamplePrintPodShowAll() {
@@ -515,12 +515,12 @@ func ExamplePrintPodShowAll() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAME      READY     STATUS      RESTARTS   AGE
-	// test1     1/2       Pending     6          10y
-	// test2     1/2       Running     6          10y
-	// test3     1/2       Succeeded   6          10y
-	// test4     1/2       Failed      6          10y
-	// test5     1/2       Unknown     6          10y
+	// NAME READY STATUS RESTARTS AGE
+	// test1 1/2 Pending 6 10y
+	// test2 1/2 Running 6 10y
+	// test3 1/2 Succeeded 6 10y
+	// test4 1/2 Failed 6 10y
+	// test5 1/2 Unknown 6 10y
 }
 
 func ExamplePrintServiceWithNamespacesAndLabels() {
@@ -583,9 +583,9 @@ func ExamplePrintServiceWithNamespacesAndLabels() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// |NAMESPACE   NAME      CLUSTER_IP   EXTERNAL_IP   PORT(S)           SELECTOR   AGE       L1|
-	// |ns1         svc1      10.1.1.1     unknown       53/UDP,53/TCP     s=magic    10y       value|
-	// |ns2         svc2      10.1.1.2     unknown       80/TCP,8080/TCP   s=kazam    10y       dolla-bill-yall|
+	// |NAMESPACE NAME CLUSTER_IP EXTERNAL_IP PORT(S) SELECTOR AGE L1|
+	// |ns1 svc1 10.1.1.1 unknown 53/UDP,53/TCP s=magic 10y value|
+	// |ns2 svc2 10.1.1.2 unknown 80/TCP,8080/TCP s=kazam 10y dolla-bill-yall|
 	// ||
 }
 

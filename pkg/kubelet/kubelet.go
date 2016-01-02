@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -549,7 +549,7 @@ type Kubelet struct {
 	// Manager for the volume maps for the pods.
 	volumeManager *volumeManager
 
-	//Cloud provider interface
+	// Cloud provider interface
 	cloud cloudprovider.Interface
 
 	// Reference to this node.
@@ -562,13 +562,13 @@ type Kubelet struct {
 	// Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod
 	// in nodecontroller. There are several constraints:
 	// 1. nodeMonitorGracePeriod must be N times more than nodeStatusUpdateFrequency, where
-	//    N means number of retries allowed for kubelet to post node status. It is pointless
-	//    to make nodeMonitorGracePeriod be less than nodeStatusUpdateFrequency, since there
-	//    will only be fresh values from Kubelet at an interval of nodeStatusUpdateFrequency.
-	//    The constant must be less than podEvictionTimeout.
+	// N means number of retries allowed for kubelet to post node status. It is pointless
+	// to make nodeMonitorGracePeriod be less than nodeStatusUpdateFrequency, since there
+	// will only be fresh values from Kubelet at an interval of nodeStatusUpdateFrequency.
+	// The constant must be less than podEvictionTimeout.
 	// 2. nodeStatusUpdateFrequency needs to be large enough for kubelet to generate node
-	//    status. Kubelet may fail to update node status reliably if the value is too small,
-	//    as it takes time to gather all necessary node information.
+	// status. Kubelet may fail to update node status reliably if the value is too small,
+	// as it takes time to gather all necessary node information.
 	nodeStatusUpdateFrequency time.Duration
 
 	// Generates pod events.
@@ -655,7 +655,7 @@ func (kl *Kubelet) addSource(source string) {
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
-// store data.  These functions are useful to pass interfaces to other modules
+// store data. These functions are useful to pass interfaces to other modules
 // that may need to know where to write data without getting a whole kubelet
 // instance.
 func (kl *Kubelet) getRootDir() string {
@@ -669,8 +669,8 @@ func (kl *Kubelet) getPodsDir() string {
 }
 
 // getPluginsDir returns the full path to the directory under which plugin
-// directories are created.  Plugins can use these directories for data that
-// they need to persist.  Plugins should create subdirectories under this named
+// directories are created. Plugins can use these directories for data that
+// they need to persist. Plugins should create subdirectories under this named
 // after their own names.
 func (kl *Kubelet) getPluginsDir() string {
 	return path.Join(kl.getRootDir(), "plugins")
@@ -684,14 +684,14 @@ func (kl *Kubelet) getPluginDir(pluginName string) string {
 }
 
 // getPodDir returns the full path to the per-pod data directory for the
-// specified pod.  This directory may not exist if the pod does not exist.
+// specified pod. This directory may not exist if the pod does not exist.
 func (kl *Kubelet) getPodDir(podUID types.UID) string {
-	// Backwards compat.  The "old" stuff should be removed before 1.0
-	// release.  The thinking here is this:
-	//     !old && !new = use new
-	//     !old && new  = use new
-	//     old && !new  = use old
-	//     old && new   = use new (but warn)
+	// Backwards compat. The "old" stuff should be removed before 1.0
+	// release. The thinking here is this:
+	// !old && !new = use new
+	// !old && new = use new
+	// old && !new = use old
+	// old && new = use new (but warn)
 	oldPath := path.Join(kl.getRootDir(), string(podUID))
 	oldExists := dirExists(oldPath)
 	newPath := path.Join(kl.getPodsDir(), string(podUID))
@@ -706,43 +706,43 @@ func (kl *Kubelet) getPodDir(podUID types.UID) string {
 }
 
 // getPodVolumesDir returns the full path to the per-pod data directory under
-// which volumes are created for the specified pod.  This directory may not
+// which volumes are created for the specified pod. This directory may not
 // exist if the pod does not exist.
 func (kl *Kubelet) getPodVolumesDir(podUID types.UID) string {
 	return path.Join(kl.getPodDir(podUID), "volumes")
 }
 
 // getPodVolumeDir returns the full path to the directory which represents the
-// named volume under the named plugin for specified pod.  This directory may not
+// named volume under the named plugin for specified pod. This directory may not
 // exist if the pod does not exist.
 func (kl *Kubelet) getPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
 	return path.Join(kl.getPodVolumesDir(podUID), pluginName, volumeName)
 }
 
 // getPodPluginsDir returns the full path to the per-pod data directory under
-// which plugins may store data for the specified pod.  This directory may not
+// which plugins may store data for the specified pod. This directory may not
 // exist if the pod does not exist.
 func (kl *Kubelet) getPodPluginsDir(podUID types.UID) string {
 	return path.Join(kl.getPodDir(podUID), "plugins")
 }
 
 // getPodPluginDir returns a data directory name for a given plugin name for a
-// given pod UID.  Plugins can use these directories to store data that they
-// need to persist.  For non-per-pod plugin data, see getPluginDir.
+// given pod UID. Plugins can use these directories to store data that they
+// need to persist. For non-per-pod plugin data, see getPluginDir.
 func (kl *Kubelet) getPodPluginDir(podUID types.UID, pluginName string) string {
 	return path.Join(kl.getPodPluginsDir(podUID), pluginName)
 }
 
 // getPodContainerDir returns the full path to the per-pod data directory under
-// which container data is held for the specified pod.  This directory may not
+// which container data is held for the specified pod. This directory may not
 // exist if the pod or container does not exist.
 func (kl *Kubelet) getPodContainerDir(podUID types.UID, ctrName string) string {
-	// Backwards compat.  The "old" stuff should be removed before 1.0
-	// release.  The thinking here is this:
-	//     !old && !new = use new
-	//     !old && new  = use new
-	//     old && !new  = use old
-	//     old && new   = use new (but warn)
+	// Backwards compat. The "old" stuff should be removed before 1.0
+	// release. The thinking here is this:
+	// !old && !new = use new
+	// !old && new = use new
+	// old && !new = use old
+	// old && new = use new (but warn)
 	oldPath := path.Join(kl.getPodDir(podUID), ctrName)
 	oldExists := dirExists(oldPath)
 	newPath := path.Join(kl.getPodDir(podUID), "containers", ctrName)
@@ -1222,7 +1222,7 @@ func ensureHostsFile(fileName string, hostIP, hostName string) error {
 	}
 	var buffer bytes.Buffer
 	buffer.WriteString("# Kubernetes-managed hosts file.\n")
-	buffer.WriteString("127.0.0.1\tlocalhost\n")                      // ipv4 localhost
+	buffer.WriteString("127.0.0.1\tlocalhost\n") // ipv4 localhost
 	buffer.WriteString("::1\tlocalhost ip6-localhost ip6-loopback\n") // ipv6 localhost
 	buffer.WriteString("fe00::0\tip6-localnet\n")
 	buffer.WriteString("fe00::0\tip6-mcastprefix\n")
@@ -1367,8 +1367,8 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 // Make the service environment variables for a pod in the given namespace.
 func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Container) ([]kubecontainer.EnvVar, error) {
 	var result []kubecontainer.EnvVar
-	// Note:  These are added to the docker.Config, but are not included in the checksum computed
-	// by dockertools.BuildDockerName(...).  That way, we can still determine whether an
+	// Note: These are added to the docker.Config, but are not included in the checksum computed
+	// by dockertools.BuildDockerName(...). That way, we can still determine whether an
 	// api.Container is already running by its hash. (We don't want to restart a container just
 	// because some service changed.)
 	//
@@ -1383,19 +1383,19 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 
 	// Determine the final values of variables:
 	//
-	// 1.  Determine the final value of each variable:
-	//     a.  If the variable's Value is set, expand the `$(var)` references to other
-	//         variables in the .Value field; the sources of variables are the declared
-	//         variables of the container and the service environment variables
-	//     b.  If a source is defined for an environment variable, resolve the source
-	// 2.  Create the container's environment in the order variables are declared
-	// 3.  Add remaining service environment vars
+	// 1. Determine the final value of each variable:
+	// a. If the variable's Value is set, expand the `$(var)` references to other
+	// variables in the .Value field; the sources of variables are the declared
+	// variables of the container and the service environment variables
+	// b. If a source is defined for an environment variable, resolve the source
+	// 2. Create the container's environment in the order variables are declared
+	// 3. Add remaining service environment vars
 
 	tmpEnv := make(map[string]string)
 	mappingFunc := expansion.MappingFuncFor(tmpEnv, serviceEnv)
 	for _, envVar := range container.Env {
 		// Accesses apiserver+Pods.
-		// So, the master may set service env vars, or kubelet may.  In case both are doing
+		// So, the master may set service env vars, or kubelet may. In case both are doing
 		// it, we delete the key from the kubelet-generated ones so we don't have duplicate
 		// env vars.
 		// TODO: remove this net line once all platforms use apiserver+Pods.
@@ -1735,7 +1735,7 @@ func podUsesHostNetwork(pod *api.Pod) bool {
 }
 
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull secrets
-// TODO duplicate secrets are being retrieved multiple times and there is no cache.  Creating and using a secret manager interface will make this easier to address.
+// TODO duplicate secrets are being retrieved multiple times and there is no cache. Creating and using a secret manager interface will make this easier to address.
 func (kl *Kubelet) getPullSecretsForPod(pod *api.Pod) ([]api.Secret, error) {
 	pullSecrets := []api.Secret{}
 
@@ -1858,12 +1858,12 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 				glog.Infof("volume %q, still has a container running %q, skipping teardown", name, parts[0])
 				continue
 			}
-			//TODO (jonesdl) We should somehow differentiate between volumes that are supposed
-			//to be deleted and volumes that are leftover after a crash.
+			// TODO (jonesdl) We should somehow differentiate between volumes that are supposed
+			// to be deleted and volumes that are leftover after a crash.
 			glog.Warningf("Orphaned volume %q found, tearing down volume", name)
 			// TODO(yifan): Refactor this hacky string manipulation.
 			kl.volumeManager.DeleteVolumes(types.UID(parts[0]))
-			//TODO (jonesdl) This should not block other kubelet synchronization procedures
+			// TODO (jonesdl) This should not block other kubelet synchronization procedures
 			err := vol.TearDown()
 			if err != nil {
 				glog.Errorf("Could not tear down volume %q: %v", name, err)
@@ -1920,8 +1920,8 @@ func (kl *Kubelet) pastActiveDeadline(pod *api.Pod) bool {
 }
 
 // Get pods which should be resynchronized. Currently, the following pod should be resynchronized:
-//   * pod whose work is ready.
-//   * pod past the active deadline.
+// * pod whose work is ready.
+// * pod past the active deadline.
 func (kl *Kubelet) getPodsToSync() []*api.Pod {
 	allPods := kl.podManager.GetPods()
 	podUIDs := kl.workQueue.GetWork()
@@ -2024,11 +2024,11 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	// it should never leave regardless of the restart policy. The statuses
 	// of such pods should not be changed, and there is no need to sync them.
 	// TODO: the logic here does not handle two cases:
-	//   1. If the containers were removed immediately after they died, kubelet
-	//      may fail to generate correct statuses, let alone filtering correctly.
-	//   2. If kubelet restarted before writing the terminated status for a pod
-	//      to the apiserver, it could still restart the terminated pod (even
-	//      though the pod was not considered terminated by the apiserver).
+	// 1. If the containers were removed immediately after they died, kubelet
+	// may fail to generate correct statuses, let alone filtering correctly.
+	// 2. If kubelet restarted before writing the terminated status for a pod
+	// to the apiserver, it could still restart the terminated pod (even
+	// though the pod was not considered terminated by the apiserver).
 	// These two conditions could be alleviated by checkpointing kubelet.
 	activePods := kl.filterOutTerminatedPods(allPods)
 

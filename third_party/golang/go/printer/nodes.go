@@ -20,11 +20,11 @@ import (
 
 // Formatting issues:
 // - better comment formatting for /*-style comments at the end of a line (e.g. a declaration)
-//   when the comment spans multiple lines; if such a comment is just two lines, formatting is
-//   not idempotent
+// when the comment spans multiple lines; if such a comment is just two lines, formatting is
+// not idempotent
 // - formatting of expression lists
 // - should use blank instead of tab to separate one-line function bodies from
-//   the function header unless there is a group of consecutive one-liners
+// the function header unless there is a group of consecutive one-liners
 
 // ----------------------------------------------------------------------------
 // Common AST nodes.
@@ -35,12 +35,12 @@ import (
 // line break was printed; returns false otherwise.
 //
 // TODO(gri): linebreak may add too many lines if the next statement at "line"
-//            is preceded by comments because the computation of n assumes
-//            the current position before the comment and the target position
-//            after the comment. Thus, after interspersing such comments, the
-//            space taken up by them is not considered to reduce the number of
-//            linebreaks. At the moment there is no easy way to know about
-//            future (not yet interspersed) comments in this function.
+// is preceded by comments because the computation of n assumes
+// the current position before the comment and the target position
+// after the comment. Thus, after interspersing such comments, the
+// space taken up by them is not considered to reduce the number of
+// linebreaks. At the moment there is no easy way to know about
+// future (not yet interspersed) comments in this function.
 //
 func (p *printer) linebreak(line, min int, ws whiteSpace, newSection bool) (printedBreak bool) {
 	n := nlimit(line - p.pos.Line)
@@ -96,7 +96,7 @@ type exprListMode uint
 
 const (
 	commaTerm exprListMode = 1 << iota // list is optionally terminated by a comma
-	noIndent                           // no extra indentation in multi-line lists
+	noIndent // no extra indentation in multi-line lists
 )
 
 // If indent is set, a multi-line identifier list is indented after the
@@ -119,8 +119,8 @@ func (p *printer) identList(list []*ast.Ident, indent bool) {
 // expressions.
 //
 // TODO(gri) Consider rewriting this to be independent of []ast.Expr
-//           so that we can use the algorithm for any kind of list
-//           (e.g., pass list via a channel over which to range).
+// so that we can use the algorithm for any kind of list
+// (e.g., pass list via a channel over which to range).
 func (p *printer) exprList(prev0 token.Pos, list []ast.Expr, depth int, mode exprListMode, next0 token.Pos) {
 	if len(list) == 0 {
 		return
@@ -174,7 +174,7 @@ func (p *printer) exprList(prev0 token.Pos, list []ast.Expr, depth int, mode exp
 		// in general, use the entire node size to make the decision; for
 		// key:value expressions, use the key size
 		// TODO(gri) for a better result, should probably incorporate both
-		//           the key and the node size into the decision process
+		// the key and the node size into the decision process
 		useFF := true
 
 		// determine element size: all bets are off if we don't have
@@ -600,11 +600,11 @@ func reduceDepth(depth int) int {
 // (Algorithm suggestion by Russ Cox.)
 //
 // The precedences are:
-//	5             *  /  %  <<  >>  &  &^
-//	4             +  -  |  ^
-//	3             ==  !=  <  <=  >  >=
-//	2             &&
-//	1             ||
+// 	5 * / % << >> & &^
+// 	4 + - | ^
+// 	3 == != < <= > >=
+// 	2 &&
+// 	1 ||
 //
 // The only decision is whether there will be spaces around levels 4 and 5.
 // There are never spaces at level 6 (unary), and always spaces at levels 3 and below.
@@ -612,31 +612,31 @@ func reduceDepth(depth int) int {
 // To choose the cutoff, look at the whole expression but excluding primary
 // expressions (function calls, parenthesized exprs), and apply these rules:
 //
-//	1) If there is a binary operator with a right side unary operand
-//	   that would clash without a space, the cutoff must be (in order):
+// 	1) If there is a binary operator with a right side unary operand
+// 	 that would clash without a space, the cutoff must be (in order):
 //
-//		/*	6
-//		&&	6
-//		&^	6
-//		++	5
-//		--	5
+// 		/*	6
+// 		&&	6
+// 		&^	6
+// 		++	5
+// 		--	5
 //
-//         (Comparison operators always have spaces around them.)
+// (Comparison operators always have spaces around them.)
 //
-//	2) If there is a mix of level 5 and level 4 operators, then the cutoff
-//	   is 5 (use spaces to distinguish precedence) in Normal mode
-//	   and 4 (never use spaces) in Compact mode.
+// 	2) If there is a mix of level 5 and level 4 operators, then the cutoff
+// 	 is 5 (use spaces to distinguish precedence) in Normal mode
+// 	 and 4 (never use spaces) in Compact mode.
 //
-//	3) If there are no level 4 operators or no level 5 operators, then the
-//	   cutoff is 6 (always use spaces) in Normal mode
-//	   and 4 (never use spaces) in Compact mode.
+// 	3) If there are no level 4 operators or no level 5 operators, then the
+// 	 cutoff is 6 (always use spaces) in Normal mode
+// 	 and 4 (never use spaces) in Compact mode.
 //
 func (p *printer) binaryExpr(x *ast.BinaryExpr, prec1, cutoff, depth int) {
 	prec := x.Op.Precedence()
 	if prec < prec1 {
 		// parenthesis needed
 		// Note: The parser inserts an ast.ParenExpr node; thus this case
-		//       can only occur if the AST is created in a different way.
+		// can only occur if the AST is created in a different way.
 		p.print(token.LPAREN)
 		p.expr0(x, reduceDepth(depth)) // parentheses undo one level of depth
 		p.print(token.RPAREN)
@@ -784,7 +784,7 @@ func (p *printer) expr1(expr ast.Expr, prec1, depth int) {
 			if i > 0 {
 				// blanks around ":" if both sides exist and either side is a binary expression
 				// TODO(gri) once we have committed a variant of a[i:j:k] we may want to fine-
-				//           tune the formatting here
+				// tune the formatting here
 				x := indices[i-1]
 				if depth <= 1 && x != nil && y != nil && (isBinary(x) || isBinary(y)) {
 					p.print(blank, token.COLON, blank)
@@ -1255,23 +1255,23 @@ func (p *printer) stmt(stmt ast.Stmt, nextIsRBrace bool) {
 //
 // For example, the declaration:
 //
-//	const (
-//		foobar int = 42 // comment
-//		x          = 7  // comment
-//		foo
-//              bar = 991
-//	)
+// 	const (
+// 		foobar int = 42 //   comment
+// 		x = 7 //   comment
+// 		foo
+// bar = 991
+// 	)
 //
 // leads to the type/values matrix below. A run of value columns (V) can
 // be moved into the type column if there is no type for any of the values
 // in that column (we only move entire columns so that they align properly).
 //
-//	matrix        formatted     result
-//                    matrix
-//	T  V    ->    T  V     ->   true      there is a T and so the type
-//	-  V          -  V          true      column must be kept
-//	-  -          -  -          false
-//	-  V          V  -          false     V is moved into T column
+// 	matrix formatted result
+// matrix
+// 	T V -> T V -> true there is a T and so the type
+// 	- V - V true column must be kept
+// 	- - - - false
+// 	- V V - false V is moved into T column
 //
 func keepTypeColumn(specs []ast.Spec) []bool {
 	m := make([]bool, len(specs))

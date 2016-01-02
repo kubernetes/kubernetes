@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -142,11 +142,11 @@ var _ = Describe("kubelet", func() {
 				DeleteRC(framework.Client, framework.Namespace.Name, rcName)
 				// Check that the pods really are gone by querying /runningpods on the
 				// node. The /runningpods handler checks the container runtime (or its
-				// cache) and  returns a list of running pods. Some possible causes of
+				// cache) and returns a list of running pods. Some possible causes of
 				// failures are:
-				//   - kubelet deadlock
-				//   - a bug in graceful termination (if it is enabled)
-				//   - docker slow to delete pods (or resource problems causing slowness)
+				// - kubelet deadlock
+				// - a bug in graceful termination (if it is enabled)
+				// - docker slow to delete pods (or resource problems causing slowness)
 				start := time.Now()
 				Expect(waitTillNPodsRunningOnNodes(framework.Client, nodeNames, rcName, framework.Namespace.Name, 0,
 					itArg.timeout)).NotTo(HaveOccurred())

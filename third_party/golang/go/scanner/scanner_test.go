@@ -46,14 +46,14 @@ var tokens = [...]elt{
 	{token.COMMENT, "/* a comment */", special},
 	{token.COMMENT, "// a comment \n", special},
 	{token.COMMENT, "/*\r*/", special},
-	{token.COMMENT, "//\r\n", special},
+	{token.COMMENT, "// \r\n", special},
 
 	// Identifiers and basic type literals
 	{token.IDENT, "foobar", literal},
 	{token.IDENT, "a۰۱۸", literal},
 	{token.IDENT, "foo६४", literal},
 	{token.IDENT, "bar９８７６", literal},
-	{token.IDENT, "ŝ", literal},    // was bug (issue 4000)
+	{token.IDENT, "ŝ", literal}, // was bug (issue 4000)
 	{token.IDENT, "ŝfoo", literal}, // was bug (issue 4000)
 	{token.INT, "0", literal},
 	{token.INT, "1", literal},
@@ -181,7 +181,7 @@ var tokens = [...]elt{
 	{token.VAR, "var", keyword},
 }
 
-const whitespace = "  \t  \n\n\n" // to separate tokens
+const whitespace = " \t \n\n\n" // to separate tokens
 
 var source = func() []byte {
 	var src []byte
@@ -272,7 +272,7 @@ func TestScan(t *testing.T) {
 		case token.COMMENT:
 			// no CRs in comments
 			elit = string(stripCR([]byte(e.lit)))
-			//-style comment literal doesn't contain newline
+			// -style comment literal doesn't contain newline
 			if elit[1] == '/' {
 				elit = elit[0 : len(elit)-1]
 			}
@@ -442,15 +442,15 @@ var lines = []string{
 	"type\n",
 	"var\n",
 
-	"foo$//comment\n",
-	"foo$//comment",
+	"foo$// comment\n",
+	"foo$// comment",
 	"foo$/*comment*/\n",
 	"foo$/*\n*/",
 	"foo$/*comment*/    \n",
 	"foo$/*\n*/    ",
 
-	"foo    $// comment\n",
-	"foo    $// comment",
+	"foo $// comment\n",
+	"foo $// comment",
 	"foo    $/*comment*/\n",
 	"foo    $/*\n*/",
 	"foo    $/*  */ /* \n */ bar$/**/\n",
@@ -461,7 +461,7 @@ var lines = []string{
 	"foo	$/**/ /*-------------*/       /*----\n*/bar       $/*  \n*/baa$\n",
 	"foo    $/* an EOF terminates a line */",
 	"foo    $/* an EOF terminates a line */ /*",
-	"foo    $/* an EOF terminates a line */ //",
+	"foo $/* an EOF terminates a line */ // ",
 
 	"package main$\n\nfunc main() {\n\tif {\n\t\treturn /* */ }$\n}$\n",
 	"package main$",
@@ -482,38 +482,38 @@ func TestSemis(t *testing.T) {
 }
 
 type segment struct {
-	srcline  string // a line of source text
+	srcline string // a line of source text
 	filename string // filename for current token
-	line     int    // line number for current token
+	line int // line number for current token
 }
 
 var segments = []segment{
 	// exactly one token per line since the test consumes one token per segment
 	{"  line1", filepath.Join("dir", "TestLineComments"), 1},
 	{"\nline2", filepath.Join("dir", "TestLineComments"), 2},
-	{"\nline3  //line File1.go:100", filepath.Join("dir", "TestLineComments"), 3}, // bad line comment, ignored
+	{"\nline3 // line File1.go:100", filepath.Join("dir", "TestLineComments"), 3}, //   bad line comment, ignored
 	{"\nline4", filepath.Join("dir", "TestLineComments"), 4},
-	{"\n//line File1.go:100\n  line100", filepath.Join("dir", "File1.go"), 100},
-	{"\n//line  \t :42\n  line1", "", 42},
-	{"\n//line File2.go:200\n  line200", filepath.Join("dir", "File2.go"), 200},
-	{"\n//line foo\t:42\n  line42", filepath.Join("dir", "foo"), 42},
-	{"\n //line foo:42\n  line44", filepath.Join("dir", "foo"), 44},           // bad line comment, ignored
-	{"\n//line foo 42\n  line46", filepath.Join("dir", "foo"), 46},            // bad line comment, ignored
-	{"\n//line foo:42 extra text\n  line48", filepath.Join("dir", "foo"), 48}, // bad line comment, ignored
-	{"\n//line ./foo:42\n  line42", filepath.Join("dir", "foo"), 42},
-	{"\n//line a/b/c/File1.go:100\n  line100", filepath.Join("dir", "a", "b", "c", "File1.go"), 100},
+	{"\n// line File1.go:100\n line100", filepath.Join("dir", "File1.go"), 100},
+	{"\n// line \t :42\n line1", "", 42},
+	{"\n// line File2.go:200\n line200", filepath.Join("dir", "File2.go"), 200},
+	{"\n// line foo\t:42\n line42", filepath.Join("dir", "foo"), 42},
+	{"\n // line foo:42\n line44", filepath.Join("dir", "foo"), 44}, //   bad line comment, ignored
+	{"\n// line foo 42\n line46", filepath.Join("dir", "foo"), 46}, //   bad line comment, ignored
+	{"\n// line foo:42 extra text\n line48", filepath.Join("dir", "foo"), 48}, //   bad line comment, ignored
+	{"\n// line ./foo:42\n line42", filepath.Join("dir", "foo"), 42},
+	{"\n// line a/b/c/File1.go:100\n line100", filepath.Join("dir", "a", "b", "c", "File1.go"), 100},
 }
 
 var unixsegments = []segment{
-	{"\n//line /bar:42\n  line42", "/bar", 42},
+	{"\n// line /bar:42\n line42", "/bar", 42},
 }
 
 var winsegments = []segment{
-	{"\n//line c:\\bar:42\n  line42", "c:\\bar", 42},
-	{"\n//line c:\\dir\\File1.go:100\n  line100", "c:\\dir\\File1.go", 100},
+	{"\n// line c:\\bar:42\n line42", "c:\\bar", 42},
+	{"\n// line c:\\dir\\File1.go:100\n line100", "c:\\dir\\File1.go", 100},
 }
 
-// Verify that comments of the form "//line filename:line" are interpreted correctly.
+// Verify that comments of the form "//   line filename:line" are interpreted correctly.
 func TestLineComments(t *testing.T) {
 	segs := segments
 	if runtime.GOOS == "windows" {
@@ -559,8 +559,8 @@ func TestInit(t *testing.T) {
 	if f1.Size() != len(src1) {
 		t.Errorf("bad file size: got %d, expected %d", f1.Size(), len(src1))
 	}
-	s.Scan()              // if
-	s.Scan()              // true
+	s.Scan() // if
+	s.Scan() // true
 	_, tok, _ := s.Scan() // {
 	if tok != token.LBRACE {
 		t.Errorf("bad token: got %s, expected %s", tok, token.LBRACE)
@@ -586,11 +586,11 @@ func TestInit(t *testing.T) {
 func TestStdErrorHander(t *testing.T) {
 	const src = "@\n" + // illegal character, cause an error
 		"@ @\n" + // two errors on the same line
-		"//line File2:20\n" +
+		"// line File2:20\n" +
 		"@\n" + // different file, but same line
-		"//line File2:1\n" +
+		"// line File2:1\n" +
 		"@ @\n" + // same file, decreasing line number
-		"//line File1:1\n" +
+		"// line File1:1\n" +
 		"@ @ @" // original file, line 1 again
 
 	var list ErrorList
@@ -627,8 +627,8 @@ func TestStdErrorHander(t *testing.T) {
 }
 
 type errorCollector struct {
-	cnt int            // number of errors encountered
-	msg string         // last error message encountered
+	cnt int // number of errors encountered
+	msg string // last error message encountered
 	pos token.Position // last error position encountered
 }
 
@@ -723,9 +723,9 @@ var errors = []struct {
 	{"0X", token.INT, 0, "0X", "illegal hexadecimal number"},
 	{"\"abc\x00def\"", token.STRING, 4, "\"abc\x00def\"", "illegal character NUL"},
 	{"\"abc\x80def\"", token.STRING, 4, "\"abc\x80def\"", "illegal UTF-8 encoding"},
-	{"\ufeff\ufeff", token.ILLEGAL, 3, "\ufeff\ufeff", "illegal byte order mark"},                        // only first BOM is ignored
-	{"//\ufeff", token.COMMENT, 2, "//\ufeff", "illegal byte order mark"},                                // only first BOM is ignored
-	{"'\ufeff" + `'`, token.CHAR, 1, "'\ufeff" + `'`, "illegal byte order mark"},                         // only first BOM is ignored
+	{"\ufeff\ufeff", token.ILLEGAL, 3, "\ufeff\ufeff", "illegal byte order mark"}, // only first BOM is ignored
+	{"// \ufeff", token.COMMENT, 2, "//   \ufeff", "illegal byte order mark"}, //   only first BOM is ignored
+	{"'\ufeff" + `'`, token.CHAR, 1, "'\ufeff" + `'`, "illegal byte order mark"}, // only first BOM is ignored
 	{`"` + "abc\ufeffdef" + `"`, token.STRING, 4, `"` + "abc\ufeffdef" + `"`, "illegal byte order mark"}, // only first BOM is ignored
 }
 

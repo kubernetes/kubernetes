@@ -22,11 +22,11 @@ const (
 	literal_beg
 	// Identifiers and basic type literals
 	// (these tokens stand for classes of literals)
-	IDENT  // main
-	INT    // 12345
-	FLOAT  // 123.45
-	IMAG   // 123.45i
-	CHAR   // 'a'
+	IDENT // main
+	INT // 12345
+	FLOAT // 123.45
+	IMAG // 123.45i
+	CHAR // 'a'
 	STRING // "abc"
 	literal_end
 
@@ -38,11 +38,11 @@ const (
 	QUO // /
 	REM // %
 
-	AND     // &
-	OR      // |
-	XOR     // ^
-	SHL     // <<
-	SHR     // >>
+	AND // &
+	OR // |
+	XOR // ^
+	SHL // <<
+	SHR // >>
 	AND_NOT // &^
 
 	ADD_ASSIGN // +=
@@ -51,42 +51,42 @@ const (
 	QUO_ASSIGN // /=
 	REM_ASSIGN // %=
 
-	AND_ASSIGN     // &=
-	OR_ASSIGN      // |=
-	XOR_ASSIGN     // ^=
-	SHL_ASSIGN     // <<=
-	SHR_ASSIGN     // >>=
+	AND_ASSIGN // &=
+	OR_ASSIGN // |=
+	XOR_ASSIGN // ^=
+	SHL_ASSIGN // <<=
+	SHR_ASSIGN // >>=
 	AND_NOT_ASSIGN // &^=
 
-	LAND  // &&
-	LOR   // ||
+	LAND // &&
+	LOR // ||
 	ARROW // <-
-	INC   // ++
-	DEC   // --
+	INC // ++
+	DEC // --
 
-	EQL    // ==
-	LSS    // <
-	GTR    // >
+	EQL // ==
+	LSS // <
+	GTR // >
 	ASSIGN // =
-	NOT    // !
+	NOT // !
 
-	NEQ      // !=
-	LEQ      // <=
-	GEQ      // >=
-	DEFINE   // :=
+	NEQ // !=
+	LEQ // <=
+	GEQ // >=
+	DEFINE // :=
 	ELLIPSIS // ...
 
 	LPAREN // (
 	LBRACK // [
 	LBRACE // {
-	COMMA  // ,
+	COMMA // ,
 	PERIOD // .
 
-	RPAREN    // )
-	RBRACK    // ]
-	RBRACE    // }
+	RPAREN // )
+	RBRACK // ]
+	RBRACE // }
 	SEMICOLON // ;
-	COLON     // :
+	COLON // :
 	operator_end
 
 	keyword_beg
@@ -247,7 +247,7 @@ func (tok Token) String() string {
 // indexing, and other operator and delimiter tokens.
 //
 const (
-	LowestPrec  = 0 // non-operators
+	LowestPrec = 0 // non-operators
 	UnaryPrec   = 6
 	HighestPrec = 7
 )

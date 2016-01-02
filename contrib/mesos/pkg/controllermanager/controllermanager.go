@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -127,7 +127,7 @@ func (s *CMServer) Run(_ []string) error {
 	go daemon.NewDaemonSetsController(kubeClient, s.resyncPeriod).
 		Run(s.ConcurrentDSCSyncs, util.NeverStop)
 
-	//TODO(jdef) should eventually support more cloud providers here
+	// TODO(jdef) should eventually support more cloud providers here
 	if s.CloudProvider != mesos.ProviderName {
 		glog.Fatalf("Only provider %v is supported, you specified %v", mesos.ProviderName, s.CloudProvider)
 	}

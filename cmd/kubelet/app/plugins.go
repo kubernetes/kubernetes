@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/persistent_claim"
 	"k8s.io/kubernetes/pkg/volume/rbd"
 	"k8s.io/kubernetes/pkg/volume/secret"
-	//Cloud providers
+	// Cloud providers
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 )
 
@@ -54,7 +54,7 @@ func ProbeVolumePlugins(pluginDir string) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by the kubelet binary, not
-	// by dynamic linking or other "magic".  Plugins will be analyzed and
+	// by dynamic linking or other "magic". Plugins will be analyzed and
 	// initialized later.
 	//
 	// Kubelet does not currently need to configure volume plugins.

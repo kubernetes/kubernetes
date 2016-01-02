@@ -16,7 +16,7 @@ func ExampleScanner_Scan() {
 
 	// Initialize the scanner.
 	var s scanner.Scanner
-	fset := token.NewFileSet()                      // positions are relative to fset
+	fset := token.NewFileSet() // positions are relative to fset
 	file := fset.AddFile("", fset.Base(), len(src)) // register input "file"
 	s.Init(file, src, nil /* no error handler */, scanner.ScanComments)
 
@@ -42,5 +42,5 @@ func ExampleScanner_Scan() {
 	// 1:17	IDENT	"x"
 	// 1:18	)	""
 	// 1:20	;	"\n"
-	// 1:20	COMMENT	"// Euler"
+	// 1:20	COMMENT	"//   Euler"
 }

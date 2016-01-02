@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -77,7 +77,7 @@ func (r *PortAllocator) Free() int {
 
 // Allocate attempts to reserve the provided port. ErrNotInRange or
 // ErrAllocated will be returned if the port is not valid for this range
-// or has already been reserved.  ErrFull will be returned if there
+// or has already been reserved. ErrFull will be returned if there
 // are no ports left.
 func (r *PortAllocator) Allocate(port int) error {
 	ok, offset := r.contains(port)

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -51,7 +51,7 @@ func newSecrets(c *LegacyClient, namespace string) *secrets {
 	}
 }
 
-// Create takes the representation of a secret and creates it.  Returns the server's representation of the secret, and an error, if there is any.
+// Create takes the representation of a secret and creates it. Returns the server's representation of the secret, and an error, if there is any.
 func (c *secrets) Create(secret *api.Secret) (result *api.Secret, err error) {
 	result = &api.Secret{}
 	err = c.client.Post().

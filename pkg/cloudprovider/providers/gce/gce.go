@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -1313,7 +1313,7 @@ func (gce *GCECloud) GetInstanceGroup(name string) (*compute.InstanceGroup, erro
 }
 
 // Take a GCE instance 'hostname' and break it down to something that can be fed
-// to the GCE API client library.  Basically this means reducing 'kubernetes-
+// to the GCE API client library. Basically this means reducing 'kubernetes-
 // minion-2.c.my-proj.internal' to 'kubernetes-minion-2' if necessary.
 func canonicalizeInstanceName(name string) string {
 	ix := strings.Index(name, ".")
@@ -1631,7 +1631,7 @@ func (gce *GCECloud) convertDiskToAttachedDisk(disk *compute.Disk, readWrite str
 		DeviceName: disk.Name,
 		Kind:       disk.Kind,
 		Mode:       readWrite,
-		Source:     "https://" + path.Join("www.googleapis.com/compute/v1/projects/", gce.projectID, "zones", gce.zone, "disks", disk.Name),
+		Source: "https://" + path.Join("www.googleapis.com/compute/v1/projects/", gce.projectID, "zones", gce.zone, "disks", disk.Name),
 		Type:       "PERSISTENT",
 	}
 }

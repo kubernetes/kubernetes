@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,7 +24,7 @@ import (
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
-// ConfigOverrides holds values that should override whatever information is pulled from the actual Config object.  You can't
+// ConfigOverrides holds values that should override whatever information is pulled from the actual Config object. You can't
 // simply use an actual Config object, because Configs hold maps, but overrides are restricted to "at most one"
 type ConfigOverrides struct {
 	AuthInfo       clientcmdapi.AuthInfo
@@ -33,7 +33,7 @@ type ConfigOverrides struct {
 	CurrentContext string
 }
 
-// ConfigOverrideFlags holds the flag names to be used for binding command line flags.  Notice that this structure tightly
+// ConfigOverrideFlags holds the flag names to be used for binding command line flags. Notice that this structure tightly
 // corresponds to ConfigOverrides
 type ConfigOverrideFlags struct {
 	AuthOverrideFlags    AuthOverrideFlags
@@ -66,13 +66,13 @@ type ClusterOverrideFlags struct {
 	InsecureSkipTLSVerify FlagInfo
 }
 
-// FlagInfo contains information about how to register a flag.  This struct is useful if you want to provide a way for an extender to
-// get back a set of recommended flag names, descriptions, and defaults, but allow for customization by an extender.  This makes for
+// FlagInfo contains information about how to register a flag. This struct is useful if you want to provide a way for an extender to
+// get back a set of recommended flag names, descriptions, and defaults, but allow for customization by an extender. This makes for
 // coherent extension, without full prescription
 type FlagInfo struct {
-	// LongName is the long string for a flag.  If this is empty, then the flag will not be bound
+	// LongName is the long string for a flag. If this is empty, then the flag will not be bound
 	LongName string
-	// ShortName is the single character for a flag.  If this is empty, then there will be no short flag
+	// ShortName is the single character for a flag. If this is empty, then there will be no short flag
 	ShortName string
 	// Default is the default value for the flag
 	Default string
@@ -80,7 +80,7 @@ type FlagInfo struct {
 	Description string
 }
 
-// BindStringFlag binds the flag based on the provided info.  If LongName == "", nothing is registered
+// BindStringFlag binds the flag based on the provided info. If LongName == "", nothing is registered
 func (f FlagInfo) BindStringFlag(flags *pflag.FlagSet, target *string) {
 	// you can't register a flag without a long name
 	if len(f.LongName) > 0 {
@@ -88,11 +88,11 @@ func (f FlagInfo) BindStringFlag(flags *pflag.FlagSet, target *string) {
 	}
 }
 
-// BindBoolFlag binds the flag based on the provided info.  If LongName == "", nothing is registered
+// BindBoolFlag binds the flag based on the provided info. If LongName == "", nothing is registered
 func (f FlagInfo) BindBoolFlag(flags *pflag.FlagSet, target *bool) {
 	// you can't register a flag without a long name
 	if len(f.LongName) > 0 {
-		// try to parse Default as a bool.  If it fails, assume false
+		// try to parse Default as a bool. If it fails, assume false
 		boolVal, err := strconv.ParseBool(f.Default)
 		if err != nil {
 			boolVal = false

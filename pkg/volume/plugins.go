@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -56,18 +56,18 @@ type VolumeOptions struct {
 // VolumePlugin is an interface to volume plugins that can be used on a
 // kubernetes node (e.g. by kubelet) to instantiate and manage volumes.
 type VolumePlugin interface {
-	// Init initializes the plugin.  This will be called exactly once
+	// Init initializes the plugin. This will be called exactly once
 	// before any New* calls are made - implementations of plugins may
 	// depend on this.
 	Init(host VolumeHost) error
 
-	// Name returns the plugin's name.  Plugins should use namespaced names
-	// such as "example.com/volume".  The "kubernetes.io" namespace is
+	// Name returns the plugin's name. Plugins should use namespaced names
+	// such as "example.com/volume". The "kubernetes.io" namespace is
 	// reserved for plugins which are bundled with kubernetes.
 	Name() string
 
 	// CanSupport tests whether the plugin supports a given volume
-	// specification from the API.  The spec pointer should be considered
+	// specification from the API. The spec pointer should be considered
 	// const.
 	CanSupport(spec *Spec) bool
 
@@ -120,20 +120,20 @@ type ProvisionableVolumePlugin interface {
 // VolumeHost is an interface that plugins can use to access the kubelet.
 type VolumeHost interface {
 	// GetPluginDir returns the absolute path to a directory under which
-	// a given plugin may store data.  This directory might not actually
-	// exist on disk yet.  For plugin data that is per-pod, see
+	// a given plugin may store data. This directory might not actually
+	// exist on disk yet. For plugin data that is per-pod, see
 	// GetPodPluginDir().
 	GetPluginDir(pluginName string) string
 
 	// GetPodVolumeDir returns the absolute path a directory which
 	// represents the named volume under the named plugin for the given
-	// pod.  If the specified pod does not exist, the result of this call
+	// pod. If the specified pod does not exist, the result of this call
 	// might not exist.
 	GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string
 
 	// GetPodPluginDir returns the absolute path to a directory under which
-	// a given plugin may store data for a given pod.  If the specified pod
-	// does not exist, the result of this call might not exist.  This
+	// a given plugin may store data for a given pod. If the specified pod
+	// does not exist, the result of this call might not exist. This
 	// directory might not actually exist on disk yet.
 	GetPodPluginDir(podUID types.UID, pluginName string) string
 
@@ -141,13 +141,13 @@ type VolumeHost interface {
 	GetKubeClient() client.Interface
 
 	// NewWrapperBuilder finds an appropriate plugin with which to handle
-	// the provided spec.  This is used to implement volume plugins which
-	// "wrap" other plugins.  For example, the "secret" volume is
+	// the provided spec. This is used to implement volume plugins which
+	// "wrap" other plugins. For example, the "secret" volume is
 	// implemented in terms of the "emptyDir" volume.
 	NewWrapperBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions) (Builder, error)
 
 	// NewWrapperCleaner finds an appropriate plugin with which to handle
-	// the provided spec.  See comments on NewWrapperBuilder for more
+	// the provided spec. See comments on NewWrapperBuilder for more
 	// context.
 	NewWrapperCleaner(spec *Spec, podUID types.UID) (Cleaner, error)
 
@@ -170,7 +170,7 @@ type VolumePluginMgr struct {
 	plugins map[string]VolumePlugin
 }
 
-// Spec is an internal representation of a volume.  All API volume types translate to Spec.
+// Spec is an internal representation of a volume. All API volume types translate to Spec.
 type Spec struct {
 	Volume           *api.Volume
 	PersistentVolume *api.PersistentVolume
@@ -189,19 +189,19 @@ func (spec *Spec) Name() string {
 	}
 }
 
-// VolumeConfig is how volume plugins receive configuration.  An instance specific to the plugin will be passed to
-// the plugin's ProbeVolumePlugins(config) func.  Reasonable defaults will be provided by the binary hosting
-// the plugins while allowing override of those default values.  Those config values are then set to an instance of
+// VolumeConfig is how volume plugins receive configuration. An instance specific to the plugin will be passed to
+// the plugin's ProbeVolumePlugins(config) func. Reasonable defaults will be provided by the binary hosting
+// the plugins while allowing override of those default values. Those config values are then set to an instance of
 // VolumeConfig and passed to the plugin.
 //
-// Values in VolumeConfig are intended to be relevant to several plugins, but not necessarily all plugins.  The
-// preference is to leverage strong typing in this struct.  All config items must have a descriptive but non-specific
-// name (i.e, RecyclerMinimumTimeout is OK but RecyclerMinimumTimeoutForNFS is !OK).  An instance of config will be
+// Values in VolumeConfig are intended to be relevant to several plugins, but not necessarily all plugins. The
+// preference is to leverage strong typing in this struct. All config items must have a descriptive but non-specific
+// name (i.e, RecyclerMinimumTimeout is OK but RecyclerMinimumTimeoutForNFS is !OK). An instance of config will be
 // given directly to the plugin, so config names specific to plugins are unneeded and wrongly expose plugins
 // in this VolumeConfig struct.
 //
 // OtherAttributes is a map of string values intended for one-off configuration of a plugin or config that is only
-// relevant to a single plugin.  All values are passed by string and require interpretation by the plugin.
+// relevant to a single plugin. All values are passed by string and require interpretation by the plugin.
 // Passing config as strings is the least desirable option but can be used for truly one-off configuration.
 // The binary should still use strong typing for this value when binding CLI values before they are passed as strings
 // in OtherAttributes.
@@ -220,7 +220,7 @@ type VolumeConfig struct {
 	// Example: 5Gi volume x 30s increment = 150s + 30s minimum = 180s ActiveDeadlineSeconds for recycler pod
 	RecyclerTimeoutIncrement int
 
-	// OtherAttributes stores config as strings.  These strings are opaque to the system and only understood by the binary
+	// OtherAttributes stores config as strings. These strings are opaque to the system and only understood by the binary
 	// hosting the plugin and the plugin itself.
 	OtherAttributes map[string]string
 }
@@ -240,7 +240,7 @@ func NewSpecFromPersistentVolume(pv *api.PersistentVolume, readOnly bool) *Spec 
 	}
 }
 
-// InitPlugins initializes each plugin.  All plugins must have unique names.
+// InitPlugins initializes each plugin. All plugins must have unique names.
 // This must be called exactly once before any New* methods are called on any
 // plugins.
 func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) error {
@@ -276,7 +276,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) 
 }
 
 // FindPluginBySpec looks for a plugin that can support a given volume
-// specification.  If no plugins can support or more than one plugin can
+// specification. If no plugins can support or more than one plugin can
 // support it, return error.
 func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	pm.mutex.Lock()
@@ -297,7 +297,7 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	return pm.plugins[matches[0]], nil
 }
 
-// FindPluginByName fetches a plugin by name or by legacy name.  If no plugin
+// FindPluginByName fetches a plugin by name or by legacy name. If no plugin
 // is found, returns error.
 func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	pm.mutex.Lock()
@@ -320,7 +320,7 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 }
 
 // FindPersistentPluginBySpec looks for a persistent volume plugin that can support a given volume
-// specification.  If no plugin is found, return an error
+// specification. If no plugin is found, return an error
 func (pm *VolumePluginMgr) FindPersistentPluginBySpec(spec *Spec) (PersistentVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
 	if err != nil {
@@ -332,7 +332,7 @@ func (pm *VolumePluginMgr) FindPersistentPluginBySpec(spec *Spec) (PersistentVol
 	return nil, fmt.Errorf("no persistent volume plugin matched")
 }
 
-// FindPersistentPluginByName fetches a persistent volume plugin by name.  If no plugin
+// FindPersistentPluginByName fetches a persistent volume plugin by name. If no plugin
 // is found, returns error.
 func (pm *VolumePluginMgr) FindPersistentPluginByName(name string) (PersistentVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginByName(name)
@@ -345,7 +345,7 @@ func (pm *VolumePluginMgr) FindPersistentPluginByName(name string) (PersistentVo
 	return nil, fmt.Errorf("no persistent volume plugin matched")
 }
 
-// FindRecyclablePluginByName fetches a persistent volume plugin by name.  If no plugin
+// FindRecyclablePluginByName fetches a persistent volume plugin by name. If no plugin
 // is found, returns error.
 func (pm *VolumePluginMgr) FindRecyclablePluginBySpec(spec *Spec) (RecyclableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
@@ -358,7 +358,7 @@ func (pm *VolumePluginMgr) FindRecyclablePluginBySpec(spec *Spec) (RecyclableVol
 	return nil, fmt.Errorf("no recyclable volume plugin matched")
 }
 
-// FindDeletablePluginByName fetches a persistent volume plugin by name.  If no plugin
+// FindDeletablePluginByName fetches a persistent volume plugin by name. If no plugin
 // is found, returns error.
 func (pm *VolumePluginMgr) FindDeletablePluginBySpec(spec *Spec) (DeletableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
@@ -371,7 +371,7 @@ func (pm *VolumePluginMgr) FindDeletablePluginBySpec(spec *Spec) (DeletableVolum
 	return nil, fmt.Errorf("no deletable volume plugin matched")
 }
 
-// FindCreatablePluginBySpec fetches a persistent volume plugin by name.  If no plugin
+// FindCreatablePluginBySpec fetches a persistent volume plugin by name. If no plugin
 // is found, returns error.
 func (pm *VolumePluginMgr) FindCreatablePluginBySpec(spec *Spec) (ProvisionableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
@@ -384,13 +384,13 @@ func (pm *VolumePluginMgr) FindCreatablePluginBySpec(spec *Spec) (ProvisionableV
 	return nil, fmt.Errorf("no creatable volume plugin matched")
 }
 
-// NewPersistentVolumeRecyclerPodTemplate creates a template for a recycler pod.  By default, a recycler pod simply runs
-// "rm -rf" on a volume and tests for emptiness.  Most attributes of the template will be correct for most
-// plugin implementations.  The following attributes can be overridden per plugin via configuration:
+// NewPersistentVolumeRecyclerPodTemplate creates a template for a recycler pod. By default, a recycler pod simply runs
+// "rm -rf" on a volume and tests for emptiness. Most attributes of the template will be correct for most
+// plugin implementations. The following attributes can be overridden per plugin via configuration:
 //
-// 1.  pod.Spec.Volumes[0].VolumeSource must be overridden.  Recycler implementations without a valid VolumeSource will fail.
-// 2.  pod.GenerateName helps distinguish recycler pods by name.  Recommended. Default is "pv-recycler-".
-// 3.  pod.Spec.ActiveDeadlineSeconds gives the recycler pod a maximum timeout before failing.  Recommended.  Default is 60 seconds.
+// 1. pod.Spec.Volumes[0].VolumeSource must be overridden. Recycler implementations without a valid VolumeSource will fail.
+// 2. pod.GenerateName helps distinguish recycler pods by name. Recommended. Default is "pv-recycler-".
+// 3. pod.Spec.ActiveDeadlineSeconds gives the recycler pod a maximum timeout before failing. Recommended. Default is 60 seconds.
 //
 // See HostPath and NFS for working recycler examples
 func NewPersistentVolumeRecyclerPodTemplate() *api.Pod {
@@ -406,7 +406,7 @@ func NewPersistentVolumeRecyclerPodTemplate() *api.Pod {
 			Volumes: []api.Volume{
 				{
 					Name: "vol",
-					// IMPORTANT!  All plugins using this template MUST override pod.Spec.Volumes[0].VolumeSource
+					// IMPORTANT! All plugins using this template MUST override pod.Spec.Volumes[0].VolumeSource
 					// Recycler implementations without a valid VolumeSource will fail.
 					VolumeSource: api.VolumeSource{},
 				},

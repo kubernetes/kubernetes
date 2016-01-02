@@ -26,8 +26,8 @@ const (
 // will pass in Strict mode. The additional rules are:
 //
 // - A type assertion x.(T) where T is an interface type
-//   is invalid if any (statically known) method that exists
-//   for both x and T have different signatures.
+// is invalid if any (statically known) method that exists
+// for both x and T have different signatures.
 //
 const strict = false
 
@@ -36,12 +36,12 @@ type exprInfo struct {
 	isLhs bool // expression is lhs operand of a shift with delayed type-check
 	mode  operandMode
 	typ   *Basic
-	val   constant.Value // constant value; or nil (if not a constant)
+	val constant.Value // constant value; or nil (if not a constant)
 }
 
 // funcInfo stores the information required for type-checking a function.
 type funcInfo struct {
-	name string    // for debugging/tracing only
+	name string // for debugging/tracing only
 	decl *declInfo // for cycle detection
 	sig  *Signature
 	body *ast.BlockStmt
@@ -49,12 +49,12 @@ type funcInfo struct {
 
 // A context represents the context within which an object is type-checked.
 type context struct {
-	decl          *declInfo      // package-level declaration whose init expression/function body is checked
-	scope         *Scope         // top-most scope for lookups
-	iota          constant.Value // value of iota in a constant declaration; nil otherwise
-	sig           *Signature     // function signature if inside a function; nil otherwise
-	hasLabel      bool           // set if a function makes use of labels (only ~1% of functions); unused outside functions
-	hasCallOrRecv bool           // set if an expression contains a function call or channel receive operation
+	decl *declInfo // package-level declaration whose init expression/function body is checked
+	scope *Scope // top-most scope for lookups
+	iota constant.Value // value of iota in a constant declaration; nil otherwise
+	sig *Signature // function signature if inside a function; nil otherwise
+	hasLabel bool // set if a function makes use of labels (only ~1% of functions); unused outside functions
+	hasCallOrRecv bool // set if an expression contains a function call or channel receive operation
 }
 
 // A Checker maintains the state of the type checker.
@@ -71,14 +71,14 @@ type Checker struct {
 	// information collected during type-checking of a set of package files
 	// (initialized by Files, valid only for the duration of check.Files;
 	// maps and lists are allocated on demand)
-	files            []*ast.File                       // package files
+	files []*ast.File // package files
 	unusedDotImports map[*Scope]map[*Package]token.Pos // positions of unused dot-imported packages for each file scope
 
-	firstErr error                 // first error encountered
-	methods  map[string][]*Func    // maps type names to associated methods
-	untyped  map[ast.Expr]exprInfo // map of expressions without final type
-	funcs    []funcInfo            // list of functions to type-check
-	delayed  []func()              // delayed checks requiring fully setup types
+	firstErr error // first error encountered
+	methods map[string][]*Func // maps type names to associated methods
+	untyped map[ast.Expr]exprInfo // map of expressions without final type
+	funcs []funcInfo // list of functions to type-check
+	delayed []func() // delayed checks requiring fully setup types
 
 	// context within which the current object is type-checked
 	// (valid only for the duration of type-checking a specific object)

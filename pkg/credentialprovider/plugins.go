@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,9 +28,9 @@ var providers = make(map[string]DockerConfigProvider)
 
 // RegisterCredentialProvider is called by provider implementations on
 // initialization to register themselves, like so:
-//   func init() {
-//    	RegisterCredentialProvider("name", &myProvider{...})
-//   }
+// func init() {
+// 	RegisterCredentialProvider("name", &myProvider{...})
+// }
 func RegisterCredentialProvider(name string, provider DockerConfigProvider) {
 	providersMutex.Lock()
 	defer providersMutex.Unlock()
@@ -49,7 +49,7 @@ func NewDockerKeyring() DockerKeyring {
 		Providers: make([]DockerConfigProvider, 0),
 	}
 
-	// TODO(mattmoor): iterating over the map is non-deterministic.  We should
+	// TODO(mattmoor): iterating over the map is non-deterministic. We should
 	// introduce the notion of priorities for conflict resolution.
 	for name, provider := range providers {
 		if provider.Enabled() {

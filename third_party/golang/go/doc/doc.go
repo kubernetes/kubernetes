@@ -46,10 +46,10 @@ type Type struct {
 	Decl *ast.GenDecl
 
 	// associated declarations
-	Consts  []*Value // sorted list of constants of (mostly) this type
-	Vars    []*Value // sorted list of variables of (mostly) this type
-	Funcs   []*Func  // sorted list of functions returning this type
-	Methods []*Func  // sorted list of methods (including embedded ones) of this type
+	Consts []*Value // sorted list of constants of (mostly) this type
+	Vars []*Value // sorted list of variables of (mostly) this type
+	Funcs []*Func // sorted list of functions returning this type
+	Methods []*Func // sorted list of methods (including embedded ones) of this type
 }
 
 // Func is the documentation for a func declaration.
@@ -60,9 +60,9 @@ type Func struct {
 
 	// methods
 	// (for functions, these fields have the respective zero value)
-	Recv  string // actual   receiver "T" or "*T"
-	Orig  string // original receiver "T" or "*T"
-	Level int    // embedding level; 0 means not embedded
+	Recv string // actual receiver "T" or "*T"
+	Orig string // original receiver "T" or "*T"
+	Level int // embedding level; 0 means not embedded
 }
 
 // A Note represents a marked comment starting with "MARKER(uid): note body".
@@ -71,8 +71,8 @@ type Func struct {
 // Notes are collected in the Package.Notes map indexed by the notes marker.
 type Note struct {
 	Pos, End token.Pos // position range of the comment containing the marker
-	UID      string    // uid found with the marker
-	Body     string    // note body text
+	UID string // uid found with the marker
+	Body string // note body text
 }
 
 // Mode values control the operation of New.

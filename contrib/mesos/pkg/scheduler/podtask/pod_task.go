@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -62,16 +62,16 @@ type T struct {
 	// Meant to be set by algorith.SchedulerAlgorithm only.
 	Spec *Spec
 
-	Offer       offers.Perishable // thread-safe
+	Offer offers.Perishable // thread-safe
 	State       StateType
 	Flags       map[FlagType]struct{}
 	CreateTime  time.Time
 	UpdatedTime time.Time // time of the most recent StatusUpdate we've seen from the mesos master
 
 	podStatus       api.PodStatus
-	prototype       *mesos.ExecutorInfo // readonly
-	frameworkRoles  []string            // Mesos framework roles, pods are allowed to be launched with those
-	defaultPodRoles []string            // roles under which pods are scheduled if none are specified in labels
+	prototype *mesos.ExecutorInfo // readonly
+	frameworkRoles []string // Mesos framework roles, pods are allowed to be launched with those
+	defaultPodRoles []string // roles under which pods are scheduled if none are specified in labels
 	podKey          string
 	launchTime      time.Time
 	bindTime        time.Time
@@ -93,8 +93,8 @@ type Spec struct {
 }
 
 // mostly-clone this pod task. the clone will actually share the some fields:
-//   - executor    // OK because it's read only
-//   - Offer       // OK because it's guarantees safe concurrent access
+// - executor //   OK because it's read only
+// - Offer //   OK because it's guarantees safe concurrent access
 func (t *T) Clone() *T {
 	if t == nil {
 		return nil
@@ -269,14 +269,14 @@ func RecoverFrom(pod api.Pod) (*T, bool, error) {
 		return nil, false, err
 	}
 
-	//TODO(jdef) recover ports (and other resource requirements?) from the pod spec as well
+	// TODO(jdef) recover ports (and other resource requirements?) from the pod spec as well
 
 	now := time.Now()
 	t := &T{
 		Pod:        pod,
 		CreateTime: now,
 		podKey:     key,
-		State:      StatePending, // possibly running? mesos will tell us during reconciliation
+		State: StatePending, // possibly running? mesos will tell us during reconciliation
 		Flags:      make(map[FlagType]struct{}),
 		mapper:     NewHostPortMapper(&pod),
 		launchTime: now,

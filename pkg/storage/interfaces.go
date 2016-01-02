@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -132,19 +132,19 @@ type Interface interface {
 	//
 	// s := /* implementation of Interface */
 	// err := s.GuaranteedUpdate(
-	//     "myKey", &MyType{}, true,
-	//     func(input runtime.Object, res ResponseMeta) (runtime.Object, *uint64, error) {
-	//       // Before each incovation of the user defined function, "input" is reset to
-	//       // current contents for "myKey" in database.
-	//       curr := input.(*MyType)  // Guaranteed to succeed.
+	// "myKey", &MyType{}, true,
+	// func(input runtime.Object, res ResponseMeta) (runtime.Object, *uint64, error) {
+	// //   Before each incovation of the user defined function, "input" is reset to
+	// //   current contents for "myKey" in database.
+	// curr := input.(*MyType) //   Guaranteed to succeed.
 	//
-	//       // Make the modification
-	//       curr.Counter++
+	// //   Make the modification
+	// curr.Counter++
 	//
-	//       // Return the modified object - return an error to stop iterating. Return
-	//       // a uint64 to alter the TTL on the object, or nil to keep it the same value.
-	//       return cur, nil, nil
-	//    }
+	// //   Return the modified object - return an error to stop iterating. Return
+	// //   a uint64 to alter the TTL on the object, or nil to keep it the same value.
+	// return cur, nil, nil
+	// }
 	// })
 	GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate UpdateFunc) error
 

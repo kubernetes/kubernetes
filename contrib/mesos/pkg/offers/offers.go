@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -34,10 +34,10 @@ import (
 )
 
 const (
-	offerListenerMaxAge      = 12              // max number of times we'll attempt to fit an offer to a listener before requiring them to re-register themselves
-	offerIdCacheTTL          = 1 * time.Second // determines expiration of cached offer ids, used in listener notification
-	deferredDeclineTtlFactor = 2               // this factor, multiplied by the offer ttl, determines how long to wait before attempting to decline previously claimed offers that were subsequently deleted, then released. see offerStorage.Delete
-	notifyListenersDelay     = 0               // delay between offer listener notification attempts
+	offerListenerMaxAge = 12 // max number of times we'll attempt to fit an offer to a listener before requiring them to re-register themselves
+	offerIdCacheTTL = 1 * time.Second // determines expiration of cached offer ids, used in listener notification
+	deferredDeclineTtlFactor = 2 // this factor, multiplied by the offer ttl, determines how long to wait before attempting to decline previously claimed offers that were subsequently deleted, then released. see offerStorage.Delete
+	notifyListenersDelay = 0 // delay between offer listener notification attempts
 )
 
 type Filter func(*mesos.Offer) bool
@@ -76,25 +76,25 @@ type Registry interface {
 type Walker func(offer Perishable) (stop bool, err error)
 
 type RegistryConfig struct {
-	DeclineOffer  func(offerId string) <-chan error // tell Mesos that we're declining the offer
-	Compat        func(*mesos.Offer) bool           // returns true if offer is compatible; incompatible offers are declined
-	TTL           time.Duration                     // determines a perishable offer's expiration deadline: now+ttl
-	LingerTTL     time.Duration                     // if zero, offers will not linger in the FIFO past their expiration deadline
-	ListenerDelay time.Duration                     // specifies the sleep time between offer listener notifications
+	DeclineOffer func(offerId string) <-chan error // tell Mesos that we're declining the offer
+	Compat func(*mesos.Offer) bool // returns true if offer is compatible; incompatible offers are declined
+	TTL time.Duration // determines a perishable offer's expiration deadline: now+ttl
+	LingerTTL time.Duration // if zero, offers will not linger in the FIFO past their expiration deadline
+	ListenerDelay time.Duration // specifies the sleep time between offer listener notifications
 }
 
 type offerStorage struct {
 	RegistryConfig
-	offers    *cache.FIFO       // collection of Perishable, both live and expired
-	listeners *queue.DelayFIFO  // collection of *offerListener
-	delayed   *queue.DelayQueue // deadline-oriented offer-event queue
-	slaves    *slaveStorage     // slave to offer mappings
+	offers *cache.FIFO // collection of Perishable, both live and expired
+	listeners *queue.DelayFIFO // collection of *offerListener
+	delayed *queue.DelayQueue // deadline-oriented offer-event queue
+	slaves *slaveStorage // slave to offer mappings
 }
 
 type liveOffer struct {
 	*mesos.Offer
 	expiration time.Time
-	acquired   int32 // 1 = acquired, 0 = free
+	acquired int32 // 1 = acquired, 0 = free
 }
 
 type expiredOffer struct {
@@ -226,7 +226,7 @@ func CreateRegistry(c RegistryConfig) Registry {
 }
 
 func (s *offerStorage) declineOffer(offerId, hostname string, reason metrics.OfferDeclinedReason) {
-	//TODO(jdef) might be nice to spec an abort chan here
+	// TODO(jdef) might be nice to spec an abort chan here
 	runtime.Signal(proc.OnError(s.DeclineOffer(offerId), func(err error) {
 		log.Warningf("decline failed for offer id %v: %v", offerId, err)
 	}, nil)).Then(func() {
@@ -238,7 +238,7 @@ func (s *offerStorage) Add(offers []*mesos.Offer) {
 	now := time.Now()
 	for _, offer := range offers {
 		if !s.Compat(offer) {
-			//TODO(jdef) would be nice to batch these up
+			// TODO(jdef) would be nice to batch these up
 			offerId := offer.Id.GetValue()
 			log.V(3).Infof("Declining incompatible offer %v", offerId)
 			s.declineOffer(offerId, offer.GetHostname(), metrics.OfferCompat)
@@ -443,7 +443,7 @@ func (s *offerStorage) ageOffers() {
 func (s *offerStorage) nextListener() *offerListener {
 	obj := s.listeners.Pop(queue.WithoutCancel())
 	if listen, ok := obj.(*offerListener); !ok {
-		//programming error
+		// programming error
 		panic(fmt.Sprintf("unexpected listener object %v", obj))
 	} else {
 		return listen

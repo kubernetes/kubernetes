@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -223,7 +223,7 @@ func TestAllPossibleAccessModes(t *testing.T) {
 		index.Add(pv)
 	}
 
-	// the mock PVs creates contain 2 types of accessmodes:   RWO+ROX and RWO+ROW+RWX
+	// the mock PVs creates contain 2 types of accessmodes: RWO+ROX and RWO+ROW+RWX
 	possibleModes := index.allPossibleMatchingAccessModes([]api.PersistentVolumeAccessMode{api.ReadWriteOnce})
 	if len(possibleModes) != 2 {
 		t.Errorf("Expected 2 arrays of modes that match RWO, but got %v", len(possibleModes))
@@ -322,7 +322,7 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
 	}
 
-	// pretend the exact match is bound.  should get the next level up of modes.
+	// pretend the exact match is bound. should get the next level up of modes.
 	ebs.Spec.ClaimRef = &api.ObjectReference{}
 	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
 	volume, _ = index.findBestMatchForClaim(claim)
@@ -532,7 +532,7 @@ func TestFindingPreboundVolumes(t *testing.T) {
 		t.Errorf("Expected %s but got volume %s instead", pv1.Name, volume.Name)
 	}
 
-	// pretend the exact match is pre-bound.  should get the next size up.
+	// pretend the exact match is pre-bound. should get the next size up.
 	pv1.Spec.ClaimRef = &api.ObjectReference{Name: "foo", Namespace: "bar"}
 	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != pv5.Name {

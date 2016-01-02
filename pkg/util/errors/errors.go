@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,7 +26,7 @@ type Aggregate interface {
 }
 
 // NewAggregate converts a slice of errors into an Aggregate interface, which
-// is itself an implementation of the error interface.  If the slice is empty,
+// is itself an implementation of the error interface. If the slice is empty,
 // this returns nil.
 func NewAggregate(errlist []error) Aggregate {
 	if len(errlist) == 0 {
@@ -35,7 +35,7 @@ func NewAggregate(errlist []error) Aggregate {
 	return aggregate(errlist)
 }
 
-// This helper implements the error and Errors interfaces.  Keeping it private
+// This helper implements the error and Errors interfaces. Keeping it private
 // prevents people from making an aggregate of 0 errors, which is not
 // an error, but does satisfy the error interface.
 type aggregate []error
@@ -62,11 +62,11 @@ func (agg aggregate) Errors() []error {
 	return []error(agg)
 }
 
-// Matcher is used to match errors.  Returns true if the error matches.
+// Matcher is used to match errors. Returns true if the error matches.
 type Matcher func(error) bool
 
 // FilterOut removes all errors that match any of the matchers from the input
-// error.  If the input is a singular error, only that error is tested.  If the
+// error. If the input is a singular error, only that error is tested. If the
 // input implements the Aggregate interface, the list of errors will be
 // processed recursively.
 //

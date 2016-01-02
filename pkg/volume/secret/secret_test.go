@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -115,7 +115,7 @@ func TestPlugin(t *testing.T) {
 }
 
 // Test the case where the 'ready' file has been created and the pod volume dir
-// is a mountpoint.  Mount should not be called.
+// is a mountpoint. Mount should not be called.
 func TestPluginIdempotent(t *testing.T) {
 	var (
 		testPodUID     = types.UID("test_pod_uid2")
@@ -175,7 +175,7 @@ func TestPluginIdempotent(t *testing.T) {
 }
 
 // Test the case where the plugin's ready file exists, but the volume dir is not a
-// mountpoint, which is the state the system will be in after reboot.  The dir
+// mountpoint, which is the state the system will be in after reboot. The dir
 // should be mounter and the secret data written to it.
 func TestPluginReboot(t *testing.T) {
 	var (

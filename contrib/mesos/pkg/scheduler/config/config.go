@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,14 +24,14 @@ import (
 )
 
 const (
-	DefaultOfferTTL                           = 5 * time.Second   // duration an offer is viable, prior to being expired
-	DefaultOfferLingerTTL                     = 120 * time.Second // duration an expired offer lingers in history
-	DefaultListenerDelay                      = 1 * time.Second   // duration between offer listener notifications
-	DefaultUpdatesBacklog                     = 2048              // size of the pod updates channel
-	DefaultFrameworkIdRefreshInterval         = 30 * time.Second  // interval we update the frameworkId stored in etcd
-	DefaultInitialImplicitReconciliationDelay = 15 * time.Second  // wait this amount of time after initial registration before attempting implicit reconciliation
-	DefaultExplicitReconciliationMaxBackoff   = 2 * time.Minute   // interval in between internal task status checks/updates
-	DefaultExplicitReconciliationAbortTimeout = 30 * time.Second  // waiting period after attempting to cancel an ongoing reconciliation
+	DefaultOfferTTL = 5 * time.Second // duration an offer is viable, prior to being expired
+	DefaultOfferLingerTTL = 120 * time.Second // duration an expired offer lingers in history
+	DefaultListenerDelay = 1 * time.Second // duration between offer listener notifications
+	DefaultUpdatesBacklog = 2048 // size of the pod updates channel
+	DefaultFrameworkIdRefreshInterval = 30 * time.Second // interval we update the frameworkId stored in etcd
+	DefaultInitialImplicitReconciliationDelay = 15 * time.Second // wait this amount of time after initial registration before attempting implicit reconciliation
+	DefaultExplicitReconciliationMaxBackoff = 2 * time.Minute // interval in between internal task status checks/updates
+	DefaultExplicitReconciliationAbortTimeout = 30 * time.Second // waiting period after attempting to cancel an ongoing reconciliation
 	DefaultInitialPodBackoff                  = 1 * time.Second
 	DefaultMaxPodBackoff                      = 60 * time.Second
 	DefaultHttpHandlerTimeout                 = 10 * time.Second
@@ -41,9 +41,9 @@ const (
 // Example scheduler configuration file:
 //
 // [scheduler]
-//  info-name        = Kubernetes
-//  offer-ttl        = 5s
-//  offer-linger-ttl = 2m
+// info-name = Kubernetes
+// offer-ttl = 5s
+// offer-linger-ttl = 2m
 
 type ConfigWrapper struct {
 	Scheduler Config

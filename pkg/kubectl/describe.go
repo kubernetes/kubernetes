@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -1488,7 +1488,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit))
 	}
 
-	fmt.Fprint(out, "Allocated resources:\n  (Total limits may be over 100%, i.e., overcommitted. More info: http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md)\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
+	fmt.Fprint(out, "Allocated resources:\n (Total limits may be over 100%, i.e., overcommitted. More info: http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md)\n CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
 	fmt.Fprint(out, "  ------------\t----------\t---------------\t-------------\n")
 	reqs, limits, err := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
 	if err != nil {
@@ -1749,7 +1749,7 @@ func (d *Describers) DescribeObject(exact interface{}, extra ...interface{}) (st
 // Add adds one or more describer functions to the Describer. The passed function must
 // match the signature:
 //
-//     func(...) (string, error)
+// func(...) (string, error)
 //
 // Any number of arguments may be provided.
 func (d *Describers) Add(fns ...interface{}) error {

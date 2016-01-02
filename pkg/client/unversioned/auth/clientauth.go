@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,7 +52,7 @@ Example:
 
     info, err := auth.LoadFromFile(filename)
     if err != nil {
-      // handle error
+ // handle error
     }
     clientConfig = client.Config{}
     clientConfig.Host = "example.com:4901"
@@ -62,7 +62,7 @@ Example:
 */
 package auth
 
-// TODO: need a way to rotate Tokens.  Therefore, need a way for client object to be reset when the authcfg is updated.
+// TODO: need a way to rotate Tokens. Therefore, need a way for client object to be reset when the authcfg is updated.
 import (
 	"encoding/json"
 	"io/ioutil"
@@ -71,7 +71,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
-// Info holds Kubernetes API authorization config.  It is intended
+// Info holds Kubernetes API authorization config. It is intended
 // to be read/written from a file as a JSON object.
 type Info struct {
 	User        string

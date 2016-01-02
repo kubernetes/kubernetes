@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,7 +38,7 @@ import (
 
 // specialVerbs contains just strings which are used in REST paths for special actions that don't fall under the normal
 // CRUDdy GET/POST/PUT/DELETE actions on REST objects.
-// TODO: find a way to keep this up to date automatically.  Maybe dynamically populate list as handlers added to
+// TODO: find a way to keep this up to date automatically. Maybe dynamically populate list as handlers added to
 // master's Mux.
 var specialVerbs = sets.NewString("proxy", "redirect", "watch")
 
@@ -373,11 +373,11 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 	attribs.APIGroup = requestInfo.APIGroup
 
 	// If a path follows the conventions of the REST object store, then
-	// we can extract the resource.  Otherwise, not.
+	// we can extract the resource. Otherwise, not.
 	attribs.Resource = requestInfo.Resource
 
 	// If the request specifies a namespace, then the namespace is filled in.
-	// Assumes there is no empty string namespace.  Unspecified results
+	// Assumes there is no empty string namespace. Unspecified results
 	// in empty (does not understand defaulting rules.)
 	attribs.Namespace = requestInfo.Namespace
 
@@ -402,7 +402,7 @@ type RequestInfo struct {
 	IsResourceRequest bool
 	// Path is the URL path of the request
 	Path string
-	// Verb is the kube verb associated with the request for API requests, not the http verb.  This includes things like list and watch.
+	// Verb is the kube verb associated with the request for API requests, not the http verb. This includes things like list and watch.
 	// for non-resource requests, this is the lowercase http verb
 	Verb string
 
@@ -410,9 +410,9 @@ type RequestInfo struct {
 	APIGroup   string
 	APIVersion string
 	Namespace  string
-	// Resource is the name of the resource being requested.  This is not the kind.  For example: pods
+	// Resource is the name of the resource being requested. This is not the kind. For example: pods
 	Resource string
-	// Subresource is the name of the subresource being requested.  This is a different resource, scoped to the parent resource, but it may have a different kind.
+	// Subresource is the name of the subresource being requested. This is a different resource, scoped to the parent resource, but it may have a different kind.
 	// For instance, /pods has the resource "pods" and the kind "Pod", while /pods/foo/status has the resource "pods", the sub resource "status", and the kind "Pod"
 	// (because status operates on pods). The binding resource for a pod though may be /pods/foo/binding, which has resource "pods", subresource "binding", and kind "Binding".
 	Subresource string
@@ -428,7 +428,7 @@ type RequestInfoResolver struct {
 }
 
 // TODO write an integration test against the swagger doc to test the RequestInfo and match up behavior to responses
-// GetRequestInfo returns the information from the http request.  If error is not nil, RequestInfo holds the information as best it is known before the failure
+// GetRequestInfo returns the information from the http request. If error is not nil, RequestInfo holds the information as best it is known before the failure
 // It handles both resource and non-resource requests and fills in all the pertinent information for each.
 // Valid Inputs:
 // Resource paths

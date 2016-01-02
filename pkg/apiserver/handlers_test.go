@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -62,9 +62,9 @@ func pathWithPrefix(prefix, resource, namespace, name string) string {
 
 // Tests that MaxInFlightLimit works, i.e.
 // - "long" requests such as proxy or watch, identified by regexp are not accounted despite
-//   hanging for the long time,
+// hanging for the long time,
 // - "short" requests are correctly accounted, i.e. there can be only size of channel passed to the
-//   constructor in flight at any given moment,
+// constructor in flight at any given moment,
 // - subsequent "short" requests are rejected instantly with apropriate error,
 // - subsequent "long" requests are handled normally,
 // - we correctly recover after some "short" requests finish, i.e. we can process new ones.

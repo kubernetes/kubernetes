@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -105,7 +105,7 @@ type Requirement struct {
 // (3) If the operator is Equals, DoubleEquals, or NotEquals, the values set must contain one value.
 // (4) If the operator is Exists or DoesNotExist, the value set must be empty.
 // (5) The key is invalid due to its length, or sequence
-//     of characters. See validateLabelKey for more details.
+// of characters. See validateLabelKey for more details.
 //
 // The empty string is a valid value in the input values set.
 func NewRequirement(key string, op Operator, vals sets.String) (*Requirement, error) {
@@ -141,11 +141,11 @@ func NewRequirement(key string, op Operator, vals sets.String) (*Requirement, er
 // There is a match in the following cases:
 // (1) The operator is Exists and Labels has the Requirement's key.
 // (2) The operator is In, Labels has the Requirement's key and Labels'
-//     value for that key is in Requirement's value set.
+// value for that key is in Requirement's value set.
 // (3) The operator is NotIn, Labels has the Requirement's key and
-//     Labels' value for that key is not in Requirement's value set.
+// Labels' value for that key is not in Requirement's value set.
 // (4) The operator is DoesNotExist or NotIn and Labels does not have the
-//     Requirement's key.
+// Requirement's key.
 func (r *Requirement) Matches(ls Labels) bool {
 	switch r.operator {
 	case InOperator, EqualsOperator, DoubleEqualsOperator:
@@ -632,7 +632,7 @@ func (p *Parser) parseIdentifiersList() (sets.String, error) {
 			}
 			tok2, _ := p.lookahead(Values)
 			if tok2 == ClosedParToken {
-				s.Insert("") // to handle ,)  Double "" removed by StringSet
+				s.Insert("") // to handle ,) Double "" removed by StringSet
 				return s, nil
 			}
 			if tok2 == CommaToken {
@@ -670,26 +670,26 @@ func (p *Parser) parseExactValue() (sets.String, error) {
 // <requirement> ::= [!] KEY [ <set-based-restriction> | <exact-match-restriction> ]
 // <set-based-restriction> ::= "" | <inclusion-exclusion> <value-set>
 // <inclusion-exclusion> ::= <inclusion> | <exclusion>
-//           <exclusion> ::= "notin"
-//           <inclusion> ::= "in"
-//           <value-set> ::= "(" <values> ")"
-//              <values> ::= VALUE | VALUE "," <values>
+// <exclusion> ::= "notin"
+// <inclusion> ::= "in"
+// <value-set> ::= "(" <values> ")"
+// <values> ::= VALUE | VALUE "," <values>
 // <exact-match-restriction> ::= ["="|"=="|"!="] VALUE
 // KEY is a sequence of one or more characters following [ DNS_SUBDOMAIN "/" ] DNS_LABEL. Max length is 63 characters.
 // VALUE is a sequence of zero or more characters "([A-Za-z0-9_-\.])". Max length is 63 characters.
 // Delimiter is white space: (' ', '\t')
 // Example of valid syntax:
-//  "x in (foo,,baz),y,z notin ()"
+// "x in (foo,,baz),y,z notin ()"
 //
 // Note:
-//  (1) Inclusion - " in " - denotes that the KEY exists and is equal to any of the
-//      VALUEs in its requirement
-//  (2) Exclusion - " notin " - denotes that the KEY is not equal to any
-//      of the VALUEs in its requirement or does not exist
-//  (3) The empty string is a valid VALUE
-//  (4) A requirement with just a KEY - as in "y" above - denotes that
-//      the KEY exists and can be any VALUE.
-//  (5) A requirement with just !KEY requires that the KEY not exist.
+// (1) Inclusion - " in " - denotes that the KEY exists and is equal to any of the
+// VALUEs in its requirement
+// (2) Exclusion - " notin " - denotes that the KEY is not equal to any
+// of the VALUEs in its requirement or does not exist
+// (3) The empty string is a valid VALUE
+// (4) A requirement with just a KEY - as in "y" above - denotes that
+// the KEY exists and can be any VALUE.
+// (5) A requirement with just !KEY requires that the KEY not exist.
 //
 func Parse(selector string) (Selector, error) {
 	p := &Parser{l: &Lexer{s: selector, pos: 0}}
@@ -727,7 +727,7 @@ func SelectorFromSet(ls Set) Selector {
 	var requirements internalSelector
 	for label, value := range ls {
 		if r, err := NewRequirement(label, EqualsOperator, sets.NewString(value)); err != nil {
-			//TODO: double check errors when input comes from serialization?
+			// TODO: double check errors when input comes from serialization?
 			return internalSelector{}
 		} else {
 			requirements = append(requirements, *r)

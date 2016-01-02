@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -76,7 +76,7 @@ const (
 	k8sRktUIDAnno          = "rkt.kubernetes.io/uid"
 	k8sRktNameAnno         = "rkt.kubernetes.io/name"
 	k8sRktNamespaceAnno    = "rkt.kubernetes.io/namespace"
-	//TODO: remove the creation time annotation once this is closed: https://github.com/coreos/rkt/issues/1789
+	// TODO: remove the creation time annotation once this is closed: https://github.com/coreos/rkt/issues/1789
 	k8sRktCreationTimeAnno  = "rkt.kubernetes.io/created"
 	k8sRktContainerHashAnno = "rkt.kubernetes.io/containerhash"
 	k8sRktRestartCountAnno  = "rkt.kubernetes.io/restartcount"
@@ -961,7 +961,7 @@ func (r *Runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 			continue
 		}
 
-		// TODO: check for non-root image directives.  See ../docker/manager.go#SyncPod
+		// TODO: check for non-root image directives. See ../docker/manager.go#SyncPod
 
 		// TODO(yifan): Take care of host network change.
 		containerChanged := c.Hash != 0 && c.Hash != expectedHash
@@ -1138,9 +1138,9 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 // computer) and the specified port in the container.
 //
 // TODO:
-//  - match cgroups of container
-//  - should we support nsenter + socat on the host? (current impl)
-//  - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
+// - match cgroups of container
+// - should we support nsenter + socat on the host? (current impl)
+// - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
 //
 // TODO(yifan): Merge with the same function in dockertools.
 // TODO(yifan): If the rkt is using lkvm as the stage1 image, then this function will fail.
@@ -1260,7 +1260,7 @@ func populateContainerStatus(pod rktapi.Pod, app rktapi.App, runtimeApp appcsche
 		StartedAt: creationTime,
 		ExitCode:  int(app.ExitCode),
 		Image:     app.Image.Name,
-		ImageID:   "rkt://" + app.Image.Id, // TODO(yifan): Add the prefix only in api.PodStatus.
+		ImageID: "rkt://" + app.Image.Id, //   TODO(yifan): Add the prefix only in api.PodStatus.
 		Hash:      hashNum,
 		// TODO(yifan): Note that now all apps share the same restart count, this might
 		// change once apps don't share the same lifecycle.

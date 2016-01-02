@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -107,8 +107,8 @@ type RollingUpdater struct {
 	ns string
 	// scaleAndWait scales a controller and returns its updated state.
 	scaleAndWait func(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error)
-	//getOrCreateTargetController gets and validates an existing controller or
-	//makes a new one.
+	// getOrCreateTargetController gets and validates an existing controller or
+	// makes a new one.
 	getOrCreateTargetController func(controller *api.ReplicationController, sourceId string) (*api.ReplicationController, bool, error)
 	// cleanup performs post deployment cleanup tasks for newRc and oldRc.
 	cleanup func(oldRc, newRc *api.ReplicationController, config *RollingUpdaterConfig) error
@@ -633,7 +633,7 @@ const MaxRetries = 3
 
 func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, client client.Interface, deploymentKey, deploymentValue, namespace string, out io.Writer) (*api.ReplicationController, error) {
 	var err error
-	// First, update the template label.  This ensures that any newly created pods will have the new label
+	// First, update the template label. This ensures that any newly created pods will have the new label
 	if oldRc, err = updateWithRetries(client.ReplicationControllers(namespace), oldRc, func(rc *api.ReplicationController) {
 		if rc.Spec.Template.Labels == nil {
 			rc.Spec.Template.Labels = map[string]string{}

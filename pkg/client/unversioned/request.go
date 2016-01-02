@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -590,7 +590,7 @@ func (r *Request) URL() *url.URL {
 // finalURLTemplate is similar to URL(), but will make all specific parameter values equal
 // - instead of name or namespace, "{name}" and "{namespace}" will be used, and all query
 // parameters will be reset. This creates a copy of the request so as not to change the
-// underyling object.  This means some useful request info (like the types of field
+// underyling object. This means some useful request info (like the types of field
 // selectors in use) will be lost.
 // TODO: preserve field selector keys
 func (r Request) finalURLTemplate() string {
@@ -663,15 +663,15 @@ func updateURLMetrics(req *Request, resp *http.Response, err error) {
 	if err != nil {
 		metrics.RequestResult.WithLabelValues(err.Error(), req.verb, url).Inc()
 	} else {
-		//Metrics for failure codes
+		// Metrics for failure codes
 		metrics.RequestResult.WithLabelValues(strconv.Itoa(resp.StatusCode), req.verb, url).Inc()
 	}
 }
 
 // Stream formats and executes the request, and offers streaming of the response.
 // Returns io.ReadCloser which could be used for streaming of the response, or an error
-// Any non-2xx http status code causes an error.  If we get a non-2xx code, we try to convert the body into an APIStatus object.
-// If we can, we return that as an error.  Otherwise, we create an error that lists the http status and the content of the response.
+// Any non-2xx http status code causes an error. If we get a non-2xx code, we try to convert the body into an APIStatus object.
+// If we can, we return that as an error. Otherwise, we create an error that lists the http status and the content of the response.
 func (r *Request) Stream() (io.ReadCloser, error) {
 	if r.err != nil {
 		return nil, r.err
@@ -731,7 +731,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 // fn at most once. It will return an error if a problem occurred prior to connecting to the
 // server - the provided function is responsible for handling server errors.
 func (r *Request) request(fn func(*http.Request, *http.Response)) error {
-	//Metrics for total request latency
+	// Metrics for total request latency
 	start := time.Now()
 	defer func() {
 		metrics.RequestLatency.WithLabelValues(r.verb, r.finalURLTemplate()).Observe(metrics.SinceInMicroseconds(start))
@@ -803,10 +803,10 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 // processing.
 //
 // Error type:
-//  * If the request can't be constructed, or an error happened earlier while building its
-//    arguments: *RequestConstructionError
-//  * If the server responds with a status: *errors.StatusError or *errors.UnexpectedObjectError
-//  * http.Client.Do errors are returned directly.
+// * If the request can't be constructed, or an error happened earlier while building its
+// arguments: *RequestConstructionError
+// * If the server responds with a status: *errors.StatusError or *errors.UnexpectedObjectError
+// * http.Client.Do errors are returned directly.
 func (r *Request) Do() Result {
 	var result Result
 	err := r.request(func(req *http.Request, resp *http.Response) {
@@ -878,15 +878,15 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 // unexpected responses. The rough structure is:
 //
 // 1. Assume the server sends you something sane - JSON + well defined error objects + proper codes
-//    - this is the happy path
-//    - when you get this output, trust what the server sends
+// - this is the happy path
+// - when you get this output, trust what the server sends
 // 2. Guard against empty fields / bodies in received JSON and attempt to cull sufficient info from them to
-//    generate a reasonable facsimile of the original failure.
-//    - Be sure to use a distinct error type or flag that allows a client to distinguish between this and error 1 above
+// generate a reasonable facsimile of the original failure.
+// - Be sure to use a distinct error type or flag that allows a client to distinguish between this and error 1 above
 // 3. Handle true disconnect failures / completely malformed data by moving up to a more generic client error
 // 4. Distinguish between various connection failures like SSL certificates, timeouts, proxy errors, unexpected
-//    initial contact, the presence of mismatched body contents from posted content types
-//    - Give these a separate distinct error type and capture as much as possible of the original message
+// initial contact, the presence of mismatched body contents from posted content types
+// - Give these a separate distinct error type and capture as much as possible of the original message
 //
 // TODO: introduce transformation of generic http.Client.Do() errors that separates 4.
 func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *http.Request, body []byte) error {

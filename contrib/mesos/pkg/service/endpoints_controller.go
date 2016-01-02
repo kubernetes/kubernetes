@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -400,9 +400,9 @@ func (e *endpointController) checkLeftoverEndpoints() {
 	}
 }
 
-// findPort locates the container port for the given pod and portName.  If the
-// targetPort is a number, use that.  If the targetPort is a string, look that
-// string up in all named ports in all containers in the target pod.  If no
+// findPort locates the container port for the given pod and portName. If the
+// targetPort is a number, use that. If the targetPort is a string, look that
+// string up in all named ports in all containers in the target pod. If no
 // match is found, fail.
 //
 // HACK(jdef): return the HostPort in addition to the ContainerPort for generic mesos compatibility

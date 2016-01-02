@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,18 +30,18 @@ type Signal <-chan struct{}
 // multiple invocations of the returned func will not generate a panic.
 // two funcs from separate invocations of Closer() (on the same sig chan) will cause a panic if both invoked.
 // for example:
-//     // good
-//     x := runtime.After(func() { ... })
-//     f := x.Closer()
-//     f()
-//     f()
+// //   good
+// x := runtime.After(func() { ... })
+// f := x.Closer()
+// f()
+// f()
 //
-//     // bad
-//     x := runtime.After(func() { ... })
-//     f := x.Closer()
-//     g := x.Closer()
-//     f()
-//     g() // this will panic
+// //   bad
+// x := runtime.After(func() { ... })
+// f := x.Closer()
+// g := x.Closer()
+// f()
+// g() //   this will panic
 func Closer(sig chan<- struct{}) func() {
 	var once sync.Once
 	return func() {
@@ -51,7 +51,7 @@ func Closer(sig chan<- struct{}) func() {
 
 // upon receiving signal sig invoke function f and immediately return a signal
 // that indicates f's completion. used to chain handler funcs, for example:
-//    On(job.Done(), response.Send).Then(wg.Done)
+// On(job.Done(), response.Send).Then(wg.Done)
 func (sig Signal) Then(f func()) Signal {
 	if sig == nil {
 		return nil

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -68,7 +68,7 @@ var _ = Describe("PersistentVolumes [Skipped]", func() {
 		pvc, err = c.PersistentVolumeClaims(ns).Create(pvc)
 		Expect(err).NotTo(HaveOccurred())
 
-		// allow the binder a chance to catch up.  should not be more than 20s.
+		// allow the binder a chance to catch up. should not be more than 20s.
 		waitForPersistentVolumePhase(api.VolumeBound, c, pv.Name, 1*time.Second, 30*time.Second)
 
 		pv, err = c.PersistentVolumes().Get(pv.Name)
@@ -81,7 +81,7 @@ var _ = Describe("PersistentVolumes [Skipped]", func() {
 		err = c.PersistentVolumeClaims(ns).Delete(pvc.Name)
 		Expect(err).NotTo(HaveOccurred())
 
-		// allow the recycler a chance to catch up.  it has to perform NFS scrub, which can be slow in e2e.
+		// allow the recycler a chance to catch up. it has to perform NFS scrub, which can be slow in e2e.
 		waitForPersistentVolumePhase(api.VolumeAvailable, c, pv.Name, 5*time.Second, 300*time.Second)
 
 		pv, err = c.PersistentVolumes().Get(pv.Name)

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,8 +29,8 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-//TODO : Consolidate this code with the code for emptyDir.
-//This will require some smart.
+// TODO : Consolidate this code with the code for emptyDir.
+// This will require some smart.
 var _ = Describe("hostPath", func() {
 	framework := NewFramework("hostpath")
 	var c *client.Client
@@ -40,7 +40,7 @@ var _ = Describe("hostPath", func() {
 		c = framework.Client
 		namespace = framework.Namespace
 
-		//cleanup before running the test.
+		// cleanup before running the test.
 		_ = os.Remove("/tmp/test-file")
 	})
 
@@ -79,8 +79,8 @@ var _ = Describe("hostPath", func() {
 			fmt.Sprintf("--file_content_in_loop=%v", filePath),
 			fmt.Sprintf("--retry_time=%d", retryDuration),
 		}
-		//Read the content of the file with the second container to
-		//verify volumes  being shared properly among containers within the pod.
+		// Read the content of the file with the second container to
+		// verify volumes being shared properly among containers within the pod.
 		testContainerOutput("hostPath r/w", c, pod, 1, []string{
 			"content of file \"/test-volume/test-file\": mount-tester new file",
 		}, namespace.Name,
@@ -88,8 +88,8 @@ var _ = Describe("hostPath", func() {
 	})
 })
 
-//These constants are borrowed from the other test.
-//const volumeName = "test-volume"
+// These constants are borrowed from the other test.
+// const volumeName = "test-volume"
 const containerName1 = "test-container-1"
 const containerName2 = "test-container-2"
 
@@ -104,7 +104,7 @@ func mount(source *api.HostPathVolumeSource) []api.Volume {
 	}
 }
 
-//TODO: To merge this with the emptyDir tests, we can make source a lambda.
+// TODO: To merge this with the emptyDir tests, we can make source a lambda.
 func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod {
 	podName := "pod-host-path-test"
 

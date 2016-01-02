@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -48,11 +48,11 @@ import (
 // * GCE L7 took too long to spin up
 // * GCE L7 took too long to health check a backend
 // * Repeated 404:
-//   - L7 is sending traffic to the default backend of the addon.
-//   - Backend is receiving /foo when it expects /bar.
+// - L7 is sending traffic to the default backend of the addon.
+// - Backend is receiving /foo when it expects /bar.
 // * Repeated 5xx:
-//   - Out of quota (describe ing should show you if this is the case)
-//   - Mismatched service/container port, or endpoints are dead.
+// - Out of quota (describe ing should show you if this is the case)
+// - Mismatched service/container port, or endpoints are dead.
 
 var (
 	appPrefix         = "app"
@@ -138,8 +138,8 @@ func ruleByIndex(i int) extensions.IngressRule {
 // createIngress creates an Ingress with num rules. Eg:
 // start = 1 num = 2 will given you a single Ingress with 2 rules:
 // Ingress {
-//	 foo1.bar.com: /foo1
-//	 foo2.bar.com: /foo2
+// 	 foo1.bar.com: /foo1
+// 	 foo2.bar.com: /foo2
 // }
 func createIngress(c *client.Client, ns string, start, num int) extensions.Ingress {
 	ing := extensions.Ingress{
@@ -472,10 +472,10 @@ var _ = Describe("GCE L7 LoadBalancer Controller [Serial] [Slow] [Flaky]", func(
 		// apps: {foo-app-(0-10)}
 		// ingress: {foo-app-(0, 2, 4, 6, 8)}
 		// paths:
-		//  ingress foo-app-0:
-		//	  default1.bar.com
-		//	  foo0.bar.com: /foo0
-		//	  foo1.bar.com: /foo1
+		// ingress foo-app-0:
+		// 	 default1.bar.com
+		// 	 foo0.bar.com: /foo0
+		// 	 foo1.bar.com: /foo1
 		if numApps < numIng {
 			Failf("Need more apps than Ingress")
 		}

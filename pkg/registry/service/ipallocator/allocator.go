@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -45,18 +45,18 @@ var (
 //
 // The internal structure of the range is:
 //
-//   For CIDR 10.0.0.0/24
-//   254 addresses usable out of 256 total (minus base and broadcast IPs)
-//     The number of usable addresses is r.max
+// For CIDR 10.0.0.0/24
+// 254 addresses usable out of 256 total (minus base and broadcast IPs)
+// The number of usable addresses is r.max
 //
-//   CIDR base IP          CIDR broadcast IP
-//   10.0.0.0                     10.0.0.255
-//   |                                     |
-//   0 1 2 3 4 5 ...         ... 253 254 255
-//     |                              |
-//   r.base                     r.base + r.max
-//     |                              |
-//   offset #0 of r.allocated   last offset of r.allocated
+// CIDR base IP CIDR broadcast IP
+// 10.0.0.0 10.0.0.255
+// | |
+// 0 1 2 3 4 5 ... ... 253 254 255
+// | |
+// r.base r.base + r.max
+// | |
+// offset #0 of r.allocated last offset of r.allocated
 type Range struct {
 	net *net.IPNet
 	// base is a cached version of the start IP in the CIDR range as a *big.Int
@@ -76,7 +76,7 @@ func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.Allocator
 	r := Range{
 		net:  cidr,
 		base: base.Add(base, big.NewInt(1)), // don't use the network base
-		max:  maximum(0, int(max-2)),        // don't use the network broadcast,
+		max: maximum(0, int(max-2)), // don't use the network broadcast,
 	}
 	r.alloc = allocatorFactory(r.max, rangeSpec)
 	return &r
@@ -103,7 +103,7 @@ func (r *Range) Free() int {
 
 // Allocate attempts to reserve the provided IP. ErrNotInRange or
 // ErrAllocated will be returned if the IP is not valid for this range
-// or has already been reserved.  ErrFull will be returned if there
+// or has already been reserved. ErrFull will be returned if there
 // are no addresses left.
 func (r *Range) Allocate(ip net.IP) error {
 	ok, offset := r.contains(ip)

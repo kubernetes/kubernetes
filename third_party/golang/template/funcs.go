@@ -1,6 +1,6 @@
-//This package is copied from Go library text/template.
-//The original private functions eq, ge, gt, le, lt, and ne
-//are exported as public functions.
+// This package is copied from Go library text/template.
+// The original private functions eq, ge, gt, le, lt, and ne
+// are exported as public functions.
 package template
 
 import (
@@ -106,7 +106,7 @@ func findFunction(name string) (reflect.Value, bool) {
 // Indexing.
 
 // index returns the result of indexing its first argument by the following
-// arguments.  Thus "index x 1 2 3" is, in Go syntax, x[1][2][3]. Each
+// arguments. Thus "index x 1 2 3" is, in Go syntax, x[1][2][3]. Each
 // indexed item must be a map, slice, or array.
 func index(item interface{}, indices ...interface{}) (interface{}, error) {
 	v := reflect.ValueOf(item)
@@ -575,7 +575,7 @@ func URLQueryEscaper(args ...interface{}) string {
 }
 
 // evalArgs formats the list of arguments into a string. It is therefore equivalent to
-//	fmt.Sprint(args...)
+// 	fmt.Sprint(args...)
 // except that each argument is indirected (if a pointer), as required,
 // using the same rules as the default string evaluation during template
 // execution.

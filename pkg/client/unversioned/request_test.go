@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -742,7 +742,7 @@ func TestBackoffLifecycle(t *testing.T) {
 	defer testServer.Close()
 	c := testRESTClient(t, testServer)
 
-	// Test backoff recovery and increase.  This correlates to the constants
+	// Test backoff recovery and increase. This correlates to the constants
 	// which are used in the server implementation returning StatusOK above.
 	seconds := []int{0, 1, 2, 4, 8, 0, 1, 2, 4, 0}
 	request := c.Verb("POST").Prefix("backofftest").Suffix("abc")

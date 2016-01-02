@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -158,13 +158,13 @@ type RESTMapping struct {
 // TODO(caesarxuchao): Add proper multi-group support so that kinds & resources are
 // scoped to groups. See http://issues.k8s.io/12413 and http://issues.k8s.io/10009.
 type RESTMapper interface {
-	// KindFor takes a partial resource and returns back the single match.  Returns an error if there are multiple matches
+	// KindFor takes a partial resource and returns back the single match. Returns an error if there are multiple matches
 	KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error)
 
 	// KindsFor takes a partial resource and returns back the list of potential kinds in priority order
 	KindsFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionKind, error)
 
-	// ResourceFor takes a partial resource and returns back the single match.  Returns an error if there are multiple matches
+	// ResourceFor takes a partial resource and returns back the single match. Returns an error if there are multiple matches
 	ResourceFor(input unversioned.GroupVersionResource) (unversioned.GroupVersionResource, error)
 
 	// ResourcesFor takes a partial resource and returns back the list of potential resource in priority order

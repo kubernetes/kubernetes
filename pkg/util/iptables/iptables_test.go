@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -186,7 +186,7 @@ func TestEnsureRuleAlreadyExists(t *testing.T) {
 		CommandScript: []exec.FakeCommandAction{
 			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Success of that exec means "done".
+			// The second Command() call is checking the rule. Success of that exec means "done".
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
@@ -222,7 +222,7 @@ func TestEnsureRuleNew(t *testing.T) {
 		CommandScript: []exec.FakeCommandAction{
 			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Failure of that means create it.
+			// The second Command() call is checking the rule. Failure of that means create it.
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
@@ -257,7 +257,7 @@ func TestEnsureRuleErrorChecking(t *testing.T) {
 		CommandScript: []exec.FakeCommandAction{
 			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Failure of that means create it.
+			// The second Command() call is checking the rule. Failure of that means create it.
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
@@ -287,7 +287,7 @@ func TestEnsureRuleErrorCreating(t *testing.T) {
 		CommandScript: []exec.FakeCommandAction{
 			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Failure of that means create it.
+			// The second Command() call is checking the rule. Failure of that means create it.
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
@@ -316,7 +316,7 @@ func TestDeleteRuleAlreadyExists(t *testing.T) {
 		CommandScript: []exec.FakeCommandAction{
 			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Failure of that exec means "does not exist".
+			// The second Command() call is checking the rule. Failure of that exec means "does not exist".
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
@@ -349,7 +349,7 @@ func TestDeleteRuleNew(t *testing.T) {
 		CommandScript: []exec.FakeCommandAction{
 			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Success of that means delete it.
+			// The second Command() call is checking the rule. Success of that means delete it.
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
@@ -381,7 +381,7 @@ func TestDeleteRuleErrorChecking(t *testing.T) {
 		CommandScript: []exec.FakeCommandAction{
 			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Failure of that means create it.
+			// The second Command() call is checking the rule. Failure of that means create it.
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
@@ -411,7 +411,7 @@ func TestDeleteRuleErrorCreating(t *testing.T) {
 		CommandScript: []exec.FakeCommandAction{
 			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Success of that means delete it.
+			// The second Command() call is checking the rule. Success of that means delete it.
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
@@ -482,7 +482,7 @@ COMMIT
 	}
 	fexec := exec.FakeExec{
 		CommandScript: []exec.FakeCommandAction{
-			// The first Command() call is checking the rule.  Success of that exec means "done".
+			// The first Command() call is checking the rule. Success of that exec means "done".
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
@@ -520,7 +520,7 @@ COMMIT
 	}
 	fexec := exec.FakeExec{
 		CommandScript: []exec.FakeCommandAction{
-			// The first Command() call is checking the rule.  Success of that exec means "done".
+			// The first Command() call is checking the rule. Success of that exec means "done".
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}

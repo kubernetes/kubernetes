@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -136,7 +136,7 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 		},
 		func(j *api.ReplicationControllerSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
-			//j.TemplateRef = nil // this is required for round trip
+			// j.TemplateRef = nil //   this is required for round trip
 		},
 		func(j *extensions.DeploymentStrategy, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
@@ -166,15 +166,15 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 		func(j *api.List, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			// TODO: uncomment when round trip starts from a versioned object
-			if false { //j.Items == nil {
+			if false { // j.Items == nil {
 				j.Items = []runtime.Object{}
 			}
 		},
 		func(j *runtime.Object, c fuzz.Continue) {
 			// TODO: uncomment when round trip starts from a versioned object
-			if true { //c.RandBool() {
+			if true { // c.RandBool() {
 				*j = &runtime.Unknown{
-					// apiVersion has rules now.  Since it includes <group>/<version> and only `v1` can be bare,
+					// apiVersion has rules now. Since it includes <group>/<version> and only `v1` can be bare,
 					// then this must choose a valid format to deserialize
 					TypeMeta: runtime.TypeMeta{Kind: "Something", APIVersion: "unknown.group/unknown"},
 					RawJSON:  []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`),
@@ -288,7 +288,7 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(ct *api.Container, c fuzz.Continue) {
-			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
+			c.FuzzNoCustom(ct) // fuzz self without calling this function again
 			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty
 		},
 		func(p *api.Probe, c fuzz.Continue) {
@@ -360,8 +360,8 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			s.Phase = api.NamespaceActive
 		},
 		func(http *api.HTTPGetAction, c fuzz.Continue) {
-			c.FuzzNoCustom(http)            // fuzz self without calling this function again
-			http.Path = "/" + http.Path     // can't be blank
+			c.FuzzNoCustom(http) // fuzz self without calling this function again
+			http.Path = "/" + http.Path // can't be blank
 			http.Scheme = "x" + http.Scheme // can't be blank
 		},
 		func(ss *api.ServiceSpec, c fuzz.Continue) {

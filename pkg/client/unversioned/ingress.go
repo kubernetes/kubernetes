@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -92,7 +92,7 @@ func (c *ingress) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Watch()
 }
 
-// UpdateStatus takes the name of the ingress and the new status.  Returns the server's representation of the ingress, and an error, if it occurs.
+// UpdateStatus takes the name of the ingress and the new status. Returns the server's representation of the ingress, and an error, if it occurs.
 func (c *ingress) UpdateStatus(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	result = &extensions.Ingress{}
 	err = c.r.Put().Namespace(c.ns).Resource("ingresses").Name(ingress.Name).SubResource("status").Body(ingress).Do().Into(result)

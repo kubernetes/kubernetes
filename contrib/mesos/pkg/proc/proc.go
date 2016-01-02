@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -45,13 +45,13 @@ type scheduledAction struct {
 }
 
 type processState struct {
-	actions    chan *scheduledAction           // scheduled action backlog
-	running    chan struct{}                   // closes upon start of action backlog processing
-	terminated chan struct{}                   // closes upon termination of run()
-	doer       Doer                            // delegate that schedules actions
-	guardDoer  sync.RWMutex                    // protect doer
-	end        chan struct{}                   // closes upon invocation of End()
-	closeEnd   sync.Once                       // guard: only close end chan once
+	actions chan *scheduledAction // scheduled action backlog
+	running chan struct{} // closes upon start of action backlog processing
+	terminated chan struct{} // closes upon termination of run()
+	doer Doer // delegate that schedules actions
+	guardDoer sync.RWMutex // protect doer
+	end chan struct{} // closes upon invocation of End()
+	closeEnd sync.Once // guard: only close end chan once
 	nextAction func() (*scheduledAction, bool) // return false if actions queue is closed
 }
 
@@ -125,7 +125,7 @@ func (ps *processState) run() {
 	// updating the state func along the way.
 	f := stateRun
 	ps.nextAction = func() (a *scheduledAction, ok bool) {
-		// if we successfully read from ps.end,  we don't know if the
+		// if we successfully read from ps.end, we don't know if the
 		// actions queue is closed. assume it's not: the state machine
 		// shouldn't terminate yet.
 		// also, give preference to ps.end: we want to avoid processing

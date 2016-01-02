@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -66,7 +66,7 @@ func updateMacroBlock(mlines mungeLines, token string, insertThis mungeLines) (m
 	return out, nil
 }
 
-// Tests that a document, represented as a slice of lines, has a line.  Ignores
+// Tests that a document, represented as a slice of lines, has a line. Ignores
 // leading and trailing space.
 func hasLine(lines mungeLines, needle string) bool {
 	for _, mline := range lines {
@@ -157,13 +157,13 @@ func hasMacroBlock(lines mungeLines, token string) bool {
 	return false
 }
 
-// Returns the canonical begin-tag for a given description.  This does not
+// Returns the canonical begin-tag for a given description. This does not
 // include the trailing newline.
 func beginMungeTag(desc string) string {
 	return fmt.Sprintf("<!-- BEGIN MUNGE: %s -->", desc)
 }
 
-// Returns the canonical end-tag for a given description.  This does not
+// Returns the canonical end-tag for a given description. This does not
 // include the trailing newline.
 func endMungeTag(desc string) string {
 	return fmt.Sprintf("<!-- END MUNGE: %s -->", desc)
@@ -271,8 +271,8 @@ func getMungeLines(in string) mungeLines {
 
 // filePath is the file we are looking for
 // inFile is the file where we found the link. So if we are processing
-//    /path/to/repoRoot/docs/admin/README.md and are looking for
-//    ../../file.json we can find that location.
+// /path/to/repoRoot/docs/admin/README.md and are looking for
+// ../../file.json we can find that location.
 // In many cases filePath and processingFile may be the same
 func makeRepoRelative(filePath string, processingFile string) (string, error) {
 	if filePath, err := filepath.Rel(repoRoot, filePath); err == nil {

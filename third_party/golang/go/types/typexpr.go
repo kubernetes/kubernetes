@@ -465,15 +465,15 @@ func (check *Checker) interfaceType(iface *Interface, ityp *ast.InterfaceType, d
 	}
 
 	// Phase 1: Collect explicitly declared methods, the corresponding
-	//          signature (AST) expressions, and the list of embedded
-	//          type (AST) expressions. Do not resolve signatures or
-	//          embedded types yet to avoid cycles referring to this
-	//          interface.
+	// signature (AST) expressions, and the list of embedded
+	// type (AST) expressions. Do not resolve signatures or
+	// embedded types yet to avoid cycles referring to this
+	// interface.
 
 	var (
 		mset       objset
 		signatures []ast.Expr // list of corresponding method signatures
-		embedded   []ast.Expr // list of embedded types
+		embedded []ast.Expr // list of embedded types
 	)
 	for _, f := range ityp.Methods.List {
 		if len(f.Names) > 0 {
@@ -511,14 +511,14 @@ func (check *Checker) interfaceType(iface *Interface, ityp *ast.InterfaceType, d
 	}
 
 	// Phase 2: Resolve embedded interfaces. Because an interface must not
-	//          embed itself (directly or indirectly), each embedded interface
-	//          can be fully resolved without depending on any method of this
-	//          interface (if there is a cycle or another error, the embedded
-	//          type resolves to an invalid type and is ignored).
-	//          In particular, the list of methods for each embedded interface
-	//          must be complete (it cannot depend on this interface), and so
-	//          those methods can be added to the list of all methods of this
-	//          interface.
+	// embed itself (directly or indirectly), each embedded interface
+	// can be fully resolved without depending on any method of this
+	// interface (if there is a cycle or another error, the embedded
+	// type resolves to an invalid type and is ignored).
+	// In particular, the list of methods for each embedded interface
+	// must be complete (it cannot depend on this interface), and so
+	// those methods can be added to the list of all methods of this
+	// interface.
 
 	for _, e := range embedded {
 		pos := e.Pos()
@@ -544,10 +544,10 @@ func (check *Checker) interfaceType(iface *Interface, ityp *ast.InterfaceType, d
 	}
 
 	// Phase 3: At this point all methods have been collected for this interface.
-	//          It is now safe to type-check the signatures of all explicitly
-	//          declared methods, even if they refer to this interface via a cycle
-	//          and embed the methods of this interface in a parameter of interface
-	//          type.
+	// It is now safe to type-check the signatures of all explicitly
+	// declared methods, even if they refer to this interface via a cycle
+	// and embed the methods of this interface in a parameter of interface
+	// type.
 
 	for i, m := range iface.methods {
 		expr := signatures[i]

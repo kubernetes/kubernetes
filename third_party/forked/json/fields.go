@@ -60,7 +60,7 @@ func LookupPatchMetadata(t reflect.Type, jsonField string) (reflect.Type, string
 // A field represents a single field found in a struct.
 type field struct {
 	name      string
-	nameBytes []byte                 // []byte(name)
+	nameBytes []byte // []byte(name)
 	equalFold func(s, t []byte) bool // bytes.EqualFold or equivalent
 
 	tag bool
@@ -333,7 +333,7 @@ func isValidTag(s string) bool {
 }
 
 const (
-	caseMask     = ^byte(0x20) // Mask to ignore case in ASCII.
+	caseMask = ^byte(0x20) // Mask to ignore case in ASCII.
 	kelvin       = '\u212a'
 	smallLongEss = '\u017f'
 )
@@ -347,8 +347,8 @@ const (
 // 4) simpleLetterEqualFold, no specials, no non-letters.
 //
 // The letters S and K are special because they map to 3 runes, not just 2:
-//  * S maps to s and to U+017F 'ſ' Latin small letter long s
-//  * k maps to K and to U+212A 'K' Kelvin sign
+// * S maps to s and to U+017F 'ſ' Latin small letter long s
+// * k maps to K and to U+212A 'K' Kelvin sign
 // See http://play.golang.org/p/tTxjOc0OGo
 //
 // The returned function is specialized for matching against s and

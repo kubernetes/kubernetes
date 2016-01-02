@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,20 +20,20 @@ import (
 	"time"
 )
 
-// RetryFn represents a retryable test condition.  It returns an error if the condition is not met
+// RetryFn represents a retryable test condition. It returns an error if the condition is not met
 // otherwise returns nil for success.
 type RetryFn func() error
 
-// Retry retries the RetryFn for a maximum of maxWait time.  The wait duration is waited between
-// retries.  If the success condition is not met in maxWait time, the list of encountered errors
-// is returned.  If successful returns an empty list.
+// Retry retries the RetryFn for a maximum of maxWait time. The wait duration is waited between
+// retries. If the success condition is not met in maxWait time, the list of encountered errors
+// is returned. If successful returns an empty list.
 // Example:
 // Expect(Retry(time.Minute*1, time.Second*2, func() error {
-//    if success {
-//      return nil
-//    } else {
-//      return errors.New("Failed")
-//    }
+// if success {
+// return nil
+// } else {
+// return errors.New("Failed")
+// }
 // }).To(BeNil(), fmt.Sprintf("Failed"))
 func Retry(maxWait time.Duration, wait time.Duration, retry RetryFn) []error {
 	errs := []error{}

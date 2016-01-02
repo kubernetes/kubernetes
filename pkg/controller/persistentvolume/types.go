@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	// A PVClaim can request a quality of service tier by adding this annotation.  The value of the annotation
-	// is arbitrary.  The values are pre-defined by a cluster admin and known to users when requesting a QoS.
+	// A PVClaim can request a quality of service tier by adding this annotation. The value of the annotation
+	// is arbitrary. The values are pre-defined by a cluster admin and known to users when requesting a QoS.
 	// For example tiers might be gold, silver, and tin and the admin configures what that means for each volume plugin that can provision a volume.
 	// Values in the alpha version of this feature are not meaningful, but will be in the full version of this feature.
 	qosProvisioningKey = "volume.alpha.kubernetes.io/storage-class"
@@ -87,11 +87,11 @@ type matchPredicate func(compareThis, toThis *api.PersistentVolume) bool
 
 // find returns the nearest PV from the ordered list or nil if a match is not found
 func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVolumeClaim, matchPredicate matchPredicate) (*api.PersistentVolume, error) {
-	// PVs are indexed by their access modes to allow easier searching.  Each index is the string representation of a set of access modes.
+	// PVs are indexed by their access modes to allow easier searching. Each index is the string representation of a set of access modes.
 	// There is a finite number of possible sets and PVs will only be indexed in one of them (whichever index matches the PV's modes).
 	//
-	// A request for resources will always specify its desired access modes.  Any matching PV must have at least that number
-	// of access modes, but it can have more.  For example, a user asks for ReadWriteOnce but a GCEPD is available, which is ReadWriteOnce+ReadOnlyMany.
+	// A request for resources will always specify its desired access modes. Any matching PV must have at least that number
+	// of access modes, but it can have more. For example, a user asks for ReadWriteOnce but a GCEPD is available, which is ReadWriteOnce+ReadOnlyMany.
 	//
 	// Searches are performed against a set of access modes, so we can attempt not only the exact matching modes but also
 	// potential matches (the GCEPD example above).
@@ -121,7 +121,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 		}
 
 		// a claim requesting provisioning will have an exact match pre-bound to the claim.
-		// no need to search through unbound volumes.  The matching volume will be created by the provisioner
+		// no need to search through unbound volumes. The matching volume will be created by the provisioner
 		// and will match above when the claim is re-processed by the binder.
 		if keyExists(qosProvisioningKey, claim.Annotations) {
 			return nil, nil
@@ -190,20 +190,20 @@ func matchStorageCapacity(pvA, pvB *api.PersistentVolume) bool {
 // A request for RWO could be satisfied by both sets of indexed volumes, so allPossibleMatchingAccessModes returns:
 //
 // [][]api.PersistentVolumeAccessMode {
-//      []api.PersistentVolumeAccessMode {
-//			api.ReadWriteOnce, api.ReadOnlyMany,
-//		},
-//      []api.PersistentVolumeAccessMode {
-//			api.ReadWriteOnce, api.ReadOnlyMany, api.ReadWriteMany,
-//		},
+// []api.PersistentVolumeAccessMode {
+// 			api.ReadWriteOnce, api.ReadOnlyMany,
+// 		},
+// []api.PersistentVolumeAccessMode {
+// 			api.ReadWriteOnce, api.ReadOnlyMany, api.ReadWriteMany,
+// 		},
 // }
 //
 // A request for RWX can be satisfied by only one set of indexed volumes, so the return is:
 //
 // [][]api.PersistentVolumeAccessMode {
-//      []api.PersistentVolumeAccessMode {
-//			api.ReadWriteOnce, api.ReadOnlyMany, api.ReadWriteMany,
-//		},
+// []api.PersistentVolumeAccessMode {
+// 			api.ReadWriteOnce, api.ReadOnlyMany, api.ReadWriteMany,
+// 		},
 // }
 //
 // This func returns modes with ascending levels of modes to give the user what is closest to what they actually asked for.

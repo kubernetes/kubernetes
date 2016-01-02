@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -164,10 +164,10 @@ func objDiff(a, b interface{}) string {
 	// An alternate diff attempt, in case json isn't showing you
 	// the difference. (reflect.DeepEqual makes a distinction between
 	// nil and empty slices, for example.)
-	//return util.StringDiff(
-	//	fmt.Sprintf("%#v", a),
-	//	fmt.Sprintf("%#v", b),
-	//)
+	// return util.StringDiff(
+	// 	fmt.Sprintf("%#v", a),
+	// 	fmt.Sprintf("%#v", b),
+	// )
 }
 
 func runTest(t *testing.T, source interface{}) {
@@ -351,8 +351,8 @@ func TestEncode_Ptr(t *testing.T) {
 func TestBadJSONRejection(t *testing.T) {
 	s := GetTestScheme()
 	badJSONs := [][]byte{
-		[]byte(`{"myVersionKey":"v1"}`),                          // Missing kind
-		[]byte(`{"myVersionKey":"v1","myKindKey":"bar"}`),        // Unknown kind
+		[]byte(`{"myVersionKey":"v1"}`), // Missing kind
+		[]byte(`{"myVersionKey":"v1","myKindKey":"bar"}`), // Unknown kind
 		[]byte(`{"myVersionKey":"bar","myKindKey":"TestType1"}`), // Unknown version
 	}
 	for _, b := range badJSONs {

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -55,16 +55,16 @@ type MinionServer struct {
 	kmBinary       string
 	tasks          []*tasks.Task
 
-	pathOverride        string // the PATH environment for the sub-processes
-	cgroupPrefix        string // e.g. mesos
-	cgroupRoot          string // the cgroupRoot that we pass to the kubelet-executor, depends on containPodResources
-	mesosCgroup         string // discovered mesos cgroup root, e.g. /mesos/{container-id}
+	pathOverride string // the PATH environment for the sub-processes
+	cgroupPrefix string // e.g. mesos
+	cgroupRoot string // the cgroupRoot that we pass to the kubelet-executor, depends on containPodResources
+	mesosCgroup string // discovered mesos cgroup root, e.g. /mesos/{container-id}
 	containPodResources bool
 
 	logMaxSize      resource.Quantity
 	logMaxBackups   int
 	logMaxAgeInDays int
-	logVerbosity    int32 // see glog.Level
+	logVerbosity int32 // see glog.Level
 
 	runProxy     bool
 	proxyLogV    int
@@ -76,14 +76,14 @@ type MinionServer struct {
 func NewMinionServer() *MinionServer {
 	s := &MinionServer{
 		KubeletExecutorServer: exservice.NewKubeletExecutorServer(),
-		privateMountNS:        false, // disabled until Docker supports customization of the parent mount namespace
+		privateMountNS: false, // disabled until Docker supports customization of the parent mount namespace
 		cgroupPrefix:          config.DefaultCgroupPrefix,
 		containPodResources:   true,
 		logMaxSize:            config.DefaultLogMaxSize(),
 		logMaxBackups:         config.DefaultLogMaxBackups,
 		logMaxAgeInDays:       config.DefaultLogMaxAgeInDays,
 		runProxy:              true,
-		proxyMode:             "userspace", // upstream default is "iptables" post-v1.1
+		proxyMode: "userspace", // upstream default is "iptables" post-v1.1
 	}
 
 	// cache this for later use

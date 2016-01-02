@@ -7,7 +7,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -139,13 +139,13 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 	}
 
 	// The test does the following for each nodeStateManager in this list:
-	//	1. Create a new node
-	//	2. Apply the makeUnSchedulable function
-	//	3. Create a new pod
-	//  4. Check that the pod doesn't get assigned to the node
-	//  5. Apply the schedulable function
-	//  6. Check that the pod *does* get assigned to the node
-	//  7. Delete the pod and node.
+	// 	1. Create a new node
+	// 	2. Apply the makeUnSchedulable function
+	// 	3. Create a new pod
+	// 4. Check that the pod doesn't get assigned to the node
+	// 5. Apply the schedulable function
+	// 6. Check that the pod *does* get assigned to the node
+	// 7. Delete the pod and node.
 
 	nodeModifications := []nodeStateManager{
 		// Test node.Spec.Unschedulable=true/false
@@ -352,8 +352,8 @@ func TestMultiScheduler(t *testing.T) {
 	}
 
 	// 4. **check point-1**:
-	//		- testPodNoAnnotation, testPodWithAnnotationFitsDefault should be scheduled
-	//		- testPodWithAnnotationFitsFoo should NOT be scheduled
+	// 		- testPodNoAnnotation, testPodWithAnnotationFitsDefault should be scheduled
+	// 		- testPodWithAnnotationFitsFoo should NOT be scheduled
 	err = wait.Poll(time.Second, time.Second*5, podScheduled(restClient, testPodNoAnnotation.Namespace, testPodNoAnnotation.Name))
 	if err != nil {
 		t.Errorf("Test MultiScheduler: %s Pod not scheduled: %v", testPodNoAnnotation.Name, err)
@@ -390,8 +390,8 @@ func TestMultiScheduler(t *testing.T) {
 
 	defer close(schedulerConfig2.StopEverything)
 
-	//	6. **check point-2**:
-	//		- testPodWithAnnotationFitsFoo should be scheduled
+	// 	6. **check point-2**:
+	// 		- testPodWithAnnotationFitsFoo should be scheduled
 	err = wait.Poll(time.Second, time.Second*5, podScheduled(restClient, testPodWithAnnotationFitsFoo.Namespace, testPodWithAnnotationFitsFoo.Name))
 	if err != nil {
 		t.Errorf("Test MultiScheduler: %s Pod not scheduled, %v", testPodWithAnnotationFitsFoo.Name, err)
@@ -399,7 +399,7 @@ func TestMultiScheduler(t *testing.T) {
 		t.Logf("Test MultiScheduler: %s Pod scheduled", testPodWithAnnotationFitsFoo.Name)
 	}
 
-	//	7. delete the pods that were scheduled by the default scheduler, and stop the default scheduler
+	// 	7. delete the pods that were scheduled by the default scheduler, and stop the default scheduler
 	err = restClient.Pods(api.NamespaceDefault).Delete(testPodNoAnnotation.Name, api.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("Failed to delete pod: %v", err)
@@ -410,8 +410,8 @@ func TestMultiScheduler(t *testing.T) {
 	}
 	close(schedulerConfig.StopEverything)
 
-	//	8. create 2 pods: testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2
-	//		- note: these two pods belong to default scheduler which no longer exists
+	// 	8. create 2 pods: testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2
+	// 		- note: these two pods belong to default scheduler which no longer exists
 	podWithNoAnnotation2 := createPod("pod-with-no-annotation2", nil)
 	podWithAnnotationFitsDefault2 := createPod("pod-with-annotation-fits-default2", schedulerAnnotationFitsDefault)
 	testPodNoAnnotation2, err := restClient.Pods(api.NamespaceDefault).Create(podWithNoAnnotation2)
@@ -423,8 +423,8 @@ func TestMultiScheduler(t *testing.T) {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
-	//	9. **check point-3**:
-	//		- testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2 shoule NOT be scheduled
+	// 	9. **check point-3**:
+	// 		- testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2 shoule NOT be scheduled
 	err = wait.Poll(time.Second, time.Second*5, podScheduled(restClient, testPodNoAnnotation2.Namespace, testPodNoAnnotation2.Name))
 	if err == nil {
 		t.Errorf("Test MultiScheduler: %s Pod got scheduled, %v", testPodNoAnnotation2.Name, err)

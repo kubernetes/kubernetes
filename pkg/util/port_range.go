@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,7 +22,7 @@ import (
 	"strings"
 )
 
-// PortRange represents a range of TCP/UDP ports.  To represent a single port,
+// PortRange represents a range of TCP/UDP ports. To represent a single port,
 // set Size to 1.
 type PortRange struct {
 	Base int
@@ -44,7 +44,7 @@ func (pr PortRange) String() string {
 }
 
 // Set parses a string of the form "min-max", inclusive at both ends, and
-// sets the PortRange from it.  This is part of the flag.Value and pflag.Value
+// sets the PortRange from it. This is part of the flag.Value and pflag.Value
 // interfaces.
 func (pr *PortRange) Set(value string) error {
 	value = strings.TrimSpace(value)
@@ -82,7 +82,7 @@ func (pr *PortRange) Set(value string) error {
 	return nil
 }
 
-// Type returns a descriptive string about this type.  This is part of the
+// Type returns a descriptive string about this type. This is part of the
 // pflag.Value interface.
 func (*PortRange) Type() string {
 	return "portRange"

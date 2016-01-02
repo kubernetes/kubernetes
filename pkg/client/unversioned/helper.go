@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -46,7 +46,7 @@ type Config struct {
 	// Host must be a host string, a host:port pair, or a URL to the base of the API.
 	Host string
 	// Prefix is the sub path of the server. If not specified, the client will set
-	// a default value.  Use "/" to indicate the server root should be used
+	// a default value. Use "/" to indicate the server root should be used
 	Prefix string
 	// GroupVersion is the API version to talk to. Must be provided when initializing
 	// a RESTClient directly. When initializing a Client, will be set with the default
@@ -86,7 +86,7 @@ type Config struct {
 	// on top of the returned RoundTripper.
 	WrapTransport func(rt http.RoundTripper) http.RoundTripper
 
-	// QPS indicates the maximum QPS to the master from this client.  If zero, QPS is unlimited.
+	// QPS indicates the maximum QPS to the master from this client. If zero, QPS is unlimited.
 	QPS float32
 
 	// Maximum burst for throttle
@@ -230,12 +230,12 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 // NegotiateVersion queries the server's supported api versions to find
 // a version that both client and server support.
 // - If no version is provided, try registered client versions in order of
-//   preference.
+// preference.
 // - If version is provided, but not default config (explicitly requested via
-//   commandline flag), and is unsupported by the server, print a warning to
-//   stderr and try client's registered versions in order of preference.
+// commandline flag), and is unsupported by the server, print a warning to
+// stderr and try client's registered versions in order of preference.
 // - If version is config default, and the server does not support it,
-//   return an error.
+// return an error.
 func NegotiateVersion(client *Client, c *Config, requestedGV *unversioned.GroupVersion, clientRegisteredGVs []unversioned.GroupVersion) (*unversioned.GroupVersion, error) {
 	var err error
 	if client == nil {
@@ -338,7 +338,7 @@ func InClusterConfig() (*Config, error) {
 
 	return &Config{
 		// TODO: switch to using cluster DNS.
-		Host:            "https://" + net.JoinHostPort(host, port),
+		Host: "https://" + net.JoinHostPort(host, port),
 		BearerToken:     string(token),
 		TLSClientConfig: tlsClientConfig,
 	}, nil

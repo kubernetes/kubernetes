@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -114,10 +114,10 @@ func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 	return []VolumePlugin{&FakeVolumePlugin{PluginName: "fake-plugin"}}
 }
 
-// FakeVolumePlugin is useful for testing.  It tries to be a fully compliant
+// FakeVolumePlugin is useful for testing. It tries to be a fully compliant
 // plugin, but all it does is make empty directories.
 // Use as:
-//   volume.RegisterPlugin(&FakePlugin{"fake-name"})
+// volume.RegisterPlugin(&FakePlugin{"fake-name"})
 type FakeVolumePlugin struct {
 	PluginName string
 	Host       VolumeHost

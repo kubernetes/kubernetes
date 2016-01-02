@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -91,7 +91,7 @@ func NamespaceValue(ctx Context) string {
 	return namespace
 }
 
-// ValidNamespace returns false if the namespace on the context differs from the resource.  If the resource has no namespace, it is set to the value in the context.
+// ValidNamespace returns false if the namespace on the context differs from the resource. If the resource has no namespace, it is set to the value in the context.
 func ValidNamespace(ctx Context, resource *ObjectMeta) bool {
 	ns, ok := NamespaceFrom(ctx)
 	if len(resource.Namespace) == 0 {

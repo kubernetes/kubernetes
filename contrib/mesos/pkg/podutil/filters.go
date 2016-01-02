@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,8 +29,8 @@ type Filters []FilterFunc
 
 // Annotate safely copies annotation metadata from kv to meta.Annotations.
 func Annotate(meta *api.ObjectMeta, kv map[string]string) {
-	//TODO(jdef) this func probably belong in an "apiutil" package, but we don't
-	//have much to put there right now so it can just live here.
+	// TODO(jdef) this func probably belong in an "apiutil" package, but we don't
+	// have much to put there right now so it can just live here.
 	if meta.Annotations == nil {
 		meta.Annotations = make(map[string]string)
 	}

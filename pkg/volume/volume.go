@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,7 +36,7 @@ type Volume interface {
 
 // MetricsProvider exposes metrics (e.g. used,available space) related to a Volume.
 type MetricsProvider interface {
-	// GetMetrics returns the Metrics for the Volume.  Maybe expensive for some implementations.
+	// GetMetrics returns the Metrics for the Volume. Maybe expensive for some implementations.
 	GetMetrics() (*Metrics, error)
 }
 
@@ -70,11 +70,11 @@ type Builder interface {
 	// Uses Interface to provide the path for Docker binds.
 	Volume
 	// SetUp prepares and mounts/unpacks the volume to a self-determined
-	// directory path.  This may be called more than once, so
+	// directory path. This may be called more than once, so
 	// implementations must be idempotent.
 	SetUp() error
 	// SetUpAt prepares and mounts/unpacks the volume to the specified
-	// directory path, which may or may not exist yet.  This may be called
+	// directory path, which may or may not exist yet. This may be called
 	// more than once, so implementations must be idempotent.
 	SetUpAt(dir string) error
 	// GetAttributes returns the attributes of the builder.
@@ -95,8 +95,8 @@ type Cleaner interface {
 // Recycler provides methods to reclaim the volume resource.
 type Recycler interface {
 	Volume
-	// Recycle reclaims the resource.  Calls to this method should block until the recycling task is complete.
-	// Any error returned indicates the volume has failed to be reclaimed.  A nil return indicates success.
+	// Recycle reclaims the resource. Calls to this method should block until the recycling task is complete.
+	// Any error returned indicates the volume has failed to be reclaimed. A nil return indicates success.
 	Recycle() error
 }
 
@@ -108,11 +108,11 @@ type Provisioner interface {
 	Provision(*api.PersistentVolume) error
 	// NewPersistentVolumeTemplate creates a new PersistentVolume to be used as a template before saving.
 	// The provisioner will want to tweak its properties, assign correct annotations, etc.
-	// This func should *NOT* persist the PV in the API.  That is left to the caller.
+	// This func should *NOT* persist the PV in the API. That is left to the caller.
 	NewPersistentVolumeTemplate() (*api.PersistentVolume, error)
 }
 
-// Delete removes the resource from the underlying storage provider.  Calls to this method should block until
+// Delete removes the resource from the underlying storage provider. Calls to this method should block until
 // the deletion is complete. Any error returned indicates the volume has failed to be reclaimed.
 // A nil return indicates success.
 type Deleter interface {

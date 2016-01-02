@@ -51,8 +51,8 @@ func (check *Checker) conversion(x *operand, T Type) {
 		final = T
 		// - For conversions to interfaces, use the argument's default type.
 		// - For conversions of untyped constants to non-constant types, also
-		//   use the default type (e.g., []byte("foo") should report string
-		//   not []byte as type for the constant "foo").
+		// use the default type (e.g., []byte("foo") should report string
+		// not []byte as type for the constant "foo").
 		// - Keep untyped nil for untyped nil arguments.
 		if IsInterface(T) || constArg && !isConstType(T) {
 			final = defaultType(x.typ)
@@ -126,8 +126,8 @@ func isUintptr(typ Type) bool {
 
 func isUnsafePointer(typ Type) bool {
 	// TODO(gri): Is this (typ.Underlying() instead of just typ) correct?
-	//            The spec does not say so, but gc claims it is. See also
-	//            issue 6326.
+	// The spec does not say so, but gc claims it is. See also
+	// issue 6326.
 	t, ok := typ.Underlying().(*Basic)
 	return ok && t.kind == UnsafePointer
 }

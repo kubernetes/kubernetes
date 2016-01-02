@@ -21,8 +21,8 @@ var V0 uintptr
 // CAx constants should appear after CBx constants.
 const (
 	CA2 = iota // before CA1
-	CA1        // before CA0
-	CA0        // at end
+	CA1 // before CA0
+	CA0 // at end
 )
 
 // VAx variables should appear after VBx variables.

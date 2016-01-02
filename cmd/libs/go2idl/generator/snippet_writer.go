@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -79,9 +79,9 @@ func NewSnippetWriter(w io.Writer, c *Context, left, right string) *SnippetWrite
 // * "type" therefore sees a map and looks up the key "type"
 // * "|" means "pass the thing on the left to the thing on the right"
 // * "public" is the name of a naming system, so the SnippetWriter has given
-//   the template a function called "public" that takes a *types.Type and
-//   returns the naming system's name. E.g., if the type is "string" this might
-//   return "String".
+// the template a function called "public" that takes a *types.Type and
+// returns the naming system's name. E.g., if the type is "string" this might
+// return "String".
 // * the second "$" ends the template directive.
 //
 // The map is actually not necessary. The below does the same thing:

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -72,14 +72,14 @@ func (c *pods) Delete(name string, options *api.DeleteOptions) error {
 	return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Body(options).Do().Error()
 }
 
-// Create takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.
+// Create takes the representation of a pod. Returns the server's representation of the pod, and an error, if it occurs.
 func (c *pods) Create(pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	err = c.r.Post().Namespace(c.ns).Resource("pods").Body(pod).Do().Into(result)
 	return
 }
 
-// Update takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs.
+// Update takes the representation of a pod to update. Returns the server's representation of the pod, and an error, if it occurs.
 func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	err = c.r.Put().Namespace(c.ns).Resource("pods").Name(pod.Name).Body(pod).Do().Into(result)
@@ -101,7 +101,7 @@ func (c *pods) Bind(binding *api.Binding) error {
 	return c.r.Post().Namespace(c.ns).Resource("pods").Name(binding.Name).SubResource("binding").Body(binding).Do().Error()
 }
 
-// UpdateStatus takes the name of the pod and the new status.  Returns the server's representation of the pod, and an error, if it occurs.
+// UpdateStatus takes the name of the pod and the new status. Returns the server's representation of the pod, and an error, if it occurs.
 func (c *pods) UpdateStatus(pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	err = c.r.Put().Namespace(c.ns).Resource("pods").Name(pod.Name).SubResource("status").Body(pod).Do().Into(result)

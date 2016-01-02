@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -229,9 +229,9 @@ func main() {
 	// For each markdown file under source docs root, process the doc.
 	// - If any error occurs: exit with failure (exit >1).
 	// - If verify is true: exit 0 if no changes needed, exit 1 if changes
-	//   needed.
+	// needed.
 	// - If verify is false: exit 0 if changes successfully made or no
-	//   changes needed, exit 1 if manual changes are needed.
+	// changes needed, exit 1 if manual changes are needed.
 	var changesNeeded bool
 
 	err = filepath.Walk(*rootDir, newWalkFunc(&fp, &changesNeeded))

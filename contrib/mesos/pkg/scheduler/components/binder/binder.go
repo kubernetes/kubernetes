@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -63,7 +63,7 @@ func (b *binder) Bind(binding *api.Binding) error {
 		// in this case it's likely that the pod has been deleted between Schedule
 		// and Bind calls
 		log.Infof("No pending task for pod %s", podKey)
-		return errors.NoSuchPodErr //TODO(jdef) this error is somewhat misleading since the task could be running?!
+		return errors.NoSuchPodErr // TODO(jdef) this error is somewhat misleading since the task could be running?!
 	}
 }
 
@@ -117,7 +117,7 @@ func (b *binder) bind(ctx api.Context, binding *api.Binding, task *podtask.T) (e
 	return b.rollback(task, fmt.Errorf("Failed to launch task %v: %v", task.ID, err))
 }
 
-//TODO(jdef) unit test this, ensure that task's copy of api.Pod is not modified
+// TODO(jdef) unit test this, ensure that task's copy of api.Pod is not modified
 func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *podtask.T, offerId string) error {
 	pod := task.Pod
 

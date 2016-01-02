@@ -64,7 +64,7 @@ func (e Equalities) AddFunc(eqFunc interface{}) error {
 // Below here is forked from go's reflect/deepequal.go
 
 // During deepValueEqual, must keep track of checks that are
-// in progress.  The comparison algorithm assumes that all
+// in progress. The comparison algorithm assumes that all
 // checks in progress are true when it reencounters them.
 // Visited comparisons are stored in a map indexed by visit.
 type visit struct {

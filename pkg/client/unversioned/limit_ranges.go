@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -71,14 +71,14 @@ func (c *limitRanges) Delete(name string) error {
 	return c.r.Delete().Namespace(c.ns).Resource("limitRanges").Name(name).Do().Error()
 }
 
-// Create takes the representation of a limitRange.  Returns the server's representation of the limitRange, and an error, if it occurs.
+// Create takes the representation of a limitRange. Returns the server's representation of the limitRange, and an error, if it occurs.
 func (c *limitRanges) Create(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
 	result = &api.LimitRange{}
 	err = c.r.Post().Namespace(c.ns).Resource("limitRanges").Body(limitRange).Do().Into(result)
 	return
 }
 
-// Update takes the representation of a limitRange to update.  Returns the server's representation of the limitRange, and an error, if it occurs.
+// Update takes the representation of a limitRange to update. Returns the server's representation of the limitRange, and an error, if it occurs.
 func (c *limitRanges) Update(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
 	result = &api.LimitRange{}
 	if len(limitRange.ResourceVersion) == 0 {

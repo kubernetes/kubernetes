@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -144,9 +144,9 @@ func (g *genDeepCopy) copyableWithinPackage(t *types.Type) bool {
 	// of generating everything everywhere.
 	// This is done that way only to minimize number of changes per PR.
 	// Once this is done, we should replace HasPrefix with:
-	//if t.Name.Package != g.targetPackage {
-	//	return false
-	//}
+	// if t.Name.Package != g.targetPackage {
+	// 	return false
+	// }
 	if !strings.HasPrefix(t.Name.Package, "k8s.io/kubernetes/") {
 		return false
 	}

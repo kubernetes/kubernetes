@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -162,7 +162,7 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		// if input object is a list, traverse and edit each item one at a time
 		for _, obj := range objs {
 			// TODO: add an annotating YAML printer that can print inline comments on each field,
-			//   including descriptions or validation errors
+			// including descriptions or validation errors
 
 			// generate the file to edit
 			buf := &bytes.Buffer{}

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -184,7 +184,7 @@ func (r *RuntimeSort) Less(i, j int) bool {
 	return less
 }
 
-// Returns the starting (original) position of a particular index.  e.g. If OriginalPosition(0) returns 5 than the
+// Returns the starting (original) position of a particular index. e.g. If OriginalPosition(0) returns 5 than the
 // the item currently at position 0 was at position 5 in the original unsorted array.
 func (r *RuntimeSort) OriginalPosition(ix int) int {
 	if ix < 0 || ix > len(r.origPosition) {

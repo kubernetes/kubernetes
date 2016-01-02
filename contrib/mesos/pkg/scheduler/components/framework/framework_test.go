@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,9 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 )
 
-//get number of non-expired offers from  offer registry
+// get number of non-expired offers from offer registry
 func getNumberOffers(os offers.Registry) int {
-	//walk offers and check it is stored in registry
+	// walk offers and check it is stored in registry
 	walked := 0
 	walker1 := func(p offers.Perishable) (bool, error) {
 		walked++
@@ -88,7 +88,7 @@ func mockScheduler() scheduler.Scheduler {
 	return mockScheduler
 }
 
-//test adding of ressource offer, should be added to offer registry and slaves
+// test adding of ressource offer, should be added to offer registry and slaves
 func TestResourceOffer_Add(t *testing.T) {
 	assert := assert.New(t)
 
@@ -119,23 +119,23 @@ func TestResourceOffer_Add(t *testing.T) {
 	assert.Equal(1, len(registrator.store.List()))
 
 	assert.Equal(1, getNumberOffers(testFramework.offers))
-	//check slave hostname
+	// check slave hostname
 	assert.Equal(1, len(testFramework.slaveHostNames.SlaveIDs()))
 
-	//add another offer
+	// add another offer
 	hostname2 := "h2"
 	offer2 := &mesos.Offer{Id: util.NewOfferID("test2"), Hostname: &hostname2, SlaveId: util.NewSlaveID(hostname2)}
 	offers2 := []*mesos.Offer{offer2}
 	testFramework.ResourceOffers(nil, offers2)
 
-	//check it is stored in registry
+	// check it is stored in registry
 	assert.Equal(2, getNumberOffers(testFramework.offers))
 
-	//check slave hostnames
+	// check slave hostnames
 	assert.Equal(2, len(testFramework.slaveHostNames.SlaveIDs()))
 }
 
-//test adding of ressource offer, should be added to offer registry and slavesf
+// test adding of ressource offer, should be added to offer registry and slavesf
 func TestResourceOffer_Add_Rescind(t *testing.T) {
 	assert := assert.New(t)
 
@@ -164,10 +164,10 @@ func TestResourceOffer_Add_Rescind(t *testing.T) {
 
 	assert.Equal(1, getNumberOffers(testFramework.offers))
 
-	//check slave hostname
+	// check slave hostname
 	assert.Equal(1, len(testFramework.slaveHostNames.SlaveIDs()))
 
-	//add another offer
+	// add another offer
 	hostname2 := "h2"
 	offer2 := &mesos.Offer{Id: util.NewOfferID("test2"), Hostname: &hostname2, SlaveId: util.NewSlaveID(hostname2)}
 	offers2 := []*mesos.Offer{offer2}
@@ -175,23 +175,23 @@ func TestResourceOffer_Add_Rescind(t *testing.T) {
 
 	assert.Equal(2, getNumberOffers(testFramework.offers))
 
-	//check slave hostnames
+	// check slave hostnames
 	assert.Equal(2, len(testFramework.slaveHostNames.SlaveIDs()))
 
-	//next whether offers can be rescinded
+	// next whether offers can be rescinded
 	testFramework.OfferRescinded(nil, offerID1)
 	assert.Equal(1, getNumberOffers(testFramework.offers))
 
-	//next whether offers can be rescinded
+	// next whether offers can be rescinded
 	testFramework.OfferRescinded(nil, util.NewOfferID("test2"))
-	//walk offers again and check it is removed from registry
+	// walk offers again and check it is removed from registry
 	assert.Equal(0, getNumberOffers(testFramework.offers))
 
-	//remove non existing ID
+	// remove non existing ID
 	testFramework.OfferRescinded(nil, util.NewOfferID("notExist"))
 }
 
-//test that when a slave is lost we remove all offers
+// test that when a slave is lost we remove all offers
 func TestSlave_Lost(t *testing.T) {
 	assert := assert.New(t)
 
@@ -218,38 +218,38 @@ func TestSlave_Lost(t *testing.T) {
 	offers2 := []*mesos.Offer{offer2}
 	testFramework.ResourceOffers(nil, offers2)
 
-	//add another offer from different slaveID
+	// add another offer from different slaveID
 	hostname2 := "h2"
 	offer3 := &mesos.Offer{Id: util.NewOfferID("test3"), Hostname: &hostname2, SlaveId: util.NewSlaveID(hostname2)}
 	offers3 := []*mesos.Offer{offer3}
 	testFramework.ResourceOffers(nil, offers3)
 
-	//test precondition
+	// test precondition
 	assert.Equal(3, getNumberOffers(testFramework.offers))
 	assert.Equal(2, len(testFramework.slaveHostNames.SlaveIDs()))
 
-	//remove first slave
+	// remove first slave
 	testFramework.SlaveLost(nil, util.NewSlaveID(hostname))
 
-	//offers should be removed
+	// offers should be removed
 	assert.Equal(1, getNumberOffers(testFramework.offers))
-	//slave hostnames should still be all present
+	// slave hostnames should still be all present
 	assert.Equal(2, len(testFramework.slaveHostNames.SlaveIDs()))
 
-	//remove second slave
+	// remove second slave
 	testFramework.SlaveLost(nil, util.NewSlaveID(hostname2))
 
-	//offers should be removed
+	// offers should be removed
 	assert.Equal(0, getNumberOffers(testFramework.offers))
-	//slave hostnames should still be all present
+	// slave hostnames should still be all present
 	assert.Equal(2, len(testFramework.slaveHostNames.SlaveIDs()))
 
-	//try to remove non existing slave
+	// try to remove non existing slave
 	testFramework.SlaveLost(nil, util.NewSlaveID("notExist"))
 
 }
 
-//test when we loose connection to master we invalidate all cached offers
+// test when we loose connection to master we invalidate all cached offers
 func TestDisconnect(t *testing.T) {
 	assert := assert.New(t)
 
@@ -276,22 +276,22 @@ func TestDisconnect(t *testing.T) {
 	offers2 := []*mesos.Offer{offer2}
 	testFramework.ResourceOffers(nil, offers2)
 
-	//add another offer from different slaveID
+	// add another offer from different slaveID
 	hostname2 := "h2"
 	offer3 := &mesos.Offer{Id: util.NewOfferID("test2"), Hostname: &hostname2, SlaveId: util.NewSlaveID(hostname2)}
 	offers3 := []*mesos.Offer{offer3}
 	testFramework.ResourceOffers(nil, offers3)
 
-	//disconnect
+	// disconnect
 	testFramework.Disconnected(nil)
 
-	//all offers should be removed
+	// all offers should be removed
 	assert.Equal(0, getNumberOffers(testFramework.offers))
-	//slave hostnames should still be all present
+	// slave hostnames should still be all present
 	assert.Equal(2, len(testFramework.slaveHostNames.SlaveIDs()))
 }
 
-//test we can handle different status updates, TODO check state transitions
+// test we can handle different status updates, TODO check state transitions
 func TestStatus_Update(t *testing.T) {
 
 	mockdriver := MockSchedulerDriver{}
@@ -331,6 +331,6 @@ func TestStatus_Update(t *testing.T) {
 	)
 	testFramework.StatusUpdate(testFramework.driver, taskStatus_task_failed)
 
-	//assert that mock was invoked
+	// assert that mock was invoked
 	mockdriver.AssertExpectations(t)
 }

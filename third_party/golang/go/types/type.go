@@ -121,7 +121,7 @@ func (s *Slice) Elem() Type { return s.elem }
 // A Struct represents a struct type.
 type Struct struct {
 	fields []*Var
-	tags   []string // field tags; nil if there are no tags
+	tags []string // field tags; nil if there are no tags
 	// TODO(gri) access to offsets is not threadsafe - fix this
 	offsets []int64 // field offsets in bytes, lazily initialized
 }
@@ -200,11 +200,11 @@ type Signature struct {
 	// and store it in the Func Object) because when type-checking a function
 	// literal we call the general type checker which returns a general Type.
 	// We then unpack the *Signature and use the scope for the literal body.
-	scope    *Scope // function scope, present for package-local signatures
-	recv     *Var   // nil if not a method
-	params   *Tuple // (incoming) parameters from left to right; or nil
-	results  *Tuple // (outgoing) results from left to right; or nil
-	variadic bool   // true if the last parameter's type is of the form ...T (or string, for append built-in only)
+	scope *Scope // function scope, present for package-local signatures
+	recv *Var // nil if not a method
+	params *Tuple // (incoming) parameters from left to right; or nil
+	results *Tuple // (outgoing) results from left to right; or nil
+	variadic bool // true if the last parameter's type is of the form ...T (or string, for append built-in only)
 }
 
 // NewSignature returns a new function type for the given receiver, parameters,
@@ -228,7 +228,7 @@ func NewSignature(recv *Var, params, results *Tuple, variadic bool) *Signature {
 // function.
 //
 // For an abstract method, Recv returns the enclosing interface either
-// as a *Named or an *Interface.  Due to embedding, an interface may
+// as a *Named or an *Interface. Due to embedding, an interface may
 // contain methods whose receiver type is a different interface.
 func (s *Signature) Recv() *Var { return s.recv }
 
@@ -243,7 +243,7 @@ func (s *Signature) Variadic() bool { return s.variadic }
 
 // An Interface represents an interface type.
 type Interface struct {
-	methods   []*Func  // ordered list of explicitly declared methods
+	methods []*Func // ordered list of explicitly declared methods
 	embeddeds []*Named // ordered list of explicitly embedded types
 
 	allMethods []*Func // ordered list of methods declared with or embedded in this interface (TODO(gri): replace with mset)
@@ -380,9 +380,9 @@ func (c *Chan) Elem() Type { return c.elem }
 
 // A Named represents a named type.
 type Named struct {
-	obj        *TypeName // corresponding declared object
-	underlying Type      // possibly a *Named during setup; never a *Named once set up completely
-	methods    []*Func   // methods declared for this type (not the method set of this type)
+	obj *TypeName // corresponding declared object
+	underlying Type // possibly a *Named during setup; never a *Named once set up completely
+	methods []*Func // methods declared for this type (not the method set of this type)
 }
 
 // NewNamed returns a new named type for the given type name, underlying type, and associated methods.

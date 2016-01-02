@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -79,7 +79,7 @@ func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder)
 	return podConfig
 }
 
-// Channel creates or returns a config source channel.  The channel
+// Channel creates or returns a config source channel. The channel
 // only accepts PodUpdates
 func (c *PodConfig) Channel(source string) chan<- interface{} {
 	c.sourcesLock.Lock()
@@ -109,8 +109,8 @@ func (c *PodConfig) Sync() {
 }
 
 // podStorage manages the current pod state at any point in time and ensures updates
-// to the channel are delivered in order.  Note that this object is an in-memory source of
-// "truth" and on creation contains zero entries.  Once all previously read sources are
+// to the channel are delivered in order. Note that this object is an in-memory source of
+// "truth" and on creation contains zero entries. Once all previously read sources are
 // available, then this object should be considered authoritative.
 type podStorage struct {
 	podLock sync.RWMutex
@@ -146,7 +146,7 @@ func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodConfigNotificatio
 
 // Merge normalizes a set of incoming changes from different sources into a map of all Pods
 // and ensures that redundant changes are filtered out, and then pushes zero or more minimal
-// updates onto the update channel.  Ensures that updates are delivered in order.
+// updates onto the update channel. Ensures that updates are delivered in order.
 func (s *podStorage) Merge(source string, change interface{}) error {
 	s.updateLock.Lock()
 	defer s.updateLock.Unlock()
@@ -420,7 +420,7 @@ func podsDifferSemantically(existing, ref *api.Pod) bool {
 // returns false if there was no update.
 func checkAndUpdatePod(existing, ref *api.Pod) bool {
 	// TODO: it would be better to update the whole object and only preserve certain things
-	//       like the source annotation or the UID (to ensure safety)
+	// like the source annotation or the UID (to ensure safety)
 	if !podsDifferSemantically(existing, ref) {
 		return false
 	}

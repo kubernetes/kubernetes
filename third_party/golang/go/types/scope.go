@@ -17,7 +17,7 @@ import (
 )
 
 // TODO(gri) Provide scopes with a name or other mechanism so that
-//           objects can use that information for better printing.
+// objects can use that information for better printing.
 
 // A Scope maintains a set of objects and links to its containing
 // (parent) and contained (children) scopes. Objects may be inserted
@@ -26,13 +26,13 @@ import (
 type Scope struct {
 	parent   *Scope
 	children []*Scope
-	elems    map[string]Object // lazily allocated
-	pos, end token.Pos         // scope extent; may be invalid
-	comment  string            // for debugging only
+	elems map[string]Object // lazily allocated
+	pos, end token.Pos // scope extent; may be invalid
+	comment string // for debugging only
 }
 
 // NewScope returns a new, empty scope contained in the given parent
-// scope, if any.  The comment is for debugging only.
+// scope, if any. The comment is for debugging only.
 func NewScope(parent *Scope, pos, end token.Pos, comment string) *Scope {
 	s := &Scope{parent, nil, nil, pos, end, comment}
 	// don't add children to Universe scope!

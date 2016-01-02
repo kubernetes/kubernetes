@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,7 +43,7 @@ const (
 )
 
 // realVersion turns a version constant s into a version string deployable on
-// GKE.  See hack/get-build.sh for more information.
+// GKE. See hack/get-build.sh for more information.
 func realVersion(s string) (string, error) {
 	v, _, err := runCmd(path.Join(testContext.RepoRoot, "hack/get-build.sh"), "-v", s)
 	if err != nil {
@@ -188,9 +188,9 @@ var _ = Describe("Cluster Upgrade [Skipped]", func() {
 		testLoadBalancerReachable(ingress, 80)
 
 		// TODO(mikedanese): Add setup, validate, and teardown for:
-		//  - secrets
-		//  - volumes
-		//  - persistent volumes
+		// - secrets
+		// - volumes
+		// - persistent volumes
 	})
 	AfterEach(func() {
 		w.Cleanup()
@@ -331,8 +331,8 @@ func checkMasterVersion(c *client.Client, want string) error {
 		return fmt.Errorf("checkMasterVersion() couldn't get the master version: %v", err)
 	}
 	// We do prefix trimming and then matching because:
-	// want looks like:  0.19.3-815-g50e67d4
-	// got  looks like: v0.19.3-815-g50e67d4034e858-dirty
+	// want looks like: 0.19.3-815-g50e67d4
+	// got looks like: v0.19.3-815-g50e67d4034e858-dirty
 	got := strings.TrimPrefix(v.GitVersion, "v")
 	if !strings.HasPrefix(got, want) {
 		return fmt.Errorf("master had kube-apiserver version %s which does not start with %s",
@@ -355,8 +355,8 @@ func checkNodesVersions(c *client.Client, want string) error {
 	l := ListSchedulableNodesOrDie(c)
 	for _, n := range l.Items {
 		// We do prefix trimming and then matching because:
-		// want   looks like:  0.19.3-815-g50e67d4
-		// kv/kvp look  like: v0.19.3-815-g50e67d4034e858-dirty
+		// want looks like: 0.19.3-815-g50e67d4
+		// kv/kvp look like: v0.19.3-815-g50e67d4034e858-dirty
 		kv, kpv := strings.TrimPrefix(n.Status.NodeInfo.KubeletVersion, "v"),
 			strings.TrimPrefix(n.Status.NodeInfo.KubeProxyVersion, "v")
 		if !strings.HasPrefix(kv, want) {
@@ -507,9 +507,9 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 	prefix, suffix := "Started [", "]."
 	if err := wait.Poll(poll, singleCallTimeout, func() (bool, error) {
 		// TODO(mikedanese): make this hit the compute API directly instead of
-		//                 shelling out to gcloud.
+		// shelling out to gcloud.
 		// NOTE(mikedanese): If you are changing this gcloud command, update
-		//                 cluster/gce/upgrade.sh to match this EXACTLY.
+		// cluster/gce/upgrade.sh to match this EXACTLY.
 		// A `rolling-updates start` call outputs what we want to stderr.
 		_, output, err := retryCmd("gcloud", append(migUpdateCmdBase(),
 			"rolling-updates",
@@ -522,7 +522,7 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 			// Optional args to fine-tune behavior.
 			fmt.Sprintf("--instance-startup-timeout=%ds", int(nt.Seconds())),
 			// NOTE: We can speed up this process by increasing
-			//       --max-num-concurrent-instances.
+			// --max-num-concurrent-instances.
 			fmt.Sprintf("--max-num-concurrent-instances=%d", 1),
 			fmt.Sprintf("--max-num-failed-instances=%d", 0),
 			fmt.Sprintf("--min-instance-update-time=%ds", 0))...)
@@ -557,12 +557,12 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 // pieces of the gcloud command that come after "gcloud" but before
 // "rolling-updates". Examples of returned values are:
 //
-//   {preview"}
+// {preview"}
 //
-//   {"alpha", "compute"}
+// {"alpha", "compute"}
 //
 // TODO(mikedanese): Remove this hack on July 29, 2015 when the migration to
-//                 `gcloud alpha compute rolling-updates` is complete.
+// `gcloud alpha compute rolling-updates` is complete.
 func migUpdateCmdBase() []string {
 	b := []string{"preview"}
 	a := []string{"rolling-updates", "-h"}

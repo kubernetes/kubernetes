@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,9 +29,9 @@ import (
 )
 
 // RepackSubsets takes a slice of EndpointSubset objects, expands it to the full
-// representation, and then repacks that into the canonical layout.  This
+// representation, and then repacks that into the canonical layout. This
 // ensures that code which operates on these objects can rely on the common
-// form for things like comparison.  The result is a newly allocated slice.
+// form for things like comparison. The result is a newly allocated slice.
 func RepackSubsets(subsets []api.EndpointSubset) []api.EndpointSubset {
 	// First map each unique port definition to the sets of hosts that
 	// offer it.
@@ -129,8 +129,8 @@ type addrReady struct {
 
 func hashAddresses(addrs addressSet) string {
 	// Flatten the list of addresses into a string so it can be used as a
-	// map key.  Unfortunately, DeepHashObject is implemented in terms of
-	// spew, and spew does not handle non-primitive map keys well.  So
+	// map key. Unfortunately, DeepHashObject is implemented in terms of
+	// spew, and spew does not handle non-primitive map keys well. So
 	// first we collapse it into a slice, sort the slice, then hash that.
 	slice := make([]addrReady, 0, len(addrs))
 	for k, ready := range addrs {
@@ -177,7 +177,7 @@ func (sl addrPtrsByIpAndUID) Less(i, j int) bool {
 	return LessEndpointAddress(sl[i], sl[j])
 }
 
-// SortSubsets sorts an array of EndpointSubset objects in place.  For ease of
+// SortSubsets sorts an array of EndpointSubset objects in place. For ease of
 // use it returns the input slice.
 func SortSubsets(subsets []api.EndpointSubset) []api.EndpointSubset {
 	for i := range subsets {

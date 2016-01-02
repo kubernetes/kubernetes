@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,7 +41,7 @@ var noLeadingMasterError = fmt.Errorf("there is no current leading master availa
 
 type mesosClient struct {
 	masterLock    sync.RWMutex
-	master        string // host:port formatted address
+	master string // host:port formatted address
 	httpClient    *http.Client
 	tr            *http.Transport
 	initialMaster <-chan struct{} // signal chan, closes once an initial, non-nil master is found
@@ -56,7 +56,7 @@ type slaveNode struct {
 
 type mesosState struct {
 	clusterName string
-	nodes       map[string]*slaveNode // by hostname
+	nodes map[string]*slaveNode // by hostname
 }
 
 type stateCache struct {
@@ -196,7 +196,7 @@ func (c *mesosClient) pollMasterForState(ctx context.Context) (*mesosState, erro
 		return nil, noLeadingMasterError
 	}
 
-	//TODO(jdef) should not assume master uses http (what about https?)
+	// TODO(jdef) should not assume master uses http (what about https?)
 
 	uri := fmt.Sprintf("http://%s/state.json", master)
 	req, err := http.NewRequest("GET", uri, nil)
@@ -227,18 +227,18 @@ func parseMesosState(blob []byte) (*mesosState, error) {
 	type State struct {
 		ClusterName string `json:"cluster"`
 		Slaves      []*struct {
-			Id        string                 `json:"id"`        // ex: 20150106-162714-3815890698-5050-2453-S2
-			Pid       string                 `json:"pid"`       // ex: slave(1)@10.22.211.18:5051
-			Hostname  string                 `json:"hostname"`  // ex: 10.22.211.18, or slave-123.nowhere.com
+			Id string `json:"id"` // ex: 20150106-162714-3815890698-5050-2453-S2
+			Pid string `json:"pid"` // ex: slave(1)@10.22.211.18:5051
+			Hostname string `json:"hostname"` // ex: 10.22.211.18, or slave-123.nowhere.com
 			Resources map[string]interface{} `json:"resources"` // ex: {"mem": 123, "ports": "[31000-3200]"}
 		} `json:"slaves"`
 		Frameworks []*struct {
-			Id        string `json:"id"`  // ex: 20151105-093752-3745622208-5050-1-0000
-			Pid       string `json:"pid"` // ex: scheduler(1)@192.168.65.228:57124
+			Id string `json:"id"` // ex: 20151105-093752-3745622208-5050-1-0000
+			Pid string `json:"pid"` // ex: scheduler(1)@192.168.65.228:57124
 			Executors []*struct {
-				SlaveId    string `json:"slave_id"`    // ex: 20151105-093752-3745622208-5050-1-S1
+				SlaveId string `json:"slave_id"` // ex: 20151105-093752-3745622208-5050-1-S1
 				ExecutorId string `json:"executor_id"` // ex: 6704d375c68fee1e_k8sm-executor
-				Name       string `json:"name"`        // ex: Kubelet-Executor
+				Name string `json:"name"` // ex: Kubelet-Executor
 			} `json:"executors"`
 		} `json:"frameworks"`
 	}

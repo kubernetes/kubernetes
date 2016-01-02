@@ -66,7 +66,7 @@ var emptyMethodSet MethodSet
 // It always returns a non-nil method set, even if it is empty.
 func NewMethodSet(T Type) *MethodSet {
 	// WARNING: The code in this function is extremely subtle - do not modify casually!
-	//          This function and lookupFieldOrMethod should be kept in sync.
+	// This function and lookupFieldOrMethod should be kept in sync.
 
 	// method set up to the current depth, allocated lazily
 	var base methodSet

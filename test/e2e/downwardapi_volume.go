@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -95,7 +95,7 @@ var _ = Describe("Downward API volume", func() {
 		},
 			podLogTimeout, poll).Should(ContainSubstring("key1=\"value1\"\n"))
 
-		//modify labels
+		// modify labels
 		pod.Labels["key3"] = "value3"
 		_, err = f.Client.Pods(f.Namespace.Name).Update(pod)
 		Expect(err).NotTo(HaveOccurred())
@@ -131,7 +131,7 @@ var _ = Describe("Downward API volume", func() {
 		},
 			podLogTimeout, poll).Should(ContainSubstring("builder=\"bar\"\n"))
 
-		//modify annotations
+		// modify annotations
 		pod.Annotations["builder"] = "foo"
 		_, err = f.Client.Pods(f.Namespace.Name).Update(pod)
 		Expect(err).NotTo(HaveOccurred())

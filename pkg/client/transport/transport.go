@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -121,10 +121,10 @@ func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
 	return nil, nil
 }
 
-// rootCertPool returns nil if caData is empty.  When passed along, this will mean "use system CAs".
+// rootCertPool returns nil if caData is empty. When passed along, this will mean "use system CAs".
 // When caData is not empty, it will be the ONLY information used in the CertPool.
 func rootCertPool(caData []byte) *x509.CertPool {
-	// What we really want is a copy of x509.systemRootsPool, but that isn't exposed.  It's difficult to build (see the go
+	// What we really want is a copy of x509.systemRootsPool, but that isn't exposed. It's difficult to build (see the go
 	// code for a look at the platform specific insanity), so we'll use the fact that RootCAs == nil gives us the system values
 	// It doesn't allow trusting either/or, but hopefully that won't be an issue
 	if len(caData) == 0 {

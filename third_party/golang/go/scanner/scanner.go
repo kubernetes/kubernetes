@@ -26,22 +26,22 @@ import (
 type ErrorHandler func(pos token.Position, msg string)
 
 // A Scanner holds the scanner's internal state while processing
-// a given text.  It can be allocated as part of another data
+// a given text. It can be allocated as part of another data
 // structure but must be initialized via Init before use.
 //
 type Scanner struct {
 	// immutable state
-	file *token.File  // source file handle
-	dir  string       // directory portion of file.Name()
-	src  []byte       // source
-	err  ErrorHandler // error reporting; or nil
-	mode Mode         // scanning mode
+	file *token.File // source file handle
+	dir string // directory portion of file.Name()
+	src []byte // source
+	err ErrorHandler // error reporting; or nil
+	mode Mode // scanning mode
 
 	// scanning state
-	ch         rune // current character
-	offset     int  // character offset
-	rdOffset   int  // reading offset (position after current character)
-	lineOffset int  // current line offset
+	ch rune // current character
+	offset int // character offset
+	rdOffset int // reading offset (position after current character)
+	lineOffset int // current line offset
 	insertSemi bool // insert a semicolon before next newline
 
 	// public state - ok to modify
@@ -91,8 +91,8 @@ func (s *Scanner) next() {
 type Mode uint
 
 const (
-	ScanComments    Mode = 1 << iota // return comments as COMMENT tokens
-	dontInsertSemis                  // do not automatically insert semicolons - for testing only
+	ScanComments Mode = 1 << iota // return comments as COMMENT tokens
+	dontInsertSemis // do not automatically insert semicolons - for testing only
 )
 
 // Init prepares the scanner s to tokenize the text src by setting the
@@ -141,14 +141,14 @@ func (s *Scanner) error(offs int, msg string) {
 	s.ErrorCount++
 }
 
-var prefix = []byte("//line ")
+var prefix = []byte("// line ")
 
 func (s *Scanner) interpretLineComment(text []byte) {
 	if bytes.HasPrefix(text, prefix) {
 		// get filename and line number, if any
 		if i := bytes.LastIndex(text, []byte{':'}); i > 0 {
 			if line, err := strconv.Atoi(string(text[i+1:])); err == nil && line > 0 {
-				// valid //line filename:line comment
+				// valid //   line filename:line comment
 				filename := string(bytes.TrimSpace(text[len(prefix):i]))
 				if filename != "" {
 					filename = filepath.Clean(filename)
@@ -170,7 +170,7 @@ func (s *Scanner) scanComment() string {
 	hasCR := false
 
 	if s.ch == '/' {
-		//-style comment
+		// -style comment
 		s.next()
 		for s.ch != '\n' && s.ch >= 0 {
 			if s.ch == '\r' {
@@ -224,7 +224,7 @@ func (s *Scanner) findLineEnd() bool {
 	// read ahead until a newline, EOF, or non-comment token is found
 	for s.ch == '/' || s.ch == '*' {
 		if s.ch == '/' {
-			//-style comment always contains a newline
+			// -style comment always contains a newline
 			return true
 		}
 		/*-style comment: look for newline */

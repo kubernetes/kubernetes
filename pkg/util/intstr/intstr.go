@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,9 +24,9 @@ import (
 	"github.com/google/gofuzz"
 )
 
-// IntOrString is a type that can hold an int32 or a string.  When used in
+// IntOrString is a type that can hold an int32 or a string. When used in
 // JSON or YAML marshalling and unmarshalling, it produces or consumes the
-// inner type.  This allows you to have, for example, a JSON field that can
+// inner type. This allows you to have, for example, a JSON field that can
 // accept a name or number.
 // TODO: Rename to Int32OrString
 //
@@ -42,8 +42,8 @@ type IntOrString struct {
 type Type int
 
 const (
-	Int    Type = iota // The IntOrString holds an int.
-	String             // The IntOrString holds a string.
+	Int Type = iota // The IntOrString holds an int.
+	String // The IntOrString holds a string.
 )
 
 // FromInt creates an IntOrString object with an int32 value. It is

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -84,7 +84,7 @@ var _ = Describe("Job", func() {
 		// on an emptyDir, which is not preserved across new pods.
 		// Worst case analysis: 15 failures, each taking 1 minute to
 		// run due to some slowness, 1 in 2^15 chance of happening,
-		// causing test flake.  Should be very rare.
+		// causing test flake. Should be very rare.
 		job := newTestJob("randomlySucceedOrFail", "rand-non-local", api.RestartPolicyNever, parallelism, completions)
 		job, err := createJob(f.Client, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred())
@@ -251,7 +251,7 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 	case "failOnce":
 		// Fail the first the container of the pod is run, and
 		// succeed the second time. Checks for file on emptydir.
-		// If present, succeed.  If not, create but fail.
+		// If present, succeed. If not, create but fail.
 		// Note that this cannot be used with RestartNever because
 		// it always fails the first time for a pod.
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "if [[ -r /data/foo ]] ; then exit 0 ; else touch /data/foo ; exit 1 ; fi"}
@@ -267,7 +267,7 @@ func deleteJob(c *client.Client, ns, name string) error {
 	return c.Extensions().Jobs(ns).Delete(name, api.NewDeleteOptions(0))
 }
 
-// Wait for all pods to become Running.  Only use when pods will run for a long time, or it will be racy.
+// Wait for all pods to become Running. Only use when pods will run for a long time, or it will be racy.
 func waitForAllPodsRunning(c *client.Client, ns, jobName string, parallelism int) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{jobSelectorKey: jobName}))
 	return wait.Poll(poll, jobTimeout, func() (bool, error) {

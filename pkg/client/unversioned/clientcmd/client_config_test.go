@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -88,7 +88,7 @@ func TestCertificateData(t *testing.T) {
 
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
-		Server:                   "https://localhost:8443",
+		Server: "https://localhost:8443",
 		APIVersion:               testapi.Default.GroupVersion().String(),
 		CertificateAuthorityData: caData,
 	}
@@ -121,7 +121,7 @@ func TestBasicAuthData(t *testing.T) {
 
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
-		Server:     "https://localhost:8443",
+		Server: "https://localhost:8443",
 		APIVersion: testapi.Default.GroupVersion().String(),
 	}
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
@@ -172,7 +172,7 @@ func TestCreateCleanWithPrefix(t *testing.T) {
 		{"http://anything.com:8080/foo/bar", "http://anything.com:8080", "/foo/bar"},
 		{"http://anything.com:8080/foo/bar/", "http://anything.com:8080", "/foo/bar/"},
 		{"http://anything.com:8080/", "http://anything.com:8080/", ""},
-		{"http://anything.com:8080//", "http://anything.com:8080", "//"},
+		{"http://anything.com:8080//   ", "http://anything.com:8080", "//   "},
 		{"anything.com:8080/foo/bar", "anything.com:8080/foo/bar", ""},
 		{"anything.com:8080", "anything.com:8080", ""},
 		{"anything.com", "anything.com", ""},

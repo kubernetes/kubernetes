@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,15 +39,15 @@ var (
 
 type affinityState struct {
 	clientIP string
-	//clientProtocol  api.Protocol //not yet used
-	//sessionCookie   string       //not yet used
+	// clientProtocol api.Protocol //   not yet used
+	// sessionCookie string //   not yet used
 	endpoint string
 	lastUsed time.Time
 }
 
 type affinityPolicy struct {
 	affinityType api.ServiceAffinity
-	affinityMap  map[string]*affinityState // map client IP -> affinity info
+	affinityMap map[string]*affinityState // map client IP -> affinity info
 	ttlMinutes   int
 }
 
@@ -62,7 +62,7 @@ var _ LoadBalancer = &LoadBalancerRR{}
 
 type balancerState struct {
 	endpoints []string // a list of "ip:port" style strings
-	index     int      // current index into endpoints
+	index int // current index into endpoints
 	affinity  affinityPolicy
 }
 
@@ -91,7 +91,7 @@ func (lb *LoadBalancerRR) NewService(svcPort proxy.ServicePortName, affinityType
 // This assumes that lb.lock is already held.
 func (lb *LoadBalancerRR) newServiceInternal(svcPort proxy.ServicePortName, affinityType api.ServiceAffinity, ttlMinutes int) *balancerState {
 	if ttlMinutes == 0 {
-		ttlMinutes = 180 //default to 3 hours if not specified.  Should 0 be unlimited instead????
+		ttlMinutes = 180 // default to 3 hours if not specified. Should 0 be unlimited instead????
 	}
 
 	if _, exists := lb.services[svcPort]; !exists {
@@ -115,7 +115,7 @@ func isSessionAffinity(affinity *affinityPolicy) bool {
 // NextEndpoint returns a service endpoint.
 // The service endpoint is chosen using the round-robin algorithm.
 func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr net.Addr) (string, error) {
-	// Coarse locking is simple.  We can get more fine-grained if/when we
+	// Coarse locking is simple. We can get more fine-grained if/when we
 	// can prove it matters.
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
@@ -156,7 +156,7 @@ func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr ne
 		var affinity *affinityState
 		affinity = state.affinity.affinityMap[ipaddr]
 		if affinity == nil {
-			affinity = new(affinityState) //&affinityState{ipaddr, "TCP", "", endpoint, time.Now()}
+			affinity = new(affinityState) // &affinityState{ipaddr, "TCP", "", endpoint, time.Now()}
 			state.affinity.affinityMap[ipaddr] = affinity
 		}
 		affinity.lastUsed = time.Now()
@@ -178,7 +178,7 @@ func isValidEndpoint(hpp *hostPortPair) bool {
 }
 
 func flattenValidEndpoints(endpoints []hostPortPair) []string {
-	// Convert Endpoint objects into strings for easier use later.  Ignore
+	// Convert Endpoint objects into strings for easier use later. Ignore
 	// the protocol field - we'll get that from the Service objects.
 	var result []string
 	for i := range endpoints {
@@ -236,7 +236,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 		svcEndpoints := &allEndpoints[i]
 
 		// We need to build a map of portname -> all ip:ports for that
-		// portname.  Explode Endpoints.Subsets[*] into this structure.
+		// portname. Explode Endpoints.Subsets[*] into this structure.
 		portsToEndpoints := map[string][]hostPortPair{}
 		for i := range svcEndpoints.Subsets {
 			ss := &svcEndpoints.Subsets[i]
@@ -263,8 +263,8 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 				glog.V(1).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", svcPort, newEndpoints)
 				lb.updateAffinityMap(svcPort, newEndpoints)
 				// OnEndpointsUpdate can be called without NewService being called externally.
-				// To be safe we will call it here.  A new service will only be created
-				// if one does not already exist.  The affinity will be updated
+				// To be safe we will call it here. A new service will only be created
+				// if one does not already exist. The affinity will be updated
 				// later, once NewService is called.
 				state = lb.newServiceInternal(svcPort, api.ServiceAffinity(""), 0)
 				state.endpoints = slice.ShuffleStrings(newEndpoints)
@@ -284,7 +284,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	}
 }
 
-// Tests whether two slices are equivalent.  This sorts both slices in-place.
+// Tests whether two slices are equivalent. This sorts both slices in-place.
 func slicesEquiv(lhs, rhs []string) bool {
 	if len(lhs) != len(rhs) {
 		return false

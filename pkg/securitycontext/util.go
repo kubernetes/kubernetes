@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -50,7 +50,7 @@ func HasCapabilitiesRequest(container *api.Container) bool {
 const expectedSELinuxContextFields = 4
 
 // ParseSELinuxOptions parses a string containing a full SELinux context
-// (user, role, type, and level) into an SELinuxOptions object.  If the
+// (user, role, type, and level) into an SELinuxOptions object. If the
 // context is malformed, an error is returned.
 func ParseSELinuxOptions(context string) (*api.SELinuxOptions, error) {
 	fields := strings.SplitN(context, ":", expectedSELinuxContextFields)

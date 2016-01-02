@@ -33,9 +33,9 @@ type parser struct {
 	scanner scanner.Scanner
 
 	// Tracing/debugging
-	mode   Mode // parsing mode
-	trace  bool // == (mode & Trace != 0)
-	indent int  // indentation used for tracing output
+	mode Mode // parsing mode
+	trace bool // == (mode & Trace != 0)
+	indent int // indentation used for tracing output
 
 	// Comments
 	comments    []*ast.CommentGroup
@@ -43,30 +43,30 @@ type parser struct {
 	lineComment *ast.CommentGroup // last line comment
 
 	// Next token
-	pos token.Pos   // token position
+	pos token.Pos // token position
 	tok token.Token // one token look-ahead
-	lit string      // token literal
+	lit string // token literal
 
 	// Error recovery
 	// (used to limit the number of calls to syncXXX functions
 	// w/o making scanning progress - avoids potential endless
 	// loops across multiple parser functions during error recovery)
 	syncPos token.Pos // last synchronization position
-	syncCnt int       // number of calls to syncXXX without progress
+	syncCnt int // number of calls to syncXXX without progress
 
 	// Non-syntactic parser control
-	exprLev int  // < 0: in control clause, >= 0: in expression
-	inRhs   bool // if set, the parser is parsing a rhs expression
+	exprLev int // < 0: in control clause, >= 0: in expression
+	inRhs bool // if set, the parser is parsing a rhs expression
 
 	// Ordinary identifier scopes
-	pkgScope   *ast.Scope        // pkgScope.Outer == nil
-	topScope   *ast.Scope        // top-most scope; may be pkgScope
-	unresolved []*ast.Ident      // unresolved identifiers
-	imports    []*ast.ImportSpec // list of imports
+	pkgScope *ast.Scope // pkgScope.Outer == nil
+	topScope *ast.Scope // top-most scope; may be pkgScope
+	unresolved []*ast.Ident // unresolved identifiers
+	imports []*ast.ImportSpec // list of imports
 
 	// Label scopes
 	// (maintained by open/close LabelScope)
-	labelScope  *ast.Scope     // label scope for current function
+	labelScope *ast.Scope // label scope for current function
 	targetStack [][]*ast.Ident // stack of unresolved labels
 }
 
@@ -585,8 +585,8 @@ func (p *parser) parseLhsList() []ast.Expr {
 		// of a switch statement):
 		// - labels are declared by the caller of parseLhsList
 		// - for communication clauses, if there is a stand-alone identifier
-		//   followed by a colon, we have a syntax error; there is no need
-		//   to resolve the identifier in that case
+		// followed by a colon, we have a syntax error; there is no need
+		// to resolve the identifier in that case
 	default:
 		// identifiers must be declared elsewhere
 		for _, x := range list {
@@ -1533,14 +1533,14 @@ func (p *parser) parseUnaryExpr(lhs bool) ast.Expr {
 		// once we have found the end of the unary expression. There
 		// are two cases:
 		//
-		//   <- type  => (<-type) must be channel type
-		//   <- expr  => <-(expr) is a receive from an expression
+		// <- type => (<-type) must be channel type
+		// <- expr => <-(expr) is a receive from an expression
 		//
 		// In the first case, the arrow must be re-associated with
 		// the channel type parsed already:
 		//
-		//   <- (chan type)    =>  (<-chan type)
-		//   <- (chan<- type)  =>  (<-chan (<-type))
+		// <- (chan type) => (<-chan type)
+		// <- (chan<- type) => (<-chan (<-type))
 
 		x := p.parseUnaryExpr(false)
 
@@ -1945,7 +1945,7 @@ func (p *parser) parseSwitchStmt() ast.Stmt {
 				// to the variable declared in the initial SimpleStmt.
 				// Introduce extra scope to avoid redeclaration errors:
 				//
-				//	switch t := 0; t := x.(T) { ... }
+				// 	switch t := 0; t := x.(T) { ... }
 				//
 				// (this code is not valid Go because the first t
 				// cannot be accessed and thus is never used, the extra

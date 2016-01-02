@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -494,10 +494,10 @@ var _ = Describe("Pods", func() {
 
 		// This service exposes port 8080 of the test pod as a service on port 8765
 		// TODO(filbranden): We would like to use a unique service name such as:
-		//   svcName := "svc-envvars-" + randomSuffix()
+		// svcName := "svc-envvars-" + randomSuffix()
 		// However, that affects the name of the environment variables which are the capitalized
-		// service name, so that breaks this test.  One possibility is to tweak the variable names
-		// to match the service.  Another is to rethink environment variable names and possibly
+		// service name, so that breaks this test. One possibility is to tweak the variable names
+		// to match the service. Another is to rethink environment variable names and possibly
 		// allow overriding the prefix in the service manifest.
 		svcName := "fooservice"
 		svc := &api.Service{

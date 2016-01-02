@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -143,7 +143,7 @@ func makeValidService() api.Service {
 func TestBeforeUpdate(t *testing.T) {
 	testCases := []struct {
 		name      string
-		tweakSvc  func(oldSvc, newSvc *api.Service) // given basic valid services, each test case can customize them
+		tweakSvc func(oldSvc, newSvc *api.Service) // given basic valid services, each test case can customize them
 		expectErr bool
 	}{
 		{

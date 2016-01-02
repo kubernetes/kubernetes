@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -74,12 +74,12 @@ type Packages []Package
 // making more readable code.
 //
 // The call order for the functions that take a Context is:
-// 1. Filter()        // Subsequent calls see only types that pass this.
-// 2. Namers()        // Subsequent calls see the namers provided by this.
+// 1. Filter() //   Subsequent calls see only types that pass this.
+// 2. Namers() //   Subsequent calls see the namers provided by this.
 // 3. PackageVars()
 // 4. PackageConsts()
 // 5. Init()
-// 6. GenerateType()  // Called N times, once per type in the context's Order.
+// 6. GenerateType() //   Called N times, once per type in the context's Order.
 // 7. Imports()
 //
 // You may have multiple generators for the same file.

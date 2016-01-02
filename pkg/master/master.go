@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -130,7 +130,7 @@ type thirdPartyEntry struct {
 // New returns a new instance of Master from the given config.
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
-//   KubeletClient
+// KubeletClient
 func New(c *Config) *Master {
 	if c.KubeletClient == nil {
 		glog.Fatalf("Master.New() called with config.KubeletClient == nil")
@@ -460,7 +460,7 @@ func (m *Master) removeThirdPartyStorage(path string) error {
 	return nil
 }
 
-// RemoveThirdPartyResource removes all resources matching `path`.  Also deletes any stored data
+// RemoveThirdPartyResource removes all resources matching `path`. Also deletes any stored data
 func (m *Master) RemoveThirdPartyResource(path string) error {
 	if err := m.removeThirdPartyStorage(path); err != nil {
 		return err
@@ -512,13 +512,13 @@ func (m *Master) addThirdPartyResourceStorage(path string, storage *thirdpartyre
 	m.thirdPartyResources[path] = thirdPartyEntry{storage, apiGroup}
 }
 
-// InstallThirdPartyResource installs a third party resource specified by 'rsrc'.  When a resource is
+// InstallThirdPartyResource installs a third party resource specified by 'rsrc'. When a resource is
 // installed a corresponding RESTful resource is added as a valid path in the web service provided by
 // the master.
 //
 // For example, if you install a resource ThirdPartyResource{ Name: "foo.company.com", Versions: {"v1"} }
 // then the following RESTful resource is created on the server:
-//   http://<host>/apis/company.com/v1/foos/...
+// http://<host>/apis/company.com/v1/foos/...
 func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) error {
 	kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
 	if err != nil {

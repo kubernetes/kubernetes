@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+ http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -364,7 +364,7 @@ func (s *Server) error(w http.ResponseWriter, err error) {
 	http.Error(w, msg, http.StatusInternalServerError)
 }
 
-// Checks if kubelet's sync loop  that updates containers is working.
+// Checks if kubelet's sync loop that updates containers is working.
 func (s *Server) syncLoopHealthCheck(req *http.Request) error {
 	duration := s.host.ResyncInterval() * 2
 	minDuration := time.Minute * 5
@@ -767,7 +767,7 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 	ServePortForward(response.ResponseWriter, request.Request, s.host, podName, uid, s.host.StreamingConnectionIdleTimeout(), defaultStreamCreationTimeout)
 }
 
-// ServePortForward handles a port forwarding request.  A single request is
+// ServePortForward handles a port forwarding request. A single request is
 // kept alive as long as the client is still alive and the connection has not
 // been timed out due to idleness. This function handles multiple forwarded
 // connections; i.e., multiple `curl http://localhost:8888/` requests will be
@@ -926,7 +926,7 @@ func (h *portForwardStreamHandler) requestID(stream httpstream.Stream) string {
 		//
 		// NOTE: this only works when there are not concurrent new streams from
 		// multiple forwarded connections; it's a best-effort attempt at supporting
-		// old clients that don't generate request ids.  If there are concurrent
+		// old clients that don't generate request ids. If there are concurrent
 		// new connections, it's possible that 1 connection gets streams whose IDs
 		// are not consecutive (e.g. 5 and 9 instead of 5 and 7).
 		streamType := stream.Headers().Get(api.StreamType)
@@ -1089,9 +1089,9 @@ type StatsRequest struct {
 func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	// Stats requests are in the following forms:
 	//
-	// /stats/                                              : Root container stats
-	// /stats/container/                                    : Non-Kubernetes container stats (returns a map)
-	// /stats/<pod name>/<container name>                   : Stats for Kubernetes pod/container
+	// /stats/ : Root container stats
+	// /stats/container/ : Non-Kubernetes container stats (returns a map)
+	// /stats/<pod name>/<container name> : Stats for Kubernetes pod/container
 	// /stats/<namespace>/<pod name>/<uid>/<container name> : Stats for Kubernetes namespace/pod/uid/container
 	components := strings.Split(strings.TrimPrefix(path.Clean(req.URL.Path), "/"), "/")
 	var stats interface{}
