@@ -51,6 +51,8 @@ concurrent-endpoint-syncs
 concurrent-resource-quota-syncs
 config-sync-period
 configure-cbr0
+conntrack-max
+conntrack-tcp-timeout-established
 container-port
 container-runtime
 contain-pod-resources
