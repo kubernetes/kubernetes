@@ -64,6 +64,13 @@ func defaultPredicates() sets.String {
 		),
 		// Fit is determined by non-conflicting disk volumes.
 		factory.RegisterFitPredicate("NoDiskConflict", predicates.NoDiskConflict),
+		// Fit is determined by volume zone requirements.
+		factory.RegisterFitPredicateFactory(
+			"NoVolumeZoneConflict",
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				return predicates.NewVolumeZonePredicate(args.NodeInfo, args.PVInfo, args.PVCInfo)
+			},
+		),
 		// Fit is determined by node selector query.
 		factory.RegisterFitPredicateFactory(
 			"MatchNodeSelector",
