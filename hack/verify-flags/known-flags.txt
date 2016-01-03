@@ -221,6 +221,7 @@ namespace-sync-period
 network-plugin
 network-plugin-dir
 node-instance-group
+node-ip
 node-monitor-grace-period
 node-monitor-period
 node-label
