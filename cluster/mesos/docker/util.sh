@@ -30,7 +30,6 @@ provider_root="${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}"
 
 source "${provider_root}/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
-source "${provider_root}/common/bin/util-ssl.sh"
 
 # Execute a docker-compose command with the default environment and compose file.
 function cluster::mesos::docker::docker_compose {
@@ -129,9 +128,40 @@ function cluster::mesos::docker::run_in_docker_cagen {
     docker run \
       -d \
       -v "${out_dir}:/var/run/kubernetes/auth" \
-      --entrypoint="kube-cagen.sh" \
-      mesosphere/kubernetes-mesos-keygen \
+      mesosphere/kubernetes-keygen:v1.0.0 \
+      "cagen" \
       "/var/run/kubernetes/auth"
+  )
+
+  docker logs -f "${container_id}" &
+
+  # trap and kill for better signal handing
+  trap 'echo "Killing container ${container_id}" 1>&2 && docker kill ${container_id}' INT TERM
+  exit_status=$(docker wait "${container_id}")
+  trap - INT TERM
+
+  if [ "$exit_status" != 0 ]; then
+    echo "Exited ${exit_status}" 1>&2
+  fi
+
+  docker rm -f "${container_id}" > /dev/null
+
+  return "${exit_status}"
+}
+
+# Run kube-keygen.sh inside docker.
+function cluster::mesos::docker::run_in_docker_keygen {
+  local out_file_path="$1"
+  local out_dir="$(dirname "${out_file_path}")"
+  local out_file="$(basename "${out_file_path}")"
+
+  container_id=$(
+    docker run \
+      -d \
+      -v "${out_dir}:/var/run/kubernetes/auth" \
+      mesosphere/kubernetes-keygen:v1.0.0 \
+      "keygen" \
+      "/var/run/kubernetes/auth/${out_file}"
   )
 
   docker logs -f "${container_id}" &
@@ -238,10 +268,13 @@ function cluster::mesos::docker::init_auth {
   rm -rf "${auth_dir}"/*
 
   echo "Creating Certificate Authority" 1>&2
-  cluster::mesos::docker::run_in_docker_cagen "${auth_dir}"
+  cluster::mesos::docker::buffer_output cluster::mesos::docker::run_in_docker_cagen "${auth_dir}"
+  echo "Certificate Authority Key: ${auth_dir}/root-ca.key" 1>&2
+  echo "Certificate Authority Cert: ${auth_dir}/root-ca.crt" 1>&2
 
-  echo "Creating Service-Account RSA Key" 1>&2
-  cluster::mesos::docker::create_rsa_key "${auth_dir}/service-accounts.key"
+  echo "Creating Service Account RSA Key" 1>&2
+  cluster::mesos::docker::buffer_output cluster::mesos::docker::run_in_docker_keygen "${auth_dir}/service-accounts.key"
+  echo "Service Account Key: ${auth_dir}/service-accounts.key" 1>&2
 
   echo "Creating User Accounts" 1>&2
   cluster::mesos::docker::create_token_user "cluster-admin" > "${auth_dir}/token-users"
@@ -272,7 +305,6 @@ function kube-up {
     # TODO: version images (k8s version, git sha, and dirty state) to avoid re-building them every time.
     "${provider_root}/km/build.sh"
     "${provider_root}/test/build.sh"
-    "${provider_root}/keygen/build.sh"
   fi
 
   cluster::mesos::docker::init_auth
@@ -389,4 +421,32 @@ function cluster::mesos::docker::dump_logs {
   while read name; do
     docker logs "${name}" &> "${out_dir}/${name}.log"
   done < <(cluster::mesos::docker::docker_compose ps -q | xargs docker inspect --format '{{.Name}}')
+}
+
+# Creates a k8s token auth user file.
+# See /docs/admin/authentication.md
+function cluster::mesos::docker::create_token_user {
+  local user_name="$1"
+  echo "$(openssl rand -hex 32),${user_name},${user_name}"
+}
+
+# Creates a k8s basic auth user file.
+# See /docs/admin/authentication.md
+function cluster::mesos::docker::create_basic_user {
+  local user_name="$1"
+  local password="$2"
+  echo "${password},${user_name},${user_name}"
+}
+
+# Buffers command output to memory, prints on failure.
+function cluster::mesos::docker::buffer_output {
+  local cmd="$@"
+
+  # buffer output until failure
+  local output=$((${cmd} || exit $?) 2>&1)
+  local exit_status="$?"
+  if [ "${exit_status}" != 0 ]; then
+    echo "${output}" 1>&2
+    return "${exit_status}"
+  fi
 }
