@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,16 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Resolve an IP from a hostname (using getent)
-# Usage: resolveip <hostname>
-# Requires: getent
-# TODO: Mac support
+# Deploy the Kube-UI addon
 
 set -o errexit
 set -o nounset
 set -o pipefail
+set -o errtrace
 
-hostname=$1
-[ -z "${hostname}" ] && echo "No hostname supplied" && exit 1
+KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
+source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/${KUBE_CONFIG_FILE-"config-default.sh"}"
+kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
 
-getent hosts "${hostname}" | cut -d' ' -f1 | sort -u | tail -1
+"${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/kube-ui/kube-ui-rc.yaml"
+"${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/kube-ui/kube-ui-svc.yaml"
