@@ -156,6 +156,7 @@ func (binder *PersistentVolumeClaimBinder) updateClaim(oldObj, newObj interface{
 	newClaim, ok := newObj.(*api.PersistentVolumeClaim)
 	if !ok {
 		glog.Errorf("Expected PersistentVolumeClaim but handler received %+v", newObj)
+		return
 	}
 	if err := syncClaim(binder.volumeIndex, binder.client, newClaim); err != nil {
 		glog.Errorf("PVClaimBinder could not update claim %s: %+v", newClaim.Name, err)
