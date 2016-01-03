@@ -77,6 +77,7 @@ func NewPersistentVolumeRecycler(kubeClient client.Interface, syncPeriod time.Du
 				pv, ok := obj.(*api.PersistentVolume)
 				if !ok {
 					glog.Errorf("Error casting object to PersistentVolume: %v", obj)
+					return
 				}
 				recycler.reclaimVolume(pv)
 			},
@@ -84,6 +85,7 @@ func NewPersistentVolumeRecycler(kubeClient client.Interface, syncPeriod time.Du
 				pv, ok := newObj.(*api.PersistentVolume)
 				if !ok {
 					glog.Errorf("Error casting object to PersistentVolume: %v", newObj)
+					return
 				}
 				recycler.reclaimVolume(pv)
 			},
