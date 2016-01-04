@@ -70,6 +70,7 @@ func NewHollowKubelet(
 			1*time.Minute,          /* MinimumGCAge */
 			10*time.Second,         /* NodeStatusUpdateFrequency */
 			10*time.Second,         /* SyncFrequency */
+			5*time.Minute,          /* OutOfDiskTransitionFrequency */
 			40,                     /* MaxPods */
 			containerManager,
 			nil,

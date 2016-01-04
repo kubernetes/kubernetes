@@ -143,6 +143,7 @@ type KubeletServer struct {
 	TLSCertFile                    string
 	TLSPrivateKeyFile              string
 	ReconcileCIDR                  bool
+	OutOfDiskTransitionFrequency   time.Duration
 
 	// Flags intended for testing
 	// Is the kubelet containerized?
@@ -233,6 +234,7 @@ func NewKubeletServer() *KubeletServer {
 		ReconcileCIDR:                  true,
 		KubeAPIQPS:                     5.0,
 		KubeAPIBurst:                   10,
+		OutOfDiskTransitionFrequency:   5 * time.Minute,
 		ExperimentalFlannelOverlay:     experimentalFlannelOverlay,
 	}
 }
@@ -349,6 +351,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.BoolVar(&s.SerializeImagePulls, "serialize-image-pulls", s.SerializeImagePulls, "Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]")
+	fs.DurationVar(&s.OutOfDiskTransitionFrequency, "outofdisk-transition-frequency", s.OutOfDiskTransitionFrequency, "Duration for which the kubelet has to wait before transitioning out of out-of-disk node condition status. Default: 5m0s")
 	fs.BoolVar(&s.ExperimentalFlannelOverlay, "experimental-flannel-overlay", s.ExperimentalFlannelOverlay, "Experimental support for starting the kubelet with the default overlay network (flannel). Assumes flanneld is already running in client mode. [default=false]")
 	fs.IPVar(&s.NodeIP, "node-ip", s.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node")
 }
@@ -488,6 +491,7 @@ func (s *KubeletServer) UnsecuredKubeletConfig() (*KubeletConfig, error) {
 		TLSOptions:                     tlsOptions,
 		Writer:                         writer,
 		VolumePlugins:                  ProbeVolumePlugins(s.VolumePluginDir),
+		OutOfDiskTransitionFrequency:   s.OutOfDiskTransitionFrequency,
 
 		ExperimentalFlannelOverlay: s.ExperimentalFlannelOverlay,
 		NodeIP: s.NodeIP,
@@ -706,7 +710,7 @@ func SimpleKubelet(client *client.Client,
 	configFilePath string,
 	cloud cloudprovider.Interface,
 	osInterface kubecontainer.OSInterface,
-	fileCheckFrequency, httpCheckFrequency, minimumGCAge, nodeStatusUpdateFrequency, syncFrequency time.Duration,
+	fileCheckFrequency, httpCheckFrequency, minimumGCAge, nodeStatusUpdateFrequency, syncFrequency, outOfDiskTransitionFrequency time.Duration,
 	maxPods int,
 	containerManager cm.ContainerManager, clusterDNS net.IP) *KubeletConfig {
 	imageGCPolicy := kubelet.ImageGCPolicy{
@@ -768,6 +772,7 @@ func SimpleKubelet(client *client.Client,
 		TLSOptions:          tlsOptions,
 		VolumePlugins:       volumePlugins,
 		Writer:              &io.StdWriter{},
+		OutOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
 	}
 	return &kcfg
 }
@@ -965,6 +970,7 @@ type KubeletConfig struct {
 	TLSOptions                     *server.TLSOptions
 	Writer                         io.Writer
 	VolumePlugins                  []volume.VolumePlugin
+	OutOfDiskTransitionFrequency   time.Duration
 
 	ExperimentalFlannelOverlay bool
 	NodeIP                     net.IP
@@ -1050,6 +1056,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.OOMAdjuster,
 		kc.SerializeImagePulls,
 		kc.ContainerManager,
+		kc.OutOfDiskTransitionFrequency,
 		kc.ExperimentalFlannelOverlay,
 		kc.NodeIP,
 	)
