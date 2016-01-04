@@ -438,15 +438,20 @@ function cluster::mesos::docker::create_basic_user {
   echo "${password},${user_name},${user_name}"
 }
 
-# Buffers command output to memory, prints on failure.
+# Buffers command output to file, prints output on failure.
 function cluster::mesos::docker::buffer_output {
   local cmd="$@"
-
-  # buffer output until failure
-  local output=$((${cmd} || exit $?) 2>&1)
+  local tempfile="$(mktemp "${TMPDIR}/buffer.XXXXXX")"
+  trap "kill -TERM \${PID}; rm '${tempfile}'" TERM INT
+  ${cmd} &> "${tempfile}" &
+  PID=$!
+  wait ${PID}
+  trap - TERM INT
+  wait ${PID}
   local exit_status="$?"
   if [ "${exit_status}" != 0 ]; then
-    echo "${output}" 1>&2
-    return "${exit_status}"
+    cat "${tempfile}" 1>&2
   fi
+  rm "${tempfile}"
+  return "${exit_status}"
 }
