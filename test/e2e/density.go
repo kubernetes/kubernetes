@@ -118,24 +118,6 @@ var _ = Describe("Density [Skipped]", func() {
 
 	// Gathers data prior to framework namespace teardown
 	AfterEach(func() {
-		// Remove any remaining pods from this test if the
-		// replication controller still exists and the replica count
-		// isn't 0.  This means the controller wasn't cleaned up
-		// during the test so clean it up here. We want to do it separately
-		// to not cause a timeout on Namespace removal.
-		rc, err := c.ReplicationControllers(ns).Get(RCName)
-		if err == nil && rc.Spec.Replicas != 0 {
-			By("Cleaning up the replication controller")
-			err := DeleteRC(c, ns, RCName)
-			expectNoError(err)
-		}
-
-		By("Removing additional pods if any")
-		for i := 1; i <= nodeCount; i++ {
-			name := additionalPodsPrefix + "-" + strconv.Itoa(i)
-			c.Pods(ns).Delete(name, nil)
-		}
-
 		// Verify latency metrics.
 		highLatencyRequests, err := HighLatencyRequests(c)
 		expectNoError(err)
@@ -148,7 +130,7 @@ var _ = Describe("Density [Skipped]", func() {
 	})
 
 	// Explicitly put here, to delete namespace at the end of the test
-	// (after measuring latency metrics, etc.).
+	// (after measuring latency metrics, etc.).framework := NewFramework("density")
 	framework := NewFramework("density")
 	framework.NamespaceDeletionTimeout = time.Hour
 
