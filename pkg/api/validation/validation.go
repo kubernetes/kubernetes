@@ -2072,10 +2072,13 @@ func ValidateService(service *api.Service) field.ErrorList {
 	ipPath := specPath.Child("externalIPs")
 	for i, ip := range service.Spec.ExternalIPs {
 		idxPath := ipPath.Index(i)
-		if ip == "0.0.0.0" {
-			allErrs = append(allErrs, field.Invalid(idxPath, ip, "must be a valid IP address"))
+		if msgs := validation.IsValidIP(ip); len(msgs) != 0 {
+			for i := range msgs {
+				allErrs = append(allErrs, field.Invalid(idxPath, ip, msgs[i]))
+			}
+		} else {
+			allErrs = append(allErrs, validateNonSpecialIP(ip, idxPath)...)
 		}
-		allErrs = append(allErrs, validateIpIsNotLinkLocalOrLoopback(ip, idxPath)...)
 	}
 
 	if len(service.Spec.Type) == 0 {
@@ -3033,8 +3036,8 @@ func validateEndpointSubsets(subsets []api.EndpointSubset, fldPath *field.Path) 
 
 func validateEndpointAddress(address *api.EndpointAddress, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !validation.IsValidIP(address.IP) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), address.IP, "must be a valid IP address"))
+	for _, msg := range validation.IsValidIP(address.IP) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), address.IP, msg))
 	}
 	if len(address.Hostname) > 0 {
 		for _, msg := range validation.IsDNS1123Label(address.Hostname) {
@@ -3044,17 +3047,23 @@ func validateEndpointAddress(address *api.EndpointAddress, fldPath *field.Path) 
 	if len(allErrs) > 0 {
 		return allErrs
 	}
-	return validateIpIsNotLinkLocalOrLoopback(address.IP, fldPath.Child("ip"))
+	allErrs = append(allErrs, validateNonSpecialIP(address.IP, fldPath.Child("ip"))...)
+	return allErrs
 }
 
-func validateIpIsNotLinkLocalOrLoopback(ipAddress string, fldPath *field.Path) field.ErrorList {
-	// We disallow some IPs as endpoints or external-ips.  Specifically, loopback addresses are
-	// nonsensical and link-local addresses tend to be used for node-centric purposes (e.g. metadata service).
+func validateNonSpecialIP(ipAddress string, fldPath *field.Path) field.ErrorList {
+	// We disallow some IPs as endpoints or external-ips.  Specifically,
+	// unspecified and loopback addresses are nonsensical and link-local
+	// addresses tend to be used for node-centric purposes (e.g. metadata
+	// service).
 	allErrs := field.ErrorList{}
 	ip := net.ParseIP(ipAddress)
 	if ip == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "must be a valid IP address"))
 		return allErrs
+	}
+	if ip.IsUnspecified() {
+		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be unspecified (0.0.0.0)"))
 	}
 	if ip.IsLoopback() {
 		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the loopback range (127.0.0.0/8)"))

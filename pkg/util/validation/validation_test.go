@@ -293,8 +293,8 @@ func TestIsValidIP(t *testing.T) {
 		"0.0.0.0",
 	}
 	for _, val := range goodValues {
-		if !IsValidIP(val) {
-			t.Errorf("expected true for %q", val)
+		if msgs := IsValidIP(val); len(msgs) != 0 {
+			t.Errorf("expected true for %q: %v", val, msgs)
 		}
 	}
 
@@ -306,7 +306,7 @@ func TestIsValidIP(t *testing.T) {
 		"a",
 	}
 	for _, val := range badValues {
-		if IsValidIP(val) {
+		if msgs := IsValidIP(val); len(msgs) == 0 {
 			t.Errorf("expected false for %q", val)
 		}
 	}
