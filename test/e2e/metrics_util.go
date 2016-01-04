@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/prometheus/common/expfmt"
@@ -46,7 +47,33 @@ const (
 	apiCallLatencyLargeThreshold  time.Duration = 1 * time.Second
 )
 
-var InterestingApiServerMetrics = sets.NewString(
+type metricsForE2E metrics.MetricsCollection
+
+func (m *metricsForE2E) PrintHumanReadable() string {
+	buf := bytes.Buffer{}
+	for _, interestingMetric := range InterestingApiServerMetrics {
+		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
+		for _, sample := range (*m).ApiServerMetrics[interestingMetric] {
+			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+		}
+	}
+	for kubelet, grabbed := range (*m).KubeletMetrics {
+		buf.WriteString(fmt.Sprintf("For %v:\n", kubelet))
+		for _, interestingMetric := range InterestingKubeletMetrics {
+			buf.WriteString(fmt.Sprintf("\tFor %v:\n", interestingMetric))
+			for _, sample := range grabbed[interestingMetric] {
+				buf.WriteString(fmt.Sprintf("\t\t%v\n", metrics.PrintSample(sample)))
+			}
+		}
+	}
+	return buf.String()
+}
+
+func (m *metricsForE2E) PrintJSON() string {
+	return "JSON printer not implemented for Metrics"
+}
+
+var InterestingApiServerMetrics = []string{
 	"apiserver_request_count",
 	"apiserver_request_latencies_bucket",
 	"etcd_helper_cache_entry_count",
@@ -62,9 +89,9 @@ var InterestingApiServerMetrics = sets.NewString(
 	"process_resident_memory_bytes",
 	"process_start_time_seconds",
 	"process_virtual_memory_bytes",
-)
+}
 
-var InterestingKubeletMetrics = sets.NewString(
+var InterestingKubeletMetrics = []string{
 	"container_cpu_system_seconds_total",
 	"container_cpu_user_seconds_total",
 	"container_fs_io_time_weighted_seconds_total",
@@ -86,7 +113,7 @@ var InterestingKubeletMetrics = sets.NewString(
 	"process_resident_memory_bytes",
 	"process_start_time_seconds",
 	"process_virtual_memory_bytes",
-)
+}
 
 // Dashboard metrics
 type LatencyMetric struct {
