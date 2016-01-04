@@ -21,6 +21,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
@@ -106,6 +107,32 @@ func (s *AWSCloud) CreateRoute(clusterName string, nameHint string, route *cloud
 	table, err := s.findRouteTable(clusterName)
 	if err != nil {
 		return err
+	}
+
+	var deleteRoute *ec2.Route
+	for _, r := range table.Routes {
+		destinationCIDR := aws.StringValue(r.DestinationCidrBlock)
+
+		if destinationCIDR != route.DestinationCIDR {
+			continue
+		}
+
+		if aws.StringValue(r.State) == ec2.RouteStateBlackhole {
+			deleteRoute = r
+		}
+	}
+
+	if deleteRoute != nil {
+		glog.Infof("deleting blackholed route: %s", aws.StringValue(deleteRoute.DestinationCidrBlock))
+
+		request := &ec2.DeleteRouteInput{}
+		request.DestinationCidrBlock = deleteRoute.DestinationCidrBlock
+		request.RouteTableId = table.RouteTableId
+
+		_, err = s.ec2.DeleteRoute(request)
+		if err != nil {
+			return fmt.Errorf("error deleting blackholed AWS route (%s): %v", deleteRoute.DestinationCidrBlock, err)
+		}
 	}
 
 	request := &ec2.CreateRouteInput{}
