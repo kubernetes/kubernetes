@@ -51,9 +51,10 @@ import (
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
-	"k8s.io/kubernetes/pkg/controller/serviceaccount"
+	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -433,9 +434,9 @@ func (s *CMServer) Run(_ []string) error {
 		if err != nil {
 			glog.Errorf("Error reading key for service account token controller: %v", err)
 		} else {
-			serviceaccount.NewTokensController(
+			serviceaccountcontroller.NewTokensController(
 				clientForUserAgentOrDie(*kubeconfig, "tokens-controller"),
-				serviceaccount.TokensControllerOptions{
+				serviceaccountcontroller.TokensControllerOptions{
 					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
 					RootCA:         rootCA,
 				},
@@ -443,9 +444,9 @@ func (s *CMServer) Run(_ []string) error {
 		}
 	}
 
-	serviceaccount.NewServiceAccountsController(
+	serviceaccountcontroller.NewServiceAccountsController(
 		clientForUserAgentOrDie(*kubeconfig, "service-account-controller"),
-		serviceaccount.DefaultServiceAccountsControllerOptions(),
+		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
 	).Run()
 
 	select {}

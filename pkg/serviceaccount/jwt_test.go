@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package serviceaccount
+package serviceaccount_test
 
 import (
 	"crypto/rsa"
@@ -24,9 +24,12 @@ import (
 	"testing"
 
 	"github.com/dgrijalva/jwt-go"
+
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
 const otherPublicKey = `-----BEGIN PUBLIC KEY-----
@@ -100,7 +103,7 @@ func TestReadPrivateKey(t *testing.T) {
 		t.Fatalf("error creating tmpfile: %v", err)
 	}
 
-	if _, err := ReadPrivateKey(f.Name()); err != nil {
+	if _, err := serviceaccount.ReadPrivateKey(f.Name()); err != nil {
 		t.Fatalf("error reading key: %v", err)
 	}
 }
@@ -116,7 +119,7 @@ func TestReadPublicKey(t *testing.T) {
 		t.Fatalf("error creating tmpfile: %v", err)
 	}
 
-	if _, err := ReadPublicKey(f.Name()); err != nil {
+	if _, err := serviceaccount.ReadPublicKey(f.Name()); err != nil {
 		t.Fatalf("error reading key: %v", err)
 	}
 }
@@ -141,7 +144,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 
 	// Generate the token
-	generator := JWTTokenGenerator(getPrivateKey(privateKey))
+	generator := serviceaccount.JWTTokenGenerator(getPrivateKey(privateKey))
 	token, err := generator.GenerateToken(*serviceAccount, *secret)
 	if err != nil {
 		t.Fatalf("error generating token: %v", err)
@@ -219,8 +222,8 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 
 	for k, tc := range testCases {
-		getter := NewGetterFromClient(tc.Client)
-		authenticator := JWTTokenAuthenticator(tc.Keys, tc.Client != nil, getter)
+		getter := serviceaccountcontroller.NewGetterFromClient(tc.Client)
+		authenticator := serviceaccount.JWTTokenAuthenticator(tc.Keys, tc.Client != nil, getter)
 
 		user, ok, err := authenticator.AuthenticateToken(token)
 		if (err != nil) != tc.ExpectedErr {
@@ -253,8 +256,8 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 }
 
 func TestMakeSplitUsername(t *testing.T) {
-	username := MakeUsername("ns", "name")
-	ns, name, err := SplitUsername(username)
+	username := serviceaccount.MakeUsername("ns", "name")
+	ns, name, err := serviceaccount.SplitUsername(username)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -264,7 +267,7 @@ func TestMakeSplitUsername(t *testing.T) {
 
 	invalid := []string{"test", "system:serviceaccount", "system:serviceaccount:", "system:serviceaccount:ns", "system:serviceaccount:ns:name:extra"}
 	for _, n := range invalid {
-		_, _, err := SplitUsername("test")
+		_, _, err := serviceaccount.SplitUsername("test")
 		if err == nil {
 			t.Errorf("Expected error for %s", n)
 		}
