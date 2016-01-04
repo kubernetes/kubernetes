@@ -831,17 +831,17 @@ func TestValidatePorts(t *testing.T) {
 		"name > 15 characters": {
 			[]api.ContainerPort{{Name: strings.Repeat("a", 16), ContainerPort: 80, Protocol: "TCP"}},
 			field.ErrorTypeInvalid,
-			"name", PortNameErrorMsg,
+			"name", "15",
 		},
-		"name not a IANA svc name ": {
+		"name contains invalid characters": {
 			[]api.ContainerPort{{Name: "a.b.c", ContainerPort: 80, Protocol: "TCP"}},
 			field.ErrorTypeInvalid,
-			"name", PortNameErrorMsg,
+			"name", "alpha-numeric",
 		},
-		"name not a IANA svc name (i.e. a number)": {
+		"name is a number": {
 			[]api.ContainerPort{{Name: "80", ContainerPort: 80, Protocol: "TCP"}},
 			field.ErrorTypeInvalid,
-			"name", PortNameErrorMsg,
+			"name", "at least one letter",
 		},
 		"name not unique": {
 			[]api.ContainerPort{
@@ -853,18 +853,18 @@ func TestValidatePorts(t *testing.T) {
 		},
 		"zero container port": {
 			[]api.ContainerPort{{ContainerPort: 0, Protocol: "TCP"}},
-			field.ErrorTypeInvalid,
-			"containerPort", PortRangeErrorMsg,
+			field.ErrorTypeRequired,
+			"containerPort", "",
 		},
 		"invalid container port": {
 			[]api.ContainerPort{{ContainerPort: 65536, Protocol: "TCP"}},
 			field.ErrorTypeInvalid,
-			"containerPort", PortRangeErrorMsg,
+			"containerPort", "between",
 		},
 		"invalid host port": {
 			[]api.ContainerPort{{ContainerPort: 80, HostPort: 65536, Protocol: "TCP"}},
 			field.ErrorTypeInvalid,
-			"hostPort", PortRangeErrorMsg,
+			"hostPort", "between",
 		},
 		"invalid protocol case": {
 			[]api.ContainerPort{{ContainerPort: 80, Protocol: "tcp"}},
@@ -4948,7 +4948,7 @@ func TestValidateEndpoints(t *testing.T) {
 				},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: PortRangeErrorMsg,
+			errorDetail: "between",
 		},
 		"Invalid protocol": {
 			endpoints: api.Endpoints{
@@ -4986,7 +4986,7 @@ func TestValidateEndpoints(t *testing.T) {
 				},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: PortRangeErrorMsg,
+			errorDetail: "between",
 		},
 		"Port missing protocol": {
 			endpoints: api.Endpoints{

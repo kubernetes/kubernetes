@@ -50,14 +50,8 @@ const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = `field is immutable`
 const isNotIntegerErrorMsg string = `must be an integer`
 
-func InclusiveRangeErrorMsg(lo, hi int) string {
-	return fmt.Sprintf(`must be between %d and %d, inclusive`, lo, hi)
-}
-
-var pdPartitionErrorMsg string = InclusiveRangeErrorMsg(1, 255)
-var PortRangeErrorMsg string = InclusiveRangeErrorMsg(1, 65535)
-var IdRangeErrorMsg string = InclusiveRangeErrorMsg(0, math.MaxInt32)
-var PortNameErrorMsg string = fmt.Sprintf(`must be an IANA_SVC_NAME (at most 15 characters, matching regex %s, it must contain at least one letter [a-z], and hyphens cannot be adjacent to other hyphens): e.g. "http"`, validation.IdentifierNoHyphensBeginEndFmt)
+var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
+var IdRangeErrorMsg string = validation.InclusiveRangeError(0, math.MaxInt32)
 
 const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
 
@@ -561,7 +555,7 @@ func validateISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, fldPath *field.Path
 		allErrs = append(allErrs, field.Required(fldPath.Child("iqn"), ""))
 	}
 	if iscsi.Lun < 0 || iscsi.Lun > 255 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), iscsi.Lun, InclusiveRangeErrorMsg(0, 255)))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), iscsi.Lun, validation.InclusiveRangeError(0, 255)))
 	}
 	return allErrs
 }
@@ -576,7 +570,7 @@ func validateFCVolumeSource(fc *api.FCVolumeSource, fldPath *field.Path) field.E
 		allErrs = append(allErrs, field.Required(fldPath.Child("lun"), ""))
 	} else {
 		if *fc.Lun < 0 || *fc.Lun > 255 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), fc.Lun, InclusiveRangeErrorMsg(0, 255)))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), fc.Lun, validation.InclusiveRangeError(0, 255)))
 		}
 	}
 	return allErrs
@@ -956,8 +950,10 @@ func validateContainerPorts(ports []api.ContainerPort, fldPath *field.Path) fiel
 	for i, port := range ports {
 		idxPath := fldPath.Index(i)
 		if len(port.Name) > 0 {
-			if !validation.IsValidPortName(port.Name) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), port.Name, PortNameErrorMsg))
+			if msgs := validation.IsValidPortName(port.Name); len(msgs) != 0 {
+				for i = range msgs {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), port.Name, msgs[i]))
+				}
 			} else if allNames.Has(port.Name) {
 				allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), port.Name))
 			} else {
@@ -965,12 +961,16 @@ func validateContainerPorts(ports []api.ContainerPort, fldPath *field.Path) fiel
 			}
 		}
 		if port.ContainerPort == 0 {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("containerPort"), port.ContainerPort, PortRangeErrorMsg))
-		} else if !validation.IsValidPortNum(port.ContainerPort) {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("containerPort"), port.ContainerPort, PortRangeErrorMsg))
+			allErrs = append(allErrs, field.Required(idxPath.Child("containerPort"), ""))
+		} else {
+			for _, msg := range validation.IsValidPortNum(port.ContainerPort) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("containerPort"), port.ContainerPort, msg))
+			}
 		}
-		if port.HostPort != 0 && !validation.IsValidPortNum(port.HostPort) {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("hostPort"), port.HostPort, PortRangeErrorMsg))
+		if port.HostPort != 0 {
+			for _, msg := range validation.IsValidPortNum(port.HostPort) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostPort"), port.HostPort, msg))
+			}
 		}
 		if len(port.Protocol) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("protocol"), ""))
@@ -1162,19 +1162,16 @@ func validateExecAction(exec *api.ExecAction, fldPath *field.Path) field.ErrorLi
 	return allErrors
 }
 
+var supportedHTTPSchemes = sets.NewString(string(api.URISchemeHTTP), string(api.URISchemeHTTPS))
+
 func validateHTTPGetAction(http *api.HTTPGetAction, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	if len(http.Path) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("path"), ""))
 	}
-	if http.Port.Type == intstr.Int && !validation.IsValidPortNum(http.Port.IntValue()) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("port"), http.Port, PortRangeErrorMsg))
-	} else if http.Port.Type == intstr.String && !validation.IsValidPortName(http.Port.StrVal) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("port"), http.Port.StrVal, PortNameErrorMsg))
-	}
-	supportedSchemes := sets.NewString(string(api.URISchemeHTTP), string(api.URISchemeHTTPS))
-	if !supportedSchemes.Has(string(http.Scheme)) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("scheme"), http.Scheme, fmt.Sprintf("must be one of %v", supportedSchemes.List())))
+	allErrors = append(allErrors, ValidatePortNumOrName(http.Port, fldPath.Child("port"))...)
+	if !supportedHTTPSchemes.Has(string(http.Scheme)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("scheme"), http.Scheme, supportedHTTPSchemes.List()))
 	}
 	for _, header := range http.HTTPHeaders {
 		if !validation.IsHTTPHeaderName(header.Name) {
@@ -1184,14 +1181,24 @@ func validateHTTPGetAction(http *api.HTTPGetAction, fldPath *field.Path) field.E
 	return allErrors
 }
 
-func validateTCPSocketAction(tcp *api.TCPSocketAction, fldPath *field.Path) field.ErrorList {
-	allErrors := field.ErrorList{}
-	if tcp.Port.Type == intstr.Int && !validation.IsValidPortNum(tcp.Port.IntValue()) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("port"), tcp.Port, PortRangeErrorMsg))
-	} else if tcp.Port.Type == intstr.String && !validation.IsValidPortName(tcp.Port.StrVal) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("port"), tcp.Port.StrVal, PortNameErrorMsg))
+func ValidatePortNumOrName(port intstr.IntOrString, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if port.Type == intstr.Int {
+		for _, msg := range validation.IsValidPortNum(port.IntValue()) {
+			allErrs = append(allErrs, field.Invalid(fldPath, port.IntValue(), msg))
+		}
+	} else if port.Type == intstr.String {
+		for _, msg := range validation.IsValidPortName(port.StrVal) {
+			allErrs = append(allErrs, field.Invalid(fldPath, port.StrVal, msg))
+		}
+	} else {
+		allErrs = append(allErrs, field.InternalError(fldPath, fmt.Errorf("unknown type: %v", port.Type)))
 	}
-	return allErrors
+	return allErrs
+}
+
+func validateTCPSocketAction(tcp *api.TCPSocketAction, fldPath *field.Path) field.ErrorList {
+	return ValidatePortNumOrName(tcp.Port, fldPath.Child("port"))
 }
 
 func validateHandler(handler *api.Handler, fldPath *field.Path) field.ErrorList {
@@ -1777,8 +1784,8 @@ func validateServicePort(sp *api.ServicePort, requireName, isHeadlessService boo
 		}
 	}
 
-	if !validation.IsValidPortNum(sp.Port) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), sp.Port, PortRangeErrorMsg))
+	for _, msg := range validation.IsValidPortNum(sp.Port) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), sp.Port, msg))
 	}
 
 	if len(sp.Protocol) == 0 {
@@ -1787,12 +1794,7 @@ func validateServicePort(sp *api.ServicePort, requireName, isHeadlessService boo
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, supportedPortProtocols.List()))
 	}
 
-	if sp.TargetPort.Type == intstr.Int && !validation.IsValidPortNum(sp.TargetPort.IntValue()) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetPort"), sp.TargetPort, PortRangeErrorMsg))
-	}
-	if sp.TargetPort.Type == intstr.String && !validation.IsValidPortName(sp.TargetPort.StrVal) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetPort"), sp.TargetPort, PortNameErrorMsg))
-	}
+	allErrs = append(allErrs, ValidatePortNumOrName(sp.TargetPort, fldPath.Child("targetPort"))...)
 
 	// in the v1 API, targetPorts on headless services were tolerated.
 	// once we have version-specific validation, we can reject this on newer API versions, but until then, we have to tolerate it for compatibility.
@@ -2624,8 +2626,8 @@ func validateEndpointPort(port *api.EndpointPort, requireName bool, fldPath *fie
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), port.Name, msg))
 		}
 	}
-	if !validation.IsValidPortNum(port.Port) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), port.Port, PortRangeErrorMsg))
+	for _, msg := range validation.IsValidPortNum(port.Port) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), port.Port, msg))
 	}
 	if len(port.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
