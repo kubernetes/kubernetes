@@ -22,7 +22,7 @@ import (
 	"testing"
 )
 
-func TestScaledValue(t *testing.T) {
+func TestScaledValueInternal(t *testing.T) {
 	tests := []struct {
 		unscaled *big.Int
 		scale    int

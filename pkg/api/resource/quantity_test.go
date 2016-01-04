@@ -95,6 +95,28 @@ func TestQuantityCmp(t *testing.T) {
 			t.Errorf("X: %v, Y: %v, Expected: %v, Actual: %v", testCase.x, testCase.y, testCase.expect, result)
 		}
 	}
+
+	nils := []struct {
+		x      *inf.Dec
+		y      *inf.Dec
+		expect int
+	}{
+		{dec(0, 0), dec(0, 0), 0},
+		{nil, dec(0, 0), 0},
+		{dec(0, 0), nil, 0},
+		{nil, nil, 0},
+		{nil, dec(10, 0), -1},
+		{nil, dec(-10, 0), 1},
+		{dec(10, 0), nil, 1},
+		{dec(-10, 0), nil, -1},
+	}
+	for _, nilCase := range nils {
+		q1 := Quantity{nilCase.x, DecimalSI}
+		q2 := Quantity{nilCase.y, DecimalSI}
+		if result := q1.Cmp(q2); result != nilCase.expect {
+			t.Errorf("X: %v, Y: %v, Expected: %v, Actual: %v", nilCase.x, nilCase.y, nilCase.expect, result)
+		}
+	}
 }
 
 func TestQuantityParse(t *testing.T) {
@@ -103,6 +125,8 @@ func TestQuantityParse(t *testing.T) {
 		expect Quantity
 	}{
 		{"0", Quantity{dec(0, 0), DecimalSI}},
+		{"0n", Quantity{dec(0, 0), DecimalSI}},
+		{"0u", Quantity{dec(0, 0), DecimalSI}},
 		{"0m", Quantity{dec(0, 0), DecimalSI}},
 		{"0Ki", Quantity{dec(0, 0), BinarySI}},
 		{"0k", Quantity{dec(0, 0), DecimalSI}},
@@ -126,6 +150,8 @@ func TestQuantityParse(t *testing.T) {
 		{"100Ti", Quantity{dec(100*1024*1024*1024*1024, 0), BinarySI}},
 
 		// Decimal suffixes
+		{"5n", Quantity{dec(5, -9), DecimalSI}},
+		{"4u", Quantity{dec(4, -6), DecimalSI}},
 		{"3m", Quantity{dec(3, -3), DecimalSI}},
 		{"9", Quantity{dec(9, 0), DecimalSI}},
 		{"8k", Quantity{dec(8, 3), DecimalSI}},
@@ -186,15 +212,15 @@ func TestQuantityParse(t *testing.T) {
 		{"1.01E", Quantity{dec(101, 16), DecimalSI}},
 
 		// Things that saturate/round
-		{"3.001m", Quantity{dec(4, -3), DecimalSI}},
-		{"1.1E-3", Quantity{dec(2, -3), DecimalExponent}},
-		{"0.0001", Quantity{dec(1, -3), DecimalSI}},
-		{"0.0005", Quantity{dec(1, -3), DecimalSI}},
-		{"0.00050", Quantity{dec(1, -3), DecimalSI}},
-		{"0.5e-3", Quantity{dec(1, -3), DecimalExponent}},
-		{"0.9m", Quantity{dec(1, -3), DecimalSI}},
-		{"0.12345", Quantity{dec(124, -3), DecimalSI}},
-		{"0.12354", Quantity{dec(124, -3), DecimalSI}},
+		{"3.001n", Quantity{dec(4, -9), DecimalSI}},
+		{"1.1E-9", Quantity{dec(2, -9), DecimalExponent}},
+		{"0.0000000001", Quantity{dec(1, -9), DecimalSI}},
+		{"0.0000000005", Quantity{dec(1, -9), DecimalSI}},
+		{"0.00000000050", Quantity{dec(1, -9), DecimalSI}},
+		{"0.5e-9", Quantity{dec(1, -9), DecimalExponent}},
+		{"0.9n", Quantity{dec(1, -9), DecimalSI}},
+		{"0.00000012345", Quantity{dec(124, -9), DecimalSI}},
+		{"0.00000012354", Quantity{dec(124, -9), DecimalSI}},
 		{"9Ei", Quantity{maxAllowed, BinarySI}},
 		{"9223372036854775807Ki", Quantity{maxAllowed, BinarySI}},
 		{"12E", Quantity{maxAllowed, DecimalSI}},
@@ -206,7 +232,7 @@ func TestQuantityParse(t *testing.T) {
 		{"0.025Ti", Quantity{dec(274877906944, -1), BinarySI}},
 
 		// Things written by trolls
-		{"0.000001Ki", Quantity{dec(2, -3), DecimalSI}}, // rounds up, changes format
+		{"0.000000000001Ki", Quantity{dec(2, -9), DecimalSI}}, // rounds up, changes format
 		{".001", Quantity{dec(1, -3), DecimalSI}},
 		{".0001k", Quantity{dec(100, -3), DecimalSI}},
 		{"1.", Quantity{dec(1, 0), DecimalSI}},
@@ -308,6 +334,7 @@ func TestQuantityString(t *testing.T) {
 		{Quantity{dec(0, 0), BinarySI}, "0"},
 		{Quantity{dec(1, 9), DecimalExponent}, "1e9"},
 		{Quantity{dec(1, -3), DecimalExponent}, "1e-3"},
+		{Quantity{dec(1, -9), DecimalExponent}, "1e-9"},
 		{Quantity{dec(80, -3), DecimalExponent}, "80e-3"},
 		{Quantity{dec(300, 6), DecimalExponent}, "300e6"},
 		{Quantity{dec(1, 12), DecimalExponent}, "1e12"},
@@ -315,6 +342,14 @@ func TestQuantityString(t *testing.T) {
 		{Quantity{dec(3, 3), DecimalExponent}, "3e3"},
 		{Quantity{dec(3, 3), DecimalSI}, "3k"},
 		{Quantity{dec(0, 0), DecimalExponent}, "0"},
+		{Quantity{dec(1, -9), DecimalSI}, "1n"},
+		{Quantity{dec(80, -9), DecimalSI}, "80n"},
+		{Quantity{dec(1080, -9), DecimalSI}, "1080n"},
+		{Quantity{dec(108, -8), DecimalSI}, "1080n"},
+		{Quantity{dec(10800, -10), DecimalSI}, "1080n"},
+		{Quantity{dec(1, -6), DecimalSI}, "1u"},
+		{Quantity{dec(80, -6), DecimalSI}, "80u"},
+		{Quantity{dec(1080, -6), DecimalSI}, "1080u"},
 	}
 	for _, item := range table {
 		got := item.in.String()
@@ -346,7 +381,10 @@ func TestQuantityParseEmit(t *testing.T) {
 		{"1Gi", "1Gi"},
 		{"1024Mi", "1Gi"},
 		{"1000M", "1G"},
-		{".000001Ki", "2m"},
+		{".001Ki", "1024m"},
+		{".000001Ki", "1024u"},
+		{".000000001Ki", "1024n"},
+		{".000000000001Ki", "2n"},
 	}
 
 	for _, item := range table {
@@ -498,6 +536,77 @@ func TestNewSet(t *testing.T) {
 		q.Set(item.value)
 		if e, a := item.expect, q.String(); e != a {
 			t.Errorf("Set: Expected %v, got %v; %#v", e, a, q)
+		}
+	}
+}
+
+func TestNewScaledSet(t *testing.T) {
+	table := []struct {
+		value  int64
+		scale  Scale
+		expect string
+	}{
+		{1, Nano, "1n"},
+		{1000, Nano, "1u"},
+		{1, Micro, "1u"},
+		{1000, Micro, "1m"},
+		{1, Milli, "1m"},
+		{1000, Milli, "1"},
+		{1, 0, "1"},
+		{0, Nano, "0"},
+		{0, Micro, "0"},
+		{0, Milli, "0"},
+		{0, 0, "0"},
+	}
+
+	for _, item := range table {
+		q := NewScaledQuantity(item.value, item.scale)
+		if e, a := item.expect, q.String(); e != a {
+			t.Errorf("Expected %v, got %v; %#v", e, a, q)
+		}
+		q2, err := ParseQuantity(q.String())
+		if err != nil {
+			t.Errorf("Round trip failed on %v", q)
+		}
+		if e, a := item.value, q2.ScaledValue(item.scale); e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+		q3 := NewQuantity(0, DecimalSI)
+		q3.SetScaled(item.value, item.scale)
+		if q.Cmp(*q3) != 0 {
+			t.Errorf("Expected %v and %v to be equal", q, q3)
+		}
+	}
+}
+
+func TestScaledValue(t *testing.T) {
+	table := []struct {
+		fromScale Scale
+		toScale   Scale
+		expected  int64
+	}{
+		{Nano, Nano, 1},
+		{Nano, Micro, 1},
+		{Nano, Milli, 1},
+		{Nano, 0, 1},
+		{Micro, Nano, 1000},
+		{Micro, Micro, 1},
+		{Micro, Milli, 1},
+		{Micro, 0, 1},
+		{Milli, Nano, 1000 * 1000},
+		{Milli, Micro, 1000},
+		{Milli, Milli, 1},
+		{Milli, 0, 1},
+		{0, Nano, 1000 * 1000 * 1000},
+		{0, Micro, 1000 * 1000},
+		{0, Milli, 1000},
+		{0, 0, 1},
+	}
+
+	for _, item := range table {
+		q := NewScaledQuantity(1, item.fromScale)
+		if e, a := item.expected, q.ScaledValue(item.toScale); e != a {
+			t.Errorf("%v to %v: Expected %v, got %v", item.fromScale, item.toScale, e, a)
 		}
 	}
 }
