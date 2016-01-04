@@ -210,8 +210,11 @@ func IsValidPortName(port string) []string {
 }
 
 // IsValidIP tests that the argument is a valid IP address.
-func IsValidIP(value string) bool {
-	return net.ParseIP(value) != nil
+func IsValidIP(value string) []string {
+	if net.ParseIP(value) == nil {
+		return []string{"must be a valid IP address, (e.g. 10.9.8.7)"}
+	}
+	return nil
 }
 
 const percentFmt string = "[0-9]+%"
