@@ -18,6 +18,7 @@ package genericapiserver
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -27,7 +28,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -126,6 +129,21 @@ type APIGroupVersionOverride struct {
 	Disable bool
 	// List of overrides for individual resources in this group version.
 	ResourceOverrides map[string]bool
+}
+
+// Info about an API group.
+type APIGroupInfo struct {
+	GroupMeta latest.GroupMeta
+	// Info about the resources in this group. Its a map from version to resource to the storage.
+	VersionedResourcesStorageMap map[string]map[string]rest.Storage
+	// True, if this is the legacy group ("/v1").
+	IsLegacyGroup bool
+	// OptionsExternalVersion controls the APIVersion used for common objects in the
+	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
+	// define a version "v1beta1" but want to use the Kubernetes "v1" internal objects.
+	// If nil, defaults to groupMeta.GroupVersion.
+	// TODO: Remove this when https://github.com/kubernetes/kubernetes/issues/19018 is fixed.
+	OptionsExternalVersion *unversioned.GroupVersion
 }
 
 // Config is a structure used to configure a GenericAPIServer.
@@ -229,8 +247,8 @@ type GenericAPIServer struct {
 	enableSwaggerSupport     bool
 	enableProfiling          bool
 	enableWatchCache         bool
-	ApiPrefix                string
-	ApiGroupPrefix           string
+	APIPrefix                string
+	APIGroupPrefix           string
 	corsAllowedOriginList    []string
 	authenticator            authenticator.Request
 	authorizer               authorizer.Authorizer
@@ -351,8 +369,8 @@ func New(c *Config) *GenericAPIServer {
 		enableSwaggerSupport:     c.EnableSwaggerSupport,
 		enableProfiling:          c.EnableProfiling,
 		enableWatchCache:         c.EnableWatchCache,
-		ApiPrefix:                c.APIPrefix,
-		ApiGroupPrefix:           c.APIGroupPrefix,
+		APIPrefix:                c.APIPrefix,
+		APIGroupPrefix:           c.APIGroupPrefix,
 		corsAllowedOriginList:    c.CorsAllowedOriginList,
 		authenticator:            c.Authenticator,
 		authorizer:               c.Authorizer,
@@ -397,8 +415,8 @@ func New(c *Config) *GenericAPIServer {
 
 func (s *GenericAPIServer) NewRequestInfoResolver() *apiserver.RequestInfoResolver {
 	return &apiserver.RequestInfoResolver{
-		sets.NewString(strings.Trim(s.ApiPrefix, "/"), strings.Trim(s.ApiGroupPrefix, "/")), // all possible API prefixes
-		sets.NewString(strings.Trim(s.ApiPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
+		sets.NewString(strings.Trim(s.APIPrefix, "/"), strings.Trim(s.APIGroupPrefix, "/")), // all possible API prefixes
+		sets.NewString(strings.Trim(s.APIPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
 	}
 }
 
@@ -502,6 +520,102 @@ func (s *GenericAPIServer) init(c *Config) {
 	} else {
 		s.InsecureHandler = handler
 	}
+}
+
+// Exposes the given group versions in API.
+func (s *GenericAPIServer) InstallAPIGroups(groupsInfo []APIGroupInfo) error {
+	for _, apiGroupInfo := range groupsInfo {
+		if err := s.installAPIGroup(&apiGroupInfo); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *GenericAPIServer) installAPIGroup(apiGroupInfo *APIGroupInfo) error {
+	apiPrefix := s.APIGroupPrefix
+	if apiGroupInfo.IsLegacyGroup {
+		apiPrefix = s.APIPrefix
+	}
+
+	// Install REST handlers for all the versions in this group.
+	apiVersions := []string{}
+	for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
+		apiVersions = append(apiVersions, groupVersion.Version)
+
+		apiGroupVersion, err := s.getAPIGroupVersion(apiGroupInfo, groupVersion, apiPrefix)
+		if err != nil {
+			return err
+		}
+		if apiGroupInfo.OptionsExternalVersion != nil {
+			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
+		}
+
+		if err := apiGroupVersion.InstallREST(s.HandlerContainer); err != nil {
+			return fmt.Errorf("Unable to setup API %v: %v", apiGroupInfo, err)
+		}
+	}
+	// Install the version handler.
+	if apiGroupInfo.IsLegacyGroup {
+		// Add a handler at /api to enumerate the supported api versions.
+		apiserver.AddApiWebService(s.HandlerContainer, apiPrefix, apiVersions)
+	} else {
+		// Add a handler at /apis/<groupName> to enumerate all versions supported by this group.
+		apiVersionsForDiscovery := []unversioned.GroupVersionForDiscovery{}
+		for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
+			apiVersionsForDiscovery = append(apiVersionsForDiscovery, unversioned.GroupVersionForDiscovery{
+				GroupVersion: groupVersion.String(),
+				Version:      groupVersion.Version,
+			})
+		}
+		preferedVersionForDiscovery := unversioned.GroupVersionForDiscovery{
+			GroupVersion: apiGroupInfo.GroupMeta.GroupVersion.String(),
+			Version:      apiGroupInfo.GroupMeta.GroupVersion.Version,
+		}
+		apiGroup := unversioned.APIGroup{
+			Name:             apiGroupInfo.GroupMeta.GroupVersion.Group,
+			Versions:         apiVersionsForDiscovery,
+			PreferredVersion: preferedVersionForDiscovery,
+		}
+		apiserver.AddGroupWebService(s.HandlerContainer, apiPrefix+"/"+apiGroup.Name, apiGroup)
+	}
+	apiserver.InstallServiceErrorHandler(s.HandlerContainer, s.NewRequestInfoResolver(), apiVersions)
+	return nil
+}
+
+func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion unversioned.GroupVersion, apiPrefix string) (*apiserver.APIGroupVersion, error) {
+	storage := make(map[string]rest.Storage)
+	for k, v := range apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version] {
+		storage[strings.ToLower(k)] = v
+	}
+	version, err := s.newAPIGroupVersion(apiGroupInfo.GroupMeta, groupVersion)
+	version.Root = apiPrefix
+	version.Storage = storage
+	return version, err
+}
+
+func (s *GenericAPIServer) newAPIGroupVersion(groupMeta latest.GroupMeta, groupVersion unversioned.GroupVersion) (*apiserver.APIGroupVersion, error) {
+	versionInterface, err := groupMeta.InterfacesFor(groupVersion)
+	if err != nil {
+		return nil, err
+	}
+	return &apiserver.APIGroupVersion{
+		RequestInfoResolver: s.NewRequestInfoResolver(),
+
+		Creater:   api.Scheme,
+		Convertor: api.Scheme,
+		Typer:     api.Scheme,
+
+		GroupVersion: groupVersion,
+		Linker:       groupMeta.SelfLinker,
+		Mapper:       groupMeta.RESTMapper,
+		Codec:        versionInterface.Codec,
+
+		Admit:   s.AdmissionControl,
+		Context: s.RequestContextMapper,
+
+		MinRequestTimeout: s.MinRequestTimeout,
+	}, nil
 }
 
 // InstallSwaggerAPI installs the /swaggerapi/ endpoint to allow schema discovery
