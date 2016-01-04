@@ -19,6 +19,7 @@ package generators
 
 import (
 	"path/filepath"
+	"strings"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
@@ -70,13 +71,7 @@ func packageForGroup(group string, version string, typeList []*types.Type, baseP
 			for _, t := range typeList {
 				generators = append(generators, &genClientForType{
 					DefaultGen: generator.DefaultGen{
-						// Use the privatized version of the
-						// type name as the file name.
-						//
-						// TODO: make a namer that converts
-						// camelCase to '-' separation for file
-						// names?
-						OptionalName: c.Namers["private"].Name(t),
+						OptionalName: strings.ToLower(c.Namers["private"].Name(t)),
 					},
 					outputPackage: outputPackagePath,
 					group:         group,
