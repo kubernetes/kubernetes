@@ -146,6 +146,13 @@ func (m *EtcdTestServer) waitUntilUp() error {
 func (m *EtcdTestServer) Terminate(t *testing.T) {
 	m.Client = nil
 	m.s.Stop()
+	// TODO: This is a pretty ugly hack to workaround races during closing
+	// in-memory etcd server in unit tests - see #18928 for more details.
+	// We should get rid of it as soon as we have a proper fix - etcd clients
+	// have overwritten transport counting opened connections (probably by
+	// overwriting Dial function) and termination function waiting for all
+	// connections to be closed and stopping accepting new ones.
+	time.Sleep(250 * time.Millisecond)
 	for _, hs := range m.hss {
 		hs.CloseClientConnections()
 		hs.Close()
