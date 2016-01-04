@@ -222,6 +222,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		10*time.Second, /* MinimumGCAge */
 		3*time.Second,  /* NodeStatusUpdateFrequency */
 		10*time.Second, /* SyncFrequency */
+		10*time.Second, /* OutOfDiskTransitionFrequency */
 		40,             /* MaxPods */
 		cm, net.ParseIP("127.0.0.1"))
 
@@ -254,6 +255,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		10*time.Second, /* MinimumGCAge */
 		3*time.Second,  /* NodeStatusUpdateFrequency */
 		10*time.Second, /* SyncFrequency */
+		10*time.Second, /* OutOfDiskTransitionFrequency */
 
 		40, /* MaxPods */
 		cm,
