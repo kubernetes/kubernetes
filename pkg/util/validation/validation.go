@@ -153,8 +153,11 @@ func IsCIdentifier(value string) []string {
 }
 
 // IsValidPortNum tests that the argument is a valid, non-zero port number.
-func IsValidPortNum(port int) bool {
-	return 0 < port && port < 65536
+func IsValidPortNum(port int) []string {
+	if port < 1 || port > 65535 {
+		return []string{InclusiveRangeError(1, 65535)}
+	}
+	return nil
 }
 
 // Now in libcontainer UID/GID limits is 0 ~ 1<<31 - 1
@@ -176,34 +179,34 @@ func IsValidUserId(uid int64) bool {
 	return minUserID <= uid && uid <= maxUserID
 }
 
-const doubleHyphensFmt string = ".*(--).*"
+var portNameCharsetRegex = regexp.MustCompile("^[-a-z0-9]+$")
+var portNameOneLetterRegexp = regexp.MustCompile("[a-z]")
 
-var doubleHyphensRegexp = regexp.MustCompile("^" + doubleHyphensFmt + "$")
-
-const IdentifierNoHyphensBeginEndFmt string = "[a-z0-9]([a-z0-9-]*[a-z0-9])*"
-
-var identifierNoHyphensBeginEndRegexp = regexp.MustCompile("^" + IdentifierNoHyphensBeginEndFmt + "$")
-
-const atLeastOneLetterFmt string = ".*[a-z].*"
-
-var atLeastOneLetterRegexp = regexp.MustCompile("^" + atLeastOneLetterFmt + "$")
-
-// IsValidPortName check that the argument is valid syntax. It must be non empty and no more than 15 characters long
-// It must contains at least one letter [a-z] and it must contains only [a-z0-9-].
-// Hypens ('-') cannot be leading or trailing character of the string and cannot be adjacent to other hyphens.
-// Although RFC 6335 allows upper and lower case characters but case is ignored for comparison purposes: (HTTP
-// and http denote the same service).
-func IsValidPortName(port string) bool {
-	if len(port) < 1 || len(port) > 15 {
-		return false
+// IsValidPortName check that the argument is valid syntax. It must be
+// non-empty and no more than 15 characters long. It may contain only [-a-z0-9]
+// and must contain at least one letter [a-z]. It must not start or end with a
+// hyphen, nor contain adjacent hyphens.
+//
+// Note: We only allow lower-case characters, even though RFC 6335 is case
+// insensitive.
+func IsValidPortName(port string) []string {
+	var errs []string
+	if len(port) > 15 {
+		errs = append(errs, MaxLenError(15))
 	}
-	if doubleHyphensRegexp.MatchString(port) {
-		return false
+	if !portNameCharsetRegex.MatchString(port) {
+		errs = append(errs, "must contain only alpha-numeric characters (a-z, 0-9), and hyphens (-)")
 	}
-	if identifierNoHyphensBeginEndRegexp.MatchString(port) && atLeastOneLetterRegexp.MatchString(port) {
-		return true
+	if !portNameOneLetterRegexp.MatchString(port) {
+		errs = append(errs, "must contain at least one letter (a-z)")
 	}
-	return false
+	if strings.Contains(port, "--") {
+		errs = append(errs, "must not contain consecutive hyphens")
+	}
+	if len(port) > 0 && (port[0] == '-' || port[len(port)-1] == '-') {
+		errs = append(errs, "must not begin or end with a hyphen")
+	}
+	return errs
 }
 
 // IsValidIP tests that the argument is a valid IP address.
@@ -262,4 +265,10 @@ func prefixEach(msgs []string, prefix string) []string {
 		msgs[i] = prefix + msgs[i]
 	}
 	return msgs
+}
+
+// InclusiveRangeError returns a string explanation of a numeric "must be
+// between" validation failure.
+func InclusiveRangeError(lo, hi int) string {
+	return fmt.Sprintf(`must be between %d and %d, inclusive`, lo, hi)
 }

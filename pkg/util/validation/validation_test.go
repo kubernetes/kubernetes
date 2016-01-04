@@ -141,15 +141,15 @@ func TestIsCIdentifier(t *testing.T) {
 func TestIsValidPortNum(t *testing.T) {
 	goodValues := []int{1, 2, 1000, 16384, 32768, 65535}
 	for _, val := range goodValues {
-		if !IsValidPortNum(val) {
-			t.Errorf("expected true for '%d'", val)
+		if msgs := IsValidPortNum(val); len(msgs) != 0 {
+			t.Errorf("expected true for %d, got %v", val, msgs)
 		}
 	}
 
 	badValues := []int{0, -1, 65536, 100000}
 	for _, val := range badValues {
-		if IsValidPortNum(val) {
-			t.Errorf("expected false for '%d'", val)
+		if msgs := IsValidPortNum(val); len(msgs) == 0 {
+			t.Errorf("expected false for %d", val)
 		}
 	}
 }
@@ -189,14 +189,14 @@ func TestIsValidUserId(t *testing.T) {
 func TestIsValidPortName(t *testing.T) {
 	goodValues := []string{"telnet", "re-mail-ck", "pop3", "a", "a-1", "1-a", "a-1-b-2-c", "1-a-2-b-3"}
 	for _, val := range goodValues {
-		if !IsValidPortName(val) {
-			t.Errorf("expected true for %q", val)
+		if msgs := IsValidPortName(val); len(msgs) != 0 {
+			t.Errorf("expected true for %q: %v", val, msgs)
 		}
 	}
 
-	badValues := []string{"longerthan15characters", "", "12345", "1-2-3-4", "-begin", "end-", "two--hyphens", "1-2", "whois++"}
+	badValues := []string{"longerthan15characters", "", strings.Repeat("a", 16), "12345", "1-2-3-4", "-begin", "end-", "two--hyphens", "whois++"}
 	for _, val := range badValues {
-		if IsValidPortName(val) {
+		if msgs := IsValidPortName(val); len(msgs) == 0 {
 			t.Errorf("expected false for %q", val)
 		}
 	}
