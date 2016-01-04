@@ -32,7 +32,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -74,8 +74,8 @@ func newSystemContainer(containerName string) *systemContainer {
 }
 
 type containerManagerImpl struct {
-	cadvisorInterface cadvisor.Interface
-	mountUtil         mount.Interface
+	collectorInterface collector.Interface
+	mountUtil          mount.Interface
 	NodeConfig
 	// External containers being managed.
 	systemContainers []*systemContainer
@@ -114,11 +114,11 @@ func validateSystemRequirements(mountUtil mount.Interface) error {
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, collectorInterface collector.Interface) (ContainerManager, error) {
 	return &containerManagerImpl{
-		cadvisorInterface: cadvisorInterface,
-		mountUtil:         mountUtil,
-		NodeConfig:        NodeConfig{},
+		collectorInterface: collectorInterface,
+		mountUtil:          mountUtil,
+		NodeConfig:         NodeConfig{},
 	}, nil
 }
 
@@ -192,11 +192,11 @@ func (cm *containerManagerImpl) setupNode() error {
 	if cm.DockerDaemonContainerName != "" {
 		cont := newSystemContainer(cm.DockerDaemonContainerName)
 
-		info, err := cm.cadvisorInterface.MachineInfo()
+		info, err := cm.collectorInterface.MachineInfo()
 		var capacity = api.ResourceList{}
 		if err != nil {
 		} else {
-			capacity = cadvisor.CapacityFromMachineInfo(info)
+			capacity = collector.CapacityFromMachineInfo(info)
 		}
 		memoryLimit := (int64(capacity.Memory().Value() * DockerMemoryLimitThresholdPercent / 100))
 		if memoryLimit < MinDockerMemoryLimit {
@@ -215,7 +215,7 @@ func (cm *containerManagerImpl) setupNode() error {
 			},
 		}
 		cont.ensureStateFunc = func(manager *fs.Manager) error {
-			return ensureDockerInContainer(cm.cadvisorInterface, -900, dockerContainer)
+			return ensureDockerInContainer(cm.collectorInterface, -900, dockerContainer)
 		}
 		systemContainers = append(systemContainers, cont)
 	}
@@ -294,7 +294,7 @@ func (cm *containerManagerImpl) SystemContainersLimit() api.ResourceList {
 }
 
 // Ensures that the Docker daemon is in the desired container.
-func ensureDockerInContainer(cadvisor cadvisor.Interface, oomScoreAdj int, manager *fs.Manager) error {
+func ensureDockerInContainer(collector collector.Interface, oomScoreAdj int, manager *fs.Manager) error {
 	// What container is Docker in?
 	out, err := exec.Command("pidof", "docker").Output()
 	if err != nil {

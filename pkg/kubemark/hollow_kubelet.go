@@ -22,8 +22,8 @@ import (
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
@@ -39,7 +39,7 @@ type HollowKubelet struct {
 func NewHollowKubelet(
 	nodeName string,
 	client *client.Client,
-	cadvisorInterface cadvisor.Interface,
+	collectorInterface collector.Interface,
 	dockerClient dockertools.DockerInterface,
 	kubeletPort, kubeletReadOnlyPort int,
 	containerManager cm.ContainerManager,
@@ -61,7 +61,7 @@ func NewHollowKubelet(
 			api.NamespaceDefault,
 			empty_dir.ProbeVolumePlugins(),
 			nil, /* tls-options */
-			cadvisorInterface,
+			collectorInterface,
 			manifestFilePath,
 			nil, /* cloud-provider */
 			kubecontainer.FakeOS{}, /* os-interface */

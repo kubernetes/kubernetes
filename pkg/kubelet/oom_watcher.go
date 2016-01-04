@@ -18,12 +18,10 @@ package kubelet
 
 import (
 	"github.com/golang/glog"
-	"github.com/google/cadvisor/events"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -32,29 +30,29 @@ type OOMWatcher interface {
 }
 
 type realOOMWatcher struct {
-	cadvisor cadvisor.Interface
-	recorder record.EventRecorder
+	collector collector.Interface
+	recorder  record.EventRecorder
 }
 
-func NewOOMWatcher(cadvisor cadvisor.Interface, recorder record.EventRecorder) OOMWatcher {
+func NewOOMWatcher(collector collector.Interface, recorder record.EventRecorder) OOMWatcher {
 	return &realOOMWatcher{
-		cadvisor: cadvisor,
-		recorder: recorder,
+		collector: collector,
+		recorder:  recorder,
 	}
 }
 
 const systemOOMEvent = "SystemOOM"
 
-// Watches cadvisor for system oom's and records an event for every system oom encountered.
+// Watches collector for system oom's and records an event for every system oom encountered.
 func (ow *realOOMWatcher) Start(ref *api.ObjectReference) error {
-	request := events.Request{
-		EventType: map[cadvisorapi.EventType]bool{
-			cadvisorapi.EventOom: true,
+	request := collector.Request{
+		EventType: map[collector.EventType]bool{
+			collector.EventOom: true,
 		},
 		ContainerName:        "/",
 		IncludeSubcontainers: false,
 	}
-	eventChannel, err := ow.cadvisor.WatchEvents(&request)
+	eventChannel, err := ow.collector.WatchEvents(&request)
 	if err != nil {
 		return err
 	}
@@ -62,11 +60,11 @@ func (ow *realOOMWatcher) Start(ref *api.ObjectReference) error {
 	go func() {
 		defer util.HandleCrash()
 
-		for event := range eventChannel.GetChannel() {
-			glog.V(2).Infof("Got sys oom event from cadvisor: %v", event)
+		for event := range eventChannel {
+			glog.V(2).Infof("Got sys oom event from collector: %v", event)
 			ow.recorder.PastEventf(ref, unversioned.Time{Time: event.Timestamp}, api.EventTypeWarning, systemOOMEvent, "System OOM encountered")
 		}
-		glog.Errorf("Unexpectedly stopped receiving OOM notifications from cAdvisor")
+		glog.Errorf("Unexpectedly stopped receiving OOM notifications from Collector")
 	}()
 	return nil
 }

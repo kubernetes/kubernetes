@@ -26,8 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubemark"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
@@ -93,7 +93,7 @@ func main() {
 	}
 
 	if config.Morph == "kubelet" {
-		cadvisorInterface := new(cadvisor.Fake)
+		collectorInterface := &collector.Fake{}
 		containerManager := cm.NewStubContainerManager()
 
 		fakeDockerClient := dockertools.NewFakeDockerClient()
@@ -103,7 +103,7 @@ func main() {
 		hollowKubelet := kubemark.NewHollowKubelet(
 			config.NodeName,
 			cl,
-			cadvisorInterface,
+			collectorInterface,
 			fakeDockerClient,
 			config.KubeletPort,
 			config.KubeletReadOnlyPort,

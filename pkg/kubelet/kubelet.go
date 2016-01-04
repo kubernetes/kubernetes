@@ -33,7 +33,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -46,8 +45,8 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
@@ -164,7 +163,7 @@ func NewMainKubelet(
 	networkPluginName string,
 	streamingConnectionIdleTimeout time.Duration,
 	recorder record.EventRecorder,
-	cadvisorInterface cadvisor.Interface,
+	collectorInterface collector.Interface,
 	imageGCPolicy ImageGCPolicy,
 	diskSpacePolicy DiskSpacePolicy,
 	cloud cloudprovider.Interface,
@@ -255,7 +254,7 @@ func NewMainKubelet(
 		Namespace: "",
 	}
 
-	diskSpaceManager, err := newDiskSpaceManager(cadvisorInterface, diskSpacePolicy)
+	diskSpaceManager, err := newDiskSpaceManager(collectorInterface, diskSpacePolicy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
 	}
@@ -263,7 +262,7 @@ func NewMainKubelet(
 
 	volumeManager := newVolumeManager()
 
-	oomWatcher := NewOOMWatcher(cadvisorInterface, recorder)
+	oomWatcher := NewOOMWatcher(collectorInterface, recorder)
 
 	klet := &Kubelet{
 		hostname:                       hostname,
@@ -286,7 +285,7 @@ func NewMainKubelet(
 		masterServiceNamespace:         masterServiceNamespace,
 		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
 		recorder:                       recorder,
-		cadvisor:                       cadvisorInterface,
+		collector:                      collectorInterface,
 		diskSpaceManager:               diskSpaceManager,
 		volumeManager:                  volumeManager,
 		cloud:                          cloud,
@@ -406,7 +405,7 @@ func NewMainKubelet(
 	klet.containerGC = containerGC
 
 	// setup imageManager
-	imageManager, err := newImageManager(klet.containerRuntime, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
+	imageManager, err := newImageManager(klet.containerRuntime, collectorInterface, recorder, nodeRef, imageGCPolicy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
@@ -487,8 +486,8 @@ type Kubelet struct {
 	// Optional, client for http requests, defaults to empty client
 	httpClient kubetypes.HttpGetter
 
-	// cAdvisor used for container information.
-	cadvisor cadvisor.Interface
+	// Collector used for container information.
+	collector collector.Interface
 
 	// Set to true to have the node register itself with the apiserver.
 	registerNode bool
@@ -545,8 +544,8 @@ type Kubelet struct {
 	// Diskspace manager.
 	diskSpaceManager diskSpaceManager
 
-	// Cached MachineInfo returned by cadvisor.
-	machineInfo *cadvisorapi.MachineInfo
+	// Cached MachineInfo returned by collector.
+	machineInfo *collector.MachineInfo
 
 	// Syncs pods statuses with apiserver; also used as a cache of statuses.
 	statusManager status.Manager
@@ -917,8 +916,8 @@ func (kl *Kubelet) initializeModules() error {
 
 // initializeRuntimeDependentModules will initialize internal modules that require the container runtime to be up.
 func (kl *Kubelet) initializeRuntimeDependentModules() {
-	if err := kl.cadvisor.Start(); err != nil {
-		kl.runtimeState.setInternalError(fmt.Errorf("Failed to start cAdvisor %v", err))
+	if err := kl.collector.Start(); err != nil {
+		kl.runtimeState.setInternalError(fmt.Errorf("Failed to start Collector%v", err))
 	}
 }
 
@@ -2178,7 +2177,7 @@ func (kl *Kubelet) hasInsufficientfFreeResources(pods []*api.Pod) (bool, bool) {
 		// TODO: Should we admit the pod when machine info is unavailable?
 		return false, false
 	}
-	capacity := cadvisor.CapacityFromMachineInfo(info)
+	capacity := collector.CapacityFromMachineInfo(info)
 	_, notFittingCPU, notFittingMemory := predicates.CheckPodsExceedingFreeResources(pods, capacity)
 	return len(notFittingCPU) > 0, len(notFittingMemory) > 0
 }
@@ -2723,8 +2722,8 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 }
 
 func (kl *Kubelet) setNodeStatusMachineInfo(node *api.Node) {
-	// TODO: Post NotReady if we cannot get MachineInfo from cAdvisor. This needs to start
-	// cAdvisor locally, e.g. for test-cmd.sh, and in integration test.
+	// TODO: Post NotReady if we cannot get MachineInfo from Collector. This needs to start
+	// Collector locally, e.g. for test-cmd.sh, and in integration test.
 	info, err := kl.GetCachedMachineInfo()
 	if err != nil {
 		// TODO(roberthbailey): This is required for test-cmd.sh to pass.
@@ -2738,7 +2737,7 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *api.Node) {
 	} else {
 		node.Status.NodeInfo.MachineID = info.MachineID
 		node.Status.NodeInfo.SystemUUID = info.SystemUUID
-		node.Status.Capacity = cadvisor.CapacityFromMachineInfo(info)
+		node.Status.Capacity = collector.CapacityFromMachineInfo(info)
 		node.Status.Capacity[api.ResourcePods] = *resource.NewQuantity(
 			int64(kl.maxPods), resource.DecimalSI)
 		if node.Status.NodeInfo.BootID != "" &&
@@ -2771,7 +2770,7 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *api.Node) {
 
 // Set versioninfo for the node.
 func (kl *Kubelet) setNodeStatusVersionInfo(node *api.Node) {
-	verinfo, err := kl.cadvisor.VersionInfo()
+	verinfo, err := kl.collector.VersionInfo()
 	if err != nil {
 		glog.Errorf("Error getting version info: %v", err)
 	} else {
@@ -3250,8 +3249,8 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 	return kl.resyncInterval
 }
 
-// GetContainerInfo returns stats (from Cadvisor) for a container.
-func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
+// GetContainerInfo returns stats (from Collector) for a container.
+func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, containerName string, req *collector.ContainerInfoRequest) (map[string]interface{}, error) {
 
 	podUID = kl.podManager.TranslatePodUID(podUID)
 
@@ -3265,32 +3264,18 @@ func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, contai
 		return nil, kubecontainer.ErrContainerNotFound
 	}
 
-	ci, err := kl.cadvisor.DockerContainer(container.ID.ID, req)
-	if err != nil {
-		return nil, err
-	}
-	return &ci, nil
+	return kl.collector.ContainerInfo(container.ID.ID, req, false, false)
 }
 
-// Returns stats (from Cadvisor) for a non-Kubernetes container.
-func (kl *Kubelet) GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error) {
-	if subcontainers {
-		return kl.cadvisor.SubcontainerInfo(containerName, req)
-	} else {
-		containerInfo, err := kl.cadvisor.ContainerInfo(containerName, req)
-		if err != nil {
-			return nil, err
-		}
-		return map[string]*cadvisorapi.ContainerInfo{
-			containerInfo.Name: containerInfo,
-		}, nil
-	}
+// Returns stats (from Collector) for a non-Kubernetes container.
+func (kl *Kubelet) GetRawContainerInfo(containerName string, req *collector.ContainerInfoRequest, subcontainers bool) (map[string]interface{}, error) {
+	return kl.collector.ContainerInfo(containerName, req, subcontainers, true)
 }
 
 // GetCachedMachineInfo assumes that the machine info can't change without a reboot
-func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) {
+func (kl *Kubelet) GetCachedMachineInfo() (*collector.MachineInfo, error) {
 	if kl.machineInfo == nil {
-		info, err := kl.cadvisor.MachineInfo()
+		info, err := kl.collector.MachineInfo()
 		if err != nil {
 			return nil, err
 		}

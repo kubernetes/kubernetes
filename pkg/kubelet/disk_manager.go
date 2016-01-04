@@ -22,8 +22,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	cadvisorapi "github.com/google/cadvisor/info/v2"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 )
 
 // Manages policy for diskspace management for disks holding docker images and root fs.
@@ -53,13 +52,13 @@ type fsInfo struct {
 }
 
 type realDiskSpaceManager struct {
-	cadvisor   cadvisor.Interface
+	collector  collector.Interface
 	cachedInfo map[string]fsInfo // cache of filesystem info.
 	lock       sync.Mutex        // protecting cachedInfo.
 	policy     DiskSpacePolicy   // thresholds. Set at creation time.
 }
 
-func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorapi.FsInfo, error)) (fsInfo, error) {
+func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func(string) (*collector.FsInfo, error), fsLabel string) (fsInfo, error) {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 	fsi := fsInfo{}
@@ -70,7 +69,7 @@ func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorapi.F
 		}
 	}
 	if fsi.Timestamp.IsZero() {
-		fs, err := f()
+		fs, err := f(fsLabel)
 		if err != nil {
 			return fsInfo{}, err
 		}
@@ -84,15 +83,15 @@ func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorapi.F
 }
 
 func (dm *realDiskSpaceManager) IsDockerDiskSpaceAvailable() (bool, error) {
-	return dm.isSpaceAvailable("docker", dm.policy.DockerFreeDiskMB, dm.cadvisor.DockerImagesFsInfo)
+	return dm.isSpaceAvailable("docker", dm.policy.DockerFreeDiskMB, dm.collector.FsInfo, collector.LabelDockerImages)
 }
 
 func (dm *realDiskSpaceManager) IsRootDiskSpaceAvailable() (bool, error) {
-	return dm.isSpaceAvailable("root", dm.policy.RootFreeDiskMB, dm.cadvisor.RootFsInfo)
+	return dm.isSpaceAvailable("root", dm.policy.RootFreeDiskMB, dm.collector.FsInfo, collector.LabelSystemRoot)
 }
 
-func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f func() (cadvisorapi.FsInfo, error)) (bool, error) {
-	fsInfo, err := dm.getFsInfo(fsType, f)
+func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f func(string) (*collector.FsInfo, error), fsLabel string) (bool, error) {
+	fsInfo, err := dm.getFsInfo(fsType, f, fsLabel)
 	if err != nil {
 		return true, fmt.Errorf("failed to get fs info for %q: %v", fsType, err)
 	}
@@ -120,7 +119,7 @@ func validatePolicy(policy DiskSpacePolicy) error {
 	return nil
 }
 
-func newDiskSpaceManager(cadvisorInterface cadvisor.Interface, policy DiskSpacePolicy) (diskSpaceManager, error) {
+func newDiskSpaceManager(collector collector.Interface, policy DiskSpacePolicy) (diskSpaceManager, error) {
 	// validate policy
 	err := validatePolicy(policy)
 	if err != nil {
@@ -128,7 +127,7 @@ func newDiskSpaceManager(cadvisorInterface cadvisor.Interface, policy DiskSpaceP
 	}
 
 	dm := &realDiskSpaceManager{
-		cadvisor:   cadvisorInterface,
+		collector:  collector,
 		policy:     policy,
 		cachedInfo: map[string]fsInfo{},
 	}

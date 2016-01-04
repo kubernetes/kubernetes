@@ -17,26 +17,32 @@ limitations under the License.
 package service
 
 import (
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"fmt"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
+	"k8s.io/kubernetes/pkg/kubelet/collector/cadvisor"
 )
 
-type MesosCadvisor struct {
-	cadvisor.Interface
+type MesosCollector struct {
+	collector.Interface
 	cores int
 	mem   int64
 }
 
-func NewMesosCadvisor(cores int, mem int64, port uint) (*MesosCadvisor, error) {
-	c, err := cadvisor.New(port)
-	if err != nil {
-		return nil, err
+func NewMesosCollector(cores int, mem int64, collector string, collectorURL string) (*MesosCollector, error) {
+	switch collector {
+	case "cadvisor":
+		c, err := cadvisor.NewCadvisorCollector(collectorURL)
+		if err != nil {
+			return nil, err
+		}
+		return &MesosCollector{c, cores, mem}, nil
+	default:
+		return nil, fmt.Errorf("Unrecognized collector type: %s", collector)
 	}
-	return &MesosCadvisor{c, cores, mem}, nil
 }
 
-func (mc *MesosCadvisor) MachineInfo() (*cadvisorapi.MachineInfo, error) {
+func (mc *MesosCollector) MachineInfo() (*collector.MachineInfo, error) {
 	mi, err := mc.Interface.MachineInfo()
 	if err != nil {
 		return nil, err

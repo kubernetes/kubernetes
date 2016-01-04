@@ -31,7 +31,6 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 	"github.com/golang/glog"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -45,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/httplog"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -138,9 +138,9 @@ type AuthInterface interface {
 // HostInterface contains all the kubelet methods required by the server.
 // For testablitiy.
 type HostInterface interface {
-	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
-	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
-	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
+	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *collector.ContainerInfoRequest) (map[string]interface{}, error)
+	GetRawContainerInfo(containerName string, req *collector.ContainerInfoRequest, subcontainers bool) (map[string]interface{}, error)
+	GetCachedMachineInfo() (*collector.MachineInfo, error)
 	GetPods() []*api.Pod
 	GetRunningPods() ([]*api.Pod, error)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
@@ -231,7 +231,7 @@ func (s *Server) InstallDefaultHandlers() {
 	ws.Route(ws.GET("").
 		To(s.getSpec).
 		Operation("getSpec").
-		Writes(cadvisorapi.MachineInfo{}))
+		Writes(collector.MachineInfo{}))
 	s.restfulCont.Add(ws)
 }
 

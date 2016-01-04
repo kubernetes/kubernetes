@@ -152,8 +152,10 @@ type KubeletConfiguration struct {
 	// maxContainerCount is the maximum number of old instances of containers
 	// to retain globally. Each container takes up some disk space.
 	MaxContainerCount int `json:"maxContainerCount"`
-	// cAdvisorPort is the port of the localhost cAdvisor endpoint
-	CAdvisorPort uint `json:"cAdvisorPort"`
+	// collector is the type of the collector kubelet should use
+	Collector string `json:"collector"`
+	// collectorURL is the URL of the collector kubelet should connect to
+	CollectorURL string `json:"collectorURL"`
 	// healthzPort is the port of the localhost healthz endpoint
 	HealthzPort int `json:"healthzPort"`
 	// healthzBindAddress is the IP address for the healthz server to serve

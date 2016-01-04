@@ -25,7 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/collector"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util"
@@ -79,8 +79,8 @@ type realImageManager struct {
 	// TODO(mqliang): move it to ImageGCPolicy and make it configurable
 	minAge time.Duration
 
-	// cAdvisor instance.
-	cadvisor cadvisor.Interface
+	// collector instance.
+	collector collector.Interface
 
 	// Recorder for Kubernetes events.
 	recorder record.EventRecorder
@@ -104,7 +104,7 @@ type imageRecord struct {
 	size int64
 }
 
-func newImageManager(runtime container.Runtime, cadvisorInterface cadvisor.Interface, recorder record.EventRecorder, nodeRef *api.ObjectReference, policy ImageGCPolicy) (imageManager, error) {
+func newImageManager(runtime container.Runtime, collectorInterface collector.Interface, recorder record.EventRecorder, nodeRef *api.ObjectReference, policy ImageGCPolicy) (imageManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)
@@ -120,7 +120,7 @@ func newImageManager(runtime container.Runtime, cadvisorInterface cadvisor.Inter
 		policy:       policy,
 		minAge:       defaultGCAge,
 		imageRecords: make(map[string]*imageRecord),
-		cadvisor:     cadvisorInterface,
+		collector:    collectorInterface,
 		recorder:     recorder,
 		nodeRef:      nodeRef,
 		initialized:  false,
@@ -209,7 +209,7 @@ func (im *realImageManager) detectImages(detected time.Time) error {
 
 func (im *realImageManager) GarbageCollect() error {
 	// Get disk usage on disk holding images.
-	fsInfo, err := im.cadvisor.DockerImagesFsInfo()
+	fsInfo, err := im.collector.FsInfo(collector.LabelDockerImages)
 	if err != nil {
 		return err
 	}

@@ -154,7 +154,8 @@ type SchedulerServer struct {
 	kubeletRootDirectory           string
 	kubeletDockerEndpoint          string
 	kubeletPodInfraContainerImage  string
-	kubeletCadvisorPort            uint
+	kubeletCollector               string
+	kubeletCollectorURL            string
 	kubeletHostNetworkSources      string
 	kubeletSyncFrequency           time.Duration
 	kubeletNetworkPluginName       string
@@ -213,7 +214,8 @@ func NewSchedulerServer() *SchedulerServer {
 		frameworkName:                  defaultFrameworkName,
 		ha:                             false,
 		mux:                            http.NewServeMux(),
-		kubeletCadvisorPort:            4194, // copied from github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kubelet/app/server.go
+		kubeletCollector:               "cadvisor",
+		kubeletCollectorURL:            "4194",
 		kubeletSyncFrequency:           10 * time.Second,
 		kubeletEnableDebuggingHandlers: true,
 		containPodResources:            true,
@@ -297,7 +299,8 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.kubeletRootDirectory, "kubelet-root-dir", s.kubeletRootDirectory, "Directory path for managing kubelet files (volume mounts,etc). Defaults to executor sandbox.")
 	fs.StringVar(&s.kubeletDockerEndpoint, "kubelet-docker-endpoint", s.kubeletDockerEndpoint, "If non-empty, kubelet will use this for the docker endpoint to communicate with.")
 	fs.StringVar(&s.kubeletPodInfraContainerImage, "kubelet-pod-infra-container-image", s.kubeletPodInfraContainerImage, "The image whose network/ipc namespaces containers in each pod will use.")
-	fs.UintVar(&s.kubeletCadvisorPort, "kubelet-cadvisor-port", s.kubeletCadvisorPort, "The port of the kubelet's local cAdvisor endpoint")
+	fs.StringVar(&s.kubeletCollector, "collector", s.kubeletCollector, "Type of metrics collector to use")
+	fs.StringVar(&s.kubeletCollectorURL, "collector-url", s.kubeletCollectorURL, "The URL of a built-in or a 3rd party metrics collector. Refers to specific collector to see what are the valid URL formats")
 	fs.StringVar(&s.kubeletHostNetworkSources, "kubelet-host-network-sources", s.kubeletHostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network. For all sources use \"*\" [default=\"file\"]")
 	fs.DurationVar(&s.kubeletSyncFrequency, "kubelet-sync-frequency", s.kubeletSyncFrequency, "Max period between synchronizing running containers and config")
 	fs.StringVar(&s.kubeletNetworkPluginName, "kubelet-network-plugin", s.kubeletNetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
@@ -419,7 +422,8 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	}
 
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--mesos-cgroup-prefix=%v", s.mesosCgroupPrefix))
-	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--cadvisor-port=%v", s.kubeletCadvisorPort))
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--collector=%v", s.kubeletCollector))
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--collector-url=%v", s.kubeletCollectorURL))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--sync-frequency=%v", s.kubeletSyncFrequency))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--contain-pod-resources=%t", s.containPodResources))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--enable-debugging-handlers=%t", s.kubeletEnableDebuggingHandlers))
