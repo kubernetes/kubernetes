@@ -144,7 +144,7 @@ kubectl get pods busybox
 
 You should see:
 ```
-NAME      READY     REASON    RESTARTS   AGE
+NAME      READY     STATUS    RESTARTS   AGE
 busybox   1/1       Running   0          <some-time>
 ```
 
