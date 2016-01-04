@@ -112,7 +112,7 @@ type CMServer struct {
 func NewCMServer() *CMServer {
 	s := CMServer{
 		Port:                              ports.ControllerManagerPort,
-		Address:                           net.ParseIP("127.0.0.1"),
+		Address:                           net.ParseIP("0.0.0.0"),
 		ConcurrentEndpointSyncs:           5,
 		ConcurrentRCSyncs:                 5,
 		ConcurrentDSCSyncs:                2,
