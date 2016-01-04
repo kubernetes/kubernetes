@@ -41,13 +41,16 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/capabilities"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/util"
@@ -485,24 +488,32 @@ func (s *APIServer) Run(_ []string) error {
 
 	// Default to the private server key for service account token signing
 	if s.ServiceAccountKeyFile == "" && s.TLSPrivateKeyFile != "" {
-		if apiserver.IsValidServiceAccountKeyFile(s.TLSPrivateKeyFile) {
+		if authenticator.IsValidServiceAccountKeyFile(s.TLSPrivateKeyFile) {
 			s.ServiceAccountKeyFile = s.TLSPrivateKeyFile
 		} else {
 			glog.Warning("No RSA key provided, service account token authentication disabled")
 		}
 	}
-	authenticator, err := apiserver.NewAuthenticator(apiserver.AuthenticatorConfig{
-		BasicAuthFile:         s.BasicAuthFile,
-		ClientCAFile:          s.ClientCAFile,
-		TokenAuthFile:         s.TokenAuthFile,
-		OIDCIssuerURL:         s.OIDCIssuerURL,
-		OIDCClientID:          s.OIDCClientID,
-		OIDCCAFile:            s.OIDCCAFile,
-		OIDCUsernameClaim:     s.OIDCUsernameClaim,
-		ServiceAccountKeyFile: s.ServiceAccountKeyFile,
-		ServiceAccountLookup:  s.ServiceAccountLookup,
-		Storage:               etcdStorage,
-		KeystoneURL:           s.KeystoneURL,
+
+	var serviceAccountGetter serviceaccount.ServiceAccountTokenGetter
+	if s.ServiceAccountLookup {
+		// If we need to look up service accounts and tokens,
+		// go directly to etcd to avoid recursive auth insanity
+		serviceAccountGetter = serviceaccountcontroller.NewGetterFromStorageInterface(etcdStorage)
+	}
+
+	authenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
+		BasicAuthFile:             s.BasicAuthFile,
+		ClientCAFile:              s.ClientCAFile,
+		TokenAuthFile:             s.TokenAuthFile,
+		OIDCIssuerURL:             s.OIDCIssuerURL,
+		OIDCClientID:              s.OIDCClientID,
+		OIDCCAFile:                s.OIDCCAFile,
+		OIDCUsernameClaim:         s.OIDCUsernameClaim,
+		ServiceAccountKeyFile:     s.ServiceAccountKeyFile,
+		ServiceAccountLookup:      s.ServiceAccountLookup,
+		ServiceAccountTokenGetter: serviceAccountGetter,
+		KeystoneURL:               s.KeystoneURL,
 	})
 
 	if err != nil {
