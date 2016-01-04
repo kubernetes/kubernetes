@@ -20,7 +20,6 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
 
 # Join all args with |
 #   Example: join_regex_allow_empty a b "c d" e  =>  a|b|c d|e
