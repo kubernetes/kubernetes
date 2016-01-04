@@ -172,7 +172,7 @@ func (controller *PersistentVolumeProvisionerController) reconcileClaim(claim *a
 	}
 
 	glog.V(5).Infof("PersistentVolumeClaim[%s] provisioning", claim.Name)
-	provisioner, err := newProvisioner(controller.provisioner, claim)
+	provisioner, err := newProvisioner(controller.provisioner, claim, nil)
 	if err != nil {
 		return fmt.Errorf("Unexpected error getting new provisioner for claim %s: %v\n", claim.Name, err)
 	}
@@ -274,7 +274,7 @@ func provisionVolume(pv *api.PersistentVolume, controller *PersistentVolumeProvi
 	}
 	claim := obj.(*api.PersistentVolumeClaim)
 
-	provisioner, _ := newProvisioner(controller.provisioner, claim)
+	provisioner, _ := newProvisioner(controller.provisioner, claim, pv)
 	err := provisioner.Provision(pv)
 	if err != nil {
 		glog.Errorf("Could not provision %s", pv.Name)
@@ -330,15 +330,21 @@ func (controller *PersistentVolumeProvisionerController) Stop() {
 	}
 }
 
-func newProvisioner(plugin volume.ProvisionableVolumePlugin, claim *api.PersistentVolumeClaim) (volume.Provisioner, error) {
+func newProvisioner(plugin volume.ProvisionableVolumePlugin, claim *api.PersistentVolumeClaim, pv *api.PersistentVolume) (volume.Provisioner, error) {
+	tags := make(map[string]string)
+	tags[cloudVolumeCreatedForClaimNamespaceTag] = claim.Namespace
+	tags[cloudVolumeCreatedForClaimNameTag] = claim.Name
+
+	// pv can be nil when the provisioner has not created the PV yet
+	if pv != nil {
+		tags[cloudVolumeCreatedForVolumeNameTag] = pv.Name
+	}
+
 	volumeOptions := volume.VolumeOptions{
 		Capacity:                      claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)],
 		AccessModes:                   claim.Spec.AccessModes,
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
-		CloudTags: &map[string]string{
-			cloudVolumeCreatedForNamespaceTag: claim.Namespace,
-			cloudVolumeCreatedForNameTag:      claim.Name,
-		},
+		CloudTags:                     &tags,
 	}
 
 	provisioner, err := plugin.NewProvisioner(volumeOptions)
