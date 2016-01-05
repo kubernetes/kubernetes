@@ -139,12 +139,12 @@ func (ms *MinionServer) launchProxyServer() {
 		"--logtostderr=true",
 		"--resource-container=" + path.Join("/", ms.mesosCgroup, "kube-proxy"),
 		"--proxy-mode=" + ms.proxyMode,
-		"--conntrack-max=0",
+		"--conntrack-tcp-timeout-established=0",
 		/*
 			// TODO(jdef) this is a temporary hack to fix failing smoke tests. a following PR
 			// will more properly fix the smoke tests as well as make these flags configrable
 			// at the framework level (as opposed to hardcoded here)
-			"--conntrack-tcp-timeout-established=0",
+			"--conntrack-max=0", // this appears to smoke-test OK on its own
 		*/
 	}
 
