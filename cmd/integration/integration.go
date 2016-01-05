@@ -76,6 +76,8 @@ var (
 	maxConcurrency int
 
 	longTestTimeout = time.Second * 300
+
+	maxTestTimeout = time.Minute * 10
 )
 
 type fakeKubeletClient struct{}
@@ -962,7 +964,7 @@ func main() {
 
 	go func() {
 		defer util.FlushLogs()
-		time.Sleep(3 * time.Minute)
+		time.Sleep(maxTestTimeout)
 		glog.Fatalf("This test has timed out.")
 	}()
 
