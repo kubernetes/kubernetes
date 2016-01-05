@@ -91,7 +91,7 @@ If your cluster runs short on resources you can easily add more machines to it i
 If you're using GCE or GKE it's done by resizing Instance Group managing your Nodes. It can be accomplished by modifying number of instances on `Compute > Compute Engine > Instance groups > your group > Edit group` [Google Cloud Console page](https://console.developers.google.com) or using gcloud CLI:
 
 ```
-gcloud compute instance-groups managed resize kubernetes-minion-group --size 42
+gcloud compute instance-groups managed resize kubernetes-minion-group --size 42 --zone $ZONE
 ```
 
 Instance Group will take care of putting appropriate image on new machines and start them, while Kubelet will register its Node with API server to make it available for scheduling. If you scale the instance group down, system will randomly choose Nodes to kill.
