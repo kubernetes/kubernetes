@@ -96,7 +96,7 @@ function detect-master {
   fi
 
   KUBE_MASTER_IP=""
-  KUBE_SERVER="${dcos_url%/}/service/kubernetes"
+  KUBE_SERVER="${dcos_url%/}/service/kubernetes/api"
 
   echo "KUBE_MASTER_IP: $KUBE_MASTER_IP" 1>&2
   echo "KUBE_SERVER:    $KUBE_SERVER" 1>&2
