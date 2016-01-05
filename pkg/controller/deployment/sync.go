@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -44,6 +45,104 @@ func (dc *DeploymentController) syncStatusOnly(deployment *extensions.Deployment
 
 	allRSs := append(oldRSs, newRS)
 	return dc.syncDeploymentStatus(allRSs, newRS, deployment)
+}
+
+// used for unit testing
+var nowFn = func() time.Time { return time.Now() }
+
+// hasTimedOut let us know if a deployment did not manage to finish before the specified
+// timeout (progressDeadlineSeconds). The controller should stop processing it and in a
+// follow-up we should enable automatically rollback to the previous successful replica
+// set.
+func (dc *DeploymentController) hasTimedOut(deployment *extensions.Deployment) (bool, error) {
+	if deployment.Spec.ProgressDeadlineSeconds == nil {
+		return false, nil
+	}
+
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(deployment, false)
+	if err != nil {
+		return false, err
+	}
+	allRSs := oldRSs
+
+	// On template changes we should try to cleanup the deployment status and not look at
+	// the timeout.
+	if newRS == nil {
+		// Remove any condition that denotes lack of progress for a new rollout is underway.
+		removed := removeCondition(deployment, extensions.DeploymentProgressing, api.ConditionFalse)
+		if !removed {
+			return false, nil
+		}
+
+		d, err := dc.client.Extensions().Deployments(deployment.Namespace).UpdateStatus(deployment)
+		if err != nil {
+			return false, err
+		}
+		deployment = d
+		return false, nil
+	}
+
+	allRSs = append(allRSs, newRS)
+
+	newStatus, _, err := dc.calculateStatus(allRSs, newRS, deployment)
+	if err != nil {
+		return false, err
+	}
+
+	// Complete deployment.
+	if newStatus.UpdatedReplicas == deployment.Spec.Replicas &&
+		newStatus.AvailableReplicas >= deployment.Spec.Replicas-maxUnavailable(*deployment) {
+		return false, nil
+	}
+
+	// Look at the difference in seconds between now and the last time we reported any progress
+	// and compare against progressDeadlineSeconds.
+	condition := getCondition(deployment, extensions.DeploymentProgressing, api.ConditionTrue)
+	if condition == nil {
+		return false, nil
+	}
+
+	from := condition.LastTransitionTime
+	delta := time.Duration(*deployment.Spec.ProgressDeadlineSeconds) * time.Second
+	return from.Add(delta).Before(nowFn()), nil
+}
+
+// syncFailed adds a timeout condition in a deployment if it does not have one yet and
+// scales down to zero the failed replica set.
+func (dc *DeploymentController) syncFailed(deployment *extensions.Deployment) error {
+	newRS, _, err := dc.getAllReplicaSetsAndSyncRevision(deployment, false)
+	if err != nil {
+		return err
+	}
+	// At this point we have a new replica set but a sanity check never hurts.
+	if newRS == nil {
+		return nil
+	}
+	if newRS.Annotations == nil {
+		newRS.Annotations = make(map[string]string)
+	}
+	// Mark the replica set as failed and scale it down to zero so the replica set controller
+	// will stop scaling up a doomed template. We don't care about the value of the annotation,
+	// just for its mere existense.
+	//
+	// TODO: Automatic rollback here. Locate the last successful replica set and scale it up in
+	// place of newRS.
+	newRS.Annotations[deploymentutil.NoProgressAnnotation] = ""
+	newRS.Spec.Replicas = 0
+	if _, err = dc.client.Extensions().ReplicaSets(newRS.Namespace).Update(newRS); err != nil {
+		return err
+	}
+
+	condition := getCondition(deployment, extensions.DeploymentProgressing, api.ConditionFalse)
+	if condition != nil {
+		// If the timeout condition already exists, we don't need to update the deployment.
+		return nil
+	}
+
+	cond := newCondition(extensions.DeploymentProgressing, api.ConditionFalse, "TimedOut", "Deployment has timed out")
+	setCondition(deployment, *cond)
+	_, err = dc.client.Extensions().Deployments(deployment.Namespace).UpdateStatus(deployment)
+	return err
 }
 
 // sync is responsible for reconciling deployments on scaling events or when they
@@ -462,31 +561,47 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*extensions.ReplicaSe
 
 // syncDeploymentStatus checks if the status is up-to-date and sync it if necessary
 func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, d *extensions.Deployment) error {
-	newStatus, err := dc.calculateStatus(allRSs, newRS, d)
+	newStatus, _, err := dc.calculateStatus(allRSs, newRS, d)
 	if err != nil {
 		return err
 	}
-	if !reflect.DeepEqual(d.Status, newStatus) {
+	// Remove any condition that denotes progress when a deployment is paused so that it
+	// won't switch to failed once it is unpaused.
+	removed := false
+	if d.Spec.Paused {
+		removed = removeCondition(d, extensions.DeploymentProgressing, api.ConditionTrue)
+	}
+	if !reflect.DeepEqual(d.Status, newStatus) || removed {
 		return dc.updateDeploymentStatus(allRSs, newRS, d)
 	}
 	return nil
 }
 
-func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment *extensions.Deployment) (extensions.DeploymentStatus, error) {
+func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment *extensions.Deployment) (extensions.DeploymentStatus, bool, error) {
 	availableReplicas, err := dc.getAvailablePodsForReplicaSets(deployment, allRSs)
 	if err != nil {
-		return deployment.Status, fmt.Errorf("failed to count available pods: %v", err)
+		// We don't know that there is no progress, so we are not going to report no progress.
+		return deployment.Status, true, fmt.Errorf("failed to count available pods: %v", err)
 	}
 	totalReplicas := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 
-	return extensions.DeploymentStatus{
+	oldStatus := deployment.Status
+	newStatus := extensions.DeploymentStatus{
 		// TODO: Ensure that if we start retrying status updates, we won't pick up a new Generation value.
 		ObservedGeneration:  deployment.Generation,
 		Replicas:            deploymentutil.GetActualReplicaCountForReplicaSets(allRSs),
 		UpdatedReplicas:     deploymentutil.GetActualReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS}),
 		AvailableReplicas:   availableReplicas,
 		UnavailableReplicas: totalReplicas - availableReplicas,
-	}, nil
+		Conditions:          deployment.Status.Conditions,
+	}
+
+	progressing := oldStatus.Replicas != newStatus.Replicas ||
+		oldStatus.UpdatedReplicas != newStatus.UpdatedReplicas ||
+		oldStatus.AvailableReplicas != newStatus.AvailableReplicas ||
+		oldStatus.UnavailableReplicas != newStatus.UnavailableReplicas
+
+	return newStatus, progressing, nil
 }
 
 func (dc *DeploymentController) getAvailablePodsForReplicaSets(deployment *extensions.Deployment, rss []*extensions.ReplicaSet) (int32, error) {
@@ -498,12 +613,18 @@ func (dc *DeploymentController) getAvailablePodsForReplicaSets(deployment *exten
 }
 
 func (dc *DeploymentController) updateDeploymentStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment *extensions.Deployment) error {
-	newStatus, err := dc.calculateStatus(allRSs, newRS, deployment)
+	newStatus, progressing, err := dc.calculateStatus(allRSs, newRS, deployment)
 	if err != nil {
 		return err
 	}
 	newDeployment := deployment
 	newDeployment.Status = newStatus
+
+	if progressing {
+		condition := newCondition(extensions.DeploymentProgressing, api.ConditionTrue, "Progressing", "Deployment is progressing")
+		setCondition(deployment, *condition)
+	}
+
 	_, err = dc.client.Extensions().Deployments(deployment.Namespace).UpdateStatus(newDeployment)
 	return err
 }

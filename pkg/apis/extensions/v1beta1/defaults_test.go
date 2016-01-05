@@ -251,6 +251,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
+					ProgressDeadlineSeconds: newInt32(30),
 				},
 			},
 			expected: &Deployment{
@@ -259,7 +260,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
-					Template: defaultTemplate,
+					Template:                defaultTemplate,
+					ProgressDeadlineSeconds: newInt32(30),
 				},
 			},
 		},
@@ -275,7 +277,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			t.FailNow()
 		}
 		if !reflect.DeepEqual(got.Spec, expected.Spec) {
-			t.Errorf("got different than expected:\n\t%+v\ngot:\n\t%+v", got.Spec, expected.Spec)
+			t.Errorf("object mismatch!\nexpected:\n\t%+v\ngot:\n\t%+v", got.Spec, expected.Spec)
 		}
 	}
 }

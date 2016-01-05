@@ -51,6 +51,8 @@ const (
 	// is deployment.spec.replicas + maxSurge. Used by the underlying replica sets to estimate their
 	// proportions in case the deployment has surge replicas.
 	MaxReplicasAnnotation = "deployment.kubernetes.io/max-replicas"
+	// NoProgressAnnotation on a replica set denotes that it has failed to progress during its deployment.
+	NoProgressAnnotation = "deployment.kubernetes.io/failed"
 
 	// RollbackRevisionNotFound is not found rollback event reason
 	RollbackRevisionNotFound = "DeploymentRollbackRevisionNotFound"
@@ -59,6 +61,59 @@ const (
 	// RollbackDone is the done rollback event reason
 	RollbackDone = "DeploymentRollback"
 )
+
+// NewCondition creates a new deployment condition.
+func NewCondition(conditionType extensions.DeploymentConditionType, status api.ConditionStatus, reason, message string) *extensions.DeploymentCondition {
+	return &extensions.DeploymentCondition{
+		Type:               conditionType,
+		Status:             status,
+		LastTransitionTime: unversioned.Now(),
+		Reason:             reason,
+		Message:            message,
+	}
+}
+
+// GetCondition returns the deployment condition with the provided type and status.
+func GetCondition(d *extensions.Deployment, cType extensions.DeploymentConditionType, cStatus api.ConditionStatus) *extensions.DeploymentCondition {
+	for _, c := range d.Status.Conditions {
+		if c.Type == cType && c.Status == cStatus {
+			return &c
+		}
+	}
+	return nil
+}
+
+// SetCondition updates the deployment to include the provided condition. If the condition
+// already existed, then it is replaced.
+func SetCondition(d *extensions.Deployment, condition extensions.DeploymentCondition) {
+	newConditions, _ := filterOutCondition(d, condition.Type, condition.Status)
+	d.Status.Conditions = append(newConditions, condition)
+}
+
+// RemoveCondition removes the deployment condition with the provided type and status from
+// the deployment conditions. It returns true if there was a removal, false otherwise.
+func RemoveCondition(d *extensions.Deployment, cType extensions.DeploymentConditionType, cStatus api.ConditionStatus) bool {
+	conditions, found := filterOutCondition(d, cType, cStatus)
+	d.Status.Conditions = conditions
+	return found
+}
+
+// filterOutCondition returns a new slice of deployment conditions without conditions with the
+// provided type and status.
+func filterOutCondition(d *extensions.Deployment, cType extensions.DeploymentConditionType, cStatus api.ConditionStatus) ([]extensions.DeploymentCondition, bool) {
+	newConditions := []extensions.DeploymentCondition{}
+	found := false
+
+	for _, c := range d.Status.Conditions {
+		if c.Type == cType && c.Status == cStatus {
+			found = true
+			continue
+		}
+		newConditions = append(newConditions, c)
+	}
+
+	return newConditions, found
+}
 
 // MaxRevision finds the highest revision in the replica sets
 func MaxRevision(allRSs []*extensions.ReplicaSet) int64 {

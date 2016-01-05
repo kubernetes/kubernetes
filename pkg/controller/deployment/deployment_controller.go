@@ -491,6 +491,14 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return dc.syncStatusOnly(d)
 	}
 
+	timedOut, err := dc.hasTimedOut(d)
+	if err != nil {
+		return err
+	}
+	if timedOut {
+		return dc.syncFailed(d)
+	}
+
 	if d.Spec.Paused {
 		return dc.sync(d)
 	}

@@ -68,6 +68,9 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	It("deployment should support rollover", func() {
 		testRolloverDeployment(f)
 	})
+	It("failed deployment should not be reconciled", func() {
+		testFailedDeployment(f)
+	})
 	It("paused deployment should be ignored by the controller", func() {
 		testPausedDeployment(f)
 	})
@@ -488,6 +491,50 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	err = framework.WaitForDeploymentOldRSsNum(c, ns, deploymentName, int(*revisionHistoryLimit))
 	Expect(err).NotTo(HaveOccurred())
 	close(stopCh)
+}
+
+func testFailedDeployment(f *framework.Framework) {
+	/*
+		ns := f.Namespace.Name
+		c := f.Client
+		deploymentName := "nginx"
+		podLabels := map[string]string{"name": "nginx", "test": "failed"}
+		framework.Logf("Creating failed deployment %s", deploymentName)
+		// A zero timeout will fail the deployment immediately.
+		zero := 0
+		failed := newDeployment(deploymentName, 3, podLabels, "nginx", "nginx", extensions.RecreateDeploymentStrategyType, nil)
+		failed.Spec.ProgressDeadlineSeconds = &zero
+		_, err := c.Extensions().Deployments(ns).Create(failed)
+		// Check that the deployment is created fine.
+		failed, err = c.Extensions().Deployments(ns).Get(deploymentName)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Wait for at least an event so we avoid update conflicts.
+		framework.WaitForEvents(c, ns, failed, 1)
+
+		// Bump the timeout and retry the deployment
+		failed, err = framework.UpdateDeploymentWithRetries(adapter.FromUnversionedClient(c), ns, failed.Name, func(update *extensions.Deployment) {
+			*update.Spec.ProgressDeadlineSeconds = 60
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		updated := failed
+
+		selector, err := unversioned.LabelSelectorAsSelector(updated.Spec.Selector)
+		Expect(err).NotTo(HaveOccurred())
+		opts := api.ListOptions{LabelSelector: selector}
+		w, err := c.Extensions().ReplicaSets(ns).Watch(opts)
+		Expect(err).NotTo(HaveOccurred())
+
+		select {
+		case event := <-w.ResultChan():
+			// TODO: Check for an ADDED event type
+			_ = event.Type
+		case <-time.After(time.Minute):
+			err = fmt.Errorf("expected a new replica set to be created")
+			Expect(err).NotTo(HaveOccurred())
+		}
+	*/
 }
 
 // testRolloverDeployment tests that deployment supports rollover.
