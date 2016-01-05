@@ -34,6 +34,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -1629,7 +1630,7 @@ func printEvent(event *api.Event, w io.Writer, options PrintOptions) error {
 
 // Sorts and prints the EventList in a human-friendly format.
 func printEventList(list *api.EventList, w io.Writer, options PrintOptions) error {
-	sort.Sort(SortableEvents(list.Items))
+	sort.Sort(events.SortableEvents(list.Items))
 	for i := range list.Items {
 		if err := printEvent(&list.Items[i], w, options); err != nil {
 			return err
