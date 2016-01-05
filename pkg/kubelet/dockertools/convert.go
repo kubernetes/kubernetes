@@ -28,14 +28,18 @@ import (
 
 // This file contains helper functions to convert docker API types to runtime
 // (kubecontainer) types.
+const (
+	statusRunningPrefix = "Up"
+	statusExitedPrefix  = "Exited"
+)
 
 func mapState(state string) kubecontainer.ContainerState {
 	// Parse the state string in docker.APIContainers. This could break when
 	// we upgrade docker.
 	switch {
-	case strings.HasPrefix(state, "Up"):
+	case strings.HasPrefix(state, statusRunningPrefix):
 		return kubecontainer.ContainerStateRunning
-	case strings.HasPrefix(state, "Exited"):
+	case strings.HasPrefix(state, statusExitedPrefix):
 		return kubecontainer.ContainerStateExited
 	default:
 		return kubecontainer.ContainerStateUnknown
