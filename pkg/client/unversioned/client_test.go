@@ -273,7 +273,7 @@ func TestGetSwaggerSchema(t *testing.T) {
 	defer server.Close()
 
 	client := NewOrDie(&Config{Host: server.URL})
-	got, err := client.SwaggerSchema(v1.SchemeGroupVersion)
+	got, err := client.Discovery().SwaggerSchema(v1.SchemeGroupVersion)
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
@@ -292,7 +292,7 @@ func TestGetSwaggerSchemaFail(t *testing.T) {
 	defer server.Close()
 
 	client := NewOrDie(&Config{Host: server.URL})
-	got, err := client.SwaggerSchema(unversioned.GroupVersion{Group: "api.group", Version: "v4"})
+	got, err := client.Discovery().SwaggerSchema(unversioned.GroupVersion{Group: "api.group", Version: "v4"})
 	if got != nil {
 		t.Fatalf("unexpected response: %v", got)
 	}
