@@ -87,7 +87,7 @@ func TestPoll(t *testing.T) {
 		invocations++
 		return true, nil
 	})
-	fp := fakePoller{max: 1, wg: sync.WaitGroup{}}
+	fp := fakePoller{max: 1}
 	if err := pollInternal(fp.GetWaitFunc(), f); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
@@ -106,7 +106,7 @@ func TestPollError(t *testing.T) {
 	f := ConditionFunc(func() (bool, error) {
 		return false, expectedError
 	})
-	fp := fakePoller{max: 1, wg: sync.WaitGroup{}}
+	fp := fakePoller{max: 1}
 	if err := pollInternal(fp.GetWaitFunc(), f); err == nil || err != expectedError {
 		t.Fatalf("Expected error %v, got none %v", expectedError, err)
 	}
@@ -123,10 +123,11 @@ func TestPollImmediate(t *testing.T) {
 		invocations++
 		return true, nil
 	})
-	fp := fakePoller{max: 0, wg: sync.WaitGroup{}}
+	fp := fakePoller{max: 0}
 	if err := pollImmediateInternal(fp.GetWaitFunc(), f); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
+	// We don't need to wait for fp.wg, as pollImmediate shouldn't call WaitFunc at all.
 	if invocations != 1 {
 		t.Errorf("Expected exactly one invocation, got %d", invocations)
 	}
@@ -141,10 +142,11 @@ func TestPollImmediateError(t *testing.T) {
 	f := ConditionFunc(func() (bool, error) {
 		return false, expectedError
 	})
-	fp := fakePoller{max: 0, wg: sync.WaitGroup{}}
+	fp := fakePoller{max: 0}
 	if err := pollImmediateInternal(fp.GetWaitFunc(), f); err == nil || err != expectedError {
 		t.Fatalf("Expected error %v, got none %v", expectedError, err)
 	}
+	// We don't need to wait for fp.wg, as pollImmediate shouldn't call WaitFunc at all.
 	used := atomic.LoadInt32(&fp.used)
 	if used != 0 {
 		t.Errorf("Expected exactly zero ticks, got %d", used)
