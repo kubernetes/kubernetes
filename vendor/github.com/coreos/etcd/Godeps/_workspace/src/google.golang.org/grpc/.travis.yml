@@ -1,0 +1,10 @@
+sudo: false
+
+language: go
+
+install:
+  - go get -v -t -d google.golang.org/grpc/...
+
+script:
+  - go test -v -cpu 1,4 google.golang.org/grpc/...
+  - go test -v -race -cpu 1,4 google.golang.org/grpc/...

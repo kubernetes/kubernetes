@@ -1,0 +1,101 @@
+{{var "v"}} := {{if not isArray}}*{{end}}{{ .Varname }}
+{{var "h"}}, {{var "l"}} := z.DecSliceHelperStart() {{/* // helper, containerLenS */}}
+var {{var "c"}} bool {{/* // changed */}}
+if {{var "l"}} == 0 {
+	{{if isSlice }}if {{var "v"}} == nil {
+		{{var "v"}} = []{{ .Typ }}{}
+		{{var "c"}} = true
+	} else if len({{var "v"}}) != 0 {
+		{{var "v"}} = {{var "v"}}[:0]
+		{{var "c"}} = true
+	} {{end}} {{if isChan }}if {{var "v"}} == nil {
+		{{var "v"}} = make({{ .CTyp }}, 0)
+		{{var "c"}} = true
+	} {{end}}
+} else if {{var "l"}} > 0 {
+	{{if isChan }}if {{var "v"}} == nil {
+		{{var "rl"}}, _ = z.DecInferLen({{var "l"}}, z.DecBasicHandle().MaxInitLen, {{ .Size }})
+		{{var "v"}} = make({{ .CTyp }}, {{var "rl"}})
+		{{var "c"}} = true
+	}
+	for {{var "r"}} := 0; {{var "r"}} < {{var "l"}}; {{var "r"}}++ {
+		{{var "h"}}.ElemContainerState({{var "r"}})
+		var {{var "t"}} {{ .Typ }}
+		{{ $x := printf "%st%s" .TempVar .Rand }}{{ decLineVar $x }}
+		{{var "v"}} <- {{var "t"}}
+	}
+	{{ else }}	var {{var "rr"}}, {{var "rl"}} int {{/* // num2read, length of slice/array/chan */}}
+	var {{var "rt"}} bool {{/* truncated */}}
+	if {{var "l"}} > cap({{var "v"}}) {
+		{{if isArray }}z.DecArrayCannotExpand(len({{var "v"}}), {{var "l"}})
+		{{ else }}{{if not .Immutable }}
+		{{var "rg"}} := len({{var "v"}}) > 0
+		{{var "v2"}} := {{var "v"}} {{end}}
+		{{var "rl"}}, {{var "rt"}} = z.DecInferLen({{var "l"}}, z.DecBasicHandle().MaxInitLen, {{ .Size }})
+		if {{var "rt"}} {
+			if {{var "rl"}} <= cap({{var "v"}}) {
+				{{var "v"}} = {{var "v"}}[:{{var "rl"}}]
+			} else {
+				{{var "v"}} = make([]{{ .Typ }}, {{var "rl"}})
+			}
+		} else {
+			{{var "v"}} = make([]{{ .Typ }}, {{var "rl"}})
+		}
+		{{var "c"}} = true
+		{{var "rr"}} = len({{var "v"}}) {{if not .Immutable }}
+			if {{var "rg"}} { copy({{var "v"}}, {{var "v2"}}) } {{end}} {{end}}{{/* end not Immutable, isArray */}}
+	} {{if isSlice }} else if {{var "l"}} != len({{var "v"}}) {
+		{{var "v"}} = {{var "v"}}[:{{var "l"}}]
+		{{var "c"}} = true
+	} {{end}}	{{/* end isSlice:47 */}} 
+	{{var "j"}} := 0
+	for ; {{var "j"}} < {{var "rr"}} ; {{var "j"}}++ {
+		{{var "h"}}.ElemContainerState({{var "j"}})
+		{{ $x := printf "%[1]vv%[2]v[%[1]vj%[2]v]" .TempVar .Rand }}{{ decLineVar $x }}
+	}
+	{{if isArray }}for ; {{var "j"}} < {{var "l"}} ; {{var "j"}}++ {
+		{{var "h"}}.ElemContainerState({{var "j"}})
+		z.DecSwallow()
+	}
+	{{ else }}if {{var "rt"}} {
+		for ; {{var "j"}} < {{var "l"}} ; {{var "j"}}++ {
+			{{var "v"}} = append({{var "v"}}, {{ zero}})
+			{{var "h"}}.ElemContainerState({{var "j"}})
+			{{ $x := printf "%[1]vv%[2]v[%[1]vj%[2]v]" .TempVar .Rand }}{{ decLineVar $x }}
+		}
+	} {{end}} {{/* end isArray:56 */}}
+	{{end}} {{/* end isChan:16 */}}
+} else { {{/* len < 0 */}}
+	{{var "j"}} := 0
+	for ; !r.CheckBreak(); {{var "j"}}++ {
+		{{if isChan }}
+		{{var "h"}}.ElemContainerState({{var "j"}})
+		var {{var "t"}} {{ .Typ }}
+		{{ $x := printf "%st%s" .TempVar .Rand }}{{ decLineVar $x }}
+		{{var "v"}} <- {{var "t"}} 
+		{{ else }}
+		if {{var "j"}} >= len({{var "v"}}) {
+			{{if isArray }}z.DecArrayCannotExpand(len({{var "v"}}), {{var "j"}}+1)
+			{{ else }}{{var "v"}} = append({{var "v"}}, {{zero}})// var {{var "z"}} {{ .Typ }}
+			{{var "c"}} = true {{end}}
+		}
+		{{var "h"}}.ElemContainerState({{var "j"}})
+		if {{var "j"}} < len({{var "v"}}) {
+			{{ $x := printf "%[1]vv%[2]v[%[1]vj%[2]v]" .TempVar .Rand }}{{ decLineVar $x }}
+		} else {
+			z.DecSwallow()
+		}
+		{{end}}
+	}
+	{{if isSlice }}if {{var "j"}} < len({{var "v"}}) {
+		{{var "v"}} = {{var "v"}}[:{{var "j"}}]
+		{{var "c"}} = true
+	} else if {{var "j"}} == 0 && {{var "v"}} == nil {
+		{{var "v"}} = []{{ .Typ }}{}
+		{{var "c"}} = true
+	}{{end}}
+}
+{{var "h"}}.End()
+{{if not isArray }}if {{var "c"}} { 
+	*{{ .Varname }} = {{var "v"}}
+}{{end}}

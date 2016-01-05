@@ -1,0 +1,20 @@
+# This file is like Go's AUTHORS file: it lists Copyright holders.
+# The list of humans who have contributd is in the CONTRIBUTORS file.
+#
+# To contribute to this project, because it will eventually be folded
+# back in to Go itself, you need to submit a CLA:
+#
+#    http://golang.org/doc/contribute.html#copyright
+#
+# Then you get added to CONTRIBUTORS and you or your company get added
+# to the AUTHORS file.
+
+Blake Mizerany <blake.mizerany@gmail.com> github=bmizerany
+Daniel Morsing <daniel.morsing@gmail.com> github=DanielMorsing
+Gabriel Aszalos <gabriel.aszalos@gmail.com> github=gbbr
+Google, Inc.
+Keith Rarick <kr@xph.us> github=kr
+Matthew Keenan <tank.en.mate@gmail.com> <github@mattkeenan.net> github=mattkeenan
+Matt Layher <mdlayher@gmail.com> github=mdlayher
+Perry Abbott <perry.j.abbott@gmail.com> github=pabbott0
+Tatsuhiro Tsujikawa <tatsuhiro.t@gmail.com> github=tatsuhiro-t
