@@ -42,7 +42,7 @@ func (dc *DeploymentController) rolloutRolling(deployment *extensions.Deployment
 	}
 	if scaledUp {
 		// Update DeploymentStatus
-		return dc.updateDeploymentStatus(allRSs, newRS, deployment)
+		return dc.syncDeploymentStatus(allRSs, newRS, deployment)
 	}
 
 	// Scale down, if we can.
@@ -52,7 +52,7 @@ func (dc *DeploymentController) rolloutRolling(deployment *extensions.Deployment
 	}
 	if scaledDown {
 		// Update DeploymentStatus
-		return dc.updateDeploymentStatus(allRSs, newRS, deployment)
+		return dc.syncDeploymentStatus(allRSs, newRS, deployment)
 	}
 
 	dc.cleanupDeployment(oldRSs, deployment)

@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -79,6 +80,17 @@ func (deploymentStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Obj
 	if !reflect.DeepEqual(newDeployment.Spec, oldDeployment.Spec) ||
 		!reflect.DeepEqual(newDeployment.Annotations, oldDeployment.Annotations) {
 		newDeployment.Generation = oldDeployment.Generation + 1
+	}
+
+	// Update deployment conditions with an Unknown condition when pausing/resuming
+	// a deployment. In this way, we can be sure that we won't timeout when a user
+	// resumes a Deployment with a set progressDeadlineSeconds.
+	if newDeployment.Spec.Paused && !oldDeployment.Spec.Paused {
+		condition := deploymentutil.NewCondition(extensions.DeploymentProgressing, api.ConditionUnknown, "Paused", "Deployment is paused")
+		newDeployment.Status, _ = deploymentutil.SetCondition(newDeployment.Status, *condition, true)
+	} else if !newDeployment.Spec.Paused && oldDeployment.Spec.Paused {
+		condition := deploymentutil.NewCondition(extensions.DeploymentProgressing, api.ConditionUnknown, "Resumed", "Deployment is resumed")
+		newDeployment.Status, _ = deploymentutil.SetCondition(newDeployment.Status, *condition, true)
 	}
 }
 
