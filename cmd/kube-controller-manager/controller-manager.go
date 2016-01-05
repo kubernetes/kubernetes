@@ -27,7 +27,8 @@ import (
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flags"
+	"k8s.io/kubernetes/pkg/util/log"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
@@ -42,9 +43,9 @@ func main() {
 	s := app.NewCMServer()
 	s.AddFlags(pflag.CommandLine)
 
-	util.InitFlags()
-	util.InitLogs()
-	defer util.FlushLogs()
+	flags.InitFlags()
+	log.InitLogs()
+	defer log.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
 

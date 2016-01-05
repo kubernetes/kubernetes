@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 type EmbeddedTest struct {
@@ -152,7 +152,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 	internal.Items[2].(*runtime.Unknown).Kind = "OtherTest"
 	internal.Items[2].(*runtime.Unknown).APIVersion = "unknown.group/unknown"
 	if e, a := internal.Items, list; !reflect.DeepEqual(e, a) {
-		t.Errorf("mismatched decoded: %s", util.ObjectDiff(e, a))
+		t.Errorf("mismatched decoded: %s", diff.ObjectDiff(e, a))
 	}
 }
 

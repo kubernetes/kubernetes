@@ -29,7 +29,7 @@ import (
 
 	"github.com/golang/glog"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/kubectl/util"
 )
 
 const (

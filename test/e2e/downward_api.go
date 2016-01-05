@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -29,7 +29,7 @@ var _ = Describe("Downward API", func() {
 	framework := NewFramework("downward-api")
 
 	It("should provide pod name and namespace as env vars [Conformance]", func() {
-		podName := "downward-api-" + string(util.NewUUID())
+		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []api.EnvVar{
 			{
 				Name: "POD_NAME",
@@ -60,7 +60,7 @@ var _ = Describe("Downward API", func() {
 	})
 
 	It("should provide pod IP as an env var", func() {
-		podName := "downward-api-" + string(util.NewUUID())
+		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []api.EnvVar{
 			{
 				Name: "POD_IP",

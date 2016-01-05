@@ -28,7 +28,9 @@ import (
 	"path"
 	"runtime"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flags"
+	"k8s.io/kubernetes/pkg/util/log"
+	"k8s.io/kubernetes/pkg/util/template"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
@@ -72,7 +74,7 @@ func (hk *HyperKube) Flags() *pflag.FlagSet {
 	if hk.baseFlags == nil {
 		hk.baseFlags = pflag.NewFlagSet(hk.Name, pflag.ContinueOnError)
 		hk.baseFlags.SetOutput(ioutil.Discard)
-		hk.baseFlags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+		hk.baseFlags.SetNormalizeFunc(flags.WordSepNormalizeFunc)
 		hk.baseFlags.BoolVarP(&hk.helpFlagVal, "help", "h", false, "help for "+hk.Name)
 
 		// These will add all of the "global" flags (defined with both the
@@ -166,8 +168,8 @@ func (hk *HyperKube) Run(args []string) error {
 
 	verflag.PrintAndExitIfRequested()
 
-	util.InitLogs()
-	defer util.FlushLogs()
+	log.InitLogs()
+	defer log.FlushLogs()
 
 	err = s.Run(s, s.Flags().Args())
 	if err != nil {
@@ -201,5 +203,5 @@ Servers
 {{.Long | trim | wrap "    "}}{{end}}
 Call '{{.Name}} <server> --help' for help on a specific server.
 `
-	util.ExecuteTemplate(hk.Out(), tt, hk)
+	template.ExecuteTemplate(hk.Out(), tt, hk)
 }

@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 
 	"github.com/ghodss/yaml"
 	"github.com/google/gofuzz"
@@ -159,12 +159,12 @@ func objDiff(a, b interface{}) string {
 	if err != nil {
 		panic("b")
 	}
-	return util.StringDiff(string(ab), string(bb))
+	return diff.StringDiff(string(ab), string(bb))
 
 	// An alternate diff attempt, in case json isn't showing you
 	// the difference. (reflect.DeepEqual makes a distinction between
 	// nil and empty slices, for example.)
-	//return util.StringDiff(
+	//return diff.StringDiff(
 	//	fmt.Sprintf("%#v", a),
 	//	fmt.Sprintf("%#v", b),
 	//)

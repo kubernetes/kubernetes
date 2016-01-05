@@ -33,7 +33,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 const (
@@ -307,7 +307,7 @@ func verifyPDContentsViaContainer(f *Framework, podName, containerName string, f
 
 func createPD() (string, error) {
 	if testContext.Provider == "gce" || testContext.Provider == "gke" {
-		pdName := fmt.Sprintf("%s-%s", testContext.prefix, string(util.NewUUID()))
+		pdName := fmt.Sprintf("%s-%s", testContext.prefix, string(uuid.NewUUID()))
 
 		gceCloud, err := getGCECloud()
 		if err != nil {
@@ -416,7 +416,7 @@ func testPDPod(diskNames []string, targetHost string, readOnly bool, numContaine
 			APIVersion: latest.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: api.ObjectMeta{
-			Name: "pd-test-" + string(util.NewUUID()),
+			Name: "pd-test-" + string(uuid.NewUUID()),
 		},
 		Spec: api.PodSpec{
 			Containers: containers,

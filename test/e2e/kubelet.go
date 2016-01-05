@@ -22,8 +22,8 @@ import (
 	"time"
 
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -121,7 +121,7 @@ var _ = Describe("kubelet", func() {
 			It(name, func() {
 				totalPods := itArg.podsPerNode * numNodes
 				By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
-				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(util.NewUUID()))
+				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(uuid.NewUUID()))
 
 				Expect(RunRC(RCConfig{
 					Client:    framework.Client,

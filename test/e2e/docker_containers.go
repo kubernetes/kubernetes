@@ -19,7 +19,7 @@ package e2e
 import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -75,7 +75,7 @@ const testContainerName = "test-container"
 
 // Return a prototypical entrypoint test pod
 func entrypointTestPod() *api.Pod {
-	podName := "client-containers-" + string(util.NewUUID())
+	podName := "client-containers-" + string(uuid.NewUUID())
 
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{

@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -425,7 +425,7 @@ var _ = Describe("SchedulerPredicates [Serial]", func() {
 		expectNoError(err)
 
 		By("Trying to apply a random label on the found node.")
-		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(util.NewUUID()))
+		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(uuid.NewUUID()))
 		v := "42"
 		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
 		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()

@@ -22,7 +22,8 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flags"
+	"k8s.io/kubernetes/pkg/util/template"
 
 	"github.com/spf13/pflag"
 )
@@ -49,7 +50,7 @@ func (s *Server) Usage() error {
 Available Flags:
 {{.Flags.FlagUsages}}`
 
-	return util.ExecuteTemplate(s.hk.Out(), tt, s)
+	return template.ExecuteTemplate(s.hk.Out(), tt, s)
 }
 
 // Name returns the name of the command as derived from the usage line.
@@ -70,7 +71,7 @@ func (s *Server) Flags() *pflag.FlagSet {
 	if s.flags == nil {
 		s.flags = pflag.NewFlagSet(s.Name(), pflag.ContinueOnError)
 		s.flags.SetOutput(ioutil.Discard)
-		s.flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+		s.flags.SetNormalizeFunc(flags.WordSepNormalizeFunc)
 	}
 	return s.flags
 }

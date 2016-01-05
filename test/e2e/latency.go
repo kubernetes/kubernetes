@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	uuidutil "k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/watch"
 
 	. "github.com/onsi/ginkgo"
@@ -75,7 +75,7 @@ var _ = Describe("Latency [Skipped]", func() {
 		// terminating namespace to be finally deleted before starting this test.
 		expectNoError(checkTestingNSDeletedExcept(c, ns))
 
-		uuid = string(util.NewUUID())
+		uuid = string(uuidutil.NewUUID())
 
 		expectNoError(resetMetrics(c))
 		expectNoError(os.Mkdir(fmt.Sprintf(testContext.OutputDir+"/%s", uuid), 0777))
@@ -103,7 +103,7 @@ func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 		startTimestamps    = make(map[string]unversioned.Time, 0) // pod name -> time to run
 		watchTimestamps    = make(map[string]unversioned.Time, 0) // pod name -> time to read from informer
 
-		additionalPodsPrefix = "latency-pod-" + string(util.NewUUID())
+		additionalPodsPrefix = "latency-pod-" + string(uuidutil.NewUUID())
 	)
 
 	var mutex sync.Mutex

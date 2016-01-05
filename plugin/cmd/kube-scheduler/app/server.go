@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flow"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -145,7 +145,7 @@ func (s *SchedulerServer) Run(_ []string) error {
 		glog.Fatal(server.ListenAndServe())
 	}()
 
-	configFactory := factory.NewConfigFactory(kubeClient, util.NewTokenBucketRateLimiter(s.BindPodsQPS, s.BindPodsBurst), s.SchedulerName)
+	configFactory := factory.NewConfigFactory(kubeClient, flow.NewTokenBucketRateLimiter(s.BindPodsQPS, s.BindPodsBurst), s.SchedulerName)
 	config, err := s.createConfig(configFactory)
 	if err != nil {
 		glog.Fatalf("Failed to create scheduler configuration: %v", err)

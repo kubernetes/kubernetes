@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flags"
 )
 
 func TestNewFactoryDefaultFlagBindings(t *testing.T) {
@@ -197,7 +197,7 @@ func TestCanBeExposed(t *testing.T) {
 func TestFlagUnderscoreRenaming(t *testing.T) {
 	factory := NewFactory(nil)
 
-	factory.flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+	factory.flags.SetNormalizeFunc(flags.WordSepNormalizeFunc)
 	factory.flags.Bool("valid_flag", false, "bool value")
 
 	// In case of failure of this test check this PR: spf13/pflag#23

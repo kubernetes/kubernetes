@@ -26,14 +26,14 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 func scTestPod(hostIPC bool, hostPID bool) *api.Pod {
-	podName := "security-context-" + string(util.NewUUID())
+	podName := "security-context-" + string(uuid.NewUUID())
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:   podName,

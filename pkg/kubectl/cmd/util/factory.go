@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	flagutil "k8s.io/kubernetes/pkg/util/flags"
 )
 
 const (
@@ -156,7 +156,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	mapper := kubectl.ShortcutExpander{RESTMapper: api.RESTMapper}
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-	flags.SetNormalizeFunc(util.WarnWordSepNormalizeFunc) // Warn for "_" flags
+	flags.SetNormalizeFunc(flagutil.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
 	clientConfig := optionalClientConfig
 	if optionalClientConfig == nil {
@@ -408,7 +408,7 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 
 	// Normalize all flags that are coming from other packages or pre-configurations
 	// a.k.a. change all "_" to "-". e.g. glog package
-	flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+	flags.SetNormalizeFunc(flagutil.WordSepNormalizeFunc)
 }
 
 func getPorts(spec api.PodSpec) []string {

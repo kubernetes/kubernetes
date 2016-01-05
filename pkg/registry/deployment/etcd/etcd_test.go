@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 func newStorage(t *testing.T) (*DeploymentStorage, *etcdtesting.EtcdTestServer) {
@@ -209,7 +209,7 @@ func TestScaleGet(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if e, a := expect, scale; !api.Semantic.DeepDerivative(e, a) {
-		t.Errorf("unexpected scale: %s", util.ObjectDiff(e, a))
+		t.Errorf("unexpected scale: %s", diff.ObjectDiff(e, a))
 	}
 }
 

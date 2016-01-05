@@ -21,13 +21,13 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 // FillObjectMetaSystemFields populates fields that are managed by the system on ObjectMeta.
 func FillObjectMetaSystemFields(ctx Context, meta *ObjectMeta) {
 	meta.CreationTimestamp = unversioned.Now()
-	meta.UID = util.NewUUID()
+	meta.UID = uuid.NewUUID()
 	meta.SelfLink = ""
 }
 

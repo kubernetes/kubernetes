@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flow"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -66,7 +66,7 @@ var _ = Describe("Service endpoints latency", func() {
 
 		// Turn off rate limiting--it interferes with our measurements.
 		oldThrottle := f.Client.RESTClient.Throttle
-		f.Client.RESTClient.Throttle = util.NewFakeRateLimiter()
+		f.Client.RESTClient.Throttle = flow.NewFakeRateLimiter()
 		defer func() { f.Client.RESTClient.Throttle = oldThrottle }()
 
 		failing := sets.NewString()

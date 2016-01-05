@@ -33,8 +33,8 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -210,7 +210,7 @@ var _ = Describe("Pods", func() {
 	framework := NewFramework("pods")
 
 	PIt("should get a host IP [Conformance]", func() {
-		name := "pod-hostip-" + string(util.NewUUID())
+		name := "pod-hostip-" + string(uuid.NewUUID())
 		testHostIP(framework.Client, framework.Namespace.Name, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name: name,
@@ -230,7 +230,7 @@ var _ = Describe("Pods", func() {
 		podClient := framework.Client.Pods(framework.Namespace.Name)
 
 		By("creating the pod")
-		name := "pod-update-" + string(util.NewUUID())
+		name := "pod-update-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -267,7 +267,7 @@ var _ = Describe("Pods", func() {
 		podClient := framework.Client.Pods(framework.Namespace.Name)
 
 		By("creating the pod")
-		name := "pod-update-" + string(util.NewUUID())
+		name := "pod-update-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -384,7 +384,7 @@ var _ = Describe("Pods", func() {
 		podClient := framework.Client.Pods(framework.Namespace.Name)
 
 		By("creating the pod")
-		name := "pod-update-" + string(util.NewUUID())
+		name := "pod-update-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -469,7 +469,7 @@ var _ = Describe("Pods", func() {
 	It("should contain environment variables for services [Conformance]", func() {
 		// Make a pod that will be a service.
 		// This pod serves its hostname via HTTP.
-		serverName := "server-envvars-" + string(util.NewUUID())
+		serverName := "server-envvars-" + string(uuid.NewUUID())
 		serverPod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   serverName,
@@ -524,7 +524,7 @@ var _ = Describe("Pods", func() {
 		}
 
 		// Make a client pod that verifies that it has the service environment variables.
-		podName := "client-envvars-" + string(util.NewUUID())
+		podName := "client-envvars-" + string(uuid.NewUUID())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   podName,
@@ -706,7 +706,7 @@ var _ = Describe("Pods", func() {
 		podClient := framework.Client.Pods(framework.Namespace.Name)
 
 		By("creating the pod")
-		name := "pod-exec-websocket-" + string(util.NewUUID())
+		name := "pod-exec-websocket-" + string(uuid.NewUUID())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name: name,
@@ -785,7 +785,7 @@ var _ = Describe("Pods", func() {
 		podClient := framework.Client.Pods(framework.Namespace.Name)
 
 		By("creating the pod")
-		name := "pod-logs-websocket-" + string(util.NewUUID())
+		name := "pod-logs-websocket-" + string(uuid.NewUUID())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name: name,
@@ -1014,7 +1014,7 @@ var _ = Describe("Pods", func() {
 			podClient := framework.Client.Pods(framework.Namespace.Name)
 
 			By("creating the pod")
-			name := "pod-exec-" + string(util.NewUUID())
+			name := "pod-exec-" + string(uuid.NewUUID())
 			value := strconv.Itoa(time.Now().Nanosecond())
 			pod := &api.Pod{
 				ObjectMeta: api.ObjectMeta{
@@ -1088,7 +1088,7 @@ var _ = Describe("Pods", func() {
 			podClient := framework.Client.Pods(framework.Namespace.Name)
 
 			By("creating the pod")
-			name := "pod-portforward-" + string(util.NewUUID())
+			name := "pod-portforward-" + string(uuid.NewUUID())
 			value := strconv.Itoa(time.Now().Nanosecond())
 			pod := &api.Pod{
 				ObjectMeta: api.ObjectMeta{

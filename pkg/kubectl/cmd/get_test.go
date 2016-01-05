@@ -35,7 +35,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/pkg/watch/json"
 )
@@ -583,7 +583,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	expected := []runtime.Object{&svc.Items[0], node}
 	actual := tf.Printer.(*testPrinter).Objects
 	if !api.Semantic.DeepEqual(expected, actual) {
-		t.Errorf("unexpected object: %s", util.ObjectDiff(expected, actual))
+		t.Errorf("unexpected object: %s", diff.ObjectDiff(expected, actual))
 	}
 	if len(buf.String()) == 0 {
 		t.Errorf("unexpected empty output")

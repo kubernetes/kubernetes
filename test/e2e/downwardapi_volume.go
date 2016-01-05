@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -47,7 +47,7 @@ func getPodLogs(c *client.Client, namespace, podName, containerName string) (str
 var _ = Describe("Downward API volume", func() {
 	f := NewFramework("downward-api")
 	It("should provide podname only [Conformance]", func() {
-		podName := "downwardapi-volume-" + string(util.NewUUID())
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePod(podName, map[string]string{}, map[string]string{}, "/etc/podname")
 
 		testContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
@@ -56,7 +56,7 @@ var _ = Describe("Downward API volume", func() {
 	})
 
 	It("should provide podname as non-root with fsgroup [Conformance] [Skipped]", func() {
-		podName := "metadata-volume-" + string(util.NewUUID())
+		podName := "metadata-volume-" + string(uuid.NewUUID())
 		uid := int64(1001)
 		gid := int64(1234)
 		pod := downwardAPIVolumePod(podName, map[string]string{}, map[string]string{}, "/etc/podname")
@@ -74,7 +74,7 @@ var _ = Describe("Downward API volume", func() {
 		labels["key1"] = "value1"
 		labels["key2"] = "value2"
 
-		podName := "labelsupdate" + string(util.NewUUID())
+		podName := "labelsupdate" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePod(podName, labels, map[string]string{}, "/etc/labels")
 		containerName := "client-container"
 		defer func() {
@@ -110,7 +110,7 @@ var _ = Describe("Downward API volume", func() {
 	It("should update annotations on modification [Conformance]", func() {
 		annotations := map[string]string{}
 		annotations["builder"] = "bar"
-		podName := "annotationupdate" + string(util.NewUUID())
+		podName := "annotationupdate" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePod(podName, map[string]string{}, annotations, "/etc/annotations")
 
 		containerName := "client-container"

@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -49,7 +49,7 @@ var _ = Describe("ReplicationController", func() {
 // a replication controller. The image serves its hostname
 // which is checked for each replica.
 func ServeImageOrFail(f *Framework, test string, image string) {
-	name := "my-hostname-" + test + "-" + string(util.NewUUID())
+	name := "my-hostname-" + test + "-" + string(uuid.NewUUID())
 	replicas := 2
 
 	// Create a replication controller for a service

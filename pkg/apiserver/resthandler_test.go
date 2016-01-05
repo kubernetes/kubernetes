@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
@@ -244,7 +244,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 		reallyExpectedPod := expectedObj.(*api.Pod)
 
 		if !reflect.DeepEqual(*reallyExpectedPod, *resultPod) {
-			t.Errorf("%s mismatch: %v\n", tc.name, util.ObjectGoPrintDiff(reallyExpectedPod, resultPod))
+			t.Errorf("%s mismatch: %v\n", tc.name, diff.ObjectGoPrintDiff(reallyExpectedPod, resultPod))
 			return
 		}
 	}

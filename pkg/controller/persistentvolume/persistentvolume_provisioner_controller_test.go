@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	fake_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -178,7 +178,7 @@ func (c *mockControllerClient) GetPersistentVolume(name string) (*api.Persistent
 
 func (c *mockControllerClient) CreatePersistentVolume(pv *api.PersistentVolume) (*api.PersistentVolume, error) {
 	if pv.GenerateName != "" && pv.Name == "" {
-		pv.Name = fmt.Sprintf(pv.GenerateName, util.NewUUID())
+		pv.Name = fmt.Sprintf(pv.GenerateName, uuid.NewUUID())
 	}
 	c.volume = pv
 	return c.volume, nil

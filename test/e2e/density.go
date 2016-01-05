@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	uuidutil "k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/watch"
 
 	. "github.com/onsi/ginkgo"
@@ -167,7 +167,7 @@ var _ = Describe("Density [Skipped]", func() {
 		err = checkTestingNSDeletedExcept(c, ns)
 		expectNoError(err)
 
-		uuid = string(util.NewUUID())
+		uuid = string(uuidutil.NewUUID())
 
 		expectNoError(resetMetrics(c))
 		expectNoError(os.Mkdir(fmt.Sprintf(testContext.OutputDir+"/%s", uuid), 0777))
@@ -312,7 +312,7 @@ var _ = Describe("Density [Skipped]", func() {
 					}
 				}
 
-				additionalPodsPrefix = "density-latency-pod-" + string(util.NewUUID())
+				additionalPodsPrefix = "density-latency-pod-" + string(uuidutil.NewUUID())
 				_, controller := controllerframework.NewInformer(
 					&cache.ListWatch{
 						ListFunc: func(options api.ListOptions) (runtime.Object, error) {

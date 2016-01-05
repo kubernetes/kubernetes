@@ -125,7 +125,7 @@ func (op *oidcProvider) generateExpiredToken(t *testing.T, iss, sub, aud string,
 }
 
 // generateSelfSignedCert generates a self-signed cert/key pairs and writes to the certPath/keyPath.
-// This method is mostly identical to util.GenerateSelfSignedCert except for the 'IsCA' and 'KeyUsage'
+// This method is mostly identical to secure.GenerateSelfSignedCert except for the 'IsCA' and 'KeyUsage'
 // in the certificate template. (Maybe we can merge these two methods).
 func generateSelfSignedCert(t *testing.T, host, certPath, keyPath string) {
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)

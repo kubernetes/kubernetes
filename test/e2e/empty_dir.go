@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -309,7 +309,7 @@ func formatMedium(medium api.StorageMedium) string {
 }
 
 func testPodWithVolume(image, path string, source *api.EmptyDirVolumeSource) *api.Pod {
-	podName := "pod-" + string(util.NewUUID())
+	podName := "pod-" + string(uuid.NewUUID())
 	return &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",

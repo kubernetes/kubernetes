@@ -33,7 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/metrics"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/cache"
+	"k8s.io/kubernetes/pkg/util/log"
 	"k8s.io/kubernetes/pkg/watch"
 
 	etcd "github.com/coreos/etcd/client"
@@ -85,7 +86,7 @@ func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string) stor
 		versioner:  APIObjectVersioner{},
 		copier:     api.Scheme,
 		pathPrefix: path.Join("/", prefix),
-		cache:      util.NewCache(maxEtcdCacheEntries),
+		cache:      cache.NewCache(maxEtcdCacheEntries),
 	}
 }
 
@@ -107,7 +108,7 @@ type etcdHelper struct {
 	// support multi-object transaction that will result in many objects with the same index.
 	// Number of entries stored in the cache is controlled by maxEtcdCacheEntries constant.
 	// TODO: Measure how much this cache helps after the conversion code is optimized.
-	cache util.Cache
+	cache cache.Cache
 }
 
 func init() {
@@ -346,7 +347,7 @@ func (h *etcdHelper) GetToList(ctx context.Context, key string, filter storage.F
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}
-	trace := util.NewTrace("GetToList " + getTypeName(listObj))
+	trace := log.NewTrace("GetToList " + getTypeName(listObj))
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -381,7 +382,7 @@ func (h *etcdHelper) GetToList(ctx context.Context, key string, filter storage.F
 
 // decodeNodeList walks the tree of each node in the list and decodes into the specified object
 func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.FilterFunc, slicePtr interface{}) error {
-	trace := util.NewTrace("decodeNodeList " + getTypeName(slicePtr))
+	trace := log.NewTrace("decodeNodeList " + getTypeName(slicePtr))
 	defer trace.LogIfLong(500 * time.Millisecond)
 	v, err := conversion.EnforcePtr(slicePtr)
 	if err != nil || v.Kind() != reflect.Slice {
@@ -428,7 +429,7 @@ func (h *etcdHelper) List(ctx context.Context, key string, resourceVersion strin
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}
-	trace := util.NewTrace("List " + getTypeName(listObj))
+	trace := log.NewTrace("List " + getTypeName(listObj))
 	defer trace.LogIfLong(time.Second)
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {

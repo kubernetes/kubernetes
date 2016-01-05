@@ -52,6 +52,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/util/flags"
 	"k8s.io/kubernetes/pkg/util/flow"
 	"k8s.io/kubernetes/pkg/util/log"
 	"k8s.io/kubernetes/pkg/util/networking"
@@ -956,7 +957,7 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	addFlags(pflag.CommandLine)
 
-	util.InitFlags()
+	flags.InitFlags()
 	testutil.ReallyCrash = true
 	log.InitLogs()
 	defer log.FlushLogs()

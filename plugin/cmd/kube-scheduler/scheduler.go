@@ -20,7 +20,8 @@ import (
 	"runtime"
 
 	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flags"
+	"k8s.io/kubernetes/pkg/util/log"
 	"k8s.io/kubernetes/pkg/version/verflag"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 
@@ -36,9 +37,9 @@ func main() {
 	s := app.NewSchedulerServer()
 	s.AddFlags(pflag.CommandLine)
 
-	util.InitFlags()
-	util.InitLogs()
-	defer util.FlushLogs()
+	flags.InitFlags()
+	log.InitLogs()
+	defer log.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
 

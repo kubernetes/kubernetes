@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flow"
 )
 
 const (
@@ -58,7 +58,7 @@ type RESTClient struct {
 	Client *http.Client
 
 	// TODO extract this into a wrapper interface via the RESTClient interface in kubectl.
-	Throttle util.RateLimiter
+	Throttle flow.RateLimiter
 }
 
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
@@ -72,9 +72,9 @@ func NewRESTClient(baseURL *url.URL, groupVersion unversioned.GroupVersion, c ru
 	base.RawQuery = ""
 	base.Fragment = ""
 
-	var throttle util.RateLimiter
+	var throttle flow.RateLimiter
 	if maxQPS > 0 {
-		throttle = util.NewTokenBucketRateLimiter(maxQPS, maxBurst)
+		throttle = flow.NewTokenBucketRateLimiter(maxQPS, maxBurst)
 	}
 	return &RESTClient{
 		baseURL:      &base,
@@ -97,7 +97,7 @@ func readExpBackoffConfig() BackoffManager {
 		return &NoBackoff{}
 	} else {
 		return &URLBackoff{
-			Backoff: util.NewBackOff(
+			Backoff: flow.NewBackOff(
 				time.Duration(backoffBaseInt)*time.Second,
 				time.Duration(backoffDurationInt)*time.Second)}
 	}

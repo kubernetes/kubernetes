@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flow"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -137,11 +137,11 @@ func (q *UniqueQueue) Head() (TimedValue, bool) {
 // of execution. It is also rate limited.
 type RateLimitedTimedQueue struct {
 	queue   UniqueQueue
-	limiter util.RateLimiter
+	limiter flow.RateLimiter
 }
 
 // Creates new queue which will use given RateLimiter to oversee execution.
-func NewRateLimitedTimedQueue(limiter util.RateLimiter) *RateLimitedTimedQueue {
+func NewRateLimitedTimedQueue(limiter flow.RateLimiter) *RateLimitedTimedQueue {
 	return &RateLimitedTimedQueue{
 		queue: UniqueQueue{
 			queue: TimedQueue{},

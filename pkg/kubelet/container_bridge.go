@@ -24,7 +24,7 @@ import (
 	"regexp"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/os"
 )
 
 var cidrRegexp = regexp.MustCompile(`inet ([0-9a-fA-F.:]*/[0-9]*)`)
@@ -46,7 +46,7 @@ func createCBR0(wantCIDR *net.IPNet) error {
 	// restart docker
 	// For now just log the error. The containerRuntime check will catch docker failures.
 	// TODO (dawnchen) figure out what we should do for rkt here.
-	if util.UsingSystemdInitSystem() {
+	if osutil.UsingSystemdInitSystem() {
 		if err := exec.Command("systemctl", "restart", "docker").Run(); err != nil {
 			glog.Error(err)
 		}

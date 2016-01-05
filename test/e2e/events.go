@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -39,7 +39,7 @@ var _ = Describe("Events", func() {
 		podClient := framework.Client.Pods(framework.Namespace.Name)
 
 		By("creating the pod")
-		name := "send-events-" + string(util.NewUUID())
+		name := "send-events-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{

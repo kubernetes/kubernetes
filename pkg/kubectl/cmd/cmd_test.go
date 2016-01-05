@@ -38,7 +38,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	iotools "k8s.io/kubernetes/pkg/util/io"
 )
 
 func initTestErrorHandler(t *testing.T) {
@@ -576,7 +576,7 @@ func ExamplePrintServiceWithNamespacesAndLabels() {
 				Status: api.ServiceStatus{},
 			}},
 	}
-	ld := util.NewLineDelimiter(os.Stdout, "|")
+	ld := iotools.NewLineDelimiter(os.Stdout, "|")
 	defer ld.Flush()
 	err := f.PrintObject(cmd, svc, ld)
 	if err != nil {

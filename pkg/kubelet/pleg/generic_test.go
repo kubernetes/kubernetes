@@ -23,7 +23,7 @@ import (
 	"time"
 
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 const (
@@ -79,7 +79,7 @@ func verifyEvents(t *testing.T, expected, actual []*PodLifecycleEvent) {
 	sort.Sort(sortableEvents(expected))
 	sort.Sort(sortableEvents(actual))
 	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("Actual events differ from the expected; diff: %v", util.ObjectDiff(expected, actual))
+		t.Errorf("Actual events differ from the expected; diff: %v", diff.ObjectDiff(expected, actual))
 	}
 }
 

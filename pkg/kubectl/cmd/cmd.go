@@ -22,7 +22,7 @@ import (
 	"github.com/golang/glog"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flags"
 
 	"github.com/spf13/cobra"
 )
@@ -147,7 +147,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	f.BindFlags(cmds.PersistentFlags())
 
 	// From this point and forward we get warnings on flags that contain "_" separators
-	cmds.SetGlobalNormalizationFunc(util.WarnWordSepNormalizeFunc)
+	cmds.SetGlobalNormalizationFunc(flags.WarnWordSepNormalizeFunc)
 
 	cmds.AddCommand(NewCmdGet(f, out))
 	cmds.AddCommand(NewCmdDescribe(f, out))

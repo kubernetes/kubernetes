@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -29,7 +29,7 @@ var _ = Describe("Secrets", func() {
 	f := NewFramework("secrets")
 
 	It("should be consumable from pods [Conformance]", func() {
-		name := "secret-test-" + string(util.NewUUID())
+		name := "secret-test-" + string(uuid.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
 
@@ -59,7 +59,7 @@ var _ = Describe("Secrets", func() {
 
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name: "pod-secrets-" + string(util.NewUUID()),
+				Name: "pod-secrets-" + string(uuid.NewUUID()),
 			},
 			Spec: api.PodSpec{
 				Volumes: []api.Volume{

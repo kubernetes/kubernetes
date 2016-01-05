@@ -22,7 +22,8 @@ import (
 	"runtime"
 
 	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flags"
+	"k8s.io/kubernetes/pkg/util/log"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"k8s.io/kubernetes/contrib/mesos/pkg/controllermanager"
@@ -40,9 +41,9 @@ func main() {
 	s := controllermanager.NewCMServer()
 	s.AddFlags(pflag.CommandLine)
 
-	util.InitFlags()
-	util.InitLogs()
-	defer util.FlushLogs()
+	flags.InitFlags()
+	log.InitLogs()
+	defer log.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
 

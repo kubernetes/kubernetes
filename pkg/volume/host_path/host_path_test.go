@@ -29,7 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/os"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -91,7 +92,7 @@ func TestRecycler(t *testing.T) {
 }
 
 func TestDeleter(t *testing.T) {
-	tempPath := fmt.Sprintf("/tmp/hostpath/%s", util.NewUUID())
+	tempPath := fmt.Sprintf("/tmp/hostpath/%s", uuid.NewUUID())
 	defer os.RemoveAll(tempPath)
 	err := os.MkdirAll(tempPath, 0750)
 	if err != nil {
@@ -116,7 +117,7 @@ func TestDeleter(t *testing.T) {
 	if err := deleter.Delete(); err != nil {
 		t.Errorf("Mock Recycler expected to return nil but got %s", err)
 	}
-	if exists, _ := util.FileExists("foo"); exists {
+	if exists, _ := osutil.FileExists("foo"); exists {
 		t.Errorf("Temp path expected to be deleted, but was found at %s", tempPath)
 	}
 }

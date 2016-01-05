@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 
@@ -60,7 +60,7 @@ var _ = Describe("ServiceAccounts [Flaky]", func() {
 
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name: "pod-service-account-" + string(util.NewUUID()),
+				Name: "pod-service-account-" + string(uuid.NewUUID()),
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{

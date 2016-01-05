@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -263,7 +263,7 @@ func (r *hostPathProvisioner) Provision(pv *api.PersistentVolume) error {
 }
 
 func (r *hostPathProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
-	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", util.NewUUID())
+	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", uuid.NewUUID())
 	return &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "pv-hostpath-",
