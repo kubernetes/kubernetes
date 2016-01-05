@@ -972,7 +972,7 @@ func (r podResponseChecker) checkAllResponses() (done bool, err error) {
 // version.
 //
 // TODO(18726): This should be incorporated into client.VersionInterface.
-func serverVersionGTE(v semver.Version, c client.VersionInterface) (bool, error) {
+func serverVersionGTE(v semver.Version, c client.ServerVersionInterface) (bool, error) {
 	serverVersion, err := c.ServerVersion()
 	if err != nil {
 		return false, fmt.Errorf("Unable to get server version: %v", err)
