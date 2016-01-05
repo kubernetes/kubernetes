@@ -40,9 +40,10 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
+	"k8s.io/kubernetes/pkg/util/networking"
+	"k8s.io/kubernetes/pkg/util/testutil"
 	"k8s.io/kubernetes/pkg/util/wsstream"
 	"k8s.io/kubernetes/pkg/version"
 
@@ -61,7 +62,7 @@ func monitorFilter(action, resource string) restful.FilterFunction {
 		reqStart := time.Now()
 		chain.ProcessFilter(req, res)
 		httpCode := res.StatusCode()
-		metrics.Monitor(&action, &resource, util.GetClient(req.Request), &httpCode, reqStart)
+		metrics.Monitor(&action, &resource, networking.GetClient(req.Request), &httpCode, reqStart)
 	}
 }
 
@@ -354,7 +355,7 @@ func write(statusCode int, groupVersion unversioned.GroupVersion, codec runtime.
 		if wsstream.IsWebSocketRequest(req) {
 			r := wsstream.NewReader(out, true)
 			if err := r.Copy(w, req); err != nil {
-				util.HandleError(fmt.Errorf("error encountered while streaming results via websocket: %v", err))
+				testutil.HandleError(fmt.Errorf("error encountered while streaming results via websocket: %v", err))
 			}
 			return
 		}
@@ -429,7 +430,7 @@ func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) int {
 // errorJSONFatal renders an error to the response, and if codec fails will render plaintext.
 // Returns the HTTP status code of the error.
 func errorJSONFatal(err error, codec runtime.Codec, w http.ResponseWriter) int {
-	util.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
+	testutil.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
 	status := errToAPIStatus(err)
 	code := int(status.Code)
 	output, err := runtime.Encode(codec, status)

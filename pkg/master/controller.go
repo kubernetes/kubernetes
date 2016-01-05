@@ -30,8 +30,11 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service"
 	servicecontroller "k8s.io/kubernetes/pkg/registry/service/ipallocator/controller"
 	portallocatorcontroller "k8s.io/kubernetes/pkg/registry/service/portallocator/controller"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/funcs"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/networking"
+	"k8s.io/kubernetes/pkg/util/testutil"
+	"k8s.io/kubernetes/pkg/util/timeutil"
 
 	"github.com/golang/glog"
 )
@@ -51,7 +54,7 @@ type Controller struct {
 
 	ServiceNodePortRegistry service.RangeRegistry
 	ServiceNodePortInterval time.Duration
-	ServiceNodePortRange    util.PortRange
+	ServiceNodePortRange    networking.PortRange
 
 	EndpointRegistry endpoint.Registry
 	EndpointInterval time.Duration
@@ -65,7 +68,7 @@ type Controller struct {
 	PublicServicePort         int
 	KubernetesServiceNodePort int
 
-	runner *util.Runner
+	runner *funcs.Runner
 }
 
 // Start begins the core controller loops that must exist for bootstrapping
@@ -92,18 +95,18 @@ func (c *Controller) Start() {
 		glog.Errorf("Unable to perform initial Kubernetes service initialization: %v", err)
 	}
 
-	c.runner = util.NewRunner(c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
+	c.runner = funcs.NewRunner(c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
 	c.runner.Start()
 }
 
 // RunKubernetesService periodically updates the kubernetes service
 func (c *Controller) RunKubernetesService(ch chan struct{}) {
-	util.Until(func() {
+	timeutil.Until(func() {
 		// Service definition is not reconciled after first
 		// run, ports and type will be corrected only during
 		// start.
 		if err := c.UpdateKubernetesService(false); err != nil {
-			util.HandleError(fmt.Errorf("unable to sync kubernetes service: %v", err))
+			testutil.HandleError(fmt.Errorf("unable to sync kubernetes service: %v", err))
 		}
 	}, c.EndpointInterval, ch)
 }

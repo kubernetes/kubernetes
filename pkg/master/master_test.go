@@ -44,8 +44,8 @@ import (
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/networking"
 
 	"github.com/emicklei/go-restful"
 	"github.com/stretchr/testify/assert"
@@ -110,7 +110,7 @@ func TestNew(t *testing.T) {
 	assert.Equal(master.ServiceReadWriteIP, config.ServiceReadWriteIP)
 
 	// These functions should point to the same memory location
-	masterDialer, _ := util.Dialer(master.ProxyTransport)
+	masterDialer, _ := networking.Dialer(master.ProxyTransport)
 	masterDialerFunc := fmt.Sprintf("%p", masterDialer)
 	configDialerFunc := fmt.Sprintf("%p", config.ProxyDialer)
 	assert.Equal(masterDialerFunc, configDialerFunc)
@@ -164,7 +164,7 @@ func TestNewBootstrapController(t *testing.T) {
 	master, etcdserver, _, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	portRange := util.PortRange{Base: 10, Size: 10}
+	portRange := networking.PortRange{Base: 10, Size: 10}
 
 	master.namespaceRegistry = namespace.NewRegistry(nil)
 	master.serviceRegistry = registrytest.NewServiceRegistry()

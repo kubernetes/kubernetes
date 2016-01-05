@@ -29,9 +29,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/iptables"
+	"k8s.io/kubernetes/pkg/util/networking"
+	"k8s.io/kubernetes/pkg/util/testutil"
 )
 
 type portal struct {
@@ -137,12 +138,12 @@ func IsProxyLocked(err error) bool {
 // if iptables fails to update or acquire the initial lock. Once a proxier is
 // created, it will keep iptables up to date in the background and will not
 // terminate if a particular iptables call fails.
-func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, pr util.PortRange, syncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
+func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, pr networking.PortRange, syncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
 		return nil, ErrProxyOnLocalhost
 	}
 
-	hostIP, err := util.ChooseHostInterface()
+	hostIP, err := networking.ChooseHostInterface()
 	if err != nil {
 		return nil, fmt.Errorf("failed to select a host interface: %v", err)
 	}
@@ -161,7 +162,7 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, proxyPorts PortAllocator, syncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
 	// convenient to pass nil for tests..
 	if proxyPorts == nil {
-		proxyPorts = newPortAllocator(util.PortRange{})
+		proxyPorts = newPortAllocator(networking.PortRange{})
 	}
 	// Set up the iptables foundations we need.
 	if err := iptablesInit(iptables); err != nil {
@@ -333,7 +334,7 @@ func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol
 
 	glog.V(2).Infof("Proxying for service %q on %s port %d", service, protocol, portNum)
 	go func(service proxy.ServicePortName, proxier *Proxier) {
-		defer util.HandleCrash()
+		defer testutil.HandleCrash()
 		atomic.AddInt32(&proxier.numProxyLoops, 1)
 		sock.ProxyLoop(service, si, proxier)
 		atomic.AddInt32(&proxier.numProxyLoops, -1)

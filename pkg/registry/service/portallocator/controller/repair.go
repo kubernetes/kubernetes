@@ -23,20 +23,22 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/networking"
+	"k8s.io/kubernetes/pkg/util/testutil"
+	"k8s.io/kubernetes/pkg/util/timeutil"
 )
 
 // See ipallocator/controller/repair.go; this is a copy for ports.
 type Repair struct {
 	interval  time.Duration
 	registry  service.Registry
-	portRange util.PortRange
+	portRange networking.PortRange
 	alloc     service.RangeRegistry
 }
 
 // NewRepair creates a controller that periodically ensures that all ports are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
-func NewRepair(interval time.Duration, registry service.Registry, portRange util.PortRange, alloc service.RangeRegistry) *Repair {
+func NewRepair(interval time.Duration, registry service.Registry, portRange networking.PortRange, alloc service.RangeRegistry) *Repair {
 	return &Repair{
 		interval:  interval,
 		registry:  registry,
@@ -47,9 +49,9 @@ func NewRepair(interval time.Duration, registry service.Registry, portRange util
 
 // RunUntil starts the controller until the provided ch is closed.
 func (c *Repair) RunUntil(ch chan struct{}) {
-	util.Until(func() {
+	timeutil.Until(func() {
 		if err := c.RunOnce(); err != nil {
-			util.HandleError(err)
+			testutil.HandleError(err)
 		}
 	}, c.interval, ch)
 }
@@ -99,11 +101,11 @@ func (c *Repair) RunOnce() error {
 			case portallocator.ErrAllocated:
 				// TODO: send event
 				// port is broken, reallocate
-				util.HandleError(fmt.Errorf("the port %d for service %s/%s was assigned to multiple services; please recreate", port, svc.Name, svc.Namespace))
+				testutil.HandleError(fmt.Errorf("the port %d for service %s/%s was assigned to multiple services; please recreate", port, svc.Name, svc.Namespace))
 			case portallocator.ErrNotInRange:
 				// TODO: send event
 				// port is broken, reallocate
-				util.HandleError(fmt.Errorf("the port %d for service %s/%s is not within the port range %v; please recreate", port, svc.Name, svc.Namespace, c.portRange))
+				testutil.HandleError(fmt.Errorf("the port %d for service %s/%s is not within the port range %v; please recreate", port, svc.Name, svc.Namespace, c.portRange))
 			case portallocator.ErrFull:
 				// TODO: send event
 				return fmt.Errorf("the port range %v is full; you must widen the port range in order to create new services", c.portRange)

@@ -41,8 +41,10 @@ import (
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	"k8s.io/kubernetes/pkg/util/networking"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/timeutil"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -58,7 +60,7 @@ type ProxyServerConfig struct {
 	ResourceContainer              string
 	Master                         string
 	Kubeconfig                     string
-	PortRange                      util.PortRange
+	PortRange                      networking.PortRange
 	HostnameOverride               string
 	ProxyMode                      string
 	IptablesSyncPeriod             time.Duration
@@ -324,12 +326,12 @@ func (s *ProxyServer) Run(_ []string) error {
 
 	// Start up Healthz service if requested
 	if s.Config.HealthzPort > 0 {
-		go util.Until(func() {
+		go timeutil.Until(func() {
 			err := http.ListenAndServe(s.Config.HealthzBindAddress.String()+":"+strconv.Itoa(s.Config.HealthzPort), nil)
 			if err != nil {
 				glog.Errorf("Starting health server failed: %v", err)
 			}
-		}, 5*time.Second, util.NeverStop)
+		}, 5*time.Second, timeutil.NeverStop)
 	}
 
 	// Tune conntrack, if requested

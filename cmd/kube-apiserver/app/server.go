@@ -53,7 +53,9 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/networking"
+	"k8s.io/kubernetes/pkg/util/secure"
+	"k8s.io/kubernetes/pkg/util/testutil"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -106,11 +108,11 @@ type APIServer struct {
 	CorsAllowedOriginList      []string
 	AllowPrivileged            bool
 	ServiceClusterIPRange      net.IPNet // TODO: make this a list
-	ServiceNodePortRange       util.PortRange
+	ServiceNodePortRange       networking.PortRange
 	EnableLogsSupport          bool
 	MasterServiceNamespace     string
 	MasterCount                int
-	RuntimeConfig              util.ConfigurationMap
+	RuntimeConfig              ConfigurationMap
 	KubeletConfig              kubeletclient.KubeletClientConfig
 	EnableProfiling            bool
 	EnableWatchCache           bool
@@ -142,7 +144,7 @@ func NewAPIServer() *APIServer {
 		CertDirectory:          "/var/run/kubernetes",
 		StorageVersions:        latest.AllPreferredGroupVersions(),
 
-		RuntimeConfig: make(util.ConfigurationMap),
+		RuntimeConfig: make(ConfigurationMap),
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:        ports.KubeletPort,
 			EnableHttps: true,
@@ -367,7 +369,7 @@ func (s *APIServer) Run(_ []string) error {
 	// is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
 	// interface as valid public addr for master (see: util#ValidPublicAddrForMaster)
 	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
-		hostIP, err := util.ValidPublicAddrForMaster(s.BindAddress)
+		hostIP, err := networking.ValidPublicAddrForMaster(s.BindAddress)
 		if err != nil {
 			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
 				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
@@ -627,7 +629,7 @@ func (s *APIServer) Run(_ []string) error {
 		}
 
 		if len(s.ClientCAFile) > 0 {
-			clientCAs, err := util.CertPoolFromFile(s.ClientCAFile)
+			clientCAs, err := secure.CertPoolFromFile(s.ClientCAFile)
 			if err != nil {
 				glog.Fatalf("Unable to load client CA file: %v", err)
 			}
@@ -647,7 +649,7 @@ func (s *APIServer) Run(_ []string) error {
 			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}
 			// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
 			// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-			if err := util.GenerateSelfSignedCert(config.PublicAddress.String(), s.TLSCertFile, s.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
+			if err := secure.GenerateSelfSignedCert(config.PublicAddress.String(), s.TLSCertFile, s.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
 				glog.Errorf("Unable to generate self signed cert: %v", err)
 			} else {
 				glog.Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
@@ -655,7 +657,7 @@ func (s *APIServer) Run(_ []string) error {
 		}
 
 		go func() {
-			defer util.HandleCrash()
+			defer testutil.HandleCrash()
 			for {
 				// err == systemd.SdNotifyNoSocket when not running on a systemd system
 				if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {

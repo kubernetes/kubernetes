@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/networking"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -77,7 +77,7 @@ func TestNew(t *testing.T) {
 	assert.Equal(s.ServiceReadWriteIP, config.ServiceReadWriteIP)
 
 	// These functions should point to the same memory location
-	serverDialer, _ := util.Dialer(s.ProxyTransport)
+	serverDialer, _ := networking.Dialer(s.ProxyTransport)
 	serverDialerFunc := fmt.Sprintf("%p", serverDialer)
 	configDialerFunc := fmt.Sprintf("%p", config.ProxyDialer)
 	assert.Equal(serverDialerFunc, configDialerFunc)

@@ -72,13 +72,17 @@ import (
 	"k8s.io/kubernetes/pkg/util/chmod"
 	"k8s.io/kubernetes/pkg/util/chown"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/flow"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/networking"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/testutil"
+	"k8s.io/kubernetes/pkg/util/timeutil"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/version"
@@ -337,7 +341,7 @@ func NewMainKubelet(
 	}
 
 	procFs := procfs.NewProcFS()
-	imageBackOff := util.NewBackOff(backOffPeriod, MaxContainerBackOff)
+	imageBackOff := flow.NewBackOff(backOffPeriod, MaxContainerBackOff)
 
 	klet.livenessManager = proberesults.NewManager()
 
@@ -444,7 +448,7 @@ func NewMainKubelet(
 	klet.workQueue = queue.NewBasicWorkQueue()
 	klet.podWorkers = newPodWorkers(runtimeCache, klet.syncPod, recorder, klet.workQueue, klet.resyncInterval, backOffPeriod)
 
-	klet.backOff = util.NewBackOff(backOffPeriod, MaxContainerBackOff)
+	klet.backOff = flow.NewBackOff(backOffPeriod, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.Pod, podKillingChannelCapacity)
 	klet.sourcesSeen = sets.NewString()
 	return klet, nil
@@ -620,7 +624,7 @@ type Kubelet struct {
 	syncLoopMonitor atomic.Value
 
 	// Container restart Backoff
-	backOff *util.Backoff
+	backOff *flow.Backoff
 
 	// Channel for sending pods to kill.
 	podKillingCh chan *kubecontainer.Pod
@@ -846,17 +850,17 @@ func (kl *Kubelet) GetNode() (*api.Node, error) {
 
 // Starts garbage collection threads.
 func (kl *Kubelet) StartGarbageCollection() {
-	go util.Until(func() {
+	go timeutil.Until(func() {
 		if err := kl.containerGC.GarbageCollect(); err != nil {
 			glog.Errorf("Container garbage collection failed: %v", err)
 		}
-	}, time.Minute, util.NeverStop)
+	}, time.Minute, timeutil.NeverStop)
 
-	go util.Until(func() {
+	go timeutil.Until(func() {
 		if err := kl.imageManager.GarbageCollect(); err != nil {
 			glog.Errorf("Image garbage collection failed: %v", err)
 		}
-	}, 5*time.Minute, util.NeverStop)
+	}, 5*time.Minute, timeutil.NeverStop)
 }
 
 // initializeModules will initialize internal modules that do not require the container runtime to be up.
@@ -927,14 +931,14 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	if kl.kubeClient != nil {
 		// Start syncing node status immediately, this may set up things the runtime needs to run.
-		go util.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, util.NeverStop)
+		go timeutil.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, timeutil.NeverStop)
 	}
-	go util.Until(kl.syncNetworkStatus, 30*time.Second, util.NeverStop)
-	go util.Until(kl.updateRuntimeUp, 5*time.Second, util.NeverStop)
+	go timeutil.Until(kl.syncNetworkStatus, 30*time.Second, timeutil.NeverStop)
+	go timeutil.Until(kl.updateRuntimeUp, 5*time.Second, timeutil.NeverStop)
 
 	// Start a goroutine responsible for killing pods (that are not properly
 	// handled by pod workers).
-	go util.Until(kl.podKiller, 1*time.Second, util.NeverStop)
+	go timeutil.Until(kl.podKiller, 1*time.Second, timeutil.NeverStop)
 
 	// Start component sync loops.
 	kl.statusManager.Start()
@@ -1642,7 +1646,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	// Kill pods we can't run.
 	if err := canRunPod(pod); err != nil || pod.DeletionTimestamp != nil {
 		if err := kl.killPod(pod, runningPod); err != nil {
-			util.HandleError(err)
+			testutil.HandleError(err)
 		}
 		return err
 	}
@@ -2741,7 +2745,7 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 				}
 
 				if len(node.Status.Addresses) == 0 {
-					ip, err := util.ChooseHostInterface()
+					ip, err := networking.ChooseHostInterface()
 					if err != nil {
 						return err
 					}

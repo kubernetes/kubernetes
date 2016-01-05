@@ -23,7 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/networking"
+	"k8s.io/kubernetes/pkg/util/timeutil"
 )
 
 var (
@@ -52,7 +53,7 @@ func (r *randomAllocator) Release(_ int) {
 // newPortAllocator builds PortAllocator for a given PortRange. If the PortRange is empty
 // then a random port allocator is returned; otherwise, a new range-based allocator
 // is returned.
-func newPortAllocator(r util.PortRange) PortAllocator {
+func newPortAllocator(r networking.PortRange) PortAllocator {
 	if r.Base == 0 {
 		return &randomAllocator{}
 	}
@@ -66,14 +67,14 @@ const (
 )
 
 type rangeAllocator struct {
-	util.PortRange
+	networking.PortRange
 	ports chan int
 	used  big.Int
 	lock  sync.Mutex
 	rand  *rand.Rand
 }
 
-func newPortRangeAllocator(r util.PortRange) PortAllocator {
+func newPortRangeAllocator(r networking.PortRange) PortAllocator {
 	if r.Base == 0 || r.Size == 0 {
 		panic("illegal argument: may not specify an empty port range")
 	}
@@ -82,7 +83,7 @@ func newPortRangeAllocator(r util.PortRange) PortAllocator {
 		ports:     make(chan int, portsBufSize),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
-	go util.Until(func() { ra.fillPorts(util.NeverStop) }, nextFreePortCooldown, util.NeverStop)
+	go timeutil.Until(func() { ra.fillPorts(timeutil.NeverStop) }, nextFreePortCooldown, timeutil.NeverStop)
 	return ra
 }
 

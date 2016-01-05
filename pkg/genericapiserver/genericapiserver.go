@@ -40,7 +40,9 @@ import (
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/ui"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/funcs"
+	"k8s.io/kubernetes/pkg/util/networking"
+	"k8s.io/kubernetes/pkg/util/regex"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/emicklei/go-restful"
@@ -209,7 +211,7 @@ type Config struct {
 	ServiceReadWriteIP net.IP
 
 	// The range of ports to be assigned to services with type=NodePort or greater
-	ServiceNodePortRange util.PortRange
+	ServiceNodePortRange networking.PortRange
 
 	// Used to customize default proxy dial/tls options
 	ProxyDialer          apiserver.ProxyDialerFunc
@@ -234,7 +236,7 @@ type Config struct {
 type GenericAPIServer struct {
 	// "Inputs", Copied from Config
 	ServiceClusterIPRange *net.IPNet
-	ServiceNodePortRange  util.PortRange
+	ServiceNodePortRange  networking.PortRange
 	cacheTimeout          time.Duration
 	MinRequestTimeout     time.Duration
 
@@ -264,7 +266,7 @@ type GenericAPIServer struct {
 	PublicReadWritePort  int
 	ServiceReadWriteIP   net.IP
 	ServiceReadWritePort int
-	masterServices       *util.Runner
+	masterServices       *funcs.Runner
 	ExtraServicePorts    []api.ServicePort
 	ExtraEndpointPorts   []api.EndpointPort
 
@@ -316,7 +318,7 @@ func setDefaults(c *Config) {
 		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
 		// but then that breaks the strict nestedness of ServiceType.
 		// Review post-v1
-		defaultServiceNodePortRange := util.PortRange{Base: 30000, Size: 2768}
+		defaultServiceNodePortRange := networking.PortRange{Base: 30000, Size: 2768}
 		c.ServiceNodePortRange = defaultServiceNodePortRange
 		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ServiceNodePortRange)
 	}
@@ -451,7 +453,7 @@ func NewHandlerContainer(mux *http.ServeMux) *restful.Container {
 func (s *GenericAPIServer) init(c *Config) {
 
 	if c.ProxyDialer != nil || c.ProxyTLSClientConfig != nil {
-		s.ProxyTransport = util.SetTransportDefaults(&http.Transport{
+		s.ProxyTransport = networking.SetTransportDefaults(&http.Transport{
 			Dial:            c.ProxyDialer,
 			TLSClientConfig: c.ProxyTLSClientConfig,
 		})
@@ -484,7 +486,7 @@ func (s *GenericAPIServer) init(c *Config) {
 	// github.com/emicklei/go-restful/blob/GenericAPIServer/examples/restful-basic-authentication.go
 
 	if len(c.CorsAllowedOriginList) > 0 {
-		allowedOriginRegexps, err := util.CompileRegexps(c.CorsAllowedOriginList)
+		allowedOriginRegexps, err := regex.CompileRegexps(c.CorsAllowedOriginList)
 		if err != nil {
 			glog.Fatalf("Invalid CORS allowed origin, --cors-allowed-origins flag was set to %v - %v", strings.Join(c.CorsAllowedOriginList, ","), err)
 		}

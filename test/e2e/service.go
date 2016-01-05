@@ -32,14 +32,15 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/networking"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // This should match whatever the default/configured range is
-var ServiceNodePortRange = util.PortRange{Base: 30000, Size: 2768}
+var ServiceNodePortRange = networking.PortRange{Base: 30000, Size: 2768}
 
 var _ = Describe("Services", func() {
 	f := NewFramework("services")
@@ -1446,7 +1447,7 @@ func NewWebserverTest(client *client.Client, namespace string, serviceName strin
 	t.Client = client
 	t.Namespace = namespace
 	t.ServiceName = serviceName
-	t.TestId = t.ServiceName + "-" + string(util.NewUUID())
+	t.TestId = t.ServiceName + "-" + string(uuid.NewUUID())
 	t.Labels = map[string]string{
 		"testid": t.TestId,
 	}

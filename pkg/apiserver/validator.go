@@ -25,7 +25,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/networking"
 )
 
 // TODO: this basic interface is duplicated in N places.  consolidate?
@@ -59,7 +59,7 @@ func (server *Server) DoServerCheck(rt http.RoundTripper) (probe.Result, string,
 		// TODO(roberthbailey): The servers that use HTTPS are currently the
 		// kubelets, and we should be using a standard kubelet client library
 		// to talk to them rather than a separate http client.
-		transport := util.SetTransportDefaults(&http.Transport{
+		transport := networking.SetTransportDefaults(&http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		})
 

@@ -52,8 +52,12 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flow"
+	"k8s.io/kubernetes/pkg/util/log"
+	"k8s.io/kubernetes/pkg/util/networking"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/testutil"
+	"k8s.io/kubernetes/pkg/util/timeutil"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
@@ -153,7 +157,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	}
 
 	// The caller of master.New should guarantee pulicAddress is properly set
-	hostIP, err := util.ValidPublicAddrForMaster(publicAddress)
+	hostIP, err := networking.ValidPublicAddrForMaster(publicAddress)
 	if err != nil {
 		glog.Fatalf("Unable to find suitable network address.error='%v' . "+
 			"Fail to get a valid public address for master.", err)
@@ -184,13 +188,13 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 
 	// ensure the service endpoints are sync'd several times within the window that the integration tests wait
 	go endpointcontroller.NewEndpointController(cl, controller.NoResyncPeriodFunc).
-		Run(3, util.NeverStop)
+		Run(3, timeutil.NeverStop)
 
 	// TODO: Write an integration test for the replication controllers watch.
 	go replicationcontroller.NewReplicationManager(cl, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas).
-		Run(3, util.NeverStop)
+		Run(3, timeutil.NeverStop)
 
-	nodeController := nodecontroller.NewNodeController(nil, cl, 5*time.Minute, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(),
+	nodeController := nodecontroller.NewNodeController(nil, cl, 5*time.Minute, flow.NewFakeRateLimiter(), flow.NewFakeRateLimiter(),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
 	nodeController.Run(5 * time.Second)
 	cadvisorInterface := new(cadvisor.Fake)
@@ -953,12 +957,12 @@ func main() {
 	addFlags(pflag.CommandLine)
 
 	util.InitFlags()
-	util.ReallyCrash = true
-	util.InitLogs()
-	defer util.FlushLogs()
+	testutil.ReallyCrash = true
+	log.InitLogs()
+	defer log.FlushLogs()
 
 	go func() {
-		defer util.FlushLogs()
+		defer log.FlushLogs()
 		time.Sleep(maxTestTimeout)
 		glog.Fatalf("This test has timed out.")
 	}()

@@ -29,7 +29,8 @@ import (
 	"github.com/coreos/go-oidc/oidc"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/auth/user"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/networking"
+	"k8s.io/kubernetes/pkg/util/secure"
 )
 
 var (
@@ -62,7 +63,7 @@ func New(issuerURL, clientID, caFile, usernameClaim string) (*OIDCAuthenticator,
 	}
 
 	if caFile != "" {
-		roots, err = util.CertPoolFromFile(caFile)
+		roots, err = secure.CertPoolFromFile(caFile)
 		if err != nil {
 			glog.Errorf("Failed to read the CA file: %v", err)
 		}
@@ -72,7 +73,7 @@ func New(issuerURL, clientID, caFile, usernameClaim string) (*OIDCAuthenticator,
 	}
 
 	// Copied from http.DefaultTransport.
-	tr := util.SetTransportDefaults(&http.Transport{
+	tr := networking.SetTransportDefaults(&http.Transport{
 		// According to golang's doc, if RootCAs is nil,
 		// TLS uses the host's root CA set.
 		TLSClientConfig: &tls.Config{RootCAs: roots},
