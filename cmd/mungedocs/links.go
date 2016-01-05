@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -33,11 +34,12 @@ var (
 )
 
 func processLink(in string, filePath string) (string, error) {
-	var err error
+	var errs []string
 	out := linkRE.ReplaceAllStringFunc(in, func(in string) string {
+		var err error
 		match := linkRE.FindStringSubmatch(in)
 		if match == nil {
-			err = fmt.Errorf("Detected this line had a link, but unable to parse, %v", in)
+			errs = append(errs, fmt.Sprintf("Detected this line had a link, but unable to parse, %v", in))
 			return ""
 		}
 		// match[0] is the entire expression;
@@ -56,8 +58,8 @@ func processLink(in string, filePath string) (string, error) {
 
 		u, terr := url.Parse(linkText)
 		if terr != nil {
-			err = fmt.Errorf("link %q is unparsable: %v", linkText, terr)
-			return ""
+			errs = append(errs, fmt.Sprintf("link %q is unparsable: %v", linkText, terr))
+			return in
 		}
 
 		if u.Host != "" && u.Host != "github.com" {
@@ -69,8 +71,8 @@ func processLink(in string, filePath string) (string, error) {
 		if u.Path != "" && !strings.HasPrefix(linkText, "TODO:") {
 			newPath, targetExists := checkPath(filePath, path.Clean(u.Path))
 			if !targetExists {
-				err = fmt.Errorf("%q: target not found", linkText)
-				return ""
+				errs = append(errs, fmt.Sprintf("%q: target not found", linkText))
+				return in
 			}
 			u.Path = newPath
 			if strings.HasPrefix(u.Path, "/") {
@@ -87,7 +89,8 @@ func processLink(in string, filePath string) (string, error) {
 				dir := path.Dir(filePath)
 				suggestedVisibleText, err = makeRepoRelative(path.Join(dir, u.Path), filePath)
 				if err != nil {
-					return ""
+					errs = append(errs, fmt.Sprintf("%q: unable to make path relative", filePath))
+					return in
 				}
 			} else {
 				suggestedVisibleText = u.Path
@@ -109,8 +112,8 @@ func processLink(in string, filePath string) (string, error) {
 
 		return fmt.Sprintf("[%s](%s)", visibleText, linkText+altText)
 	})
-	if out == "" {
-		return in, err
+	if len(errs) != 0 {
+		return "", errors.New(strings.Join(errs, ","))
 	}
 	return out, nil
 }
