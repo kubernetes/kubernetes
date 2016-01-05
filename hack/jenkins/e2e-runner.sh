@@ -19,6 +19,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -o xtrace
 
 echo "--------------------------------------------------------------------------------"
 echo "Test Environment:"
@@ -67,7 +68,10 @@ if [[ "${E2E_UP,,}" == "true" || "${JENKINS_FORCE_GET_TARS:-}" =~ ^[yY]$ ]]; the
         # At this point, we want to have the following vars set:
         # - bucket
         # - build_version
-        gsutil -m cp gs://kubernetes-release/${bucket}/${build_version}/kubernetes.tar.gz gs://kubernetes-release/${bucket}/${build_version}/kubernetes-test.tar.gz .
+        gsutil -mq cp \
+            "gs://kubernetes-release/${bucket}/${build_version}/kubernetes.tar.gz" \
+            "gs://kubernetes-release/${bucket}/${build_version}/kubernetes-test.tar.gz" \
+            .
 
         # Set by GKE-CI to change the CLUSTER_API_VERSION to the git version
         if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
