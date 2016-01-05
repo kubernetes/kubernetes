@@ -113,6 +113,17 @@ func (q *Type) Get() (item interface{}, shutdown bool) {
 	return item, false
 }
 
+// Get the head of the queue
+func (q *Type) Peek() interface{} {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+	if len(q.queue) == 0 {
+		return nil
+	}
+	item := q.queue[0]
+	return item
+}
+
 // Done marks item as done processing, and if it has been marked as dirty again
 // while it was being processed, it will be re-added to the queue for
 // re-processing.
