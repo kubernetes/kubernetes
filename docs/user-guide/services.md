@@ -423,30 +423,79 @@ as of Kubernetes 1.0.
 
 ### Type NodePort
 
-If you set the `type` field to `"NodePort"`, the Kubernetes master will
+If you set the `spec.type` field to `"NodePort"`, the Kubernetes master will
 allocate a port from a flag-configured range (default: 30000-32767), and each
 Node will proxy that port (the same port number on every Node) into your `Service`.
-That port will be reported in your `Service`'s `spec.ports[*].nodePort` field.
+Here is an example of a `Service` definition of type `"NodePort"` that can be issued using the
+[`kubectl run`] (https://cloud.google.com/container-engine/docs/kubectl/run) command.
 
-If you want a specific port number, you can specify a value in the `nodePort`
-field, and the system will allocate you that port or else the API transaction
-will fail (i.e. you need to take care about possible port collisions yourself).
-The value you specify must be in the configured range for node ports.
+```json
+{
+    "kind": "Service",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "my-service"
+    },
+    "spec": {
+        "type" : "NodePort",
+        "selector": {
+            "app": "MyApp"
+        },
+        "ports": [
+            {
+                "protocol": "TCP",
+                "port": 80,
+                "targetPort": 9376
+            }
+        ]
+    }
+}
+```
+Kubernetes will provide the port that it picked, in the kubectl command's response message, but you can always
+'query' the service using the following command.That port will be reported in your `Service`'s `spec.ports[*].nodePort` field.
 
-This gives developers the freedom to set up their own load balancers, to
-configure cloud environments that are not fully supported by Kubernetes, or
-even to just expose one or more nodes' IPs directly.
+```bash
+kubectl get service -o template <NAME_OF_YOUR_SERVICE> --template={{.spec.ports}}
+```
 
-Note that this Service will be visible as both `<NodeIP>:spec.ports[*].nodePort`
+On the other hand, if you want to create a `Service` that is going to listen on a specific port number, you can specify a value in the `spec.ports[*].nodePort` field on your create command, the system will allocate you that port or else the API transaction will fail (i.e. you need to take care about possible port collisions yourself).The value you specify must be in the configured range for node ports. 
+
+Here is an example of a `Service` definition of type `"NodePort"` with a predefined port (33000) that can be issued using the [`kubectl run`] (https://cloud.google.com/container-engine/docs/kubectl/run) command.
+
+```json
+{
+    "kind": "Service",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "my-service"
+    },
+    "spec": {
+        "type" : "NodePort",
+        "selector": {
+            "app": "MyApp"
+        },
+        "ports": [
+            {
+                "protocol": "TCP",
+                "port": 80,
+                "targetPort": 9376,
+                "nodePort": 33000
+            }
+        ]
+    }
+}
+```
+
+Note that in both examples the Service will be visible as both `<NodeIP>:spec.ports[*].nodePort`
 and `spec.clusterIp:spec.ports[*].port`.
+
+In general, this type of Service definition, gives developers the freedom to set up their own load balancers, to
+configure cloud environments that are not fully supported by Kubernetes, or even to just expose one or more nodes' IPs directly.
 
 ### Type LoadBalancer
 
-On cloud providers which support external load balancers, setting the `type`
-field to `"LoadBalancer"` will provision a load balancer for your `Service`.
-The actual creation of the load balancer happens asynchronously, and
-information about the provisioned balancer will be published in the `Service`'s
-`status.loadBalancer` field.  For example:
+On cloud providers which support external load balancers, setting the `type` field to `"LoadBalancer"` will provision a load balancer for your `Service`.
+The actual creation of the load balancer happens asynchronously, and information about the provisioned balancer will be published in the `Service`'s `status.loadBalancer` field.  For example:
 
 ```json
 {
