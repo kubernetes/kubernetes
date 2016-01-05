@@ -30,59 +30,155 @@ import (
 )
 
 func TestSetDefaultDaemonSet(t *testing.T) {
+	defaultIntOrString := intstr.FromInt(1)
+	defaultLabels := map[string]string{"foo": "bar"}
+	period := int64(v1.DefaultTerminationGracePeriodSeconds)
+	defaultTemplate := &v1.PodTemplateSpec{
+		Spec: v1.PodSpec{
+			DNSPolicy:                     v1.DNSClusterFirst,
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			SecurityContext:               &v1.PodSecurityContext{},
+			TerminationGracePeriodSeconds: &period,
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Labels: defaultLabels,
+		},
+	}
 	tests := []struct {
-		ds                 *DaemonSet
-		expectLabelsChange bool
+		original *DaemonSet
+		expected *DaemonSet
 	}{
-		{
-			ds: &DaemonSet{
+		{ // Labels change/defaulting test.
+			original: &DaemonSet{
 				Spec: DaemonSetSpec{
-					Template: &v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
-							Labels: map[string]string{
-								"foo": "bar",
-							},
-						},
-					},
+					Template: defaultTemplate,
 				},
 			},
-			expectLabelsChange: true,
+			expected: &DaemonSet{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: DaemonSetSpec{
+					Selector: &LabelSelector{
+						MatchLabels: defaultLabels,
+					},
+					Template: defaultTemplate,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
+					UniqueLabelKey: newString(DefaultDaemonSetUniqueLabelKey),
+				},
+			},
 		},
-		{
-			ds: &DaemonSet{
+		{ // Labels change/defaulting test.
+			original: &DaemonSet{
 				ObjectMeta: v1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
 				},
 				Spec: DaemonSetSpec{
-					Template: &v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
-							Labels: map[string]string{
-								"foo": "bar",
-							},
+					Template: defaultTemplate,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							MaxUnavailable: &defaultIntOrString,
 						},
 					},
 				},
 			},
-			expectLabelsChange: false,
+			expected: &DaemonSet{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{
+						"bar": "foo",
+					},
+				},
+				Spec: DaemonSetSpec{
+					Selector: &LabelSelector{
+						MatchLabels: defaultLabels,
+					},
+					Template: defaultTemplate,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
+					UniqueLabelKey: newString(DefaultDaemonSetUniqueLabelKey),
+				},
+			},
+		},
+		{ // Update strategy.
+			original: &DaemonSet{},
+			expected: &DaemonSet{
+				Spec: DaemonSetSpec{
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
+					UniqueLabelKey: newString(DefaultDaemonSetUniqueLabelKey),
+				},
+			},
+		},
+		{ // Update strategy.
+			original: &DaemonSet{
+				Spec: DaemonSetSpec{
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						RollingUpdate: &RollingUpdateDaemonSet{},
+					},
+				},
+			},
+			expected: &DaemonSet{
+				Spec: DaemonSetSpec{
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
+					UniqueLabelKey: newString(DefaultDaemonSetUniqueLabelKey),
+				},
+			},
+		},
+		{ // Custom unique label key.
+			original: &DaemonSet{
+				Spec: DaemonSetSpec{
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						RollingUpdate: &RollingUpdateDaemonSet{},
+					},
+					UniqueLabelKey: newString("customDaemonSetKey"),
+				},
+			},
+			expected: &DaemonSet{
+				Spec: DaemonSetSpec{
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
+					UniqueLabelKey: newString("customDaemonSetKey"),
+				},
+			},
 		},
 	}
 
-	for _, test := range tests {
-		ds := test.ds
-		obj2 := roundTrip(t, runtime.Object(ds))
-		ds2, ok := obj2.(*DaemonSet)
+	for i, test := range tests {
+		original := test.original
+		expected := test.expected
+		obj2 := roundTrip(t, runtime.Object(original))
+		got, ok := obj2.(*DaemonSet)
 		if !ok {
-			t.Errorf("unexpected object: %v", ds2)
+			t.Errorf("(%d) unexpected object: %v", i, got)
 			t.FailNow()
 		}
-		if test.expectLabelsChange != reflect.DeepEqual(ds2.Labels, ds2.Spec.Template.Labels) {
-			if test.expectLabelsChange {
-				t.Errorf("expected: %v, got: %v", ds2.Spec.Template.Labels, ds2.Labels)
-			} else {
-				t.Errorf("unexpected equality: %v", ds.Labels)
-			}
+		if !reflect.DeepEqual(got.Spec, expected.Spec) {
+			t.Errorf("(%d) got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", i, got.Spec, expected.Spec)
 		}
 	}
 }

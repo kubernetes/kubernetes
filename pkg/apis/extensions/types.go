@@ -312,11 +312,11 @@ type DaemonSetUpdateStrategy struct {
 	// Type of daemon set update. Only "RollingUpdate" is supported at this time. Default is RollingUpdate.
 	Type DaemonSetUpdateStrategyType `json:"type,omitempty"`
 
-	// Rolling update config params. Present only if DeploymentStrategyType =
+	// Rolling update config params. Present only if DaemonSetUpdateStrategy =
 	// RollingUpdate.
 	//---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
-	// to be. Same as DeploymentStrategy.RollingUpdate
+	// to be. Same as DeploymentStrategy.RollingUpdate.
 	RollingUpdate *RollingUpdateDaemonSet `json:"rollingUpdate,omitempty"`
 }
 
@@ -324,7 +324,7 @@ type DaemonSetUpdateStrategyType string
 
 const (
 	// Replace the old daemons by new ones using rolling update i.e replace them on each node one after the other.
-	RollingUpdateDaemonSetUpdateStrategyType DaemonSetUpdateStrategyType = "RollingUpdate"
+	RollingUpdateDaemonSetStrategyType DaemonSetUpdateStrategyType = "RollingUpdate"
 )
 
 // Spec to control the desired behavior of daemon set rolling update.
@@ -333,6 +333,7 @@ type RollingUpdateDaemonSet struct {
 	// update. Value can be an absolute number (ex: 5) or a percentage of total
 	// number of DaemonSet pods at the start of the update (ex: 10%). Absolute
 	// number is calculated from percentage by rounding up.
+	// This cannot be 0.
 	// Default value is 1.
 	// Example: when this is set to 30%, 30% of the currently running DaemonSet
 	// pods can be stopped for an update at any given time. The update starts
@@ -358,16 +359,32 @@ type DaemonSetSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
 	Selector *LabelSelector `json:"selector,omitempty"`
 
-	// The update strategy to use to replace existing DaemonSet with a new one.
-	Strategy DaemonSetUpdateStrategy `json:"strategy,omitempty"`
-
 	// Template is the object that describes the pod that will be created.
 	// The DaemonSet will create exactly one copy of this pod on every node
 	// that matches the template's node selector (or on every node if no node
 	// selector is specified).
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template
 	Template *api.PodTemplateSpec `json:"template,omitempty"`
+
+	// Update strategy to replace existing DaemonSet pods with new pods.
+	UpdateStrategy DaemonSetUpdateStrategy `json:"updateStrategy,omitempty"`
+
+	// Label key that is added to DaemonSet pods to distinguish between old and
+	// new pod templates during DaemonSet update.
+	// Users can set this to an empty string to indicate that the system should
+	// not add any label. If unspecified, system uses
+	// DefaultDaemonSetUniqueLabelKey("daemonset.kubernetes.io/podTemplateHash").
+	// Value of this key is hash of DaemonSetSpec.PodTemplateSpec.
+	// No label is added if this is set to empty string.
+	UniqueLabelKey string `json:"uniqueLabelKey,omitempty"`
 }
+
+const (
+	// DefaultDaemonSetUniqueLabelKey is the default key of the labels that is added
+	// to daemon set pods to distinguish between old and new pod templates during
+	// DaemonSet update. See DaemonSetSpec's UniqueLabelKey field for more information.
+	DefaultDaemonSetUniqueLabelKey string = "daemonset.kubernetes.io/podTemplateHash"
+)
 
 // DaemonSetStatus represents the current status of a daemon set.
 type DaemonSetStatus struct {
