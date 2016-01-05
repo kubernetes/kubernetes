@@ -542,12 +542,6 @@ func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 // runSyncPod is a helper function to retrieve the running pods from the fake
 // docker client and runs SyncPod for the given pod.
 func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, pod *api.Pod, backOff *util.Backoff, expectErr bool) {
-	runningPods, err := dm.GetPods(false)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	runningPod := kubecontainer.Pods(runningPods).FindPodByID(pod.UID)
-
 	podStatus, apiPodStatus, err := dm.GetPodStatusAndAPIPodStatus(pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -556,7 +550,7 @@ func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, p
 	if backOff == nil {
 		backOff = util.NewBackOff(time.Second, time.Minute)
 	}
-	err = dm.SyncPod(pod, runningPod, *apiPodStatus, podStatus, []api.Secret{}, backOff)
+	err = dm.SyncPod(pod, *apiPodStatus, podStatus, []api.Secret{}, backOff)
 	if err != nil && !expectErr {
 		t.Errorf("unexpected error: %v", err)
 	} else if err == nil && expectErr {

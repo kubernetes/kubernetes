@@ -1749,7 +1749,7 @@ func (dm *DockerManager) clearReasonCache(pod *api.Pod, container *api.Container
 }
 
 // Sync the running pod to match the specified desired pod.
-func (dm *DockerManager) SyncPod(pod *api.Pod, _ kubecontainer.Pod, _ api.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error {
+func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("SyncPod").Observe(metrics.SinceInMicroseconds(start))
