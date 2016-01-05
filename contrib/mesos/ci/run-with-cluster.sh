@@ -58,6 +58,7 @@ echo "${DOCKER_BIN_PATH}"
 cd "${KUBE_ROOT}"
 exec docker run \
   --rm \
+  --privileged \
   -v "${KUBE_ROOT}:/go/src/github.com/GoogleCloudPlatform/kubernetes" \
   -v "/var/run/docker.sock:/var/run/docker.sock" \
   -v "${DOCKER_BIN_PATH}:/usr/bin/docker" \
