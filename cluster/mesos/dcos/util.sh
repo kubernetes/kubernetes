@@ -107,7 +107,7 @@ function detect-master {
 # These Mesos slaves MAY host Kublets,
 # but might not have a Kublet running unless a kubernetes task has been scheduled on them.
 function detect-nodes {
-  KUBE_NODE_IP_ADDRESSES=(abc)
+  KUBE_NODE_IP_ADDRESSES=(dummy)
   echo "KUBE_NODE_IP_ADDRESSES: [${KUBE_NODE_IP_ADDRESSES[*]}]" 1>&2
 }
 
