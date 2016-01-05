@@ -54,6 +54,11 @@ else
 fi
 echo "${DOCKER_BIN_PATH}"
 
+if which lsmod; then
+  echo "Listing loaded linux kernel modules"
+  lsmod | sort
+fi
+
 # Clean (k8s output & images), Build, Kube-Up, Test, Kube-Down
 cd "${KUBE_ROOT}"
 exec docker run \
