@@ -512,6 +512,16 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return err
 	}
 
+	timedOut, err := dc.hasTimedOut(d)
+	if err != nil {
+		return err
+	}
+	if timedOut {
+		// TODO: Automatic rollback here. Locate the last complete replica set and scale it up in
+		// place of newRS. See https://github.com/kubernetes/kubernetes/issues/23211.
+		return dc.syncFailed(d)
+	}
+
 	if d.Spec.Paused {
 		return dc.sync(d)
 	}

@@ -91,14 +91,6 @@ func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(deployment *ext
 		return nil, nil, err
 	}
 
-	// Sync deployment's revision number with new replica set
-	if newRS != nil && newRS.Annotations != nil && len(newRS.Annotations[deploymentutil.RevisionAnnotation]) > 0 &&
-		(deployment.Annotations == nil || deployment.Annotations[deploymentutil.RevisionAnnotation] != newRS.Annotations[deploymentutil.RevisionAnnotation]) {
-		if err = dc.updateDeploymentRevision(deployment, newRS.Annotations[deploymentutil.RevisionAnnotation]); err != nil {
-			glog.V(4).Infof("Error: %v. Unable to update deployment revision, will retry later.", err)
-		}
-	}
-
 	return newRS, allOldRSs, nil
 }
 
@@ -247,14 +239,40 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 	newRevision := strconv.FormatInt(maxOldRevision+1, 10)
 
 	existingNewRS, err := deploymentutil.FindNewReplicaSet(deployment, rsList)
-	if err != nil {
+	switch {
+	case err != nil:
 		return nil, err
-	} else if existingNewRS != nil {
-		// Set existing new replica set's annotation
+
+	case existingNewRS != nil:
+		// Latest replica set exists. We need to sync its annotations (includes copying all but
+		// annotationsToSkip from the parent deployment, and update revision, desiredReplicas,
+		// and maxReplicas) and also update the revision annotation in the deployment with the
+		// latest revision.
 		if deploymentutil.SetNewReplicaSetAnnotations(deployment, existingNewRS, newRevision, true) {
-			return dc.client.Extensions().ReplicaSets(deployment.ObjectMeta.Namespace).Update(existingNewRS)
+			if _, err := dc.client.Extensions().ReplicaSets(deployment.ObjectMeta.Namespace).Update(existingNewRS); err != nil {
+				return nil, err
+			}
+		}
+
+		updateConditions := false
+		if deployment.Spec.ProgressDeadlineSeconds != nil && len(deployment.Status.Conditions) == 0 {
+			// If no other Conditions have been recorded and we need to estimate the progress of this
+			// deployment then it is likely that old users started caring about progress. In that case
+			// we need to take into account the first time we noticed their new replica set.
+			condition := deploymentutil.NewCondition(extensions.DeploymentProgressing, api.ConditionTrue, deploymentutil.FoundNewRSReason, fmt.Sprintf("Found new replica set %q", existingNewRS.Name))
+			deployment.Status = deploymentutil.SetCondition(deployment.Status, *condition)
+			updateConditions = true
+		}
+
+		if updateConditions || deploymentutil.SetDeploymentRevision(deployment, newRevision) {
+			if _, err := dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(deployment); err != nil {
+				return nil, err
+			}
 		}
 		return existingNewRS, nil
+
+	default:
+		// Latest replica set does not exist. We need to create a new one.
 	}
 
 	if !createIfNotExisted {
@@ -292,25 +310,29 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 	deploymentutil.SetNewReplicaSetAnnotations(deployment, &newRS, newRevision, false)
 	createdRS, err := dc.client.Extensions().ReplicaSets(namespace).Create(&newRS)
 	if err != nil {
-		return nil, fmt.Errorf("error creating replica set %v: %v", deployment.Name, err)
+		// TODO: Should this condition denote lack of progress? There are cases where this error will
+		// be transient eg. due to temporarily exceeded quota.
+		condition := deploymentutil.NewCondition(extensions.DeploymentProgressing, api.ConditionUnknown, deploymentutil.FailedRSCreateReason,
+			fmt.Sprintf("Failed to create new replica set %q: %v", createdRS.Name, err))
+		// If this exact condition already exists, then we shouldn't add it again.
+		if !deploymentutil.ConditionExists(deployment.Status, *condition) {
+			deployment.Status = deploymentutil.SetCondition(deployment.Status, *condition)
+			// We don't really care about this error at this point, since we have a bigger issue to report.
+			dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(deployment)
+		}
+
+		return nil, err
 	}
 	if newReplicasCount > 0 {
 		dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", "up", createdRS.Name, newReplicasCount)
 	}
 
-	return createdRS, dc.updateDeploymentRevision(deployment, newRevision)
-}
-
-func (dc *DeploymentController) updateDeploymentRevision(deployment *extensions.Deployment, revision string) error {
-	if deployment.Annotations == nil {
-		deployment.Annotations = make(map[string]string)
-	}
-	if deployment.Annotations[deploymentutil.RevisionAnnotation] != revision {
-		deployment.Annotations[deploymentutil.RevisionAnnotation] = revision
-		_, err := dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).Update(deployment)
-		return err
-	}
-	return nil
+	deploymentutil.SetDeploymentRevision(deployment, newRevision)
+	condition := deploymentutil.NewCondition(extensions.DeploymentProgressing, api.ConditionTrue, deploymentutil.NewReplicaSetReason, fmt.Sprintf("Created new replica set %q", createdRS.Name))
+	deployment.Status = deploymentutil.SetCondition(deployment.Status, *condition)
+	deployment.Status, _ = deploymentutil.RemoveCondition(deployment.Status, extensions.DeploymentProgressing, api.ConditionFalse)
+	_, err = dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(deployment)
+	return createdRS, err
 }
 
 // scale scales proportionally in order to mitigate risk. Otherwise, scaling up can increase the size
@@ -494,6 +516,7 @@ func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet,
 		UpdatedReplicas:     deploymentutil.GetActualReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS}),
 		AvailableReplicas:   availableReplicas,
 		UnavailableReplicas: totalReplicas - availableReplicas,
+		Conditions:          deployment.Status.Conditions,
 	}, nil
 }
 
