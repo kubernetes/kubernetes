@@ -29,9 +29,10 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
+	stringutil "k8s.io/kubernetes/pkg/util/strings"
+	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 // fakeVolumeHost is useful for testing volume plugins.
@@ -192,7 +193,7 @@ func (fv *FakeVolume) SetUpAt(dir string) error {
 }
 
 func (fv *FakeVolume) GetPath() string {
-	return path.Join(fv.Plugin.Host.GetPodVolumeDir(fv.PodUID, util.EscapeQualifiedNameForDisk(fv.Plugin.PluginName), fv.VolName))
+	return path.Join(fv.Plugin.Host.GetPodVolumeDir(fv.PodUID, stringutil.EscapeQualifiedNameForDisk(fv.Plugin.PluginName), fv.VolName))
 }
 
 func (fv *FakeVolume) TearDown() error {
@@ -246,7 +247,7 @@ type FakeProvisioner struct {
 }
 
 func (fc *FakeProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
-	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", util.NewUUID())
+	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", uuid.NewUUID())
 	return &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "pv-fakeplugin-",

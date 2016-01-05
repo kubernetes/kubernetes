@@ -27,9 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/os"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -178,7 +179,7 @@ func (kl *Kubelet) getPodVolumes(podUID types.UID) ([]*volumeTuple, error) {
 		volumeKindPath := path.Join(podVolDir, volumeKind)
 		// ioutil.ReadDir exits without returning any healthy dir when encountering the first lstat error
 		// but skipping dirs means no cleanup for healthy volumes. switching to a no-exit api solves this problem
-		volumeNameDirs, volumeNameDirsStat, err := util.ReadDirNoExit(volumeKindPath)
+		volumeNameDirs, volumeNameDirsStat, err := osutil.ReadDirNoExit(volumeKindPath)
 		if err != nil {
 			return []*volumeTuple{}, fmt.Errorf("could not read directory %s: %v", volumeKindPath, err)
 		}
@@ -233,7 +234,7 @@ func (kl *Kubelet) getPodVolumesFromDisk() map[string]volume.Cleaner {
 }
 
 func (kl *Kubelet) newVolumeCleanerFromPlugins(kind string, name string, podUID types.UID) (volume.Cleaner, error) {
-	plugName := util.UnescapeQualifiedNameForDisk(kind)
+	plugName := str.UnescapeQualifiedNameForDisk(kind)
 	plugin, err := kl.volumePluginMgr.FindPluginByName(plugName)
 	if err != nil {
 		// TODO: Maybe we should launch a cleanup of this dir?

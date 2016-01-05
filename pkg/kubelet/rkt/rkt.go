@@ -47,9 +47,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/flow"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/strings"
 )
 
 const (
@@ -135,7 +136,7 @@ func New(config *Config,
 	containerRefManager *kubecontainer.RefManager,
 	livenessManager proberesults.Manager,
 	volumeGetter volumeGetter,
-	imageBackOff *util.Backoff,
+	imageBackOff *flow.Backoff,
 	serializeImagePulls bool,
 ) (*Runtime, error) {
 	// Create dbus connection.
@@ -715,7 +716,7 @@ func (r *Runtime) generateEvents(runtimePod *kubecontainer.Pod, reason string, f
 		}
 
 		// Note that 'rkt id' is the pod id.
-		uuid := util.ShortenString(id.uuid, 8)
+		uuid := str.ShortenString(id.uuid, 8)
 		switch reason {
 		case "Created":
 			r.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.CreatedContainer, "Created with rkt id %v", uuid)
@@ -938,7 +939,7 @@ func (r *Runtime) Version() (kubecontainer.Version, error) {
 }
 
 // SyncPod syncs the running pod to match the specified desired pod.
-func (r *Runtime) SyncPod(pod *api.Pod, podStatus api.PodStatus, internalPodStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error {
+func (r *Runtime) SyncPod(pod *api.Pod, podStatus api.PodStatus, internalPodStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *flow.Backoff) error {
 	// TODO: (random-liu) Stop using running pod in SyncPod()
 	// TODO: (random-liu) Rename podStatus to apiPodStatus, rename internalPodStatus to podStatus, and use new pod status as much as possible,
 	// we may stop using apiPodStatus someday.

@@ -50,10 +50,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flow"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/strings"
+	"k8s.io/kubernetes/pkg/util/testutil"
 )
 
 const (
@@ -161,7 +163,7 @@ func NewDockerManager(
 	oomAdjuster *oom.OOMAdjuster,
 	procFs procfs.ProcFSInterface,
 	cpuCFSQuota bool,
-	imageBackOff *util.Backoff,
+	imageBackOff *flow.Backoff,
 	serializeImagePulls bool) *DockerManager {
 
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
@@ -715,7 +717,7 @@ func (dm *DockerManager) runContainer(
 		return kubecontainer.ContainerID{}, err
 	}
 
-	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.CreatedContainer, "Created container with docker id %v", util.ShortenString(dockerContainer.ID, 12))
+	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.CreatedContainer, "Created container with docker id %v", str.ShortenString(dockerContainer.ID, 12))
 
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
 	binds := makeMountBindings(opts.Mounts, podHasSELinuxLabel)
@@ -772,10 +774,10 @@ func (dm *DockerManager) runContainer(
 
 	if err = dm.client.StartContainer(dockerContainer.ID, hc); err != nil {
 		dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToStartContainer,
-			"Failed to start container with docker id %v with error: %v", util.ShortenString(dockerContainer.ID, 12), err)
+			"Failed to start container with docker id %v with error: %v", str.ShortenString(dockerContainer.ID, 12), err)
 		return kubecontainer.ContainerID{}, err
 	}
-	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.StartedContainer, "Started container with docker id %v", util.ShortenString(dockerContainer.ID, 12))
+	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.StartedContainer, "Started container with docker id %v", str.ShortenString(dockerContainer.ID, 12))
 
 	return kubetypes.DockerID(dockerContainer.ID).ContainerID(), nil
 }
@@ -1238,7 +1240,7 @@ func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) err
 	for _, container := range runningPod.Containers {
 		wg.Add(1)
 		go func(container *kubecontainer.Container) {
-			defer util.HandleCrash()
+			defer testutil.HandleCrash()
 			defer wg.Done()
 
 			var containerSpec *api.Container
@@ -1356,7 +1358,7 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
-			defer util.HandleCrash()
+			defer testutil.HandleCrash()
 			if err := dm.runner.Run(containerID, pod, container, container.Lifecycle.PreStop); err != nil {
 				glog.Errorf("preStop hook for container %q failed: %v", name, err)
 			}
@@ -1388,7 +1390,7 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 	if !ok {
 		glog.Warningf("No ref for pod '%q'", name)
 	} else {
-		message := fmt.Sprintf("Killing container with docker id %v", util.ShortenString(ID, 12))
+		message := fmt.Sprintf("Killing container with docker id %v", str.ShortenString(ID, 12))
 		if reason != "" {
 			message = fmt.Sprint(message, ": ", reason)
 		}
@@ -1749,7 +1751,7 @@ func (dm *DockerManager) clearReasonCache(pod *api.Pod, container *api.Container
 }
 
 // Sync the running pod to match the specified desired pod.
-func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error {
+func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *flow.Backoff) error {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("SyncPod").Observe(metrics.SinceInMicroseconds(start))
@@ -1964,7 +1966,7 @@ func getUidFromUser(id string) string {
 	return id
 }
 
-func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podStatus *kubecontainer.PodStatus, backOff *util.Backoff) bool {
+func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podStatus *kubecontainer.PodStatus, backOff *flow.Backoff) bool {
 	containerStatus := podStatus.FindContainerStatusByName(container.Name)
 	if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateExited && !containerStatus.FinishedAt.IsZero() {
 		ts := containerStatus.FinishedAt
