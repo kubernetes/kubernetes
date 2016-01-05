@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/testing"
-	"k8s.io/kubernetes/pkg/util/timeutil"
+	"k8s.io/kubernetes/pkg/util/time"
 )
 
 // Config contains all the settings for a Controller.

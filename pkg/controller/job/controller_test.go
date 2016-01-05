@@ -28,8 +28,8 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/rand"
+	"k8s.io/kubernetes/pkg/util/time"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -558,7 +558,7 @@ func TestWatchJobs(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go manager.jobController.Run(stopCh)
-	go util.Until(manager.worker, 10*time.Millisecond, stopCh)
+	go timeutil.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	// We're sending new job to see if it reaches syncHandler.
 	testJob.Name = "foo"
@@ -623,7 +623,7 @@ func TestWatchPods(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go manager.podController.Run(stopCh)
-	go util.Until(manager.worker, 10*time.Millisecond, stopCh)
+	go timeutil.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	pods := newPodList(1, api.PodRunning, testJob)
 	testPod := pods[0]

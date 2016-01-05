@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/util/networking"
-	"k8s.io/kubernetes/pkg/util/timeutil"
+	"k8s.io/kubernetes/pkg/util/time"
 )
 
 var (

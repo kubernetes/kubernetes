@@ -41,10 +41,11 @@ import (
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/flow"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
+	timetesting "k8s.io/kubernetes/pkg/util/time/testing"
 )
 
 type fakeHTTP struct {
@@ -94,7 +95,7 @@ func newTestDockerManagerWithHTTPClient(fakeHTTPClient *fakeHTTP) (*DockerManage
 		networkPlugin,
 		optionGenerator,
 		fakeHTTPClient,
-		util.NewBackOff(time.Second, 300*time.Second))
+		flow.NewBackOff(time.Second, 300*time.Second))
 
 	return dockerManager, fakeDocker
 }
@@ -541,14 +542,14 @@ func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 
 // runSyncPod is a helper function to retrieve the running pods from the fake
 // docker client and runs SyncPod for the given pod.
-func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, pod *api.Pod, backOff *util.Backoff, expectErr bool) {
+func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, pod *api.Pod, backOff *flow.Backoff, expectErr bool) {
 	podStatus, apiPodStatus, err := dm.GetPodStatusAndAPIPodStatus(pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	fakeDocker.ClearCalls()
 	if backOff == nil {
-		backOff = util.NewBackOff(time.Second, time.Minute)
+		backOff = flow.NewBackOff(time.Second, time.Minute)
 	}
 	err = dm.SyncPod(pod, *apiPodStatus, podStatus, []api.Secret{}, backOff)
 	if err != nil && !expectErr {
@@ -1151,7 +1152,7 @@ func TestGetAPIPodStatusWithLastTermination(t *testing.T) {
 }
 
 func TestSyncPodBackoff(t *testing.T) {
-	var fakeClock = &util.FakeClock{Time: time.Now()}
+	var fakeClock = &timetesting.FakeClock{Time: time.Now()}
 	startTime := fakeClock.Now()
 
 	dm, fakeDocker := newTestDockerManager()
@@ -1219,7 +1220,7 @@ func TestSyncPodBackoff(t *testing.T) {
 		{130, 1, 0, startCalls, false},
 	}
 
-	backOff := util.NewBackOff(time.Second, time.Minute)
+	backOff := flow.NewBackOff(time.Second, time.Minute)
 	backOff.Clock = fakeClock
 	for _, c := range tests {
 		fakeDocker.SetFakeContainers(dockerContainers)

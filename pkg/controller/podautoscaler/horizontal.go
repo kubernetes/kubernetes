@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/time"
 )
 
 const (
@@ -62,11 +62,11 @@ func NewHorizontalController(evtNamespacer client.EventNamespacer, scaleNamespac
 }
 
 func (a *HorizontalController) Run(syncPeriod time.Duration) {
-	go util.Until(func() {
+	go timeutil.Until(func() {
 		if err := a.reconcileAutoscalers(); err != nil {
 			glog.Errorf("Couldn't reconcile horizontal pod autoscalers: %v", err)
 		}
-	}, syncPeriod, util.NeverStop)
+	}, syncPeriod, timeutil.NeverStop)
 }
 
 func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.HorizontalPodAutoscaler, scale *extensions.Scale) (int, *int, time.Time, error) {

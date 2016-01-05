@@ -29,7 +29,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/time"
 )
 
 func TestExtractFromNonExistentFile(t *testing.T) {
@@ -52,7 +52,7 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
 
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(timeutil.ForeverTestTimeout):
 		t.Errorf("Expected update, timeout instead")
 	}
 }
@@ -147,7 +147,7 @@ func TestReadPodsFromFile(t *testing.T) {
 				if !api.Semantic.DeepEqual(testCase.expected, update) {
 					t.Errorf("%s: Expected %#v, Got %#v", testCase.desc, testCase.expected, update)
 				}
-			case <-time.After(util.ForeverTestTimeout):
+			case <-time.After(timeutil.ForeverTestTimeout):
 				t.Errorf("%s: Expected update, timeout instead", testCase.desc)
 			}
 		}()

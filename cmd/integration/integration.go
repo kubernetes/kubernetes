@@ -57,7 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/networking"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/testing"
-	"k8s.io/kubernetes/pkg/util/timeutil"
+	"k8s.io/kubernetes/pkg/util/time"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"

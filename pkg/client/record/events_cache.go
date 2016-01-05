@@ -27,9 +27,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
+	"k8s.io/kubernetes/pkg/util/time"
 )
 
 const (
@@ -116,12 +116,12 @@ type EventAggregator struct {
 	maxIntervalInSeconds int
 
 	// clock is used to allow for testing over a time interval
-	clock util.Clock
+	clock timeutil.Clock
 }
 
 // NewEventAggregator returns a new instance of an EventAggregator
 func NewEventAggregator(lruCacheSize int, keyFunc EventAggregatorKeyFunc, messageFunc EventAggregatorMessageFunc,
-	maxEvents int, maxIntervalInSeconds int, clock util.Clock) *EventAggregator {
+	maxEvents int, maxIntervalInSeconds int, clock timeutil.Clock) *EventAggregator {
 	return &EventAggregator{
 		cache:                lru.New(lruCacheSize),
 		keyFunc:              keyFunc,
@@ -207,11 +207,11 @@ type eventLog struct {
 type eventLogger struct {
 	sync.RWMutex
 	cache *lru.Cache
-	clock util.Clock
+	clock timeutil.Clock
 }
 
 // newEventLogger observes events and counts their frequencies
-func newEventLogger(lruCacheEntries int, clock util.Clock) *eventLogger {
+func newEventLogger(lruCacheEntries int, clock timeutil.Clock) *eventLogger {
 	return &eventLogger{cache: lru.New(lruCacheEntries), clock: clock}
 }
 
@@ -326,7 +326,7 @@ type EventCorrelateResult struct {
 //     the same reason.
 //   * Events are incrementally counted if the exact same event is encountered multiple
 //     times.
-func NewEventCorrelator(clock util.Clock) *EventCorrelator {
+func NewEventCorrelator(clock timeutil.Clock) *EventCorrelator {
 	cacheSize := maxLruCacheEntries
 	return &EventCorrelator{
 		filterFunc: DefaultEventFilterFunc,

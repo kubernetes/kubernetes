@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/time"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/mesos/mesos-go/mesosproto"
@@ -71,7 +71,7 @@ func TestExecutorRegister(t *testing.T) {
 		if reflect.DeepEqual(initialPodUpdate, update) {
 			receivedInitialPodUpdate = true
 		}
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(timeutil.ForeverTestTimeout):
 	}
 	assert.Equal(t, true, receivedInitialPodUpdate,
 		"executor should have sent an initial PodUpdate "+
@@ -163,7 +163,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 
 	select {
 	case <-updates:
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(timeutil.ForeverTestTimeout):
 		t.Fatalf("Executor should send an initial update on Registration")
 	}
 
@@ -206,7 +206,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 
 	executor.LaunchTask(mockDriver, taskInfo)
 
-	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
+	assertext.EventuallyTrue(t, timeutil.ForeverTestTimeout, func() bool {
 		executor.lock.Lock()
 		defer executor.lock.Unlock()
 		return len(executor.tasks) == 1 && len(executor.pods) == 1
@@ -218,7 +218,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 		if len(update.Pods) == 1 {
 			gotPodUpdate = true
 		}
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(timeutil.ForeverTestTimeout):
 	}
 	assert.Equal(t, true, gotPodUpdate,
 		"the executor should send an update about a new pod to "+
@@ -228,7 +228,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	finished := kmruntime.After(statusUpdateCalls.Wait)
 	select {
 	case <-finished:
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(timeutil.ForeverTestTimeout):
 		t.Fatalf("timed out waiting for status update calls to finish")
 	}
 
@@ -240,7 +240,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 
 	executor.KillTask(mockDriver, taskInfo.TaskId)
 
-	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
+	assertext.EventuallyTrue(t, timeutil.ForeverTestTimeout, func() bool {
 		executor.lock.Lock()
 		defer executor.lock.Unlock()
 		return len(executor.tasks) == 0 && len(executor.pods) == 0
@@ -250,7 +250,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	finished = kmruntime.After(statusUpdateCalls.Wait)
 	select {
 	case <-finished:
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(timeutil.ForeverTestTimeout):
 		t.Fatalf("timed out waiting for status update calls to finish")
 	}
 	mockDriver.AssertExpectations(t)
@@ -421,7 +421,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 	// when removing the task from k.tasks through the "task-lost:foo" message below.
 	select {
 	case <-called:
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(timeutil.ForeverTestTimeout):
 		t.Fatalf("timed out waiting for SendStatusUpdate for the running task")
 	}
 
@@ -433,7 +433,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 	).Return(mesosproto.Status_DRIVER_RUNNING, nil).Run(func(_ mock.Arguments) { close(called) }).Once()
 
 	executor.FrameworkMessage(mockDriver, "task-lost:foo")
-	assertext.EventuallyTrue(t, util.ForeverTestTimeout, func() bool {
+	assertext.EventuallyTrue(t, timeutil.ForeverTestTimeout, func() bool {
 		executor.lock.Lock()
 		defer executor.lock.Unlock()
 		return len(executor.tasks) == 0 && len(executor.pods) == 0
@@ -441,7 +441,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 
 	select {
 	case <-called:
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(timeutil.ForeverTestTimeout):
 		t.Fatalf("timed out waiting for SendStatusUpdate")
 	}
 
@@ -605,7 +605,7 @@ func TestExecutorsendFrameworkMessage(t *testing.T) {
 	// guard against data race in mock driver between AssertExpectations and Called
 	select {
 	case <-called: // expected
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(timeutil.ForeverTestTimeout):
 		t.Fatalf("expected call to SendFrameworkMessage")
 	}
 	mockDriver.AssertExpectations(t)

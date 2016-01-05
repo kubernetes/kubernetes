@@ -55,7 +55,10 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flow"
+	"k8s.io/kubernetes/pkg/util/secure"
+	"k8s.io/kubernetes/pkg/util/time"
+
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
@@ -286,17 +289,17 @@ func (s *CMServer) Run(_ []string) error {
 	}()
 
 	go endpointcontroller.NewEndpointController(clientForUserAgentOrDie(*kubeconfig, "endpoint-controller"), s.ResyncPeriod).
-		Run(s.ConcurrentEndpointSyncs, util.NeverStop)
+		Run(s.ConcurrentEndpointSyncs, timeutil.NeverStop)
 
 	go replicationcontroller.NewReplicationManager(
 		clientForUserAgentOrDie(*kubeconfig, "replication-controller"),
 		s.ResyncPeriod,
 		replicationcontroller.BurstReplicas,
-	).Run(s.ConcurrentRCSyncs, util.NeverStop)
+	).Run(s.ConcurrentRCSyncs, timeutil.NeverStop)
 
 	if s.TerminatedPodGCThreshold > 0 {
 		go gc.New(clientForUserAgentOrDie(*kubeconfig, "garbage-collector"), s.ResyncPeriod, s.TerminatedPodGCThreshold).
-			Run(util.NeverStop)
+			Run(timeutil.NeverStop)
 	}
 
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
@@ -305,8 +308,8 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	nodeController := nodecontroller.NewNodeController(cloud, clientForUserAgentOrDie(*kubeconfig, "node-controller"),
-		s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
-		util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
+		s.PodEvictionTimeout, flow.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
+		flow.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
 		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, &s.ClusterCIDR, s.AllocateNodeCIDRs)
 	nodeController.Run(s.NodeSyncPeriod)
 
@@ -330,7 +333,7 @@ func (s *CMServer) Run(_ []string) error {
 
 	go resourcequotacontroller.NewResourceQuotaController(
 		clientForUserAgentOrDie(*kubeconfig, "resourcequota-controller"),
-		controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod)).Run(s.ConcurrentResourceQuotaSyncs, util.NeverStop)
+		controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod)).Run(s.ConcurrentResourceQuotaSyncs, timeutil.NeverStop)
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
@@ -376,19 +379,19 @@ func (s *CMServer) Run(_ []string) error {
 		if containsResource(resources, "daemonsets") {
 			glog.Infof("Starting daemon set controller")
 			go daemon.NewDaemonSetsController(clientForUserAgentOrDie(*kubeconfig, "daemon-set-controller"), s.ResyncPeriod).
-				Run(s.ConcurrentDSCSyncs, util.NeverStop)
+				Run(s.ConcurrentDSCSyncs, timeutil.NeverStop)
 		}
 
 		if containsResource(resources, "jobs") {
 			glog.Infof("Starting job controller")
 			go job.NewJobController(clientForUserAgentOrDie(*kubeconfig, "job-controller"), s.ResyncPeriod).
-				Run(s.ConcurrentJobSyncs, util.NeverStop)
+				Run(s.ConcurrentJobSyncs, timeutil.NeverStop)
 		}
 
 		if containsResource(resources, "deployments") {
 			glog.Infof("Starting deployment controller")
 			go deployment.NewDeploymentController(clientForUserAgentOrDie(*kubeconfig, "deployment-controller"), s.ResyncPeriod).
-				Run(s.ConcurrentDeploymentSyncs, util.NeverStop)
+				Run(s.ConcurrentDeploymentSyncs, timeutil.NeverStop)
 		}
 	}
 
@@ -422,7 +425,7 @@ func (s *CMServer) Run(_ []string) error {
 		if err != nil {
 			return fmt.Errorf("error reading root-ca-file at %s: %v", s.RootCAFile, err)
 		}
-		if _, err := util.CertsFromPEM(rootCA); err != nil {
+		if _, err := secure.CertsFromPEM(rootCA); err != nil {
 			return fmt.Errorf("error parsing root-ca-file at %s: %v", s.RootCAFile, err)
 		}
 	} else {

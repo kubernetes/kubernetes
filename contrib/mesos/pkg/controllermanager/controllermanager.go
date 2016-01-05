@@ -46,7 +46,9 @@ import (
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flow"
+	"k8s.io/kubernetes/pkg/util/secure"
+	"k8s.io/kubernetes/pkg/util/time"
 
 	"k8s.io/kubernetes/contrib/mesos/pkg/profile"
 	kmendpoint "k8s.io/kubernetes/contrib/mesos/pkg/service"
@@ -120,13 +122,13 @@ func (s *CMServer) Run(_ []string) error {
 	}()
 
 	endpoints := s.createEndpointController(kubeClient)
-	go endpoints.Run(s.ConcurrentEndpointSyncs, util.NeverStop)
+	go endpoints.Run(s.ConcurrentEndpointSyncs, timeutil.NeverStop)
 
 	go replicationcontroller.NewReplicationManager(kubeClient, s.resyncPeriod, replicationcontroller.BurstReplicas).
-		Run(s.ConcurrentRCSyncs, util.NeverStop)
+		Run(s.ConcurrentRCSyncs, timeutil.NeverStop)
 
 	go daemon.NewDaemonSetsController(kubeClient, s.resyncPeriod).
-		Run(s.ConcurrentDSCSyncs, util.NeverStop)
+		Run(s.ConcurrentDSCSyncs, timeutil.NeverStop)
 
 	//TODO(jdef) should eventually support more cloud providers here
 	if s.CloudProvider != mesos.ProviderName {
@@ -138,13 +140,13 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	nodeController := nodecontroller.NewNodeController(cloud, kubeClient,
-		s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
-		util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
+		s.PodEvictionTimeout, flow.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
+		flow.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
 		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, (*net.IPNet)(&s.ClusterCIDR), s.AllocateNodeCIDRs)
 	nodeController.Run(s.NodeSyncPeriod)
 
 	nodeStatusUpdaterController := node.NewStatusUpdater(kubeClient, s.NodeMonitorPeriod, time.Now)
-	if err := nodeStatusUpdaterController.Run(util.NeverStop); err != nil {
+	if err := nodeStatusUpdaterController.Run(timeutil.NeverStop); err != nil {
 		glog.Fatalf("Failed to start node status update controller: %v", err)
 	}
 
@@ -163,7 +165,7 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	go resourcequotacontroller.NewResourceQuotaController(
-		kubeClient, controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod)).Run(s.ConcurrentResourceQuotaSyncs, util.NeverStop)
+		kubeClient, controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod)).Run(s.ConcurrentResourceQuotaSyncs, timeutil.NeverStop)
 
 	namespaceController := namespacecontroller.NewNamespaceController(kubeClient, &unversioned.APIVersions{}, s.NamespaceSyncPeriod)
 	namespaceController.Run()
@@ -198,7 +200,7 @@ func (s *CMServer) Run(_ []string) error {
 		if err != nil {
 			return fmt.Errorf("error reading root-ca-file at %s: %v", s.RootCAFile, err)
 		}
-		if _, err := util.CertsFromPEM(rootCA); err != nil {
+		if _, err := secure.CertsFromPEM(rootCA); err != nil {
 			return fmt.Errorf("error parsing root-ca-file at %s: %v", s.RootCAFile, err)
 		}
 	} else {

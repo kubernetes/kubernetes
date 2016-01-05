@@ -28,8 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	k8sruntime "k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
+	"k8s.io/kubernetes/pkg/util/time"
+	timetesting "k8s.io/kubernetes/pkg/util/time/testing"
 )
 
 func init() {
@@ -348,7 +349,7 @@ func TestEventf(t *testing.T) {
 	eventBroadcaster := NewBroadcaster()
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 
-	clock := &util.FakeClock{time.Now()}
+	clock := &timetesting.FakeClock{time.Now()}
 	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 	for index, item := range table {
 		clock.Step(1 * time.Second)
@@ -377,7 +378,7 @@ func TestEventf(t *testing.T) {
 	sinkWatcher.Stop()
 }
 
-func recorderWithFakeClock(eventSource api.EventSource, eventBroadcaster EventBroadcaster, clock util.Clock) EventRecorder {
+func recorderWithFakeClock(eventSource api.EventSource, eventBroadcaster EventBroadcaster, clock timeutil.Clock) EventRecorder {
 	return &recorderImpl{eventSource, eventBroadcaster.(*eventBroadcasterImpl).Broadcaster, clock}
 }
 
@@ -445,7 +446,7 @@ func TestWriteEventError(t *testing.T) {
 			},
 		},
 	).Stop()
-	clock := &util.FakeClock{time.Now()}
+	clock := &timetesting.FakeClock{time.Now()}
 	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 	for caseName := range table {
 		clock.Step(1 * time.Second)
@@ -584,7 +585,7 @@ func TestEventfNoNamespace(t *testing.T) {
 	eventBroadcaster := NewBroadcaster()
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 
-	clock := &util.FakeClock{time.Now()}
+	clock := &timetesting.FakeClock{time.Now()}
 	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
 	for index, item := range table {
@@ -871,7 +872,7 @@ func TestMultiSinkCache(t *testing.T) {
 	}
 
 	eventBroadcaster := NewBroadcaster()
-	clock := &util.FakeClock{time.Now()}
+	clock := &timetesting.FakeClock{time.Now()}
 	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)

@@ -21,7 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/testing"
-	"k8s.io/kubernetes/pkg/util/timeutil"
+	"k8s.io/kubernetes/pkg/util/time"
 )
 
 // ExpirationCache implements the store interface

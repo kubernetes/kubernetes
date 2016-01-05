@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/testing"
-	timetesting "k8s.io/kubernetes/pkg/util/timeutil/testing"
+	timetesting "k8s.io/kubernetes/pkg/util/time/testing"
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 

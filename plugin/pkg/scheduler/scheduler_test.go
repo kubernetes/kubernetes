@@ -27,7 +27,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
+	"k8s.io/kubernetes/pkg/util/flow"
+	timetesting "k8s.io/kubernetes/pkg/util/time/testing"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 )
@@ -150,7 +152,7 @@ func TestScheduler(t *testing.T) {
 			t.Errorf("%v: error: wanted %v, got %v", i, e, a)
 		}
 		if e, a := item.expectBind, gotBinding; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: error: %s", i, util.ObjectDiff(e, a))
+			t.Errorf("%v: error: %s", i, diff.ObjectDiff(e, a))
 		}
 		<-called
 		events.Stop()
@@ -176,7 +178,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	// all entries inserted with fakeTime will expire.
 	ttl := 30 * time.Second
 	fakeTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	fakeClock := &util.FakeClock{Time: fakeTime}
+	fakeClock := &timetesting.FakeClock{Time: fakeTime}
 	ttlPolicy := &cache.TTLPolicy{Ttl: ttl, Clock: fakeClock}
 	assumedPodsStore := cache.NewFakeExpirationStore(
 		cache.MetaNamespaceKeyFunc, nil, ttlPolicy, fakeClock)
@@ -253,7 +255,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 		Target:     api.ObjectReference{Kind: "Node", Name: "machine1"},
 	}
 	if ex, ac := expectBind, gotBinding; !reflect.DeepEqual(ex, ac) {
-		t.Errorf("Expected exact match on binding: %s", util.ObjectDiff(ex, ac))
+		t.Errorf("Expected exact match on binding: %s", diff.ObjectDiff(ex, ac))
 	}
 
 	<-called
@@ -291,7 +293,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 		Target:     api.ObjectReference{Kind: "Node", Name: "machine1"},
 	}
 	if ex, ac := expectBind, gotBinding; !reflect.DeepEqual(ex, ac) {
-		t.Errorf("Expected exact match on binding: %s", util.ObjectDiff(ex, ac))
+		t.Errorf("Expected exact match on binding: %s", diff.ObjectDiff(ex, ac))
 	}
 	<-called
 	events.Stop()
@@ -299,7 +301,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 
 // Fake rate limiter that records the 'accept' tokens from the real rate limiter
 type FakeRateLimiter struct {
-	r            util.RateLimiter
+	r            flow.RateLimiter
 	acceptValues []bool
 }
 
@@ -332,7 +334,7 @@ func TestSchedulerRateLimitsBinding(t *testing.T) {
 		rand.New(rand.NewSource(time.Now().UnixNano())))
 
 	// Rate limit to 1 pod
-	fr := FakeRateLimiter{util.NewTokenBucketRateLimiter(0.02, 1), []bool{}}
+	fr := FakeRateLimiter{flow.NewTokenBucketRateLimiter(0.02, 1), []bool{}}
 	c := &Config{
 		Modeler: modeler,
 		NodeLister: algorithm.FakeNodeLister(

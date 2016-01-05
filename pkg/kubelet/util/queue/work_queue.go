@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/time"
 )
 
 // WorkQueue allows queueing items with a timestamp. An item is
@@ -35,7 +35,7 @@ type WorkQueue interface {
 }
 
 type basicWorkQueue struct {
-	clock util.Clock
+	clock timeutil.Clock
 	lock  sync.Mutex
 	queue map[types.UID]time.Time
 }
@@ -44,7 +44,7 @@ var _ WorkQueue = &basicWorkQueue{}
 
 func NewBasicWorkQueue() WorkQueue {
 	queue := make(map[types.UID]time.Time)
-	return &basicWorkQueue{queue: queue, clock: util.RealClock{}}
+	return &basicWorkQueue{queue: queue, clock: timeutil.RealClock{}}
 }
 
 func (q *basicWorkQueue) GetWork() []types.UID {

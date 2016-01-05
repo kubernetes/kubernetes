@@ -21,8 +21,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/time"
+	timetesting "k8s.io/kubernetes/pkg/util/time/testing"
 )
 
 func TestTTLExpirationBasic(t *testing.T) {
@@ -36,7 +37,7 @@ func TestTTLExpirationBasic(t *testing.T) {
 				return obj.(*timestampedEntry).obj.(testStoreObject).id, nil
 			},
 		},
-		util.RealClock{},
+		timeutil.RealClock{},
 	)
 	err := ttlStore.Add(testObj)
 	if err != nil {
@@ -55,7 +56,7 @@ func TestTTLExpirationBasic(t *testing.T) {
 		if delKey != key {
 			t.Errorf("Unexpected delete for key %s", key)
 		}
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(timeutil.ForeverTestTimeout):
 		t.Errorf("Unexpected timeout waiting on delete")
 	}
 	close(deleteChan)
@@ -79,7 +80,7 @@ func TestTTLList(t *testing.T) {
 				return obj.(*timestampedEntry).obj.(testStoreObject).id, nil
 			},
 		},
-		util.RealClock{},
+		timeutil.RealClock{},
 	)
 	for _, obj := range testObjs {
 		err := ttlStore.Add(obj)
@@ -100,7 +101,7 @@ func TestTTLList(t *testing.T) {
 				t.Errorf("Unexpected delete for key %s", delKey)
 			}
 			expireKeys.Delete(delKey)
-		case <-time.After(util.ForeverTestTimeout):
+		case <-time.After(timeutil.ForeverTestTimeout):
 			t.Errorf("Unexpected timeout waiting on delete")
 			return
 		}
@@ -113,7 +114,7 @@ func TestTTLPolicy(t *testing.T) {
 	exactlyOnTTL := fakeTime.Add(-ttl)
 	expiredTime := fakeTime.Add(-(ttl + 1))
 
-	policy := TTLPolicy{ttl, &util.FakeClock{Time: fakeTime}}
+	policy := TTLPolicy{ttl, &timetesting.FakeClock{Time: fakeTime}}
 	fakeTimestampedEntry := &timestampedEntry{obj: struct{}{}, timestamp: exactlyOnTTL}
 	if policy.IsExpired(fakeTimestampedEntry) {
 		t.Errorf("TTL cache should not expire entries exactly on ttl")

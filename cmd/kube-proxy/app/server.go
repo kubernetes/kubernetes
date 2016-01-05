@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/networking"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
-	"k8s.io/kubernetes/pkg/util/timeutil"
+	"k8s.io/kubernetes/pkg/util/time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"

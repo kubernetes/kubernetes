@@ -32,8 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/time"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -424,7 +425,7 @@ func (config *KubeProxyTestConfig) createService(serviceSpec *api.Service) *api.
 
 func (config *KubeProxyTestConfig) setup() {
 	By("creating a selector")
-	selectorName := "selector-" + string(util.NewUUID())
+	selectorName := "selector-" + string(uuid.NewUUID())
 	serviceSelector := map[string]string{
 		selectorName: "true",
 	}
@@ -497,12 +498,12 @@ func (config *KubeProxyTestConfig) deleteNetProxyPod() {
 	config.getPodClient().Delete(pod.Name, api.NewDeleteOptions(0))
 	config.endpointPods = config.endpointPods[1:]
 	// wait for pod being deleted.
-	err := waitForPodToDisappear(config.f.Client, config.f.Namespace.Name, pod.Name, labels.Everything(), time.Second, util.ForeverTestTimeout)
+	err := waitForPodToDisappear(config.f.Client, config.f.Namespace.Name, pod.Name, labels.Everything(), time.Second, timeutil.ForeverTestTimeout)
 	if err != nil {
 		Failf("Failed to delete %s pod: %v", pod.Name, err)
 	}
 	// wait for endpoint being removed.
-	err = waitForServiceEndpointsNum(config.f.Client, config.f.Namespace.Name, nodePortServiceName, len(config.endpointPods), time.Second, util.ForeverTestTimeout)
+	err = waitForServiceEndpointsNum(config.f.Client, config.f.Namespace.Name, nodePortServiceName, len(config.endpointPods), time.Second, timeutil.ForeverTestTimeout)
 	if err != nil {
 		Failf("Failed to remove endpoint from service: %s", nodePortServiceName)
 	}

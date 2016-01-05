@@ -17,8 +17,8 @@ limitations under the License.
 package cache
 
 import (
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/time"
 )
 
 type fakeThreadSafeMap struct {
@@ -42,7 +42,7 @@ func (p *FakeExpirationPolicy) IsExpired(obj *timestampedEntry) bool {
 	return !p.NeverExpire.Has(key)
 }
 
-func NewFakeExpirationStore(keyFunc KeyFunc, deletedKeys chan<- string, expirationPolicy ExpirationPolicy, cacheClock util.Clock) Store {
+func NewFakeExpirationStore(keyFunc KeyFunc, deletedKeys chan<- string, expirationPolicy ExpirationPolicy, cacheClock timeutil.Clock) Store {
 	cacheStorage := NewThreadSafeStore(Indexers{}, Indices{})
 	return &ExpirationCache{
 		cacheStorage:     &fakeThreadSafeMap{cacheStorage, deletedKeys},

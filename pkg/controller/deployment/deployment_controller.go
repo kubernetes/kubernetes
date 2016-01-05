@@ -35,7 +35,7 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	mathtool "k8s.io/kubernetes/pkg/util/math"
 	"k8s.io/kubernetes/pkg/util/testing"
-	"k8s.io/kubernetes/pkg/util/timeutil"
+	"k8s.io/kubernetes/pkg/util/time"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )

@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	"k8s.io/kubernetes/pkg/util/networking"
 	"k8s.io/kubernetes/pkg/util/testing"
-	"k8s.io/kubernetes/pkg/util/timeutil"
+	"k8s.io/kubernetes/pkg/util/time"
 )
 
 // See ipallocator/controller/repair.go; this is a copy for ports.

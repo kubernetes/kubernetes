@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/time"
 
 	"github.com/golang/glog"
 )
@@ -45,7 +45,7 @@ func NewSourceFile(path string, nodeName string, period time.Duration, updates c
 		updates:  updates,
 	}
 	glog.V(1).Infof("Watching path %q", path)
-	go util.Until(config.run, period, util.NeverStop)
+	go timeutil.Until(config.run, period, timeutil.NeverStop)
 }
 
 func (s *sourceFile) run() {

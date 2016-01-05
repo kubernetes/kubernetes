@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/time"
 
 	"github.com/golang/glog"
 )
@@ -49,7 +49,7 @@ func NewSourceURL(url string, header http.Header, nodeName string, period time.D
 		data:     nil,
 	}
 	glog.V(1).Infof("Watching URL %s", url)
-	go util.Until(config.run, period, util.NeverStop)
+	go timeutil.Until(config.run, period, timeutil.NeverStop)
 }
 
 func (s *sourceURL) run() {

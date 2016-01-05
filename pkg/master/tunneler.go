@@ -25,7 +25,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/os"
+	"k8s.io/kubernetes/pkg/util/ssh"
+	"k8s.io/kubernetes/pkg/util/time"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -47,11 +49,11 @@ type SSHTunneler struct {
 	SSHKeyfile    string
 	InstallSSHKey InstallSSHKey
 
-	tunnels        *util.SSHTunnelList
+	tunnels        *ssh.SSHTunnelList
 	tunnelsLock    sync.Mutex
 	lastSync       int64 // Seconds since Epoch
 	lastSyncMetric prometheus.GaugeFunc
-	clock          util.Clock
+	clock          timeutil.Clock
 
 	getAddresses AddressFunc
 	stopChan     chan struct{}
@@ -63,7 +65,7 @@ func NewSSHTunneler(sshUser string, sshKeyfile string, installSSHKey InstallSSHK
 		SSHKeyfile:    sshKeyfile,
 		InstallSSHKey: installSSHKey,
 
-		clock: util.RealClock{},
+		clock: timeutil.RealClock{},
 	}
 }
 
@@ -88,7 +90,7 @@ func (c *SSHTunneler) Run(getAddresses AddressFunc) {
 
 	// public keyfile is written last, so check for that.
 	publicKeyFile := c.SSHKeyfile + ".pub"
-	exists, err := util.FileExists(publicKeyFile)
+	exists, err := osutil.FileExists(publicKeyFile)
 	if err != nil {
 		glog.Errorf("Error detecting if key exists: %v", err)
 	} else if !exists {
@@ -98,7 +100,7 @@ func (c *SSHTunneler) Run(getAddresses AddressFunc) {
 			glog.Errorf("Failed to create key pair: %v", err)
 		}
 	}
-	c.tunnels = &util.SSHTunnelList{}
+	c.tunnels = &ssh.SSHTunnelList{}
 	c.setupSecureProxy(c.SSHUser, c.SSHKeyfile, publicKeyFile)
 	c.lastSync = c.clock.Now().Unix()
 }
@@ -113,7 +115,7 @@ func (c *SSHTunneler) Stop() {
 
 func (c *SSHTunneler) Dial(net, addr string) (net.Conn, error) {
 	// Only lock while picking a tunnel.
-	tunnel, err := func() (util.SSHTunnelEntry, error) {
+	tunnel, err := func() (ssh.SSHTunnelEntry, error) {
 		c.tunnelsLock.Lock()
 		defer c.tunnelsLock.Unlock()
 		return c.tunnels.PickRandomTunnel()
@@ -154,7 +156,7 @@ func (c *SSHTunneler) needToReplaceTunnels(addrs []string) bool {
 
 func (c *SSHTunneler) replaceTunnels(user, keyfile string, newAddrs []string) error {
 	glog.Infof("replacing tunnels. New addrs: %v", newAddrs)
-	tunnels := util.MakeSSHTunnels(user, keyfile, newAddrs)
+	tunnels := ssh.MakeSSHTunnels(user, keyfile, newAddrs)
 	if err := tunnels.Open(); err != nil {
 		return err
 	}
@@ -192,17 +194,17 @@ func (c *SSHTunneler) refreshTunnels(user, keyfile string) error {
 
 func (c *SSHTunneler) setupSecureProxy(user, privateKeyfile, publicKeyfile string) {
 	// Sync loop to ensure that the SSH key has been installed.
-	go util.Until(func() {
+	go timeutil.Until(func() {
 		if c.InstallSSHKey == nil {
 			glog.Error("Won't attempt to install ssh key: InstallSSHKey function is nil")
 			return
 		}
-		key, err := util.ParsePublicKeyFromFile(publicKeyfile)
+		key, err := ssh.ParsePublicKeyFromFile(publicKeyfile)
 		if err != nil {
 			glog.Errorf("Failed to load public key: %v", err)
 			return
 		}
-		keyData, err := util.EncodeSSHKey(key)
+		keyData, err := ssh.EncodeSSHKey(key)
 		if err != nil {
 			glog.Errorf("Failed to encode public key: %v", err)
 			return
@@ -213,7 +215,7 @@ func (c *SSHTunneler) setupSecureProxy(user, privateKeyfile, publicKeyfile strin
 	}, 5*time.Minute, c.stopChan)
 	// Sync loop for tunnels
 	// TODO: switch this to watch.
-	go util.Until(func() {
+	go timeutil.Until(func() {
 		if err := c.loadTunnels(user, privateKeyfile); err != nil {
 			glog.Errorf("Failed to load SSH Tunnels: %v", err)
 		}
@@ -225,7 +227,7 @@ func (c *SSHTunneler) setupSecureProxy(user, privateKeyfile, publicKeyfile strin
 	}, 1*time.Second, c.stopChan)
 	// Refresh loop for tunnels
 	// TODO: could make this more controller-ish
-	go util.Until(func() {
+	go timeutil.Until(func() {
 		time.Sleep(5 * time.Minute)
 		if err := c.refreshTunnels(user, privateKeyfile); err != nil {
 			glog.Errorf("Failed to refresh SSH Tunnels: %v", err)
@@ -235,13 +237,13 @@ func (c *SSHTunneler) setupSecureProxy(user, privateKeyfile, publicKeyfile strin
 
 func (c *SSHTunneler) generateSSHKey(user, privateKeyfile, publicKeyfile string) error {
 	// TODO: user is not used. Consider removing it as an input to the function.
-	private, public, err := util.GenerateKey(2048)
+	private, public, err := ssh.GenerateKey(2048)
 	if err != nil {
 		return err
 	}
 	// If private keyfile already exists, we must have only made it halfway
 	// through last time, so delete it.
-	exists, err := util.FileExists(privateKeyfile)
+	exists, err := osutil.FileExists(privateKeyfile)
 	if err != nil {
 		glog.Errorf("Error detecting if private key exists: %v", err)
 	} else if exists {
@@ -250,10 +252,10 @@ func (c *SSHTunneler) generateSSHKey(user, privateKeyfile, publicKeyfile string)
 			glog.Errorf("Failed to remove stale private key: %v", err)
 		}
 	}
-	if err := ioutil.WriteFile(privateKeyfile, util.EncodePrivateKey(private), 0600); err != nil {
+	if err := ioutil.WriteFile(privateKeyfile, ssh.EncodePrivateKey(private), 0600); err != nil {
 		return err
 	}
-	publicKeyBytes, err := util.EncodePublicKey(public)
+	publicKeyBytes, err := ssh.EncodePublicKey(public)
 	if err != nil {
 		return err
 	}

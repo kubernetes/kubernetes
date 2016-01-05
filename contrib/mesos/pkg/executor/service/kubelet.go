@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/testing"
-	"k8s.io/kubernetes/pkg/util/timeutil"
+	"k8s.io/kubernetes/pkg/util/time"
 )
 
 // executorKubelet decorates the kubelet with a Run function that notifies the

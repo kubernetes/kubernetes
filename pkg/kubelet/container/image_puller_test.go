@@ -24,7 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flow"
+	timetesting "k8s.io/kubernetes/pkg/util/time/testing"
 )
 
 func TestPuller(t *testing.T) {
@@ -97,8 +98,8 @@ func TestPuller(t *testing.T) {
 			ImagePullPolicy: c.policy,
 		}
 
-		backOff := util.NewBackOff(time.Second, time.Minute)
-		fakeClock := &util.FakeClock{Time: time.Now()}
+		backOff := flow.NewBackOff(time.Second, time.Minute)
+		fakeClock := &timetesting.FakeClock{Time: time.Now()}
 		backOff.Clock = fakeClock
 
 		fakeRuntime := &FakeRuntime{}

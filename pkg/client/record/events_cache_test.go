@@ -24,7 +24,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
+	"k8s.io/kubernetes/pkg/util/time"
 )
 
 func makeObjectReference(kind, name, namespace string) api.ObjectReference {
@@ -118,7 +119,7 @@ func validateEvent(messagePrefix string, actualEvent *api.Event, expectedEvent *
 	}
 	recvEvent.Name = expectedEvent.Name
 	if e, a := expectedEvent, &recvEvent; !reflect.DeepEqual(e, a) {
-		t.Errorf("%v - diff: %s", messagePrefix, util.ObjectGoPrintDiff(e, a))
+		t.Errorf("%v - diff: %s", messagePrefix, diff.ObjectGoPrintDiff(e, a))
 	}
 	recvEvent.FirstTimestamp = actualFirstTimestamp
 	recvEvent.LastTimestamp = actualLastTimestamp
@@ -222,7 +223,7 @@ func TestEventCorrelator(t *testing.T) {
 
 	for testScenario, testInput := range scenario {
 		eventInterval := time.Duration(testInput.intervalSeconds) * time.Second
-		clock := util.IntervalClock{Time: time.Now(), Duration: eventInterval}
+		clock := timeutil.IntervalClock{Time: time.Now(), Duration: eventInterval}
 		correlator := NewEventCorrelator(&clock)
 		for i := range testInput.previousEvents {
 			event := testInput.previousEvents[i]

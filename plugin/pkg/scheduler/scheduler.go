@@ -24,7 +24,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flow"
+	"k8s.io/kubernetes/pkg/util/time"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/metrics"
 
@@ -78,7 +79,7 @@ type Config struct {
 
 	// Rate at which we can create pods
 	// If this field is nil, we don't have any rate limit.
-	BindPodsRateLimiter util.RateLimiter
+	BindPodsRateLimiter flow.RateLimiter
 
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this, because scheduling
@@ -109,12 +110,12 @@ func New(c *Config) *Scheduler {
 // Run begins watching and scheduling. It starts a goroutine and returns immediately.
 func (s *Scheduler) Run() {
 	if s.config.BindPodsRateLimiter != nil {
-		go util.Forever(func() {
+		go timeutil.Forever(func() {
 			sat := s.config.BindPodsRateLimiter.Saturation()
 			metrics.BindingRateLimiterSaturation.Set(sat)
 		}, metrics.BindingSaturationReportInterval)
 	}
-	go util.Until(s.scheduleOne, 0, s.config.StopEverything)
+	go timeutil.Until(s.scheduleOne, 0, s.config.StopEverything)
 }
 
 func (s *Scheduler) scheduleOne() {

@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/time"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -57,7 +57,7 @@ type etcdMasterElector struct {
 func (e *etcdMasterElector) Elect(path, id string) watch.Interface {
 	e.done = make(chan empty)
 	e.events = make(chan watch.Event)
-	go util.Until(func() { e.run(path, id) }, time.Second*5, util.NeverStop)
+	go timeutil.Until(func() { e.run(path, id) }, time.Second*5, timeutil.NeverStop)
 	return e
 }
 

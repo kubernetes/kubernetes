@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/time"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -155,7 +155,7 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 		keyFunc:    config.KeyFunc,
 		stopped:    false,
 		// We need to (potentially) stop both:
-		// - util.Until go-routine
+		// - timeutil.Until go-routine
 		// - reflector.ListAndWatch
 		// and there are no guarantees on the order that they will stop.
 		// So we will be simply closing the channel, and synchronizing on the WaitGroup.
@@ -170,7 +170,7 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	stopCh := cacher.stopCh
 	cacher.stopWg.Add(1)
 	go func() {
-		util.Until(
+		timeutil.Until(
 			func() {
 				if !cacher.isStopped() {
 					cacher.startCaching(stopCh)

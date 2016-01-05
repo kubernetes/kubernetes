@@ -24,7 +24,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/time"
 )
 
 // GenericPLEG is an extremely simple generic PLEG that relies solely on
@@ -79,7 +79,7 @@ func (g *GenericPLEG) Watch() chan *PodLifecycleEvent {
 
 // Start spawns a goroutine to relist periodically.
 func (g *GenericPLEG) Start() {
-	go util.Until(g.relist, g.relistPeriod, util.NeverStop)
+	go timeutil.Until(g.relist, g.relistPeriod, timeutil.NeverStop)
 }
 
 func generateEvent(podID types.UID, cid string, oldState, newState kubecontainer.ContainerState) *PodLifecycleEvent {
