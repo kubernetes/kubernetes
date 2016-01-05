@@ -29,6 +29,10 @@
       "endpoint": "",
       "signingRegion": "us-east-1"
     },
+    "*/ec2metadata": {
+      "endpoint": "http://169.254.169.254/latest",
+      "signingRegion": "us-east-1"
+    },
     "*/iam": {
       "endpoint": "iam.amazonaws.com",
       "signingRegion": "us-east-1"
@@ -43,6 +47,10 @@
     },
     "*/sts": {
       "endpoint": "sts.amazonaws.com",
+      "signingRegion": "us-east-1"
+    },
+    "*/waf": {
+      "endpoint": "waf.amazonaws.com",
       "signingRegion": "us-east-1"
     },
     "us-east-1/sdb": {

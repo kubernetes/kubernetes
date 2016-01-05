@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"regexp"
@@ -35,6 +34,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
@@ -224,10 +224,10 @@ func addHandlers(h *request.Handlers) {
 }
 
 func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
-	service := ec2.New(&aws.Config{
+	service := ec2.New(session.New(&aws.Config{
 		Region:      &regionName,
 		Credentials: p.creds,
-	})
+	}))
 
 	addHandlers(&service.Handlers)
 
@@ -238,10 +238,10 @@ func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 }
 
 func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
-	elbClient := elb.New(&aws.Config{
+	elbClient := elb.New(session.New(&aws.Config{
 		Region:      &regionName,
 		Credentials: p.creds,
-	})
+	}))
 
 	addHandlers(&elbClient.Handlers)
 
@@ -249,10 +249,10 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 }
 
 func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
-	client := autoscaling.New(&aws.Config{
+	client := autoscaling.New(session.New(&aws.Config{
 		Region:      &regionName,
 		Credentials: p.creds,
-	})
+	}))
 
 	addHandlers(&client.Handlers)
 
@@ -332,19 +332,6 @@ func (self *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([
 	}
 
 	return results, nil
-}
-
-type awsSdkMetadata struct {
-	metadata *ec2metadata.Client
-}
-
-var metadataClient = http.Client{
-	Timeout: time.Second * 10,
-}
-
-// Implements EC2Metadata.GetMetadata
-func (self *awsSdkMetadata) GetMetadata(path string) (string, error) {
-	return self.metadata.GetMetadata(path)
 }
 
 // Implements EC2.DescribeSecurityGroups

@@ -218,3 +218,5 @@ type AutoScalingAPI interface {
 
 	UpdateAutoScalingGroup(*autoscaling.UpdateAutoScalingGroupInput) (*autoscaling.UpdateAutoScalingGroupOutput, error)
 }
+
+var _ AutoScalingAPI = (*autoscaling.AutoScaling)(nil)

@@ -472,10 +472,12 @@ func (c *ELB) DescribeInstanceHealthRequest(input *DescribeInstanceHealthInput) 
 	return
 }
 
-// Describes the state of the specified instances registered with the specified
+// Describes the state of the specified instances with respect to the specified
 // load balancer. If no instances are specified, the call describes the state
-// of all instances registered with the load balancer, not including any terminated
-// instances.
+// of all instances that are currently registered with the load balancer. If
+// instances are specified, their state is returned even if they are no longer
+// registered with the load balancer. The state of terminated instances is not
+// returned.
 func (c *ELB) DescribeInstanceHealth(input *DescribeInstanceHealthInput) (*DescribeInstanceHealthOutput, error) {
 	req, out := c.DescribeInstanceHealthRequest(input)
 	err := req.Send()
@@ -609,6 +611,7 @@ func (c *ELB) DescribeLoadBalancers(input *DescribeLoadBalancersInput) (*Describ
 
 func (c *ELB) DescribeLoadBalancersPages(input *DescribeLoadBalancersInput, fn func(p *DescribeLoadBalancersOutput, lastPage bool) (shouldContinue bool)) error {
 	page, _ := c.DescribeLoadBalancersRequest(input)
+	page.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler("Paginator"))
 	return page.EachPage(func(p interface{}, lastPage bool) bool {
 		return fn(p.(*DescribeLoadBalancersOutput), lastPage)
 	})
@@ -814,8 +817,9 @@ func (c *ELB) RegisterInstancesWithLoadBalancerRequest(input *RegisterInstancesW
 // with the load balancer in the VPC.
 //
 // Note that RegisterInstanceWithLoadBalancer completes when the request has
-// been registered. Instance registration happens shortly afterwards. To check
-// the state of the registered instances, use DescribeLoadBalancers or DescribeInstanceHealth.
+// been registered. Instance registration takes a little time to complete. To
+// check the state of the registered instances, use DescribeLoadBalancers or
+// DescribeInstanceHealth.
 //
 // After the instance is registered, it starts receiving traffic and requests
 // from the load balancer. Any instance that is not in one of the Availability
@@ -1310,8 +1314,9 @@ type CreateAppCookieStickinessPolicyInput struct {
 	// The name of the load balancer.
 	LoadBalancerName *string `type:"string" required:"true"`
 
-	// The name of the policy being created. This name must be unique within the
-	// set of policies for this load balancer.
+	// The name of the policy being created. Policy names must consist of alphanumeric
+	// characters and dashes (-). This name must be unique within the set of policies
+	// for this load balancer.
 	PolicyName *string `type:"string" required:"true"`
 
 	metadataCreateAppCookieStickinessPolicyInput `json:"-" xml:"-"`
@@ -1358,8 +1363,9 @@ type CreateLBCookieStickinessPolicyInput struct {
 	// The name of the load balancer.
 	LoadBalancerName *string `type:"string" required:"true"`
 
-	// The name of the policy being created. This name must be unique within the
-	// set of policies for this load balancer.
+	// The name of the policy being created. Policy names must consist of alphanumeric
+	// characters and dashes (-). This name must be unique within the set of policies
+	// for this load balancer.
 	PolicyName *string `type:"string" required:"true"`
 
 	metadataCreateLBCookieStickinessPolicyInput `json:"-" xml:"-"`
@@ -1415,9 +1421,9 @@ type CreateLoadBalancerInput struct {
 
 	// The name of the load balancer.
 	//
-	// This name must be unique within your AWS account, must have a maximum of
-	// 32 characters, must contain only alphanumeric characters or hyphens, and
-	// cannot begin or end with a hyphen.
+	// This name must be unique within your set of load balancers for the region,
+	// must have a maximum of 32 characters, must contain only alphanumeric characters
+	// or hyphens, and cannot begin or end with a hyphen.
 	LoadBalancerName *string `type:"string" required:"true"`
 
 	// The type of a load balancer. Valid only for load balancers in a VPC.
@@ -2364,8 +2370,9 @@ type Listener struct {
 	// is HTTP or TCP, the listener's InstanceProtocol must be HTTP or TCP.
 	InstanceProtocol *string `type:"string"`
 
-	// The port on which the load balancer is listening. The supported ports are:
-	// 25, 80, 443, 465, 587, and 1024-65535.
+	// The port on which the load balancer is listening. On EC2-VPC, you can specify
+	// any port from the range 1-65535. On EC2-Classic, you can specify any port
+	// from the following list: 25, 80, 443, 465, 587, 1024-65535.
 	LoadBalancerPort *int64 `type:"integer" required:"true"`
 
 	// The load balancer transport protocol to use for routing: HTTP, HTTPS, TCP,

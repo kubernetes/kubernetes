@@ -7,11 +7,11 @@ var (
 	// not found.
 	//
 	// @readonly
-	ErrMissingRegion error = awserr.New("MissingRegion", "could not find region configuration", nil)
+	ErrMissingRegion = awserr.New("MissingRegion", "could not find region configuration", nil)
 
 	// ErrMissingEndpoint is an error that is returned if an endpoint cannot be
 	// resolved for a service.
 	//
 	// @readonly
-	ErrMissingEndpoint error = awserr.New("MissingEndpoint", "'Endpoint' configuration is required for this service", nil)
+	ErrMissingEndpoint = awserr.New("MissingEndpoint", "'Endpoint' configuration is required for this service", nil)
 )
