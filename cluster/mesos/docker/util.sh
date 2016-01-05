@@ -441,7 +441,7 @@ function cluster::mesos::docker::create_basic_user {
 # Buffers command output to file, prints output on failure.
 function cluster::mesos::docker::buffer_output {
   local cmd="$@"
-  local tempfile="$(mktemp "${TMPDIR}/buffer.XXXXXX")"
+  local tempfile="$(mktemp "${TMPDIR:-/tmp}/buffer.XXXXXX")"
   trap "kill -TERM \${PID}; rm '${tempfile}'" TERM INT
   ${cmd} &> "${tempfile}" &
   PID=$!
