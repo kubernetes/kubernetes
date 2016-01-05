@@ -512,6 +512,16 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return err
 	}
 
+	timedOut, err := dc.hasTimedOut(d)
+	if err != nil {
+		return err
+	}
+	if timedOut {
+		// TODO: Automatic rollback here. Locate the last complete replica set and scale it up in
+		// place of newRS. See https://github.com/kubernetes/kubernetes/issues/23211.
+		return nil
+	}
+
 	if d.Spec.Paused {
 		return dc.sync(d)
 	}
@@ -575,4 +585,55 @@ func (dc *DeploymentController) handleOverlap(d *extensions.Deployment) error {
 		d, _ = dc.clearDeploymentOverlap(d)
 	}
 	return nil
+}
+
+// hasTimedOut let us know if a deployment did not manage to finish before the specified
+// timeout (progressDeadlineSeconds). The controller should not reconcile deployments that
+// timed out. In a future PR we will add automatic rollback, then the controller will need
+// to maintain the last replica set that was successfully deployed instead of the newest.
+func (dc *DeploymentController) hasTimedOut(deployment *extensions.Deployment) (bool, error) {
+	if deployment.Spec.ProgressDeadlineSeconds == nil || deployment.Spec.RollbackTo != nil {
+		return false, nil
+	}
+
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(deployment, false)
+	if err != nil {
+		return false, err
+	}
+	allRSs := oldRSs
+
+	// There is a template change so we don't need to check for any progress right now.
+	if newRS == nil {
+		return false, nil
+	}
+	allRSs = append(allRSs, newRS)
+
+	switch {
+	case util.IsReplicaSetComplete(newRS):
+		// If the latest replica set has been tagged as complete then there is no need
+		// to check for the deployment progress anymore.
+		return false, nil
+
+	case util.IsReplicaSetFailed(newRS):
+		// If the latest replica set has been tagged as failed then we already know about
+		// the lack of progress of this deployment.
+		return true, dc.syncRolloutStatus(allRSs, newRS, deployment)
+
+	case deployment.Spec.Paused:
+		// We shouldn't report any lack of progress for paused deployments.
+		return false, nil
+	}
+
+	newStatus, err := dc.calculateStatus(allRSs, newRS, deployment)
+	if err != nil {
+		return false, err
+	}
+
+	if util.IsDeploymentComplete(deployment, newStatus) ||
+		util.IsDeploymentProgressing(deployment, newStatus) ||
+		!util.IsDeploymentFailed(deployment, newStatus) {
+		return false, nil
+	}
+
+	return true, dc.syncRolloutStatus(allRSs, newRS, deployment)
 }

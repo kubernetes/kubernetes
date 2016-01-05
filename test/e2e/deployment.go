@@ -89,6 +89,9 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	It("overlapping deployment should not fight with each other", func() {
 		testOverlappingDeployment(f)
 	})
+	It("lack of progress should be reported in the deployment status", func() {
+		testFailedDeployment(f)
+	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 })
 
@@ -1287,4 +1290,123 @@ func testOverlappingDeployment(f *framework.Framework) {
 	By("Checking the second deployment is now synced")
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deployOverlapping.Name, "2", redisImage)
 	Expect(err).NotTo(HaveOccurred(), "The second deployment failed to update to revision 2")
+}
+
+func testFailedDeployment(f *framework.Framework) {
+	ns := f.Namespace.Name
+	c := adapter.FromUnversionedClient(f.Client)
+
+	podLabels := map[string]string{"name": nginxImageName}
+	replicas := int32(1)
+
+	// Create a nginx deployment.
+	deploymentName := "nginx"
+	// Such a short deadline will report instant failure
+	zero := int32(0)
+	d := newDeployment(deploymentName, replicas, podLabels, "nginx", "nginx", extensions.RecreateDeploymentStrategyType, nil)
+	d.Spec.ProgressDeadlineSeconds = &zero
+	framework.Logf("Creating deployment %q", deploymentName)
+	_, err := c.Extensions().Deployments(ns).Create(d)
+	Expect(err).NotTo(HaveOccurred())
+	defer stopDeployment(c, f.Client, ns, deploymentName)
+
+	// Check that deployment is created fine.
+	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
+	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
+	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Waiting for deployment %q status", deploymentName)
+	err = framework.WaitForDeploymentStatus(c, deployment)
+	Expect(err).NotTo(HaveOccurred())
+
+	newRs, err := deploymentutil.GetNewReplicaSet(deployment, c)
+	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Checking replica set %q for a %q annotation", newRs.Name, deploymentutil.FailedProgressAnnotation)
+	err = wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
+		newRs, err := deploymentutil.GetNewReplicaSet(deployment, c)
+		if err != nil {
+			return false, err
+		}
+		_, ok := newRs.Annotations[deploymentutil.FailedProgressAnnotation]
+		return ok, nil
+	})
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("Expected a %q annotation for replica set %q", deploymentutil.FailedProgressAnnotation, newRs.Name)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Checking deployment %q for a failure condition", deploymentName)
+	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
+	Expect(err).NotTo(HaveOccurred())
+
+	var failedCond *extensions.DeploymentCondition
+	conditions := deployment.Status.Conditions
+	for i := range conditions {
+		condition := deployment.Status.Conditions[i]
+		if condition.Reason == deploymentutil.TimedOutReason {
+			failedCond = &condition
+			break
+		}
+	}
+	if failedCond == nil {
+		Expect(fmt.Errorf("Expected a %q condition for deployment %q: %#v", deploymentutil.TimedOutReason, deployment.Name, conditions)).NotTo(HaveOccurred())
+	}
+
+	framework.Logf("Bumping progressDeadlineSeconds and retrying deployment %q", deploymentName)
+	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
+		*update.Spec.ProgressDeadlineSeconds = 30
+		one := int64(1)
+		update.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	// Check that deployment is created fine.
+	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
+	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
+	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
+	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Waiting for deployment %q status", deploymentName)
+	err = framework.WaitForDeploymentStatus(c, deployment)
+	Expect(err).NotTo(HaveOccurred())
+
+	newRs, err = deploymentutil.GetNewReplicaSet(deployment, c)
+	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Checking replica set %q for a %q annotation", newRs.Name, deploymentutil.CompleteProgressAnnotation)
+	err = wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
+		newRs, err := deploymentutil.GetNewReplicaSet(deployment, c)
+		if err != nil {
+			return false, err
+		}
+		_, ok := newRs.Annotations[deploymentutil.CompleteProgressAnnotation]
+		return ok, nil
+	})
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("Expected a %q annotation for replica set %q", deploymentutil.CompleteProgressAnnotation, newRs.Name)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Checking deployment %q for a complete condition", deploymentName)
+	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
+	Expect(err).NotTo(HaveOccurred())
+
+	var completeCond *extensions.DeploymentCondition
+	conditions = deployment.Status.Conditions
+	for i := range conditions {
+		condition := deployment.Status.Conditions[i]
+		if condition.Reason == deploymentutil.NewRSAvailableReason {
+			completeCond = &condition
+			break
+		}
+	}
+	if completeCond == nil {
+		Expect(fmt.Errorf("Expected a %q condition for deployment %q: %#v", deploymentutil.NewRSAvailableReason, deployment.Name, conditions)).NotTo(HaveOccurred())
+	}
 }
