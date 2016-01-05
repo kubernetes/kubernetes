@@ -470,7 +470,7 @@ const (
 
 // JobCondition describes current state of a job.
 type JobCondition struct {
-	// Type of job condition, currently only Complete.
+	// Type of job condition, Complete or Failed.
 	Type JobConditionType `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
 	Status api.ConditionStatus `json:"status"`
