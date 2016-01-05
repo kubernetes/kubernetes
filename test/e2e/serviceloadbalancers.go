@@ -203,7 +203,9 @@ func (s *ingManager) test(path string) error {
 	})
 }
 
-var _ = Describe("ServiceLoadBalancer", func() {
+// TODO(ihmccreery) Skipped originally in #14988, never sent follow-up PR, as
+// far as I can tell.
+var _ = Describe("ServiceLoadBalancer [Skipped]", func() {
 	// These variables are initialized after framework's beforeEach.
 	var ns string
 	var repoRoot string
