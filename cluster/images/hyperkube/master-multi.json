@@ -24,7 +24,7 @@
               "/hyperkube",
               "apiserver",
               "--service-cluster-ip-range=10.0.0.1/24",
-              "--address=0.0.0.0",
+              "--insecure-bind-address=0.0.0.0",
               "--etcd-servers=http://127.0.0.1:4001",
               "--admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota",
               "--v=2"
