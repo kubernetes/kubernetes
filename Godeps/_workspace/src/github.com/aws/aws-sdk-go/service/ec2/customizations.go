@@ -3,8 +3,10 @@ package ec2
 import (
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awsutil"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/private/endpoints"
 )
 
 func init() {
@@ -20,38 +22,34 @@ func fillPresignedURL(r *request.Request) {
 		return
 	}
 
-	params := r.Params.(*CopySnapshotInput)
+	origParams := r.Params.(*CopySnapshotInput)
 
 	// Stop if PresignedURL/DestinationRegion is set
-	if params.PresignedUrl != nil || params.DestinationRegion != nil {
+	if origParams.PresignedUrl != nil || origParams.DestinationRegion != nil {
 		return
 	}
 
-	// First generate a copy of parameters
-	r.Params = awsutil.CopyOf(r.Params)
-	params = r.Params.(*CopySnapshotInput)
+	origParams.DestinationRegion = r.Config.Region
+	newParams := awsutil.CopyOf(r.Params).(*CopySnapshotInput)
 
-	// Set destination region. Avoids infinite handler loop.
-	// Also needed to sign sub-request.
-	params.DestinationRegion = r.Service.Config.Region
-
-	// Create a new client pointing at source region.
-	// We will use this to presign the CopySnapshot request against
-	// the source region
-	config := r.Service.Config.Copy().
+	// Create a new request based on the existing request. We will use this to
+	// presign the CopySnapshot request against the source region.
+	cfg := r.Config.Copy(aws.NewConfig().
 		WithEndpoint("").
-		WithRegion(*params.SourceRegion)
+		WithRegion(aws.StringValue(origParams.SourceRegion)))
 
-	client := New(config)
+	clientInfo := r.ClientInfo
+	clientInfo.Endpoint, clientInfo.SigningRegion = endpoints.EndpointForRegion(
+		clientInfo.ServiceName, aws.StringValue(cfg.Region), aws.BoolValue(cfg.DisableSSL))
 
 	// Presign a CopySnapshot request with modified params
-	req, _ := client.CopySnapshotRequest(params)
-	url, err := req.Presign(300 * time.Second) // 5 minutes should be enough.
-
-	if err != nil { // bubble error back up to original request
+	req := request.New(*cfg, clientInfo, r.Handlers, r.Retryer, r.Operation, newParams, r.Data)
+	url, err := req.Presign(5 * time.Minute) // 5 minutes should be enough.
+	if err != nil {                          // bubble error back up to original request
 		r.Error = err
+		return
 	}
 
 	// We have our URL, set it on params
-	params.PresignedUrl = &url
+	origParams.PresignedUrl = &url
 }

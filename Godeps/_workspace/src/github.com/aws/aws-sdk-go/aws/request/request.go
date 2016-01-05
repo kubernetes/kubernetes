@@ -12,15 +12,16 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awsutil"
-	"github.com/aws/aws-sdk-go/aws/service/serviceinfo"
+	"github.com/aws/aws-sdk-go/aws/client/metadata"
 )
 
 // A Request is the service request to be made.
 type Request struct {
+	Config     aws.Config
+	ClientInfo metadata.ClientInfo
+	Handlers   Handlers
+
 	Retryer
-	Service      serviceinfo.ServiceInfo
-	Handlers     Handlers
 	Time         time.Time
 	ExpireTime   time.Duration
 	Operation    *Operation
@@ -32,7 +33,7 @@ type Request struct {
 	Error        error
 	Data         interface{}
 	RequestID    string
-	RetryCount   uint
+	RetryCount   int
 	Retryable    *bool
 	RetryDelay   time.Duration
 
@@ -61,7 +62,9 @@ type Paginator struct {
 // Params is any value of input parameters to be the request payload.
 // Data is pointer value to an object which the request's response
 // payload will be deserialized to.
-func New(service serviceinfo.ServiceInfo, handlers Handlers, retryer Retryer, operation *Operation, params interface{}, data interface{}) *Request {
+func New(cfg aws.Config, clientInfo metadata.ClientInfo, handlers Handlers,
+	retryer Retryer, operation *Operation, params interface{}, data interface{}) *Request {
+
 	method := operation.HTTPMethod
 	if method == "" {
 		method = "POST"
@@ -72,12 +75,14 @@ func New(service serviceinfo.ServiceInfo, handlers Handlers, retryer Retryer, op
 	}
 
 	httpReq, _ := http.NewRequest(method, "", nil)
-	httpReq.URL, _ = url.Parse(service.Endpoint + p)
+	httpReq.URL, _ = url.Parse(clientInfo.Endpoint + p)
 
 	r := &Request{
+		Config:     cfg,
+		ClientInfo: clientInfo,
+		Handlers:   handlers.Copy(),
+
 		Retryer:     retryer,
-		Service:     service,
-		Handlers:    handlers.Copy(),
 		Time:        time.Now(),
 		ExpireTime:  0,
 		Operation:   operation,
@@ -140,7 +145,7 @@ func (r *Request) Presign(expireTime time.Duration) (string, error) {
 }
 
 func debugLogReqError(r *Request, stage string, retrying bool, err error) {
-	if !r.Service.Config.LogLevel.Matches(aws.LogDebugWithRequestErrors) {
+	if !r.Config.LogLevel.Matches(aws.LogDebugWithRequestErrors) {
 		return
 	}
 
@@ -149,8 +154,8 @@ func debugLogReqError(r *Request, stage string, retrying bool, err error) {
 		retryStr = "will retry"
 	}
 
-	r.Service.Config.Logger.Log(fmt.Sprintf("DEBUG: %s %s/%s failed, %s, error %v",
-		stage, r.Service.ServiceName, r.Operation.Name, retryStr, err))
+	r.Config.Logger.Log(fmt.Sprintf("DEBUG: %s %s/%s failed, %s, error %v",
+		stage, r.ClientInfo.ServiceName, r.Operation.Name, retryStr, err))
 }
 
 // Build will build the request's object so it can be signed and sent
@@ -205,9 +210,9 @@ func (r *Request) Send() error {
 		}
 
 		if aws.BoolValue(r.Retryable) {
-			if r.Service.Config.LogLevel.Matches(aws.LogDebugWithRequestRetries) {
-				r.Service.Config.Logger.Log(fmt.Sprintf("DEBUG: Retrying Request %s/%s, attempt %d",
-					r.Service.ServiceName, r.Operation.Name, r.RetryCount))
+			if r.Config.LogLevel.Matches(aws.LogDebugWithRequestRetries) {
+				r.Config.Logger.Log(fmt.Sprintf("DEBUG: Retrying Request %s/%s, attempt %d",
+					r.ClientInfo.ServiceName, r.Operation.Name, r.RetryCount))
 			}
 
 			// Re-seek the body back to the original point in for a retry so that
@@ -264,85 +269,11 @@ func (r *Request) Send() error {
 	return nil
 }
 
-// HasNextPage returns true if this request has more pages of data available.
-func (r *Request) HasNextPage() bool {
-	return r.nextPageTokens() != nil
-}
-
-// nextPageTokens returns the tokens to use when asking for the next page of
-// data.
-func (r *Request) nextPageTokens() []interface{} {
-	if r.Operation.Paginator == nil {
-		return nil
+// AddToUserAgent adds the string to the end of the request's current user agent.
+func AddToUserAgent(r *Request, s string) {
+	curUA := r.HTTPRequest.Header.Get("User-Agent")
+	if len(curUA) > 0 {
+		s = curUA + " " + s
 	}
-
-	if r.Operation.TruncationToken != "" {
-		tr := awsutil.ValuesAtAnyPath(r.Data, r.Operation.TruncationToken)
-		if tr == nil || len(tr) == 0 {
-			return nil
-		}
-		switch v := tr[0].(type) {
-		case bool:
-			if v == false {
-				return nil
-			}
-		}
-	}
-
-	found := false
-	tokens := make([]interface{}, len(r.Operation.OutputTokens))
-
-	for i, outtok := range r.Operation.OutputTokens {
-		v := awsutil.ValuesAtAnyPath(r.Data, outtok)
-		if v != nil && len(v) > 0 {
-			found = true
-			tokens[i] = v[0]
-		}
-	}
-
-	if found {
-		return tokens
-	}
-	return nil
-}
-
-// NextPage returns a new Request that can be executed to return the next
-// page of result data. Call .Send() on this request to execute it.
-func (r *Request) NextPage() *Request {
-	tokens := r.nextPageTokens()
-	if tokens == nil {
-		return nil
-	}
-
-	data := reflect.New(reflect.TypeOf(r.Data).Elem()).Interface()
-	nr := New(r.Service, r.Handlers, r.Retryer, r.Operation, awsutil.CopyOf(r.Params), data)
-	for i, intok := range nr.Operation.InputTokens {
-		awsutil.SetValueAtAnyPath(nr.Params, intok, tokens[i])
-	}
-	return nr
-}
-
-// EachPage iterates over each page of a paginated request object. The fn
-// parameter should be a function with the following sample signature:
-//
-//   func(page *T, lastPage bool) bool {
-//       return true // return false to stop iterating
-//   }
-//
-// Where "T" is the structure type matching the output structure of the given
-// operation. For example, a request object generated by
-// DynamoDB.ListTablesRequest() would expect to see dynamodb.ListTablesOutput
-// as the structure "T". The lastPage value represents whether the page is
-// the last page of data or not. The return value of this function should
-// return true to keep iterating or false to stop.
-func (r *Request) EachPage(fn func(data interface{}, isLastPage bool) (shouldContinue bool)) error {
-	for page := r; page != nil; page = page.NextPage() {
-		page.Send()
-		shouldContinue := fn(page.Data, !page.HasNextPage())
-		if page.Error != nil || !shouldContinue {
-			return page.Error
-		}
-	}
-
-	return nil
+	r.HTTPRequest.Header.Set("User-Agent", s)
 }

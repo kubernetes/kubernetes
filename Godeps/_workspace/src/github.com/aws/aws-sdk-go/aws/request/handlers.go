@@ -1,5 +1,10 @@
 package request
 
+import (
+	"fmt"
+	"strings"
+)
+
 // A Handlers provides a collection of request handlers for various
 // stages of handling requests.
 type Handlers struct {
@@ -108,5 +113,28 @@ func (l *HandlerList) Remove(n NamedHandler) {
 func (l *HandlerList) Run(r *Request) {
 	for _, f := range l.list {
 		f.Fn(r)
+	}
+}
+
+// MakeAddToUserAgentHandler will add the name/version pair to the User-Agent request
+// header. If the extra parameters are provided they will be added as metadata to the
+// name/version pair resulting in the following format.
+// "name/version (extra0; extra1; ...)"
+// The user agent part will be concatenated with this current request's user agent string.
+func MakeAddToUserAgentHandler(name, version string, extra ...string) func(*Request) {
+	ua := fmt.Sprintf("%s/%s", name, version)
+	if len(extra) > 0 {
+		ua += fmt.Sprintf(" (%s)", strings.Join(extra, "; "))
+	}
+	return func(r *Request) {
+		AddToUserAgent(r, ua)
+	}
+}
+
+// MakeAddToUserAgentFreeFormHandler adds the input to the User-Agent request header.
+// The input string will be concatenated with the current request's user agent string.
+func MakeAddToUserAgentFreeFormHandler(s string) func(*Request) {
+	return func(r *Request) {
+		AddToUserAgent(r, s)
 	}
 }

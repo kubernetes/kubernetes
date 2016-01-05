@@ -1,0 +1,257 @@
+[
+  {
+    "given": {
+      "outer": {
+        "foo": "foo",
+        "bar": "bar",
+        "baz": "baz"
+      }
+    },
+    "cases": [
+      {
+        "expression": "outer.foo || outer.bar",
+        "result": "foo"
+      },
+      {
+        "expression": "outer.foo||outer.bar",
+        "result": "foo"
+      },
+      {
+        "expression": "outer.bar || outer.baz",
+        "result": "bar"
+      },
+      {
+        "expression": "outer.bar||outer.baz",
+        "result": "bar"
+      },
+      {
+        "expression": "outer.bad || outer.foo",
+        "result": "foo"
+      },
+      {
+        "expression": "outer.bad||outer.foo",
+        "result": "foo"
+      },
+      {
+        "expression": "outer.foo || outer.bad",
+        "result": "foo"
+      },
+      {
+        "expression": "outer.foo||outer.bad",
+        "result": "foo"
+      },
+      {
+        "expression": "outer.bad || outer.alsobad",
+        "result": null
+      },
+      {
+        "expression": "outer.bad||outer.alsobad",
+        "result": null
+      }
+    ]
+  },
+  {
+    "given": {
+      "outer": {
+        "foo": "foo",
+        "bool": false,
+        "empty_list": [],
+        "empty_string": ""
+      }
+    },
+    "cases": [
+      {
+        "expression": "outer.empty_string || outer.foo",
+        "result": "foo"
+      },
+      {
+        "expression": "outer.nokey || outer.bool || outer.empty_list || outer.empty_string || outer.foo",
+        "result": "foo"
+      }
+    ]
+  },
+  {
+    "given": {
+      "True": true,
+      "False": false,
+      "Number": 5,
+      "EmptyList": [],
+      "Zero": 0
+    },
+    "cases": [
+      {
+        "expression": "True && False",
+        "result": false
+      },
+      {
+        "expression": "False && True",
+        "result": false
+      },
+      {
+        "expression": "True && True",
+        "result": true
+      },
+      {
+        "expression": "False && False",
+        "result": false
+      },
+      {
+        "expression": "True && Number",
+        "result": 5
+      },
+      {
+        "expression": "Number && True",
+        "result": true
+      },
+      {
+        "expression": "Number && False",
+        "result": false
+      },
+      {
+        "expression": "Number && EmptyList",
+        "result": []
+      },
+      {
+        "expression": "Number && True",
+        "result": true
+      },
+      {
+        "expression": "EmptyList && True",
+        "result": []
+      },
+      {
+        "expression": "EmptyList && False",
+        "result": []
+      },
+      {
+        "expression": "True || False",
+        "result": true
+      },
+      {
+        "expression": "True || True",
+        "result": true
+      },
+      {
+        "expression": "False || True",
+        "result": true
+      },
+      {
+        "expression": "False || False",
+        "result": false
+      },
+      {
+        "expression": "Number || EmptyList",
+        "result": 5
+      },
+      {
+        "expression": "Number || True",
+        "result": 5
+      },
+      {
+        "expression": "Number || True && False",
+        "result": 5
+      },
+      {
+        "expression": "(Number || True) && False",
+        "result": false
+      },
+      {
+        "expression": "Number || (True && False)",
+        "result": 5
+      },
+      {
+        "expression": "!True",
+        "result": false
+      },
+      {
+        "expression": "!False",
+        "result": true
+      },
+      {
+        "expression": "!Number",
+        "result": false
+      },
+      {
+        "expression": "!EmptyList",
+        "result": true
+      },
+      {
+        "expression": "True && !False",
+        "result": true
+      },
+      {
+        "expression": "True && !EmptyList",
+        "result": true
+      },
+      {
+        "expression": "!False && !EmptyList",
+        "result": true
+      },
+      {
+        "expression": "!(True && False)",
+        "result": true
+      },
+      {
+        "expression": "!Zero",
+        "result": false
+      },
+      {
+        "expression": "!!Zero",
+        "result": true
+      }
+    ]
+  },
+  {
+    "given": {
+      "one": 1,
+      "two": 2,
+      "three": 3
+    },
+    "cases": [
+      {
+        "expression": "one < two",
+        "result": true
+      },
+      {
+        "expression": "one <= two",
+        "result": true
+      },
+      {
+        "expression": "one == one",
+        "result": true
+      },
+      {
+        "expression": "one == two",
+        "result": false
+      },
+      {
+        "expression": "one > two",
+        "result": false
+      },
+      {
+        "expression": "one >= two",
+        "result": false
+      },
+      {
+        "expression": "one != two",
+        "result": true
+      },
+      {
+        "expression": "one < two && three > one",
+        "result": true
+      },
+      {
+        "expression": "one < two || three > one",
+        "result": true
+      },
+      {
+        "expression": "one < two || three < one",
+        "result": true
+      },
+      {
+        "expression": "two < one || three < one",
+        "result": false
+      }
+    ]
+  }
+]
