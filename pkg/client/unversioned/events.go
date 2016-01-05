@@ -72,7 +72,7 @@ func (e *events) Create(event *api.Event) (*api.Event, error) {
 	}
 	result := &api.Event{}
 	err := e.client.Post().
-		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
+		Namespace(event.Namespace).
 		Resource("events").
 		Body(event).
 		Do().
@@ -91,7 +91,7 @@ func (e *events) Update(event *api.Event) (*api.Event, error) {
 	}
 	result := &api.Event{}
 	err := e.client.Put().
-		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
+		Namespace(event.Namespace).
 		Resource("events").
 		Name(event.Name).
 		Body(event).
@@ -107,7 +107,7 @@ func (e *events) Update(event *api.Event) (*api.Event, error) {
 func (e *events) Patch(incompleteEvent *api.Event, data []byte) (*api.Event, error) {
 	result := &api.Event{}
 	err := e.client.Patch(api.StrategicMergePatchType).
-		NamespaceIfScoped(incompleteEvent.Namespace, len(incompleteEvent.Namespace) > 0).
+		Namespace(incompleteEvent.Namespace).
 		Resource("events").
 		Name(incompleteEvent.Name).
 		Body(data).
@@ -120,7 +120,7 @@ func (e *events) Patch(incompleteEvent *api.Event, data []byte) (*api.Event, err
 func (e *events) List(opts api.ListOptions) (*api.EventList, error) {
 	result := &api.EventList{}
 	err := e.client.Get().
-		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
+		Namespace(e.namespace).
 		Resource("events").
 		VersionedParams(&opts, api.Scheme).
 		Do().
@@ -132,7 +132,7 @@ func (e *events) List(opts api.ListOptions) (*api.EventList, error) {
 func (e *events) Get(name string) (*api.Event, error) {
 	result := &api.Event{}
 	err := e.client.Get().
-		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
+		Namespace(e.namespace).
 		Resource("events").
 		Name(name).
 		Do().
@@ -144,7 +144,7 @@ func (e *events) Get(name string) (*api.Event, error) {
 func (e *events) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return e.client.Get().
 		Prefix("watch").
-		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
+		Namespace(e.namespace).
 		Resource("events").
 		VersionedParams(&opts, api.Scheme).
 		Watch()
@@ -178,7 +178,7 @@ func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
 // Delete deletes an existing event.
 func (e *events) Delete(name string) error {
 	return e.client.Delete().
-		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
+		Namespace(e.namespace).
 		Resource("events").
 		Name(name).
 		Do().
@@ -188,7 +188,7 @@ func (e *events) Delete(name string) error {
 // DeleteCollection deletes a collection of objects.
 func (e *events) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return e.client.Delete().
-		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
+		Namespace(e.namespace).
 		Resource("events").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
