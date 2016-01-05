@@ -54,10 +54,12 @@ function start-proxy()
   done
 
   PROXY_PID=$!
+  # We try checking kubectl proxy 30 times with 1s delays to avoid occasional
+  # failures.
   if [ $# -eq 0 ]; then
-    kube::util::wait_for_url "http://127.0.0.1:${PROXY_PORT}/healthz" "kubectl proxy"
+    kube::util::wait_for_url "http://127.0.0.1:${PROXY_PORT}/healthz" "kubectl proxy" 1 30
   else
-    kube::util::wait_for_url "http://127.0.0.1:${PROXY_PORT}/$1/healthz" "kubectl proxy --api-prefix=$1"
+    kube::util::wait_for_url "http://127.0.0.1:${PROXY_PORT}/$1/healthz" "kubectl proxy --api-prefix=$1" 1 30
   fi
 }
 
