@@ -83,6 +83,9 @@ exec docker run \
   -t $(tty &>/dev/null && echo "-i") \
   mesosphere/kubernetes-mesos-test \
   -ceux "\
+    cat /proc/self/mounts && \
+    stat /sys/module/nf_conntrack && \
+    stat /proc/sys/net/netfilter/nf_conntrack_max && \
     make clean all && \
     trap 'timeout 5m ./cluster/kube-down.sh' EXIT && \
     ./cluster/kube-down.sh && \
