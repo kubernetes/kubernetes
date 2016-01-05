@@ -279,16 +279,7 @@ func (c *Fake) Discovery() client.DiscoveryInterface {
 	return &FakeDiscovery{c}
 }
 
-func (c *Fake) ServerVersion() (*version.Info, error) {
-	action := ActionImpl{}
-	action.Verb = "get"
-	action.Resource = "version"
-
-	c.Invokes(action, nil)
-	versionInfo := version.Get()
-	return &versionInfo, nil
-}
-
+// TODO: this should be removed
 func (c *Fake) ServerAPIVersions() (*unversioned.APIVersions, error) {
 	action := ActionImpl{}
 	action.Verb = "get"
@@ -385,4 +376,14 @@ func (c *FakeDiscovery) ServerResources() (map[string]*unversioned.APIResourceLi
 
 func (c *FakeDiscovery) ServerGroups() (*unversioned.APIGroupList, error) {
 	return nil, nil
+}
+
+func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
+	action := ActionImpl{}
+	action.Verb = "get"
+	action.Resource = "version"
+
+	c.Invokes(action, nil)
+	versionInfo := version.Get()
+	return &versionInfo, nil
 }

@@ -17,11 +17,14 @@ limitations under the License.
 package unversioned
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/url"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 // DiscoveryInterface holds the methods that discover server-supported API groups,
@@ -29,6 +32,7 @@ import (
 type DiscoveryInterface interface {
 	ServerGroupsInterface
 	ServerResourcesInterface
+	ServerVersionInterface
 }
 
 // ServerGroupsInterface has methods for obtaining supported groups on the API server
@@ -44,6 +48,12 @@ type ServerResourcesInterface interface {
 	ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error)
 	// ServerResources returns the supported resources for all groups and versions.
 	ServerResources() (map[string]*unversioned.APIResourceList, error)
+}
+
+// ServerVersionInterface has a method for retrieving the server's version.
+type ServerVersionInterface interface {
+	// ServerVersion retrieves and parses the server's version (git version).
+	ServerVersion() (*version.Info, error)
 }
 
 // DiscoveryClient implements the functions that dicovery server-supported API groups,
@@ -136,6 +146,20 @@ func (d *DiscoveryClient) ServerResources() (map[string]*unversioned.APIResource
 		result[groupVersion] = resources
 	}
 	return result, nil
+}
+
+// ServerVersion retrieves and parses the server's version (git version).
+func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
+	body, err := d.Get().AbsPath("/version").Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	var info version.Info
+	err = json.Unmarshal(body, &info)
+	if err != nil {
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+	}
+	return &info, nil
 }
 
 func setDiscoveryDefaults(config *Config) error {

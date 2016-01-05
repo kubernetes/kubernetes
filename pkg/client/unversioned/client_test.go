@@ -48,7 +48,7 @@ func TestGetServerVersion(t *testing.T) {
 	}))
 	client := NewOrDie(&Config{Host: server.URL})
 
-	got, err := client.ServerVersion()
+	got, err := client.Discovery().ServerVersion()
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}

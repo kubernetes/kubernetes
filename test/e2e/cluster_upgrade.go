@@ -326,7 +326,7 @@ func testMasterUpgrade(ip, v string, mUp func(v string) error) {
 }
 
 func checkMasterVersion(c *client.Client, want string) error {
-	v, err := c.ServerVersion()
+	v, err := c.Discovery().ServerVersion()
 	if err != nil {
 		return fmt.Errorf("checkMasterVersion() couldn't get the master version: %v", err)
 	}
