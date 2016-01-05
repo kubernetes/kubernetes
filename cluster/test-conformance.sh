@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Smoke Tests a running Kubernetes cluster.
+# Conformance Tests a running Kubernetes cluster.
 # Validates that the cluster was deployed, is accessible, and at least
-# satisfies minimal functional requirements.
-# Emphasis on speed and being non-destructive over thoroughness.
+# satisfies end-to-end tests marked as being a part of the conformance suite.
+# Emphasis on broad coverage and being non-destructive over thoroughness.
 
 set -o errexit
 set -o nounset
@@ -27,6 +27,4 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 TEST_ARGS="$@"
 
-SMOKE_TEST_FOCUS_REGEX="Guestbook.application"
-
-exec "${KUBE_ROOT}/cluster/test-e2e.sh" -ginkgo.focus="${SMOKE_TEST_FOCUS_REGEX}" ${TEST_ARGS}
+exec "${KUBE_ROOT}/hack/conformance-test.sh" ${TEST_ARGS}

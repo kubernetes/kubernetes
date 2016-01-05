@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,19 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Smoke Tests a running Kubernetes cluster.
-# Validates that the cluster was deployed, is accessible, and at least
-# satisfies minimal functional requirements.
-# Emphasis on speed and being non-destructive over thoroughness.
+# Deploys a test cluster, runs the e2e tests, and destroys the test cluster.
+#
+# Prerequisite:
+# ./cluster/mesos/docker/test/build.sh
+#
+# Example Usage:
+# ./contrib/mesos/ci/test-e2e.sh -v=2
 
 set -o errexit
 set -o nounset
 set -o pipefail
-
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+set -o errtrace
 
 TEST_ARGS="$@"
 
-SMOKE_TEST_FOCUS_REGEX="Guestbook.application"
+KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 
-exec "${KUBE_ROOT}/cluster/test-e2e.sh" -ginkgo.focus="${SMOKE_TEST_FOCUS_REGEX}" ${TEST_ARGS}
+"${KUBE_ROOT}/contrib/mesos/ci/run-with-cluster.sh" ./cluster/test-e2e.sh ${TEST_ARGS}
