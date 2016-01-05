@@ -54,10 +54,16 @@ else
 fi
 echo "${DOCKER_BIN_PATH}"
 
+if which lsmod; then
+  echo "Listing loaded linux kernel modules"
+  lsmod | sort
+fi
+
 # Clean (k8s output & images), Build, Kube-Up, Test, Kube-Down
 cd "${KUBE_ROOT}"
 exec docker run \
   --rm \
+  --privileged \
   -v "${KUBE_ROOT}:/go/src/github.com/GoogleCloudPlatform/kubernetes" \
   -v "/var/run/docker.sock:/var/run/docker.sock" \
   -v "${DOCKER_BIN_PATH}:/usr/bin/docker" \
@@ -77,6 +83,9 @@ exec docker run \
   -t $(tty &>/dev/null && echo "-i") \
   mesosphere/kubernetes-mesos-test \
   -ceux "\
+    cat /proc/self/mounts && \
+    stat /sys/module/nf_conntrack && \
+    stat /proc/sys/net/netfilter/nf_conntrack_max && \
     make clean all && \
     trap 'timeout 5m ./cluster/kube-down.sh' EXIT && \
     ./cluster/kube-down.sh && \

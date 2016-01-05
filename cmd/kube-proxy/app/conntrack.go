@@ -39,7 +39,13 @@ func (realConntracker) SetMax(max int) error {
 	}
 	// TODO: generify this and sysctl to a new sysfs.WriteInt()
 	glog.Infof("Setting conntrack hashsize to %d", max/4)
-	return ioutil.WriteFile("/sys/module/nf_conntrack/parameters/hashsize", []byte(strconv.Itoa(max/4)), 0640)
+
+	//TODO(jdef) debugging, don't return this error (for now)
+	err := ioutil.WriteFile("/sys/module/nf_conntrack/parameters/hashsize", []byte(strconv.Itoa(max/4)), 0640)
+	if err != nil {
+		glog.Errorf("Failed to set conntrack hashsize: %+v", err)
+	}
+	return nil
 }
 
 func (realConntracker) SetTCPEstablishedTimeout(seconds int) error {
