@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 // Interface holds the methods for clients of Kubernetes,
@@ -38,7 +37,6 @@ type Interface interface {
 	ReplicationControllersNamespacer
 	ServicesNamespacer
 	EndpointsNamespacer
-	VersionInterface
 	NodesInterface
 	EventNamespacer
 	LimitRangesNamespacer
@@ -113,31 +111,11 @@ func (c *Client) ComponentStatuses() ComponentStatusInterface {
 	return newComponentStatuses(c)
 }
 
-// VersionInterface has a method to retrieve the server version.
-type VersionInterface interface {
-	ServerVersion() (*version.Info, error)
-}
-
 // Client is the implementation of a Kubernetes client.
 type Client struct {
 	*RESTClient
 	*ExtensionsClient
-	// TODO: remove this when we re-structure pkg/client.
 	*DiscoveryClient
-}
-
-// ServerVersion retrieves and parses the server's version.
-func (c *Client) ServerVersion() (*version.Info, error) {
-	body, err := c.Get().AbsPath("/version").Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var info version.Info
-	err = json.Unmarshal(body, &info)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &info, nil
 }
 
 // SwaggerSchemaInterface has a method to retrieve the swagger schema. Used in
