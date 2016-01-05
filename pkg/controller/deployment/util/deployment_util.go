@@ -60,11 +60,121 @@ const (
 	RollbackDone = "DeploymentRollback"
 	// OverlapAnnotation marks deployments with overlapping selector with other deployments
 	// TODO: Delete this annotation when we gracefully handle overlapping selectors. See https://github.com/kubernetes/kubernetes/issues/2210
+	// TODO: Should be a Condition.
 	OverlapAnnotation = "deployment.kubernetes.io/error-selector-overlapping-with"
 	// SelectorUpdateAnnotation marks the last time deployment selector update
 	// TODO: Delete this annotation when we gracefully handle overlapping selectors. See https://github.com/kubernetes/kubernetes/issues/2210
+	// TODO: Should be a Condition.
 	SelectorUpdateAnnotation = "deployment.kubernetes.io/selector-updated-at"
+
+	// Reasons for deployment conditions
+	//
+	// ReplicaSetUpdatedReason is added in a deployment when one of its replica sets is updated as part
+	// of the rollout process.
+	ReplicaSetUpdatedReason = "ReplicaSetUpdated"
+	// FailedRSCreateReason is added in a deployment when it cannot create a new replica set.
+	FailedRSCreateReason = "ReplicaSetCreateErr"
+	// NewReplicaSetReason is added in a deployment when it creates a new replica set.
+	NewReplicaSetReason = "NewReplicaSetCreated"
+	// FoundNewRSReason is added in a deployment when it adopts an existing replica set.
+	FoundNewRSReason = "FoundNewReplicaSet"
+	// NewRSAvailableReason is added in a deployment when its newest replica set is made available
+	// ie. the number of new pods that have passed readiness checks and run for at least minReadySeconds
+	// is at least the minimum available pods that need to run for the deployment.
+	NewRSAvailableReason = "NewReplicaSetAvailable"
+	// TimedOutReason is added in a deployment when its newest replica set fails to deploy within the
+	// given deadline (progressDeadlineSeconds).
+	TimedOutReason = "DeploymentTimedOut"
+	// PausedDeployReason is added in a deployment when it is paused.
+	PausedDeployReason = "DeploymentPaused"
+	// ResumedDeployReason is added in a deployment when it is resumed. Useful for not failing accidentally
+	// deployments that paused amidst a rollout and are bounded by a deadline.
+	ResumedDeployReason = "DeploymentResumed"
 )
+
+// NewDeploymentCondition creates a new deployment condition.
+func NewDeploymentCondition(condType extensions.DeploymentConditionType, status api.ConditionStatus, reason, message string) *extensions.DeploymentCondition {
+	return &extensions.DeploymentCondition{
+		Type:               condType,
+		Status:             status,
+		LastTransitionTime: unversioned.Now(),
+		Reason:             reason,
+		Message:            message,
+	}
+}
+
+// DeploymentConditionExists returns if the provided condition already exists in the deployment conditions and the
+// only difference is in the timestamp.
+func DeploymentConditionExists(status extensions.DeploymentStatus, condType extensions.DeploymentConditionType, condStatus api.ConditionStatus, condReason string) bool {
+	for _, c := range status.Conditions {
+		if c.Type == condType && c.Status == condStatus && c.Reason == condReason {
+			return true
+		}
+	}
+	return false
+}
+
+// SetDeploymentCondition updates the deployment to include the provided condition. If the
+// condition already exists and overwriteIfExists is true, then the condition will be replaced.
+// True will be returned if there is an update in the deployment conditions.
+func SetDeploymentCondition(status *extensions.DeploymentStatus, condition extensions.DeploymentCondition) {
+	newConditions := filterOutCondition(status.Conditions, condition.Type)
+	status.Conditions = append(newConditions, condition)
+}
+
+// RemoveDeploymentCondition removes the deployment condition with the provided type and status
+// from the deployment conditions. It returns true if there was a removal, false otherwise.
+func RemoveDeploymentCondition(status *extensions.DeploymentStatus, condType extensions.DeploymentConditionType) {
+	status.Conditions = filterOutCondition(status.Conditions, condType)
+}
+
+// filterOutCondition returns a new slice of deployment conditions without conditions
+// with the provided type.
+func filterOutCondition(conditions []extensions.DeploymentCondition, condType extensions.DeploymentConditionType) []extensions.DeploymentCondition {
+	newConditions := []extensions.DeploymentCondition{}
+	for _, c := range conditions {
+		if c.Type == condType {
+			continue
+		}
+		newConditions = append(newConditions, c)
+	}
+	return newConditions
+}
+
+// ConditionFromWarningEvent transforms a warning event into a deployment condition.
+// Events passed in this helper should belong to a replica set. Only warnings for a
+// replica set currently are for failed creation or deletion of a pod, so we bound
+// this helper to accept just those.
+func ConditionFromWarningEvent(event api.Event) *extensions.DeploymentCondition {
+	if event.Type != api.EventTypeWarning &&
+		(event.Reason != controller.FailedCreatePodReason ||
+			event.Reason != controller.FailedDeletePodReason) {
+		return nil
+	}
+
+	return &extensions.DeploymentCondition{
+		Type:               extensions.DeploymentReplicaFailures,
+		Status:             api.ConditionTrue,
+		LastTransitionTime: event.FirstTimestamp,
+		Reason:             event.Reason,
+		Message:            event.Message,
+	}
+}
+
+// SetDeploymentRevision updates the revision for a deployment.
+func SetDeploymentRevision(deployment *extensions.Deployment, revision string) bool {
+	updated := false
+
+	if deployment.Annotations == nil {
+		deployment.Annotations = make(map[string]string)
+	}
+	if deployment.Annotations[RevisionAnnotation] != revision {
+		deployment.Annotations[RevisionAnnotation] = revision
+		updated = true
+	}
+
+	return updated
+}
 
 // MaxRevision finds the highest revision in the replica sets
 func MaxRevision(allRSs []*extensions.ReplicaSet) int64 {
@@ -697,6 +807,59 @@ func Revision(rs *extensions.ReplicaSet) (int64, error) {
 // IsRollingUpdate returns true if the strategy type is a rolling update.
 func IsRollingUpdate(deployment *extensions.Deployment) bool {
 	return deployment.Spec.Strategy.Type == extensions.RollingUpdateDeploymentStrategyType
+}
+
+// IsDeploymentComplete considers a deployment as complete once its desired replicas equals its
+// updatedReplicas and it doesn't violate minimum availability.
+func IsDeploymentComplete(deployment *extensions.Deployment, newStatus extensions.DeploymentStatus) bool {
+	return newStatus.UpdatedReplicas == deployment.Spec.Replicas &&
+		newStatus.AvailableReplicas >= deployment.Spec.Replicas-MaxUnavailable(*deployment)
+}
+
+// IsDeploymentProgressing reports if a deployment is progressing.
+func IsDeploymentProgressing(deployment *extensions.Deployment, newStatus extensions.DeploymentStatus) bool {
+	return deployment.Status.Replicas != newStatus.Replicas ||
+		deployment.Status.UpdatedReplicas != newStatus.UpdatedReplicas ||
+		deployment.Status.AvailableReplicas != newStatus.AvailableReplicas ||
+		deployment.Status.UnavailableReplicas != newStatus.UnavailableReplicas
+}
+
+// used for unit testing
+var nowFn = func() time.Time { return time.Now() }
+
+// IsDeploymentFailed considers a deployment as failed once its latest condition that reported progress
+// is older than the specified timeout.
+func IsDeploymentFailed(deployment *extensions.Deployment, newStatus extensions.DeploymentStatus) bool {
+	if deployment.Spec.ProgressDeadlineSeconds == nil {
+		return false
+	}
+
+	// Look at the difference in seconds between now and the last time we reported any
+	// progress or tried to create a replica set, or resumed a paused deployment and
+	// compare against progressDeadlineSeconds. If there is no such condition, we have
+	// no base to estimate progress.
+	var condition *extensions.DeploymentCondition
+out:
+	for i := range deployment.Status.Conditions {
+		cond := deployment.Status.Conditions[i]
+		if cond.Type != extensions.DeploymentProgressing {
+			continue
+		}
+		switch cond.Status {
+		case api.ConditionTrue, api.ConditionUnknown:
+			condition = &cond
+			break out
+		case api.ConditionFalse:
+			return true
+		}
+	}
+	if condition == nil {
+		return false
+	}
+
+	from := condition.LastTransitionTime
+	delta := time.Duration(*deployment.Spec.ProgressDeadlineSeconds) * time.Second
+	return from.Add(delta).Before(nowFn())
 }
 
 // NewRSNewReplicas calculates the number of replicas a deployment's new RS should have.

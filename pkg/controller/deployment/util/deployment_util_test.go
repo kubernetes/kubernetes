@@ -770,3 +770,67 @@ func TestNewRSNewReplicas(t *testing.T) {
 		}
 	}
 }
+
+func TestIsDeploymentFailed(t *testing.T) {
+	var (
+		null *int32
+		ten  = int32(10)
+	)
+
+	timeFn := func(min, sec int) time.Time {
+		return time.Date(2016, 1, 1, 0, min, sec, 0, time.UTC)
+	}
+	deployment := func(condType extensions.DeploymentConditionType, status api.ConditionStatus, pds *int32, from time.Time) extensions.Deployment {
+		return extensions.Deployment{
+			Spec: extensions.DeploymentSpec{
+				ProgressDeadlineSeconds: pds,
+			},
+			Status: extensions.DeploymentStatus{
+				Conditions: []extensions.DeploymentCondition{
+					{
+						Type:               condType,
+						Status:             status,
+						LastTransitionTime: unversioned.Time{Time: from},
+					},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name string
+
+		d        extensions.Deployment
+		nowFn    func() time.Time
+		expected bool
+	}{
+		{
+			name: "no progressDeadlineSeconds specified - no timeout",
+
+			d:        deployment(extensions.DeploymentProgressing, api.ConditionTrue, null, timeFn(1, 9)),
+			nowFn:    func() time.Time { return timeFn(1, 20) },
+			expected: false,
+		},
+		{
+			name: "progressDeadlineSeconds: 10s, now - started => 00:01:20 - 00:01:09 => 11s",
+
+			d:        deployment(extensions.DeploymentProgressing, api.ConditionTrue, &ten, timeFn(1, 9)),
+			nowFn:    func() time.Time { return timeFn(1, 20) },
+			expected: true,
+		},
+		{
+			name: "progressDeadlineSeconds: 10s, now - started => 00:01:20 - 00:01:11 => 9s",
+
+			d:        deployment(extensions.DeploymentProgressing, api.ConditionTrue, &ten, timeFn(1, 11)),
+			nowFn:    func() time.Time { return timeFn(1, 20) },
+			expected: false,
+		},
+	}
+
+	for i, test := range tests {
+		nowFn = test.nowFn
+		if got, exp := IsDeploymentFailed(&test.d, test.d.Status), test.expected; got != exp {
+			t.Errorf("[%d] expected timeout: %t, got: %t", i, exp, got)
+		}
+	}
+}
