@@ -24,7 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/timeutil"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -63,9 +64,9 @@ func NewRepair(interval time.Duration, registry service.Registry, network *net.I
 
 // RunUntil starts the controller until the provided ch is closed.
 func (c *Repair) RunUntil(ch chan struct{}) {
-	util.Until(func() {
+	timeutil.Until(func() {
 		if err := c.RunOnce(); err != nil {
-			util.HandleError(err)
+			testutil.HandleError(err)
 		}
 	}, c.interval, ch)
 }
@@ -106,7 +107,7 @@ func (c *Repair) RunOnce() error {
 		ip := net.ParseIP(svc.Spec.ClusterIP)
 		if ip == nil {
 			// cluster IP is broken, reallocate
-			util.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not a valid IP; please recreate", svc.Spec.ClusterIP, svc.Name, svc.Namespace))
+			testutil.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not a valid IP; please recreate", svc.Spec.ClusterIP, svc.Name, svc.Namespace))
 			continue
 		}
 		switch err := r.Allocate(ip); err {
@@ -114,11 +115,11 @@ func (c *Repair) RunOnce() error {
 		case ipallocator.ErrAllocated:
 			// TODO: send event
 			// cluster IP is broken, reallocate
-			util.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s was assigned to multiple services; please recreate", ip, svc.Name, svc.Namespace))
+			testutil.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s was assigned to multiple services; please recreate", ip, svc.Name, svc.Namespace))
 		case ipallocator.ErrNotInRange:
 			// TODO: send event
 			// cluster IP is broken, reallocate
-			util.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not within the service CIDR %s; please recreate", ip, svc.Name, svc.Namespace, c.network))
+			testutil.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not within the service CIDR %s; please recreate", ip, svc.Name, svc.Namespace, c.network))
 		case ipallocator.ErrFull:
 			// TODO: send event
 			return fmt.Errorf("the service CIDR %v is full; you must widen the CIDR in order to create new services", r)

@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/testing"
 )
 
 const (
@@ -803,7 +803,7 @@ func (k *Executor) doShutdown(driver bindings.ExecutorDriver) {
 
 	if k.shutdownAlert != nil {
 		func() {
-			util.HandleCrash()
+			testutil.HandleCrash()
 			k.shutdownAlert()
 		}()
 	}

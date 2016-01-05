@@ -55,7 +55,7 @@ import (
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/util/networking"
 	"k8s.io/kubernetes/pkg/util/secure"
-	"k8s.io/kubernetes/pkg/util/testutil"
+	"k8s.io/kubernetes/pkg/util/testing"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"

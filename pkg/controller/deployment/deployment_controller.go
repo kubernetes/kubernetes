@@ -32,8 +32,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
+	mathtool "k8s.io/kubernetes/pkg/util/math"
+	"k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/timeutil"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -162,12 +164,12 @@ func NewDeploymentController(client client.Interface, resyncPeriod controller.Re
 
 // Run begins watching and syncing.
 func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
-	defer util.HandleCrash()
+	defer testutil.HandleCrash()
 	go dc.dController.Run(stopCh)
 	go dc.rcController.Run(stopCh)
 	go dc.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {
-		go util.Until(dc.worker, time.Second, stopCh)
+		go timeutil.Until(dc.worker, time.Second, stopCh)
 	}
 	<-stopCh
 	glog.Infof("Shutting down deployment controller")
@@ -490,12 +492,12 @@ func (dc *DeploymentController) reconcileNewRC(allRCs []*api.ReplicationControll
 		return true, err
 	}
 	// Check if we can scale up.
-	maxSurge, isPercent, err := util.GetIntOrPercentValue(&deployment.Spec.Strategy.RollingUpdate.MaxSurge)
+	maxSurge, isPercent, err := mathtool.GetIntOrPercentValue(&deployment.Spec.Strategy.RollingUpdate.MaxSurge)
 	if err != nil {
 		return false, fmt.Errorf("invalid value for MaxSurge: %v", err)
 	}
 	if isPercent {
-		maxSurge = util.GetValueFromPercent(maxSurge, deployment.Spec.Replicas)
+		maxSurge = mathtool.GetValueFromPercent(maxSurge, deployment.Spec.Replicas)
 	}
 	// Find the total number of pods
 	currentPodCount := deploymentutil.GetReplicaCountForRCs(allRCs)
@@ -520,12 +522,12 @@ func (dc *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationControl
 		// Cant scale down further
 		return false, nil
 	}
-	maxUnavailable, isPercent, err := util.GetIntOrPercentValue(&deployment.Spec.Strategy.RollingUpdate.MaxUnavailable)
+	maxUnavailable, isPercent, err := mathtool.GetIntOrPercentValue(&deployment.Spec.Strategy.RollingUpdate.MaxUnavailable)
 	if err != nil {
 		return false, fmt.Errorf("invalid value for MaxUnavailable: %v", err)
 	}
 	if isPercent {
-		maxUnavailable = util.GetValueFromPercent(maxUnavailable, deployment.Spec.Replicas)
+		maxUnavailable = mathtool.GetValueFromPercent(maxUnavailable, deployment.Spec.Replicas)
 	}
 	// Check if we can scale down.
 	minAvailable := deployment.Spec.Replicas - maxUnavailable

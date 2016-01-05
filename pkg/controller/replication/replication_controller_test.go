@@ -32,8 +32,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/timeutil"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -52,7 +54,7 @@ func newReplicationController(replicas int) *api.ReplicationController {
 	rc := &api.ReplicationController{
 		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 		ObjectMeta: api.ObjectMeta{
-			UID:             util.NewUUID(),
+			UID:             uuid.NewUUID(),
 			Name:            "foobar",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "18",
@@ -188,7 +190,7 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 		if key != expected {
 			t.Errorf("Unexpected sync all for rc %v, expected %v", key, expected)
 		}
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(timeutil.ForeverTestTimeout):
 		t.Errorf("Processing DeleteFinalStateUnknown took longer than expected")
 	}
 }
@@ -210,7 +212,7 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 
 func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	// Setup a fake server to listen for requests, and run the rc manager in steady state
-	fakeHandler := util.FakeHandler{
+	fakeHandler := testutil.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: "",
 	}
@@ -251,7 +253,7 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 
 func TestControllerUpdateReplicas(t *testing.T) {
 	// This is a happy server just to record the PUT request we expect for status.Replicas
-	fakeHandler := util.FakeHandler{
+	fakeHandler := testutil.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: "",
 	}
@@ -290,7 +292,7 @@ func TestControllerUpdateReplicas(t *testing.T) {
 
 func TestSyncReplicationControllerDormancy(t *testing.T) {
 	// Setup a test server so we can lie about the current state of pods
-	fakeHandler := util.FakeHandler{
+	fakeHandler := testutil.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: "",
 	}
@@ -440,14 +442,14 @@ func TestWatchControllers(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go manager.rcController.Run(stopCh)
-	go util.Until(manager.worker, 10*time.Millisecond, stopCh)
+	go timeutil.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	testControllerSpec.Name = "foo"
 	fakeWatch.Add(&testControllerSpec)
 
 	select {
 	case <-received:
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(timeutil.ForeverTestTimeout):
 		t.Errorf("Expected 1 call but got 0")
 	}
 }
@@ -483,7 +485,7 @@ func TestWatchPods(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go manager.podController.Run(stopCh)
-	go util.Until(manager.worker, 10*time.Millisecond, stopCh)
+	go timeutil.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	pods := newPodList(nil, 1, api.PodRunning, testControllerSpec)
 	testPod := pods.Items[0]
@@ -492,7 +494,7 @@ func TestWatchPods(t *testing.T) {
 
 	select {
 	case <-received:
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(timeutil.ForeverTestTimeout):
 		t.Errorf("Expected 1 call but got 0")
 	}
 }
@@ -514,7 +516,7 @@ func TestUpdatePods(t *testing.T) {
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	go util.Until(manager.worker, 10*time.Millisecond, stopCh)
+	go timeutil.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	// Put 2 rcs and one pod into the controller's stores
 	testControllerSpec1 := newReplicationController(1)
@@ -541,7 +543,7 @@ func TestUpdatePods(t *testing.T) {
 			if !expected.Has(got) {
 				t.Errorf("Expected keys %#v got %v", expected, got)
 			}
-		case <-time.After(util.ForeverTestTimeout):
+		case <-time.After(timeutil.ForeverTestTimeout):
 			t.Errorf("Expected update notifications for controllers within 100ms each")
 		}
 	}
@@ -549,7 +551,7 @@ func TestUpdatePods(t *testing.T) {
 
 func TestControllerUpdateRequeue(t *testing.T) {
 	// This server should force a requeue of the controller because it fails to update status.Replicas.
-	fakeHandler := util.FakeHandler{
+	fakeHandler := testutil.FakeHandler{
 		StatusCode:   500,
 		ResponseBody: "",
 	}
@@ -581,7 +583,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 		if key != expectedKey {
 			t.Errorf("Expected requeue of controller with key %s got %s", expectedKey, key)
 		}
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(timeutil.ForeverTestTimeout):
 		manager.queue.ShutDown()
 		t.Errorf("Expected to find an rc in the queue, found none.")
 	}
@@ -871,7 +873,7 @@ func TestOverlappingRCs(t *testing.T) {
 		for j := 1; j < 10; j++ {
 			controllerSpec := newReplicationController(1)
 			controllerSpec.CreationTimestamp = unversioned.Date(2014, time.December, j, 0, 0, 0, 0, time.Local)
-			controllerSpec.Name = string(util.NewUUID())
+			controllerSpec.Name = string(uuid.NewUUID())
 			controllers = append(controllers, controllerSpec)
 		}
 		shuffledControllers := shuffle(controllers)

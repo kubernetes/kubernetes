@@ -27,7 +27,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/testing"
 )
 
 // PodWorkers is an abstract interface for testability.
@@ -154,7 +154,7 @@ func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateType kube
 		// the status of the pod for the first pod worker sync. See corresponding
 		// comment in syncPod.
 		go func() {
-			defer util.HandleCrash()
+			defer testutil.HandleCrash()
 			p.managePodLoop(podUpdates)
 		}()
 	}

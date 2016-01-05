@@ -27,11 +27,13 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/volume"
+
+	"k8s.io/kubernetes/pkg/util/testing"
 )
 
 const (
@@ -133,7 +135,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (volum
 		return "", 0, err
 	}
 
-	name := fmt.Sprintf("kube-dynamic-%s", util.NewUUID())
+	name := fmt.Sprintf("kube-dynamic-%s", uuid.NewUUID())
 	requestBytes := c.options.Capacity.Value()
 	// GCE works with gigabytes, convert to GiB with rounding up
 	requestGB := volume.RoundUpSize(requestBytes, 1024*1024*1024)
@@ -214,7 +216,7 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String) (string, er
 // This function is intended to be called asynchronously as a go routine.
 func detachDiskAndVerify(c *gcePersistentDiskCleaner) {
 	glog.V(5).Infof("detachDiskAndVerify(...) for pd %q. Will block for pending operations", c.pdName)
-	defer util.HandleCrash()
+	defer testutil.HandleCrash()
 
 	// Block execution until any pending attach/detach operations for this PD have completed
 	attachDetachMutex.LockKey(c.pdName)

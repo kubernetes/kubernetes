@@ -26,12 +26,13 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/timeutil"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 func init() {
-	util.ReallyCrash = true
+	testutil.ReallyCrash = true
 }
 
 var defaultProbe *api.Probe = &api.Probe{
@@ -259,7 +260,7 @@ func TestUpdateReadiness(t *testing.T) {
 
 	// Start syncing readiness without leaking goroutine.
 	stopCh := make(chan struct{})
-	go util.Until(m.updateReadiness, 0, stopCh)
+	go timeutil.Until(m.updateReadiness, 0, stopCh)
 	defer func() {
 		close(stopCh)
 		// Send an update to exit updateReadiness()
@@ -331,7 +332,7 @@ func waitForWorkerExit(m *manager, workerPaths []probeKey) error {
 			continue // Already exited, no need to poll.
 		}
 		glog.Infof("Polling %v", w)
-		if err := wait.Poll(interval, util.ForeverTestTimeout, condition); err != nil {
+		if err := wait.Poll(interval, timeutil.ForeverTestTimeout, condition); err != nil {
 			return err
 		}
 	}
@@ -356,7 +357,7 @@ func waitForReadyStatus(m *manager, ready bool) error {
 		return status.ContainerStatuses[0].Ready == ready, nil
 	}
 	glog.Infof("Polling for ready state %v", ready)
-	if err := wait.Poll(interval, util.ForeverTestTimeout, condition); err != nil {
+	if err := wait.Poll(interval, timeutil.ForeverTestTimeout, condition); err != nil {
 		return err
 	}
 
@@ -377,7 +378,7 @@ func cleanup(t *testing.T, m *manager) {
 	if exited, _ := condition(); exited {
 		return // Already exited, no need to poll.
 	}
-	if err := wait.Poll(interval, util.ForeverTestTimeout, condition); err != nil {
+	if err := wait.Poll(interval, timeutil.ForeverTestTimeout, condition); err != nil {
 		t.Fatalf("Error during cleanup: %v", err)
 	}
 }

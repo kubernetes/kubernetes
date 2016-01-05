@@ -23,7 +23,8 @@ import (
 	"time"
 
 	"golang.org/x/net/websocket"
-	"k8s.io/kubernetes/pkg/util"
+
+	"k8s.io/kubernetes/pkg/util/testing"
 )
 
 // The WebSocket subprotocol "binary.k8s.io" will only send messages to the
@@ -71,7 +72,7 @@ func (r *Reader) handshake(config *websocket.Config, req *http.Request) error {
 // method completes.
 func (r *Reader) Copy(w http.ResponseWriter, req *http.Request) error {
 	go func() {
-		defer util.HandleCrash()
+		defer testutil.HandleCrash()
 		websocket.Server{Handshake: r.handshake, Handler: r.handle}.ServeHTTP(w, req)
 	}()
 	return <-r.err

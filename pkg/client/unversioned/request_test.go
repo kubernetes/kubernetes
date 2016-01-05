@@ -37,9 +37,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flow"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/watch"
 	watchjson "k8s.io/kubernetes/pkg/watch/json"
 )
@@ -697,7 +698,7 @@ func TestDoRequestNewWay(t *testing.T) {
 		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := testutil.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
@@ -747,7 +748,7 @@ func TestBackoffLifecycle(t *testing.T) {
 	seconds := []int{0, 1, 2, 4, 8, 0, 1, 2, 4, 0}
 	request := c.Verb("POST").Prefix("backofftest").Suffix("abc")
 	request.backoffMgr = &URLBackoff{
-		Backoff: util.NewBackOff(
+		Backoff: flow.NewBackOff(
 			time.Duration(1)*time.Second,
 			time.Duration(200)*time.Second)}
 	for _, sec := range seconds {
@@ -861,7 +862,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := testutil.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
@@ -901,7 +902,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := testutil.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
@@ -955,7 +956,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := testutil.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
@@ -1000,7 +1001,7 @@ func TestWasCreated(t *testing.T) {
 		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := testutil.FakeHandler{
 		StatusCode:   201,
 		ResponseBody: string(expectedBody),
 		T:            t,

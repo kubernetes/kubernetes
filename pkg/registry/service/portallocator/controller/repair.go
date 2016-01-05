@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	"k8s.io/kubernetes/pkg/util/networking"
-	"k8s.io/kubernetes/pkg/util/testutil"
+	"k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/util/timeutil"
 )
 

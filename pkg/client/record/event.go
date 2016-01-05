@@ -26,7 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/timeutil"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -106,7 +107,7 @@ func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSin
 	// The default math/rand package functions aren't thread safe, so create a
 	// new Rand object for each StartRecording call.
 	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
-	eventCorrelator := NewEventCorrelator(util.RealClock{})
+	eventCorrelator := NewEventCorrelator(timeutil.RealClock{})
 	return eventBroadcaster.StartEventWatcher(
 		func(event *api.Event) {
 			// Make a copy before modification, because there could be multiple listeners.
@@ -115,7 +116,7 @@ func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSin
 			event = &eventCopy
 			result, err := eventCorrelator.EventCorrelate(event)
 			if err != nil {
-				util.HandleError(err)
+				testutil.HandleError(err)
 			}
 			if result.Skip {
 				return
@@ -212,7 +213,7 @@ func (eventBroadcaster *eventBroadcasterImpl) StartLogging(logf func(format stri
 func (eventBroadcaster *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*api.Event)) watch.Interface {
 	watcher := eventBroadcaster.Watch()
 	go func() {
-		defer util.HandleCrash()
+		defer testutil.HandleCrash()
 		for {
 			watchEvent, open := <-watcher.ResultChan()
 			if !open {
@@ -232,13 +233,13 @@ func (eventBroadcaster *eventBroadcasterImpl) StartEventWatcher(eventHandler fun
 
 // NewRecorder returns an EventRecorder that records events with the given event source.
 func (eventBroadcaster *eventBroadcasterImpl) NewRecorder(source api.EventSource) EventRecorder {
-	return &recorderImpl{source, eventBroadcaster.Broadcaster, util.RealClock{}}
+	return &recorderImpl{source, eventBroadcaster.Broadcaster, timeutil.RealClock{}}
 }
 
 type recorderImpl struct {
 	source api.EventSource
 	*watch.Broadcaster
-	clock util.Clock
+	clock timeutil.Clock
 }
 
 func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp unversioned.Time, eventtype, reason, message string) {

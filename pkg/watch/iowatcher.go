@@ -23,7 +23,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/networking"
-	"k8s.io/kubernetes/pkg/util/testutil"
+	"k8s.io/kubernetes/pkg/util/testing"
 )
 
 // Decoder allows StreamWatcher to watch any stream for which a Decoder can be written.

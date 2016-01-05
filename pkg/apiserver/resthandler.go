@@ -35,8 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/log"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
+	"k8s.io/kubernetes/pkg/util/testing"
 
 	"github.com/emicklei/go-restful"
 	"github.com/evanphx/json-patch"
@@ -117,7 +118,7 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) restful.Rou
 	return getResourceHandler(scope,
 		func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error) {
 			// For performance tracking purposes.
-			trace := util.NewTrace("Get " + req.Request.URL.Path)
+			trace := log.NewTrace("Get " + req.Request.URL.Path)
 			defer trace.LogIfLong(250 * time.Millisecond)
 			opts := v1.ExportOptions{}
 			if err := scope.Codec.DecodeParametersInto(req.Request.URL.Query(), &opts); err != nil {
@@ -243,7 +244,7 @@ func (r *responder) Error(err error) {
 func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		// For performance tracking purposes.
-		trace := util.NewTrace("List " + req.Request.URL.Path)
+		trace := log.NewTrace("List " + req.Request.URL.Path)
 
 		w := res.ResponseWriter
 
@@ -356,7 +357,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, includeName bool) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		// For performance tracking purposes.
-		trace := util.NewTrace("Create " + req.Request.URL.Path)
+		trace := log.NewTrace("Create " + req.Request.URL.Path)
 		defer trace.LogIfLong(250 * time.Millisecond)
 
 		w := res.ResponseWriter
@@ -608,7 +609,7 @@ func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.
 func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		// For performance tracking purposes.
-		trace := util.NewTrace("Update " + req.Request.URL.Path)
+		trace := log.NewTrace("Update " + req.Request.URL.Path)
 		defer trace.LogIfLong(250 * time.Millisecond)
 
 		w := res.ResponseWriter
@@ -685,7 +686,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		// For performance tracking purposes.
-		trace := util.NewTrace("Delete " + req.Request.URL.Path)
+		trace := log.NewTrace("Delete " + req.Request.URL.Path)
 		defer trace.LogIfLong(250 * time.Millisecond)
 
 		w := res.ResponseWriter
@@ -876,7 +877,7 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 	panicCh := make(chan interface{}, 1)
 	go func() {
 		// panics don't cross goroutine boundaries, so we have to handle ourselves
-		defer util.HandleCrash(func(panicReason interface{}) {
+		defer testutil.HandleCrash(func(panicReason interface{}) {
 			// Propagate to parent goroutine
 			panicCh <- panicReason
 		})

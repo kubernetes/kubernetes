@@ -32,8 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flow"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -70,7 +71,7 @@ type ConfigFactory struct {
 	// Close this to stop all reflectors
 	StopEverything chan struct{}
 	// Rate limiter for binding pods
-	BindPodsRateLimiter util.RateLimiter
+	BindPodsRateLimiter flow.RateLimiter
 
 	scheduledPodPopulator *framework.Controller
 	modeler               scheduler.SystemModeler
@@ -82,7 +83,7 @@ type ConfigFactory struct {
 }
 
 // Initializes the factory.
-func NewConfigFactory(client *client.Client, rateLimiter util.RateLimiter, schedulerName string) *ConfigFactory {
+func NewConfigFactory(client *client.Client, rateLimiter flow.RateLimiter, schedulerName string) *ConfigFactory {
 	c := &ConfigFactory{
 		Client:             client,
 		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
@@ -347,7 +348,7 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 		// Retry asynchronously.
 		// Note that this is extremely rudimentary and we need a more real error handling path.
 		go func() {
-			defer util.HandleCrash()
+			defer testutil.HandleCrash()
 			podID := types.NamespacedName{
 				Namespace: pod.Namespace,
 				Name:      pod.Name,

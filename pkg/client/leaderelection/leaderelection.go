@@ -61,7 +61,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/timeutil"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -156,7 +157,7 @@ type LeaderElectionRecord struct {
 // Run starts the leader election loop
 func (le *LeaderElector) Run() {
 	defer func() {
-		util.HandleCrash()
+		testutil.HandleCrash()
 		le.config.Callbacks.OnStoppedLeading()
 	}()
 	le.acquire()
@@ -169,7 +170,7 @@ func (le *LeaderElector) Run() {
 // acquire loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew succeeds.
 func (le *LeaderElector) acquire() {
 	stop := make(chan struct{})
-	util.Until(func() {
+	timeutil.Until(func() {
 		succeeded := le.tryAcquireOrRenew()
 		if !succeeded {
 			glog.V(4).Infof("failed to renew lease %v/%v", le.config.EndpointsMeta.Namespace, le.config.EndpointsMeta.Name)
@@ -185,7 +186,7 @@ func (le *LeaderElector) acquire() {
 // renew loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew fails.
 func (le *LeaderElector) renew() {
 	stop := make(chan struct{})
-	util.Until(func() {
+	timeutil.Until(func() {
 		err := wait.Poll(le.config.RetryPeriod, le.config.RenewDeadline, func() (bool, error) {
 			return le.tryAcquireOrRenew(), nil
 		})

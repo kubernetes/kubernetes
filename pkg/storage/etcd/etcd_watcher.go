@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/watch"
 
 	etcd "github.com/coreos/etcd/client"
@@ -144,7 +144,7 @@ func newEtcdWatcher(list bool, include includeFunc, filter storage.FilterFunc, e
 // etcdWatch calls etcd's Watch function, and handles any errors. Meant to be called
 // as a goroutine.
 func (w *etcdWatcher) etcdWatch(ctx context.Context, client etcd.KeysAPI, key string, resourceVersion uint64) {
-	defer util.HandleCrash()
+	defer testutil.HandleCrash()
 	defer close(w.etcdError)
 	defer close(w.etcdIncoming)
 
@@ -246,7 +246,7 @@ var (
 // called as a goroutine.
 func (w *etcdWatcher) translate() {
 	defer close(w.outgoing)
-	defer util.HandleCrash()
+	defer testutil.HandleCrash()
 
 	for {
 		select {

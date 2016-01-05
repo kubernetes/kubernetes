@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/testing"
 )
 
 func parseSelectorOrDie(s string) fields.Selector {
@@ -89,7 +89,7 @@ func TestListWatchesCanList(t *testing.T) {
 		},
 	}
 	for _, item := range table {
-		handler := util.FakeHandler{
+		handler := testutil.FakeHandler{
 			StatusCode:   500,
 			ResponseBody: "",
 			T:            t,
@@ -155,7 +155,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 	}
 
 	for _, item := range table {
-		handler := util.FakeHandler{
+		handler := testutil.FakeHandler{
 			StatusCode:   500,
 			ResponseBody: "",
 			T:            t,

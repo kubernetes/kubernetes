@@ -31,7 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/timeutil"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 	"sync"
@@ -176,12 +177,12 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 
 // Run begins watching and syncing daemon sets.
 func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
-	defer util.HandleCrash()
+	defer testutil.HandleCrash()
 	go dsc.dsController.Run(stopCh)
 	go dsc.podController.Run(stopCh)
 	go dsc.nodeController.Run(stopCh)
 	for i := 0; i < workers; i++ {
-		go util.Until(dsc.worker, time.Second, stopCh)
+		go timeutil.Until(dsc.worker, time.Second, stopCh)
 	}
 	<-stopCh
 	glog.Infof("Shutting down Daemon Set Controller")
@@ -435,7 +436,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 			if err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, ds.Spec.Template, ds); err != nil {
 				glog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
 				dsc.expectations.CreationObserved(dsKey)
-				util.HandleError(err)
+				testutil.HandleError(err)
 			}
 		}(i)
 	}
@@ -450,7 +451,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 			if err := dsc.podControl.DeletePod(ds.Namespace, podsToDelete[ix], ds); err != nil {
 				glog.V(2).Infof("Failed deletion, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
 				dsc.expectations.DeletionObserved(dsKey)
-				util.HandleError(err)
+				testutil.HandleError(err)
 			}
 		}(i)
 	}

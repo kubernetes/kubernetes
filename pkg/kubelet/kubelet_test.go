@@ -55,16 +55,20 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
+	"k8s.io/kubernetes/pkg/util/diff"
+	"k8s.io/kubernetes/pkg/util/flow"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/timeutil"
+	timetesting "k8s.io/kubernetes/pkg/util/timeutil/testing"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
 )
 
 func init() {
-	util.ReallyCrash = true
+	testutil.ReallyCrash = true
 }
 
 const testKubeletHostname = "127.0.0.1"
@@ -143,8 +147,8 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 
 	kubelet.volumeManager = newVolumeManager()
 	kubelet.containerManager = cm.NewStubContainerManager()
-	fakeClock := &util.FakeClock{Time: time.Now()}
-	kubelet.backOff = util.NewBackOff(time.Second, time.Minute)
+	fakeClock := &timetesting.FakeClock{Time: time.Now()}
+	kubelet.backOff = flow.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
 	kubelet.podKillingCh = make(chan *kubecontainer.Pod, 20)
 	kubelet.resyncInterval = 10 * time.Second
@@ -2581,7 +2585,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
-		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
+		t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
 	}
 }
 
@@ -2702,7 +2706,7 @@ func testDockerRuntimeVersion(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
-		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
+		t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
 	}
 
 	// Downgrade docker version, node should be NotReady
@@ -3000,7 +3004,7 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
-		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
+		t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
 	}
 }
 
@@ -3410,7 +3414,7 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 		done <- struct{}{}
 	}()
 	select {
-	case <-time.After(util.ForeverTestTimeout):
+	case <-time.After(timeutil.ForeverTestTimeout):
 		t.Errorf("timed out waiting for registration")
 	case <-done:
 		return

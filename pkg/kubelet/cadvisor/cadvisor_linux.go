@@ -33,7 +33,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/utils/sysfs"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/testing"
 )
 
 type cadvisorClient struct {
@@ -109,7 +109,7 @@ func (cc *cadvisorClient) exportHTTP(port uint) error {
 		// If export failed, retry in the background until we are able to bind.
 		// This allows an existing cAdvisor to be killed before this one registers.
 		go func() {
-			defer util.HandleCrash()
+			defer testutil.HandleCrash()
 
 			err := serv.ListenAndServe()
 			for err != nil {

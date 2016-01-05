@@ -30,7 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/timeutil"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -83,7 +84,7 @@ func New(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc, 
 
 func (gcc *GCController) Run(stop <-chan struct{}) {
 	go gcc.podStoreSyncer.Run(stop)
-	go util.Until(gcc.gc, gcCheckPeriod, stop)
+	go timeutil.Until(gcc.gc, gcCheckPeriod, stop)
 	<-stop
 }
 
@@ -108,7 +109,7 @@ func (gcc *GCController) gc() {
 			defer wait.Done()
 			if err := gcc.deletePod(namespace, name); err != nil {
 				// ignore not founds
-				defer util.HandleError(err)
+				defer testutil.HandleError(err)
 			}
 		}(terminatedPods[i].Namespace, terminatedPods[i].Name)
 	}

@@ -28,13 +28,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
+	"k8s.io/kubernetes/pkg/util/testing"
 )
 
 func TestDoRequestSuccess(t *testing.T) {
 	status := &unversioned.Status{Status: unversioned.StatusSuccess}
 	expectedBody, _ := testapi.Default.Codec().Encode(status)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := testutil.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
@@ -77,7 +78,7 @@ func TestDoRequestFailed(t *testing.T) {
 		Details: &unversioned.StatusDetails{},
 	}
 	expectedBody, _ := testapi.Default.Codec().Encode(status)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := testutil.FakeHandler{
 		StatusCode:   404,
 		ResponseBody: string(expectedBody),
 		T:            t,
@@ -102,14 +103,14 @@ func TestDoRequestFailed(t *testing.T) {
 	}
 	actual := ss.Status()
 	if !reflect.DeepEqual(status, &actual) {
-		t.Errorf("Unexpected mis-match: %s", util.ObjectDiff(status, &actual))
+		t.Errorf("Unexpected mis-match: %s", diff.ObjectDiff(status, &actual))
 	}
 }
 
 func TestDoRequestCreated(t *testing.T) {
 	status := &unversioned.Status{Status: unversioned.StatusSuccess}
 	expectedBody, _ := testapi.Default.Codec().Encode(status)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := testutil.FakeHandler{
 		StatusCode:   201,
 		ResponseBody: string(expectedBody),
 		T:            t,

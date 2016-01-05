@@ -50,11 +50,11 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 	"k8s.io/kubernetes/pkg/util/limitwriter"
+	"k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/util/wsstream"
 )
 
@@ -778,7 +778,7 @@ func ServePortForward(w http.ResponseWriter, req *http.Request, portForwarder Po
 	// negotiated protocol isn't currently used server side, but could be in the future
 	if err != nil {
 		// Handshake writes the error to the client
-		util.HandleError(err)
+		testutil.HandleError(err)
 		return
 	}
 
@@ -880,7 +880,7 @@ func (h *portForwardStreamHandler) monitorStreamPair(p *portForwardStreamPair, t
 	select {
 	case <-timeout:
 		err := fmt.Errorf("(conn=%p, request=%s) timed out waiting for streams", h.conn, p.requestID)
-		util.HandleError(err)
+		testutil.HandleError(err)
 		p.printError(err.Error())
 	case <-p.complete:
 		glog.V(5).Infof("(conn=%p, request=%s) successfully received error and data streams", h.conn, p.requestID)
@@ -964,7 +964,7 @@ Loop:
 			}
 			if complete, err := p.add(stream); err != nil {
 				msg := fmt.Sprintf("error processing stream for request %s: %v", requestID, err)
-				util.HandleError(errors.New(msg))
+				testutil.HandleError(errors.New(msg))
 				p.printError(msg)
 			} else if complete {
 				go h.portForward(p)
@@ -988,7 +988,7 @@ func (h *portForwardStreamHandler) portForward(p *portForwardStreamPair) {
 
 	if err != nil {
 		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", port, h.pod, h.uid, err)
-		util.HandleError(msg)
+		testutil.HandleError(msg)
 		fmt.Fprint(p.errorStream, msg.Error())
 	}
 }

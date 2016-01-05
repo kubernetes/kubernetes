@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/testing"
 )
 
 func TestURLErrorNotExistNoUpdate(t *testing.T) {
@@ -106,7 +106,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: Some weird json problem: %v", testCase.desc, err)
 		}
-		fakeHandler := util.FakeHandler{
+		fakeHandler := testutil.FakeHandler{
 			StatusCode:   200,
 			ResponseBody: string(data),
 		}
@@ -266,7 +266,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
 		}
-		fakeHandler := util.FakeHandler{
+		fakeHandler := testutil.FakeHandler{
 			StatusCode:   200,
 			ResponseBody: string(data),
 		}
@@ -311,7 +311,7 @@ func TestURLWithHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected json marshalling error: %v", err)
 	}
-	fakeHandler := util.FakeHandler{
+	fakeHandler := testutil.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(data),
 	}

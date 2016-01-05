@@ -53,10 +53,14 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/chmod"
 	"k8s.io/kubernetes/pkg/util/chown"
+	"k8s.io/kubernetes/pkg/util/flags"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/secure"
+	"k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/timeutil"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -76,7 +80,7 @@ type KubeletServer struct {
 	Address                        net.IP
 	AllowPrivileged                bool
 	APIServerList                  []string
-	AuthPath                       util.StringFlag // Deprecated -- use KubeConfig instead
+	AuthPath                       flags.StringFlag // Deprecated -- use KubeConfig instead
 	CAdvisorPort                   uint
 	CertDirectory                  string
 	CgroupRoot                     string
@@ -105,7 +109,7 @@ type KubeletServer struct {
 	HTTPCheckFrequency             time.Duration
 	ImageGCHighThresholdPercent    int
 	ImageGCLowThresholdPercent     int
-	KubeConfig                     util.StringFlag
+	KubeConfig                     flags.StringFlag
 	LowDiskSpaceThresholdMB        int
 	ManifestURL                    string
 	ManifestURLHeader              string
@@ -178,7 +182,7 @@ type KubeletBuilder func(kc *KubeletConfig) (KubeletBootstrap, *config.PodConfig
 func NewKubeletServer() *KubeletServer {
 	return &KubeletServer{
 		Address:                     net.ParseIP("0.0.0.0"),
-		AuthPath:                    util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
+		AuthPath:                    flags.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
 		CAdvisorPort:                4194,
 		CertDirectory:               "/var/run/kubernetes",
 		CgroupRoot:                  "",
@@ -200,7 +204,7 @@ func NewKubeletServer() *KubeletServer {
 		HTTPCheckFrequency:          20 * time.Second,
 		ImageGCHighThresholdPercent: 90,
 		ImageGCLowThresholdPercent:  80,
-		KubeConfig:                  util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
+		KubeConfig:                  flags.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 		LowDiskSpaceThresholdMB:     256,
 		MasterServiceNamespace:      api.NamespaceDefault,
 		MaxContainerCount:           100,
@@ -543,7 +547,7 @@ func (s *KubeletServer) Run(kcfg *KubeletConfig) error {
 		}
 	}
 
-	util.ReallyCrash = s.ReallyCrashForTesting
+	testutil.ReallyCrash = s.ReallyCrashForTesting
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	credentialprovider.SetPreferredDockercfgPath(s.RootDirectory)
@@ -562,12 +566,12 @@ func (s *KubeletServer) Run(kcfg *KubeletConfig) error {
 
 	if s.HealthzPort > 0 {
 		healthz.DefaultHealthz()
-		go util.Until(func() {
+		go timeutil.Until(func() {
 			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress.String(), strconv.Itoa(s.HealthzPort)), nil)
 			if err != nil {
 				glog.Errorf("Starting health server failed: %v", err)
 			}
-		}, 5*time.Second, util.NeverStop)
+		}, 5*time.Second, timeutil.NeverStop)
 	}
 
 	if s.RunOnce {
@@ -584,7 +588,7 @@ func (s *KubeletServer) InitializeTLS() (*server.TLSOptions, error) {
 	if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
 		s.TLSCertFile = path.Join(s.CertDirectory, "kubelet.crt")
 		s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "kubelet.key")
-		if err := util.GenerateSelfSignedCert(nodeutil.GetHostname(s.HostnameOverride), s.TLSCertFile, s.TLSPrivateKeyFile, nil, nil); err != nil {
+		if err := secure.GenerateSelfSignedCert(nodeutil.GetHostname(s.HostnameOverride), s.TLSCertFile, s.TLSPrivateKeyFile, nil, nil); err != nil {
 			return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
 		}
 		glog.V(4).Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
@@ -849,18 +853,18 @@ func RunKubelet(kcfg *KubeletConfig) error {
 
 func startKubelet(k KubeletBootstrap, podCfg *config.PodConfig, kc *KubeletConfig) {
 	// start the kubelet
-	go util.Until(func() { k.Run(podCfg.Updates()) }, 0, util.NeverStop)
+	go timeutil.Until(func() { k.Run(podCfg.Updates()) }, 0, timeutil.NeverStop)
 
 	// start the kubelet server
 	if kc.EnableServer {
-		go util.Until(func() {
+		go timeutil.Until(func() {
 			k.ListenAndServe(kc.Address, kc.Port, kc.TLSOptions, kc.Auth, kc.EnableDebuggingHandlers)
-		}, 0, util.NeverStop)
+		}, 0, timeutil.NeverStop)
 	}
 	if kc.ReadOnlyPort > 0 {
-		go util.Until(func() {
+		go timeutil.Until(func() {
 			k.ListenAndServeReadOnly(kc.Address, kc.ReadOnlyPort)
-		}, 0, util.NeverStop)
+		}, 0, timeutil.NeverStop)
 	}
 }
 

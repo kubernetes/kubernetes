@@ -35,8 +35,10 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flow"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/timeutil"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -62,7 +64,7 @@ type NodeController struct {
 	allocateNodeCIDRs       bool
 	cloud                   cloudprovider.Interface
 	clusterCIDR             *net.IPNet
-	deletingPodsRateLimiter util.RateLimiter
+	deletingPodsRateLimiter flow.RateLimiter
 	knownNodeSet            sets.String
 	kubeClient              client.Interface
 	// Method for easy mocking in unittest.
@@ -118,8 +120,8 @@ func NewNodeController(
 	cloud cloudprovider.Interface,
 	kubeClient client.Interface,
 	podEvictionTimeout time.Duration,
-	deletionEvictionLimiter util.RateLimiter,
-	terminationEvictionLimiter util.RateLimiter,
+	deletionEvictionLimiter flow.RateLimiter,
+	terminationEvictionLimiter flow.RateLimiter,
 	nodeMonitorGracePeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration,
@@ -194,14 +196,14 @@ func NewNodeController(
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *NodeController) Run(period time.Duration) {
-	go nc.nodeController.Run(util.NeverStop)
-	go nc.podController.Run(util.NeverStop)
+	go nc.nodeController.Run(timeutil.NeverStop)
+	go nc.podController.Run(timeutil.NeverStop)
 	// Incorporate the results of node status pushed from kubelet to master.
-	go util.Until(func() {
+	go timeutil.Until(func() {
 		if err := nc.monitorNodeStatus(); err != nil {
 			glog.Errorf("Error monitoring node status: %v", err)
 		}
-	}, nc.nodeMonitorPeriod, util.NeverStop)
+	}, nc.nodeMonitorPeriod, timeutil.NeverStop)
 
 	// Managing eviction of nodes:
 	// 1. when we delete pods off a node, if the node was not empty at the time we then
@@ -215,13 +217,13 @@ func (nc *NodeController) Run(period time.Duration) {
 	//    b. If there are no pods left terminating, exit
 	//    c. If there are pods still terminating, wait for their estimated completion
 	//       before retrying
-	go util.Until(func() {
+	go timeutil.Until(func() {
 		nc.evictorLock.Lock()
 		defer nc.evictorLock.Unlock()
 		nc.podEvictor.Try(func(value TimedValue) (bool, time.Duration) {
 			remaining, err := nc.deletePods(value.Value)
 			if err != nil {
-				util.HandleError(fmt.Errorf("unable to evict node %q: %v", value.Value, err))
+				testutil.HandleError(fmt.Errorf("unable to evict node %q: %v", value.Value, err))
 				return false, 0
 			}
 
@@ -230,17 +232,17 @@ func (nc *NodeController) Run(period time.Duration) {
 			}
 			return true, 0
 		})
-	}, nodeEvictionPeriod, util.NeverStop)
+	}, nodeEvictionPeriod, timeutil.NeverStop)
 
 	// TODO: replace with a controller that ensures pods that are terminating complete
 	// in a particular time period
-	go util.Until(func() {
+	go timeutil.Until(func() {
 		nc.evictorLock.Lock()
 		defer nc.evictorLock.Unlock()
 		nc.terminationEvictor.Try(func(value TimedValue) (bool, time.Duration) {
 			completed, remaining, err := nc.terminatePods(value.Value, value.AddedAt)
 			if err != nil {
-				util.HandleError(fmt.Errorf("unable to terminate pods on node %q: %v", value.Value, err))
+				testutil.HandleError(fmt.Errorf("unable to terminate pods on node %q: %v", value.Value, err))
 				return false, 0
 			}
 
@@ -257,7 +259,7 @@ func (nc *NodeController) Run(period time.Duration) {
 			}
 			return false, remaining
 		})
-	}, nodeEvictionPeriod, util.NeverStop)
+	}, nodeEvictionPeriod, timeutil.NeverStop)
 }
 
 // Generates num pod CIDRs that could be assigned to nodes.
@@ -313,7 +315,7 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 		// this can only happen if the Store.KeyFunc has a problem creating
 		// a key for the pod. If it happens once, it will happen again so
 		// don't bother requeuing the pod.
-		util.HandleError(err)
+		testutil.HandleError(err)
 		return
 	}
 
@@ -346,7 +348,7 @@ func forcefullyDeletePod(c client.Interface, pod *api.Pod) {
 	var zero int64
 	err := c.Pods(pod.Namespace).Delete(pod.Name, &api.DeleteOptions{GracePeriodSeconds: &zero})
 	if err != nil {
-		util.HandleError(err)
+		testutil.HandleError(err)
 	}
 }
 
