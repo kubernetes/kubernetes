@@ -282,6 +282,7 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 	}
 	container.NetworkSettings = &docker.NetworkSettings{IPAddress: "2.3.4.5"}
 	f.ContainerMap[id] = container
+	f.updateContainerStatus(id, statusRunningPrefix)
 	f.normalSleep(200, 50, 50)
 	return nil
 }
@@ -322,6 +323,7 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 		container.State.Running = false
 	}
 	f.ContainerMap[id] = container
+	f.updateContainerStatus(id, statusExitedPrefix)
 	f.normalSleep(200, 50, 50)
 	return nil
 }
@@ -410,6 +412,14 @@ func (f *FakeDockerClient) RemoveImage(image string) error {
 		f.RemovedImages.Insert(image)
 	}
 	return err
+}
+
+func (f *FakeDockerClient) updateContainerStatus(id, status string) {
+	for i := range f.ContainerList {
+		if f.ContainerList[i].ID == id {
+			f.ContainerList[i].Status = status
+		}
+	}
 }
 
 // FakeDockerPuller is a stub implementation of DockerPuller.
