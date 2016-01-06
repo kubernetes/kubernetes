@@ -82,20 +82,6 @@ var (
 			Minor:       1,
 			Permissions: "rwm",
 		},
-		{
-			Path:        "/dev/tty0",
-			Type:        'c',
-			Major:       4,
-			Minor:       0,
-			Permissions: "rwm",
-		},
-		{
-			Path:        "/dev/tty1",
-			Type:        'c',
-			Major:       4,
-			Minor:       1,
-			Permissions: "rwm",
-		},
 		// /dev/pts/ - pts namespaces are "coming soon"
 		{
 			Path:        "",

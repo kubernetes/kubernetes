@@ -41,7 +41,8 @@ func NewOOMAdjuster() *OOMAdjuster {
 func getPids(cgroupName string) ([]int, error) {
 	fsManager := fs.Manager{
 		Cgroups: &configs.Cgroup{
-			Name: cgroupName,
+			Parent: "/",
+			Name:   cgroupName,
 		},
 	}
 	return fsManager.GetPids()
