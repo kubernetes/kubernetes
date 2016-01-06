@@ -1939,9 +1939,11 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 			return false, err
 		}
 		if totalCreated > maxCreated {
+			logRCsOfDeployment(deploymentName, oldRCs, newRC)
 			return false, fmt.Errorf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
 		}
 		if totalAvailable < minAvailable {
+			logRCsOfDeployment(deploymentName, oldRCs, newRC)
 			return false, fmt.Errorf("total pods available: %d, less than the min required: %d", totalAvailable, minAvailable)
 		}
 
@@ -1949,15 +1951,24 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 			deployment.Status.UpdatedReplicas == desiredUpdatedReplicas {
 			// Verify RCs.
 			if deploymentutil.GetReplicaCountForRCs(oldRCs) != 0 {
+				logRCsOfDeployment(deploymentName, oldRCs, newRC)
 				return false, fmt.Errorf("old RCs are not fully scaled down")
 			}
 			if deploymentutil.GetReplicaCountForRCs([]*api.ReplicationController{newRC}) != desiredUpdatedReplicas {
+				logRCsOfDeployment(deploymentName, oldRCs, newRC)
 				return false, fmt.Errorf("new RC is not fully scaled up")
 			}
 			return true, nil
 		}
 		return false, nil
 	})
+}
+
+func logRCsOfDeployment(deploymentName string, oldRCs []*api.ReplicationController, newRC *api.ReplicationController) {
+	for i := range oldRCs {
+		Logf("Old RCs (%d/%d) of deployment %s: %+v", i+1, len(oldRCs), deploymentName, oldRCs[i])
+	}
+	Logf("New RC of deployment %s: %+v", deploymentName, newRC)
 }
 
 // Waits for the number of events on the given object to reach a desired count.
