@@ -76,7 +76,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	const graceTime = 5 * time.Minute
 	// ingestionTimeout is how long to keep retrying to wait for all the
 	// logs to be ingested.
-	const ingestionTimeout = 3 * time.Minute
+	const ingestionTimeout = 10 * time.Minute
 
 	// Check for the existence of the Elasticsearch service.
 	By("Checking the Elasticsearch service exists.")
@@ -346,7 +346,8 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 		}
 		hits, ok := response["hits"].(map[string]interface{})
 		if !ok {
-			Failf("response[hits] not of the expected type: %T", response["hits"])
+			Logf("response[hits] not of the expected type: %T", response["hits"])
+			continue
 		}
 		totalF, ok := hits["total"].(float64)
 		if !ok {
@@ -405,6 +406,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 		// Make sure we correctly observed the expected log lines from each node.
 		totalMissing = 0
 		missingPerNode = make([]int, nodeCount)
+		incorrectCount := false
 		for n := range observed {
 			for i, c := range observed[n] {
 				if c == 0 {
@@ -412,9 +414,14 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 					missingPerNode[n]++
 				}
 				if c < 0 || c > 1 {
-					Failf("Got incorrect count for node %d index %d: %d", n, i, c)
+					Logf("Got incorrect count for node %d index %d: %d", n, i, c)
+					incorrectCount = true
 				}
 			}
+		}
+		if incorrectCount {
+			Logf("After %v es still return duplicated log lines", time.Since(start))
+			continue
 		}
 		if totalMissing != 0 {
 			Logf("After %v still missing %d log lines", time.Since(start), totalMissing)
