@@ -279,19 +279,19 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 			if err != nil {
 				return nil, nil, err
 			}
-		} else {
-			// Check if the object's resource version matches the latest resource version.
-			newVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
-			if err != nil {
-				return nil, nil, err
-			}
-			if newVersion != version {
-				return nil, nil, kubeerr.NewConflict(e.QualifiedResource, name, fmt.Errorf("the object has been modified; please apply your changes to the latest version and try again"))
-			}
 		}
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
 			return nil, nil, err
 		}
+		// Check if the object's resource version matches the latest resource version.
+		newVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
+		if err != nil {
+			return nil, nil, err
+		}
+		if newVersion != version {
+			return nil, nil, kubeerr.NewConflict(e.QualifiedResource, name, fmt.Errorf("the object has been modified; please apply your changes to the latest version and try again"))
+		}
+
 		ttl, err := e.calculateTTL(obj, res.TTL, true)
 		if err != nil {
 			return nil, nil, err
