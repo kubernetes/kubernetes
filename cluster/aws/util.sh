@@ -860,6 +860,7 @@ function start-master() {
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
     echo "readonly ZONE='${ZONE}'"
+    echo "readonly NUM_NODES='${NUM_NODES}'"
     echo "readonly KUBE_USER='${KUBE_USER}'"
     echo "readonly KUBE_PASSWORD='${KUBE_PASSWORD}'"
     echo "readonly SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
