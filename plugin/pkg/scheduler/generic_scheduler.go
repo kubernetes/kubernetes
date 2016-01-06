@@ -84,6 +84,7 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 	}
 
 	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, nodeNameToInfo, g.predicates, nodes, g.extenders)
+
 	if err != nil {
 		return "", err
 	}
@@ -130,13 +131,18 @@ func findNodesThatFit(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.No
 
 	for _, node := range nodes.Items {
 		fits := true
-		for name, predicate := range predicateFuncs {
+		for _, predicate := range predicateFuncs {
 			fit, err := predicate(pod, node.Name, nodeNameToInfo[node.Name])
 			if err != nil {
 				switch e := err.(type) {
 				case *predicates.InsufficientResourceError:
 					if fit {
 						err := fmt.Errorf("got InsufficientResourceError: %v, but also fit='true' which is unexpected", e)
+						return api.NodeList{}, FailedPredicateMap{}, err
+					}
+				case *predicates.PredicateFailureError:
+					if fit {
+						err := fmt.Errorf("got PredicateFailureError: %v, but also fit='true' which is unexpected", e)
 						return api.NodeList{}, FailedPredicateMap{}, err
 					}
 				default:
@@ -149,10 +155,16 @@ func findNodesThatFit(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.No
 					failedPredicateMap[node.Name] = sets.String{}
 				}
 				if re, ok := err.(*predicates.InsufficientResourceError); ok {
-					failedPredicateMap[node.Name].Insert(re.Error())
+					failedPredicateMap[node.Name].Insert(fmt.Sprintf("Insufficient %s", re.ResourceName))
 					break
 				}
-				failedPredicateMap[node.Name].Insert(name)
+				if re, ok := err.(*predicates.PredicateFailureError); ok {
+					failedPredicateMap[node.Name].Insert(re.PredicateName)
+					break
+				} else {
+					err := fmt.Errorf("SchedulerPredicates failed due to %v, which is unexpected.", err)
+					return api.NodeList{}, FailedPredicateMap{}, err
+				}
 				break
 			}
 		}

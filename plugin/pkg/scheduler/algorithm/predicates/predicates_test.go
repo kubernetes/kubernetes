@@ -159,7 +159,7 @@ func TestPodFitsResources(t *testing.T) {
 	for _, test := range enoughPodsTests {
 		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)}}
 
-		fit := ResourceFit{FakeNodeInfo(node)}
+		fit := NodeStatus{FakeNodeInfo(node)}
 		fits, err := fit.PodFitsResources(test.pod, "machine", test.nodeInfo)
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
@@ -204,7 +204,7 @@ func TestPodFitsResources(t *testing.T) {
 	for _, test := range notEnoughPodsTests {
 		node := api.Node{Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1)}}
 
-		fit := ResourceFit{FakeNodeInfo(node)}
+		fit := NodeStatus{FakeNodeInfo(node)}
 		fits, err := fit.PodFitsResources(test.pod, "machine", test.nodeInfo)
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
@@ -252,11 +252,14 @@ func TestPodFitsHost(t *testing.T) {
 
 	for _, test := range tests {
 		result, err := PodFitsHost(test.pod, test.node, schedulercache.NewNodeInfo())
-		if err != nil {
+		if !reflect.DeepEqual(err, ErrPodNotMatchHostName) && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if result == false && !reflect.DeepEqual(err, ErrPodNotMatchHostName) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if result != test.fits {
-			t.Errorf("unexpected difference for %s: got: %v expected %v", test.test, test.fits, result)
+			t.Errorf("unexpected difference for %s: expected: %v got %v", test.test, test.fits, result)
 		}
 	}
 }
@@ -322,7 +325,10 @@ func TestPodFitsHostPorts(t *testing.T) {
 	}
 	for _, test := range tests {
 		fits, err := PodFitsHostPorts(test.pod, "machine", test.nodeInfo)
-		if err != nil {
+		if !reflect.DeepEqual(err, ErrPodNotFitsHostPorts) && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if fits == false && !reflect.DeepEqual(err, ErrPodNotFitsHostPorts) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if test.fits != fits {
@@ -404,8 +410,11 @@ func TestDiskConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		ok, err := NoDiskConflict(test.pod, "machine", test.nodeInfo)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		if !reflect.DeepEqual(err, ErrDiskConflict) && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if ok == false && !reflect.DeepEqual(err, ErrDiskConflict) {
+			t.Errorf("unexpected error: %v", err)
 		}
 		if test.isOk && !ok {
 			t.Errorf("expected ok, got none.  %v %s %s", test.pod, test.nodeInfo, test.test)
@@ -453,8 +462,11 @@ func TestAWSDiskConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		ok, err := NoDiskConflict(test.pod, "machine", test.nodeInfo)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		if !reflect.DeepEqual(err, ErrDiskConflict) && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if ok == false && !reflect.DeepEqual(err, ErrDiskConflict) {
+			t.Errorf("unexpected error: %v", err)
 		}
 		if test.isOk && !ok {
 			t.Errorf("expected ok, got none.  %v %s %s", test.pod, test.nodeInfo, test.test)
@@ -508,8 +520,11 @@ func TestRBDDiskConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		ok, err := NoDiskConflict(test.pod, "machine", test.nodeInfo)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		if !reflect.DeepEqual(err, ErrDiskConflict) && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if ok == false && !reflect.DeepEqual(err, ErrDiskConflict) {
+			t.Errorf("unexpected error: %v", err)
 		}
 		if test.isOk && !ok {
 			t.Errorf("expected ok, got none.  %v %s %s", test.pod, test.nodeInfo, test.test)
@@ -980,9 +995,12 @@ func TestPodFitsSelector(t *testing.T) {
 	for _, test := range tests {
 		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: test.labels}}
 
-		fit := NodeSelector{FakeNodeInfo(node)}
+		fit := NodeStatus{FakeNodeInfo(node)}
 		fits, err := fit.PodSelectorMatches(test.pod, "machine", schedulercache.NewNodeInfo())
-		if err != nil {
+		if !reflect.DeepEqual(err, ErrNodeSelectorNotMatch) && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if fits == false && !reflect.DeepEqual(err, ErrNodeSelectorNotMatch) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if fits != test.fits {
@@ -1041,7 +1059,10 @@ func TestNodeLabelPresence(t *testing.T) {
 		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: label}}
 		labelChecker := NodeLabelChecker{FakeNodeInfo(node), test.labels, test.presence}
 		fits, err := labelChecker.CheckNodeLabelPresence(test.pod, "machine", schedulercache.NewNodeInfo())
-		if err != nil {
+		if !reflect.DeepEqual(err, ErrNodeLabelPresenceViolated) && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if fits == false && !reflect.DeepEqual(err, ErrNodeLabelPresenceViolated) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if fits != test.fits {
@@ -1181,7 +1202,10 @@ func TestServiceAffinity(t *testing.T) {
 		nodes := []api.Node{node1, node2, node3, node4, node5}
 		serviceAffinity := ServiceAffinity{algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels}
 		fits, err := serviceAffinity.CheckServiceAffinity(test.pod, test.node, schedulercache.NewNodeInfo())
-		if err != nil {
+		if !reflect.DeepEqual(err, ErrServiceAffinityViolated) && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if fits == false && !reflect.DeepEqual(err, ErrServiceAffinityViolated) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if fits != test.fits {
@@ -1401,7 +1425,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 	for _, test := range tests {
 		pred := NewMaxPDVolumeCountPredicate(filter, test.maxVols, pvInfo, pvcInfo)
 		fits, err := pred(test.newPod, "some-node", schedulercache.NewNodeInfo(test.existingPods...))
-		if err != nil {
+		if err != nil && !reflect.DeepEqual(err, ErrMaxVolumeCountExceeded) {
 			t.Errorf("unexpected error: %v", err)
 		}
 
@@ -1452,6 +1476,86 @@ func TestPredicatesRegistered(t *testing.T) {
 				t.Errorf("predicate %s is implemented as public but seems not registered or used in any other place",
 					functionName)
 			}
+		}
+	}
+}
+
+func newPodWithPort(hostPorts ...int) *api.Pod {
+	networkPorts := []api.ContainerPort{}
+	for _, port := range hostPorts {
+		networkPorts = append(networkPorts, api.ContainerPort{HostPort: port})
+	}
+	return &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Ports: networkPorts,
+				},
+			},
+		},
+	}
+}
+
+func TestRunGeneralPredicates(t *testing.T) {
+	resourceTests := []struct {
+		pod      *api.Pod
+		nodeName string
+		nodeInfo *schedulercache.NodeInfo
+		node     *api.Node
+		fits     bool
+		test     string
+		wErr     error
+	}{
+		{
+			pod:      &api.Pod{},
+			nodeName: "machine1",
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 9, memory: 19})),
+			node: &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)}},
+			fits: true,
+			wErr: nil,
+			test: "no resources/port/host requested always fits",
+		},
+		{
+			pod:      newResourcePod(resourceRequest{milliCPU: 8, memory: 10}),
+			nodeName: "machine1",
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 19})),
+			node: &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)}},
+			fits: false,
+			wErr: newInsufficientResourceError("CPU", 8, 5, 10),
+			test: "not enough cpu resource",
+		},
+		{
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					NodeName: "machine2",
+				},
+			},
+			nodeName: "machine1",
+			nodeInfo: schedulercache.NewNodeInfo(),
+			node:     &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)}},
+			fits:     false,
+			wErr:     ErrPodNotMatchHostName,
+			test:     "host not match",
+		},
+		{
+			pod:      newPodWithPort(123),
+			nodeName: "machine1",
+			nodeInfo: schedulercache.NewNodeInfo(newPodWithPort(123)),
+			node:     &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 32)}},
+			fits:     false,
+			wErr:     ErrPodNotFitsHostPorts,
+			test:     "hostport conflict",
+		},
+	}
+	for _, test := range resourceTests {
+		fits, err := RunGeneralPredicates(test.pod, test.nodeName, test.nodeInfo, test.node)
+		if !reflect.DeepEqual(err, test.wErr) {
+			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
+		}
+		if fits != test.fits {
+			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
 		}
 	}
 }

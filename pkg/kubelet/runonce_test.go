@@ -24,6 +24,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -73,6 +74,7 @@ func TestRunOnce(t *testing.T) {
 		containerRuntime:    fakeRuntime,
 		reasonCache:         NewReasonCache(),
 		clock:               util.RealClock{},
+		kubeClient:          &fake.Clientset{},
 	}
 	kb.containerManager = cm.NewStubContainerManager()
 
