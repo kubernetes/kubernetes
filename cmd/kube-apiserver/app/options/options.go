@@ -31,6 +31,7 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 
 	"github.com/spf13/pflag"
 )
@@ -76,7 +77,7 @@ type APIServer struct {
 	ServiceAccountKeyFile      string
 	ServiceAccountLookup       bool
 	ServiceClusterIPRange      net.IPNet // TODO: make this a list
-	ServiceNodePortRange       util.PortRange
+	ServiceNodePortRange       utilnet.PortRange
 	StorageVersions            string
 	TokenAuthFile              string
 }

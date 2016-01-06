@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/probe"
 	httpprober "k8s.io/kubernetes/pkg/probe/http"
-	"k8s.io/kubernetes/pkg/util"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"time"
 )
 
@@ -57,7 +57,7 @@ func (server *Server) DoServerCheck(prober httpprober.HTTPProber) (probe.Result,
 	if server.EnableHTTPS {
 		scheme = "https"
 	}
-	url := util.FormatURL(scheme, server.Addr, server.Port, server.Path)
+	url := utilnet.FormatURL(scheme, server.Addr, server.Port, server.Path)
 
 	result, data, err := prober.Probe(url, probeTimeOut)
 
