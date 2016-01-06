@@ -31,6 +31,7 @@ type TestTypeNamespacer interface {
 type TestTypeInterface interface {
 	Create(*testgroup.TestType) (*testgroup.TestType, error)
 	Update(*testgroup.TestType) (*testgroup.TestType, error)
+	UpdateStatus(*testgroup.TestType) (*testgroup.TestType, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*testgroup.TestType, error)
@@ -76,6 +77,12 @@ func (c *testTypes) Update(testType *testgroup.TestType) (result *testgroup.Test
 		Do().
 		Into(result)
 	return
+}
+
+func (c *testTypes) UpdateStatus(testType *testgroup.TestType) (*testgroup.TestType, error) {
+	result := &testgroup.TestType{}
+	err := c.client.Put().Resource("testTypes").Name(testType.Name).SubResource("status").Body(testType).Do().Into(result)
+	return result, err
 }
 
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.

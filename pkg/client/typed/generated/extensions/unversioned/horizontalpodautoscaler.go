@@ -31,6 +31,7 @@ type HorizontalPodAutoscalerNamespacer interface {
 type HorizontalPodAutoscalerInterface interface {
 	Create(*extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
 	Update(*extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
+	UpdateStatus(*extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*extensions.HorizontalPodAutoscaler, error)
@@ -76,6 +77,12 @@ func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *extensions.Ho
 		Do().
 		Into(result)
 	return
+}
+
+func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error) {
+	result := &extensions.HorizontalPodAutoscaler{}
+	err := c.client.Put().Resource("horizontalPodAutoscalers").Name(horizontalPodAutoscaler.Name).SubResource("status").Body(horizontalPodAutoscaler).Do().Into(result)
+	return result, err
 }
 
 // Delete takes name of the horizontalPodAutoscaler and deletes it. Returns an error if one occurs.

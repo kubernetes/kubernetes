@@ -30,6 +30,7 @@ type NamespaceNamespacer interface {
 type NamespaceInterface interface {
 	Create(*api.Namespace) (*api.Namespace, error)
 	Update(*api.Namespace) (*api.Namespace, error)
+	UpdateStatus(*api.Namespace) (*api.Namespace, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.Namespace, error)
@@ -75,6 +76,12 @@ func (c *namespaces) Update(namespace *api.Namespace) (result *api.Namespace, er
 		Do().
 		Into(result)
 	return
+}
+
+func (c *namespaces) UpdateStatus(namespace *api.Namespace) (*api.Namespace, error) {
+	result := &api.Namespace{}
+	err := c.client.Put().Resource("namespaces").Name(namespace.Name).SubResource("status").Body(namespace).Do().Into(result)
+	return result, err
 }
 
 // Delete takes name of the namespace and deletes it. Returns an error if one occurs.

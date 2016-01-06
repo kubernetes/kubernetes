@@ -19,6 +19,7 @@ package generators
 import (
 	"io"
 	"path/filepath"
+	"strings"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
@@ -49,6 +50,18 @@ func (g *genClientForType) Imports(c *generator.Context) (imports []string) {
 	return g.imports.ImportLines()
 }
 
+// Ideally, we'd like hasStatus to return true if there is a subresource path
+// registered for "status" in the API server, but we do not have that
+// information, so hasStatus returns true if the type has a status field.
+func hasStatus(t *types.Type) bool {
+	for _, m := range t.Members {
+		if m.Name == "Status" && strings.Contains(m.Tags, `json:"status`) {
+			return true
+		}
+	}
+	return false
+}
+
 // GenerateType makes the body of a file implementing a set for type t.
 func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
@@ -63,11 +76,20 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"apiListOptions":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
 	}
 	sw.Do(namespacerTemplate, m)
-	sw.Do(interfaceTemplate, m)
+	sw.Do(interfaceTemplate1, m)
+	// Include the UpdateStatus method if the type has a status
+	if hasStatus(t) {
+		sw.Do(interfaceUpdateStatusTemplate, m)
+	}
+	sw.Do(interfaceTemplate2, m)
 	sw.Do(structTemplate, m)
 	sw.Do(newStructTemplate, m)
 	sw.Do(createTemplate, m)
 	sw.Do(updateTemplate, m)
+	// Generate the UpdateStatus method if the type has a status
+	if hasStatus(t) {
+		sw.Do(updateStatusTemplate, m)
+	}
 	sw.Do(deleteTemplate, m)
 	sw.Do(deleteCollectionTemplate, m)
 	sw.Do(getTemplate, m)
@@ -86,11 +108,17 @@ type $.type|public$Namespacer interface {
 `
 
 // template for the Interface
-var interfaceTemplate = `
+var interfaceTemplate1 = `
 // $.type|public$Interface has methods to work with $.type|public$ resources.
 type $.type|public$Interface interface {
 	Create(*$.type|raw$) (*$.type|raw$, error)
-	Update(*$.type|raw$) (*$.type|raw$, error)
+	Update(*$.type|raw$) (*$.type|raw$, error)`
+
+var interfaceUpdateStatusTemplate = `
+	UpdateStatus(*$.type|raw$) (*$.type|raw$, error)`
+
+// template for the Interface
+var interfaceTemplate2 = `
 	Delete(name string, options *$.apiDeleteOptions|raw$) error
 	DeleteCollection(options *$.apiDeleteOptions|raw$, listOptions $.apiListOptions|raw$) error
 	Get(name string) (*$.type|raw$, error)
@@ -196,6 +224,14 @@ func (c *$.type|privatePlural$) Update($.type|private$ *$.type|raw$) (result *$.
 		Do().
 		Into(result)
 	return
+}
+`
+
+var updateStatusTemplate = `
+func (c *$.type|privatePlural$) UpdateStatus($.type|private$ *$.type|raw$) (*$.type|raw$, error) {
+	result := &$.type|raw${}
+	err := c.client.Put().Resource("$.type|privatePlural$").Name($.type|private$.Name).SubResource("status").Body($.type|private$).Do().Into(result)
+	return result, err
 }
 `
 

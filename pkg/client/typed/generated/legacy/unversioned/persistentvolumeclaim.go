@@ -30,6 +30,7 @@ type PersistentVolumeClaimNamespacer interface {
 type PersistentVolumeClaimInterface interface {
 	Create(*api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	Update(*api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
+	UpdateStatus(*api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.PersistentVolumeClaim, error)
@@ -75,6 +76,12 @@ func (c *persistentVolumeClaims) Update(persistentVolumeClaim *api.PersistentVol
 		Do().
 		Into(result)
 	return
+}
+
+func (c *persistentVolumeClaims) UpdateStatus(persistentVolumeClaim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
+	result := &api.PersistentVolumeClaim{}
+	err := c.client.Put().Resource("persistentVolumeClaims").Name(persistentVolumeClaim.Name).SubResource("status").Body(persistentVolumeClaim).Do().Into(result)
+	return result, err
 }
 
 // Delete takes name of the persistentVolumeClaim and deletes it. Returns an error if one occurs.

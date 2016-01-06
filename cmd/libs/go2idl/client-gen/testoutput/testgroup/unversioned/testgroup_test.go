@@ -97,6 +97,29 @@ func TestUpdateTestType(t *testing.T) {
 	c.simpleClient.Validate(t, receivedTestType, err)
 }
 
+func TestUpdateStatusTestType(t *testing.T) {
+	ns := api.NamespaceDefault
+	requestTestType := &testgroup.TestType{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "1",
+			Labels: map[string]string{
+				"foo":  "bar",
+				"name": "baz",
+			},
+		},
+		Status: testgroup.TestTypeStatus{"I'm in good status"},
+	}
+	c := DecoratedSimpleClient{
+		simpleClient: simple.Client{
+			Request:  simple.Request{Method: "PUT", Path: testHelper.ResourcePath("testtypes", ns, "foo"), Query: simple.BuildQueryValues(nil)},
+			Response: simple.Response{StatusCode: http.StatusOK, Body: requestTestType},
+		},
+	}
+	receivedTestType, err := c.Setup(t).TestTypes(ns).Update(requestTestType)
+	c.simpleClient.Validate(t, receivedTestType, err)
+}
+
 func TestDeleteTestType(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := DecoratedSimpleClient{
