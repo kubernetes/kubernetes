@@ -401,12 +401,14 @@ function cluster::mesos::docker::buffer_output {
   local cmd="$@"
   local tempfile="$(mktemp "${TMPDIR:-/tmp}/buffer.XXXXXX")"
   trap "kill -TERM \${PID}; rm '${tempfile}'" TERM INT
+  set +e
   ${cmd} &> "${tempfile}" &
   PID=$!
   wait ${PID}
   trap - TERM INT
   wait ${PID}
   local exit_status="$?"
+  set -e
   if [ "${exit_status}" != 0 ]; then
     cat "${tempfile}" 1>&2
   fi
