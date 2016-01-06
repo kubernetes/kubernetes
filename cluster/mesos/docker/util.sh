@@ -89,34 +89,20 @@ function cluster::mesos::docker::run_in_docker_test {
     kube_config_mount="-v \"$(dirname ${KUBECONFIG}):/root/.kube\""
   fi
 
-  container_id=$(
-    docker run \
-      -d \
-      -e "KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER}" \
-      -v "${KUBE_ROOT}:/go/src/github.com/GoogleCloudPlatform/kubernetes" \
-      ${kube_config_mount} \
-      -v "/var/run/docker.sock:/var/run/docker.sock" \
-      --link docker_mesosmaster1_1:mesosmaster1 \
-      --link docker_apiserver_1:apiserver \
-      --entrypoint="${entrypoint}" \
-      mesosphere/kubernetes-mesos-test \
-      ${args}
-  )
+  docker run \
+    --rm \
+    -t $(tty &>/dev/null && echo "-i") \
+    -e "KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER}" \
+    -v "${KUBE_ROOT}:/go/src/github.com/GoogleCloudPlatform/kubernetes" \
+    ${kube_config_mount} \
+    -v "/var/run/docker.sock:/var/run/docker.sock" \
+    --link docker_mesosmaster1_1:mesosmaster1 \
+    --link docker_apiserver_1:apiserver \
+    --entrypoint="${entrypoint}" \
+    mesosphere/kubernetes-mesos-test \
+    ${args}
 
-  docker logs -f "${container_id}" &
-
-  # trap and kill for better signal handing
-  trap 'echo "Killing container ${container_id}" 1>&2 && docker kill ${container_id}' INT TERM
-  exit_status=$(docker wait "${container_id}")
-  trap - INT TERM
-
-  if [ "$exit_status" != 0 ]; then
-    echo "Exited ${exit_status}" 1>&2
-  fi
-
-  docker rm -f "${container_id}" > /dev/null
-
-  return "${exit_status}"
+  return "$?"
 }
 
 # Run kube-cagen.sh inside docker.
@@ -124,29 +110,15 @@ function cluster::mesos::docker::run_in_docker_test {
 function cluster::mesos::docker::run_in_docker_cagen {
   local out_dir="$1"
 
-  container_id=$(
-    docker run \
-      -d \
-      -v "${out_dir}:/var/run/kubernetes/auth" \
-      mesosphere/kubernetes-keygen:v1.0.0 \
-      "cagen" \
-      "/var/run/kubernetes/auth"
-  )
+  docker run \
+    --rm \
+    -t $(tty &>/dev/null && echo "-i") \
+    -v "${out_dir}:/var/run/kubernetes/auth" \
+    mesosphere/kubernetes-keygen:v1.0.0 \
+    "cagen" \
+    "/var/run/kubernetes/auth"
 
-  docker logs -f "${container_id}" &
-
-  # trap and kill for better signal handing
-  trap 'echo "Killing container ${container_id}" 1>&2 && docker kill ${container_id}' INT TERM
-  exit_status=$(docker wait "${container_id}")
-  trap - INT TERM
-
-  if [ "$exit_status" != 0 ]; then
-    echo "Exited ${exit_status}" 1>&2
-  fi
-
-  docker rm -f "${container_id}" > /dev/null
-
-  return "${exit_status}"
+  return "$?"
 }
 
 # Run kube-keygen.sh inside docker.
@@ -155,29 +127,15 @@ function cluster::mesos::docker::run_in_docker_keygen {
   local out_dir="$(dirname "${out_file_path}")"
   local out_file="$(basename "${out_file_path}")"
 
-  container_id=$(
-    docker run \
-      -d \
-      -v "${out_dir}:/var/run/kubernetes/auth" \
-      mesosphere/kubernetes-keygen:v1.0.0 \
-      "keygen" \
-      "/var/run/kubernetes/auth/${out_file}"
-  )
+  docker run \
+    --rm \
+    -t $(tty &>/dev/null && echo "-i") \
+    -v "${out_dir}:/var/run/kubernetes/auth" \
+    mesosphere/kubernetes-keygen:v1.0.0 \
+    "keygen" \
+    "/var/run/kubernetes/auth/${out_file}"
 
-  docker logs -f "${container_id}" &
-
-  # trap and kill for better signal handing
-  trap 'echo "Killing container ${container_id}" 1>&2 && docker kill ${container_id}' INT TERM
-  exit_status=$(docker wait "${container_id}")
-  trap - INT TERM
-
-  if [ "$exit_status" != 0 ]; then
-    echo "Exited ${exit_status}" 1>&2
-  fi
-
-  docker rm -f "${container_id}" > /dev/null
-
-  return "${exit_status}"
+  return "$?"
 }
 
 # Generate kubeconfig data for the created cluster.
