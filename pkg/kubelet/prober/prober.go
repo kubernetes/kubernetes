@@ -284,6 +284,10 @@ func (eic execInContainer) CombinedOutput() ([]byte, error) {
 	return eic.run()
 }
 
+func (eic execInContainer) Output() ([]byte, error) {
+	return nil, fmt.Errorf("unimplemented")
+}
+
 func (eic execInContainer) SetDir(dir string) {
 	//unimplemented
 }
