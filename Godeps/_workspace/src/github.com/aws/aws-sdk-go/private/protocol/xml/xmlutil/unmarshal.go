@@ -59,7 +59,7 @@ func parse(r reflect.Value, node *XMLNode, tag reflect.StructTag) error {
 
 	switch t {
 	case "structure":
-		if field, ok := rtype.FieldByName("SDKShapeTraits"); ok {
+		if field, ok := rtype.FieldByName("_"); ok {
 			tag = field.Tag
 		}
 		return parseStruct(r, node, tag)

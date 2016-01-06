@@ -93,7 +93,7 @@ func buildLocationElements(r *request.Request, v reflect.Value) {
 }
 
 func buildBody(r *request.Request, v reflect.Value) {
-	if field, ok := v.Type().FieldByName("SDKShapeTraits"); ok {
+	if field, ok := v.Type().FieldByName("_"); ok {
 		if payloadName := field.Tag.Get("payload"); payloadName != "" {
 			pfield, _ := v.Type().FieldByName(payloadName)
 			if ptag := pfield.Tag.Get("type"); ptag != "" && ptag != "structure" {
