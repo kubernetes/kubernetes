@@ -91,7 +91,7 @@ func (c *thirdPartyResources) Delete(name string, options *api.DeleteOptions) er
 // DeleteCollection deletes a collection of objects.
 func (c *thirdPartyResources) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Namespace(c.ns).
 		Resource("thirdPartyResources").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).

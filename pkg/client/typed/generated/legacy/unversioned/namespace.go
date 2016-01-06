@@ -90,7 +90,7 @@ func (c *namespaces) Delete(name string, options *api.DeleteOptions) error {
 // DeleteCollection deletes a collection of objects.
 func (c *namespaces) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Namespace(c.ns).
 		Resource("namespaces").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
