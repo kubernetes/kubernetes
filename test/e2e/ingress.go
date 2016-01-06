@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -187,18 +188,24 @@ func createApp(c *client.Client, ns string, i int) {
 
 // gcloudUnmarshal unmarshals json output of gcloud into given out interface.
 func gcloudUnmarshal(resource, regex string, out interface{}) {
-	args := []string{
+	// gcloud prints a message to stderr if it has an available update
+	// so we only look at stdout.
+	command := []string{
 		"compute", resource, "list",
 		fmt.Sprintf("--regex=%v", regex),
 		fmt.Sprintf("--project=%v", testContext.CloudConfig.ProjectID),
 		"-q", "--format=json",
 	}
-	output, err := exec.Command("gcloud", args...).CombinedOutput()
+	output, err := exec.Command("gcloud", command...).Output()
 	if err != nil {
-		Failf("Error unmarshalling gcloud output: %v", err)
+		errCode := -1
+		if exitErr, ok := err.(utilexec.ExitError); ok {
+			errCode = exitErr.ExitStatus()
+		}
+		Logf("Error running gcloud command 'gcloud %s': err: %v, output: %v, status: %d", strings.Join(command, " "), err, string(output), errCode)
 	}
 	if err := json.Unmarshal([]byte(output), out); err != nil {
-		Failf("Error unmarshalling gcloud output for %v: %v, output: %v, command: gcloud %s", resource, err, string(output), strings.Join(args, " "))
+		Failf("Error unmarshalling gcloud output for %v: %v, output: %v, command: gcloud %s", resource, err, string(output), strings.Join(command, " "))
 	}
 }
 
