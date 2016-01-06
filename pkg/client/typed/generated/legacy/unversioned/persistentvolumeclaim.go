@@ -90,7 +90,7 @@ func (c *persistentVolumeClaims) Delete(name string, options *api.DeleteOptions)
 // DeleteCollection deletes a collection of objects.
 func (c *persistentVolumeClaims) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Namespace(c.ns).
 		Resource("persistentVolumeClaims").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
