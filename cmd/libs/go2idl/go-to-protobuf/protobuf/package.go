@@ -18,8 +18,13 @@ package protobuf
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
+
+	"k8s.io/kubernetes/third_party/golang/go/ast"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
@@ -68,11 +73,17 @@ type protobufPackage struct {
 	// A list of types to filter to; if not specified all types will be included.
 	FilterTypes map[types.Name]struct{}
 
+	// If true, omit any gogoprotobuf extensions not defined as types.
+	OmitGogo bool
+
 	// A list of field types that will be excluded from the output struct
 	OmitFieldTypes map[types.Name]struct{}
 
 	// A list of names that this package exports
 	LocalNames map[string]struct{}
+
+	// A list of struct tags to generate onto named struct fields
+	StructTags map[string]map[string]string
 
 	// An import tracker for this package
 	Imports *ImportTracker
@@ -127,6 +138,43 @@ func (p *protobufPackage) HasGoType(name string) bool {
 	return ok
 }
 
+func (p *protobufPackage) ExtractGeneratedType(t *ast.TypeSpec) bool {
+	if !p.HasGoType(t.Name.Name) {
+		return false
+	}
+
+	switch s := t.Type.(type) {
+	case *ast.StructType:
+		for i, f := range s.Fields.List {
+			if len(f.Tag.Value) == 0 {
+				continue
+			}
+			tag := strings.Trim(f.Tag.Value, "`")
+			protobufTag := reflect.StructTag(tag).Get("protobuf")
+			if len(protobufTag) == 0 {
+				continue
+			}
+			if len(f.Names) > 1 {
+				log.Printf("WARNING: struct %s field %d %s: defined multiple names but single protobuf tag", t.Name.Name, i, f.Names[0].Name)
+				// TODO hard error?
+			}
+			if p.StructTags == nil {
+				p.StructTags = make(map[string]map[string]string)
+			}
+			m := p.StructTags[t.Name.Name]
+			if m == nil {
+				m = make(map[string]string)
+				p.StructTags[t.Name.Name] = m
+			}
+			m[f.Names[0].Name] = tag
+		}
+	default:
+		log.Printf("WARNING: unexpected Go AST type definition: %#v", t)
+	}
+
+	return true
+}
+
 func (p *protobufPackage) Generators(c *generator.Context) []generator.Generator {
 	generators := []generator.Generator{}
 
@@ -140,6 +188,7 @@ func (p *protobufPackage) Generators(c *generator.Context) []generator.Generator
 		localGoPackage: types.Name{Package: p.PackagePath, Name: p.GoPackageName()},
 		imports:        p.Imports,
 		generateAll:    p.GenerateAll,
+		omitGogo:       p.OmitGogo,
 		omitFieldTypes: p.OmitFieldTypes,
 	})
 	return generators
