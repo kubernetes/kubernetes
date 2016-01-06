@@ -139,7 +139,7 @@ func (d *DiscoveryClient) ServerResources() (map[string]*unversioned.APIResource
 }
 
 func setDiscoveryDefaults(config *Config) error {
-	config.Prefix = ""
+	config.APIPath = ""
 	config.GroupVersion = nil
 	// Discovery client deals with unversioned objects, so we use api.Codec.
 	config.Codec = api.Codec
