@@ -24,6 +24,11 @@ import (
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
+func deepCopy_unversioned_Duration(in unversioned.Duration, out *unversioned.Duration, c *conversion.Cloner) error {
+	out.Duration = in.Duration
+	return nil
+}
+
 func deepCopy_unversioned_TypeMeta(in unversioned.TypeMeta, out *unversioned.TypeMeta, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
@@ -35,13 +40,12 @@ func deepCopy_v1alpha1_KubeProxyConfiguration(in KubeProxyConfiguration, out *Ku
 		return err
 	}
 	out.BindAddress = in.BindAddress
-	out.CleanupIPTables = in.CleanupIPTables
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.HealthzPort = in.HealthzPort
 	out.HostnameOverride = in.HostnameOverride
-	out.IPTablesSyncePeriodSeconds = in.IPTablesSyncePeriodSeconds
-	out.KubeAPIBurst = in.KubeAPIBurst
-	out.KubeAPIQPS = in.KubeAPIQPS
+	if err := deepCopy_unversioned_Duration(in.IPTablesSyncPeriod, &out.IPTablesSyncPeriod, c); err != nil {
+		return err
+	}
 	out.KubeconfigPath = in.KubeconfigPath
 	out.MasqueradeAll = in.MasqueradeAll
 	out.Master = in.Master
@@ -54,12 +58,19 @@ func deepCopy_v1alpha1_KubeProxyConfiguration(in KubeProxyConfiguration, out *Ku
 	out.Mode = in.Mode
 	out.PortRange = in.PortRange
 	out.ResourceContainer = in.ResourceContainer
-	out.UDPTimeoutMilliseconds = in.UDPTimeoutMilliseconds
+	if err := deepCopy_unversioned_Duration(in.UDPIdleTimeout, &out.UDPIdleTimeout, c); err != nil {
+		return err
+	}
+	out.ConntrackMax = in.ConntrackMax
+	if err := deepCopy_unversioned_Duration(in.ConntrackTCPEstablishedTimeout, &out.ConntrackTCPEstablishedTimeout, c); err != nil {
+		return err
+	}
 	return nil
 }
 
 func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
+		deepCopy_unversioned_Duration,
 		deepCopy_unversioned_TypeMeta,
 		deepCopy_v1alpha1_KubeProxyConfiguration,
 	)
