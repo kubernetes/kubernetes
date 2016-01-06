@@ -5,6 +5,763 @@
   "resourcePath": "/apis/extensions/v1beta1",
   "apis": [
    {
+    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/configmaps",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.ConfigMapList",
+      "method": "GET",
+      "summary": "list or watch objects of kind ConfigMap",
+      "nickname": "listNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ConfigMapList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.ConfigMap",
+      "method": "POST",
+      "summary": "create a ConfigMap",
+      "nickname": "createNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.ConfigMap",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ConfigMap"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "unversioned.Status",
+      "method": "DELETE",
+      "summary": "delete collection of ConfigMap",
+      "nickname": "deletecollectionNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "unversioned.Status"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/watch/namespaces/{namespace}/configmaps",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of ConfigMap",
+      "nickname": "watchNamespacedConfigMapList",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/configmaps/{name}",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.ConfigMap",
+      "method": "GET",
+      "summary": "read the specified ConfigMap",
+      "nickname": "readNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "exact",
+        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ConfigMap",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ConfigMap"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.ConfigMap",
+      "method": "PUT",
+      "summary": "replace the specified ConfigMap",
+      "nickname": "replaceNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.ConfigMap",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ConfigMap",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ConfigMap"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.ConfigMap",
+      "method": "PATCH",
+      "summary": "partially update the specified ConfigMap",
+      "nickname": "patchNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "unversioned.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ConfigMap",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ConfigMap"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     },
+     {
+      "type": "unversioned.Status",
+      "method": "DELETE",
+      "summary": "delete a ConfigMap",
+      "nickname": "deleteNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ConfigMap",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "unversioned.Status"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/watch/namespaces/{namespace}/configmaps/{name}",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch changes to an object of kind ConfigMap",
+      "nickname": "watchNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ConfigMap",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/configmaps",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.ConfigMapList",
+      "method": "GET",
+      "summary": "list or watch objects of kind ConfigMap",
+      "nickname": "listConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ConfigMapList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/extensions/v1beta1/watch/configmaps",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of ConfigMap",
+      "nickname": "watchConfigMapList",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/apis/extensions/v1beta1/namespaces/{namespace}/horizontalpodautoscalers",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
@@ -2632,12 +3389,9 @@
    }
   ],
   "models": {
-   "v1beta1.HorizontalPodAutoscalerList": {
-    "id": "v1beta1.HorizontalPodAutoscalerList",
-    "description": "list of horizontal pod autoscaler objects.",
-    "required": [
-     "items"
-    ],
+   "v1beta1.ConfigMapList": {
+    "id": "v1beta1.ConfigMapList",
+    "description": "ConfigMapList is a resource containing a list of ConfigMap objects.",
     "properties": {
      "kind": {
       "type": "string",
@@ -2649,14 +3403,14 @@
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
-      "description": "Standard list metadata."
+      "description": "More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.HorizontalPodAutoscaler"
+       "$ref": "v1beta1.ConfigMap"
       },
-      "description": "list of horizontal pod autoscaler objects."
+      "description": "Items is the list of ConfigMaps."
      }
     }
    },
@@ -2674,9 +3428,9 @@
      }
     }
    },
-   "v1beta1.HorizontalPodAutoscaler": {
-    "id": "v1beta1.HorizontalPodAutoscaler",
-    "description": "configuration of a horizontal pod autoscaler.",
+   "v1beta1.ConfigMap": {
+    "id": "v1beta1.ConfigMap",
+    "description": "ConfigMap holds configuration data for pods to consume.",
     "properties": {
      "kind": {
       "type": "string",
@@ -2688,15 +3442,11 @@
      },
      "metadata": {
       "$ref": "v1.ObjectMeta",
-      "description": "Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+      "description": "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata."
      },
-     "spec": {
-      "$ref": "v1beta1.HorizontalPodAutoscalerSpec",
-      "description": "behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status."
-     },
-     "status": {
-      "$ref": "v1beta1.HorizontalPodAutoscalerStatus",
-      "description": "current information about the autoscaler."
+     "data": {
+      "type": "any",
+      "description": "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot."
      }
     }
    },
@@ -2753,103 +3503,6 @@
      "annotations": {
       "type": "any",
       "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://releases.k8s.io/HEAD/docs/user-guide/annotations.md"
-     }
-    }
-   },
-   "v1beta1.HorizontalPodAutoscalerSpec": {
-    "id": "v1beta1.HorizontalPodAutoscalerSpec",
-    "description": "specification of a horizontal pod autoscaler.",
-    "required": [
-     "scaleRef",
-     "maxReplicas"
-    ],
-    "properties": {
-     "scaleRef": {
-      "$ref": "v1beta1.SubresourceReference",
-      "description": "reference to Scale subresource; horizontal pod autoscaler will learn the current resource consumption from its status, and will set the desired number of pods by modifying its spec."
-     },
-     "minReplicas": {
-      "type": "integer",
-      "format": "int32",
-      "description": "lower limit for the number of pods that can be set by the autoscaler, default 1."
-     },
-     "maxReplicas": {
-      "type": "integer",
-      "format": "int32",
-      "description": "upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas."
-     },
-     "cpuUtilization": {
-      "$ref": "v1beta1.CPUTargetUtilization",
-      "description": "target average CPU utilization (represented as a percentage of requested CPU) over all the pods; if not specified it defaults to the target CPU utilization at 80% of the requested resources."
-     }
-    }
-   },
-   "v1beta1.SubresourceReference": {
-    "id": "v1beta1.SubresourceReference",
-    "description": "SubresourceReference contains enough information to let you inspect or modify the referred subresource.",
-    "properties": {
-     "kind": {
-      "type": "string",
-      "description": "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds\""
-     },
-     "name": {
-      "type": "string",
-      "description": "Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
-     },
-     "apiVersion": {
-      "type": "string",
-      "description": "API version of the referent"
-     },
-     "subresource": {
-      "type": "string",
-      "description": "Subresource name of the referent"
-     }
-    }
-   },
-   "v1beta1.CPUTargetUtilization": {
-    "id": "v1beta1.CPUTargetUtilization",
-    "required": [
-     "targetPercentage"
-    ],
-    "properties": {
-     "targetPercentage": {
-      "type": "integer",
-      "format": "int32",
-      "description": "fraction of the requested CPU that should be utilized/used, e.g. 70 means that 70% of the requested CPU should be in use."
-     }
-    }
-   },
-   "v1beta1.HorizontalPodAutoscalerStatus": {
-    "id": "v1beta1.HorizontalPodAutoscalerStatus",
-    "description": "current status of a horizontal pod autoscaler",
-    "required": [
-     "currentReplicas",
-     "desiredReplicas"
-    ],
-    "properties": {
-     "observedGeneration": {
-      "type": "integer",
-      "format": "int64",
-      "description": "most recent generation observed by this autoscaler."
-     },
-     "lastScaleTime": {
-      "type": "string",
-      "description": "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed."
-     },
-     "currentReplicas": {
-      "type": "integer",
-      "format": "int32",
-      "description": "current number of replicas of pods managed by this autoscaler."
-     },
-     "desiredReplicas": {
-      "type": "integer",
-      "format": "int32",
-      "description": "desired number of replicas of pods managed by this autoscaler."
-     },
-     "currentCPUUtilizationPercentage": {
-      "type": "integer",
-      "format": "int32",
-      "description": "current average CPU utilization over all pods, represented as a percentage of requested CPU, e.g. 70 means that an average pod is using now 70% of its requested CPU."
      }
     }
    },
@@ -2977,6 +3630,157 @@
       "type": "integer",
       "format": "int64",
       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately."
+     }
+    }
+   },
+   "v1beta1.HorizontalPodAutoscalerList": {
+    "id": "v1beta1.HorizontalPodAutoscalerList",
+    "description": "list of horizontal pod autoscaler objects.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "unversioned.ListMeta",
+      "description": "Standard list metadata."
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.HorizontalPodAutoscaler"
+      },
+      "description": "list of horizontal pod autoscaler objects."
+     }
+    }
+   },
+   "v1beta1.HorizontalPodAutoscaler": {
+    "id": "v1beta1.HorizontalPodAutoscaler",
+    "description": "configuration of a horizontal pod autoscaler.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "v1beta1.HorizontalPodAutoscalerSpec",
+      "description": "behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status."
+     },
+     "status": {
+      "$ref": "v1beta1.HorizontalPodAutoscalerStatus",
+      "description": "current information about the autoscaler."
+     }
+    }
+   },
+   "v1beta1.HorizontalPodAutoscalerSpec": {
+    "id": "v1beta1.HorizontalPodAutoscalerSpec",
+    "description": "specification of a horizontal pod autoscaler.",
+    "required": [
+     "scaleRef",
+     "maxReplicas"
+    ],
+    "properties": {
+     "scaleRef": {
+      "$ref": "v1beta1.SubresourceReference",
+      "description": "reference to Scale subresource; horizontal pod autoscaler will learn the current resource consumption from its status, and will set the desired number of pods by modifying its spec."
+     },
+     "minReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "lower limit for the number of pods that can be set by the autoscaler, default 1."
+     },
+     "maxReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas."
+     },
+     "cpuUtilization": {
+      "$ref": "v1beta1.CPUTargetUtilization",
+      "description": "target average CPU utilization (represented as a percentage of requested CPU) over all the pods; if not specified it defaults to the target CPU utilization at 80% of the requested resources."
+     }
+    }
+   },
+   "v1beta1.SubresourceReference": {
+    "id": "v1beta1.SubresourceReference",
+    "description": "SubresourceReference contains enough information to let you inspect or modify the referred subresource.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds\""
+     },
+     "name": {
+      "type": "string",
+      "description": "Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "API version of the referent"
+     },
+     "subresource": {
+      "type": "string",
+      "description": "Subresource name of the referent"
+     }
+    }
+   },
+   "v1beta1.CPUTargetUtilization": {
+    "id": "v1beta1.CPUTargetUtilization",
+    "required": [
+     "targetPercentage"
+    ],
+    "properties": {
+     "targetPercentage": {
+      "type": "integer",
+      "format": "int32",
+      "description": "fraction of the requested CPU that should be utilized/used, e.g. 70 means that 70% of the requested CPU should be in use."
+     }
+    }
+   },
+   "v1beta1.HorizontalPodAutoscalerStatus": {
+    "id": "v1beta1.HorizontalPodAutoscalerStatus",
+    "description": "current status of a horizontal pod autoscaler",
+    "required": [
+     "currentReplicas",
+     "desiredReplicas"
+    ],
+    "properties": {
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "most recent generation observed by this autoscaler."
+     },
+     "lastScaleTime": {
+      "type": "string",
+      "description": "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed."
+     },
+     "currentReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "current number of replicas of pods managed by this autoscaler."
+     },
+     "desiredReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "desired number of replicas of pods managed by this autoscaler."
+     },
+     "currentCPUUtilizationPercentage": {
+      "type": "integer",
+      "format": "int32",
+      "description": "current average CPU utilization over all pods, represented as a percentage of requested CPU, e.g. 70 means that an average pod is using now 70% of its requested CPU."
      }
     }
    },
