@@ -458,8 +458,8 @@ func TestKillContainerInPodWithPreStop(t *testing.T) {
 			Name: "/k8s_foo_qux_new_1234_42",
 			Config: &docker.Config{
 				Labels: map[string]string{
-					kubernetesPodLabel:       string(podString),
-					kubernetesContainerLabel: "foo",
+					kubernetesPodLabel:           string(podString),
+					kubernetesContainerNameLabel: "foo",
 				},
 			},
 		},
@@ -1434,11 +1434,7 @@ func TestGetTerminationMessagePath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected inspect error: %v", err)
 	}
-	var containerInfo *labelledContainerInfo
-	containerInfo, err = getContainerInfoFromLabel(inspectResult.Config.Labels)
-	if err != nil {
-		t.Fatalf("Unexpected error when getContainerInfoFromLabel: %v", err)
-	}
+	containerInfo := getContainerInfoFromLabel(inspectResult.Config.Labels)
 	terminationMessagePath := containerInfo.TerminationMessagePath
 	if terminationMessagePath != containers[0].TerminationMessagePath {
 		t.Errorf("expected termination message path %s, got %s", containers[0].TerminationMessagePath, terminationMessagePath)
