@@ -1709,30 +1709,28 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	var apiPodStatus api.PodStatus
 	var podStatus *kubecontainer.PodStatus
 
+	// Always generate the kubecontainer.PodStatus to know whether there are
+	// running containers associated with the pod.
+	podStatusPtr, apiPodStatusPtr, err := kl.containerRuntime.GetPodStatusAndAPIPodStatus(pod)
+	if err != nil {
+		glog.Errorf("Unable to get status for pod %q: %v", format.Pod(pod), err)
+		return err
+	}
+	apiPodStatus = *apiPodStatusPtr
+	podStatus = podStatusPtr
+
 	if updateType == kubetypes.SyncPodCreate {
 		// This is the first time we are syncing the pod. Record the latency
 		// since kubelet first saw the pod if firstSeenTime is set.
 		if !firstSeenTime.IsZero() {
 			metrics.PodWorkerStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
 		}
-
+		// kubelet may have just been restarted. Re-use the last known
+		// apiPodStatus.
 		apiPodStatus = pod.Status
 		apiPodStatus.StartTime = &unversioned.Time{Time: start}
 		kl.statusManager.SetPodStatus(pod, apiPodStatus)
-		podStatus = &kubecontainer.PodStatus{
-			ID:        pod.UID,
-			Name:      pod.Name,
-			Namespace: pod.Namespace,
-		}
-		glog.V(3).Infof("Not generating pod status for new pod %q", format.Pod(pod))
-	} else {
-		podStatusPtr, apiPodStatusPtr, err := kl.containerRuntime.GetPodStatusAndAPIPodStatus(pod)
-		if err != nil {
-			glog.Errorf("Unable to get status for pod %q: %v", format.Pod(pod), err)
-			return err
-		}
-		apiPodStatus = *apiPodStatusPtr
-		podStatus = podStatusPtr
+		glog.V(3).Infof("Reusing api pod status for new pod %q", format.Pod(pod))
 	}
 
 	pullSecrets, err := kl.getPullSecretsForPod(pod)
