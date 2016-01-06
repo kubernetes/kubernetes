@@ -36,8 +36,7 @@ bin="$(cd "$(dirname "${BASH_SOURCE}")" && pwd -P)"
 
 if [ "${ENABLE_CLUSTER_DNS}" == "true" ]; then
   echo "Deploying DNS Addon" 1>&2
-  #TODO: curling to get a script to make a tempdir is a bit overkill...
-  curl -o- https://raw.githubusercontent.com/karlkfi/intemp/v1.0.2/intemp.sh | bash -s -- -t 'kube-dns' "${bin}/deploy-dns.sh"
+  "${KUBE_ROOT}/third_party/intemp/intemp.sh" -t 'kube-dns' "${bin}/deploy-dns.sh"
 fi
 
 if [ "${ENABLE_CLUSTER_UI}" == "true" ]; then
