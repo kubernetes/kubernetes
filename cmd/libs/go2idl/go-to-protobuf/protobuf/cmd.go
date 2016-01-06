@@ -43,6 +43,7 @@ type Generator struct {
 	Conditional          string
 	Clean                bool
 	OnlyIDL              bool
+	KeepGogoproto        bool
 	SkipGeneratedRewrite bool
 	DropEmbeddedFields   string
 }
@@ -77,6 +78,7 @@ func (g *Generator) BindFlags(flag *flag.FlagSet) {
 	flag.StringVar(&g.Conditional, "conditional", g.Conditional, "An optional Golang build tag condition to add to the generated Go code")
 	flag.BoolVar(&g.Clean, "clean", g.Clean, "If true, remove all generated files for the specified Packages.")
 	flag.BoolVar(&g.OnlyIDL, "only-idl", g.OnlyIDL, "If true, only generate the IDL for each package.")
+	flag.BoolVar(&g.KeepGogoproto, "keep-gogoproto", g.KeepGogoproto, "If true, the generated IDL will contain gogoprotobuf extensions which are normally removed")
 	flag.BoolVar(&g.SkipGeneratedRewrite, "skip-generated-rewrite", g.SkipGeneratedRewrite, "If true, skip fixing up the generated.pb.go file (debugging only).")
 	flag.StringVar(&g.DropEmbeddedFields, "drop-embedded-fields", g.DropEmbeddedFields, "Comma-delimited list of embedded Go types to omit from generated protobufs")
 }
@@ -206,8 +208,11 @@ func Run(g *Generator) {
 
 	for _, outputPackage := range outputPackages {
 		p := outputPackage.(*protobufPackage)
+
 		path := filepath.Join(g.OutputBase, p.ImportPath())
 		outputPath := filepath.Join(g.OutputBase, p.OutputPath())
+
+		// generate the gogoprotobuf protoc
 		cmd := exec.Command("protoc", append(args, path)...)
 		out, err := cmd.CombinedOutput()
 		if len(out) > 0 {
@@ -217,29 +222,74 @@ func Run(g *Generator) {
 			log.Println(strings.Join(cmd.Args, " "))
 			log.Fatalf("Unable to generate protoc on %s: %v", p.PackageName, err)
 		}
-		if !g.SkipGeneratedRewrite {
-			if err := RewriteGeneratedGogoProtobufFile(outputPath, p.GoPackageName(), p.HasGoType, buf.Bytes()); err != nil {
-				log.Fatalf("Unable to rewrite generated %s: %v", outputPath, err)
-			}
 
-			cmd := exec.Command("goimports", "-w", outputPath)
-			out, err := cmd.CombinedOutput()
-			if len(out) > 0 {
-				log.Printf(string(out))
-			}
-			if err != nil {
-				log.Println(strings.Join(cmd.Args, " "))
-				log.Fatalf("Unable to rewrite imports for %s: %v", p.PackageName, err)
-			}
+		if g.SkipGeneratedRewrite {
+			continue
+		}
 
-			cmd = exec.Command("gofmt", "-s", "-w", outputPath)
-			out, err = cmd.CombinedOutput()
-			if len(out) > 0 {
-				log.Printf(string(out))
+		// alter the generated protobuf file to remove the generated types (but leave the serializers) and rewrite the
+		// package statement to match the desired package name
+		if err := RewriteGeneratedGogoProtobufFile(outputPath, p.GoPackageName(), p.ExtractGeneratedType, buf.Bytes()); err != nil {
+			log.Fatalf("Unable to rewrite generated %s: %v", outputPath, err)
+		}
+
+		// sort imports
+		cmd = exec.Command("goimports", "-w", outputPath)
+		out, err = cmd.CombinedOutput()
+		if len(out) > 0 {
+			log.Printf(string(out))
+		}
+		if err != nil {
+			log.Println(strings.Join(cmd.Args, " "))
+			log.Fatalf("Unable to rewrite imports for %s: %v", p.PackageName, err)
+		}
+
+		// format and simplify the generated file
+		cmd = exec.Command("gofmt", "-s", "-w", outputPath)
+		out, err = cmd.CombinedOutput()
+		if len(out) > 0 {
+			log.Printf(string(out))
+		}
+		if err != nil {
+			log.Println(strings.Join(cmd.Args, " "))
+			log.Fatalf("Unable to apply gofmt for %s: %v", p.PackageName, err)
+		}
+	}
+
+	if g.SkipGeneratedRewrite {
+		return
+	}
+
+	if !g.KeepGogoproto {
+		// generate, but do so without gogoprotobuf extensions
+		for _, outputPackage := range outputPackages {
+			p := outputPackage.(*protobufPackage)
+			p.OmitGogo = true
+		}
+		if err := c.ExecutePackages(g.OutputBase, outputPackages); err != nil {
+			log.Fatalf("Failed executing generator: %v", err)
+		}
+	}
+
+	for _, outputPackage := range outputPackages {
+		p := outputPackage.(*protobufPackage)
+
+		if len(p.StructTags) == 0 {
+			continue
+		}
+
+		pattern := filepath.Join(g.OutputBase, p.PackagePath, "*.go")
+		files, err := filepath.Glob(pattern)
+		if err != nil {
+			log.Fatalf("Can't glob pattern %q: %v", pattern, err)
+		}
+
+		for _, s := range files {
+			if strings.HasSuffix(s, "_test.go") {
+				continue
 			}
-			if err != nil {
-				log.Println(strings.Join(cmd.Args, " "))
-				log.Fatalf("Unable to rewrite imports for %s: %v", p.PackageName, err)
+			if err := RewriteTypesWithProtobufStructTags(s, p.StructTags); err != nil {
+				log.Fatalf("Unable to rewrite with struct tags %s: %v", s, err)
 			}
 		}
 	}
