@@ -238,6 +238,7 @@ oidc-client-id
 oidc-issuer-url
 oidc-username-claim
 oom-score-adj
+outofdisk-transition-frequency
 output-base
 output-package
 output-print-type

@@ -196,10 +196,10 @@ func NewMainKubelet(
 	oomAdjuster *oom.OOMAdjuster,
 	serializeImagePulls bool,
 	containerManager cm.ContainerManager,
+	outOfDiskTransitionFrequency time.Duration,
 	flannelExperimentalOverlay bool,
 	nodeIP net.IP,
 ) (*Kubelet, error) {
-
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -315,6 +315,8 @@ func NewMainKubelet(
 		flannelExperimentalOverlay:     flannelExperimentalOverlay,
 		flannelHelper:                  NewFlannelHelper(),
 		nodeIP:                         nodeIP,
+		clock:                          util.RealClock{},
+		outOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
 	}
 	if klet.flannelExperimentalOverlay {
 		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
@@ -419,7 +421,7 @@ func NewMainKubelet(
 		SystemContainerName:       systemContainer,
 		KubeletContainerName:      resourceContainer,
 	}
-	klet.runtimeState.setRuntimeSync(time.Now())
+	klet.runtimeState.setRuntimeSync(klet.clock.Now())
 
 	klet.runner = klet.containerRuntime
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
@@ -654,6 +656,16 @@ type Kubelet struct {
 
 	// If non-nil, use this IP address for the node
 	nodeIP net.IP
+
+	// clock is an interface that provides time related functionality in a way that makes it
+	// easy to test the code.
+	clock util.Clock
+
+	// outOfDiskTransitionFrequency specifies the amount of time the kubelet has to be actually
+	// not out of disk before it can transition the node condition status from out-of-disk to
+	// not-out-of-disk. This prevents a pod that causes out-of-disk condition from repeatedly
+	// getting rescheduled onto the node.
+	outOfDiskTransitionFrequency time.Duration
 }
 
 // Validate given node IP belongs to the current host
@@ -1614,7 +1626,7 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 }
 
 func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) (syncErr error) {
-	start := time.Now()
+	start := kl.clock.Now()
 	var firstSeenTime time.Time
 	if firstSeenTimeStr, ok := pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey]; !ok {
 		glog.V(3).Infof("First seen time not recorded for pod %q", pod.UID)
@@ -1943,7 +1955,6 @@ func (kl *Kubelet) cleanupTerminatedPods(pods []*api.Pod, runningPods []*kubecon
 // pastActiveDeadline returns true if the pod has been active for more than
 // ActiveDeadlineSeconds.
 func (kl *Kubelet) pastActiveDeadline(pod *api.Pod) bool {
-	now := unversioned.Now()
 	if pod.Spec.ActiveDeadlineSeconds != nil {
 		podStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
 		if !ok {
@@ -1951,7 +1962,7 @@ func (kl *Kubelet) pastActiveDeadline(pod *api.Pod) bool {
 		}
 		if !podStatus.StartTime.IsZero() {
 			startTime := podStatus.StartTime.Time
-			duration := now.Time.Sub(startTime)
+			duration := kl.clock.Since(startTime)
 			allowedDuration := time.Duration(*pod.Spec.ActiveDeadlineSeconds) * time.Second
 			if duration >= allowedDuration {
 				return true
@@ -2313,7 +2324,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 
 func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler SyncHandler,
 	syncCh <-chan time.Time, housekeepingCh <-chan time.Time, plegCh <-chan *pleg.PodLifecycleEvent) bool {
-	kl.syncLoopMonitor.Store(time.Now())
+	kl.syncLoopMonitor.Store(kl.clock.Now())
 	select {
 	case u, open := <-updates:
 		if !open {
@@ -2349,7 +2360,7 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 		}
 		glog.V(2).Infof("SyncLoop (PLEG): %q, event: %#v", format.Pod(pod), e)
 		// Force the container runtime cache to update.
-		if err := kl.runtimeCache.ForceUpdateIfOlder(time.Now()); err != nil {
+		if err := kl.runtimeCache.ForceUpdateIfOlder(kl.clock.Now()); err != nil {
 			glog.Errorf("SyncLoop: unable to update runtime cache")
 			// TODO (yujuhong): should we delay the sync until container
 			// runtime can be updated?
@@ -2380,7 +2391,7 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 			}
 		}
 	}
-	kl.syncLoopMonitor.Store(time.Now())
+	kl.syncLoopMonitor.Store(kl.clock.Now())
 	return true
 }
 
@@ -2409,7 +2420,7 @@ func (kl *Kubelet) handleMirrorPod(mirrorPod *api.Pod, start time.Time) {
 }
 
 func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) {
-	start := time.Now()
+	start := kl.clock.Now()
 	sort.Sort(podsByCreationTime(pods))
 	for _, pod := range pods {
 		kl.podManager.AddPod(pod)
@@ -2435,7 +2446,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) {
 }
 
 func (kl *Kubelet) HandlePodUpdates(pods []*api.Pod) {
-	start := time.Now()
+	start := kl.clock.Now()
 	for _, pod := range pods {
 		kl.podManager.UpdatePod(pod)
 		if kubepod.IsMirrorPod(pod) {
@@ -2450,7 +2461,7 @@ func (kl *Kubelet) HandlePodUpdates(pods []*api.Pod) {
 }
 
 func (kl *Kubelet) HandlePodDeletions(pods []*api.Pod) {
-	start := time.Now()
+	start := kl.clock.Now()
 	for _, pod := range pods {
 		kl.podManager.DeletePod(pod)
 		if kubepod.IsMirrorPod(pod) {
@@ -2467,7 +2478,7 @@ func (kl *Kubelet) HandlePodDeletions(pods []*api.Pod) {
 }
 
 func (kl *Kubelet) HandlePodSyncs(pods []*api.Pod) {
-	start := time.Now()
+	start := kl.clock.Now()
 	for _, pod := range pods {
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
@@ -2615,7 +2626,7 @@ func (kl *Kubelet) updateRuntimeUp() {
 		return
 	}
 	kl.oneTimeInitializer.Do(kl.initializeRuntimeDependentModules)
-	kl.runtimeState.setRuntimeSync(time.Now())
+	kl.runtimeState.setRuntimeSync(kl.clock.Now())
 }
 
 func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
@@ -2819,7 +2830,7 @@ func (kl *Kubelet) setNodeReadyCondition(node *api.Node) {
 	// NOTE(aaronlevy): NodeReady condition needs to be the last in the list of node conditions.
 	// This is due to an issue with version skewed kubelet and master components.
 	// ref: https://github.com/kubernetes/kubernetes/issues/16961
-	currentTime := unversioned.Now()
+	currentTime := unversioned.NewTime(kl.clock.Now())
 	var newNodeReadyCondition api.NodeCondition
 	if rs := kl.runtimeState.errors(); len(rs) == 0 {
 		newNodeReadyCondition = api.NodeCondition{
@@ -2869,7 +2880,7 @@ func (kl *Kubelet) setNodeReadyCondition(node *api.Node) {
 
 // Set OODcondition for the node.
 func (kl *Kubelet) setNodeOODCondition(node *api.Node) {
-	currentTime := unversioned.Now()
+	currentTime := unversioned.NewTime(kl.clock.Now())
 	var nodeOODCondition *api.NodeCondition
 
 	// Check if NodeOutOfDisk condition already exists and if it does, just pick it up for update.
@@ -2883,9 +2894,8 @@ func (kl *Kubelet) setNodeOODCondition(node *api.Node) {
 	// If the NodeOutOfDisk condition doesn't exist, create one.
 	if nodeOODCondition == nil {
 		nodeOODCondition = &api.NodeCondition{
-			Type:               api.NodeOutOfDisk,
-			Status:             api.ConditionUnknown,
-			LastTransitionTime: currentTime,
+			Type:   api.NodeOutOfDisk,
+			Status: api.ConditionUnknown,
 		}
 		// nodeOODCondition cannot be appended to node.Status.Conditions here because it gets
 		// copied to the slice. So if we append nodeOODCondition to the slice here none of the
@@ -2912,11 +2922,18 @@ func (kl *Kubelet) setNodeOODCondition(node *api.Node) {
 		}
 	} else {
 		if nodeOODCondition.Status != api.ConditionFalse {
-			nodeOODCondition.Status = api.ConditionFalse
-			nodeOODCondition.Reason = "KubeletHasSufficientDisk"
-			nodeOODCondition.Message = "kubelet has sufficient disk space available"
-			nodeOODCondition.LastTransitionTime = currentTime
-			kl.recordNodeStatusEvent(api.EventTypeNormal, "NodeHasSufficientDisk")
+			// Update the out of disk condition when the condition status is unknown even if we
+			// are within the outOfDiskTransitionFrequency duration. We do this to set the
+			// condition status correctly at kubelet startup.
+			if nodeOODCondition.Status == api.ConditionUnknown || kl.clock.Since(nodeOODCondition.LastTransitionTime.Time) >= kl.outOfDiskTransitionFrequency {
+				nodeOODCondition.Status = api.ConditionFalse
+				nodeOODCondition.Reason = "KubeletHasSufficientDisk"
+				nodeOODCondition.Message = "kubelet has sufficient disk space available"
+				nodeOODCondition.LastTransitionTime = currentTime
+				kl.recordNodeStatusEvent(api.EventTypeNormal, "NodeHasSufficientDisk")
+			} else {
+				glog.Infof("Node condition status for OutOfDisk is false, but last transition time is less than %s", kl.outOfDiskTransitionFrequency)
+			}
 		}
 	}
 
@@ -3090,7 +3107,7 @@ func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 // after refactoring, modify them later.
 func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 
-	start := time.Now()
+	start := kl.clock.Now()
 	defer func() {
 		metrics.PodStatusLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()

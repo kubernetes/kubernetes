@@ -85,6 +85,7 @@ type TestKubelet struct {
 	fakeCadvisor     *cadvisor.Mock
 	fakeKubeClient   *testclient.Fake
 	fakeMirrorClient *kubepod.FakeMirrorClient
+	fakeClock        *util.FakeClock
 }
 
 func newTestKubelet(t *testing.T) *TestKubelet {
@@ -151,7 +152,8 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.workQueue = queue.NewBasicWorkQueue()
 	// Relist period does not affect the tests.
 	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour)
-	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient}
+	kubelet.clock = fakeClock
+	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock}
 }
 
 func newTestPods(count int) []*api.Pod {
@@ -2465,6 +2467,26 @@ func TestValidateContainerStatus(t *testing.T) {
 	}
 }
 
+// updateDiskSpacePolicy creates a new DiskSpaceManager with a new policy. This new manager along
+// with the mock FsInfo values added to Cadvisor should make the kubelet report that it has
+// sufficient disk space or it is out of disk, depending on the capacity, availability and
+// threshold values.
+func updateDiskSpacePolicy(kubelet *Kubelet, mockCadvisor *cadvisor.Mock, rootCap, dockerCap, rootAvail, dockerAvail uint64, rootThreshold, dockerThreshold int) error {
+	dockerimagesFsInfo := cadvisorapiv2.FsInfo{Capacity: rootCap * mb, Available: rootAvail * mb}
+	rootFsInfo := cadvisorapiv2.FsInfo{Capacity: dockerCap * mb, Available: dockerAvail * mb}
+	mockCadvisor.On("DockerImagesFsInfo").Return(dockerimagesFsInfo, nil)
+	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
+
+	dsp := DiskSpacePolicy{DockerFreeDiskMB: rootThreshold, RootFreeDiskMB: dockerThreshold}
+	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, dsp)
+	if err != nil {
+		return err
+	}
+	diskSpaceManager.Unfreeze()
+	kubelet.diskSpaceManager = diskSpaceManager
+	return nil
+}
+
 func TestUpdateNewNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
@@ -2489,21 +2511,10 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
-	// Create a new DiskSpaceManager with a new policy. This new manager along with the mock
-	// FsInfo values added to Cadvisor should make the kubelet report that it has sufficient
-	// disk space.
-	dockerimagesFsInfo := cadvisorapiv2.FsInfo{Capacity: 500 * mb, Available: 200 * mb}
-	rootFsInfo := cadvisorapiv2.FsInfo{Capacity: 500 * mb, Available: 200 * mb}
-	mockCadvisor.On("DockerImagesFsInfo").Return(dockerimagesFsInfo, nil)
-	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
-
-	dsp := DiskSpacePolicy{DockerFreeDiskMB: 100, RootFreeDiskMB: 100}
-	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, dsp)
-	if err != nil {
+	// Make kubelet report that it has sufficient disk space.
+	if err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 200, 200, 100, 100); err != nil {
 		t.Fatalf("can't update disk space manager: %v", err)
 	}
-	diskSpaceManager.Unfreeze()
-	kubelet.diskSpaceManager = diskSpaceManager
 
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
@@ -2585,6 +2596,82 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	}
 }
 
+func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	kubeClient := testKubelet.fakeKubeClient
+	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
+	}}).ReactionChain
+	machineInfo := &cadvisorapi.MachineInfo{
+		MachineID:      "123",
+		SystemUUID:     "abc",
+		BootID:         "1b3",
+		NumCores:       2,
+		MemoryCapacity: 1024,
+	}
+	mockCadvisor := testKubelet.fakeCadvisor
+	mockCadvisor.On("Start").Return(nil)
+	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &cadvisorapi.VersionInfo{
+		KernelVersion:      "3.16.0-0.bpo.4-amd64",
+		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+		DockerVersion:      "1.5.0",
+	}
+	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+
+	// Make Kubelet report that it has sufficient disk space.
+	if err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 200, 200, 100, 100); err != nil {
+		t.Fatalf("can't update disk space manager: %v", err)
+	}
+
+	kubelet.outOfDiskTransitionFrequency = 10 * time.Second
+
+	expectedNodeOutOfDiskCondition := api.NodeCondition{
+		Type:               api.NodeOutOfDisk,
+		Status:             api.ConditionFalse,
+		Reason:             "KubeletHasSufficientDisk",
+		Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
+		LastHeartbeatTime:  unversioned.Time{},
+		LastTransitionTime: unversioned.Time{},
+	}
+
+	kubelet.updateRuntimeUp()
+	if err := kubelet.updateNodeStatus(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	actions := kubeClient.Actions()
+	if len(actions) != 2 {
+		t.Fatalf("unexpected actions: %v", actions)
+	}
+	if !actions[1].Matches("update", "nodes") || actions[1].GetSubresource() != "status" {
+		t.Fatalf("unexpected actions: %v", actions)
+	}
+	updatedNode, ok := actions[1].(testclient.UpdateAction).GetObject().(*api.Node)
+	if !ok {
+		t.Errorf("unexpected object type")
+	}
+
+	var oodCondition api.NodeCondition
+	for i, cond := range updatedNode.Status.Conditions {
+		if cond.LastHeartbeatTime.IsZero() {
+			t.Errorf("unexpected zero last probe timestamp for %v condition", cond.Type)
+		}
+		if cond.LastTransitionTime.IsZero() {
+			t.Errorf("unexpected zero last transition timestamp for %v condition", cond.Type)
+		}
+		updatedNode.Status.Conditions[i].LastHeartbeatTime = unversioned.Time{}
+		updatedNode.Status.Conditions[i].LastTransitionTime = unversioned.Time{}
+		if cond.Type == api.NodeOutOfDisk {
+			oodCondition = updatedNode.Status.Conditions[i]
+		}
+	}
+
+	if !reflect.DeepEqual(expectedNodeOutOfDiskCondition, oodCondition) {
+		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNodeOutOfDiskCondition, oodCondition))
+	}
+}
+
 // FIXME: Enable me..
 func testDockerRuntimeVersion(t *testing.T) {
 	testKubelet := newTestKubelet(t)
@@ -2611,20 +2698,11 @@ func testDockerRuntimeVersion(t *testing.T) {
 		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
-	// Create a new DiskSpaceManager with a new policy. This new manager along with the mock
-	// FsInfo values added to Cadvisor should make the kubelet report that it has sufficient
-	// disk space.
-	dockerimagesFsInfo := cadvisorapiv2.FsInfo{Capacity: 500 * mb, Available: 200 * mb}
-	rootFsInfo := cadvisorapiv2.FsInfo{Capacity: 500 * mb, Available: 200 * mb}
-	mockCadvisor.On("DockerImagesFsInfo").Return(dockerimagesFsInfo, nil)
-	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
-	dsp := DiskSpacePolicy{DockerFreeDiskMB: 100, RootFreeDiskMB: 100}
-	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, dsp)
-	if err != nil {
+
+	// Make kubelet report that it has sufficient disk space.
+	if err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 200, 200, 100, 100); err != nil {
 		t.Fatalf("can't update disk space manager: %v", err)
 	}
-	diskSpaceManager.Unfreeze()
-	kubelet.diskSpaceManager = diskSpaceManager
 
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
@@ -2781,20 +2859,10 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
-	// Create a new DiskSpaceManager with a new policy. This new manager along with the mock FsInfo
-	// values added to Cadvisor should make the kubelet report that it is out of disk space.
-	dockerimagesFsInfo := cadvisorapiv2.FsInfo{Capacity: 500 * mb, Available: 70 * mb}
-	rootFsInfo := cadvisorapiv2.FsInfo{Capacity: 500 * mb, Available: 50 * mb}
-	mockCadvisor.On("DockerImagesFsInfo").Return(dockerimagesFsInfo, nil)
-	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
-
-	dsp := DiskSpacePolicy{DockerFreeDiskMB: 100, RootFreeDiskMB: 100}
-	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, dsp)
-	if err != nil {
+	// Make kubelet report that it is out of disk space.
+	if err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 50, 50, 100, 100); err != nil {
 		t.Fatalf("can't update disk space manager: %v", err)
 	}
-	diskSpaceManager.Unfreeze()
-	kubelet.diskSpaceManager = diskSpaceManager
 
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
@@ -2878,6 +2946,158 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	}
 }
 
+func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	clock := testKubelet.fakeClock
+	kubeClient := testKubelet.fakeKubeClient
+	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
+		{
+			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
+			Spec:       api.NodeSpec{},
+			Status: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					{
+						Type:               api.NodeReady,
+						Status:             api.ConditionTrue,
+						Reason:             "KubeletReady",
+						Message:            fmt.Sprintf("kubelet is posting ready status"),
+						LastHeartbeatTime:  unversioned.NewTime(clock.Now()),
+						LastTransitionTime: unversioned.NewTime(clock.Now()),
+					},
+					{
+
+						Type:               api.NodeOutOfDisk,
+						Status:             api.ConditionTrue,
+						Reason:             "KubeletOutOfDisk",
+						Message:            "out of disk space",
+						LastHeartbeatTime:  unversioned.NewTime(clock.Now()),
+						LastTransitionTime: unversioned.NewTime(clock.Now()),
+					},
+				},
+			},
+		},
+	}}).ReactionChain
+	mockCadvisor := testKubelet.fakeCadvisor
+	machineInfo := &cadvisorapi.MachineInfo{
+		MachineID:      "123",
+		SystemUUID:     "abc",
+		BootID:         "1b3",
+		NumCores:       2,
+		MemoryCapacity: 1024,
+	}
+	mockCadvisor.On("Start").Return(nil)
+	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &cadvisorapi.VersionInfo{
+		KernelVersion:      "3.16.0-0.bpo.4-amd64",
+		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+		DockerVersion:      "1.5.0",
+	}
+	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+
+	kubelet.outOfDiskTransitionFrequency = 5 * time.Second
+
+	ood := api.NodeCondition{
+		Type:               api.NodeOutOfDisk,
+		Status:             api.ConditionTrue,
+		Reason:             "KubeletOutOfDisk",
+		Message:            "out of disk space",
+		LastHeartbeatTime:  unversioned.NewTime(clock.Now()), // placeholder
+		LastTransitionTime: unversioned.NewTime(clock.Now()), // placeholder
+	}
+	noOod := api.NodeCondition{
+		Type:               api.NodeOutOfDisk,
+		Status:             api.ConditionFalse,
+		Reason:             "KubeletHasSufficientDisk",
+		Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
+		LastHeartbeatTime:  unversioned.NewTime(clock.Now()), // placeholder
+		LastTransitionTime: unversioned.NewTime(clock.Now()), // placeholder
+	}
+
+	testCases := []struct {
+		rootFsAvail   uint64
+		dockerFsAvail uint64
+		expected      api.NodeCondition
+	}{
+		{
+			// NodeOutOfDisk==false
+			rootFsAvail:   200,
+			dockerFsAvail: 200,
+			expected:      ood,
+		},
+		{
+			// NodeOutOfDisk==true
+			rootFsAvail:   50,
+			dockerFsAvail: 200,
+			expected:      ood,
+		},
+		{
+			// NodeOutOfDisk==false
+			rootFsAvail:   200,
+			dockerFsAvail: 200,
+			expected:      ood,
+		},
+		{
+			// NodeOutOfDisk==true
+			rootFsAvail:   200,
+			dockerFsAvail: 50,
+			expected:      ood,
+		},
+		{
+			// NodeOutOfDisk==false
+			rootFsAvail:   200,
+			dockerFsAvail: 200,
+			expected:      noOod,
+		},
+	}
+
+	kubelet.updateRuntimeUp()
+	for tcIdx, tc := range testCases {
+		// Step by a second
+		clock.Step(1 * time.Second)
+
+		// Setup expected times.
+		tc.expected.LastHeartbeatTime = unversioned.NewTime(clock.Now())
+		// In the last case, there should be a status transition for NodeOutOfDisk
+		if tcIdx == len(testCases)-1 {
+			tc.expected.LastTransitionTime = unversioned.NewTime(clock.Now())
+		}
+
+		// Make kubelet report that it has sufficient disk space
+		if err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, tc.rootFsAvail, tc.dockerFsAvail, 100, 100); err != nil {
+			t.Fatalf("can't update disk space manager: %v", err)
+		}
+
+		if err := kubelet.updateNodeStatus(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		actions := kubeClient.Actions()
+		if len(actions) != 2 {
+			t.Errorf("%d. unexpected actions: %v", tcIdx, actions)
+		}
+		updateAction, ok := actions[1].(testclient.UpdateAction)
+		if !ok {
+			t.Errorf("%d. unexpected action type.  expected UpdateAction, got %#v", tcIdx, actions[1])
+		}
+		updatedNode, ok := updateAction.GetObject().(*api.Node)
+		if !ok {
+			t.Errorf("%d. unexpected object type", tcIdx)
+		}
+		kubeClient.ClearActions()
+
+		var oodCondition api.NodeCondition
+		for i, cond := range updatedNode.Status.Conditions {
+			if cond.Type == api.NodeOutOfDisk {
+				oodCondition = updatedNode.Status.Conditions[i]
+			}
+		}
+
+		if !reflect.DeepEqual(tc.expected, oodCondition) {
+			t.Errorf("%d.\nwant \n%v\n, got \n%v", tcIdx, tc.expected, oodCondition)
+		}
+	}
+}
+
 func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
@@ -2907,21 +3127,10 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
-	// Create a new DiskSpaceManager with a new policy. This new manager along with the
-	// mock FsInfo values assigned to Cadvisor should make the kubelet report that it has
-	// sufficient disk space.
-	dockerimagesFsInfo := cadvisorapiv2.FsInfo{Capacity: 500 * mb, Available: 200 * mb}
-	rootFsInfo := cadvisorapiv2.FsInfo{Capacity: 500 * mb, Available: 200 * mb}
-	mockCadvisor.On("DockerImagesFsInfo").Return(dockerimagesFsInfo, nil)
-	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
-
-	dsp := DiskSpacePolicy{DockerFreeDiskMB: 100, RootFreeDiskMB: 100}
-	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, dsp)
-	if err != nil {
+	// Make kubelet report that it has sufficient disk space.
+	if err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 200, 200, 100, 100); err != nil {
 		t.Fatalf("can't update disk space manager: %v", err)
 	}
-	diskSpaceManager.Unfreeze()
-	kubelet.diskSpaceManager = diskSpaceManager
 
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
