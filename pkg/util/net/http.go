@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package net
 
 import (
 	"crypto/tls"
@@ -110,4 +110,13 @@ func FormatURL(scheme string, host string, port int, path string) *url.URL {
 		Host:   net.JoinHostPort(host, strconv.Itoa(port)),
 		Path:   path,
 	}
+}
+
+func GetHTTPClient(req *http.Request) string {
+	if userAgent, ok := req.Header["User-Agent"]; ok {
+		if len(userAgent) > 0 {
+			return userAgent[0]
+		}
+	}
+	return "unknown"
 }

@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	"k8s.io/kubernetes/pkg/util"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 
 	"github.com/spf13/pflag"
 )
@@ -42,7 +42,7 @@ type ProxyServerConfig struct {
 	ResourceContainer              string
 	Master                         string
 	Kubeconfig                     string
-	PortRange                      util.PortRange
+	PortRange                      utilnet.PortRange
 	HostnameOverride               string
 	ProxyMode                      string
 	IptablesSyncPeriod             time.Duration

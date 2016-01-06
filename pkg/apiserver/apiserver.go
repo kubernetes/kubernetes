@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/wsstream"
 	"k8s.io/kubernetes/pkg/version"
 
@@ -61,7 +62,7 @@ func monitorFilter(action, resource string) restful.FilterFunction {
 		reqStart := time.Now()
 		chain.ProcessFilter(req, res)
 		httpCode := res.StatusCode()
-		metrics.Monitor(&action, &resource, util.GetClient(req.Request), &httpCode, reqStart)
+		metrics.Monitor(&action, &resource, utilnet.GetHTTPClient(req.Request), &httpCode, reqStart)
 	}
 }
 

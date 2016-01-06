@@ -29,7 +29,7 @@ import (
 	"reflect"
 	"runtime"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/net"
 )
 
 // chaosrt provides the ability to perform simulations of HTTP client failures
@@ -88,7 +88,7 @@ func (rt *chaosrt) RoundTrip(req *http.Request) (*http.Response, error) {
 	return rt.rt.RoundTrip(req)
 }
 
-var _ = util.RoundTripperWrapper(&chaosrt{})
+var _ = net.RoundTripperWrapper(&chaosrt{})
 
 func (rt *chaosrt) WrappedRoundTripper() http.RoundTripper {
 	return rt.rt

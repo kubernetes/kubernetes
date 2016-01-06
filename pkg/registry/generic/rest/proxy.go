@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
+	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/proxy"
 
 	"github.com/golang/glog"
@@ -226,7 +226,7 @@ func (p *corsRemovingTransport) RoundTrip(req *http.Request) (*http.Response, er
 	return resp, nil
 }
 
-var _ = util.RoundTripperWrapper(&corsRemovingTransport{})
+var _ = net.RoundTripperWrapper(&corsRemovingTransport{})
 
 func (rt *corsRemovingTransport) WrappedRoundTripper() http.RoundTripper {
 	return rt.RoundTripper

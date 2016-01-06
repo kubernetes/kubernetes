@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -199,7 +199,7 @@ func getPod(getter ResourceGetter, ctx api.Context, name string) (*api.Pod, erro
 func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
 	// Allow ID as "podname" or "podname:port" or "scheme:podname:port".
 	// If port is not specified, try to use the first defined port on the pod.
-	scheme, name, port, valid := util.SplitSchemeNamePort(id)
+	scheme, name, port, valid := utilnet.SplitSchemeNamePort(id)
 	if !valid {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid pod request %q", id))
 	}
