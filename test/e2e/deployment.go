@@ -292,18 +292,13 @@ func testRolloverDeployment(f *Framework) {
 	deployment, err := c.Deployments(ns).Get(deploymentName)
 	// Make sure the deployment starts to scale up and down RCs
 	waitForPartialEvents(c, ns, deployment, 2)
-	events, err := c.Events(ns).Search(deployment)
-	if err != nil {
-		Logf("error in listing events: %s", err)
-		Expect(err).NotTo(HaveOccurred())
-	}
 	newRC, err := deploymentutil.GetNewRC(*deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRC).NotTo(Equal(nil))
 
 	// Before the deployment finishes, update the deployment to rollover the above 2 rcs and bring up redis pods.
 	// If the deployment already finished here, the test would fail. When this happens, increase its minReadySeconds or replicas to prevent it.
-	Expect(len(events.Items)).Should(BeNumerically("<", deploymentReplicas))
+	Expect(newRC.Spec.Replicas).Should(BeNumerically("<", deploymentReplicas))
 	updatedDeploymentImage := "redis"
 	newDeployment.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImage
 	newDeployment.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage
