@@ -4,6 +4,7 @@ package fs
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -29,13 +30,13 @@ func (s *CpusetGroup) Apply(d *cgroupData) error {
 }
 
 func (s *CpusetGroup) Set(path string, cgroup *configs.Cgroup) error {
-	if cgroup.CpusetCpus != "" {
-		if err := writeFile(path, "cpuset.cpus", cgroup.CpusetCpus); err != nil {
+	if cgroup.Resources.CpusetCpus != "" {
+		if err := writeFile(path, "cpuset.cpus", cgroup.Resources.CpusetCpus); err != nil {
 			return err
 		}
 	}
-	if cgroup.CpusetMems != "" {
-		if err := writeFile(path, "cpuset.mems", cgroup.CpusetMems); err != nil {
+	if cgroup.Resources.CpusetMems != "" {
+		if err := writeFile(path, "cpuset.mems", cgroup.Resources.CpusetMems); err != nil {
 			return err
 		}
 	}
@@ -61,11 +62,6 @@ func (s *CpusetGroup) ApplyDir(dir string, cgroup *configs.Cgroup, pid int) erro
 		return err
 	}
 	if err := s.ensureParent(dir, root); err != nil {
-		return err
-	}
-	// the default values inherit from parent cgroup are already set in
-	// s.ensureParent, cover these if we have our own
-	if err := s.Set(dir, cgroup); err != nil {
 		return err
 	}
 	// because we are not using d.join we need to place the pid into the procs file
@@ -94,6 +90,10 @@ func (s *CpusetGroup) ensureParent(current, root string) error {
 	parent := filepath.Dir(current)
 	if filepath.Clean(parent) == root {
 		return nil
+	}
+	// Avoid infinite recursion.
+	if parent == current {
+		return fmt.Errorf("cpuset: cgroup parent path outside cgroup root")
 	}
 	if err := s.ensureParent(parent, root); err != nil {
 		return err

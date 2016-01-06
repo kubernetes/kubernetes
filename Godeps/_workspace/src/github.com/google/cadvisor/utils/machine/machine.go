@@ -82,8 +82,8 @@ func GetClockSpeed(procInfo []byte) (uint64, error) {
 }
 
 // GetMachineMemoryCapacity returns the machine's total memory from /proc/meminfo.
-// Returns the total memory capacity as an int64 (number of bytes).
-func GetMachineMemoryCapacity() (int64, error) {
+// Returns the total memory capacity as an uint64 (number of bytes).
+func GetMachineMemoryCapacity() (uint64, error) {
 	out, err := ioutil.ReadFile("/proc/meminfo")
 	if err != nil {
 		return 0, err
@@ -97,8 +97,8 @@ func GetMachineMemoryCapacity() (int64, error) {
 }
 
 // GetMachineSwapCapacity returns the machine's total swap from /proc/meminfo.
-// Returns the total swap capacity as an int64 (number of bytes).
-func GetMachineSwapCapacity() (int64, error) {
+// Returns the total swap capacity as an uint64 (number of bytes).
+func GetMachineSwapCapacity() (uint64, error) {
 	out, err := ioutil.ReadFile("/proc/meminfo")
 	if err != nil {
 		return 0, err
@@ -113,14 +113,14 @@ func GetMachineSwapCapacity() (int64, error) {
 
 // parseCapacity matches a Regexp in a []byte, returning the resulting value in bytes.
 // Assumes that the value matched by the Regexp is in KB.
-func parseCapacity(b []byte, r *regexp.Regexp) (int64, error) {
+func parseCapacity(b []byte, r *regexp.Regexp) (uint64, error) {
 	matches := r.FindSubmatch(b)
 	if len(matches) != 2 {
-		return -1, fmt.Errorf("failed to match regexp in output: %q", string(b))
+		return 0, fmt.Errorf("failed to match regexp in output: %q", string(b))
 	}
-	m, err := strconv.ParseInt(string(matches[1]), 10, 64)
+	m, err := strconv.ParseUint(string(matches[1]), 10, 64)
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 
 	// Convert to bytes.

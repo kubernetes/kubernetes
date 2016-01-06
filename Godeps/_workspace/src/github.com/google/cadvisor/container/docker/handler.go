@@ -139,6 +139,7 @@ func newDockerContainerHandler(
 		rootFs:             rootFs,
 		rootfsStorageDir:   rootfsStorageDir,
 		fsHandler:          newFsHandler(time.Minute, rootfsStorageDir, otherStorageDir, fsInfo),
+		envs:               make(map[string]string),
 	}
 
 	// We assume that if Inspect fails then the container is not known to docker.
@@ -206,36 +207,31 @@ func libcontainerConfigToContainerSpec(config *libcontainerconfigs.Config, mi *i
 	spec.HasMemory = true
 	spec.Memory.Limit = math.MaxUint64
 	spec.Memory.SwapLimit = math.MaxUint64
-	if config.Cgroups.Memory > 0 {
-		spec.Memory.Limit = uint64(config.Cgroups.Memory)
-	}
-	if config.Cgroups.MemorySwap > 0 {
-		spec.Memory.SwapLimit = uint64(config.Cgroups.MemorySwap)
-	}
 
-	// Get CPU info
-	spec.HasCpu = true
-	spec.Cpu.Limit = 1024
-	if config.Cgroups.CpuShares != 0 {
-		spec.Cpu.Limit = uint64(config.Cgroups.CpuShares)
+	if config.Cgroups.Resources != nil {
+		if config.Cgroups.Resources.Memory > 0 {
+			spec.Memory.Limit = uint64(config.Cgroups.Resources.Memory)
+		}
+		if config.Cgroups.Resources.MemorySwap > 0 {
+			spec.Memory.SwapLimit = uint64(config.Cgroups.Resources.MemorySwap)
+		}
+
+		// Get CPU info
+		spec.HasCpu = true
+		spec.Cpu.Limit = 1024
+		if config.Cgroups.Resources.CpuShares != 0 {
+			spec.Cpu.Limit = uint64(config.Cgroups.Resources.CpuShares)
+		}
+		spec.Cpu.Mask = utils.FixCpuMask(config.Cgroups.Resources.CpusetCpus, mi.NumCores)
 	}
-	spec.Cpu.Mask = utils.FixCpuMask(config.Cgroups.CpusetCpus, mi.NumCores)
 
 	spec.HasDiskIo = true
 
 	return spec
 }
 
-var (
-	hasNetworkModes = map[string]bool{
-		"host":    true,
-		"bridge":  true,
-		"default": true,
-	}
-)
-
 func hasNet(networkMode string) bool {
-	return hasNetworkModes[networkMode]
+	return !strings.HasPrefix(networkMode, "container:")
 }
 
 func (self *dockerContainerHandler) GetSpec() (info.ContainerSpec, error) {

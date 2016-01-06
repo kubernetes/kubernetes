@@ -22,7 +22,7 @@ import (
 
 type NodeInfo struct {
 	Cores int
-	Mem   int64 // in bytes
+	Mem   uint64 // in bytes
 }
 
 func nodeInfo(si *mesos.SlaveInfo, ei *mesos.ExecutorInfo) NodeInfo {
@@ -57,13 +57,13 @@ func nodeInfo(si *mesos.SlaveInfo, ei *mesos.ExecutorInfo) NodeInfo {
 			// TODO(sttts): switch to float64 when "Machine Allocables" are implemented
 			ni.Cores += int(r.GetScalar().GetValue())
 		case "mem":
-			ni.Mem += int64(r.GetScalar().GetValue()) * 1024 * 1024
+			ni.Mem += uint64(r.GetScalar().GetValue()) * 1024 * 1024
 		}
 	}
 
 	// TODO(sttts): subtract executorCPU/Mem from static pod resources before subtracting them from the capacity
 	ni.Cores -= int(executorCPU)
-	ni.Mem -= int64(executorMem) * 1024 * 1024
+	ni.Mem -= uint64(executorMem) * 1024 * 1024
 
 	return ni
 }

@@ -26,6 +26,10 @@ func (m *Manager) GetPids() ([]int, error) {
 	return nil, fmt.Errorf("Systemd not supported")
 }
 
+func (m *Manager) GetAllPids() ([]int, error) {
+	return nil, fmt.Errorf("Systemd not supported")
+}
+
 func (m *Manager) Destroy() error {
 	return fmt.Errorf("Systemd not supported")
 }

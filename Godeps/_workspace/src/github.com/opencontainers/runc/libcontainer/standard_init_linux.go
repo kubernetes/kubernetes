@@ -3,6 +3,7 @@
 package libcontainer
 
 import (
+	"io"
 	"os"
 	"syscall"
 
@@ -14,6 +15,7 @@ import (
 )
 
 type linuxStandardInit struct {
+	pipe      io.ReadWriter
 	parentPid int
 	config    *initConfig
 }
@@ -50,7 +52,6 @@ func (l *linuxStandardInit) Init() error {
 	if err := setOomScoreAdj(l.config.Config.OomScoreAdj); err != nil {
 		return err
 	}
-
 	label.Init()
 	// InitializeMountNamespace() can be executed only for a new mount namespace
 	if l.config.Config.Namespaces.Contains(configs.NEWNS) {
@@ -75,7 +76,6 @@ func (l *linuxStandardInit) Init() error {
 			return err
 		}
 	}
-
 	for _, path := range l.config.Config.ReadonlyPaths {
 		if err := remountReadonly(path); err != nil {
 			return err
@@ -88,6 +88,12 @@ func (l *linuxStandardInit) Init() error {
 	}
 	pdeath, err := system.GetParentDeathSignal()
 	if err != nil {
+		return err
+	}
+	// Tell our parent that we're ready to Execv. This must be done before the
+	// Seccomp rules have been applied, because we need to be able to read and
+	// write to a socket.
+	if err := syncParentReady(l.pipe); err != nil {
 		return err
 	}
 	if l.config.Config.Seccomp != nil {
