@@ -356,3 +356,7 @@ www-prefix
 clientset-name
 clientset-only
 clientset-path
+leader-elect
+leader-elect-lease-duration
+leader-elect-renew-deadline
+leader-elect-retry-period
