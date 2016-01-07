@@ -45,8 +45,10 @@ config_ip_firewall() {
 create_dirs() {
   # Create required directories.
   mkdir -p /var/lib/kubelet
-  mkdir -p /var/lib/kube-proxy
   mkdir -p /etc/kubernetes/manifests
+  if [ "${KUBERNETES_MASTER:-}" = "false" ]; then
+    mkdir -p /var/lib/kube-proxy
+  fi
 }
 
 download_kube_env() {
@@ -65,7 +67,6 @@ for k,v in yaml.load(sys.stdin).iteritems():
 
 create_kubelet_kubeconfig() {
   # Create the kubelet kubeconfig file.
-  . /etc/kube-env
   if [ -z "${KUBELET_CA_CERT:-}" ]; then
     KUBELET_CA_CERT="${CA_CERT}"
   fi
@@ -158,38 +159,45 @@ download_or_bust() {
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
 # and places them into suitable directories.
 install_kube_binary_config() {
-  . /etc/kube-env
-  # For a testing cluster, we pull kubelet, kube-proxy, and kubectl binaries,
-  # and place them in /usr/local/bin. For a non-test cluster, we use the binaries
-  # pre-installed in the image, or pull and place them in /usr/bin if they are
-  # not pre-installed.
+  # In anyway we have to download the release tarball as docker_tag files and
+  # kube-proxy image file are there.
+  cd /tmp
+  k8s_sha1="${SERVER_BINARY_TAR_URL##*/}.sha1"
+  echo "Downloading k8s tar sha1 file ${k8s_sha1}"
+  download_or_bust "${k8s_sha1}" "${SERVER_BINARY_TAR_URL}.sha1"
+  k8s_tar="${SERVER_BINARY_TAR_URL##*/}"
+  echo "Downloading k8s tar file ${k8s_tar}"
+  download_or_bust "${k8s_tar}" "${SERVER_BINARY_TAR_URL}"
+  # Validate hash.
+  actual=$(sha1sum ${k8s_tar} | awk '{ print $1 }') || true
+  if [ "${actual}" != "${SERVER_BINARY_TAR_HASH}" ]; then
+    echo "== ${k8s_tar} corrupted, sha1 ${actual} doesn't match expected ${SERVER_BINARY_TAR_HASH} =="
+  else
+    echo "Validated ${SERVER_BINARY_TAR_URL} SHA1 = ${SERVER_BINARY_TAR_HASH}"
+  fi
+  tar xzf "/tmp/${k8s_tar}" -C /tmp/ --overwrite
+  # Copy docker_tag and image files to /run/kube-docker-files.
+  mkdir -p /run/kube-docker-files
+  cp /tmp/kubernetes/server/bin/*.docker_tag /run/kube-docker-files/
+  if [ "${KUBERNETES_MASTER:-}" = "false" ]; then
+    cp /tmp/kubernetes/server/bin/kube-proxy.tar /run/kube-docker-files/
+  fi
+  # For a testing cluster, we use kubelet, kube-proxy, and kubectl binaries
+  # from the release tarball and place them in /usr/local/bin. For a non-test
+  # cluster, we use the binaries pre-installed in the image, or pull and place
+  # them in /usr/bin if they are not pre-installed.
   BINARY_PATH="/usr/bin/"
   if [ "${TEST_CLUSTER:-}" = "true" ]; then
     BINARY_PATH="/usr/local/bin/"
   fi
   if ! which kubelet > /dev/null || ! which kube-proxy > /dev/null || [ "${TEST_CLUSTER:-}" = "true" ]; then
-    cd /tmp
-    k8s_sha1="${SERVER_BINARY_TAR_URL##*/}.sha1"
-    echo "Downloading k8s tar sha1 file ${k8s_sha1}"
-    download_or_bust "${k8s_sha1}" "${SERVER_BINARY_TAR_URL}.sha1"
-    k8s_tar="${SERVER_BINARY_TAR_URL##*/}"
-    echo "Downloading k8s tar file ${k8s_tar}"
-    download_or_bust "${k8s_tar}" "${SERVER_BINARY_TAR_URL}"
-    # Validate hash.
-    actual=$(sha1sum ${k8s_tar} | awk '{ print $1 }') || true
-    if [ "${actual}" != "${SERVER_BINARY_TAR_HASH}" ]; then
-      echo "== ${k8s_tar} corrupted, sha1 ${actual} doesn't match expected ${SERVER_BINARY_TAR_HASH} =="
-    else
-      echo "Validated ${SERVER_BINARY_TAR_URL} SHA1 = ${SERVER_BINARY_TAR_HASH}"
-    fi
-    tar xzf "/tmp/${k8s_tar}" -C /tmp/ --overwrite
     cp /tmp/kubernetes/server/bin/kubelet ${BINARY_PATH}
-    cp /tmp/kubernetes/server/bin/kube-proxy ${BINARY_PATH}
     cp /tmp/kubernetes/server/bin/kubectl ${BINARY_PATH}
-    rm -rf "/tmp/kubernetes"
-    rm "/tmp/${k8s_tar}"
-    rm "/tmp/${k8s_sha1}"
   fi
+  # Clean up.
+  rm -rf "/tmp/kubernetes"
+  rm "/tmp/${k8s_tar}"
+  rm "/tmp/${k8s_sha1}"
 
   # Put kube-system pods manifests in /etc/kube-manifests/.
   mkdir -p /run/kube-manifests
@@ -213,7 +221,6 @@ install_kube_binary_config() {
 }
 
 restart_docker_daemon() {
-  . /etc/kube-env
   # Assemble docker deamon options
   DOCKER_OPTS="-p /var/run/docker.pid --bridge=cbr0 --iptables=false --ip-masq=false"
   if [ "${TEST_CLUSTER:-}" = "true" ]; then
@@ -229,4 +236,13 @@ restart_docker_daemon() {
   # Remove docker0
   ifconfig docker0 down
   brctl delbr docker0
+}
+
+# Create the log file and set its properties.
+#
+# $1 is the file to create
+prepare_log_file() {
+  touch $1
+  chmod 644 $1
+  chown root:root $1
 }
