@@ -27,6 +27,7 @@ import (
 	"strings"
 	"syscall"
 
+	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	exservice "k8s.io/kubernetes/contrib/mesos/pkg/executor/service"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	"k8s.io/kubernetes/contrib/mesos/pkg/minion/config"
@@ -250,7 +251,7 @@ func (ms *MinionServer) Run(hks hyperkube.Interface, _ []string) error {
 	}
 
 	// create apiserver client
-	clientConfig, err := ms.KubeletExecutorServer.CreateAPIServerClientConfig()
+	clientConfig, err := kubeletapp.CreateAPIServerClientConfig(ms.KubeletExecutorServer.KubeletServer)
 	if err != nil {
 		// required for k8sm since we need to send api.Binding information
 		// back to the apiserver
