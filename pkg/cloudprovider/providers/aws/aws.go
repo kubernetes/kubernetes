@@ -260,7 +260,7 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 }
 
 func (p *awsSDKProvider) Metadata() (EC2Metadata, error) {
-	client := ec2metadata.New(nil)
+	client := ec2metadata.New(session.New(&aws.Config{}))
 	return client, nil
 }
 
@@ -439,7 +439,9 @@ func init() {
 		creds := credentials.NewChainCredentials(
 			[]credentials.Provider{
 				&credentials.EnvProvider{},
-				&ec2rolecreds.EC2RoleProvider{},
+				&ec2rolecreds.EC2RoleProvider{
+					Client: ec2metadata.New(session.New(&aws.Config{})),
+				},
 				&credentials.SharedCredentialsProvider{},
 			})
 		aws := &awsSDKProvider{creds: creds}
