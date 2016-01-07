@@ -121,12 +121,15 @@ type LeaderElectionConfig struct {
 //
 // possible future callbacks:
 //  * OnChallenge()
-//  * OnNewLeader()
 type LeaderCallbacks struct {
 	// OnStartedLeading is called when a LeaderElector client starts leading
 	OnStartedLeading func(stop <-chan struct{})
 	// OnStoppedLeading is called when a LeaderElector client stops leading
 	OnStoppedLeading func()
+	// OnNewLeader is called when the client observes a leader that is
+	// not the previously observed leader. This includes the first observed
+	// leader when the client starts.
+	OnNewLeader func(identity string)
 }
 
 // LeaderElector is a leader election client.
@@ -139,6 +142,10 @@ type LeaderElector struct {
 	// internal bookkeeping
 	observedRecord LeaderElectionRecord
 	observedTime   time.Time
+	// used to implement OnNewLeader(), may lag slightly from the
+	// value observedRecord.HolderIdentity if the transistion has
+	// not yet been reported.
+	reportedLeader string
 }
 
 // LeaderElectionRecord is the record that is stored in the leader election annotation.
@@ -182,6 +189,7 @@ func (le *LeaderElector) acquire() {
 	stop := make(chan struct{})
 	util.Until(func() {
 		succeeded := le.tryAcquireOrRenew()
+		le.maybeReportTransition()
 		if !succeeded {
 			glog.V(4).Infof("failed to renew lease %v/%v", le.config.EndpointsMeta.Namespace, le.config.EndpointsMeta.Name)
 			time.Sleep(wait.Jitter(le.config.RetryPeriod, JitterFactor))
@@ -200,6 +208,7 @@ func (le *LeaderElector) renew() {
 		err := wait.Poll(le.config.RetryPeriod, le.config.RenewDeadline, func() (bool, error) {
 			return le.tryAcquireOrRenew(), nil
 		})
+		le.maybeReportTransition()
 		if err == nil {
 			glog.V(4).Infof("succesfully renewed lease %v/%v", le.config.EndpointsMeta.Namespace, le.config.EndpointsMeta.Name)
 			return
@@ -295,4 +304,14 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	le.observedRecord = leaderElectionRecord
 	le.observedTime = time.Now()
 	return true
+}
+
+func (l *LeaderElector) maybeReportTransition() {
+	if l.observedRecord.HolderIdentity == l.reportedLeader {
+		return
+	}
+	l.reportedLeader = l.observedRecord.HolderIdentity
+	if l.config.Callbacks.OnNewLeader != nil {
+		go l.config.Callbacks.OnNewLeader(l.reportedLeader)
+	}
 }
