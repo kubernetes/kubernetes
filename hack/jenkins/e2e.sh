@@ -498,11 +498,16 @@ case ${JOB_NAME} in
     NUM_NODES=${NUM_NODES_PARALLEL}
     ;;
 
-  # Runs only the reboot tests on GCE.
+  # Run the GCE_PARALLEL_SKIP_TESTS on GCE.
   kubernetes-e2e-gce-reboot)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-reboot"}
     : ${E2E_NETWORK:="e2e-reboot"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Reboot"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_allow_empty \
+          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
+          ) --ginkgo.skip=$(join_regex_no_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-reboot"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
@@ -617,17 +622,19 @@ case ${JOB_NAME} in
           )"}
     ;;
 
+  # Run the GCE_PARALLEL_SKIP_TESTS on GKE.
   kubernetes-e2e-gke-ci-reboot)
     : ${E2E_CLUSTER_NAME:="jkns-gke-e2e-ci-reboot"}
     : ${E2E_NETWORK:="e2e-gke-ci-reboot"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${PROJECT:="k8s-jkns-e2e-gke-ci-reboot"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          "\[Skipped\]" \
-          ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_allow_empty \
+          ${GCE_PARALLEL_SKIP_TESTS[@]:+${GCE_PARALLEL_SKIP_TESTS[@]}} \
+          ) --ginkgo.skip=$(join_regex_no_empty \
+          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
+          ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
           )"}
     ;;
 
