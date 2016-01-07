@@ -35,6 +35,7 @@ type PersistentVolumeInterface interface {
 	Get(name string) (*api.PersistentVolume, error)
 	List(opts api.ListOptions) (*api.PersistentVolumeList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	PersistentVolumeExpansion
 }
 
 // persistentVolumes implements PersistentVolumeInterface

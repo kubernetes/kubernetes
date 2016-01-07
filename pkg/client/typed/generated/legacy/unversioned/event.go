@@ -35,6 +35,7 @@ type EventInterface interface {
 	Get(name string) (*api.Event, error)
 	List(opts api.ListOptions) (*api.EventList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	EventExpansion
 }
 
 // events implements EventInterface

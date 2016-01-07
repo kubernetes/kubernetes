@@ -36,6 +36,7 @@ type IngressInterface interface {
 	Get(name string) (*extensions.Ingress, error)
 	List(opts api.ListOptions) (*extensions.IngressList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	IngressExpansion
 }
 
 // ingresses implements IngressInterface

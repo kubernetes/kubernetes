@@ -35,6 +35,7 @@ type ReplicationControllerInterface interface {
 	Get(name string) (*api.ReplicationController, error)
 	List(opts api.ListOptions) (*api.ReplicationControllerList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	ReplicationControllerExpansion
 }
 
 // replicationControllers implements ReplicationControllerInterface

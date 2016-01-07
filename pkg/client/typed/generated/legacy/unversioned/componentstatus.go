@@ -35,6 +35,7 @@ type ComponentStatusInterface interface {
 	Get(name string) (*api.ComponentStatus, error)
 	List(opts api.ListOptions) (*api.ComponentStatusList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	ComponentStatusExpansion
 }
 
 // componentStatus implements ComponentStatusInterface

@@ -36,6 +36,7 @@ type TestTypeInterface interface {
 	Get(name string) (*testgroup.TestType, error)
 	List(opts api.ListOptions) (*testgroup.TestTypeList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	TestTypeExpansion
 }
 
 // testTypes implements TestTypeInterface

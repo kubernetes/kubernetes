@@ -35,6 +35,7 @@ type NamespaceInterface interface {
 	Get(name string) (*api.Namespace, error)
 	List(opts api.ListOptions) (*api.NamespaceList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	NamespaceExpansion
 }
 
 // namespaces implements NamespaceInterface
