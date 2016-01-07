@@ -533,7 +533,7 @@ func TestAuthFilters(t *testing.T) {
 
 	// This is a sanity check that the Handle->HandleWithFilter() delegation is working
 	// Ideally, these would move to registered web services and this list would get shorter
-	expectedPaths := []string{"/healthz", "/stats/", "/metrics"}
+	expectedPaths := []string{"/healthz", "/metrics"}
 	paths := sets.NewString(fw.serverUnderTest.restfulCont.RegisteredHandlePaths()...)
 	for _, expectedPath := range expectedPaths {
 		if !paths.Has(expectedPath) {
