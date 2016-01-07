@@ -41,11 +41,12 @@ Documentation for other releases can be found at
     - [`kubectl scale` and `kubectl autoscale`](#kubectl-scale-and-kubectl-autoscale)
     - [`kubectl rollout`](#kubectl-rollout)
     - [`kubectl set`](#kubectl-set)
+    - [Mutating Operations](#mutating-operations)
     - [Example](#example)
   - [Support in Deployment](#support-in-deployment)
     - [Deployment Status](#deployment-status)
     - [Deployment Version](#deployment-version)
-    - [Inert Deployments](#inert-deployments)
+    - [Pause Deployments](#pause-deployments)
     - [Perm-failed Deployments](#perm-failed-deployments)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -95,8 +96,20 @@ Users may use `kubectl scale` or `kubectl autoscale` to scale up and down Deploy
 ### `kubectl set`
 
 `kubectl set` has the following subcommands:
-- `kubectl set env` allows the users to set environment variables of Kubernetes resources. It should support Pod, ReplicationController, ReplicaSet, Deployment, and DaemonSet.
-- `kubectl set image` allows the users to update the image of deployments. Users will use `--container` and `--image` flags to update the image of a container.
+- `kubectl set env` allows the users to set environment variables of Kubernetes resources. It should support any object that contains a single, primary PodTemplate (such as Pod, ReplicationController, ReplicaSet, Deployment, and DaemonSet).
+- `kubectl set image` allows the users to update multiple images of Kubernetes resources. Users will use `--container` and `--image` flags to update the image of a container. It should support anything that has a PodTemplate.
+
+`kubectl set` should be used for things that are common and commonly modified. Other possible future commands include:
+- `kubectl set volume`
+- `kubectl set limits`
+- `kubectl set security`
+- `kubectl set port`
+
+### Mutating Operations
+
+Other means of mutating Deployments and DaemonSets, including `kubectl apply`, `kubectl edit`, `kubectl replace`, `kubectl patch`, `kubectl label`, and `kubectl annotate`, may trigger rollouts if they modify the pod template.
+
+`kubectl create` and `kubectl delete`, for creating and deleting Deployments and DaemonSets, are also relevant.
 
 ### Example
 
@@ -139,7 +152,7 @@ See issue [#17164](https://github.com/kubernetes/kubernetes/issues/17164).
 
 We store previous deployment versions information in deployment annotation `kubectl.kubernetes.io/deployment-version-<time>`. The value stored in the annotation can be a spec hash, a strategic merge patch or the kubectl commands previously executed. We choose strategic merge patch since it's more human-readable than spec hash, and commands like `kubectl edit` won't provide enough useful information.
 
-### Inert Deployments
+### Pause Deployments
 
 Users sometimes need to temporarily disable a deployment. See issue [#14516](https://github.com/kubernetes/kubernetes/issues/14516).
 
