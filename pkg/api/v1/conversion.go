@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
+	"speter.net/go/exp/math/dec/inf"
 )
 
 const (
@@ -44,6 +45,7 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		Convert_v1_PodSpec_To_api_PodSpec,
 		Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
 		Convert_v1_ServiceSpec_To_api_ServiceSpec,
+		Convert_v1_ResourceList_To_api_ResourceList,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -538,5 +540,29 @@ func Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurityCont
 	} else {
 		out.FSGroup = nil
 	}
+	return nil
+}
+
+func Convert_v1_ResourceList_To_api_ResourceList(in *ResourceList, out *api.ResourceList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ResourceList))(in)
+	}
+	if *in == nil {
+		return nil
+	}
+
+	converted := make(api.ResourceList)
+	for key, val := range *in {
+		value := val.Copy()
+
+		// TODO(#18538): We round up resource values to milli scale to maintain API compatibility.
+		// In the future, we should instead reject values that need rounding.
+		const milliScale = 3
+		value.Amount.Round(value.Amount, milliScale, inf.RoundUp)
+
+		converted[api.ResourceName(key)] = *value
+	}
+
+	*out = converted
 	return nil
 }
