@@ -57,3 +57,8 @@
                     </testDataPublishers>
                     <healthScaleFactor>100.0</healthScaleFactor>
                 </hudson.tasks.junit.JUnitResultArchiver>
+
+# Default email recipients are set in Jenkins global config
+- defaults:
+    name: global
+    emails: '$DEFAULT_RECIPIENTS'
