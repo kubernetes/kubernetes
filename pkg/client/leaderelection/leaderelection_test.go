@@ -22,6 +22,7 @@ package leaderelection
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -195,14 +196,24 @@ func TestTryAcquireOrRenew(t *testing.T) {
 		},
 	}
 
-	lec := LeaderElectionConfig{
-		EndpointsMeta: api.ObjectMeta{Namespace: "foo", Name: "bar"},
-		Identity:      "baz",
-		EventRecorder: &record.FakeRecorder{},
-		LeaseDuration: 10 * time.Second,
-	}
-
 	for i, test := range tests {
+		// OnNewLeader is called async so we have to wait for it.
+		var wg sync.WaitGroup
+		wg.Add(1)
+		var reportedLeader string
+
+		lec := LeaderElectionConfig{
+			EndpointsMeta: api.ObjectMeta{Namespace: "foo", Name: "bar"},
+			Identity:      "baz",
+			EventRecorder: &record.FakeRecorder{},
+			LeaseDuration: 10 * time.Second,
+			Callbacks: LeaderCallbacks{
+				OnNewLeader: func(l string) {
+					defer wg.Done()
+					reportedLeader = l
+				},
+			},
+		}
 		c := &testclient.Fake{}
 		for _, reactor := range test.reactors {
 			c.AddReactor(reactor.verb, "endpoints", reactor.reaction)
@@ -236,6 +247,12 @@ func TestTryAcquireOrRenew(t *testing.T) {
 		}
 		if !test.transitionLeader && le.observedRecord.LeaderTransitions != 0 {
 			t.Errorf("[%v]leader should not have transitioned but did", i)
+		}
+
+		le.maybeReportTransition()
+		wg.Wait()
+		if reportedLeader != test.outHolder {
+			t.Errorf("[%v]reported leader was not the new leader. expected %q, got %q", i, test.outHolder, reportedLeader)
 		}
 	}
 }
