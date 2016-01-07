@@ -109,36 +109,40 @@ func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSin
 	eventCorrelator := NewEventCorrelator(util.RealClock{})
 	return eventBroadcaster.StartEventWatcher(
 		func(event *api.Event) {
-			// Make a copy before modification, because there could be multiple listeners.
-			// Events are safe to copy like this.
-			eventCopy := *event
-			event = &eventCopy
-			result, err := eventCorrelator.EventCorrelate(event)
-			if err != nil {
-				util.HandleError(err)
-			}
-			if result.Skip {
-				return
-			}
-			tries := 0
-			for {
-				if recordEvent(sink, result.Event, result.Patch, result.Event.Count > 1, eventCorrelator) {
-					break
-				}
-				tries++
-				if tries >= maxTriesPerEvent {
-					glog.Errorf("Unable to write event '%#v' (retry limit exceeded!)", event)
-					break
-				}
-				// Randomize the first sleep so that various clients won't all be
-				// synced up if the master goes down.
-				if tries == 1 {
-					time.Sleep(time.Duration(float64(sleepDuration) * randGen.Float64()))
-				} else {
-					time.Sleep(sleepDuration)
-				}
-			}
+			recordToSink(sink, event, eventCorrelator, randGen)
 		})
+}
+
+func recordToSink(sink EventSink, event *api.Event, eventCorrelator *EventCorrelator, randGen *rand.Rand) {
+	// Make a copy before modification, because there could be multiple listeners.
+	// Events are safe to copy like this.
+	eventCopy := *event
+	event = &eventCopy
+	result, err := eventCorrelator.EventCorrelate(event)
+	if err != nil {
+		util.HandleError(err)
+	}
+	if result.Skip {
+		return
+	}
+	tries := 0
+	for {
+		if recordEvent(sink, result.Event, result.Patch, result.Event.Count > 1, eventCorrelator) {
+			break
+		}
+		tries++
+		if tries >= maxTriesPerEvent {
+			glog.Errorf("Unable to write event '%#v' (retry limit exceeded!)", event)
+			break
+		}
+		// Randomize the first sleep so that various clients won't all be
+		// synced up if the master goes down.
+		if tries == 1 {
+			time.Sleep(time.Duration(float64(sleepDuration) * randGen.Float64()))
+		} else {
+			time.Sleep(sleepDuration)
+		}
+	}
 }
 
 func isKeyNotFoundError(err error) bool {
