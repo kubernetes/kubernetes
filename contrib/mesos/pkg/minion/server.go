@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -66,10 +67,12 @@ type MinionServer struct {
 	logMaxAgeInDays int
 	logVerbosity    int32 // see glog.Level
 
-	runProxy     bool
-	proxyLogV    int
-	proxyBindall bool
-	proxyMode    string
+	runProxy                       bool
+	proxyLogV                      int
+	proxyBindall                   bool
+	proxyMode                      string
+	conntrackMax                   int
+	conntrackTCPTimeoutEstablished int
 }
 
 // NewMinionServer creates the MinionServer struct with default values to be used by hyperkube
@@ -139,11 +142,8 @@ func (ms *MinionServer) launchProxyServer() {
 		"--logtostderr=true",
 		"--resource-container=" + path.Join("/", ms.mesosCgroup, "kube-proxy"),
 		"--proxy-mode=" + ms.proxyMode,
-		// TODO(jdef) this is a temporary hack to fix failing smoke tests. a following PR
-		// will more properly fix the smoke tests as well as make these flags configrable
-		// at the framework level (as opposed to hardcoded here)
-		"--conntrack-max=0",
-		"--conntrack-tcp-timeout-established=0",
+		"--conntrack-max=" + strconv.Itoa(ms.conntrackMax),
+		"--conntrack-tcp-timeout-established=" + strconv.Itoa(ms.conntrackTCPTimeoutEstablished),
 	}
 
 	if ms.clientConfig.Host != "" {
@@ -351,4 +351,6 @@ func (ms *MinionServer) AddMinionFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&ms.proxyLogV, "proxy-logv", ms.proxyLogV, "Log verbosity of the child kube-proxy.")
 	fs.BoolVar(&ms.proxyBindall, "proxy-bindall", ms.proxyBindall, "When true will cause kube-proxy to bind to 0.0.0.0.")
 	fs.StringVar(&ms.proxyMode, "proxy-mode", ms.proxyMode, "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
+	fs.IntVar(&ms.conntrackMax, "conntrack-max", ms.conntrackMax, "Maximum number of NAT connections to track on agent nodes (0 to leave as-is)")
+	fs.IntVar(&ms.conntrackTCPTimeoutEstablished, "conntrack-tcp-timeout-established", ms.conntrackTCPTimeoutEstablished, "Idle timeout for established TCP connections on agent nodes (0 to leave as-is)")
 }
