@@ -48,9 +48,7 @@ const (
 	restartPodReadyAgainTimeout = 5 * time.Minute
 )
 
-// TODO(ihmccreery): This is skipped because it was previously in
-// REBOOT_SKIP_TESTS, dates back before version control (#10078)
-var _ = Describe("Restart [Skipped]", func() {
+var _ = Describe("Restart", func() {
 	var c *client.Client
 	var ps *podStore
 	var skipped bool

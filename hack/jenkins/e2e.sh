@@ -265,13 +265,19 @@ fi
 # When 1.2.0-beta.0 comes out, e.g., this will become "ci/latest-1.2"
 CURRENT_RELEASE_PUBLISHED_VERSION="ci/latest-1.1"
 
-# Specialized tests which should be skipped by default for projects.
-GCE_DEFAULT_SKIP_TESTS=(
-    "\[Example\]" # previously in REBOOT_SKIP_TESTS..., dates back before version control (#10078)
-    "\[Skipped\]"
+# Specialized to skip when running reboot tests.
+REBOOT_SKIP_TESTS=(
+    "Restart\sshould\srestart\sall\snodes"
+    "\[Example\]"
     )
 
-# PROVIDER SKIPS --------------------------------------
+# Specialized tests which should be skipped by default for projects.
+GCE_DEFAULT_SKIP_TESTS=(
+    "${REBOOT_SKIP_TESTS[@]}"
+    "\[Skipped\]"
+    "Reboot"
+    "ServiceLoadBalancer"
+    )
 
 # Tests which cannot be run on GKE, e.g. because they require
 # master ssh access.
@@ -301,7 +307,6 @@ AWS_REQUIRED_SKIP_TESTS=(
     "GCE\sL7\sLoadBalancer\sController" # GCE L7 loadbalancing
 )
 
-# END PROVIDER SKIPS --------------------------------------
 
 # Tests which kills or restarts components and/or nodes.
 DISRUPTIVE_TESTS=(
@@ -321,6 +326,10 @@ GCE_FLAKY_TESTS=(
 # comments below, and for poorly implemented tests, please quote the
 # issue number tracking speed improvements.
 GCE_SLOW_TESTS=(
+    # Before enabling this loadbalancer test in any other test list you must
+    # make sure the associated project has enough quota. At the time of this
+    # writing a GCE project is allowed 3 backend services by default. This
+    # test requires at least 5.
     "\[Slow\]"
     )
 
@@ -331,6 +340,21 @@ GCE_PARALLEL_SKIP_TESTS=(
     "\[Serial\]"
     "\[Disruptive\]"
 )
+
+# Tests that should not run on soak cluster.
+GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
+    "GCE\sL7\sLoadBalancer\sController" # issue: #17119
+    "Density.*30\spods"
+    "Elasticsearch"
+    "external\sload\sbalancer"
+    "identically\snamed\sservices"
+    "network\spartition"
+    "Services.*Type\sgoes\sfrom"
+    "${DISRUPTIVE_TESTS[@]}"       # avoid component restarts.
+    )
+
+GCE_RELEASE_SKIP_TESTS=(
+    )
 
 # Define environment variables based on the Jenkins project name.
 # NOTE: Not all jobs are defined here. The hack/jenkins/e2e.sh in master and
@@ -592,13 +616,10 @@ case ${JOB_NAME} in
     : ${E2E_UP:="false"}
     # Clear out any orphaned namespaces in case previous run was interrupted.
     : ${E2E_CLEAN_START:="true"}
-    # We should be testing the reliability of a long-running cluster. The
-    # DISRUPTIVE_TESTS kill/restart components or nodes in the cluster,
-    # defeating the purpose of a soak cluster. (#15722)
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${DISRUPTIVE_TESTS[@]:+${DISRUPTIVE_TESTS[@]}} \
+          ${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]:+${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]}} \
           )"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="gce-soak-weekly"}
     : ${PROJECT:="kubernetes-jenkins"}
@@ -626,6 +647,7 @@ case ${JOB_NAME} in
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           "\[Skipped\]" \
           ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
+          ${REBOOT_SKIP_TESTS[@]:+${REBOOT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
           ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
@@ -668,14 +690,11 @@ case ${JOB_NAME} in
     : ${E2E_CLEAN_START:="true"}
     : ${PROJECT:="kubernetes-jenkins"}
     : ${E2E_OPT:="--check_version_skew=false"}
-    # We should be testing the reliability of a long-running cluster. The
-    # DISRUPTIVE_TESTS kill/restart components or nodes in the cluster,
-    # defeating the purpose of a soak cluster. (#15722)
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
           ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${DISRUPTIVE_TESTS[@]:+${DISRUPTIVE_TESTS[@]}} \
+          ${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]:+${GCE_SOAK_CONTINUOUS_SKIP_TESTS[@]}} \
           )"}
     ;;
 
