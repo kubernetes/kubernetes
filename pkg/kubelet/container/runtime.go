@@ -216,6 +216,16 @@ func (c *ContainerID) UnmarshalJSON(data []byte) error {
 	return c.ParseString(string(data))
 }
 
+// DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
+type DockerID string
+
+func (id DockerID) ContainerID() ContainerID {
+	return ContainerID{
+		Type: "docker",
+		ID:   string(id),
+	}
+}
+
 type ContainerState string
 
 const (

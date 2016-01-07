@@ -88,7 +88,7 @@ func newTestDockerManagerWithHTTPClient(fakeHTTPClient *fakeHTTP) (*DockerManage
 		proberesults.NewManager(),
 		containerRefManager,
 		&cadvisorapi.MachineInfo{},
-		PodInfraContainerImage,
+		kubetypes.PodInfraContainerImage,
 		0, 0, "",
 		kubecontainer.FakeOS{},
 		networkPlugin,
@@ -532,7 +532,7 @@ func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 
 	container := &api.Container{
 		Name:            PodInfraContainerName,
-		Image:           PodInfraContainerImage,
+		Image:           kubetypes.PodInfraContainerImage,
 		Ports:           ports,
 		ImagePullPolicy: podInfraContainerImagePullPolicy,
 	}
@@ -830,7 +830,7 @@ func TestSyncPodsUnhealthy(t *testing.T) {
 			ID:   infraContainerID,
 			Name: "/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_foo_new_12345678_42",
 		}})
-	dm.livenessManager.Set(kubetypes.DockerID(unhealthyContainerID).ContainerID(), proberesults.Failure, nil)
+	dm.livenessManager.Set(kubecontainer.DockerID(unhealthyContainerID).ContainerID(), proberesults.Failure, nil)
 
 	runSyncPod(t, dm, fakeDocker, pod, nil, false)
 

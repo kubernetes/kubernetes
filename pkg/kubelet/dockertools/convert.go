@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // This file contains helper functions to convert docker API types to runtime
@@ -55,7 +54,7 @@ func toRuntimeContainer(c *docker.APIContainers) (*kubecontainer.Container, erro
 	}
 
 	return &kubecontainer.Container{
-		ID:      kubetypes.DockerID(c.ID).ContainerID(),
+		ID:      kubecontainer.DockerID(c.ID).ContainerID(),
 		Name:    dockerName.ContainerName,
 		Image:   c.Image,
 		Hash:    hash,
