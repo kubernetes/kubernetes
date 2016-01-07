@@ -83,7 +83,7 @@ The local-machine solutions are:
 
 - [Local Docker-based](docker.md) (recommended starting point)
 - [Vagrant](vagrant.md) (works on any platform with Vagrant: Linux, MacOS, or Windows.)
-- [No-VM local cluster](locally.md) (Linux only)
+- [No-VM local cluster](../devel/running-locally.md)  (Linux only)
 
 
 ### Hosted Solutions
@@ -190,7 +190,6 @@ Joyent               | Juju         | Ubuntu | flannel     | [docs](juju.md)    
 AWS                  | Saltstack    | Ubuntu | OVS         | [docs](aws.md)                                    |          | Community ([@justinsb](https://github.com/justinsb))
 Bare-metal           | custom       | Ubuntu | Calico      | [docs](ubuntu-calico.md)                          |          | Community ([@djosborne](https://github.com/djosborne))
 Bare-metal           | custom       | Ubuntu | flannel     | [docs](ubuntu.md)                                 |          | Community ([@resouer](https://github.com/resouer), [@dalanlan](https://github.com/dalanlan), [@WIZARD-CXY](https://github.com/WIZARD-CXY))
-Local                |              |        | _none_      | [docs](locally.md)                                |          | Community ([@preillyme](https://github.com/preillyme))
 libvirt/KVM          | CoreOS       | CoreOS | libvirt/KVM | [docs](libvirt-coreos.md)                         |          | Community ([@lhuard1A](https://github.com/lhuard1A))
 oVirt                |              |        |             | [docs](ovirt.md)                                  |          | Community ([@simon3z](https://github.com/simon3z))
 Rackspace            | CoreOS       | CoreOS | flannel     | [docs](rackspace.md)                              |          | Community ([@doublerr](https://github.com/doublerr))

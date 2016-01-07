@@ -18,11 +18,6 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/locally.md).
-
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -56,7 +51,7 @@ Getting started locally
 
 #### Linux
 
-Not running Linux? Consider running Linux in a local virtual machine with [Vagrant](vagrant.md), or on a cloud provider like [Google Compute Engine](gce.md)
+Not running Linux? Consider running Linux in a local virtual machine with [Vagrant](../getting-started-guides/vagrant.md), or on a cloud provider like [Google Compute Engine](../getting-started-guides/gce.md).
 
 #### Docker
 
@@ -71,7 +66,7 @@ You need an [etcd](https://github.com/coreos/etcd/releases) in your path, please
 
 #### go
 
-You need [go](https://golang.org/doc/install) in your path (see [here](../devel/development.md#go-versions) for supported versions), please make sure it is installed and in your ``$PATH``.
+You need [go](https://golang.org/doc/install) in your path (see [here](development.md#go-versions) for supported versions), please make sure it is installed and in your ``$PATH``.
 
 ### Clone the repository
 
@@ -174,6 +169,8 @@ One or more of the Kubernetes daemons might've crashed. Tail the logs of each in
 The local-up-cluster.sh script doesn't start a DNS service. Similar situation can be found [here](http://issue.k8s.io/6667). You can start a manually. Related documents can be found [here](../../cluster/addons/dns/#how-do-i-configure-it)
 
 
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/locally.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/running-locally.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
