@@ -182,6 +182,7 @@ func NewMainKubelet(
 	dockerDaemonContainer string,
 	systemContainer string,
 	configureCBR0 bool,
+	nonMasqueradeCIDR string,
 	podCIDR string,
 	reconcileCIDR bool,
 	maxPods int,
@@ -301,6 +302,7 @@ func NewMainKubelet(
 		chownRunner:                    chownRunner,
 		writer:                         writer,
 		configureCBR0:                  configureCBR0,
+		nonMasqueradeCIDR:              nonMasqueradeCIDR,
 		reconcileCIDR:                  reconcileCIDR,
 		maxPods:                        maxPods,
 		syncLoopMonitor:                atomic.Value{},
@@ -608,6 +610,9 @@ type Kubelet struct {
 	// the correct state.
 	configureCBR0 bool
 	reconcileCIDR bool
+
+	// Traffic to IPs outside this range will use IP masquerade.
+	nonMasqueradeCIDR string
 
 	// Maximum Number of Pods which can be run by this Kubelet
 	maxPods int
@@ -2644,7 +2649,7 @@ func (kl *Kubelet) syncNetworkStatus() {
 				kl.runtimeState.podCIDR(), podCIDR)
 			kl.runtimeState.setPodCIDR(podCIDR)
 		}
-		if err := ensureIPTablesMasqRule(); err != nil {
+		if err := ensureIPTablesMasqRule(kl.nonMasqueradeCIDR); err != nil {
 			err = fmt.Errorf("Error on adding ip table rules: %v", err)
 			glog.Error(err)
 			kl.runtimeState.setNetworkState(err)
