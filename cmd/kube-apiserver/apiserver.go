@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
@@ -36,7 +37,7 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	s := app.NewAPIServer()
+	s := options.NewAPIServer()
 	s.AddFlags(pflag.CommandLine)
 
 	util.InitFlags()
@@ -45,7 +46,7 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	if err := s.Run(pflag.CommandLine.Args()); err != nil {
+	if err := app.Run(s); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
