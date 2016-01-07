@@ -18,14 +18,12 @@ package server
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/pprof"
-	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -49,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/httplog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
+	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
@@ -222,7 +221,7 @@ func (s *Server) InstallDefaultHandlers() {
 		Operation("getPods"))
 	s.restfulCont.Add(ws)
 
-	s.restfulCont.Handle("/stats/", &httpHandler{f: s.handleStats})
+	s.restfulCont.Add(stats.CreateHandlers(s.host))
 	s.restfulCont.Handle("/metrics", prometheus.Handler())
 
 	ws = new(restful.WebService)
@@ -355,13 +354,6 @@ type httpHandler struct {
 
 func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.f(w, r)
-}
-
-// error serializes an error object into an HTTP response.
-func (s *Server) error(w http.ResponseWriter, err error) {
-	msg := fmt.Sprintf("Internal Error: %v", err)
-	glog.Infof("HTTP InternalServerError: %s", msg)
-	http.Error(w, msg, http.StatusInternalServerError)
 }
 
 // Checks if kubelet's sync loop  that updates containers is working.
@@ -499,11 +491,6 @@ func (s *Server) getRunningPods(request *restful.Request, response *restful.Resp
 		return
 	}
 	response.Write(data)
-}
-
-// handleStats handles stats requests against the Kubelet.
-func (s *Server) handleStats(w http.ResponseWriter, req *http.Request) {
-	s.serveStats(w, req)
 }
 
 // getLogs handles logs requests against the Kubelet.
@@ -1060,108 +1047,4 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		),
 	).Log()
 	s.restfulCont.ServeHTTP(w, req)
-}
-
-type StatsRequest struct {
-	// The name of the container for which to request stats.
-	// Default: /
-	ContainerName string `json:"containerName,omitempty"`
-
-	// Max number of stats to return.
-	// If start and end time are specified this limit is ignored.
-	// Default: 60
-	NumStats int `json:"num_stats,omitempty"`
-
-	// Start time for which to query information.
-	// If omitted, the beginning of time is assumed.
-	Start time.Time `json:"start,omitempty"`
-
-	// End time for which to query information.
-	// If omitted, current time is assumed.
-	End time.Time `json:"end,omitempty"`
-
-	// Whether to also include information from subcontainers.
-	// Default: false.
-	Subcontainers bool `json:"subcontainers,omitempty"`
-}
-
-// serveStats implements stats logic.
-func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
-	// Stats requests are in the following forms:
-	//
-	// /stats/                                              : Root container stats
-	// /stats/container/                                    : Non-Kubernetes container stats (returns a map)
-	// /stats/<pod name>/<container name>                   : Stats for Kubernetes pod/container
-	// /stats/<namespace>/<pod name>/<uid>/<container name> : Stats for Kubernetes namespace/pod/uid/container
-	components := strings.Split(strings.TrimPrefix(path.Clean(req.URL.Path), "/"), "/")
-	var stats interface{}
-	var err error
-	var query StatsRequest
-	query.NumStats = 60
-
-	err = json.NewDecoder(req.Body).Decode(&query)
-	if err != nil && err != io.EOF {
-		s.error(w, err)
-		return
-	}
-	cadvisorRequest := cadvisorapi.ContainerInfoRequest{
-		NumStats: query.NumStats,
-		Start:    query.Start,
-		End:      query.End,
-	}
-
-	switch len(components) {
-	case 1:
-		// Root container stats.
-		var statsMap map[string]*cadvisorapi.ContainerInfo
-		statsMap, err = s.host.GetRawContainerInfo("/", &cadvisorRequest, false)
-		stats = statsMap["/"]
-	case 2:
-		// Non-Kubernetes container stats.
-		if components[1] != "container" {
-			http.Error(w, fmt.Sprintf("unknown stats request type %q", components[1]), http.StatusNotFound)
-			return
-		}
-		containerName := path.Join("/", query.ContainerName)
-		stats, err = s.host.GetRawContainerInfo(containerName, &cadvisorRequest, query.Subcontainers)
-	case 3:
-		// Backward compatibility without uid information, does not support namespace
-		pod, ok := s.host.GetPodByName(api.NamespaceDefault, components[1])
-		if !ok {
-			http.Error(w, "Pod does not exist", http.StatusNotFound)
-			return
-		}
-		stats, err = s.host.GetContainerInfo(kubecontainer.GetPodFullName(pod), "", components[2], &cadvisorRequest)
-	case 5:
-		pod, ok := s.host.GetPodByName(components[1], components[2])
-		if !ok {
-			http.Error(w, "Pod does not exist", http.StatusNotFound)
-			return
-		}
-		stats, err = s.host.GetContainerInfo(kubecontainer.GetPodFullName(pod), types.UID(components[3]), components[4], &cadvisorRequest)
-	default:
-		http.Error(w, fmt.Sprintf("Unknown resource: %v", components), http.StatusNotFound)
-		return
-	}
-	switch err {
-	case nil:
-		break
-	case kubecontainer.ErrContainerNotFound:
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	default:
-		s.error(w, err)
-		return
-	}
-	if stats == nil {
-		fmt.Fprint(w, "{}")
-		return
-	}
-	data, err := json.Marshal(stats)
-	if err != nil {
-		s.error(w, err)
-		return
-	}
-	w.Header().Add("Content-type", "application/json")
-	w.Write(data)
 }
