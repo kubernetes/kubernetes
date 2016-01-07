@@ -166,6 +166,17 @@ func (le *LeaderElector) Run() {
 	close(stop)
 }
 
+// GetLeader returns the identity of the last observed leader or returns the empty string if
+// no leader has yet been observed.
+func (le *LeaderElector) GetLeader() string {
+	return le.observedRecord.HolderIdentity
+}
+
+// IsLeader returns true if the last observed leader was this client else returns false.
+func (le *LeaderElector) IsLeader() bool {
+	return le.observedRecord.HolderIdentity == le.config.Identity
+}
+
 // acquire loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew succeeds.
 func (le *LeaderElector) acquire() {
 	stop := make(chan struct{})
