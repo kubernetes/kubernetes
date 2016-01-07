@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/iptables"
 )
@@ -213,7 +215,7 @@ func Test_getProxyMode(t *testing.T) {
 func TestProxyServerWithCleanupAndExit(t *testing.T) {
 
 	//creates default config
-	config := NewProxyConfig()
+	config := options.NewProxyConfig()
 
 	//sets CleanupAndExit manually
 	config.CleanupAndExit = true
