@@ -1034,6 +1034,9 @@ case ${JOB_NAME} in
     ;;
 esac
 
+# Skip gcloud update checking
+export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
+
 # AWS variables
 export KUBE_AWS_INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
 export KUBE_AWS_ZONE=${E2E_ZONE}
