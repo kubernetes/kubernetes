@@ -305,7 +305,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	totalMissing := 0
 	expected := nodeCount * countTo
 	missingPerNode := []int{}
-	for start := time.Now(); time.Since(start) < ingestionTimeout; time.Sleep(10 * time.Second) {
+	for start := time.Now(); time.Since(start) < ingestionTimeout; time.Sleep(25 * time.Second) {
 
 		// Debugging code to report the status of the elasticsearch logging endpoints.
 		selector := labels.Set{k8sAppKey: esValue}.AsSelector()
@@ -372,33 +372,41 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 		for _, e := range h {
 			l, ok := e.(map[string]interface{})
 			if !ok {
-				Failf("element of hit not of expected type: %T", e)
+				Logf("element of hit not of expected type: %T", e)
+				continue
 			}
 			source, ok := l["_source"].(map[string]interface{})
 			if !ok {
-				Failf("_source not of the expected type: %T", l["_source"])
+				Logf("_source not of the expected type: %T", l["_source"])
+				continue
 			}
 			msg, ok := source["log"].(string)
 			if !ok {
-				Failf("log not of the expected type: %T", source["log"])
+				Logf("log not of the expected type: %T", source["log"])
+				continue
 			}
 			words := strings.Split(msg, " ")
-			if len(words) < 4 {
-				Failf("Malformed log line: %s", msg)
+			if len(words) != 4 {
+				Logf("Malformed log line: %s", msg)
+				continue
 			}
 			n, err := strconv.ParseUint(words[0], 10, 0)
 			if err != nil {
-				Failf("Expecting numer of node as first field of %s", msg)
+				Logf("Expecting numer of node as first field of %s", msg)
+				continue
 			}
 			if n < 0 || int(n) >= nodeCount {
-				Failf("Node count index out of range: %d", nodeCount)
+				Logf("Node count index out of range: %d", nodeCount)
+				continue
 			}
 			index, err := strconv.ParseUint(words[2], 10, 0)
 			if err != nil {
-				Failf("Expecting number as third field of %s", msg)
+				Logf("Expecting number as third field of %s", msg)
+				continue
 			}
 			if index < 0 || index >= countTo {
-				Failf("Index value out of range: %d", index)
+				Logf("Index value out of range: %d", index)
+				continue
 			}
 			// Record the observation of a log line from node n at the given index.
 			observed[n][index]++
