@@ -75,6 +75,10 @@ func (fake *FakeCmd) CombinedOutput() ([]byte, error) {
 	return fake.CombinedOutputScript[i]()
 }
 
+func (fake *FakeCmd) Output() ([]byte, error) {
+	return nil, fmt.Errorf("unimplemented")
+}
+
 // A simple fake ExitError type.
 type FakeExitError struct {
 	Status int
