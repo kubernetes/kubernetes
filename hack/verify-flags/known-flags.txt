@@ -142,6 +142,7 @@ input-dirs
 insecure-bind-address
 insecure-port
 insecure-skip-tls-verify
+internal-cidr
 iptables-sync-period
 ir-data-source
 ir-dbname
