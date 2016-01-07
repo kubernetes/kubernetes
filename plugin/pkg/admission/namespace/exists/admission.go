@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,17 +17,16 @@ limitations under the License.
 package exists
 
 import (
-	"fmt"
 	"io"
+	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 func init() {
@@ -40,22 +39,19 @@ func init() {
 // It rejects all incoming requests in a namespace context if the namespace does not exist.
 // It is useful in deployments that want to enforce pre-declaration of a Namespace resource.
 type exists struct {
+	*admission.Handler
 	client client.Interface
 	store  cache.Store
 }
 
 func (e *exists) Admit(a admission.Attributes) (err error) {
-	defaultVersion, kind, err := latest.RESTMapper.VersionAndKindForResource(a.GetResource())
-	if err != nil {
-		return err
-	}
-	mapping, err := latest.RESTMapper.RESTMapping(kind, defaultVersion)
-	if err != nil {
-		return err
-	}
-	if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
+	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
+	// its a namespaced resource.
+	if len(a.GetNamespace()) == 0 || a.GetKind() == api.Kind("Namespace") {
 		return nil
 	}
+
 	namespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:      a.GetNamespace(),
@@ -65,34 +61,44 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 	}
 	_, exists, err := e.store.Get(namespace)
 	if err != nil {
-		return err
+		return errors.NewInternalError(err)
 	}
 	if exists {
 		return nil
 	}
-	obj := a.GetObject()
-	name := "Unknown"
-	if obj != nil {
-		name, _ = meta.NewAccessor().Name(obj)
+
+	// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
+	_, err = e.client.Namespaces().Get(a.GetNamespace())
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return err
+		}
+		return errors.NewInternalError(err)
 	}
-	return apierrors.NewForbidden(kind, name, fmt.Errorf("Namespace %s does not exist", a.GetNamespace()))
+
+	return nil
 }
 
+// NewExists creates a new namespace exists admission control handler
 func NewExists(c client.Interface) admission.Interface {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	// TODO: look into a list/watch that can work with client.Interface, maybe pass it a ListFunc and a WatchFunc
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
-			Client:        c.(*client.Client),
-			FieldSelector: labels.Everything(),
-			Resource:      "namespaces",
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return c.Namespaces().List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return c.Namespaces().Watch(options)
+			},
 		},
 		&api.Namespace{},
 		store,
+		5*time.Minute,
 	)
 	reflector.Run()
 	return &exists{
-		client: c,
-		store:  store,
+		client:  c,
+		store:   store,
+		Handler: admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 	}
 }

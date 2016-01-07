@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +17,10 @@ limitations under the License.
 package basicauth
 
 import (
-	"encoding/base64"
-	"errors"
 	"net/http"
-	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/auth/authenticator"
+	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 // Authenticator authenticates requests using basic auth
@@ -38,26 +35,9 @@ func New(auth authenticator.Password) *Authenticator {
 
 // AuthenticateRequest authenticates the request using the "Authorization: Basic" header in the request
 func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
-	auth := strings.TrimSpace(req.Header.Get("Authorization"))
-	if auth == "" {
+	username, password, found := req.BasicAuth()
+	if !found {
 		return nil, false, nil
 	}
-	parts := strings.Split(auth, " ")
-	if len(parts) < 2 || strings.ToLower(parts[0]) != "basic" {
-		return nil, false, nil
-	}
-
-	payload, err := base64.StdEncoding.DecodeString(parts[1])
-	if err != nil {
-		return nil, false, err
-	}
-
-	pair := strings.SplitN(string(payload), ":", 2)
-	if len(pair) != 2 {
-		return nil, false, errors.New("malformed basic auth header")
-	}
-
-	username := pair[0]
-	password := pair[1]
 	return a.auth.AuthenticatePassword(username, password)
 }

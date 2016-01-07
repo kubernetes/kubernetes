@@ -2,48 +2,79 @@ base:
   '*':
     - base
     - debian-auto-upgrades
+    - salt-helpers
+{% if grains.get('cloud') == 'aws' %}
+    - ntp
+{% endif %}
+{% if pillar.get('e2e_storage_test_environment', '').lower() == 'true' %}
+    - e2e
+{% endif %}
 
   'roles:kubernetes-pool':
     - match: grain
     - docker
-    - kubelet
-    - kube-proxy
-{% if pillar.get('enable_node_monitoring', '').lower() == 'true' %}
-    - cadvisor
+{% if pillar.get('network_provider', '').lower() == 'flannel' %}
+    - flannel
 {% endif %}
-{% if pillar.get('enable_node_logging', '').lower() == 'true' %}
-  {% if pillar['logging_destination'] is defined and pillar['logging_destination'] == 'elasticsearch' %}
+    - helpers
+    - cadvisor
+    - kube-client-tools
+    - kube-node-unpacker
+    - kubelet
+{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-networking-minion
+{% else %}
+    - kube-proxy
+{% endif %}
+{% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] is defined %}
+  {% if pillar['logging_destination'] == 'elasticsearch' %}
     - fluentd-es
-  {% endif %}
-  {% if pillar['logging_destination'] is defined and pillar['logging_destination'] == 'gcp' %}
+  {% elif pillar['logging_destination'] == 'gcp' %}
     - fluentd-gcp
   {% endif %}
 {% endif %}
-    - logrotate
-{% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
-    - openvpn-client
-{% else %}
-    - sdn
+{% if pillar.get('enable_cluster_registry', '').lower() == 'true' %}
+    - kube-registry-proxy
 {% endif %}
+    - logrotate
+    - supervisor
 
   'roles:kubernetes-master':
     - match: grain
     - generate-cert
     - etcd
+{% if pillar.get('network_provider', '').lower() == 'flannel' %}
+    - flannel-server
+    - flannel
+{% endif %}
     - kube-apiserver
     - kube-controller-manager
     - kube-scheduler
-    - monit
+    - supervisor
+{% if grains['cloud'] is defined and not grains.cloud in [ 'aws', 'gce', 'vagrant' ] %}
     - nginx
-    - kube-client-tools
-    - logrotate
-    - kube-addons
-{% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
-    - openvpn
 {% endif %}
-{% if grains['cloud'] is defined and grains['cloud'] == 'vagrant' %}
+    - cadvisor
+    - kube-client-tools
+    - kube-master-addons
+    - kube-admission-controls
+{% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] is defined %}
+  {% if pillar['logging_destination'] == 'elasticsearch' %}
+    - fluentd-es
+  {% elif pillar['logging_destination'] == 'gcp' %}
+    - fluentd-gcp
+  {% endif %}
+{% endif %}
+{% if grains['cloud'] is defined and grains['cloud'] != 'vagrant' %}
+    - logrotate
+{% endif %}
+    - kube-addons
+{% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws' ] %}
     - docker
-    - sdn
+    - kubelet
+{% endif %}
+{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+    - opencontrail-networking-master
 {% endif %}
 
   'roles:kubernetes-pool-vsphere':

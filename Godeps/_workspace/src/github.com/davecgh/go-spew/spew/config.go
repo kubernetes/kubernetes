@@ -76,10 +76,16 @@ type ConfigState struct {
 
 	// SortKeys specifies map keys should be sorted before being printed. Use
 	// this to have a more deterministic, diffable output.  Note that only
-	// native types (bool, int, uint, floats, uintptr and string) are supported
-	// with other types sorted according to the reflect.Value.String() output
-	// which guarantees display stability.
+	// native types (bool, int, uint, floats, uintptr and string) and types
+	// that support the error or Stringer interfaces (if methods are
+	// enabled) are supported, with other types sorted according to the
+	// reflect.Value.String() output which guarantees display stability.
 	SortKeys bool
+
+	// SpewKeys specifies that, as a last resort attempt, map keys should
+	// be spewed to strings and sorted by those strings.  This is only
+	// considered if SortKeys is true.
+	SpewKeys bool
 }
 
 // Config is the active configuration of the top-level functions.

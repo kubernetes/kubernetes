@@ -51,21 +51,21 @@ import (
 
 	{{if .IncludeImports}}. "github.com/onsi/ginkgo"{{end}}
 	{{if .IncludeImports}}. "github.com/onsi/gomega"{{end}}
-	. "github.com/sclevine/agouti/core"
 	. "github.com/sclevine/agouti/matchers"
+	"github.com/sclevine/agouti"
 )
 
 var _ = Describe("{{.Subject}}", func() {
-	var page Page
+	var page *agouti.Page
 
 	BeforeEach(func() {
 		var err error
-		page, err = agoutiDriver.Page()
+		page, err = agoutiDriver.NewPage()
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterEach(func() {
-		page.Destroy()
+		Expect(page.Destroy()).To(Succeed())
 	})
 })
 `

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,8 +19,9 @@ set -o nounset
 set -o pipefail
 
 cert_ip=$1
-cert_dir=/srv/kubernetes
-cert_group=kube-cert
+extra_sans=${2:-}
+cert_dir=${CERT_DIR:-/srv/kubernetes}
+cert_group=${CERT_GROUP:-kube-cert}
 
 mkdir -p "$cert_dir"
 
@@ -35,12 +36,12 @@ if [ "$cert_ip" == "_use_aws_external_ip_" ]; then
   cert_ip=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 fi
 
-if [ "$cert_ip" == "_use_azure_dns_name_" ]; then
-  cert_ip=$(hostname -f | awk -F. '{ print $2 }').cloudapp.net
-  use_cn=true
+sans="IP:${cert_ip}"
+if [[ -n "${extra_sans}" ]]; then
+  sans="${sans},${extra_sans}"
 fi
 
-tmpdir=$(mktemp -d --tmpdir kubernetes_cacert.XXXXXX)
+tmpdir=$(mktemp -d -t kubernetes_cacert.XXXXXX)
 trap 'rm -rf "${tmpdir}"' EXIT
 cd "${tmpdir}"
 
@@ -67,7 +68,7 @@ if [ $use_cn = "true" ]; then
     cp -p pki/issued/$cert_ip.crt "${cert_dir}/server.cert" > /dev/null 2>&1
     cp -p pki/private/$cert_ip.key "${cert_dir}/server.key" > /dev/null 2>&1
 else
-    ./easyrsa --subject-alt-name=IP:$cert_ip build-server-full kubernetes-master nopass > /dev/null 2>&1
+    ./easyrsa --subject-alt-name="${sans}" build-server-full kubernetes-master nopass > /dev/null 2>&1
     cp -p pki/issued/kubernetes-master.crt "${cert_dir}/server.cert" > /dev/null 2>&1
     cp -p pki/private/kubernetes-master.key "${cert_dir}/server.key" > /dev/null 2>&1
 fi

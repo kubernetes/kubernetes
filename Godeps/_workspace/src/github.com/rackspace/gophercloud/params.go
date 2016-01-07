@@ -9,11 +9,35 @@ import (
 	"time"
 )
 
-// MaybeString takes a string that might be a zero-value, and either returns a
-// pointer to its address or a nil value (i.e. empty pointer). This is useful
-// for converting zero values in options structs when the end-user hasn't
-// defined values. Those zero values need to be nil in order for the JSON
-// serialization to ignore them.
+// EnabledState is a convenience type, mostly used in Create and Update
+// operations. Because the zero value of a bool is FALSE, we need to use a
+// pointer instead to indicate zero-ness.
+type EnabledState *bool
+
+// Convenience vars for EnabledState values.
+var (
+	iTrue  = true
+	iFalse = false
+
+	Enabled  EnabledState = &iTrue
+	Disabled EnabledState = &iFalse
+)
+
+// IntToPointer is a function for converting integers into integer pointers.
+// This is useful when passing in options to operations.
+func IntToPointer(i int) *int {
+	return &i
+}
+
+/*
+MaybeString is an internal function to be used by request methods in individual
+resource packages.
+
+It takes a string that might be a zero value and returns either a pointer to its
+address or nil. This is useful for allowing users to conveniently omit values
+from an options struct by leaving them zeroed, but still pass nil to the JSON
+serializer so they'll be omitted from the request body.
+*/
 func MaybeString(original string) *string {
 	if original != "" {
 		return &original
@@ -21,8 +45,14 @@ func MaybeString(original string) *string {
 	return nil
 }
 
-// MaybeInt takes an int that might be a zero-value, and either returns a
-// pointer to its address or a nil value (i.e. empty pointer).
+/*
+MaybeInt is an internal function to be used by request methods in individual
+resource packages.
+
+Like MaybeString, it accepts an int that may or may not be a zero value, and
+returns either a pointer to its address or nil. It's intended to hint that the
+JSON serializer should omit its field.
+*/
 func MaybeInt(original int) *int {
 	if original != 0 {
 		return &original
@@ -61,19 +91,26 @@ func isZero(v reflect.Value) bool {
 }
 
 /*
-BuildQueryString accepts a generic structure and parses it URL struct. It
-converts field names into query names based on "q" tags. So for example, this
-type:
+BuildQueryString is an internal function to be used by request methods in
+individual resource packages.
 
-	struct {
+It accepts a tagged structure and expands it into a URL struct. Field names are
+converted into query parameters based on a "q" tag. For example:
+
+	type struct Something {
 	   Bar string `q:"x_bar"`
 	   Baz int    `q:"lorem_ipsum"`
-	}{
-	   Bar: "XXX",
-	   Baz: "YYY",
 	}
 
-will be converted into ?x_bar=XXX&lorem_ipsum=YYYY
+	instance := Something{
+	   Bar: "AAA",
+	   Baz: "BBB",
+	}
+
+will be converted into "?x_bar=AAA&lorem_ipsum=BBB".
+
+The struct's fields may be strings, integers, or boolean values. Fields left at
+their type's zero value will be omitted from the query.
 */
 func BuildQueryString(opts interface{}) (*url.URL, error) {
 	optsValue := reflect.ValueOf(opts)
@@ -86,7 +123,8 @@ func BuildQueryString(opts interface{}) (*url.URL, error) {
 		optsType = optsType.Elem()
 	}
 
-	var optsSlice []string
+	params := url.Values{}
+
 	if optsValue.Kind() == reflect.Struct {
 		for i := 0; i < optsValue.NumField(); i++ {
 			v := optsValue.Field(i)
@@ -101,11 +139,22 @@ func BuildQueryString(opts interface{}) (*url.URL, error) {
 				if !isZero(v) {
 					switch v.Kind() {
 					case reflect.String:
-						optsSlice = append(optsSlice, tags[0]+"="+v.String())
+						params.Add(tags[0], v.String())
 					case reflect.Int:
-						optsSlice = append(optsSlice, tags[0]+"="+strconv.FormatInt(v.Int(), 10))
+						params.Add(tags[0], strconv.FormatInt(v.Int(), 10))
 					case reflect.Bool:
-						optsSlice = append(optsSlice, tags[0]+"="+strconv.FormatBool(v.Bool()))
+						params.Add(tags[0], strconv.FormatBool(v.Bool()))
+					case reflect.Slice:
+						switch v.Type().Elem() {
+						case reflect.TypeOf(0):
+							for i := 0; i < v.Len(); i++ {
+								params.Add(tags[0], strconv.FormatInt(v.Index(i).Int(), 10))
+							}
+						default:
+							for i := 0; i < v.Len(); i++ {
+								params.Add(tags[0], v.Index(i).String())
+							}
+						}
 					}
 				} else {
 					// Otherwise, the field is not set.
@@ -115,26 +164,42 @@ func BuildQueryString(opts interface{}) (*url.URL, error) {
 					}
 				}
 			}
+		}
 
-		}
-		// URL encode the string for safety.
-		s := strings.Join(optsSlice, "&")
-		if s != "" {
-			s = "?" + s
-		}
-		u, err := url.Parse(s)
-		if err != nil {
-			return nil, err
-		}
-		return u, nil
+		return &url.URL{RawQuery: params.Encode()}, nil
 	}
 	// Return an error if the underlying type of 'opts' isn't a struct.
 	return nil, fmt.Errorf("Options type is not a struct.")
 }
 
-// BuildHeaders accepts a generic structure and parses it into a string map. It
-// converts field names into header names based on "h" tags, and field values
-// into header values by a simple one-to-one mapping.
+/*
+BuildHeaders is an internal function to be used by request methods in
+individual resource packages.
+
+It accepts an arbitrary tagged structure and produces a string map that's
+suitable for use as the HTTP headers of an outgoing request. Field names are
+mapped to header names based in "h" tags.
+
+  type struct Something {
+    Bar string `h:"x_bar"`
+    Baz int    `h:"lorem_ipsum"`
+  }
+
+  instance := Something{
+    Bar: "AAA",
+    Baz: "BBB",
+  }
+
+will be converted into:
+
+  map[string]string{
+    "x_bar": "AAA",
+    "lorem_ipsum": "BBB",
+  }
+
+Untagged fields and fields left at their zero values are skipped. Integers,
+booleans and string values are supported.
+*/
 func BuildHeaders(opts interface{}) (map[string]string, error) {
 	optsValue := reflect.ValueOf(opts)
 	if optsValue.Kind() == reflect.Ptr {
@@ -181,4 +246,26 @@ func BuildHeaders(opts interface{}) (map[string]string, error) {
 	}
 	// Return an error if the underlying type of 'opts' isn't a struct.
 	return optsMap, fmt.Errorf("Options type is not a struct.")
+}
+
+// IDSliceToQueryString takes a slice of elements and converts them into a query
+// string. For example, if name=foo and slice=[]int{20, 40, 60}, then the
+// result would be `?name=20&name=40&name=60'
+func IDSliceToQueryString(name string, ids []int) string {
+	str := ""
+	for k, v := range ids {
+		if k == 0 {
+			str += "?"
+		} else {
+			str += "&"
+		}
+		str += fmt.Sprintf("%s=%s", name, strconv.Itoa(v))
+	}
+	return str
+}
+
+// IntWithinRange returns TRUE if an integer falls within a defined range, and
+// FALSE if not.
+func IntWithinRange(val, min, max int) bool {
+	return val > min && val < max
 }

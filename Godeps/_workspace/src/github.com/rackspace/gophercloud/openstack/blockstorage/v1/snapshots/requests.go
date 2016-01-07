@@ -5,8 +5,6 @@ import (
 
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
-
-	"github.com/racker/perigee"
 )
 
 // CreateOptsBuilder allows extensions to add additional parameters to the
@@ -69,11 +67,8 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 		return res
 	}
 
-	_, res.Err = perigee.Request("POST", createURL(client), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200, 201},
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
+	_, res.Err = client.Post(createURL(client), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200, 201},
 	})
 	return res
 }
@@ -81,10 +76,7 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 // Delete will delete the existing Snapshot with the provided ID.
 func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", deleteURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202, 204},
-	})
+	_, res.Err = client.Delete(deleteURL(client, id), nil)
 	return res
 }
 
@@ -92,11 +84,7 @@ func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 // object from the response, call the Extract method on the GetResult.
 func Get(client *gophercloud.ServiceClient, id string) GetResult {
 	var res GetResult
-	_, res.Err = perigee.Request("GET", getURL(client, id), perigee.Options{
-		Results:     &res.Body,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
-	})
+	_, res.Err = client.Get(getURL(client, id), &res.Body, nil)
 	return res
 }
 
@@ -178,11 +166,41 @@ func UpdateMetadata(client *gophercloud.ServiceClient, id string, opts UpdateMet
 		return res
 	}
 
-	_, res.Err = perigee.Request("PUT", updateMetadataURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
+	_, res.Err = client.Put(updateMetadataURL(client, id), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 	return res
+}
+
+// IDFromName is a convienience function that returns a snapshot's ID given its name.
+func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
+	snapshotCount := 0
+	snapshotID := ""
+	if name == "" {
+		return "", fmt.Errorf("A snapshot name must be provided.")
+	}
+	pager := List(client, nil)
+	pager.EachPage(func(page pagination.Page) (bool, error) {
+		snapshotList, err := ExtractSnapshots(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, s := range snapshotList {
+			if s.Name == name {
+				snapshotCount++
+				snapshotID = s.ID
+			}
+		}
+		return true, nil
+	})
+
+	switch snapshotCount {
+	case 0:
+		return "", fmt.Errorf("Unable to find snapshot: %s", name)
+	case 1:
+		return snapshotID, nil
+	default:
+		return "", fmt.Errorf("Found %d snapshots matching %s", snapshotCount, name)
+	}
 }

@@ -1,0 +1,99 @@
+{
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "flannel-server",
+        "namespace": "kube-system",
+        "labels": {
+            "app": "flannel-server",
+            "version": "v0.1"
+        }
+    },
+    "spec": {
+        "volumes": [
+            {
+                "name": "varlog",
+                "hostPath": {
+                    "path": "/var/log"
+                }
+            },
+            {
+                "name": "etcdstorage",
+                "emptyDir": {}
+            },
+            {
+                "name": "networkconfig",
+                "hostPath": {
+                    "path": "/etc/kubernetes/network.json"
+                }
+            }
+        ],
+        "containers": [
+            {
+                "name": "flannel-server-helper",
+                "image": "gcr.io/google_containers/flannel-server-helper:0.1",
+                "args": [
+                    "--network-config=/etc/kubernetes/network.json",
+                    "--etcd-prefix=/kubernetes.io/network",
+                    "--etcd-server=http://127.0.0.1:4001"
+                ],
+                "volumeMounts": [
+                    {
+                        "name": "networkconfig",
+                        "mountPath": "/etc/kubernetes/network.json"
+                    }
+                ],
+                "imagePullPolicy": "Always"
+            },
+            {
+                "name": "flannel-container",
+                "image": "quay.io/coreos/flannel:0.5.5",
+                "command": [
+                    "/bin/sh",
+                    "-c",
+                    "/opt/bin/flanneld -listen 0.0.0.0:10253 -etcd-endpoints http://127.0.0.1:4001 -etcd-prefix /kubernetes.io/network 1>>/var/log/flannel_server.log 2>&1"
+                ],
+                "ports": [
+                    {
+                        "hostPort": 10253,
+                        "containerPort": 10253
+                    }
+                ],
+                "resources": {
+                    "limits": {
+                        "cpu": "100m"
+                    }
+                },
+                "volumeMounts": [
+                    {
+                        "name": "varlog",
+                        "mountPath": "/var/log"
+                    }
+                ]
+            },
+            {
+                "name": "etcd-container",
+                "image": "gcr.io/google_containers/etcd:2.2.1",
+                "command": [
+                    "/bin/sh",
+                    "-c",
+                    "/opt/bin/etcd --listen-peer-urls http://127.0.0.1:4001 --addr http://127.0.0.1:4001 --bind-addr 127.0.0.1:4001 --data-dir /var/etcd/data 1>>/var/log/etcd_flannel.log 2>&1"
+                ],
+                "resources": {
+                    "limits": {
+                        "cpu": "100m",
+                        "memory": "50Mi"
+                    }
+                },
+                "volumeMounts": [
+                    {
+                        "name": "etcdstorage",
+                        "mountPath": "/var/etcd/data"
+                    }
+                ]
+            }
+        ],
+        "hostNetwork": true
+    }
+}
+

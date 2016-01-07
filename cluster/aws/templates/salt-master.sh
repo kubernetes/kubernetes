@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,19 +16,34 @@
 
 # Prepopulate the name of the Master
 mkdir -p /etc/salt/minion.d
-echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
+echo "master: $SALT_MASTER" > /etc/salt/minion.d/master.conf
 
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-master
   cloud: aws
+  cbr-cidr: "${MASTER_IP_RANGE}"
 EOF
 
-cat <<EOF > /etc/aws.conf
-[Global]
-Region = ${AWS_ZONE}
+# Helper that sets a salt grain in grains.conf, if the upper-cased key is a non-empty env
+function env_to_salt {
+  local key=$1
+  local env_key=`echo $key | tr '[:lower:]' '[:upper:]'`
+  local value=${!env_key}
+  if [[ -n "${value}" ]]; then
+    # Note this is yaml, so indentation matters
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
+  ${key}: '$(echo "${value}" | sed -e "s/'/''/g")'
 EOF
+  fi
+}
+
+env_to_salt docker_opts
+env_to_salt docker_root
+env_to_salt kubelet_root
+env_to_salt master_extra_sans
+env_to_salt runtime_config
 
 # Auto accept all keys from minions that try to join
 mkdir -p /etc/salt/master.d
@@ -43,12 +58,7 @@ reactor:
     - /srv/reactor/highstate-new.sls
 EOF
 
-# Install Salt
-#
-# We specify -X to avoid a race condition that can cause minion failure to
-# install.  See https://github.com/saltstack/salt-bootstrap/issues/270
-#
-# -M installs the master
-set +x
-curl -L --connect-timeout 20 --retry 6 --retry-delay 10 http://bootstrap.saltstack.com | sh -s -- -M -X
-set -x
+install-salt master
+
+service salt-master start
+service salt-minion start

@@ -29,9 +29,10 @@ var (
 		Namespace: "my_company",
 		Subsystem: "storage",
 		Name:      "documents_total_size_bytes",
-		Help:      "The total size of all documents in the storage."}})
+		Help:      "The total size of all documents in the storage.",
+	})
 )
- 
+
 func main() {
 	http.Handle("/metrics", prometheus.Handler())
 
@@ -50,4 +51,3 @@ func init() {
 # Documentation
 
 [![GoDoc](https://godoc.org/github.com/prometheus/client_golang?status.png)](https://godoc.org/github.com/prometheus/client_golang)
-

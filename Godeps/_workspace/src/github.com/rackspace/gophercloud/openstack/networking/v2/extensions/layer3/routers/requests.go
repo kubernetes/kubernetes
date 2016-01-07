@@ -3,7 +3,6 @@ package routers
 import (
 	"errors"
 
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -82,23 +81,14 @@ func Create(c *gophercloud.ServiceClient, opts CreateOpts) CreateResult {
 	}
 
 	var res CreateResult
-	_, res.Err = perigee.Request("POST", rootURL(c), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{201},
-	})
+	_, res.Err = c.Post(rootURL(c), reqBody, &res.Body, nil)
 	return res
 }
 
 // Get retrieves a particular router based on its unique ID.
 func Get(c *gophercloud.ServiceClient, id string) GetResult {
 	var res GetResult
-	_, res.Err = perigee.Request("GET", resourceURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		OkCodes:     []int{200},
-	})
+	_, res.Err = c.Get(resourceURL(c, id), &res.Body, nil)
 	return res
 }
 
@@ -136,11 +126,8 @@ func Update(c *gophercloud.ServiceClient, id string, opts UpdateOpts) UpdateResu
 
 	// Send request to API
 	var res UpdateResult
-	_, res.Err = perigee.Request("PUT", resourceURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = c.Put(resourceURL(c, id), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 
 	return res
@@ -149,10 +136,7 @@ func Update(c *gophercloud.ServiceClient, id string, opts UpdateOpts) UpdateResu
 // Delete will permanently delete a particular router based on its unique ID.
 func Delete(c *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", resourceURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
-	})
+	_, res.Err = c.Delete(resourceURL(c, id), nil)
 	return res
 }
 
@@ -202,11 +186,8 @@ func AddInterface(c *gophercloud.ServiceClient, id string, opts InterfaceOpts) I
 
 	body := request{SubnetID: opts.SubnetID, PortID: opts.PortID}
 
-	_, res.Err = perigee.Request("PUT", addInterfaceURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &body,
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = c.Put(addInterfaceURL(c, id), body, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 
 	return res
@@ -235,11 +216,8 @@ func RemoveInterface(c *gophercloud.ServiceClient, id string, opts InterfaceOpts
 
 	body := request{SubnetID: opts.SubnetID, PortID: opts.PortID}
 
-	_, res.Err = perigee.Request("PUT", removeInterfaceURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &body,
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = c.Put(removeInterfaceURL(c, id), body, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 
 	return res

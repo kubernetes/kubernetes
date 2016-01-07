@@ -1,320 +1,431 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/examples/cassandra/README.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 ## Cloud Native Deployments of Cassandra using Kubernetes
 
 The following document describes the development of a _cloud native_ [Cassandra](http://cassandra.apache.org/) deployment on Kubernetes.  When we say _cloud native_ we mean an application which understands that it is running within a cluster manager, and uses this cluster management infrastructure to help implement the application.  In particular, in this instance, a custom Cassandra ```SeedProvider``` is used to enable Cassandra to dynamically discover new Cassandra nodes as they join the cluster.
 
-This document also attempts to describe the core components of Kubernetes, _Pods_, _Services_ and _Replication Controllers_.
+This document also attempts to describe the core components of Kubernetes: _Pods_, _Services_, and _Replication Controllers_.
 
 ### Prerequisites
-This example assumes that you have a Kubernetes cluster installed and running, and that you have installed the ```kubectl``` command line tool somewhere in your path.  Please see the [getting started](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/getting-started-guides) for installation instructions for your platform.
+
+This example assumes that you have a Kubernetes cluster installed and running, and that you have installed the ```kubectl``` command line tool somewhere in your path.  Please see the [getting started](../../docs/getting-started-guides/) for installation instructions for your platform.
+
+This example also has a few code and configuration files needed.  To avoid typing these out, you can ```git clone``` the Kubernetes repository to you local computer.
 
 ### A note for the impatient
+
 This is a somewhat long tutorial.  If you want to jump straight to the "do it now" commands, please see the [tl; dr](#tl-dr) at the end.
 
 ### Simple Single Pod Cassandra Node
-In Kubernetes, the atomic unit of an application is a [_Pod_](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.  In this simple case, we define a single container running Cassandra for our pod:
+
+In Kubernetes, the atomic unit of an application is a [_Pod_](../../docs/user-guide/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.
+In this simple case, we define a single container running Cassandra for our pod:
+
+<!-- BEGIN MUNGE: EXAMPLE cassandra-controller.yaml -->
 
 ```yaml
-id: cassandra
-kind: Pod
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    version: v1beta1
-    id: cassandra
-    containers:
-      - name: cassandra
-        image: kubernetes/cassandra
-        command:
-          - /run.sh
-        cpu: 1000
-        ports:
-          - name: cql
-            containerPort: 9042
-          - name: thrift
-            containerPort: 9160
-        env:
-          - key: MAX_HEAP_SIZE
-            value: 512M
-          - key: HEAP_NEWSIZE
-            value: 100M
-labels:
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    app: cassandra
   name: cassandra
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: cassandra
+    spec:
+      containers:
+        - command:
+            - /run.sh
+          resources:
+            limits:
+              cpu: 0.1
+          env:
+            - name: MAX_HEAP_SIZE
+              value: 512M
+            - name: HEAP_NEWSIZE
+              value: 100M
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          image: gcr.io/google_containers/cassandra:v7
+          name: cassandra
+          ports:
+            - containerPort: 9042
+              name: cql
+            - containerPort: 9160
+              name: thrift
+          volumeMounts:
+            - mountPath: /cassandra_data
+              name: data
+      volumes:
+        - name: data
+          emptyDir: {}
 ```
 
-There are a few things to note in this description.  First is that we are running the ```kubernetes/cassandra``` image.  This is a standard Cassandra installation on top of Debian.  However it also adds a custom [```SeedProvider```](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java) to Cassandra.  In Cassandra, a ```SeedProvider``` bootstraps the gossip protocol that Cassandra uses to find other nodes.  The ```KubernetesSeedProvider``` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later)
+[Download example](cassandra-controller.yaml?raw=true)
+<!-- END MUNGE: EXAMPLE cassandra-controller.yaml -->
 
-You may also note that we are setting some Cassandra parameters (```MAX_HEAP_SIZE``` and ```HEAP_NEWSIZE```).  We also tell Kubernetes that the container exposes both the ```CQL``` and ```Thrift``` API ports.  Finally, we tell the cluster manager that we need 1000 milli-cpus (1 core).
+There are a few things to note in this description.  First is that we are running the [```gcr.io/google_containers/cassandra:v6```](image/Dockerfile) image from Google's [container registry](https://cloud.google.com/container-registry/docs/).  This is a standard Cassandra installation on top of Debian.  However it also adds a custom [```SeedProvider```](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java) to Cassandra.  In Cassandra, a ```SeedProvider``` bootstraps the gossip protocol that Cassandra uses to find other nodes.  The [```KubernetesSeedProvider```](#seed-provider-source) discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later)
 
-Given this configuration, we can create the pod as follows
+You may also note that we are setting some Cassandra parameters (```MAX_HEAP_SIZE``` and ```HEAP_NEWSIZE```) and adding information about the [namespace](../../docs/user-guide/namespaces.md).  We also tell Kubernetes that the container exposes both the ```CQL``` and ```Thrift``` API ports.  Finally, we tell the cluster manager that we need 0.1 cpu (0.1 core).
 
-```sh
-$ kubectl create -f cassandra.yaml
-```
+In theory could create a single Cassandra pod right now but since `KubernetesSeedProvider` needs to learn what nodes are in the Cassandra deployment we need to create a service first.
 
-After a few moments, you should be able to see the pod running:
+### Cassandra Service
 
-```sh
-$ kubectl get pods cassandra
-POD                 CONTAINER(S)        IMAGE(S)               HOST                                                          LABELS              STATUS
-cassandra           cassandra           kubernetes/cassandra   kubernetes-minion-1/1.2.3.4   name=cassandra      Running
-```
-
-
-### Adding a Cassandra Service
-In Kubernetes a _Service_ describes a set of Pods that perform the same task.  For example, the set of nodes in a Cassandra cluster, or even the single node we created above.  An important use for a Service is to create a load balancer which distributes traffic across members of the set.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods (or the single Pod we've already created) available via the Kubernetes API.  This is the way that we use initially use Services with Cassandra.
+In Kubernetes a _[Service](../../docs/user-guide/services.md)_ describes a set of Pods that perform the same task.  For example, the set of Pods in a Cassandra cluster can be a Kubernetes Service, or even just the single Pod we created above.  An important use for a Service is to create a load balancer which distributes traffic across members of the set of Pods.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods (or the single Pod we've already created) available via the Kubernetes API.  This is the way that we use initially use Services with Cassandra.
 
 Here is the service description:
+
+<!-- BEGIN MUNGE: EXAMPLE cassandra-service.yaml -->
+
 ```yaml
-id: cassandra
+apiVersion: v1
 kind: Service
-apiVersion: v1beta1
-port: 9042
-containerPort: 9042
-selector:
+metadata:
+  labels:
+    app: cassandra
   name: cassandra
+spec:
+  ports:
+    - port: 9042
+  selector:
+    app: cassandra
 ```
+
+[Download example](cassandra-service.yaml?raw=true)
+<!-- END MUNGE: EXAMPLE cassandra-service.yaml -->
 
 The important thing to note here is the ```selector```. It is a query over labels, that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is ```name=cassandra```.  If you look back at the Pod specification above, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.
 
 Create this service as follows:
-```sh
-$ kubectl create -f cassandra-service.yaml
+
+```console
+$ kubectl create -f examples/cassandra/cassandra-service.yaml
 ```
 
-Once the service is created, you can query it's endpoints:
-```sh
+Now, as the service is running, we can create the first Cassandra pod using the mentioned specification.
+
+```console
+$ kubectl create -f examples/cassandra/cassandra.yaml
+```
+
+After a few moments, you should be able to see the pod running, plus its single container:
+
+```console
+$ kubectl get pods cassandra
+NAME        READY     STATUS    RESTARTS   AGE
+cassandra   1/1       Running   0          55s
+```
+
+You can also query the service endpoints to check if the pod has been correctly selected.
+
+```console
 $ kubectl get endpoints cassandra -o yaml
-apiVersion: v1beta1
-creationTimestamp: 2015-01-05T05:51:50Z
-endpoints:
-- 10.244.1.10:9042
-id: cassandra
+apiVersion: v1
 kind: Endpoints
-namespace: default
-resourceVersion: 69130
-selfLink: /api/v1beta1/endpoints/cassandra?namespace=default
-uid: f1937b47-949e-11e4-8a8b-42010af0e23e
+metadata:
+  creationTimestamp: 2015-06-21T22:34:12Z
+  labels:
+    app: cassandra
+  name: cassandra
+  namespace: default
+  resourceVersion: "944373"
+  selfLink: /api/v1/namespaces/default/endpoints/cassandra
+  uid: a3d6c25f-1865-11e5-a34e-42010af01bcc
+subsets:
+- addresses:
+  - ip: 10.244.3.15
+    targetRef:
+      kind: Pod
+      name: cassandra
+      namespace: default
+      resourceVersion: "944372"
+      uid: 9ef9895d-1865-11e5-a34e-42010af01bcc
+  ports:
+  - port: 9042
+    protocol: TCP
 ```
-
-You can see that the _Service_ has found the pod we created in step one.
 
 ### Adding replicated nodes
-Of course, a single node cluster isn't particularly interesting.  The real power of Kubernetes and Cassandra lies in easily building a replicated, resizable Cassandra cluster.
 
-In Kubernetes a _Replication Controller_ is responsible for replicating sets of identical pods.  Like a _Service_ it has a selector query which identifies the members of it's set.  Unlike a _Service_ it also has a desired number of replicas, and it will create or delete _Pods_ to ensure that the number of _Pods_ matches up with it's desired state.
+Of course, a single node cluster isn't particularly interesting.  The real power of Kubernetes and Cassandra lies in easily building a replicated, scalable Cassandra cluster.
 
-Replication Controllers will "adopt" existing pods that match their selector query, so let's create a Replication Controller with a single replica to adopt our existing Cassandra Pod.
+In Kubernetes a _[Replication Controller](../../docs/user-guide/replication-controller.md)_ is responsible for replicating sets of identical pods.  Like a _Service_ it has a selector query which identifies the members of it's set.  Unlike a _Service_ it also has a desired number of replicas, and it will create or delete _Pods_ to ensure that the number of _Pods_ matches up with it's desired state.
+
+Replication controllers will "adopt" existing pods that match their selector query, so let's create a replication controller with a single replica to adopt our existing Cassandra pod.
+
+<!-- BEGIN MUNGE: EXAMPLE cassandra-controller.yaml -->
 
 ```yaml
-id: cassandra
+apiVersion: v1
 kind: ReplicationController
-apiVersion: v1beta1
-desiredState:
+metadata:
+  labels:
+    app: cassandra
+  name: cassandra
+spec:
   replicas: 1
-  replicaSelector:
-    name: cassandra
-  # This is identical to the pod config above
-  podTemplate:
-    desiredState:
-      manifest:
-        version: v1beta1
-        id: cassandra
-        containers:
-          - name: cassandra
-            image: kubernetes/cassandra
-            command:
-              - /run.sh
-            cpu: 1000
-            ports:
-              - name: cql
-                containerPort: 9042
-              - name: thrift
-                containerPort: 9160
-            env:
-              - key: MAX_HEAP_SIZE
-                value: 512M
-              - key: HEAP_NEWSIZE
-                value: 100M
-    labels:
-      name: cassandra
+  template:
+    metadata:
+      labels:
+        app: cassandra
+    spec:
+      containers:
+        - command:
+            - /run.sh
+          resources:
+            limits:
+              cpu: 0.1
+          env:
+            - name: MAX_HEAP_SIZE
+              value: 512M
+            - name: HEAP_NEWSIZE
+              value: 100M
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          image: gcr.io/google_containers/cassandra:v7
+          name: cassandra
+          ports:
+            - containerPort: 9042
+              name: cql
+            - containerPort: 9160
+              name: thrift
+          volumeMounts:
+            - mountPath: /cassandra_data
+              name: data
+      volumes:
+        - name: data
+          emptyDir: {}
 ```
 
-The bulk of the replication controller config is actually identical to the Cassandra pod declaration above, it simply gives the controller a recipe to use when creating new pods.  The other parts are the ```replicaSelector``` which contains the controller's selector query, and the ```replicas``` parameter which specifies the desired number of replicas, in this case 1.
+[Download example](cassandra-controller.yaml?raw=true)
+<!-- END MUNGE: EXAMPLE cassandra-controller.yaml -->
+
+Most of this replication controller definition is identical to the Cassandra pod definition above, it simply gives the replication controller a recipe to use when it creates new Cassandra pods.  The other differentiating parts are the ```selector``` attribute which contains the controller's selector query, and the ```replicas``` attribute which specifies the desired number of replicas, in this case 1.
 
 Create this controller:
 
-```sh
-$ kubectl create -f cassandra-controller.yaml
+```console
+$ kubectl create -f examples/cassandra/cassandra-controller.yaml
 ```
 
 Now this is actually not that interesting, since we haven't actually done anything new.  Now it will get interesting.
 
-Let's resize our cluster to 2:
-```sh
-$ kubectl resize rc cassandra --replicas=2
+Let's scale our cluster to 2:
+
+```console
+$ kubectl scale rc cassandra --replicas=2
 ```
 
-Now if you list the pods in your cluster, you should see two cassandra pods:
+Now if you list the pods in your cluster, and filter to the label ```name=cassandra```, you should see two cassandra pods:
 
-```sh
-$ kubectl get pods
-POD                                    CONTAINER(S)        IMAGE(S)                       HOST                                                          LABELS              STATUS
-cassandra                              cassandra           kubernetes/cassandra           kubernetes-minion-1.c.my-cloud-code.internal/1.2.3.4   name=cassandra      Running
-16b2beab-94a1-11e4-8a8b-42010af0e23e   cassandra           kubernetes/cassandra           kubernetes-minion-3.c.my-cloud-code.internal/2.3.4.5                 name=cassandra      Running
+```console 
+$ kubectl get pods -l="name=cassandra"
+NAME              READY     STATUS    RESTARTS   AGE
+cassandra         1/1       Running   0          3m
+cassandra-af6h5   1/1       Running   0          28s
 ```
 
 Notice that one of the pods has the human readable name ```cassandra``` that you specified in your config before, and one has a random string, since it was named by the replication controller.
 
-To prove that this all works, you can use the ```nodetool``` command to examine the status of the cluster, for example:
+To prove that this all works, you can use the ```nodetool``` command to examine the status of the cluster.  To do this, use the ```kubectl exec``` command to run ```nodetool``` in one of your Cassandra pods.
 
-```sh
-$ ssh 1.2.3.4
-$ docker exec <cassandra-container-id> nodetool status
+```console
+$ kubectl exec -ti cassandra -- nodetool status
 Datacenter: datacenter1
 =======================
 Status=Up/Down
 |/ State=Normal/Leaving/Joining/Moving
---  Address      Load       Tokens  Owns (effective)  Host ID                               Rack
-UN  10.244.3.29  72.07 KB   256     100.0%            f736f0b5-bd1f-46f1-9b9d-7e8f22f37c9e  rack1
-UN  10.244.1.10  41.14 KB   256     100.0%            42617acd-b16e-4ee3-9486-68a6743657b1  rack1
+--  Address     Load       Tokens  Owns (effective)  Host ID                               Rack
+UN  10.244.0.5  74.09 KB   256     100.0%            86feda0f-f070-4a5b-bda1-2eeb0ad08b77  rack1
+UN  10.244.3.3  51.28 KB   256     100.0%            dafe3154-1d67-42e1-ac1d-78e7e80dce2b  rack1
 ```
 
-Now let's resize our cluster to 4 nodes:
+Now let's scale our cluster to 4 nodes:
+
 ```sh
-$ kubectl resize rc cassandra --replicas=4
+$ kubectl scale rc cassandra --replicas=4
 ```
 
-Examining the status again:
+In a few moments, you can examine the status again:
+
 ```sh
-$ docker exec <cassandra-container-id> nodetool status
+$ kubectl exec -ti cassandra -- nodetool status
 Datacenter: datacenter1
 =======================
 Status=Up/Down
 |/ State=Normal/Leaving/Joining/Moving
---  Address      Load       Tokens  Owns (effective)  Host ID                               Rack
-UN  10.244.3.29  72.07 KB   256     49.5%             f736f0b5-bd1f-46f1-9b9d-7e8f22f37c9e  rack1
-UN  10.244.2.14  61.62 KB   256     52.6%             3e9981a6-6919-42c4-b2b8-af50f23a68f2  rack1
-UN  10.244.1.10  41.14 KB   256     49.5%             42617acd-b16e-4ee3-9486-68a6743657b1  rack1
-UN  10.244.4.8   63.83 KB   256     48.3%             eeb73967-d1e6-43c1-bb54-512f8117d372  rack1
+--  Address     Load       Tokens  Owns (effective)  Host ID                               Rack
+UN  10.244.2.3  57.61 KB   256     49.1%             9d560d8e-dafb-4a88-8e2f-f554379c21c3  rack1
+UN  10.244.1.7  41.1 KB    256     50.2%             68b8cc9c-2b76-44a4-b033-31402a77b839  rack1
+UN  10.244.0.5  74.09 KB   256     49.7%             86feda0f-f070-4a5b-bda1-2eeb0ad08b77  rack1
+UN  10.244.3.3  51.28 KB   256     51.0%             dafe3154-1d67-42e1-ac1d-78e7e80dce2b  rack1
+```
+
+### Using a DaemonSet
+
+In Kubernetes a _[Daemon Set](../../docs/admin/daemons.md)_ can distribute pods onto Kubernetes nodes, one-to-one.  Like a _ReplicationController_ it has a selector query which identifies the members of it's set.  Unlike a _ReplicationController_ it has a node selector to limit which nodes are scheduled with the templated pods, and replicates not based on a set target number of pods, but rather assigns a single pod to each targeted node.
+
+An example use case: when deploying to the cloud, the expectation is that instances are ephemeral and might die at any time. Cassandra is built to replicate data across the cluster to facilitate data redundancy, so that in the case that an instance dies, the data stored on the instance does not, and the cluster can react by re-replicating the data to other running nodes.
+
+DaemonSet is designed to place a single pod on each node in the Kubernetes cluster. If you're looking for data redundancy with Cassandra, let's create a daemonset to start our storage cluster:
+
+<!-- BEGIN MUNGE: EXAMPLE cassandra-daemonset.yaml -->
+
+```yaml
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    name: cassandra
+  name: cassandra
+spec:
+  template:
+    metadata:
+      labels:
+        name: cassandra
+    spec:
+      # Filter to specific nodes:
+      # nodeSelector:
+      #  app: cassandra
+      containers:
+        - command:
+            - /run.sh
+          env:
+            - name: MAX_HEAP_SIZE
+              value: 512M
+            - name: HEAP_NEWSIZE
+              value: 100M
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          image: "gcr.io/google_containers/cassandra:v7"
+          name: cassandra
+          ports:
+            - containerPort: 9042
+              name: cql
+            - containerPort: 9160
+              name: thrift
+          resources:
+            request:
+              cpu: 0.1
+          volumeMounts:
+            - mountPath: /cassandra_data
+              name: data
+      volumes:
+        - name: data
+          hostPath:
+            path: /var/lib/cassandra
+```
+
+[Download example](cassandra-daemonset.yaml?raw=true)
+<!-- END MUNGE: EXAMPLE cassandra-daemonset.yaml -->
+
+Most of this daemon set definition is identical to the Cassandra pod and ReplicationController definitions above, it simply gives the daemon set a recipe to use when it creates new Cassandra pods, and targets all Cassandra nodes in the cluster.  The other differentiating part from a Replication Controller is the ```nodeSelector``` attribute which allows the daemonset to target a specific subset of nodes, and the lack of a ```replicas``` attribute due to the 1 to 1 node-pod relationship.
+
+Create this daemonset:
+
+```console
+$ kubectl create -f examples/cassandra/cassandra-daemonset.yaml
+```
+
+Now if you list the pods in your cluster, and filter to the label ```name=cassandra```, you should see one cassandra pod for each node in your network:
+
+```console 
+$ kubectl get pods -l="name=cassandra"
+NAME              READY     STATUS    RESTARTS   AGE
+cassandra-af6h5   1/1       Running   0          28s
+cassandra-2jq1b   1/1       Running   0          32s
+cassandra-34j2a   1/1       Running   0          29s
+```
+
+To prove that this all works, you can use the ```nodetool``` command to examine the status of the cluster.  To do this, use the ```kubectl exec``` command to run ```nodetool``` in one of your Cassandra pods.
+
+```console
+$ kubectl exec -ti cassandra-af6h5 -- nodetool status
+Datacenter: datacenter1
+=======================
+Status=Up/Down
+|/ State=Normal/Leaving/Joining/Moving
+--  Address     Load       Tokens  Owns (effective)  Host ID                               Rack
+UN  10.244.0.5  74.09 KB   256     100.0%            86feda0f-f070-4a5b-bda1-2eeb0ad08b77  rack1
+UN  10.244.4.2  32.45 KB   256     100.0%            0b1be71a-6ffb-4895-ac3e-b9791299c141  rack1
+UN  10.244.3.3  51.28 KB   256     100.0%            dafe3154-1d67-42e1-ac1d-78e7e80dce2b  rack1
 ```
 
 ### tl; dr;
+
 For those of you who are impatient, here is the summary of the commands we ran in this tutorial.
 
 ```sh
-# create a single cassandra node
-kubectl create -f cassandra.yaml
-
 # create a service to track all cassandra nodes
-kubectl create -f cassandra-service.yaml
+kubectl create -f examples/cassandra/cassandra-service.yaml
+
+# create a single cassandra node
+kubectl create -f examples/cassandra/cassandra.yaml
 
 # create a replication controller to replicate cassandra nodes
-kubectl create -f cassandra-controller.yaml
+kubectl create -f examples/cassandra/cassandra-controller.yaml
 
 # scale up to 2 nodes
-kubectl resize rc cassandra --replicas=2
+kubectl scale rc cassandra --replicas=2
 
 # validate the cluster
-docker exec <container-id> nodetool status
+kubectl exec -ti cassandra -- nodetool status
 
 # scale up to 4 nodes
-kubectl resize rc cassandra --replicas=4
+kubectl scale rc cassandra --replicas=4
+
+# create a daemonset to place a cassandra node on each kubernetes node
+kubectl create -f examples/cassandra/cassandra-daemonset.yaml
 ```
 
 ### Seed Provider Source
-```java
-package io.k8s.cassandra;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.net.URL;
-import java.net.URLConnection;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+See [here](java/src/io/k8s/cassandra/KubernetesSeedProvider.java).
 
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.apache.cassandra.locator.SeedProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-public class KubernetesSeedProvider implements SeedProvider {
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class Endpoints {
-        public String[] endpoints;
-    }
-    
-    private static String getEnvOrDefault(String var, String def) {
-        String val = System.getenv(var);
-        if (val == null) {
-	    val = def;
-        }
-        return val;
-    }
-
-    private static final Logger logger = LoggerFactory.getLogger(KubernetesSeedProvider.class);
-
-    private List defaultSeeds;
-   
-    public KubernetesSeedProvider(Map<String, String> params) {
-        // Taken from SimpleSeedProvider.java
-        // These are used as a fallback, if we get nothing from k8s.
-        String[] hosts = params.get("seeds").split(",", -1);
-        defaultSeeds = new ArrayList<InetAddress>(hosts.length);
-        for (String host : hosts)
-	    {
-		try {
-		    defaultSeeds.add(InetAddress.getByName(host.trim()));
-		}
-		catch (UnknownHostException ex)
-		    {
-			// not fatal... DD will bark if there end up being zero seeds.
-			logger.warn("Seed provider couldn't lookup host " + host);
-		    }
-	    }
-    } 
-
-    public List<InetAddress> getSeeds() {
-        List<InetAddress> list = new ArrayList<InetAddress>();
-        String protocol = getEnvOrDefault("KUBERNETES_API_PROTOCOL", "http");
-        String hostName = getEnvOrDefault("KUBERNETES_RO_SERVICE_HOST", "localhost");
-        String hostPort = getEnvOrDefault("KUBERNETES_RO_SERVICE_PORT", "8080");
-
-        String host = protocol + "://" + hostName + ":" + hostPort;
-        String serviceName = getEnvOrDefault("CASSANDRA_SERVICE", "cassandra");
-        String path = "/api/v1beta1/endpoints/";
-        try {
-	    URL url = new URL(host + path + serviceName);
-	    ObjectMapper mapper = new ObjectMapper();
-	    Endpoints endpoints = mapper.readValue(url, Endpoints.class);
-	    if (endpoints != null) {
-		for (String endpoint : endpoints.endpoints) {
-		    String[] parts = endpoint.split(":");
-		    list.add(InetAddress.getByName(parts[0]));
-		}
-	    }
-        } catch (IOException ex) {
-	    logger.warn("Request to kubernetes apiserver failed"); 
-        }
-        if (list.size() == 0) {
-	    // If we got nothing, we might be the first instance, in that case
-	    // fall back on the seeds that were passed in cassandra.yaml.
-	    return defaultSeeds;
-        }
-        return list;
-    }
-
-    // Simple main to test the implementation
-    public static void main(String[] args) {
-        SeedProvider provider = new KubernetesSeedProvider(new HashMap<String, String>());
-        System.out.println(provider.getSeeds());
-    }
-}
-```
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/cassandra/README.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

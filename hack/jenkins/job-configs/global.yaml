@@ -1,0 +1,59 @@
+# Mail Watcher Plugin alerts the specified address whenever a job config is updated or deleted.
+- property:
+    name: mail-watcher
+    properties:
+        - raw:
+            xml: |
+                <org.jenkinsci.plugins.mailwatcher.WatcherJobProperty plugin="mail-watcher-plugin@1.13">
+                    <watcherAddresses>cloud-kubernetes-team@google.com</watcherAddresses>
+                </org.jenkinsci.plugins.mailwatcher.WatcherJobProperty>
+
+- publisher:
+    name: gcs-uploader
+    publishers:
+        # Use the plugin for the build log, since it isn't available on Jenkins slaves.
+        - google-cloud-storage:
+            credentials-id: kubernetes-jenkins
+            uploads:
+                - build-log:
+                    log-name: build-log.txt
+                    storage-location: gs://kubernetes-jenkins/logs/$JOB_NAME/$BUILD_NUMBER
+                    share-publicly: true
+                    upload-for-failed-jobs: true
+        # Use our script for build artifacts, since it's more flexible.
+        - postbuildscript:
+            builders:
+                - shell: |
+                    if [[ -x ./hack/jenkins/upload-to-gcs.sh ]]; then
+                      ./hack/jenkins/upload-to-gcs.sh
+                    else
+                      curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh" | bash -
+                    fi
+            script-only-if-succeeded: False
+            script-only-if-failed: False
+
+# Default log parser rules.
+- publisher:
+    name: log-parser
+    publishers:
+        - logparser:
+            parse-rules: /jenkins-master-data/log_parser_rules.txt
+            unstable-on-warning: false
+            fail-on-error: false
+
+# There is a junit JJB tag, but it doesn't handle the flaky-test-handler plugin.
+- publisher:
+    name: junit-publisher
+    publishers:
+        - raw:
+            xml: |
+                <hudson.tasks.junit.JUnitResultArchiver plugin="junit@1.9">
+                    <testResults>_artifacts/junit*.xml</testResults>
+                    <keepLongStdio>true</keepLongStdio>
+                    <testDataPublishers>
+                        <de.esailors.jenkins.teststability.StabilityTestDataPublisher plugin="test-stability@1.0"/>
+                        <com.google.jenkins.flakyTestHandler.plugin.JUnitFlakyTestDataPublisher plugin="flaky-test-handler@1.0.1"/>
+                        <hudson.plugins.claim.ClaimTestDataPublisher plugin="claim@2.7"/>
+                    </testDataPublishers>
+                    <healthScaleFactor>100.0</healthScaleFactor>
+                </hudson.tasks.junit.JUnitResultArchiver>

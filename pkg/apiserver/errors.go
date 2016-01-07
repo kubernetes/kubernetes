@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,33 +20,29 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/util"
 )
 
-// statusError is an object that can be converted into an api.Status
+// statusError is an object that can be converted into an unversioned.Status
 type statusError interface {
-	Status() api.Status
+	Status() unversioned.Status
 }
 
-// errToAPIStatus converts an error to an api.Status object.
-func errToAPIStatus(err error) *api.Status {
+// errToAPIStatus converts an error to an unversioned.Status object.
+func errToAPIStatus(err error) *unversioned.Status {
 	switch t := err.(type) {
 	case statusError:
 		status := t.Status()
 		if len(status.Status) == 0 {
+			status.Status = unversioned.StatusFailure
 		}
-		switch status.Status {
-		case api.StatusSuccess:
-			if status.Code == 0 {
+		if status.Code == 0 {
+			switch status.Status {
+			case unversioned.StatusSuccess:
 				status.Code = http.StatusOK
-			}
-		case "":
-			status.Status = api.StatusFailure
-			fallthrough
-		case api.StatusFailure:
-			if status.Code == 0 {
+			case unversioned.StatusFailure:
 				status.Code = http.StatusInternalServerError
 			}
 		}
@@ -56,18 +52,18 @@ func errToAPIStatus(err error) *api.Status {
 		status := http.StatusInternalServerError
 		switch {
 		//TODO: replace me with NewConflictErr
-		case tools.IsEtcdTestFailed(err):
+		case storage.IsTestFailed(err):
 			status = http.StatusConflict
 		}
 		// Log errors that were not converted to an error status
 		// by REST storage - these typically indicate programmer
 		// error by not using pkg/api/errors, or unexpected failure
 		// cases.
-		util.HandleError(fmt.Errorf("apiserver received an error that is not an api.Status: %v", err))
-		return &api.Status{
-			Status:  api.StatusFailure,
-			Code:    status,
-			Reason:  api.StatusReasonUnknown,
+		util.HandleError(fmt.Errorf("apiserver received an error that is not an unversioned.Status: %v", err))
+		return &unversioned.Status{
+			Status:  unversioned.StatusFailure,
+			Code:    int32(status),
+			Reason:  unversioned.StatusReasonUnknown,
 			Message: err.Error(),
 		}
 	}
@@ -89,4 +85,23 @@ func badGatewayError(w http.ResponseWriter, req *http.Request) {
 func forbidden(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusForbidden)
 	fmt.Fprintf(w, "Forbidden: %#v", req.RequestURI)
+}
+
+// errAPIPrefixNotFound indicates that a RequestInfo resolution failed because the request isn't under
+// any known API prefixes
+type errAPIPrefixNotFound struct {
+	SpecifiedPrefix string
+}
+
+func (e *errAPIPrefixNotFound) Error() string {
+	return fmt.Sprintf("no valid API prefix found matching %v", e.SpecifiedPrefix)
+}
+
+func IsAPIPrefixNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	_, ok := err.(*errAPIPrefixNotFound)
+	return ok
 }

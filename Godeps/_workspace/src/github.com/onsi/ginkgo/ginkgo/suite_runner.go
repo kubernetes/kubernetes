@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"runtime"
+	"sync"
 
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/ginkgo/interrupthandler"
@@ -10,26 +11,19 @@ import (
 	"github.com/onsi/ginkgo/ginkgo/testsuite"
 )
 
+type compilationInput struct {
+	runner *testrunner.TestRunner
+	result chan compilationOutput
+}
+
+type compilationOutput struct {
+	runner *testrunner.TestRunner
+	err    error
+}
+
 type SuiteRunner struct {
 	notifier         *Notifier
 	interruptHandler *interrupthandler.InterruptHandler
-}
-
-type compiler struct {
-	runner           *testrunner.TestRunner
-	compilationError chan error
-}
-
-func (c *compiler) compile() {
-	retries := 0
-
-	err := c.runner.Compile()
-	for err != nil && retries < 5 { //We retry because Go sometimes steps on itself when multiple compiles happen in parallel.  This is ugly, but should help resolve flakiness...
-		err = c.runner.Compile()
-		retries++
-	}
-
-	c.compilationError <- err
 }
 
 func NewSuiteRunner(notifier *Notifier, interruptHandler *interrupthandler.InterruptHandler) *SuiteRunner {
@@ -39,63 +33,111 @@ func NewSuiteRunner(notifier *Notifier, interruptHandler *interrupthandler.Inter
 	}
 }
 
-func (r *SuiteRunner) RunSuites(runners []*testrunner.TestRunner, numCompilers int, keepGoing bool, willCompile func(suite testsuite.TestSuite)) (testrunner.RunResult, int) {
-	runResult := testrunner.PassingRunResult()
+func (r *SuiteRunner) compileInParallel(runners []*testrunner.TestRunner, numCompilers int, willCompile func(suite testsuite.TestSuite)) chan compilationOutput {
+	//we return this to the consumer, it will return each runner in order as it compiles
+	compilationOutputs := make(chan compilationOutput, len(runners))
 
-	compilers := make([]*compiler, len(runners))
-	for i, runner := range runners {
-		compilers[i] = &compiler{
-			runner:           runner,
-			compilationError: make(chan error, 1),
-		}
+	//an array of channels - the nth runner's compilation output is sent to the nth channel in this array
+	//we read from these channels in order to ensure we run the suites in order
+	orderedCompilationOutputs := []chan compilationOutput{}
+	for _ = range runners {
+		orderedCompilationOutputs = append(orderedCompilationOutputs, make(chan compilationOutput, 1))
 	}
 
-	compilerChannel := make(chan *compiler)
+	//we're going to spin up numCompilers compilers - they're going to run concurrently and will consume this channel
+	//we prefill the channel then close it, this ensures we compile things in the correct order
+	workPool := make(chan compilationInput, len(runners))
+	for i, runner := range runners {
+		workPool <- compilationInput{runner, orderedCompilationOutputs[i]}
+	}
+	close(workPool)
+
+	//pick a reasonable numCompilers
 	if numCompilers == 0 {
 		numCompilers = runtime.NumCPU()
 	}
+
+	//a WaitGroup to help us wait for all compilers to shut down
+	wg := &sync.WaitGroup{}
+	wg.Add(numCompilers)
+
+	//spin up the concurrent compilers
 	for i := 0; i < numCompilers; i++ {
 		go func() {
-			for compiler := range compilerChannel {
-				if willCompile != nil {
-					willCompile(compiler.runner.Suite)
+			defer wg.Done()
+			for input := range workPool {
+				if r.interruptHandler.WasInterrupted() {
+					return
 				}
-				compiler.compile()
+
+				if willCompile != nil {
+					willCompile(input.runner.Suite)
+				}
+
+				//We retry because Go sometimes steps on itself when multiple compiles happen in parallel.  This is ugly, but should help resolve flakiness...
+				var err error
+				retries := 0
+				for retries <= 5 {
+					if r.interruptHandler.WasInterrupted() {
+						return
+					}
+					if err = input.runner.Compile(); err == nil {
+						break
+					}
+					retries++
+				}
+
+				input.result <- compilationOutput{input.runner, err}
 			}
 		}()
 	}
+
+	//read from the compilation output channels *in order* and send them to the caller
+	//close the compilationOutputs channel to tell the caller we're done
 	go func() {
-		for _, compiler := range compilers {
-			compilerChannel <- compiler
+		defer close(compilationOutputs)
+		for _, orderedCompilationOutput := range orderedCompilationOutputs {
+			select {
+			case compilationOutput := <-orderedCompilationOutput:
+				compilationOutputs <- compilationOutput
+			case <-r.interruptHandler.C:
+				//interrupt detected, wait for the compilers to shut down then bail
+				//this ensure we clean up after ourselves as we don't leave any compilation processes running
+				wg.Wait()
+				return
+			}
 		}
-		close(compilerChannel)
 	}()
+
+	return compilationOutputs
+}
+
+func (r *SuiteRunner) RunSuites(runners []*testrunner.TestRunner, numCompilers int, keepGoing bool, willCompile func(suite testsuite.TestSuite)) (testrunner.RunResult, int) {
+	runResult := testrunner.PassingRunResult()
+
+	compilationOutputs := r.compileInParallel(runners, numCompilers, willCompile)
 
 	numSuitesThatRan := 0
 	suitesThatFailed := []testsuite.TestSuite{}
-	for i, runner := range runners {
-		if r.interruptHandler.WasInterrupted() {
-			break
-		}
-
-		compilationError := <-compilers[i].compilationError
-		if compilationError != nil {
-			fmt.Print(compilationError.Error())
+	for compilationOutput := range compilationOutputs {
+		if compilationOutput.err != nil {
+			fmt.Print(compilationOutput.err.Error())
 		}
 		numSuitesThatRan++
 		suiteRunResult := testrunner.FailingRunResult()
-		if compilationError == nil {
-			suiteRunResult = compilers[i].runner.Run()
+		if compilationOutput.err == nil {
+			suiteRunResult = compilationOutput.runner.Run()
 		}
-		r.notifier.SendSuiteCompletionNotification(runner.Suite, suiteRunResult.Passed)
+		r.notifier.SendSuiteCompletionNotification(compilationOutput.runner.Suite, suiteRunResult.Passed)
+		r.notifier.RunCommand(compilationOutput.runner.Suite, suiteRunResult.Passed)
 		runResult = runResult.Merge(suiteRunResult)
 		if !suiteRunResult.Passed {
-			suitesThatFailed = append(suitesThatFailed, runner.Suite)
+			suitesThatFailed = append(suitesThatFailed, compilationOutput.runner.Suite)
 			if !keepGoing {
 				break
 			}
 		}
-		if i < len(runners)-1 && !config.DefaultReporterConfig.Succinct {
+		if numSuitesThatRan < len(runners) && !config.DefaultReporterConfig.Succinct {
 			fmt.Println("")
 		}
 	}

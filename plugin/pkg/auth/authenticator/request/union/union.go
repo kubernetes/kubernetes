@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,9 +19,9 @@ package union
 import (
 	"net/http"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/auth/authenticator"
+	"k8s.io/kubernetes/pkg/auth/user"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 // unionAuthRequestHandler authenticates requests using a chain of authenticator.Requests
@@ -48,5 +48,5 @@ func (authHandler unionAuthRequestHandler) AuthenticateRequest(req *http.Request
 		}
 	}
 
-	return nil, false, errors.NewAggregate(errlist)
+	return nil, false, utilerrors.NewAggregate(errlist)
 }

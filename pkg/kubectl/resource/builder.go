@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,12 +23,18 @@ import (
 	"os"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
+
+var FileExtensions = []string{".json", ".yaml", ".yml"}
+var InputExtensions = append(FileExtensions, "stdin")
 
 // Builder provides convenience functions for taking arguments and parameters
 // from the command line and converting them to a list of resources to iterate
@@ -42,12 +48,15 @@ type Builder struct {
 	stream bool
 	dir    bool
 
-	selector labels.Selector
+	selector  labels.Selector
+	selectAll bool
 
 	resources []string
 
 	namespace string
-	name      string
+	names     []string
+
+	resourceTuples []resourceTuple
 
 	defaultNamespace bool
 	requireNamespace bool
@@ -55,21 +64,41 @@ type Builder struct {
 	flatten bool
 	latest  bool
 
+	requireObject bool
+
 	singleResourceType bool
 	continueOnError    bool
+
+	export bool
+
+	schema validation.Schema
+}
+
+type resourceTuple struct {
+	Resource string
+	Name     string
 }
 
 // NewBuilder creates a builder that operates on generic objects.
 func NewBuilder(mapper meta.RESTMapper, typer runtime.ObjectTyper, clientMapper ClientMapper) *Builder {
 	return &Builder{
-		mapper: &Mapper{typer, mapper, clientMapper},
+		mapper:        &Mapper{typer, mapper, clientMapper},
+		requireObject: true,
 	}
 }
 
-// Filename is parameters passed via a filename argument which may be URLs, the "-" argument indicating
-// STDIN, or paths to files or directories. If ContinueOnError() is set prior to this method being called,
-// objects on the path that are unrecognized will be ignored (but logged at V(2)).
-func (b *Builder) FilenameParam(paths ...string) *Builder {
+func (b *Builder) Schema(schema validation.Schema) *Builder {
+	b.schema = schema
+	return b
+}
+
+// FilenameParam groups input in two categories: URLs and files (files, directories, STDIN)
+// If enforceNamespace is false, namespaces in the specs will be allowed to
+// override the default namespace. If it is true, namespaces that don't match
+// will cause an error.
+// If ContinueOnError() is set prior to this method, objects on the path that are not
+// recognized will be ignored (but logged at V(2)).
+func (b *Builder) FilenameParam(enforceNamespace bool, paths ...string) *Builder {
 	for _, s := range paths {
 		switch {
 		case s == "-":
@@ -85,6 +114,11 @@ func (b *Builder) FilenameParam(paths ...string) *Builder {
 			b.Path(s)
 		}
 	}
+
+	if enforceNamespace {
+		b.RequireNamespace()
+	}
+
 	return b
 }
 
@@ -94,6 +128,7 @@ func (b *Builder) URL(urls ...*url.URL) *Builder {
 		b.paths = append(b.paths, &URLVisitor{
 			Mapper: b.mapper,
 			URL:    u,
+			Schema: b.schema,
 		})
 	}
 	return b
@@ -103,7 +138,9 @@ func (b *Builder) URL(urls ...*url.URL) *Builder {
 // prior to this method being called, objects in the stream that are unrecognized
 // will be ignored (but logged at V(2)).
 func (b *Builder) Stdin() *Builder {
-	return b.Stream(os.Stdin, "STDIN")
+	b.stream = true
+	b.paths = append(b.paths, FileVisitorForSTDIN(b.mapper, b.schema))
+	return b
 }
 
 // Stream will read objects from the provided reader, and if an error occurs will
@@ -112,16 +149,18 @@ func (b *Builder) Stdin() *Builder {
 // will be ignored (but logged at V(2)).
 func (b *Builder) Stream(r io.Reader, name string) *Builder {
 	b.stream = true
-	b.paths = append(b.paths, NewStreamVisitor(r, b.mapper, name, b.continueOnError))
+	b.paths = append(b.paths, NewStreamVisitor(r, b.mapper, name, b.schema))
 	return b
 }
 
-// Path is a set of filesystem paths that may be files containing one or more
-// resources. If ContinueOnError() is set prior to this method being called,
-// objects on the path that are unrecognized will be ignored (but logged at V(2)).
+// Path accepts a set of paths that may be files, directories (all can containing
+// one or more resources). Creates a FileVisitor for each file and then each
+// FileVisitor is streaming the content to a StreamVisitor. If ContinueOnError() is set
+// prior to this method being called, objects on the path that are unrecognized will be
+// ignored (but logged at V(2)).
 func (b *Builder) Path(paths ...string) *Builder {
 	for _, p := range paths {
-		i, err := os.Stat(p)
+		_, err := os.Stat(p)
 		if os.IsNotExist(err) {
 			b.errs = append(b.errs, fmt.Errorf("the path %q does not exist", p))
 			continue
@@ -130,24 +169,16 @@ func (b *Builder) Path(paths ...string) *Builder {
 			b.errs = append(b.errs, fmt.Errorf("the path %q cannot be accessed: %v", p, err))
 			continue
 		}
-		var visitor Visitor
-		if i.IsDir() {
-			b.dir = true
-			visitor = &DirectoryVisitor{
-				Mapper:       b.mapper,
-				Path:         p,
-				Extensions:   []string{".json", ".yaml"},
-				Recursive:    false,
-				IgnoreErrors: b.continueOnError,
-			}
-		} else {
-			visitor = &PathVisitor{
-				Mapper:       b.mapper,
-				Path:         p,
-				IgnoreErrors: b.continueOnError,
-			}
+
+		visitors, err := ExpandPathsToFileVisitors(b.mapper, p, false, FileExtensions, b.schema)
+		if err != nil {
+			b.errs = append(b.errs, fmt.Errorf("error reading %q: %v", p, err))
 		}
-		b.paths = append(b.paths, visitor)
+		if len(visitors) > 1 {
+			b.dir = true
+		}
+
+		b.paths = append(b.paths, visitors...)
 	}
 	return b
 }
@@ -159,16 +190,42 @@ func (b *Builder) ResourceTypes(types ...string) *Builder {
 	return b
 }
 
+// ResourceNames accepts a default type and one or more names, and creates tuples of
+// resources
+func (b *Builder) ResourceNames(resource string, names ...string) *Builder {
+	for _, name := range names {
+		// See if this input string is of type/name format
+		tuple, ok, err := splitResourceTypeName(name)
+		if err != nil {
+			b.errs = append(b.errs, err)
+			return b
+		}
+
+		if ok {
+			b.resourceTuples = append(b.resourceTuples, tuple)
+			continue
+		}
+
+		// Use the given default type to create a resource tuple
+		b.resourceTuples = append(b.resourceTuples, resourceTuple{Resource: resource, Name: name})
+	}
+	return b
+}
+
 // SelectorParam defines a selector that should be applied to the object types to load.
 // This will not affect files loaded from disk or URL. If the parameter is empty it is
 // a no-op - to select all resources invoke `b.Selector(labels.Everything)`.
 func (b *Builder) SelectorParam(s string) *Builder {
-	selector, err := labels.ParseSelector(s)
+	selector, err := labels.Parse(s)
 	if err != nil {
 		b.errs = append(b.errs, fmt.Errorf("the provided selector %q is not valid: %v", s, err))
 		return b
 	}
 	if selector.Empty() {
+		return b
+	}
+	if b.selectAll {
+		b.errs = append(b.errs, fmt.Errorf("found non empty selector %q with previously set 'all' parameter. ", s))
 		return b
 	}
 	return b.Selector(selector)
@@ -180,8 +237,14 @@ func (b *Builder) Selector(selector labels.Selector) *Builder {
 	return b
 }
 
-// The namespace that these resources should be assumed to under - used by DefaultNamespace()
-// and RequireNamespace()
+// ExportParam accepts the export boolean for these resources
+func (b *Builder) ExportParam(export bool) *Builder {
+	b.export = export
+	return b
+}
+
+// NamespaceParam accepts the namespace that these resources should be
+// considered under from - used by DefaultNamespace() and RequireNamespace()
 func (b *Builder) NamespaceParam(namespace string) *Builder {
 	b.namespace = namespace
 	return b
@@ -194,6 +257,15 @@ func (b *Builder) DefaultNamespace() *Builder {
 	return b
 }
 
+// AllNamespaces instructs the builder to use NamespaceAll as a namespace to request resources
+// acroll all namespace. This overrides the namespace set by NamespaceParam().
+func (b *Builder) AllNamespaces(allNamespace bool) *Builder {
+	if allNamespace {
+		b.namespace = api.NamespaceAll
+	}
+	return b
+}
+
 // RequireNamespace instructs the builder to set the namespace value for any object found
 // to NamespaceParam() if empty, and if the value on the resource does not match
 // NamespaceParam() an error will be returned.
@@ -202,40 +274,129 @@ func (b *Builder) RequireNamespace() *Builder {
 	return b
 }
 
-// ResourceTypeOrNameArgs indicates that the builder should accept one or two arguments
-// of the form `(<type1>[,<type2>,...]|<type> <name>)`. When one argument is received, the types
-// provided will be retrieved from the server (and be comma delimited).  When two arguments are
-// received, they must be a single type and name. If more than two arguments are provided an
-// error is set.
-func (b *Builder) ResourceTypeOrNameArgs(args ...string) *Builder {
-	switch len(args) {
-	case 2:
-		b.name = args[1]
+// SelectEverythingParam
+func (b *Builder) SelectAllParam(selectAll bool) *Builder {
+	if selectAll && b.selector != nil {
+		b.errs = append(b.errs, fmt.Errorf("setting 'all' parameter but found a non empty selector. "))
+		return b
+	}
+	b.selectAll = selectAll
+	return b
+}
+
+// ResourceTypeOrNameArgs indicates that the builder should accept arguments
+// of the form `(<type1>[,<type2>,...]|<type> <name1>[,<name2>,...])`. When one argument is
+// received, the types provided will be retrieved from the server (and be comma delimited).
+// When two or more arguments are received, they must be a single type and resource name(s).
+// The allowEmptySelector permits to select all the resources (via Everything func).
+func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string) *Builder {
+	args = normalizeMultipleResourcesArgs(args)
+	if ok, err := hasCombinedTypeArgs(args); ok {
+		if err != nil {
+			b.errs = append(b.errs, err)
+			return b
+		}
+		for _, s := range args {
+			tuple, ok, err := splitResourceTypeName(s)
+			if err != nil {
+				b.errs = append(b.errs, err)
+				return b
+			}
+			if ok {
+				b.resourceTuples = append(b.resourceTuples, tuple)
+			}
+		}
+		return b
+	}
+	if len(args) > 0 {
+		// Try replacing aliases only in types
+		args[0] = b.replaceAliases(args[0])
+	}
+	switch {
+	case len(args) > 2:
+		b.names = append(b.names, args[1:]...)
 		b.ResourceTypes(SplitResourceArgument(args[0])...)
-	case 1:
+	case len(args) == 2:
+		b.names = append(b.names, args[1])
 		b.ResourceTypes(SplitResourceArgument(args[0])...)
-		if b.selector == nil {
+	case len(args) == 1:
+		b.ResourceTypes(SplitResourceArgument(args[0])...)
+		if b.selector == nil && allowEmptySelector {
 			b.selector = labels.Everything()
 		}
-	case 0:
+	case len(args) == 0:
 	default:
 		b.errs = append(b.errs, fmt.Errorf("when passing arguments, must be resource or resource and name"))
 	}
 	return b
 }
 
-// ResourceTypeAndNameArgs expects two arguments, a resource type, and a resource name. The resource
-// matching that type and and name will be retrieved from the server.
-func (b *Builder) ResourceTypeAndNameArgs(args ...string) *Builder {
-	switch len(args) {
-	case 2:
-		b.name = args[1]
-		b.ResourceTypes(SplitResourceArgument(args[0])...)
-	case 0:
-	default:
-		b.errs = append(b.errs, fmt.Errorf("when passing arguments, must be resource and name"))
+// replaceAliases accepts an argument and tries to expand any existing
+// aliases found in it
+func (b *Builder) replaceAliases(input string) string {
+	replaced := []string{}
+	for _, arg := range strings.Split(input, ",") {
+		if aliases, ok := b.mapper.AliasesForResource(arg); ok {
+			arg = strings.Join(aliases, ",")
+		}
+		replaced = append(replaced, arg)
 	}
-	return b
+	return strings.Join(replaced, ",")
+}
+
+func hasCombinedTypeArgs(args []string) (bool, error) {
+	hasSlash := 0
+	for _, s := range args {
+		if strings.Contains(s, "/") {
+			hasSlash++
+		}
+	}
+	switch {
+	case hasSlash > 0 && hasSlash == len(args):
+		return true, nil
+	case hasSlash > 0 && hasSlash != len(args):
+		return true, fmt.Errorf("when passing arguments in resource/name form, all arguments must include the resource")
+	default:
+		return false, nil
+	}
+}
+
+// Normalize args convert multiple resources to resource tuples, a,b,c d
+// as a transform to a/d b/d c/d
+func normalizeMultipleResourcesArgs(args []string) []string {
+	if len(args) >= 2 {
+		resources := []string{}
+		resources = append(resources, SplitResourceArgument(args[0])...)
+		if len(resources) > 1 {
+			names := []string{}
+			names = append(names, args[1:]...)
+			newArgs := []string{}
+			for _, resource := range resources {
+				for _, name := range names {
+					newArgs = append(newArgs, strings.Join([]string{resource, name}, "/"))
+				}
+			}
+			return newArgs
+		}
+	}
+	return args
+}
+
+// splitResourceTypeName handles type/name resource formats and returns a resource tuple
+// (empty or not), whether it successfully found one, and an error
+func splitResourceTypeName(s string) (resourceTuple, bool, error) {
+	if !strings.Contains(s, "/") {
+		return resourceTuple{}, false, nil
+	}
+	seg := strings.Split(s, "/")
+	if len(seg) != 2 {
+		return resourceTuple{}, false, fmt.Errorf("arguments in resource/name form may not have more than one slash")
+	}
+	resource, name := seg[0], seg[1]
+	if len(resource) == 0 || len(name) == 0 || len(SplitResourceArgument(resource)) != 1 {
+		return resourceTuple{}, false, fmt.Errorf("arguments in resource/name form must have a single resource and name")
+	}
+	return resourceTuple{Resource: resource, Name: name}, true, nil
 }
 
 // Flatten will convert any objects with a field named "Items" that is an array of runtime.Object
@@ -249,6 +410,12 @@ func (b *Builder) Flatten() *Builder {
 // Latest will fetch the latest copy of any objects loaded from URLs or files from the server.
 func (b *Builder) Latest() *Builder {
 	b.latest = true
+	return b
+}
+
+// RequireObject ensures that resulting infos have an object set. If false, resulting info may not have an object set.
+func (b *Builder) RequireObject(require bool) *Builder {
+	b.requireObject = require
 	return b
 }
 
@@ -273,11 +440,11 @@ func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 	}
 	mappings := []*meta.RESTMapping{}
 	for _, r := range b.resources {
-		version, kind, err := b.mapper.VersionAndKindForResource(r)
+		gvk, err := b.mapper.KindFor(unversioned.GroupVersionResource{Resource: r})
 		if err != nil {
 			return nil, err
 		}
-		mapping, err := b.mapper.RESTMapping(kind, version)
+		mapping, err := b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
 			return nil, err
 		}
@@ -286,15 +453,47 @@ func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 	return mappings, nil
 }
 
+func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) {
+	mappings := make(map[string]*meta.RESTMapping)
+	canonical := make(map[string]struct{})
+	for _, r := range b.resourceTuples {
+		if _, ok := mappings[r.Resource]; ok {
+			continue
+		}
+		gvk, err := b.mapper.KindFor(unversioned.GroupVersionResource{Resource: r.Resource})
+		if err != nil {
+			return nil, err
+		}
+		mapping, err := b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return nil, err
+		}
+		mappings[mapping.Resource] = mapping
+		mappings[r.Resource] = mapping
+		canonical[mapping.Resource] = struct{}{}
+	}
+	if len(canonical) > 1 && b.singleResourceType {
+		return nil, fmt.Errorf("you may only specify a single resource type")
+	}
+	return mappings, nil
+}
+
 func (b *Builder) visitorResult() *Result {
 	if len(b.errs) > 0 {
-		return &Result{err: errors.NewAggregate(b.errs)}
+		return &Result{err: utilerrors.NewAggregate(b.errs)}
+	}
+
+	if b.selectAll {
+		b.selector = labels.Everything()
 	}
 
 	// visit selectors
 	if b.selector != nil {
-		if len(b.name) != 0 {
+		if len(b.names) != 0 {
 			return &Result{err: fmt.Errorf("name cannot be provided when a selector is specified")}
+		}
+		if len(b.resourceTuples) != 0 {
+			return &Result{err: fmt.Errorf("selectors and the all flag cannot be used when passing resource/name arguments")}
 		}
 		if len(b.resources) == 0 {
 			return &Result{err: fmt.Errorf("at least one resource must be specified to use a selector")}
@@ -322,7 +521,7 @@ func (b *Builder) visitorResult() *Result {
 			if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 				selectorNamespace = ""
 			}
-			visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector))
+			visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector, b.export))
 		}
 		if b.continueOnError {
 			return &Result{visitor: EagerVisitorList(visitors), sources: visitors}
@@ -330,38 +529,109 @@ func (b *Builder) visitorResult() *Result {
 		return &Result{visitor: VisitorList(visitors), sources: visitors}
 	}
 
-	// visit single item specified by name
-	if len(b.name) != 0 {
+	// visit items specified by resource and name
+	if len(b.resourceTuples) != 0 {
+		isSingular := len(b.resourceTuples) == 1
+
 		if len(b.paths) != 0 {
-			return &Result{singular: true, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
+			return &Result{singular: isSingular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
+		}
+		if len(b.resources) != 0 {
+			return &Result{singular: isSingular, err: fmt.Errorf("you may not specify individual resources and bulk resources in the same call")}
+		}
+
+		// retrieve one client for each resource
+		mappings, err := b.resourceTupleMappings()
+		if err != nil {
+			return &Result{singular: isSingular, err: err}
+		}
+		clients := make(map[string]RESTClient)
+		for _, mapping := range mappings {
+			s := fmt.Sprintf("%s/%s", mapping.GroupVersionKind.GroupVersion().String(), mapping.Resource)
+			if _, ok := clients[s]; ok {
+				continue
+			}
+			client, err := b.mapper.ClientForMapping(mapping)
+			if err != nil {
+				return &Result{err: err}
+			}
+			clients[s] = client
+		}
+
+		items := []Visitor{}
+		for _, tuple := range b.resourceTuples {
+			mapping, ok := mappings[tuple.Resource]
+			if !ok {
+				return &Result{singular: isSingular, err: fmt.Errorf("resource %q is not recognized: %v", tuple.Resource, mappings)}
+			}
+			s := fmt.Sprintf("%s/%s", mapping.GroupVersionKind.GroupVersion().String(), mapping.Resource)
+			client, ok := clients[s]
+			if !ok {
+				return &Result{singular: isSingular, err: fmt.Errorf("could not find a client for resource %q", tuple.Resource)}
+			}
+
+			selectorNamespace := b.namespace
+			if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+				selectorNamespace = ""
+			} else {
+				if len(b.namespace) == 0 {
+					return &Result{singular: isSingular, err: fmt.Errorf("namespace may not be empty when retrieving a resource by name")}
+				}
+			}
+
+			info := NewInfo(client, mapping, selectorNamespace, tuple.Name, b.export)
+			items = append(items, info)
+		}
+
+		var visitors Visitor
+		if b.continueOnError {
+			visitors = EagerVisitorList(items)
+		} else {
+			visitors = VisitorList(items)
+		}
+		return &Result{singular: isSingular, visitor: visitors, sources: items}
+	}
+
+	// visit items specified by name
+	if len(b.names) != 0 {
+		isSingular := len(b.names) == 1
+
+		if len(b.paths) != 0 {
+			return &Result{singular: isSingular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
 		}
 		if len(b.resources) == 0 {
-			return &Result{singular: true, err: fmt.Errorf("you must provide a resource and a resource name together")}
+			return &Result{singular: isSingular, err: fmt.Errorf("you must provide a resource and a resource name together")}
 		}
 		if len(b.resources) > 1 {
-			return &Result{singular: true, err: fmt.Errorf("you must specify only one resource")}
+			return &Result{singular: isSingular, err: fmt.Errorf("you must specify only one resource")}
 		}
+
 		mappings, err := b.resourceMappings()
 		if err != nil {
-			return &Result{singular: true, err: err}
+			return &Result{singular: isSingular, err: err}
 		}
 		mapping := mappings[0]
-		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
-			b.namespace = ""
-		} else {
-			if len(b.namespace) == 0 {
-				return &Result{singular: true, err: fmt.Errorf("namespace may not be empty when retrieving a resource by name")}
-			}
-		}
+
 		client, err := b.mapper.ClientForMapping(mapping)
 		if err != nil {
-			return &Result{singular: true, err: err}
+			return &Result{err: err}
 		}
-		info := NewInfo(client, mappings[0], b.namespace, b.name)
-		if err := info.Get(); err != nil {
-			return &Result{singular: true, err: err}
+
+		selectorNamespace := b.namespace
+		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+			selectorNamespace = ""
+		} else {
+			if len(b.namespace) == 0 {
+				return &Result{singular: isSingular, err: fmt.Errorf("namespace may not be empty when retrieving a resource by name")}
+			}
 		}
-		return &Result{singular: true, visitor: info, sources: []Visitor{info}}
+
+		visitors := []Visitor{}
+		for _, name := range b.names {
+			info := NewInfo(client, mapping, selectorNamespace, name, b.export)
+			visitors = append(visitors, info)
+		}
+		return &Result{singular: isSingular, visitor: VisitorList(visitors), sources: visitors}
 	}
 
 	// visit items specified by paths
@@ -384,12 +654,16 @@ func (b *Builder) visitorResult() *Result {
 			if b.flatten {
 				visitors = NewFlattenListVisitor(visitors, b.mapper)
 			}
+			// must set namespace prior to fetching
+			if b.defaultNamespace {
+				visitors = NewDecoratedVisitor(visitors, SetNamespace(b.namespace))
+			}
 			visitors = NewDecoratedVisitor(visitors, RetrieveLatest)
 		}
 		return &Result{singular: singular, visitor: visitors, sources: b.paths}
 	}
 
-	return &Result{err: fmt.Errorf("you must provide one or more resources by argument or filename")}
+	return &Result{err: fmt.Errorf("you must provide one or more resources by argument or filename (%s)", strings.Join(InputExtensions, "|"))}
 }
 
 // Do returns a Result object with a Visitor for the resources identified by the Builder.
@@ -411,13 +685,38 @@ func (b *Builder) Do() *Result {
 	if b.requireNamespace {
 		helpers = append(helpers, RequireNamespace(b.namespace))
 	}
-	helpers = append(helpers, FilterNamespace())
+	helpers = append(helpers, FilterNamespace)
+	if b.requireObject {
+		helpers = append(helpers, RetrieveLazy)
+	}
 	r.visitor = NewDecoratedVisitor(r.visitor, helpers...)
+	if b.continueOnError {
+		r.visitor = ContinueOnErrorVisitor{r.visitor}
+	}
 	return r
 }
 
+// SplitResourceArgument splits the argument with commas and returns unique
+// strings in the original order.
 func SplitResourceArgument(arg string) []string {
-	set := util.NewStringSet()
-	set.Insert(strings.Split(arg, ",")...)
-	return set.List()
+	out := []string{}
+	set := sets.NewString()
+	for _, s := range strings.Split(arg, ",") {
+		if set.Has(s) {
+			continue
+		}
+		set.Insert(s)
+		out = append(out, s)
+	}
+	return out
+}
+
+// HasNames returns true if the provided args contain resource names
+func HasNames(args []string) (bool, error) {
+	args = normalizeMultipleResourcesArgs(args)
+	hasCombinedTypes, err := hasCombinedTypeArgs(args)
+	if err != nil {
+		return false, err
+	}
+	return hasCombinedTypes || len(args) > 1, nil
 }

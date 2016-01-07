@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,24 +17,26 @@ limitations under the License.
 package http
 
 import (
-	"net"
+	"crypto/tls"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/pkg/probe"
 
 	"github.com/golang/glog"
 )
 
 func New() HTTPProber {
-	transport := &http.Transport{}
+	tlsConfig := &tls.Config{InsecureSkipVerify: true}
+	transport := &http.Transport{TLSClientConfig: tlsConfig, DisableKeepAlives: true}
 	return httpProber{transport}
 }
 
 type HTTPProber interface {
-	Probe(host string, port int, path string, timeout time.Duration) (probe.Result, error)
+	Probe(url *url.URL, timeout time.Duration) (probe.Result, string, error)
 }
 
 type httpProber struct {
@@ -42,8 +44,8 @@ type httpProber struct {
 }
 
 // Probe returns a ProbeRunner capable of running an http check.
-func (pr httpProber) Probe(host string, port int, path string, timeout time.Duration) (probe.Result, error) {
-	return DoHTTPProbe(formatURL(host, port, path), &http.Client{Timeout: timeout, Transport: pr.transport})
+func (pr httpProber) Probe(url *url.URL, timeout time.Duration) (probe.Result, string, error) {
+	return DoHTTPProbe(url, &http.Client{Timeout: timeout, Transport: pr.transport})
 }
 
 type HTTPGetInterface interface {
@@ -54,26 +56,22 @@ type HTTPGetInterface interface {
 // If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
 // If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure.
 // This is exported because some other packages may want to do direct HTTP probes.
-func DoHTTPProbe(url string, client HTTPGetInterface) (probe.Result, error) {
-	res, err := client.Get(url)
+func DoHTTPProbe(url *url.URL, client HTTPGetInterface) (probe.Result, string, error) {
+	res, err := client.Get(url.String())
 	if err != nil {
-		glog.V(1).Infof("HTTP probe error: %v", err)
-		return probe.Failure, nil
+		// Convert errors into failures to catch timeouts.
+		return probe.Failure, err.Error(), nil
 	}
 	defer res.Body.Close()
+	b, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return probe.Failure, "", err
+	}
+	body := string(b)
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
-		return probe.Success, nil
+		glog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
+		return probe.Success, body, nil
 	}
-	glog.V(1).Infof("Health check failed for %s, Response: %v", url, *res)
-	return probe.Failure, nil
-}
-
-// formatURL formats a URL from args.  For testability.
-func formatURL(host string, port int, path string) string {
-	u := url.URL{
-		Scheme: "http",
-		Host:   net.JoinHostPort(host, strconv.Itoa(port)),
-		Path:   path,
-	}
-	return u.String()
+	glog.V(4).Infof("Probe failed for %s, Response: %v", url.String(), *res)
+	return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode), nil
 }

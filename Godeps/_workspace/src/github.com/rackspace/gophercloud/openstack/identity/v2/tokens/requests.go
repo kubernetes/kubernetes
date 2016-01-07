@@ -1,7 +1,8 @@
 package tokens
 
 import (
-	"github.com/racker/perigee"
+	"fmt"
+
 	"github.com/rackspace/gophercloud"
 )
 
@@ -41,20 +42,24 @@ func (auth AuthOptions) ToTokenCreateMap() (map[string]interface{}, error) {
 		return nil, ErrDomainNameProvided
 	}
 
-	// Username and Password are always required.
-	if auth.Username == "" {
-		return nil, ErrUsernameRequired
-	}
-	if auth.Password == "" {
-		return nil, ErrPasswordRequired
-	}
-
 	// Populate the request map.
 	authMap := make(map[string]interface{})
 
-	authMap["passwordCredentials"] = map[string]interface{}{
-		"username": auth.Username,
-		"password": auth.Password,
+	if auth.Username != "" {
+		if auth.Password != "" {
+			authMap["passwordCredentials"] = map[string]interface{}{
+				"username": auth.Username,
+				"password": auth.Password,
+			}
+		} else {
+			return nil, ErrPasswordRequired
+		}
+	} else if auth.TokenID != "" {
+		authMap["token"] = map[string]interface{}{
+			"id": auth.TokenID,
+		}
+	} else {
+		return nil, fmt.Errorf("You must provide either username/password or tenantID/token values.")
 	}
 
 	if auth.TenantID != "" {
@@ -78,9 +83,7 @@ func Create(client *gophercloud.ServiceClient, auth AuthOptionsBuilder) CreateRe
 	}
 
 	var result CreateResult
-	_, result.Err = perigee.Request("POST", CreateURL(client), perigee.Options{
-		ReqBody: &request,
-		Results: &result.Body,
+	_, result.Err = client.Post(CreateURL(client), request, &result.Body, &gophercloud.RequestOpts{
 		OkCodes: []int{200, 203},
 	})
 	return result

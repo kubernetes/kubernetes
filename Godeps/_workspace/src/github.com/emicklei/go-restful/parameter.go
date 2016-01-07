@@ -30,11 +30,12 @@ type Parameter struct {
 // ParameterData represents the state of a Parameter.
 // It is made public to make it accessible to e.g. the Swagger package.
 type ParameterData struct {
-	Name, Description, DataType string
-	Kind                        int
-	Required                    bool
-	AllowableValues             map[string]string
-	AllowMultiple               bool
+	Name, Description, DataType, DataFormat string
+	Kind                                    int
+	Required                                bool
+	AllowableValues                         map[string]string
+	AllowMultiple                           bool
+	DefaultValue                            string
 }
 
 // Data returns the state of the Parameter
@@ -70,26 +71,44 @@ func (p *Parameter) beForm() *Parameter {
 	return p
 }
 
-// Required sets the required field and return the receiver
+// Required sets the required field and returns the receiver
 func (p *Parameter) Required(required bool) *Parameter {
 	p.data.Required = required
 	return p
 }
 
-// AllowMultiple sets the allowMultiple field and return the receiver
+// AllowMultiple sets the allowMultiple field and returns the receiver
 func (p *Parameter) AllowMultiple(multiple bool) *Parameter {
 	p.data.AllowMultiple = multiple
 	return p
 }
 
-// AllowableValues sets the allowableValues field and return the receiver
+// AllowableValues sets the allowableValues field and returns the receiver
 func (p *Parameter) AllowableValues(values map[string]string) *Parameter {
 	p.data.AllowableValues = values
 	return p
 }
 
-// DataType sets the dataType field and return the receiver
+// DataType sets the dataType field and returns the receiver
 func (p *Parameter) DataType(typeName string) *Parameter {
 	p.data.DataType = typeName
+	return p
+}
+
+// DataFormat sets the dataFormat field for Swagger UI
+func (p *Parameter) DataFormat(formatName string) *Parameter {
+	p.data.DataFormat = formatName
+	return p
+}
+
+// DefaultValue sets the default value field and returns the receiver
+func (p *Parameter) DefaultValue(stringRepresentation string) *Parameter {
+	p.data.DefaultValue = stringRepresentation
+	return p
+}
+
+// Description sets the description value field and returns the receiver
+func (p *Parameter) Description(doc string) *Parameter {
+	p.data.Description = doc
 	return p
 }

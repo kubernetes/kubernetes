@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,3 +40,16 @@ source "${KUBE_ROOT}/hack/lib/golang.sh"
 source "${KUBE_ROOT}/hack/lib/etcd.sh"
 
 KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BINPATH}/$(kube::util::host_platform)"
+
+# emulates "readlink -f" which is not available on BSD (OS X).
+function readlinkdashf {
+  path=$1
+  # Follow links until there are no more links to follow.
+  while readlink "$path"; do
+    path="$(readlink $path)"
+  done 
+  # Convert to canonical path.
+  path=$(cd "$(dirname "${path}")" && pwd -P)
+  echo "$path"
+}
+

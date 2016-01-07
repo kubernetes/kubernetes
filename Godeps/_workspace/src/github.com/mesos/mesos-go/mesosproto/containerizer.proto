@@ -1,0 +1,112 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package mesosproto;
+
+import "mesos.proto";
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = true;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.testgen_all) = true;
+option (gogoproto.benchgen_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+
+/**
+ * Encodes the launch command sent to the external containerizer
+ * program.
+ */
+message Launch {
+  required ContainerID container_id = 1;
+  optional TaskInfo task_info = 2;
+  optional ExecutorInfo executor_info = 3;
+  optional string directory = 4;
+  optional string user = 5;
+  optional SlaveID slave_id = 6;
+  optional string slave_pid = 7;
+  optional bool checkpoint = 8;
+}
+
+
+/**
+ * Encodes the update command sent to the external containerizer
+ * program.
+ */
+message Update {
+  required ContainerID container_id = 1;
+  repeated Resource resources = 2;
+}
+
+
+/**
+ * Encodes the wait command sent to the external containerizer
+ * program.
+ */
+message Wait {
+  required ContainerID container_id = 1;
+}
+
+
+/**
+ * Encodes the destroy command sent to the external containerizer
+ * program.
+ */
+message Destroy {
+  required ContainerID container_id = 1;
+}
+
+
+/**
+ * Encodes the usage command sent to the external containerizer
+ * program.
+ */
+message Usage {
+  required ContainerID container_id = 1;
+}
+
+
+/**
+ * Information about a container termination, returned by the
+ * containerizer to the slave.
+ */
+message Termination {
+  // A container may be killed if it exceeds its resources; this will
+  // be indicated by killed=true and described by the message string.
+  // TODO(jaybuff): As part of MESOS-2035 we should remove killed and
+  // replace it with a TaskStatus::Reason.
+  required bool killed = 1;
+  required string message = 2;
+
+  // Exit status of the process.
+  optional int32 status = 3;
+}
+
+
+/**
+ * Information on all active containers returned by the containerizer
+ * to the slave.
+ */
+message Containers {
+  repeated ContainerID containers = 1;
+}

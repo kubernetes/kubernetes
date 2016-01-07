@@ -3,29 +3,138 @@
   {% set daemon_args = "" -%}
 {% endif -%}
 
-{% if grains.apiservers is defined -%}
-  {% set apiservers = "--api_servers=https://" + grains.apiservers + ":6443" -%}
+{% if grains.api_servers is defined -%}
+  {% set api_servers = "--api-servers=https://" + grains.api_servers -%}
+{% elif grains.apiservers is defined -%} # TODO(remove after 0.16.0): Deprecated form
+  {% set api_servers = "--api-servers=https://" + grains.apiservers -%}
+{% elif grains['roles'][0] == 'kubernetes-master' -%}
+  {% set master_ipv4 = salt['grains.get']('fqdn_ip4')[0] -%}
+  {% set api_servers = "--api-servers=https://" + master_ipv4 -%}
 {% else -%}
   {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() -%}
-  {% set apiservers = "--api_servers=https://" + ips[0][0] + ":6443" -%}
+  {% set api_servers = "--api-servers=https://" + ips[0][0] -%}
 {% endif -%}
 
-{% set address = "--address=0.0.0.0" -%}
+# TODO: remove nginx for other cloud providers.
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant' ]  %}
+  {% set api_servers_with_port = api_servers -%}
+{% else -%}
+  {% set api_servers_with_port = api_servers + ":6443" -%}
+{% endif -%}
+
+{% set master_kubelet_args = "" %}
+
+{% set debugging_handlers = "--enable-debugging-handlers=true" -%}
+
+{% if grains['roles'][0] == 'kubernetes-master' -%}
+  {% if grains.cloud in ['aws', 'gce', 'vagrant'] -%}
+
+    # Unless given a specific directive, disable registration for the kubelet
+    # running on the master.
+    {% if grains.kubelet_api_servers is defined -%}
+      {% set api_servers_with_port = "--api-servers=https://" + grains.kubelet_api_servers -%}
+      {% set master_kubelet_args = master_kubelet_args + "--register-schedulable=false --reconcile-cidr=false" -%}
+    {% else -%}
+      {% set api_servers_with_port = "" -%}
+    {% endif -%}
+
+    # Disable the debugging handlers (/run and /exec) to prevent arbitrary
+    # code execution on the master.
+    # TODO(roberthbailey): Relax this constraint once the master is self-hosted.
+    {% set debugging_handlers = "--enable-debugging-handlers=false" -%}
+  {% endif -%}
+{% endif -%}
+
+{% set cloud_provider = "" -%}
+{% if grains.cloud is defined and grains.cloud != 'vagrant' -%}
+  {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
+{% endif -%}
+
 {% set config = "--config=/etc/kubernetes/manifests" -%}
-{% set hostname_override = "" -%}
-{% if grains.minion_ip is defined -%}
-  {% set hostname_override = " --hostname_override=" + grains.minion_ip -%}
+
+{% set manifest_url = "" -%}
+{% set manifest_url_header = "" -%}
+{% if pillar.get('enable_manifest_url', '').lower() == 'true' %}
+  {% set manifest_url = "--manifest-url=" + pillar['manifest_url'] + " --manifest-url-header=" + pillar['manifest_url_header'] -%}
 {% endif -%}
 
-{% set auth_path = "--auth_path=/var/lib/kubelet/kubernetes_auth" -%}
-
-{% set registry_qps = "--registry_qps=0.1" %}
+{% set hostname_override = "" -%}
+{% if grains.hostname_override is defined -%}
+  {% set hostname_override = " --hostname-override=" + grains.hostname_override -%}
+{% endif -%}
 
 {% set cluster_dns = "" %}
 {% set cluster_domain = "" %}
 {% if pillar.get('enable_cluster_dns', '').lower() == 'true' %}
-  {% set cluster_dns = "--cluster_dns=" + pillar['dns_server'] %}
-  {% set cluster_domain = "--cluster_domain=" + pillar['dns_domain'] %}
+  {% set cluster_dns = "--cluster-dns=" + pillar['dns_server'] %}
+  {% set cluster_domain = "--cluster-domain=" + pillar['dns_domain'] %}
 {% endif %}
 
-DAEMON_ARGS="{{daemon_args}} {{apiservers}} {{auth_path}} {{hostname_override}} {{address}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}}"
+{% set docker_root = "" -%}
+{% if grains.docker_root is defined -%}
+  {% set docker_root = " --docker-root=" + grains.docker_root -%}
+{% endif -%}
+
+{% set kubelet_root = "" -%}
+{% if grains.kubelet_root is defined -%}
+  {% set kubelet_root = " --root-dir=" + grains.kubelet_root -%}
+{% endif -%}
+
+{% set configure_cbr0 = "" -%}
+{% if pillar['allocate_node_cidrs'] is defined -%}
+  {% set configure_cbr0 = "--configure-cbr0=" + pillar['allocate_node_cidrs'] -%}
+{% endif -%}
+
+# The master kubelet cannot wait for the flannel daemon because it is responsible
+# for starting up the flannel server in a static pod. So even though the flannel
+# daemon runs on the master, it doesn't hold up cluster bootstrap. All the pods
+# on the master run with host networking, so the master flannel doesn't care
+# even if the network changes. We only need it for the master proxy.
+{% set experimental_flannel_overlay = "" -%}
+{% if pillar.get('network_provider', '').lower() == 'flannel' and grains['roles'][0] != 'kubernetes-master' %}
+  {% set experimental_flannel_overlay = "--experimental-flannel-overlay=true" %}
+{% endif -%}
+
+# Run containers under the root cgroup and create a system container.
+{% set system_container = "" -%}
+{% set cgroup_root = "" -%}
+{% if grains['os_family'] == 'Debian' -%}
+  {% set system_container = "--system-container=/system" -%}
+  {% set cgroup_root = "--cgroup-root=/" -%}
+{% endif -%}
+{% if grains['oscodename'] == 'vivid' -%}
+  {% set cgroup_root = "--cgroup-root=docker" -%}
+{% endif -%}
+
+{% set pod_cidr = "" %}
+{% if grains['roles'][0] == 'kubernetes-master' and grains.get('cbr-cidr') %}
+  {% set pod_cidr = "--pod-cidr=" + grains['cbr-cidr'] %}
+{% endif %}
+
+{% set cpu_cfs_quota = "" %}
+{% if pillar['enable_cpu_cfs_quota'] is defined -%}
+ {% set cpu_cfs_quota = "--cpu-cfs-quota=" + pillar['enable_cpu_cfs_quota'] -%}
+{% endif -%}
+
+{% set test_args = "" -%}
+{% if pillar['kubelet_test_args'] is defined -%}
+  {% set test_args=pillar['kubelet_test_args'] %}
+{% endif -%}
+
+{% set network_plugin = "" -%}
+{% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
+  {% set network_plugin = "--network-plugin=opencontrail" %}
+{% endif -%}
+
+{% set kubelet_port = "" -%}
+{% if pillar['kubelet_port'] is defined -%}
+  {% set kubelet_port="--port=" + pillar['kubelet_port'] %}
+{% endif -%}
+
+{% set log_level = pillar['log_level'] -%}
+{% if pillar['kubelet_test_log_level'] is defined -%}
+  {% set log_level = pillar['kubelet_test_log_level'] -%}
+{% endif -%}
+
+# test_args has to be kept at the end, so they'll overwrite any prior configuration
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{experimental_flannel_overlay}} {{test_args}}"

@@ -1,7 +1,8 @@
 package flavors
 
 import (
-	"github.com/racker/perigee"
+	"fmt"
+
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -63,10 +64,40 @@ func ListDetail(client *gophercloud.ServiceClient, opts ListOptsBuilder) paginat
 // Get instructs OpenStack to provide details on a single flavor, identified by its ID.
 // Use ExtractFlavor to convert its result into a Flavor.
 func Get(client *gophercloud.ServiceClient, id string) GetResult {
-	var gr GetResult
-	gr.Err = perigee.Get(getURL(client, id), perigee.Options{
-		Results:     &gr.Body,
-		MoreHeaders: client.AuthenticatedHeaders(),
+	var res GetResult
+	_, res.Err = client.Get(getURL(client, id), &res.Body, nil)
+	return res
+}
+
+// IDFromName is a convienience function that returns a flavor's ID given its name.
+func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
+	flavorCount := 0
+	flavorID := ""
+	if name == "" {
+		return "", fmt.Errorf("A flavor name must be provided.")
+	}
+	pager := ListDetail(client, nil)
+	pager.EachPage(func(page pagination.Page) (bool, error) {
+		flavorList, err := ExtractFlavors(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, f := range flavorList {
+			if f.Name == name {
+				flavorCount++
+				flavorID = f.ID
+			}
+		}
+		return true, nil
 	})
-	return gr
+
+	switch flavorCount {
+	case 0:
+		return "", fmt.Errorf("Unable to find flavor: %s", name)
+	case 1:
+		return flavorID, nil
+	default:
+		return "", fmt.Errorf("Found %d flavors matching %s", flavorCount, name)
+	}
 }

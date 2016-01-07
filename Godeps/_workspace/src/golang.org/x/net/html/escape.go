@@ -12,7 +12,7 @@ import (
 
 // These replacements permit compatibility with old numeric entities that
 // assumed Windows-1252 encoding.
-// http://www.whatwg.org/specs/web-apps/current-work/multipage/tokenization.html#consume-a-character-reference
+// https://html.spec.whatwg.org/multipage/syntax.html#consume-a-character-reference
 var replacementTable = [...]rune{
 	'\u20AC', // First entry is what 0x80 should be replaced with.
 	'\u0081',
@@ -55,7 +55,7 @@ var replacementTable = [...]rune{
 // Precondition: b[src] == '&' && dst <= src.
 // attribute should be true if parsing an attribute value.
 func unescapeEntity(b []byte, dst, src int, attribute bool) (dst1, src1 int) {
-	// http://www.whatwg.org/specs/web-apps/current-work/multipage/tokenization.html#consume-a-character-reference
+	// https://html.spec.whatwg.org/multipage/syntax.html#consume-a-character-reference
 
 	// i starts at 1 because we already know that s[0] == '&'.
 	i, s := 1, b[src:]

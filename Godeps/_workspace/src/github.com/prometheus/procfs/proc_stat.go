@@ -7,8 +7,22 @@ import (
 	"os"
 )
 
-// #include <unistd.h>
-import "C"
+// Originally, this USER_HZ value was dynamically retrieved via a sysconf call which
+// required cgo. However, that caused a lot of problems regarding
+// cross-compilation. Alternatives such as running a binary to determine the
+// value, or trying to derive it in some other way were all problematic.
+// After much research it was determined that USER_HZ is actually hardcoded to
+// 100 on all Go-supported platforms as of the time of this writing. This is
+// why we decided to hardcode it here as well. It is not impossible that there
+// could be systems with exceptions, but they should be very exotic edge cases,
+// and in that case, the worst outcome will be two misreported metrics.
+//
+// See also the following discussions:
+//
+// - https://github.com/prometheus/node_exporter/issues/52
+// - https://github.com/prometheus/procfs/pull/2
+// - http://stackoverflow.com/questions/17410841/how-does-user-hz-solve-the-jiffy-scaling-issue
+const userHZ = 100
 
 // ProcStat provides status information about the process,
 // read from /proc/[pid]/stat.
@@ -152,14 +166,10 @@ func (s ProcStat) StartTime() (float64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return float64(stat.BootTime) + (float64(s.Starttime) / ticks()), nil
+	return float64(stat.BootTime) + (float64(s.Starttime) / userHZ), nil
 }
 
 // CPUTime returns the total CPU user and system time in seconds.
 func (s ProcStat) CPUTime() float64 {
-	return float64(s.UTime+s.STime) / ticks()
-}
-
-func ticks() float64 {
-	return float64(C.sysconf(C._SC_CLK_TCK)) // most likely 100
+	return float64(s.UTime+s.STime) / userHZ
 }

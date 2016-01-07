@@ -1,0 +1,466 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package mesosproto;
+
+import "mesos.proto";
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = true;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.testgen_all) = true;
+option (gogoproto.benchgen_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+
+// TODO(benh): Provide comments for each of these messages. Also,
+// consider splitting these messages into different "packages" which
+// represent which messages get handled by which components (e.g., the
+// "mesos.executor" package includes messages that the
+// executor handles).
+
+
+// TODO(benh): It would be great if this could just be a
+// TaskInfo wherever it gets used! However, doing so would
+// require adding the framework_id field, the executor_id field, and
+// the state field into TaskInfo though (or send them another
+// way). Also, one performance reason why we don't do that now is
+// because storing whatever data is coupled with a TaskInfo
+// could be large and unnecessary.
+// TODO(bmahler): Add executor_uuid here, and send it to the master. This will
+// allow us to expose executor work directories for tasks in the webui when
+// looking from the master level. Currently only the slave knows which run the
+// task belongs to.
+message Task {
+  required string name = 1;
+  required TaskID task_id = 2;
+  required FrameworkID framework_id = 3;
+  optional ExecutorID executor_id = 4;
+  required SlaveID slave_id = 5;
+  required TaskState state = 6; // Latest state of the task.
+  repeated Resource resources = 7;
+  repeated TaskStatus statuses = 8;
+
+  // These fields correspond to the state and uuid of the latest
+  // status update forwarded to the master.
+  // NOTE: Either both the fields must be set or both must be unset.
+  optional TaskState status_update_state = 9;
+  optional bytes status_update_uuid = 10;
+
+  optional Labels labels = 11;
+
+  // Service discovery information for the task. It is not interpreted
+  // or acted upon by Mesos. It is up to a service discovery system
+  // to use this information as needed and to handle tasks without
+  // service discovery information.
+  optional DiscoveryInfo discovery = 12;
+}
+
+
+// TODO(vinod): Create a new UUID message type.
+message StatusUpdate {
+  required FrameworkID framework_id = 1;
+  optional ExecutorID executor_id = 2;
+  optional SlaveID slave_id = 3;
+  required TaskStatus status = 4;
+  required double timestamp = 5;
+
+  // This is being deprecated in favor of TaskStatus.uuid. In 0.23.0,
+  // we set the TaskStatus 'uuid' in the executor driver for all
+  // retryable status updates.
+  optional bytes uuid = 6;
+
+  // This corresponds to the latest state of the task according to the
+  // slave. Note that this state might be different than the state in
+  // 'status' because status update manager queues updates. In other
+  // words, 'status' corresponds to the update at top of the queue and
+  // 'latest_state' corresponds to the update at bottom of the queue.
+  optional TaskState latest_state = 7;
+}
+
+
+// This message encapsulates how we checkpoint a status update to disk.
+// NOTE: If type == UPDATE, the 'update' field is required.
+// NOTE: If type == ACK, the 'uuid' field is required.
+message StatusUpdateRecord {
+  enum Type {
+    UPDATE = 0;
+    ACK = 1;
+  }
+  required Type type = 1;
+  optional StatusUpdate update = 2;
+  optional bytes uuid = 3;
+}
+
+
+message SubmitSchedulerRequest
+{
+  required string name = 1;
+}
+
+
+message SubmitSchedulerResponse
+{
+  required bool okay = 1;
+}
+
+
+message ExecutorToFrameworkMessage {
+  required SlaveID slave_id = 1;
+  required FrameworkID framework_id = 2;
+  required ExecutorID executor_id = 3;
+  required bytes data = 4;
+}
+
+
+message FrameworkToExecutorMessage {
+  required SlaveID slave_id = 1;
+  required FrameworkID framework_id = 2;
+  required ExecutorID executor_id = 3;
+  required bytes data = 4;
+}
+
+
+message RegisterFrameworkMessage {
+  required FrameworkInfo framework = 1;
+}
+
+
+message ReregisterFrameworkMessage {
+  required FrameworkInfo framework = 2;
+  required bool failover = 3;
+}
+
+
+message FrameworkRegisteredMessage {
+  required FrameworkID framework_id = 1;
+  required MasterInfo master_info = 2;
+}
+
+message FrameworkReregisteredMessage {
+  required FrameworkID framework_id = 1;
+  required MasterInfo master_info = 2;
+}
+
+message UnregisterFrameworkMessage {
+  required FrameworkID framework_id = 1;
+}
+
+
+message DeactivateFrameworkMessage {
+  required FrameworkID framework_id = 1;
+}
+
+
+message ResourceRequestMessage {
+  required FrameworkID framework_id = 1;
+  repeated Request requests = 2;
+}
+
+
+message ResourceOffersMessage {
+  repeated Offer offers = 1;
+  repeated string pids = 2;
+}
+
+
+message LaunchTasksMessage {
+  required FrameworkID framework_id = 1;
+  repeated TaskInfo tasks = 3;
+  required Filters filters = 5;
+  repeated OfferID offer_ids = 6;
+}
+
+
+message RescindResourceOfferMessage {
+  required OfferID offer_id = 1;
+}
+
+
+message ReviveOffersMessage {
+  required FrameworkID framework_id = 1;
+}
+
+
+message RunTaskMessage {
+  // TODO(karya): Remove framework_id after MESOS-2559 has shipped.
+  optional FrameworkID framework_id = 1 [deprecated = true];
+  required FrameworkInfo framework = 2;
+  required TaskInfo task = 4;
+
+  // The pid of the framework. This was moved to 'optional' in
+  // 0.24.0 to support schedulers using the HTTP API. For now, we
+  // continue to always set pid since it was required in 0.23.x.
+  // When 'pid' is unset, or set to empty string, the slave will
+  // forward executor messages through the master. For schedulers
+  // still using the driver, this will remain set.
+  optional string pid = 3;
+}
+
+
+message KillTaskMessage {
+  // TODO(bmahler): Include the SlaveID here to improve the Master's
+  // ability to respond for non-activated slaves.
+  required FrameworkID framework_id = 1;
+  required TaskID task_id = 2;
+}
+
+
+// NOTE: If 'pid' is present, scheduler driver sends an
+// acknowledgement to the pid.
+message StatusUpdateMessage {
+  required StatusUpdate update = 1;
+  optional string pid = 2;
+}
+
+
+message StatusUpdateAcknowledgementMessage {
+  required SlaveID slave_id = 1;
+  required FrameworkID framework_id = 2;
+  required TaskID task_id = 3;
+  required bytes uuid = 4;
+}
+
+
+message LostSlaveMessage {
+  required SlaveID slave_id = 1;
+}
+
+
+// Allows the framework to query the status for non-terminal tasks.
+// This causes the master to send back the latest task status for
+// each task in 'statuses', if possible. Tasks that are no longer
+// known will result in a TASK_LOST update. If statuses is empty,
+// then the master will send the latest status for each task
+// currently known.
+message ReconcileTasksMessage {
+  required FrameworkID framework_id = 1;
+  repeated TaskStatus statuses = 2; // Should be non-terminal only.
+}
+
+
+message FrameworkErrorMessage {
+  required string message = 2;
+}
+
+
+message RegisterSlaveMessage {
+  required SlaveInfo slave = 1;
+
+  // Resources that are checkpointed by the slave (e.g., persistent
+  // volume or dynamic reservation). Frameworks need to release
+  // checkpointed resources explicitly.
+  repeated Resource checkpointed_resources = 3;
+
+  // NOTE: This is a hack for the master to detect the slave's
+  // version. If unset the slave is < 0.21.0.
+  // TODO(bmahler): Do proper versioning: MESOS-986.
+  optional string version = 2;
+}
+
+
+message ReregisterSlaveMessage {
+  required SlaveInfo slave = 2;
+
+  // Resources that are checkpointed by the slave (e.g., persistent
+  // volume or dynamic reservation). Frameworks need to release
+  // checkpointed resources explicitly.
+  repeated Resource checkpointed_resources = 7;
+
+  repeated ExecutorInfo executor_infos = 4;
+  repeated Task tasks = 3;
+  repeated Archive.Framework completed_frameworks = 5;
+
+  // NOTE: This is a hack for the master to detect the slave's
+  // version. If unset the slave is < 0.21.0.
+  // TODO(bmahler): Do proper versioning: MESOS-986.
+  optional string version = 6;
+}
+
+
+message SlaveRegisteredMessage {
+  required SlaveID slave_id = 1;
+  optional MasterSlaveConnection connection = 2;
+}
+
+
+message SlaveReregisteredMessage {
+  required SlaveID slave_id = 1;
+
+  repeated ReconcileTasksMessage reconciliations = 2;
+  optional MasterSlaveConnection connection = 3;
+}
+
+
+message UnregisterSlaveMessage {
+  required SlaveID slave_id = 1;
+}
+
+
+message MasterSlaveConnection {
+  // Product of max_slave_ping_timeouts * slave_ping_timeout.
+  // If no pings are received within the total timeout,
+  // the master will remove the slave.
+  optional double total_ping_timeout_seconds = 1;
+}
+
+
+// This message is periodically sent by the master to the slave.
+// If the slave is connected to the master, "connected" is true.
+message PingSlaveMessage {
+  required bool connected = 1;
+}
+
+
+// This message is sent by the slave to the master in response to the
+// PingSlaveMessage.
+message PongSlaveMessage {}
+
+
+// Tells a slave to shut down all executors of the given framework.
+message ShutdownFrameworkMessage {
+  required FrameworkID framework_id = 1;
+}
+
+
+// Tells a slave (and consequently executor) to shutdown an executor.
+message ShutdownExecutorMessage {
+  // TODO(vinod): Make these fields required. These are made optional
+  // for backwards compatibility between 0.23.0 slave and pre 0.23.0
+  // executor driver.
+  optional ExecutorID executor_id = 1;
+  optional FrameworkID framework_id = 2;
+}
+
+
+message UpdateFrameworkMessage {
+  required FrameworkID framework_id = 1;
+
+  // See the comment on RunTaskMessage.pid.
+  optional string pid = 2;
+}
+
+
+// This message is sent to the slave whenever there is an update of
+// the resources that need to be checkpointed (e.g., persistent volume
+// or dynamic reservation).
+message CheckpointResourcesMessage {
+  repeated Resource resources = 1;
+}
+
+
+// This message is sent by the slave to the master to inform the
+// master about the total amount of oversubscribed (allocated and
+// allocatable) resources.
+message UpdateSlaveMessage {
+  required SlaveID slave_id = 1;
+  repeated Resource oversubscribed_resources = 2;
+}
+
+
+message RegisterExecutorMessage {
+  required FrameworkID framework_id = 1;
+  required ExecutorID executor_id = 2;
+}
+
+
+message ExecutorRegisteredMessage {
+  required ExecutorInfo executor_info = 2;
+  required FrameworkID framework_id = 3;
+  required FrameworkInfo framework_info = 4;
+  required SlaveID slave_id = 5;
+  required SlaveInfo slave_info = 6;
+}
+
+
+message ExecutorReregisteredMessage {
+  required SlaveID slave_id = 1;
+  required SlaveInfo slave_info = 2;
+}
+
+
+message ExitedExecutorMessage {
+  required SlaveID slave_id = 1;
+  required FrameworkID framework_id = 2;
+  required ExecutorID executor_id = 3;
+  required int32 status = 4;
+}
+
+
+message ReconnectExecutorMessage {
+  required SlaveID slave_id = 1;
+}
+
+
+message ReregisterExecutorMessage {
+  required ExecutorID executor_id = 1;
+  required FrameworkID framework_id = 2;
+  repeated TaskInfo tasks = 3;
+  repeated StatusUpdate updates = 4;
+}
+
+
+message ShutdownMessage {
+  optional string message = 1;
+}
+
+
+// TODO(adam-mesos): Move this to an 'archive' package.
+/**
+ * Describes Completed Frameworks, etc. for archival.
+ */
+message Archive {
+  message Framework {
+    required FrameworkInfo framework_info = 1;
+    optional string pid = 2;
+    repeated Task tasks = 3;
+  }
+  repeated Framework frameworks = 1;
+}
+
+// Message describing task current health status that is sent by
+// the task health checker to the command executor.
+// The command executor reports the task status back to the
+// on each receive. If the health checker configured faiure
+// condition meets, then kill_task flag will be set to true which
+// the executor on message receive will kill the task.
+message TaskHealthStatus {
+  required TaskID task_id = 1;
+
+  required bool healthy = 2;
+
+  // Flag to initiate task kill.
+  optional bool kill_task = 3 [default = false];
+
+  // Number of consecutive counts in current status.
+  // This will not be populated if task is healthy.
+  optional int32 consecutive_failures = 4;
+}
+
+
+/**
+ * Message to signal completion of an event within a module.
+ */
+message HookExecuted {
+  optional string module = 1;
+}

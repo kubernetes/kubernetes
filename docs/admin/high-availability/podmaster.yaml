@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: scheduler-master
+spec:
+  hostNetwork: true
+  containers:
+  - name: scheduler-elector
+    image: gcr.io/google_containers/podmaster:1.1
+    command:
+    - /podmaster
+    - --etcd-servers=http://127.0.0.1:4001
+    - --key=scheduler
+    - --source-file=/kubernetes/kube-scheduler.manifest
+    - --dest-file=/manifests/kube-scheduler.manifest
+    volumeMounts:
+    - mountPath: /kubernetes
+      name: k8s
+      readOnly: true
+    - mountPath: /manifests
+      name: manifests
+  - name: controller-manager-elector
+    image: gcr.io/google_containers/podmaster:1.1
+    command:
+    - /podmaster
+    - --etcd-servers=http://127.0.0.1:4001
+    - --key=controller
+    - --source-file=/kubernetes/kube-controller-manager.manifest
+    - --dest-file=/manifests/kube-controller-manager.manifest
+    terminationMessagePath: /dev/termination-log
+    volumeMounts:
+    - mountPath: /kubernetes
+      name: k8s
+      readOnly: true
+    - mountPath: /manifests
+      name: manifests
+  volumes:
+  - hostPath:
+      path: /srv/kubernetes
+    name: k8s
+  - hostPath:
+      path: /etc/kubernetes/manifests
+    name: manifests

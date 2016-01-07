@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,6 +53,46 @@ func TestDec(t *testing.T) {
 	for _, item := range table {
 		if e, a := item.expect, item.got.String(); e != a {
 			t.Errorf("expected %v, got %v", e, a)
+		}
+	}
+}
+
+// TestQuantityParseZero ensures that when a 0 quantity is passed, its string value is 0
+func TestQuantityParseZero(t *testing.T) {
+	zero := MustParse("0")
+	if expected, actual := "0", zero.String(); expected != actual {
+		t.Errorf("Expected %v, actual %v", expected, actual)
+	}
+}
+
+// Verifies that you get 0 as canonical value if internal value is 0, and not 0<suffix>
+func TestQuantityCanocicalizeZero(t *testing.T) {
+	val := MustParse("1000m")
+	x := val.Amount
+	y := dec(1, 0)
+	z := val.Amount.Sub(x, y)
+	zero := Quantity{z, DecimalSI}
+	if expected, actual := "0", zero.String(); expected != actual {
+		t.Errorf("Expected %v, actual %v", expected, actual)
+	}
+}
+
+func TestQuantityCmp(t *testing.T) {
+	table := []struct {
+		x      string
+		y      string
+		expect int
+	}{
+		{"0", "0", 0},
+		{"100m", "50m", 1},
+		{"50m", "100m", -1},
+		{"10000T", "100Gi", 1},
+	}
+	for _, testCase := range table {
+		q1 := MustParse(testCase.x)
+		q2 := MustParse(testCase.y)
+		if result := q1.Cmp(q2); result != testCase.expect {
+			t.Errorf("X: %v, Y: %v, Expected: %v, Actual: %v", testCase.x, testCase.y, testCase.expect, result)
 		}
 	}
 }
@@ -468,7 +508,7 @@ func TestUninitializedNoCrash(t *testing.T) {
 	q.Value()
 	q.MilliValue()
 	q.Copy()
-	q.String()
+	_ = q.String()
 	q.MarshalJSON()
 }
 
@@ -493,5 +533,49 @@ func TestQFlagIsPFlag(t *testing.T) {
 	var pfv pflag.Value = qFlag{}
 	if e, a := "quantity", pfv.Type(); e != a {
 		t.Errorf("Unexpected result %v != %v", e, a)
+	}
+}
+
+func TestSub(t *testing.T) {
+	tests := []struct {
+		a        Quantity
+		b        Quantity
+		expected Quantity
+	}{
+		{Quantity{dec(10, 0), DecimalSI}, Quantity{dec(1, 1), DecimalSI}, Quantity{dec(0, 0), DecimalSI}},
+		{Quantity{dec(10, 0), DecimalSI}, Quantity{dec(1, 0), BinarySI}, Quantity{dec(9, 0), DecimalSI}},
+		{Quantity{dec(10, 0), BinarySI}, Quantity{dec(1, 0), DecimalSI}, Quantity{dec(9, 0), BinarySI}},
+		{Quantity{nil, DecimalSI}, Quantity{dec(50, 0), DecimalSI}, Quantity{dec(-50, 0), DecimalSI}},
+		{Quantity{dec(50, 0), DecimalSI}, Quantity{nil, DecimalSI}, Quantity{dec(50, 0), DecimalSI}},
+		{Quantity{nil, DecimalSI}, Quantity{nil, DecimalSI}, Quantity{dec(0, 0), DecimalSI}},
+	}
+
+	for i, test := range tests {
+		test.a.Sub(test.b)
+		if test.a.Cmp(test.expected) != 0 {
+			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
+		}
+	}
+}
+
+func TestAdd(t *testing.T) {
+	tests := []struct {
+		a        Quantity
+		b        Quantity
+		expected Quantity
+	}{
+		{Quantity{dec(10, 0), DecimalSI}, Quantity{dec(1, 1), DecimalSI}, Quantity{dec(20, 0), DecimalSI}},
+		{Quantity{dec(10, 0), DecimalSI}, Quantity{dec(1, 0), BinarySI}, Quantity{dec(11, 0), DecimalSI}},
+		{Quantity{dec(10, 0), BinarySI}, Quantity{dec(1, 0), DecimalSI}, Quantity{dec(11, 0), BinarySI}},
+		{Quantity{nil, DecimalSI}, Quantity{dec(50, 0), DecimalSI}, Quantity{dec(50, 0), DecimalSI}},
+		{Quantity{dec(50, 0), DecimalSI}, Quantity{nil, DecimalSI}, Quantity{dec(50, 0), DecimalSI}},
+		{Quantity{nil, DecimalSI}, Quantity{nil, DecimalSI}, Quantity{dec(0, 0), DecimalSI}},
+	}
+
+	for i, test := range tests {
+		test.a.Add(test.b)
+		if test.a.Cmp(test.expected) != 0 {
+			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
+		}
 	}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,11 +27,11 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -43,6 +43,7 @@ var (
 	pushup           = flag.Bool("pushup", false, "If true, push to e2e cluster if it's up, otherwise start the e2e cluster.")
 	down             = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
 	test             = flag.Bool("test", false, "Run Ginkgo tests.")
+	testArgs         = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
 	root             = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
 	verbose          = flag.Bool("v", false, "If true, print all command output.")
 	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
@@ -59,11 +60,10 @@ const (
 	downloadDirName = "_output/downloads"
 	tarDirName      = "server"
 	tempDirName     = "upgrade-e2e-temp-dir"
-	minMinionCount  = 2
+	minNodeCount    = 2
 )
 
 var (
-	signals = make(chan os.Signal, 100)
 	// Root directory of the specified cluster version, rather than of where
 	// this script is being run from.
 	versionRoot = *root
@@ -85,8 +85,8 @@ type TestResult struct {
 type ResultsByTest map[string]TestResult
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.Parse()
-	signal.Notify(signals, os.Interrupt)
 
 	if *isup {
 		status := 1
@@ -178,19 +178,21 @@ func Up() bool {
 		}
 	}
 
+	// Enable deployments for e2e tests.
+	os.Setenv("KUBE_ENABLE_DEPLOYMENTS", "true")
 	return finishRunning("up", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-up.sh")))
 }
 
 // Ensure that the cluster is large engough to run the e2e tests.
 func ValidateClusterSize() {
-	// Check that there are at least 3 minions running
+	// Check that there are at least minNodeCount nodes running
 	cmd := exec.Command(path.Join(*root, "hack/e2e-internal/e2e-cluster-size.sh"))
 	if *verbose {
 		cmd.Stderr = os.Stderr
 	}
 	stdout, err := cmd.Output()
 	if err != nil {
-		log.Fatal("Could not get nodes to validate cluster size (%s)", err)
+		log.Fatalf("Could not get nodes to validate cluster size (%s)", err)
 	}
 
 	numNodes, err := strconv.Atoi(strings.TrimSpace(string(stdout)))
@@ -198,8 +200,8 @@ func ValidateClusterSize() {
 		log.Fatalf("Could not count number of nodes to validate cluster size (%s)", err)
 	}
 
-	if numNodes < minMinionCount {
-		log.Fatalf("Cluster size (%d) is too small to run e2e tests.  %d Minions are required.", numNodes, minMinionCount)
+	if numNodes < minNodeCount {
+		log.Fatalf("Cluster size (%d) is too small to run e2e tests.  %d Nodes are required.", numNodes, minNodeCount)
 	}
 }
 
@@ -265,15 +267,13 @@ func shuffleStrings(strings []string, r *rand.Rand) {
 }
 
 func Test() bool {
-	defer runBashUntil("watchEvents", exec.Command(filepath.Join(*root, "hack/e2e-internal/e2e-watch-events.sh")))()
-
 	if !IsUp() {
 		log.Fatal("Testing requested, but e2e cluster not up!")
 	}
 
 	ValidateClusterSize()
 
-	return finishRunning("Ginkgo tests", exec.Command(filepath.Join(*root, "hack/ginkgo-e2e.sh")))
+	return finishRunning("Ginkgo tests", exec.Command(filepath.Join(*root, "hack/ginkgo-e2e.sh"), strings.Fields(*testArgs)...))
 }
 
 // All nonsense below is temporary until we have go versions of these things.
@@ -295,40 +295,21 @@ func runBashUntil(stepName string, cmd *exec.Cmd) func() {
 	}
 }
 
-func finishRunningWithOutputs(stepName string, cmd *exec.Cmd) (bool, string, string) {
-	log.Printf("Running: %v", stepName)
-	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
+func finishRunning(stepName string, cmd *exec.Cmd) bool {
 	if *verbose {
-		cmd.Stdout = io.MultiWriter(os.Stdout, stdout)
-		cmd.Stderr = io.MultiWriter(os.Stderr, stderr)
-	} else {
-		cmd.Stdout = stdout
-		cmd.Stderr = stderr
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
 	}
-
-	done := make(chan struct{})
-	defer close(done)
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case s := <-signals:
-				cmd.Process.Signal(s)
-			}
-		}
-	}()
+	log.Printf("Running: %v", stepName)
+	defer func(start time.Time) {
+		log.Printf("Step '%s' finished in %s", stepName, time.Since(start))
+	}(time.Now())
 
 	if err := cmd.Run(); err != nil {
 		log.Printf("Error running %v: %v", stepName, err)
-		return false, string(stdout.Bytes()), string(stderr.Bytes())
+		return false
 	}
-	return true, string(stdout.Bytes()), string(stderr.Bytes())
-}
-
-func finishRunning(stepName string, cmd *exec.Cmd) bool {
-	result, _, _ := finishRunningWithOutputs(stepName, cmd)
-	return result
+	return true
 }
 
 func printBashOutputs(headerprefix, lineprefix, output string, escape bool) {
@@ -345,7 +326,7 @@ func printPrefixedLines(prefix, s string) {
 }
 
 // returns either "", or a list of args intended for appending with the
-// kubectl command (begining with a space).
+// kubectl command (beginning with a space).
 func kubectlArgs() string {
 	if *checkVersionSkew {
 		return " --match-server-version"

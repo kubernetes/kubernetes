@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,109 +17,100 @@ limitations under the License.
 package api
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // Codec is the identity codec for this package - it can only convert itself
 // to itself.
-var Codec = runtime.CodecFor(Scheme, "")
+var Codec = runtime.CodecFor(Scheme, unversioned.GroupVersion{})
 
 func init() {
-	Scheme.AddConversionFuncs(
-		func(in *util.Time, out *util.Time, s conversion.Scope) error {
-			// Cannot deep copy these, because time.Time has unexported fields.
-			*out = *in
-			return nil
-		},
-		func(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
-			// Cannot deep copy these, because inf.Dec has unexported fields.
-			*out = *in.Copy()
-			return nil
-		},
-		// Convert ContainerManifest to BoundPod
-		func(in *ContainerManifest, out *BoundPod, s conversion.Scope) error {
-			out.Spec.Containers = in.Containers
-			out.Spec.Volumes = in.Volumes
-			out.Spec.RestartPolicy = in.RestartPolicy
-			out.Spec.DNSPolicy = in.DNSPolicy
-			out.Name = in.ID
-			out.UID = in.UUID
-			return nil
-		},
-		func(in *BoundPod, out *ContainerManifest, s conversion.Scope) error {
-			out.Containers = in.Spec.Containers
-			out.Volumes = in.Spec.Volumes
-			out.RestartPolicy = in.Spec.RestartPolicy
-			out.DNSPolicy = in.Spec.DNSPolicy
-			out.Version = "v1beta2"
-			out.ID = in.Name
-			out.UUID = in.UID
-			return nil
-		},
-
-		// ContainerManifestList
-		func(in *ContainerManifestList, out *BoundPods, s conversion.Scope) error {
-			if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
-				return err
+	Scheme.AddDefaultingFuncs(
+		func(obj *ListOptions) {
+			if obj.LabelSelector == nil {
+				obj.LabelSelector = labels.Everything()
 			}
-			for i := range out.Items {
-				item := &out.Items[i]
-				item.ResourceVersion = in.ResourceVersion
+			if obj.FieldSelector == nil {
+				obj.FieldSelector = fields.Everything()
 			}
-			return nil
-		},
-		func(in *BoundPods, out *ContainerManifestList, s conversion.Scope) error {
-			if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
-				return err
-			}
-			out.ResourceVersion = in.ResourceVersion
-			return nil
-		},
-
-		// Convert Pod to BoundPod
-		func(in *Pod, out *BoundPod, s conversion.Scope) error {
-			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
-				return err
-			}
-			// Only copy a subset of fields, and override manifest attributes with the pod
-			// metadata
-			out.UID = in.UID
-			out.Name = in.Name
-			out.Namespace = in.Namespace
-			out.CreationTimestamp = in.CreationTimestamp
-			return nil
-		},
-
-		// Conversion between Manifest and PodSpec
-		func(in *PodSpec, out *ContainerManifest, s conversion.Scope) error {
-			if err := s.Convert(&in.Volumes, &out.Volumes, 0); err != nil {
-				return err
-			}
-			if err := s.Convert(&in.Containers, &out.Containers, 0); err != nil {
-				return err
-			}
-			if err := s.Convert(&in.RestartPolicy, &out.RestartPolicy, 0); err != nil {
-				return err
-			}
-			out.DNSPolicy = in.DNSPolicy
-			out.Version = "v1beta2"
-			return nil
-		},
-		func(in *ContainerManifest, out *PodSpec, s conversion.Scope) error {
-			if err := s.Convert(&in.Volumes, &out.Volumes, 0); err != nil {
-				return err
-			}
-			if err := s.Convert(&in.Containers, &out.Containers, 0); err != nil {
-				return err
-			}
-			if err := s.Convert(&in.RestartPolicy, &out.RestartPolicy, 0); err != nil {
-				return err
-			}
-			out.DNSPolicy = in.DNSPolicy
-			return nil
 		},
 	)
+	Scheme.AddConversionFuncs(
+		Convert_unversioned_TypeMeta_To_unversioned_TypeMeta,
+		Convert_unversioned_ListMeta_To_unversioned_ListMeta,
+		Convert_intstr_IntOrString_To_intstr_IntOrString,
+		Convert_unversioned_Time_To_unversioned_Time,
+		Convert_string_To_labels_Selector,
+		Convert_string_To_fields_Selector,
+		Convert_labels_Selector_To_string,
+		Convert_fields_Selector_To_string,
+		Convert_resource_Quantity_To_resource_Quantity,
+	)
+}
+
+func Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(in, out *unversioned.TypeMeta, s conversion.Scope) error {
+	// These values are explicitly not copied
+	//out.APIVersion = in.APIVersion
+	//out.Kind = in.Kind
+	return nil
+}
+
+func Convert_unversioned_ListMeta_To_unversioned_ListMeta(in, out *unversioned.ListMeta, s conversion.Scope) error {
+	out.ResourceVersion = in.ResourceVersion
+	out.SelfLink = in.SelfLink
+	return nil
+}
+
+func Convert_intstr_IntOrString_To_intstr_IntOrString(in, out *intstr.IntOrString, s conversion.Scope) error {
+	out.Type = in.Type
+	out.IntVal = in.IntVal
+	out.StrVal = in.StrVal
+	return nil
+}
+
+func Convert_unversioned_Time_To_unversioned_Time(in *unversioned.Time, out *unversioned.Time, s conversion.Scope) error {
+	// Cannot deep copy these, because time.Time has unexported fields.
+	*out = *in
+	return nil
+}
+func Convert_string_To_labels_Selector(in *string, out *labels.Selector, s conversion.Scope) error {
+	selector, err := labels.Parse(*in)
+	if err != nil {
+		return err
+	}
+	*out = selector
+	return nil
+}
+func Convert_string_To_fields_Selector(in *string, out *fields.Selector, s conversion.Scope) error {
+	selector, err := fields.ParseSelector(*in)
+	if err != nil {
+		return err
+	}
+	*out = selector
+	return nil
+}
+func Convert_labels_Selector_To_string(in *labels.Selector, out *string, s conversion.Scope) error {
+	if *in == nil {
+		return nil
+	}
+	*out = (*in).String()
+	return nil
+}
+func Convert_fields_Selector_To_string(in *fields.Selector, out *string, s conversion.Scope) error {
+	if *in == nil {
+		return nil
+	}
+	*out = (*in).String()
+	return nil
+}
+func Convert_resource_Quantity_To_resource_Quantity(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
+	// Cannot deep copy these, because inf.Dec has unexported fields.
+	*out = *in.Copy()
+	return nil
 }

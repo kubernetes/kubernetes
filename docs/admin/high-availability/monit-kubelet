@@ -1,0 +1,11 @@
+check process kubelet with pidfile /var/run/kubelet.pid
+group kubelet
+start program = "/etc/init.d/kubelet start"
+stop program = "/etc/init.d/kubelet stop"
+if does not exist then restart
+if failed
+  host 127.0.0.1
+  port 10255
+  protocol HTTP
+  request "/healthz"
+then restart

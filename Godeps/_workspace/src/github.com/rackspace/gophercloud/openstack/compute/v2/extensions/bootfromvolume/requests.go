@@ -6,8 +6,6 @@ import (
 
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
-
-	"github.com/racker/perigee"
 )
 
 // SourceType represents the type of medium being used to create the volume.
@@ -101,11 +99,8 @@ func Create(client *gophercloud.ServiceClient, opts servers.CreateOptsBuilder) s
 		return res
 	}
 
-	_, res.Err = perigee.Request("POST", createURL(client), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		ReqBody:     reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{200, 202},
+	_, res.Err = client.Post(createURL(client), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200, 202},
 	})
 	return res
 }

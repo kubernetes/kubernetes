@@ -1,0 +1,6 @@
+.bzr
+*.pyc
+*~
+*\#*
+/files/.kubernetes-*
+.venv

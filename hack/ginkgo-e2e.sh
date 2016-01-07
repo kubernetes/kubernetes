@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,20 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+GINKGO_PARALLEL=${GINKGO_PARALLEL:-n} # set to 'y' to run tests in parallel
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
+source "${KUBE_ROOT}/cluster/common.sh"
+source "${KUBE_ROOT}/hack/lib/init.sh"
+
+# Ginkgo will build the e2e tests, so we need to make sure that the environment
+# is set up correctly (including Godeps, etc).
+kube::golang::setup_env
+# Find the ginkgo binary build as part of the release.
+ginkgo=$(kube::util::find-binary "ginkgo")
+e2e_test=$(kube::util::find-binary "e2e.test")
+
+# --- Setup some env vars.
 
 : ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
 : ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
@@ -27,80 +40,72 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 export KUBECTL KUBE_CONFIG_FILE
 
 source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
-prepare-e2e
+# ---- Do cloud-provider-specific setup
+if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
+    echo "Conformance test: not doing test setup."
+    KUBERNETES_PROVIDER=""
 
-detect-master >/dev/null
+    detect-master-from-kubeconfig
 
-# Detect the OS name/arch so that we can find our binary
-case "$(uname -s)" in
-  Darwin)
-    host_os=darwin
-    ;;
-  Linux)
-    host_os=linux
-    ;;
-  *)
-    echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
-    exit 1
-    ;;
-esac
-
-case "$(uname -m)" in
-  x86_64*)
-    host_arch=amd64
-    ;;
-  i?86_64*)
-    host_arch=amd64
-    ;;
-  amd64*)
-    host_arch=amd64
-    ;;
-  arm*)
-    host_arch=arm
-    ;;
-  i?86*)
-    host_arch=x86
-    ;;
-  *)
-    echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
-    exit 1
-    ;;
-esac
-
-# Gather up the list of likely places and use ls to find the latest one.
-locations=(
-  "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/e2e"
-  "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/e2e"
-  "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/e2e"
-)
-e2e=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
-
-if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
-  # When we are using vagrant it has hard coded auth.  We repeat that here so that
-  # we don't clobber auth that might be used for a publicly facing cluster.
-  auth_config=(
-    "--auth_config=$HOME/.kubernetes_vagrant_auth"
-  )
-elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
-  # With GKE, our auth and certs are in gcloud's config directory.
-  detect-project &> /dev/null
-  cfg_dir="${GCLOUD_CONFIG_DIR}/${PROJECT}.${ZONE}.${CLUSTER_NAME}"
-  auth_config=(
-    "--auth_config=${cfg_dir}/kubernetes_auth"
-    "--cert_dir=${cfg_dir}"
-  )
-elif [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
-  auth_config=(
-    "--auth_config=${HOME}/.kube/${INSTANCE_PREFIX}/kubernetes_auth"
-  )
+    auth_config=(
+      "--kubeconfig=${KUBECONFIG}"
+    )
 else
-  auth_config=()
+    echo "Setting up for KUBERNETES_PROVIDER=\"${KUBERNETES_PROVIDER}\"."
+
+    source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+
+    prepare-e2e
+
+    detect-master >/dev/null
+    KUBE_MASTER_URL="${KUBE_MASTER_URL:-https://${KUBE_MASTER_IP:-}}"
+
+    auth_config=(
+      "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
+    )
 fi
 
-"${e2e}" "${auth_config[@]:+${auth_config[@]}}" \
-  --host="https://${KUBE_MASTER_IP-}" \
+if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
+  NODE_INSTANCE_GROUP="${NODE_INSTANCE_PREFIX}-group"
+else
+  NODE_INSTANCE_GROUP=""
+fi
+
+if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+  detect-node-instance-group
+fi
+
+ginkgo_args=()
+if [[ -n "${CONFORMANCE_TEST_SKIP_REGEX:-}" ]]; then
+  ginkgo_args+=("--skip=${CONFORMANCE_TEST_SKIP_REGEX}")
+  ginkgo_args+=("--seed=1436380640")
+fi
+if [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
+  ginkgo_args+=("-p")
+fi
+
+
+# The --host setting is used only when providing --auth_config
+# If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
+# file and the one provided with --host is ignored.
+# Add path for things like running kubectl binary.
+export PATH=$(dirname "${e2e_test}"):"${PATH}"
+"${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
+  "${auth_config[@]:+${auth_config[@]}}" \
+  --host="${KUBE_MASTER_URL}" \
   --provider="${KUBERNETES_PROVIDER}" \
-  ${E2E_REPORT_DIR+"--report_dir=${E2E_REPORT_DIR}"} \
+  --gce-project="${PROJECT:-}" \
+  --gce-zone="${ZONE:-}" \
+  --gce-service-account="${GCE_SERVICE_ACCOUNT:-}" \
+  --gke-cluster="${CLUSTER_NAME:-}" \
+  --kube-master="${KUBE_MASTER:-}" \
+  --cluster-tag="${CLUSTER_ID:-}" \
+  --repo-root="${KUBE_VERSION_ROOT}" \
+  --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
+  --num-nodes="${NUM_NODES:-}" \
+  --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" \
+  ${E2E_CLEAN_START:+"--clean-start=true"} \
+  ${E2E_MIN_STARTUP_PODS:+"--minStartupPods=${E2E_MIN_STARTUP_PODS}"} \
+  ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} \
   "${@:-}"

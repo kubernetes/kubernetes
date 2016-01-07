@@ -1,6 +1,11 @@
 package servers
 
 import (
+	"reflect"
+	"fmt"
+	"path"
+	"net/url"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
@@ -20,8 +25,21 @@ func (r serverResult) Extract() (*Server, error) {
 		Server Server `mapstructure:"server"`
 	}
 
-	err := mapstructure.Decode(r.Body, &response)
-	return &response.Server, err
+	config := &mapstructure.DecoderConfig{
+		DecodeHook: toMapFromString,
+		Result:     &response,
+	}
+	decoder, err := mapstructure.NewDecoder(config)
+	if err != nil {
+		return nil, err
+	}
+
+	err = decoder.Decode(r.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return &response.Server, nil
 }
 
 // CreateResult temporarily contains the response from a Create call.
@@ -39,7 +57,7 @@ type UpdateResult struct {
 	serverResult
 }
 
-// DeleteResult temporarily contains the response from an Delete call.
+// DeleteResult temporarily contains the response from a Delete call.
 type DeleteResult struct {
 	gophercloud.ErrResult
 }
@@ -52,6 +70,47 @@ type RebuildResult struct {
 // ActionResult represents the result of server action operations, like reboot
 type ActionResult struct {
 	gophercloud.ErrResult
+}
+
+// RescueResult represents the result of a server rescue operation
+type RescueResult struct {
+	ActionResult
+}
+
+// CreateImageResult represents the result of an image creation operation
+type CreateImageResult struct {
+	gophercloud.Result
+}
+
+// ExtractImageID gets the ID of the newly created server image from the header
+func (res CreateImageResult) ExtractImageID() (string, error) {
+	if res.Err != nil {
+		return "", res.Err
+	}
+	// Get the image id from the header
+	u, err := url.ParseRequestURI(res.Header.Get("Location"))
+	if err != nil {
+		return "", fmt.Errorf("Failed to parse the image id: %s", err.Error())
+	}
+	imageId := path.Base(u.Path)
+	if imageId == "." || imageId == "/" {
+		return "", fmt.Errorf("Failed to parse the ID of newly created image: %s", u)
+	}
+	return imageId, nil
+}
+
+// Extract interprets any RescueResult as an AdminPass, if possible.
+func (r RescueResult) Extract() (string, error) {
+	if r.Err != nil {
+		return "", r.Err
+	}
+
+	var response struct {
+		AdminPass string `mapstructure:"adminPass"`
+	}
+
+	err := mapstructure.Decode(r.Body, &response)
+	return response.AdminPass, err
 }
 
 // Server exposes only the standard OpenStack fields corresponding to a given server on the user's account.
@@ -105,6 +164,9 @@ type Server struct {
 	// AdminPass will generally be empty ("").  However, it will contain the administrative password chosen when provisioning a new server without a set AdminPass setting in the first place.
 	// Note that this is the ONLY time this field will be valid.
 	AdminPass string `json:"adminPass" mapstructure:"adminPass"`
+
+	// SecurityGroups includes the security groups that this instance has applied to it
+	SecurityGroups []map[string]interface{} `json:"security_groups" mapstructure:"security_groups"`
 }
 
 // ServerPage abstracts the raw results of making a List() request against the API.
@@ -145,6 +207,166 @@ func ExtractServers(page pagination.Page) ([]Server, error) {
 	var response struct {
 		Servers []Server `mapstructure:"servers"`
 	}
-	err := mapstructure.Decode(casted, &response)
+
+	config := &mapstructure.DecoderConfig{
+		DecodeHook: toMapFromString,
+		Result:     &response,
+	}
+	decoder, err := mapstructure.NewDecoder(config)
+	if err != nil {
+		return nil, err
+	}
+
+	err = decoder.Decode(casted)
+
 	return response.Servers, err
+}
+
+// MetadataResult contains the result of a call for (potentially) multiple key-value pairs.
+type MetadataResult struct {
+	gophercloud.Result
+}
+
+// GetMetadataResult temporarily contains the response from a metadata Get call.
+type GetMetadataResult struct {
+	MetadataResult
+}
+
+// ResetMetadataResult temporarily contains the response from a metadata Reset call.
+type ResetMetadataResult struct {
+	MetadataResult
+}
+
+// UpdateMetadataResult temporarily contains the response from a metadata Update call.
+type UpdateMetadataResult struct {
+	MetadataResult
+}
+
+// MetadatumResult contains the result of a call for individual a single key-value pair.
+type MetadatumResult struct {
+	gophercloud.Result
+}
+
+// GetMetadatumResult temporarily contains the response from a metadatum Get call.
+type GetMetadatumResult struct {
+	MetadatumResult
+}
+
+// CreateMetadatumResult temporarily contains the response from a metadatum Create call.
+type CreateMetadatumResult struct {
+	MetadatumResult
+}
+
+// DeleteMetadatumResult temporarily contains the response from a metadatum Delete call.
+type DeleteMetadatumResult struct {
+	gophercloud.ErrResult
+}
+
+// Extract interprets any MetadataResult as a Metadata, if possible.
+func (r MetadataResult) Extract() (map[string]string, error) {
+	if r.Err != nil {
+		return nil, r.Err
+	}
+
+	var response struct {
+		Metadata map[string]string `mapstructure:"metadata"`
+	}
+
+	err := mapstructure.Decode(r.Body, &response)
+	return response.Metadata, err
+}
+
+// Extract interprets any MetadatumResult as a Metadatum, if possible.
+func (r MetadatumResult) Extract() (map[string]string, error) {
+	if r.Err != nil {
+		return nil, r.Err
+	}
+
+	var response struct {
+		Metadatum map[string]string `mapstructure:"meta"`
+	}
+
+	err := mapstructure.Decode(r.Body, &response)
+	return response.Metadatum, err
+}
+
+func toMapFromString(from reflect.Kind, to reflect.Kind, data interface{}) (interface{}, error) {
+	if (from == reflect.String) && (to == reflect.Map) {
+		return map[string]interface{}{}, nil
+	}
+	return data, nil
+}
+
+// Address represents an IP address.
+type Address struct {
+	Version int    `mapstructure:"version"`
+	Address string `mapstructure:"addr"`
+}
+
+// AddressPage abstracts the raw results of making a ListAddresses() request against the API.
+// As OpenStack extensions may freely alter the response bodies of structures returned
+// to the client, you may only safely access the data provided through the ExtractAddresses call.
+type AddressPage struct {
+	pagination.SinglePageBase
+}
+
+// IsEmpty returns true if an AddressPage contains no networks.
+func (r AddressPage) IsEmpty() (bool, error) {
+	addresses, err := ExtractAddresses(r)
+	if err != nil {
+		return true, err
+	}
+	return len(addresses) == 0, nil
+}
+
+// ExtractAddresses interprets the results of a single page from a ListAddresses() call,
+// producing a map of addresses.
+func ExtractAddresses(page pagination.Page) (map[string][]Address, error) {
+	casted := page.(AddressPage).Body
+
+	var response struct {
+		Addresses map[string][]Address `mapstructure:"addresses"`
+	}
+
+	err := mapstructure.Decode(casted, &response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Addresses, err
+}
+
+// NetworkAddressPage abstracts the raw results of making a ListAddressesByNetwork() request against the API.
+// As OpenStack extensions may freely alter the response bodies of structures returned
+// to the client, you may only safely access the data provided through the ExtractAddresses call.
+type NetworkAddressPage struct {
+	pagination.SinglePageBase
+}
+
+// IsEmpty returns true if a NetworkAddressPage contains no addresses.
+func (r NetworkAddressPage) IsEmpty() (bool, error) {
+	addresses, err := ExtractNetworkAddresses(r)
+	if err != nil {
+		return true, err
+	}
+	return len(addresses) == 0, nil
+}
+
+// ExtractNetworkAddresses interprets the results of a single page from a ListAddressesByNetwork() call,
+// producing a slice of addresses.
+func ExtractNetworkAddresses(page pagination.Page) ([]Address, error) {
+	casted := page.(NetworkAddressPage).Body
+
+	var response map[string][]Address
+	err := mapstructure.Decode(casted, &response)
+	if err != nil {
+		return nil, err
+	}
+
+	var key string
+	for k := range response {
+		key = k
+	}
+
+	return response[key], err
 }

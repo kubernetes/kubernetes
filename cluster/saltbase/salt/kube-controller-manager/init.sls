@@ -1,60 +1,30 @@
-{% if grains['os_family'] == 'RedHat' %}
-{% set environment_file = '/etc/sysconfig/kube-controller-manager' %}
-{% else %}
-{% set environment_file = '/etc/default/kube-controller-manager' %}
-{% endif %}
-
-{{ environment_file }}:
+# Copy kube-controller-manager manifest to manifests folder for kubelet.
+# The ordering of salt states for service docker, kubelet and
+# master-addon below is very important to avoid the race between
+# salt restart docker or kubelet and kubelet start master components.
+# Please see http://issue.k8s.io/10122#issuecomment-114566063
+# for detail explanation on this very issue.
+/etc/kubernetes/manifests/kube-controller-manager.manifest:
   file.managed:
-    - source: salt://kube-controller-manager/default
+    - source: salt://kube-controller-manager/kube-controller-manager.manifest
     - template: jinja
     - user: root
     - group: root
     - mode: 644
-
-/usr/local/bin/kube-controller-manager:
-  file.managed:
-    - source: salt://kube-bins/kube-controller-manager
-    - user: root
-    - group: root
-    - mode: 755
-
-{% if grains['os_family'] == 'RedHat' %}
-
-/usr/lib/systemd/system/kube-controller-manager.service:
-  file.managed:
-    - source: salt://kube-controller-manager/kube-controller-manager.service
-    - user: root
-    - group: root
-
-{% else %}
-
-/etc/init.d/kube-controller-manager:
-  file.managed:
-    - source: salt://kube-controller-manager/initd
-    - user: root
-    - group: root
-    - mode: 755
-
-{% endif %}
-
-kube-controller-manager:
-  group.present:
-    - system: True
-  user.present:
-    - system: True
-    - gid_from_name: True
-    - shell: /sbin/nologin
-    - home: /var/kube-controller-manager
+    - makedirs: true
+    - dir_mode: 755
     - require:
-      - group: kube-controller-manager
-  service.running:
-    - enable: True
-    - watch:
-      - file: /usr/local/bin/kube-controller-manager
-      - file: {{ environment_file }}
-{% if grains['os_family'] != 'RedHat' %}
-      - file: /etc/init.d/kube-controller-manager
-{% endif %}
+      - service: docker
+      - service: kubelet
 
+/var/log/kube-controller-manager.log:
+  file.managed:
+    - user: root
+    - group: root
+    - mode: 644
+
+stop-legacy-kube_controller_manager:
+  service.dead:
+    - name: kube-controller-manager
+    - enable: None
 

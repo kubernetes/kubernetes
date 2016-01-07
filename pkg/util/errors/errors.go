@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -130,4 +130,21 @@ func Flatten(agg Aggregate) Aggregate {
 		}
 	}
 	return NewAggregate(result)
+}
+
+// AggregateGoroutines runs the provided functions in parallel, stuffing all
+// non-nil errors into the returned Aggregate.
+// Returns nil if all the functions complete successfully.
+func AggregateGoroutines(funcs ...func() error) Aggregate {
+	errChan := make(chan error, len(funcs))
+	for _, f := range funcs {
+		go func(f func() error) { errChan <- f() }(f)
+	}
+	errs := make([]error, 0)
+	for i := 0; i < cap(errChan); i++ {
+		if err := <-errChan; err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return NewAggregate(errs)
 }

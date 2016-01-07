@@ -59,7 +59,7 @@ Agouti allows you run WebDriver integration tests.  Learn more about Agouti [her
 
 ## Set Me Up!
 
-You'll need Golang v1.2+ (Ubuntu users: you probably have Golang v1.0 -- you'll need to upgrade!)
+You'll need Golang v1.3+ (Ubuntu users: you probably have Golang v1.0 -- you'll need to upgrade!)
 
 ```bash
 

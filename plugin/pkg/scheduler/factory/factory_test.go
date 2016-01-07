@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,18 +19,21 @@ package factory
 import (
 	"net/http"
 	"net/http/httptest"
-	"path"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 )
 
 func TestCreate(t *testing.T) {
@@ -41,182 +44,114 @@ func TestCreate(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
-	factory := NewConfigFactory(client)
+	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
+	factory := NewConfigFactory(client, nil, api.DefaultSchedulerName)
 	factory.Create()
 }
 
-func TestPollMinions(t *testing.T) {
-	table := []struct {
-		minions       []api.Node
-		expectedCount int
-	}{
-		{
-			minions: []api.Node{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReady, Status: api.ConditionFull},
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{Name: "bar"},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReachable, Status: api.ConditionFull},
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{Name: "baz"},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReady, Status: api.ConditionFull},
-							{Kind: api.NodeReachable, Status: api.ConditionFull},
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{Name: "baz"},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReady, Status: api.ConditionFull},
-							{Kind: api.NodeReady, Status: api.ConditionFull},
-						},
-					},
-				},
-			},
-			expectedCount: 4,
-		},
-		{
-			minions: []api.Node{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReady, Status: api.ConditionFull},
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{Name: "bar"},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReady, Status: api.ConditionNone},
-						},
-					},
-				},
-			},
-			expectedCount: 1,
-		},
-		{
-			minions: []api.Node{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReady, Status: api.ConditionFull},
-							{Kind: api.NodeReachable, Status: api.ConditionNone}},
-					},
-				},
-			},
-			expectedCount: 1,
-		},
-		{
-			minions: []api.Node{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReachable, Status: api.ConditionFull},
-							{Kind: "invalidValue", Status: api.ConditionNone}},
-					},
-				},
-			},
-			expectedCount: 1,
-		},
-		{
-			minions: []api.Node{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{},
-					},
-				},
-			},
-			expectedCount: 1,
-		},
+// Test configures a scheduler from a policies defined in a file
+// It combines some configurable predicate/priorities with some pre-defined ones
+func TestCreateFromConfig(t *testing.T) {
+	var configData []byte
+	var policy schedulerapi.Policy
+
+	handler := util.FakeHandler{
+		StatusCode:   500,
+		ResponseBody: "",
+		T:            t,
+	}
+	server := httptest.NewServer(&handler)
+	defer server.Close()
+	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
+	factory := NewConfigFactory(client, nil, api.DefaultSchedulerName)
+
+	// Pre-register some predicate and priority functions
+	RegisterFitPredicate("PredicateOne", PredicateOne)
+	RegisterFitPredicate("PredicateTwo", PredicateTwo)
+	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
+	RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
+
+	configData = []byte(`{
+		"kind" : "Policy",
+		"apiVersion" : "v1",
+		"predicates" : [
+			{"name" : "TestZoneAffinity", "argument" : {"serviceAffinity" : {"labels" : ["zone"]}}},
+			{"name" : "TestRequireZone", "argument" : {"labelsPresence" : {"labels" : ["zone"], "presence" : true}}},
+			{"name" : "PredicateOne"},
+			{"name" : "PredicateTwo"}
+		],
+		"priorities" : [
+			{"name" : "RackSpread", "weight" : 3, "argument" : {"serviceAntiAffinity" : {"label" : "rack"}}},
+			{"name" : "PriorityOne", "weight" : 2},
+			{"name" : "PriorityTwo", "weight" : 1}		]
+	}`)
+	err := latestschedulerapi.Codec.DecodeInto(configData, &policy)
+	if err != nil {
+		t.Errorf("Invalid configuration: %v", err)
 	}
 
-	for _, item := range table {
-		ml := &api.NodeList{Items: item.minions}
-		handler := util.FakeHandler{
-			StatusCode:   200,
-			ResponseBody: runtime.EncodeOrDie(latest.Codec, ml),
-			T:            t,
-		}
-		mux := http.NewServeMux()
-		// FakeHandler musn't be sent requests other than the one you want to test.
-		mux.Handle("/api/"+testapi.Version()+"/minions", &handler)
-		server := httptest.NewServer(mux)
-		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
-		cf := NewConfigFactory(client)
-
-		ce, err := cf.pollMinions()
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			continue
-		}
-		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/minions", "GET", nil)
-
-		if a := ce.Len(); item.expectedCount != a {
-			t.Errorf("Expected %v, got %v", item.expectedCount, a)
-		}
-	}
+	factory.CreateFromConfig(policy)
 }
 
-func makeNamespaceURL(namespace, suffix string, isClient bool) string {
-	if !(testapi.Version() == "v1beta1" || testapi.Version() == "v1beta2") {
-		return makeURL("/ns/" + namespace + suffix)
+func TestCreateFromEmptyConfig(t *testing.T) {
+	var configData []byte
+	var policy schedulerapi.Policy
+
+	handler := util.FakeHandler{
+		StatusCode:   500,
+		ResponseBody: "",
+		T:            t,
 	}
-	// if this is a url the client should call, encode the url
-	if isClient {
-		return makeURL(suffix + "?namespace=" + namespace)
+	server := httptest.NewServer(&handler)
+	defer server.Close()
+	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
+	factory := NewConfigFactory(client, nil, api.DefaultSchedulerName)
+
+	configData = []byte(`{}`)
+	err := latestschedulerapi.Codec.DecodeInto(configData, &policy)
+	if err != nil {
+		t.Errorf("Invalid configuration: %v", err)
 	}
-	// its not a client url, so its what the server needs to listen on
-	return makeURL(suffix)
+
+	factory.CreateFromConfig(policy)
 }
 
-func makeURL(suffix string) string {
-	return path.Join("/api", testapi.Version(), suffix)
+func PredicateOne(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+	return true, nil
+}
+
+func PredicateTwo(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+	return true, nil
+}
+
+func PriorityOne(pod *api.Pod, m2p map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+	return []schedulerapi.HostPriority{}, nil
+}
+
+func PriorityTwo(pod *api.Pod, m2p map[string][]*api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+	return []schedulerapi.HostPriority{}, nil
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
 	testPod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
-			DNSPolicy:     api.DNSClusterFirst,
-		},
+		Spec:       apitesting.DeepEqualSafePodSpec(),
 	}
 	handler := util.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: runtime.EncodeOrDie(latest.Codec, testPod),
+		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), testPod),
 		T:            t,
 	}
 	mux := http.NewServeMux()
 
 	// FakeHandler musn't be sent requests other than the one you want to test.
-	mux.Handle(makeNamespaceURL("bar", "/pods/foo", false), &handler)
+	mux.Handle(testapi.Default.ResourcePath("pods", "bar", "foo"), &handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()
-	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()}))
+	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()}), nil, api.DefaultSchedulerName)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := podBackoff{
-		perPodBackoff:   map[string]*backoffEntry{},
+		perPodBackoff:   map[types.NamespacedName]*backoffEntry{},
 		clock:           &fakeClock{},
 		defaultDuration: 1 * time.Millisecond,
 		maxDuration:     1 * time.Second,
@@ -233,7 +168,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		if !exists {
 			continue
 		}
-		handler.ValidateRequest(t, makeNamespaceURL("bar", "/pods/foo", true), "GET", nil)
+		handler.ValidateRequest(t, testapi.Default.ResourcePath("pods", "bar", "foo"), "GET", nil)
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
@@ -241,7 +176,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	}
 }
 
-func TestMinionEnumerator(t *testing.T) {
+func TestNodeEnumerator(t *testing.T) {
 	testList := &api.NodeList{
 		Items: []api.Node{
 			{ObjectMeta: api.ObjectMeta{Name: "foo"}},
@@ -277,7 +212,15 @@ func TestBind(t *testing.T) {
 	table := []struct {
 		binding *api.Binding
 	}{
-		{binding: &api.Binding{PodID: "foo", Host: "foohost.kubernetes.mydomain.com"}},
+		{binding: &api.Binding{
+			ObjectMeta: api.ObjectMeta{
+				Namespace: api.NamespaceDefault,
+				Name:      "foo",
+			},
+			Target: api.ObjectReference{
+				Name: "foohost.kubernetes.mydomain.com",
+			},
+		}},
 	}
 
 	for _, item := range table {
@@ -288,68 +231,142 @@ func TestBind(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
+		client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
 		b := binder{client}
 
 		if err := b.Bind(item.binding); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
-		expectedBody := runtime.EncodeOrDie(testapi.Codec(), item.binding)
-		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/bindings", "POST", &expectedBody)
+		expectedBody := runtime.EncodeOrDie(testapi.Default.Codec(), item.binding)
+		handler.ValidateRequest(t, testapi.Default.ResourcePath("bindings", api.NamespaceDefault, ""), "POST", &expectedBody)
 	}
 }
 
 func TestBackoff(t *testing.T) {
 	clock := fakeClock{}
 	backoff := podBackoff{
-		perPodBackoff:   map[string]*backoffEntry{},
+		perPodBackoff:   map[types.NamespacedName]*backoffEntry{},
 		clock:           &clock,
 		defaultDuration: 1 * time.Second,
 		maxDuration:     60 * time.Second,
 	}
 
 	tests := []struct {
-		podID            string
+		podID            types.NamespacedName
 		expectedDuration time.Duration
 		advanceClock     time.Duration
 	}{
 		{
-			podID:            "foo",
+			podID:            types.NamespacedName{Namespace: "default", Name: "foo"},
 			expectedDuration: 1 * time.Second,
 		},
 		{
-			podID:            "foo",
+			podID:            types.NamespacedName{Namespace: "default", Name: "foo"},
 			expectedDuration: 2 * time.Second,
 		},
 		{
-			podID:            "foo",
+			podID:            types.NamespacedName{Namespace: "default", Name: "foo"},
 			expectedDuration: 4 * time.Second,
 		},
 		{
-			podID:            "bar",
+			podID:            types.NamespacedName{Namespace: "default", Name: "bar"},
 			expectedDuration: 1 * time.Second,
 			advanceClock:     120 * time.Second,
 		},
 		// 'foo' should have been gc'd here.
 		{
-			podID:            "foo",
+			podID:            types.NamespacedName{Namespace: "default", Name: "foo"},
 			expectedDuration: 1 * time.Second,
 		},
 	}
 
 	for _, test := range tests {
-		duration := backoff.getBackoff(test.podID)
+		duration := backoff.getEntry(test.podID).getBackoff(backoff.maxDuration)
 		if duration != test.expectedDuration {
 			t.Errorf("expected: %s, got %s for %s", test.expectedDuration.String(), duration.String(), test.podID)
 		}
 		clock.t = clock.t.Add(test.advanceClock)
 		backoff.gc()
 	}
-
-	backoff.perPodBackoff["foo"].backoff = 60 * time.Second
-	duration := backoff.getBackoff("foo")
+	fooID := types.NamespacedName{Namespace: "default", Name: "foo"}
+	backoff.perPodBackoff[fooID].backoff = 60 * time.Second
+	duration := backoff.getEntry(fooID).getBackoff(backoff.maxDuration)
 	if duration != 60*time.Second {
 		t.Errorf("expected: 60, got %s", duration.String())
+	}
+	// Verify that we split on namespaces correctly, same name, different namespace
+	fooID.Namespace = "other"
+	duration = backoff.getEntry(fooID).getBackoff(backoff.maxDuration)
+	if duration != 1*time.Second {
+		t.Errorf("expected: 1, got %s", duration.String())
+	}
+}
+
+// TestResponsibleForPod tests if a pod with an annotation that should cause it to
+// be picked up by the default scheduler, is in fact picked by the default scheduler
+// Two schedulers are made in the test: one is default scheduler and other scheduler
+// is of name "foo-scheduler". A pod must be picked up by at most one of the two
+// schedulers.
+func TestResponsibleForPod(t *testing.T) {
+	handler := util.FakeHandler{
+		StatusCode:   500,
+		ResponseBody: "",
+		T:            t,
+	}
+	server := httptest.NewServer(&handler)
+	defer server.Close()
+	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
+	// factory of "default-scheduler"
+	factoryDefaultScheduler := NewConfigFactory(client, nil, api.DefaultSchedulerName)
+	// factory of "foo-scheduler"
+	factoryFooScheduler := NewConfigFactory(client, nil, "foo-scheduler")
+	// scheduler annotaions to be tested
+	schedulerAnnotationFitsDefault := map[string]string{"scheduler.alpha.kubernetes.io/name": "default-scheduler"}
+	schedulerAnnotationFitsFoo := map[string]string{"scheduler.alpha.kubernetes.io/name": "foo-scheduler"}
+	schedulerAnnotationFitsNone := map[string]string{"scheduler.alpha.kubernetes.io/name": "bar-scheduler"}
+	tests := []struct {
+		pod             *api.Pod
+		pickedByDefault bool
+		pickedByFoo     bool
+	}{
+		{
+			// pod with no annotation "scheduler.alpha.kubernetes.io/name=<scheduler-name>" should be
+			// picked by the default scheduler, NOT by the one of name "foo-scheduler"
+			pod:             &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"}},
+			pickedByDefault: true,
+			pickedByFoo:     false,
+		},
+		{
+			// pod with annotation "scheduler.alpha.kubernetes.io/name=default-scheduler" should be picked
+			// by the scheduler of name "default-scheduler", NOT by the one of name "foo-scheduler"
+			pod:             &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsDefault}},
+			pickedByDefault: true,
+			pickedByFoo:     false,
+		},
+		{
+			// pod with annotataion "scheduler.alpha.kubernetes.io/name=foo-scheduler" should be NOT
+			// be picked by the scheduler of name "default-scheduler", but by the one of name "foo-scheduler"
+			pod:             &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsFoo}},
+			pickedByDefault: false,
+			pickedByFoo:     true,
+		},
+		{
+			// pod with annotataion "scheduler.alpha.kubernetes.io/name=foo-scheduler" should be NOT
+			// be picked by niether the scheduler of name "default-scheduler" nor the one of name "foo-scheduler"
+			pod:             &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsNone}},
+			pickedByDefault: false,
+			pickedByFoo:     false,
+		},
+	}
+
+	for _, test := range tests {
+		podOfDefault := factoryDefaultScheduler.responsibleForPod(test.pod)
+		podOfFoo := factoryFooScheduler.responsibleForPod(test.pod)
+		results := []bool{podOfDefault, podOfFoo}
+		expected := []bool{test.pickedByDefault, test.pickedByFoo}
+		if !reflect.DeepEqual(results, expected) {
+			t.Errorf("expected: {%v, %v}, got {%v, %v}", test.pickedByDefault, test.pickedByFoo, podOfDefault, podOfFoo)
+		}
 	}
 }

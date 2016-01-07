@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,13 +20,19 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 
 	"github.com/emicklei/go-restful"
 )
 
 func IndexHandler(container *restful.Container, muxHelper *MuxHelper) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		status := http.StatusOK
+		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
+			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler registered.
+			// We want to to return a 404 status with a list of all valid paths, incase of an invalid URL request.
+			status = http.StatusNotFound
+		}
 		var handledPaths []string
 		// Extract the paths handled using restful.WebService
 		for _, ws := range container.RegisteredWebServices() {
@@ -35,6 +41,6 @@ func IndexHandler(container *restful.Container, muxHelper *MuxHelper) func(http.
 		// Extract the paths handled using mux handler.
 		handledPaths = append(handledPaths, muxHelper.RegisteredPaths...)
 		sort.Strings(handledPaths)
-		writeRawJSON(http.StatusOK, api.RootPaths{Paths: handledPaths}, w)
+		writeRawJSON(status, unversioned.RootPaths{Paths: handledPaths}, w)
 	}
 }

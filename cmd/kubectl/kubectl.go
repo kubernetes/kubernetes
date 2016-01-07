@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,13 +18,15 @@ package main
 
 import (
 	"os"
+	"runtime"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
+	"k8s.io/kubernetes/cmd/kubectl/app"
 )
 
 func main() {
-	cmd := cmd.NewFactory(nil).NewKubectlCommand(os.Stdout)
-	if err := cmd.Execute(); err != nil {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	if err := app.Run(); err != nil {
 		os.Exit(1)
 	}
+	os.Exit(0)
 }

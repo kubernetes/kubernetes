@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,8 @@ package api
 
 import (
 	"fmt"
-	"math/rand"
+
+	utilrand "k8s.io/kubernetes/pkg/util/rand"
 )
 
 // NameGenerator generates names for objects. Some backends may have more information
@@ -59,16 +60,5 @@ func (simpleNameGenerator) GenerateName(base string) string {
 	if len(base) > maxGeneratedNameLength {
 		base = base[:maxGeneratedNameLength]
 	}
-	value := randSeq(randomLength)
-	return fmt.Sprintf("%s%s", base, value)
-}
-
-var letters = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
-
-func randSeq(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
+	return fmt.Sprintf("%s%s", base, utilrand.String(randomLength))
 }

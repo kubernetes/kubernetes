@@ -1,0 +1,115 @@
+  {
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {
+  "name":"kube-apiserver",
+  "namespace": "kube-system"
+},
+"spec":{
+"hostNetwork": true,
+"containers":[
+    {
+    "name": "kube-apiserver",
+    "image": "gcr.io/google_containers/kube-apiserver:9680e782e08a1a1c94c656190011bd02",
+    "command": [
+                 "/bin/sh",
+                 "-c",
+                 "/usr/local/bin/kube-apiserver --address=0.0.0.0 --etcd-servers=http://kube0.ha:2379 --service-cluster-ip-range=10.0.0.0/16 --v=4 --allow-privileged=True 1>>/var/log/kube-apiserver.log 2>&1"
+               ],
+    "livenessProbe": {
+      "httpGet": {
+        "host": "127.0.0.1",
+        "port": 8080,
+        "path": "/healthz"
+      },
+      "initialDelaySeconds": 15,
+      "timeoutSeconds": 15
+    },
+    "ports":[
+      { "name": "https",
+        "containerPort": 443,
+        "hostPort": 443},{
+       "name": "http",
+        "containerPort": 7080,
+        "hostPort": 7080},{
+       "name": "local",
+        "containerPort": 8080,
+        "hostPort": 8080}
+        ],
+    "volumeMounts": [
+        { "name": "srvkube",
+        "mountPath": "/srv/kubernetes",
+        "readOnly": true},
+        { "name": "logfile",
+        "mountPath": "/var/log/kube-apiserver.log",
+        "readOnly": false},
+        { "name": "etcssl",
+        "mountPath": "/etc/ssl",
+        "readOnly": true},
+        { "name": "usrsharessl",
+        "mountPath": "/usr/share/ssl",
+        "readOnly": true},
+        { "name": "varssl",
+        "mountPath": "/var/ssl",
+        "readOnly": true},
+        { "name": "usrssl",
+        "mountPath": "/usr/ssl",
+        "readOnly": true},
+        { "name": "usrlibssl",
+        "mountPath": "/usr/lib/ssl",
+        "readOnly": true},
+        { "name": "usrlocalopenssl",
+        "mountPath": "/usr/local/openssl",
+        "readOnly": true},
+        { "name": "etcopenssl",
+        "mountPath": "/etc/openssl",
+        "readOnly": true},
+        { "name": "etcpkitls",
+        "mountPath": "/etc/pki/tls",
+        "readOnly": true}
+      ]
+    }
+],
+"volumes":[
+  { "name": "srvkube",
+    "hostPath": {
+        "path": "/srv/kubernetes"}
+  },
+  { "name": "logfile",
+    "hostPath": {
+        "path": "/var/log/kube-apiserver.log"}
+  },
+  { "name": "etcssl",
+    "hostPath": {
+        "path": "/etc/ssl"}
+  },
+  { "name": "usrsharessl",
+    "hostPath": {
+        "path": "/usr/share/ssl"}
+  },
+  { "name": "varssl",
+    "hostPath": {
+        "path": "/var/ssl"}
+  },
+  { "name": "usrssl",
+    "hostPath": {
+        "path": "/usr/ssl"}
+  },
+  { "name": "usrlibssl",
+    "hostPath": {
+        "path": "/usr/lib/ssl"}
+  },
+  { "name": "usrlocalopenssl",
+    "hostPath": {
+        "path": "/usr/local/openssl"}
+  },
+  { "name": "etcopenssl",
+    "hostPath": {
+        "path": "/etc/openssl"}
+  },
+  { "name": "etcpkitls",
+    "hostPath": {
+        "path": "/etc/pki/tls"}
+  }
+]
+}}

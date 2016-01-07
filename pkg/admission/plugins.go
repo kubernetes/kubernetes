@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,23 +19,26 @@ package admission
 import (
 	"io"
 	"os"
+	"sort"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/golang/glog"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
-// Factory is a function that returns a Interface for admission decisions.
+// Factory is a function that returns an Interface for admission decisions.
 // The config parameter provides an io.Reader handler to the factory in
 // order to load specific configurations. If no configuration is provided
 // the parameter is nil.
 type Factory func(client client.Interface, config io.Reader) (Interface, error)
 
 // All registered admission options.
-var pluginsMutex sync.Mutex
-var plugins = make(map[string]Factory)
+var (
+	pluginsMutex sync.Mutex
+	plugins      = make(map[string]Factory)
+)
 
-// GetPlugins enumerates the
+// GetPlugins enumerates the names of all registered plugins.
 func GetPlugins() []string {
 	pluginsMutex.Lock()
 	defer pluginsMutex.Unlock()
@@ -43,10 +46,11 @@ func GetPlugins() []string {
 	for k := range plugins {
 		keys = append(keys, k)
 	}
+	sort.Strings(keys)
 	return keys
 }
 
-// RegisterPlugin registers a plugin Factory by name.  This
+// RegisterPlugin registers a plugin Factory by name. This
 // is expected to happen during app startup.
 func RegisterPlugin(name string, plugin Factory) {
 	pluginsMutex.Lock()
@@ -59,11 +63,10 @@ func RegisterPlugin(name string, plugin Factory) {
 	plugins[name] = plugin
 }
 
-// GetInterface creates an instance of the named plugin, or nil if
-// the name is not known.  The error return is only used if the named provider
-// was known but failed to initialize. The config parameter specifies the
-// io.Reader handler of the configuration file for the cloud provider, or nil
-// for no configuration.
+// GetPlugin creates an instance of the named plugin, or nil if the name is not
+// known. The error is returned only when the named provider was known but failed
+// to initialize. The config parameter specifies the io.Reader handler of the
+// configuration file for the cloud provider, or nil for no configuration.
 func GetPlugin(name string, client client.Interface, config io.Reader) (Interface, error) {
 	pluginsMutex.Lock()
 	defer pluginsMutex.Unlock()
@@ -74,9 +77,12 @@ func GetPlugin(name string, client client.Interface, config io.Reader) (Interfac
 	return f(client, config)
 }
 
-// InitPlugin creates an instance of the named interface
+// InitPlugin creates an instance of the named interface.
 func InitPlugin(name string, client client.Interface, configFilePath string) Interface {
-	var config *os.File
+	var (
+		config *os.File
+		err    error
+	)
 
 	if name == "" {
 		glog.Info("No admission plugin specified.")
@@ -84,8 +90,6 @@ func InitPlugin(name string, client client.Interface, configFilePath string) Int
 	}
 
 	if configFilePath != "" {
-		var err error
-
 		config, err = os.Open(configFilePath)
 		if err != nil {
 			glog.Fatalf("Couldn't open admission plugin configuration %s: %#v",

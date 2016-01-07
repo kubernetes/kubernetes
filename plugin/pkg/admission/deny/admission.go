@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,9 +20,8 @@ import (
 	"errors"
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/admission"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 func init() {
@@ -36,9 +35,14 @@ func init() {
 type alwaysDeny struct{}
 
 func (alwaysDeny) Admit(a admission.Attributes) (err error) {
-	return apierrors.NewForbidden(a.GetResource(), "", errors.New("Admission control is denying all modifications"))
+	return admission.NewForbidden(a, errors.New("Admission control is denying all modifications"))
 }
 
+func (alwaysDeny) Handles(operation admission.Operation) bool {
+	return true
+}
+
+// NewAlwaysDeny creates an always deny admission handler
 func NewAlwaysDeny() admission.Interface {
 	return new(alwaysDeny)
 }

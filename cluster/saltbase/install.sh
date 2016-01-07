@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # This script will set up the salt directory on the target server.  It takes one
-# argument that is a tarball with the pre-compiled kuberntes server binaries.
+# argument that is a tarball with the pre-compiled kubernetes server binaries.
 
 set -o errexit
 set -o nounset
@@ -24,6 +24,13 @@ set -o pipefail
 SALT_ROOT=$(dirname "${BASH_SOURCE}")
 readonly SALT_ROOT
 
+readonly KUBE_DOCKER_WRAPPED_BINARIES=(
+  kube-apiserver
+  kube-controller-manager
+  kube-scheduler
+  kube-proxy
+)
+
 readonly SERVER_BIN_TAR=${1-}
 if [[ -z "$SERVER_BIN_TAR" ]]; then
   echo "!!! No binaries specified"
@@ -31,7 +38,7 @@ if [[ -z "$SERVER_BIN_TAR" ]]; then
 fi
 
 # Create a temp dir for untaring
-KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
+KUBE_TEMP=$(mktemp --tmpdir=/srv -d -t kubernetes.XXXXXX)
 trap 'rm -rf "${KUBE_TEMP}"' EXIT
 
 # This file is meant to run on the master.  It will install the salt configs
@@ -58,7 +65,24 @@ done
 echo "+++ Install binaries from tar: $1"
 tar -xz -C "${KUBE_TEMP}" -f "$1"
 mkdir -p /srv/salt-new/salt/kube-bins
+mkdir -p /srv/salt-new/salt/kube-addons-images
 cp -v "${KUBE_TEMP}/kubernetes/server/bin/"* /srv/salt-new/salt/kube-bins/
+cp -v "${KUBE_TEMP}/kubernetes/addons/"* /srv/salt-new/salt/kube-addons-images/
+
+kube_bin_dir="/srv/salt-new/salt/kube-bins";
+docker_images_sls_file="/srv/salt-new/pillar/docker-images.sls";
+for docker_file in "${KUBE_DOCKER_WRAPPED_BINARIES[@]}"; do
+  docker_tag=$(cat ${kube_bin_dir}/${docker_file}.docker_tag);
+  if [[ ! -z "${KUBE_IMAGE_TAG:-}" ]]; then
+    docker_tag="${KUBE_IMAGE_TAG}"
+  fi
+  sed -i "s/#${docker_file}_docker_tag_value#/${docker_tag}/" "${docker_images_sls_file}";
+done
+
+cat <<EOF >>"${docker_images_sls_file}"
+kube_docker_registry: '$(echo ${KUBE_DOCKER_REGISTRY:-gcr.io/google_containers})'
+EOF
+
 
 echo "+++ Swapping in new configs"
 for dir in "${SALTDIRS[@]}"; do

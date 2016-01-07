@@ -1,0 +1,40 @@
+{
+  "name": "Container Hints",
+  "description": "Container hints file",
+  "all_hosts": [
+    {
+      "network_interface": {
+        "veth_child": "eth1",
+        "veth_host": "veth24031eth1"
+      },
+      "mounts": [
+        {
+          "host_dir": "/var/run/nm-sdc1",
+          "container_dir": "/var/run/nm-sdc1",
+          "permission": "rw"
+        },
+        {
+          "host_dir": "/var/run/nm-sdb3",
+          "container_dir": "/var/run/nm-sdb3",
+          "permission": "rw"
+        },
+        {
+          "host_dir": "/var/run/nm-sda3",
+          "container_dir": "/var/run/nm-sda3",
+          "permission": "rw"
+        },
+        {
+          "host_dir": "/var/run/netns/root",
+          "container_dir": "/var/run/netns/root",
+          "permission": "ro"
+        },
+        {
+          "host_dir": "/var/run/openvswitch/db.sock",
+          "container_dir": "/var/run/openvswitch/db.sock",
+          "permission": "rw"
+        }
+      ],
+      "full_path": "18a4585950db428e4d5a65c216a5d708d241254709626f4cb300ee963fb4b144"
+    }
+  ]
+}

@@ -3,8 +3,6 @@ package apiversions
 import (
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
-
-	"github.com/racker/perigee"
 )
 
 // List lists all the Cinder API versions available to end-users.
@@ -18,11 +16,6 @@ func List(c *gophercloud.ServiceClient) pagination.Pager {
 // type from the result, call the Extract method on the GetResult.
 func Get(client *gophercloud.ServiceClient, v string) GetResult {
 	var res GetResult
-	_, err := perigee.Request("GET", getURL(client, v), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
-		Results:     &res.Body,
-	})
-	res.Err = err
+	_, res.Err = client.Get(getURL(client, v), &res.Body, nil)
 	return res
 }

@@ -64,7 +64,7 @@ func (d *DeltaTracker) Delta(suites []testsuite.TestSuite) (delta Delta, errors 
 func (d *DeltaTracker) WillRun(suite testsuite.TestSuite) error {
 	s, ok := d.suites[suite.Path]
 	if !ok {
-		return fmt.Errorf("unkown suite %s", suite.Path)
+		return fmt.Errorf("unknown suite %s", suite.Path)
 	}
 
 	return s.MarkAsRunAndRecomputedDependencies(d.maxDepth)

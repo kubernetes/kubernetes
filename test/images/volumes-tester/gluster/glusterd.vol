@@ -1,0 +1,14 @@
+# This is default glusterd.vol (incl. commented out base-port),
+# with added "rpc-auth-allow-insecure on" to allow connection
+# from non-privileged ports.
+
+volume management
+    type mgmt/glusterd
+    option working-directory /var/lib/glusterd
+    option transport-type socket,rdma
+    option transport.socket.keepalive-time 10
+    option transport.socket.keepalive-interval 2
+    option transport.socket.read-fail-log off
+#   option base-port 49152
+    option rpc-auth-allow-insecure on
+end-volume

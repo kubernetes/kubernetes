@@ -6,6 +6,7 @@ package restful
 
 import (
 	"bytes"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -43,9 +44,21 @@ func templateToRegularExpression(template string) (expression string, literalCou
 		}
 		buffer.WriteString("/")
 		if strings.HasPrefix(each, "{") {
-			// ignore var spec
+			// check for regular expression in variable
+			colon := strings.Index(each, ":")
+			if colon != -1 {
+				// extract expression
+				paramExpr := strings.TrimSpace(each[colon+1 : len(each)-1])
+				if paramExpr == "*" { // special case
+					buffer.WriteString("(.*)")
+				} else {
+					buffer.WriteString(fmt.Sprintf("(%s)", paramExpr)) // between colon and closing moustache
+				}
+			} else {
+				// plain var
+				buffer.WriteString("([^/]+?)")
+			}
 			varCount += 1
-			buffer.WriteString("([^/]+?)")
 		} else {
 			literalCount += len(each)
 			encoded := each // TODO URI encode

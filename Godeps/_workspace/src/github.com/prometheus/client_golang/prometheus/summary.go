@@ -16,16 +16,20 @@ package prometheus
 import (
 	"fmt"
 	"hash/fnv"
+	"math"
 	"sort"
 	"sync"
 	"time"
 
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/beorn7/perks/quantile"
+	"github.com/golang/protobuf/proto"
 
 	dto "github.com/prometheus/client_model/go"
-
-	"github.com/prometheus/client_golang/_vendor/perks/quantile"
 )
+
+// quantileLabel is used for the label that defines the quantile in a
+// summary.
+const quantileLabel = "quantile"
 
 // A Summary captures individual observations from an event or sample stream and
 // summarizes them in a manner similar to traditional summary statistics: 1. sum
@@ -34,6 +38,12 @@ import (
 // A typical use-case is the observation of request latencies. By default, a
 // Summary provides the median, the 90th and the 99th percentile of the latency
 // as rank estimations.
+//
+// Note that the rank estimations cannot be aggregated in a meaningful way with
+// the Prometheus query language (i.e. you cannot average or add them). If you
+// need aggregatable quantiles (e.g. you want the 99th percentile latency of all
+// queries served across all instances of a service), consider the Histogram
+// metric type. See the Prometheus documentation for more details.
 //
 // To create Summary instances, use NewSummary.
 type Summary interface {
@@ -44,9 +54,13 @@ type Summary interface {
 	Observe(float64)
 }
 
-// DefObjectives are the default Summary quantile values.
 var (
+	// DefObjectives are the default Summary quantile values.
 	DefObjectives = map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
+
+	errQuantileLabelNotAllowed = fmt.Errorf(
+		"%q is not allowed as label name in summaries", quantileLabel,
+	)
 )
 
 // Default values for SummaryOpts.
@@ -100,7 +114,9 @@ type SummaryOpts struct {
 	ConstLabels Labels
 
 	// Objectives defines the quantile rank estimates with their respective
-	// absolute error. The default value is DefObjectives.
+	// absolute error. If Objectives[q] = e, then the value reported
+	// for q will be the φ-quantile value for some φ between q-e and q+e.
+	// The default value is DefObjectives.
 	Objectives map[float64]float64
 
 	// MaxAge defines the duration for which an observation stays relevant
@@ -110,7 +126,10 @@ type SummaryOpts struct {
 	// AgeBuckets is the number of buckets used to exclude observations that
 	// are older than MaxAge from the summary. A higher number has a
 	// resource penalty, so only increase it if the higher resolution is
-	// really required. The default value is DefAgeBuckets.
+	// really required. For very high observation rates, you might want to
+	// reduce the number of age buckets. With only one age bucket, you will
+	// effectively see a complete reset of the summary each time MaxAge has
+	// passed. The default value is DefAgeBuckets.
 	AgeBuckets uint32
 
 	// BufCap defines the default sample stream buffer size.  The default
@@ -119,10 +138,6 @@ type SummaryOpts struct {
 	// is the internal buffer size of the underlying package
 	// "github.com/bmizerany/perks/quantile").
 	BufCap uint32
-
-	// Epsilon is the error epsilon for the quantile rank estimate. Must be
-	// positive. The default is DefEpsilon.
-	Epsilon float64
 }
 
 // TODO: Great fuck-up with the sliding-window decay algorithm... The Merge
@@ -156,6 +171,17 @@ func NewSummary(opts SummaryOpts) Summary {
 func newSummary(desc *Desc, opts SummaryOpts, labelValues ...string) Summary {
 	if len(desc.variableLabels) != len(labelValues) {
 		panic(errInconsistentCardinality)
+	}
+
+	for _, n := range desc.variableLabels {
+		if n == quantileLabel {
+			panic(errQuantileLabelNotAllowed)
+		}
+	}
+	for _, lp := range desc.constLabelPairs {
+		if lp.GetName() == quantileLabel {
+			panic(errQuantileLabelNotAllowed)
+		}
 	}
 
 	if len(opts.Objectives) == 0 {
@@ -256,10 +282,8 @@ func (s *summary) Write(out *dto.Metric) error {
 
 	s.bufMtx.Lock()
 	s.mtx.Lock()
-
-	if len(s.hotBuf) != 0 {
-		s.swapBufs(time.Now())
-	}
+	// Swap bufs even if hotBuf is empty to set new hotBufExpTime.
+	s.swapBufs(time.Now())
 	s.bufMtx.Unlock()
 
 	s.flushColdBuf()
@@ -267,9 +291,15 @@ func (s *summary) Write(out *dto.Metric) error {
 	sum.SampleSum = proto.Float64(s.sum)
 
 	for _, rank := range s.sortedObjectives {
+		var q float64
+		if s.headStream.Count() == 0 {
+			q = math.NaN()
+		} else {
+			q = s.headStream.Query(rank)
+		}
 		qs = append(qs, &dto.Quantile{
 			Quantile: proto.Float64(rank),
-			Value:    proto.Float64(s.headStream.Query(rank)),
+			Value:    proto.Float64(q),
 		})
 	}
 
@@ -358,7 +388,7 @@ func (s quantSort) Less(i, j int) bool {
 // SummaryVec is a Collector that bundles a set of Summaries that all share the
 // same Desc, but have different values for their variable labels. This is used
 // if you want to count the same thing partitioned by various dimensions
-// (e.g. http request latencies, partitioned by status code and method). Create
+// (e.g. HTTP request latencies, partitioned by status code and method). Create
 // instances with NewSummaryVec.
 type SummaryVec struct {
 	MetricVec
@@ -411,14 +441,100 @@ func (m *SummaryVec) GetMetricWith(labels Labels) (Summary, error) {
 // WithLabelValues works as GetMetricWithLabelValues, but panics where
 // GetMetricWithLabelValues would have returned an error. By not returning an
 // error, WithLabelValues allows shortcuts like
-//     myVec.WithLabelValues("404", "GET").Add(42)
+//     myVec.WithLabelValues("404", "GET").Observe(42.21)
 func (m *SummaryVec) WithLabelValues(lvs ...string) Summary {
 	return m.MetricVec.WithLabelValues(lvs...).(Summary)
 }
 
 // With works as GetMetricWith, but panics where GetMetricWithLabels would have
 // returned an error. By not returning an error, With allows shortcuts like
-//     myVec.With(Labels{"code": "404", "method": "GET"}).Add(42)
+//     myVec.With(Labels{"code": "404", "method": "GET"}).Observe(42.21)
 func (m *SummaryVec) With(labels Labels) Summary {
 	return m.MetricVec.With(labels).(Summary)
+}
+
+type constSummary struct {
+	desc       *Desc
+	count      uint64
+	sum        float64
+	quantiles  map[float64]float64
+	labelPairs []*dto.LabelPair
+}
+
+func (s *constSummary) Desc() *Desc {
+	return s.desc
+}
+
+func (s *constSummary) Write(out *dto.Metric) error {
+	sum := &dto.Summary{}
+	qs := make([]*dto.Quantile, 0, len(s.quantiles))
+
+	sum.SampleCount = proto.Uint64(s.count)
+	sum.SampleSum = proto.Float64(s.sum)
+
+	for rank, q := range s.quantiles {
+		qs = append(qs, &dto.Quantile{
+			Quantile: proto.Float64(rank),
+			Value:    proto.Float64(q),
+		})
+	}
+
+	if len(qs) > 0 {
+		sort.Sort(quantSort(qs))
+	}
+	sum.Quantile = qs
+
+	out.Summary = sum
+	out.Label = s.labelPairs
+
+	return nil
+}
+
+// NewConstSummary returns a metric representing a Prometheus summary with fixed
+// values for the count, sum, and quantiles. As those parameters cannot be
+// changed, the returned value does not implement the Summary interface (but
+// only the Metric interface). Users of this package will not have much use for
+// it in regular operations. However, when implementing custom Collectors, it is
+// useful as a throw-away metric that is generated on the fly to send it to
+// Prometheus in the Collect method.
+//
+// quantiles maps ranks to quantile values. For example, a median latency of
+// 0.23s and a 99th percentile latency of 0.56s would be expressed as:
+//     map[float64]float64{0.5: 0.23, 0.99: 0.56}
+//
+// NewConstSummary returns an error if the length of labelValues is not
+// consistent with the variable labels in Desc.
+func NewConstSummary(
+	desc *Desc,
+	count uint64,
+	sum float64,
+	quantiles map[float64]float64,
+	labelValues ...string,
+) (Metric, error) {
+	if len(desc.variableLabels) != len(labelValues) {
+		return nil, errInconsistentCardinality
+	}
+	return &constSummary{
+		desc:       desc,
+		count:      count,
+		sum:        sum,
+		quantiles:  quantiles,
+		labelPairs: makeLabelPairs(desc, labelValues),
+	}, nil
+}
+
+// MustNewConstSummary is a version of NewConstSummary that panics where
+// NewConstMetric would have returned an error.
+func MustNewConstSummary(
+	desc *Desc,
+	count uint64,
+	sum float64,
+	quantiles map[float64]float64,
+	labelValues ...string,
+) Metric {
+	m, err := NewConstSummary(desc, count, sum, quantiles, labelValues...)
+	if err != nil {
+		panic(err)
+	}
+	return m
 }

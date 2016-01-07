@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,9 +18,21 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Stop the bleeding, turn off the warning until we fix token gen.
+# echo "-=-=-=-=-=-=-=-=-=-="
+# echo "NOTE:"
+# echo "kubectl.sh is deprecated and will be removed soon."
+# echo "please replace all usage with calls to the kubectl"
+# echo "binary and ensure that it is in your PATH." 
+# echo ""
+# echo "Please see 'kubectl help config' for more details"
+# echo "about configuring kubectl for your cluster."
+# echo "-=-=-=-=-=-=-=-=-=-="
+
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 # Get the absolute path of the directory component of a file, i.e. the
 # absolute path of the dirname of $1.
@@ -56,10 +68,16 @@ case "$(uname -m)" in
     host_arch=arm
     ;;
   i?86*)
-    host_arch=x86
+    host_arch=386
+    ;;
+  s390x*)
+    host_arch=s390x
+    ;;
+  ppc64le*)
+    host_arch=ppc64le
     ;;
   *)
-    echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
+    echo "Unsupported host arch. Must be x86_64, 386, arm, s390x or ppc64le." >&2
     exit 1
     ;;
 esac
@@ -97,36 +115,20 @@ elif [[ ! -x "${KUBECTL_PATH}" ]]; then
 fi
 kubectl="${KUBECTL_PATH:-${kubectl}}"
 
-# While GKE requires the kubectl binary, it's actually called through
-# gcloud. But we need to adjust the PATH so gcloud gets the right one.
 if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   detect-project &> /dev/null
-  export PATH=$(get_absolute_dirname $kubectl):$PATH
-  kubectl="${GCLOUD}"
-fi
-
-if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
-  # When we are using vagrant it has hard coded auth.  We repeat that here so that
-  # we don't clobber auth that might be used for a publicly facing cluster.
+elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" || "$KUBERNETES_PROVIDER" == "juju" ]]; then
+  detect-master > /dev/null
   config=(
-    "--auth-path=$HOME/.kubernetes_vagrant_auth"
-  )
-elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
-  # GKE runs kubectl through gcloud.
-  config=(
-    "preview"
-    "container"
-    "kubectl"
-    "--project=${PROJECT}"
-    "--zone=${ZONE}"
-    "--cluster=${CLUSTER_NAME}"
+    "--server=http://${KUBE_MASTER_IP}:8080"
   )
 fi
 
-detect-master > /dev/null
-if [[ -n "${KUBE_MASTER_IP-}" && -z "${KUBERNETES_MASTER-}" ]]; then
-  export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
+
+if false; then
+  # disable these debugging messages by default
+  echo "current-context: \"$(${kubectl} "${config[@]:+${config[@]}}" config view -o template --template='{{index . "current-context"}}')\"" >&2
+  echo "Running:" "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}" >&2
 fi
 
-echo "Running:" "${kubectl}" "${config[@]:+${config[@]}}" "${@}" >&2
-"${kubectl}" "${config[@]:+${config[@]}}" "${@}"
+"${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}"

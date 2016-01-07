@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,9 +20,9 @@ import (
 	"io"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // Decoder allows StreamWatcher to watch any stream for which a Decoder can be written.
@@ -76,6 +76,13 @@ func (sw *StreamWatcher) Stop() {
 	}
 }
 
+// stopping returns true if Stop() was called previously.
+func (sw *StreamWatcher) stopping() bool {
+	sw.Lock()
+	defer sw.Unlock()
+	return sw.stopped
+}
+
 // receive reads result from the decoder in a loop and sends down the result channel.
 func (sw *StreamWatcher) receive() {
 	defer close(sw.result)
@@ -84,13 +91,22 @@ func (sw *StreamWatcher) receive() {
 	for {
 		action, obj, err := sw.source.Decode()
 		if err != nil {
+			// Ignore expected error.
+			if sw.stopping() {
+				return
+			}
 			switch err {
 			case io.EOF:
 				// watch closed normally
 			case io.ErrUnexpectedEOF:
 				glog.V(1).Infof("Unexpected EOF during watch stream event decoding: %v", err)
 			default:
-				glog.Errorf("Unable to decode an event from the watch stream: %v", err)
+				msg := "Unable to decode an event from the watch stream: %v"
+				if util.IsProbableEOF(err) {
+					glog.V(5).Infof(msg, err)
+				} else {
+					glog.Errorf(msg, err)
+				}
 			}
 			return
 		}

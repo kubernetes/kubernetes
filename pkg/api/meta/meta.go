@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,17 +20,28 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 )
 
-// Accessor takes an arbitary object pointer and returns meta.Interface.
+// Accessor takes an arbitrary object pointer and returns meta.Interface.
 // obj must be a pointer to an API type. An error is returned if the minimum
 // required fields are missing. Fields that are not required return the default
 // value and are a no-op if set.
-// TODO: add a fast path for *TypeMeta and *ObjectMeta for internal objects
-func Accessor(obj interface{}) (Interface, error) {
+func Accessor(obj interface{}) (Object, error) {
+	if oi, ok := obj.(ObjectMetaAccessor); ok {
+		if om := oi.GetObjectMeta(); om != nil {
+			return om, nil
+		}
+	}
+	// we may get passed an object that is directly portable to Object
+	if oi, ok := obj.(Object); ok {
+		return oi, nil
+	}
+	// legacy path for objects that do not implement Object and ObjectMetaAccessor via
+	// reflection - very slow code path.
 	v, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return nil, err
@@ -79,7 +90,10 @@ func Accessor(obj interface{}) (Interface, error) {
 // TODO: this interface is used to test code that does not have ObjectMeta or ListMeta
 // in round tripping (objects which can use apiVersion/kind, but do not fit the Kube
 // api conventions).
-func TypeAccessor(obj interface{}) (TypeInterface, error) {
+func TypeAccessor(obj interface{}) (Type, error) {
+	if typed, ok := obj.(runtime.Object); ok {
+		return objectAccessor{typed}, nil
+	}
 	v, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return nil, err
@@ -100,6 +114,46 @@ func TypeAccessor(obj interface{}) (TypeInterface, error) {
 	return a, nil
 }
 
+type objectAccessor struct {
+	runtime.Object
+}
+
+func (obj objectAccessor) GetKind() string {
+	if gvk := obj.GetObjectKind().GroupVersionKind(); gvk != nil {
+		return gvk.Kind
+	}
+	return ""
+}
+
+func (obj objectAccessor) SetKind(kind string) {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	if gvk == nil {
+		gvk = &unversioned.GroupVersionKind{}
+	}
+	gvk.Kind = kind
+	obj.GetObjectKind().SetGroupVersionKind(gvk)
+}
+
+func (obj objectAccessor) GetAPIVersion() string {
+	if gvk := obj.GetObjectKind().GroupVersionKind(); gvk != nil {
+		return gvk.GroupVersion().String()
+	}
+	return ""
+}
+
+func (obj objectAccessor) SetAPIVersion(version string) {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	if gvk == nil {
+		gvk = &unversioned.GroupVersionKind{}
+	}
+	gv, err := unversioned.ParseGroupVersion(version)
+	if err != nil {
+		gv = unversioned.GroupVersion{Version: version}
+	}
+	gvk.Group, gvk.Version = gv.Group, gv.Version
+	obj.GetObjectKind().SetGroupVersionKind(gvk)
+}
+
 // NewAccessor returns a MetadataAccessor that can retrieve
 // or manipulate resource version on objects derived from core API
 // metadata concepts.
@@ -111,36 +165,20 @@ func NewAccessor() MetadataAccessor {
 type resourceAccessor struct{}
 
 func (resourceAccessor) Kind(obj runtime.Object) (string, error) {
-	accessor, err := Accessor(obj)
-	if err != nil {
-		return "", err
-	}
-	return accessor.Kind(), nil
+	return objectAccessor{obj}.GetKind(), nil
 }
 
 func (resourceAccessor) SetKind(obj runtime.Object, kind string) error {
-	accessor, err := Accessor(obj)
-	if err != nil {
-		return err
-	}
-	accessor.SetKind(kind)
+	objectAccessor{obj}.SetKind(kind)
 	return nil
 }
 
 func (resourceAccessor) APIVersion(obj runtime.Object) (string, error) {
-	accessor, err := Accessor(obj)
-	if err != nil {
-		return "", err
-	}
-	return accessor.APIVersion(), nil
+	return objectAccessor{obj}.GetAPIVersion(), nil
 }
 
 func (resourceAccessor) SetAPIVersion(obj runtime.Object, version string) error {
-	accessor, err := Accessor(obj)
-	if err != nil {
-		return err
-	}
-	accessor.SetAPIVersion(version)
+	objectAccessor{obj}.SetAPIVersion(version)
 	return nil
 }
 
@@ -149,7 +187,7 @@ func (resourceAccessor) Namespace(obj runtime.Object) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return accessor.Namespace(), nil
+	return accessor.GetNamespace(), nil
 }
 
 func (resourceAccessor) SetNamespace(obj runtime.Object, namespace string) error {
@@ -166,7 +204,7 @@ func (resourceAccessor) Name(obj runtime.Object) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return accessor.Name(), nil
+	return accessor.GetName(), nil
 }
 
 func (resourceAccessor) SetName(obj runtime.Object, name string) error {
@@ -178,12 +216,29 @@ func (resourceAccessor) SetName(obj runtime.Object, name string) error {
 	return nil
 }
 
+func (resourceAccessor) GenerateName(obj runtime.Object) (string, error) {
+	accessor, err := Accessor(obj)
+	if err != nil {
+		return "", err
+	}
+	return accessor.GetGenerateName(), nil
+}
+
+func (resourceAccessor) SetGenerateName(obj runtime.Object, name string) error {
+	accessor, err := Accessor(obj)
+	if err != nil {
+		return err
+	}
+	accessor.SetGenerateName(name)
+	return nil
+}
+
 func (resourceAccessor) UID(obj runtime.Object) (types.UID, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return "", err
 	}
-	return accessor.UID(), nil
+	return accessor.GetUID(), nil
 }
 
 func (resourceAccessor) SetUID(obj runtime.Object, uid types.UID) error {
@@ -200,7 +255,7 @@ func (resourceAccessor) SelfLink(obj runtime.Object) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return accessor.SelfLink(), nil
+	return accessor.GetSelfLink(), nil
 }
 
 func (resourceAccessor) SetSelfLink(obj runtime.Object, selfLink string) error {
@@ -217,7 +272,7 @@ func (resourceAccessor) Labels(obj runtime.Object) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return accessor.Labels(), nil
+	return accessor.GetLabels(), nil
 }
 
 func (resourceAccessor) SetLabels(obj runtime.Object, labels map[string]string) error {
@@ -234,7 +289,7 @@ func (resourceAccessor) Annotations(obj runtime.Object) (map[string]string, erro
 	if err != nil {
 		return nil, err
 	}
-	return accessor.Annotations(), nil
+	return accessor.GetAnnotations(), nil
 }
 
 func (resourceAccessor) SetAnnotations(obj runtime.Object, annotations map[string]string) error {
@@ -251,7 +306,7 @@ func (resourceAccessor) ResourceVersion(obj runtime.Object) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return accessor.ResourceVersion(), nil
+	return accessor.GetResourceVersion(), nil
 }
 
 func (resourceAccessor) SetResourceVersion(obj runtime.Object, version string) error {
@@ -268,6 +323,7 @@ func (resourceAccessor) SetResourceVersion(obj runtime.Object, version string) e
 type genericAccessor struct {
 	namespace       *string
 	name            *string
+	generateName    *string
 	uid             *types.UID
 	apiVersion      *string
 	kind            *string
@@ -277,7 +333,7 @@ type genericAccessor struct {
 	annotations     *map[string]string
 }
 
-func (a genericAccessor) Namespace() string {
+func (a genericAccessor) GetNamespace() string {
 	if a.namespace == nil {
 		return ""
 	}
@@ -291,7 +347,7 @@ func (a genericAccessor) SetNamespace(namespace string) {
 	*a.namespace = namespace
 }
 
-func (a genericAccessor) Name() string {
+func (a genericAccessor) GetName() string {
 	if a.name == nil {
 		return ""
 	}
@@ -305,7 +361,21 @@ func (a genericAccessor) SetName(name string) {
 	*a.name = name
 }
 
-func (a genericAccessor) UID() types.UID {
+func (a genericAccessor) GetGenerateName() string {
+	if a.generateName == nil {
+		return ""
+	}
+	return *a.generateName
+}
+
+func (a genericAccessor) SetGenerateName(generateName string) {
+	if a.generateName == nil {
+		return
+	}
+	*a.generateName = generateName
+}
+
+func (a genericAccessor) GetUID() types.UID {
 	if a.uid == nil {
 		return ""
 	}
@@ -319,7 +389,7 @@ func (a genericAccessor) SetUID(uid types.UID) {
 	*a.uid = uid
 }
 
-func (a genericAccessor) APIVersion() string {
+func (a genericAccessor) GetAPIVersion() string {
 	return *a.apiVersion
 }
 
@@ -327,7 +397,7 @@ func (a genericAccessor) SetAPIVersion(version string) {
 	*a.apiVersion = version
 }
 
-func (a genericAccessor) Kind() string {
+func (a genericAccessor) GetKind() string {
 	return *a.kind
 }
 
@@ -335,7 +405,7 @@ func (a genericAccessor) SetKind(kind string) {
 	*a.kind = kind
 }
 
-func (a genericAccessor) ResourceVersion() string {
+func (a genericAccessor) GetResourceVersion() string {
 	return *a.resourceVersion
 }
 
@@ -343,7 +413,7 @@ func (a genericAccessor) SetResourceVersion(version string) {
 	*a.resourceVersion = version
 }
 
-func (a genericAccessor) SelfLink() string {
+func (a genericAccessor) GetSelfLink() string {
 	return *a.selfLink
 }
 
@@ -351,7 +421,7 @@ func (a genericAccessor) SetSelfLink(selfLink string) {
 	*a.selfLink = selfLink
 }
 
-func (a genericAccessor) Labels() map[string]string {
+func (a genericAccessor) GetLabels() map[string]string {
 	if a.labels == nil {
 		return nil
 	}
@@ -362,7 +432,7 @@ func (a genericAccessor) SetLabels(labels map[string]string) {
 	*a.labels = labels
 }
 
-func (a genericAccessor) Annotations() map[string]string {
+func (a genericAccessor) GetAnnotations() map[string]string {
 	if a.annotations == nil {
 		return nil
 	}
@@ -370,6 +440,10 @@ func (a genericAccessor) Annotations() map[string]string {
 }
 
 func (a genericAccessor) SetAnnotations(annotations map[string]string) {
+	if a.annotations == nil {
+		emptyAnnotations := make(map[string]string)
+		a.annotations = &emptyAnnotations
+	}
 	*a.annotations = annotations
 }
 
@@ -390,6 +464,9 @@ func extractFromObjectMeta(v reflect.Value, a *genericAccessor) error {
 		return err
 	}
 	if err := runtime.FieldPtr(v, "Name", &a.name); err != nil {
+		return err
+	}
+	if err := runtime.FieldPtr(v, "GenerateName", &a.generateName); err != nil {
 		return err
 	}
 	if err := runtime.FieldPtr(v, "UID", &a.uid); err != nil {

@@ -1,25 +1,31 @@
-# Contributing
+# Contributing to Go
 
-We don't use GitHub pull requests but use Gerrit for code reviews,
-similar to the Go project.
+Go is an open source project.
 
-1. Sign one of the contributor license agreements below.
-2. `go get golang.org/x/review/git-codereview` to install the code reviewing tool.
-3. Get the package by running `go get -d golang.org/x/oauth2`.
-Make changes and create a change by running `git codereview change <name>`, provide a command message, and use `git codereview mail` to create a Gerrit CL.
-Keep amending to the change and mail as your recieve feedback.
+It is the work of hundreds of contributors. We appreciate your help!
 
-For more information about the workflow, see Go's [Contribution Guidelines](https://golang.org/doc/contribute.html).
 
-Before we can accept any pull requests
-we have to jump through a couple of legal hurdles,
-primarily a Contributor License Agreement (CLA):
+## Filing issues
 
-- **If you are an individual writing original source code**
-  and you're sure you own the intellectual property,
-  then you'll need to sign an [individual CLA](http://code.google.com/legal/individual-cla-v1.0.html).
-- **If you work for a company that wants to allow you to contribute your work**,
-  then you'll need to sign a [corporate CLA](http://code.google.com/legal/corporate-cla-v1.0.html).
+When [filing an issue](https://github.com/golang/oauth2/issues), make sure to answer these five questions:
 
-You can sign these electronically (just scroll to the bottom).
-After that, we'll be able to accept your pull requests.
+1. What version of Go are you using (`go version`)?
+2. What operating system and processor architecture are you using?
+3. What did you do?
+4. What did you expect to see?
+5. What did you see instead?
+
+General questions should go to the [golang-nuts mailing list](https://groups.google.com/group/golang-nuts) instead of the issue tracker.
+The gophers there will answer or ask you to file an issue if you've tripped over a bug.
+
+## Contributing code
+
+Please read the [Contribution Guidelines](https://golang.org/doc/contribute.html)
+before sending patches.
+
+**We do not accept GitHub pull requests**
+(we use [Gerrit](https://code.google.com/p/gerrit/) instead for code review).
+
+Unless otherwise noted, the Go source files are distributed under
+the BSD-style license found in the LICENSE file.
+

@@ -1,0 +1,72 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package mesosproto;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = true;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.testgen_all) = true;
+option (gogoproto.benchgen_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+
+// Describes a state entry, a versioned (via a UUID) key/value pair.
+message Entry {
+  required string name = 1;
+  required bytes uuid = 2;
+  required bytes value = 3;
+}
+
+
+// Describes an operation used in the log storage implementation.
+message Operation {
+  enum Type {
+    SNAPSHOT = 1;
+    DIFF = 3;
+    EXPUNGE = 2;
+  }
+
+  // Describes a "snapshot" operation.
+  message Snapshot {
+    required Entry entry = 1;
+  }
+
+  // Describes a "diff" operation where the 'value' of the entry is
+  // just the diff itself, but the 'uuid' represents the UUID of the
+  // entry after applying this diff.
+  message Diff {
+    required Entry entry = 1;
+  }
+
+  // Describes an "expunge" operation.
+  message Expunge {
+    required string name = 1;
+  }
+
+  required Type type = 1;
+  optional Snapshot snapshot = 2;
+  optional Diff diff = 4;
+  optional Expunge expunge = 3;
+}

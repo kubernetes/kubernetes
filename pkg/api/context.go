@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,13 +18,32 @@ package api
 
 import (
 	stderrs "errors"
+	"time"
 
 	"golang.org/x/net/context"
+	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 // Context carries values across API boundaries.
+// This context matches the context.Context interface
+// (https://blog.golang.org/context), for the purposes
+// of passing the api.Context through to the storage tier.
+// TODO: Determine the extent that this abstraction+interface
+// is used by the api, and whether we can remove.
 type Context interface {
+	// Value returns the value associated with key or nil if none.
 	Value(key interface{}) interface{}
+
+	// Deadline returns the time when this Context will be canceled, if any.
+	Deadline() (deadline time.Time, ok bool)
+
+	// Done returns a channel that is closed when this Context is canceled
+	// or times out.
+	Done() <-chan struct{}
+
+	// Err indicates why this context was canceled, after the Done channel
+	// is closed.
+	Err() error
 }
 
 // The key type is unexported to prevent collisions
@@ -32,6 +51,9 @@ type key int
 
 // namespaceKey is the context key for the request namespace.
 const namespaceKey key = 0
+
+// userKey is the context key for the request user.
+const userKey key = 1
 
 // NewContext instantiates a base context object for request flows.
 func NewContext() Context {
@@ -85,4 +107,15 @@ func WithNamespaceDefaultIfNone(parent Context) Context {
 		return WithNamespace(parent, NamespaceDefault)
 	}
 	return parent
+}
+
+// WithUser returns a copy of parent in which the user value is set
+func WithUser(parent Context, user user.Info) Context {
+	return WithValue(parent, userKey, user)
+}
+
+// UserFrom returns the value of the user key on the ctx
+func UserFrom(ctx Context) (user.Info, bool) {
+	user, ok := ctx.Value(userKey).(user.Info)
+	return user, ok
 }

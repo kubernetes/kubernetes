@@ -33,13 +33,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/golang/protobuf/proto"
+	"github.com/prometheus/common/expfmt"
+
 	dto "github.com/prometheus/client_model/go"
-
-	"code.google.com/p/goprotobuf/proto"
-
-	"github.com/prometheus/client_golang/_vendor/goautoneg"
-	"github.com/prometheus/client_golang/model"
-	"github.com/prometheus/client_golang/text"
 )
 
 var (
@@ -158,20 +155,30 @@ func Unregister(c Collector) bool {
 // SetMetricFamilyInjectionHook sets a function that is called whenever metrics
 // are collected. The hook function must be set before metrics collection begins
 // (i.e. call SetMetricFamilyInjectionHook before setting the HTTP handler.) The
-// MetricFamily protobufs returned by the hook function are added to the
-// delivered metrics. Each returned MetricFamily must have a unique name (also
-// taking into account the MetricFamilies created in the regular way).
+// MetricFamily protobufs returned by the hook function are merged with the
+// metrics collected in the usual way.
 //
 // This is a way to directly inject MetricFamily protobufs managed and owned by
-// the caller. The caller has full responsibility. No sanity checks are
-// performed on the returned protobufs (besides the name checks described
-// above). The function must be callable at any time and concurrently.
+// the caller. The caller has full responsibility. As no registration of the
+// injected metrics has happened, there is no descriptor to check against, and
+// there are no registration-time checks. If collect-time checks are disabled
+// (see function EnableCollectChecks), no sanity checks are performed on the
+// returned protobufs at all. If collect-checks are enabled, type and uniqueness
+// checks are performed, but no further consistency checks (which would require
+// knowledge of a metric descriptor).
+//
+// Sorting concerns: The caller is responsible for sorting the label pairs in
+// each metric. However, the order of metrics will be sorted by the registry as
+// it is required anyway after merging with the metric families collected
+// conventionally.
+//
+// The function must be callable at any time and concurrently.
 func SetMetricFamilyInjectionHook(hook func() []*dto.MetricFamily) {
 	defRegistry.metricFamilyInjectionHook = hook
 }
 
 // PanicOnCollectError sets the behavior whether a panic is caused upon an error
-// while metrics are collected and served to the http endpoint. By default, an
+// while metrics are collected and served to the HTTP endpoint. By default, an
 // internal server error (status code 500) is served with an error message.
 func PanicOnCollectError(b bool) {
 	defRegistry.panicOnCollectError = b
@@ -187,30 +194,10 @@ func EnableCollectChecks(b bool) {
 	defRegistry.collectChecksEnabled = b
 }
 
-// Push triggers a metric collection and pushes all collected metrics to the
-// Pushgateway specified by addr. See the Pushgateway documentation for detailed
-// implications of the job and instance parameter. instance can be left
-// empty. The Pushgateway will then use the client's IP number instead. Use just
-// host:port or ip:port ass addr. (Don't add 'http://' or any path.)
-//
-// Note that all previously pushed metrics with the same job and instance will
-// be replaced with the metrics pushed by this call. (It uses HTTP method 'PUT'
-// to push to the Pushgateway.)
-func Push(job, instance, addr string) error {
-	return defRegistry.Push(job, instance, addr, "PUT")
-}
-
-// PushAdd works like Push, but only previously pushed metrics with the same
-// name (and the same job and instance) will be replaced. (It uses HTTP method
-// 'POST' to push to the Pushgateway.)
-func PushAdd(job, instance, addr string) error {
-	return defRegistry.Push(job, instance, addr, "POST")
-}
-
 // encoder is a function that writes a dto.MetricFamily to an io.Writer in a
 // certain encoding. It returns the number of bytes written and any error
-// encountered.  Note that ext.WriteDelimited and text.MetricFamilyToText are
-// encoders.
+// encountered.  Note that pbutil.WriteDelimited and pbutil.MetricFamilyToText
+// are encoders.
 type encoder func(io.Writer, *dto.MetricFamily) (int, error)
 
 type registry struct {
@@ -346,20 +333,23 @@ func (r *registry) Unregister(c Collector) bool {
 	return true
 }
 
-func (r *registry) Push(job, instance, addr, method string) error {
-	u := fmt.Sprintf("http://%s/metrics/jobs/%s", addr, url.QueryEscape(job))
+func (r *registry) Push(job, instance, pushURL, method string) error {
+	if !strings.Contains(pushURL, "://") {
+		pushURL = "http://" + pushURL
+	}
+	pushURL = fmt.Sprintf("%s/metrics/jobs/%s", pushURL, url.QueryEscape(job))
 	if instance != "" {
-		u += "/instances/" + url.QueryEscape(instance)
+		pushURL += "/instances/" + url.QueryEscape(instance)
 	}
 	buf := r.getBuf()
 	defer r.giveBuf(buf)
-	if _, err := r.writePB(buf, text.WriteProtoDelimited); err != nil {
+	if err := r.writePB(expfmt.NewEncoder(buf, expfmt.FmtProtoDelim)); err != nil {
 		if r.panicOnCollectError {
 			panic(err)
 		}
 		return err
 	}
-	req, err := http.NewRequest(method, u, buf)
+	req, err := http.NewRequest(method, pushURL, buf)
 	if err != nil {
 		return err
 	}
@@ -370,17 +360,17 @@ func (r *registry) Push(job, instance, addr, method string) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 202 {
-		return fmt.Errorf("unexpected status code %d while pushing to %s", resp.StatusCode, u)
+		return fmt.Errorf("unexpected status code %d while pushing to %s", resp.StatusCode, pushURL)
 	}
 	return nil
 }
 
 func (r *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	enc, contentType := chooseEncoder(req)
+	contentType := expfmt.Negotiate(req.Header)
 	buf := r.getBuf()
 	defer r.giveBuf(buf)
 	writer, encoding := decorateWriter(req, buf)
-	if _, err := r.writePB(writer, enc); err != nil {
+	if err := r.writePB(expfmt.NewEncoder(writer, contentType)); err != nil {
 		if r.panicOnCollectError {
 			panic(err)
 		}
@@ -391,7 +381,7 @@ func (r *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		closer.Close()
 	}
 	header := w.Header()
-	header.Set(contentTypeHeader, contentType)
+	header.Set(contentTypeHeader, string(contentType))
 	header.Set(contentLengthHeader, fmt.Sprint(buf.Len()))
 	if encoding != "" {
 		header.Set(contentEncodingHeader, encoding)
@@ -399,7 +389,7 @@ func (r *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Write(buf.Bytes())
 }
 
-func (r *registry) writePB(w io.Writer, writeEncoded encoder) (int, error) {
+func (r *registry) writePB(encoder expfmt.Encoder) error {
 	var metricHashes map[uint64]struct{}
 	if r.collectChecksEnabled {
 		metricHashes = make(map[uint64]struct{})
@@ -451,7 +441,7 @@ func (r *registry) writePB(w io.Writer, writeEncoded encoder) (int, error) {
 			// TODO: Consider different means of error reporting so
 			// that a single erroneous metric could be skipped
 			// instead of blowing up the whole collection.
-			return 0, fmt.Errorf("error collecting metric %v: %s", desc, err)
+			return fmt.Errorf("error collecting metric %v: %s", desc, err)
 		}
 		switch {
 		case metricFamily.Type != nil:
@@ -464,12 +454,14 @@ func (r *registry) writePB(w io.Writer, writeEncoded encoder) (int, error) {
 			metricFamily.Type = dto.MetricType_SUMMARY.Enum()
 		case dtoMetric.Untyped != nil:
 			metricFamily.Type = dto.MetricType_UNTYPED.Enum()
+		case dtoMetric.Histogram != nil:
+			metricFamily.Type = dto.MetricType_HISTOGRAM.Enum()
 		default:
-			return 0, fmt.Errorf("empty metric collected: %s", dtoMetric)
+			return fmt.Errorf("empty metric collected: %s", dtoMetric)
 		}
 		if r.collectChecksEnabled {
 			if err := r.checkConsistency(metricFamily, dtoMetric, desc, metricHashes); err != nil {
-				return 0, err
+				return err
 			}
 		}
 		metricFamily.Metric = append(metricFamily.Metric, dtoMetric)
@@ -477,10 +469,26 @@ func (r *registry) writePB(w io.Writer, writeEncoded encoder) (int, error) {
 
 	if r.metricFamilyInjectionHook != nil {
 		for _, mf := range r.metricFamilyInjectionHook() {
-			if _, exists := metricFamiliesByName[mf.GetName()]; exists {
-				return 0, fmt.Errorf("metric family with duplicate name injected: %s", mf)
+			existingMF, exists := metricFamiliesByName[mf.GetName()]
+			if !exists {
+				metricFamiliesByName[mf.GetName()] = mf
+				if r.collectChecksEnabled {
+					for _, m := range mf.Metric {
+						if err := r.checkConsistency(mf, m, nil, metricHashes); err != nil {
+							return err
+						}
+					}
+				}
+				continue
 			}
-			metricFamiliesByName[mf.GetName()] = mf
+			for _, m := range mf.Metric {
+				if r.collectChecksEnabled {
+					if err := r.checkConsistency(existingMF, m, nil, metricHashes); err != nil {
+						return err
+					}
+				}
+				existingMF.Metric = append(existingMF.Metric, m)
+			}
 		}
 	}
 
@@ -497,15 +505,12 @@ func (r *registry) writePB(w io.Writer, writeEncoded encoder) (int, error) {
 	}
 	sort.Strings(names)
 
-	var written int
 	for _, name := range names {
-		w, err := writeEncoded(w, metricFamiliesByName[name])
-		written += w
-		if err != nil {
-			return written, err
+		if err := encoder.Encode(metricFamiliesByName[name]); err != nil {
+			return err
 		}
 	}
-	return written, nil
+	return nil
 }
 
 func (r *registry) checkConsistency(metricFamily *dto.MetricFamily, dtoMetric *dto.Metric, desc *Desc, metricHashes map[uint64]struct{}) error {
@@ -514,18 +519,55 @@ func (r *registry) checkConsistency(metricFamily *dto.MetricFamily, dtoMetric *d
 	if metricFamily.GetType() == dto.MetricType_GAUGE && dtoMetric.Gauge == nil ||
 		metricFamily.GetType() == dto.MetricType_COUNTER && dtoMetric.Counter == nil ||
 		metricFamily.GetType() == dto.MetricType_SUMMARY && dtoMetric.Summary == nil ||
+		metricFamily.GetType() == dto.MetricType_HISTOGRAM && dtoMetric.Histogram == nil ||
 		metricFamily.GetType() == dto.MetricType_UNTYPED && dtoMetric.Untyped == nil {
 		return fmt.Errorf(
-			"collected metric %q is not a %s",
-			dtoMetric, metricFamily.Type,
+			"collected metric %s %s is not a %s",
+			metricFamily.GetName(), dtoMetric, metricFamily.GetType(),
 		)
 	}
 
+	// Is the metric unique (i.e. no other metric with the same name and the same label values)?
+	h := fnv.New64a()
+	var buf bytes.Buffer
+	buf.WriteString(metricFamily.GetName())
+	buf.WriteByte(separatorByte)
+	h.Write(buf.Bytes())
+	// Make sure label pairs are sorted. We depend on it for the consistency
+	// check. Label pairs must be sorted by contract. But the point of this
+	// method is to check for contract violations. So we better do the sort
+	// now.
+	sort.Sort(LabelPairSorter(dtoMetric.Label))
+	for _, lp := range dtoMetric.Label {
+		buf.Reset()
+		buf.WriteString(lp.GetValue())
+		buf.WriteByte(separatorByte)
+		h.Write(buf.Bytes())
+	}
+	metricHash := h.Sum64()
+	if _, exists := metricHashes[metricHash]; exists {
+		return fmt.Errorf(
+			"collected metric %s %s was collected before with the same name and label values",
+			metricFamily.GetName(), dtoMetric,
+		)
+	}
+	metricHashes[metricHash] = struct{}{}
+
+	if desc == nil {
+		return nil // Nothing left to check if we have no desc.
+	}
+
 	// Desc consistency with metric family.
+	if metricFamily.GetName() != desc.fqName {
+		return fmt.Errorf(
+			"collected metric %s %s has name %q but should have %q",
+			metricFamily.GetName(), dtoMetric, metricFamily.GetName(), desc.fqName,
+		)
+	}
 	if metricFamily.GetHelp() != desc.help {
 		return fmt.Errorf(
-			"collected metric %q has help %q but should have %q",
-			dtoMetric, desc.help, metricFamily.GetHelp(),
+			"collected metric %s %s has help %q but should have %q",
+			metricFamily.GetName(), dtoMetric, metricFamily.GetHelp(), desc.help,
 		)
 	}
 
@@ -539,8 +581,8 @@ func (r *registry) checkConsistency(metricFamily *dto.MetricFamily, dtoMetric *d
 	}
 	if len(lpsFromDesc) != len(dtoMetric.Label) {
 		return fmt.Errorf(
-			"labels in collected metric %q are inconsistent with descriptor %s",
-			dtoMetric, desc,
+			"labels in collected metric %s %s are inconsistent with descriptor %s",
+			metricFamily.GetName(), dtoMetric, desc,
 		)
 	}
 	sort.Sort(LabelPairSorter(lpsFromDesc))
@@ -549,39 +591,21 @@ func (r *registry) checkConsistency(metricFamily *dto.MetricFamily, dtoMetric *d
 		if lpFromDesc.GetName() != lpFromMetric.GetName() ||
 			lpFromDesc.Value != nil && lpFromDesc.GetValue() != lpFromMetric.GetValue() {
 			return fmt.Errorf(
-				"labels in collected metric %q are inconsistent with descriptor %s",
-				dtoMetric, desc,
+				"labels in collected metric %s %s are inconsistent with descriptor %s",
+				metricFamily.GetName(), dtoMetric, desc,
 			)
 		}
 	}
-
-	// Is the metric unique (i.e. no other metric with the same name and the same label values)?
-	h := fnv.New64a()
-	var buf bytes.Buffer
-	buf.WriteString(desc.fqName)
-	buf.WriteByte(model.SeparatorByte)
-	h.Write(buf.Bytes())
-	for _, lp := range dtoMetric.Label {
-		buf.Reset()
-		buf.WriteString(lp.GetValue())
-		buf.WriteByte(model.SeparatorByte)
-		h.Write(buf.Bytes())
-	}
-	metricHash := h.Sum64()
-	if _, exists := metricHashes[metricHash]; exists {
-		return fmt.Errorf(
-			"collected metric %q was collected before with the same name and label values",
-			dtoMetric,
-		)
-	}
-	metricHashes[metricHash] = struct{}{}
 
 	r.mtx.RLock() // Remaining checks need the read lock.
 	defer r.mtx.RUnlock()
 
 	// Is the desc registered?
 	if _, exist := r.descIDs[desc.id]; !exist {
-		return fmt.Errorf("collected metric %q with unregistered descriptor %s", dtoMetric, desc)
+		return fmt.Errorf(
+			"collected metric %s %s with unregistered descriptor %s",
+			metricFamily.GetName(), dtoMetric, desc,
+		)
 	}
 
 	return nil
@@ -656,34 +680,6 @@ func newDefaultRegistry() *registry {
 	return r
 }
 
-func chooseEncoder(req *http.Request) (encoder, string) {
-	accepts := goautoneg.ParseAccept(req.Header.Get(acceptHeader))
-	for _, accept := range accepts {
-		switch {
-		case accept.Type == "application" &&
-			accept.SubType == "vnd.google.protobuf" &&
-			accept.Params["proto"] == "io.prometheus.client.MetricFamily":
-			switch accept.Params["encoding"] {
-			case "delimited":
-				return text.WriteProtoDelimited, DelimitedTelemetryContentType
-			case "text":
-				return text.WriteProtoText, ProtoTextTelemetryContentType
-			case "compact-text":
-				return text.WriteProtoCompactText, ProtoCompactTextTelemetryContentType
-			default:
-				continue
-			}
-		case accept.Type == "text" &&
-			accept.SubType == "plain" &&
-			(accept.Params["version"] == "0.0.4" || accept.Params["version"] == ""):
-			return text.MetricFamilyToText, TextTelemetryContentType
-		default:
-			continue
-		}
-	}
-	return text.MetricFamilyToText, TextTelemetryContentType
-}
-
 // decorateWriter wraps a writer to handle gzip compression if requested.  It
 // returns the decorated writer and the appropriate "Content-Encoding" header
 // (which is empty if no compression is enabled).
@@ -710,6 +706,15 @@ func (s metricSorter) Swap(i, j int) {
 }
 
 func (s metricSorter) Less(i, j int) bool {
+	if len(s[i].Label) != len(s[j].Label) {
+		// This should not happen. The metrics are
+		// inconsistent. However, we have to deal with the fact, as
+		// people might use custom collectors or metric family injection
+		// to create inconsistent metrics. So let's simply compare the
+		// number of labels in this case. That will still yield
+		// reproducible sorting.
+		return len(s[i].Label) < len(s[j].Label)
+	}
 	for n, lp := range s[i].Label {
 		vi := lp.GetValue()
 		vj := s[j].Label[n].GetValue()

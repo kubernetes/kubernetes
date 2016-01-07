@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,5 +20,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+guestbook_version=${1:-latest}
 docker build --rm --force-rm -t kubernetes/guestbook-builder .
-docker run --rm kubernetes/guestbook-builder | docker build -t kubernetes/guestbook -
+docker run --rm kubernetes/guestbook-builder | docker build -t "kubernetes/guestbook:${guestbook_version}" -

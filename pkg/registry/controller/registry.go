@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,17 +17,74 @@ limitations under the License.
 package controller
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"fmt"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store ReplicationControllers.
 type Registry interface {
-	ListControllers(ctx api.Context) (*api.ReplicationControllerList, error)
-	WatchControllers(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	ListControllers(ctx api.Context, options *api.ListOptions) (*api.ReplicationControllerList, error)
+	WatchControllers(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 	GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error)
-	CreateController(ctx api.Context, controller *api.ReplicationController) error
-	UpdateController(ctx api.Context, controller *api.ReplicationController) error
+	CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
+	UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
 	DeleteController(ctx api.Context, controllerID string) error
+}
+
+// storage puts strong typing around storage calls
+type storage struct {
+	rest.StandardStorage
+}
+
+// NewRegistry returns a new Registry interface for the given Storage. Any mismatched
+// types will panic.
+func NewRegistry(s rest.StandardStorage) Registry {
+	return &storage{s}
+}
+
+func (s *storage) ListControllers(ctx api.Context, options *api.ListOptions) (*api.ReplicationControllerList, error) {
+	if options != nil && options.FieldSelector != nil && !options.FieldSelector.Empty() {
+		return nil, fmt.Errorf("field selector not supported yet")
+	}
+	obj, err := s.List(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.ReplicationControllerList), err
+}
+
+func (s *storage) WatchControllers(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+	return s.Watch(ctx, options)
+}
+
+func (s *storage) GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error) {
+	obj, err := s.Get(ctx, controllerID)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.ReplicationController), nil
+}
+
+func (s *storage) CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
+	obj, err := s.Create(ctx, controller)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.ReplicationController), nil
+}
+
+func (s *storage) UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
+	obj, _, err := s.Update(ctx, controller)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.ReplicationController), nil
+}
+
+func (s *storage) DeleteController(ctx api.Context, controllerID string) error {
+	_, err := s.Delete(ctx, controllerID, nil)
+	return err
 }

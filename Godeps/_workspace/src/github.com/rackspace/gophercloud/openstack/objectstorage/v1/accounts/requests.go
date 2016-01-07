@@ -1,9 +1,6 @@
 package accounts
 
-import (
-	"github.com/racker/perigee"
-	"github.com/rackspace/gophercloud"
-)
+import "github.com/rackspace/gophercloud"
 
 // GetOptsBuilder allows extensions to add additional headers to the Get
 // request.
@@ -42,11 +39,13 @@ func Get(c *gophercloud.ServiceClient, opts GetOptsBuilder) GetResult {
 		}
 	}
 
-	resp, err := perigee.Request("HEAD", getURL(c), perigee.Options{
+	resp, err := c.Request("HEAD", getURL(c), gophercloud.RequestOpts{
 		MoreHeaders: h,
 		OkCodes:     []int{204},
 	})
-	res.Header = resp.HttpResponse.Header
+	if resp != nil {
+		res.Header = resp.Header
+	}
 	res.Err = err
 	return res
 }
@@ -83,7 +82,7 @@ func (opts UpdateOpts) ToAccountUpdateMap() (map[string]string, error) {
 // To extract the headers returned, call the Extract method on the UpdateResult.
 func Update(c *gophercloud.ServiceClient, opts UpdateOptsBuilder) UpdateResult {
 	var res UpdateResult
-	h := c.AuthenticatedHeaders()
+	h := make(map[string]string)
 
 	if opts != nil {
 		headers, err := opts.ToAccountUpdateMap()
@@ -96,11 +95,13 @@ func Update(c *gophercloud.ServiceClient, opts UpdateOptsBuilder) UpdateResult {
 		}
 	}
 
-	resp, err := perigee.Request("POST", updateURL(c), perigee.Options{
+	resp, err := c.Request("POST", updateURL(c), gophercloud.RequestOpts{
 		MoreHeaders: h,
-		OkCodes:     []int{204},
+		OkCodes:     []int{201, 202, 204},
 	})
-	res.Header = resp.HttpResponse.Header
+	if resp != nil {
+		res.Header = resp.Header
+	}
 	res.Err = err
 	return res
 }

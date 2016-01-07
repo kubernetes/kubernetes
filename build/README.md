@@ -1,14 +1,17 @@
 # Building Kubernetes
 
-To build Kubernetes you need to have access to a Docker installation through either of the following methods:
+Building Kubernetes is easy if you take advantage of the containerized build environment. This document will help guide you through understanding this build process.
 
 ## Requirements
 
-1. Be running Docker.  2 options supported/tested:
-  1. **Mac OS X** The best way to go is to use `boot2docker`.  See instructions [here](https://docs.docker.com/installation/mac/).
+1. Docker, using one of the two following configurations:
+  1. **Mac OS X** You can either use docker-machine or boot2docker. See installation instructions [here](https://docs.docker.com/installation/mac/).  
+  * **Note**: You will want to set the boot2docker vm to have at least 3GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)) and do not `make quick-release` from `/tmp/` (See: [#14773]( https://github.com/kubernetes/kubernetes/issues/14773))
   2. **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.  The scripts here assume that they are using a local Docker server and that they can "reach around" docker and grab results directly from the file system.
-2. Have python installed.  Pretty much it is installed everywhere at this point so you can probably ignore this.
-3. *Optional* For uploading your release to Google Cloud Storage, have the [Google Cloud SDK](https://developers.google.com/cloud/sdk/) installed and configured.
+2. [Python](https://www.python.org)
+3. **Optional** [Google Cloud SDK](https://developers.google.com/cloud/sdk/)
+
+You must install and configure Google Cloud SDK if you want to upload your release to Google Cloud Storage and may safely omit this otherwise.
 
 ## Overview
 
@@ -34,7 +37,7 @@ The `release.sh` script will build a release.  It will build binaries, run tests
 
 The main output is a tar file: `kubernetes.tar.gz`.  This includes:
 * Cross compiled client utilities.
-* Script (`cluster/kubectl.sh`) for picking and running the right client binary based on platform.
+* Script (`kubectl`) for picking and running the right client binary based on platform.
 * Examples
 * Cluster deployment scripts for various clouds
 * Tar file containing all server binaries
@@ -67,10 +70,28 @@ Everything in `build/build-image/` is meant to be run inside of the container.  
 
 When building final release tars, they are first staged into `_output/release-stage` before being tar'd up and put into `_output/release-tars`.
 
+## Proxy Settings
+
+
+If you are behind a proxy, you need to edit `build/build-image/Dockerfile` and add proxy settings to execute command in that container correctly.
+
+example:
+
+`ENV http_proxy http://username:password@proxyaddr:proxyport`
+
+`ENV https_proxy http://username:password@proxyaddr:proxyport`
+
+Besides, to avoid integration test touch the proxy while connecting to local etcd service, you need to set
+
+`ENV no_proxy 127.0.0.1`
+
 ## TODOs
 
 These are in no particular order
 
 * [X] Harmonize with scripts in `hack/`.  How much do we support building outside of Docker and these scripts?
 * [X] Deprecate/replace most of the stuff in the hack/
-* [ ] Finish support for the Dockerized runtime. Issue (#19)[https://github.com/GoogleCloudPlatform/kubernetes/issues/19].  A key issue here is to make this fast/light enough that we can use it for development workflows.
+* [ ] Finish support for the Dockerized runtime. Issue [#19](http://issue.k8s.io/19).  A key issue here is to make this fast/light enough that we can use it for development workflows.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build/README.md?pixel)]()

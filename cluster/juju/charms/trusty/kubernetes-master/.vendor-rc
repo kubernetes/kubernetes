@@ -1,0 +1,5 @@
+omit:
+- .git
+- .gitignore
+- .gitmodules
+- revision

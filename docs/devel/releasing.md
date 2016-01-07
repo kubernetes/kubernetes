@@ -1,9 +1,236 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/devel/releasing.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Releasing Kubernetes
 
-This document explains how to create a Kubernetes release (as in version) and
-how the version information gets embedded into the built binaries.
+This document explains how to cut a release, and the theory behind it. If you
+just want to cut a release and move on with your life, you can stop reading
+after the first section.
 
-## Origin of the Sources
+## How to cut a Kubernetes release
+
+Regardless of whether you are cutting a major or minor version, cutting a
+release breaks down into four pieces:
+
+1. selecting release components;
+1. cutting/branching the release;
+1. building and pushing the binaries; and
+1. publishing binaries and release notes.
+1. updating the master branch.
+
+You should progress in this strict order.
+
+### Selecting release components
+
+First, figure out what kind of release you're doing, what branch you're cutting
+from, and other prerequisites.
+
+* Alpha releases (`vX.Y.0-alpha.W`) are cut directly from `master`.
+  * Alpha releases don't require anything besides green tests, (see below).
+* Beta releases (`vX.Y.Z-beta.W`) are cut from their respective release branch,
+  `release-X.Y`.
+  * Make sure all necessary cherry picks have been resolved.  You should ensure
+    that all outstanding cherry picks have been reviewed and merged and the
+    branch validated on Jenkins. See [Cherry Picks](cherry-picks.md) for more
+    information on how to manage cherry picks prior to cutting the release.
+  * Beta releases also require green tests, (see below).
+* Official releases (`vX.Y.Z`) are cut from their respective release branch,
+  `release-X.Y`.
+  * Official releases should be similar or identical to their respective beta
+    releases, so have a look at the cherry picks that have been merged since
+    the beta release and question everything you find.
+  * Official releases also require green tests, (see below).
+* New release series are also cut directly from `master`.
+  * **This is a big deal!**  If you're reading this doc for the first time, you
+    probably shouldn't be doing this release, and should talk to someone on the
+    release team.
+  * New release series cut a new release branch, `release-X.Y`, off of
+    `master`, and also release the first beta in the series, `vX.Y.0-beta.0`.
+  * Every change in the `vX.Y` series from this point on will have to be
+    cherry picked, so be sure you want to do this before proceeding.
+  * You should still look for green tests, (see below).
+
+No matter what you're cutting, you're going to want to look at
+[Jenkins](http://go/k8s-test/).  Figure out what branch you're cutting from,
+(see above,) and look at the critical jobs building from that branch.  First
+glance through builds and look for nice solid rows of green builds, and then
+check temporally with the other critical builds to make sure they're solid
+around then as well.
+
+If you're doing an alpha release or cutting a new release series, you can
+choose an arbitrary build.  If you are doing an official release, you have to
+release from HEAD of the branch, (because you have to do some version-rev
+commits,) so choose the latest build on the release branch.  (Remember, that
+branch should be frozen.)
+
+Once you find some greens, you can find the build hash for a build by looking at
+the Full Console Output and searching for `build_version=`. You should see a line:
+
+```console
+build_version=v1.2.0-alpha.2.164+b44c7d79d6c9bb
+```
+
+Or, if you're cutting from a release branch (i.e. doing an official release),
+
+```console
+build_version=v1.1.0-beta.567+d79d6c9bbb44c7
+```
+
+Please note that `build_version` was called `githash` versions prior to v1.2.
+
+Because Jenkins builds frequently, if you're looking between jobs
+(e.g. `kubernetes-e2e-gke-ci` and `kubernetes-e2e-gce`), there may be no single
+`build_version` that's been run on both jobs. In that case, take the a green
+`kubernetes-e2e-gce` build (but please check that it corresponds to a temporally
+similar build that's green on `kubernetes-e2e-gke-ci`). Lastly, if you're having
+trouble understanding why the GKE continuous integration clusters are failing
+and you're trying to cut a release, don't hesitate to contact the GKE
+oncall.
+
+Before proceeding to the next step:
+
+```sh
+export BUILD_VERSION=v1.2.0-alpha.2.164+b44c7d79d6c9bb
+```
+
+Where `v1.2.0-alpha.2.164+b44c7d79d6c9bb` is the build hash you decided on. This
+will become your release point.
+
+### Cutting/branching the release
+
+You'll need the latest version of the releasing tools:
+
+```console
+git clone git@github.com:kubernetes/kubernetes.git
+cd kubernetes
+```
+
+or `git fetch upstream && git checkout upstream/master` from an existing repo.
+
+Decide what version you're cutting and export it:
+
+- alpha release: `export RELEASE_VERSION="vX.Y.0-alpha.W"`;
+- beta release: `export RELEASE_VERSION="vX.Y.Z-beta.W"`;
+- official release: `export RELEASE_VERSION="vX.Y.Z"`;
+- new release series: `export RELEASE_VERSION="vX.Y"`.
+
+Then, run
+
+```console
+./release/cut-official-release.sh "${RELEASE_VERSION}" "${BUILD_VERSION}"
+```
+
+This will do a dry run of the release.  It will give you instructions at the
+end for `pushd`ing into the dry-run directory and having a look around.
+`pushd` into the directory and make sure everythig looks as you expect:
+
+```console
+git log "${RELEASE_VERSION}"  # do you see the commit you expect?
+make release
+./cluster/kubectl.sh version -c
+```
+
+If you're satisfied with the result of the script, go back to `upstream/master`
+run
+
+```console
+./release/cut-official-release.sh "${RELEASE_VERSION}" "${BUILD_VERSION}" --no-dry-run
+```
+
+and follow the instructions.
+
+### Publishing binaries and release notes
+
+Only publish a beta release if it's a standalone pre-release (*not*
+vX.Y.Z-beta.0).  We create beta tags after we do official releases to
+maintain proper semantic versioning, but we don't publish these beta releases.
+
+The script you ran above will prompt you to take any remaining steps to push
+tars, and will also give you a template for the release notes.  Compose an
+email to the team with the template.  Figure out what the PR numbers for this
+release and last release are, and get an api-token from GitHub
+(https://github.com/settings/tokens).  From a clone of
+[kubernetes/contrib](https://github.com/kubernetes/contrib),
+
+```
+go run release-notes/release-notes.go --last-release-pr=<number> --current-release-pr=<number> --api-token=<token> --base=<release-branch>
+```
+
+where `<release-branch>` is `master` for alpha releases and `release-X.Y` for beta and official releases.
+
+**If this is a first official release (vX.Y.0)**, look through the release
+notes for all of the alpha releases since the last cycle, and include anything
+important in release notes.
+
+Feel free to edit the notes, (e.g. cherry picks should generally just have the
+same title as the original PR).
+
+Send the email out, letting people know these are the draft release notes.  If
+they want to change anything, they should update the appropriate PRs with the
+`release-note` label.
+
+When you're ready to announce the release, [create a GitHub
+release](https://github.com/kubernetes/kubernetes/releases/new):
+
+1. pick the appropriate tag;
+1. check "This is a pre-release" if it's an alpha or beta release;
+1. fill in the release title from the draft;
+1. re-run the appropriate release notes tool(s) to pick up any changes people
+   have made;
+1. find the appropriate `kubernetes.tar.gz` in [GCS bucket](https://
+console.developers.google.com/storage/browser/kubernetes-release/release/),
+   download it, double check the hash (compare to what you had in the release
+   notes draft), and attach it to the release; and
+1. publish!
+
+Finally, from a clone of upstream/master, *make sure* you still have
+`RELEASE_VERSION` set correctly, and run `./build/mark-stable-release.sh
+${RELEASE_VERSION}`.
+
+### Updating the master branch
+
+If you are cutting a new release series, please also update the master branch:
+change the `latestReleaseBranch` in `cmd/mungedocs/mungedocs.go` to the new
+release branch (`release-X.Y`), run `hack/update-generated-docs.sh`. This will
+let the unversioned warning in docs point to the latest release series. Please
+send the changes as a PR titled "Update the latestReleaseBranch to release-X.Y
+in the munger".
+
+## Injecting Version into Binaries
+
+*Please note that this information may be out of date.  The scripts are the
+authoritative source on how version injection works.*
 
 Kubernetes may be built from either a git tree (using `hack/build-go.sh`) or
 from a tarball (using either `hack/build-go.sh` or `go install`) or directly by
@@ -19,34 +246,6 @@ access to the information about the git tree, but we still want to be able to
 tell whether this build corresponds to an exact release (e.g. v0.3) or is
 between releases (e.g. at some point in development between v0.3 and v0.4).
 
-## Version Number Format
-
-In order to account for these use cases, there are some specific formats that
-may end up representing the Kubernetes version. Here are a few examples:
-
-- **v0.5**: This is official version 0.5 and this version will only be used
-  when building from a clean git tree at the v0.5 git tag, or from a tree
-  extracted from the tarball corresponding to that specific release.
-- **v0.5-15-g0123abcd4567**: This is the `git describe` output and it indicates
-  that we are 15 commits past the v0.5 release and that the SHA1 of the commit
-  where the binaries were built was `0123abcd4567`. It is only possible to have
-  this level of detail in the version information when building from git, not
-  when building from a tarball.
-- **v0.5-15-g0123abcd4567-dirty** or **v0.5-dirty**: The extra `-dirty` prefix
-  means that the tree had local modifications or untracked files at the time of
-  the build, so there's no guarantee that the source code matches exactly the
-  state of the tree at the `0123abcd4567` commit or at the `v0.5` git tag
-  (resp.)
-- **v0.5-dev**: This means we are building from a tarball or using `go get` or,
-  if we have a git tree, we are using `go install` directly, so it is not
-  possible to inject the git version into the build information. Additionally,
-  this is not an official release, so the `-dev` prefix indicates that the
-  version we are building is after `v0.5` but before `v0.6`. (There is actually
-  an exception where a commit with `v0.5-dev` is not present on `v0.6`, see
-  later for details.)
-
-## Injecting Version into Binaries
-
 In order to cover the different build cases, we start by providing information
 that can be used when using only Go build tools or when we do not have the git
 version information available.
@@ -58,11 +257,11 @@ present.
 We are using `pkg/version/base.go` as the source of versioning in absence of
 information from git. Here is a sample of that file's contents:
 
-```
-  var (
-      gitVersion   string = "v0.4-dev"  // version from git, output of $(git describe)
-      gitCommit    string = ""          // sha1 from git, output of $(git rev-parse HEAD)
-  )
+```go
+var (
+    gitVersion   string = "v0.4-dev"  // version from git, output of $(git describe)
+    gitCommit    string = ""          // sha1 from git, output of $(git rev-parse HEAD)
+)
 ```
 
 This means a build with `go install` or `go get` or a build from a tarball will
@@ -77,76 +276,7 @@ can, for instance, tell it to override `gitVersion` and set it to
 `v0.4-13-g4567bcdef6789-dirty` and set `gitCommit` to `4567bcdef6789...` which
 is the complete SHA1 of the (dirty) tree used at build time.
 
-## Handling Official Versions
 
-Handling official versions from git is easy, as long as there is an annotated
-git tag pointing to a specific version then `git describe` will return that tag
-exactly which will match the idea of an official version (e.g. `v0.5`).
-
-Handling it on tarballs is a bit harder since the exact version string must be
-present in `pkg/version/base.go` for it to get embedded into the binaries. But
-simply creating a commit with `v0.5` on its own would mean that the commits
-coming after it would also get the `v0.5` version when built from tarball or `go
-get` while in fact they do not match `v0.5` (the one that was tagged) exactly.
-
-To handle that case, creating a new release should involve creating two adjacent
-commits where the first of them will set the version to `v0.5` and the second
-will set it to `v0.5-dev`. In that case, even in the presence of merges, there
-will be a single comit where the exact `v0.5` version will be used and all
-others around it will either have `v0.4-dev` or `v0.5-dev`.
-
-The diagram below illustrates it.
-
-![Diagram of git commits involved in the release](./releasing.png)
-
-After working on `v0.4-dev` and merging PR 99 we decide it is time to release
-`v0.5`. So we start a new branch, create one commit to update
-`pkg/version/base.go` to include `gitVersion = "v0.5"` and `git commit` it.
-
-We test it and make sure everything is working as expected.
-
-Before sending a PR for it, we create a second commit on that same branch,
-updating `pkg/version/base.go` to include `gitVersion = "v0.5-dev"`. That will
-ensure that further builds (from tarball or `go install`) on that tree will
-always include the `-dev` prefix and will not have a `v0.5` version (since they
-do not match the official `v0.5` exactly.)
-
-We then send PR 100 with both commits in it.
-
-Once the PR is accepted, we can use `git tag -a` to create an annotated tag
-*pointing to the one commit* that has `v0.5` in `pkg/version/base.go` and push
-it to GitHub. (Unfortunately GitHub tags/releases are not annotated tags, so
-this needs to be done from a git client and pushed to GitHub using SSH.)
-
-## Parallel Commits
-
-While we are working on releasing `v0.5`, other development takes place and
-other PRs get merged. For instance, in the example above, PRs 101 and 102 get
-merged to the master branch before the versioning PR gets merged.
-
-This is not a problem, it is only slightly inaccurate that checking out the tree
-at commit `012abc` or commit `345cde` or at the commit of the merges of PR 101
-or 102 will yield a version of `v0.4-dev` *but* those commits are not present in
-`v0.5`.
-
-In that sense, there is a small window in which commits will get a
-`v0.4-dev` or `v0.4-N-gXXX` label and while they're indeed later than `v0.4`
-but they are not really before `v0.5` in that `v0.5` does not contain those
-commits.
-
-Unfortunately, there is not much we can do about it. On the other hand, other
-projects seem to live with that and it does not really become a large problem.
-
-As an example, Docker commit a327d9b91edf has a `v1.1.1-N-gXXX` label but it is
-not present in Docker `v1.2.0`:
-
-```
-  $ git describe a327d9b91edf
-  v1.1.1-822-ga327d9b91edf
-
-  $ git log --oneline v1.2.0..a327d9b91edf
-  a327d9b91edf Fix data space reporting from Kb/Mb to KB/MB
-
-  (Non-empty output here means the commit is not present on v1.2.0.)
-```
-
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/releasing.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

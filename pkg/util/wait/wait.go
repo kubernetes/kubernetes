@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,26 +43,54 @@ type ConditionFunc func() (done bool, err error)
 // Poll tries a condition func until it returns true, an error, or the timeout
 // is reached. condition will always be invoked at least once but some intervals
 // may be missed if the condition takes too long or the time window is too short.
-// If you pass maxTimes = 0, Poll will loop until condition returns true or an
-// error.
+// If you want to Poll something forever, see PollInfinite.
+// Poll always waits the interval before the first check of the condition.
 func Poll(interval, timeout time.Duration, condition ConditionFunc) error {
-	return WaitFor(poller(interval, timeout), condition)
+	return pollInternal(poller(interval, timeout), condition)
+}
+
+func pollInternal(wait WaitFunc, condition ConditionFunc) error {
+	done := make(chan struct{})
+	defer close(done)
+	return WaitFor(wait, condition, done)
+}
+
+func PollImmediate(interval, timeout time.Duration, condition ConditionFunc) error {
+	return pollImmediateInternal(poller(interval, timeout), condition)
+}
+
+func pollImmediateInternal(wait WaitFunc, condition ConditionFunc) error {
+	done, err := condition()
+	if err != nil {
+		return err
+	}
+	if done {
+		return nil
+	}
+	return pollInternal(wait, condition)
+}
+
+// PollInfinite polls forever.
+func PollInfinite(interval time.Duration, condition ConditionFunc) error {
+	done := make(chan struct{})
+	defer close(done)
+	return WaitFor(poller(interval, 0), condition, done)
 }
 
 // WaitFunc creates a channel that receives an item every time a test
 // should be executed and is closed when the last test should be invoked.
-type WaitFunc func() <-chan struct{}
+type WaitFunc func(done <-chan struct{}) <-chan struct{}
 
-// WaitFor gets a channel from wait(), and then invokes c once for every value
-// placed on the channel and once more when the channel is closed.  If c
-// returns an error the loop ends and that error is returned, and if c returns
+// WaitFor gets a channel from wait(), and then invokes fn once for every value
+// placed on the channel and once more when the channel is closed.  If fn
+// returns an error the loop ends and that error is returned, and if fn returns
 // true the loop ends and nil is returned. ErrWaitTimeout will be returned if
-// the channel is closed without c every returning true.
-func WaitFor(wait WaitFunc, c ConditionFunc) error {
-	w := wait()
+// the channel is closed without fn ever returning true.
+func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
+	c := wait(done)
 	for {
-		_, open := <-w
-		ok, err := c()
+		_, open := <-c
+		ok, err := fn()
 		if err != nil {
 			return err
 		}
@@ -79,28 +107,45 @@ func WaitFor(wait WaitFunc, c ConditionFunc) error {
 // poller returns a WaitFunc that will send to the channel every
 // interval until timeout has elapsed and then close the channel.
 // Over very short intervals you may receive no ticks before
-// the channel is closed closed.  If maxTimes is 0, the channel
+// the channel is closed.  If timeout is 0, the channel
 // will never be closed.
 func poller(interval, timeout time.Duration) WaitFunc {
-	return WaitFunc(func() <-chan struct{} {
+	return WaitFunc(func(done <-chan struct{}) <-chan struct{} {
 		ch := make(chan struct{})
+
 		go func() {
+			defer close(ch)
+
 			tick := time.NewTicker(interval)
 			defer tick.Stop()
+
 			var after <-chan time.Time
 			if timeout != 0 {
-				after = time.After(timeout)
+				// time.After is more convenient, but it
+				// potentially leaves timers around much longer
+				// than necessary if we exit early.
+				timer := time.NewTimer(timeout)
+				after = timer.C
+				defer timer.Stop()
 			}
+
 			for {
 				select {
 				case <-tick.C:
-					ch <- struct{}{}
+					// If the consumer isn't ready for this signal drop it and
+					// check the other channels.
+					select {
+					case ch <- struct{}{}:
+					default:
+					}
 				case <-after:
-					close(ch)
+					return
+				case <-done:
 					return
 				}
 			}
 		}()
+
 		return ch
 	})
 }

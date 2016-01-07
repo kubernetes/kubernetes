@@ -6,7 +6,7 @@ package html
 
 // Section 12.2.3.2 of the HTML5 specification says "The following elements
 // have varying levels of special parsing rules".
-// http://www.whatwg.org/specs/web-apps/current-work/multipage/parsing.html#the-stack-of-open-elements
+// https://html.spec.whatwg.org/multipage/syntax.html#the-stack-of-open-elements
 var isSpecialElementMap = map[string]bool{
 	"address":    true,
 	"applet":     true,
@@ -24,7 +24,6 @@ var isSpecialElementMap = map[string]bool{
 	"center":     true,
 	"col":        true,
 	"colgroup":   true,
-	"command":    true,
 	"dd":         true,
 	"details":    true,
 	"dir":        true,
@@ -73,17 +72,20 @@ var isSpecialElementMap = map[string]bool{
 	"script":     true,
 	"section":    true,
 	"select":     true,
+	"source":     true,
 	"style":      true,
 	"summary":    true,
 	"table":      true,
 	"tbody":      true,
 	"td":         true,
+	"template":   true,
 	"textarea":   true,
 	"tfoot":      true,
 	"th":         true,
 	"thead":      true,
 	"title":      true,
 	"tr":         true,
+	"track":      true,
 	"ul":         true,
 	"wbr":        true,
 	"xmp":        true,

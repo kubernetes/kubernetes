@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -73,13 +73,16 @@ func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Requ
 	f.RequestBody = string(bodyReceived)
 }
 
-func (f *FakeHandler) ValidateRequestCount(t TestInterface, count int) {
+func (f *FakeHandler) ValidateRequestCount(t TestInterface, count int) bool {
+	ok := true
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	if f.requestCount != count {
+		ok = false
 		t.Logf("Expected %d call, but got %d. Only the last call is recorded and checked.", count, f.requestCount)
 	}
 	f.hasBeenChecked = true
+	return ok
 }
 
 // ValidateRequest verifies that FakeHandler received a request with expected path, method, and body.

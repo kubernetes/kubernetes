@@ -2,10 +2,13 @@ package servers
 
 import (
 	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
 
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
+	"github.com/rackspace/gophercloud/openstack/compute/v2/flavors"
+	"github.com/rackspace/gophercloud/openstack/compute/v2/images"
 	"github.com/rackspace/gophercloud/pagination"
 )
 
@@ -46,6 +49,9 @@ type ListOpts struct {
 
 	// Integer value for the limit of values to return.
 	Limit int `q:"limit"`
+
+	// Bool to show all tenants
+	AllTenants bool `q:"all_tenants"`
 }
 
 // ToServerListQuery formats a ListOpts into a query string.
@@ -96,17 +102,53 @@ type Network struct {
 	FixedIP string
 }
 
+// Personality is an array of files that are injected into the server at launch.
+type Personality []*File
+
+// File is used within CreateOpts and RebuildOpts to inject a file into the server at launch.
+// File implements the json.Marshaler interface, so when a Create or Rebuild operation is requested,
+// json.Marshal will call File's MarshalJSON method.
+type File struct {
+	// Path of the file
+	Path string
+	// Contents of the file. Maximum content size is 255 bytes.
+	Contents []byte
+}
+
+// MarshalJSON marshals the escaped file, base64 encoding the contents.
+func (f *File) MarshalJSON() ([]byte, error) {
+	file := struct {
+		Path     string `json:"path"`
+		Contents string `json:"contents"`
+	}{
+		Path:     f.Path,
+		Contents: base64.StdEncoding.EncodeToString(f.Contents),
+	}
+	return json.Marshal(file)
+}
+
 // CreateOpts specifies server creation parameters.
 type CreateOpts struct {
 	// Name [required] is the name to assign to the newly launched server.
 	Name string
 
-	// ImageRef [required] is the ID or full URL to the image that contains the server's OS and initial state.
-	// Optional if using the boot-from-volume extension.
+	// ImageRef [optional; required if ImageName is not provided] is the ID or full
+	// URL to the image that contains the server's OS and initial state.
+	// Also optional if using the boot-from-volume extension.
 	ImageRef string
 
-	// FlavorRef [required] is the ID or full URL to the flavor that describes the server's specs.
+	// ImageName [optional; required if ImageRef is not provided] is the name of the
+	// image that contains the server's OS and initial state.
+	// Also optional if using the boot-from-volume extension.
+	ImageName string
+
+	// FlavorRef [optional; required if FlavorName is not provided] is the ID or
+	// full URL to the flavor that describes the server's specs.
 	FlavorRef string
+
+	// FlavorName [optional; required if FlavorRef is not provided] is the name of
+	// the flavor that describes the server's specs.
+	FlavorName string
 
 	// SecurityGroups [optional] lists the names of the security groups to which this server should belong.
 	SecurityGroups []string
@@ -125,12 +167,22 @@ type CreateOpts struct {
 	// Metadata [optional] contains key-value pairs (up to 255 bytes each) to attach to the server.
 	Metadata map[string]string
 
-	// Personality [optional] includes the path and contents of a file to inject into the server at launch.
-	// The maximum size of the file is 255 bytes (decoded).
-	Personality []byte
+	// Personality [optional] includes files to inject into the server at launch.
+	// Create will base64-encode file contents for you.
+	Personality Personality
 
 	// ConfigDrive [optional] enables metadata injection through a configuration drive.
 	ConfigDrive bool
+
+	// AdminPass [optional] sets the root user password. If not set, a randomly-generated
+	// password will be created and returned in the response.
+	AdminPass string
+
+	// AccessIPv4 [optional] specifies an IPv4 address for the instance.
+	AccessIPv4 string
+
+	// AccessIPv6 [optional] specifies an IPv6 address for the instance.
+	AccessIPv6 string
 }
 
 // ToServerCreateMap assembles a request body based on the contents of a CreateOpts.
@@ -139,15 +191,13 @@ func (opts CreateOpts) ToServerCreateMap() (map[string]interface{}, error) {
 
 	server["name"] = opts.Name
 	server["imageRef"] = opts.ImageRef
+	server["imageName"] = opts.ImageName
 	server["flavorRef"] = opts.FlavorRef
+	server["flavorName"] = opts.FlavorName
 
 	if opts.UserData != nil {
 		encoded := base64.StdEncoding.EncodeToString(opts.UserData)
 		server["user_data"] = &encoded
-	}
-	if opts.Personality != nil {
-		encoded := base64.StdEncoding.EncodeToString(opts.Personality)
-		server["personality"] = &encoded
 	}
 	if opts.ConfigDrive {
 		server["config_drive"] = "true"
@@ -158,12 +208,22 @@ func (opts CreateOpts) ToServerCreateMap() (map[string]interface{}, error) {
 	if opts.Metadata != nil {
 		server["metadata"] = opts.Metadata
 	}
+	if opts.AdminPass != "" {
+		server["adminPass"] = opts.AdminPass
+	}
+	if opts.AccessIPv4 != "" {
+		server["accessIPv4"] = opts.AccessIPv4
+	}
+	if opts.AccessIPv6 != "" {
+		server["accessIPv6"] = opts.AccessIPv6
+	}
 
 	if len(opts.SecurityGroups) > 0 {
 		securityGroups := make([]map[string]interface{}, len(opts.SecurityGroups))
 		for i, groupName := range opts.SecurityGroups {
 			securityGroups[i] = map[string]interface{}{"name": groupName}
 		}
+		server["security_groups"] = securityGroups
 	}
 
 	if len(opts.Networks) > 0 {
@@ -183,6 +243,10 @@ func (opts CreateOpts) ToServerCreateMap() (map[string]interface{}, error) {
 		server["networks"] = networks
 	}
 
+	if len(opts.Personality) > 0 {
+		server["personality"] = opts.Personality
+	}
+
 	return map[string]interface{}{"server": server}, nil
 }
 
@@ -196,31 +260,54 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 		return res
 	}
 
-	_, res.Err = perigee.Request("POST", listURL(client), perigee.Options{
-		Results:     &res.Body,
-		ReqBody:     reqBody,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
-	})
+	// If ImageRef isn't provided, use ImageName to ascertain the image ID.
+	if reqBody["server"].(map[string]interface{})["imageRef"].(string) == "" {
+		imageName := reqBody["server"].(map[string]interface{})["imageName"].(string)
+		if imageName == "" {
+			res.Err = errors.New("One and only one of ImageRef and ImageName must be provided.")
+			return res
+		}
+		imageID, err := images.IDFromName(client, imageName)
+		if err != nil {
+			res.Err = err
+			return res
+		}
+		reqBody["server"].(map[string]interface{})["imageRef"] = imageID
+	}
+	delete(reqBody["server"].(map[string]interface{}), "imageName")
+
+	// If FlavorRef isn't provided, use FlavorName to ascertain the flavor ID.
+	if reqBody["server"].(map[string]interface{})["flavorRef"].(string) == "" {
+		flavorName := reqBody["server"].(map[string]interface{})["flavorName"].(string)
+		if flavorName == "" {
+			res.Err = errors.New("One and only one of FlavorRef and FlavorName must be provided.")
+			return res
+		}
+		flavorID, err := flavors.IDFromName(client, flavorName)
+		if err != nil {
+			res.Err = err
+			return res
+		}
+		reqBody["server"].(map[string]interface{})["flavorRef"] = flavorID
+	}
+	delete(reqBody["server"].(map[string]interface{}), "flavorName")
+
+	_, res.Err = client.Post(listURL(client), reqBody, &res.Body, nil)
 	return res
 }
 
 // Delete requests that a server previously provisioned be removed from your account.
 func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", deleteURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
-	})
+	_, res.Err = client.Delete(deleteURL(client, id), nil)
 	return res
 }
 
 // Get requests details on a single server, by ID.
 func Get(client *gophercloud.ServiceClient, id string) GetResult {
 	var result GetResult
-	_, result.Err = perigee.Request("GET", getURL(client, id), perigee.Options{
-		Results:     &result.Body,
-		MoreHeaders: client.AuthenticatedHeaders(),
+	_, result.Err = client.Get(getURL(client, id), &result.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200, 203},
 	})
 	return result
 }
@@ -262,10 +349,9 @@ func (opts UpdateOpts) ToServerUpdateMap() map[string]interface{} {
 // Update requests that various attributes of the indicated server be changed.
 func Update(client *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder) UpdateResult {
 	var result UpdateResult
-	_, result.Err = perigee.Request("PUT", updateURL(client, id), perigee.Options{
-		Results:     &result.Body,
-		ReqBody:     opts.ToServerUpdateMap(),
-		MoreHeaders: client.AuthenticatedHeaders(),
+	reqBody := opts.ToServerUpdateMap()
+	_, result.Err = client.Put(updateURL(client, id), reqBody, &result.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 	return result
 }
@@ -281,13 +367,7 @@ func ChangeAdminPassword(client *gophercloud.ServiceClient, id, newPassword stri
 	req.ChangePassword.AdminPass = newPassword
 
 	var res ActionResult
-
-	_, res.Err = perigee.Request("POST", actionURL(client, id), perigee.Options{
-		ReqBody:     req,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
-	})
-
+	_, res.Err = client.Post(actionURL(client, id), req, nil, nil)
 	return res
 }
 
@@ -351,16 +431,13 @@ func Reboot(client *gophercloud.ServiceClient, id string, how RebootMethod) Acti
 		return res
 	}
 
-	_, res.Err = perigee.Request("POST", actionURL(client, id), perigee.Options{
-		ReqBody: struct {
-			C map[string]string `json:"reboot"`
-		}{
-			map[string]string{"type": string(how)},
-		},
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
-	})
+	reqBody := struct {
+		C map[string]string `json:"reboot"`
+	}{
+		map[string]string{"type": string(how)},
+	}
 
+	_, res.Err = client.Post(actionURL(client, id), reqBody, nil, nil)
 	return res
 }
 
@@ -391,9 +468,9 @@ type RebuildOpts struct {
 	// Metadata [optional] contains key-value pairs (up to 255 bytes each) to attach to the server.
 	Metadata map[string]string
 
-	// Personality [optional] includes the path and contents of a file to inject into the server at launch.
-	// The maximum size of the file is 255 bytes (decoded).
-	Personality []byte
+	// Personality [optional] includes files to inject into the server at launch.
+	// Rebuild will base64-encode file contents for you.
+	Personality Personality
 }
 
 // ToServerRebuildMap formats a RebuildOpts struct into a map for use in JSON
@@ -429,9 +506,8 @@ func (opts RebuildOpts) ToServerRebuildMap() (map[string]interface{}, error) {
 		server["metadata"] = opts.Metadata
 	}
 
-	if opts.Personality != nil {
-		encoded := base64.StdEncoding.EncodeToString(opts.Personality)
-		server["personality"] = &encoded
+	if len(opts.Personality) > 0 {
+		server["personality"] = opts.Personality
 	}
 
 	return map[string]interface{}{"rebuild": server}, nil
@@ -453,13 +529,7 @@ func Rebuild(client *gophercloud.ServiceClient, id string, opts RebuildOptsBuild
 		return result
 	}
 
-	_, result.Err = perigee.Request("POST", actionURL(client, id), perigee.Options{
-		ReqBody:     &reqBody,
-		Results:     &result.Body,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
-	})
-
+	_, result.Err = client.Post(actionURL(client, id), reqBody, &result.Body, nil)
 	return result
 }
 
@@ -475,7 +545,7 @@ type ResizeOpts struct {
 	FlavorRef string
 }
 
-// ToServerResizeMap formats a ResizeOpts as a map that can be used as a JSON request body to the
+// ToServerResizeMap formats a ResizeOpts as a map that can be used as a JSON request body for the
 // Resize request.
 func (opts ResizeOpts) ToServerResizeMap() (map[string]interface{}, error) {
 	resize := map[string]interface{}{
@@ -500,12 +570,7 @@ func Resize(client *gophercloud.ServiceClient, id string, opts ResizeOptsBuilder
 		return res
 	}
 
-	_, res.Err = perigee.Request("POST", actionURL(client, id), perigee.Options{
-		ReqBody:     reqBody,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
-	})
-
+	_, res.Err = client.Post(actionURL(client, id), reqBody, nil, nil)
 	return res
 }
 
@@ -514,12 +579,10 @@ func Resize(client *gophercloud.ServiceClient, id string, opts ResizeOptsBuilder
 func ConfirmResize(client *gophercloud.ServiceClient, id string) ActionResult {
 	var res ActionResult
 
-	_, res.Err = perigee.Request("POST", actionURL(client, id), perigee.Options{
-		ReqBody:     map[string]interface{}{"confirmResize": nil},
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
+	reqBody := map[string]interface{}{"confirmResize": nil}
+	_, res.Err = client.Post(actionURL(client, id), reqBody, nil, &gophercloud.RequestOpts{
+		OkCodes: []int{201, 202, 204},
 	})
-
 	return res
 }
 
@@ -527,12 +590,263 @@ func ConfirmResize(client *gophercloud.ServiceClient, id string) ActionResult {
 // See Resize() for more details.
 func RevertResize(client *gophercloud.ServiceClient, id string) ActionResult {
 	var res ActionResult
+	reqBody := map[string]interface{}{"revertResize": nil}
+	_, res.Err = client.Post(actionURL(client, id), reqBody, nil, nil)
+	return res
+}
 
-	_, res.Err = perigee.Request("POST", actionURL(client, id), perigee.Options{
-		ReqBody:     map[string]interface{}{"revertResize": nil},
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+// RescueOptsBuilder is an interface that allows extensions to override the
+// default structure of a Rescue request.
+type RescueOptsBuilder interface {
+	ToServerRescueMap() (map[string]interface{}, error)
+}
+
+// RescueOpts represents the configuration options used to control a Rescue
+// option.
+type RescueOpts struct {
+	// AdminPass is the desired administrative password for the instance in
+	// RESCUE mode. If it's left blank, the server will generate a password.
+	AdminPass string
+}
+
+// ToServerRescueMap formats a RescueOpts as a map that can be used as a JSON
+// request body for the Rescue request.
+func (opts RescueOpts) ToServerRescueMap() (map[string]interface{}, error) {
+	server := make(map[string]interface{})
+	if opts.AdminPass != "" {
+		server["adminPass"] = opts.AdminPass
+	}
+	return map[string]interface{}{"rescue": server}, nil
+}
+
+// Rescue instructs the provider to place the server into RESCUE mode.
+func Rescue(client *gophercloud.ServiceClient, id string, opts RescueOptsBuilder) RescueResult {
+	var result RescueResult
+
+	if id == "" {
+		result.Err = fmt.Errorf("ID is required")
+		return result
+	}
+	reqBody, err := opts.ToServerRescueMap()
+	if err != nil {
+		result.Err = err
+		return result
+	}
+
+	_, result.Err = client.Post(actionURL(client, id), reqBody, &result.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 
+	return result
+}
+
+// ResetMetadataOptsBuilder allows extensions to add additional parameters to the
+// Reset request.
+type ResetMetadataOptsBuilder interface {
+	ToMetadataResetMap() (map[string]interface{}, error)
+}
+
+// MetadataOpts is a map that contains key-value pairs.
+type MetadataOpts map[string]string
+
+// ToMetadataResetMap assembles a body for a Reset request based on the contents of a MetadataOpts.
+func (opts MetadataOpts) ToMetadataResetMap() (map[string]interface{}, error) {
+	return map[string]interface{}{"metadata": opts}, nil
+}
+
+// ToMetadataUpdateMap assembles a body for an Update request based on the contents of a MetadataOpts.
+func (opts MetadataOpts) ToMetadataUpdateMap() (map[string]interface{}, error) {
+	return map[string]interface{}{"metadata": opts}, nil
+}
+
+// ResetMetadata will create multiple new key-value pairs for the given server ID.
+// Note: Using this operation will erase any already-existing metadata and create
+// the new metadata provided. To keep any already-existing metadata, use the
+// UpdateMetadatas or UpdateMetadata function.
+func ResetMetadata(client *gophercloud.ServiceClient, id string, opts ResetMetadataOptsBuilder) ResetMetadataResult {
+	var res ResetMetadataResult
+	metadata, err := opts.ToMetadataResetMap()
+	if err != nil {
+		res.Err = err
+		return res
+	}
+	_, res.Err = client.Put(metadataURL(client, id), metadata, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
 	return res
+}
+
+// Metadata requests all the metadata for the given server ID.
+func Metadata(client *gophercloud.ServiceClient, id string) GetMetadataResult {
+	var res GetMetadataResult
+	_, res.Err = client.Get(metadataURL(client, id), &res.Body, nil)
+	return res
+}
+
+// UpdateMetadataOptsBuilder allows extensions to add additional parameters to the
+// Create request.
+type UpdateMetadataOptsBuilder interface {
+	ToMetadataUpdateMap() (map[string]interface{}, error)
+}
+
+// UpdateMetadata updates (or creates) all the metadata specified by opts for the given server ID.
+// This operation does not affect already-existing metadata that is not specified
+// by opts.
+func UpdateMetadata(client *gophercloud.ServiceClient, id string, opts UpdateMetadataOptsBuilder) UpdateMetadataResult {
+	var res UpdateMetadataResult
+	metadata, err := opts.ToMetadataUpdateMap()
+	if err != nil {
+		res.Err = err
+		return res
+	}
+	_, res.Err = client.Post(metadataURL(client, id), metadata, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
+	return res
+}
+
+// MetadatumOptsBuilder allows extensions to add additional parameters to the
+// Create request.
+type MetadatumOptsBuilder interface {
+	ToMetadatumCreateMap() (map[string]interface{}, string, error)
+}
+
+// MetadatumOpts is a map of length one that contains a key-value pair.
+type MetadatumOpts map[string]string
+
+// ToMetadatumCreateMap assembles a body for a Create request based on the contents of a MetadataumOpts.
+func (opts MetadatumOpts) ToMetadatumCreateMap() (map[string]interface{}, string, error) {
+	if len(opts) != 1 {
+		return nil, "", errors.New("CreateMetadatum operation must have 1 and only 1 key-value pair.")
+	}
+	metadatum := map[string]interface{}{"meta": opts}
+	var key string
+	for k := range metadatum["meta"].(MetadatumOpts) {
+		key = k
+	}
+	return metadatum, key, nil
+}
+
+// CreateMetadatum will create or update the key-value pair with the given key for the given server ID.
+func CreateMetadatum(client *gophercloud.ServiceClient, id string, opts MetadatumOptsBuilder) CreateMetadatumResult {
+	var res CreateMetadatumResult
+	metadatum, key, err := opts.ToMetadatumCreateMap()
+	if err != nil {
+		res.Err = err
+		return res
+	}
+
+	_, res.Err = client.Put(metadatumURL(client, id, key), metadatum, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
+	return res
+}
+
+// Metadatum requests the key-value pair with the given key for the given server ID.
+func Metadatum(client *gophercloud.ServiceClient, id, key string) GetMetadatumResult {
+	var res GetMetadatumResult
+	_, res.Err = client.Request("GET", metadatumURL(client, id, key), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+	})
+	return res
+}
+
+// DeleteMetadatum will delete the key-value pair with the given key for the given server ID.
+func DeleteMetadatum(client *gophercloud.ServiceClient, id, key string) DeleteMetadatumResult {
+	var res DeleteMetadatumResult
+	_, res.Err = client.Delete(metadatumURL(client, id, key), nil)
+	return res
+}
+
+// ListAddresses makes a request against the API to list the servers IP addresses.
+func ListAddresses(client *gophercloud.ServiceClient, id string) pagination.Pager {
+	createPageFn := func(r pagination.PageResult) pagination.Page {
+		return AddressPage{pagination.SinglePageBase(r)}
+	}
+	return pagination.NewPager(client, listAddressesURL(client, id), createPageFn)
+}
+
+// ListAddressesByNetwork makes a request against the API to list the servers IP addresses
+// for the given network.
+func ListAddressesByNetwork(client *gophercloud.ServiceClient, id, network string) pagination.Pager {
+	createPageFn := func(r pagination.PageResult) pagination.Page {
+		return NetworkAddressPage{pagination.SinglePageBase(r)}
+	}
+	return pagination.NewPager(client, listAddressesByNetworkURL(client, id, network), createPageFn)
+}
+
+type CreateImageOpts struct {
+	// Name [required] of the image/snapshot
+	Name string
+	// Metadata [optional] contains key-value pairs (up to 255 bytes each) to attach to the created image.
+	Metadata map[string]string
+}
+
+type CreateImageOptsBuilder interface {
+	ToServerCreateImageMap() (map[string]interface{}, error)
+}
+
+// ToServerCreateImageMap formats a CreateImageOpts structure into a request body.
+func (opts CreateImageOpts) ToServerCreateImageMap() (map[string]interface{}, error) {
+	var err error
+	img := make(map[string]interface{})
+	if opts.Name == "" {
+		return nil, fmt.Errorf("Cannot create a server image without a name")
+	}
+	img["name"] = opts.Name
+	if opts.Metadata != nil {
+		img["metadata"] = opts.Metadata
+	}
+	createImage := make(map[string]interface{})
+	createImage["createImage"] = img
+	return createImage, err
+}
+
+// CreateImage makes a request against the nova API to schedule an image to be created of the server
+func CreateImage(client *gophercloud.ServiceClient, serverId string, opts CreateImageOptsBuilder) CreateImageResult {
+	var res CreateImageResult
+	reqBody, err := opts.ToServerCreateImageMap()
+	if err != nil {
+		res.Err = err
+		return res
+	}
+	response, err := client.Post(actionURL(client, serverId), reqBody, nil, &gophercloud.RequestOpts{
+		OkCodes: []int{202},
+	})
+	res.Err = err
+	res.Header = response.Header
+	return res
+}
+
+// IDFromName is a convienience function that returns a server's ID given its name.
+func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
+	serverCount := 0
+	serverID := ""
+	if name == "" {
+		return "", fmt.Errorf("A server name must be provided.")
+	}
+	pager := List(client, nil)
+	pager.EachPage(func(page pagination.Page) (bool, error) {
+		serverList, err := ExtractServers(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, s := range serverList {
+			if s.Name == name {
+				serverCount++
+				serverID = s.ID
+			}
+		}
+		return true, nil
+	})
+
+	switch serverCount {
+	case 0:
+		return "", fmt.Errorf("Unable to find server: %s", name)
+	case 1:
+		return serverID, nil
+	default:
+		return "", fmt.Errorf("Found %d servers matching %s", serverCount, name)
+	}
 }

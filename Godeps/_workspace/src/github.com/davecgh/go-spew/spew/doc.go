@@ -99,9 +99,15 @@ The following configuration options are available:
 		Specifies map keys should be sorted before being printed. Use
 		this to have a more deterministic, diffable output.  Note that
 		only native types (bool, int, uint, floats, uintptr and string)
-		are supported with other types sorted according to the
-		reflect.Value.String() output which guarantees display stability.
-		Natural map order is used by default.
+		and types which implement error or Stringer interfaces are
+		supported with other types sorted according to the
+		reflect.Value.String() output which guarantees display
+		stability.  Natural map order is used by default.
+
+	* SpewKeys
+		Specifies that, as a last resort attempt, map keys should be
+		spewed to strings and sorted by those strings.  This is only
+		considered if SortKeys is true.
 
 Dump Usage
 

@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/internal"
 	"golang.org/x/oauth2/jws"
@@ -57,7 +58,7 @@ type Config struct {
 
 // TokenSource returns a JWT TokenSource using the configuration
 // in c and the HTTP client from the provided context.
-func (c *Config) TokenSource(ctx oauth2.Context) oauth2.TokenSource {
+func (c *Config) TokenSource(ctx context.Context) oauth2.TokenSource {
 	return oauth2.ReuseTokenSource(nil, jwtSource{ctx, c})
 }
 
@@ -66,14 +67,14 @@ func (c *Config) TokenSource(ctx oauth2.Context) oauth2.TokenSource {
 // obtained from c.
 //
 // The returned client and its Transport should not be modified.
-func (c *Config) Client(ctx oauth2.Context) *http.Client {
+func (c *Config) Client(ctx context.Context) *http.Client {
 	return oauth2.NewClient(ctx, c.TokenSource(ctx))
 }
 
 // jwtSource is a source that always does a signed JWT request for a token.
 // It should typically be wrapped with a reuseTokenSource.
 type jwtSource struct {
-	ctx  oauth2.Context
+	ctx  context.Context
 	conf *Config
 }
 

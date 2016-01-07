@@ -1,8 +1,6 @@
 package snapshots
 
 import (
-	"github.com/racker/perigee"
-
 	"github.com/rackspace/gophercloud"
 	os "github.com/rackspace/gophercloud/openstack/blockstorage/v1/snapshots"
 	"github.com/rackspace/gophercloud/pagination"
@@ -138,7 +136,7 @@ func (snapshot Snapshot) WaitUntilDeleted(c *gophercloud.ServiceClient, timeout 
 		_, err := Get(c, snapshot.ID).Extract()
 
 		// Check for a 404
-		if casted, ok := err.(*perigee.UnexpectedResponseCodeError); ok && casted.Actual == 404 {
+		if casted, ok := err.(*gophercloud.UnexpectedResponseCodeError); ok && casted.Actual == 404 {
 			return true, nil
 		} else if err != nil {
 			return false, err

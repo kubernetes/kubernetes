@@ -1,0 +1,85 @@
+- job-template:
+    name: 'kubernetes-e2e-{suffix}'
+    description: '{description} Test owner: {test-owner}.'
+    logrotate:
+        daysToKeep: 7
+    builders:
+        - shell: |
+            curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
+    properties:
+        - mail-watcher
+    publishers:
+        - claim-build
+        - junit-publisher
+        - gcs-uploader
+        - log-parser
+        - email-ext
+    triggers:
+        - reverse:
+            jobs: '{trigger-job}'
+            result: success
+        - timed: 'H/30 * * * *'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: '{timeout}'
+            fail: true
+        - timestamps
+        - workspace-cleanup
+
+- project:
+    name: kubernetes-e2e
+    trigger-job: 'kubernetes-build'
+    test-owner: 'Build Cop'
+    branch: 'master'
+    suffix:
+        - 'gce':
+            description: 'Run E2E tests on GCE using the latest successful build.'
+            timeout: 150
+        - 'gce-autoscaling':
+            description: 'Run autoscaling E2E tests on GCE using the latest successful build.'
+            timeout: 210
+        - 'gce-flaky':
+            description: 'Run E2E tests on GCE using the latest successful build. Limit to known-flaky tests.'
+            timeout: 180
+        - 'gce-parallel':
+            description: 'Run E2E tests using Ginkgo''s parallel test runner on GCE using the latest successful build.'
+            timeout: 120
+        - 'gce-parallel-flaky':
+            description: 'Run E2E tests using Ginkgo''s parallel test runner on GCE using the latest successful build. Limit to known-flaky tests.'
+            timeout: 90
+        - 'gce-reboot':
+            description: 'Run E2E reboot tests on GCE using the latest successful build. The reboot tests are currently flaky and causing other tests to fail, so we quarantine them into this project and dedicated test cluster.'
+            timeout: 90
+        - 'gce-scalability':
+            description: 'Run scalability E2E tests on GCE using the latest successful build.'
+            timeout: 210
+        - 'gce-slow':
+            description: 'Run slow E2E tests on GCE using the latest successful build.'
+            timeout: 270
+        - 'gce-flannel':
+            description: 'Run E2E tests on GCE using Flannel and the latest successful build. This suite is quarantined in a dedicated project because Flannel integration is experimental.'
+            timeout: 90
+        - 'gke-ci':
+            description: |
+                Run e2e tests using the following config:<br>
+                - provider: GKE<br>
+                - apiary: staging<br>
+                - borg job: test<br>
+                - client (kubectl): ci/latest.txt<br>
+                - cluster (k8s): ci/latest.txt<br>
+                - tests: ci/latest.txt
+            timeout: 300
+        - 'gke-ci-reboot':
+            description: |
+                Run e2e tests using the following config:<br>
+                - provider: GKE<br>
+                - apiary: staging<br>
+                - borg job: test<br>
+                - client (kubectl): ci/latest.txt<br>
+                - cluster (k8s): ci/latest.txt<br>
+                - tests: ci/latest.txt
+            timeout: 120
+    jobs:
+        - 'kubernetes-e2e-{suffix}'

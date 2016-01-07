@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,17 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 )
+
+// ToJSON converts a single YAML document into a JSON document
+// or returns an error. If the document appears to be JSON the
+// YAML decoding path is not used (so that error messages are
+// JSON specific).
+func ToJSON(data []byte) ([]byte, error) {
+	if hasJSONPrefix(data) {
+		return data, nil
+	}
+	return yaml.YAMLToJSON(data)
+}
 
 // YAMLToJSONDecoder decodes YAML documents from an io.Reader by
 // separating individual documents. It first converts the YAML
@@ -143,11 +154,19 @@ func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 func guessJSONStream(r io.Reader, size int) (io.Reader, bool) {
 	buffer := bufio.NewReaderSize(r, size)
 	b, _ := buffer.Peek(size)
-	return buffer, hasPrefix(b, []byte("{"))
+	return buffer, hasJSONPrefix(b)
+}
+
+var jsonPrefix = []byte("{")
+
+// hasJSONPrefix returns true if the provided buffer appears to start with
+// a JSON open brace.
+func hasJSONPrefix(buf []byte) bool {
+	return hasPrefix(buf, jsonPrefix)
 }
 
 // Return true if the first non-whitespace bytes in buf is
-// prefix
+// prefix.
 func hasPrefix(buf []byte, prefix []byte) bool {
 	trim := bytes.TrimLeftFunc(buf, unicode.IsSpace)
 	return bytes.HasPrefix(trim, prefix)

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,14 +21,24 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apitesting "github.com/GoogleCloudPlatform/kubernetes/pkg/api/testing"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func LoadSchemaForTest(file string) (Schema, error) {
-	data, err := ioutil.ReadFile(file)
+func readPod(filename string) (string, error) {
+	data, err := ioutil.ReadFile("testdata/" + testapi.Default.GroupVersion().Version + "/" + filename)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func loadSchemaForTest() (Schema, error) {
+	// TODO this path is broken
+	pathToSwaggerSpec := "../../../api/swagger-spec/" + testapi.Default.GroupVersion().Version + ".json"
+	data, err := ioutil.ReadFile(pathToSwaggerSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -36,14 +46,14 @@ func LoadSchemaForTest(file string) (Schema, error) {
 }
 
 func TestLoad(t *testing.T) {
-	_, err := LoadSchemaForTest("v1beta1-swagger.json")
+	_, err := loadSchemaForTest()
 	if err != nil {
 		t.Errorf("Failed to load: %v", err)
 	}
 }
 
 func TestValidateOk(t *testing.T) {
-	schema, err := LoadSchemaForTest("v1beta1-swagger.json")
+	schema, err := loadSchemaForTest()
 	if err != nil {
 		t.Errorf("Failed to load: %v", err)
 	}
@@ -57,12 +67,12 @@ func TestValidateOk(t *testing.T) {
 	}
 
 	seed := rand.Int63()
-	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(seed))
+	apiObjectFuzzer := apitesting.FuzzerFor(nil, testapi.Default.InternalGroupVersion(), rand.NewSource(seed))
 	for i := 0; i < 5; i++ {
 		for _, test := range tests {
 			testObj := test.obj
 			apiObjectFuzzer.Fuzz(testObj)
-			data, err := v1beta1.Codec.Encode(testObj)
+			data, err := testapi.Default.Codec().Encode(testObj)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -74,150 +84,73 @@ func TestValidateOk(t *testing.T) {
 	}
 }
 
-var invalidPod = `{
-  "id": "name",
-  "kind": "Pod",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "redis-master",
-      "containers": [{
-        "name": "master",
-        "image": "dockerfile/redis",
-        "command": "this is a bad command",
-      }]
-    }
-  },
-  "labels": {
-    "name": "redis-master"
-  }
-}
-`
-
-var invalidPod2 = `{
-  "apiVersion": "v1beta1",
-  "kind": "Pod",
-  "id": "apache-php",
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "apache-php",
-      "containers": [{
-         "name": "apache-php",
-         "image": "php:5.6.2-apache",
-         "ports": [{ "name": "apache", "containerPort": 80, "hostPort":"13380", "protocol":"TCP" }],
-         "volumeMounts": [{"name": "shared-disk","mountPath": "/var/www/html", "readOnly": false}]
-      }]
-    }
-  },
-  "labels": { "name": "apache-php" },
-  "restartPolicy": {"always": {}},
-  "dnsPolicy": "ClusterFirst",
-  "volumes": [
-    "name": "shared-disk",
-    "source": {
-      "GCEPersistentDisk": {
-        "path": "shared-disk"
-      }
-    }
-  ]
-}
-`
-
-var invalidPod3 = `{
-  "apiVersion": "v1beta1",
-  "kind": "Pod",
-  "id": "apache-php",
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "apache-php",
-      "containers": [{
-         "name": "apache-php",
-         "image": "php:5.6.2-apache",
-         "ports": [{ "name": "apache", "containerPort": 80, "hostPort":"13380", "protocol":"TCP" }],
-         "volumeMounts": [{"name": "shared-disk","mountPath": "/var/www/html", "readOnly": false}]
-      }]
-    }
-  },
-  "labels": { "name": "apache-php" },
-  "restartPolicy": {"always": {}},
-  "dnsPolicy": "ClusterFirst",
-  "volumes": [
-    {
-      "name": "shared-disk",
-      "source": {
-        "GCEPersistentDisk": {
-          "path": "shared-disk"
-        }
-      }
-    }
-  ]
-}
-`
-
-var invalidYaml = `
-id: name
-kind: Pod
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    version: v1beta1
-    id: redis-master
-    containers:
-      - name: "master"
-        image: "dockerfile/redis"
-        command: "this is a bad command"
-labels:
-  name: "redis-master"
-`
-
 func TestInvalid(t *testing.T) {
-	schema, err := LoadSchemaForTest("v1beta1-swagger.json")
+	schema, err := loadSchemaForTest()
 	if err != nil {
 		t.Errorf("Failed to load: %v", err)
 	}
-	tests := []string{invalidPod, invalidPod2, invalidPod3, invalidYaml}
+	tests := []string{
+		"invalidPod1.json", // command is a string, instead of []string.
+		"invalidPod2.json", // hostPort if of type string, instead of int.
+		"invalidPod3.json", // volumes is not an array of objects.
+		"invalidPod.yaml",  // command is a string, instead of []string.
+	}
 	for _, test := range tests {
-		err = schema.ValidateBytes([]byte(test))
+		pod, err := readPod(test)
+		if err != nil {
+			t.Errorf("could not read file: %s", pod)
+		}
+		err = schema.ValidateBytes([]byte(pod))
 		if err == nil {
-			t.Errorf("unexpected non-error\n%s", test)
+			t.Errorf("unexpected non-error, err: %s for pod: %s", err, pod)
 		}
 	}
 }
 
-var validYaml = `
-id: name
-kind: Pod
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    version: v1beta1
-    id: redis-master
-    containers:
-      - name: "master"
-        image: "dockerfile/redis"
-        command:
-        	- this
-        	- is
-        	- an
-        	- ok
-        	- command
-labels:
-  name: "redis-master"
-`
-
 func TestValid(t *testing.T) {
-	schema, err := LoadSchemaForTest("v1beta1-swagger.json")
+	schema, err := loadSchemaForTest()
 	if err != nil {
 		t.Errorf("Failed to load: %v", err)
 	}
-	tests := []string{validYaml}
+	tests := []string{
+		"validPod.yaml",
+	}
 	for _, test := range tests {
-		err = schema.ValidateBytes([]byte(test))
-		if err == nil {
-			t.Errorf("unexpected non-error\n%s", test)
+		pod, err := readPod(test)
+		if err != nil {
+			t.Errorf("could not read file: %s", test)
+		}
+		err = schema.ValidateBytes([]byte(pod))
+		if err != nil {
+			t.Errorf("unexpected error %s, for pod %s", err, pod)
+		}
+	}
+}
+
+func TestVersionRegex(t *testing.T) {
+	testCases := []struct {
+		typeName string
+		match    bool
+	}{
+		{
+			typeName: "v1.Binding",
+			match:    true,
+		},
+		{
+			typeName: "v1beta1.Binding",
+			match:    true,
+		},
+		{
+			typeName: "Binding",
+			match:    false,
+		},
+	}
+	for _, test := range testCases {
+		if versionRegexp.MatchString(test.typeName) && !test.match {
+			t.Errorf("unexpected error: expect %s not to match the regular expression", test.typeName)
+		}
+		if !versionRegexp.MatchString(test.typeName) && test.match {
+			t.Errorf("unexpected error: expect %s to match the regular expression", test.typeName)
 		}
 	}
 }

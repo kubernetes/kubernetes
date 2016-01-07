@@ -1,0 +1,2 @@
+cluster/addons/registry/images/Dockerfile:ADD run_proxy.sh /usr/bin/run_proxy
+docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:var cloud_config = require('../cloud_config.js');

@@ -1,12 +1,17 @@
 package objects
 
 import (
+	"bytes"
+	"crypto/hmac"
+	"crypto/md5"
+	"crypto/sha1"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
+	"github.com/rackspace/gophercloud/openstack/objectstorage/v1/accounts"
 	"github.com/rackspace/gophercloud/pagination"
 )
 
@@ -18,6 +23,10 @@ type ListOptsBuilder interface {
 
 // ListOpts is a structure that holds parameters for listing objects.
 type ListOpts struct {
+	// Full is a true/false value that represents the amount of object information
+	// returned. If Full is set to true, then the content-type, number of bytes, hash
+	// date last modified, and name are returned. If set to false or not set, then
+	// only the object names are returned.
 	Full      bool
 	Limit     int    `q:"limit"`
 	Marker    string `q:"marker"`
@@ -88,7 +97,7 @@ type DownloadOpts struct {
 
 // ToObjectDownloadParams formats a DownloadOpts into a query string and map of
 // headers.
-func (opts ListOpts) ToObjectDownloadParams() (map[string]string, string, error) {
+func (opts DownloadOpts) ToObjectDownloadParams() (map[string]string, string, error) {
 	q, err := gophercloud.BuildQueryString(opts)
 	if err != nil {
 		return nil, "", err
@@ -123,14 +132,15 @@ func Download(c *gophercloud.ServiceClient, containerName, objectName string, op
 		url += query
 	}
 
-	resp, err := perigee.Request("GET", url, perigee.Options{
+	resp, err := c.Request("GET", url, gophercloud.RequestOpts{
 		MoreHeaders: h,
-		OkCodes:     []int{200},
+		OkCodes:     []int{200, 304},
 	})
-
-	res.Body = resp.HttpResponse.Body
+	if resp != nil {
+		res.Header = resp.Header
+		res.Body = resp.Body
+	}
 	res.Err = err
-	res.Header = resp.HttpResponse.Header
 
 	return res
 }
@@ -146,7 +156,7 @@ type CreateOpts struct {
 	Metadata           map[string]string
 	ContentDisposition string `h:"Content-Disposition"`
 	ContentEncoding    string `h:"Content-Encoding"`
-	ContentLength      int    `h:"Content-Length"`
+	ContentLength      int64  `h:"Content-Length"`
 	ContentType        string `h:"Content-Type"`
 	CopyFrom           string `h:"X-Copy-From"`
 	DeleteAfter        int    `h:"X-Delete-After"`
@@ -180,12 +190,13 @@ func (opts CreateOpts) ToObjectCreateParams() (map[string]string, string, error)
 	return h, q.String(), nil
 }
 
-// Create is a function that creates a new object or replaces an existing object.
-func Create(c *gophercloud.ServiceClient, containerName, objectName string, content io.Reader, opts CreateOptsBuilder) CreateResult {
+// Create is a function that creates a new object or replaces an existing object. If the returned response's ETag
+// header fails to match the local checksum, the failed request will automatically be retried up to a maximum of 3 times.
+func Create(c *gophercloud.ServiceClient, containerName, objectName string, content io.ReadSeeker, opts CreateOptsBuilder) CreateResult {
 	var res CreateResult
 
 	url := createURL(c, containerName, objectName)
-	h := c.AuthenticatedHeaders()
+	h := make(map[string]string)
 
 	if opts != nil {
 		headers, query, err := opts.ToObjectCreateParams()
@@ -201,16 +212,37 @@ func Create(c *gophercloud.ServiceClient, containerName, objectName string, cont
 		url += query
 	}
 
-	contentType := h["Content-Type"]
+	hash := md5.New()
 
-	resp, err := perigee.Request("PUT", url, perigee.Options{
-		ContentType: contentType,
-		ReqBody:     content,
+	contentBuffer := bytes.NewBuffer([]byte{})
+	_, err := io.Copy(contentBuffer, io.TeeReader(content, hash))
+	if err != nil {
+		res.Err = err
+		return res
+	}
+
+	localChecksum := hash.Sum(nil)
+	h["ETag"] = fmt.Sprintf("%x", localChecksum)
+
+	ropts := gophercloud.RequestOpts{
+		RawBody:     strings.NewReader(contentBuffer.String()),
 		MoreHeaders: h,
-		OkCodes:     []int{201, 202},
-	})
-	res.Header = resp.HttpResponse.Header
-	res.Err = err
+	}
+
+	resp, err := c.Request("PUT", url, ropts)
+	if err != nil {
+		res.Err = err
+		return res
+	}
+	if resp != nil {
+		res.Header = resp.Header
+		if resp.Header.Get("ETag") == fmt.Sprintf("%x", localChecksum) {
+			res.Err = err
+			return res
+		}
+		res.Err = fmt.Errorf("Local checksum does not match API ETag header")
+	}
+
 	return res
 }
 
@@ -261,11 +293,13 @@ func Copy(c *gophercloud.ServiceClient, containerName, objectName string, opts C
 	}
 
 	url := copyURL(c, containerName, objectName)
-	resp, err := perigee.Request("COPY", url, perigee.Options{
+	resp, err := c.Request("COPY", url, gophercloud.RequestOpts{
 		MoreHeaders: h,
 		OkCodes:     []int{201},
 	})
-	res.Header = resp.HttpResponse.Header
+	if resp != nil {
+		res.Header = resp.Header
+	}
 	res.Err = err
 	return res
 }
@@ -304,11 +338,10 @@ func Delete(c *gophercloud.ServiceClient, containerName, objectName string, opts
 		url += query
 	}
 
-	resp, err := perigee.Request("DELETE", url, perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
-	})
-	res.Header = resp.HttpResponse.Header
+	resp, err := c.Delete(url, nil)
+	if resp != nil {
+		res.Header = resp.Header
+	}
 	res.Err = err
 	return res
 }
@@ -349,11 +382,12 @@ func Get(c *gophercloud.ServiceClient, containerName, objectName string, opts Ge
 		url += query
 	}
 
-	resp, err := perigee.Request("HEAD", url, perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{200, 204},
+	resp, err := c.Request("HEAD", url, gophercloud.RequestOpts{
+		OkCodes: []int{200, 204},
 	})
-	res.Header = resp.HttpResponse.Header
+	if resp != nil {
+		res.Header = resp.Header
+	}
 	res.Err = err
 	return res
 }
@@ -406,11 +440,60 @@ func Update(c *gophercloud.ServiceClient, containerName, objectName string, opts
 	}
 
 	url := updateURL(c, containerName, objectName)
-	resp, err := perigee.Request("POST", url, perigee.Options{
+	resp, err := c.Request("POST", url, gophercloud.RequestOpts{
 		MoreHeaders: h,
-		OkCodes:     []int{202},
 	})
-	res.Header = resp.HttpResponse.Header
+	if resp != nil {
+		res.Header = resp.Header
+	}
 	res.Err = err
 	return res
+}
+
+// HTTPMethod represents an HTTP method string (e.g. "GET").
+type HTTPMethod string
+
+var (
+	// GET represents an HTTP "GET" method.
+	GET HTTPMethod = "GET"
+	// POST represents an HTTP "POST" method.
+	POST HTTPMethod = "POST"
+)
+
+// CreateTempURLOpts are options for creating a temporary URL for an object.
+type CreateTempURLOpts struct {
+	// (REQUIRED) Method is the HTTP method to allow for users of the temp URL. Valid values
+	// are "GET" and "POST".
+	Method HTTPMethod
+	// (REQUIRED) TTL is the number of seconds the temp URL should be active.
+	TTL int
+	// (Optional) Split is the string on which to split the object URL. Since only
+	// the object path is used in the hash, the object URL needs to be parsed. If
+	// empty, the default OpenStack URL split point will be used ("/v1/").
+	Split string
+}
+
+// CreateTempURL is a function for creating a temporary URL for an object. It
+// allows users to have "GET" or "POST" access to a particular tenant's object
+// for a limited amount of time.
+func CreateTempURL(c *gophercloud.ServiceClient, containerName, objectName string, opts CreateTempURLOpts) (string, error) {
+	if opts.Split == "" {
+		opts.Split = "/v1/"
+	}
+	duration := time.Duration(opts.TTL) * time.Second
+	expiry := time.Now().Add(duration).Unix()
+	getHeader, err := accounts.Get(c, nil).Extract()
+	if err != nil {
+		return "", err
+	}
+	secretKey := []byte(getHeader.TempURLKey)
+	url := getURL(c, containerName, objectName)
+	splitPath := strings.Split(url, opts.Split)
+	baseURL, objectPath := splitPath[0], splitPath[1]
+	objectPath = opts.Split + objectPath
+	body := fmt.Sprintf("%s\n%d\n%s", opts.Method, expiry, objectPath)
+	hash := hmac.New(sha1.New, secretKey)
+	hash.Write([]byte(body))
+	hexsum := fmt.Sprintf("%x", hash.Sum(nil))
+	return fmt.Sprintf("%s%s?temp_url_sig=%s&temp_url_expires=%d", baseURL, objectPath, hexsum, expiry), nil
 }

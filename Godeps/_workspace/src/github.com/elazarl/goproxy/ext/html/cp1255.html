@@ -1,0 +1,585 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+  
+<html lang="he">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1255">
+<meta http-equiv="Content-Language" content="he"/>
+<!--meta http-equiv="Content-Type" content="text/html; charset=utf-8" /-->
+<META NAME="Keywords" CONTENT="אוניברסיטה, הוראה מרחוק, קורסים, Distance Learning, E-Learning, University, Education, Open, Courseware, Israel, Higher Education, Satellite, Telecourses, Courses,  educational technology, computer-mediated,  studies">
+<meta http-equiv="Content-Style-Type" content="text/css">
+<title>דף הבית של שה&quot;ם</title>
+<link rel="alternate" href="rss/rss.xml" type="application/rss+xml" title="חדשות ועדכונים משה&quot;ם, המרכז לשילוב טכנולוגיות בהוראה מרחוק באוניברסיטה הפתוחה"/>	
+<link rel="stylesheet" type="text/css" href="design/common.css">
+<link rel="stylesheet" type="text/css" href="design/news.css">
+
+<script language="javascript" type="text/javascript" src="js_scripts/shoham_common.js"></script>
+<script language="JavaScript" src="include/email_unobfuscator.js" type="text/javascript"></script>
+<script type="text/javascript" src="/js_scripts/toolbox.js"></script> 
+
+<script type="text/javascript">
+var semester='2012b';	// current semester
+var hebrewSemester;
+
+//js for the flash movie:
+function getSemester(){ 
+	return semester;
+	//return '2009a';
+}
+
+setSemester(semester);
+switchLinkSemester(semester);
+createSuggestionScript();
+switchCoursesSuggestionSource(semester);
+
+addLoadEvent(function() {
+
+	// ADD JAVASCRIPT EVENTS/FUNCTIONS ETC. YOU WANT TO BE CALLED ONLOAD HERE AND ONLY HERE
+	
+	showHideMessage();
+	//addIt();
+	//setAddThis();
+	
+}  )
+
+
+
+var tBox = new QQtoolBox();
+
+</script>
+
+<!--script language="javascript" src="js_scripts/flash2.js"></script-->
+
+<link rel="stylesheet" href="suggestion/suggestion.css" media="screen" type="text/css">	
+
+</head>
+
+<body>
+<div id="container">
+<div id="header">
+<div id="header_right">
+<a href="/" target="_self" title="שה&quot;ם"><img src="graphics_nhp/shoam_logo_s.jpg" border="0" alt="שה&quot;ם" target="_self"></a>
+</div>
+
+<div id="header_left">
+
+<div id="header_left_op">
+<a href="http://www.openu.ac.il/" target="_self" title="אופנ'ט"><img src="graphics_nhp/openu.gif" border="0" alt="אופנ'ט"></a>
+</div>
+<!--div id="search"-->
+<!-- search_hp.html (START) -->
+
+<!--script language="javascript" src="opusSearch.js" type="text/javascript"></script-->
+
+<div id="search">
+
+
+<form name="form" action="http://www.google.co.il/search" id="simpleSearch" target="" method="get">
+<input type="text" id="as_q" name="as_q" onFocus="this.select()" value="חפשו באתר זה ובאתרי הקורסים">
+<input type="hidden" id="hl" name="hl" value="iw">
+<input type="hidden" id="as_sitesearch" name="as_sitesearch" value="telem.openu.ac.il">
+<!--a id="button" title="חיפוש בגוגל" href="javascript:simpleSearch();"><span>&nbsp;חפש</span></a-->
+<a id="button" title="חיפוש בגוגל" onclick="form.submit()"><span>&nbsp;חפש</span></a>
+</form>
+
+<div id="header_eng"><span class="eng"><a href="http://www-e.openu.ac.il/geninfor/shoham.html" target="_self" title="shoham english site">English</a></span></div>
+
+</div>
+<!-- search_hp.html (END) -->
+<!--/div-->
+
+</div>
+<!--end of header-->
+</div>
+
+<div id="content">
+
+<div id="text">
+
+<div id="right">
+<div id="top_right">
+<div id="top_right_text">
+
+<h1>כניסה לאתרי הקורסים</h1>
+<!-- suggestion.htm (START) -->
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1255">
+<meta http-equiv="Content-Language" content="he"/>
+
+<link rel="stylesheet" href="suggestion/suggestion.css" media="screen" type="text/css">
+
+<style type="text/css">
+/* script suggestion CSS START */
+/* uri: don't touch this section unless your name is "Uri Shefi" */
+#suggestion_box{
+	/*dawidth: 245px; */   	/* causes some courses to disapear */
+	border:solid 0px;
+	font-size: 15px;
+}
+
+#course_suggestion{ /* input */
+	direction: rtl;
+	font-family: Arial, Verdana, Tahoma;
+	font-size: 12px;
+	border: 1px solid #CCCCCC;
+	width: 170px;
+	height:15px;
+	
+}
+.autocomplete{
+	/* right: 178px; */
+	width: 280px;
+}
+/* script suggestion CSS END */
+
+.suggestion_button{
+	border: 0px solid #CCCCCC;
+	vertical-align:middle;
+	cursor: pointer;
+
+	/*
+	width:23px;
+    height:19px;
+	*/
+	padding-bottom:2px;
+
+		/*cursor: hand;*/
+}
+#current_semester{
+
+	font-family: Arial, Verdana, Tahoma;
+	font-size: 15px;
+	text-transform: uppercase;
+	width: 122px;
+
+}
+#autoComplteMessageLayer{
+
+}
+
+#summerLink, #summerLink a{
+	color: red;
+	display: none;
+	font-weight: bold;
+	font-size: 15px;
+	text-decoration: underline;
+	cursor: hand;
+}
+</style>
+
+<div id="switch_semester_box">
+<span id="koteret">סמסטר</span>
+<select id="current_semester" onChange="refreshSemester(this.options[this.selectedIndex].value);">
+ <option value="2012b">2012 ב (אביב)</option>
+ <option value="2012a">2012 א (סתיו)</option>
+ <option value="2011c">2011 ג (קיץ)</option>
+ <option value="2011b">2011 ב (אביב)</option>
+ <option value="2011a">2011 א (סתיו)</option>
+ <option value="2010c">2010 ג (קיץ)</option>
+ <option value="2010b">2010 ב (אביב)</option>
+ <option value="2010a">2010 א (סתיו)</option>
+ <option value="2009c">2009 ג (קיץ)</option>
+ <option value="2009b">2009 ב (אביב)</option>
+ <option value="2009a">2009 א (סתיו)</option>
+ <option value="2008c">2008 ג (קיץ)</option>
+ <option value="2008b">2008 ב (אביב)</option>
+ <option value="2008a">2008 א (סתיו)</option>
+ <option value="2007c">2007 ג (קיץ)</option>
+ <option value="2007b">2007 ב (אביב)</option> 
+ <option value="2007a">2007 א (סתיו)</option>
+ <option value="2006c">2006 ג (קיץ)</option>
+ <option value="2006b">2006 ב (אביב)</option> 
+ <option value="2006a">2006 א (סתיו)</option>
+ <option value="2005c">2005 ג (קיץ)</option>
+ <option value="2005b">2005 ב (אביב)</option> 
+ <option value="2005a">2005 א (סתיו)</option>
+</select>
+</div>
+
+<!-- SEGGUESTION BOX (START) -->
+<div style="text-align: right; color:#404040" id="suggestion_box">
+שם קורס או מספר קורס <div id="suggestion_course_display"></div><br/>
+<input type="text" id="course_suggestion" value="רשימת הקורסים המוצעים בסמסטר הנבחר" maxlength="60" title="רשימת הקורסים המוצעים בסמסטר זה"><img src="graphics_nhp/mgIcon2.jpg" onclick="evalChoice();" class="suggestion_button" alt="לאתר הקורס" />
+<!--div id="autoComplteMessageLayer"></div-->
+<!--<span id='summerLink' onClick="refreshSemester('2011c');">לסמסטר קיץ 2011ג לחץ כאן</span>-->
+<span id='summerLink'><a href="courses_lists/courses_2011c.html">לסמסטר קיץ 2011ג לחץ כאן</a></span>
+</div>
+<!-- SEGGUESTION BOX (END) -->
+
+
+<div id="fulllist">
+<a href="courses_lists/courses_2009a.html" id="courses_full_link" target="_self"> לרשימת אתרי הקורסים והמחלקות</a>  <div id="courses_full_link_display"></div>
+</div>
+<!-- suggestion.htm (END) -->
+</div>
+<!--end of top_right-->
+</div>
+
+<div id="bottom_right">
+<div id="bottom_right_text">
+<h1>צוותי הוראה</h1>
+<div class="linklist_a">
+<a href="content/help_staff.html" target="_self" class="linklist_item_a" title="תמיכה ועזרה">תמיכה ועזרה</a><br>
+<a href="content/training.html" target="_self" class="linklist_item_a" title="הדרכות לסגל ההוראה">הדרכות לסגל ההוראה </a>&nbsp;<img src="graphics_nhp/star_bg_gray.gif" border="0" alt="">&nbsp;<span class="new">חדש</span><br>
+<a href="http://telem.openu.ac.il/segel/" target="_self" class="linklist_item_a" title="אתר צוותי הוראה">אתר צוותי הוראה</a><br>
+<a href="http://telem.openu.ac.il/content/virtual_shoham.html" target="_self" class="linklist_item_a" title="כיתה וירטואלית">כיתה וירטואלית</a><br>
+<a href="http://telem.openu.ac.il/content/matalot_staff.html" target="_self" class="linklist_item_a" title="מערכת המטלות">מערכת המטלות</a><br>
+<a href="http://telem.openu.ac.il/tikshuv_prize/" target="_blank" class="linklist_item_a" title="תחרות מתקשב מצטיין">תחרות מתקשב מצטיין</a><br>
+<a href="http://telem.openu.ac.il/content/hp_search.html" target="_blank" class="linklist_item_a" title="חיפוש באתרי הקורסים">חיפוש באתרי הקורסים</a><br>
+<!--a href="http://telem.openu.ac.il/courses/resources/private/oracle_Brochure.pdf" target="_blank" class="linklist_item_a" title="העלאת חוברת הקורס לאתר ">העלאת חוברת הקורס</a>&nbsp;&nbsp;(<a href="https://sheilta.apps.openu.ac.il/pls/myopr/BOOKLET.FIRST" target="_blank" title="כניסה למורשים">כניסה למורשים</a>)<!--&nbsp;&nbsp;&nbsp;<img src="graphics_nhp/star_bg_gray.gif" border="0" alt="">&nbsp;<span class="new">חדש</span>--><br-->
+<a href="http://www.openu.ac.il/surveys/teaching_reports.html" target="_blank" class="linklist_item_a" title="דוחות סקר הוראה">דוחות סקר הוראה</a>&nbsp;&nbsp;(<img border="0"  src="graphics_nhp/content_img/lockg.gif" title="כניסה לבעלי הרשאות בלבד מתוך האו&quot;פ" alt="כניסה לבעלי הרשאות בלבד מתוך האו&quot;פ" />) 
+<!--&nbsp;&nbsp;&nbsp;<img src="graphics_nhp/star_bg_gray.gif" border="0" alt="">&nbsp;<span class="new">חדש</span>--><br>
+
+
+<a href="https://sso.apps.openu.ac.il/login?T_PLACE=https://sheilta.apps.openu.ac.il/pls/myopr/PELE.FIRST" target="_blank" class="linklist_item_a" title="פורטל מנחים">פורטל מנחים </a>&nbsp;
+(<img border="0"   src="graphics_nhp/content_img/lockg.gif" title="כניסה לבעלי הרשאות בלבד מתוך האו&quot;פ" alt="כניסה לבעלי הרשאות בלבד מתוך האו&quot;פ" />) 
+
+<!--&nbsp;&nbsp;<img src="graphics_nhp/star_bg_gray.gif" border="0" alt="">&nbsp;<span class="new">חדש</span>--><br>
+
+
+<a href="http://opal.openu.ac.il" title="כניסה לסביבת הלמידה החדשה"    target="_blank" class="new">מערכת אוֹפָּל</a><!--&nbsp;<img src="graphics_nhp/star_bg_gray.gif" border="0" alt="">&nbsp;<span class="new">חדש</span>--><br>
+
+
+
+<a href="http://opal.openu.ac.il/course/view.php?id=107" title=" "    target="_blank">ניהול אתרי קורסים - מדריך למרכזים</a>&nbsp;(<img border="0"   src="graphics_nhp/content_img/lockg.gif" title="כניסה לבעלי הרשאות בלבד מתוך האו&quot;פ" alt="כניסה לבעלי הרשאות בלבד מתוך האו&quot;פ" />) 
+<img src="graphics_nhp/star_bg_gray.gif" border="0" alt=""><span class="new">חדש</span><br>
+
+
+
+<br>
+</div>
+
+<h1>סטודנטים</h1>
+<div class="linklist_a">
+<a href="/content/help_students.html" target="_self" class="linklist_item_a" title="תמיכה ועזרה">תמיכה ועזרה</a><br>
+<a href="https://sheilta.apps.openu.ac.il/pls/dmyopt2/user_form.first?p_from=http://telem.openu.ac.il/hp_files/html_files/user_info.html" target="_blank" class="linklist_item_a" title="עדכון פרטים אישיים">עדכון פרטים אישיים</a><br>
+
+<a href="http://www.openu.ac.il/sheilta/" target="_blank" class="linklist_item_a" title="שאילת'א">שאילת&quot;א</a><br>
+
+<a href="https://sheilta.apps.openu.ac.il/pls/dmyopt2/LUACH_SHANA.first?p_time=" target="_blank" class="linklist_item_a" title="לוח זמנים מפ'ה">לוח זמנים - מפ&quot;ה</a><br>
+
+<a href="/content/matalot_stud.html" target="_self" class="linklist_item_a" title="מערכת המטלות">מערכת המטלות</a><br>
+
+<a href="/content/ofek.html" target="_self" class="linklist_item_a" title="אופק">אופק - שיעורים בוידיאו</a>&nbsp;&nbsp;&nbsp;&nbsp;<!--img src="graphics_nhp/star_bg_gray.gif" border="0" alt="">&nbsp;<span class="new">חדש</span--><br>
+
+
+
+<a href="http://telem.openu.ac.il/content/elluminate_support.html" target="_self" class="linklist_item_a" title=" כיתה וירטואלית (Elluminate)"> כיתה וירטואלית (Elluminate) </a><br>
+
+
+<!--<a href="http://telem.openu.ac.il/content/GoToMeeting.html" target="_self" class="linklist_item_a" title=" כיתה וירטואלית (GoToMeeting)"> כיתה וירטואלית (GoToMeeting) </a><br>-->
+
+
+<a href="/content/courseware.html" target="_self" class="linklist_item_a" title="מאגר הלומדות והתקליטורים">מאגר הלומדות והתקליטורים</a><br>
+
+<a href="http://telem.openu.ac.il/academic-paper/index.htm" target="_blank" class="linklist_item_a" title="כתיבת עבודה סמינריונית">כתיבת עבודה סמינריונית (לומדה)</a><br>
+
+<a href="http://estudy.openu.ac.il/opus/bin/en.jsp?enPage=AnnotationsPage&enDispWho=Annotations&enZone=Annotations" target="_blank" class="linklist_item_a" title="כניסה לפנקס האישי">פנקס אישי</a><br>
+ 
+
+<a href="http://www.openu.ac.il/new-student/" target="_blank" class="linklist_item_a" title="אתר הסטודנט">המדריך לסטודנט החדש</a> 
+<br>
+
+
+ 
+
+
+</div>
+ 
+<!--<div id="mashov_gen">
+<div class="mashov"><a href="http://forum.openu.ac.il/opus/bin/en.jsp?enZone=Forum117583" target="_blank" title="משוב לשה&quot;ם">פורום משוב - חוו דעתכם על אתרי הקורסים, הלומדות, ויקי... </a></div>
+</div>-->
+</div>
+
+<!--end of bootom_right-->
+</div>
+<!--end of right-->
+</div>
+
+<div id="left">
+<div id="flash_zone" title="Falsh Movie" astyle="background:url(graphics_nhp/flash.jpg) 100 0 no-repeat;">
+<!--  <script type="text/javascript" src="js_scripts/flash.js"></script> 
+--><!--must be after the last </boject> -->
+
+<img src="graphics_nhp/flash.jpg" border="0" alt="rss" valign="left" align="abstop">
+</div>
+
+<div id="message" class="messageHidden">
+
+
+<!--פתיחת סמסטר-->
+<!--spring-->
+<div class="tm">
+<div class="img">
+<IMG alt="" src="graphics_nhp/message_gifs/icon_spring.gif" border=0></div>
+<strong>&nbsp;&nbsp;אתרי 2012ב נפתחו לסטודנטים. צוות שה"ם מאחל לכם סמסטר מוצלח.</strong>
+<span class="date">(4.3.12)</span>
+</div>
+</div>
+
+<!--center><img src="content/happy_holiday.gif" style="padding: 3px; margin: 3px;"></center-->
+
+<div id="links_zone">
+
+
+<div id="links_right">
+<h1>
+<span class="news">חדשות ועדכונים</span>
+<span class="rss">
+<span class="rss_text"><a href="content/rss_help.html" target="_blank" title="עזרה"><span id="rss_gif">?</span>rss&nbsp;</a><img src="graphics_nhp/rss.jpg" border="0" alt="rss" valign="left" align="abstop"></span></span>
+
+
+</h1>
+
+<div id="rss_list">
+<ul class='newsBriefList'>
+
+	<li class='newsBriefItem'><a href='http://shohamnews.blogspot.com/2012/03/html5.html' target='_blank'>HTML5</a>
+<div class='newsBriefDate'>2012-03-21 12:45:00</div>
+	</li>
+	<li class='newsBriefItem'><a href='http://shohamnews.blogspot.com/2012/03/2012.html' target='_blank'>קול קורא להגשת הצעות לכנס מיט&quot;ל העשירי 2012</a>
+<div class='newsBriefDate'>2012-03-07 12:52:00</div>
+	</li>
+	<li class='newsBriefItem'><a href='http://shohamnews.blogspot.com/2012/03/19312.html' target='_blank'>הזמנה להרצאה בסמינר המחקר של המחקר לחקר חדשנות ושה&quot;ם - 19.3.12</a>
+<div class='newsBriefDate'>2012-03-07 09:03:00</div>
+	</li>
+	<li class='newsBriefItem'><a href='http://peer-news.blogspot.com/2012/01/blog-post_18.html' target='_blank'>ספר קולי נוסף בקורס ג&#39;נוסייד: &quot;השמדת העמים האינדיאנים של אמריקה הספרדית</a>
+<div class='newsBriefDate'>2012-01-18 14:41:00</div>
+	</li>
+	<li class='newsBriefItem'><a href='http://peer-news.blogspot.com/2012/01/blog-post.html' target='_blank'>ספר קולי חדש בקורס ג&#39;נוסייד: &quot;בין גזענות לג&#39;נוסייד בעת המודרנית</a>
+<div class='newsBriefDate'>2012-01-18 14:31:00</div>
+	</li>
+	<li class='newsBriefItem'><a href='http://peer-news.blogspot.com/2012/01/10934.html' target='_blank'>כרך נוסף בקורס &quot;בטהובן - מורד ורומנטיקן&quot; (10934)</a>
+<div class='newsBriefDate'>2012-01-15 14:21:00</div>
+	</li>
+
+</ul>
+
+</div>
+
+<div id="allnews">
+<div id="allnews_link">
+<a href="content/news.html"> לרשימה המלאה</a>
+<!--a href="/content/news.html" target="_blank" title="לרשימת העידכונים המלאה"-->
+</div>
+</div>
+</div>
+
+
+
+<div id="links_mid">
+<h1>פעילויות המרכז</h1>
+<div class="linklist">
+<a href="/content/about_shoham.html" target="_self" class="linklist_item" title="אודות שה&quot;ם">אודות שה&quot;ם</a><br>
+
+
+<a href="http://telem.openu.ac.il/content/about_shoham.html#organizational_structure" target="_self" class="linklist_item" title="מבנה ארגוני">מבנה ארגוני</a><!--&nbsp;<img src="graphics_nhp/star_bg_gray.gif" border="0" alt="">&nbsp;<span class="new">חדש</span>--> <br>
+
+
+<a href="/content/distance_edu.html" target="_self" class="linklist_item" title="הוראה ולמידה מרחוק">הוראה ולמידה מרחוק</a><br>
+<a href="/content/courses_sites.html" target="_self" class="linklist_item" title="אתרי הקורסים">אתרי הקורסים</a><br>
+
+
+<a href="http://telem.openu.ac.il/content/moodle_move.html" target="_self" class="linklist_item" title="סביבת למידה חדשה באו&quot;פ Moodle">סביבת למידה חדשה באו&quot;פ Moodle</a>&nbsp;<img src="graphics_nhp/star.gif" border="0" alt=""><br>
+
+<a href="/content/vid_learning.html" target="_self" class="linklist_item" title=" וידאו בהוראה סינכרונית ">וידאו והוראה סינכרונית</a> <img src="graphics_nhp/star.gif" border="0" alt="">&nbsp;<span class="new">חדש</span><br>
+
+
+<a href="/content/virtual_class.html" target="_self" class="linklist_item" title=" כיתה וירטואלית - למידה מהבית ">כיתה וירטואלית - למידה מהבית</a> <!--<img src="graphics_nhp/star.gif" border="0" alt="">&nbsp;<span class="new">חדש</span>--><br>
+
+<!--<a href="http://telem.openu.ac.il/content/elluminate.html" target="_self" class="linklist_item" title="כיתה וירטואלית - ניסוי Elluminate">כיתה וירטואלית - ניסוי Elluminate</a> --> 
+
+
+<a href="http://telem.openu.ac.il/content/video_classes.html" target="_self" class="linklist_item" title=" צילום מפגשי הנחיה בכיתות">צילום מפגשי הנחיה בכיתות</a><!-- <img src="graphics_nhp/star.gif" border="0" alt="">&nbsp;<span class="new">חדש</span>--><br>
+
+
+<a href="/content/digital.html" target="_self" class="linklist_item" title="חומרי למידה אינטראקטיביים">חומרי למידה אינטראקטיביים</a> <!--<img src="graphics_nhp/star.gif" border="0" alt="">&nbsp;<span class="new">חדש</span>--><br>
+<a href="/content/pedagogical_dev.html" target="_self" class="linklist_item" title="פיתוח פדגוגי, הטמעה והדרכה">פיתוח פדגוגי, הטמעה והדרכה</a><br>
+<a href="/content/tools.html" target="_self" class="linklist_item" title="כלים לאירגון וניהול הלמידה">כלים לאירגון וניהול הלמידה</a><br>
+<!--<a href="/content/future_project.html" target="_self" class="linklist_item" title="ניסויים ופרויקטים מיוחדים">  ניסויים ופרויקטים מיוחדים</a> &nbsp;--><!--<img src="graphics_nhp/star.gif" border="0" alt="">&nbsp;<span class="new">חדש</span>--> 
+
+<a href="http://telem.openu.ac.il/content/sadan.html" target="_self" class="linklist_item" title="סד&quot;ן - ספרים דיגיטאליים ניידים">ספרים דיגיטאליים ניידים</a>&nbsp;<img src="graphics_nhp/star.gif" border="0" alt="">&nbsp;<span class="new">חדש</span><br>
+
+ 
+<a href="http://telem.openu.ac.il/content/audio_books.html" target="_self" class="linklist_item" title="ספרים קוליים &ndash; ערוץ למידה נוסף">ספרים קוליים – ערוץ למידה נוסף</a> <!--&nbsp;<img src="graphics_nhp/star.gif" border="0" alt="">&nbsp;<span class="new"> חדש --><br>
+
+ 
+
+<a href="/content/cooperative_learning.html" target="_self" class="linklist_item" title="למידה שיתופית">למידה שיתופית</a><br>
+<a href="http://wiki-openu.openu.ac.il/courses/wikiop" target="_blank" class="linklist_item" title="ויקיאופ"><img src="graphics_nhp/wiki.gif" border="0" alt="ויקיאופ">&nbsp;ויקיאופ</a><br>
+</div>
+
+<br>
+<div class="linklist_em">
+<a href="http://telem.openu.ac.il/hp_files/paper/archive/index.html" target="_self" class="linklist_item" title="צליל מקוון">צליל מקוון - עלון שה&quot;ם</a><!-- <img src="graphics_nhp/star.gif" border="0" alt="">&nbsp;<span class="new">חדש</span>--><br> 
+<a href="http://www.shoham-at-ou.blogspot.com/" target="_blank" class="linklist_item" title="בלוג שה&quot;ם">בלוג שה&quot;ם</a><br>
+<img src="graphics_nhp/twitter_icon_small.gif" border="0" alt="טוויטר" align="absbottom">&nbsp; <a href="http://twitter.com/shoham1" target="_blank" class="linklist_item" title="twitter">עקבו אחרינו ב-twitter </a><!--img src="graphics_nhp/star_bg_gray.gif" border="0" alt="">&nbsp;<span class="new">חדש</span--><br>
+<a href="content/articles.html" target="_self" class="linklist_item" title="מאמרים ומצגות מכנסים">מחקרי הערכה, מאמרים ומצגות</a><!-- <img src="graphics_nhp/star_bg_gray.gif" border="0" alt="">&nbsp;<span class="new">חדש</span>--><br>
+<a href="content/lectures.html" target="_self" class="linklist_item" title="ימי עיון">ימי עיון בטכנולוגיות למידה</a><!-- <img src="graphics_nhp/star.gif" border="0" alt="">&nbsp;<span class="new">חדש</span><br>-->
+</div>
+</div>
+
+
+
+
+<div id="links_left">
+
+<!--div class="linklist" id="linklist"-->
+<!--a href="http://telem.openu.ac.il/content/contact_us.html" class="linklist_item" title="צור קשר">צור קשר</a><br-->
+<!--a href="http://www-e.openu.ac.il/geninfor/136.html" target="_self" class="linklist_item" title="english">English</a><br><br-->
+<!--a href="http://ocw.openu.ac.il/" target="_blank" class="linklist_item_gif" title="פא'ר"><img src="graphics_nhp/ocw.gif" border="0" alt="פא'ר"></a><br-->
+<!--/div-->
+
+
+<h1>חומרי לימוד פתוחים</h1>
+ <img src="graphics_nhp/logos8.jpg" width="170" border="1" usemap="#Map">
+ <map name="Map">
+  <area shape="rect" coords="2,68,81,106" href="http://goo.gl/4BPH" target="_blank" title="ספרי האו&quot;פ בגרסה אלקטרונית">
+  <area shape="rect" coords="89,68,167,108" href="http://www.youtube.com/user/openofek" target="_blank" title="ערוץ YouTub  של האו&quot;פ">
+  <area shape="rect" coords="90,112,168,154" href="http://www.kotar.co.il/" target="_blank" title="ספרי האו&quot;פ בספריה המקוונת של מט&quot;ח">
+  <area shape="rect" coords="13,2,155,61" href="http://ocw.openu.ac.il/" target="_blank" alt="ספרים וחומרי לימוד פתוחים לכל"  title="ספרים וחומרי לימוד פתוחים לכל">
+  <area shape="rect" coords="2,113,81,154" onclick="tBox.objVisibility('iconmenu');" target="_blank" title="ספרי האו&quot;פ בגרסה קולית">
+
+</map>
+
+<div id="iconmenu" style="display: none; border: 1px solid gray; background-color: white; padding-right:2px; font-size:1.3em;    color:#336699;	padding-right:2px; ">
+<a href="http://goo.gl/kBQ1F" title="הרצאות" target="_blank" class="linklist_item">הרצאות</a><br>
+<a href="http://goo.gl/dywt" title="ספרים קוליים" target="_blank"class="linklist_item">ספרים קוליים</a>
+
+
+<div style="color: blue; cursor: pointer; text-align: center;" onclick="tBox.objVisibility('iconmenu', 0);">[x] סגור</div> 
+
+</div> 
+ 
+ 
+<br><br>
+<div class="linklist_em">
+ <a href="/content/opensources.html" target="_self" class="linklist_item" title="לפירוט אודות הערוצים הפתוחים"> לפירוט אודות הערוצים הפתוחים </a><!--img src="graphics_nhp/star.gif" border="0" alt="">&nbsp;<span class="new">חדש</span--><br>
+
+</div>
+<!--<div class="linklist_em">
+<a href="http://ocw.openu.ac.il/" target="_blank" class="linklist_item_gif" title="פא'ר"><img src="graphics_nhp/ocw_s1_gray.gif" border="0" alt='פא"ר - פתיחת אוצרות רוח'></a><br>
+<a href="http://www.kotar.co.il/" target="_blank" class="linklist_item" title='ספרי האו"פ בכותר – מט"ח'> ספרי האו"פ בכותר – מט"ח</a><br>
+<a href="http://goo.gl/4BPH" target="_blank" class="linklist_item" title='ספרי האו"פ google books'>   ספרי האו"פ   google books  </a> <br> 
+<a href="http://www.youtube.com/user/openofek" target="_blank" class="linklist_item" title=' YouTube  ערוץ האו"פ'><img src="graphics_nhp/youtube_small.gif" alt="youtube" width="40" height="17" border="0" align="absbottom">&nbsp; ערוץ האו"פ</a>
+<a href="http://www.icast.co.il/default.aspx?p=default&c_list=1&c=82" target="_blank" class="linklist_item" title='ערוץ האו"פ ב- iCast'>ערוץ האו"פ ב- iCast &nbsp;<!--img src="graphics_nhp/icast_logo.png" border="0" alt="youtube" align="absbottom"></a><br>-->
+
+<!--<a href="http://ocw.openu.ac.il/newsletter/01.html" target="_blank" class="linklist_item" title='אוצרות - עלון פא"ר'>   אוצרות - עלון פא"ר      </a> <br> -->
+
+<!--a href="content/presentations.html" target="_self" class="linklist_item" title="מצגות בכנסים">מצגות בכנסים</a><br>
+
+</div>-->
+<br>
+<h1>קישורים</h1>
+<div class="linklist" id="links">
+<a href="http://www.openu.ac.il/Library/" target="_blank" class="linklist_item" title="ספריה ומאגרי מידע">ספריה ומאגרי מידע</a><br>
+<a href="http://www.openu.ac.il/innovation/" target="_blank" class="linklist_item" title="המרכז לחקר חדשנות בטכנולוגיות למידה">המרכז לחקר חדשנות בטכנולוגיות למידה</a><br>
+<a href="http://meital.iucc.ac.il/" target="_blank" class="linklist_item" title="מרכז ידע טכנולוגיות למידה ">מיט&quot;ל</a><br>
+
+<!--<a href="http://wiki-openu.openu.ac.il/courses/wikiop" target="_blank" class="linklist_item" title=""><img src="graphics_nhp/oui_books_icon.jpg" alt="ספרים דיגיטלים" width="23" height="13" border="0">&nbsp;הספרים הדיגיטלים בפייסבוק</a><br>-->
+</div>
+
+
+<!-- share this button (start) 
+<span  class='st_sharethis' displayText='ShareThis' style="width: 100px; height: 100px;"></span>
+<script type="text/javascript">var switchTo5x=false;</script><script type="text/javascript" src="http://w.sharethis.com/button/buttons.js"></script><script type="text/javascript">stLight.options({publisher:'c009e98c-ad2e-4156-afda-95a59aca520c'});</script>
+ share this button (end) -->
+
+ 
+<!-- AddToAny BEGIN -->
+<a class="a2a_dd" href="http://www.addtoany.com/share_save"><img src="http://static.addtoany.com/buttons/share_save_171_16.png" width="171" height="16" border="0" alt="Share"/></a>
+<script type="text/javascript">
+var a2a_config = a2a_config || {};
+a2a_config.onclick = 1;
+a2a_config.locale = "he";
+a2a_config.num_services = 4;
+</script>
+<script type="text/javascript" src="http://static.addtoany.com/menu/page.js"></script>
+<!-- AddToAny END -->
+
+<!-- google +1 (START) -->
+<script type="text/javascript" src="http://apis.google.com/js/plusone.js">
+  {lang: 'iw'}
+</script>
+<g:plusone size="small"></g:plusone>
+<!-- google +1 (START) -->
+
+
+</div>
+
+<!--end of links_zone-->
+</div>
+
+<!--end of left-->
+</div>
+
+<!--end of text-->
+</div>
+<div id="close">
+
+</div>
+
+<!--end of content-->
+</div>
+<div id="footer">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1255" />
+<meta http-equiv="Content-Language" content="he" />
+
+<div id="footer1">
+
+<a href="http://telem.openu.ac.il/content/about_shoham.html" id="abouts" title="אודות" target="_blank">אודות</a><!--&nbsp;|-->
+<a href="http://telem.openu.ac.il/content/contact_us.html" id="conts" title="צור קשר" target="_blank">צור קשר</a><!--&nbsp;|-->
+<a href="/" id="hps" title="דף הבית" target="_self">דף הבית</a><!--&nbsp;|-->
+<a href="http://www.openu.ac.il/" id="opnets" title="אופנ'ט" target="_self"><img src="http://telem.openu.ac.il/graphics_nhp/openu_icon.gif" border="0" alt="אופנט" /></a><!--&nbsp;|--> 
+</div>
+
+<div id="footer2">
+<table id="copyRight" style="display: none;" align="center" width="180" cellspacing="0" cellpadding="1" border="0"  bgcolor="#000000">
+ <tr>
+  <td>
+   <table cellspacing="0" cellpadding="3" border="0" width="100%">
+	<tr>
+	 <td bgcolor="#FFFFFF">
+	<span id="open" style="cursor: pointer;" onclick="showHideLayer('copyRight', '', '');">[סגור]</span>
+	 </td>
+	</tr>
+    <tr>
+	 <td bgcolor="#FFFFFF">
+   <center><b>שימוש מסחרי בחומר הכלול באתרים אלה אסור בהחלט, אלא ברשות מפורשת ובכתב ממדור זכויות יוצרים של האו'פ <BR /></b>
+   </center>
+     </td>
+	</tr>
+   </table>
+  </td>
+ </tr>
+</table>
+
+Copyright &copy;,The Open University of Israel 1997-2012 <b style="cursor: pointer;" onclick="showHideLayer('copyRight', '', '');">all rights reserved<br />
+כל הזכויות שמורות	</b>&copy; לאוניברסיטה הפתוחה. תשע"ב - 2012
+</div>
+
+<!--include virtual="/include/general/footer_source_popup_shoham_logical.htm"  -->   
+<!--include virtual="/include/general/footer_code_popup_shoham_logical.html"  -->
+
+
+<!-- GOOGLE ANALYTICS (TELEM ONLY) START -->
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+var pageTracker = _gat._getTracker("UA-4646503-5");
+//pageTracker._initData();
+pageTracker._trackPageview();
+</script>
+<!-- GOOGLE ANALYTICS (TELEM ONLY) END -->
+
+
+</div>
+<!--end of container-->
+</div>
+
+
+
+</body>
+</html>
+
+

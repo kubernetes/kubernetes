@@ -1,7 +1,6 @@
 package volumetypes
 
 import (
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -45,11 +44,8 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 		return res
 	}
 
-	_, res.Err = perigee.Request("POST", createURL(client), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200, 201},
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
+	_, res.Err = client.Post(createURL(client), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200, 201},
 	})
 	return res
 }
@@ -57,10 +53,7 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 // Delete will delete the volume type with the provided ID.
 func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", deleteURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
-	})
+	_, res.Err = client.Delete(deleteURL(client, id), nil)
 	return res
 }
 
@@ -68,11 +61,7 @@ func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 // type from the result, call the Extract method on the GetResult.
 func Get(client *gophercloud.ServiceClient, id string) GetResult {
 	var res GetResult
-	_, err := perigee.Request("GET", getURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
-		Results:     &res.Body,
-	})
+	_, err := client.Get(getURL(client, id), &res.Body, nil)
 	res.Err = err
 	return res
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,28 +21,25 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"strings"
 
 	"github.com/spf13/cobra"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 )
 
 type unsetOptions struct {
-	pathOptions  *pathOptions
+	configAccess ConfigAccess
 	propertyName string
 }
 
-func NewCmdConfigUnset(out io.Writer, pathOptions *pathOptions) *cobra.Command {
-	options := &unsetOptions{pathOptions: pathOptions}
+const unset_long = `Unsets an individual value in a kubeconfig file
+PROPERTY_NAME is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.`
+
+func NewCmdConfigUnset(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+	options := &unsetOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:   "unset property-name",
-		Short: "Unsets an individual value in a .kubeconfig file",
-		Long: `Unsets an individual value in a .kubeconfig file
-
-		property-name is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
-		`,
+		Use:   "unset PROPERTY_NAME",
+		Short: "Unsets an individual value in a kubeconfig file",
+		Long:  unset_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {
 				return
@@ -50,7 +47,9 @@ func NewCmdConfigUnset(out io.Writer, pathOptions *pathOptions) *cobra.Command {
 
 			err := options.run()
 			if err != nil {
-				fmt.Printf("%v\n", err)
+				fmt.Fprintf(out, "%v\n", err)
+			} else {
+				fmt.Fprintf(out, "property %q unset.\n", options.propertyName)
 			}
 		},
 	}
@@ -64,23 +63,21 @@ func (o unsetOptions) run() error {
 		return err
 	}
 
-	config, filename, err := o.pathOptions.getStartingConfig()
+	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
 		return err
 	}
 
-	if len(filename) == 0 {
-		return errors.New("cannot set property without using a specific file")
+	steps, err := newNavigationSteps(o.propertyName)
+	if err != nil {
+		return err
 	}
-
-	parts := strings.Split(o.propertyName, ".")
-	err = modifyConfig(reflect.ValueOf(config), parts, "", true)
+	err = modifyConfig(reflect.ValueOf(config), steps, "", true)
 	if err != nil {
 		return err
 	}
 
-	err = clientcmd.WriteToFile(*config, filename)
-	if err != nil {
+	if err := ModifyConfig(o.configAccess, *config, false); err != nil {
 		return err
 	}
 
@@ -100,7 +97,7 @@ func (o *unsetOptions) complete(cmd *cobra.Command) bool {
 
 func (o unsetOptions) validate() error {
 	if len(o.propertyName) == 0 {
-		return errors.New("You must specify a property")
+		return errors.New("you must specify a property")
 	}
 
 	return nil

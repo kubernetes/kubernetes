@@ -12,12 +12,23 @@ type CreateOpts struct {
 	// Name [required] is the name to assign to the newly launched server.
 	Name string
 
-	// ImageRef [required] is the ID or full URL to the image that contains the server's OS and initial state.
-	// Optional if using the boot-from-volume extension.
+	// ImageRef [optional; required if ImageName is not provided] is the ID or full
+	// URL to the image that contains the server's OS and initial state.
+	// Also optional if using the boot-from-volume extension.
 	ImageRef string
 
-	// FlavorRef [required] is the ID or full URL to the flavor that describes the server's specs.
+	// ImageName [optional; required if ImageRef is not provided] is the name of the
+	// image that contains the server's OS and initial state.
+	// Also optional if using the boot-from-volume extension.
+	ImageName string
+
+	// FlavorRef [optional; required if FlavorName is not provided] is the ID or
+	// full URL to the flavor that describes the server's specs.
 	FlavorRef string
+
+	// FlavorName [optional; required if FlavorRef is not provided] is the name of
+	// the flavor that describes the server's specs.
+	FlavorName string
 
 	// SecurityGroups [optional] lists the names of the security groups to which this server should belong.
 	SecurityGroups []string
@@ -36,12 +47,16 @@ type CreateOpts struct {
 	// Metadata [optional] contains key-value pairs (up to 255 bytes each) to attach to the server.
 	Metadata map[string]string
 
-	// Personality [optional] includes the path and contents of a file to inject into the server at launch.
-	// The maximum size of the file is 255 bytes (decoded).
-	Personality []byte
+	// Personality [optional] includes files to inject into the server at launch.
+	// Create will base64-encode file contents for you.
+	Personality os.Personality
 
 	// ConfigDrive [optional] enables metadata injection through a configuration drive.
 	ConfigDrive bool
+
+	// AdminPass [optional] sets the root user password. If not set, a randomly-generated
+	// password will be created and returned in the response.
+	AdminPass string
 
 	// Rackspace-specific extensions begin here.
 
@@ -54,7 +69,7 @@ type CreateOpts struct {
 	DiskConfig diskconfig.DiskConfig
 
 	// BlockDevice [optional] will create the server from a volume, which is created from an image,
-	// a snapshot, or an another volume.
+	// a snapshot, or another volume.
 	BlockDevice []bootfromvolume.BlockDevice
 }
 
@@ -64,7 +79,9 @@ func (opts CreateOpts) ToServerCreateMap() (map[string]interface{}, error) {
 	base := os.CreateOpts{
 		Name:             opts.Name,
 		ImageRef:         opts.ImageRef,
+		ImageName:        opts.ImageName,
 		FlavorRef:        opts.FlavorRef,
+		FlavorName:       opts.FlavorName,
 		SecurityGroups:   opts.SecurityGroups,
 		UserData:         opts.UserData,
 		AvailabilityZone: opts.AvailabilityZone,
@@ -72,6 +89,7 @@ func (opts CreateOpts) ToServerCreateMap() (map[string]interface{}, error) {
 		Metadata:         opts.Metadata,
 		Personality:      opts.Personality,
 		ConfigDrive:      opts.ConfigDrive,
+		AdminPass:        opts.AdminPass,
 	}
 
 	drive := diskconfig.CreateOptsExt{
@@ -99,7 +117,9 @@ func (opts CreateOpts) ToServerCreateMap() (map[string]interface{}, error) {
 	// key_name doesn't actually come from the extension (or at least isn't documented there) so
 	// we need to add it manually.
 	serverMap := res["server"].(map[string]interface{})
-	serverMap["key_name"] = opts.KeyPair
+	if opts.KeyPair != "" {
+		serverMap["key_name"] = opts.KeyPair
+	}
 
 	return res, nil
 }
@@ -125,9 +145,9 @@ type RebuildOpts struct {
 	// Metadata [optional] contains key-value pairs (up to 255 bytes each) to attach to the server.
 	Metadata map[string]string
 
-	// Personality [optional] includes the path and contents of a file to inject into the server at launch.
-	// The maximum size of the file is 255 bytes (decoded).
-	Personality []byte
+	// Personality [optional] includes files to inject into the server at launch.
+	// Rebuild will base64-encode file contents for you.
+	Personality os.Personality
 
 	// Rackspace-specific stuff begins here.
 

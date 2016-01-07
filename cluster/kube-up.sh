@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,26 +25,32 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
-echo "Starting cluster using provider: $KUBERNETES_PROVIDER" >&2
+if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
+    source "${KUBE_ROOT}/cluster/env.sh"
+fi
+
+source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_ROOT}/cluster/kube-util.sh"
+
+echo "... Starting cluster using provider: $KUBERNETES_PROVIDER" >&2
 
 echo "... calling verify-prereqs" >&2
 verify-prereqs
+
+if [[ "${KUBE_STAGE_IMAGES:-}" == "true" ]]; then
+  echo "... staging images" >&2
+  stage-images
+fi
 
 echo "... calling kube-up" >&2
 kube-up
 
 echo "... calling validate-cluster" >&2
-"${KUBE_ROOT}/cluster/validate-cluster.sh"
+validate-cluster
 
-echo "... calling setup-monitoring-firewall" >&2
-setup-monitoring-firewall
-
-echo "... calling setup-logging-firewall" >&2
-setup-logging-firewall
-
-echo "Done" >&2
+echo -e "Done, listing cluster services:\n" >&2
+"${KUBE_ROOT}/cluster/kubectl.sh" cluster-info
+echo
 
 exit 0

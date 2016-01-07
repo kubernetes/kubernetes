@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,15 +21,25 @@ limitations under the License.
 package main
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/controllermanager"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
+	"fmt"
+	"os"
+	"runtime"
+
+	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
+	"k8s.io/kubernetes/pkg/healthz"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
 )
 
+func init() {
+	healthz.DefaultHealthz()
+}
+
 func main() {
-	s := controllermanager.NewCMServer()
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	s := app.NewCMServer()
 	s.AddFlags(pflag.CommandLine)
 
 	util.InitFlags()
@@ -38,5 +48,8 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	s.Run(pflag.CommandLine.Args())
+	if err := s.Run(pflag.CommandLine.Args()); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
 }

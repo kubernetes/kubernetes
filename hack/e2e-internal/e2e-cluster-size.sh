@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
 : ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
-: ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
+: ${KUBECTL:=${KUBE_VERSION_ROOT}/cluster/kubectl.sh}
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
 
 export KUBECTL KUBE_CONFIG_FILE
@@ -31,4 +31,4 @@ source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
 prepare-e2e
 
-${KUBECTL} get minions --no-headers | wc -l
+${KUBECTL} get nodes --no-headers | wc -l

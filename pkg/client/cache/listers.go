@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,8 +19,10 @@ package cache
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 //  TODO: generate these classes and methods for all resources of interest using
@@ -39,18 +41,63 @@ type StoreToPodLister struct {
 	Store
 }
 
-// TODO Get rid of the selector because that is confusing because the user might not realize that there has already been
-// some selection at the caching stage.  Also, consistency will facilitate code generation.  However, the pkg/client
-// is inconsistent too.
-func (s *StoreToPodLister) List(selector labels.Selector) (pods []api.Pod, err error) {
+// Please note that selector is filtering among the pods that have gotten into
+// the store; there may have been some filtering that already happened before
+// that.
+//
+// TODO: converge on the interface in pkg/client.
+func (s *StoreToPodLister) List(selector labels.Selector) (pods []*api.Pod, err error) {
+	// TODO: it'd be great to just call
+	// s.Pods(api.NamespaceAll).List(selector), however then we'd have to
+	// remake the list.Items as a []*api.Pod. So leave this separate for
+	// now.
 	for _, m := range s.Store.List() {
 		pod := m.(*api.Pod)
 		if selector.Matches(labels.Set(pod.Labels)) {
-			pods = append(pods, *pod)
+			pods = append(pods, pod)
 		}
 	}
 	return pods, nil
 }
+
+// Pods is taking baby steps to be more like the api in pkg/client
+func (s *StoreToPodLister) Pods(namespace string) storePodsNamespacer {
+	return storePodsNamespacer{s.Store, namespace}
+}
+
+type storePodsNamespacer struct {
+	store     Store
+	namespace string
+}
+
+// Please note that selector is filtering among the pods that have gotten into
+// the store; there may have been some filtering that already happened before
+// that.
+func (s storePodsNamespacer) List(selector labels.Selector) (pods api.PodList, err error) {
+	list := api.PodList{}
+	for _, m := range s.store.List() {
+		pod := m.(*api.Pod)
+		if s.namespace == api.NamespaceAll || s.namespace == pod.Namespace {
+			if selector.Matches(labels.Set(pod.Labels)) {
+				list.Items = append(list.Items, *pod)
+			}
+		}
+	}
+	return list, nil
+}
+
+// Exists returns true if a pod matching the namespace/name of the given pod exists in the store.
+func (s *StoreToPodLister) Exists(pod *api.Pod) (bool, error) {
+	_, exists, err := s.Store.Get(pod)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// NodeConditionPredicate is a function that indicates whether the given node's conditions meet
+// some set of criteria defined by the function.
+type NodeConditionPredicate func(node api.Node) bool
 
 // StoreToNodeLister makes a Store have the List method of the client.NodeInterface
 // The Store must contain (only) Nodes.
@@ -65,21 +112,194 @@ func (s *StoreToNodeLister) List() (machines api.NodeList, err error) {
 	return machines, nil
 }
 
-// TODO Move this back to scheduler as a helper function that takes a Store,
-// rather than a method of StoreToNodeLister.
-// GetNodeInfo returns cached data for the minion 'id'.
-func (s *StoreToNodeLister) GetNodeInfo(id string) (*api.Node, error) {
-	minion, exists, err := s.Get(&api.Node{ObjectMeta: api.ObjectMeta{Name: id}})
+// NodeCondition returns a storeToNodeConditionLister
+func (s *StoreToNodeLister) NodeCondition(predicate NodeConditionPredicate) storeToNodeConditionLister {
+	// TODO: Move this filtering server side. Currently our selectors don't facilitate searching through a list so we
+	// have the reflector filter out the Unschedulable field and sift through node conditions in the lister.
+	return storeToNodeConditionLister{s.Store, predicate}
+}
 
+// storeToNodeConditionLister filters and returns nodes matching the given type and status from the store.
+type storeToNodeConditionLister struct {
+	store     Store
+	predicate NodeConditionPredicate
+}
+
+// List returns a list of nodes that match the conditions defined by the predicate functions in the storeToNodeConditionLister.
+func (s storeToNodeConditionLister) List() (nodes api.NodeList, err error) {
+	for _, m := range s.store.List() {
+		node := *m.(*api.Node)
+		if s.predicate(node) {
+			nodes.Items = append(nodes.Items, node)
+		} else {
+			glog.V(5).Infof("Node %s matches none of the conditions", node.Name)
+		}
+	}
+	return
+}
+
+// StoreToReplicationControllerLister gives a store List and Exists methods. The store must contain only ReplicationControllers.
+type StoreToReplicationControllerLister struct {
+	Store
+}
+
+// Exists checks if the given rc exists in the store.
+func (s *StoreToReplicationControllerLister) Exists(controller *api.ReplicationController) (bool, error) {
+	_, exists, err := s.Store.Get(controller)
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving minion '%v' from cache: %v", id, err)
+		return false, err
+	}
+	return exists, nil
+}
+
+// StoreToReplicationControllerLister lists all controllers in the store.
+// TODO: converge on the interface in pkg/client
+func (s *StoreToReplicationControllerLister) List() (controllers []api.ReplicationController, err error) {
+	for _, c := range s.Store.List() {
+		controllers = append(controllers, *(c.(*api.ReplicationController)))
+	}
+	return controllers, nil
+}
+
+// GetPodControllers returns a list of replication controllers managing a pod. Returns an error only if no matching controllers are found.
+func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+	var selector labels.Selector
+	var rc api.ReplicationController
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no controllers found for pod %v because it has no labels", pod.Name)
+		return
 	}
 
-	if !exists {
-		return nil, fmt.Errorf("minion '%v' is not in cache", id)
+	for _, m := range s.Store.List() {
+		rc = *m.(*api.ReplicationController)
+		if rc.Namespace != pod.Namespace {
+			continue
+		}
+		labelSet := labels.Set(rc.Spec.Selector)
+		selector = labels.Set(rc.Spec.Selector).AsSelector()
+
+		// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
+		if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		controllers = append(controllers, rc)
+	}
+	if len(controllers) == 0 {
+		err = fmt.Errorf("could not find controller for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
+
+// StoreToDeploymentLister gives a store List and Exists methods. The store must contain only Deployments.
+type StoreToDeploymentLister struct {
+	Store
+}
+
+// Exists checks if the given deployment exists in the store.
+func (s *StoreToDeploymentLister) Exists(deployment *extensions.Deployment) (bool, error) {
+	_, exists, err := s.Store.Get(deployment)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// StoreToDeploymentLister lists all deployments in the store.
+// TODO: converge on the interface in pkg/client
+func (s *StoreToDeploymentLister) List() (deployments []extensions.Deployment, err error) {
+	for _, c := range s.Store.List() {
+		deployments = append(deployments, *(c.(*extensions.Deployment)))
+	}
+	return deployments, nil
+}
+
+// GetDeploymentsForRC returns a list of deployments managing a replication controller. Returns an error only if no matching deployments are found.
+func (s *StoreToDeploymentLister) GetDeploymentsForRC(rc *api.ReplicationController) (deployments []extensions.Deployment, err error) {
+	var selector labels.Selector
+	var d extensions.Deployment
+
+	if len(rc.Labels) == 0 {
+		err = fmt.Errorf("no deployments found for replication controller %v because it has no labels", rc.Name)
+		return
 	}
 
-	return minion.(*api.Node), nil
+	// TODO: MODIFY THIS METHOD so that it checks for the podTemplateSpecHash label
+	for _, m := range s.Store.List() {
+		d = *m.(*extensions.Deployment)
+		if d.Namespace != rc.Namespace {
+			continue
+		}
+		labelSet := labels.Set(d.Spec.Selector)
+		selector = labels.Set(d.Spec.Selector).AsSelector()
+
+		// If a deployment with a nil or empty selector creeps in, it should match nothing, not everything.
+		if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(rc.Labels)) {
+			continue
+		}
+		deployments = append(deployments, d)
+	}
+	if len(deployments) == 0 {
+		err = fmt.Errorf("could not find deployments set for replication controller %s in namespace %s with labels: %v", rc.Name, rc.Namespace, rc.Labels)
+	}
+	return
+}
+
+// StoreToDaemonSetLister gives a store List and Exists methods. The store must contain only DaemonSets.
+type StoreToDaemonSetLister struct {
+	Store
+}
+
+// Exists checks if the given daemon set exists in the store.
+func (s *StoreToDaemonSetLister) Exists(ds *extensions.DaemonSet) (bool, error) {
+	_, exists, err := s.Store.Get(ds)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// List lists all daemon sets in the store.
+// TODO: converge on the interface in pkg/client
+func (s *StoreToDaemonSetLister) List() (dss extensions.DaemonSetList, err error) {
+	for _, c := range s.Store.List() {
+		dss.Items = append(dss.Items, *(c.(*extensions.DaemonSet)))
+	}
+	return dss, nil
+}
+
+// GetPodDaemonSets returns a list of daemon sets managing a pod.
+// Returns an error if and only if no matching daemon sets are found.
+func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []extensions.DaemonSet, err error) {
+	var selector labels.Selector
+	var daemonSet extensions.DaemonSet
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no daemon sets found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		daemonSet = *m.(*extensions.DaemonSet)
+		if daemonSet.Namespace != pod.Namespace {
+			continue
+		}
+		selector, err = extensions.LabelSelectorAsSelector(daemonSet.Spec.Selector)
+		if err != nil {
+			// this should not happen if the DaemonSet passed validation
+			return nil, err
+		}
+
+		// If a daemonSet with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		daemonSets = append(daemonSets, daemonSet)
+	}
+	if len(daemonSets) == 0 {
+		err = fmt.Errorf("could not find daemon set for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
 }
 
 // StoreToServiceLister makes a Store that has the List method of the client.ServiceInterface
@@ -97,7 +317,7 @@ func (s *StoreToServiceLister) List() (services api.ServiceList, err error) {
 
 // TODO: Move this back to scheduler as a helper function that takes a Store,
 // rather than a method of StoreToServiceLister.
-func (s *StoreToServiceLister) GetPodServices(pod api.Pod) (services []api.Service, err error) {
+func (s *StoreToServiceLister) GetPodServices(pod *api.Pod) (services []api.Service, err error) {
 	var selector labels.Selector
 	var service api.Service
 
@@ -107,16 +327,132 @@ func (s *StoreToServiceLister) GetPodServices(pod api.Pod) (services []api.Servi
 		if service.Namespace != pod.Namespace {
 			continue
 		}
+		if service.Spec.Selector == nil {
+			// services with nil selectors match nothing, not everything.
+			continue
+		}
 		selector = labels.Set(service.Spec.Selector).AsSelector()
 		if selector.Matches(labels.Set(pod.Labels)) {
 			services = append(services, service)
 		}
 	}
 	if len(services) == 0 {
-		err = fmt.Errorf("Could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 
 	return
 }
 
-// TODO: add StoreToEndpointsLister for use in kube-proxy.
+// StoreToEndpointsLister makes a Store that lists endpoints.
+type StoreToEndpointsLister struct {
+	Store
+}
+
+// List lists all endpoints in the store.
+func (s *StoreToEndpointsLister) List() (services api.EndpointsList, err error) {
+	for _, m := range s.Store.List() {
+		services.Items = append(services.Items, *(m.(*api.Endpoints)))
+	}
+	return services, nil
+}
+
+// GetServiceEndpoints returns the endpoints of a service, matched on service name.
+func (s *StoreToEndpointsLister) GetServiceEndpoints(svc *api.Service) (ep api.Endpoints, err error) {
+	for _, m := range s.Store.List() {
+		ep = *m.(*api.Endpoints)
+		if svc.Name == ep.Name && svc.Namespace == ep.Namespace {
+			return ep, nil
+		}
+	}
+	err = fmt.Errorf("could not find endpoints for service: %v", svc.Name)
+	return
+}
+
+// StoreToJobLister gives a store List and Exists methods. The store must contain only Jobs.
+type StoreToJobLister struct {
+	Store
+}
+
+// Exists checks if the given job exists in the store.
+func (s *StoreToJobLister) Exists(job *extensions.Job) (bool, error) {
+	_, exists, err := s.Store.Get(job)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// StoreToJobLister lists all jobs in the store.
+func (s *StoreToJobLister) List() (jobs extensions.JobList, err error) {
+	for _, c := range s.Store.List() {
+		jobs.Items = append(jobs.Items, *(c.(*extensions.Job)))
+	}
+	return jobs, nil
+}
+
+// GetPodJobs returns a list of jobs managing a pod. Returns an error only if no matching jobs are found.
+func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err error) {
+	var selector labels.Selector
+	var job extensions.Job
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no jobs found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		job = *m.(*extensions.Job)
+		if job.Namespace != pod.Namespace {
+			continue
+		}
+
+		selector, _ = extensions.LabelSelectorAsSelector(job.Spec.Selector)
+		if !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		jobs = append(jobs, job)
+	}
+	if len(jobs) == 0 {
+		err = fmt.Errorf("could not find jobs for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
+
+// Typed wrapper around a store of PersistentVolumes
+type StoreToPVFetcher struct {
+	Store
+}
+
+// GetPersistentVolumeInfo returns cached data for the PersistentVolume 'id'.
+func (s *StoreToPVFetcher) GetPersistentVolumeInfo(id string) (*api.PersistentVolume, error) {
+	o, exists, err := s.Get(&api.PersistentVolume{ObjectMeta: api.ObjectMeta{Name: id}})
+
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving PersistentVolume '%v' from cache: %v", id, err)
+	}
+
+	if !exists {
+		return nil, fmt.Errorf("PersistentVolume '%v' is not in cache", id)
+	}
+
+	return o.(*api.PersistentVolume), nil
+}
+
+// Typed wrapper around a store of PersistentVolumeClaims
+type StoreToPVCFetcher struct {
+	Store
+}
+
+// GetPersistentVolumeClaimInfo returns cached data for the PersistentVolumeClaim 'id'.
+func (s *StoreToPVCFetcher) GetPersistentVolumeClaimInfo(namespace string, id string) (*api.PersistentVolumeClaim, error) {
+	o, exists, err := s.Get(&api.PersistentVolumeClaim{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: id}})
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving PersistentVolumeClaim '%s/%s' from cache: %v", namespace, id, err)
+	}
+
+	if !exists {
+		return nil, fmt.Errorf("PersistentVolumeClaim '%s/%s' is not in cache", namespace, id)
+	}
+
+	return o.(*api.PersistentVolumeClaim), nil
+}

@@ -1,10 +1,16 @@
 package restful
 
+import (
+	"fmt"
+	"os"
+	"sync"
+
+	"github.com/emicklei/go-restful/log"
+)
+
 // Copyright 2013 Ernest Micklei. All rights reserved.
 // Use of this source code is governed by a license
 // that can be found in the LICENSE file.
-
-import "log"
 
 // WebService holds a collection of Route values that bind a Http Method + URL Path to a function.
 type WebService struct {
@@ -17,6 +23,15 @@ type WebService struct {
 	filters        []FilterFunction
 	documentation  string
 	apiVersion     string
+
+	dynamicRoutes bool
+
+	// protects 'routes' if dynamic routes are enabled
+	routesLock sync.RWMutex
+}
+
+func (w *WebService) SetDynamicRoutes(enable bool) {
+	w.dynamicRoutes = enable
 }
 
 // compilePathExpression ensures that the path is compiled into a RegEx for those routers that need it.
@@ -26,7 +41,8 @@ func (w *WebService) compilePathExpression() {
 	}
 	compiled, err := newPathExpression(w.rootPath)
 	if err != nil {
-		log.Fatalf("[restful] invalid path:%s because:%v", w.rootPath, err)
+		log.Printf("[restful] invalid path:%s because:%v", w.rootPath, err)
+		os.Exit(1)
 	}
 	w.pathExpr = compiled
 }
@@ -60,6 +76,12 @@ func (w *WebService) Param(parameter *Parameter) *WebService {
 // PathParameter creates a new Parameter of kind Path for documentation purposes.
 // It is initialized as required with string as its DataType.
 func (w *WebService) PathParameter(name, description string) *Parameter {
+	return PathParameter(name, description)
+}
+
+// PathParameter creates a new Parameter of kind Path for documentation purposes.
+// It is initialized as required with string as its DataType.
+func PathParameter(name, description string) *Parameter {
 	p := &Parameter{&ParameterData{Name: name, Description: description, Required: true, DataType: "string"}}
 	p.bePath()
 	return p
@@ -68,6 +90,12 @@ func (w *WebService) PathParameter(name, description string) *Parameter {
 // QueryParameter creates a new Parameter of kind Query for documentation purposes.
 // It is initialized as not required with string as its DataType.
 func (w *WebService) QueryParameter(name, description string) *Parameter {
+	return QueryParameter(name, description)
+}
+
+// QueryParameter creates a new Parameter of kind Query for documentation purposes.
+// It is initialized as not required with string as its DataType.
+func QueryParameter(name, description string) *Parameter {
 	p := &Parameter{&ParameterData{Name: name, Description: description, Required: false, DataType: "string"}}
 	p.beQuery()
 	return p
@@ -76,6 +104,12 @@ func (w *WebService) QueryParameter(name, description string) *Parameter {
 // BodyParameter creates a new Parameter of kind Body for documentation purposes.
 // It is initialized as required without a DataType.
 func (w *WebService) BodyParameter(name, description string) *Parameter {
+	return BodyParameter(name, description)
+}
+
+// BodyParameter creates a new Parameter of kind Body for documentation purposes.
+// It is initialized as required without a DataType.
+func BodyParameter(name, description string) *Parameter {
 	p := &Parameter{&ParameterData{Name: name, Description: description, Required: true}}
 	p.beBody()
 	return p
@@ -84,6 +118,12 @@ func (w *WebService) BodyParameter(name, description string) *Parameter {
 // HeaderParameter creates a new Parameter of kind (Http) Header for documentation purposes.
 // It is initialized as not required with string as its DataType.
 func (w *WebService) HeaderParameter(name, description string) *Parameter {
+	return HeaderParameter(name, description)
+}
+
+// HeaderParameter creates a new Parameter of kind (Http) Header for documentation purposes.
+// It is initialized as not required with string as its DataType.
+func HeaderParameter(name, description string) *Parameter {
 	p := &Parameter{&ParameterData{Name: name, Description: description, Required: false, DataType: "string"}}
 	p.beHeader()
 	return p
@@ -92,6 +132,12 @@ func (w *WebService) HeaderParameter(name, description string) *Parameter {
 // FormParameter creates a new Parameter of kind Form (using application/x-www-form-urlencoded) for documentation purposes.
 // It is initialized as required with string as its DataType.
 func (w *WebService) FormParameter(name, description string) *Parameter {
+	return FormParameter(name, description)
+}
+
+// FormParameter creates a new Parameter of kind Form (using application/x-www-form-urlencoded) for documentation purposes.
+// It is initialized as required with string as its DataType.
+func FormParameter(name, description string) *Parameter {
 	p := &Parameter{&ParameterData{Name: name, Description: description, Required: false, DataType: "string"}}
 	p.beForm()
 	return p
@@ -99,9 +145,26 @@ func (w *WebService) FormParameter(name, description string) *Parameter {
 
 // Route creates a new Route using the RouteBuilder and add to the ordered list of Routes.
 func (w *WebService) Route(builder *RouteBuilder) *WebService {
+	w.routesLock.Lock()
+	defer w.routesLock.Unlock()
 	builder.copyDefaults(w.produces, w.consumes)
 	w.routes = append(w.routes, builder.Build())
 	return w
+}
+
+// RemoveRoute removes the specified route, looks for something that matches 'path' and 'method'
+func (w *WebService) RemoveRoute(path, method string) error {
+	if !w.dynamicRoutes {
+		return fmt.Errorf("dynamic routes are not enabled.")
+	}
+	w.routesLock.Lock()
+	defer w.routesLock.Unlock()
+	for ix := range w.routes {
+		if w.routes[ix].Method == method && w.routes[ix].Path == path {
+			w.routes = append(w.routes[:ix], w.routes[ix+1:]...)
+		}
+	}
+	return nil
 }
 
 // Method creates a new RouteBuilder and initialize its http method
@@ -125,7 +188,17 @@ func (w *WebService) Consumes(accepts ...string) *WebService {
 
 // Routes returns the Routes associated with this WebService
 func (w WebService) Routes() []Route {
-	return w.routes
+	if !w.dynamicRoutes {
+		return w.routes
+	}
+	// Make a copy of the array to prevent concurrency problems
+	w.routesLock.RLock()
+	defer w.routesLock.RUnlock()
+	result := make([]Route, len(w.routes))
+	for ix := range w.routes {
+		result[ix] = w.routes[ix]
+	}
+	return result
 }
 
 // RootPath returns the RootPath associated with this WebService. Default "/"

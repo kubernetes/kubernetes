@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,13 +26,17 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/runtime"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/yaml"
+	"k8s.io/kubernetes/pkg/watch"
+)
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+const (
+	constSTDINstr       string = "STDIN"
+	stopValidateMessage        = "if you choose to ignore these errors, turn validation off with --validate=false"
 )
 
 // Visitor lets clients walk a list of resources.
@@ -40,8 +44,12 @@ type Visitor interface {
 	Visit(VisitorFunc) error
 }
 
-// VisitorFunc implements the Visitor interface for a matching function
-type VisitorFunc func(*Info) error
+// VisitorFunc implements the Visitor interface for a matching function.
+// If there was a problem walking a list of resources, the incoming error
+// will describe the problem and the function can decide how to handle that error.
+// A nil returned indicates to accept an error to continue loops even when errors happen.
+// This is useful for ignoring certain kinds of errors or aggregating errors in some way.
+type VisitorFunc func(*Info, error) error
 
 // Watchable describes a resource that can be watched for changes that occur on the server,
 // beginning after the provided resource version.
@@ -63,6 +71,13 @@ type Info struct {
 	Namespace string
 	Name      string
 
+	// Optional, Source is the filename or URL to template file (.json or .yaml),
+	// or stdin to use to handle the resource
+	Source string
+	// Optional, this is the provided object in a versioned type before defaulting
+	// and conversions into its corresponding internal type. This is useful for
+	// reflecting on user intent which may be lost after defaulting and conversions.
+	VersionedObject interface{}
 	// Optional, this is the most recent value returned by the server if available
 	runtime.Object
 	// Optional, this is the most recent resource version the server knows about for
@@ -70,26 +85,29 @@ type Info struct {
 	// but if set it should be equal to or newer than the resource version of the
 	// object (however the server defines resource version).
 	ResourceVersion string
+	// Optional, should this resource be exported, stripped of cluster-specific and instance specific fields
+	Export bool
 }
 
 // NewInfo returns a new info object
-func NewInfo(client RESTClient, mapping *meta.RESTMapping, namespace, name string) *Info {
+func NewInfo(client RESTClient, mapping *meta.RESTMapping, namespace, name string, export bool) *Info {
 	return &Info{
 		Client:    client,
 		Mapping:   mapping,
 		Namespace: namespace,
 		Name:      name,
+		Export:    export,
 	}
 }
 
 // Visit implements Visitor
 func (i *Info) Visit(fn VisitorFunc) error {
-	return fn(i)
+	return fn(i, nil)
 }
 
 // Get retrieves the object from the Namespace and Name fields
-func (i *Info) Get() error {
-	obj, err := NewHelper(i.Client, i.Mapping).Get(i.Namespace, i.Name)
+func (i *Info) Get() (err error) {
+	obj, err := NewHelper(i.Client, i.Mapping).Get(i.Namespace, i.Name, i.Export)
 	if err != nil {
 		return err
 	}
@@ -130,6 +148,11 @@ func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
 	return nil
 }
 
+// Namespaced returns true if the object belongs to a namespace
+func (i *Info) Namespaced() bool {
+	return i.Mapping != nil && i.Mapping.Scope.Name() == meta.RESTScopeNameNamespace
+}
+
 // Watch returns server changes to this object after it was retrieved.
 func (i *Info) Watch(resourceVersion string) (watch.Interface, error) {
 	return NewHelper(i.Client, i.Mapping).WatchSingle(i.Namespace, i.Name, resourceVersion)
@@ -163,8 +186,12 @@ type EagerVisitorList []Visitor
 func (l EagerVisitorList) Visit(fn VisitorFunc) error {
 	errs := []error(nil)
 	for i := range l {
-		if err := l[i].Visit(func(info *Info) error {
-			if err := fn(info); err != nil {
+		if err := l[i].Visit(func(info *Info, err error) error {
+			if err != nil {
+				errs = append(errs, err)
+				return nil
+			}
+			if err := fn(info, nil); err != nil {
 				errs = append(errs, err)
 			}
 			return nil
@@ -172,105 +199,35 @@ func (l EagerVisitorList) Visit(fn VisitorFunc) error {
 			errs = append(errs, err)
 		}
 	}
-	return errors.NewAggregate(errs)
+	return utilerrors.NewAggregate(errs)
 }
 
-// PathVisitor visits a given path and returns an object representing the file
-// at that path.
-type PathVisitor struct {
-	*Mapper
-	// The file path to load
-	Path string
-	// Whether to ignore files that are not recognized as API objects
-	IgnoreErrors bool
-}
-
-func (v *PathVisitor) Visit(fn VisitorFunc) error {
-	data, err := ioutil.ReadFile(v.Path)
-	if err != nil {
-		return fmt.Errorf("unable to read %q: %v", v.Path, err)
-	}
-	info, err := v.Mapper.InfoForData(data, v.Path)
-	if err != nil {
-		if v.IgnoreErrors {
-			return err
-		}
-		glog.V(2).Infof("Unable to load file %q: %v", v.Path, err)
+func ValidateSchema(data []byte, schema validation.Schema) error {
+	if schema == nil {
 		return nil
 	}
-	return fn(info)
-}
-
-// DirectoryVisitor loads the specified files from a directory and passes them
-// to visitors.
-type DirectoryVisitor struct {
-	*Mapper
-	// The directory or file to start from
-	Path string
-	// Whether directories are recursed
-	Recursive bool
-	// The file extensions to include. If empty, all files are read.
-	Extensions []string
-	// Whether to ignore files that are not recognized as API objects
-	IgnoreErrors bool
-}
-
-func (v *DirectoryVisitor) ignoreFile(path string) bool {
-	if len(v.Extensions) == 0 {
-		return false
+	data, err := yaml.ToJSON(data)
+	if err != nil {
+		return fmt.Errorf("error converting to YAML: %v", err)
 	}
-	ext := filepath.Ext(path)
-	for _, s := range v.Extensions {
-		if s == ext {
-			return false
-		}
+	if err := schema.ValidateBytes(data); err != nil {
+		return fmt.Errorf("error validating data: %v; %s", err, stopValidateMessage)
 	}
-	return true
-}
-
-func (v *DirectoryVisitor) Visit(fn VisitorFunc) error {
-	return filepath.Walk(v.Path, func(path string, fi os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if fi.IsDir() {
-			if path != v.Path && !v.Recursive {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if v.ignoreFile(path) {
-			return nil
-		}
-
-		data, err := ioutil.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("unable to read %q: %v", path, err)
-		}
-		info, err := v.Mapper.InfoForData(data, path)
-		if err != nil {
-			if v.IgnoreErrors {
-				return err
-			}
-			glog.V(2).Infof("Unable to load file %q: %v", path, err)
-			return nil
-		}
-		return fn(info)
-	})
+	return nil
 }
 
 // URLVisitor downloads the contents of a URL, and if successful, returns
 // an info object representing the downloaded object.
 type URLVisitor struct {
 	*Mapper
-	URL *url.URL
+	URL    *url.URL
+	Schema validation.Schema
 }
 
 func (v *URLVisitor) Visit(fn VisitorFunc) error {
 	res, err := http.Get(v.URL.String())
 	if err != nil {
-		return fmt.Errorf("unable to access URL %q: %v\n", v.URL, err)
+		return err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
@@ -280,11 +237,14 @@ func (v *URLVisitor) Visit(fn VisitorFunc) error {
 	if err != nil {
 		return fmt.Errorf("unable to read URL %q: %v\n", v.URL, err)
 	}
+	if err := ValidateSchema(data, v.Schema); err != nil {
+		return fmt.Errorf("error validating %q: %v", v.URL, err)
+	}
 	info, err := v.Mapper.InfoForData(data, v.URL.String())
 	if err != nil {
 		return err
 	}
-	return fn(info)
+	return fn(info, nil)
 }
 
 // DecoratedVisitor will invoke the decorators in order prior to invoking the visitor function
@@ -306,14 +266,51 @@ func NewDecoratedVisitor(v Visitor, fn ...VisitorFunc) Visitor {
 
 // Visit implements Visitor
 func (v DecoratedVisitor) Visit(fn VisitorFunc) error {
-	return v.visitor.Visit(func(info *Info) error {
+	return v.visitor.Visit(func(info *Info, err error) error {
+		if err != nil {
+			return err
+		}
 		for i := range v.decorators {
-			if err := v.decorators[i](info); err != nil {
+			if err := v.decorators[i](info, nil); err != nil {
 				return err
 			}
 		}
-		return fn(info)
+		return fn(info, nil)
 	})
+}
+
+// ContinueOnErrorVisitor visits each item and, if an error occurs on
+// any individual item, returns an aggregate error after all items
+// are visited.
+type ContinueOnErrorVisitor struct {
+	Visitor
+}
+
+// Visit returns nil if no error occurs during traversal, a regular
+// error if one occurs, or if multiple errors occur, an aggregate
+// error.  If the provided visitor fails on any individual item it
+// will not prevent the remaining items from being visited. An error
+// returned by the visitor directly may still result in some items
+// not being visited.
+func (v ContinueOnErrorVisitor) Visit(fn VisitorFunc) error {
+	errs := []error{}
+	err := v.Visitor.Visit(func(info *Info, err error) error {
+		if err != nil {
+			errs = append(errs, err)
+			return nil
+		}
+		if err := fn(info, nil); err != nil {
+			errs = append(errs, err)
+		}
+		return nil
+	})
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) == 1 {
+		return errs[0]
+	}
+	return utilerrors.NewAggregate(errs)
 }
 
 // FlattenListVisitor flattens any objects that runtime.ExtractList recognizes as a list
@@ -334,13 +331,22 @@ func NewFlattenListVisitor(v Visitor, mapper *Mapper) Visitor {
 }
 
 func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
-	return v.Visitor.Visit(func(info *Info) error {
-		if info.Object == nil {
-			return fn(info)
-		}
-		items, err := runtime.ExtractList(info.Object)
+	return v.Visitor.Visit(func(info *Info, err error) error {
 		if err != nil {
-			return fn(info)
+			return err
+		}
+		if info.Object == nil {
+			return fn(info, nil)
+		}
+		items, err := meta.ExtractList(info.Object)
+		if err != nil {
+			return fn(info, nil)
+		}
+		if errs := runtime.DecodeList(items, struct {
+			runtime.ObjectTyper
+			runtime.Decoder
+		}{v.Mapper, info.Mapping.Codec}); len(errs) > 0 {
+			return utilerrors.NewAggregate(errs)
 		}
 		for i := range items {
 			item, err := v.InfoForObject(items[i])
@@ -350,12 +356,92 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 			if len(info.ResourceVersion) != 0 {
 				item.ResourceVersion = info.ResourceVersion
 			}
-			if err := fn(item); err != nil {
+			if err := fn(item, nil); err != nil {
 				return err
 			}
 		}
 		return nil
 	})
+}
+
+func ignoreFile(path string, extensions []string) bool {
+	if len(extensions) == 0 {
+		return false
+	}
+	ext := filepath.Ext(path)
+	for _, s := range extensions {
+		if s == ext {
+			return false
+		}
+	}
+	return true
+}
+
+// FileVisitorForSTDIN return a special FileVisitor just for STDIN
+func FileVisitorForSTDIN(mapper *Mapper, schema validation.Schema) Visitor {
+	return &FileVisitor{
+		Path:          constSTDINstr,
+		StreamVisitor: NewStreamVisitor(nil, mapper, constSTDINstr, schema),
+	}
+}
+
+// ExpandPathsToFileVisitors will return a slice of FileVisitors that will handle files from the provided path.
+// After FileVisitors open the files, they will pass a io.Reader to a StreamVisitor to do the reading. (stdin
+// is also taken care of). Paths argument also accepts a single file, and will return a single visitor
+func ExpandPathsToFileVisitors(mapper *Mapper, paths string, recursive bool, extensions []string, schema validation.Schema) ([]Visitor, error) {
+	var visitors []Visitor
+	err := filepath.Walk(paths, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if fi.IsDir() {
+			if path != paths && !recursive {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		// Don't check extension if the filepath was passed explicitly
+		if path != paths && ignoreFile(path, extensions) {
+			return nil
+		}
+
+		visitor := &FileVisitor{
+			Path:          path,
+			StreamVisitor: NewStreamVisitor(nil, mapper, path, schema),
+		}
+
+		visitors = append(visitors, visitor)
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return visitors, nil
+}
+
+// FileVisitor is wrapping around a StreamVisitor, to handle open/close files
+type FileVisitor struct {
+	Path string
+	*StreamVisitor
+}
+
+// Visit in a FileVisitor is just taking care of opening/closing files
+func (v *FileVisitor) Visit(fn VisitorFunc) error {
+	var f *os.File
+	if v.Path == constSTDINstr {
+		f = os.Stdin
+	} else {
+		var err error
+		if f, err = os.Open(v.Path); err != nil {
+			return err
+		}
+	}
+	defer f.Close()
+	v.StreamVisitor.Reader = f
+
+	return v.StreamVisitor.Visit(fn)
 }
 
 // StreamVisitor reads objects from an io.Reader and walks them. A stream visitor can only be
@@ -366,20 +452,21 @@ type StreamVisitor struct {
 	io.Reader
 	*Mapper
 
-	Source       string
-	IgnoreErrors bool
+	Source string
+	Schema validation.Schema
 }
 
-// NewStreamVisitor creates a visitor that will return resources that were encoded into the provided
-// stream. If ignoreErrors is set, unrecognized or invalid objects will be skipped and logged. An
-// empty stream is treated as an error for now.
-// TODO: convert ignoreErrors into a func(data, error, count) bool that consumers can use to decide
-// what to do with ignored errors.
-func NewStreamVisitor(r io.Reader, mapper *Mapper, source string, ignoreErrors bool) Visitor {
-	return &StreamVisitor{r, mapper, source, ignoreErrors}
+// NewStreamVisitor is a helper function that is useful when we want to change the fields of the struct but keep calls the same.
+func NewStreamVisitor(r io.Reader, mapper *Mapper, source string, schema validation.Schema) *StreamVisitor {
+	return &StreamVisitor{
+		Reader: r,
+		Mapper: mapper,
+		Source: source,
+		Schema: schema,
+	}
 }
 
-// Visit implements Visitor over a stream.
+// Visit implements Visitor over a stream. StreamVisitor is able to distinct multiple resources in one stream.
 func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 	d := yaml.NewYAMLOrJSONDecoder(v.Reader, 4096)
 	for {
@@ -394,23 +481,26 @@ func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 		if len(ext.RawJSON) == 0 || bytes.Equal(ext.RawJSON, []byte("null")) {
 			continue
 		}
+		if err := ValidateSchema(ext.RawJSON, v.Schema); err != nil {
+			return fmt.Errorf("error validating %q: %v", v.Source, err)
+		}
 		info, err := v.InfoForData(ext.RawJSON, v.Source)
 		if err != nil {
-			if v.IgnoreErrors {
-				glog.Warningf("Could not read an encoded object from %s: %v", v.Source, err)
-				glog.V(4).Infof("Unreadable: %s", string(ext.RawJSON))
-				continue
+			if fnErr := fn(info, err); fnErr != nil {
+				return fnErr
 			}
-			return err
+			continue
 		}
-		if err := fn(info); err != nil {
+		if err := fn(info, nil); err != nil {
 			return err
 		}
 	}
-	return nil
 }
 
-func UpdateObjectNamespace(info *Info) error {
+func UpdateObjectNamespace(info *Info, err error) error {
+	if err != nil {
+		return err
+	}
 	if info.Object != nil {
 		return info.Mapping.MetadataAccessor.SetNamespace(info.Object, info.Namespace)
 	}
@@ -418,23 +508,30 @@ func UpdateObjectNamespace(info *Info) error {
 }
 
 // FilterNamespace omits the namespace if the object is not namespace scoped
-func FilterNamespace() VisitorFunc {
-	return func(info *Info) error {
-		if info.Mapping.Scope.Name() != meta.RESTScopeNameNamespace {
-			info.Namespace = ""
-			UpdateObjectNamespace(info)
-		}
-		return nil
+func FilterNamespace(info *Info, err error) error {
+	if err != nil {
+		return err
 	}
+	if !info.Namespaced() {
+		info.Namespace = ""
+		UpdateObjectNamespace(info, nil)
+	}
+	return nil
 }
 
 // SetNamespace ensures that every Info object visited will have a namespace
 // set. If info.Object is set, it will be mutated as well.
 func SetNamespace(namespace string) VisitorFunc {
-	return func(info *Info) error {
+	return func(info *Info, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.Namespaced() {
+			return nil
+		}
 		if len(info.Namespace) == 0 {
 			info.Namespace = namespace
-			UpdateObjectNamespace(info)
+			UpdateObjectNamespace(info, nil)
 		}
 		return nil
 	}
@@ -445,10 +542,16 @@ func SetNamespace(namespace string) VisitorFunc {
 // value, returns an error. This is intended to guard against administrators
 // accidentally operating on resources outside their namespace.
 func RequireNamespace(namespace string) VisitorFunc {
-	return func(info *Info) error {
+	return func(info *Info, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.Namespaced() {
+			return nil
+		}
 		if len(info.Namespace) == 0 {
 			info.Namespace = namespace
-			UpdateObjectNamespace(info)
+			UpdateObjectNamespace(info, nil)
 			return nil
 		}
 		if info.Namespace != namespace {
@@ -460,15 +563,35 @@ func RequireNamespace(namespace string) VisitorFunc {
 
 // RetrieveLatest updates the Object on each Info by invoking a standard client
 // Get.
-func RetrieveLatest(info *Info) error {
-	if len(info.Name) == 0 || len(info.Namespace) == 0 {
+func RetrieveLatest(info *Info, err error) error {
+	if err != nil {
+		return err
+	}
+	if meta.IsListType(info.Object) {
+		return fmt.Errorf("watch is only supported on individual resources and resource collections, but a list of resources is found")
+	}
+	if len(info.Name) == 0 {
 		return nil
 	}
-	obj, err := NewHelper(info.Client, info.Mapping).Get(info.Namespace, info.Name)
+	if info.Namespaced() && len(info.Namespace) == 0 {
+		return fmt.Errorf("no namespace set on resource %s %q", info.Mapping.Resource, info.Name)
+	}
+	obj, err := NewHelper(info.Client, info.Mapping).Get(info.Namespace, info.Name, info.Export)
 	if err != nil {
 		return err
 	}
 	info.Object = obj
 	info.ResourceVersion, _ = info.Mapping.MetadataAccessor.ResourceVersion(obj)
+	return nil
+}
+
+// RetrieveLazy updates the object if it has not been loaded yet.
+func RetrieveLazy(info *Info, err error) error {
+	if err != nil {
+		return err
+	}
+	if info.Object == nil {
+		return info.Get()
+	}
 	return nil
 }

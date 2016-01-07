@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,19 +17,28 @@ limitations under the License.
 package validation
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // ValidateEvent makes sure that the event makes sense.
-func ValidateEvent(event *api.Event) errs.ValidationErrorList {
-	allErrs := errs.ValidationErrorList{}
-	if event.Namespace != event.InvolvedObject.Namespace {
-		allErrs = append(allErrs, errs.NewFieldInvalid("involvedObject.namespace", event.InvolvedObject.Namespace, "namespace does not match involvedObject"))
+func ValidateEvent(event *api.Event) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// There is no namespace required for node.
+	// However, older client code accidentally sets event.Namespace
+	// to api.NamespaceDefault, so we accept that too, but "" is preferred.
+	if event.InvolvedObject.Kind == "Node" &&
+		event.Namespace != api.NamespaceDefault &&
+		event.Namespace != "" {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "not allowed for node"))
 	}
-	if !util.IsDNSSubdomain(event.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", event.Namespace, ""))
+	if event.InvolvedObject.Kind != "Node" &&
+		event.Namespace != event.InvolvedObject.Namespace {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "does not match involvedObject"))
+	}
+	if !validation.IsDNS1123Subdomain(event.Namespace) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("namespace"), event.Namespace, ""))
 	}
 	return allErrs
 }

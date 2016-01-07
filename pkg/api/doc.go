@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,6 @@ limitations under the License.
 // Package api contains the latest (or "internal") version of the
 // Kubernetes API objects. This is the API objects as represented in memory.
 // The contract presented to clients is located in the versioned packages,
-// which are sub-directories. The first one is "v1beta1". Those packages
+// which are sub-directories. The first one is "v1". Those packages
 // describe how a particular version is serialized to storage/network.
 package api

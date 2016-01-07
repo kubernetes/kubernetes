@@ -2,6 +2,26 @@
 
 Improvements:
 
+- `Skip(message)` can be used to skip the current test.
+
+Bug Fixes:
+
+- Ginkgo tests now fail when you `panic(nil)` (#167)
+
+## 1.2.0 5/31/2015
+
+Improvements
+
+- `ginkgo -coverpkg` calls down to `go test -coverpkg` (#160)
+- `ginkgo -afterSuiteHook COMMAND` invokes the passed-in `COMMAND` after a test suite completes (#152)
+- Relaxed requirement for Go 1.4+.  `ginkgo` now works with Go v1.3+ (#166)
+
+## 1.2.0-beta
+
+Ginkgo now requires Go 1.4+
+
+Improvements:
+
 - Call reporters in reverse order when announcing spec completion -- allows custom reporters to emit output before the default reporter does.
 - Improved focus behavior.  Now, this:
 
@@ -26,13 +46,18 @@ Improvements:
 - Support `bootstrap`ping and `generate`ing [Agouti](http://agouti.org) specs.
 - `ginkgo generate` and `ginkgo bootstrap` now honor the package name already defined in a given directory
 - The `ginkgo` CLI ignores `SIGQUIT`.  Prevents its stack dump from interlacing with the underlying test suite's stack dump.
+- The `ginkgo` CLI now compiles tests into a temporary directory instead of the package directory.  This necessitates upgrading to Go v1.4+.
+- `ginkgo -notify` now works on Linux
 
 Bug Fixes:
 
 - If --skipPackages is used and all packages are skipped, Ginkgo should exit 0.
 - Fix tempfile leak when running in parallel
 - Fix incorrect failure message when a panic occurs during a parallel test run
-
+- Fixed an issue where a pending test within a focused context (or a focused test within a pending context) would skip all other tests.
+- Be more consistent about handling SIGTERM as well as SIGINT
+- When interupted while concurrently compiling test suites in the background, Ginkgo now cleans up the compiled artifacts.
+- Fixed a long standing bug where `ginkgo -p` would hang if a process spawned by one of the Ginkgo parallel nodes does not exit. (Hooray!)
 
 ## 1.1.0 (8/2/2014)
 

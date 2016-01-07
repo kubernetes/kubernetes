@@ -14,7 +14,7 @@ import (
 )
 
 // A parser implements the HTML5 parsing algorithm:
-// http://www.whatwg.org/specs/web-apps/current-work/multipage/tokenization.html#tree-construction
+// https://html.spec.whatwg.org/multipage/syntax.html#tree-construction
 type parser struct {
 	// tokenizer provides the tokens for the parser.
 	tokenizer *Tokenizer
@@ -59,7 +59,7 @@ func (p *parser) top() *Node {
 // Stop tags for use in popUntil. These come from section 12.2.3.2.
 var (
 	defaultScopeStopTags = map[string][]a.Atom{
-		"":     {a.Applet, a.Caption, a.Html, a.Table, a.Td, a.Th, a.Marquee, a.Object},
+		"":     {a.Applet, a.Caption, a.Html, a.Table, a.Td, a.Th, a.Marquee, a.Object, a.Template},
 		"math": {a.AnnotationXml, a.Mi, a.Mn, a.Mo, a.Ms, a.Mtext},
 		"svg":  {a.Desc, a.ForeignObject, a.Title},
 	}
@@ -1037,15 +1037,15 @@ func inBodyIM(p *parser) bool {
 
 func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
 	// This is the "adoption agency" algorithm, described at
-	// http://www.whatwg.org/specs/web-apps/current-work/multipage/tokenization.html#adoptionAgency
+	// https://html.spec.whatwg.org/multipage/syntax.html#adoptionAgency
 
 	// TODO: this is a fairly literal line-by-line translation of that algorithm.
 	// Once the code successfully parses the comprehensive test suite, we should
 	// refactor this code to be more idiomatic.
 
-	// Steps 1-3. The outer loop.
+	// Steps 1-4. The outer loop.
 	for i := 0; i < 8; i++ {
-		// Step 4. Find the formatting element.
+		// Step 5. Find the formatting element.
 		var formattingElement *Node
 		for j := len(p.afe) - 1; j >= 0; j-- {
 			if p.afe[j].Type == scopeMarkerNode {
@@ -1070,7 +1070,7 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
 			return
 		}
 
-		// Steps 5-6. Find the furthest block.
+		// Steps 9-10. Find the furthest block.
 		var furthestBlock *Node
 		for _, e := range p.oe[feIndex:] {
 			if isSpecialElement(e) {
@@ -1087,47 +1087,47 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
 			return
 		}
 
-		// Steps 7-8. Find the common ancestor and bookmark node.
+		// Steps 11-12. Find the common ancestor and bookmark node.
 		commonAncestor := p.oe[feIndex-1]
 		bookmark := p.afe.index(formattingElement)
 
-		// Step 9. The inner loop. Find the lastNode to reparent.
+		// Step 13. The inner loop. Find the lastNode to reparent.
 		lastNode := furthestBlock
 		node := furthestBlock
 		x := p.oe.index(node)
-		// Steps 9.1-9.3.
+		// Steps 13.1-13.2
 		for j := 0; j < 3; j++ {
-			// Step 9.4.
+			// Step 13.3.
 			x--
 			node = p.oe[x]
-			// Step 9.5.
+			// Step 13.4 - 13.5.
 			if p.afe.index(node) == -1 {
 				p.oe.remove(node)
 				continue
 			}
-			// Step 9.6.
+			// Step 13.6.
 			if node == formattingElement {
 				break
 			}
-			// Step 9.7.
+			// Step 13.7.
 			clone := node.clone()
 			p.afe[p.afe.index(node)] = clone
 			p.oe[p.oe.index(node)] = clone
 			node = clone
-			// Step 9.8.
+			// Step 13.8.
 			if lastNode == furthestBlock {
 				bookmark = p.afe.index(node) + 1
 			}
-			// Step 9.9.
+			// Step 13.9.
 			if lastNode.Parent != nil {
 				lastNode.Parent.RemoveChild(lastNode)
 			}
 			node.AppendChild(lastNode)
-			// Step 9.10.
+			// Step 13.10.
 			lastNode = node
 		}
 
-		// Step 10. Reparent lastNode to the common ancestor,
+		// Step 14. Reparent lastNode to the common ancestor,
 		// or for misnested table nodes, to the foster parent.
 		if lastNode.Parent != nil {
 			lastNode.Parent.RemoveChild(lastNode)
@@ -1139,13 +1139,13 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
 			commonAncestor.AppendChild(lastNode)
 		}
 
-		// Steps 11-13. Reparent nodes from the furthest block's children
+		// Steps 15-17. Reparent nodes from the furthest block's children
 		// to a clone of the formatting element.
 		clone := formattingElement.clone()
 		reparentChildren(clone, furthestBlock)
 		furthestBlock.AppendChild(clone)
 
-		// Step 14. Fix up the list of active formatting elements.
+		// Step 18. Fix up the list of active formatting elements.
 		if oldLoc := p.afe.index(formattingElement); oldLoc != -1 && oldLoc < bookmark {
 			// Move the bookmark with the rest of the list.
 			bookmark--
@@ -1153,13 +1153,15 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
 		p.afe.remove(formattingElement)
 		p.afe.insert(bookmark, clone)
 
-		// Step 15. Fix up the stack of open elements.
+		// Step 19. Fix up the stack of open elements.
 		p.oe.remove(formattingElement)
 		p.oe.insert(p.oe.index(furthestBlock)+1, clone)
 	}
 }
 
 // inBodyEndTagOther performs the "any other end tag" algorithm for inBodyIM.
+// "Any other end tag" handling from 12.2.5.5 The rules for parsing tokens in foreign content
+// https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-inforeign
 func (p *parser) inBodyEndTagOther(tagAtom a.Atom) {
 	for i := len(p.oe) - 1; i >= 0; i-- {
 		if p.oe[i].DataAtom == tagAtom {

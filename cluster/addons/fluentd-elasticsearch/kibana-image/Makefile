@@ -1,9 +1,9 @@
 .PHONY:	build push
 
-TAG = 1.0
+TAG = 1.3
 
-build:	
-	docker build -t kubernetes/kibana:$(TAG) .
+build:
+	docker build -t gcr.io/google_containers/kibana:$(TAG) .
 
-push:	
-	docker push kubernetes/kibana:$(TAG)
+push:
+	gcloud docker push gcr.io/google_containers/kibana:$(TAG)

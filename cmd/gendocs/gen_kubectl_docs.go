@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,41 +18,35 @@ package main
 
 import (
 	"fmt"
-	"io"
+	"io/ioutil"
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/cmd/genutils"
+	"k8s.io/kubernetes/pkg/kubectl/cmd"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 func main() {
-	out := os.Stdout
+	// use os.Args instead of "flags" because "flags" will mess up the man pages!
+	path := "docs/"
+	if len(os.Args) == 2 {
+		path = os.Args[1]
+	} else if len(os.Args) > 2 {
+		fmt.Fprintf(os.Stderr, "usage: %s [output directory]\n", os.Args[0])
+		os.Exit(1)
+	}
+
+	outDir, err := genutils.OutDir(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get output directory: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Set environment variables used by kubectl so the output is consistent,
 	// regardless of where we run.
 	os.Setenv("HOME", "/home/username")
-	kubectl := cmd.NewFactory(nil).NewKubectlCommand(out)
-	fmt.Fprintf(out, "## %s\n\n", kubectl.Name())
-	fmt.Fprintf(out, "%s\n\n", kubectl.Short)
-	fmt.Fprintln(out, "### Commands\n")
-	for _, c := range kubectl.Commands() {
-		genMarkdown(c, nil, out)
-	}
-}
-
-func genMarkdown(command, parent *cobra.Command, out io.Writer) {
-	name := command.Name()
-	if parent != nil {
-		name = fmt.Sprintf("%s %s", parent.Name(), name)
-	}
-	fmt.Fprintf(out, "#### %s\n", name)
-	desc := command.Long
-	if len(desc) == 0 {
-		desc = command.Short
-	}
-	fmt.Fprintf(out, "%s\n\n", desc)
-	usage := command.UsageString()
-	fmt.Fprintf(out, "Usage:\n```\n%s\n```\n\n", usage[9:len(usage)-1])
-	for _, c := range command.Commands() {
-		genMarkdown(c, command, out)
-	}
+	//TODO os.Stdin should really be something like ioutil.Discard, but a Reader
+	kubectl := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, ioutil.Discard, ioutil.Discard)
+	cobra.GenMarkdownTree(kubectl, outDir)
 }

@@ -14,6 +14,9 @@
 package prometheus
 
 import (
+	"bufio"
+	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -47,7 +50,7 @@ func nowSeries(t ...time.Time) nower {
 }
 
 // InstrumentHandler wraps the given HTTP handler for instrumentation. It
-// registers four metric collectors (if not already done) and reports http
+// registers four metric collectors (if not already done) and reports HTTP
 // metrics to the (newly or already) registered collectors: http_requests_total
 // (CounterVec), http_request_duration_microseconds (Summary),
 // http_request_size_bytes (Summary), http_response_size_bytes (Summary). Each
@@ -141,7 +144,18 @@ func InstrumentHandlerFuncWithOpts(opts SummaryOpts, handlerFunc func(http.Respo
 			urlLen = len(r.URL.String())
 		}
 		go computeApproximateRequestSize(r, out, urlLen)
-		handlerFunc(delegate, r)
+
+		_, cn := w.(http.CloseNotifier)
+		_, fl := w.(http.Flusher)
+		_, hj := w.(http.Hijacker)
+		_, rf := w.(io.ReaderFrom)
+		var rw http.ResponseWriter
+		if cn && fl && hj && rf {
+			rw = &fancyResponseWriterDelegator{delegate}
+		} else {
+			rw = delegate
+		}
+		handlerFunc(rw, r)
 
 		elapsed := float64(time.Since(now)) / float64(time.Microsecond)
 
@@ -178,7 +192,7 @@ type responseWriterDelegator struct {
 
 	handler, method string
 	status          int
-	written         int
+	written         int64
 	wroteHeader     bool
 }
 
@@ -193,7 +207,32 @@ func (r *responseWriterDelegator) Write(b []byte) (int, error) {
 		r.WriteHeader(http.StatusOK)
 	}
 	n, err := r.ResponseWriter.Write(b)
-	r.written += n
+	r.written += int64(n)
+	return n, err
+}
+
+type fancyResponseWriterDelegator struct {
+	*responseWriterDelegator
+}
+
+func (f *fancyResponseWriterDelegator) CloseNotify() <-chan bool {
+	return f.ResponseWriter.(http.CloseNotifier).CloseNotify()
+}
+
+func (f *fancyResponseWriterDelegator) Flush() {
+	f.ResponseWriter.(http.Flusher).Flush()
+}
+
+func (f *fancyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return f.ResponseWriter.(http.Hijacker).Hijack()
+}
+
+func (f *fancyResponseWriterDelegator) ReadFrom(r io.Reader) (int64, error) {
+	if !f.wroteHeader {
+		f.WriteHeader(http.StatusOK)
+	}
+	n, err := f.ResponseWriter.(io.ReaderFrom).ReadFrom(r)
+	f.written += n
 	return n, err
 }
 

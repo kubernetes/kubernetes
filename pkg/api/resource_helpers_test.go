@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package api
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 func TestResourceHelpers(t *testing.T) {
@@ -33,10 +33,10 @@ func TestResourceHelpers(t *testing.T) {
 		},
 	}
 	if res := resourceSpec.Limits.Cpu(); *res != cpuLimit {
-		t.Errorf("expected cpulimit %d, got %d", cpuLimit, res)
+		t.Errorf("expected cpulimit %v, got %v", cpuLimit, res)
 	}
 	if res := resourceSpec.Limits.Memory(); *res != memoryLimit {
-		t.Errorf("expected memorylimit %d, got %d", memoryLimit, res)
+		t.Errorf("expected memorylimit %v, got %v", memoryLimit, res)
 	}
 	resourceSpec = ResourceRequirements{
 		Limits: ResourceList{
@@ -45,9 +45,9 @@ func TestResourceHelpers(t *testing.T) {
 		},
 	}
 	if res := resourceSpec.Limits.Cpu(); res.Value() != 0 {
-		t.Errorf("expected cpulimit %d, got %d", 0, res)
+		t.Errorf("expected cpulimit %v, got %v", 0, res)
 	}
 	if res := resourceSpec.Limits.Memory(); *res != memoryLimit {
-		t.Errorf("expected memorylimit %d, got %d", memoryLimit, res)
+		t.Errorf("expected memorylimit %v, got %v", memoryLimit, res)
 	}
 }

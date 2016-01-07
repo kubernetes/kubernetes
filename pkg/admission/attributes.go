@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,37 +17,63 @@ limitations under the License.
 package admission
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type attributesRecord struct {
-	namespace string
-	resource  string
-	operation string
-	object    runtime.Object
+	kind        unversioned.GroupKind
+	namespace   string
+	name        string
+	resource    unversioned.GroupResource
+	subresource string
+	operation   Operation
+	object      runtime.Object
+	userInfo    user.Info
 }
 
-func NewAttributesRecord(object runtime.Object, namespace, resource, operation string) Attributes {
+func NewAttributesRecord(object runtime.Object, kind unversioned.GroupKind, namespace, name string, resource unversioned.GroupResource, subresource string, operation Operation, userInfo user.Info) Attributes {
 	return &attributesRecord{
-		namespace: namespace,
-		resource:  resource,
-		operation: operation,
-		object:    object,
+		kind:        kind,
+		namespace:   namespace,
+		name:        name,
+		resource:    resource,
+		subresource: subresource,
+		operation:   operation,
+		object:      object,
+		userInfo:    userInfo,
 	}
+}
+
+func (record *attributesRecord) GetKind() unversioned.GroupKind {
+	return record.kind
 }
 
 func (record *attributesRecord) GetNamespace() string {
 	return record.namespace
 }
 
-func (record *attributesRecord) GetResource() string {
+func (record *attributesRecord) GetName() string {
+	return record.name
+}
+
+func (record *attributesRecord) GetResource() unversioned.GroupResource {
 	return record.resource
 }
 
-func (record *attributesRecord) GetOperation() string {
+func (record *attributesRecord) GetSubresource() string {
+	return record.subresource
+}
+
+func (record *attributesRecord) GetOperation() Operation {
 	return record.operation
 }
 
 func (record *attributesRecord) GetObject() runtime.Object {
 	return record.object
+}
+
+func (record *attributesRecord) GetUserInfo() user.Info {
+	return record.userInfo
 }

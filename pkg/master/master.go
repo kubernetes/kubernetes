@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,484 +17,365 @@ limitations under the License.
 package master
 
 import (
-	"bytes"
-	_ "expvar"
 	"fmt"
 	"net"
 	"net/http"
 	"net/url"
-	rt "runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/binding"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequotausage"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/healthz"
+	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/registry/componentstatus"
+	controlleretcd "k8s.io/kubernetes/pkg/registry/controller/etcd"
+	deploymentetcd "k8s.io/kubernetes/pkg/registry/deployment/etcd"
+	"k8s.io/kubernetes/pkg/registry/endpoint"
+	endpointsetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
+	eventetcd "k8s.io/kubernetes/pkg/registry/event/etcd"
+	expcontrolleretcd "k8s.io/kubernetes/pkg/registry/experimental/controller/etcd"
+	"k8s.io/kubernetes/pkg/registry/generic"
+	ingressetcd "k8s.io/kubernetes/pkg/registry/ingress/etcd"
+	jobetcd "k8s.io/kubernetes/pkg/registry/job/etcd"
+	limitrangeetcd "k8s.io/kubernetes/pkg/registry/limitrange/etcd"
+	"k8s.io/kubernetes/pkg/registry/namespace"
+	namespaceetcd "k8s.io/kubernetes/pkg/registry/namespace/etcd"
+	"k8s.io/kubernetes/pkg/registry/node"
+	nodeetcd "k8s.io/kubernetes/pkg/registry/node/etcd"
+	pvetcd "k8s.io/kubernetes/pkg/registry/persistentvolume/etcd"
+	pvcetcd "k8s.io/kubernetes/pkg/registry/persistentvolumeclaim/etcd"
+	podetcd "k8s.io/kubernetes/pkg/registry/pod/etcd"
+	podtemplateetcd "k8s.io/kubernetes/pkg/registry/podtemplate/etcd"
+	resourcequotaetcd "k8s.io/kubernetes/pkg/registry/resourcequota/etcd"
+	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
+	"k8s.io/kubernetes/pkg/registry/service"
+	etcdallocator "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
+	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
+	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
+	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
+	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
+	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
+	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
+	"k8s.io/kubernetes/pkg/storage"
+	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 
-	"github.com/emicklei/go-restful"
-	"github.com/emicklei/go-restful/swagger"
+	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"
+	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
+
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/kubernetes/pkg/registry/service/allocator"
+	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 )
 
-// Config is a structure used to configure a Master.
 type Config struct {
-	Client            *client.Client
-	Cloud             cloudprovider.Interface
-	EtcdHelper        tools.EtcdHelper
-	EventTTL          time.Duration
-	MinionRegexp      string
-	KubeletClient     client.KubeletClient
-	PortalNet         *net.IPNet
-	EnableLogsSupport bool
-	EnableUISupport   bool
-	// allow downstream consumers to disable swagger
-	EnableSwaggerSupport bool
-	// allow v1beta3 to be conditionally enabled
-	EnableV1Beta3 bool
-	// allow downstream consumers to disable the index route
-	EnableIndex            bool
-	APIPrefix              string
-	CorsAllowedOriginList  util.StringList
-	Authenticator          authenticator.Request
-	Authorizer             authorizer.Authorizer
-	AdmissionControl       admission.Interface
-	MasterServiceNamespace string
+	*genericapiserver.Config
 
-	// If specified, all web services will be registered into this container
-	RestfulContainer *restful.Container
-
-	// Number of masters running; all masters must be started with the
-	// same value for this field. (Numbers > 1 currently untested.)
-	MasterCount int
-
-	// The port on PublicAddress where a read-only server will be installed.
-	// Defaults to 7080 if not set.
-	ReadOnlyPort int
-	// The port on PublicAddress where a read-write server will be installed.
-	// Defaults to 6443 if not set.
-	ReadWritePort int
-
-	// If nil, the first result from net.InterfaceAddrs will be used.
-	PublicAddress net.IP
-
-	// Control the interval that pod, node IP, and node heath status caches
-	// expire.
-	CacheTimeout time.Duration
+	EnableCoreControllers bool
+	EventTTL              time.Duration
+	KubeletClient         kubeletclient.KubeletClient
+	// Used to start and monitor tunneling
+	Tunneler Tunneler
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
-	// "Inputs", Copied from Config
-	podRegistry           pod.Registry
-	controllerRegistry    controller.Registry
-	serviceRegistry       service.Registry
-	endpointRegistry      endpoint.Registry
-	minionRegistry        minion.Registry
-	bindingRegistry       binding.Registry
-	eventRegistry         generic.Registry
-	limitRangeRegistry    generic.Registry
-	resourceQuotaRegistry resourcequota.Registry
-	namespaceRegistry     generic.Registry
-	storage               map[string]apiserver.RESTStorage
-	client                *client.Client
-	portalNet             *net.IPNet
-	cacheTimeout          time.Duration
+	*genericapiserver.GenericAPIServer
 
-	mux                   apiserver.Mux
-	muxHelper             *apiserver.MuxHelper
-	handlerContainer      *restful.Container
-	rootWebService        *restful.WebService
-	enableLogsSupport     bool
-	enableUISupport       bool
-	enableSwaggerSupport  bool
-	apiPrefix             string
-	corsAllowedOriginList util.StringList
-	authenticator         authenticator.Request
-	authorizer            authorizer.Authorizer
-	admissionControl      admission.Interface
-	masterCount           int
-	v1beta3               bool
+	// Map of v1 resources to their REST storages.
+	v1ResourcesStorage map[string]rest.Storage
 
-	publicIP             net.IP
-	publicReadOnlyPort   int
-	publicReadWritePort  int
-	serviceReadOnlyIP    net.IP
-	serviceReadOnlyPort  int
-	serviceReadWriteIP   net.IP
-	serviceReadWritePort int
-	masterServices       *util.Runner
+	enableCoreControllers bool
+	// registries are internal client APIs for accessing the storage layer
+	// TODO: define the internal typed interface in a way that clients can
+	// also be replaced
+	nodeRegistry              node.Registry
+	namespaceRegistry         namespace.Registry
+	serviceRegistry           service.Registry
+	endpointRegistry          endpoint.Registry
+	serviceClusterIPAllocator service.RangeRegistry
+	serviceNodePortAllocator  service.RangeRegistry
 
-	// "Outputs"
-	Handler         http.Handler
-	InsecureHandler http.Handler
+	// storage for third party objects
+	thirdPartyStorage storage.Interface
+	// map from api path to a tuple of (storage for the objects, APIGroup)
+	thirdPartyResources map[string]thirdPartyEntry
+	// protects the map
+	thirdPartyResourcesLock sync.RWMutex
+
+	// Used to start and monitor tunneling
+	tunneler Tunneler
 }
 
-// NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
-// is incorrect.
-func NewEtcdHelper(client tools.EtcdGetSet, version string) (helper tools.EtcdHelper, err error) {
-	if version == "" {
-		version = latest.Version
-	}
-	versionInterfaces, err := latest.InterfacesFor(version)
-	if err != nil {
-		return helper, err
-	}
-	return tools.EtcdHelper{client, versionInterfaces.Codec, tools.RuntimeVersionAdapter{versionInterfaces.MetadataAccessor}}, nil
-}
-
-// setDefaults fills in any fields not set that are required to have valid data.
-func setDefaults(c *Config) {
-	if c.PortalNet == nil {
-		defaultNet := "10.0.0.0/24"
-		glog.Warningf("Portal net unspecified. Defaulting to %v.", defaultNet)
-		_, portalNet, err := net.ParseCIDR(defaultNet)
-		if err != nil {
-			glog.Fatalf("Unable to parse CIDR: %v", err)
-		}
-		c.PortalNet = portalNet
-	}
-	if c.MasterCount == 0 {
-		// Clearly, there will be at least one master.
-		c.MasterCount = 1
-	}
-	if c.ReadOnlyPort == 0 {
-		c.ReadOnlyPort = 7080
-	}
-	if c.ReadWritePort == 0 {
-		c.ReadWritePort = 6443
-	}
-	if c.CacheTimeout == 0 {
-		c.CacheTimeout = 5 * time.Second
-	}
-	for c.PublicAddress == nil {
-		// Find and use the first non-loopback address.
-		// TODO: potentially it'd be useful to skip the docker interface if it
-		// somehow is first in the list.
-		addrs, err := net.InterfaceAddrs()
-		if err != nil {
-			glog.Fatalf("Unable to get network interfaces: error='%v'", err)
-		}
-		found := false
-		for i := range addrs {
-			ip, _, err := net.ParseCIDR(addrs[i].String())
-			if err != nil {
-				glog.Errorf("Error parsing '%v': %v", addrs[i], err)
-				continue
-			}
-			if ip.IsLoopback() {
-				glog.Infof("'%v' (%v) is a loopback address, ignoring.", ip, addrs[i])
-				continue
-			}
-			found = true
-			c.PublicAddress = ip
-			glog.Infof("Will report %v as public IP address.", ip)
-			break
-		}
-		if !found {
-			glog.Errorf("Unable to find suitable network address in list: '%v'\n"+
-				"Will try again in 5 seconds. Set the public address directly to avoid this wait.", addrs)
-			time.Sleep(5 * time.Second)
-		}
-	}
+// thirdPartyEntry combines objects storage and API group into one struct
+// for easy lookup.
+type thirdPartyEntry struct {
+	storage *thirdpartyresourcedataetcd.REST
+	group   unversioned.APIGroup
 }
 
 // New returns a new instance of Master from the given config.
-// Certain config fields will be set to a default value if unset,
-// including:
-//   PortalNet
-//   MasterCount
-//   ReadOnlyPort
-//   ReadWritePort
-//   PublicAddress
+// Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
 //   KubeletClient
-// Public fields:
-//   Handler -- The returned master has a field TopHandler which is an
-//   http.Handler which handles all the endpoints provided by the master,
-//   including the API, the UI, and miscelaneous debugging endpoints.  All
-//   these are subject to authorization and authentication.
-//   InsecureHandler -- an http.Handler which handles all the same
-//   endpoints as Handler, but no authorization and authentication is done.
-// Public methods:
-//   HandleWithAuth -- Allows caller to add an http.Handler for an endpoint
-//   that uses the same authentication and authorization (if any is configured)
-//   as the master's built-in endpoints.
-//   If the caller wants to add additional endpoints not using the master's
-//   auth, then the caller should create a handler for those endpoints, which delegates the
-//   any unhandled paths to "Handler".
 func New(c *Config) *Master {
-	setDefaults(c)
-	minionRegistry := etcd.NewRegistry(c.EtcdHelper, nil)
-	serviceRegistry := etcd.NewRegistry(c.EtcdHelper, nil)
-	boundPodFactory := &pod.BasicBoundPodFactory{
-		ServiceRegistry:        serviceRegistry,
-		MasterServiceNamespace: c.MasterServiceNamespace,
-	}
 	if c.KubeletClient == nil {
-		glog.Fatalf("master.New() called with config.KubeletClient == nil")
+		glog.Fatalf("Master.New() called with config.KubeletClient == nil")
 	}
 
-	// Select the first two valid IPs from portalNet to use as the master service portalIPs
-	serviceReadOnlyIP, err := service.GetIndexedIP(c.PortalNet, 1)
-	if err != nil {
-		glog.Fatalf("Failed to generate service read-only IP for master service: %v", err)
-	}
-	serviceReadWriteIP, err := service.GetIndexedIP(c.PortalNet, 2)
-	if err != nil {
-		glog.Fatalf("Failed to generate service read-write IP for master service: %v", err)
-	}
-	glog.Infof("Setting master service IPs based on PortalNet subnet to %q (read-only) and %q (read-write).", serviceReadOnlyIP, serviceReadWriteIP)
+	s := genericapiserver.New(c.Config)
 
 	m := &Master{
-		podRegistry:           etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
-		controllerRegistry:    etcd.NewRegistry(c.EtcdHelper, nil),
-		serviceRegistry:       serviceRegistry,
-		endpointRegistry:      etcd.NewRegistry(c.EtcdHelper, nil),
-		bindingRegistry:       etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
-		eventRegistry:         event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
-		namespaceRegistry:     namespace.NewEtcdRegistry(c.EtcdHelper),
-		minionRegistry:        minionRegistry,
-		limitRangeRegistry:    limitrange.NewEtcdRegistry(c.EtcdHelper),
-		resourceQuotaRegistry: resourcequota.NewEtcdRegistry(c.EtcdHelper),
-		client:                c.Client,
-		portalNet:             c.PortalNet,
-		rootWebService:        new(restful.WebService),
-		enableLogsSupport:     c.EnableLogsSupport,
-		enableUISupport:       c.EnableUISupport,
-		enableSwaggerSupport:  c.EnableSwaggerSupport,
-		apiPrefix:             c.APIPrefix,
-		corsAllowedOriginList: c.CorsAllowedOriginList,
-		authenticator:         c.Authenticator,
-		authorizer:            c.Authorizer,
-		admissionControl:      c.AdmissionControl,
-		v1beta3:               c.EnableV1Beta3,
-
-		cacheTimeout: c.CacheTimeout,
-
-		masterCount:         c.MasterCount,
-		publicIP:            c.PublicAddress,
-		publicReadOnlyPort:  c.ReadOnlyPort,
-		publicReadWritePort: c.ReadWritePort,
-		serviceReadOnlyIP:   serviceReadOnlyIP,
-		// TODO: serviceReadOnlyPort should be passed in as an argument, it may not always be 80
-		serviceReadOnlyPort: 80,
-		serviceReadWriteIP:  serviceReadWriteIP,
-		// TODO: serviceReadWritePort should be passed in as an argument, it may not always be 443
-		serviceReadWritePort: 443,
+		GenericAPIServer:      s,
+		enableCoreControllers: c.EnableCoreControllers,
+		tunneler:              c.Tunneler,
 	}
+	m.InstallAPIs(c)
 
-	if c.RestfulContainer != nil {
-		m.mux = c.RestfulContainer.ServeMux
-		m.handlerContainer = c.RestfulContainer
-	} else {
-		mux := http.NewServeMux()
-		m.mux = mux
-		m.handlerContainer = NewHandlerContainer(mux)
-	}
-	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
-	m.handlerContainer.Router(restful.CurlyRouter{})
-	m.muxHelper = &apiserver.MuxHelper{m.mux, []string{}}
-
-	m.masterServices = util.NewRunner(m.serviceWriterLoop, m.roServiceWriterLoop)
-	m.init(c)
-	return m
-}
-
-// HandleWithAuth adds an http.Handler for pattern to an http.ServeMux
-// Applies the same authentication and authorization (if any is configured)
-// to the request is used for the master's built-in endpoints.
-func (m *Master) HandleWithAuth(pattern string, handler http.Handler) {
-	// TODO: Add a way for plugged-in endpoints to translate their
-	// URLs into attributes that an Authorizer can understand, and have
-	// sensible policy defaults for plugged-in endpoints.  This will be different
-	// for generic endpoints versus REST object endpoints.
-	// TODO: convert to go-restful
-	m.muxHelper.Handle(pattern, handler)
-}
-
-// HandleFuncWithAuth adds an http.Handler for pattern to an http.ServeMux
-// Applies the same authentication and authorization (if any is configured)
-// to the request is used for the master's built-in endpoints.
-func (m *Master) HandleFuncWithAuth(pattern string, handler func(http.ResponseWriter, *http.Request)) {
-	// TODO: convert to go-restful
-	m.muxHelper.HandleFunc(pattern, handler)
-}
-
-func NewHandlerContainer(mux *http.ServeMux) *restful.Container {
-	container := restful.NewContainer()
-	container.ServeMux = mux
-	container.RecoverHandler(logStackOnRecover)
-	return container
-}
-
-//TODO: Unify with RecoverPanics?
-func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) {
-	var buffer bytes.Buffer
-	buffer.WriteString(fmt.Sprintf("recover from panic situation: - %v\r\n", panicReason))
-	for i := 2; ; i += 1 {
-		_, file, line, ok := rt.Caller(i)
-		if !ok {
-			break
-		}
-		buffer.WriteString(fmt.Sprintf("    %s:%d\r\n", file, line))
-	}
-	glog.Errorln(buffer.String())
-}
-
-// init initializes master.
-func (m *Master) init(c *Config) {
-	var userContexts = handlers.NewUserRequestContext()
-	var authenticator = c.Authenticator
-
-	nodeRESTStorage := minion.NewREST(m.minionRegistry)
-	podCache := NewPodCache(
-		c.KubeletClient,
-		RESTStorageToNodes(nodeRESTStorage).Nodes(),
-		m.podRegistry,
-	)
-	go util.Forever(func() { podCache.UpdateAllContainers() }, m.cacheTimeout)
-	go util.Forever(func() { podCache.GarbageCollectPodStatus() }, time.Minute*30)
-
-	// TODO: Factor out the core API registration
-	m.storage = map[string]apiserver.RESTStorage{
-		"pods": pod.NewREST(&pod.RESTConfig{
-			PodCache: podCache,
-			Registry: m.podRegistry,
-		}),
-		"replicationControllers": controller.NewREST(m.controllerRegistry, m.podRegistry),
-		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.minionRegistry, m.portalNet),
-		"endpoints":              endpoint.NewREST(m.endpointRegistry),
-		"minions":                nodeRESTStorage,
-		"nodes":                  nodeRESTStorage,
-		"events":                 event.NewREST(m.eventRegistry),
-
-		// TODO: should appear only in scheduler API group.
-		"bindings": binding.NewREST(m.bindingRegistry),
-
-		"limitRanges":         limitrange.NewREST(m.limitRangeRegistry),
-		"resourceQuotas":      resourcequota.NewREST(m.resourceQuotaRegistry),
-		"resourceQuotaUsages": resourcequotausage.NewREST(m.resourceQuotaRegistry),
-		"namespaces":          namespace.NewREST(m.namespaceRegistry),
-	}
-
-	apiVersions := []string{"v1beta1", "v1beta2"}
-	if err := apiserver.NewAPIGroupVersion(m.api_v1beta1()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta1"); err != nil {
-		glog.Fatalf("Unable to setup API v1beta1: %v", err)
-	}
-	if err := apiserver.NewAPIGroupVersion(m.api_v1beta2()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta2"); err != nil {
-		glog.Fatalf("Unable to setup API v1beta2: %v", err)
-	}
-	if c.EnableV1Beta3 {
-		if err := apiserver.NewAPIGroupVersion(m.api_v1beta3()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta3"); err != nil {
-			glog.Fatalf("Unable to setup API v1beta3: %v", err)
-		}
-		apiVersions = []string{"v1beta1", "v1beta2", "v1beta3"}
-	}
-
-	apiserver.InstallSupport(m.muxHelper, m.rootWebService)
-	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
-
-	// Register root handler.
-	// We do not register this using restful Webservice since we do not want to surface this in api docs.
-	// Allow master to be embedded in contexts which already have something registered at the root
-	if c.EnableIndex {
-		m.mux.HandleFunc("/", apiserver.IndexHandler(m.handlerContainer, m.muxHelper))
-	}
-
-	// TODO: use go-restful
-	apiserver.InstallValidator(m.muxHelper, func() map[string]apiserver.Server { return m.getServersToValidate(c) })
-	if c.EnableLogsSupport {
-		apiserver.InstallLogsSupport(m.muxHelper)
-	}
-	if c.EnableUISupport {
-		ui.InstallSupport(m.muxHelper, m.enableSwaggerSupport)
-	}
-
-	// TODO: install runtime/pprof handler
-	// See github.com/emicklei/go-restful/blob/master/examples/restful-cpuprofiler-service.go
-
-	handler := http.Handler(m.mux.(*http.ServeMux))
-
-	// TODO: handle CORS and auth using go-restful
-	// See github.com/emicklei/go-restful/blob/master/examples/restful-CORS-filter.go, and
-	// github.com/emicklei/go-restful/blob/master/examples/restful-basic-authentication.go
-
-	if len(c.CorsAllowedOriginList) > 0 {
-		allowedOriginRegexps, err := util.CompileRegexps(c.CorsAllowedOriginList)
-		if err != nil {
-			glog.Fatalf("Invalid CORS allowed origin, --cors_allowed_origins flag was set to %v - %v", strings.Join(c.CorsAllowedOriginList, ","), err)
-		}
-		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
-	}
-
-	m.InsecureHandler = handler
-
-	attributeGetter := apiserver.NewRequestAttributeGetter(userContexts, latest.RESTMapper, "api")
-	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, m.authorizer)
-
-	// Install Authenticator
-	if authenticator != nil {
-		handler = handlers.NewRequestAuthenticator(userContexts, authenticator, handlers.Unauthorized, handler)
-	}
-
-	// Install root web services
-	m.handlerContainer.Add(m.rootWebService)
-
-	// TODO: Make this optional?  Consumers of master depend on this currently.
-	m.Handler = handler
-
-	if m.enableSwaggerSupport {
+	// TODO: Move this to generic api server.
+	if c.EnableSwaggerSupport {
 		m.InstallSwaggerAPI()
 	}
 
 	// TODO: Attempt clean shutdown?
-	m.masterServices.Start()
+	if m.enableCoreControllers {
+		m.NewBootstrapController().Start()
+	}
+
+	return m
 }
 
-// InstallSwaggerAPI installs the /swaggerapi/ endpoint to allow schema discovery
-// and traversal.  It is optional to allow consumers of the Kubernetes master to
-// register their own web services into the Kubernetes mux prior to initialization
-// of swagger, so that other resource types show up in the documentation.
-func (m *Master) InstallSwaggerAPI() {
-	// Enable swagger UI and discovery API
-	swaggerConfig := swagger.Config{
-		WebServicesUrl: net.JoinHostPort(m.publicIP.String(), strconv.Itoa(m.publicReadWritePort)),
-		WebServices:    m.handlerContainer.RegisteredWebServices(),
-		// TODO: Parameterize the path?
-		ApiPath:         "/swaggerapi/",
-		SwaggerPath:     "/swaggerui/",
-		SwaggerFilePath: "/swagger-ui/",
+func (m *Master) InstallAPIs(c *Config) {
+	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
+
+	// Run the tunnel.
+	healthzChecks := []healthz.HealthzChecker{}
+	if m.tunneler != nil {
+		m.tunneler.Run(m.getNodeAddresses)
+		healthzChecks = append(healthzChecks, healthz.NamedCheck("SSH Tunnel Check", m.IsTunnelSyncHealthy))
+		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+			Name: "apiserver_proxy_tunnel_sync_latency_secs",
+			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
+		}, func() float64 { return float64(m.tunneler.SecondsSinceSync()) })
 	}
-	swagger.RegisterSwaggerService(swaggerConfig, m.handlerContainer)
+
+	// TODO(nikhiljindal): Refactor generic parts of support services (like /versions) to genericapiserver.
+	apiserver.InstallSupport(m.MuxHelper, m.RootWebService, c.EnableProfiling, healthzChecks...)
+
+	// Install v1 unless disabled.
+	if !m.ApiGroupVersionOverrides["api/v1"].Disable {
+		// Install v1 API.
+		m.initV1ResourcesStorage(c)
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *latest.GroupOrDie(api.GroupName),
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": m.v1ResourcesStorage,
+			},
+			IsLegacyGroup: true,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+	}
+
+	// Install root web services
+	m.HandlerContainer.Add(m.RootWebService)
+
+	// allGroups records all supported groups at /apis
+	allGroups := []unversioned.APIGroup{}
+	// Install extensions unless disabled.
+	if !m.ApiGroupVersionOverrides["extensions/v1beta1"].Disable {
+		m.thirdPartyStorage = c.StorageDestinations.APIGroups[extensions.GroupName].Default
+		m.thirdPartyResources = map[string]thirdPartyEntry{}
+
+		extensionResources := m.getExtensionResources(c)
+		extensionsGroupMeta := latest.GroupOrDie(extensions.GroupName)
+		// Update the prefered version as per StorageVersions in the config.
+		storageVersion, found := c.StorageVersions[extensionsGroupMeta.GroupVersion.Group]
+		if !found {
+			glog.Fatalf("Couldn't find storage version of group %v", extensionsGroupMeta.GroupVersion.Group)
+		}
+		preferedGroupVersion, err := unversioned.ParseGroupVersion(storageVersion)
+		if err != nil {
+			glog.Fatalf("Error in parsing group version %s: %v", storageVersion, err)
+		}
+		extensionsGroupMeta.GroupVersion = preferedGroupVersion
+
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *extensionsGroupMeta,
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1beta1": extensionResources,
+			},
+			OptionsExternalVersion: &latest.GroupOrDie(api.GroupName).GroupVersion,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+
+		extensionsGVForDiscovery := unversioned.GroupVersionForDiscovery{
+			GroupVersion: extensionsGroupMeta.GroupVersion.String(),
+			Version:      extensionsGroupMeta.GroupVersion.Version,
+		}
+		group := unversioned.APIGroup{
+			Name:             extensionsGroupMeta.GroupVersion.Group,
+			Versions:         []unversioned.GroupVersionForDiscovery{extensionsGVForDiscovery},
+			PreferredVersion: extensionsGVForDiscovery,
+		}
+		allGroups = append(allGroups, group)
+	}
+	if err := m.InstallAPIGroups(apiGroupsInfo); err != nil {
+		glog.Fatalf("Error in registering group versions: %v", err)
+	}
+
+	// This should be done after all groups are registered
+	// TODO: replace the hardcoded "apis".
+	apiserver.AddApisWebService(m.HandlerContainer, "/apis", func() []unversioned.APIGroup {
+		groups := []unversioned.APIGroup{}
+		for ix := range allGroups {
+			groups = append(groups, allGroups[ix])
+		}
+		m.thirdPartyResourcesLock.Lock()
+		defer m.thirdPartyResourcesLock.Unlock()
+		if m.thirdPartyResources != nil {
+			for key := range m.thirdPartyResources {
+				groups = append(groups, m.thirdPartyResources[key].group)
+			}
+		}
+		return groups
+	})
+}
+
+func (m *Master) initV1ResourcesStorage(c *Config) {
+	storageDecorator := m.StorageDecorator()
+	dbClient := func(resource string) storage.Interface { return c.StorageDestinations.Get("", resource) }
+
+	podTemplateStorage := podtemplateetcd.NewREST(dbClient("podTemplates"), storageDecorator)
+
+	eventStorage := eventetcd.NewREST(dbClient("events"), storageDecorator, uint64(c.EventTTL.Seconds()))
+	limitRangeStorage := limitrangeetcd.NewREST(dbClient("limitRanges"), storageDecorator)
+
+	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewREST(dbClient("resourceQuotas"), storageDecorator)
+	secretStorage := secretetcd.NewREST(dbClient("secrets"), storageDecorator)
+	serviceAccountStorage := serviceaccountetcd.NewREST(dbClient("serviceAccounts"), storageDecorator)
+	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewREST(dbClient("persistentVolumes"), storageDecorator)
+	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewREST(dbClient("persistentVolumeClaims"), storageDecorator)
+
+	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(dbClient("namespaces"), storageDecorator)
+	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
+
+	endpointsStorage := endpointsetcd.NewREST(dbClient("endpoints"), storageDecorator)
+	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
+
+	nodeStorage, nodeStatusStorage := nodeetcd.NewREST(dbClient("nodes"), storageDecorator, c.KubeletClient, m.ProxyTransport)
+	m.nodeRegistry = node.NewRegistry(nodeStorage)
+
+	podStorage := podetcd.NewStorage(
+		dbClient("pods"),
+		storageDecorator,
+		kubeletclient.ConnectionInfoGetter(nodeStorage),
+		m.ProxyTransport,
+	)
+
+	serviceStorage := serviceetcd.NewREST(dbClient("services"), storageDecorator)
+	m.serviceRegistry = service.NewRegistry(serviceStorage)
+
+	var serviceClusterIPRegistry service.RangeRegistry
+	serviceClusterIPRange := m.ServiceClusterIPRange
+	if serviceClusterIPRange == nil {
+		glog.Fatalf("service clusterIPRange is nil")
+		return
+	}
+	serviceClusterIPAllocator := ipallocator.NewAllocatorCIDRRange(serviceClusterIPRange, func(max int, rangeSpec string) allocator.Interface {
+		mem := allocator.NewAllocationMap(max, rangeSpec)
+		etcd := etcdallocator.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), dbClient("services"))
+		serviceClusterIPRegistry = etcd
+		return etcd
+	})
+	m.serviceClusterIPAllocator = serviceClusterIPRegistry
+
+	var serviceNodePortRegistry service.RangeRegistry
+	serviceNodePortAllocator := portallocator.NewPortAllocatorCustom(m.ServiceNodePortRange, func(max int, rangeSpec string) allocator.Interface {
+		mem := allocator.NewAllocationMap(max, rangeSpec)
+		etcd := etcdallocator.NewEtcd(mem, "/ranges/servicenodeports", api.Resource("servicenodeportallocations"), dbClient("services"))
+		serviceNodePortRegistry = etcd
+		return etcd
+	})
+	m.serviceNodePortAllocator = serviceNodePortRegistry
+
+	controllerStorage, controllerStatusStorage := controlleretcd.NewREST(dbClient("replicationControllers"), storageDecorator)
+
+	m.v1ResourcesStorage = map[string]rest.Storage{
+		"pods":             podStorage.Pod,
+		"pods/attach":      podStorage.Attach,
+		"pods/status":      podStorage.Status,
+		"pods/log":         podStorage.Log,
+		"pods/exec":        podStorage.Exec,
+		"pods/portforward": podStorage.PortForward,
+		"pods/proxy":       podStorage.Proxy,
+		"pods/binding":     podStorage.Binding,
+		"bindings":         podStorage.Binding,
+
+		"podTemplates": podTemplateStorage,
+
+		"replicationControllers":        controllerStorage,
+		"replicationControllers/status": controllerStatusStorage,
+		"services":                      service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator, m.ProxyTransport),
+		"endpoints":                     endpointsStorage,
+		"nodes":                         nodeStorage,
+		"nodes/status":                  nodeStatusStorage,
+		"events":                        eventStorage,
+
+		"limitRanges":                   limitRangeStorage,
+		"resourceQuotas":                resourceQuotaStorage,
+		"resourceQuotas/status":         resourceQuotaStatusStorage,
+		"namespaces":                    namespaceStorage,
+		"namespaces/status":             namespaceStatusStorage,
+		"namespaces/finalize":           namespaceFinalizeStorage,
+		"secrets":                       secretStorage,
+		"serviceAccounts":               serviceAccountStorage,
+		"persistentVolumes":             persistentVolumeStorage,
+		"persistentVolumes/status":      persistentVolumeStatusStorage,
+		"persistentVolumeClaims":        persistentVolumeClaimStorage,
+		"persistentVolumeClaims/status": persistentVolumeClaimStatusStorage,
+
+		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c) }),
+	}
+}
+
+// NewBootstrapController returns a controller for watching the core capabilities of the master.
+func (m *Master) NewBootstrapController() *Controller {
+	return &Controller{
+		NamespaceRegistry: m.namespaceRegistry,
+		ServiceRegistry:   m.serviceRegistry,
+		MasterCount:       m.MasterCount,
+
+		EndpointRegistry: m.endpointRegistry,
+		EndpointInterval: 10 * time.Second,
+
+		ServiceClusterIPRegistry: m.serviceClusterIPAllocator,
+		ServiceClusterIPRange:    m.ServiceClusterIPRange,
+		ServiceClusterIPInterval: 3 * time.Minute,
+
+		ServiceNodePortRegistry: m.serviceNodePortAllocator,
+		ServiceNodePortRange:    m.ServiceNodePortRange,
+		ServiceNodePortInterval: 3 * time.Minute,
+
+		PublicIP: m.ClusterIP,
+
+		ServiceIP:                 m.ServiceReadWriteIP,
+		ServicePort:               m.ServiceReadWritePort,
+		ExtraServicePorts:         m.ExtraServicePorts,
+		ExtraEndpointPorts:        m.ExtraEndpointPorts,
+		PublicServicePort:         m.PublicReadWritePort,
+		KubernetesServiceNodePort: m.KubernetesServiceNodePort,
+	}
 }
 
 func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
@@ -502,7 +383,8 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 		"controller-manager": {Addr: "127.0.0.1", Port: ports.ControllerManagerPort, Path: "/healthz"},
 		"scheduler":          {Addr: "127.0.0.1", Port: ports.SchedulerPort, Path: "/healthz"},
 	}
-	for ix, machine := range c.EtcdHelper.Client.GetCluster() {
+
+	for ix, machine := range c.StorageDestinations.Backends() {
 		etcdUrl, err := url.Parse(machine)
 		if err != nil {
 			glog.Errorf("Failed to parse etcd url for validation: %v", err)
@@ -522,44 +404,266 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 			addr = etcdUrl.Host
 			port = 4001
 		}
-		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/v2/keys/"}
-	}
-	nodes, err := m.minionRegistry.ListMinions(api.NewDefaultContext())
-	if err != nil {
-		glog.Errorf("Failed to list minions: %v", err)
-	}
-	for ix, node := range nodes.Items {
-		serversToValidate[fmt.Sprintf("node-%d", ix)] = apiserver.Server{Addr: node.Name, Port: ports.KubeletPort, Path: "/healthz"}
+		// TODO: etcd health checking should be abstracted in the storage tier
+		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/health", Validate: etcdutil.EtcdHealthCheck}
 	}
 	return serversToValidate
 }
 
-// api_v1beta1 returns the resources and codec for API version v1beta1.
-func (m *Master) api_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec, string, string, runtime.SelfLinker, admission.Interface, meta.RESTMapper) {
-	storage := make(map[string]apiserver.RESTStorage)
-	for k, v := range m.storage {
-		storage[k] = v
+// HasThirdPartyResource returns true if a particular third party resource currently installed.
+func (m *Master) HasThirdPartyResource(rsrc *extensions.ThirdPartyResource) (bool, error) {
+	_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
+	if err != nil {
+		return false, err
 	}
-	return storage, v1beta1.Codec, "api", "/api/v1beta1", latest.SelfLinker, m.admissionControl, latest.RESTMapper
-}
-
-// api_v1beta2 returns the resources and codec for API version v1beta2.
-func (m *Master) api_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec, string, string, runtime.SelfLinker, admission.Interface, meta.RESTMapper) {
-	storage := make(map[string]apiserver.RESTStorage)
-	for k, v := range m.storage {
-		storage[k] = v
-	}
-	return storage, v1beta2.Codec, "api", "/api/v1beta2", latest.SelfLinker, m.admissionControl, latest.RESTMapper
-}
-
-// api_v1beta3 returns the resources and codec for API version v1beta3.
-func (m *Master) api_v1beta3() (map[string]apiserver.RESTStorage, runtime.Codec, string, string, runtime.SelfLinker, admission.Interface, meta.RESTMapper) {
-	storage := make(map[string]apiserver.RESTStorage)
-	for k, v := range m.storage {
-		if k == "minions" {
-			continue
+	path := makeThirdPartyPath(group)
+	services := m.HandlerContainer.RegisteredWebServices()
+	for ix := range services {
+		if services[ix].RootPath() == path {
+			return true, nil
 		}
-		storage[strings.ToLower(k)] = v
 	}
-	return storage, v1beta3.Codec, "api", "/api/v1beta3", latest.SelfLinker, m.admissionControl, latest.RESTMapper
+	return false, nil
+}
+
+func (m *Master) removeThirdPartyStorage(path string) error {
+	m.thirdPartyResourcesLock.Lock()
+	defer m.thirdPartyResourcesLock.Unlock()
+	storage, found := m.thirdPartyResources[path]
+	if found {
+		if err := m.removeAllThirdPartyResources(storage.storage); err != nil {
+			return err
+		}
+		delete(m.thirdPartyResources, path)
+	}
+	return nil
+}
+
+// RemoveThirdPartyResource removes all resources matching `path`.  Also deletes any stored data
+func (m *Master) RemoveThirdPartyResource(path string) error {
+	if err := m.removeThirdPartyStorage(path); err != nil {
+		return err
+	}
+
+	services := m.HandlerContainer.RegisteredWebServices()
+	for ix := range services {
+		root := services[ix].RootPath()
+		if root == path || strings.HasPrefix(root, path+"/") {
+			m.HandlerContainer.Remove(services[ix])
+		}
+	}
+	return nil
+}
+
+func (m *Master) removeAllThirdPartyResources(registry *thirdpartyresourcedataetcd.REST) error {
+	ctx := api.NewDefaultContext()
+	existingData, err := registry.List(ctx, nil)
+	if err != nil {
+		return err
+	}
+	list, ok := existingData.(*extensions.ThirdPartyResourceDataList)
+	if !ok {
+		return fmt.Errorf("expected a *ThirdPartyResourceDataList, got %#v", list)
+	}
+	for ix := range list.Items {
+		item := &list.Items[ix]
+		if _, err := registry.Delete(ctx, item.Name, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ListThirdPartyResources lists all currently installed third party resources
+func (m *Master) ListThirdPartyResources() []string {
+	m.thirdPartyResourcesLock.RLock()
+	defer m.thirdPartyResourcesLock.RUnlock()
+	result := []string{}
+	for key := range m.thirdPartyResources {
+		result = append(result, key)
+	}
+	return result
+}
+
+func (m *Master) addThirdPartyResourceStorage(path string, storage *thirdpartyresourcedataetcd.REST, apiGroup unversioned.APIGroup) {
+	m.thirdPartyResourcesLock.Lock()
+	defer m.thirdPartyResourcesLock.Unlock()
+	m.thirdPartyResources[path] = thirdPartyEntry{storage, apiGroup}
+}
+
+// InstallThirdPartyResource installs a third party resource specified by 'rsrc'.  When a resource is
+// installed a corresponding RESTful resource is added as a valid path in the web service provided by
+// the master.
+//
+// For example, if you install a resource ThirdPartyResource{ Name: "foo.company.com", Versions: {"v1"} }
+// then the following RESTful resource is created on the server:
+//   http://<host>/apis/company.com/v1/foos/...
+func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) error {
+	kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
+	if err != nil {
+		return err
+	}
+	thirdparty := m.thirdpartyapi(group, kind, rsrc.Versions[0].Name)
+	if err := thirdparty.InstallREST(m.HandlerContainer); err != nil {
+		glog.Fatalf("Unable to setup thirdparty api: %v", err)
+	}
+	path := makeThirdPartyPath(group)
+	groupVersion := unversioned.GroupVersionForDiscovery{
+		GroupVersion: group + "/" + rsrc.Versions[0].Name,
+		Version:      rsrc.Versions[0].Name,
+	}
+	apiGroup := unversioned.APIGroup{
+		Name:     group,
+		Versions: []unversioned.GroupVersionForDiscovery{groupVersion},
+	}
+	apiserver.AddGroupWebService(m.HandlerContainer, path, apiGroup)
+	m.addThirdPartyResourceStorage(path, thirdparty.Storage[strings.ToLower(kind)+"s"].(*thirdpartyresourcedataetcd.REST), apiGroup)
+	apiserver.InstallServiceErrorHandler(m.HandlerContainer, m.NewRequestInfoResolver(), []string{thirdparty.GroupVersion.String()})
+	return nil
+}
+
+func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupVersion {
+	resourceStorage := thirdpartyresourcedataetcd.NewREST(m.thirdPartyStorage, generic.UndecoratedStorage, group, kind)
+
+	apiRoot := makeThirdPartyPath("")
+
+	storage := map[string]rest.Storage{
+		strings.ToLower(kind) + "s": resourceStorage,
+	}
+
+	optionsExternalVersion := latest.GroupOrDie(api.GroupName).GroupVersion
+
+	return &apiserver.APIGroupVersion{
+		Root:                apiRoot,
+		GroupVersion:        unversioned.GroupVersion{Group: group, Version: version},
+		RequestInfoResolver: m.NewRequestInfoResolver(),
+
+		Creater:   thirdpartyresourcedata.NewObjectCreator(group, version, api.Scheme),
+		Convertor: api.Scheme,
+		Typer:     api.Scheme,
+
+		Mapper:                 thirdpartyresourcedata.NewMapper(latest.GroupOrDie(extensions.GroupName).RESTMapper, kind, version, group),
+		Codec:                  thirdpartyresourcedata.NewCodec(latest.GroupOrDie(extensions.GroupName).Codec, kind),
+		Linker:                 latest.GroupOrDie(extensions.GroupName).SelfLinker,
+		Storage:                storage,
+		OptionsExternalVersion: &optionsExternalVersion,
+
+		Context: m.RequestContextMapper,
+
+		MinRequestTimeout: m.MinRequestTimeout,
+	}
+}
+
+// getExperimentalResources returns the resources for extenstions api
+func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
+	// All resources except these are disabled by default.
+	enabledResources := sets.NewString("jobs", "horizontalpodautoscalers", "ingresses")
+	resourceOverrides := m.ApiGroupVersionOverrides["extensions/v1beta1"].ResourceOverrides
+	isEnabled := func(resource string) bool {
+		// Check if the resource has been overriden.
+		enabled, ok := resourceOverrides[resource]
+		if !ok {
+			return enabledResources.Has(resource)
+		}
+		return enabled
+	}
+	storageDecorator := m.StorageDecorator()
+	dbClient := func(resource string) storage.Interface {
+		return c.StorageDestinations.Get(extensions.GroupName, resource)
+	}
+
+	storage := map[string]rest.Storage{}
+	if isEnabled("horizontalpodautoscalers") {
+		autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizontalpodautoscalers"), storageDecorator)
+		storage["horizontalpodautoscalers"] = autoscalerStorage
+		storage["horizontalpodautoscalers/status"] = autoscalerStatusStorage
+		controllerStorage := expcontrolleretcd.NewStorage(c.StorageDestinations.Get("", "replicationControllers"), storageDecorator)
+		storage["replicationcontrollers"] = controllerStorage.ReplicationController
+		storage["replicationcontrollers/scale"] = controllerStorage.Scale
+	}
+	if isEnabled("thirdpartyresources") {
+		thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(dbClient("thirdpartyresources"), storageDecorator)
+		thirdPartyControl := ThirdPartyController{
+			master: m,
+			thirdPartyResourceRegistry: thirdPartyResourceStorage,
+		}
+		go func() {
+			util.Forever(func() {
+				if err := thirdPartyControl.SyncResources(); err != nil {
+					glog.Warningf("third party resource sync failed: %v", err)
+				}
+			}, 10*time.Second)
+		}()
+
+		storage["thirdpartyresources"] = thirdPartyResourceStorage
+	}
+
+	if isEnabled("daemonsets") {
+		daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(dbClient("daemonsets"), storageDecorator)
+		storage["daemonsets"] = daemonSetStorage
+		storage["daemonsets/status"] = daemonSetStatusStorage
+	}
+	if isEnabled("deployments") {
+		deploymentStorage := deploymentetcd.NewStorage(dbClient("deployments"), storageDecorator)
+		storage["deployments"] = deploymentStorage.Deployment
+		storage["deployments/status"] = deploymentStorage.Status
+		storage["deployments/scale"] = deploymentStorage.Scale
+	}
+	if isEnabled("jobs") {
+		jobStorage, jobStatusStorage := jobetcd.NewREST(dbClient("jobs"), storageDecorator)
+		storage["jobs"] = jobStorage
+		storage["jobs/status"] = jobStatusStorage
+	}
+	if isEnabled("ingresses") {
+		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(dbClient("ingresses"), storageDecorator)
+		storage["ingresses"] = ingressStorage
+		storage["ingresses/status"] = ingressStatusStorage
+	}
+	return storage
+}
+
+// findExternalAddress returns ExternalIP of provided node with fallback to LegacyHostIP.
+func findExternalAddress(node *api.Node) (string, error) {
+	var fallback string
+	for ix := range node.Status.Addresses {
+		addr := &node.Status.Addresses[ix]
+		if addr.Type == api.NodeExternalIP {
+			return addr.Address, nil
+		}
+		if fallback == "" && addr.Type == api.NodeLegacyHostIP {
+			fallback = addr.Address
+		}
+	}
+	if fallback != "" {
+		return fallback, nil
+	}
+	return "", fmt.Errorf("Couldn't find external address: %v", node)
+}
+
+func (m *Master) getNodeAddresses() ([]string, error) {
+	nodes, err := m.nodeRegistry.ListNodes(api.NewDefaultContext(), nil)
+	if err != nil {
+		return nil, err
+	}
+	addrs := []string{}
+	for ix := range nodes.Items {
+		node := &nodes.Items[ix]
+		addr, err := findExternalAddress(node)
+		if err != nil {
+			return nil, err
+		}
+		addrs = append(addrs, addr)
+	}
+	return addrs, nil
+}
+
+func (m *Master) IsTunnelSyncHealthy(req *http.Request) error {
+	if m.tunneler == nil {
+		return nil
+	}
+	lag := m.tunneler.SecondsSinceSync()
+	if lag > 600 {
+		return fmt.Errorf("Tunnel sync is taking to long: %d", lag)
+	}
+	return nil
 }

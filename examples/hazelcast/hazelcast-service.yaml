@@ -1,7 +1,11 @@
-id: hazelcast
+apiVersion: v1
 kind: Service
-apiVersion: v1beta1
-port: 5701
-containerPort: 5701
-selector:
+metadata:
+  labels:
+    name: hazelcast
   name: hazelcast
+spec: 
+  ports:
+    - port: 5701
+  selector:
+    name: hazelcast

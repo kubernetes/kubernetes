@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ package admit
 import (
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"k8s.io/kubernetes/pkg/admission"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 func init() {
@@ -37,6 +37,11 @@ func (alwaysAdmit) Admit(a admission.Attributes) (err error) {
 	return nil
 }
 
+func (alwaysAdmit) Handles(operation admission.Operation) bool {
+	return true
+}
+
+// NewAlwaysAdmit creates a new always admit admission handler
 func NewAlwaysAdmit() admission.Interface {
 	return new(alwaysAdmit)
 }

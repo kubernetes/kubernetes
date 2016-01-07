@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,123 +17,313 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+
+	"github.com/evanphx/json-patch"
 	"github.com/golang/glog"
-	"github.com/imdario/mergo"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
-func checkErr(err error) {
-	if err != nil {
-		glog.FatalDepth(1, err.Error())
-	}
+const (
+	ApplyAnnotationsFlag = "save-config"
+)
+
+type debugError interface {
+	DebugError() (msg string, args []interface{})
 }
 
-func usageError(cmd *cobra.Command, format string, args ...interface{}) {
-	glog.Errorf(format, args...)
-	glog.Errorf("See '%s -h' for help.", cmd.CommandPath())
+// AddSourceToErr adds handleResourcePrefix and source string to error message.
+// verb is the string like "creating", "deleting" etc.
+// souce is the filename or URL to the template file(*.json or *.yaml), or stdin to use to handle the resource.
+func AddSourceToErr(verb string, source string, err error) error {
+	if source != "" {
+		if statusError, ok := err.(errors.APIStatus); ok {
+			status := statusError.Status()
+			status.Message = fmt.Sprintf("error when %s %q: %v", verb, source, status.Message)
+			return &errors.StatusError{ErrStatus: status}
+		}
+		return fmt.Errorf("error when %s %q: %v", verb, source, err)
+	}
+	return err
+}
+
+var fatalErrHandler = fatal
+
+// BehaviorOnFatal allows you to override the default behavior when a fatal
+// error occurs, which is call os.Exit(1). You can pass 'panic' as a function
+// here if you prefer the panic() over os.Exit(1).
+func BehaviorOnFatal(f func(string)) {
+	fatalErrHandler = f
+}
+
+// fatal prints the message and then exits. If V(2) or greater, glog.Fatal
+// is invoked for extended information.
+func fatal(msg string) {
+	// add newline if needed
+	if !strings.HasSuffix(msg, "\n") {
+		msg += "\n"
+	}
+
+	if glog.V(2) {
+		glog.FatalDepth(2, msg)
+	}
+	fmt.Fprint(os.Stderr, msg)
 	os.Exit(1)
 }
 
-func GetFlagString(cmd *cobra.Command, flag string) string {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
-	}
-	return f.Value.String()
+// CheckErr prints a user friendly error to STDERR and exits with a non-zero
+// exit code. Unrecognized errors will be printed with an "error: " prefix.
+//
+// This method is generic to the command in use and may be used by non-Kubectl
+// commands.
+func CheckErr(err error) {
+	checkErr(err, fatalErrHandler)
 }
 
-func GetFlagBool(cmd *cobra.Command, flag string) bool {
+func checkErr(err error, handleErr func(string)) {
+	if err == nil {
+		return
+	}
+
+	if errors.IsInvalid(err) {
+		details := err.(*errors.StatusError).Status().Details
+		prefix := fmt.Sprintf("The %s %q is invalid.\n", details.Kind, details.Name)
+		errs := statusCausesToAggrError(details.Causes)
+		handleErr(MultilineError(prefix, errs))
+	}
+
+	// handle multiline errors
+	if clientcmd.IsConfigurationInvalid(err) {
+		handleErr(MultilineError("Error in configuration: ", err))
+	}
+	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) > 0 {
+		handleErr(MultipleErrors("", agg.Errors()))
+	}
+
+	msg, ok := StandardErrorMessage(err)
+	if !ok {
+		msg = fmt.Sprintf("error: %s", err.Error())
+	}
+	handleErr(msg)
+}
+
+func statusCausesToAggrError(scs []unversioned.StatusCause) utilerrors.Aggregate {
+	errs := make([]error, len(scs))
+	for i, sc := range scs {
+		errs[i] = fmt.Errorf("%s: %s", sc.Field, sc.Message)
+	}
+	return utilerrors.NewAggregate(errs)
+}
+
+// StandardErrorMessage translates common errors into a human readable message, or returns
+// false if the error is not one of the recognized types. It may also log extended
+// information to glog.
+//
+// This method is generic to the command in use and may be used by non-Kubectl
+// commands.
+func StandardErrorMessage(err error) (string, bool) {
+	if debugErr, ok := err.(debugError); ok {
+		glog.V(4).Infof(debugErr.DebugError())
+	}
+	_, isStatus := err.(errors.APIStatus)
+	switch {
+	case isStatus:
+		return fmt.Sprintf("Error from server: %s", err.Error()), true
+	case errors.IsUnexpectedObjectError(err):
+		return fmt.Sprintf("Server returned an unexpected response: %s", err.Error()), true
+	}
+	switch t := err.(type) {
+	case *url.Error:
+		glog.V(4).Infof("Connection error: %s %s: %v", t.Op, t.URL, t.Err)
+		switch {
+		case strings.Contains(t.Err.Error(), "connection refused"):
+			host := t.URL
+			if server, err := url.Parse(t.URL); err == nil {
+				host = server.Host
+			}
+			return fmt.Sprintf("The connection to the server %s was refused - did you specify the right host or port?", host), true
+		}
+		return fmt.Sprintf("Unable to connect to the server: %v", t.Err), true
+	}
+	return "", false
+}
+
+// MultilineError returns a string representing an error that splits sub errors into their own
+// lines. The returned string will end with a newline.
+func MultilineError(prefix string, err error) string {
+	if agg, ok := err.(utilerrors.Aggregate); ok {
+		errs := utilerrors.Flatten(agg).Errors()
+		buf := &bytes.Buffer{}
+		switch len(errs) {
+		case 0:
+			return fmt.Sprintf("%s%v\n", prefix, err)
+		case 1:
+			return fmt.Sprintf("%s%v\n", prefix, messageForError(errs[0]))
+		default:
+			fmt.Fprintln(buf, prefix)
+			for _, err := range errs {
+				fmt.Fprintf(buf, "* %v\n", messageForError(err))
+			}
+			return buf.String()
+		}
+	}
+	return fmt.Sprintf("%s%s\n", prefix, err)
+}
+
+// MultipleErrors returns a newline delimited string containing
+// the prefix and referenced errors in standard form.
+func MultipleErrors(prefix string, errs []error) string {
+	buf := &bytes.Buffer{}
+	for _, err := range errs {
+		fmt.Fprintf(buf, "%s%v\n", prefix, messageForError(err))
+	}
+	return buf.String()
+}
+
+// messageForError returns the string representing the error.
+func messageForError(err error) string {
+	msg, ok := StandardErrorMessage(err)
+	if !ok {
+		msg = err.Error()
+	}
+	return msg
+}
+
+func UsageError(cmd *cobra.Command, format string, args ...interface{}) error {
+	msg := fmt.Sprintf(format, args...)
+	return fmt.Errorf("%s\nSee '%s -h' for help and examples.", msg, cmd.CommandPath())
+}
+
+// Whether this cmd need watching objects.
+func isWatch(cmd *cobra.Command) bool {
+	if w, err := cmd.Flags().GetBool("watch"); w && err == nil {
+		return true
+	}
+
+	if wo, err := cmd.Flags().GetBool("watch-only"); wo && err == nil {
+		return true
+	}
+
+	return false
+}
+
+func getFlag(cmd *cobra.Command, flag string) *pflag.Flag {
 	f := cmd.Flags().Lookup(flag)
 	if f == nil {
-		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
+		glog.Fatalf("flag accessed but not defined for command %s: %s", cmd.Name(), flag)
 	}
-	// Caseless compare.
-	if strings.ToLower(f.Value.String()) == "true" {
+	return f
+}
+
+func GetFlagString(cmd *cobra.Command, flag string) string {
+	s, err := cmd.Flags().GetString(flag)
+	if err != nil {
+		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+	}
+	return s
+}
+
+// GetFlagStringList can be used to accept multiple argument with flag repetition (e.g. -f arg1 -f arg2 ...)
+func GetFlagStringSlice(cmd *cobra.Command, flag string) []string {
+	s, err := cmd.Flags().GetStringSlice(flag)
+	if err != nil {
+		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+	}
+	return s
+}
+
+// GetWideFlag is used to determine if "-o wide" is used
+func GetWideFlag(cmd *cobra.Command) bool {
+	f := cmd.Flags().Lookup("output")
+	if f.Value.String() == "wide" {
 		return true
 	}
 	return false
 }
 
-// Returns nil if the flag wasn't set.
-func GetFlagBoolPtr(cmd *cobra.Command, flag string) *bool {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
+func GetFlagBool(cmd *cobra.Command, flag string) bool {
+	b, err := cmd.Flags().GetBool(flag)
+	if err != nil {
+		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
-	// Check if flag was not set at all.
-	if !f.Changed && f.DefValue == f.Value.String() {
-		return nil
-	}
-	var ret bool
-	// Caseless compare.
-	if strings.ToLower(f.Value.String()) == "true" {
-		ret = true
-	} else {
-		ret = false
-	}
-	return &ret
+	return b
 }
 
 // Assumes the flag has a default value.
 func GetFlagInt(cmd *cobra.Command, flag string) int {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
+	i, err := cmd.Flags().GetInt(flag)
+	if err != nil {
+		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
-	v, err := strconv.Atoi(f.Value.String())
-	// This is likely not a sufficiently friendly error message, but cobra
-	// should prevent non-integer values from reaching here.
-	checkErr(err)
-	return v
+	return i
+}
+
+// Assumes the flag has a default value.
+func GetFlagInt64(cmd *cobra.Command, flag string) int64 {
+	i, err := cmd.Flags().GetInt64(flag)
+	if err != nil {
+		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+	}
+	return i
 }
 
 func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
+	d, err := cmd.Flags().GetDuration(flag)
+	if err != nil {
+		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
-	v, err := time.ParseDuration(f.Value.String())
-	checkErr(err)
-	return v
+	return d
 }
 
-// Returns the first non-empty string out of the ones provided. If all
-// strings are empty, returns an empty string.
-func FirstNonEmptyString(args ...string) string {
-	for _, s := range args {
-		if len(s) > 0 {
-			return s
-		}
-	}
-	return ""
+func AddValidateFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
+	cmd.Flags().String("schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
 }
 
-// Return a list of file names of a certain type within a given directory.
-// TODO: replace with resource.Builder
-func GetFilesFromDir(directory string, fileType string) []string {
-	files := []string{}
+func AddApplyAnnotationFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool(ApplyAnnotationsFlag, false, "If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.")
+}
 
-	err := filepath.Walk(directory, func(path string, f os.FileInfo, err error) error {
-		if filepath.Ext(path) == fileType {
-			files = append(files, path)
-		}
-		return err
-	})
+// AddGeneratorFlags adds flags common to resource generation commands
+// TODO: need to take a pass at other generator commands to use this set of flags
+func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
+	cmd.Flags().String("generator", defaultGenerator, "The name of the API generator to use.")
+	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
+	cmd.Flags().StringP("output", "o", "", "Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md].")
+	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")
+}
 
-	checkErr(err)
-	return files
+func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
+	data, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(data) == 0 {
+		return nil, fmt.Errorf(`Read from %s but no data found`, source)
+	}
+
+	return data, nil
 }
 
 // ReadConfigData reads the bytes from the specified filesytem or network
@@ -146,16 +336,7 @@ func ReadConfigData(location string) ([]byte, error) {
 
 	if location == "-" {
 		// Read from stdin.
-		data, err := ioutil.ReadAll(os.Stdin)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(data) == 0 {
-			return nil, fmt.Errorf(`Read from stdin specified ("-") but no data found`)
-		}
-
-		return data, nil
+		return ReadConfigDataFromReader(os.Stdin, "stdin ('-')")
 	}
 
 	// Use the location as a file path or URL.
@@ -174,50 +355,103 @@ func ReadConfigDataFromLocation(location string) ([]byte, error) {
 		if resp.StatusCode != 200 {
 			return nil, fmt.Errorf("unable to read URL, server reported %d %s", resp.StatusCode, resp.Status)
 		}
-		data, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read URL %s: %v\n", location, err)
-		}
-		return data, nil
+		return ReadConfigDataFromReader(resp.Body, location)
 	} else {
-		data, err := ioutil.ReadFile(location)
+		file, err := os.Open(location)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read %s: %v\n", location, err)
 		}
-		return data, nil
+		return ReadConfigDataFromReader(file, location)
 	}
 }
 
-func Merge(dst runtime.Object, fragment, kind string) error {
+func Merge(dst runtime.Object, fragment, kind string) (runtime.Object, error) {
 	// Ok, this is a little hairy, we'd rather not force the user to specify a kind for their JSON
 	// So we pull it into a map, add the Kind field, and then reserialize.
 	// We also pull the apiVersion for proper parsing
 	var intermediate interface{}
 	if err := json.Unmarshal([]byte(fragment), &intermediate); err != nil {
-		return err
+		return nil, err
 	}
 	dataMap, ok := intermediate.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("Expected a map, found something else: %s", fragment)
+		return nil, fmt.Errorf("Expected a map, found something else: %s", fragment)
 	}
 	version, found := dataMap["apiVersion"]
 	if !found {
-		return fmt.Errorf("Inline JSON requires an apiVersion field")
+		return nil, fmt.Errorf("Inline JSON requires an apiVersion field")
 	}
 	versionString, ok := version.(string)
 	if !ok {
-		return fmt.Errorf("apiVersion must be a string")
+		return nil, fmt.Errorf("apiVersion must be a string")
 	}
-	codec := runtime.CodecFor(api.Scheme, versionString)
+	groupVersion, err := unversioned.ParseGroupVersion(versionString)
+	if err != nil {
+		return nil, err
+	}
 
-	dataMap["kind"] = kind
-	data, err := json.Marshal(intermediate)
+	i, err := latest.GroupOrDie(api.GroupName).InterfacesFor(groupVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	// encode dst into versioned json and apply fragment directly too it
+	target, err := i.Codec.Encode(dst)
+	if err != nil {
+		return nil, err
+	}
+	patched, err := jsonpatch.MergePatch(target, []byte(fragment))
+	if err != nil {
+		return nil, err
+	}
+	out, err := i.Codec.Decode(patched)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DumpReaderToFile writes all data from the given io.Reader to the specified file
+// (usually for temporary use).
+func DumpReaderToFile(reader io.Reader, filename string) error {
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	defer f.Close()
 	if err != nil {
 		return err
 	}
-	src, err := codec.Decode(data)
-	if err != nil {
-		return err
+	buffer := make([]byte, 1024)
+	for {
+		count, err := reader.Read(buffer)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		_, err = f.Write(buffer[:count])
+		if err != nil {
+			return err
+		}
 	}
-	return mergo.Merge(dst, src)
+	return nil
+}
+
+// UpdateObject updates resource object with updateFn
+func UpdateObject(info *resource.Info, updateFn func(runtime.Object) error) (runtime.Object, error) {
+	helper := resource.NewHelper(info.Client, info.Mapping)
+
+	if err := updateFn(info.Object); err != nil {
+		return nil, err
+	}
+
+	// Update the annotation used by kubectl apply
+	if err := kubectl.UpdateApplyAnnotation(info); err != nil {
+		return nil, err
+	}
+
+	if _, err := helper.Replace(info.Namespace, info.Name, true, info.Object); err != nil {
+		return nil, err
+	}
+
+	return info.Object, nil
 }

@@ -117,8 +117,8 @@ func (stenographer *FakeStenographer) AnnouncePendingSpec(spec *types.SpecSummar
 	stenographer.registerCall("AnnouncePendingSpec", spec, noisy)
 }
 
-func (stenographer *FakeStenographer) AnnounceSkippedSpec(spec *types.SpecSummary) {
-	stenographer.registerCall("AnnounceSkippedSpec", spec)
+func (stenographer *FakeStenographer) AnnounceSkippedSpec(spec *types.SpecSummary, succinct bool, fullTrace bool) {
+	stenographer.registerCall("AnnounceSkippedSpec", spec, succinct, fullTrace)
 }
 
 func (stenographer *FakeStenographer) AnnounceSpecTimedOut(spec *types.SpecSummary, succinct bool, fullTrace bool) {

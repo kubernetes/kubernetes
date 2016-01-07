@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,66 +17,94 @@ limitations under the License.
 package kubelet
 
 import (
-	"strconv"
+	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/coreos/go-etcd/etcd"
-	"github.com/golang/glog"
-	cadvisor "github.com/google/cadvisor/client"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/capabilities"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
-// TODO: move this into the kubelet itself
-func MonitorCAdvisor(k *Kubelet, cp uint) {
-	defer util.HandleCrash()
-	// TODO: Monitor this connection, reconnect if needed?
-	glog.V(1).Infof("Trying to create cadvisor client.")
-	cadvisorClient, err := cadvisor.NewClient("http://127.0.0.1:" + strconv.Itoa(int(cp)))
-	if err != nil {
-		glog.Errorf("Error on creating cadvisor client: %v", err)
-		return
-	}
-	glog.V(1).Infof("Successfully created cadvisor client.")
-	k.SetCadvisorClient(cadvisorClient)
-}
-
-// TODO: move this into a pkg/tools/etcd_tools
-func EtcdClientOrDie(etcdServerList util.StringList, etcdConfigFile string) tools.EtcdClient {
-	if len(etcdServerList) > 0 {
-		return etcd.NewClient(etcdServerList)
-	} else if etcdConfigFile != "" {
-		etcdClient, err := etcd.NewClientFromFile(etcdConfigFile)
+// Check whether we have the capabilities to run the specified pod.
+func canRunPod(pod *api.Pod) error {
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork {
+		allowed, err := allowHostNetwork(pod)
 		if err != nil {
-			glog.Fatalf("Error with etcd config file: %v", err)
+			return err
 		}
-		return etcdClient
+		if !allowed {
+			return fmt.Errorf("pod with UID %q specified host networking, but is disallowed", pod.UID)
+		}
+	}
+
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostPID {
+		allowed, err := allowHostPID(pod)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return fmt.Errorf("pod with UID %q specified host PID, but is disallowed", pod.UID)
+		}
+	}
+
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostIPC {
+		allowed, err := allowHostIPC(pod)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return fmt.Errorf("pod with UID %q specified host ipc, but is disallowed", pod.UID)
+		}
+	}
+
+	if !capabilities.Get().AllowPrivileged {
+		for _, container := range pod.Spec.Containers {
+			if securitycontext.HasPrivilegedRequest(&container) {
+				return fmt.Errorf("pod with UID %q specified privileged container, but is disallowed", pod.UID)
+			}
+		}
 	}
 	return nil
 }
 
-// TODO: move this into pkg/capabilities
-func SetupCapabilities(allowPrivileged bool) {
-	capabilities.Initialize(capabilities.Capabilities{
-		AllowPrivileged: allowPrivileged,
-	})
+// Determined whether the specified pod is allowed to use host networking
+func allowHostNetwork(pod *api.Pod) (bool, error) {
+	podSource, err := kubetypes.GetPodSource(pod)
+	if err != nil {
+		return false, err
+	}
+	for _, source := range capabilities.Get().PrivilegedSources.HostNetworkSources {
+		if source == podSource {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
-// TODO: Split this up?
-func SetupLogging() {
-	etcd.SetLogger(util.NewLogger("etcd "))
-	// Log the events locally too.
-	record.StartLogging(glog.Infof)
+// Determined whether the specified pod is allowed to use host networking
+func allowHostPID(pod *api.Pod) (bool, error) {
+	podSource, err := kubetypes.GetPodSource(pod)
+	if err != nil {
+		return false, err
+	}
+	for _, source := range capabilities.Get().PrivilegedSources.HostPIDSources {
+		if source == podSource {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
-func SetupEventSending(client *client.Client, hostname string) {
-	glog.Infof("Sending events to api server.")
-	record.StartRecording(client.Events(""),
-		api.EventSource{
-			Component: "kubelet",
-			Host:      hostname,
-		})
+// Determined whether the specified pod is allowed to use host ipc
+func allowHostIPC(pod *api.Pod) (bool, error) {
+	podSource, err := kubetypes.GetPodSource(pod)
+	if err != nil {
+		return false, err
+	}
+	for _, source := range capabilities.Get().PrivilegedSources.HostIPCSources {
+		if source == podSource {
+			return true, nil
+		}
+	}
+	return false, nil
 }

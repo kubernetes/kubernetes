@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -85,7 +85,8 @@ kube::log::error_exit() {
 
 # Log an error but keep going.  Don't dump the stack or exit.
 kube::log::error() {
-  echo "!!! ${1-}" >&2
+  timestamp=$(date +"[%m%d %H:%M:%S]")
+  echo "!!! $timestamp ${1-}" >&2
   shift
   for message; do
     echo "    $message" >&2
@@ -118,6 +119,13 @@ kube::log::info() {
   done
 }
 
+# Just like kube::log::info, but no \n, so you can make a progress bar
+kube::log::progress() {
+  for message; do
+    echo -e -n "$message"
+  done
+}
+
 kube::log::info_from_stdin() {
   local messages=()
   while read -r line; do
@@ -129,7 +137,8 @@ kube::log::info_from_stdin() {
 
 # Print a status line.  Formatted to show up in a stream of output.
 kube::log::status() {
-  echo "+++ $1"
+  timestamp=$(date +"[%m%d %H:%M:%S]")
+  echo "+++ $timestamp $1"
   shift
   for message; do
     echo "    $message"

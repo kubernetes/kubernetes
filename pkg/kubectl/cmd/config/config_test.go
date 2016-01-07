@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,58 +18,130 @@ package config
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"reflect"
+	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 func newRedFederalCowHammerConfig() clientcmdapi.Config {
 	return clientcmdapi.Config{
-		AuthInfos: map[string]clientcmdapi.AuthInfo{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"red-user": {Token: "red-token"}},
-		Clusters: map[string]clientcmdapi.Cluster{
+		Clusters: map[string]*clientcmdapi.Cluster{
 			"cow-cluster": {Server: "http://cow.org:8080"}},
-		Contexts: map[string]clientcmdapi.Context{
+		Contexts: map[string]*clientcmdapi.Context{
 			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster"}},
+		CurrentContext: "federal-context",
 	}
 }
 
-type configCommandTest struct {
-	args           []string
-	startingConfig clientcmdapi.Config
-	expectedConfig clientcmdapi.Config
-}
-
-func TestSetCurrentContext(t *testing.T) {
+func ExampleView() {
 	expectedConfig := newRedFederalCowHammerConfig()
-	expectedConfig.CurrentContext = "the-new-context"
 	test := configCommandTest{
-		args:           []string{"use-context", "the-new-context"},
+		args:           []string{"view"},
 		startingConfig: newRedFederalCowHammerConfig(),
 		expectedConfig: expectedConfig,
 	}
 
+	output := test.run(nil)
+	fmt.Printf("%v", output)
+	// Output:
+	// apiVersion: v1
+	// clusters:
+	// - cluster:
+	//     server: http://cow.org:8080
+	//   name: cow-cluster
+	// contexts:
+	// - context:
+	//     cluster: cow-cluster
+	//     user: red-user
+	//   name: federal-context
+	// current-context: federal-context
+	// kind: Config
+	// preferences: {}
+	// users:
+	// - name: red-user
+	//   user:
+	//     token: red-token
+}
+
+func TestSetCurrentContext(t *testing.T) {
+	expectedConfig := newRedFederalCowHammerConfig()
+	startingConfig := newRedFederalCowHammerConfig()
+
+	newContextName := "the-new-context"
+
+	startingConfig.Contexts[newContextName] = clientcmdapi.NewContext()
+	expectedConfig.Contexts[newContextName] = clientcmdapi.NewContext()
+
+	expectedConfig.CurrentContext = newContextName
+
+	test := configCommandTest{
+		args:           []string{"use-context", "the-new-context"},
+		startingConfig: startingConfig,
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestSetNonExistentContext(t *testing.T) {
+	expectedConfig := newRedFederalCowHammerConfig()
+	test := configCommandTest{
+		args:            []string{"use-context", "non-existent-config"},
+		startingConfig:  expectedConfig,
+		expectedConfig:  expectedConfig,
+		expectedOutputs: []string{`no context exists with the name: "non-existent-config"`},
+	}
 	test.run(t)
 }
 
 func TestSetIntoExistingStruct(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
-	a := expectedConfig.AuthInfos["red-user"]
-	authInfo := &a
-	authInfo.AuthPath = "new-path-value"
-	expectedConfig.AuthInfos["red-user"] = *authInfo
+	expectedConfig.AuthInfos["red-user"].Password = "new-path-value"
 	test := configCommandTest{
-		args:           []string{"set", "users.red-user.auth-path", "new-path-value"},
+		args:           []string{"set", "users.red-user.password", "new-path-value"},
 		startingConfig: newRedFederalCowHammerConfig(),
 		expectedConfig: expectedConfig,
 	}
 
 	test.run(t)
+}
+
+func TestSetWithPathPrefixIntoExistingStruct(t *testing.T) {
+	expectedConfig := newRedFederalCowHammerConfig()
+	expectedConfig.Clusters["cow-cluster"].Server = "http://cow.org:8080/foo/baz"
+	test := configCommandTest{
+		args:           []string{"set", "clusters.cow-cluster.server", "http://cow.org:8080/foo/baz"},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+
+	dc := clientcmd.NewDefaultClientConfig(expectedConfig, &clientcmd.ConfigOverrides{})
+	dcc, err := dc.ClientConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expectedHost := "http://cow.org:8080"
+	if expectedHost != dcc.Host {
+		t.Fatalf("expected client.Config.Host = %q instead of %q", expectedHost, dcc.Host)
+	}
+	expectedPrefix := "/foo/baz"
+	if expectedPrefix != dcc.Prefix {
+		t.Fatalf("expected client.Config.Prefix = %q instead of %q", expectedPrefix, dcc.Prefix)
+	}
 }
 
 func TestUnsetStruct(t *testing.T) {
@@ -86,7 +158,7 @@ func TestUnsetStruct(t *testing.T) {
 
 func TestUnsetField(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
-	expectedConfig.AuthInfos["red-user"] = *clientcmdapi.NewAuthInfo()
+	expectedConfig.AuthInfos["red-user"] = clientcmdapi.NewAuthInfo()
 	test := configCommandTest{
 		args:           []string{"unset", "users.red-user.token"},
 		startingConfig: newRedFederalCowHammerConfig(),
@@ -100,7 +172,7 @@ func TestSetIntoNewStruct(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	cluster := clientcmdapi.NewCluster()
 	cluster.Server = "new-server-value"
-	expectedConfig.Clusters["big-cluster"] = *cluster
+	expectedConfig.Clusters["big-cluster"] = cluster
 	test := configCommandTest{
 		args:           []string{"set", "clusters.big-cluster.server", "new-server-value"},
 		startingConfig: newRedFederalCowHammerConfig(),
@@ -114,7 +186,7 @@ func TestSetBoolean(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	cluster := clientcmdapi.NewCluster()
 	cluster.InsecureSkipTLSVerify = true
-	expectedConfig.Clusters["big-cluster"] = *cluster
+	expectedConfig.Clusters["big-cluster"] = cluster
 	test := configCommandTest{
 		args:           []string{"set", "clusters.big-cluster.insecure-skip-tls-verify", "true"},
 		startingConfig: newRedFederalCowHammerConfig(),
@@ -128,7 +200,7 @@ func TestSetIntoNewConfig(t *testing.T) {
 	expectedConfig := *clientcmdapi.NewConfig()
 	context := clientcmdapi.NewContext()
 	context.AuthInfo = "fake-user"
-	expectedConfig.Contexts["new-context"] = *context
+	expectedConfig.Contexts["new-context"] = context
 	test := configCommandTest{
 		args:           []string{"set", "contexts.new-context.user", "fake-user"},
 		startingConfig: *clientcmdapi.NewConfig(),
@@ -140,7 +212,7 @@ func TestSetIntoNewConfig(t *testing.T) {
 
 func TestNewEmptyAuth(t *testing.T) {
 	expectedConfig := *clientcmdapi.NewConfig()
-	expectedConfig.AuthInfos["the-user-name"] = *clientcmdapi.NewAuthInfo()
+	expectedConfig.AuthInfos["the-user-name"] = clientcmdapi.NewAuthInfo()
 	test := configCommandTest{
 		args:           []string{"set-credentials", "the-user-name"},
 		startingConfig: *clientcmdapi.NewConfig(),
@@ -153,14 +225,324 @@ func TestNewEmptyAuth(t *testing.T) {
 func TestAdditionalAuth(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
-	authInfo.AuthPath = "auth-path"
-	authInfo.ClientKey = "client-key"
 	authInfo.Token = "token"
-	expectedConfig.AuthInfos["another-user"] = *authInfo
+	expectedConfig.AuthInfos["another-user"] = authInfo
 	test := configCommandTest{
-		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagAuthPath + "=auth-path", "--" + clientcmd.FlagKeyFile + "=client-key", "--" + clientcmd.FlagBearerToken + "=token"},
+		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagBearerToken + "=token"},
 		startingConfig: newRedFederalCowHammerConfig(),
 		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestEmbedClientCert(t *testing.T) {
+	fakeCertFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(fakeCertFile.Name())
+	fakeData := []byte("fake-data")
+	ioutil.WriteFile(fakeCertFile.Name(), fakeData, 0600)
+	expectedConfig := newRedFederalCowHammerConfig()
+	authInfo := clientcmdapi.NewAuthInfo()
+	authInfo.ClientCertificateData = fakeData
+	expectedConfig.AuthInfos["another-user"] = authInfo
+
+	test := configCommandTest{
+		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagCertFile + "=" + fakeCertFile.Name(), "--" + clientcmd.FlagEmbedCerts + "=true"},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestEmbedClientKey(t *testing.T) {
+	fakeKeyFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(fakeKeyFile.Name())
+	fakeData := []byte("fake-data")
+	ioutil.WriteFile(fakeKeyFile.Name(), fakeData, 0600)
+	expectedConfig := newRedFederalCowHammerConfig()
+	authInfo := clientcmdapi.NewAuthInfo()
+	authInfo.ClientKeyData = fakeData
+	expectedConfig.AuthInfos["another-user"] = authInfo
+
+	test := configCommandTest{
+		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagKeyFile + "=" + fakeKeyFile.Name(), "--" + clientcmd.FlagEmbedCerts + "=true"},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestEmbedNoKeyOrCertDisallowed(t *testing.T) {
+	expectedConfig := newRedFederalCowHammerConfig()
+	test := configCommandTest{
+		args:            []string{"set-credentials", "another-user", "--" + clientcmd.FlagEmbedCerts + "=true"},
+		startingConfig:  newRedFederalCowHammerConfig(),
+		expectedConfig:  expectedConfig,
+		expectedOutputs: []string{"--client-certificate", "--client-key", "embed"},
+	}
+
+	test.run(t)
+}
+
+func TestEmptyTokenAndCertAllowed(t *testing.T) {
+	fakeCertFile, _ := ioutil.TempFile("", "cert-file")
+
+	expectedConfig := newRedFederalCowHammerConfig()
+	authInfo := clientcmdapi.NewAuthInfo()
+	authInfo.ClientCertificate = path.Base(fakeCertFile.Name())
+	expectedConfig.AuthInfos["another-user"] = authInfo
+
+	test := configCommandTest{
+		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagCertFile + "=" + fakeCertFile.Name(), "--" + clientcmd.FlagBearerToken + "="},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestTokenAndCertAllowed(t *testing.T) {
+	expectedConfig := newRedFederalCowHammerConfig()
+	authInfo := clientcmdapi.NewAuthInfo()
+	authInfo.Token = "token"
+	authInfo.ClientCertificate = "/cert-file"
+	expectedConfig.AuthInfos["another-user"] = authInfo
+	test := configCommandTest{
+		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagCertFile + "=/cert-file", "--" + clientcmd.FlagBearerToken + "=token"},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestTokenAndBasicDisallowed(t *testing.T) {
+	expectedConfig := newRedFederalCowHammerConfig()
+	test := configCommandTest{
+		args:            []string{"set-credentials", "another-user", "--" + clientcmd.FlagUsername + "=myuser", "--" + clientcmd.FlagBearerToken + "=token"},
+		startingConfig:  newRedFederalCowHammerConfig(),
+		expectedConfig:  expectedConfig,
+		expectedOutputs: []string{"--token", "--username"},
+	}
+
+	test.run(t)
+}
+
+func TestBasicClearsToken(t *testing.T) {
+	authInfoWithToken := clientcmdapi.NewAuthInfo()
+	authInfoWithToken.Token = "token"
+
+	authInfoWithBasic := clientcmdapi.NewAuthInfo()
+	authInfoWithBasic.Username = "myuser"
+	authInfoWithBasic.Password = "mypass"
+
+	startingConfig := newRedFederalCowHammerConfig()
+	startingConfig.AuthInfos["another-user"] = authInfoWithToken
+
+	expectedConfig := newRedFederalCowHammerConfig()
+	expectedConfig.AuthInfos["another-user"] = authInfoWithBasic
+
+	test := configCommandTest{
+		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagUsername + "=myuser", "--" + clientcmd.FlagPassword + "=mypass"},
+		startingConfig: startingConfig,
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestTokenClearsBasic(t *testing.T) {
+	authInfoWithBasic := clientcmdapi.NewAuthInfo()
+	authInfoWithBasic.Username = "myuser"
+	authInfoWithBasic.Password = "mypass"
+
+	authInfoWithToken := clientcmdapi.NewAuthInfo()
+	authInfoWithToken.Token = "token"
+
+	startingConfig := newRedFederalCowHammerConfig()
+	startingConfig.AuthInfos["another-user"] = authInfoWithBasic
+
+	expectedConfig := newRedFederalCowHammerConfig()
+	expectedConfig.AuthInfos["another-user"] = authInfoWithToken
+
+	test := configCommandTest{
+		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagBearerToken + "=token"},
+		startingConfig: startingConfig,
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestTokenLeavesCert(t *testing.T) {
+	authInfoWithCerts := clientcmdapi.NewAuthInfo()
+	authInfoWithCerts.ClientCertificate = "cert"
+	authInfoWithCerts.ClientCertificateData = []byte("certdata")
+	authInfoWithCerts.ClientKey = "key"
+	authInfoWithCerts.ClientKeyData = []byte("keydata")
+
+	authInfoWithTokenAndCerts := clientcmdapi.NewAuthInfo()
+	authInfoWithTokenAndCerts.Token = "token"
+	authInfoWithTokenAndCerts.ClientCertificate = "cert"
+	authInfoWithTokenAndCerts.ClientCertificateData = []byte("certdata")
+	authInfoWithTokenAndCerts.ClientKey = "key"
+	authInfoWithTokenAndCerts.ClientKeyData = []byte("keydata")
+
+	startingConfig := newRedFederalCowHammerConfig()
+	startingConfig.AuthInfos["another-user"] = authInfoWithCerts
+
+	expectedConfig := newRedFederalCowHammerConfig()
+	expectedConfig.AuthInfos["another-user"] = authInfoWithTokenAndCerts
+
+	test := configCommandTest{
+		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagBearerToken + "=token"},
+		startingConfig: startingConfig,
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestCertLeavesToken(t *testing.T) {
+	authInfoWithToken := clientcmdapi.NewAuthInfo()
+	authInfoWithToken.Token = "token"
+
+	authInfoWithTokenAndCerts := clientcmdapi.NewAuthInfo()
+	authInfoWithTokenAndCerts.Token = "token"
+	authInfoWithTokenAndCerts.ClientCertificate = "/cert"
+	authInfoWithTokenAndCerts.ClientKey = "/key"
+
+	startingConfig := newRedFederalCowHammerConfig()
+	startingConfig.AuthInfos["another-user"] = authInfoWithToken
+
+	expectedConfig := newRedFederalCowHammerConfig()
+	expectedConfig.AuthInfos["another-user"] = authInfoWithTokenAndCerts
+
+	test := configCommandTest{
+		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagCertFile + "=/cert", "--" + clientcmd.FlagKeyFile + "=/key"},
+		startingConfig: startingConfig,
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestCAClearsInsecure(t *testing.T) {
+	fakeCAFile, _ := ioutil.TempFile("", "ca-file")
+
+	clusterInfoWithInsecure := clientcmdapi.NewCluster()
+	clusterInfoWithInsecure.InsecureSkipTLSVerify = true
+
+	clusterInfoWithCA := clientcmdapi.NewCluster()
+	clusterInfoWithCA.CertificateAuthority = path.Base(fakeCAFile.Name())
+
+	startingConfig := newRedFederalCowHammerConfig()
+	startingConfig.Clusters["another-cluster"] = clusterInfoWithInsecure
+
+	expectedConfig := newRedFederalCowHammerConfig()
+	expectedConfig.Clusters["another-cluster"] = clusterInfoWithCA
+
+	test := configCommandTest{
+		args:           []string{"set-cluster", "another-cluster", "--" + clientcmd.FlagCAFile + "=" + fakeCAFile.Name()},
+		startingConfig: startingConfig,
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestCAClearsCAData(t *testing.T) {
+	clusterInfoWithCAData := clientcmdapi.NewCluster()
+	clusterInfoWithCAData.CertificateAuthorityData = []byte("cadata")
+
+	clusterInfoWithCA := clientcmdapi.NewCluster()
+	clusterInfoWithCA.CertificateAuthority = "/cafile"
+
+	startingConfig := newRedFederalCowHammerConfig()
+	startingConfig.Clusters["another-cluster"] = clusterInfoWithCAData
+
+	expectedConfig := newRedFederalCowHammerConfig()
+	expectedConfig.Clusters["another-cluster"] = clusterInfoWithCA
+
+	test := configCommandTest{
+		args:           []string{"set-cluster", "another-cluster", "--" + clientcmd.FlagCAFile + "=/cafile", "--" + clientcmd.FlagInsecure + "=false"},
+		startingConfig: startingConfig,
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestInsecureClearsCA(t *testing.T) {
+	clusterInfoWithInsecure := clientcmdapi.NewCluster()
+	clusterInfoWithInsecure.InsecureSkipTLSVerify = true
+
+	clusterInfoWithCA := clientcmdapi.NewCluster()
+	clusterInfoWithCA.CertificateAuthority = "cafile"
+	clusterInfoWithCA.CertificateAuthorityData = []byte("cadata")
+
+	startingConfig := newRedFederalCowHammerConfig()
+	startingConfig.Clusters["another-cluster"] = clusterInfoWithCA
+
+	expectedConfig := newRedFederalCowHammerConfig()
+	expectedConfig.Clusters["another-cluster"] = clusterInfoWithInsecure
+
+	test := configCommandTest{
+		args:           []string{"set-cluster", "another-cluster", "--" + clientcmd.FlagInsecure + "=true"},
+		startingConfig: startingConfig,
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestCADataClearsCA(t *testing.T) {
+	fakeCAFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(fakeCAFile.Name())
+	fakeData := []byte("cadata")
+	ioutil.WriteFile(fakeCAFile.Name(), fakeData, 0600)
+
+	clusterInfoWithCAData := clientcmdapi.NewCluster()
+	clusterInfoWithCAData.CertificateAuthorityData = fakeData
+
+	clusterInfoWithCA := clientcmdapi.NewCluster()
+	clusterInfoWithCA.CertificateAuthority = "cafile"
+
+	startingConfig := newRedFederalCowHammerConfig()
+	startingConfig.Clusters["another-cluster"] = clusterInfoWithCA
+
+	expectedConfig := newRedFederalCowHammerConfig()
+	expectedConfig.Clusters["another-cluster"] = clusterInfoWithCAData
+
+	test := configCommandTest{
+		args:           []string{"set-cluster", "another-cluster", "--" + clientcmd.FlagCAFile + "=" + fakeCAFile.Name(), "--" + clientcmd.FlagEmbedCerts + "=true"},
+		startingConfig: startingConfig,
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestEmbedNoCADisallowed(t *testing.T) {
+	expectedConfig := newRedFederalCowHammerConfig()
+	test := configCommandTest{
+		args:            []string{"set-cluster", "another-cluster", "--" + clientcmd.FlagEmbedCerts + "=true"},
+		startingConfig:  newRedFederalCowHammerConfig(),
+		expectedConfig:  expectedConfig,
+		expectedOutputs: []string{"--certificate-authority", "embed"},
+	}
+
+	test.run(t)
+}
+
+func TestCAAndInsecureDisallowed(t *testing.T) {
+	test := configCommandTest{
+		args:            []string{"set-cluster", "another-cluster", "--" + clientcmd.FlagCAFile + "=cafile", "--" + clientcmd.FlagInsecure + "=true"},
+		startingConfig:  newRedFederalCowHammerConfig(),
+		expectedConfig:  newRedFederalCowHammerConfig(),
+		expectedOutputs: []string{"certificate", "insecure"},
 	}
 
 	test.run(t)
@@ -169,10 +551,10 @@ func TestAdditionalAuth(t *testing.T) {
 func TestMergeExistingAuth(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := expectedConfig.AuthInfos["red-user"]
-	authInfo.AuthPath = "auth-path"
+	authInfo.ClientKey = "/key"
 	expectedConfig.AuthInfos["red-user"] = authInfo
 	test := configCommandTest{
-		args:           []string{"set-credentials", "red-user", "--" + clientcmd.FlagAuthPath + "=auth-path"},
+		args:           []string{"set-credentials", "red-user", "--" + clientcmd.FlagKeyFile + "=/key"},
 		startingConfig: newRedFederalCowHammerConfig(),
 		expectedConfig: expectedConfig,
 	}
@@ -182,7 +564,7 @@ func TestMergeExistingAuth(t *testing.T) {
 
 func TestNewEmptyCluster(t *testing.T) {
 	expectedConfig := *clientcmdapi.NewConfig()
-	expectedConfig.Clusters["new-cluster"] = *clientcmdapi.NewCluster()
+	expectedConfig.Clusters["new-cluster"] = clientcmdapi.NewCluster()
 	test := configCommandTest{
 		args:           []string{"set-cluster", "new-cluster"},
 		startingConfig: *clientcmdapi.NewConfig(),
@@ -194,14 +576,14 @@ func TestNewEmptyCluster(t *testing.T) {
 
 func TestAdditionalCluster(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
-	cluster := *clientcmdapi.NewCluster()
-	cluster.APIVersion = "v1beta1"
-	cluster.CertificateAuthority = "ca-location"
-	cluster.InsecureSkipTLSVerify = true
+	cluster := clientcmdapi.NewCluster()
+	cluster.APIVersion = testapi.Default.GroupVersion().String()
+	cluster.CertificateAuthority = "/ca-location"
+	cluster.InsecureSkipTLSVerify = false
 	cluster.Server = "serverlocation"
 	expectedConfig.Clusters["different-cluster"] = cluster
 	test := configCommandTest{
-		args:           []string{"set-cluster", "different-cluster", "--" + clientcmd.FlagAPIServer + "=serverlocation", "--" + clientcmd.FlagInsecure + "=true", "--" + clientcmd.FlagCAFile + "=ca-location", "--" + clientcmd.FlagAPIVersion + "=v1beta1"},
+		args:           []string{"set-cluster", "different-cluster", "--" + clientcmd.FlagAPIServer + "=serverlocation", "--" + clientcmd.FlagInsecure + "=false", "--" + clientcmd.FlagCAFile + "=/ca-location", "--" + clientcmd.FlagAPIVersion + "=" + testapi.Default.GroupVersion().String()},
 		startingConfig: newRedFederalCowHammerConfig(),
 		expectedConfig: expectedConfig,
 	}
@@ -211,7 +593,7 @@ func TestAdditionalCluster(t *testing.T) {
 
 func TestOverwriteExistingCluster(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
-	cluster := *clientcmdapi.NewCluster()
+	cluster := clientcmdapi.NewCluster()
 	cluster.Server = "serverlocation"
 	expectedConfig.Clusters["cow-cluster"] = cluster
 
@@ -226,7 +608,7 @@ func TestOverwriteExistingCluster(t *testing.T) {
 
 func TestNewEmptyContext(t *testing.T) {
 	expectedConfig := *clientcmdapi.NewConfig()
-	expectedConfig.Contexts["new-context"] = *clientcmdapi.NewContext()
+	expectedConfig.Contexts["new-context"] = clientcmdapi.NewContext()
 	test := configCommandTest{
 		args:           []string{"set-context", "new-context"},
 		startingConfig: *clientcmdapi.NewConfig(),
@@ -238,7 +620,7 @@ func TestNewEmptyContext(t *testing.T) {
 
 func TestAdditionalContext(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
-	context := *clientcmdapi.NewContext()
+	context := clientcmdapi.NewContext()
 	context.Cluster = "some-cluster"
 	context.AuthInfo = "some-user"
 	context.Namespace = "different-namespace"
@@ -299,10 +681,13 @@ func TestToBool(t *testing.T) {
 
 }
 
-func testConfigCommand(args []string, startingConfig clientcmdapi.Config) (string, clientcmdapi.Config) {
+func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *testing.T) (string, clientcmdapi.Config) {
 	fakeKubeFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(fakeKubeFile.Name())
-	clientcmd.WriteToFile(startingConfig, fakeKubeFile.Name())
+	err := clientcmd.WriteToFile(startingConfig, fakeKubeFile.Name())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	argsToUse := make([]string, 0, 2+len(args))
 	argsToUse = append(argsToUse, "--kubeconfig="+fakeKubeFile.Name())
@@ -310,7 +695,7 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config) (strin
 
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdConfig(buf)
+	cmd := NewCmdConfig(NewDefaultPathOptions(), buf)
 	cmd.SetArgs(argsToUse)
 	cmd.Execute()
 
@@ -320,15 +705,45 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config) (strin
 	return buf.String(), *config
 }
 
-func (test configCommandTest) run(t *testing.T) {
-	_, actualConfig := testConfigCommand(test.args, test.startingConfig)
+type configCommandTest struct {
+	args            []string
+	startingConfig  clientcmdapi.Config
+	expectedConfig  clientcmdapi.Config
+	expectedOutputs []string
+}
+
+func (test configCommandTest) run(t *testing.T) string {
+	out, actualConfig := testConfigCommand(test.args, test.startingConfig, t)
 
 	testSetNilMapsToEmpties(reflect.ValueOf(&test.expectedConfig))
 	testSetNilMapsToEmpties(reflect.ValueOf(&actualConfig))
+	testClearLocationOfOrigin(&actualConfig)
 
-	if !reflect.DeepEqual(test.expectedConfig, actualConfig) {
+	if !api.Semantic.DeepEqual(test.expectedConfig, actualConfig) {
 		t.Errorf("diff: %v", util.ObjectDiff(test.expectedConfig, actualConfig))
 		t.Errorf("expected: %#v\n actual:   %#v", test.expectedConfig, actualConfig)
+	}
+
+	for _, expectedOutput := range test.expectedOutputs {
+		if !strings.Contains(out, expectedOutput) {
+			t.Errorf("expected '%s' in output, got '%s'", expectedOutput, out)
+		}
+	}
+
+	return out
+}
+func testClearLocationOfOrigin(config *clientcmdapi.Config) {
+	for key, obj := range config.AuthInfos {
+		obj.LocationOfOrigin = ""
+		config.AuthInfos[key] = obj
+	}
+	for key, obj := range config.Clusters {
+		obj.LocationOfOrigin = ""
+		config.Clusters[key] = obj
+	}
+	for key, obj := range config.Contexts {
+		obj.LocationOfOrigin = ""
+		config.Contexts[key] = obj
 	}
 }
 func testSetNilMapsToEmpties(curr reflect.Value) {
@@ -341,20 +756,7 @@ func testSetNilMapsToEmpties(curr reflect.Value) {
 	case reflect.Map:
 		for _, mapKey := range actualCurrValue.MapKeys() {
 			currMapValue := actualCurrValue.MapIndex(mapKey)
-
-			// our maps do not hold pointers to structs, they hold the structs themselves.  This means that MapIndex returns the struct itself
-			// That in turn means that they have kinds of type.Struct, which is not a settable type.  Because of this, we need to make new struct of that type
-			// copy all the data from the old value into the new value, then take the .addr of the new value to modify it in the next recursion.
-			// clear as mud
-			modifiableMapValue := reflect.New(currMapValue.Type()).Elem()
-			modifiableMapValue.Set(currMapValue)
-
-			if modifiableMapValue.Kind() == reflect.Struct {
-				modifiableMapValue = modifiableMapValue.Addr()
-			}
-
-			testSetNilMapsToEmpties(modifiableMapValue)
-			actualCurrValue.SetMapIndex(mapKey, reflect.Indirect(modifiableMapValue))
+			testSetNilMapsToEmpties(currMapValue)
 		}
 
 	case reflect.Struct:

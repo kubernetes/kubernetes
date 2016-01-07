@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package cloudprovider
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -39,8 +40,7 @@ var providers = make(map[string]Factory)
 func RegisterCloudProvider(name string, cloud Factory) {
 	providersMutex.Lock()
 	defer providersMutex.Unlock()
-	_, found := providers[name]
-	if found {
+	if _, found := providers[name]; found {
 		glog.Fatalf("Cloud provider %q was registered twice", name)
 	}
 	glog.V(1).Infof("Registered cloud provider %q", name)
@@ -63,17 +63,17 @@ func GetCloudProvider(name string, config io.Reader) (Interface, error) {
 }
 
 // InitCloudProvider creates an instance of the named cloud provider.
-func InitCloudProvider(name string, configFilePath string) Interface {
-	var config *os.File
+func InitCloudProvider(name string, configFilePath string) (Interface, error) {
+	var cloud Interface
+	var err error
 
 	if name == "" {
 		glog.Info("No cloud provider specified.")
-		return nil
+		return nil, nil
 	}
 
 	if configFilePath != "" {
-		var err error
-
+		var config *os.File
 		config, err = os.Open(configFilePath)
 		if err != nil {
 			glog.Fatalf("Couldn't open cloud provider configuration %s: %#v",
@@ -81,15 +81,19 @@ func InitCloudProvider(name string, configFilePath string) Interface {
 		}
 
 		defer config.Close()
+		cloud, err = GetCloudProvider(name, config)
+	} else {
+		// Pass explicit nil so plugins can actually check for nil. See
+		// "Why is my nil error value not equal to nil?" in golang.org/doc/faq.
+		cloud, err = GetCloudProvider(name, nil)
 	}
 
-	cloud, err := GetCloudProvider(name, config)
 	if err != nil {
-		glog.Fatalf("Couldn't init cloud provider %q: %v", name, err)
+		return nil, fmt.Errorf("could not init cloud provider %q: %v", name, err)
 	}
 	if cloud == nil {
-		glog.Fatalf("Unknown cloud provider: %s", name)
+		return nil, fmt.Errorf("unknown cloud provider %q", name)
 	}
 
-	return cloud
+	return cloud, nil
 }

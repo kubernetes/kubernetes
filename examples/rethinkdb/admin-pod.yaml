@@ -1,30 +1,29 @@
-apiVersion: v1beta1
-namespace: rethinkdb
+apiVersion: v1
 kind: Pod
-id: rethinkdb-admin-1.16.0
-labels:
-  db: rethinkdb
-  role: admin
-desiredState:
-  manifest:
-    version: v1beta1
-    id: rethinkdb
-    containers:
-      - name: rethinkdb
-        image: antmanler/rethinkdb:1.16.0
-        ports:
-          - name: admin-port
-            containerPort: 8080
-          - name: driver-port
-            containerPort: 28015
-          - name: cluster-port
-            containerPort: 29015
-        volumeMounts:
-          - name: rethinkdb-storage
-            mountPath: /data/rethinkdb_data
-    volumes:
-      - name: rethinkdb-storage
-        source:
-          emptyDir: {}
-    restartPolicy:
-      always: {}
+metadata:
+  labels:
+    db: rethinkdb
+    role: admin
+  name: rethinkdb-admin
+spec:
+  containers:
+  - image: gcr.io/google_containers/rethinkdb:1.16.0_1
+    name: rethinkdb
+    env:
+    - name: POD_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    ports:
+    - containerPort: 8080
+      name: admin-port
+    - containerPort: 28015
+      name: driver-port
+    - containerPort: 29015
+      name: cluster-port
+    volumeMounts:
+    - mountPath: /data/rethinkdb_data
+      name: rethinkdb-storage
+  volumes:
+  - name: rethinkdb-storage
+    emptyDir: {}

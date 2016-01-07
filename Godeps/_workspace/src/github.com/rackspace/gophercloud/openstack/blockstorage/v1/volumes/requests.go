@@ -5,8 +5,6 @@ import (
 
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
-
-	"github.com/racker/perigee"
 )
 
 // CreateOptsBuilder allows extensions to add additional parameters to the
@@ -85,11 +83,8 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 		return res
 	}
 
-	_, res.Err = perigee.Request("POST", createURL(client), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{200, 201},
+	_, res.Err = client.Post(createURL(client), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200, 201},
 	})
 	return res
 }
@@ -97,10 +92,7 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 // Delete will delete the existing Volume with the provided ID.
 func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", deleteURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202, 204},
-	})
+	_, res.Err = client.Delete(deleteURL(client, id), nil)
 	return res
 }
 
@@ -108,11 +100,7 @@ func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 // from the response, call the Extract method on the GetResult.
 func Get(client *gophercloud.ServiceClient, id string) GetResult {
 	var res GetResult
-	_, res.Err = perigee.Request("GET", getURL(client, id), perigee.Options{
-		Results:     &res.Body,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
-	})
+	_, res.Err = client.Get(getURL(client, id), &res.Body, nil)
 	return res
 }
 
@@ -157,6 +145,7 @@ func List(client *gophercloud.ServiceClient, opts ListOptsBuilder) pagination.Pa
 	createPage := func(r pagination.PageResult) pagination.Page {
 		return ListResult{pagination.SinglePageBase(r)}
 	}
+
 	return pagination.NewPager(client, url, createPage)
 }
 
@@ -207,11 +196,41 @@ func Update(client *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder
 		return res
 	}
 
-	_, res.Err = perigee.Request("PUT", updateURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
+	_, res.Err = client.Put(updateURL(client, id), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 	return res
+}
+
+// IDFromName is a convienience function that returns a server's ID given its name.
+func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
+	volumeCount := 0
+	volumeID := ""
+	if name == "" {
+		return "", fmt.Errorf("A volume name must be provided.")
+	}
+	pager := List(client, nil)
+	pager.EachPage(func(page pagination.Page) (bool, error) {
+		volumeList, err := ExtractVolumes(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, s := range volumeList {
+			if s.Name == name {
+				volumeCount++
+				volumeID = s.ID
+			}
+		}
+		return true, nil
+	})
+
+	switch volumeCount {
+	case 0:
+		return "", fmt.Errorf("Unable to find volume: %s", name)
+	case 1:
+		return volumeID, nil
+	default:
+		return "", fmt.Errorf("Found %d volumes matching %s", volumeCount, name)
+	}
 }

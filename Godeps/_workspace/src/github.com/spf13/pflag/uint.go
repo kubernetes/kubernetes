@@ -25,13 +25,30 @@ func (i *uintValue) Type() string {
 
 func (i *uintValue) String() string { return fmt.Sprintf("%v", *i) }
 
+func uintConv(sval string) (interface{}, error) {
+	v, err := strconv.ParseUint(sval, 0, 0)
+	if err != nil {
+		return 0, err
+	}
+	return uint(v), nil
+}
+
+// GetUint return the uint value of a flag with the given name
+func (f *FlagSet) GetUint(name string) (uint, error) {
+	val, err := f.getFlagType(name, "uint", uintConv)
+	if err != nil {
+		return 0, err
+	}
+	return val.(uint), nil
+}
+
 // UintVar defines a uint flag with specified name, default value, and usage string.
 // The argument p points to a uint variable in which to store the value of the flag.
 func (f *FlagSet) UintVar(p *uint, name string, value uint, usage string) {
 	f.VarP(newUintValue(value, p), name, "", usage)
 }
 
-// Like UintVar, but accepts a shorthand letter that can be used after a single dash.
+// UintVarP is like UintVar, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) UintVarP(p *uint, name, shorthand string, value uint, usage string) {
 	f.VarP(newUintValue(value, p), name, shorthand, usage)
 }
@@ -42,7 +59,7 @@ func UintVar(p *uint, name string, value uint, usage string) {
 	CommandLine.VarP(newUintValue(value, p), name, "", usage)
 }
 
-// Like UintVar, but accepts a shorthand letter that can be used after a single dash.
+// UintVarP is like UintVar, but accepts a shorthand letter that can be used after a single dash.
 func UintVarP(p *uint, name, shorthand string, value uint, usage string) {
 	CommandLine.VarP(newUintValue(value, p), name, shorthand, usage)
 }
@@ -55,7 +72,7 @@ func (f *FlagSet) Uint(name string, value uint, usage string) *uint {
 	return p
 }
 
-// Like Uint, but accepts a shorthand letter that can be used after a single dash.
+// UintP is like Uint, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) UintP(name, shorthand string, value uint, usage string) *uint {
 	p := new(uint)
 	f.UintVarP(p, name, shorthand, value, usage)
@@ -68,7 +85,7 @@ func Uint(name string, value uint, usage string) *uint {
 	return CommandLine.UintP(name, "", value, usage)
 }
 
-// Like Uint, but accepts a shorthand letter that can be used after a single dash.
+// UintP is like Uint, but accepts a shorthand letter that can be used after a single dash.
 func UintP(name, shorthand string, value uint, usage string) *uint {
 	return CommandLine.UintP(name, shorthand, value, usage)
 }

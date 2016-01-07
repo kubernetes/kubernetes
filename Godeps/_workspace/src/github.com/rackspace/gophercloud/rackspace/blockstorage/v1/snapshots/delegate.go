@@ -3,8 +3,6 @@ package snapshots
 import (
 	"errors"
 
-	"github.com/racker/perigee"
-
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 
@@ -123,11 +121,10 @@ func Update(c *gophercloud.ServiceClient, snapshotID string, opts UpdateOptsBuil
 	}
 
 	// Send request to API
-	_, res.Err = perigee.Request("PUT", updateURL(c, snapshotID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{200, 201},
+	_, res.Err = c.Request("PUT", updateURL(c, snapshotID), gophercloud.RequestOpts{
+		JSONBody:     &reqBody,
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200, 201},
 	})
 
 	return res

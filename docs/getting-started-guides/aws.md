@@ -1,54 +1,160 @@
-## Getting started on AWS
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-### Prerequisites
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/aws.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+Getting started on AWS EC2
+--------------------------
+
+**Table of Contents**
+
+- [Prerequisites](#prerequisites)
+- [Cluster turnup](#cluster-turnup)
+    - [Supported procedure: `get-kube`](#supported-procedure-get-kube)
+    - [Alternatives](#alternatives)
+- [Getting started with your cluster](#getting-started-with-your-cluster)
+    - [Command line administration tool: `kubectl`](#command-line-administration-tool-kubectl)
+    - [Examples](#examples)
+- [Tearing down the cluster](#tearing-down-the-cluster)
+- [Further reading](#further-reading)
+
+## Prerequisites
 
 1. You need an AWS account. Visit [http://aws.amazon.com](http://aws.amazon.com) to get started
 2. Install and configure [AWS Command Line Interface](http://aws.amazon.com/cli)
 3. You need an AWS [instance profile and role](http://docs.aws.amazon.com/IAM/latest/UserGuide/instance-profiles.html) with EC2 full access.
 
-### Cluster turnup
+NOTE: This script use the 'default' AWS profile by default.
+You may explicitly set AWS profile to use using the `AWS_DEFAULT_PROFILE` environment variable:
 
-#### Download Kubernetes
-##### a) Preferred Option: Install from [0.10.0 release](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v0.10.0)
-1. ```wget https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.10.0/kubernetes.tar.gz```
-2. ```tar -xzf kubernetes.tar.gz; cd kubernetes```
-3. ```export PATH=$PATH:$PWD/platforms/<os>/<platform>```
-
-##### b) Alternate Option: Install from source at head
-1. ```git clone https://github.com/GoogleCloudPlatform/kubernetes.git```
-2. ```cd kubernetes; make release```
-3. ```export PATH=$PATH:$PWD/_output/local/bin/<os>/<platform>```
-
-#### Turn up the cluster
-```
-export KUBERNETES_PROVIDER=aws
-cluster/kube-up.sh
+```bash
+export AWS_DEFAULT_PROFILE=myawsprofile
 ```
 
-The script above relies on AWS S3 to deploy the software to instances running in EC2.
+## Cluster turnup
 
-NOTE: The script will provision a new VPC and a 5 node k8s cluster in us-west-2 (Oregon). It'll also try to create a keypair called "kubernetes" as well as create or reuse an IAM role also called "kubernetes" so make sure one doesn't already exist prior to running the script in order to elminate a potential conflict.
+### Supported procedure: `get-kube`
 
-Once the cluster is up, it will print the ip address of your cluster, this process takes ~5 minutes.
+```bash
+#Using wget
+export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | bash
 
-```
-export KUBERNETES_MASTER=https://<ip-address>
-```
-
-Also setup your path to point to the released binaries:
-```
-export PATH=$PATH:$PWD:/cluster
+#Using cURL
+export KUBERNETES_PROVIDER=aws; curl -sS https://get.k8s.io | bash
 ```
 
-### Running examples
+NOTE: This script calls [cluster/kube-up.sh](http://releases.k8s.io/HEAD/cluster/kube-up.sh)
+which in turn calls [cluster/aws/util.sh](http://releases.k8s.io/HEAD/cluster/aws/util.sh)
+using [cluster/aws/config-default.sh](http://releases.k8s.io/HEAD/cluster/aws/config-default.sh).
 
-Take a look at [next steps](https://github.com/GoogleCloudPlatform/kubernetes#where-to-go-next)
+This process takes about 5 to 10 minutes. Once the cluster is up, the IP addresses of your master and node(s) will be printed,
+as well as information about the default services running in the cluster (monitoring, logging, dns). User credentials and security
+tokens are written in `~/.kube/config`, they will be necessary to use the CLI or the HTTP Basic Auth.
 
-### Tearing down the cluster
+By default, the script will provision a new VPC and a 4 node k8s cluster in us-west-2a (Oregon) with EC2 instances running on Ubuntu.
+You can override the variables defined in [config-default.sh](http://releases.k8s.io/HEAD/cluster/aws/config-default.sh) to change this behavior as follows:
+
+```bash
+export KUBE_AWS_ZONE=eu-west-1c
+export NUM_NODES=2
+export NODE_SIZE=m3.medium
+export AWS_S3_REGION=eu-west-1
+export AWS_S3_BUCKET=mycompany-kubernetes-artifacts
+export INSTANCE_PREFIX=k8s
+...
 ```
-cd kubernetes
+
+If you don't specify master and minion sizes, the scripts will attempt to guess the correct size of the master and worker nodes based on `${NUM_NODES}`. In
+particular, for clusters less than 50 nodes it will use a `t2.micro`, for clusters between 50 and 150 nodes it will use a `t2.small` and for clusters with
+greater than 150 nodes it will use a `t2.medium`.
+
+WARNING: beware that `t2` instances receive a limited number of CPU credits per hour and might not be suitable for clusters where the CPU is used
+consistently. As a rough estimation, consider 15 pods/node the absolute limit a `t2.large` instance can handle before it starts exhausting its CPU credits
+steadily, although this number depends heavily on the usage.
+
+The script will also try to create or reuse a keypair called "kubernetes", and IAM profiles called "kubernetes-master" and "kubernetes-minion".
+If these already exist, make sure you want them to be used here.
+
+NOTE: If using an existing keypair named "kubernetes" then you must set the `AWS_SSH_KEY` key to point to your private key.
+
+### Alternatives
+
+A contributed [example](coreos/coreos_multinode_cluster.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), using
+EC2 with user data (cloud-config).
+
+## Getting started with your cluster
+
+### Command line administration tool: `kubectl`
+
+The cluster startup script will leave you with a `kubernetes` directory on your workstation.
+Alternately, you can download the latest Kubernetes release from [this page](https://github.com/kubernetes/kubernetes/releases).
+
+Next, add the appropriate binary folder to your `PATH` to access kubectl:
+
+```bash
+# OS X
+export PATH=<path/to/kubernetes-directory>/platforms/darwin/amd64:$PATH
+
+# Linux
+export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
+```
+
+An up-to-date documentation page for this tool is available here: [kubectl manual](../../docs/user-guide/kubectl/kubectl.md)
+
+By default, `kubectl` will use the `kubeconfig` file generated during the cluster startup for authenticating against the API.
+For more information, please read [kubeconfig files](../../docs/user-guide/kubeconfig-file.md)
+
+### Examples
+
+See [a simple nginx example](../../docs/user-guide/simple-nginx.md) to try out your new cluster.
+
+The "Guestbook" application is another popular example to get started with Kubernetes: [guestbook example](../../examples/guestbook/)
+
+For more complete applications, please look in the [examples directory](../../examples/)
+
+## Tearing down the cluster
+
+Make sure the environment variables you used to provision your cluster are still exported, then call the following script inside the
+`kubernetes` directory:
+
+```bash
 cluster/kube-down.sh
 ```
 
-### Cloud Formation [optional]
-There is a contributed [example](aws-coreos.md) from [CoreOS](http://www.coreos.com) using Cloud Formation.
+## Further reading
+
+Please see the [Kubernetes docs](../../docs/) for more details on administering
+and using a Kubernetes cluster.
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/aws.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

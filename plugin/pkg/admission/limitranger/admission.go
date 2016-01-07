@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,48 +19,75 @@ package limitranger
 import (
 	"fmt"
 	"io"
+	"sort"
+	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/client/cache"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/watch"
+)
+
+const (
+	limitRangerAnnotation = "kubernetes.io/limit-ranger"
 )
 
 func init() {
 	admission.RegisterPlugin("LimitRanger", func(client client.Interface, config io.Reader) (admission.Interface, error) {
-		return NewLimitRanger(client, PodLimitFunc), nil
+		return NewLimitRanger(client, Limit), nil
 	})
 }
 
 // limitRanger enforces usage limits on a per resource basis in the namespace
 type limitRanger struct {
+	*admission.Handler
 	client    client.Interface
 	limitFunc LimitFunc
+	indexer   cache.Indexer
 }
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
 func (l *limitRanger) Admit(a admission.Attributes) (err error) {
-	// ignore deletes
-	if a.GetOperation() == "DELETE" {
+
+	// Ignore all calls to subresources
+	if a.GetSubresource() != "" {
 		return nil
 	}
 
-	// look for a limit range in current namespace that requires enforcement
-	// TODO: Move to cache when issue is resolved: https://github.com/GoogleCloudPlatform/kubernetes/issues/2294
-	items, err := l.client.LimitRanges(a.GetNamespace()).List(labels.Everything())
+	obj := a.GetObject()
+	name := "Unknown"
+	if obj != nil {
+		name, _ = meta.NewAccessor().Name(obj)
+		if len(name) == 0 {
+			name, _ = meta.NewAccessor().GenerateName(obj)
+		}
+	}
+
+	key := &api.LimitRange{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: a.GetNamespace(),
+			Name:      "",
+		},
+	}
+	items, err := l.indexer.Index("namespace", key)
 	if err != nil {
-		return err
+		return admission.NewForbidden(a, fmt.Errorf("Unable to %s %v at this time because there was an error enforcing limit ranges", a.GetOperation(), a.GetResource()))
+	}
+	if len(items) == 0 {
+		return nil
 	}
 
 	// ensure it meets each prescribed min/max
-	for i := range items.Items {
-		limitRange := &items.Items[i]
-		err = l.limitFunc(limitRange, a.GetResource(), a.GetObject())
+	for i := range items {
+		limitRange := items[i].(*api.LimitRange)
+		err = l.limitFunc(limitRange, a.GetResource().Resource, a.GetObject())
 		if err != nil {
-			return err
+			return admission.NewForbidden(a, err)
 		}
 	}
 	return nil
@@ -68,9 +95,25 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 
 // NewLimitRanger returns an object that enforces limits based on the supplied limit function
 func NewLimitRanger(client client.Interface, limitFunc LimitFunc) admission.Interface {
-	return &limitRanger{client: client, limitFunc: limitFunc}
+	lw := &cache.ListWatch{
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			return client.LimitRanges(api.NamespaceAll).List(options)
+		},
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			return client.LimitRanges(api.NamespaceAll).Watch(options)
+		},
+	}
+	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.LimitRange{}, 0)
+	reflector.Run()
+	return &limitRanger{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		client:    client,
+		limitFunc: limitFunc,
+		indexer:   indexer,
+	}
 }
 
+// Min returns the lesser of its 2 arguments
 func Min(a int64, b int64) int64 {
 	if a < b {
 		return a
@@ -78,6 +121,7 @@ func Min(a int64, b int64) int64 {
 	return b
 }
 
+// Max returns the greater of its 2 arguments
 func Max(a int64, b int64) int64 {
 	if a > b {
 		return a
@@ -85,91 +129,268 @@ func Max(a int64, b int64) int64 {
 	return b
 }
 
-// PodLimitFunc enforces that a pod spec does not exceed any limits specified on the supplied limit range
-func PodLimitFunc(limitRange *api.LimitRange, resourceName string, obj runtime.Object) error {
-	if resourceName != "pods" {
-		return nil
+// Limit enforces resource requirements of incoming resources against enumerated constraints
+// on the LimitRange.  It may modify the incoming object to apply default resource requirements
+// if not specified, and enumerated on the LimitRange
+func Limit(limitRange *api.LimitRange, resourceName string, obj runtime.Object) error {
+	switch resourceName {
+	case "pods":
+		return PodLimitFunc(limitRange, obj.(*api.Pod))
 	}
+	return nil
+}
 
-	pod := obj.(*api.Pod)
-
-	podCPU := int64(0)
-	podMem := int64(0)
-
-	minContainerCPU := int64(0)
-	minContainerMem := int64(0)
-	maxContainerCPU := int64(0)
-	maxContainerMem := int64(0)
-
-	for i := range pod.Spec.Containers {
-		container := pod.Spec.Containers[i]
-		containerCPU := container.Resources.Limits.Cpu().MilliValue()
-		containerMem := container.Resources.Limits.Memory().Value()
-
-		if i == 0 {
-			minContainerCPU = containerCPU
-			minContainerMem = containerMem
-			maxContainerCPU = containerCPU
-			maxContainerMem = containerMem
-		}
-
-		podCPU = podCPU + container.Resources.Limits.Cpu().MilliValue()
-		podMem = podMem + container.Resources.Limits.Memory().Value()
-
-		minContainerCPU = Min(containerCPU, minContainerCPU)
-		minContainerMem = Min(containerMem, minContainerMem)
-		maxContainerCPU = Max(containerCPU, maxContainerCPU)
-		maxContainerMem = Max(containerMem, maxContainerMem)
-	}
+// defaultContainerResourceRequirements returns the default requirements for a container
+// the requirement.Limits are taken from the LimitRange defaults (if specified)
+// the requirement.Requests are taken from the LimitRange default request (if specified)
+func defaultContainerResourceRequirements(limitRange *api.LimitRange) api.ResourceRequirements {
+	requirements := api.ResourceRequirements{}
+	requirements.Requests = api.ResourceList{}
+	requirements.Limits = api.ResourceList{}
 
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
-		for _, minOrMax := range []string{"Min", "Max"} {
-			var rl api.ResourceList
-			switch minOrMax {
-			case "Min":
-				rl = limit.Min
-			case "Max":
-				rl = limit.Max
+		if limit.Type == api.LimitTypeContainer {
+			for k, v := range limit.DefaultRequest {
+				value := v.Copy()
+				requirements.Requests[k] = *value
 			}
-			for k, v := range rl {
-				observed := int64(0)
-				enforced := int64(0)
-				var err error
-				switch k {
-				case api.ResourceMemory:
-					enforced = v.Value()
-					switch limit.Type {
-					case api.LimitTypePod:
-						observed = podMem
-						err = fmt.Errorf("%simum memory usage per pod is %s", minOrMax, v.String())
-					case api.LimitTypeContainer:
-						observed = maxContainerMem
-						err = fmt.Errorf("%simum memory usage per container is %s", minOrMax, v.String())
-					}
-				case api.ResourceCPU:
-					enforced = v.MilliValue()
-					switch limit.Type {
-					case api.LimitTypePod:
-						observed = podCPU
-						err = fmt.Errorf("%simum CPU usage per pod is %s, but requested %s", minOrMax, v.String(), resource.NewMilliQuantity(observed, resource.DecimalSI))
-					case api.LimitTypeContainer:
-						observed = maxContainerCPU
-						err = fmt.Errorf("%simum CPU usage per container is %s", minOrMax, v.String())
+			for k, v := range limit.Default {
+				value := v.Copy()
+				requirements.Limits[k] = *value
+			}
+		}
+	}
+	return requirements
+}
+
+// mergePodResourceRequirements merges enumerated requirements with default requirements
+// it annotates the pod with information about what requirements were modified
+func mergePodResourceRequirements(pod *api.Pod, defaultRequirements *api.ResourceRequirements) {
+	annotations := []string{}
+
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		setRequests := []string{}
+		setLimits := []string{}
+		if container.Resources.Limits == nil {
+			container.Resources.Limits = api.ResourceList{}
+		}
+		if container.Resources.Requests == nil {
+			container.Resources.Requests = api.ResourceList{}
+		}
+		for k, v := range defaultRequirements.Limits {
+			_, found := container.Resources.Limits[k]
+			if !found {
+				container.Resources.Limits[k] = *v.Copy()
+				setLimits = append(setLimits, string(k))
+			}
+		}
+		for k, v := range defaultRequirements.Requests {
+			_, found := container.Resources.Requests[k]
+			if !found {
+				container.Resources.Requests[k] = *v.Copy()
+				setRequests = append(setRequests, string(k))
+			}
+		}
+		if len(setRequests) > 0 {
+			sort.Strings(setRequests)
+			a := strings.Join(setRequests, ", ") + " request for container " + container.Name
+			annotations = append(annotations, a)
+		}
+		if len(setLimits) > 0 {
+			sort.Strings(setLimits)
+			a := strings.Join(setLimits, ", ") + " limit for container " + container.Name
+			annotations = append(annotations, a)
+		}
+	}
+
+	if len(annotations) > 0 {
+		if pod.ObjectMeta.Annotations == nil {
+			pod.ObjectMeta.Annotations = make(map[string]string)
+		}
+		val := "LimitRanger plugin set: " + strings.Join(annotations, "; ")
+		pod.ObjectMeta.Annotations[limitRangerAnnotation] = val
+	}
+}
+
+// requestLimitEnforcedValues returns the specified values at a common precision to support comparability
+func requestLimitEnforcedValues(requestQuantity, limitQuantity, enforcedQuantity resource.Quantity) (request, limit, enforced int64) {
+	request = requestQuantity.Value()
+	limit = limitQuantity.Value()
+	enforced = enforcedQuantity.Value()
+	// do a more precise comparison if possible (if the value won't overflow)
+	if request <= resource.MaxMilliValue && limit <= resource.MaxMilliValue && enforced <= resource.MaxMilliValue {
+		request = requestQuantity.MilliValue()
+		limit = limitQuantity.MilliValue()
+		enforced = enforcedQuantity.MilliValue()
+	}
+	return
+}
+
+// minConstraint enforces the min constraint over the specified resource
+func minConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
+	req, reqExists := request[resourceName]
+	lim, limExists := limit[resourceName]
+	observedReqValue, observedLimValue, enforcedValue := requestLimitEnforcedValues(req, lim, enforced)
+
+	if !reqExists {
+		return fmt.Errorf("Minimum %s usage per %s is %s.  No request is specified.", resourceName, limitType, enforced.String())
+	}
+	if observedReqValue < enforcedValue {
+		return fmt.Errorf("Minimum %s usage per %s is %s, but request is %s.", resourceName, limitType, enforced.String(), req.String())
+	}
+	if limExists && (observedLimValue < enforcedValue) {
+		return fmt.Errorf("Minimum %s usage per %s is %s, but limit is %s.", resourceName, limitType, enforced.String(), lim.String())
+	}
+	return nil
+}
+
+// maxConstraint enforces the max constraint over the specified resource
+func maxConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
+	req, reqExists := request[resourceName]
+	lim, limExists := limit[resourceName]
+	observedReqValue, observedLimValue, enforcedValue := requestLimitEnforcedValues(req, lim, enforced)
+
+	if !limExists {
+		return fmt.Errorf("Maximum %s usage per %s is %s.  No limit is specified.", resourceName, limitType, enforced.String())
+	}
+	if observedLimValue > enforcedValue {
+		return fmt.Errorf("Maximum %s usage per %s is %s, but limit is %s.", resourceName, limitType, enforced.String(), lim.String())
+	}
+	if reqExists && (observedReqValue > enforcedValue) {
+		return fmt.Errorf("Maximum %s usage per %s is %s, but request is %s.", resourceName, limitType, enforced.String(), req.String())
+	}
+	return nil
+}
+
+// limitRequestRatioConstraint enforces the limit to request ratio over the specified resource
+func limitRequestRatioConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
+	req, reqExists := request[resourceName]
+	lim, limExists := limit[resourceName]
+	observedReqValue, observedLimValue, _ := requestLimitEnforcedValues(req, lim, enforced)
+
+	if !reqExists || (observedReqValue == int64(0)) {
+		return fmt.Errorf("%s max limit to request ratio per %s is %s, but no request is specified or request is 0.", resourceName, limitType, enforced.String())
+	}
+	if !limExists || (observedLimValue == int64(0)) {
+		return fmt.Errorf("%s max limit to request ratio per %s is %s, but no limit is specified or limit is 0.", resourceName, limitType, enforced.String())
+	}
+
+	observedRatio := float64(observedLimValue) / float64(observedReqValue)
+	displayObservedRatio := observedRatio
+	maxLimitRequestRatio := float64(enforced.Value())
+	if enforced.Value() <= resource.MaxMilliValue {
+		observedRatio = observedRatio * 1000
+		maxLimitRequestRatio = float64(enforced.MilliValue())
+	}
+
+	if observedRatio > maxLimitRequestRatio {
+		return fmt.Errorf("%s max limit to request ratio per %s is %s, but provided ratio is %f.", resourceName, limitType, enforced.String(), displayObservedRatio)
+	}
+
+	return nil
+}
+
+// sum takes the total of each named resource across all inputs
+// if a key is not in each input, then the output resource list will omit the key
+func sum(inputs []api.ResourceList) api.ResourceList {
+	result := api.ResourceList{}
+	keys := []api.ResourceName{}
+	for i := range inputs {
+		for k := range inputs[i] {
+			keys = append(keys, k)
+		}
+	}
+	for _, key := range keys {
+		total, isSet := int64(0), true
+
+		for i := range inputs {
+			input := inputs[i]
+			v, exists := input[key]
+			if exists {
+				if key == api.ResourceCPU {
+					total = total + v.MilliValue()
+				} else {
+					total = total + v.Value()
+				}
+			} else {
+				isSet = false
+			}
+		}
+
+		if isSet {
+			if key == api.ResourceCPU {
+				result[key] = *(resource.NewMilliQuantity(total, resource.DecimalSI))
+			} else {
+				result[key] = *(resource.NewQuantity(total, resource.DecimalSI))
+			}
+
+		}
+	}
+	return result
+}
+
+// PodLimitFunc enforces resource requirements enumerated by the pod against
+// the specified LimitRange.  The pod may be modified to apply default resource
+// requirements if not specified, and enumerated on the LimitRange
+func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
+	var errs []error
+
+	defaultResources := defaultContainerResourceRequirements(limitRange)
+	mergePodResourceRequirements(pod, &defaultResources)
+
+	for i := range limitRange.Spec.Limits {
+		limit := limitRange.Spec.Limits[i]
+		limitType := limit.Type
+		// enforce container limits
+		if limitType == api.LimitTypeContainer {
+			for j := range pod.Spec.Containers {
+				container := &pod.Spec.Containers[j]
+				for k, v := range limit.Min {
+					if err := minConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
+						errs = append(errs, err)
 					}
 				}
-				switch minOrMax {
-				case "Min":
-					if observed < enforced {
-						return apierrors.NewForbidden(resourceName, pod.Name, err)
+				for k, v := range limit.Max {
+					if err := maxConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
+						errs = append(errs, err)
 					}
-				case "Max":
-					if observed > enforced {
-						return apierrors.NewForbidden(resourceName, pod.Name, err)
+				}
+				for k, v := range limit.MaxLimitRequestRatio {
+					if err := limitRequestRatioConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
+						errs = append(errs, err)
 					}
 				}
 			}
 		}
+
+		// enforce pod limits
+		if limitType == api.LimitTypePod {
+			containerRequests, containerLimits := []api.ResourceList{}, []api.ResourceList{}
+			for j := range pod.Spec.Containers {
+				container := &pod.Spec.Containers[j]
+				containerRequests = append(containerRequests, container.Resources.Requests)
+				containerLimits = append(containerLimits, container.Resources.Limits)
+			}
+			podRequests := sum(containerRequests)
+			podLimits := sum(containerLimits)
+			for k, v := range limit.Min {
+				if err := minConstraint(limitType, k, v, podRequests, podLimits); err != nil {
+					errs = append(errs, err)
+				}
+			}
+			for k, v := range limit.Max {
+				if err := maxConstraint(limitType, k, v, podRequests, podLimits); err != nil {
+					errs = append(errs, err)
+				}
+			}
+			for k, v := range limit.MaxLimitRequestRatio {
+				if err := limitRequestRatioConstraint(limitType, k, v, podRequests, podLimits); err != nil {
+					errs = append(errs, err)
+				}
+			}
+		}
 	}
-	return nil
+	return utilerrors.NewAggregate(errs)
 }

@@ -1,10 +1,44 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/design/admission_control.md).
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Kubernetes Proposal - Admission Control
 
-**Related PR:** 
+**Related PR:**
 
 | Topic | Link |
 | ----- | ---- |
-| Separate validation from RESTStorage | https://github.com/GoogleCloudPlatform/kubernetes/issues/2977 |
+| Separate validation from RESTStorage | http://issue.k8s.io/2977 |
 
 ## Background
 
@@ -30,12 +64,12 @@ The kube-apiserver takes the following OPTIONAL arguments to enable admission co
 
 | Option | Behavior |
 | ------ | -------- |
-| admission_control | Comma-delimited, ordered list of admission control choices to invoke prior to modifying or deleting an object. |
-| admission_control_config_file | File with admission control configuration parameters to boot-strap plug-in. |
+| admission-control | Comma-delimited, ordered list of admission control choices to invoke prior to modifying or deleting an object. |
+| admission-control-config-file | File with admission control configuration parameters to boot-strap plug-in. |
 
 An **AdmissionControl** plug-in is an implementation of the following interface:
 
-```
+```go
 package admission
 
 // Attributes is an interface used by a plug-in to make an admission decision on a individual request.
@@ -57,7 +91,7 @@ type Interface interface {
 A **plug-in** must be compiled with the binary, and is registered as an available option by providing a name, and implementation
 of admission.Interface.
 
-```
+```go
 func init() {
   admission.RegisterPlugin("AlwaysDeny", func(client client.Interface, config io.Reader) (admission.Interface, error) { return NewAlwaysDeny(), nil })
 }
@@ -65,15 +99,21 @@ func init() {
 
 Invocation of admission control is handled by the **APIServer** and not individual **RESTStorage** implementations.
 
-This design assumes that **Issue 297** is adopted, and as a consequence, the general framework of the APIServer request/response flow
-will ensure the following:
+This design assumes that **Issue 297** is adopted, and as a consequence, the general framework of the APIServer request/response flow will ensure the following:
 
 1. Incoming request
 2. Authenticate user
 3. Authorize user
-4. If operation=create|update, then validate(object)
-5. If operation=create|update|delete, then admission.Admit(requestAttributes)
-  a. invoke each admission.Interface object in sequence
-6. Object is persisted
+4. If operation=create|update|delete|connect, then admission.Admit(requestAttributes)
+   - invoke each admission.Interface object in sequence
+5. Case on the operation:
+   - If operation=create|update, then validate(object) and persist
+   - If operation=delete, delete the object
+   - If operation=connect, exec
 
 If at any step, there is an error, the request is canceled.
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

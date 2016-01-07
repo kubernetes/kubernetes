@@ -1,24 +1,40 @@
 {
-  "apiVersion": "v1beta1",
-  "kind": "ReplicationController",
-  "id": "redis-master-controller",
-  "desiredState": {
-    "replicas": 1,
-    "replicaSelector": { "name": "redis", "role": "master" },
-    "podTemplate": {
-      "desiredState": {
-        "manifest": {
-          "version": "v1beta1",
-          "id": "redis-master-controller",
-          "containers": [{
-            "name": "redis-master",
-            "image": "gurpartap/redis",
-            "ports": [{ "name": "redis-server", "containerPort": 6379 }]
-          }]
-        }
+   "kind":"ReplicationController",
+   "apiVersion":"v1",
+   "metadata":{
+      "name":"redis-master",
+      "labels":{
+         "app":"redis",
+         "role":"master"
+      }
+   },
+   "spec":{
+      "replicas":1,
+      "selector":{
+         "app":"redis",
+         "role":"master"
       },
-      "labels": { "name": "redis", "role": "master" }
-    }
-  },
-  "labels": { "name": "redis", "role": "master" }
+      "template":{
+         "metadata":{
+            "labels":{
+               "app":"redis",
+               "role":"master"
+            }
+         },
+         "spec":{
+            "containers":[
+               {
+                  "name":"redis-master",
+                  "image":"redis",
+                  "ports":[
+                     {
+                        "name":"redis-server",
+                        "containerPort":6379
+                     }
+                  ]
+               }
+            ]
+         }
+      }
+   }
 }

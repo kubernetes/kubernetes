@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,23 +31,29 @@ set -o xtrace
 # space.
 export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 export PATH=$PATH:/usr/local/go/bin
-export KUBE_RELEASE_RUN_TESTS=n
 export KUBE_SKIP_CONFIRMATIONS=y
 
-# Clean stuff out. Assume the worst - the last build may have left the
-# tree in an odd state. There's a Jenkins git clean plugin, but we
-# have the docker images to worry about as well, so be really pedantic
-# about cleaning.
+: ${KUBE_RELEASE_RUN_TESTS:="n"}
+export KUBE_RELEASE_RUN_TESTS
+
+# Clean stuff out. Assume the last build left the tree in an odd
+# state.
 rm -rf ~/.kube*
 make clean
 git clean -fdx
-docker ps -aq | xargs -r docker rm
-docker images -q | xargs -r docker rmi
+
+# Uncomment if you want to purge the Docker cache completely each
+# build. It costs about 150s each build to pull the golang image and
+# rebuild the kube-build:cross image, but these rarely change.
+# docker ps -aq | xargs -r docker rm
+# docker images -q | xargs -r docker rmi
 
 # Build
 go run ./hack/e2e.go -v --build
 
-# Push to GCS
-./build/push-ci-build.sh
+[[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]] || {
+    # Push to GCS
+    ./build/push-ci-build.sh
+}
 
 sha256sum _output/release-tars/kubernetes*.tar.gz

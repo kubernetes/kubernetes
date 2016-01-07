@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,13 @@ limitations under the License.
 package conversion
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"path"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // EncodeToVersion turns the given api object into an appropriate JSON string.
@@ -40,8 +45,8 @@ import (
 //       expressing any API object.
 //  * Only versioned objects should be encoded. This means that, if you pass
 //    a native object, Encode will convert it to a versioned object. For
-//    example, an api.Pod will get converted to a v1beta1.Pod. However, if
-//    you pass in an object that's already versioned (v1beta1.Pod), Encode
+//    example, an api.Pod will get converted to a v1.Pod. However, if
+//    you pass in an object that's already versioned (v1.Pod), Encode
 //    will not modify it.
 //
 // The purpose of the above complex conversion behavior is to allow us to
@@ -50,54 +55,101 @@ import (
 // config files.
 //
 func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []byte, err error) {
+	buff := &bytes.Buffer{}
+	if err := s.EncodeToVersionStream(obj, destVersion, buff); err != nil {
+		return nil, err
+	}
+	return buff.Bytes(), nil
+}
+
+func (s *Scheme) EncodeToVersionStream(obj interface{}, destGroupVersionString string, stream io.Writer) error {
 	obj = maybeCopy(obj)
 	v, _ := EnforcePtr(obj) // maybeCopy guarantees a pointer
-	if _, registered := s.typeToVersion[v.Type()]; !registered {
-		return nil, fmt.Errorf("type %v is not registered and it will be impossible to Decode it, therefore Encode will refuse to encode it.", v.Type())
+
+	// Don't encode an object defined in the unversioned package, unless if the
+	// destGroupVersionString is v1, encode it to v1 for backward compatibility.
+	pkg := path.Base(v.Type().PkgPath())
+	if pkg == "unversioned" && destGroupVersionString != "v1" {
+		// TODO: convert this to streaming too
+		data, err := s.encodeUnversionedObject(obj)
+		if err != nil {
+			return err
+		}
+		_, err = stream.Write(data)
+		return err
 	}
 
-	objVersion, objKind, err := s.ObjectVersionAndKind(obj)
+	if _, registered := s.typeToGVK[v.Type()]; !registered {
+		return fmt.Errorf("type %v is not registered for %q and it will be impossible to Decode it, therefore Encode will refuse to encode it.", v.Type(), destGroupVersionString)
+	}
+
+	objKind, err := s.ObjectKind(obj)
 	if err != nil {
-		return nil, err
+		return err
+	}
+
+	destVersion, err := unversioned.ParseGroupVersion(destGroupVersionString)
+	if err != nil {
+		return err
 	}
 
 	// Perform a conversion if necessary.
-	if objVersion != destVersion {
-		objOut, err := s.NewObject(destVersion, objKind)
+	if objKind.GroupVersion() != destVersion {
+		objOut, err := s.NewObject(destVersion.WithKind(objKind.Kind))
 		if err != nil {
-			return nil, err
+			return err
 		}
-		err = s.converter.Convert(obj, objOut, 0, s.generateConvertMeta(objVersion, destVersion))
+		flags, meta := s.generateConvertMeta(objKind.GroupVersion(), destVersion, obj)
+		err = s.converter.Convert(obj, objOut, flags, meta)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		obj = objOut
-	}
 
-	// ensure the output object name comes from the destination type
-	_, objKind, err = s.ObjectVersionAndKind(obj)
-	if err != nil {
-		return nil, err
+		// ensure the output object name comes from the destination type
+		newGroupVersionKind, err := s.ObjectKind(obj)
+		if err != nil {
+			return err
+		}
+		objKind.Kind = newGroupVersionKind.Kind
 	}
 
 	// Version and Kind should be set on the wire.
-	err = s.SetVersionAndKind(destVersion, objKind, obj)
+	err = s.SetVersionAndKind(destVersion.String(), objKind.Kind, obj)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// To add metadata, do some simple surgery on the JSON.
-	data, err = json.Marshal(obj)
-	if err != nil {
-		return nil, err
+	encoder := json.NewEncoder(stream)
+	if err := encoder.Encode(obj); err != nil {
+		return err
 	}
 
 	// Version and Kind should be blank in memory. Reset them, since it's
 	// possible that we modified a user object and not a copy above.
 	err = s.SetVersionAndKind("", "", obj)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
+	return nil
+}
+
+func (s *Scheme) encodeUnversionedObject(obj interface{}) (data []byte, err error) {
+	objGVK, err := s.ObjectKind(obj)
+	if err != nil {
+		return nil, err
+	}
+	if err = s.SetVersionAndKind("", objGVK.Kind, obj); err != nil {
+		return nil, err
+	}
+	data, err = json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	// Version and Kind should be blank in memory. Reset them, since it's
+	// possible that we modified a user object and not a copy above.
+	err = s.SetVersionAndKind("", "", obj)
 	return data, nil
 }

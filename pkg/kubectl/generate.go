@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,11 +18,14 @@ package kubectl
 
 import (
 	"fmt"
+	"reflect"
+	"strconv"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/runtime"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 // GeneratorParam is a parameter for a generator
@@ -35,34 +38,93 @@ type GeneratorParam struct {
 // Generator is an interface for things that can generate API objects from input parameters.
 type Generator interface {
 	// Generate creates an API object given a set of parameters
-	Generate(params map[string]string) (runtime.Object, error)
+	Generate(params map[string]interface{}) (runtime.Object, error)
 	// ParamNames returns the list of parameters that this generator uses
 	ParamNames() []GeneratorParam
 }
 
-// Generators is a global list of known generators.
-// TODO: Dynamically create this from a list of template files?
-var Generators map[string]Generator = map[string]Generator{
-	"run-container/v1": BasicReplicationController{},
-	"service/v1":       ServiceGenerator{},
+// StructuredGenerator is an interface for things that can generate API objects not using parameter injection
+type StructuredGenerator interface {
+	// StructuredGenerator creates an API object using pre-configured parameters
+	StructuredGenerate() (runtime.Object, error)
+}
+
+func IsZero(i interface{}) bool {
+	if i == nil {
+		return true
+	}
+	return reflect.DeepEqual(i, reflect.Zero(reflect.TypeOf(i)).Interface())
 }
 
 // ValidateParams ensures that all required params are present in the params map
-func ValidateParams(paramSpec []GeneratorParam, params map[string]string) error {
+func ValidateParams(paramSpec []GeneratorParam, params map[string]interface{}) error {
+	allErrs := []error{}
 	for ix := range paramSpec {
 		if paramSpec[ix].Required {
 			value, found := params[paramSpec[ix].Name]
-			if !found || len(value) == 0 {
-				return fmt.Errorf("Parameter: %s is required", paramSpec[ix].Name)
+			if !found || IsZero(value) {
+				allErrs = append(allErrs, fmt.Errorf("Parameter: %s is required", paramSpec[ix].Name))
 			}
 		}
 	}
-	return nil
+	return utilerrors.NewAggregate(allErrs)
+}
+
+// AnnotateFlags annotates all flags that are used by generators.
+func AnnotateFlags(cmd *cobra.Command, generators map[string]Generator) {
+	// Iterate over all generators and mark any flags used by them.
+	for name, generator := range generators {
+		generatorParams := map[string]struct{}{}
+		for _, param := range generator.ParamNames() {
+			generatorParams[param.Name] = struct{}{}
+		}
+
+		cmd.Flags().VisitAll(func(flag *pflag.Flag) {
+			if _, found := generatorParams[flag.Name]; !found {
+				// This flag is not used by the current generator
+				// so skip it.
+				return
+			}
+			if flag.Annotations == nil {
+				flag.Annotations = map[string][]string{}
+			}
+			if annotations := flag.Annotations["generator"]; annotations == nil {
+				flag.Annotations["generator"] = []string{}
+			}
+			flag.Annotations["generator"] = append(flag.Annotations["generator"], name)
+		})
+	}
+}
+
+//  EnsureFlagsValid ensures that no invalid flags are being used against a generator.
+func EnsureFlagsValid(cmd *cobra.Command, generators map[string]Generator, generatorInUse string) error {
+	AnnotateFlags(cmd, generators)
+
+	allErrs := []error{}
+	cmd.Flags().VisitAll(func(flag *pflag.Flag) {
+		// If the flag hasn't changed, don't validate it.
+		if !flag.Changed {
+			return
+		}
+		// Look into the flag annotations for the generators that can use it.
+		if annotations := flag.Annotations["generator"]; len(annotations) > 0 {
+			annotationMap := map[string]struct{}{}
+			for _, ann := range annotations {
+				annotationMap[ann] = struct{}{}
+			}
+			// If the current generator is not annotated, then this flag shouldn't
+			// be used with it.
+			if _, found := annotationMap[generatorInUse]; !found {
+				allErrs = append(allErrs, fmt.Errorf("cannot use --%s with --generator=%s", flag.Name, generatorInUse))
+			}
+		}
+	})
+	return utilerrors.NewAggregate(allErrs)
 }
 
 // MakeParams is a utility that creates generator parameters from a command line
-func MakeParams(cmd *cobra.Command, params []GeneratorParam) map[string]string {
-	result := map[string]string{}
+func MakeParams(cmd *cobra.Command, params []GeneratorParam) map[string]interface{} {
+	result := map[string]interface{}{}
 	for ix := range params {
 		f := cmd.Flags().Lookup(params[ix].Name)
 		if f != nil {
@@ -81,19 +143,30 @@ func MakeLabels(labels map[string]string) string {
 }
 
 // ParseLabels turns a string representation of a label set into a map[string]string
-func ParseLabels(labelString string) map[string]string {
+func ParseLabels(labelSpec interface{}) (map[string]string, error) {
+	labelString, isString := labelSpec.(string)
+	if !isString {
+		return nil, fmt.Errorf("expected string, found %v", labelSpec)
+	}
 	if len(labelString) == 0 {
-		return nil
+		return nil, fmt.Errorf("no label spec passed")
 	}
 	labels := map[string]string{}
 	labelSpecs := strings.Split(labelString, ",")
 	for ix := range labelSpecs {
 		labelSpec := strings.Split(labelSpecs[ix], "=")
 		if len(labelSpec) != 2 {
-			glog.Errorf("unexpected label spec: %s", labelSpecs[ix])
-			continue
+			return nil, fmt.Errorf("unexpected label spec: %s", labelSpecs[ix])
 		}
 		labels[labelSpec[0]] = labelSpec[1]
 	}
-	return labels
+	return labels, nil
+}
+
+func GetBool(params map[string]string, key string, defValue bool) (bool, error) {
+	if val, found := params[key]; !found {
+		return defValue, nil
+	} else {
+		return strconv.ParseBool(val)
+	}
 }

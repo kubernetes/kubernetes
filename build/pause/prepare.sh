@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,8 +17,10 @@
 set -e
 set -x
 
+ARCH=$1
+
 # Build the binary.
-go build --ldflags '-extldflags "-static" -s' pause.go
+CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} godep go build -a -installsuffix cgo -ldflags '-w' ./pause.go
 
 # Run goupx to shrink binary size.
 go get github.com/pwaller/goupx

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,39 +17,70 @@ limitations under the License.
 package cache
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"time"
+
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
+// ListFunc knows how to list resources
+type ListFunc func(options api.ListOptions) (runtime.Object, error)
+
+// WatchFunc knows how to watch resources
+type WatchFunc func(options api.ListOptions) (watch.Interface, error)
+
 // ListWatch knows how to list and watch a set of apiserver resources.  It satisfies the ListerWatcher interface.
-// It is a convenience function for users of NewReflector, etc.  Client must not be nil.
+// It is a convenience function for users of NewReflector, etc.
+// ListFunc and WatchFunc must not be nil
 type ListWatch struct {
-	Client        *client.Client
-	FieldSelector labels.Selector
-	Resource      string
-	Namespace     string
+	ListFunc  ListFunc
+	WatchFunc WatchFunc
 }
 
-// ListWatch knows how to list and watch a set of apiserver resources.
-func (lw *ListWatch) List() (runtime.Object, error) {
-	return lw.Client.
-		Get().
-		Namespace(lw.Namespace).
-		Resource(lw.Resource).
-		SelectorParam("fields", lw.FieldSelector).
-		Do().
-		Get()
+// Getter interface knows how to access Get method from RESTClient.
+type Getter interface {
+	Get() *client.Request
 }
 
-func (lw *ListWatch) Watch(resourceVersion string) (watch.Interface, error) {
-	return lw.Client.
-		Get().
-		Prefix("watch").
-		Namespace(lw.Namespace).
-		Resource(lw.Resource).
-		SelectorParam("fields", lw.FieldSelector).
-		Param("resourceVersion", resourceVersion).
-		Watch()
+// NewListWatchFromClient creates a new ListWatch from the specified client, resource, namespace and field selector.
+func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSelector fields.Selector) *ListWatch {
+	listFunc := func(options api.ListOptions) (runtime.Object, error) {
+		return c.Get().
+			Namespace(namespace).
+			Resource(resource).
+			VersionedParams(&options, api.Scheme).
+			FieldsSelectorParam(fieldSelector).
+			Do().
+			Get()
+	}
+	watchFunc := func(options api.ListOptions) (watch.Interface, error) {
+		return c.Get().
+			Prefix("watch").
+			Namespace(namespace).
+			Resource(resource).
+			VersionedParams(&options, api.Scheme).
+			FieldsSelectorParam(fieldSelector).
+			Watch()
+	}
+	return &ListWatch{ListFunc: listFunc, WatchFunc: watchFunc}
+}
+
+func timeoutFromListOptions(options api.ListOptions) time.Duration {
+	if options.TimeoutSeconds != nil {
+		return time.Duration(*options.TimeoutSeconds) * time.Second
+	}
+	return 0
+}
+
+// List a set of apiserver resources
+func (lw *ListWatch) List(options api.ListOptions) (runtime.Object, error) {
+	return lw.ListFunc(options)
+}
+
+// Watch a set of apiserver resources
+func (lw *ListWatch) Watch(options api.ListOptions) (watch.Interface, error) {
+	return lw.WatchFunc(options)
 }

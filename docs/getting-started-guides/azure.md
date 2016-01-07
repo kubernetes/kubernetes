@@ -1,123 +1,43 @@
-## Getting started on Microsoft Azure
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-### Azure Prerequisites
+<!-- BEGIN STRIP_FOR_RELEASE -->
 
-1. You need an Azure account. Visit http://azure.microsoft.com/ to get started.
-2. Install and configure the Azure cross-platform command-line interface. http://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
-3. Make sure you have a default account set in the Azure cli, using `azure account set`
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+     width="25" height="25">
 
-### Prerequisites for your workstation
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
 
-1. Be running a Linux or Mac OS X.
-2. Get or build a [binary release](binary_release.md)
-3. If you want to build your own release, you need to have [Docker
-installed](https://docs.docker.com/installation/).  On Mac OS X you can use
-[boot2docker](http://boot2docker.io/).
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
 
-### Setup
-The cluster setup scripts can setup Kubernetes for multiple targets. First modify `cluster/kube-env.sh` to specify azure:
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/azure.md).
 
-    KUBERNETES_PROVIDER="azure"
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
 
-Next, specify an existing virtual network in `cluster/azure/config-defualt.sh`:
+<!-- END STRIP_FOR_RELEASE -->
 
-    AZ_VNET=<vnet name>
+<!-- END MUNGE: UNVERSIONED_WARNING -->
 
-Now you're ready.
+Getting started on Microsoft Azure
+----------------------------------
 
-You can then use the `cluster/kube-*.sh` scripts to manage your azure cluster, start with:
-
-    cluster/kube-up.sh
-
-The script above will start (by default) a single master VM along with 4 worker VMs.  You
-can tweak some of these parameters by editing `cluster/azure/config-default.sh`.
-
-### Running a container (simple version)
-
-Once you have your instances up and running, the `hack/build-go.sh` script sets up
-your Go workspace and builds the Go components.
-
-The `kubectl.sh` line below spins up two containers running
-[Nginx](http://nginx.org/en/) running on port 80:
-
-```bash
-cluster/kubectl.sh run-container my-nginx --image=dockerfile/nginx --replicas=2 --port=80
-```
-
-To stop the containers:
-
-```bash
-cluster/kubectl.sh stop rc my-nginx
-```
-
-To delete the containers:
-
-```bash
-cluster/kubectl.sh delete rc my-nginx
-```
-
-### Running a container (more complete version)
+Checkout the [coreos azure getting started guide](coreos/azure/README.md)
 
 
-You can create a pod like this:
-
-
-```
-cd kubernetes
-cluster/kubectl.sh create -f api/examples/pod.json
-```
-
-Where pod.json contains something like:
-
-```
-{
-  "id": "php",
-  "kind": "Pod",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "php",
-      "containers": [{
-        "name": "nginx",
-        "image": "dockerfile/nginx",
-        "ports": [{
-          "containerPort": 80,
-          "hostPort": 8080
-        }],
-        "livenessProbe": {
-          "enabled": true,
-          "type": "http",
-          "initialDelaySeconds": 30,
-          "httpGet": {
-            "path": "/index.html",
-            "port": "8080"
-          }
-        }
-      }]
-    }
-  },
-  "labels": {
-    "name": "foo"
-  }
-}
-```
-
-You can see your cluster's pods:
-
-```
-cluster/kubectl.sh get pods
-```
-
-and delete the pod you just created:
-
-```
-cluster/kubectl.sh delete pods php
-```
-
-Look in `api/examples/` for more examples
-
-### Tearing down the cluster
-```
-cluster/kube-down.sh
-```
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/azure.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->

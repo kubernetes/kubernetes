@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,15 +17,24 @@ limitations under the License.
 package main
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/server"
+	"runtime"
+
+	"k8s.io/kubernetes/pkg/healthz"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/version/verflag"
+	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
+	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 
 	"github.com/spf13/pflag"
 )
 
+func init() {
+	healthz.DefaultHealthz()
+}
+
 func main() {
-	s := server.NewSchedulerServer()
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	s := options.NewSchedulerServer()
 	s.AddFlags(pflag.CommandLine)
 
 	util.InitFlags()
@@ -34,5 +43,5 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	s.Run(pflag.CommandLine.Args())
+	app.Run(s)
 }

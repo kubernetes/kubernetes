@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/resource"
 
 	"speter.net/go/exp/math/dec/inf"
 )
@@ -54,8 +54,8 @@ func TestSemantic(t *testing.T) {
 		{resource.Quantity{}, resource.MustParse("0"), true},
 		{resource.Quantity{}, resource.MustParse("1m"), false},
 		{
-			resource.Quantity{inf.NewDec(5, 0), resource.BinarySI},
-			resource.Quantity{inf.NewDec(5, 0), resource.DecimalSI},
+			resource.Quantity{Amount: inf.NewDec(5, 0), Format: resource.BinarySI},
+			resource.Quantity{Amount: inf.NewDec(5, 0), Format: resource.DecimalSI},
 			true,
 		},
 		{resource.MustParse("2m"), resource.MustParse("1m"), false},
@@ -63,7 +63,7 @@ func TestSemantic(t *testing.T) {
 
 	for index, item := range table {
 		if e, a := item.shouldEqual, Semantic.DeepEqual(item.a, item.b); e != a {
-			t.Errorf("expected %v, got %v.", index, e, a)
+			t.Errorf("case[%d], expected %v, got %v.", index, e, a)
 		}
 	}
 }
@@ -83,5 +83,95 @@ func TestIsStandardResource(t *testing.T) {
 		if IsStandardResourceName(tc.input) != tc.output {
 			t.Errorf("case[%d], expected: %t, got: %t", i, tc.output, !tc.output)
 		}
+	}
+}
+
+func TestAddToNodeAddresses(t *testing.T) {
+	testCases := []struct {
+		existing []NodeAddress
+		toAdd    []NodeAddress
+		expected []NodeAddress
+	}{
+		{
+			existing: []NodeAddress{},
+			toAdd:    []NodeAddress{},
+			expected: []NodeAddress{},
+		},
+		{
+			existing: []NodeAddress{},
+			toAdd: []NodeAddress{
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+				{Type: NodeHostName, Address: "localhost"},
+			},
+			expected: []NodeAddress{
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+				{Type: NodeHostName, Address: "localhost"},
+			},
+		},
+		{
+			existing: []NodeAddress{},
+			toAdd: []NodeAddress{
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+			},
+			expected: []NodeAddress{
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+			},
+		},
+		{
+			existing: []NodeAddress{
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+				{Type: NodeInternalIP, Address: "10.1.1.1"},
+			},
+			toAdd: []NodeAddress{
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+				{Type: NodeHostName, Address: "localhost"},
+			},
+			expected: []NodeAddress{
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+				{Type: NodeInternalIP, Address: "10.1.1.1"},
+				{Type: NodeHostName, Address: "localhost"},
+			},
+		},
+	}
+
+	for i, tc := range testCases {
+		AddToNodeAddresses(&tc.existing, tc.toAdd...)
+		if !Semantic.DeepEqual(tc.expected, tc.existing) {
+			t.Errorf("case[%d], expected: %v, got: %v", i, tc.expected, tc.existing)
+		}
+	}
+}
+
+func TestGetAccessModesFromString(t *testing.T) {
+	modes := GetAccessModesFromString("ROX")
+	if !containsAccessMode(modes, ReadOnlyMany) {
+		t.Errorf("Expected mode %s, but got %+v", ReadOnlyMany, modes)
+	}
+
+	modes = GetAccessModesFromString("ROX,RWX")
+	if !containsAccessMode(modes, ReadOnlyMany) {
+		t.Errorf("Expected mode %s, but got %+v", ReadOnlyMany, modes)
+	}
+	if !containsAccessMode(modes, ReadWriteMany) {
+		t.Errorf("Expected mode %s, but got %+v", ReadWriteMany, modes)
+	}
+
+	modes = GetAccessModesFromString("RWO,ROX,RWX")
+	if !containsAccessMode(modes, ReadOnlyMany) {
+		t.Errorf("Expected mode %s, but got %+v", ReadOnlyMany, modes)
+	}
+	if !containsAccessMode(modes, ReadWriteMany) {
+		t.Errorf("Expected mode %s, but got %+v", ReadWriteMany, modes)
+	}
+}
+
+func TestRemoveDuplicateAccessModes(t *testing.T) {
+	modes := []PersistentVolumeAccessMode{
+		ReadWriteOnce, ReadOnlyMany, ReadOnlyMany, ReadOnlyMany,
+	}
+	modes = removeDuplicateAccessModes(modes)
+	if len(modes) != 2 {
+		t.Errorf("Expected 2 distinct modes in set but found %v", len(modes))
 	}
 }

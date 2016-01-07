@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,8 +20,11 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/yaml"
 )
 
 // Mapper is a convenience struct for holding references to the three interfaces
@@ -36,11 +39,22 @@ type Mapper struct {
 // if any of the decoding or client lookup steps fail. Name and namespace will be
 // set into Info if the mapping's MetadataAccessor can retrieve them.
 func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
-	version, kind, err := m.DataVersionAndKind(data)
+	json, err := yaml.ToJSON(data)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse %q: %v", source, err)
+	}
+	data = json
+	gvk, err := runtime.UnstructuredJSONScheme.DataKind(data)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from %q: %v", source, err)
 	}
-	mapping, err := m.RESTMapping(kind, version)
+	if ok := registered.IsEnabledVersion(gvk.GroupVersion()); !ok {
+		return nil, fmt.Errorf("API version %q in %q isn't supported, only supports API versions %q", gvk.GroupVersion().String(), source, registered.EnabledVersions())
+	}
+	if gvk.Kind == "" {
+		return nil, fmt.Errorf("kind not set in %q", source)
+	}
+	mapping, err := m.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, fmt.Errorf("unable to recognize %q: %v", source, err)
 	}
@@ -52,31 +66,39 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
 	}
+
 	name, _ := mapping.MetadataAccessor.Name(obj)
 	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
 	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)
-	return &Info{
-		Mapping:   mapping,
-		Client:    client,
-		Namespace: namespace,
-		Name:      name,
 
+	var versionedObject interface{}
+
+	if vo, _, err := api.Scheme.Raw().DecodeToVersionedObject(data); err == nil {
+		versionedObject = vo
+	}
+	return &Info{
+		Mapping:         mapping,
+		Client:          client,
+		Namespace:       namespace,
+		Name:            name,
+		Source:          source,
+		VersionedObject: versionedObject,
 		Object:          obj,
 		ResourceVersion: resourceVersion,
 	}, nil
 }
 
-// InfoForData creates an Info object for the given Object. An error is returned
+// InfoForObject creates an Info object for the given Object. An error is returned
 // if the object cannot be introspected. Name and namespace will be set into Info
 // if the mapping's MetadataAccessor can retrieve them.
 func (m *Mapper) InfoForObject(obj runtime.Object) (*Info, error) {
-	version, kind, err := m.ObjectVersionAndKind(obj)
+	groupVersionKind, err := m.ObjectKind(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from the object %q: %v", reflect.TypeOf(obj), err)
 	}
-	mapping, err := m.RESTMapping(kind, version)
+	mapping, err := m.RESTMapping(groupVersionKind.GroupKind(), groupVersionKind.Version)
 	if err != nil {
-		return nil, fmt.Errorf("unable to recognize %q: %v", kind, err)
+		return nil, fmt.Errorf("unable to recognize %v: %v", groupVersionKind, err)
 	}
 	client, err := m.ClientForMapping(mapping)
 	if err != nil {

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,12 +21,18 @@ import (
 	"syscall"
 )
 
+// ErrExecutableNotFound is returned if the executable is not found.
+var ErrExecutableNotFound = osexec.ErrNotFound
+
 // Interface is an interface that presents a subset of the os/exec API.  Use this
 // when you want to inject fakeable/mockable exec behavior.
 type Interface interface {
 	// Command returns a Cmd instance which can be used to run a single command.
 	// This follows the pattern of package os/exec.
 	Command(cmd string, args ...string) Cmd
+
+	// LookPath wraps os/exec.LookPath
+	LookPath(file string) (string, error)
 }
 
 // Cmd is an interface that presents an API that is very similar to Cmd from os/exec.
@@ -62,6 +68,11 @@ func (executor *executor) Command(cmd string, args ...string) Cmd {
 	return (*cmdWrapper)(osexec.Command(cmd, args...))
 }
 
+// LookPath is part of the Interface interface
+func (executor *executor) LookPath(file string) (string, error) {
+	return osexec.LookPath(file)
+}
+
 // Wraps exec.Cmd so we can capture errors.
 type cmdWrapper osexec.Cmd
 
@@ -73,13 +84,17 @@ func (cmd *cmdWrapper) SetDir(dir string) {
 func (cmd *cmdWrapper) CombinedOutput() ([]byte, error) {
 	out, err := (*osexec.Cmd)(cmd).CombinedOutput()
 	if err != nil {
-		ee, ok := err.(*osexec.ExitError)
-		if !ok {
-			return out, err
+		if ee, ok := err.(*osexec.ExitError); ok {
+			// Force a compile fail if exitErrorWrapper can't convert to ExitError.
+			var x ExitError = &exitErrorWrapper{ee}
+			return out, x
 		}
-		// Force a compile fail if exitErrorWrapper can't convert to ExitError.
-		var x ExitError = &exitErrorWrapper{ee}
-		return out, x
+		if ee, ok := err.(*osexec.Error); ok {
+			if ee.Err == osexec.ErrNotFound {
+				return out, ErrExecutableNotFound
+			}
+		}
+		return out, err
 	}
 	return out, nil
 }

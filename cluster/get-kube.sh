@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,26 +16,26 @@
 
 # Bring up a Kubernetes cluster.
 # Usage:
-#   wget -q -O - https://get.k8s.io | sh
+#   wget -q -O - https://get.k8s.io | bash
 # or
-#   curl -sS https://get.k8s.io | sh
+#   curl -sS https://get.k8s.io | bash
 #
 # Advanced options
 #  Set KUBERNETES_PROVIDER to choose between different providers:
 #  Google Compute Engine [default]
-#   * export KUBERNETES_PROVIDER=gce; wget -q -O - https://get.k8s.io | sh
+#   * export KUBERNETES_PROVIDER=gce; wget -q -O - https://get.k8s.io | bash
 #  Google Container Engine
-#   * export KUBERNETES_PROVIDER=gke; wget -q -O - https://get.k8s.io | sh
+#   * export KUBERNETES_PROVIDER=gke; wget -q -O - https://get.k8s.io | bash
 #  Amazon EC2
-#   * export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | sh
-#  Microsoft Azure
-#   * export KUBERNETES_PROVIDER=azure; wget -q -O - https://get.k8s.io | sh
+#   * export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | bash
+#  Libvirt (with CoreOS as a guest operating system)
+#   * export KUBERNETES_PROVIDER=libvirt-coreos; wget -q -O - https://get.k8s.io | bash
 #  Vagrant (local virtual machines)
-#   * export KUBERNETES_PROVIDER=vagrant; wget -q -O - https://get.k8s.io | sh
+#   * export KUBERNETES_PROVIDER=vagrant; wget -q -O - https://get.k8s.io | bash
 #  VMWare VSphere
-#   * export KUBERNETES_PROVIDER=vsphere; wget -q -O - https://get.k8s.io | sh
+#   * export KUBERNETES_PROVIDER=vsphere; wget -q -O - https://get.k8s.io | bash
 #  Rackspace
-#   * export KUBERNETES_PROVIDER=rackspace; wget -q -O - https://get.k8s.io | sh
+#   * export KUBERNETES_PROVIDER=rackspace; wget -q -O - https://get.k8s.io | bash
 #
 #  Set KUBERNETES_SKIP_DOWNLOAD to non-empty to skip downloading a release.
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
@@ -48,8 +48,10 @@ function create_cluster {
   (
     cd kubernetes
     ./cluster/kube-up.sh
-    echo "Kubernetes binaries at ${PWD}/kubernetes/cluster/"
-    echo "You may want to add this directory to your PATH in \$HOME/.profile"
+    echo "Kubernetes binaries at ${PWD}/cluster/"
+    if [[ ":$PATH:" != *":${PWD}/cluster:"* ]]; then
+      echo "You may want to add this directory to your PATH in \$HOME/.profile"
+    fi
 
     echo "Installation successful!"
   )
@@ -60,7 +62,19 @@ if [[ "${KUBERNETES_SKIP_DOWNLOAD-}" ]]; then
   exit 0
 fi
 
-release=v0.10.1
+function get_latest_version_number {
+  local -r latest_url="https://storage.googleapis.com/kubernetes-release/release/stable.txt"
+  if [[ $(which wget) ]]; then
+    wget -qO- ${latest_url}
+  elif [[ $(which curl) ]]; then
+    curl -Ss ${latest_url}
+  else
+    echo "Couldn't find curl or wget.  Bailing out."
+    exit 4
+  fi
+}
+
+release=$(get_latest_version_number)
 release_url=https://storage.googleapis.com/kubernetes-release/release/${release}/kubernetes.tar.gz
 
 uname=$(uname)
@@ -82,15 +96,18 @@ elif [[ "${machine}" == "i686" ]]; then
   arch="386"
 elif [[ "${machine}" == "arm*" ]]; then
   arch="arm"
+elif [[ "${machine}" == "s390x*" ]]; then
+  arch="s390x"
+elif [[ "${machine}" == "ppc64le" ]]; then
+  arch="ppc64le"
 else
   echo "Unknown, unsupported architecture (${machine})."
-  echo "Supported architectures x86_64, i686, arm*"
+  echo "Supported architectures x86_64, i686, arm, s390x, ppc64le."
   echo "Bailing out."
   exit 3
 fi
 
 file=kubernetes.tar.gz
-
 
 echo "Downloading kubernetes release ${release} to ${PWD}/kubernetes.tar.gz"
 if [[ -n "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
@@ -116,4 +133,3 @@ tar -xzf ${file}
 rm ${file}
 
 create_cluster
-

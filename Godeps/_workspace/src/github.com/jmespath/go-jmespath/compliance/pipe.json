@@ -1,0 +1,131 @@
+[{
+  "given": {
+    "foo": {
+      "bar": {
+        "baz": "subkey"
+      },
+      "other": {
+        "baz": "subkey"
+      },
+      "other2": {
+        "baz": "subkey"
+      },
+      "other3": {
+        "notbaz": ["a", "b", "c"]
+      },
+      "other4": {
+        "notbaz": ["a", "b", "c"]
+      }
+    }
+  },
+  "cases": [
+    {
+      "expression": "foo.*.baz | [0]",
+      "result": "subkey"
+    },
+    {
+      "expression": "foo.*.baz | [1]",
+      "result": "subkey"
+    },
+    {
+      "expression": "foo.*.baz | [2]",
+      "result": "subkey"
+    },
+    {
+      "expression": "foo.bar.* | [0]",
+      "result": "subkey"
+    },
+    {
+      "expression": "foo.*.notbaz | [*]",
+      "result": [["a", "b", "c"], ["a", "b", "c"]]
+    },
+    {
+      "expression": "{\"a\": foo.bar, \"b\": foo.other} | *.baz",
+      "result": ["subkey", "subkey"]
+    }
+  ]
+}, {
+  "given": {
+    "foo": {
+      "bar": {
+        "baz": "one"
+      },
+      "other": {
+        "baz": "two"
+      },
+      "other2": {
+        "baz": "three"
+      },
+      "other3": {
+        "notbaz": ["a", "b", "c"]
+      },
+      "other4": {
+        "notbaz": ["d", "e", "f"]
+      }
+    }
+  },
+  "cases": [
+    {
+      "expression": "foo | bar",
+      "result": {"baz": "one"}
+    },
+    {
+      "expression": "foo | bar | baz",
+      "result": "one"
+    },
+    {
+      "expression": "foo|bar| baz",
+      "result": "one"
+    },
+    {
+      "expression": "not_there | [0]",
+      "result": null
+    },
+    {
+      "expression": "not_there | [0]",
+      "result": null
+    },
+    {
+      "expression": "[foo.bar, foo.other] | [0]",
+      "result": {"baz": "one"}
+    },
+    {
+      "expression": "{\"a\": foo.bar, \"b\": foo.other} | a",
+      "result": {"baz": "one"}
+    },
+    {
+      "expression": "{\"a\": foo.bar, \"b\": foo.other} | b",
+      "result": {"baz": "two"}
+    },
+    {
+      "expression": "foo.bam || foo.bar | baz",
+      "result": "one"
+    },
+    {
+      "expression": "foo | not_there || bar",
+      "result": {"baz": "one"}
+    }
+  ]
+}, {
+  "given": {
+    "foo": [{
+      "bar": [{
+        "baz": "one"
+      }, {
+        "baz": "two"
+      }]
+    }, {
+      "bar": [{
+        "baz": "three"
+      }, {
+        "baz": "four"
+      }]
+    }]
+  },
+  "cases": [
+    {
+      "expression": "foo[*].bar[*] | [0][0]",
+      "result": {"baz": "one"}
+    }
+  ]
+}]

@@ -6,7 +6,8 @@ import (
 )
 
 const (
-	ErrCodeEtcdNotReachable = 501
+	ErrCodeEtcdNotReachable    = 501
+	ErrCodeUnhandledHTTPStatus = 502
 )
 
 var (

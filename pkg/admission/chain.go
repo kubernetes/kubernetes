@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +17,14 @@ limitations under the License.
 package admission
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 // chainAdmissionHandler is an instance of admission.Interface that performs admission control using a chain of admission handlers
 type chainAdmissionHandler []Interface
 
-// New returns an admission.Interface that will enforce admission control decisions
+// NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
+// the given plugins.
 func NewFromPlugins(client client.Interface, pluginNames []string, configFilePath string) Interface {
 	plugins := []Interface{}
 	for _, pluginName := range pluginNames {
@@ -35,13 +36,31 @@ func NewFromPlugins(client client.Interface, pluginNames []string, configFilePat
 	return chainAdmissionHandler(plugins)
 }
 
+// NewChainHandler creates a new chain handler from an array of handlers. Used for testing.
+func NewChainHandler(handlers ...Interface) Interface {
+	return chainAdmissionHandler(handlers)
+}
+
 // Admit performs an admission control check using a chain of handlers, and returns immediately on first error
-func (admissionHandler chainAdmissionHandler) Admit(a Attributes) (err error) {
+func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
 	for _, handler := range admissionHandler {
+		if !handler.Handles(a.GetOperation()) {
+			continue
+		}
 		err := handler.Admit(a)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// Handles will return true if any of the handlers handles the given operation
+func (admissionHandler chainAdmissionHandler) Handles(operation Operation) bool {
+	for _, handler := range admissionHandler {
+		if handler.Handles(operation) {
+			return true
+		}
+	}
+	return false
 }

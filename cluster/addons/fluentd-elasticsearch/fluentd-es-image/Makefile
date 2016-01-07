@@ -1,9 +1,10 @@
 .PHONY:	build push
 
-TAG = 1.0
+IMAGE = fluentd-elasticsearch
+TAG = 1.12
 
 build:	
-	sudo docker build -t kubernetes/fluentd-elasticsearch:$(TAG) .
+	docker build -t gcr.io/google_containers/$(IMAGE):$(TAG) .
 
 push:	
-	sudo docker push kubernetes/fluentd-elasticsearch:$(TAG)
+	gcloud docker --server=gcr.io push gcr.io/google_containers/$(IMAGE):$(TAG)

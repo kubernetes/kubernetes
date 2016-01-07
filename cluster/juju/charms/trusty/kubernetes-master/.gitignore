@@ -1,0 +1,5 @@
+*~
+.bzr
+.venv
+unit_tests/__pycache__
+*.pyc

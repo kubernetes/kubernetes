@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,9 @@ limitations under the License.
 package meta
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // VersionInterfaces contains the interfaces one should use for dealing with types of a particular version.
@@ -28,35 +29,48 @@ type VersionInterfaces struct {
 	MetadataAccessor
 }
 
-// Interface lets you work with object and list metadata from any of the versioned or
+type ObjectMetaAccessor interface {
+	GetObjectMeta() Object
+}
+
+// Object lets you work with object metadata from any of the versioned or
 // internal API objects. Attempting to set or retrieve a field on an object that does
 // not support that field (Name, UID, Namespace on lists) will be a no-op and return
 // a default value.
-// TODO: rename to ObjectInterface when we clear up these interfaces.
-type Interface interface {
-	TypeInterface
-
-	Namespace() string
+type Object interface {
+	GetNamespace() string
 	SetNamespace(namespace string)
-	Name() string
+	GetName() string
 	SetName(name string)
-	UID() types.UID
+	GetGenerateName() string
+	SetGenerateName(name string)
+	GetUID() types.UID
 	SetUID(uid types.UID)
-	ResourceVersion() string
+	GetResourceVersion() string
 	SetResourceVersion(version string)
-	SelfLink() string
+	GetSelfLink() string
 	SetSelfLink(selfLink string)
-	Labels() map[string]string
+	GetLabels() map[string]string
 	SetLabels(labels map[string]string)
-	Annotations() map[string]string
+	GetAnnotations() map[string]string
 	SetAnnotations(annotations map[string]string)
 }
 
-// TypeInterface exposes the type and APIVersion of versioned or internal API objects.
-type TypeInterface interface {
-	APIVersion() string
+// List lets you work with list metadata from any of the versioned or
+// internal API objects. Attempting to set or retrieve a field on an object that does
+// not support that field will be a no-op and return a default value.
+type List interface {
+	GetResourceVersion() string
+	SetResourceVersion(version string)
+	GetSelfLink() string
+	SetSelfLink(selfLink string)
+}
+
+// Type exposes the type and APIVersion of versioned or internal API objects.
+type Type interface {
+	GetAPIVersion() string
 	SetAPIVersion(version string)
-	Kind() string
+	GetKind() string
 	SetKind(kind string)
 }
 
@@ -78,6 +92,9 @@ type MetadataAccessor interface {
 
 	Name(obj runtime.Object) (string, error)
 	SetName(obj runtime.Object, name string) error
+
+	GenerateName(obj runtime.Object) (string, error)
+	SetGenerateName(obj runtime.Object, name string) error
 
 	UID(obj runtime.Object) (types.UID, error)
 	SetUID(obj runtime.Object, uid types.UID) error
@@ -102,18 +119,14 @@ const (
 )
 
 // RESTScope contains the information needed to deal with REST resources that are in a resource hierarchy
-// TODO After we deprecate v1beta1 and v1beta2, we can look a supporting removing the flexibility of supporting
-// either a query or path param, and instead just support path param
 type RESTScope interface {
 	// Name of the scope
 	Name() RESTScopeName
 	// ParamName is the optional name of the parameter that should be inserted in the resource url
 	// If empty, no param will be inserted
 	ParamName() string
-	// ParamPath is a boolean that controls how the parameter is manifested in resource paths
-	// If true, this parameter is encoded in path (i.e. /{paramName}/{paramValue})
-	// If false, this parameter is encoded in query (i.e. ?{paramName}={paramValue})
-	ParamPath() bool
+	// ArgumentName is the optional name that should be used for the variable holding the value.
+	ArgumentName() string
 	// ParamDescription is the optional description to use to document the parameter in api documentation
 	ParamDescription() string
 }
@@ -123,10 +136,8 @@ type RESTScope interface {
 type RESTMapping struct {
 	// Resource is a string representing the name of this resource as a REST client would see it
 	Resource string
-	// APIVersion represents the APIVersion that represents the resource as presented. It is provided
-	// for convenience for passing around a consistent mapping.
-	APIVersion string
-	Kind       string
+
+	GroupVersionKind unversioned.GroupVersionKind
 
 	// Scope contains the information needed to deal with REST Resources that are in a resource hierarchy
 	Scope RESTScope
@@ -138,8 +149,32 @@ type RESTMapping struct {
 
 // RESTMapper allows clients to map resources to kind, and map kind and version
 // to interfaces for manipulating those objects. It is primarily intended for
-// consumers of Kubernetes compatible REST APIs as defined in docs/api-conventions.md.
+// consumers of Kubernetes compatible REST APIs as defined in docs/devel/api-conventions.md.
+//
+// The Kubernetes API provides versioned resources and object kinds which are scoped
+// to API groups. In other words, kinds and resources should not be assumed to be
+// unique across groups.
+//
+// TODO(caesarxuchao): Add proper multi-group support so that kinds & resources are
+// scoped to groups. See http://issues.k8s.io/12413 and http://issues.k8s.io/10009.
 type RESTMapper interface {
-	VersionAndKindForResource(resource string) (defaultVersion, kind string, err error)
-	RESTMapping(kind string, versions ...string) (*RESTMapping, error)
+	// KindFor takes a partial resource and returns back the single match.  Returns an error if there are multiple matches
+	KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error)
+
+	// KindsFor takes a partial resource and returns back the list of potential kinds in priority order
+	KindsFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionKind, error)
+
+	// ResourceFor takes a partial resource and returns back the single match.  Returns an error if there are multiple matches
+	ResourceFor(input unversioned.GroupVersionResource) (unversioned.GroupVersionResource, error)
+
+	// ResourcesFor takes a partial resource and returns back the list of potential resource in priority order
+	ResourcesFor(input unversioned.GroupVersionResource) ([]unversioned.GroupVersionResource, error)
+
+	RESTMapping(gk unversioned.GroupKind, versions ...string) (*RESTMapping, error)
+
+	AliasesForResource(resource string) ([]string, bool)
+	ResourceSingularizer(resource string) (singular string, err error)
+
+	// ResourceIsValid takes a partial resource and returns back whether or not the resource matches at least one kind
+	ResourceIsValid(resource unversioned.GroupVersionResource) bool
 }

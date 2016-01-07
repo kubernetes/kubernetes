@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,9 +40,9 @@ func (m *ConfigurationMap) Set(value string) error {
 		}
 		arr := strings.SplitN(s, "=", 2)
 		if len(arr) == 2 {
-			(*m)[arr[0]] = arr[1]
+			(*m)[strings.TrimSpace(arr[0])] = strings.TrimSpace(arr[1])
 		} else {
-			(*m)[arr[0]] = ""
+			(*m)[strings.TrimSpace(arr[0])] = ""
 		}
 	}
 	return nil

@@ -3,7 +3,6 @@ package vips
 import (
 	"fmt"
 
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -179,24 +178,14 @@ func Create(c *gophercloud.ServiceClient, opts CreateOpts) CreateResult {
 		reqBody.VirtualIP.Persistence = opts.Persistence
 	}
 
-	_, res.Err = perigee.Request("POST", rootURL(c), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{201},
-	})
-
+	_, res.Err = c.Post(rootURL(c), reqBody, &res.Body, nil)
 	return res
 }
 
 // Get retrieves a particular virtual IP based on its unique ID.
 func Get(c *gophercloud.ServiceClient, id string) GetResult {
 	var res GetResult
-	_, res.Err = perigee.Request("GET", resourceURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		OkCodes:     []int{200},
-	})
+	_, res.Err = c.Get(resourceURL(c, id), &res.Body, nil)
 	return res
 }
 
@@ -252,11 +241,8 @@ func Update(c *gophercloud.ServiceClient, id string, opts UpdateOpts) UpdateResu
 	}
 
 	var res UpdateResult
-	_, res.Err = perigee.Request("PUT", resourceURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{200, 202},
+	_, res.Err = c.Put(resourceURL(c, id), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200, 202},
 	})
 
 	return res
@@ -265,9 +251,6 @@ func Update(c *gophercloud.ServiceClient, id string, opts UpdateOpts) UpdateResu
 // Delete will permanently delete a particular virtual IP based on its unique ID.
 func Delete(c *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", resourceURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
-	})
+	_, res.Err = c.Delete(resourceURL(c, id), nil)
 	return res
 }

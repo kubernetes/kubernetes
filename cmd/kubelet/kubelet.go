@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,15 +21,21 @@ limitations under the License.
 package main
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/server"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
+	"fmt"
+	"os"
+	"runtime"
+
+	"k8s.io/kubernetes/cmd/kubelet/app"
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
 )
 
 func main() {
-	s := server.NewKubeletServer()
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	s := options.NewKubeletServer()
 	s.AddFlags(pflag.CommandLine)
 
 	util.InitFlags()
@@ -38,5 +44,8 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	s.Run(pflag.CommandLine.Args())
+	if err := app.Run(s, nil); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
 }

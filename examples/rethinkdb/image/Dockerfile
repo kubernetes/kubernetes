@@ -11,4 +11,4 @@ RUN apt-get update && \
 COPY ./run.sh /usr/bin/run.sh
 RUN chmod u+x /usr/bin/run.sh
 
-CMD ["/usr/bin/run.sh"]
+CMD "/usr/bin/run.sh"

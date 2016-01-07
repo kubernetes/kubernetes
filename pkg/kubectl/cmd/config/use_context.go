@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,21 +23,21 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
 type useContextOptions struct {
-	pathOptions *pathOptions
-	contextName string
+	configAccess ConfigAccess
+	contextName  string
 }
 
-func NewCmdConfigUseContext(out io.Writer, pathOptions *pathOptions) *cobra.Command {
-	options := &useContextOptions{pathOptions: pathOptions}
+func NewCmdConfigUseContext(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+	options := &useContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:   "use-context context-name",
-		Short: "Sets the current-context in a .kubeconfig file",
-		Long:  `Sets the current-context in a .kubeconfig file`,
+		Use:   "use-context CONTEXT_NAME",
+		Short: "Sets the current-context in a kubeconfig file",
+		Long:  `Sets the current-context in a kubeconfig file`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {
 				return
@@ -45,7 +45,9 @@ func NewCmdConfigUseContext(out io.Writer, pathOptions *pathOptions) *cobra.Comm
 
 			err := options.run()
 			if err != nil {
-				fmt.Printf("%v\n", err)
+				fmt.Fprintf(out, "%v\n", err)
+			} else {
+				fmt.Fprintf(out, "switched to context %q.\n", options.contextName)
 			}
 		},
 	}
@@ -54,24 +56,19 @@ func NewCmdConfigUseContext(out io.Writer, pathOptions *pathOptions) *cobra.Comm
 }
 
 func (o useContextOptions) run() error {
-	err := o.validate()
+	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
 		return err
 	}
 
-	config, filename, err := o.pathOptions.getStartingConfig()
+	err = o.validate(config)
 	if err != nil {
 		return err
-	}
-
-	if len(filename) == 0 {
-		return errors.New("cannot set current-context without using a specific file")
 	}
 
 	config.CurrentContext = o.contextName
 
-	err = clientcmd.WriteToFile(*config, filename)
-	if err != nil {
+	if err := ModifyConfig(o.configAccess, *config, true); err != nil {
 		return err
 	}
 
@@ -89,10 +86,16 @@ func (o *useContextOptions) complete(cmd *cobra.Command) bool {
 	return true
 }
 
-func (o useContextOptions) validate() error {
+func (o useContextOptions) validate(config *clientcmdapi.Config) error {
 	if len(o.contextName) == 0 {
-		return errors.New("You must specify a current-context")
+		return errors.New("you must specify a current-context")
 	}
 
-	return nil
+	for name := range config.Contexts {
+		if name == o.contextName {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("no context exists with the name: %q.", o.contextName)
 }

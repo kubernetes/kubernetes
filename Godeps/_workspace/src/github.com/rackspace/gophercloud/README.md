@@ -25,7 +25,7 @@ export GOPATH=$HOME/go
 ```
 
 To protect yourself against changes in your dependencies, we highly recommend choosing a
-[dependency management solution](https://code.google.com/p/go-wiki/wiki/PackageManagementTools) for
+[dependency management solution](https://github.com/golang/go/wiki/PackageManagementTools) for
 your projects, such as [godep](https://github.com/tools/godep). Once this is set up, you can install
 Gophercloud as a dependency like so:
 
@@ -151,11 +151,10 @@ Engaging the community and lowering barriers for contributors is something we
 care a lot about. For this reason, we've taken the time to write a [contributing
 guide](./CONTRIBUTING.md) for folks interested in getting involved in our project.
 If you're not sure how you can get involved, feel free to submit an issue or
-[e-mail us](mailto:sdk-support@rackspace.com) privately. You don't need to be a
+[contact us](https://developer.rackspace.com/support/). You don't need to be a
 Go expert - all members of the community are welcome!
 
 ## Help and feedback
 
 If you're struggling with something or have spotted a potential bug, feel free
-to submit an issue to our [bug tracker](/issues) or e-mail us directly at
-[sdk-support@rackspace.com](mailto:sdk-support@rackspace.com).
+to submit an issue to our [bug tracker](/issues) or [contact us directly](https://developer.rackspace.com/support/).

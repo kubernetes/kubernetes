@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,10 @@ type StringFlag struct {
 	provided bool
 	// The exact value provided on the flag
 	value string
+}
+
+func NewStringFlag(defaultVal string) StringFlag {
+	return StringFlag{value: defaultVal}
 }
 
 func (f *StringFlag) Default(value string) {

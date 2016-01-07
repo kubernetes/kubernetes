@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,12 +19,13 @@ package deny
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestAdmission(t *testing.T) {
 	handler := NewAlwaysDeny()
-	err := handler.Admit(admission.NewAttributesRecord(nil, "foo", "Pod", "ignored"))
+	err := handler.Admit(admission.NewAttributesRecord(nil, api.Kind("kind"), "namespace", "name", api.Resource("resource"), "subresource", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected error returned from admission handler")
 	}

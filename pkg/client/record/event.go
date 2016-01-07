@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,12 +21,13 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -35,97 +36,185 @@ const maxTriesPerEvent = 12
 
 var sleepDuration = 10 * time.Second
 
-// EventRecorder knows how to store events (client.Client implements it.)
-// EventRecorder must respect the namespace that will be embedded in 'event'.
-// It is assumed that EventRecorder will return the same sorts of errors as
+const maxQueuedEvents = 1000
+
+// EventSink knows how to store events (client.Client implements it.)
+// EventSink must respect the namespace that will be embedded in 'event'.
+// It is assumed that EventSink will return the same sorts of errors as
 // pkg/client's REST client.
-type EventRecorder interface {
+type EventSink interface {
 	Create(event *api.Event) (*api.Event, error)
+	Update(event *api.Event) (*api.Event, error)
+	Patch(oldEvent *api.Event, data []byte) (*api.Event, error)
 }
 
-// StartRecording starts sending events to recorder. Call once while initializing
-// your binary. Subsequent calls will be ignored. The return value can be ignored
-// or used to stop recording, if desired.
+// EventRecorder knows how to record events on behalf of an EventSource.
+type EventRecorder interface {
+	// Event constructs an event from the given information and puts it in the queue for sending.
+	// 'object' is the object this event is about. Event will make a reference-- or you may also
+	// pass a reference to the object directly.
+	// 'type' of this event, and can be one of Normal, Warning. New types could be added in future
+	// 'reason' is the reason this event is generated. 'reason' should be short and unique; it
+	// should be in UpperCamelCase format (starting with a capital letter). "reason" will be used
+	// to automate handling of events, so imagine people writing switch statements to handle them.
+	// You want to make that easy.
+	// 'message' is intended to be human readable.
+	//
+	// The resulting event will be created in the same namespace as the reference object.
+	Event(object runtime.Object, eventtype, reason, message string)
+
+	// Eventf is just like Event, but with Sprintf for the message field.
+	Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{})
+
+	// PastEventf is just like Eventf, but with an option to specify the event's 'timestamp' field.
+	PastEventf(object runtime.Object, timestamp unversioned.Time, eventtype, reason, messageFmt string, args ...interface{})
+}
+
+// EventBroadcaster knows how to receive events and send them to any EventSink, watcher, or log.
+type EventBroadcaster interface {
+	// StartEventWatcher starts sending events received from this EventBroadcaster to the given
+	// event handler function. The return value can be ignored or used to stop recording, if
+	// desired.
+	StartEventWatcher(eventHandler func(*api.Event)) watch.Interface
+
+	// StartRecordingToSink starts sending events received from this EventBroadcaster to the given
+	// sink. The return value can be ignored or used to stop recording, if desired.
+	StartRecordingToSink(sink EventSink) watch.Interface
+
+	// StartLogging starts sending events received from this EventBroadcaster to the given logging
+	// function. The return value can be ignored or used to stop recording, if desired.
+	StartLogging(logf func(format string, args ...interface{})) watch.Interface
+
+	// NewRecorder returns an EventRecorder that can be used to send events to this EventBroadcaster
+	// with the event source set to the given event source.
+	NewRecorder(source api.EventSource) EventRecorder
+}
+
+// Creates a new event broadcaster.
+func NewBroadcaster() EventBroadcaster {
+	return &eventBroadcasterImpl{watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull)}
+}
+
+type eventBroadcasterImpl struct {
+	*watch.Broadcaster
+}
+
+// StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
+// The return value can be ignored or used to stop recording, if desired.
 // TODO: make me an object with parameterizable queue length and retry interval
-func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interface {
+func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSink) watch.Interface {
 	// The default math/rand package functions aren't thread safe, so create a
 	// new Rand object for each StartRecording call.
 	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return GetEvents(func(event *api.Event) {
-		// Make a copy before modification, because there could be multiple listeners.
-		// Events are safe to copy like this.
-		eventCopy := *event
-		event = &eventCopy
-		event.Source = source
-
-		tries := 0
-		for {
-			if recordEvent(recorder, event) {
-				break
+	eventCorrelator := NewEventCorrelator(util.RealClock{})
+	return eventBroadcaster.StartEventWatcher(
+		func(event *api.Event) {
+			// Make a copy before modification, because there could be multiple listeners.
+			// Events are safe to copy like this.
+			eventCopy := *event
+			event = &eventCopy
+			result, err := eventCorrelator.EventCorrelate(event)
+			if err != nil {
+				util.HandleError(err)
 			}
-			tries++
-			if tries >= maxTriesPerEvent {
-				glog.Errorf("Unable to write event '%#v' (retry limit exceeded!)", event)
-				break
+			if result.Skip {
+				return
 			}
-			// Randomize the first sleep so that various clients won't all be
-			// synced up if the master goes down.
-			if tries == 1 {
-				time.Sleep(time.Duration(float64(sleepDuration) * randGen.Float64()))
-			} else {
-				time.Sleep(sleepDuration)
+			tries := 0
+			for {
+				if recordEvent(sink, result.Event, result.Patch, result.Event.Count > 1, eventCorrelator) {
+					break
+				}
+				tries++
+				if tries >= maxTriesPerEvent {
+					glog.Errorf("Unable to write event '%#v' (retry limit exceeded!)", event)
+					break
+				}
+				// Randomize the first sleep so that various clients won't all be
+				// synced up if the master goes down.
+				if tries == 1 {
+					time.Sleep(time.Duration(float64(sleepDuration) * randGen.Float64()))
+				} else {
+					time.Sleep(sleepDuration)
+				}
 			}
-		}
-	})
+		})
 }
 
-// recordEvent attempts to write event to recorder. It returns true if the event
-// was successfully recorded or discarded, false if it should be retried.
-func recordEvent(recorder EventRecorder, event *api.Event) bool {
-	_, err := recorder.Create(event)
-	if err == nil {
+func isKeyNotFoundError(err error) bool {
+	statusErr, _ := err.(*errors.StatusError)
+	// At the moment the server is returning 500 instead of a more specific
+	// error. When changing this remember that it should be backward compatible
+	// with old api servers that may be still returning 500.
+	if statusErr != nil && statusErr.Status().Code == 500 {
 		return true
 	}
+	return false
+}
+
+// recordEvent attempts to write event to a sink. It returns true if the event
+// was successfully recorded or discarded, false if it should be retried.
+// If updateExistingEvent is false, it creates a new event, otherwise it updates
+// existing event.
+func recordEvent(sink EventSink, event *api.Event, patch []byte, updateExistingEvent bool, eventCorrelator *EventCorrelator) bool {
+	var newEvent *api.Event
+	var err error
+	if updateExistingEvent {
+		newEvent, err = sink.Patch(event, patch)
+	}
+	// Update can fail because the event may have been removed and it no longer exists.
+	if !updateExistingEvent || (updateExistingEvent && isKeyNotFoundError(err)) {
+		// Making sure that ResourceVersion is empty on creation
+		event.ResourceVersion = ""
+		newEvent, err = sink.Create(event)
+	}
+	if err == nil {
+		// we need to update our event correlator with the server returned state to handle name/resourceversion
+		eventCorrelator.UpdateState(newEvent)
+		return true
+	}
+
 	// If we can't contact the server, then hold everything while we keep trying.
 	// Otherwise, something about the event is malformed and we should abandon it.
-	giveUp := false
 	switch err.(type) {
 	case *client.RequestConstructionError:
 		// We will construct the request the same next time, so don't keep trying.
-		giveUp = true
+		glog.Errorf("Unable to construct event '%#v': '%v' (will not retry!)", event, err)
+		return true
 	case *errors.StatusError:
-		// This indicates that the server understood and rejected our request.
-		giveUp = true
+		if errors.IsAlreadyExists(err) {
+			glog.V(5).Infof("Server rejected event '%#v': '%v' (will not retry!)", event, err)
+		} else {
+			glog.Errorf("Server rejected event '%#v': '%v' (will not retry!)", event, err)
+		}
+		return true
 	case *errors.UnexpectedObjectError:
 		// We don't expect this; it implies the server's response didn't match a
 		// known pattern. Go ahead and retry.
 	default:
 		// This case includes actual http transport errors. Go ahead and retry.
 	}
-	if giveUp {
-		glog.Errorf("Unable to write event '%#v': '%v' (will not retry!)", event, err)
-		return true
-	}
 	glog.Errorf("Unable to write event: '%v' (may retry after sleeping)", err)
 	return false
 }
 
-// StartLogging just logs local events, using the given logging function. The
-// return value can be ignored or used to stop logging, if desired.
-func StartLogging(logf func(format string, args ...interface{})) watch.Interface {
-	return GetEvents(func(e *api.Event) {
-		logf("Event(%#v): reason: '%v' %v", e.InvolvedObject, e.Reason, e.Message)
-	})
+// StartLogging starts sending events received from this EventBroadcaster to the given logging function.
+// The return value can be ignored or used to stop recording, if desired.
+func (eventBroadcaster *eventBroadcasterImpl) StartLogging(logf func(format string, args ...interface{})) watch.Interface {
+	return eventBroadcaster.StartEventWatcher(
+		func(e *api.Event) {
+			logf("Event(%#v): type: '%v' reason: '%v' %v", e.InvolvedObject, e.Type, e.Reason, e.Message)
+		})
 }
 
-// GetEvents lets you see *local* events. Convenience function for testing. The
-// return value can be ignored or used to stop logging, if desired.
-func GetEvents(f func(*api.Event)) watch.Interface {
-	w := events.Watch()
+// StartEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
+// The return value can be ignored or used to stop recording, if desired.
+func (eventBroadcaster *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*api.Event)) watch.Interface {
+	watcher := eventBroadcaster.Watch()
 	go func() {
 		defer util.HandleCrash()
 		for {
-			watchEvent, open := <-w.ResultChan()
+			watchEvent, open := <-watcher.ResultChan()
 			if !open {
 				return
 			}
@@ -135,37 +224,74 @@ func GetEvents(f func(*api.Event)) watch.Interface {
 				// ever happen.
 				continue
 			}
-			f(event)
+			eventHandler(event)
 		}
 	}()
-	return w
+	return watcher
 }
 
-const maxQueuedEvents = 1000
+// NewRecorder returns an EventRecorder that records events with the given event source.
+func (eventBroadcaster *eventBroadcasterImpl) NewRecorder(source api.EventSource) EventRecorder {
+	return &recorderImpl{source, eventBroadcaster.Broadcaster, util.RealClock{}}
+}
 
-var events = watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull)
+type recorderImpl struct {
+	source api.EventSource
+	*watch.Broadcaster
+	clock util.Clock
+}
 
-// Event constructs an event from the given information and puts it in the queue for sending.
-// 'object' is the object this event is about. Event will make a reference-- or you may also
-// pass a reference to the object directly.
-// 'reason' is the reason this event is generated. 'reason' should be short and unique; it will
-// be used to automate handling of events, so imagine people writing switch statements to
-// handle them. You want to make that easy.
-// 'message' is intended to be human readable.
-//
-// The resulting event will be created in the same namespace as the reference object.
-func Event(object runtime.Object, reason, message string) {
+func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp unversioned.Time, eventtype, reason, message string) {
 	ref, err := api.GetReference(object)
 	if err != nil {
-		glog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v'", object, err, reason, message)
+		glog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v' '%v'", object, err, eventtype, reason, message)
 		return
 	}
-	t := util.Now()
 
-	e := &api.Event{
+	if !validateEventType(eventtype) {
+		glog.Errorf("Unsupported event type: '%v'", eventtype)
+		return
+	}
+
+	event := recorder.makeEvent(ref, eventtype, reason, message)
+	event.Source = recorder.source
+
+	go func() {
+		// NOTE: events should be a non-blocking operation
+		recorder.Action(watch.Added, event)
+	}()
+}
+
+func validateEventType(eventtype string) bool {
+	switch eventtype {
+	case api.EventTypeNormal, api.EventTypeWarning:
+		return true
+	}
+	return false
+}
+
+func (recorder *recorderImpl) Event(object runtime.Object, eventtype, reason, message string) {
+	recorder.generateEvent(object, unversioned.Now(), eventtype, reason, message)
+}
+
+func (recorder *recorderImpl) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	recorder.Event(object, eventtype, reason, fmt.Sprintf(messageFmt, args...))
+}
+
+func (recorder *recorderImpl) PastEventf(object runtime.Object, timestamp unversioned.Time, eventtype, reason, messageFmt string, args ...interface{}) {
+	recorder.generateEvent(object, timestamp, eventtype, reason, fmt.Sprintf(messageFmt, args...))
+}
+
+func (recorder *recorderImpl) makeEvent(ref *api.ObjectReference, eventtype, reason, message string) *api.Event {
+	t := unversioned.Time{recorder.clock.Now()}
+	namespace := ref.Namespace
+	if namespace == "" {
+		namespace = api.NamespaceDefault
+	}
+	return &api.Event{
 		ObjectMeta: api.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
-			Namespace: ref.Namespace,
+			Namespace: namespace,
 		},
 		InvolvedObject: *ref,
 		Reason:         reason,
@@ -173,12 +299,6 @@ func Event(object runtime.Object, reason, message string) {
 		FirstTimestamp: t,
 		LastTimestamp:  t,
 		Count:          1,
+		Type:           eventtype,
 	}
-
-	events.Action(watch.Added, e)
-}
-
-// Eventf is just like Event, but with Sprintf for the message field.
-func Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
-	Event(object, reason, fmt.Sprintf(messageFmt, args...))
 }

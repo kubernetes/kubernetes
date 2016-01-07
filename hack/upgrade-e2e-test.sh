@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,15 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Provide reasonable default for running the end-to-end tests against a recent
-# stable release and then again after upgrading it to a version built from head.
-
-go run "$(dirname $0)/e2e.go" -v -build -up -version="v0.6.0" -tests="*" -check_version_skew=false
+# This does a checked upgrade of the MASTER using the locally built release, then runs e2e.
+echo "Running the checked master upgrade."
+go run "$(dirname $0)/e2e.go" -build -up -v -test -test_args='--ginkgo.focus=Cluster\sUpgrade.*gce-upgrade' -check_version_skew=false
 if [ $? -eq 0 ]; then
-	echo "Tests on initial version succeeded. Proceeding with push and second set of tests."
-	go run "$(dirname $0)/e2e.go" -v -push -version="" -tests="*" -check_version_skew=false
+    echo "Master upgrade complete. Running e2e on the upgraded cluster."
+    go run "$(dirname $0)/e2e.go" -v -version="" -test -check_version_skew=false
 else
-	echo "Tests on initial version failed. Skipping tests on second version."
+    echo "Master upgrade failed."
 fi
 
 exit $?

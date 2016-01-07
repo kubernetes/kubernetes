@@ -5,8 +5,6 @@ import (
 
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
-
-	"github.com/racker/perigee"
 )
 
 // List returns a Pager which allows you to iterate over a collection of
@@ -23,11 +21,7 @@ func List(c *gophercloud.ServiceClient) pagination.Pager {
 // Get retrieves a specific network based on its unique ID.
 func Get(c *gophercloud.ServiceClient, id string) GetResult {
 	var res GetResult
-	_, res.Err = perigee.Request("GET", getURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		OkCodes:     []int{200},
-	})
+	_, res.Err = c.Get(getURL(c, id), &res.Body, nil)
 	return res
 }
 
@@ -81,11 +75,8 @@ func Create(c *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateResult {
 	}
 
 	// Send request to API
-	_, res.Err = perigee.Request("POST", createURL(c), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{200, 201, 202},
+	_, res.Err = c.Post(createURL(c), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200, 201, 202},
 	})
 	return res
 }
@@ -93,9 +84,6 @@ func Create(c *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateResult {
 // Delete accepts a unique ID and deletes the network associated with it.
 func Delete(c *gophercloud.ServiceClient, networkID string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", deleteURL(c, networkID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
-	})
+	_, res.Err = c.Delete(deleteURL(c, networkID), nil)
 	return res
 }

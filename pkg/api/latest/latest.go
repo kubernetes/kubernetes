@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,129 +18,123 @@ package latest
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// Version is the string that represents the current external default version.
-const Version = "v1beta1"
+var (
+	allGroups = GroupMetaMap{}
+	// Group is a shortcut to allGroups.Group.
+	Group = allGroups.Group
+	// RegisterGroup is a shortcut to allGroups.RegisterGroup.
+	RegisterGroup = allGroups.RegisterGroup
+	// GroupOrDie is a shortcut to allGroups.GroupOrDie.
+	GroupOrDie = allGroups.GroupOrDie
+	// AllPreferredGroupVersions returns the preferred versions of all
+	// registered groups in the form of "group1/version1,group2/version2,..."
+	AllPreferredGroupVersions = allGroups.AllPreferredGroupVersions
+	// IsRegistered is a shortcut to allGroups.IsRegistered.
+	IsRegistered = allGroups.IsRegistered
+)
 
-// OldestVersion is the string that represents the oldest server version supported,
-// for client code that wants to hardcode the lowest common denominator.
-const OldestVersion = "v1beta1"
-
-// Versions is the list of versions that are recognized in code. The order provided
-// may be assumed to be least feature rich to most feature rich, and clients may
-// choose to prefer the latter items in the list over the former items when presented
-// with a set of versions to choose.
-var Versions = []string{"v1beta1", "v1beta2", "v1beta3"}
-
-// Codec is the default codec for serializing output that should use
-// the latest supported version.  Use this Codec when writing to
-// disk, a data store that is not dynamically versioned, or in tests.
-// This codec can decode any object that Kubernetes is aware of.
-var Codec = v1beta1.Codec
-
-// accessor is the shared static metadata accessor for the API.
-var accessor = meta.NewAccessor()
-
-// ResourceVersioner describes a default versioner that can handle all types
-// of versioning.
-// TODO: when versioning changes, make this part of each API definition.
-var ResourceVersioner = runtime.ResourceVersioner(accessor)
-
-// SelfLinker can set or get the SelfLink field of all API types.
-// TODO: when versioning changes, make this part of each API definition.
-// TODO(lavalamp): Combine SelfLinker & ResourceVersioner interfaces, force all uses
-// to go through the InterfacesFor method below.
-var SelfLinker = runtime.SelfLinker(accessor)
-
-// RESTMapper provides the default mapping between REST paths and the objects declared in api.Scheme and all known
-// Kubernetes versions.
-var RESTMapper meta.RESTMapper
-
-// InterfacesFor returns the default Codec and ResourceVersioner for a given version
-// string, or an error if the version is not known.
-func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
-	switch version {
-	case "v1beta1":
-		return &meta.VersionInterfaces{
-			Codec:            v1beta1.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	case "v1beta2":
-		return &meta.VersionInterfaces{
-			Codec:            v1beta2.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	case "v1beta3":
-		return &meta.VersionInterfaces{
-			Codec:            v1beta3.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(Versions, ", "))
-	}
+// ExternalVersions is a list of all external versions for this API group in order of
+// most preferred to least preferred
+var ExternalVersions = []unversioned.GroupVersion{
+	{Group: "", Version: "v1"},
 }
 
-func init() {
-	mapper := meta.NewDefaultRESTMapper(
-		Versions,
-		func(version string) (*meta.VersionInterfaces, bool) {
-			interfaces, err := InterfacesFor(version)
-			if err != nil {
-				return nil, false
-			}
-			return interfaces, true
-		},
-	)
-	// list of versions we support on the server
-	versions := []string{"v1beta1", "v1beta2", "v1beta3"}
+// GroupMetaMap is a map between group names and their metadata.
+type GroupMetaMap map[string]*GroupMeta
 
-	// versions that used mixed case URL formats
-	versionMixedCase := map[string]bool{
-		"v1beta1": true,
-		"v1beta2": true,
+// RegisterGroup registers a group to GroupMetaMap.
+func (g GroupMetaMap) RegisterGroup(groupMeta GroupMeta) error {
+	groupName := groupMeta.GroupVersion.Group
+	if _, found := g[groupName]; found {
+		return fmt.Errorf("group %v is already registered", g)
 	}
 
-	// backwards compatibility, prior to v1beta3, we identified the namespace as a query parameter
-	versionToNamespaceScope := map[string]meta.RESTScope{
-		"v1beta1": meta.RESTScopeNamespaceLegacy,
-		"v1beta2": meta.RESTScopeNamespaceLegacy,
-		"v1beta3": meta.RESTScopeNamespace,
-	}
+	g[groupName] = &groupMeta
+	return nil
+}
 
-	// the list of kinds that are scoped at the root of the api hierarchy
-	// if a kind is not enumerated here, it is assumed to have a namespace scope
-	kindToRootScope := map[string]bool{
-		"Node":      true,
-		"Minion":    true,
-		"Namespace": true,
+// Group returns the metadata of a group if the gruop is registered, otherwise
+// an erorr is returned.
+func (g GroupMetaMap) Group(group string) (*GroupMeta, error) {
+	groupMeta, found := g[group]
+	if !found {
+		return nil, fmt.Errorf("no version is registered for group %v", group)
 	}
+	groupMetaCopy := *groupMeta
+	return &groupMetaCopy, nil
+}
 
-	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources
-	for _, version := range versions {
-		for kind := range api.Scheme.KnownTypes(version) {
-			mixedCase, found := versionMixedCase[version]
-			if !found {
-				mixedCase = false
-			}
-			scope := versionToNamespaceScope[version]
-			_, found = kindToRootScope[kind]
-			if found {
-				scope = meta.RESTScopeRoot
-			}
-			mapper.Add(scope, kind, version, mixedCase)
+// IsRegistered takes a string and determines if it's one of the registered groups
+func (g GroupMetaMap) IsRegistered(group string) bool {
+	_, found := g[group]
+	return found
+}
+
+// TODO: This is an expedient function, because we don't check if a Group is
+// supported throughout the code base. We will abandon this function and
+// checking the error returned by the Group() function.
+func (g GroupMetaMap) GroupOrDie(group string) *GroupMeta {
+	groupMeta, found := g[group]
+	if !found {
+		const msg = "Please check the KUBE_API_VERSIONS environment variable."
+		if group == "" {
+			panic("The legacy v1 API is not registered. " + msg)
+		} else {
+			panic(fmt.Sprintf("No version is registered for group %s. ", group) + msg)
 		}
 	}
-	RESTMapper = mapper
+	groupMetaCopy := *groupMeta
+	return &groupMetaCopy
+}
+
+// AllPreferredGroupVersions returns the preferred versions of all registered
+// groups in the form of "group1/version1,group2/version2,..."
+func (g GroupMetaMap) AllPreferredGroupVersions() string {
+	if len(g) == 0 {
+		return ""
+	}
+	var defaults []string
+	for _, groupMeta := range g {
+		defaults = append(defaults, groupMeta.GroupVersion.String())
+	}
+	sort.Strings(defaults)
+	return strings.Join(defaults, ",")
+}
+
+// GroupMeta stores the metadata of a group, such as the latest supported version.
+type GroupMeta struct {
+	// GroupVersion represents the current external default version of the group.
+	GroupVersion unversioned.GroupVersion
+
+	// GroupVersions is Group + Versions. This is to avoid string concatenation
+	// in many places.
+	GroupVersions []unversioned.GroupVersion
+
+	// Codec is the default codec for serializing output that should use
+	// the latest supported version.  Use this Codec when writing to
+	// disk, a data store that is not dynamically versioned, or in tests.
+	// This codec can decode any object that Kubernetes is aware of.
+	Codec runtime.Codec
+
+	// SelfLinker can set or get the SelfLink field of all API types.
+	// TODO: when versioning changes, make this part of each API definition.
+	// TODO(lavalamp): Combine SelfLinker & ResourceVersioner interfaces, force all uses
+	// to go through the InterfacesFor method below.
+	SelfLinker runtime.SelfLinker
+
+	// RESTMapper provides the default mapping between REST paths and the objects declared in api.Scheme and all known
+	// Kubernetes versions.
+	RESTMapper meta.RESTMapper
+
+	// InterfacesFor returns the default Codec and ResourceVersioner for a given version
+	// or an error if the version is not known.
+	InterfacesFor func(version unversioned.GroupVersion) (*meta.VersionInterfaces, error)
 }

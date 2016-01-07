@@ -1,0 +1,102 @@
+{
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "etcd-server-e2e-test-wojtekt-master",
+        "namespace": "default",
+        "selfLink": "/api/v1/namespaces/default/pods/etcd-server-e2e-test-wojtekt-master",
+        "uid": "a671734a-e8e5-11e4-8fde-42010af09327",
+        "resourceVersion": "22",
+        "creationTimestamp": "2015-04-22T11:49:36Z",
+        "annotations": {
+            "kubernetes.io/config.mirror": "mirror",
+            "kubernetes.io/config.source": "file"
+        }
+    },
+    "spec": {
+        "volumes": [
+            {
+                "name": "varetcd",
+                "hostPath": {
+                    "path": "/mnt/master-pd/var/etcd"
+                },
+                "emptyDir": null,
+                "gcePersistentDisk": null,
+                "awsElasticBlockStore": null,
+                "gitRepo": null,
+                "secret": null,
+                "nfs": null,
+                "iscsi": null,
+                "glusterfs": null
+            }
+        ],
+        "containers": [
+            {
+                "name": "etcd-container",
+                "image": "gcr.io/google_containers/etcd:2.0.9",
+                "command": [
+                    "/usr/local/bin/etcd",
+                    "--addr",
+                    "127.0.0.1:4001",
+                    "--bind-addr",
+                    "127.0.0.1:4001",
+                    "--data-dir",
+                    "/var/etcd/data"
+                ],
+                "ports": [
+                    {
+                        "name": "serverport",
+                        "hostPort": 2380,
+                        "containerPort": 2380,
+                        "protocol": "TCP"
+                    },
+                    {
+                        "name": "clientport",
+                        "hostPort": 4001,
+                        "containerPort": 4001,
+                        "protocol": "TCP"
+                    }
+                ],
+                "resources": {},
+                "volumeMounts": [
+                    {
+                        "name": "varetcd",
+                        "mountPath": "/var/etcd"
+                    }
+                ],
+                "terminationMessagePath": "/dev/termination-log",
+                "imagePullPolicy": "IfNotPresent",
+                "capabilities": {}
+            }
+        ],
+        "restartPolicy": "Always",
+        "dnsPolicy": "ClusterFirst",
+        "nodeName": "e2e-test-wojtekt-master",
+        "hostNetwork": true
+    },
+    "status": {
+        "phase": "Running",
+        "conditions": [
+            {
+                "type": "Ready",
+                "status": "True"
+            }
+        ],
+        "containerStatuses": [
+            {
+                "name": "etcd-container",
+                "state": {
+                    "running": {
+                        "startedAt": "2015-04-22T11:49:32Z"
+                    }
+                },
+                "lastState": {},
+                "ready": true,
+                "restartCount": 0,
+                "image": "gcr.io/google_containers/etcd:2.0.9",
+                "imageID": "docker://b6b9a86dc06aa1361357ca1b105feba961f6a4145adca6c54e142c0be0fe87b0",
+                "containerID": "docker://3cbbf818f1addfc252957b4504f56ef2907a313fe6afc47fc75373674255d46d"
+            }
+        ]
+    }
+}

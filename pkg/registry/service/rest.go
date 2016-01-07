@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,148 +20,125 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"net/http"
+	"net/url"
+	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/registry/endpoint"
+	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
+	"k8s.io/kubernetes/pkg/registry/service/portallocator"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // REST adapts a service registry into apiserver's RESTStorage model.
 type REST struct {
-	registry  Registry
-	cloud     cloudprovider.Interface
-	machines  minion.Registry
-	portalMgr *ipAllocator
+	registry         Registry
+	endpoints        endpoint.Registry
+	serviceIPs       ipallocator.Interface
+	serviceNodePorts portallocator.Interface
+	proxyTransport   http.RoundTripper
 }
 
-// NewREST returns a new REST.
-func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.Registry, portalNet *net.IPNet) *REST {
-	// TODO: Before we can replicate masters, this has to be synced (e.g. lives in etcd)
-	ipa := newIPAllocator(portalNet)
-	if ipa == nil {
-		glog.Fatalf("Failed to create an IP allocator. Is subnet '%v' valid?", portalNet)
-	}
-	reloadIPsFromStorage(ipa, registry)
-
+// NewStorage returns a new REST.
+func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
+	serviceNodePorts portallocator.Interface, proxyTransport http.RoundTripper) *REST {
 	return &REST{
-		registry:  registry,
-		cloud:     cloud,
-		machines:  machines,
-		portalMgr: ipa,
-	}
-}
-
-// Helper: mark all previously allocated IPs in the allocator.
-func reloadIPsFromStorage(ipa *ipAllocator, registry Registry) {
-	services, err := registry.ListServices(api.NewContext())
-	if err != nil {
-		// This is really bad.
-		glog.Errorf("can't list services to init service REST: %v", err)
-		return
-	}
-	for i := range services.Items {
-		service := &services.Items[i]
-		if service.Spec.PortalIP == "" {
-			glog.Warningf("service %q has no PortalIP", service.Name)
-			continue
-		}
-		if err := ipa.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
-			// This is really bad.
-			glog.Errorf("service %q PortalIP %s could not be allocated: %v", service.Name, service.Spec.PortalIP, err)
-		}
+		registry:         registry,
+		endpoints:        endpoints,
+		serviceIPs:       serviceIPs,
+		serviceNodePorts: serviceNodePorts,
+		proxyTransport:   proxyTransport,
 	}
 }
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
-	if err := rest.BeforeCreate(rest.Services, ctx, obj); err != nil {
+	if err := rest.BeforeCreate(Strategy, ctx, obj); err != nil {
 		return nil, err
 	}
 
-	if len(service.Spec.PortalIP) == 0 {
+	// TODO: this should probably move to strategy.PrepareForCreate()
+	releaseServiceIP := false
+	defer func() {
+		if releaseServiceIP {
+			if api.IsServiceIPSet(service) {
+				rs.serviceIPs.Release(net.ParseIP(service.Spec.ClusterIP))
+			}
+		}
+	}()
+
+	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts)
+	defer nodePortOp.Finish()
+
+	if api.IsServiceIPRequested(service) {
 		// Allocate next available.
-		ip, err := rs.portalMgr.AllocateNext()
+		ip, err := rs.serviceIPs.AllocateNext()
 		if err != nil {
-			return nil, err
+			// TODO: what error should be returned here?  It's not a
+			// field-level validation failure (the field is valid), and it's
+			// not really an internal error.
+			return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a serviceIP: %v", err))
 		}
-		service.Spec.PortalIP = ip.String()
-	} else {
+		service.Spec.ClusterIP = ip.String()
+		releaseServiceIP = true
+	} else if api.IsServiceIPSet(service) {
 		// Try to respect the requested IP.
-		if err := rs.portalMgr.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
-			el := errors.ValidationErrorList{errors.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, err.Error())}
-			return nil, errors.NewInvalid("Service", service.Name, el)
+		if err := rs.serviceIPs.Allocate(net.ParseIP(service.Spec.ClusterIP)); err != nil {
+			// TODO: when validation becomes versioned, this gets more complicated.
+			el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIP"), service.Spec.ClusterIP, err.Error())}
+			return nil, errors.NewInvalid(api.Kind("Service"), service.Name, el)
 		}
+		releaseServiceIP = true
 	}
 
-	// TODO: Move this to post-creation rectification loop, so that we make/remove external load balancers
-	// correctly no matter what http operations happen.
-	if service.Spec.CreateExternalLoadBalancer {
-		if rs.cloud == nil {
-			return nil, fmt.Errorf("requested an external service, but no cloud provider supplied.")
-		}
-		if service.Spec.Protocol != api.ProtocolTCP {
-			// TODO: Support UDP here too.
-			return nil, fmt.Errorf("external load balancers for non TCP services are not currently supported.")
-		}
-		balancer, ok := rs.cloud.TCPLoadBalancer()
-		if !ok {
-			return nil, fmt.Errorf("the cloud provider does not support external TCP load balancers.")
-		}
-		zones, ok := rs.cloud.Zones()
-		if !ok {
-			return nil, fmt.Errorf("the cloud provider does not support zone enumeration.")
-		}
-		hosts, err := rs.machines.ListMinions(ctx)
-		if err != nil {
-			return nil, err
-		}
-		zone, err := zones.GetZone()
-		if err != nil {
-			return nil, err
-		}
-		// TODO: We should be able to rely on valid input, and not do defaulting here.
-		var affinityType api.AffinityType = service.Spec.SessionAffinity
-		if affinityType == "" {
-			affinityType = api.AffinityTypeNone
-		}
-		if len(service.Spec.PublicIPs) > 0 {
-			for _, publicIP := range service.Spec.PublicIPs {
-				_, err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, net.ParseIP(publicIP), service.Spec.Port, hostsFromMinionList(hosts), affinityType)
-				if err != nil {
-					// TODO: have to roll-back any successful calls.
-					return nil, err
-				}
-			}
-		} else {
-			ip, err := balancer.CreateTCPLoadBalancer(service.Name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts), affinityType)
+	assignNodePorts := shouldAssignNodePorts(service)
+	for i := range service.Spec.Ports {
+		servicePort := &service.Spec.Ports[i]
+		if servicePort.NodePort != 0 {
+			err := nodePortOp.Allocate(servicePort.NodePort)
 			if err != nil {
-				return nil, err
+				// TODO: when validation becomes versioned, this gets more complicated.
+				el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), servicePort.NodePort, err.Error())}
+				return nil, errors.NewInvalid(api.Kind("Service"), service.Name, el)
 			}
-			service.Spec.PublicIPs = []string{ip.String()}
+		} else if assignNodePorts {
+			nodePort, err := nodePortOp.AllocateNext()
+			if err != nil {
+				// TODO: what error should be returned here?  It's not a
+				// field-level validation failure (the field is valid), and it's
+				// not really an internal error.
+				return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
+			}
+			servicePort.NodePort = nodePort
 		}
 	}
 
-	if err := rs.registry.CreateService(ctx, service); err != nil {
-		err = rest.CheckGeneratedNameError(rest.Services, err, service)
-		return nil, err
+	out, err := rs.registry.CreateService(ctx, service)
+	if err != nil {
+		err = rest.CheckGeneratedNameError(Strategy, err, service)
 	}
-	return rs.registry.GetService(ctx, service.Name)
-}
 
-func hostsFromMinionList(list *api.NodeList) []string {
-	result := make([]string, len(list.Items))
-	for ix := range list.Items {
-		result[ix] = list.Items[ix].Name
+	if err == nil {
+		el := nodePortOp.Commit()
+		if el != nil {
+			// these should be caught by an eventual reconciliation / restart
+			glog.Errorf("error(s) committing service node-ports changes: %v", el)
+		}
+
+		releaseServiceIP = false
 	}
-	return result
+
+	return out, err
 }
 
 func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
@@ -169,39 +146,46 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
-	rs.deleteExternalLoadBalancer(service)
-	return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteService(ctx, id)
+
+	err = rs.registry.DeleteService(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: can leave dangling endpoints, and potentially return incorrect
+	// endpoints if a new service is created with the same name
+	err = rs.endpoints.DeleteEndpoints(ctx, id)
+	if err != nil && !errors.IsNotFound(err) {
+		return nil, err
+	}
+
+	if api.IsServiceIPSet(service) {
+		rs.serviceIPs.Release(net.ParseIP(service.Spec.ClusterIP))
+	}
+
+	for _, nodePort := range CollectServiceNodePorts(service) {
+		err := rs.serviceNodePorts.Release(nodePort)
+		if err != nil {
+			// these should be caught by an eventual reconciliation / restart
+			glog.Errorf("Error releasing service %s node port %d: %v", service.Name, nodePort, err)
+		}
+	}
+
+	return &unversioned.Status{Status: unversioned.StatusSuccess}, nil
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	service, err := rs.registry.GetService(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	return service, err
+	return rs.registry.GetService(ctx, id)
 }
 
-// TODO: implement field selector?
-func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
-	list, err := rs.registry.ListServices(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var filtered []api.Service
-	for _, service := range list.Items {
-		if label.Matches(labels.Set(service.Labels)) {
-			filtered = append(filtered, service)
-		}
-	}
-	list.Items = filtered
-	return list, err
+func (rs *REST) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
+	return rs.registry.ListServices(ctx, options)
 }
 
 // Watch returns Services events via a watch.Interface.
-// It implements apiserver.ResourceWatcher.
-func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
-	return rs.registry.WatchServices(ctx, label, field, resourceVersion)
+// It implements rest.Watcher.
+func (rs *REST) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+	return rs.registry.WatchServices(ctx, options)
 }
 
 func (*REST) New() runtime.Object {
@@ -209,13 +193,13 @@ func (*REST) New() runtime.Object {
 }
 
 func (*REST) NewList() runtime.Object {
-	return &api.Service{}
+	return &api.ServiceList{}
 }
 
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	service := obj.(*api.Service)
 	if !api.ValidNamespace(ctx, &service.ObjectMeta) {
-		return nil, false, errors.NewConflict("service", service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
+		return nil, false, errors.NewConflict(api.Resource("services"), service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
 
 	oldService, err := rs.registry.GetService(ctx, service.Name)
@@ -225,54 +209,171 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 
 	// Copy over non-user fields
 	// TODO: make this a merge function
-	if errs := validation.ValidateServiceUpdate(oldService, service); len(errs) > 0 {
-		return nil, false, errors.NewInvalid("service", service.Name, errs)
+	if errs := validation.ValidateServiceUpdate(service, oldService); len(errs) > 0 {
+		return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
-	// TODO: check to see if external load balancer status changed
-	err = rs.registry.UpdateService(ctx, service)
-	if err != nil {
-		return nil, false, err
+
+	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts)
+	defer nodePortOp.Finish()
+
+	assignNodePorts := shouldAssignNodePorts(service)
+
+	oldNodePorts := CollectServiceNodePorts(oldService)
+
+	newNodePorts := []int{}
+	if assignNodePorts {
+		for i := range service.Spec.Ports {
+			servicePort := &service.Spec.Ports[i]
+			nodePort := servicePort.NodePort
+			if nodePort != 0 {
+				if !contains(oldNodePorts, nodePort) {
+					err := nodePortOp.Allocate(nodePort)
+					if err != nil {
+						el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), nodePort, err.Error())}
+						return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, el)
+					}
+				}
+			} else {
+				nodePort, err = nodePortOp.AllocateNext()
+				if err != nil {
+					// TODO: what error should be returned here?  It's not a
+					// field-level validation failure (the field is valid), and it's
+					// not really an internal error.
+					return nil, false, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
+				}
+				servicePort.NodePort = nodePort
+			}
+			// Detect duplicate node ports; this should have been caught by validation, so we panic
+			if contains(newNodePorts, nodePort) {
+				panic("duplicate node port")
+			}
+			newNodePorts = append(newNodePorts, nodePort)
+		}
+	} else {
+		// Validate should have validated that nodePort == 0
 	}
-	out, err := rs.registry.GetService(ctx, service.Name)
+
+	// The comparison loops are O(N^2), but we don't expect N to be huge
+	// (there's a hard-limit at 2^16, because they're ports; and even 4 ports would be a lot)
+	for _, oldNodePort := range oldNodePorts {
+		if !contains(newNodePorts, oldNodePort) {
+			continue
+		}
+		nodePortOp.ReleaseDeferred(oldNodePort)
+	}
+
+	// Remove any LoadBalancerStatus now if Type != LoadBalancer;
+	// although loadbalancer delete is actually asynchronous, we don't need to expose the user to that complexity.
+	if service.Spec.Type != api.ServiceTypeLoadBalancer {
+		service.Status.LoadBalancer = api.LoadBalancerStatus{}
+	}
+
+	out, err := rs.registry.UpdateService(ctx, service)
+
+	if err == nil {
+		el := nodePortOp.Commit()
+		if el != nil {
+			// problems should be fixed by an eventual reconciliation / restart
+			glog.Errorf("error(s) committing NodePorts changes: %v", el)
+		}
+	}
+
 	return out, false, err
 }
 
+// Implement Redirector.
+var _ = rest.Redirector(&REST{})
+
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
-func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
-	e, err := rs.registry.GetEndpoints(ctx, id)
+func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
+	// Allow ID as "svcname", "svcname:port", or "scheme:svcname:port".
+	svcScheme, svcName, portStr, valid := util.SplitSchemeNamePort(id)
+	if !valid {
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid service request %q", id))
+	}
+
+	// If a port *number* was specified, find the corresponding service port name
+	if portNum, err := strconv.ParseInt(portStr, 10, 64); err == nil {
+		svc, err := rs.registry.GetService(ctx, svcName)
+		if err != nil {
+			return nil, nil, err
+		}
+		found := false
+		for _, svcPort := range svc.Spec.Ports {
+			if svcPort.Port == int(portNum) {
+				// use the declared port's name
+				portStr = svcPort.Name
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no service port %d found for service %q", portNum, svcName))
+		}
+	}
+
+	eps, err := rs.endpoints.GetEndpoints(ctx, svcName)
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
-	if len(e.Endpoints) == 0 {
-		return "", fmt.Errorf("no endpoints available for %v", id)
+	if len(eps.Subsets) == 0 {
+		return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", svcName))
 	}
-	// We leave off the scheme ('http://') because we have no idea what sort of server
-	// is listening at this endpoint.
-	return e.Endpoints[rand.Intn(len(e.Endpoints))], nil
+	// Pick a random Subset to start searching from.
+	ssSeed := rand.Intn(len(eps.Subsets))
+	// Find a Subset that has the port.
+	for ssi := 0; ssi < len(eps.Subsets); ssi++ {
+		ss := &eps.Subsets[(ssSeed+ssi)%len(eps.Subsets)]
+		if len(ss.Addresses) == 0 {
+			continue
+		}
+		for i := range ss.Ports {
+			if ss.Ports[i].Name == portStr {
+				// Pick a random address.
+				ip := ss.Addresses[rand.Intn(len(ss.Addresses))].IP
+				port := ss.Ports[i].Port
+				return &url.URL{
+					Scheme: svcScheme,
+					Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
+				}, rs.proxyTransport, nil
+			}
+		}
+	}
+	return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
 }
 
-func (rs *REST) deleteExternalLoadBalancer(service *api.Service) error {
-	if !service.Spec.CreateExternalLoadBalancer || rs.cloud == nil {
-		return nil
+// This is O(N), but we expect haystack to be small;
+// so small that we expect a linear search to be faster
+func contains(haystack []int, needle int) bool {
+	for _, v := range haystack {
+		if v == needle {
+			return true
+		}
 	}
-	zones, ok := rs.cloud.Zones()
-	if !ok {
-		// We failed to get zone enumerator.
-		// As this should have failed when we tried in "create" too,
-		// assume external load balancer was never created.
-		return nil
+	return false
+}
+
+func CollectServiceNodePorts(service *api.Service) []int {
+	servicePorts := []int{}
+	for i := range service.Spec.Ports {
+		servicePort := &service.Spec.Ports[i]
+		if servicePort.NodePort != 0 {
+			servicePorts = append(servicePorts, servicePort.NodePort)
+		}
 	}
-	balancer, ok := rs.cloud.TCPLoadBalancer()
-	if !ok {
-		// See comment above.
-		return nil
+	return servicePorts
+}
+
+func shouldAssignNodePorts(service *api.Service) bool {
+	switch service.Spec.Type {
+	case api.ServiceTypeLoadBalancer:
+		return true
+	case api.ServiceTypeNodePort:
+		return true
+	case api.ServiceTypeClusterIP:
+		return false
+	default:
+		glog.Errorf("Unknown service type: %v", service.Spec.Type)
+		return false
 	}
-	zone, err := zones.GetZone()
-	if err != nil {
-		return err
-	}
-	if err := balancer.DeleteTCPLoadBalancer(service.Name, zone.Region); err != nil {
-		return err
-	}
-	return nil
 }

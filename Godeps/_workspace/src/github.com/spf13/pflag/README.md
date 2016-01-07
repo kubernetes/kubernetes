@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/spf13/pflag.svg?branch=master)](https://travis-ci.org/spf13/pflag)
+
 ## Description
 
 pflag is a drop-in replacement for Go's flag package, implementing
@@ -18,11 +20,11 @@ pflag is available using the standard `go get` command.
 
 Install by running:
 
-    go get github.com/ogier/pflag
+    go get github.com/spf13/pflag
 
 Run tests by running:
 
-    go test github.com/ogier/pflag
+    go test github.com/spf13/pflag
 
 ## Usage
 
@@ -31,7 +33,7 @@ pflag under the name "flag" then all code should continue to function
 with no changes.
 
 ``` go
-import flag "github.com/ogier/pflag"
+import flag "github.com/spf13/pflag"
 ```
 
 There is one exception to this: if you directly instantiate the Flag struct
@@ -82,6 +84,16 @@ fmt.Println("ip has value ", *ip)
 fmt.Println("flagvar has value ", flagvar)
 ```
 
+There are helpers function to get values later if you have the FlagSet but
+it was difficult to keep up with all of the the flag pointers in your code.
+If you have a pflag.FlagSet with a flag called 'flagname' of type int you
+can use GetInt() to get the int value. But notice that 'flagname' must exist
+and it must be an int. GetString("flagname") will fail.
+
+``` go
+i, err := flagset.GetInt("flagname")
+```
+
 After parsing, the arguments after the flag are available as the
 slice flag.Args() or individually as flag.Arg(i).
 The arguments are indexed from 0 through flag.NArg()-1.
@@ -109,29 +121,56 @@ in a command-line interface. The methods of FlagSet are
 analogous to the top-level functions for the command-line
 flag set.
 
+## Setting no option default values for flags
+
+After you create a flag it is possible to set the pflag.NoOptDefVal for
+the given flag. Doing this changes the meaning of the flag slightly. If
+a flag has a NoOptDefVal and the flag is set on the command line without
+an option the flag will be set to the NoOptDefVal. For example given:
+
+``` go
+var ip = flag.IntP("flagname", "f", 1234, "help message")
+flag.Lookup("flagname").NoOptDefVal = "4321"
+```
+
+Would result in something like
+
+| Parsed Arguments | Resulting Value |
+| -------------    | -------------   |
+| --flagname=1357  | ip=1357         |
+| --flagname       | ip=4321         |
+| [nothing]        | ip=1234         |
+
 ## Command line flag syntax
 
 ```
---flag    // boolean flags only
+--flag    // boolean flags, or flags with no option default values
+--flag x  // only on flags without a default value
 --flag=x
 ```
 
 Unlike the flag package, a single dash before an option means something
 different than a double dash. Single dashes signify a series of shorthand
-letters for flags. All but the last shorthand letter must be boolean flags.
+letters for flags. All but the last shorthand letter must be boolean flags
+or a flag with a default value
 
 ```
-// boolean flags
+// boolean or flags where the 'no option default value' is set
 -f
+-f=true
 -abc
+but
+-b true is INVALID
 
-// non-boolean flags
+// non-boolean and flags without a 'no option default value'
 -n 1234
--Ifile
+-n=1234
+-n1234
 
 // mixed
 -abcs "hello"
--abcn1234
+-absd="hello"
+-abcs1234
 ```
 
 Flag parsing stops after the terminator "--". Unlike the flag package,
@@ -142,6 +181,68 @@ Integer flags accept 1234, 0664, 0x1234 and may be negative.
 Boolean flags (in their long form) accept 1, 0, t, f, true, false,
 TRUE, FALSE, True, False.
 Duration flags accept any input valid for time.ParseDuration.
+
+## Mutating or "Normalizing" Flag names
+
+It is possible to set a custom flag name 'normalization function.' It allows flag names to be mutated both when created in the code and when used on the command line to some 'normalized' form. The 'normalized' form is used for comparison. Two examples of using the custom normalization func follow.
+
+**Example #1**: You want -, _, and . in flags to compare the same. aka --my-flag == --my_flag == --my.flag
+
+``` go
+func wordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
+	from := []string{"-", "_"}
+	to := "."
+	for _, sep := range from {
+		name = strings.Replace(name, sep, to, -1)
+	}
+	return pflag.NormalizedName(name)
+}
+
+myFlagSet.SetNormalizeFunc(wordSepNormalizeFunc)
+```
+
+**Example #2**: You want to alias two flags. aka --old-flag-name == --new-flag-name
+
+``` go
+func aliasNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
+	switch name {
+	case "old-flag-name":
+		name = "new-flag-name"
+		break
+	}
+	return pflag.NormalizedName(name)
+}
+
+myFlagSet.SetNormalizeFunc(aliasNormalizeFunc)
+```
+
+## Deprecating a flag or its shorthand
+It is possible to deprecate a flag, or just its shorthand. Deprecating a flag/shorthand hides it from help text and prints a usage message when the deprecated flag/shorthand is used.
+
+**Example #1**: You want to deprecate a flag named "badflag" as well as inform the users what flag they should use instead.
+```go
+// deprecate a flag by specifying its name and a usage message
+flags.MarkDeprecated("badflag", "please use --good-flag instead")
+```
+This hides "badflag" from help text, and prints `Flag --badflag has been deprecated, please use --good-flag instead` when "badflag" is used.
+
+**Example #2**: You want to keep a flag name "noshorthandflag" but deprecate its shortname "n".
+```go
+// deprecate a flag shorthand by specifying its flag name and a usage message
+flags.MarkShorthandDeprecated("noshorthandflag", "please use --noshorthandflag only")
+```
+This hides the shortname "n" from help text, and prints `Flag shorthand -n has been deprecated, please use --noshorthandflag only` when the shorthand "n" is used.
+
+Note that usage message is essential here, and it should not be empty.
+
+## Hidden flags
+It is possible to mark a flag as hidden, meaning it will still function as normal, however will not show up in usage/help text.
+
+**Example**: You have a flag named "secretFlag" that you need for internal use only and don't want it showing up in help text, or for its usage text to be available.
+```go
+// hide a flag by specifying its name
+flags.MarkHidden("secretFlag")
+```
 
 ## More info
 

@@ -55,6 +55,14 @@ func HandleListContainerInfoSuccessfully(t *testing.T) {
           "name": "marktwain"
         }
       ]`)
+		case "janeausten":
+			fmt.Fprintf(w, `[
+				{
+					"count": 1,
+					"bytes": 14,
+					"name": "marktwain"
+				}
+			]`)
 		case "marktwain":
 			fmt.Fprintf(w, `[]`)
 		default:
@@ -77,6 +85,8 @@ func HandleListContainerNamesSuccessfully(t *testing.T) {
 		switch marker {
 		case "":
 			fmt.Fprintf(w, "janeausten\nmarktwain\n")
+		case "janeausten":
+			fmt.Fprintf(w, "marktwain\n")
 		case "marktwain":
 			fmt.Fprintf(w, ``)
 		default:
@@ -94,6 +104,7 @@ func HandleCreateContainerSuccessfully(t *testing.T) {
 		th.TestHeader(t, r, "Accept", "application/json")
 
 		w.Header().Add("X-Container-Meta-Foo", "bar")
+		w.Header().Add("X-Trans-Id", "1234567")
 		w.WriteHeader(http.StatusNoContent)
 	})
 }

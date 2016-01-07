@@ -11,7 +11,7 @@ As a contributor you will need to setup your workspace in a slightly different
 way than just downloading it. Here are the basic installation instructions:
 
 1. Configure your `$GOPATH` and run `go get` as described in the main
-[README](/#how-to-install).
+[README](/README.md#how-to-install).
 
 2. Move into the directory that houses your local repository:
 
@@ -28,11 +28,10 @@ fork as `origin` instead:
    git remote add origin git@github.com/<my_username>/gophercloud
    ```
 
-4. Checkout the latest development branch ([click here](/branches) to see all
-the branches):
+4. Checkout the latest development branch:
 
    ```bash
-   git checkout release/v1.0.1
+   git checkout master
    ```
 
 5. If you're working on something (discussed more in detail below), you will
@@ -205,7 +204,7 @@ On of the easiest ways to get readily involved in our project is to let us know
 about your experiences using our SDK. Feedback like this is incredibly useful
 to us, because it allows us to refine and change features based on what our
 users want and expect of us. There are a bunch of ways to get in contact! You
-can [ping us](mailto:sdk-support@rackspace.com) via e-mail, talk to us on irc
+can [ping us](https://developer.rackspace.com/support/) via e-mail, talk to us on irc
 (#rackspace-dev on freenode), [tweet us](https://twitter.com/rackspace), or
 submit an issue on our [bug tracker](/issues). Things you might like to tell us
 are:

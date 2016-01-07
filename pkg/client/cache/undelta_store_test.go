@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -120,7 +120,7 @@ func TestReplaceCallsPush(t *testing.T) {
 
 	m := []interface{}{mkObj("a", 1)}
 
-	u.Replace(m)
+	u.Replace(m, "0")
 	if callcount != 1 {
 		t.Errorf("Expected 1 calls, got %d", callcount)
 	}

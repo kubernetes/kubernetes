@@ -1,0 +1,60 @@
+{
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {"name":"nginx"},
+"spec":{
+"hostNetwork": true,
+"containers":[
+    {
+    "name": "nginx",
+    "image": "gcr.io/google-containers/nginx:v1",
+    "resources": {
+      "limits": {
+        "cpu": "200m"
+      }
+    },
+    "command": [
+              "nginx",
+	      "-g",
+	      "daemon off;"
+	],
+    "ports":[
+      { "name": "https",
+        "containerPort": 443,
+        "hostPort": 443}
+        ],
+    "volumeMounts": [
+      { "name": "nginx",
+        "mountPath": "/etc/nginx",
+        "readOnly": true},
+      { "name": "k8s",
+        "mountPath": "/srv/kubernetes",
+        "readOnly": true},
+      { "name": "logs",
+        "mountPath": "/var/log/nginx",
+        "readOnly": false},
+      { "name": "passwd",
+        "mountPath": "/usr/share/nginx",
+        "readOnly": true}
+        ]
+    }
+],
+"volumes":[
+  { "name": "nginx",
+    "hostPath": {
+        "path": "/etc/nginx"}
+  },
+  { "name": "k8s",
+    "hostPath": {
+        "path": "/srv/kubernetes"}
+  },
+  { "name": "passwd",
+    "hostPath": {
+        "path": "/usr/share/nginx"}
+  },
+  { "name": "logs",
+    "hostPath": {
+        "path": "/var/logs/nginx"}
+  }
+]
+}}

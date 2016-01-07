@@ -4,10 +4,13 @@ import (
 	"math"
 	"time"
 
+	"sync"
+
 	"github.com/onsi/ginkgo/types"
 )
 
 type benchmarker struct {
+	mu           sync.Mutex
 	measurements map[string]*types.SpecMeasurement
 	orderCounter int
 }
@@ -23,6 +26,8 @@ func (b *benchmarker) Time(name string, body func(), info ...interface{}) (elaps
 	body()
 	elapsedTime = time.Since(t)
 
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	measurement := b.getMeasurement(name, "Fastest Time", "Slowest Time", "Average Time", "s", info...)
 	measurement.Results = append(measurement.Results, elapsedTime.Seconds())
 
@@ -31,6 +36,8 @@ func (b *benchmarker) Time(name string, body func(), info ...interface{}) (elaps
 
 func (b *benchmarker) RecordValue(name string, value float64, info ...interface{}) {
 	measurement := b.getMeasurement(name, "Smallest", " Largest", " Average", "", info...)
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	measurement.Results = append(measurement.Results, value)
 }
 
@@ -60,6 +67,8 @@ func (b *benchmarker) getMeasurement(name string, smallestLabel string, largestL
 }
 
 func (b *benchmarker) measurementsReport() map[string]*types.SpecMeasurement {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	for _, measurement := range b.measurements {
 		measurement.Smallest = math.MaxFloat64
 		measurement.Largest = -math.MaxFloat64
