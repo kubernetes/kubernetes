@@ -855,6 +855,7 @@ function start-master() {
     echo "readonly SALT_MASTER='${MASTER_INTERNAL_IP}'"
     echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "readonly NODE_INSTANCE_PREFIX='${NODE_INSTANCE_PREFIX}'"
+    echo "readonly NON_MASQUERADE_CIDR='${NON_MASQUERADE_CIDR:-}'"
     echo "readonly CLUSTER_IP_RANGE='${CLUSTER_IP_RANGE}'"
     echo "readonly ALLOCATE_NODE_CIDRS='${ALLOCATE_NODE_CIDRS}'"
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"

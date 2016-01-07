@@ -142,7 +142,6 @@ input-dirs
 insecure-bind-address
 insecure-port
 insecure-skip-tls-verify
-internal-cidr
 iptables-sync-period
 ir-data-source
 ir-dbname
@@ -234,6 +233,7 @@ node-name
 node-startup-grace-period
 node-status-update-frequency
 node-sync-period
+non-masquerade-cidr
 num-nodes
 oidc-ca-file
 oidc-client-id
