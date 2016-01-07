@@ -215,6 +215,6 @@ func handleError(response *restful.Response, err error) {
 	default:
 		msg := fmt.Sprintf("Internal Error: %v", err)
 		glog.Infof("HTTP InternalServerError: %s", msg)
-		response.WriteErrorString(http.StatusNotFound, msg)
+		response.WriteErrorString(http.StatusInternalServerError, msg)
 	}
 }
