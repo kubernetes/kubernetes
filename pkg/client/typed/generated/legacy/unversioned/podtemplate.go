@@ -35,6 +35,7 @@ type PodTemplateInterface interface {
 	Get(name string) (*api.PodTemplate, error)
 	List(opts api.ListOptions) (*api.PodTemplateList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	PodTemplateExpansion
 }
 
 // podTemplates implements PodTemplateInterface

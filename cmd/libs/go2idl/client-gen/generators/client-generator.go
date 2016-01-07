@@ -18,6 +18,7 @@ limitations under the License.
 package generators
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -50,8 +51,8 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-func packageForGroup(group string, version string, typeList []*types.Type, basePath string, boilerplate []byte) generator.Package {
-	outputPackagePath := filepath.Join(basePath, group, version)
+func packageForGroup(group string, version string, typeList []*types.Type, packageBasePath string, srcTreePath string, boilerplate []byte) generator.Package {
+	outputPackagePath := filepath.Join(packageBasePath, group, version)
 	return &generator.DefaultPackage{
 		PackageName: version,
 		PackagePath: outputPackagePath,
@@ -89,6 +90,18 @@ func packageForGroup(group string, version string, typeList []*types.Type, baseP
 				types:         typeList,
 				imports:       generator.NewImportTracker(),
 			})
+
+			expansionFileName := "generated_expansion"
+			// To avoid overriding user's manual modification, only generate the expansion file if it doesn't exist.
+			if _, err := os.Stat(filepath.Join(srcTreePath, outputPackagePath, expansionFileName+".go")); os.IsNotExist(err) {
+				generators = append(generators, &genExpansion{
+					DefaultGen: generator.DefaultGen{
+						OptionalName: expansionFileName,
+					},
+					types: typeList,
+				})
+			}
+
 			return generators
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
@@ -126,7 +139,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	var packageList []generator.Package
 	orderer := namer.Orderer{namer.NewPrivateNamer(0)}
 	for group, types := range groupToTypes {
-		packageList = append(packageList, packageForGroup(group, "unversioned", orderer.OrderTypes(types), arguments.OutputPackagePath, boilerplate))
+		packageList = append(packageList, packageForGroup(group, "unversioned", orderer.OrderTypes(types), arguments.OutputPackagePath, arguments.OutputBase, boilerplate))
 	}
 
 	return generator.Packages(packageList)

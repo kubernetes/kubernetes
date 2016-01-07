@@ -36,6 +36,7 @@ type ThirdPartyResourceInterface interface {
 	Get(name string) (*extensions.ThirdPartyResource, error)
 	List(opts api.ListOptions) (*extensions.ThirdPartyResourceList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	ThirdPartyResourceExpansion
 }
 
 // thirdPartyResources implements ThirdPartyResourceInterface

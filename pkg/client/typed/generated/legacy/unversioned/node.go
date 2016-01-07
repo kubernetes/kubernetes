@@ -35,6 +35,7 @@ type NodeInterface interface {
 	Get(name string) (*api.Node, error)
 	List(opts api.ListOptions) (*api.NodeList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	NodeExpansion
 }
 
 // nodes implements NodeInterface

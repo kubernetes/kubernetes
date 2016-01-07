@@ -35,6 +35,7 @@ type ResourceQuotaInterface interface {
 	Get(name string) (*api.ResourceQuota, error)
 	List(opts api.ListOptions) (*api.ResourceQuotaList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	ResourceQuotaExpansion
 }
 
 // resourceQuotas implements ResourceQuotaInterface

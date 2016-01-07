@@ -36,6 +36,7 @@ type DeploymentInterface interface {
 	Get(name string) (*extensions.Deployment, error)
 	List(opts api.ListOptions) (*extensions.DeploymentList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	DeploymentExpansion
 }
 
 // deployments implements DeploymentInterface
