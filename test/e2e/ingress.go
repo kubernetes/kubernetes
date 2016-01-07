@@ -187,15 +187,18 @@ func createApp(c *client.Client, ns string, i int) {
 
 // gcloudUnmarshal unmarshals json output of gcloud into given out interface.
 func gcloudUnmarshal(resource, regex string, out interface{}) {
-	output, err := exec.Command("gcloud", "compute", resource, "list",
+	args := []string{
+		"compute", resource, "list",
 		fmt.Sprintf("--regex=%v", regex),
 		fmt.Sprintf("--project=%v", testContext.CloudConfig.ProjectID),
-		"-q", "--format=json").CombinedOutput()
+		"-q", "--format=json",
+	}
+	output, err := exec.Command("gcloud", args...).CombinedOutput()
 	if err != nil {
 		Failf("Error unmarshalling gcloud output: %v", err)
 	}
 	if err := json.Unmarshal([]byte(output), out); err != nil {
-		Failf("Error unmarshalling gcloud output for %v: %v", resource, err)
+		Failf("Error unmarshalling gcloud output for %v: %v, output: %v, command: gcloud %s", resource, err, string(output), strings.Join(args, " "))
 	}
 }
 
