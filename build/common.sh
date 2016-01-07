@@ -864,9 +864,9 @@ function kube::release::package_salt_tarball() {
 # such as Ubuntu Trusty.
 #
 # There are two sources of manifests files: (1) some manifests in the directory
-# cluster/saltbase/salt can be directly used on instances without salt, so we copy
-# them from there; (2) for the ones containing salt config, we cannot directly
-# use them. Therefore, we will maintain separate copies in cluster/gce/kube-manifests.
+# cluster/saltbase/salt can be used directly or after minor revision, so we copy
+# them from there; (2) otherwise, we will maintain separate copies in
+# cluster/gce/kube-manifests.
 function kube::release::package_kube_manifests_tarball() {
   kube::log::status "Building tarball: manifests"
 
@@ -880,9 +880,11 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/fluentd-es/fluentd-es.yaml" "${release_stage}/"
   cp "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
+  cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
+
   # Source 2: manifests from cluster/gce/kube-manifests.
   # TODO(andyzheng0831): Enable the following line after finishing issue #16702.
-  # cp "${KUBE_ROOT}/cluster/gce/kube-manifests/*" "${release_stage}/"
+  # cp "${KUBE_ROOT}/cluster/gce/kube-manifests/"* "${release_stage}/"
 
   kube::release::clean_cruft
 
