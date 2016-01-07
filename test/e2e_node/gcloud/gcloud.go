@@ -142,7 +142,7 @@ func (gc *gCloudClientImpl) Run(
 		// This is to help debug if the credential issues are persistent for a given host on a given run, or transient
 		// And if downstream gcloud commands are also impacted
 		for i := 0; i < 6 && err != nil && strings.Contains(string(out), "does not have any valid credentials"); i++ {
-			glog.Errorf("mkdir failed on host %s due to credential issues, retrying in 5 seconds %v %s", gc.host, err, out)
+			glog.Warningf("mkdir failed on host %s due to credential issues, retrying in 5 seconds %v %s", gc.host, err, out)
 			time.Sleep(5 * time.Second)
 			out, err = gc.Command("mkdir", "-p", tDir)
 		}
