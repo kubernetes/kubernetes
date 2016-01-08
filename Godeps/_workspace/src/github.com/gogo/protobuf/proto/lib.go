@@ -216,7 +216,7 @@ The resulting file, test.pb.go, is:
 
 To create and play with a Test object:
 
-package main
+	package main
 
 	import (
 		"log"

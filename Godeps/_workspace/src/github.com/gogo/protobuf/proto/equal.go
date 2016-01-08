@@ -30,7 +30,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Protocol buffer comparison.
-// TODO: MessageSet.
 
 package proto
 

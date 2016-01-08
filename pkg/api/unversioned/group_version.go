@@ -24,6 +24,8 @@ import (
 
 // GroupResource specifies a Group and a Resource, but does not force a version.  This is useful for identifying
 // concepts during lookup stages without having partially valid types
+//
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type GroupResource struct {
 	Group    string
 	Resource string
@@ -46,6 +48,8 @@ func (gr *GroupResource) String() string {
 
 // GroupVersionResource unambiguously identifies a resource.  It doesn't anonymously include GroupVersion
 // to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
+//
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type GroupVersionResource struct {
 	Group    string
 	Version  string

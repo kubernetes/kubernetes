@@ -44,11 +44,11 @@ import (
 	"sort"
 )
 
-// ErrNoMessageTypeId occurs when a protocol buffer does not have a message type ID.
+// errNoMessageTypeID occurs when a protocol buffer does not have a message type ID.
 // A message type ID is required for storing a protocol buffer in a message set.
-var ErrNoMessageTypeId = errors.New("proto does not have a message type ID")
+var errNoMessageTypeID = errors.New("proto does not have a message type ID")
 
-// The first two types (_MessageSet_Item and MessageSet)
+// The first two types (_MessageSet_Item and messageSet)
 // model what the protocol compiler produces for the following protocol message:
 //   message MessageSet {
 //     repeated group Item = 1 {
@@ -58,27 +58,20 @@ var ErrNoMessageTypeId = errors.New("proto does not have a message type ID")
 //   }
 // That is the MessageSet wire format. We can't use a proto to generate these
 // because that would introduce a circular dependency between it and this package.
-//
-// When a proto1 proto has a field that looks like:
-//   optional message<MessageSet> info = 3;
-// the protocol compiler produces a field in the generated struct that looks like:
-//   Info *_proto_.MessageSet  `protobuf:"bytes,3,opt,name=info"`
-// The package is automatically inserted so there is no need for that proto file to
-// import this package.
 
 type _MessageSet_Item struct {
 	TypeId  *int32 `protobuf:"varint,2,req,name=type_id"`
 	Message []byte `protobuf:"bytes,3,req,name=message"`
 }
 
-type MessageSet struct {
+type messageSet struct {
 	Item             []*_MessageSet_Item `protobuf:"group,1,rep"`
 	XXX_unrecognized []byte
 	// TODO: caching?
 }
 
-// Make sure MessageSet is a Message.
-var _ Message = (*MessageSet)(nil)
+// Make sure messageSet is a Message.
+var _ Message = (*messageSet)(nil)
 
 // messageTypeIder is an interface satisfied by a protocol buffer type
 // that may be stored in a MessageSet.
@@ -86,7 +79,7 @@ type messageTypeIder interface {
 	MessageTypeId() int32
 }
 
-func (ms *MessageSet) find(pb Message) *_MessageSet_Item {
+func (ms *messageSet) find(pb Message) *_MessageSet_Item {
 	mti, ok := pb.(messageTypeIder)
 	if !ok {
 		return nil
@@ -100,24 +93,24 @@ func (ms *MessageSet) find(pb Message) *_MessageSet_Item {
 	return nil
 }
 
-func (ms *MessageSet) Has(pb Message) bool {
+func (ms *messageSet) Has(pb Message) bool {
 	if ms.find(pb) != nil {
 		return true
 	}
 	return false
 }
 
-func (ms *MessageSet) Unmarshal(pb Message) error {
+func (ms *messageSet) Unmarshal(pb Message) error {
 	if item := ms.find(pb); item != nil {
 		return Unmarshal(item.Message, pb)
 	}
 	if _, ok := pb.(messageTypeIder); !ok {
-		return ErrNoMessageTypeId
+		return errNoMessageTypeID
 	}
 	return nil // TODO: return error instead?
 }
 
-func (ms *MessageSet) Marshal(pb Message) error {
+func (ms *messageSet) Marshal(pb Message) error {
 	msg, err := Marshal(pb)
 	if err != nil {
 		return err
@@ -130,7 +123,7 @@ func (ms *MessageSet) Marshal(pb Message) error {
 
 	mti, ok := pb.(messageTypeIder)
 	if !ok {
-		return ErrNoMessageTypeId
+		return errNoMessageTypeID
 	}
 
 	mtid := mti.MessageTypeId()
@@ -141,9 +134,9 @@ func (ms *MessageSet) Marshal(pb Message) error {
 	return nil
 }
 
-func (ms *MessageSet) Reset()         { *ms = MessageSet{} }
-func (ms *MessageSet) String() string { return CompactTextString(ms) }
-func (*MessageSet) ProtoMessage()     {}
+func (ms *messageSet) Reset()         { *ms = messageSet{} }
+func (ms *messageSet) String() string { return CompactTextString(ms) }
+func (*messageSet) ProtoMessage()     {}
 
 // Support for the message_set_wire_format message option.
 
@@ -169,7 +162,7 @@ func MarshalMessageSet(m map[int32]Extension) ([]byte, error) {
 	}
 	sort.Ints(ids)
 
-	ms := &MessageSet{Item: make([]*_MessageSet_Item, 0, len(m))}
+	ms := &messageSet{Item: make([]*_MessageSet_Item, 0, len(m))}
 	for _, id := range ids {
 		e := m[int32(id)]
 		// Remove the wire type and field number varint, as well as the length varint.
@@ -186,7 +179,7 @@ func MarshalMessageSet(m map[int32]Extension) ([]byte, error) {
 // UnmarshalMessageSet decodes the extension map encoded in buf in the message set wire format.
 // It is called by generated Unmarshal methods on protocol buffer messages with the message_set_wire_format option.
 func UnmarshalMessageSet(buf []byte, m map[int32]Extension) error {
-	ms := new(MessageSet)
+	ms := new(messageSet)
 	if err := Unmarshal(buf, ms); err != nil {
 		return err
 	}
