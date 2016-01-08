@@ -70,7 +70,7 @@ func (m *metricsForE2E) PrintHumanReadable() string {
 }
 
 func (m *metricsForE2E) PrintJSON() string {
-	return "JSON printer not implemented for Metrics"
+	return prettyPrintJSON(*m)
 }
 
 var InterestingApiServerMetrics = []string{
@@ -402,10 +402,12 @@ func VerifySchedulerLatency(c *client.Client) error {
 func prettyPrintJSON(metrics interface{}) string {
 	output := &bytes.Buffer{}
 	if err := json.NewEncoder(output).Encode(metrics); err != nil {
+		Logf("Error building encoder: %v", err)
 		return ""
 	}
 	formatted := &bytes.Buffer{}
 	if err := json.Indent(formatted, output.Bytes(), "", "  "); err != nil {
+		Logf("Error indenting: %v", err)
 		return ""
 	}
 	return string(formatted.Bytes())

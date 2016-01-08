@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"text/tabwriter"
@@ -48,12 +49,13 @@ type containerResourceGatherer struct {
 }
 
 type singleContainerSummary struct {
-	name string
-	cpu  float64
-	mem  int64
+	Name string
+	Cpu  float64
+	Mem  int64
 }
 
-type ResourceUsageSummary map[int][]singleContainerSummary
+// we can't have int here, as JSON does not accept integer keys.
+type ResourceUsageSummary map[string][]singleContainerSummary
 
 func (s *ResourceUsageSummary) PrintHumanReadable() string {
 	buf := &bytes.Buffer{}
@@ -62,7 +64,7 @@ func (s *ResourceUsageSummary) PrintHumanReadable() string {
 		buf.WriteString(fmt.Sprintf("%v percentile:\n", perc))
 		fmt.Fprintf(w, "container\tcpu(cores)\tmemory(MB)\n")
 		for _, summary := range summaries {
-			fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", summary.name, summary.cpu, float64(summary.mem)/(1024*1024))
+			fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", summary.Name, summary.Cpu, float64(summary.Mem)/(1024*1024))
 		}
 		w.Flush()
 	}
@@ -70,7 +72,7 @@ func (s *ResourceUsageSummary) PrintHumanReadable() string {
 }
 
 func (s *ResourceUsageSummary) PrintJSON() string {
-	return "JSON printer not implemented for ResourceUsageSummary"
+	return prettyPrintJSON(*s)
 }
 
 func (g *containerResourceGatherer) startGatheringData(c *client.Client, period time.Duration) {
@@ -115,10 +117,10 @@ func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constrai
 	for _, perc := range percentiles {
 		for _, name := range sortedKeys {
 			usage := stats[perc][name]
-			summary[perc] = append(summary[perc], singleContainerSummary{
-				name: name,
-				cpu:  usage.CPUUsageInCores,
-				mem:  usage.MemoryWorkingSetInBytes,
+			summary[strconv.Itoa(perc)] = append(summary[strconv.Itoa(perc)], singleContainerSummary{
+				Name: name,
+				Cpu:  usage.CPUUsageInCores,
+				Mem:  usage.MemoryWorkingSetInBytes,
 			})
 			// Verifying 99th percentile of resource usage
 			if perc == 99 {
