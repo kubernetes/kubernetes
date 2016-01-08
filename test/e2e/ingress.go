@@ -390,11 +390,6 @@ func (cont *IngressController) Cleanup(del bool) error {
 	return fmt.Errorf(errMsg)
 }
 
-// Before enabling this loadbalancer test in any other test list you must
-// make sure the associated project has enough quota. At the time of this
-// writing a GCE project is allowed 3 backend services by default. This
-// test requires at least 5.
-//
 // Slow by design (10 min)
 // Flaky issue #17518
 var _ = Describe("GCE L7 LoadBalancer Controller [Serial] [Slow] [Flaky]", func() {
