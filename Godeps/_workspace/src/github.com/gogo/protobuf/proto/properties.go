@@ -42,6 +42,7 @@ package proto
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"reflect"
 	"sort"
@@ -740,6 +741,7 @@ func getPropertiesLocked(t reflect.Type) *StructProperties {
 	prop.Prop = make([]*Properties, t.NumField())
 	prop.order = make([]int, t.NumField())
 
+	isOneofMessage := false
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		p := new(Properties)
@@ -761,6 +763,9 @@ func getPropertiesLocked(t reflect.Type) *StructProperties {
 			prop.unrecField = toField(&f)
 		}
 		oneof := f.Tag.Get("protobuf_oneof") != "" // special case
+		if oneof {
+			isOneofMessage = true
+		}
 		prop.Prop[i] = p
 		prop.order[i] = i
 		if debug {
@@ -781,7 +786,7 @@ func getPropertiesLocked(t reflect.Type) *StructProperties {
 	type oneofMessage interface {
 		XXX_OneofFuncs() (func(Message, *Buffer) error, func(Message, int, int, *Buffer) (bool, error), []interface{})
 	}
-	if om, ok := reflect.Zero(reflect.PtrTo(t)).Interface().(oneofMessage); ok {
+	if om, ok := reflect.Zero(reflect.PtrTo(t)).Interface().(oneofMessage); isOneofMessage && ok {
 		var oots []interface{}
 		prop.oneofMarshaler, prop.oneofUnmarshaler, oots = om.XXX_OneofFuncs()
 		prop.stype = t
@@ -876,3 +881,35 @@ func RegisterEnum(typeName string, unusedNameMap map[int32]string, valueMap map[
 	}
 	enumStringMaps[typeName] = unusedNameMap
 }
+
+// EnumValueMap returns the mapping from names to integers of the
+// enum type enumType, or a nil if not found.
+func EnumValueMap(enumType string) map[string]int32 {
+	return enumValueMaps[enumType]
+}
+
+// A registry of all linked message types.
+// The string is a fully-qualified proto name ("pkg.Message").
+var (
+	protoTypes    = make(map[string]reflect.Type)
+	revProtoTypes = make(map[reflect.Type]string)
+)
+
+// RegisterType is called from generated code and maps from the fully qualified
+// proto name to the type (pointer to struct) of the protocol buffer.
+func RegisterType(x Message, name string) {
+	if _, ok := protoTypes[name]; ok {
+		// TODO: Some day, make this a panic.
+		log.Printf("proto: duplicate proto type registered: %s", name)
+		return
+	}
+	t := reflect.TypeOf(x)
+	protoTypes[name] = t
+	revProtoTypes[t] = name
+}
+
+// MessageName returns the fully-qualified proto name for the given message type.
+func MessageName(x Message) string { return revProtoTypes[reflect.TypeOf(x)] }
+
+// MessageType returns the message type (pointer to struct) for a named message.
+func MessageType(name string) reflect.Type { return protoTypes[name] }
