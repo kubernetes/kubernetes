@@ -63,6 +63,16 @@
 			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
 		},
 		{
+			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/json/jsonutil",
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
+		},
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/jsonrpc",
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
+		},
+		{
 			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/query",
 			"Comment": "v1.0.7",
 			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
@@ -94,6 +104,11 @@
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/ec2",
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
+		},
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/service/ecr",
 			"Comment": "v1.0.7",
 			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
 		},
