@@ -121,15 +121,15 @@ func Test_Instances(t *testing.T) {
 	}
 }
 
-// test mesos.TCPLoadBalancer
+// test mesos.LoadBalancer
 func Test_TcpLoadBalancer(t *testing.T) {
 	defer log.Flush()
 	mesosCloud, _ := newMesosCloud(nil)
 
-	lb, supports_lb := mesosCloud.TCPLoadBalancer()
+	lb, supports_lb := mesosCloud.LoadBalancer()
 
 	if supports_lb || lb != nil {
-		t.Fatalf("MesosCloud does not provide an implementation of TCPLoadBalancer")
+		t.Fatalf("MesosCloud does not provide an implementation of LoadBalancer")
 	}
 }
 

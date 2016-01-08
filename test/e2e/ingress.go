@@ -178,7 +178,7 @@ func createApp(c *client.Client, ns string, i int) {
 	Expect(err).NotTo(HaveOccurred())
 
 	Logf("Creating rc %v", name)
-	rc := rcByNamePort(name, 1, testImage, httpContainerPort, l)
+	rc := rcByNamePort(name, 1, testImage, httpContainerPort, api.ProtocolTCP, l)
 	rc.Spec.Template.Spec.Containers[0].Args = []string{
 		"--num=1",
 		fmt.Sprintf("--start=%d", i),

@@ -495,8 +495,8 @@ type LoadBalancer struct {
 	opts    LoadBalancerOpts
 }
 
-func (os *OpenStack) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
-	glog.V(4).Info("openstack.TCPLoadBalancer() called")
+func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
+	glog.V(4).Info("openstack.LoadBalancer() called")
 
 	// TODO: Search for and support Rackspace loadbalancer API, and others.
 	network, err := openstack.NewNetworkV2(os.provider, gophercloud.EndpointOpts{
@@ -515,7 +515,7 @@ func (os *OpenStack) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 		return nil, false
 	}
 
-	glog.V(1).Info("Claiming to support TCPLoadBalancer")
+	glog.V(1).Info("Claiming to support LoadBalancer")
 
 	return &LoadBalancer{network, compute, os.lbOpts}, true
 }
@@ -630,7 +630,7 @@ func getFloatingIPByPortID(client *gophercloud.ServiceClient, portID string) (*f
 	return &floatingIPList[0], nil
 }
 
-func (lb *LoadBalancer) GetTCPLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
+func (lb *LoadBalancer) GetLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
 	vip, err := getVipByName(lb.network, name)
 	if err == ErrNotFound {
 		return nil, false, nil
@@ -650,11 +650,19 @@ func (lb *LoadBalancer) GetTCPLoadBalancer(name, region string) (*api.LoadBalanc
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lb *LoadBalancer) EnsureTCPLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
-	glog.V(4).Infof("EnsureTCPLoadBalancer(%v, %v, %v, %v, %v, %v)", name, region, loadBalancerIP, ports, hosts, affinity)
+func (lb *LoadBalancer) EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v)", name, region, loadBalancerIP, ports, hosts, affinity)
 
 	if len(ports) > 1 {
 		return nil, fmt.Errorf("multiple ports are not yet supported in openstack load balancers")
+	} else if len(ports) == 0 {
+		return nil, fmt.Errorf("no ports provided to openstack load balancer")
+	}
+
+	// The service controller verified all the protocols match on the ports, just check and use the first one
+	// TODO: Convert all error messages to use an event recorder
+	if ports[0].Protocol != api.ProtocolTCP {
+		return nil, fmt.Errorf("Only TCP LoadBalancer is supported for openstack load balancers")
 	}
 
 	var persistence *vips.SessionPersistence
@@ -668,7 +676,7 @@ func (lb *LoadBalancer) EnsureTCPLoadBalancer(name, region string, loadBalancerI
 	}
 
 	glog.V(2).Info("Checking if openstack load balancer already exists: %s", name)
-	_, exists, err := lb.GetTCPLoadBalancer(name, region)
+	_, exists, err := lb.GetLoadBalancer(name, region)
 	if err != nil {
 		return nil, fmt.Errorf("error checking if openstack load balancer already exists: %v", err)
 	}
@@ -676,7 +684,7 @@ func (lb *LoadBalancer) EnsureTCPLoadBalancer(name, region string, loadBalancerI
 	// TODO: Implement a more efficient update strategy for common changes than delete & create
 	// In particular, if we implement hosts update, we can get rid of UpdateHosts
 	if exists {
-		err := lb.EnsureTCPLoadBalancerDeleted(name, region)
+		err := lb.EnsureLoadBalancerDeleted(name, region)
 		if err != nil {
 			return nil, fmt.Errorf("error deleting existing openstack load balancer: %v", err)
 		}
@@ -777,8 +785,8 @@ func (lb *LoadBalancer) EnsureTCPLoadBalancer(name, region string, loadBalancerI
 
 }
 
-func (lb *LoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
-	glog.V(4).Infof("UpdateTCPLoadBalancer(%v, %v, %v)", name, region, hosts)
+func (lb *LoadBalancer) UpdateLoadBalancer(name, region string, hosts []string) error {
+	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", name, region, hosts)
 
 	vip, err := getVipByName(lb.network, name)
 	if err != nil {
@@ -838,8 +846,8 @@ func (lb *LoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []strin
 	return nil
 }
 
-func (lb *LoadBalancer) EnsureTCPLoadBalancerDeleted(name, region string) error {
-	glog.V(4).Infof("EnsureTCPLoadBalancerDeleted(%v, %v)", name, region)
+func (lb *LoadBalancer) EnsureLoadBalancerDeleted(name, region string) error {
+	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v)", name, region)
 
 	vip, err := getVipByName(lb.network, name)
 	if err != nil && err != ErrNotFound {

@@ -15,5 +15,5 @@ limitations under the License.
 */
 
 // Package fake is a test-double implementation of cloudprovider
-// Interface, TCPLoadBalancer and Instances. It is useful for testing.
+// Interface, LoadBalancer and Instances. It is useful for testing.
 package fake
