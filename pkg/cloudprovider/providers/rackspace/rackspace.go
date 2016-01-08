@@ -367,7 +367,7 @@ func (os *Rackspace) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []
 	return nameservers, searches
 }
 
-func (os *Rackspace) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
+func (os *Rackspace) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return nil, false
 }
 

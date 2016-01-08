@@ -1457,8 +1457,8 @@ func ValidateService(service *api.Service) field.ErrorList {
 		portsPath := specPath.Child("ports")
 		for i := range service.Spec.Ports {
 			portPath := portsPath.Index(i)
-			if service.Spec.Ports[i].Protocol != api.ProtocolTCP {
-				allErrs = append(allErrs, field.Invalid(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, "may not use protocols other than 'TCP' when `type` is 'LoadBalancer'"))
+			if !supportedPortProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
+				allErrs = append(allErrs, field.Invalid(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, "cannot create an external load balancer with non-TCP/UDP ports"))
 			}
 		}
 	}
