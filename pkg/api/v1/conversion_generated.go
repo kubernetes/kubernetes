@@ -307,6 +307,26 @@ func Convert_api_Container_To_v1_Container(in *api.Container, out *Container, s 
 	return autoConvert_api_Container_To_v1_Container(in, out, s)
 }
 
+func autoConvert_api_ContainerImage_To_v1_ContainerImage(in *api.ContainerImage, out *ContainerImage, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ContainerImage))(in)
+	}
+	if in.RepoTags != nil {
+		out.RepoTags = make([]string, len(in.RepoTags))
+		for i := range in.RepoTags {
+			out.RepoTags[i] = in.RepoTags[i]
+		}
+	} else {
+		out.RepoTags = nil
+	}
+	out.Size = in.Size
+	return nil
+}
+
+func Convert_api_ContainerImage_To_v1_ContainerImage(in *api.ContainerImage, out *ContainerImage, s conversion.Scope) error {
+	return autoConvert_api_ContainerImage_To_v1_ContainerImage(in, out, s)
+}
+
 func autoConvert_api_ContainerPort_To_v1_ContainerPort(in *api.ContainerPort, out *ContainerPort, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ContainerPort))(in)
@@ -1499,6 +1519,16 @@ func autoConvert_api_NodeStatus_To_v1_NodeStatus(in *api.NodeStatus, out *NodeSt
 	}
 	if err := Convert_api_NodeSystemInfo_To_v1_NodeSystemInfo(&in.NodeInfo, &out.NodeInfo, s); err != nil {
 		return err
+	}
+	if in.Images != nil {
+		out.Images = make([]ContainerImage, len(in.Images))
+		for i := range in.Images {
+			if err := Convert_api_ContainerImage_To_v1_ContainerImage(&in.Images[i], &out.Images[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Images = nil
 	}
 	return nil
 }
@@ -3466,6 +3496,26 @@ func Convert_v1_Container_To_api_Container(in *Container, out *api.Container, s 
 	return autoConvert_v1_Container_To_api_Container(in, out, s)
 }
 
+func autoConvert_v1_ContainerImage_To_api_ContainerImage(in *ContainerImage, out *api.ContainerImage, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ContainerImage))(in)
+	}
+	if in.RepoTags != nil {
+		out.RepoTags = make([]string, len(in.RepoTags))
+		for i := range in.RepoTags {
+			out.RepoTags[i] = in.RepoTags[i]
+		}
+	} else {
+		out.RepoTags = nil
+	}
+	out.Size = in.Size
+	return nil
+}
+
+func Convert_v1_ContainerImage_To_api_ContainerImage(in *ContainerImage, out *api.ContainerImage, s conversion.Scope) error {
+	return autoConvert_v1_ContainerImage_To_api_ContainerImage(in, out, s)
+}
+
 func autoConvert_v1_ContainerPort_To_api_ContainerPort(in *ContainerPort, out *api.ContainerPort, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ContainerPort))(in)
@@ -4674,6 +4724,16 @@ func autoConvert_v1_NodeStatus_To_api_NodeStatus(in *NodeStatus, out *api.NodeSt
 	}
 	if err := Convert_v1_NodeSystemInfo_To_api_NodeSystemInfo(&in.NodeInfo, &out.NodeInfo, s); err != nil {
 		return err
+	}
+	if in.Images != nil {
+		out.Images = make([]api.ContainerImage, len(in.Images))
+		for i := range in.Images {
+			if err := Convert_v1_ContainerImage_To_api_ContainerImage(&in.Images[i], &out.Images[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Images = nil
 	}
 	return nil
 }
@@ -6358,6 +6418,7 @@ func init() {
 		autoConvert_api_ComponentCondition_To_v1_ComponentCondition,
 		autoConvert_api_ComponentStatusList_To_v1_ComponentStatusList,
 		autoConvert_api_ComponentStatus_To_v1_ComponentStatus,
+		autoConvert_api_ContainerImage_To_v1_ContainerImage,
 		autoConvert_api_ContainerPort_To_v1_ContainerPort,
 		autoConvert_api_ContainerStateRunning_To_v1_ContainerStateRunning,
 		autoConvert_api_ContainerStateTerminated_To_v1_ContainerStateTerminated,
@@ -6478,6 +6539,7 @@ func init() {
 		autoConvert_v1_ComponentCondition_To_api_ComponentCondition,
 		autoConvert_v1_ComponentStatusList_To_api_ComponentStatusList,
 		autoConvert_v1_ComponentStatus_To_api_ComponentStatus,
+		autoConvert_v1_ContainerImage_To_api_ContainerImage,
 		autoConvert_v1_ContainerPort_To_api_ContainerPort,
 		autoConvert_v1_ContainerStateRunning_To_api_ContainerStateRunning,
 		autoConvert_v1_ContainerStateTerminated_To_api_ContainerStateTerminated,

@@ -40,6 +40,7 @@ func init() {
 		deepCopy_api_ComponentStatus,
 		deepCopy_api_ComponentStatusList,
 		deepCopy_api_Container,
+		deepCopy_api_ContainerImage,
 		deepCopy_api_ContainerPort,
 		deepCopy_api_ContainerState,
 		deepCopy_api_ContainerStateRunning,
@@ -389,6 +390,18 @@ func deepCopy_api_Container(in Container, out *Container, c *conversion.Cloner) 
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
+	return nil
+}
+
+func deepCopy_api_ContainerImage(in ContainerImage, out *ContainerImage, c *conversion.Cloner) error {
+	if in.RepoTags != nil {
+		in, out := in.RepoTags, &out.RepoTags
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.RepoTags = nil
+	}
+	out.Size = in.Size
 	return nil
 }
 
@@ -1303,6 +1316,17 @@ func deepCopy_api_NodeStatus(in NodeStatus, out *NodeStatus, c *conversion.Clone
 	}
 	if err := deepCopy_api_NodeSystemInfo(in.NodeInfo, &out.NodeInfo, c); err != nil {
 		return err
+	}
+	if in.Images != nil {
+		in, out := in.Images, &out.Images
+		*out = make([]ContainerImage, len(in))
+		for i := range in {
+			if err := deepCopy_api_ContainerImage(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Images = nil
 	}
 	return nil
 }

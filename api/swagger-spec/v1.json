@@ -13503,6 +13503,9 @@
    "v1.NodeStatus": {
     "id": "v1.NodeStatus",
     "description": "NodeStatus is information about the current status of a node.",
+    "required": [
+     "images"
+    ],
     "properties": {
      "capacity": {
       "type": "any",
@@ -13537,6 +13540,13 @@
      "nodeInfo": {
       "$ref": "v1.NodeSystemInfo",
       "description": "Set of ids/uuids to uniquely identify the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-info"
+     },
+     "images": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.ContainerImage"
+      },
+      "description": "List of container images on this node"
      }
     }
    },
@@ -13661,6 +13671,27 @@
      "kubeProxyVersion": {
       "type": "string",
       "description": "KubeProxy Version reported by the node."
+     }
+    }
+   },
+   "v1.ContainerImage": {
+    "id": "v1.ContainerImage",
+    "description": "Describe a container image",
+    "required": [
+     "repoTags"
+    ],
+    "properties": {
+     "repoTags": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Names by which this image is known. e.g. [\"gcr.io/google_containers/hyperkube:v1.0.7\", \"dockerhub.io/google_containers/hyperkube:v1.0.7\"]"
+     },
+     "size": {
+      "type": "integer",
+      "format": "int64",
+      "description": "The size of the image in bytes."
      }
     }
    },
