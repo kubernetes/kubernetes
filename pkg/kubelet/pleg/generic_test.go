@@ -17,12 +17,15 @@ limitations under the License.
 package pleg
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -208,4 +211,109 @@ func TestReportMissingPods(t *testing.T) {
 	}
 	actual := getEventsFromChannel(ch)
 	verifyEvents(t, expected, actual)
+}
+
+func newTestGenericPLEGWithRuntimeMock() (*GenericPLEG, *kubecontainer.Mock) {
+	runtimeMock := &kubecontainer.Mock{}
+	pleg := &GenericPLEG{
+		relistPeriod: time.Hour,
+		runtime:      runtimeMock,
+		eventChannel: make(chan *PodLifecycleEvent, 100),
+		podRecords:   make(podRecords),
+		cache:        kubecontainer.NewCache(),
+	}
+	return pleg, runtimeMock
+}
+
+func createTestPodsStatusesAndEvents(num int) ([]*kubecontainer.Pod, []*kubecontainer.PodStatus, []*PodLifecycleEvent) {
+	var pods []*kubecontainer.Pod
+	var statuses []*kubecontainer.PodStatus
+	var events []*PodLifecycleEvent
+	for i := 0; i < num; i++ {
+		id := types.UID(fmt.Sprintf("test-pod-%d", i))
+		cState := kubecontainer.ContainerStateRunning
+		container := createTestContainer(fmt.Sprintf("c%d", i), cState)
+		pod := &kubecontainer.Pod{
+			ID:         id,
+			Containers: []*kubecontainer.Container{container},
+		}
+		status := &kubecontainer.PodStatus{
+			ID:                id,
+			ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: cState}},
+		}
+		event := &PodLifecycleEvent{ID: pod.ID, Type: ContainerStarted, Data: container.ID.ID}
+		pods = append(pods, pod)
+		statuses = append(statuses, status)
+		events = append(events, event)
+
+	}
+	return pods, statuses, events
+}
+
+func TestRelistWithCache(t *testing.T) {
+	pleg, runtimeMock := newTestGenericPLEGWithRuntimeMock()
+	ch := pleg.Watch()
+
+	pods, statuses, events := createTestPodsStatusesAndEvents(2)
+	runtimeMock.On("GetPods", true).Return(pods, nil)
+	runtimeMock.On("GetPodStatus", pods[0].ID, "", "").Return(statuses[0], nil).Once()
+	// Inject an error when querying runtime for the pod status for pods[1].
+	statusErr := fmt.Errorf("unable to get status")
+	runtimeMock.On("GetPodStatus", pods[1].ID, "", "").Return(&kubecontainer.PodStatus{}, statusErr).Once()
+
+	pleg.relist()
+	actualEvents := getEventsFromChannel(ch)
+	cases := []struct {
+		pod    *kubecontainer.Pod
+		status *kubecontainer.PodStatus
+		error  error
+	}{
+		{pod: pods[0], status: statuses[0], error: nil},
+		{pod: pods[1], status: &kubecontainer.PodStatus{}, error: statusErr},
+	}
+	for i, c := range cases {
+		testStr := fmt.Sprintf("test[%d]", i)
+		actualStatus, actualErr := pleg.cache.Get(c.pod.ID)
+		assert.Equal(t, c.status, actualStatus, testStr)
+		assert.Equal(t, c.error, actualErr, testStr)
+	}
+	// pleg should not generate any event for pods[1] because of the error.
+	assert.Exactly(t, []*PodLifecycleEvent{events[0]}, actualEvents)
+
+	// Return normal status for pods[1].
+	runtimeMock.On("GetPodStatus", pods[1].ID, "", "").Return(statuses[1], nil).Once()
+	pleg.relist()
+	actualEvents = getEventsFromChannel(ch)
+	cases = []struct {
+		pod    *kubecontainer.Pod
+		status *kubecontainer.PodStatus
+		error  error
+	}{
+		{pod: pods[0], status: statuses[0], error: nil},
+		{pod: pods[1], status: statuses[1], error: nil},
+	}
+	for i, c := range cases {
+		testStr := fmt.Sprintf("test[%d]", i)
+		actualStatus, actualErr := pleg.cache.Get(c.pod.ID)
+		assert.Equal(t, c.status, actualStatus, testStr)
+		assert.Equal(t, c.error, actualErr, testStr)
+	}
+	// Now that we are able to query status for pods[1], pleg should generate an event.
+	assert.Exactly(t, []*PodLifecycleEvent{events[1]}, actualEvents)
+}
+
+func TestRemoveCacheEntry(t *testing.T) {
+	pleg, runtimeMock := newTestGenericPLEGWithRuntimeMock()
+	pods, statuses, _ := createTestPodsStatusesAndEvents(1)
+	runtimeMock.On("GetPods", true).Return(pods, nil).Once()
+	runtimeMock.On("GetPodStatus", pods[0].ID, "", "").Return(statuses[0], nil).Once()
+	// Does a relist to populate the cache.
+	pleg.relist()
+	// Delete the pod from runtime. Verify that the cache entry has been
+	// removed after relisting.
+	runtimeMock.On("GetPods", true).Return([]*kubecontainer.Pod{}, nil).Once()
+	pleg.relist()
+	actualStatus, actualErr := pleg.cache.Get(pods[0].ID)
+	assert.Equal(t, &kubecontainer.PodStatus{ID: pods[0].ID}, actualStatus)
+	assert.Equal(t, nil, actualErr)
 }

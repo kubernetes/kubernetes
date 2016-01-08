@@ -174,7 +174,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.resyncInterval = 10 * time.Second
 	kubelet.workQueue = queue.NewBasicWorkQueue()
 	// Relist period does not affect the tests.
-	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour)
+	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil)
 	kubelet.clock = fakeClock
 	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock}
 }
