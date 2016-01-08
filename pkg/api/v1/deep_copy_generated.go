@@ -277,6 +277,19 @@ func deepCopy_v1_Container(in Container, out *Container, c *conversion.Cloner) e
 	return nil
 }
 
+func deepCopy_v1_ContainerImage(in ContainerImage, out *ContainerImage, c *conversion.Cloner) error {
+	if in.RepoTags != nil {
+		out.RepoTags = make([]string, len(in.RepoTags))
+		for i := range in.RepoTags {
+			out.RepoTags[i] = in.RepoTags[i]
+		}
+	} else {
+		out.RepoTags = nil
+	}
+	out.Size = in.Size
+	return nil
+}
+
 func deepCopy_v1_ContainerPort(in ContainerPort, out *ContainerPort, c *conversion.Cloner) error {
 	out.Name = in.Name
 	out.HostPort = in.HostPort
@@ -1095,6 +1108,16 @@ func deepCopy_v1_NodeStatus(in NodeStatus, out *NodeStatus, c *conversion.Cloner
 	}
 	if err := deepCopy_v1_NodeSystemInfo(in.NodeInfo, &out.NodeInfo, c); err != nil {
 		return err
+	}
+	if in.Images != nil {
+		out.Images = make([]ContainerImage, len(in.Images))
+		for i := range in.Images {
+			if err := deepCopy_v1_ContainerImage(in.Images[i], &out.Images[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Images = nil
 	}
 	return nil
 }
@@ -2441,6 +2464,7 @@ func init() {
 		deepCopy_v1_ComponentStatus,
 		deepCopy_v1_ComponentStatusList,
 		deepCopy_v1_Container,
+		deepCopy_v1_ContainerImage,
 		deepCopy_v1_ContainerPort,
 		deepCopy_v1_ContainerState,
 		deepCopy_v1_ContainerStateRunning,
