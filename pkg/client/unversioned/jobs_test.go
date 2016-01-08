@@ -60,6 +60,7 @@ func TestListJobs(t *testing.T) {
 		},
 	}
 	receivedJobList, err := c.Setup(t).Extensions().Jobs(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, receivedJobList, err)
 }
 
@@ -88,6 +89,7 @@ func TestGetJob(t *testing.T) {
 		},
 	}
 	receivedJob, err := c.Setup(t).Extensions().Jobs(ns).Get("foo")
+	defer c.Close()
 	c.Validate(t, receivedJob, err)
 }
 
@@ -95,6 +97,7 @@ func TestGetJobWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{Error: true}
 	receivedJob, err := c.Setup(t).Extensions().Jobs(ns).Get("")
+	defer c.Close()
 	if (err != nil) && (err.Error() != simple.NameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
 	}
@@ -134,6 +137,7 @@ func TestUpdateJob(t *testing.T) {
 		},
 	}
 	receivedJob, err := c.Setup(t).Extensions().Jobs(ns).Update(requestJob)
+	defer c.Close()
 	c.Validate(t, receivedJob, err)
 }
 
@@ -172,6 +176,7 @@ func TestUpdateJobStatus(t *testing.T) {
 		},
 	}
 	receivedJob, err := c.Setup(t).Extensions().Jobs(ns).UpdateStatus(requestJob)
+	defer c.Close()
 	c.Validate(t, receivedJob, err)
 }
 
@@ -186,6 +191,7 @@ func TestDeleteJob(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Extensions().Jobs(ns).Delete("foo", nil)
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -221,5 +227,6 @@ func TestCreateJob(t *testing.T) {
 		},
 	}
 	receivedJob, err := c.Setup(t).Extensions().Jobs(ns).Create(requestJob)
+	defer c.Close()
 	c.Validate(t, receivedJob, err)
 }

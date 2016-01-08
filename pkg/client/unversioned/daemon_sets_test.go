@@ -60,6 +60,7 @@ func TestListDaemonSets(t *testing.T) {
 		},
 	}
 	receivedDSs, err := c.Setup(t).Extensions().DaemonSets(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, receivedDSs, err)
 
 }
@@ -85,6 +86,7 @@ func TestGetDaemonSet(t *testing.T) {
 		},
 	}
 	receivedDaemonSet, err := c.Setup(t).Extensions().DaemonSets(ns).Get("foo")
+	defer c.Close()
 	c.Validate(t, receivedDaemonSet, err)
 }
 
@@ -92,6 +94,7 @@ func TestGetDaemonSetWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{Error: true}
 	receivedPod, err := c.Setup(t).Extensions().DaemonSets(ns).Get("")
+	defer c.Close()
 	if (err != nil) && (err.Error() != simple.NameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
 	}
@@ -123,6 +126,7 @@ func TestUpdateDaemonSet(t *testing.T) {
 		},
 	}
 	receivedDaemonSet, err := c.Setup(t).Extensions().DaemonSets(ns).Update(requestDaemonSet)
+	defer c.Close()
 	c.Validate(t, receivedDaemonSet, err)
 }
 
@@ -151,6 +155,7 @@ func TestUpdateDaemonSetUpdateStatus(t *testing.T) {
 		},
 	}
 	receivedDaemonSet, err := c.Setup(t).Extensions().DaemonSets(ns).UpdateStatus(requestDaemonSet)
+	defer c.Close()
 	c.Validate(t, receivedDaemonSet, err)
 }
 
@@ -161,6 +166,7 @@ func TestDeleteDaemon(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Extensions().DaemonSets(ns).Delete("foo")
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -188,5 +194,6 @@ func TestCreateDaemonSet(t *testing.T) {
 		},
 	}
 	receivedDaemonSet, err := c.Setup(t).Extensions().DaemonSets(ns).Create(requestDaemonSet)
+	defer c.Close()
 	c.Validate(t, receivedDaemonSet, err)
 }
