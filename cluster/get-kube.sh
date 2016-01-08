@@ -120,9 +120,9 @@ if [[ -n "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
 fi
 
 if [[ $(which wget) ]]; then
-  wget -O ${file} ${release_url}
+  wget -N ${release_url}
 elif [[ $(which curl) ]]; then
-  curl -L -o ${file} ${release_url}
+  curl -L -z ${file} ${release_url} -o ${file}
 else
   echo "Couldn't find curl or wget.  Bailing out."
   exit 1
@@ -130,6 +130,5 @@ fi
 
 echo "Unpacking kubernetes release ${release}"
 tar -xzf ${file}
-rm ${file}
 
 create_cluster
