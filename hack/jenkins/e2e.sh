@@ -269,6 +269,7 @@ CURRENT_RELEASE_PUBLISHED_VERSION="ci/latest-1.1"
 GCE_DEFAULT_SKIP_TESTS=(
     "\[Example\]" # previously in REBOOT_SKIP_TESTS..., dates back before version control (#10078)
     "\[Skipped\]"
+    "\[Feature:.+\]"
     )
 
 # PROVIDER SKIPS --------------------------------------
