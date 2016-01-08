@@ -1189,12 +1189,18 @@ func kubectlCmd(args ...string) *exec.Cmd {
 // kubectlBuilder is used to build, custimize and execute a kubectl Command.
 // Add more functions to customize the builder as needed.
 type kubectlBuilder struct {
-	cmd *exec.Cmd
+	cmd     *exec.Cmd
+	timeout <-chan time.Time
 }
 
 func newKubectlCommand(args ...string) *kubectlBuilder {
 	b := new(kubectlBuilder)
 	b.cmd = kubectlCmd(args...)
+	return b
+}
+
+func (b *kubectlBuilder) withTimeout(t <-chan time.Time) *kubectlBuilder {
+	b.timeout = t
 	return b
 }
 
@@ -1220,8 +1226,21 @@ func (b kubectlBuilder) exec() (string, error) {
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("Error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v\n", cmd, cmd.Stdout, cmd.Stderr, err)
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("Error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v\n", cmd, cmd.Stdout, cmd.Stderr, err)
+	}
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- cmd.Wait()
+	}()
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return "", fmt.Errorf("Error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v\n", cmd, cmd.Stdout, cmd.Stderr, err)
+		}
+	case <-b.timeout:
+		b.cmd.Process.Kill()
+		return "", fmt.Errorf("Timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
 	}
 	Logf("stdout: %q", stdout.String())
 	Logf("stderr: %q", stderr.String())

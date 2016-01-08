@@ -70,6 +70,7 @@ const (
 	simplePodName            = "nginx"
 	nginxDefaultOutput       = "Welcome to nginx!"
 	simplePodPort            = 80
+	runJobTimeout            = 5 * time.Minute
 )
 
 var proxyRegexp = regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
@@ -911,8 +912,11 @@ var _ = Describe("Kubectl client", func() {
 
 		It("should create a job from an image, then delete the job [Conformance]", func() {
 			By("executing a command with run --rm and attach with stdin")
+			t := time.NewTimer(runJobTimeout)
+			defer t.Stop()
 			runOutput := newKubectlCommand(nsFlag, "run", jobName, "--image=busybox", "--rm=true", "--restart=Never", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				withStdinData("abcd1234").
+				withTimeout(t.C).
 				execOrDie()
 			Expect(runOutput).To(ContainSubstring("abcd1234"))
 			Expect(runOutput).To(ContainSubstring("stdin closed"))
