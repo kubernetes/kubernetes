@@ -129,8 +129,10 @@ public class KubernetesSeedProvider implements SeedProvider {
                 // Here is a problem point, endpoints.subsets can be null in first node cases.
                 if (endpoints.subsets != null && !endpoints.subsets.isEmpty()){
                     for (Subset subset : endpoints.subsets) {
-                        for (Address address : subset.addresses) {
-                            list.add(InetAddress.getByName(address.ip));
+                        if (subset.addresses != null && !subset.addresses.isEmpty()) {
+                            for (Address address : subset.addresses) {
+                                list.add(InetAddress.getByName(address.ip));
+                            }
                         }
                     }
                 }
