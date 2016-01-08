@@ -692,29 +692,47 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 }
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
-// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 func (aws *AWSCloud) ExternalID(name string) (string, error) {
-	// We must verify that the instance still exists
-	instance, err := aws.findInstanceByNodeName(name)
+	awsInstance, err := aws.getSelfAWSInstance()
 	if err != nil {
 		return "", err
 	}
-	if instance == nil || !isAlive(instance) {
-		return "", cloudprovider.InstanceNotFound
+
+	if awsInstance.nodeName == name {
+		// We assume that if this is run on the instance itself, the instance exists and is alive
+		return awsInstance.awsID, nil
+	} else {
+		// We must verify that the instance still exists
+		// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
+		instance, err := aws.findInstanceByNodeName(name)
+		if err != nil {
+			return "", err
+		}
+		if instance == nil || !isAlive(instance) {
+			return "", cloudprovider.InstanceNotFound
+		}
+		return orEmpty(instance.InstanceId), nil
 	}
-	return orEmpty(instance.InstanceId), nil
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
 func (aws *AWSCloud) InstanceID(name string) (string, error) {
-	// TODO: Do we need to verify it exists, or can we just construct it knowing our AZ (or via caching?)
-	inst, err := aws.getInstanceByNodeName(name)
+	awsInstance, err := aws.getSelfAWSInstance()
 	if err != nil {
 		return "", err
 	}
+
 	// In the future it is possible to also return an endpoint as:
 	// <endpoint>/<zone>/<instanceid>
-	return "/" + orEmpty(inst.Placement.AvailabilityZone) + "/" + orEmpty(inst.InstanceId), nil
+	if awsInstance.nodeName == name {
+		return "/" + awsInstance.availabilityZone + "/" + awsInstance.awsID, nil
+	} else {
+		inst, err := aws.getInstanceByNodeName(name)
+		if err != nil {
+			return "", err
+		}
+		return "/" + orEmpty(inst.Placement.AvailabilityZone) + "/" + orEmpty(inst.InstanceId), nil
+	}
 }
 
 // Check if the instance is alive (running or pending)
@@ -832,6 +850,9 @@ type awsInstance struct {
 	// node name in k8s
 	nodeName string
 
+	// availability zone the instance resides in
+	availabilityZone string
+
 	mutex sync.Mutex
 
 	// We must cache because otherwise there is a race condition,
@@ -839,8 +860,8 @@ type awsInstance struct {
 	deviceMappings map[string]string
 }
 
-func newAWSInstance(ec2 EC2, awsID, nodeName string) *awsInstance {
-	self := &awsInstance{ec2: ec2, awsID: awsID, nodeName: nodeName}
+func newAWSInstance(ec2 EC2, awsID, nodeName string, availabilityZone string) *awsInstance {
+	self := &awsInstance{ec2: ec2, awsID: awsID, nodeName: nodeName, availabilityZone: availabilityZone}
 
 	// We lazy-init deviceMappings
 	self.deviceMappings = nil
@@ -1094,8 +1115,12 @@ func (s *AWSCloud) getSelfAWSInstance() (*awsInstance, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error fetching local-hostname from ec2 metadata service: %v", err)
 		}
+		availabilityZone, err := getAvailabilityZone(s.metadata)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching availability zone from ec2 metadata service: %v", err)
+		}
 
-		i = newAWSInstance(s.ec2, instanceId, privateDnsName)
+		i = newAWSInstance(s.ec2, instanceId, privateDnsName, availabilityZone)
 		s.selfAWSInstance = i
 	}
 
@@ -1117,7 +1142,7 @@ func (aws *AWSCloud) getAwsInstance(nodeName string) (*awsInstance, error) {
 			return nil, fmt.Errorf("error finding instance %s: %v", nodeName, err)
 		}
 
-		awsInstance = newAWSInstance(aws.ec2, orEmpty(instance.InstanceId), orEmpty(instance.PrivateDnsName))
+		awsInstance = newAWSInstance(aws.ec2, orEmpty(instance.InstanceId), orEmpty(instance.PrivateDnsName), orEmpty(instance.Placement.AvailabilityZone))
 	}
 
 	return awsInstance, nil
