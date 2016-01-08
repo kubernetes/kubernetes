@@ -324,6 +324,10 @@ func newReplicationController(d *exp.Deployment, name string, replicas int) *api
 
 }
 
+func newListOptions() api.ListOptions {
+	return api.ListOptions{}
+}
+
 type fixture struct {
 	t *testing.T
 
@@ -353,6 +357,10 @@ func (f *fixture) expectCreateRCAction(rc *api.ReplicationController) {
 func (f *fixture) expectUpdateRCAction(rc *api.ReplicationController) {
 	f.actions = append(f.actions, testclient.NewUpdateAction("replicationcontrollers", rc.Namespace, rc))
 	f.objects.Items = append(f.objects.Items, rc)
+}
+
+func (f *fixture) expectListPodAction(namespace string, opt api.ListOptions) {
+	f.actions = append(f.actions, testclient.NewListAction("pods", namespace, opt))
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -412,9 +420,11 @@ func TestSyncDeploymentCreatesRC(t *testing.T) {
 	// then is updated to 1 replica
 	rc := newReplicationController(d, "deploymentrc-4186632231", 0)
 	updatedRC := newReplicationController(d, "deploymentrc-4186632231", 1)
+	opt := newListOptions()
 
 	f.expectCreateRCAction(rc)
 	f.expectUpdateRCAction(updatedRC)
+	f.expectListPodAction(rc.Namespace, opt)
 	f.expectUpdateDeploymentAction(d)
 
 	f.run(getKey(d, t))

@@ -182,9 +182,11 @@ func (DeploymentSpec) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentStatus = map[string]string{
-	"":                "DeploymentStatus is the most recently observed status of the Deployment.",
-	"replicas":        "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
-	"updatedReplicas": "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
+	"":                    "DeploymentStatus is the most recently observed status of the Deployment.",
+	"replicas":            "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
+	"updatedReplicas":     "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
+	"availableReplicas":   "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
+	"unavailableReplicas": "Total number of unavailable pods targeted by this deployment.",
 }
 
 func (DeploymentStatus) SwaggerDoc() map[string]string {
