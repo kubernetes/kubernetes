@@ -367,7 +367,7 @@ func NewMainKubelet(
 			serializeImagePulls,
 		)
 
-		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod)
+		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, nil)
 	case "rkt":
 		conf := &rkt.Config{
 			Path:               rktPath,
@@ -388,7 +388,7 @@ func NewMainKubelet(
 			return nil, err
 		}
 		klet.containerRuntime = rktRuntime
-		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod)
+		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, nil)
 
 		// No Docker daemon to put in a container.
 		dockerDaemonContainer = ""
