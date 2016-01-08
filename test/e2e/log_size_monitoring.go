@@ -75,8 +75,15 @@ type LogsSizeVerifier struct {
 	workers       []*LogSizeGatherer
 }
 
+type SingleLogSummary struct {
+	AverageGenerationRate int
+	NumberOfProbes        int
+}
+
+type LogSizeDataTimeseries map[string]map[string][]TimestampedSize
+
 // node -> file -> data
-type LogsSizeDataSummary map[string]map[string][]TimestampedSize
+type LogsSizeDataSummary map[string]map[string]SingleLogSummary
 
 // TODO: make sure that we don't need locking here
 func (s *LogsSizeDataSummary) PrintHumanReadable() string {
@@ -86,12 +93,7 @@ func (s *LogsSizeDataSummary) PrintHumanReadable() string {
 	for k, v := range *s {
 		fmt.Fprintf(w, "%v\t\t\t\n", k)
 		for path, data := range v {
-			if len(data) > 1 {
-				last := data[len(data)-1]
-				first := data[0]
-				rate := (last.size - first.size) / int(last.timestamp.Sub(first.timestamp)/time.Second)
-				fmt.Fprintf(w, "\t%v\t%v\t%v\n", path, rate, len(data))
-			}
+			fmt.Fprintf(w, "\t%v\t%v\t%v\n", path, data.AverageGenerationRate, data.NumberOfProbes)
 		}
 	}
 	w.Flush()
@@ -99,11 +101,11 @@ func (s *LogsSizeDataSummary) PrintHumanReadable() string {
 }
 
 func (s *LogsSizeDataSummary) PrintJSON() string {
-	return "JSON printer not implemented for LogsSizeDataSummary"
+	return prettyPrintJSON(*s)
 }
 
 type LogsSizeData struct {
-	data LogsSizeDataSummary
+	data LogSizeDataTimeseries
 	lock sync.Mutex
 }
 
@@ -116,7 +118,7 @@ type WorkItem struct {
 }
 
 func prepareData(masterAddress string, nodeAddresses []string) LogsSizeData {
-	data := make(LogsSizeDataSummary)
+	data := make(LogSizeDataTimeseries)
 	ips := append(nodeAddresses, masterAddress)
 	for _, ip := range ips {
 		data[ip] = make(map[string][]TimestampedSize)
@@ -170,9 +172,24 @@ func NewLogsVerifier(c *client.Client, stopChannel chan bool) *LogsSizeVerifier 
 	return verifier
 }
 
-// PrintData returns a string with formated results
-func (v *LogsSizeVerifier) GetSummary() *LogsSizeDataSummary {
-	return &v.data.data
+// GetSummary returns a summary (average generation rate and number of probes) of the data gathered by LogSizeVerifier
+func (s *LogsSizeVerifier) GetSummary() *LogsSizeDataSummary {
+	result := make(LogsSizeDataSummary)
+	for k, v := range s.data.data {
+		result[k] = make(map[string]SingleLogSummary)
+		for path, data := range v {
+			if len(data) > 1 {
+				last := data[len(data)-1]
+				first := data[0]
+				rate := (last.size - first.size) / int(last.timestamp.Sub(first.timestamp)/time.Second)
+				result[k][path] = SingleLogSummary{
+					AverageGenerationRate: rate,
+					NumberOfProbes:        len(data),
+				}
+			}
+		}
+	}
+	return &result
 }
 
 // Run starts log size gathering. It starts a gorouting for every worker and then blocks until stopChannel is closed
