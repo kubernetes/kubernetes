@@ -56,6 +56,9 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 				*j = nil
 			}
 		},
+		func(q *resource.Quantity, c fuzz.Continue) {
+			*q = *resource.NewQuantity(c.Int63n(1000), resource.DecimalExponent)
+		},
 		func(j *runtime.PluginBase, c fuzz.Continue) {
 			// Do nothing; this struct has only a Kind field and it must stay blank in memory.
 		},
@@ -203,7 +206,9 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 		},
 		func(q *api.ResourceRequirements, c fuzz.Continue) {
 			randomQuantity := func() resource.Quantity {
-				return *resource.NewQuantity(c.Int63n(1000), resource.DecimalExponent)
+				var q resource.Quantity
+				c.Fuzz(&q)
+				return q
 			}
 			q.Limits = make(api.ResourceList)
 			q.Requests = make(api.ResourceList)
@@ -218,10 +223,8 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			q.Requests[api.ResourceStorage] = *storageLimit.Copy()
 		},
 		func(q *api.LimitRangeItem, c fuzz.Continue) {
-			randomQuantity := func() resource.Quantity {
-				return *resource.NewQuantity(c.Int63n(1000), resource.DecimalExponent)
-			}
-			cpuLimit := randomQuantity()
+			var cpuLimit resource.Quantity
+			c.Fuzz(&cpuLimit)
 
 			q.Type = api.LimitTypeContainer
 			q.Default = make(api.ResourceList)
