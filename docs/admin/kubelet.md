@@ -66,7 +66,7 @@ kubelet
 ```
       --address=0.0.0.0: The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)
       --allow-privileged[=false]: If true, allow containers to request privileged mode. [default=false]
-      --api-servers=[]: List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.
+      --api-server="": Kubernetes API server for publishing events, and reading pods and services, or `kubernetes` service ip address. (ip:port)
       --cadvisor-port=4194: The port of the localhost cAdvisor endpoint
       --cert-dir="/var/run/kubernetes": The directory where the TLS certs are located (by default /var/run/kubernetes). If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.
       --cgroup-root="": Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.
@@ -101,7 +101,7 @@ kubelet
       --kube-api-burst=10: Burst to use while talking with kubernetes apiserver
       --kube-api-qps=5: QPS to use while talking with kubernetes apiserver
       --kube-reserved=: A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for kubernetes system components. Currently only cpu and memory are supported. See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.html for more detail. [default=none]
-      --kubeconfig="/var/lib/kubelet/kubeconfig": Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).
+      --kubeconfig="/var/lib/kubelet/kubeconfig": Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-server flag).
       --log-flush-frequency=5s: Maximum number of seconds between log flushes
       --low-diskspace-threshold-mb=256: The absolute free disk space, in MB, to maintain. When disk space falls below this threshold, new pods would be rejected. Default: 256
       --manifest-url="": URL for accessing the container manifest
@@ -125,7 +125,7 @@ kubelet
       --read-only-port=10255: The read-only port for the Kubelet to serve on with no authentication/authorization (set to 0 to disable)
       --really-crash-for-testing[=false]: If true, when panics occur crash. Intended for testing.
       --reconcile-cidr[=true]: Reconcile node CIDR with the CIDR specified by the API server. No-op if register-node or configure-cbr0 is false. [default=true]
-      --register-node[=true]: Register the node with the apiserver (defaults to true if --api-servers is set)
+      --register-node[=true]: Register the node with the apiserver (defaults to true if --api-server is set)
       --register-schedulable[=true]: Register the node as schedulable. No-op if register-node is false. [default=true]
       --registry-burst=10: Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry-qps.  Only used if --registry-qps > 0
       --registry-qps=5: If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=5.0]
@@ -134,7 +134,7 @@ kubelet
       --rkt-path="": Path of rkt binary. Leave empty to use the first rkt in $PATH.  Only used if --container-runtime='rkt'
       --rkt-stage1-image="": image to use as stage1. Local paths and http/https URLs are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used
       --root-dir="/var/lib/kubelet": Directory path for managing kubelet files (volume mounts,etc).
-      --runonce[=false]: If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api-servers, and --enable-server
+      --runonce[=false]: If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api-server, and --enable-server
       --serialize-image-pulls[=true]: Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details. [default=true]
       --streaming-connection-idle-timeout=5m0s: Maximum time a streaming connection can be idle before the connection is automatically closed.  Example: '5m'
       --sync-frequency=1m0s: Max period between synchronizing running containers and config
