@@ -525,6 +525,10 @@ func waitForPodCondition(c *client.Client, ns, podName, desc string, timeout tim
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		pod, err := c.Pods(ns).Get(podName)
 		if err != nil {
+			if apierrs.IsNotFound(err) {
+				Logf("Pod %q in namespace %q disappeared. Error: %v", podName, ns, err)
+				return err
+			}
 			// Aligning this text makes it much more readable
 			Logf("Get pod %[1]s in namespace '%[2]s' failed, ignoring for %[3]v. Error: %[4]v",
 				podName, ns, poll, err)
