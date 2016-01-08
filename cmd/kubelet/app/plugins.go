@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/persistent_claim"
 	"k8s.io/kubernetes/pkg/volume/rbd"
 	"k8s.io/kubernetes/pkg/volume/secret"
-	//Cloud providers
+	// Cloud providers
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 )
 
