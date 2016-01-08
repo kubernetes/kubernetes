@@ -802,12 +802,16 @@ func (self *AWSCloud) GetZone() (cloudprovider.Zone, error) {
 type awsInstanceType struct {
 }
 
+// Used to represent a mount device for attaching an EBS volume
+// This should be stored as a single letter (i.e. c, not sdc or /dev/sdc)
+type mountDevice string
+
 // TODO: Also return number of mounts allowed?
-func (self *awsInstanceType) getEBSMountDevices() []string {
+func (self *awsInstanceType) getEBSMountDevices() []mountDevice {
 	// See: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/block-device-mapping-concepts.html
-	devices := []string{}
+	devices := []mountDevice{}
 	for c := 'f'; c <= 'p'; c++ {
-		devices = append(devices, fmt.Sprintf("%c", c))
+		devices = append(devices, mountDevice(fmt.Sprintf("%c", c)))
 	}
 	return devices
 }
@@ -825,7 +829,7 @@ type awsInstance struct {
 
 	// We must cache because otherwise there is a race condition,
 	// where we assign a device mapping and then get a second request before we attach the volume
-	deviceMappings map[string]string
+	deviceMappings map[mountDevice]string
 }
 
 func newAWSInstance(ec2 EC2, awsID, nodeName string) *awsInstance {
@@ -864,9 +868,10 @@ func (self *awsInstance) getInfo() (*ec2.Instance, error) {
 	return instances[0], nil
 }
 
-// Assigns an unused mountpoint (device) for the specified volume.
-// If the volume is already assigned, this will return the existing mountpoint and true
-func (self *awsInstance) assignMountpoint(volumeID string) (mountpoint string, alreadyAttached bool, err error) {
+// Gets the mountDevice already assigned to the volume, or assigns an unused mountDevice.
+// If the volume is already assigned, this will return the existing mountDevice with alreadyAttached=true.
+// Otherwise the mountDevice is assigned by finding the first available mountDevice, and it is returned with alreadyAttached=false.
+func (self *awsInstance) getMountDevice(volumeID string) (assigned mountDevice, alreadyAttached bool, err error) {
 	instanceType := self.getInstanceType()
 	if instanceType == nil {
 		return "", false, fmt.Errorf("could not get instance type for instance: %s", self.awsID)
@@ -884,35 +889,38 @@ func (self *awsInstance) assignMountpoint(volumeID string) (mountpoint string, a
 		if err != nil {
 			return "", false, err
 		}
-		deviceMappings := map[string]string{}
+		deviceMappings := map[mountDevice]string{}
 		for _, blockDevice := range info.BlockDeviceMappings {
-			mountpoint := orEmpty(blockDevice.DeviceName)
-			if strings.HasPrefix(mountpoint, "/dev/sd") {
-				mountpoint = mountpoint[7:]
+			name := aws.StringValue(blockDevice.DeviceName)
+			if strings.HasPrefix(name, "/dev/sd") {
+				name = name[7:]
 			}
-			if strings.HasPrefix(mountpoint, "/dev/xvd") {
-				mountpoint = mountpoint[8:]
+			if strings.HasPrefix(name, "/dev/xvd") {
+				name = name[8:]
 			}
-			deviceMappings[mountpoint] = orEmpty(blockDevice.Ebs.VolumeId)
+			if len(name) != 1 {
+				glog.Warningf("Unexpected EBS DeviceName: %q", aws.StringValue(blockDevice.DeviceName))
+			}
+			deviceMappings[mountDevice(name)] = aws.StringValue(blockDevice.Ebs.VolumeId)
 		}
 		self.deviceMappings = deviceMappings
 	}
 
 	// Check to see if this volume is already assigned a device on this machine
-	for mountpoint, mappingVolumeID := range self.deviceMappings {
+	for mountDevice, mappingVolumeID := range self.deviceMappings {
 		if volumeID == mappingVolumeID {
-			glog.Warningf("Got assignment call for already-assigned volume: %s@%s", mountpoint, mappingVolumeID)
-			return mountpoint, true, nil
+			glog.Warningf("Got assignment call for already-assigned volume: %s@%s", mountDevice, mappingVolumeID)
+			return mountDevice, true, nil
 		}
 	}
 
 	// Check all the valid mountpoints to see if any of them are free
 	valid := instanceType.getEBSMountDevices()
-	chosen := ""
-	for _, device := range valid {
-		_, found := self.deviceMappings[device]
+	chosen := mountDevice("")
+	for _, mountDevice := range valid {
+		_, found := self.deviceMappings[mountDevice]
 		if !found {
-			chosen = device
+			chosen = mountDevice
 			break
 		}
 	}
@@ -928,7 +936,7 @@ func (self *awsInstance) assignMountpoint(volumeID string) (mountpoint string, a
 	return chosen, false, nil
 }
 
-func (self *awsInstance) releaseMountDevice(volumeID string, mountDevice string) {
+func (self *awsInstance) releaseMountDevice(volumeID string, mountDevice mountDevice) {
 	self.mutex.Lock()
 	defer self.mutex.Unlock()
 
@@ -1130,24 +1138,24 @@ func (c *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly boo
 		return "", errors.New("AWS volumes cannot be mounted read-only")
 	}
 
-	mountpoint, alreadyAttached, err := awsInstance.assignMountpoint(disk.awsID)
+	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID)
 	if err != nil {
 		return "", err
 	}
 
 	// Inside the instance, the mountpoint always looks like /dev/xvdX (?)
-	hostDevice := "/dev/xvd" + mountpoint
+	hostDevice := "/dev/xvd" + string(mountDevice)
 	// In the EC2 API, it is sometimes is /dev/sdX and sometimes /dev/xvdX
 	// We are running on the node here, so we check if /dev/xvda exists to determine this
-	ec2Device := "/dev/xvd" + mountpoint
+	ec2Device := "/dev/xvd" + string(mountDevice)
 	if _, err := os.Stat("/dev/xvda"); os.IsNotExist(err) {
-		ec2Device = "/dev/sd" + mountpoint
+		ec2Device = "/dev/sd" + string(mountDevice)
 	}
 
 	attached := false
 	defer func() {
 		if !attached {
-			awsInstance.releaseMountDevice(disk.awsID, mountpoint)
+			awsInstance.releaseMountDevice(disk.awsID, mountDevice)
 		}
 	}()
 
