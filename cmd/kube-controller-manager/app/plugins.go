@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 
-	//Cloud providers
+	// Cloud providers
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Volume plugins
