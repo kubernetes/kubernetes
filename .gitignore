@@ -87,3 +87,6 @@ doc_tmp/
 
 # CoreOS stuff
 cluster/libvirt-coreos/coreos_*.img
+
+# Downloaded Kubernetes binary release
+kubernetes/
