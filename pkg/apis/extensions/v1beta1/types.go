@@ -286,6 +286,12 @@ type DeploymentStatus struct {
 
 	// Total number of non-terminated pods targeted by this deployment that have the desired template spec.
 	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
+
+	// Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.
+	AvailableReplicas int32 `json:"availableReplicas,omitempty"`
+
+	// Total number of unavailable pods targeted by this deployment.
+	UnavailableReplicas int32 `json:"unavailableReplicas,omitempty"`
 }
 
 // DeploymentList is a list of Deployments.

@@ -501,7 +501,11 @@ func (dc *DeploymentController) syncRollingUpdateDeployment(deployment extension
 func (dc *DeploymentController) syncDeploymentStatus(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment extensions.Deployment) error {
 	totalReplicas := deploymentutil.GetReplicaCountForRCs(allRCs)
 	updatedReplicas := deploymentutil.GetReplicaCountForRCs([]*api.ReplicationController{newRC})
-	if deployment.Status.Replicas != totalReplicas || deployment.Status.UpdatedReplicas != updatedReplicas {
+	availablePods, err := deploymentutil.GetAvailablePodsForRCs(dc.client, allRCs, deployment.Spec.Strategy.RollingUpdate.MinReadySeconds)
+	if err != nil {
+		return fmt.Errorf("failed to count ready pods: %v", err)
+	}
+	if deployment.Status.Replicas != totalReplicas || deployment.Status.UpdatedReplicas != updatedReplicas || deployment.Status.AvailableReplicas != availablePods {
 		return dc.updateDeploymentStatus(allRCs, newRC, deployment)
 	}
 	return nil
@@ -702,13 +706,19 @@ func (dc *DeploymentController) scaleUpNewRCForRecreate(newRC *api.ReplicationCo
 func (dc *DeploymentController) updateDeploymentStatus(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment extensions.Deployment) error {
 	totalReplicas := deploymentutil.GetReplicaCountForRCs(allRCs)
 	updatedReplicas := deploymentutil.GetReplicaCountForRCs([]*api.ReplicationController{newRC})
+	availablePods, err := deploymentutil.GetAvailablePodsForRCs(dc.client, allRCs, deployment.Spec.Strategy.RollingUpdate.MinReadySeconds)
+	if err != nil {
+		return fmt.Errorf("failed to count ready pods: %v", err)
+	}
 	newDeployment := deployment
 	// TODO: Reconcile this with API definition. API definition talks about ready pods, while this just computes created pods.
 	newDeployment.Status = extensions.DeploymentStatus{
-		Replicas:        totalReplicas,
-		UpdatedReplicas: updatedReplicas,
+		Replicas:            totalReplicas,
+		UpdatedReplicas:     updatedReplicas,
+		AvailableReplicas:   availablePods,
+		UnavailableReplicas: totalReplicas - availablePods,
 	}
-	_, err := dc.expClient.Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(&newDeployment)
+	_, err = dc.expClient.Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(&newDeployment)
 	return err
 }
 
