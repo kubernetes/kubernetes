@@ -37,6 +37,7 @@ func TestListEmptyPods(t *testing.T) {
 		Response: simple.Response{StatusCode: http.StatusOK, Body: &api.PodList{}},
 	}
 	podList, err := c.Setup(t).Pods(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, podList, err)
 }
 
@@ -63,6 +64,7 @@ func TestListPods(t *testing.T) {
 		},
 	}
 	receivedPodList, err := c.Setup(t).Pods(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, receivedPodList, err)
 }
 
@@ -94,6 +96,7 @@ func TestListPodsLabels(t *testing.T) {
 		},
 	}
 	c.Setup(t)
+	defer c.Close()
 	c.QueryValidator[labelSelectorQueryParamName] = simple.ValidateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
 	options := api.ListOptions{LabelSelector: selector}
@@ -121,6 +124,7 @@ func TestGetPod(t *testing.T) {
 		},
 	}
 	receivedPod, err := c.Setup(t).Pods(ns).Get("foo")
+	defer c.Close()
 	c.Validate(t, receivedPod, err)
 }
 
@@ -128,6 +132,7 @@ func TestGetPodWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{Error: true}
 	receivedPod, err := c.Setup(t).Pods(ns).Get("")
+	defer c.Close()
 	if (err != nil) && (err.Error() != simple.NameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
 	}
@@ -142,6 +147,7 @@ func TestDeletePod(t *testing.T) {
 		Response: simple.Response{StatusCode: http.StatusOK},
 	}
 	err := c.Setup(t).Pods(ns).Delete("foo", nil)
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -166,6 +172,7 @@ func TestCreatePod(t *testing.T) {
 		},
 	}
 	receivedPod, err := c.Setup(t).Pods(ns).Create(requestPod)
+	defer c.Close()
 	c.Validate(t, receivedPod, err)
 }
 
@@ -189,6 +196,7 @@ func TestUpdatePod(t *testing.T) {
 		Response: simple.Response{StatusCode: http.StatusOK, Body: requestPod},
 	}
 	receivedPod, err := c.Setup(t).Pods(ns).Update(requestPod)
+	defer c.Close()
 	c.Validate(t, receivedPod, err)
 }
 
@@ -211,6 +219,7 @@ func TestPodGetLogs(t *testing.T) {
 	}
 
 	body, err := c.Setup(t).Pods(ns).GetLogs("podName", opts).Stream()
+	defer c.Close()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

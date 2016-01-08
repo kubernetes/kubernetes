@@ -45,6 +45,7 @@ func TestNamespaceCreate(t *testing.T) {
 
 	// from the source ns, provision a new global namespace "foo"
 	response, err := c.Setup(t).Namespaces().Create(namespace)
+	defer c.Close()
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)
@@ -69,6 +70,7 @@ func TestNamespaceGet(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).Namespaces().Get("foo")
+	defer c.Close()
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)
@@ -96,6 +98,7 @@ func TestNamespaceList(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: namespaceList},
 	}
 	response, err := c.Setup(t).Namespaces().List(api.ListOptions{})
+	defer c.Close()
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)
@@ -132,6 +135,7 @@ func TestNamespaceUpdate(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: requestNamespace},
 	}
 	receivedNamespace, err := c.Setup(t).Namespaces().Update(requestNamespace)
+	defer c.Close()
 	c.Validate(t, receivedNamespace, err)
 }
 
@@ -157,6 +161,7 @@ func TestNamespaceFinalize(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: requestNamespace},
 	}
 	receivedNamespace, err := c.Setup(t).Namespaces().Finalize(requestNamespace)
+	defer c.Close()
 	c.Validate(t, receivedNamespace, err)
 }
 
@@ -166,6 +171,7 @@ func TestNamespaceDelete(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Namespaces().Delete("foo")
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -178,5 +184,6 @@ func TestNamespaceWatch(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	_, err := c.Setup(t).Namespaces().Watch(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, nil, err)
 }

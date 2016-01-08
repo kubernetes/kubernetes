@@ -45,6 +45,7 @@ func TestListNodes(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: &api.NodeList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}},
 	}
 	response, err := c.Setup(t).Nodes().List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -72,6 +73,7 @@ func TestListNodesLabels(t *testing.T) {
 		},
 	}
 	c.Setup(t)
+	defer c.Close()
 	c.QueryValidator[labelSelectorQueryParamName] = simple.ValidateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
 	options := api.ListOptions{LabelSelector: selector}
@@ -88,12 +90,14 @@ func TestGetNode(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: &api.Node{ObjectMeta: api.ObjectMeta{Name: "node-1"}}},
 	}
 	response, err := c.Setup(t).Nodes().Get("1")
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
 func TestGetNodeWithNoName(t *testing.T) {
 	c := &simple.Client{Error: true}
 	receivedNode, err := c.Setup(t).Nodes().Get("")
+	defer c.Close()
 	if (err != nil) && (err.Error() != simple.NameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
 	}
@@ -127,6 +131,7 @@ func TestCreateNode(t *testing.T) {
 		},
 	}
 	receivedNode, err := c.Setup(t).Nodes().Create(requestNode)
+	defer c.Close()
 	c.Validate(t, receivedNode, err)
 }
 
@@ -139,6 +144,7 @@ func TestDeleteNode(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Nodes().Delete("foo")
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -166,5 +172,6 @@ func TestUpdateNode(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: requestNode},
 	}
 	response, err := c.Setup(t).Nodes().Update(requestNode)
+	defer c.Close()
 	c.Validate(t, response, err)
 }

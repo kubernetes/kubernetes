@@ -64,6 +64,7 @@ func TestPersistentVolumeClaimCreate(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).PersistentVolumeClaims(ns).Create(pv)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -97,6 +98,7 @@ func TestPersistentVolumeClaimGet(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).PersistentVolumeClaims(ns).Get("abc")
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -119,6 +121,7 @@ func TestPersistentVolumeClaimList(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: persistentVolumeList},
 	}
 	response, err := c.Setup(t).PersistentVolumeClaims(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -146,6 +149,7 @@ func TestPersistentVolumeClaimUpdate(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: persistentVolumeClaim},
 	}
 	response, err := c.Setup(t).PersistentVolumeClaims(ns).Update(persistentVolumeClaim)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -179,6 +183,7 @@ func TestPersistentVolumeClaimStatusUpdate(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: persistentVolumeClaim},
 	}
 	response, err := c.Setup(t).PersistentVolumeClaims(ns).UpdateStatus(persistentVolumeClaim)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -189,6 +194,7 @@ func TestPersistentVolumeClaimDelete(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).PersistentVolumeClaims(ns).Delete("foo")
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -201,5 +207,6 @@ func TestPersistentVolumeClaimWatch(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	_, err := c.Setup(t).PersistentVolumeClaims(api.NamespaceAll).Watch(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, nil, err)
 }

@@ -60,6 +60,7 @@ func TestListIngress(t *testing.T) {
 		},
 	}
 	receivedIngressList, err := c.Setup(t).Extensions().Ingress(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, receivedIngressList, err)
 }
 
@@ -88,6 +89,7 @@ func TestGetIngress(t *testing.T) {
 		},
 	}
 	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).Get("foo")
+	defer c.Close()
 	c.Validate(t, receivedIngress, err)
 }
 
@@ -95,6 +97,7 @@ func TestGetIngressWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{Error: true}
 	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).Get("")
+	defer c.Close()
 	if (err != nil) && (err.Error() != simple.NameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
 	}
@@ -134,6 +137,7 @@ func TestUpdateIngress(t *testing.T) {
 		},
 	}
 	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).Update(requestIngress)
+	defer c.Close()
 	c.Validate(t, receivedIngress, err)
 }
 
@@ -180,6 +184,7 @@ func TestUpdateIngressStatus(t *testing.T) {
 		},
 	}
 	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).UpdateStatus(requestIngress)
+	defer c.Close()
 	c.Validate(t, receivedIngress, err)
 }
 
@@ -194,6 +199,7 @@ func TestDeleteIngress(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Extensions().Ingress(ns).Delete("foo", nil)
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -229,5 +235,6 @@ func TestCreateIngress(t *testing.T) {
 		},
 	}
 	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).Create(requestIngress)
+	defer c.Close()
 	c.Validate(t, receivedIngress, err)
 }

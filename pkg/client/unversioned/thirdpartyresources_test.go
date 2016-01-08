@@ -55,6 +55,7 @@ func TestListThirdPartyResources(t *testing.T) {
 		},
 	}
 	receivedDSs, err := c.Setup(t).Extensions().ThirdPartyResources(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, receivedDSs, err)
 
 }
@@ -78,6 +79,7 @@ func TestGetThirdPartyResource(t *testing.T) {
 		},
 	}
 	receivedThirdPartyResource, err := c.Setup(t).Extensions().ThirdPartyResources(ns).Get("foo")
+	defer c.Close()
 	c.Validate(t, receivedThirdPartyResource, err)
 }
 
@@ -85,6 +87,7 @@ func TestGetThirdPartyResourceWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{Error: true}
 	receivedPod, err := c.Setup(t).Extensions().ThirdPartyResources(ns).Get("")
+	defer c.Close()
 	if (err != nil) && (err.Error() != simple.NameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
 	}
@@ -114,6 +117,7 @@ func TestUpdateThirdPartyResource(t *testing.T) {
 		},
 	}
 	receivedThirdPartyResource, err := c.Setup(t).Extensions().ThirdPartyResources(ns).Update(requestThirdPartyResource)
+	defer c.Close()
 	c.Validate(t, receivedThirdPartyResource, err)
 }
 
@@ -139,6 +143,7 @@ func TestUpdateThirdPartyResourceUpdateStatus(t *testing.T) {
 		},
 	}
 	receivedThirdPartyResource, err := c.Setup(t).Extensions().ThirdPartyResources(ns).UpdateStatus(requestThirdPartyResource)
+	defer c.Close()
 	c.Validate(t, receivedThirdPartyResource, err)
 }
 
@@ -149,6 +154,7 @@ func TestDeleteThirdPartyResource(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Extensions().ThirdPartyResources(ns).Delete("foo")
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -174,5 +180,6 @@ func TestCreateThirdPartyResource(t *testing.T) {
 		},
 	}
 	receivedThirdPartyResource, err := c.Setup(t).Extensions().ThirdPartyResources(ns).Create(requestThirdPartyResource)
+	defer c.Close()
 	c.Validate(t, receivedThirdPartyResource, err)
 }

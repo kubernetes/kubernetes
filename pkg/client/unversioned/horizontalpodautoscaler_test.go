@@ -53,6 +53,7 @@ func TestHorizontalPodAutoscalerCreate(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).Extensions().HorizontalPodAutoscalers(ns).Create(&horizontalPodAutoscaler)
+	defer c.Close()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -78,6 +79,7 @@ func TestHorizontalPodAutoscalerGet(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).Extensions().HorizontalPodAutoscalers(ns).Get("abc")
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -103,6 +105,7 @@ func TestHorizontalPodAutoscalerList(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: horizontalPodAutoscalerList},
 	}
 	response, err := c.Setup(t).Extensions().HorizontalPodAutoscalers(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -120,6 +123,7 @@ func TestHorizontalPodAutoscalerUpdate(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: horizontalPodAutoscaler},
 	}
 	response, err := c.Setup(t).Extensions().HorizontalPodAutoscalers(ns).Update(horizontalPodAutoscaler)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -137,6 +141,7 @@ func TestHorizontalPodAutoscalerUpdateStatus(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: horizontalPodAutoscaler},
 	}
 	response, err := c.Setup(t).Extensions().HorizontalPodAutoscalers(ns).UpdateStatus(horizontalPodAutoscaler)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -147,6 +152,7 @@ func TestHorizontalPodAutoscalerDelete(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Extensions().HorizontalPodAutoscalers(ns).Delete("foo", nil)
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -159,5 +165,6 @@ func TestHorizontalPodAutoscalerWatch(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	_, err := c.Setup(t).Extensions().HorizontalPodAutoscalers(api.NamespaceAll).Watch(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
