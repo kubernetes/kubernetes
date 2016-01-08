@@ -50,7 +50,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	testClient := client.NewOrDie(&client.Config{Host: s.URL, GroupVersion: testapi.Default.GroupVersion()})
 	host := volume.NewFakeVolumeHost("/tmp/fake", nil, nil)
 
-	plugins := []volume.VolumePlugin{&volume.FakeVolumePlugin{"plugin-name", host, volume.VolumeConfig{}}}
+	plugins := []volume.VolumePlugin{&volume.FakeVolumePlugin{"plugin-name", host, volume.VolumeConfig{}, volume.VolumeOptions{}}}
 	cloud := &fake_cloud.FakeCloud{}
 
 	binder := persistentvolumecontroller.NewPersistentVolumeClaimBinder(binderClient, 10*time.Second)

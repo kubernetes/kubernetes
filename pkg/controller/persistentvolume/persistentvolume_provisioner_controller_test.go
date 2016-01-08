@@ -33,7 +33,7 @@ import (
 )
 
 func TestProvisionerRunStop(t *testing.T) {
-	controller, _ := makeTestController()
+	controller, _, _ := makeTestController()
 
 	if len(controller.stopChannels) != 0 {
 		t.Errorf("Non-running provisioner should not have any stopChannels.  Got %v", len(controller.stopChannels))
@@ -92,15 +92,15 @@ func makeTestClaim() *api.PersistentVolumeClaim {
 	}
 }
 
-func makeTestController() (*PersistentVolumeProvisionerController, *mockControllerClient) {
+func makeTestController() (*PersistentVolumeProvisionerController, *mockControllerClient, *volume.FakeVolumePlugin) {
 	mockClient := &mockControllerClient{}
 	mockVolumePlugin := &volume.FakeVolumePlugin{}
 	controller, _ := NewPersistentVolumeProvisionerController(mockClient, 1*time.Second, nil, mockVolumePlugin, &fake_cloud.FakeCloud{})
-	return controller, mockClient
+	return controller, mockClient, mockVolumePlugin
 }
 
 func TestReconcileClaim(t *testing.T) {
-	controller, mockClient := makeTestController()
+	controller, mockClient, _ := makeTestController()
 	pvc := makeTestClaim()
 
 	// watch would have added the claim to the store
@@ -132,9 +132,16 @@ func TestReconcileClaim(t *testing.T) {
 	}
 }
 
+func checkTagValue(t *testing.T, tags map[string]string, tag string, expectedValue string) {
+	value, found := tags[tag]
+	if !found || value != expectedValue {
+		t.Errorf("Expected tag value %s = %s but value %s found", tag, expectedValue, value)
+	}
+}
+
 func TestReconcileVolume(t *testing.T) {
 
-	controller, mockClient := makeTestController()
+	controller, mockClient, mockVolumePlugin := makeTestController()
 	pv := makeTestVolume()
 	pvc := makeTestClaim()
 
@@ -163,6 +170,13 @@ func TestReconcileVolume(t *testing.T) {
 	if !isAnnotationMatch(pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue, mockClient.volume.Annotations) {
 		t.Errorf("Expected %s but got %s", pvProvisioningRequiredAnnotationKey, mockClient.volume.Annotations[pvProvisioningRequiredAnnotationKey])
 	}
+
+	// Check that the volume plugin was called with correct tags
+	tags := *mockVolumePlugin.LastProvisionerOptions.CloudTags
+	checkTagValue(t, tags, cloudVolumeCreatedForClaimNamespaceTag, pvc.Namespace)
+	checkTagValue(t, tags, cloudVolumeCreatedForClaimNameTag, pvc.Name)
+	checkTagValue(t, tags, cloudVolumeCreatedForVolumeNameTag, pv.Name)
+
 }
 
 var _ controllerClient = &mockControllerClient{}
