@@ -26,6 +26,7 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
@@ -144,6 +145,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 
 	table := []struct {
 		fakeNodeHandler   *FakeNodeHandler
+		daemonSets        []extensions.DaemonSet
 		timeToPass        time.Duration
 		newNodeStatus     api.NodeStatus
 		expectedEvictPods bool
@@ -162,6 +164,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 				},
 				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
+			daemonSets:        nil,
 			timeToPass:        0,
 			newNodeStatus:     api.NodeStatus{},
 			expectedEvictPods: false,
@@ -190,6 +193,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 				},
 				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
+			daemonSets: nil,
 			timeToPass: evictionTimeout,
 			newNodeStatus: api.NodeStatus{
 				Conditions: []api.NodeCondition{
@@ -204,6 +208,72 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			},
 			expectedEvictPods: false,
 			description:       "Node created long time ago, and kubelet posted NotReady for a short period of time.",
+		},
+		// Pod is ds-managed, and kubelet posted NotReady for a long period of time.
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:               api.NodeReady,
+									Status:             api.ConditionFalse,
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+				},
+				Fake: testclient.NewSimpleFake(
+					&api.PodList{
+						Items: []api.Pod{
+							{
+								ObjectMeta: api.ObjectMeta{
+									Name:      "pod0",
+									Namespace: "default",
+									Labels:    map[string]string{"daemon": "yes"},
+								},
+								Spec: api.PodSpec{
+									NodeName: "node0",
+								},
+							},
+						},
+					},
+				),
+			},
+			daemonSets: []extensions.DaemonSet{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "ds0",
+						Namespace: "default",
+					},
+					Spec: extensions.DaemonSetSpec{
+						Selector: &extensions.LabelSelector{
+							MatchLabels: map[string]string{"daemon": "yes"},
+						},
+					},
+				},
+			},
+			timeToPass: time.Hour,
+			newNodeStatus: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					{
+						Type:   api.NodeReady,
+						Status: api.ConditionFalse,
+						// Node status has just been updated, and is NotReady for 1hr.
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 59, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
+			expectedEvictPods: false,
+			description:       "Pod is ds-managed, and kubelet posted NotReady for a long period of time.",
 		},
 		// Node created long time ago, and kubelet posted NotReady for a long period of time.
 		{
@@ -228,6 +298,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 				},
 				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
+			daemonSets: nil,
 			timeToPass: time.Hour,
 			newNodeStatus: api.NodeStatus{
 				Conditions: []api.NodeCondition{
@@ -266,6 +337,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 				},
 				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
+			daemonSets: nil,
 			timeToPass: evictionTimeout - testNodeMonitorGracePeriod,
 			newNodeStatus: api.NodeStatus{
 				Conditions: []api.NodeCondition{
@@ -304,6 +376,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 				},
 				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
+			daemonSets: nil,
 			timeToPass: 60 * time.Minute,
 			newNodeStatus: api.NodeStatus{
 				Conditions: []api.NodeCondition{
@@ -326,6 +399,9 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			evictionTimeout, util.NewFakeRateLimiter(), util.NewFakeRateLimiter(), testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
+		for _, ds := range item.daemonSets {
+			nodeController.daemonSetStore.Add(&ds)
+		}
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

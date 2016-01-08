@@ -111,6 +111,9 @@ type NodeController struct {
 	// Node framework and store
 	nodeController *framework.Controller
 	nodeStore      cache.StoreToNodeLister
+	// DaemonSet framework and store
+	daemonSetController *framework.Controller
+	daemonSetStore      cache.StoreToDaemonSetLister
 
 	forcefullyDeletePod func(*api.Pod)
 }
@@ -191,6 +194,19 @@ func NewNodeController(
 		controller.NoResyncPeriodFunc(),
 		framework.ResourceEventHandlerFuncs{},
 	)
+	nc.daemonSetStore.Store, nc.daemonSetController = framework.NewInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return nc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return nc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).Watch(options)
+			},
+		},
+		&api.Node{},
+		controller.NoResyncPeriodFunc(),
+		framework.ResourceEventHandlerFuncs{},
+	)
 	return nc
 }
 
@@ -198,6 +214,8 @@ func NewNodeController(
 func (nc *NodeController) Run(period time.Duration) {
 	go nc.nodeController.Run(util.NeverStop)
 	go nc.podController.Run(util.NeverStop)
+	go nc.daemonSetController.Run(util.NeverStop)
+
 	// Incorporate the results of node status pushed from kubelet to master.
 	go util.Until(func() {
 		if err := nc.monitorNodeStatus(); err != nil {
@@ -750,6 +768,11 @@ func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 		}
 		// if the pod has already been deleted, ignore it
 		if pod.DeletionGracePeriodSeconds != nil {
+			continue
+		}
+		// if the pod is managed by a daemonset, ignore it
+		_, err := nc.daemonSetStore.GetPodDaemonSets(&pod)
+		if err == nil { // No error means at least one daemonset was found
 			continue
 		}
 
