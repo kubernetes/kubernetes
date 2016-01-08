@@ -78,7 +78,11 @@ type DeploymentController struct {
 	podStoreSynced func() bool
 
 	// A TTLCache of pod creates/deletes each deployment expects to see
-	expectations controller.ControllerExpectationsInterface
+	podExpectations controller.ControllerExpectationsInterface
+
+	// A TTLCache of rc creates/deletes each deployment expects to see
+	// TODO: make expectation model understand (rc) updates (besides adds and deletes)
+	rcExpectations controller.ControllerExpectationsInterface
 
 	// Deployments that need to be synced
 	queue *workqueue.Type
@@ -91,11 +95,12 @@ func NewDeploymentController(client client.Interface, resyncPeriod controller.Re
 	eventBroadcaster.StartRecordingToSink(client.Events(""))
 
 	dc := &DeploymentController{
-		client:        client,
-		expClient:     client.Extensions(),
-		eventRecorder: eventBroadcaster.NewRecorder(api.EventSource{Component: "deployment-controller"}),
-		queue:         workqueue.New(),
-		expectations:  controller.NewControllerExpectations(),
+		client:          client,
+		expClient:       client.Extensions(),
+		eventRecorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "deployment-controller"}),
+		queue:           workqueue.New(),
+		podExpectations: controller.NewControllerExpectations(),
+		rcExpectations:  controller.NewControllerExpectations(),
 	}
 
 	dc.dStore.Store, dc.dController = framework.NewInformer(
@@ -192,6 +197,12 @@ func (dc *DeploymentController) addRC(obj interface{}) {
 	rc := obj.(*api.ReplicationController)
 	glog.V(4).Infof("Replication controller %s added.", rc.Name)
 	if d := dc.getDeploymentForRC(rc); rc != nil {
+		dKey, err := controller.KeyFunc(d)
+		if err != nil {
+			glog.Errorf("Couldn't get key for deployment controller %#v: %v", d, err)
+			return
+		}
+		dc.rcExpectations.CreationObserved(dKey)
 		dc.enqueueDeployment(d)
 	}
 }
@@ -329,7 +340,7 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 			glog.Errorf("Couldn't get key for deployment controller %#v: %v", d, err)
 			return
 		}
-		dc.expectations.DeletionObserved(dKey)
+		dc.podExpectations.DeletionObserved(dKey)
 	}
 }
 
@@ -384,7 +395,8 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}
 	if !exists {
 		glog.Infof("Deployment has been deleted %v", key)
-		dc.expectations.DeleteExpectations(key)
+		dc.podExpectations.DeleteExpectations(key)
+		dc.rcExpectations.DeleteExpectations(key)
 		return nil
 	}
 	d := *obj.(*extensions.Deployment)
@@ -392,7 +404,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		// Sleep so we give the rc reflector goroutine a chance to run.
 		time.Sleep(RcStoreSyncedPollPeriod)
 		glog.Infof("Waiting for rc controller to sync, requeuing deployment %s", d.Name)
-		dc.enqueueDeployment(d)
+		dc.enqueueDeployment(&d)
 		return nil
 	}
 
@@ -475,6 +487,15 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment) (*api
 	if err != nil || existingNewRC != nil {
 		return existingNewRC, err
 	}
+	// Check the rc expectations of deployment before creating a new rc
+	dKey, err := controller.KeyFunc(&deployment)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get key for deployment %#v: %v", deployment, err)
+	}
+	if !dc.rcExpectations.SatisfiedExpectations(dKey) {
+		dc.enqueueDeployment(&deployment)
+		return nil, fmt.Errorf("RC expectations not met yet before getting new RC\n")
+	}
 	// new RC does not exist, create one.
 	namespace := deployment.ObjectMeta.Namespace
 	podTemplateSpecHash := deploymentutil.GetPodTemplateSpecHash(deployment.Spec.Template)
@@ -482,6 +503,13 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment) (*api
 	// Add podTemplateHash label to selector.
 	newRCSelector := deploymentutil.CloneAndAddLabel(deployment.Spec.Selector, deployment.Spec.UniqueLabelKey, podTemplateSpecHash)
 
+	// Set RC expectations (1 rc should be created)
+	dKey, err = controller.KeyFunc(&deployment)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get key for deployment controller %#v: %v", deployment, err)
+	}
+	dc.rcExpectations.ExpectCreations(dKey, 1)
+	// Create new RC
 	newRC := api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: deployment.Name + "-",
@@ -495,6 +523,7 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment) (*api
 	}
 	createdRC, err := dc.client.ReplicationControllers(namespace).Create(&newRC)
 	if err != nil {
+		dc.rcExpectations.DeleteExpectations(dKey)
 		return nil, fmt.Errorf("error creating replication controller: %v", err)
 	}
 	return createdRC, nil
@@ -556,8 +585,8 @@ func (dc *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationControl
 	if err != nil {
 		return false, fmt.Errorf("Couldn't get key for deployment %#v: %v", deployment, err)
 	}
-	if expectationsCheck && !dc.expectations.SatisfiedExpectations(dKey) {
-		fmt.Printf("Expectations not met yet before reconciling old RCs\n")
+	if expectationsCheck && !dc.podExpectations.SatisfiedExpectations(dKey) {
+		glog.V(4).Infof("Pod expectations not met yet before reconciling old RCs\n")
 		return false, nil
 	}
 	// Find the number of ready pods.
@@ -593,7 +622,7 @@ func (dc *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationControl
 			return false, fmt.Errorf("Couldn't get key for deployment %#v: %v", deployment, err)
 		}
 		if expectationsCheck {
-			dc.expectations.ExpectDeletions(dKey, scaleDownCount)
+			dc.podExpectations.ExpectDeletions(dKey, scaleDownCount)
 		}
 	}
 	return true, err
