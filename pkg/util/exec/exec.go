@@ -39,6 +39,8 @@ type Cmd interface {
 	// CombinedOutput runs the command and returns its combined standard output
 	// and standard error.  This follows the pattern of package os/exec.
 	CombinedOutput() ([]byte, error)
+	// Output runs the command and returns standard output, but not standard err
+	Output() ([]byte, error)
 	SetDir(dir string)
 }
 
@@ -81,15 +83,27 @@ func (cmd *cmdWrapper) SetDir(dir string) {
 func (cmd *cmdWrapper) CombinedOutput() ([]byte, error) {
 	out, err := (*osexec.Cmd)(cmd).CombinedOutput()
 	if err != nil {
-		ee, ok := err.(*osexec.ExitError)
-		if !ok {
-			return out, err
-		}
-		// Force a compile fail if exitErrorWrapper can't convert to ExitError.
-		var x ExitError = &exitErrorWrapper{ee}
-		return out, x
+		return out, handleError(err)
 	}
 	return out, nil
+}
+
+func (cmd *cmdWrapper) Output() ([]byte, error) {
+	out, err := (*osexec.Cmd)(cmd).Output()
+	if err != nil {
+		return out, handleError(err)
+	}
+	return out, nil
+}
+
+func handleError(err error) error {
+	ee, ok := err.(*osexec.ExitError)
+	if !ok {
+		return err
+	}
+	// Force a compile fail if exitErrorWrapper can't convert to ExitError.
+	var x ExitError = &exitErrorWrapper{ee}
+	return x
 }
 
 // exitErrorWrapper is an implementation of ExitError in terms of os/exec ExitError.
