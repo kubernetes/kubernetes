@@ -43,6 +43,9 @@ const (
 	// of all deployments that have fulfilled their expectations at least this often.
 	// This recomputation happens based on contents in the local caches.
 	FullDeploymentResyncPeriod = 30 * time.Second
+	// We must avoid creating new rc until the rc store has synced. If it hasn't synced, to
+	// avoid a hot loop, we'll wait this long between checks.
+	RcStoreSyncedPollPeriod = 100 * time.Millisecond
 )
 
 // DeploymentController is responsible for synchronizing Deployment objects stored
@@ -107,13 +110,23 @@ func NewDeploymentController(client client.Interface, resyncPeriod controller.Re
 		&extensions.Deployment{},
 		FullDeploymentResyncPeriod,
 		framework.ResourceEventHandlerFuncs{
-			AddFunc: dc.enqueueDeployment,
+			AddFunc: func(obj interface{}) {
+				d := obj.(*extensions.Deployment)
+				glog.V(4).Infof("Adding deployment %s", d.Name)
+				dc.enqueueDeployment(obj)
+			},
 			UpdateFunc: func(old, cur interface{}) {
+				oldD := old.(*extensions.Deployment)
+				glog.V(4).Infof("Updating deployment %s", oldD.Name)
 				// Resync on deployment object relist.
 				dc.enqueueDeployment(cur)
 			},
 			// This will enter the sync loop and no-op, because the deployment has been deleted from the store.
-			DeleteFunc: dc.enqueueDeployment,
+			DeleteFunc: func(obj interface{}) {
+				d := obj.(*extensions.Deployment)
+				glog.V(4).Infof("Deleting deployment %s", d.Name)
+				dc.enqueueDeployment(obj)
+			},
 		},
 	)
 
@@ -375,6 +388,14 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return nil
 	}
 	d := *obj.(*extensions.Deployment)
+	if !dc.rcStoreSynced() {
+		// Sleep so we give the rc reflector goroutine a chance to run.
+		time.Sleep(RcStoreSyncedPollPeriod)
+		glog.Infof("Waiting for rc controller to sync, requeuing deployment %s", d.Name)
+		dc.enqueueDeployment(d)
+		return nil
+	}
+
 	switch d.Spec.Strategy.Type {
 	case extensions.RecreateDeploymentStrategyType:
 		return dc.syncRecreateDeployment(d)
