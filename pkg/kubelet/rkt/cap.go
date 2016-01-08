@@ -16,13 +16,6 @@ limitations under the License.
 
 package rkt
 
-import (
-	"fmt"
-	"strings"
-
-	"k8s.io/kubernetes/pkg/api"
-)
-
 // TODO(yifan): Export this to higher level package.
 const (
 	CAP_CHOWN = iota
@@ -107,22 +100,11 @@ var capabilityList = map[int]string{
 	CAP_AUDIT_READ:       "CAP_AUDIT_READ",
 }
 
-// getAllCapabilities returns the capability list with all capabilities.
-func getAllCapabilities() string {
+// allCapabilities returns the capability list with all capabilities.
+func allCapabilities() []string {
 	var capabilities []string
 	for _, cap := range capabilityList {
-		capabilities = append(capabilities, fmt.Sprintf("%q", cap))
+		capabilities = append(capabilities, cap)
 	}
-	return strings.Join(capabilities, ",")
-}
-
-// TODO(yifan): This assumes that api.Capability has the form of
-// "CAP_SYS_ADMIN". We need to have a formal definition for
-// capabilities.
-func getCapabilities(caps []api.Capability) string {
-	var capList []string
-	for _, cap := range caps {
-		capList = append(capList, fmt.Sprintf("%q", cap))
-	}
-	return strings.Join(capList, ",")
+	return capabilities
 }

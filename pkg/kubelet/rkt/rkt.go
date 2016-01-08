@@ -225,76 +225,42 @@ func makePodServiceFileName(uid types.UID) string {
 	return fmt.Sprintf("%s_%s.service", kubernetesUnitPrefix, uid)
 }
 
-type resource struct {
-	limit   string
-	request string
-}
+// setIsolators sets the apps' isolators according to the security context and resource spec.
+func setIsolators(app *appctypes.App, c *api.Container, ctx *api.SecurityContext) error {
+	var isolators []appctypes.Isolator
 
-// rawValue converts a string to *json.RawMessage
-func rawValue(value string) *json.RawMessage {
-	msg := json.RawMessage(value)
-	return &msg
-}
+	// Capabilities isolators.
+	if ctx != nil {
+		var addCaps, dropCaps []string
 
-// rawValue converts the request, limit to *json.RawMessage
-func rawRequestLimit(request, limit string) *json.RawMessage {
-	if request == "" {
-		request = limit
-	}
-	if limit == "" {
-		limit = request
-	}
-	return rawValue(fmt.Sprintf(`{"request":%q,"limit":%q}`, request, limit))
-}
-
-// setIsolators overrides the isolators of the pod manifest if necessary.
-// TODO need an apply config in security context for rkt
-func setIsolators(app *appctypes.App, c *api.Container) error {
-	hasCapRequests := securitycontext.HasCapabilitiesRequest(c)
-	if hasCapRequests || len(c.Resources.Limits) > 0 || len(c.Resources.Requests) > 0 {
-		app.Isolators = []appctypes.Isolator{}
-	}
-
-	// Retained capabilities/privileged.
-	privileged := false
-	if c.SecurityContext != nil && c.SecurityContext.Privileged != nil {
-		privileged = *c.SecurityContext.Privileged
-	}
-
-	var addCaps string
-	if privileged {
-		addCaps = getAllCapabilities()
-	} else {
-		if hasCapRequests {
-			addCaps = getCapabilities(c.SecurityContext.Capabilities.Add)
+		if ctx.Capabilities != nil {
+			addCaps, dropCaps = securitycontext.MakeCapabilities(ctx.Capabilities.Add, ctx.Capabilities.Drop)
+		}
+		if ctx.Privileged != nil && *ctx.Privileged {
+			addCaps, dropCaps = allCapabilities(), []string{}
+		}
+		if len(addCaps) > 0 {
+			set, err := appctypes.NewLinuxCapabilitiesRetainSet(addCaps...)
+			if err != nil {
+				return err
+			}
+			isolators = append(isolators, set.AsIsolator())
+		}
+		if len(dropCaps) > 0 {
+			set, err := appctypes.NewLinuxCapabilitiesRevokeSet(dropCaps...)
+			if err != nil {
+				return err
+			}
+			isolators = append(isolators, set.AsIsolator())
 		}
 	}
-	if len(addCaps) > 0 {
-		// TODO(yifan): Replace with constructor, see:
-		// https://github.com/appc/spec/issues/268
-		isolator := appctypes.Isolator{
-			Name:     "os/linux/capabilities-retain-set",
-			ValueRaw: rawValue(fmt.Sprintf(`{"set":[%s]}`, addCaps)),
-		}
-		app.Isolators = append(app.Isolators, isolator)
+
+	// Resources isolators.
+	type resource struct {
+		limit   string
+		request string
 	}
 
-	// Removed capabilities.
-	var dropCaps string
-	if hasCapRequests {
-		dropCaps = getCapabilities(c.SecurityContext.Capabilities.Drop)
-	}
-	if len(dropCaps) > 0 {
-		// TODO(yifan): Replace with constructor, see:
-		// https://github.com/appc/spec/issues/268
-		isolator := appctypes.Isolator{
-			Name:     "os/linux/capabilities-remove-set",
-			ValueRaw: rawValue(fmt.Sprintf(`{"set":[%s]}`, dropCaps)),
-		}
-		app.Isolators = append(app.Isolators, isolator)
-	}
-
-	// Resources.
 	resources := make(map[api.ResourceName]resource)
 	for name, quantity := range c.Resources.Limits {
 		resources[name] = resource{limit: quantity.String()}
@@ -307,25 +273,57 @@ func setIsolators(app *appctypes.App, c *api.Container) error {
 		r.request = quantity.String()
 		resources[name] = r
 	}
-	var acName appctypes.ACIdentifier
+
 	for name, res := range resources {
 		switch name {
 		case api.ResourceCPU:
-			acName = "resource/cpu"
+			cpu, err := appctypes.NewResourceCPUIsolator(res.request, res.limit)
+			if err != nil {
+				return err
+			}
+			isolators = append(isolators, cpu.AsIsolator())
 		case api.ResourceMemory:
-			acName = "resource/memory"
+			memory, err := appctypes.NewResourceMemoryIsolator(res.request, res.limit)
+			if err != nil {
+				return err
+			}
+			isolators = append(isolators, memory.AsIsolator())
 		default:
 			return fmt.Errorf("resource type not supported: %v", name)
 		}
-		// TODO(yifan): Replace with constructor, see:
-		// https://github.com/appc/spec/issues/268
-		isolator := appctypes.Isolator{
-			Name:     acName,
-			ValueRaw: rawRequestLimit(res.request, res.limit),
-		}
-		app.Isolators = append(app.Isolators, isolator)
 	}
+
+	mergeIsolators(app, isolators)
 	return nil
+}
+
+// mergeIsolators replaces the app.Isolators with isolators.
+func mergeIsolators(app *appctypes.App, isolators []appctypes.Isolator) {
+	for _, is := range isolators {
+		found := false
+		for j, js := range app.Isolators {
+			if is.Name.Equals(js.Name) {
+				switch is.Name {
+				case appctypes.LinuxCapabilitiesRetainSetName:
+					// TODO(yifan): More fine grain merge for capability set instead of override.
+					fallthrough
+				case appctypes.LinuxCapabilitiesRevokeSetName:
+					fallthrough
+				case appctypes.ResourceCPUName:
+					fallthrough
+				case appctypes.ResourceMemoryName:
+					app.Isolators[j] = is
+				default:
+					panic(fmt.Sprintf("unexpected isolator name: %v", is.Name))
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			app.Isolators = append(app.Isolators, is)
+		}
+	}
 }
 
 // mergeEnv merges the optEnv with the image's environments.
@@ -392,11 +390,33 @@ func mergePortMappings(app *appctypes.App, optPortMappings []kubecontainer.PortM
 	}
 }
 
-// setApp overrides the app's fields if any of them are specified in the
-// container's spec.
-func setApp(app *appctypes.App, c *api.Container, opts *kubecontainer.RunContainerOptions) error {
-	// Override the exec.
+func verifyNonRoot(app *appctypes.App, ctx *api.SecurityContext) error {
+	if ctx != nil && ctx.RunAsNonRoot != nil && *ctx.RunAsNonRoot {
+		if ctx.RunAsUser != nil && *ctx.RunAsUser == 0 {
+			return fmt.Errorf("container's runAsUser breaks non-root policy")
+		}
+		if ctx.RunAsUser == nil && app.User == "0" {
+			return fmt.Errorf("container has no runAsUser and image will run as root")
+		}
+	}
+	return nil
+}
 
+func setSupplementaryGIDs(app *appctypes.App, podCtx *api.PodSecurityContext) {
+	if podCtx != nil {
+		app.SupplementaryGIDs = app.SupplementaryGIDs[:0]
+		for _, v := range podCtx.SupplementalGroups {
+			app.SupplementaryGIDs = append(app.SupplementaryGIDs, int(v))
+		}
+		if podCtx.FSGroup != nil {
+			app.SupplementaryGIDs = append(app.SupplementaryGIDs, int(*podCtx.FSGroup))
+		}
+	}
+}
+
+// setApp merges the container spec with the image's manifest.
+func setApp(app *appctypes.App, c *api.Container, opts *kubecontainer.RunContainerOptions, ctx *api.SecurityContext, podCtx *api.PodSecurityContext) error {
+	// Override the exec.
 	if len(c.Command) > 0 {
 		app.Exec = c.Command
 	}
@@ -404,11 +424,16 @@ func setApp(app *appctypes.App, c *api.Container, opts *kubecontainer.RunContain
 		app.Exec = append(app.Exec, c.Args...)
 	}
 
-	// TODO(yifan): Use non-root user in the future, see:
-	// https://github.com/coreos/rkt/issues/820
-	app.User, app.Group = "0", "0"
+	// Set UID and GIDs.
+	if err := verifyNonRoot(app, ctx); err != nil {
+		return err
+	}
+	if ctx != nil && ctx.RunAsUser != nil {
+		app.User = strconv.Itoa(int(*ctx.RunAsUser))
+	}
+	setSupplementaryGIDs(app, podCtx)
 
-	// Override the working directory.
+	// Set working directory.
 	if len(c.WorkingDir) > 0 {
 		app.WorkingDirectory = c.WorkingDir
 	}
@@ -419,8 +444,7 @@ func setApp(app *appctypes.App, c *api.Container, opts *kubecontainer.RunContain
 	mergeEnv(app, opts.Envs)
 	mergePortMappings(app, opts.PortMappings)
 
-	// Override isolators.
-	return setIsolators(app, c)
+	return setIsolators(app, c, ctx)
 }
 
 // makePodManifest transforms a kubelet pod spec to the rkt pod manifest.
@@ -525,7 +549,8 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, pullSecrets [
 		return nil, nil, err
 	}
 
-	if err := setApp(imgManifest.App, &c, opts); err != nil {
+	ctx := securitycontext.DetermineEffectiveSecurityContext(pod, &c)
+	if err := setApp(imgManifest.App, &c, opts, ctx, pod.Spec.SecurityContext); err != nil {
 		return nil, nil, err
 	}
 
