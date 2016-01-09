@@ -47,6 +47,7 @@ The `image` property of a container supports the same syntax as the `docker` com
   - [Updating Images](#updating-images)
   - [Using a Private Registry](#using-a-private-registry)
     - [Using Google Container Registry](#using-google-container-registry)
+    - [Using AWS EC2 Container Registry](#using-aws-ec2-container-registry)
     - [Configuring Nodes to Authenticate to a Private Repository](#configuring-nodes-to-authenticate-to-a-private-repository)
     - [Pre-pulling Images](#pre-pulling-images)
     - [Specifying ImagePullSecrets on a Pod](#specifying-imagepullsecrets-on-a-pod)
@@ -96,6 +97,21 @@ The kubelet will authenticate to GCR using the instance's
 Google service account.  The service account on the instance
 will have a `https://www.googleapis.com/auth/devstorage.read_only`,
 so it can pull from the project's GCR, but not push.
+
+### Using AWS EC2 Container Registry
+
+Kubernetes has native support for the [AWS EC2 Container
+Registry](https://aws.amazon.com/ecr/), when nodes are AWS instances.
+
+Simply use the full image name (e.g. `ACCOUNT.dkr.ecr.REGION.amazonaws.com/imagename:tag`)
+in the Pod definition.
+
+All users of the cluster who can create pods will be able to run pods that use any of the
+images in the ECR registry.
+
+The kubelet will fetch and periodically refresh ECR credentials.  It needs the
+`ecr:GetAuthorizationToken` permission to do this.
+
 
 ### Configuring Nodes to Authenticate to a Private Repository
 
