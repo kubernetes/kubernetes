@@ -43,7 +43,7 @@ KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(be
 # Assumed vars:
 #   KUBE_USER
 #   KUBE_PASSWORD
-#   KUBE_MASTER_IP
+#   KUBE_MASTER_IP or KUBE_SERVER
 #   KUBECONFIG
 #   CONTEXT
 #
