@@ -30,9 +30,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -464,6 +467,116 @@ var _ = Describe("Pods", func() {
 		pods, err = podClient.List(options)
 		Expect(len(pods.Items)).To(Equal(1))
 		Logf("Pod update OK")
+	})
+
+	It("should have proper update count during pod creation and deletion", func() {
+		// This e2e test is mainly aimed at understand the update count for pod creation and deletion
+		// TODO(random-liu): Limit the update count later when we have a reasonable upper bound.
+		podClient := framework.Client.Pods(framework.Namespace.Name)
+
+		By("creating the pod")
+		name := "pod-update-" + string(util.NewUUID())
+		value := strconv.Itoa(time.Now().Nanosecond())
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: name,
+				Labels: map[string]string{
+					"name": name,
+					"time": value,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "nginx",
+						Image: "gcr.io/google_containers/nginx:1.7.9",
+						Ports: []api.ContainerPort{{ContainerPort: 80}},
+						LivenessProbe: &api.Probe{
+							Handler: api.Handler{
+								HTTPGet: &api.HTTPGetAction{
+									Path: "/index.html",
+									Port: intstr.FromInt(8080),
+								},
+							},
+							InitialDelaySeconds: 30,
+						},
+					},
+				},
+			},
+		}
+		updates := 0
+		waitFunc := func() {
+			last := -1
+			current := updates
+			timeout := 1 * time.Minute
+			for start := time.Now(); last < current && time.Since(start) < timeout; time.Sleep(5 * time.Second) {
+				last = current
+				current = updates
+			}
+		}
+		var err error
+
+		By("watching pod update")
+		// Create a listener for api updates
+		stop := make(chan struct{})
+		label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
+		_, controller := controllerframework.NewInformer(
+			&cache.ListWatch{
+				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+					options.LabelSelector = label
+					return podClient.List(options)
+				},
+				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+					options.LabelSelector = label
+					return podClient.Watch(options)
+				},
+			},
+			&api.Pod{},
+			0,
+			// TODO(random-liu): Count Add/Update/Delete separately.
+			controllerframework.ResourceEventHandlerFuncs{
+				AddFunc: func(_ interface{}) {
+					updates++
+				},
+				UpdateFunc: func(_, _ interface{}) {
+					updates++
+				},
+				DeleteFunc: func(_ interface{}) {
+					updates++
+				},
+			},
+		)
+		go controller.Run(stop)
+
+		By("wait until stable")
+		waitFunc()
+		last := updates
+
+		By("submitting the pod to kubernetes")
+		// We call defer here in case there is a problem with
+		// the test so we can ensure that we clean up after
+		// ourselves
+		defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
+		pod, err = podClient.Create(pod)
+		if err != nil {
+			Failf("Failed to create pod: %v", err)
+		}
+		By("wait until stable")
+		waitFunc()
+		current := updates
+		Logf("Pod Creation Update Count: %d", current-last)
+		last = current
+
+		By("deleting the pod gracefully")
+		if err := podClient.Delete(pod.Name, nil); err != nil {
+			Failf("Failed to delete pod: %v", err)
+		}
+		waitFunc()
+		current = updates
+		Logf("Pod Deletion Update Count: %d", current-last)
+
+		close(stop)
+		Logf("Pod update count OK")
 	})
 
 	It("should contain environment variables for services [Conformance]", func() {
