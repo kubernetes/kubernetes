@@ -250,6 +250,30 @@ var _ = Describe("Density [Skipped]", func() {
 			stop := make(chan struct{})
 			go controller.Run(stop)
 
+			// Create a listener for api updates
+			updateCount := 0
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": RCName}))
+			_, updateController := controllerframework.NewInformer(
+				&cache.ListWatch{
+					ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+						options.LabelSelector = label
+						return c.Pods(ns).List(options)
+					},
+					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+						options.LabelSelector = label
+						return c.Pods(ns).Watch(options)
+					},
+				},
+				&api.Pod{},
+				0,
+				controllerframework.ResourceEventHandlerFuncs{
+					UpdateFunc: func(_, _ interface{}) {
+						updateCount++
+					},
+				},
+			)
+			go updateController.Run(stop)
+
 			// Start the replication controller.
 			startTime := time.Now()
 			expectNoError(RunRC(config))
@@ -259,10 +283,14 @@ var _ = Describe("Density [Skipped]", func() {
 			By("Waiting for all events to be recorded")
 			last := -1
 			current := len(events)
+			lastCount := -1
+			currentCount := updateCount
 			timeout := 10 * time.Minute
-			for start := time.Now(); last < current && time.Since(start) < timeout; time.Sleep(10 * time.Second) {
+			for start := time.Now(); (last < current || lastCount < currentCount) && time.Since(start) < timeout; time.Sleep(10 * time.Second) {
 				last = current
 				current = len(events)
+				lastCount = currentCount
+				currentCount = updateCount
 			}
 			close(stop)
 
@@ -270,6 +298,10 @@ var _ = Describe("Density [Skipped]", func() {
 				Logf("Warning: Not all events were recorded after waiting %.2f minutes", timeout.Minutes())
 			}
 			Logf("Found %d events", current)
+			if updateCount != currentCount {
+				Logf("Warning: Not all updates were recorded after waiting %.2f minutes", timeout.Minutes())
+			}
+			Logf("Found %d updates", updateCount)
 
 			// Tune the threshold for allowed failures.
 			badEvents := BadEvents(events)
