@@ -35,90 +35,67 @@ import (
 	"github.com/spf13/pflag"
 )
 
-const (
-	// Maximum duration before timing out read/write requests
-	// Set to a value larger than the timeouts in each watch server.
-	ReadWriteTimeout = time.Minute * 60
-	// TODO: This can be tightened up. It still matches objects named watch or proxy.
-	defaultLongRunningRequestRE = "(/|^)((watch|proxy)(/|$)|(logs?|portforward|exec|attach)/?$)"
-)
-
 // APIServer runs a kubernetes api server.
 type APIServer struct {
-	InsecureBindAddress        net.IP
-	InsecurePort               int
-	BindAddress                net.IP
-	AdvertiseAddress           net.IP
-	SecurePort                 int
-	ExternalHost               string
-	TLSCertFile                string
-	TLSPrivateKeyFile          string
-	CertDirectory              string
-	APIPrefix                  string
+	*genericapiserver.ServerRunOptions
 	APIGroupPrefix             string
-	DeprecatedStorageVersion   string
-	StorageVersions            string
-	CloudProvider              string
-	CloudConfigFile            string
-	EventTTL                   time.Duration
-	BasicAuthFile              string
-	ClientCAFile               string
-	TokenAuthFile              string
-	OIDCIssuerURL              string
-	OIDCClientID               string
-	OIDCCAFile                 string
-	OIDCUsernameClaim          string
-	ServiceAccountKeyFile      string
-	ServiceAccountLookup       bool
-	KeystoneURL                string
-	AuthorizationMode          string
-	AuthorizationPolicyFile    string
+	APIPrefix                  string
 	AdmissionControl           string
 	AdmissionControlConfigFile string
-	EtcdServerList             []string
-	EtcdServersOverrides       []string
-	EtcdPathPrefix             string
-	CorsAllowedOriginList      []string
+	AdvertiseAddress           net.IP
 	AllowPrivileged            bool
-	ServiceClusterIPRange      net.IPNet // TODO: make this a list
-	ServiceNodePortRange       util.PortRange
+	AuthorizationMode          string
+	AuthorizationPolicyFile    string
+	BasicAuthFile              string
+	CloudConfigFile            string
+	CloudProvider              string
+	CorsAllowedOriginList      []string
+	DeprecatedStorageVersion   string
 	EnableLogsSupport          bool
-	MasterServiceNamespace     string
-	MasterCount                int
-	RuntimeConfig              util.ConfigurationMap
-	KubeletConfig              kubeletclient.KubeletClientConfig
 	EnableProfiling            bool
 	EnableWatchCache           bool
-	MaxRequestsInFlight        int
-	MinRequestTimeout          int
-	LongRunningRequestRE       string
-	SSHUser                    string
-	SSHKeyfile                 string
-	MaxConnectionBytesPerSec   int64
+	EtcdPathPrefix             string
+	EtcdServerList             []string
+	EtcdServersOverrides       []string
+	EventTTL                   time.Duration
+	ExternalHost               string
+	KeystoneURL                string
+	KubeletConfig              kubeletclient.KubeletClientConfig
 	KubernetesServiceNodePort  int
+	MasterCount                int
+	MasterServiceNamespace     string
+	MaxConnectionBytesPerSec   int64
+	MinRequestTimeout          int
+	OIDCCAFile                 string
+	OIDCClientID               string
+	OIDCIssuerURL              string
+	OIDCUsernameClaim          string
+	RuntimeConfig              util.ConfigurationMap
+	SSHKeyfile                 string
+	SSHUser                    string
+	ServiceAccountKeyFile      string
+	ServiceAccountLookup       bool
+	ServiceClusterIPRange      net.IPNet // TODO: make this a list
+	ServiceNodePortRange       util.PortRange
+	StorageVersions            string
+	TokenAuthFile              string
 }
 
 // NewAPIServer creates a new APIServer object with default parameters
 func NewAPIServer() *APIServer {
 	s := APIServer{
-		InsecurePort:           8080,
-		InsecureBindAddress:    net.ParseIP("127.0.0.1"),
-		BindAddress:            net.ParseIP("0.0.0.0"),
-		SecurePort:             6443,
-		APIPrefix:              "/api",
+		ServerRunOptions:       genericapiserver.NewServerRunOptions(),
 		APIGroupPrefix:         "/apis",
-		EventTTL:               1 * time.Hour,
-		AuthorizationMode:      "AlwaysAllow",
+		APIPrefix:              "/api",
 		AdmissionControl:       "AlwaysAdmit",
-		EtcdPathPrefix:         genericapiserver.DefaultEtcdPathPrefix,
+		AuthorizationMode:      "AlwaysAllow",
 		EnableLogsSupport:      true,
-		MasterServiceNamespace: api.NamespaceDefault,
+		EtcdPathPrefix:         genericapiserver.DefaultEtcdPathPrefix,
+		EventTTL:               1 * time.Hour,
 		MasterCount:            1,
-		CertDirectory:          "/var/run/kubernetes",
+		MasterServiceNamespace: api.NamespaceDefault,
+		RuntimeConfig:          make(util.ConfigurationMap),
 		StorageVersions:        latest.AllPreferredGroupVersions(),
-		LongRunningRequestRE:   defaultLongRunningRequestRE,
-
-		RuntimeConfig: make(util.ConfigurationMap),
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:        ports.KubeletPort,
 			EnableHttps: true,
