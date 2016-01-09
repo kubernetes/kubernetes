@@ -435,6 +435,44 @@ function ensure-master-pd {
   fi
 }
 
+# Configures a CloudWatch alarm to reboot the instance on failure
+function reboot-on-failure {
+  local instance_id=$1
+
+  echo "Creating Cloudwatch alarm to reboot instance ${instance_id} on failure"
+
+  local aws_owner_id=`aws ec2 describe-instances --instance-ids ${instance_id} --query Reservations[0].OwnerId`
+  if [[ -z "${aws_owner_id}" ]]; then
+    echo "Unable to determinate AWS account id for ${instance_id}"
+    exit 1
+  fi
+
+  aws cloudwatch put-metric-alarm \
+                 --alarm-name k8s-${instance_id}-statuscheckfailure-reboot \
+                 --alarm-description "Reboot ${instance_id} on status check failure" \
+                 --namespace "AWS/EC2" \
+                 --dimensions Name=InstanceId,Value=${instance_id} \
+                 --statistic Minimum \
+                 --metric-name StatusCheckFailed \
+                 --comparison-operator GreaterThanThreshold \
+                 --threshold 0 \
+                 --period 60 \
+                 --evaluation-periods 3 \
+                 --alarm-actions arn:aws:swf:${AWS_REGION}:${aws_owner_id}:action/actions/AWS_EC2.InstanceId.Reboot/1.0 > $LOG
+
+  # TODO: The IAM role EC2ActionsAccess must have been created
+  # See e.g. http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/UsingIAM.html
+}
+
+function delete-instance-alarms {
+  local instance_id=$1
+
+  alarm_names=`aws cloudwatch describe-alarms --alarm-name-prefix k8s-${instance_id}- --query MetricAlarms[].AlarmName`
+  for alarm_name in ${alarm_names}; do
+    aws cloudwatch delete-alarms --alarm-names ${alarm_name} > $LOG
+  done
+}
+
 # Creates a new DHCP option set configured correctly for Kubernetes
 # Sets DHCP_OPTION_SET_ID
 function create-dhcp-option-set () {
@@ -1010,6 +1048,8 @@ function start-master() {
     attempt=$(($attempt+1))
     sleep 10
   done
+
+  reboot-on-failure ${master_id}
 }
 
 # Creates an ASG for the minion nodes
@@ -1199,6 +1239,13 @@ function kube-down {
           sleep 3
         fi
       done
+    fi
+
+    if [[ -z "${KUBE_MASTER_ID-}" ]]; then
+      KUBE_MASTER_ID=$(get_instanceid_from_name ${MASTER_NAME})
+    fi
+    if [[ -n "${KUBE_MASTER_ID-}" ]]; then
+      delete-instance-alarms ${KUBE_MASTER_ID}
     fi
 
     echo "Deleting instances in VPC: ${vpc_id}"
