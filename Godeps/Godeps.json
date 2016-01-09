@@ -936,6 +936,10 @@
 			"Rev": "77e7d383beb96054547729f49c372b3d01e196ff"
 		},
 		{
+			"ImportPath": "google.golang.org/api/gensupport",
+			"Rev": "77e7d383beb96054547729f49c372b3d01e196ff"
+		},
+		{
 			"ImportPath": "google.golang.org/api/googleapi",
 			"Rev": "77e7d383beb96054547729f49c372b3d01e196ff"
 		},
