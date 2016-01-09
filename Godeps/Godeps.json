@@ -925,19 +925,19 @@
 		},
 		{
 			"ImportPath": "google.golang.org/api/cloudmonitoring/v2beta2",
-			"Rev": "0c2979aeaa5b573e60d3ddffe5ce8dca8df309bd"
+			"Rev": "77e7d383beb96054547729f49c372b3d01e196ff"
 		},
 		{
 			"ImportPath": "google.golang.org/api/compute/v1",
-			"Rev": "0c2979aeaa5b573e60d3ddffe5ce8dca8df309bd"
+			"Rev": "77e7d383beb96054547729f49c372b3d01e196ff"
 		},
 		{
 			"ImportPath": "google.golang.org/api/container/v1",
-			"Rev": "0c2979aeaa5b573e60d3ddffe5ce8dca8df309bd"
+			"Rev": "77e7d383beb96054547729f49c372b3d01e196ff"
 		},
 		{
 			"ImportPath": "google.golang.org/api/googleapi",
-			"Rev": "0c2979aeaa5b573e60d3ddffe5ce8dca8df309bd"
+			"Rev": "77e7d383beb96054547729f49c372b3d01e196ff"
 		},
 		{
 			"ImportPath": "google.golang.org/cloud/compute/metadata",

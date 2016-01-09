@@ -14,8 +14,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/net/context"
-	"google.golang.org/api/googleapi"
+	context "golang.org/x/net/context"
+	ctxhttp "golang.org/x/net/context/ctxhttp"
+	gensupport "google.golang.org/api/gensupport"
+	googleapi "google.golang.org/api/googleapi"
 	"io"
 	"net/http"
 	"net/url"
@@ -31,10 +33,12 @@ var _ = fmt.Sprintf
 var _ = json.NewDecoder
 var _ = io.Copy
 var _ = url.Parse
+var _ = gensupport.MarshalJSON
 var _ = googleapi.Version
 var _ = errors.New
 var _ = strings.Replace
-var _ = context.Background
+var _ = context.Canceled
+var _ = ctxhttp.Do
 
 const apiId = "cloudmonitoring:v2beta2"
 const apiName = "cloudmonitoring"
@@ -114,6 +118,24 @@ type DeleteMetricDescriptorResponse struct {
 	// Kind: Identifies what kind of resource this is. Value: the fixed
 	// string "cloudmonitoring#deleteMetricDescriptorResponse".
 	Kind string `json:"kind,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Kind") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *DeleteMetricDescriptorResponse) MarshalJSON() ([]byte, error) {
+	type noMethod DeleteMetricDescriptorResponse
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // ListMetricDescriptorsRequest: The request of
@@ -122,6 +144,20 @@ type ListMetricDescriptorsRequest struct {
 	// Kind: Identifies what kind of resource this is. Value: the fixed
 	// string "cloudmonitoring#listMetricDescriptorsRequest".
 	Kind string `json:"kind,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Kind") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *ListMetricDescriptorsRequest) MarshalJSON() ([]byte, error) {
+	type noMethod ListMetricDescriptorsRequest
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // ListMetricDescriptorsResponse: The response of
@@ -139,6 +175,24 @@ type ListMetricDescriptorsResponse struct {
 	// past the pagination limit, pass this value to the pageToken query
 	// parameter.
 	NextPageToken string `json:"nextPageToken,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Kind") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *ListMetricDescriptorsResponse) MarshalJSON() ([]byte, error) {
+	type noMethod ListMetricDescriptorsResponse
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // ListTimeseriesDescriptorsRequest: The request of
@@ -147,6 +201,20 @@ type ListTimeseriesDescriptorsRequest struct {
 	// Kind: Identifies what kind of resource this is. Value: the fixed
 	// string "cloudmonitoring#listTimeseriesDescriptorsRequest".
 	Kind string `json:"kind,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Kind") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *ListTimeseriesDescriptorsRequest) MarshalJSON() ([]byte, error) {
+	type noMethod ListTimeseriesDescriptorsRequest
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // ListTimeseriesDescriptorsResponse: The response of
@@ -172,6 +240,24 @@ type ListTimeseriesDescriptorsResponse struct {
 	// Youngest: The youngest timestamp of the interval of this query, as an
 	// RFC 3339 string.
 	Youngest string `json:"youngest,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Kind") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *ListTimeseriesDescriptorsResponse) MarshalJSON() ([]byte, error) {
+	type noMethod ListTimeseriesDescriptorsResponse
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // ListTimeseriesRequest: The request of cloudmonitoring.timeseries.list
@@ -179,6 +265,20 @@ type ListTimeseriesRequest struct {
 	// Kind: Identifies what kind of resource this is. Value: the fixed
 	// string "cloudmonitoring#listTimeseriesRequest".
 	Kind string `json:"kind,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Kind") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *ListTimeseriesRequest) MarshalJSON() ([]byte, error) {
+	type noMethod ListTimeseriesRequest
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // ListTimeseriesResponse: The response of
@@ -205,6 +305,24 @@ type ListTimeseriesResponse struct {
 	// Youngest: The youngest timestamp of the interval of this query as an
 	// RFC 3339 string.
 	Youngest string `json:"youngest,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Kind") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *ListTimeseriesResponse) MarshalJSON() ([]byte, error) {
+	type noMethod ListTimeseriesResponse
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // MetricDescriptor: A metricDescriptor defines the name, label keys,
@@ -224,6 +342,24 @@ type MetricDescriptor struct {
 
 	// TypeDescriptor: Type description for this metric.
 	TypeDescriptor *MetricDescriptorTypeDescriptor `json:"typeDescriptor,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Description") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *MetricDescriptor) MarshalJSON() ([]byte, error) {
+	type noMethod MetricDescriptor
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // MetricDescriptorLabelDescriptor: A label in a metric is a description
@@ -235,6 +371,20 @@ type MetricDescriptorLabelDescriptor struct {
 
 	// Key: Label key.
 	Key string `json:"key,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Description") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *MetricDescriptorLabelDescriptor) MarshalJSON() ([]byte, error) {
+	type noMethod MetricDescriptorLabelDescriptor
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // MetricDescriptorTypeDescriptor: A type in a metric contains
@@ -248,13 +398,27 @@ type MetricDescriptorTypeDescriptor struct {
 	// ValueType: The data type of of individual points in the metric's time
 	// series. See Metric value types.
 	ValueType string `json:"valueType,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "MetricType") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *MetricDescriptorTypeDescriptor) MarshalJSON() ([]byte, error) {
+	type noMethod MetricDescriptorTypeDescriptor
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // Point: Point is a single point in a time series. It consists of a
 // start time, an end time, and a value.
 type Point struct {
 	// BoolValue: The value of this data point. Either "true" or "false".
-	BoolValue bool `json:"boolValue,omitempty"`
+	BoolValue *bool `json:"boolValue,omitempty"`
 
 	// DistributionValue: The value of this data point as a distribution. A
 	// distribution value can contain a list of buckets and/or an
@@ -264,7 +428,7 @@ type Point struct {
 
 	// DoubleValue: The value of this data point as a double-precision
 	// floating-point number.
-	DoubleValue float64 `json:"doubleValue,omitempty"`
+	DoubleValue *float64 `json:"doubleValue,omitempty"`
 
 	// End: The interval [start, end] is the time period to which the
 	// point's value applies. For gauge metrics, whose values are
@@ -275,7 +439,7 @@ type Point struct {
 	End string `json:"end,omitempty"`
 
 	// Int64Value: The value of this data point as a 64-bit integer.
-	Int64Value int64 `json:"int64Value,omitempty,string"`
+	Int64Value *int64 `json:"int64Value,omitempty,string"`
 
 	// Start: The interval [start, end] is the time period to which the
 	// point's value applies. For gauge metrics, whose values are
@@ -286,7 +450,21 @@ type Point struct {
 	Start string `json:"start,omitempty"`
 
 	// StringValue: The value of this data point in string format.
-	StringValue string `json:"stringValue,omitempty"`
+	StringValue *string `json:"stringValue,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "BoolValue") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *Point) MarshalJSON() ([]byte, error) {
+	type noMethod Point
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // PointDistribution: Distribution data point value type. When writing
@@ -302,6 +480,20 @@ type PointDistribution struct {
 
 	// UnderflowBucket: The underflow bucket.
 	UnderflowBucket *PointDistributionUnderflowBucket `json:"underflowBucket,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Buckets") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *PointDistribution) MarshalJSON() ([]byte, error) {
+	type noMethod PointDistribution
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // PointDistributionBucket: The histogram's bucket. Buckets that form
@@ -320,6 +512,20 @@ type PointDistributionBucket struct {
 	// UpperBound: The upper bound of the value interval of this bucket
 	// (exclusive).
 	UpperBound float64 `json:"upperBound,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Count") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *PointDistributionBucket) MarshalJSON() ([]byte, error) {
+	type noMethod PointDistributionBucket
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // PointDistributionOverflowBucket: The overflow bucket is a special
@@ -333,6 +539,20 @@ type PointDistributionOverflowBucket struct {
 	// LowerBound: The lower bound of the value interval of this bucket
 	// (inclusive).
 	LowerBound float64 `json:"lowerBound,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Count") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *PointDistributionOverflowBucket) MarshalJSON() ([]byte, error) {
+	type noMethod PointDistributionOverflowBucket
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // PointDistributionUnderflowBucket: The underflow bucket is a special
@@ -346,6 +566,20 @@ type PointDistributionUnderflowBucket struct {
 	// UpperBound: The upper bound of the value interval of this bucket
 	// (exclusive).
 	UpperBound float64 `json:"upperBound,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Count") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *PointDistributionUnderflowBucket) MarshalJSON() ([]byte, error) {
+	type noMethod PointDistributionUnderflowBucket
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // Timeseries: The monitoring data is organized as metrics and stored as
@@ -359,6 +593,20 @@ type Timeseries struct {
 
 	// TimeseriesDesc: The descriptor of this time series.
 	TimeseriesDesc *TimeseriesDescriptor `json:"timeseriesDesc,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Points") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *Timeseries) MarshalJSON() ([]byte, error) {
+	type noMethod Timeseries
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // TimeseriesDescriptor: TimeseriesDescriptor identifies a single time
@@ -373,6 +621,20 @@ type TimeseriesDescriptor struct {
 	// Project: The Developers Console project number to which this time
 	// series belongs.
 	Project string `json:"project,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Labels") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *TimeseriesDescriptor) MarshalJSON() ([]byte, error) {
+	type noMethod TimeseriesDescriptor
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 type TimeseriesDescriptorLabel struct {
@@ -381,6 +643,20 @@ type TimeseriesDescriptorLabel struct {
 
 	// Value: The label's value.
 	Value string `json:"value,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Key") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *TimeseriesDescriptorLabel) MarshalJSON() ([]byte, error) {
+	type noMethod TimeseriesDescriptorLabel
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // TimeseriesPoint: When writing time series, TimeseriesPoint should be
@@ -392,6 +668,20 @@ type TimeseriesPoint struct {
 
 	// TimeseriesDesc: The descriptor of this time series.
 	TimeseriesDesc *TimeseriesDescriptor `json:"timeseriesDesc,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Point") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *TimeseriesPoint) MarshalJSON() ([]byte, error) {
+	type noMethod TimeseriesPoint
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // WriteTimeseriesRequest: The request of
@@ -404,6 +694,20 @@ type WriteTimeseriesRequest struct {
 	// for each time series. The labels in timeseries and the common_labels
 	// should form a complete list of labels that required by the metric.
 	Timeseries []*TimeseriesPoint `json:"timeseries,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "CommonLabels") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *WriteTimeseriesRequest) MarshalJSON() ([]byte, error) {
+	type noMethod WriteTimeseriesRequest
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // WriteTimeseriesResponse: The response of
@@ -412,6 +716,24 @@ type WriteTimeseriesResponse struct {
 	// Kind: Identifies what kind of resource this is. Value: the fixed
 	// string "cloudmonitoring#writeTimeseriesResponse".
 	Kind string `json:"kind,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Kind") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+}
+
+func (s *WriteTimeseriesResponse) MarshalJSON() ([]byte, error) {
+	type noMethod WriteTimeseriesResponse
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields)
 }
 
 // method id "cloudmonitoring.metricDescriptors.create":
@@ -420,46 +742,91 @@ type MetricDescriptorsCreateCall struct {
 	s                *Service
 	project          string
 	metricdescriptor *MetricDescriptor
-	opt_             map[string]interface{}
+	urlParams_       gensupport.URLParams
+	ctx_             context.Context
 }
 
 // Create: Create a new metric.
 func (r *MetricDescriptorsService) Create(project string, metricdescriptor *MetricDescriptor) *MetricDescriptorsCreateCall {
-	c := &MetricDescriptorsCreateCall{s: r.s, opt_: make(map[string]interface{})}
+	c := &MetricDescriptorsCreateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.metricdescriptor = metricdescriptor
 	return c
 }
 
-// Fields allows partial responses to be retrieved.
-// See https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
-// for more information.
-func (c *MetricDescriptorsCreateCall) Fields(s ...googleapi.Field) *MetricDescriptorsCreateCall {
-	c.opt_["fields"] = googleapi.CombineFields(s)
+// QuotaUser sets the optional parameter "quotaUser": Available to use
+// for quota purposes for server-side applications. Can be any arbitrary
+// string assigned to a user, but should not exceed 40 characters.
+// Overrides userIp if both are provided.
+func (c *MetricDescriptorsCreateCall) QuotaUser(quotaUser string) *MetricDescriptorsCreateCall {
+	c.urlParams_.Set("quotaUser", quotaUser)
 	return c
 }
 
-func (c *MetricDescriptorsCreateCall) Do() (*MetricDescriptor, error) {
+// UserIP sets the optional parameter "userIp": IP address of the site
+// where the request originates. Use this if you want to enforce
+// per-user limits.
+func (c *MetricDescriptorsCreateCall) UserIP(userIP string) *MetricDescriptorsCreateCall {
+	c.urlParams_.Set("userIp", userIP)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *MetricDescriptorsCreateCall) Fields(s ...googleapi.Field) *MetricDescriptorsCreateCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *MetricDescriptorsCreateCall) Context(ctx context.Context) *MetricDescriptorsCreateCall {
+	c.ctx_ = ctx
+	return c
+}
+
+func (c *MetricDescriptorsCreateCall) doRequest(alt string) (*http.Response, error) {
 	var body io.Reader = nil
 	body, err := googleapi.WithoutDataWrapper.JSONReader(c.metricdescriptor)
 	if err != nil {
 		return nil, err
 	}
 	ctype := "application/json"
-	params := make(url.Values)
-	params.Set("alt", "json")
-	if v, ok := c.opt_["fields"]; ok {
-		params.Set("fields", fmt.Sprintf("%v", v))
-	}
+	c.urlParams_.Set("alt", alt)
 	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/metricDescriptors")
-	urls += "?" + params.Encode()
+	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
 	googleapi.Expand(req.URL, map[string]string{
 		"project": c.project,
 	})
 	req.Header.Set("Content-Type", ctype)
 	req.Header.Set("User-Agent", c.s.userAgent())
-	res, err := c.s.client.Do(req)
+	if c.ctx_ != nil {
+		return ctxhttp.Do(c.ctx_, c.s.client, req)
+	}
+	return c.s.client.Do(req)
+}
+
+// Do executes the "cloudmonitoring.metricDescriptors.create" call.
+// Exactly one of *MetricDescriptor or error will be non-nil. Any
+// non-2xx status code is an error. Response headers are in either
+// *MetricDescriptor.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *MetricDescriptorsCreateCall) Do() (*MetricDescriptor, error) {
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -467,7 +834,12 @@ func (c *MetricDescriptorsCreateCall) Do() (*MetricDescriptor, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	var ret *MetricDescriptor
+	ret := &MetricDescriptor{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
 	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
@@ -505,44 +877,89 @@ func (c *MetricDescriptorsCreateCall) Do() (*MetricDescriptor, error) {
 // method id "cloudmonitoring.metricDescriptors.delete":
 
 type MetricDescriptorsDeleteCall struct {
-	s       *Service
-	project string
-	metric  string
-	opt_    map[string]interface{}
+	s          *Service
+	project    string
+	metric     string
+	urlParams_ gensupport.URLParams
+	ctx_       context.Context
 }
 
 // Delete: Delete an existing metric.
 func (r *MetricDescriptorsService) Delete(project string, metric string) *MetricDescriptorsDeleteCall {
-	c := &MetricDescriptorsDeleteCall{s: r.s, opt_: make(map[string]interface{})}
+	c := &MetricDescriptorsDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.metric = metric
 	return c
 }
 
-// Fields allows partial responses to be retrieved.
-// See https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
-// for more information.
-func (c *MetricDescriptorsDeleteCall) Fields(s ...googleapi.Field) *MetricDescriptorsDeleteCall {
-	c.opt_["fields"] = googleapi.CombineFields(s)
+// QuotaUser sets the optional parameter "quotaUser": Available to use
+// for quota purposes for server-side applications. Can be any arbitrary
+// string assigned to a user, but should not exceed 40 characters.
+// Overrides userIp if both are provided.
+func (c *MetricDescriptorsDeleteCall) QuotaUser(quotaUser string) *MetricDescriptorsDeleteCall {
+	c.urlParams_.Set("quotaUser", quotaUser)
 	return c
 }
 
-func (c *MetricDescriptorsDeleteCall) Do() (*DeleteMetricDescriptorResponse, error) {
+// UserIP sets the optional parameter "userIp": IP address of the site
+// where the request originates. Use this if you want to enforce
+// per-user limits.
+func (c *MetricDescriptorsDeleteCall) UserIP(userIP string) *MetricDescriptorsDeleteCall {
+	c.urlParams_.Set("userIp", userIP)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *MetricDescriptorsDeleteCall) Fields(s ...googleapi.Field) *MetricDescriptorsDeleteCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *MetricDescriptorsDeleteCall) Context(ctx context.Context) *MetricDescriptorsDeleteCall {
+	c.ctx_ = ctx
+	return c
+}
+
+func (c *MetricDescriptorsDeleteCall) doRequest(alt string) (*http.Response, error) {
 	var body io.Reader = nil
-	params := make(url.Values)
-	params.Set("alt", "json")
-	if v, ok := c.opt_["fields"]; ok {
-		params.Set("fields", fmt.Sprintf("%v", v))
-	}
+	c.urlParams_.Set("alt", alt)
 	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/metricDescriptors/{metric}")
-	urls += "?" + params.Encode()
+	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("DELETE", urls, body)
 	googleapi.Expand(req.URL, map[string]string{
 		"project": c.project,
 		"metric":  c.metric,
 	})
 	req.Header.Set("User-Agent", c.s.userAgent())
-	res, err := c.s.client.Do(req)
+	if c.ctx_ != nil {
+		return ctxhttp.Do(c.ctx_, c.s.client, req)
+	}
+	return c.s.client.Do(req)
+}
+
+// Do executes the "cloudmonitoring.metricDescriptors.delete" call.
+// Exactly one of *DeleteMetricDescriptorResponse or error will be
+// non-nil. Any non-2xx status code is an error. Response headers are in
+// either *DeleteMetricDescriptorResponse.ServerResponse.Header or (if a
+// response was returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *MetricDescriptorsDeleteCall) Do() (*DeleteMetricDescriptorResponse, error) {
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -550,7 +967,12 @@ func (c *MetricDescriptorsDeleteCall) Do() (*DeleteMetricDescriptorResponse, err
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	var ret *DeleteMetricDescriptorResponse
+	ret := &DeleteMetricDescriptorResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
 	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
@@ -595,7 +1017,9 @@ type MetricDescriptorsListCall struct {
 	s                            *Service
 	project                      string
 	listmetricdescriptorsrequest *ListMetricDescriptorsRequest
-	opt_                         map[string]interface{}
+	urlParams_                   gensupport.URLParams
+	ifNoneMatch_                 string
+	ctx_                         context.Context
 }
 
 // List: List metric descriptors that match the query. If the query is
@@ -604,7 +1028,7 @@ type MetricDescriptorsListCall struct {
 // response to request subsequent pages of results by setting the
 // pageToken query parameter to the value of the nextPageToken.
 func (r *MetricDescriptorsService) List(project string, listmetricdescriptorsrequest *ListMetricDescriptorsRequest) *MetricDescriptorsListCall {
-	c := &MetricDescriptorsListCall{s: r.s, opt_: make(map[string]interface{})}
+	c := &MetricDescriptorsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.listmetricdescriptorsrequest = listmetricdescriptorsrequest
 	return c
@@ -614,7 +1038,7 @@ func (r *MetricDescriptorsService) List(project string, listmetricdescriptorsreq
 // descriptors per page. Used for pagination. If not specified, count =
 // 100.
 func (c *MetricDescriptorsListCall) Count(count int64) *MetricDescriptorsListCall {
-	c.opt_["count"] = count
+	c.urlParams_.Set("count", fmt.Sprint(count))
 	return c
 }
 
@@ -623,7 +1047,7 @@ func (c *MetricDescriptorsListCall) Count(count int64) *MetricDescriptorsListCal
 // value to the value of the nextPageToken to retrieve the next page of
 // results.
 func (c *MetricDescriptorsListCall) PageToken(pageToken string) *MetricDescriptorsListCall {
-	c.opt_["pageToken"] = pageToken
+	c.urlParams_.Set("pageToken", pageToken)
 	return c
 }
 
@@ -634,42 +1058,90 @@ func (c *MetricDescriptorsListCall) PageToken(pageToken string) *MetricDescripto
 // returned. If an empty string is passed with this field, no metrics
 // are returned.
 func (c *MetricDescriptorsListCall) Query(query string) *MetricDescriptorsListCall {
-	c.opt_["query"] = query
+	c.urlParams_.Set("query", query)
 	return c
 }
 
-// Fields allows partial responses to be retrieved.
-// See https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// QuotaUser sets the optional parameter "quotaUser": Available to use
+// for quota purposes for server-side applications. Can be any arbitrary
+// string assigned to a user, but should not exceed 40 characters.
+// Overrides userIp if both are provided.
+func (c *MetricDescriptorsListCall) QuotaUser(quotaUser string) *MetricDescriptorsListCall {
+	c.urlParams_.Set("quotaUser", quotaUser)
+	return c
+}
+
+// UserIP sets the optional parameter "userIp": IP address of the site
+// where the request originates. Use this if you want to enforce
+// per-user limits.
+func (c *MetricDescriptorsListCall) UserIP(userIP string) *MetricDescriptorsListCall {
+	c.urlParams_.Set("userIp", userIP)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
 func (c *MetricDescriptorsListCall) Fields(s ...googleapi.Field) *MetricDescriptorsListCall {
-	c.opt_["fields"] = googleapi.CombineFields(s)
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
 	return c
 }
 
-func (c *MetricDescriptorsListCall) Do() (*ListMetricDescriptorsResponse, error) {
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *MetricDescriptorsListCall) IfNoneMatch(entityTag string) *MetricDescriptorsListCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *MetricDescriptorsListCall) Context(ctx context.Context) *MetricDescriptorsListCall {
+	c.ctx_ = ctx
+	return c
+}
+
+func (c *MetricDescriptorsListCall) doRequest(alt string) (*http.Response, error) {
 	var body io.Reader = nil
-	params := make(url.Values)
-	params.Set("alt", "json")
-	if v, ok := c.opt_["count"]; ok {
-		params.Set("count", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["pageToken"]; ok {
-		params.Set("pageToken", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["query"]; ok {
-		params.Set("query", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["fields"]; ok {
-		params.Set("fields", fmt.Sprintf("%v", v))
-	}
+	c.urlParams_.Set("alt", alt)
 	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/metricDescriptors")
-	urls += "?" + params.Encode()
+	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
 	googleapi.Expand(req.URL, map[string]string{
 		"project": c.project,
 	})
 	req.Header.Set("User-Agent", c.s.userAgent())
-	res, err := c.s.client.Do(req)
+	if c.ifNoneMatch_ != "" {
+		req.Header.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	if c.ctx_ != nil {
+		return ctxhttp.Do(c.ctx_, c.s.client, req)
+	}
+	return c.s.client.Do(req)
+}
+
+// Do executes the "cloudmonitoring.metricDescriptors.list" call.
+// Exactly one of *ListMetricDescriptorsResponse or error will be
+// non-nil. Any non-2xx status code is an error. Response headers are in
+// either *ListMetricDescriptorsResponse.ServerResponse.Header or (if a
+// response was returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *MetricDescriptorsListCall) Do() (*ListMetricDescriptorsResponse, error) {
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -677,7 +1149,12 @@ func (c *MetricDescriptorsListCall) Do() (*ListMetricDescriptorsResponse, error)
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	var ret *ListMetricDescriptorsResponse
+	ret := &ListMetricDescriptorsResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
 	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
@@ -737,9 +1214,10 @@ type TimeseriesListCall struct {
 	s                     *Service
 	project               string
 	metric                string
-	youngest              string
 	listtimeseriesrequest *ListTimeseriesRequest
-	opt_                  map[string]interface{}
+	urlParams_            gensupport.URLParams
+	ifNoneMatch_          string
+	ctx_                  context.Context
 }
 
 // List: List the data points of the time series that match the metric
@@ -748,10 +1226,10 @@ type TimeseriesListCall struct {
 // response to request subsequent pages of results by setting the
 // pageToken query parameter to the value of the nextPageToken.
 func (r *TimeseriesService) List(project string, metric string, youngest string, listtimeseriesrequest *ListTimeseriesRequest) *TimeseriesListCall {
-	c := &TimeseriesListCall{s: r.s, opt_: make(map[string]interface{})}
+	c := &TimeseriesListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.metric = metric
-	c.youngest = youngest
+	c.urlParams_.Set("youngest", youngest)
 	c.listtimeseriesrequest = listtimeseriesrequest
 	return c
 }
@@ -767,14 +1245,14 @@ func (r *TimeseriesService) List(project string, metric string, youngest string,
 //   "min"
 //   "sum"
 func (c *TimeseriesListCall) Aggregator(aggregator string) *TimeseriesListCall {
-	c.opt_["aggregator"] = aggregator
+	c.urlParams_.Set("aggregator", aggregator)
 	return c
 }
 
 // Count sets the optional parameter "count": Maximum number of data
 // points per page, which is used for pagination of results.
 func (c *TimeseriesListCall) Count(count int64) *TimeseriesListCall {
-	c.opt_["count"] = count
+	c.urlParams_.Set("count", fmt.Sprint(count))
 	return c
 }
 
@@ -788,8 +1266,8 @@ func (c *TimeseriesListCall) Count(count int64) *TimeseriesListCall {
 // you could
 // specify:
 // label=cloud.googleapis.com%2Flocation=~us-central1.*
-func (c *TimeseriesListCall) Labels(labels string) *TimeseriesListCall {
-	c.opt_["labels"] = labels
+func (c *TimeseriesListCall) Labels(labels ...string) *TimeseriesListCall {
+	c.urlParams_.SetMulti("labels", append([]string{}, labels...))
 	return c
 }
 
@@ -798,7 +1276,7 @@ func (c *TimeseriesListCall) Labels(labels string) *TimeseriesListCall {
 // neither oldest nor timespan is specified, the default time interval
 // will be (youngest - 4 hours, youngest]
 func (c *TimeseriesListCall) Oldest(oldest string) *TimeseriesListCall {
-	c.opt_["oldest"] = oldest
+	c.urlParams_.Set("oldest", oldest)
 	return c
 }
 
@@ -807,7 +1285,16 @@ func (c *TimeseriesListCall) Oldest(oldest string) *TimeseriesListCall {
 // value to the value of the nextPageToken to retrieve the next page of
 // results.
 func (c *TimeseriesListCall) PageToken(pageToken string) *TimeseriesListCall {
-	c.opt_["pageToken"] = pageToken
+	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
+// QuotaUser sets the optional parameter "quotaUser": Available to use
+// for quota purposes for server-side applications. Can be any arbitrary
+// string assigned to a user, but should not exceed 40 characters.
+// Overrides userIp if both are provided.
+func (c *TimeseriesListCall) QuotaUser(quotaUser string) *TimeseriesListCall {
+	c.urlParams_.Set("quotaUser", quotaUser)
 	return c
 }
 
@@ -825,7 +1312,15 @@ func (c *TimeseriesListCall) PageToken(pageToken string) *TimeseriesListCall {
 // If neither oldest nor timespan is specified, the default time
 // interval will be (youngest - 4 hours, youngest].
 func (c *TimeseriesListCall) Timespan(timespan string) *TimeseriesListCall {
-	c.opt_["timespan"] = timespan
+	c.urlParams_.Set("timespan", timespan)
+	return c
+}
+
+// UserIP sets the optional parameter "userIp": IP address of the site
+// where the request originates. Use this if you want to enforce
+// per-user limits.
+func (c *TimeseriesListCall) UserIP(userIP string) *TimeseriesListCall {
+	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -839,56 +1334,74 @@ func (c *TimeseriesListCall) Timespan(timespan string) *TimeseriesListCall {
 // - w: week  Examples: 3m, 4w. Only one unit is allowed, for example:
 // 2w3d is not allowed; you should use 17d instead.
 func (c *TimeseriesListCall) Window(window string) *TimeseriesListCall {
-	c.opt_["window"] = window
+	c.urlParams_.Set("window", window)
 	return c
 }
 
-// Fields allows partial responses to be retrieved.
-// See https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
 func (c *TimeseriesListCall) Fields(s ...googleapi.Field) *TimeseriesListCall {
-	c.opt_["fields"] = googleapi.CombineFields(s)
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
 	return c
 }
 
-func (c *TimeseriesListCall) Do() (*ListTimeseriesResponse, error) {
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *TimeseriesListCall) IfNoneMatch(entityTag string) *TimeseriesListCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *TimeseriesListCall) Context(ctx context.Context) *TimeseriesListCall {
+	c.ctx_ = ctx
+	return c
+}
+
+func (c *TimeseriesListCall) doRequest(alt string) (*http.Response, error) {
 	var body io.Reader = nil
-	params := make(url.Values)
-	params.Set("alt", "json")
-	params.Set("youngest", fmt.Sprintf("%v", c.youngest))
-	if v, ok := c.opt_["aggregator"]; ok {
-		params.Set("aggregator", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["count"]; ok {
-		params.Set("count", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["labels"]; ok {
-		params.Set("labels", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["oldest"]; ok {
-		params.Set("oldest", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["pageToken"]; ok {
-		params.Set("pageToken", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["timespan"]; ok {
-		params.Set("timespan", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["window"]; ok {
-		params.Set("window", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["fields"]; ok {
-		params.Set("fields", fmt.Sprintf("%v", v))
-	}
+	c.urlParams_.Set("alt", alt)
 	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/timeseries/{metric}")
-	urls += "?" + params.Encode()
+	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
 	googleapi.Expand(req.URL, map[string]string{
 		"project": c.project,
 		"metric":  c.metric,
 	})
 	req.Header.Set("User-Agent", c.s.userAgent())
-	res, err := c.s.client.Do(req)
+	if c.ifNoneMatch_ != "" {
+		req.Header.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	if c.ctx_ != nil {
+		return ctxhttp.Do(c.ctx_, c.s.client, req)
+	}
+	return c.s.client.Do(req)
+}
+
+// Do executes the "cloudmonitoring.timeseries.list" call.
+// Exactly one of *ListTimeseriesResponse or error will be non-nil. Any
+// non-2xx status code is an error. Response headers are in either
+// *ListTimeseriesResponse.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *TimeseriesListCall) Do() (*ListTimeseriesResponse, error) {
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -896,7 +1409,12 @@ func (c *TimeseriesListCall) Do() (*ListTimeseriesResponse, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	var ret *ListTimeseriesResponse
+	ret := &ListTimeseriesResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
 	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
@@ -1006,7 +1524,8 @@ type TimeseriesWriteCall struct {
 	s                      *Service
 	project                string
 	writetimeseriesrequest *WriteTimeseriesRequest
-	opt_                   map[string]interface{}
+	urlParams_             gensupport.URLParams
+	ctx_                   context.Context
 }
 
 // Write: Put data points to one or more time series for one or more
@@ -1018,41 +1537,85 @@ type TimeseriesWriteCall struct {
 // a time series are written sequentially in the order of their end
 // time.
 func (r *TimeseriesService) Write(project string, writetimeseriesrequest *WriteTimeseriesRequest) *TimeseriesWriteCall {
-	c := &TimeseriesWriteCall{s: r.s, opt_: make(map[string]interface{})}
+	c := &TimeseriesWriteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.writetimeseriesrequest = writetimeseriesrequest
 	return c
 }
 
-// Fields allows partial responses to be retrieved.
-// See https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
-// for more information.
-func (c *TimeseriesWriteCall) Fields(s ...googleapi.Field) *TimeseriesWriteCall {
-	c.opt_["fields"] = googleapi.CombineFields(s)
+// QuotaUser sets the optional parameter "quotaUser": Available to use
+// for quota purposes for server-side applications. Can be any arbitrary
+// string assigned to a user, but should not exceed 40 characters.
+// Overrides userIp if both are provided.
+func (c *TimeseriesWriteCall) QuotaUser(quotaUser string) *TimeseriesWriteCall {
+	c.urlParams_.Set("quotaUser", quotaUser)
 	return c
 }
 
-func (c *TimeseriesWriteCall) Do() (*WriteTimeseriesResponse, error) {
+// UserIP sets the optional parameter "userIp": IP address of the site
+// where the request originates. Use this if you want to enforce
+// per-user limits.
+func (c *TimeseriesWriteCall) UserIP(userIP string) *TimeseriesWriteCall {
+	c.urlParams_.Set("userIp", userIP)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *TimeseriesWriteCall) Fields(s ...googleapi.Field) *TimeseriesWriteCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *TimeseriesWriteCall) Context(ctx context.Context) *TimeseriesWriteCall {
+	c.ctx_ = ctx
+	return c
+}
+
+func (c *TimeseriesWriteCall) doRequest(alt string) (*http.Response, error) {
 	var body io.Reader = nil
 	body, err := googleapi.WithoutDataWrapper.JSONReader(c.writetimeseriesrequest)
 	if err != nil {
 		return nil, err
 	}
 	ctype := "application/json"
-	params := make(url.Values)
-	params.Set("alt", "json")
-	if v, ok := c.opt_["fields"]; ok {
-		params.Set("fields", fmt.Sprintf("%v", v))
-	}
+	c.urlParams_.Set("alt", alt)
 	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/timeseries:write")
-	urls += "?" + params.Encode()
+	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
 	googleapi.Expand(req.URL, map[string]string{
 		"project": c.project,
 	})
 	req.Header.Set("Content-Type", ctype)
 	req.Header.Set("User-Agent", c.s.userAgent())
-	res, err := c.s.client.Do(req)
+	if c.ctx_ != nil {
+		return ctxhttp.Do(c.ctx_, c.s.client, req)
+	}
+	return c.s.client.Do(req)
+}
+
+// Do executes the "cloudmonitoring.timeseries.write" call.
+// Exactly one of *WriteTimeseriesResponse or error will be non-nil. Any
+// non-2xx status code is an error. Response headers are in either
+// *WriteTimeseriesResponse.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *TimeseriesWriteCall) Do() (*WriteTimeseriesResponse, error) {
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -1060,7 +1623,12 @@ func (c *TimeseriesWriteCall) Do() (*WriteTimeseriesResponse, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	var ret *WriteTimeseriesResponse
+	ret := &WriteTimeseriesResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
 	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
@@ -1101,9 +1669,10 @@ type TimeseriesDescriptorsListCall struct {
 	s                                *Service
 	project                          string
 	metric                           string
-	youngest                         string
 	listtimeseriesdescriptorsrequest *ListTimeseriesDescriptorsRequest
-	opt_                             map[string]interface{}
+	urlParams_                       gensupport.URLParams
+	ifNoneMatch_                     string
+	ctx_                             context.Context
 }
 
 // List: List the descriptors of the time series that match the metric
@@ -1112,10 +1681,10 @@ type TimeseriesDescriptorsListCall struct {
 // response to request subsequent pages of results by setting the
 // pageToken query parameter to the value of the nextPageToken.
 func (r *TimeseriesDescriptorsService) List(project string, metric string, youngest string, listtimeseriesdescriptorsrequest *ListTimeseriesDescriptorsRequest) *TimeseriesDescriptorsListCall {
-	c := &TimeseriesDescriptorsListCall{s: r.s, opt_: make(map[string]interface{})}
+	c := &TimeseriesDescriptorsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.project = project
 	c.metric = metric
-	c.youngest = youngest
+	c.urlParams_.Set("youngest", youngest)
 	c.listtimeseriesdescriptorsrequest = listtimeseriesdescriptorsrequest
 	return c
 }
@@ -1131,7 +1700,7 @@ func (r *TimeseriesDescriptorsService) List(project string, metric string, young
 //   "min"
 //   "sum"
 func (c *TimeseriesDescriptorsListCall) Aggregator(aggregator string) *TimeseriesDescriptorsListCall {
-	c.opt_["aggregator"] = aggregator
+	c.urlParams_.Set("aggregator", aggregator)
 	return c
 }
 
@@ -1139,7 +1708,7 @@ func (c *TimeseriesDescriptorsListCall) Aggregator(aggregator string) *Timeserie
 // series descriptors per page. Used for pagination. If not specified,
 // count = 100.
 func (c *TimeseriesDescriptorsListCall) Count(count int64) *TimeseriesDescriptorsListCall {
-	c.opt_["count"] = count
+	c.urlParams_.Set("count", fmt.Sprint(count))
 	return c
 }
 
@@ -1153,8 +1722,8 @@ func (c *TimeseriesDescriptorsListCall) Count(count int64) *TimeseriesDescriptor
 // you could
 // specify:
 // label=cloud.googleapis.com%2Flocation=~us-central1.*
-func (c *TimeseriesDescriptorsListCall) Labels(labels string) *TimeseriesDescriptorsListCall {
-	c.opt_["labels"] = labels
+func (c *TimeseriesDescriptorsListCall) Labels(labels ...string) *TimeseriesDescriptorsListCall {
+	c.urlParams_.SetMulti("labels", append([]string{}, labels...))
 	return c
 }
 
@@ -1163,7 +1732,7 @@ func (c *TimeseriesDescriptorsListCall) Labels(labels string) *TimeseriesDescrip
 // neither oldest nor timespan is specified, the default time interval
 // will be (youngest - 4 hours, youngest]
 func (c *TimeseriesDescriptorsListCall) Oldest(oldest string) *TimeseriesDescriptorsListCall {
-	c.opt_["oldest"] = oldest
+	c.urlParams_.Set("oldest", oldest)
 	return c
 }
 
@@ -1172,7 +1741,16 @@ func (c *TimeseriesDescriptorsListCall) Oldest(oldest string) *TimeseriesDescrip
 // value to the value of the nextPageToken to retrieve the next page of
 // results.
 func (c *TimeseriesDescriptorsListCall) PageToken(pageToken string) *TimeseriesDescriptorsListCall {
-	c.opt_["pageToken"] = pageToken
+	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
+// QuotaUser sets the optional parameter "quotaUser": Available to use
+// for quota purposes for server-side applications. Can be any arbitrary
+// string assigned to a user, but should not exceed 40 characters.
+// Overrides userIp if both are provided.
+func (c *TimeseriesDescriptorsListCall) QuotaUser(quotaUser string) *TimeseriesDescriptorsListCall {
+	c.urlParams_.Set("quotaUser", quotaUser)
 	return c
 }
 
@@ -1190,7 +1768,15 @@ func (c *TimeseriesDescriptorsListCall) PageToken(pageToken string) *TimeseriesD
 // If neither oldest nor timespan is specified, the default time
 // interval will be (youngest - 4 hours, youngest].
 func (c *TimeseriesDescriptorsListCall) Timespan(timespan string) *TimeseriesDescriptorsListCall {
-	c.opt_["timespan"] = timespan
+	c.urlParams_.Set("timespan", timespan)
+	return c
+}
+
+// UserIP sets the optional parameter "userIp": IP address of the site
+// where the request originates. Use this if you want to enforce
+// per-user limits.
+func (c *TimeseriesDescriptorsListCall) UserIP(userIP string) *TimeseriesDescriptorsListCall {
+	c.urlParams_.Set("userIp", userIP)
 	return c
 }
 
@@ -1204,56 +1790,75 @@ func (c *TimeseriesDescriptorsListCall) Timespan(timespan string) *TimeseriesDes
 // - w: week  Examples: 3m, 4w. Only one unit is allowed, for example:
 // 2w3d is not allowed; you should use 17d instead.
 func (c *TimeseriesDescriptorsListCall) Window(window string) *TimeseriesDescriptorsListCall {
-	c.opt_["window"] = window
+	c.urlParams_.Set("window", window)
 	return c
 }
 
-// Fields allows partial responses to be retrieved.
-// See https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
 func (c *TimeseriesDescriptorsListCall) Fields(s ...googleapi.Field) *TimeseriesDescriptorsListCall {
-	c.opt_["fields"] = googleapi.CombineFields(s)
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
 	return c
 }
 
-func (c *TimeseriesDescriptorsListCall) Do() (*ListTimeseriesDescriptorsResponse, error) {
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *TimeseriesDescriptorsListCall) IfNoneMatch(entityTag string) *TimeseriesDescriptorsListCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *TimeseriesDescriptorsListCall) Context(ctx context.Context) *TimeseriesDescriptorsListCall {
+	c.ctx_ = ctx
+	return c
+}
+
+func (c *TimeseriesDescriptorsListCall) doRequest(alt string) (*http.Response, error) {
 	var body io.Reader = nil
-	params := make(url.Values)
-	params.Set("alt", "json")
-	params.Set("youngest", fmt.Sprintf("%v", c.youngest))
-	if v, ok := c.opt_["aggregator"]; ok {
-		params.Set("aggregator", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["count"]; ok {
-		params.Set("count", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["labels"]; ok {
-		params.Set("labels", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["oldest"]; ok {
-		params.Set("oldest", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["pageToken"]; ok {
-		params.Set("pageToken", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["timespan"]; ok {
-		params.Set("timespan", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["window"]; ok {
-		params.Set("window", fmt.Sprintf("%v", v))
-	}
-	if v, ok := c.opt_["fields"]; ok {
-		params.Set("fields", fmt.Sprintf("%v", v))
-	}
+	c.urlParams_.Set("alt", alt)
 	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/timeseriesDescriptors/{metric}")
-	urls += "?" + params.Encode()
+	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
 	googleapi.Expand(req.URL, map[string]string{
 		"project": c.project,
 		"metric":  c.metric,
 	})
 	req.Header.Set("User-Agent", c.s.userAgent())
-	res, err := c.s.client.Do(req)
+	if c.ifNoneMatch_ != "" {
+		req.Header.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	if c.ctx_ != nil {
+		return ctxhttp.Do(c.ctx_, c.s.client, req)
+	}
+	return c.s.client.Do(req)
+}
+
+// Do executes the "cloudmonitoring.timeseriesDescriptors.list" call.
+// Exactly one of *ListTimeseriesDescriptorsResponse or error will be
+// non-nil. Any non-2xx status code is an error. Response headers are in
+// either *ListTimeseriesDescriptorsResponse.ServerResponse.Header or
+// (if a response was returned at all) in
+// error.(*googleapi.Error).Header. Use googleapi.IsNotModified to check
+// whether the returned error was because http.StatusNotModified was
+// returned.
+func (c *TimeseriesDescriptorsListCall) Do() (*ListTimeseriesDescriptorsResponse, error) {
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -1261,7 +1866,12 @@ func (c *TimeseriesDescriptorsListCall) Do() (*ListTimeseriesDescriptorsResponse
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	var ret *ListTimeseriesDescriptorsResponse
+	ret := &ListTimeseriesDescriptorsResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
 	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
