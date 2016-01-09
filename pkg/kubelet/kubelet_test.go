@@ -2482,7 +2482,6 @@ func updateDiskSpacePolicy(kubelet *Kubelet, mockCadvisor *cadvisor.Mock, rootCa
 	if err != nil {
 		return err
 	}
-	diskSpaceManager.Unfreeze()
 	kubelet.diskSpaceManager = diskSpaceManager
 	return nil
 }
@@ -3612,6 +3611,15 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+		Usage:     400 * mb,
+		Capacity:  1000 * mb,
+		Available: 600 * mb,
+	}, nil)
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{
+		Usage:    9 * mb,
+		Capacity: 10 * mb,
+	}, nil)
 
 	done := make(chan struct{})
 	go func() {

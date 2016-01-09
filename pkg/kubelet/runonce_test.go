@@ -23,6 +23,7 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -36,6 +37,15 @@ import (
 func TestRunOnce(t *testing.T) {
 	cadvisor := &cadvisor.Mock{}
 	cadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+	cadvisor.On("DockerImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+		Usage:     400 * mb,
+		Capacity:  1000 * mb,
+		Available: 600 * mb,
+	}, nil)
+	cadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{
+		Usage:    9 * mb,
+		Capacity: 10 * mb,
+	}, nil)
 	podManager := kubepod.NewBasicPodManager(kubepod.NewFakeMirrorClient())
 	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
 	fakeRuntime := &kubecontainer.FakeRuntime{}
