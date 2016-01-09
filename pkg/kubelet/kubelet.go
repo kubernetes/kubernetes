@@ -2240,11 +2240,6 @@ func (kl *Kubelet) isOutOfDisk() bool {
 	if err == nil && !withinBounds {
 		outOfRootDisk = true
 	}
-	// Kubelet would indicate all pods as newly created on the first run after restart.
-	// We ignore the first disk check to ensure that running pods are not killed.
-	// Disk manager will only declare out of disk problems if unfreeze has been called.
-	kl.diskSpaceManager.Unfreeze()
-
 	return outOfDockerDisk || outOfRootDisk
 }
 
