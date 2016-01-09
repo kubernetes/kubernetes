@@ -1118,7 +1118,7 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 	attached := false
 	defer func() {
 		if !attached {
-			awsInstance.releaseMountDevice(disk.awsID, ec2Device)
+			awsInstance.releaseMountDevice(disk.awsID, mountpoint)
 		}
 	}()
 
@@ -1166,6 +1166,24 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 	if response == nil {
 		return errors.New("no response from DetachVolume")
 	}
+
+	// At this point we are waiting for the volume being detached. This
+	// releases the volume and invalidates the cache even when there is a timeout.
+	//
+	// TODO: A timeout leaves the cache in an inconsistent state. The volume is still
+	// detaching though the cache shows it as ready to be attached again. Subsequent
+	// attach operations will fail. The attach is being retried and eventually
+	// works though. An option would be to completely flush the cache upon timeouts.
+	//
+	defer func() {
+		for mountDevice, existingVolumeID := range awsInstance.deviceMappings {
+			if existingVolumeID == disk.awsID {
+				awsInstance.releaseMountDevice(disk.awsID, mountDevice)
+				return
+			}
+		}
+	}()
+
 	err = disk.waitForAttachmentStatus("detached")
 	if err != nil {
 		return err
