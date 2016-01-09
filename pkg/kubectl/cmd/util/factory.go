@@ -673,3 +673,10 @@ func (f *Factory) NilClientMapperForCommand() resource.ClientMapper {
 		return nil, nil
 	})
 }
+
+// One stop shopping for a Builder
+func (f *Factory) NewBuilder() *resource.Builder {
+	mapper, typer := f.Object()
+
+	return resource.NewBuilder(mapper, typer, f.ClientMapperForCommand())
+}
