@@ -162,6 +162,9 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	cmds.AddCommand(NewCmdLogs(f, out))
 	cmds.AddCommand(NewCmdRollingUpdate(f, out))
 	cmds.AddCommand(NewCmdScale(f, out))
+	cmds.AddCommand(NewCmdCordon(f, out))
+	cmds.AddCommand(NewCmdDrain(f, out))
+	cmds.AddCommand(NewCmdUncordon(f, out))
 
 	cmds.AddCommand(NewCmdAttach(f, in, out, err))
 	cmds.AddCommand(NewCmdExec(f, in, out, err))
