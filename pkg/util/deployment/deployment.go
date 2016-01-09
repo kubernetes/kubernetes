@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
 // GetOldRCs returns the old RCs targeted by the given Deployment; get PodList and RCList from client interface.
@@ -141,7 +141,7 @@ func CloneAndAddLabel(labels map[string]string, labelKey string, labelValue uint
 
 func GetPodTemplateSpecHash(template api.PodTemplateSpec) uint32 {
 	podTemplateSpecHasher := adler32.New()
-	util.DeepHashObject(podTemplateSpecHasher, template)
+	hashutil.DeepHashObject(podTemplateSpecHasher, template)
 	return podTemplateSpecHasher.Sum32()
 }
 
