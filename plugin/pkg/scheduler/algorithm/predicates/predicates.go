@@ -513,8 +513,11 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, existingPods []*api
 }
 
 func PodFitsHostPorts(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
-	existingPorts := getUsedPorts(existingPods...)
 	wantPorts := getUsedPorts(pod)
+	if len(wantPorts) == 0 {
+		return true, nil
+	}
+	existingPorts := getUsedPorts(existingPods...)
 	for wport := range wantPorts {
 		if wport == 0 {
 			continue
