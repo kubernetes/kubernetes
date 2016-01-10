@@ -763,6 +763,11 @@
 			"Rev": "740c764bc6149d3f1806231418adb9f52c11bcbf"
 		},
 		{
+			"ImportPath": "github.com/mvdan/xurls",
+			"Comment": "v0.8.0-14-g1b768d7",
+			"Rev": "1b768d7c393abd8e8dda1458385a57becd4b2d4e"
+		},
+		{
 			"ImportPath": "github.com/mxk/go-flowrate/flowrate",
 			"Rev": "cca7078d478f8520f85629ad7c68962d31ed7682"
 		},
