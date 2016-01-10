@@ -37,7 +37,7 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 # Get the absolute path of the directory component of a file, i.e. the
 # absolute path of the dirname of $1.
 get_absolute_dirname() {
-  echo "$(cd "$(dirname "$1")" && pwd)"
+  echo "$(CDPATH="" cd "$(dirname "$1")" && pwd)"
 }
 
 # Detect the OS name/arch so that we can find our binary

@@ -29,10 +29,10 @@ source ${ROOT}/config-build.sh
 
 # ensure $RELEASES_DIR is an absolute file path
 mkdir -p ${RELEASES_DIR}
-RELEASES_DIR=$(cd ${RELEASES_DIR}; pwd)
+RELEASES_DIR=$(CDPATH="" cd ${RELEASES_DIR}; pwd)
 
 # get absolute file path of binaries
-BINARY_DIR=$(cd ${ROOT}; pwd)/binaries
+BINARY_DIR=$(CDPATH="" cd ${ROOT}; pwd)/binaries
 
 function clean-up() {
   rm -rf ${RELEASES_DIR}

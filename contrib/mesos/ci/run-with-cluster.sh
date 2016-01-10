@@ -36,7 +36,7 @@ KUBERNETES_PROVIDER="mesos/docker"
 
 MESOS_DOCKER_WORK_DIR="${MESOS_DOCKER_WORK_DIR:-${HOME}/tmp/kubernetes}"
 
-KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
+KUBE_ROOT=$(CDPATH="" cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 
 # Clean (test artifacts)
 echo "Cleaning work dir"

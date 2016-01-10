@@ -21,7 +21,7 @@ set -o nounset
 set -o pipefail
 
 base_dir=$(dirname "$0")
-base_dir=$(cd "${base_dir}" && pwd)
+base_dir=$(CDPATH="" cd "${base_dir}" && pwd)
 
 guestbook_version=${1:-latest}
 

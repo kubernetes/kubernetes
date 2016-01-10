@@ -29,7 +29,7 @@ set -o errtrace
 
 TEST_ARGS="$@"
 
-KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
+KUBE_ROOT=$(CDPATH="" cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 
 export KUBERNETES_CONTRIB=mesos
 

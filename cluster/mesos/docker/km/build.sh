@@ -23,8 +23,8 @@ set -o pipefail
 IMAGE_REPO=${IMAGE_REPO:-mesosphere/kubernetes-mesos}
 IMAGE_TAG=${IMAGE_TAG:-latest}
 
-script_dir=$(cd $(dirname "${BASH_SOURCE}") && pwd -P)
-KUBE_ROOT=$(cd ${script_dir}/../../../.. && pwd -P)
+script_dir=$(CDPATH="" cd $(dirname "${BASH_SOURCE}") && pwd -P)
+KUBE_ROOT=$(CDPATH="" cd ${script_dir}/../../../.. && pwd -P)
 
 # Find a platform specific binary, whether it was cross compiled, locally built, or downloaded.
 find-binary() {
@@ -48,7 +48,7 @@ if [ -z "$km_path" ]; then
   fi
 fi
 kube_bin_path=$(dirname ${km_path})
-common_bin_path=$(cd ${script_dir}/../common/bin && pwd -P)
+common_bin_path=$(CDPATH="" cd ${script_dir}/../common/bin && pwd -P)
 
 # download nsenter and socat
 overlay_dir=${MESOS_DOCKER_OVERLAY_DIR:-${script_dir}/overlay}

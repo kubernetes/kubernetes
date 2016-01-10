@@ -27,7 +27,7 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
-KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
+KUBE_ROOT=$(CDPATH="" cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 
 "${KUBE_ROOT}/contrib/mesos/ci/run.sh" make clean
 
