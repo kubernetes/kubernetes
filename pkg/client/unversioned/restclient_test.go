@@ -40,7 +40,8 @@ func TestDoRequestSuccess(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	c, err := RESTClientFor(&Config{
 		Host:         testServer.URL,
 		GroupVersion: testapi.Default.GroupVersion(),
@@ -83,7 +84,8 @@ func TestDoRequestFailed(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	c, err := RESTClientFor(&Config{
 		Host:         testServer.URL,
 		GroupVersion: testapi.Default.GroupVersion(),
@@ -115,7 +117,8 @@ func TestDoRequestCreated(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	c, err := RESTClientFor(&Config{
 		Host:         testServer.URL,
 		GroupVersion: testapi.Default.GroupVersion(),

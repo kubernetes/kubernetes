@@ -128,7 +128,8 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 
 	// create fake apiserver
 	testApiServer := NewTestServer(t, api.NamespaceDefault, &podListWatch.list)
-	defer testApiServer.server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testApiServer.server.Close()
 
 	mockDriver := &MockExecutorDriver{}
 	updates := make(chan kubetypes.PodUpdate, 1024)
@@ -342,7 +343,8 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 	// create fake apiserver
 	podListWatch := NewMockPodsListWatch(api.PodList{})
 	testApiServer := NewTestServer(t, api.NamespaceDefault, &podListWatch.list)
-	defer testApiServer.server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testApiServer.server.Close()
 
 	// create and start executor
 	mockDriver := &MockExecutorDriver{}

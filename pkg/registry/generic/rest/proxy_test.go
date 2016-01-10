@@ -207,7 +207,8 @@ func TestServeHTTP(t *testing.T) {
 				responseHeader: backendResponseHeader,
 			}
 			backendServer := httptest.NewServer(backendHandler)
-			defer backendServer.Close()
+			// TODO: Uncomment when fix #19254
+			// defer backendServer.Close()
 
 			responder := &fakeResponder{}
 			backendURL, _ := url.Parse(backendServer.URL)
@@ -218,7 +219,8 @@ func TestServeHTTP(t *testing.T) {
 				UpgradeRequired: test.upgradeRequired,
 			}
 			proxyServer := httptest.NewServer(proxyHandler)
-			defer proxyServer.Close()
+			// TODO: Uncomment when fix #19254
+			// defer proxyServer.Close()
 			proxyURL, _ := url.Parse(proxyServer.URL)
 			proxyURL.Path = test.requestPath
 			paramValues := url.Values{}
@@ -374,7 +376,8 @@ func TestProxyUpgrade(t *testing.T) {
 			ws.Read(body)
 			ws.Write([]byte("hello " + string(body)))
 		}))
-		defer backendServer.Close()
+		// TODO: Uncomment when fix #19254
+		// defer backendServer.Close()
 
 		serverURL, _ := url.Parse(backendServer.URL)
 		proxyHandler := &UpgradeAwareProxyHandler{
@@ -382,7 +385,8 @@ func TestProxyUpgrade(t *testing.T) {
 			Transport: tc.ProxyTransport,
 		}
 		proxy := httptest.NewServer(proxyHandler)
-		defer proxy.Close()
+		// TODO: Uncomment when fix #19254
+		// defer proxy.Close()
 
 		ws, err := websocket.Dial("ws://"+proxy.Listener.Addr().String()+"/some/path", "", "http://127.0.0.1/")
 		if err != nil {
@@ -616,7 +620,8 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 			// Write successful response
 			w.Write([]byte(successfulResponse))
 		}))
-		defer downstreamServer.Close()
+		// TODO: Uncomment when fix #19254
+		// defer downstreamServer.Close()
 
 		responder := &fakeResponder{}
 		backendURL, _ := url.Parse(downstreamServer.URL)
@@ -626,7 +631,8 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 			UpgradeRequired: false,
 		}
 		proxyServer := httptest.NewServer(proxyHandler)
-		defer proxyServer.Close()
+		// TODO: Uncomment when fix #19254
+		// defer proxyServer.Close()
 
 		// Dial the proxy server
 		conn, err := net.Dial(proxyServer.Listener.Addr().Network(), proxyServer.Listener.Addr().String())

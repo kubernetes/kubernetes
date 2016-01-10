@@ -602,7 +602,8 @@ func (lt lifecycleTest) Start() <-chan LaunchedTask {
 }
 
 func (lt lifecycleTest) Close() {
-	lt.apiServer.server.Close()
+	// TODO: Uncomment when fix #19254
+	// lt.apiServer.server.Close()
 }
 
 func (lt lifecycleTest) End() <-chan struct{} {
