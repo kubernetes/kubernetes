@@ -18,7 +18,7 @@ kube-proxy-tar:
     - makedirs: True
     - user: root
     - group: root
-    - mode: 755
+    - mode: 644
 {% endif %}
 
 {% set is_helium = '0' %}
