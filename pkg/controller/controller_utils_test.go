@@ -189,7 +189,8 @@ func TestCreatePods(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
 
 	podControl := RealPodControl{

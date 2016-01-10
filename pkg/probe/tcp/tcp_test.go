@@ -42,7 +42,8 @@ func TestTcpHealthChecker(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	tHost, tPortStr, err := net.SplitHostPort(server.Listener.Addr().String())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
