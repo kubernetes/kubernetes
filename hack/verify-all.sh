@@ -60,7 +60,7 @@ if $SILENT ; then
 fi
 
 # remove protobuf until it is part of direct generation
-EXCLUDE="verify-godeps.sh verify-godep-licenses.sh verify-generated-protobuf.sh"
+EXCLUDE="verify-godeps.sh verify-godep-licenses.sh verify-generated-protobuf.sh verify-linkcheck.sh"
 
 ret=0
 for t in `ls $KUBE_ROOT/hack/verify-*.sh`
