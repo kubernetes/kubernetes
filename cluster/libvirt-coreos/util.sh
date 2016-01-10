@@ -25,7 +25,7 @@ export LIBVIRT_DEFAULT_URI=qemu:///system
 export SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-false}
 export ADMISSION_CONTROL=${ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota}
 readonly POOL=kubernetes
-readonly POOL_PATH="$(cd $ROOT && pwd)/libvirt_storage_pool"
+readonly POOL_PATH="$(cd $ROOT > /dev/null && pwd)/libvirt_storage_pool"
 
 # join <delim> <list...>
 # Concatenates the list elements with the delimiter passed as first parameter
