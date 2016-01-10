@@ -18,10 +18,6 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/proposals/workflow.md).
-
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -50,48 +46,13 @@ workflow functionality to some extent.
 
 ## Use Cases
 
-* As a user I want to be able to define a workflow.
-* As a user I want to compose workflows.
-* As a user I want to delete a workflow (eventually cascading to running _tasks_).
-* As a user I want to debug a workflow (ability to track failure).
-
-
-
-### Initializers
-
-In order to implement `Workflow`, one needs to introduce the concept of _dependency_ between resources.
-Dependecies are _edges_ of the graph.
-_Dependency_ is introduced by the [initializers proposal #17305](https://github.com/kubernetes/kubernetes/pull/17305), and we would like to use this as the foundation for workflows.
-An _initializer_ is a dynamically registered object which implements a custom policy.
-The policy could be based on some dependencies. The  policy is applied before the resource is
-created (even API validated).
-By modifying the policy one may  defer creation of the resource until prerequisites are satisfied.
-Even if not completed [#17305](https://github.com/kubernetes/kubernetes/pull/17305) already introduces a
-_dependency_ concept ([see this comment](https://github.com/kubernetes/kubernetes/pull/17305#discussion_r45007826))
-which could be reused to implement `Workflow`.
-
-```go
-type ObjectDependencies struct {
-    Initializers map[string]string `json:"initializers,omitempty"`
-    Finalizers map[string]string `json:"finalizers,omitempty"`
-    ExistenceDependencies []ObjectReference `json:"existenceDependencies,omitempty"`
-    ControllerRef *ObjectReference `json:"controllerRef,omitempty"`
-...
-}
-```
-
-### Recurring `Workflow` and `ScheduledJob`
-
-One of the major functionalities missing here is the ability to set a recurring `Workflow` (cron-like),
-similar to the `ScheduledJob` [#11980](https://github.com/kubernetes/kubernetes/pull/11980) for `Job`.
-If the scheduled job is able
-to support [various resources](https://github.com/kubernetes/kubernetes/pull/11980#discussion_r46729699)
-`Workflow` will benefit from the _schedule_ functionality of `Job`.
-
-
-### Graceful and immediate termination
-
-`Workflow` should support _graceful and immediate termination_ [#1535](https://github.com/kubernetes/kubernetes/issues/1535).
+* As a user, I want to create a _JobB_ which depends upon _JobA_ running to completion.
+* As a user, I want workflow composability. I want to create a _JobA_ which will be triggered
+as soon as an already running workflow runs to completion.
+* As a user, I want to delete a workflow (eventually cascading to running _tasks_).
+* As a user, I want to debug a workflow (ability to track failure): in case a _task_
+didn't run user should have a way to backtrack the reason of the failure, understanding which
+dependency has not been satisified.
 
 
 ## Implementation
@@ -99,10 +60,34 @@ to support [various resources](https://github.com/kubernetes/kubernetes/pull/119
 This proposal introduces a new REST resource `Workflow`. A `Workflow` is represented as a
 [graph](https://en.wikipedia.org/wiki/Graph_(mathematics)), more specifically as a DAG.
 Vertices of the graph represent steps of the workflow. The workflow steps are represented via a
-`WorkflowStep` resource.
-The edges of the graph are not represented explicitly - rather they are stored as a list of
-predecessors in each `WorkflowStep` (i.e. each node).
+`WorkflowStep`<sup>1</sup> resource.
+The edges of the graph represent _dependecies_. To represent edges there is no explicit resource
+- rather they are stored as predecessors in each `WorkflowStep` (i.e. each node).
+The basic idea of this proposal consists in creation of each step postponing execution
+until all predecessors' steps run to completion.
 
+
+### Postponing execution
+
+At the time of writing, to defer execution there are two discussions in the community:
+[#17305](https://github.com/kubernetes/kubernetes/pull/17305): an
+_initializer_ is a dynamically registered object which permits to select a custom controller
+to be applied to a resource. The controller verifies the dependencies.
+The controller checks are applied before the resource is created (even API validated).
+Using a proper controller one may defer creation of the resource until prerequisites
+are satisfied. Even if not completed [#17305](https://github.com/kubernetes/kubernetes/pull/17305)
+already introduces a _dependency_ concept
+([see this comment](https://github.com/kubernetes/kubernetes/pull/17305#discussion_r45007826))
+which could be reused to implement `Workflow`. In
+[#1899](https://github.com/kubernetes/kubernetes/issues/1899):
+some use-cases to wait for specific conditions (`complete`, `ready`) are presented.
+
+
+### Detecting run to completion
+
+To detect run to completion for the resource inside the graph the resource needs to implement
+in `status` the slice of `condition`s. [See](../../docs/devel/api-conventions.md#objects)
+and [#7856](https://github.com/kubernetes/kubernetes/issues/7856).
 
 ### Workflow
 
@@ -117,14 +102,26 @@ type Workflow struct {
     unversioned.TypeMeta `json:",inline"`
 
     // Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
-	api.ObjectMeta `json:"metadata,omitempty"`
+    // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+    api.ObjectMeta `json:"metadata,omitempty"`
 
     // Spec defines the expected behavior of a Workflow. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
     Spec WorkflowSpec `json:"spec,omitempty"`
 
     // Status represents the current status of the Workflow. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
     Status WorkflowStatus `json:"status,omitempty"`
+}
+
+// WorkflowList implements list of Workflow.
+type WorkflowList struct {
+    unversioned.TypeMeta `json:",inline"`
+
+    // Standard list metadata
+    // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+    unversioned.ListMeta `json:"metadata,omitempty"`
+
+    // Items is the list of Workflow
+    Items []Workflow `json:"items"`
 }
 ```
 
@@ -134,66 +131,64 @@ type Workflow struct {
 ```go
 // WorkflowSpec contains Workflow specification
 type WorkflowSpec struct {
+    // Optional duration in seconds relative to the startTime that the job may be active
+    // before the system tries to terminate it; value must be positive integer
+    ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 
-    // Optional duration in seconds the workflow needs to terminate gracefully. May be decreased in delete request.
-	// Value must be non-negative integer. The value zero indicates delete immediately.
-	// If this value is nil, the default grace period will be used instead.
-	// Set this value longer than the expected cleanup time for your workflow.
-    // If downstream resources (job, pod, etc.) define their TerminationGracePeriodSeconds
-    // the biggest is taken.
-	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
-
-	// Steps contains the vertices of the workflow graph.
-	Steps []WorkflowStep `json:"steps,omitempty"`
+    // Steps contains the vertices of the workflow graph. The key of the map is a string
+    // to uniquely identify the step. Steps order is defined by their dependencies.
+    Steps map[string]WorkflowStep `json:"steps,omitempty"`
 }
 ```
 
-* `spec.steps`: is an array of `WorkflowStep`s.
-* `spec.terminationGracePeriodSeconds`: is the terminationGracePeriodSeconds.
+* `spec.steps`: is a map of `WorkflowStep`s. _Key_ of the map is a string which identifies the step.
 
-### `WorkflowStep`<sup>1</sup>
+
+### `WorkflowStep`
 
 The `WorkflowStep` resource acts as a [union](https://en.wikipedia.org/wiki/Tagged_union) of `JobSpec` and `ObjectReference`.
 
 ```go
 // WorkflowStep contains necessary information to identifiy the node of the workflow graph
 type WorkflowStep struct {
-    // Id is the identifier of the current step
-    Id string  `json:"id,omitempty"`
+    // JobTemplate contains the job specificaton that should be run in this Workflow.
+    // Only one between externalRef and jobTemplate can be set.
+    JobTemplate JobSpec `json:"jobTemplate,omitempty"`
 
-    // Spec contains the job specificaton that should be run in this Workflow.
-	// Only one between External and Spec can be set.
-	Spec JobSpec `json:"jobSpec,omitempty"`
+    // External contains a reference to another schedulable resource.
+    // Only one between ExternalRef and JobTemplate can be set.
+    ExternalRef api.ObjectReference `json:"externalRef,omitempty"`
 
     // Dependecies represent dependecies of the current workflow step
     Dependencies ObjectDependencies `json:"dependencies,omitempty"`
-
-	// External contains a reference to another schedulable resource.
-	// Only one between ExternalRef and Spec can be set.
-	ExternalRef api.ObjectReference `json:"externalRef,omitempty"`
 }
 ```
 
-* `workflowStep.id` is a string to identify the current `Workflow`. The `workfowStep.id` is injected
-as a label in `metadata.annotations` in the `Job` created in the current step.
 * `workflowStep.jobSpec` contains the specification of the job to be executed.
 * `workflowStep.externalRef` contains a reference to external resources (for example another `Workflow`).
+*
 
 ```go
 type ObjectDependencies struct {
-    ...
-    ExistenceDependencies []ObjectReference `json:"existenceDependencies,omitempty"`
+    // DependeciesRef is a slice of unique identifier of the step (key of the spec.steps map)
+    DependencyIDs []string `json:"dependencyIDs,omitempty"`
     ControllerRef *ObjectReference `json:"controllerRef,omitempty"`
-    ...
+    //...
 }
 ```
 
-* `dependencies.controllerRef`: will contain the policy to trigger current `WorkflowStep`
+* `dependencies.dependencyIDs`: is a slice with a list of _step_ that must run to completion.
+* `dependencies.controllerRef`: will contain the controller for the current `WorkflowStep`. As a first
 
-For `Workflow` basic scenario 2 controllers should be implemented: `AllDependenciesRunToCompletion`,
-`AtLeastOneDependencyRunToCompletion`. This approach permits implementation of other kinds of triggering
-policies, like for example data availability or other external event.
 
+This approach permits to implement other kinds of controller, for example data availability
+or other external event. In a first implementation `dependencies.controllerRef` will implement only
+the logic to check all dependencies ran to completion: since at the beginning only `Workflow` and `Job`
+can be composed the only thing needed to implement is the ability to check wether a `Job` or
+a `Workflow` runs to completion.
+Our understanding is that detecting the type of object and an approach similar to what
+is implemented in `pkg/client/unversioned/conditions.go` and  `pkg/kubectl/scale.go` for _desiredReplicas_ can
+be used to to detect if a _step_ must be started.
 
 
 ### `WorkflowStatus`
@@ -201,31 +196,47 @@ policies, like for example data availability or other external event.
 ```go
 // WorkflowStatus contains the current status of the Workflow
 type WorkflowStatus struct {
-	Statuses []WorkflowStepStatus `json:statuses`
+    // Conditions represent the latest available observations of an object's current state.
+    Conditions []WorkflowCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+
+    // Statuses represent status of different steps
+    Statuses map[string]WorkflowStepStatus `json:statuses`
+}
+
+type WorkflowConditionType string
+
+// These are valid conditions of a workflow.
+const (
+    // WorkflowComplete means the workflow has completed its execution.
+    WorkflowComplete WorkflowConditionType = "Complete"
+)
+
+// WorkflowCondition describes current state of a workflow.
+type WorkflowCondition struct {
+    // Type of workflow condition, currently only Complete.
+    Type WorkflowConditionType `json:"type"`
+    // Status of the condition, one of True, False, Unknown.
+    Status api.ConditionStatus `json:"status"`
+    // Last time the condition was checked.
+    LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
+    // Last time the condition transited from one status to another.
+    LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
+    // (brief) reason for the condition's last transition.
+    Reason string `json:"reason,omitempty"`
+    // Human readable message indicating details about last transition.
+    Message string `json:"message,omitempty"`
 }
 
 // WorkflowStepStatus contains the status of a WorkflowStep
 type WorkflowStepStatus struct {
-	// Job contains the status of Job for a WorkflowStep
-	JobStatus Job `json:"jobsStatus,omitempty"`
-
-	// External contains the
-	ExternalRefStatus api.ObjectReference `json:"externalRefStatus,omitempty"`
-}
-
-// WorkflowList implements list of Workflow.
-type WorkflowList struct {
-	unversioned.TypeMeta `json:",inline"`
-	// Standard list metadata
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	unversioned.ListMeta `json:"metadata,omitempty"`
-
-	// Items is the list of Workflow
-	Items []Workflow `json:"items"`
+    // ObjectReference contains the reference to the resource
+    ObjectReference api.ObjectReference `json:"objectReference,omitempty"`
 }
 ```
 
-* `workflowStepStatus.jobStatus`: contains the `Job` information to report current status of the _step_.
+* `status.statuses`: is a map of `WorkflowStepStatus`es. _Key_ of the map is a string which identifies the step.
+_Keys_ are the same used in `spec.steps`.
+* `status.conditions`: is a slice of `WorkflowCondition`s. [see #7856](https://github.com/kubernetes/kubernetes/issues/7856)
 
 ## Events
 
@@ -236,7 +247,19 @@ The events associated to `Workflow`s will be:
 * WorkflowEnded
 * WorkflowDeleted
 
-## Relevant use cases out of scope of this proposal
+
+## Future evolution
+
+In the future we may want to extend _Workflow_ with other kinds of resources, modifying `WorkflowStep` to
+support a more general template to create other resources.
+One of the major functionalities missing here is the ability to set a recurring `Workflow` (cron-like),
+similar to the `ScheduledJob` [#11980](https://github.com/kubernetes/kubernetes/pull/11980) for `Job`.
+If the scheduled job is able
+to support [various resources](https://github.com/kubernetes/kubernetes/pull/11980#discussion_r46729699)
+`Workflow` will benefit from the _schedule_ functionality of `Job`.
+
+
+### Relevant use cases out of scope of this proposal
 
 * As an admin I want to set quota on workflow resources
 [#13567](https://github.com/kubernetes/kubernetes/issues/13567).
@@ -244,11 +267,14 @@ The events associated to `Workflow`s will be:
 * As a user I want to set an action when a workflow ends/start
 [#3585](https://github.com/kubernetes/kubernetes/issues/3585)
 
+
 <sup>1</sup>Something about naming: literature is full of different names, a commonly used
 name is _task_, but since we plan to compose `Workflow`s (i.e. a task can execute
 another whole `Workflow`) we have chosen the more generic word `Step`.
 
+
 <sup>2</sup>A very common feature in industrial strength workflow tools.
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/workflow.md?pixel)]()
