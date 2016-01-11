@@ -257,7 +257,7 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 	container := docker.Container{ID: name, Name: name, Config: c.Config}
 	containerCopy := container
 	f.ContainerMap[name] = &containerCopy
-	f.normalSleep(200, 50, 50)
+	f.normalSleep(100, 25, 25)
 	return &container, nil
 }
 
