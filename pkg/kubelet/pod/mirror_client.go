@@ -83,16 +83,6 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string) error {
 	return nil
 }
 
-func IsStaticPod(pod *api.Pod) bool {
-	source, err := kubetypes.GetPodSource(pod)
-	return err == nil && source != kubetypes.ApiserverSource
-}
-
-func IsMirrorPod(pod *api.Pod) bool {
-	_, ok := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]
-	return ok
-}
-
 func getHashFromMirrorPod(pod *api.Pod) (string, bool) {
 	hash, ok := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]
 	return hash, ok
