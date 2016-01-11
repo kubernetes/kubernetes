@@ -16,26 +16,15 @@ limitations under the License.
 
 package unversioned
 
-type ComponentStatusExpansion interface{}
+import "k8s.io/kubernetes/pkg/api"
 
-type EndpointsExpansion interface{}
+type NamespaceExpansion interface {
+	Finalize(item *api.Namespace) (*api.Namespace, error)
+}
 
-type LimitRangeExpansion interface{}
-
-type NodeExpansion interface{}
-
-type PersistentVolumeExpansion interface{}
-
-type PersistentVolumeClaimExpansion interface{}
-
-type PodTemplateExpansion interface{}
-
-type ReplicationControllerExpansion interface{}
-
-type ResourceQuotaExpansion interface{}
-
-type SecretExpansion interface{}
-
-type ServiceExpansion interface{}
-
-type ServiceAccountExpansion interface{}
+// Finalize takes the representation of a namespace to update.  Returns the server's representation of the namespace, and an error, if it occurs.
+func (c *namespaces) Finalize(namespace *api.Namespace) (result *api.Namespace, err error) {
+	result = &api.Namespace{}
+	err = c.client.Put().Resource("namespaces").Name(namespace.Name).SubResource("finalize").Body(namespace).Do().Into(result)
+	return
+}
