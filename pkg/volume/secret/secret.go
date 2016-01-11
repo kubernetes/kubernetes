@@ -101,10 +101,9 @@ var _ volume.Builder = &secretVolumeBuilder{}
 
 func (sv *secretVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    true,
-		Managed:                     true,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        true,
+		Managed:         true,
+		SupportsSELinux: true,
 	}
 }
 func (b *secretVolumeBuilder) SetUp(fsGroup *int64) error {

@@ -60,10 +60,9 @@ type Metrics struct {
 
 // Attributes represents the attributes of this builder.
 type Attributes struct {
-	ReadOnly                    bool
-	Managed                     bool
-	SupportsOwnershipManagement bool
-	SupportsSELinux             bool
+	ReadOnly        bool
+	Managed         bool
+	SupportsSELinux bool
 }
 
 // Builder interface provides methods to set up/mount the volume.

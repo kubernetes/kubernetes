@@ -116,10 +116,9 @@ var _ volume.Builder = &gitRepoVolumeBuilder{}
 
 func (b *gitRepoVolumeBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    false,
-		Managed:                     true,
-		SupportsOwnershipManagement: false,
-		SupportsSELinux:             true, // xattr change should be okay, TODO: double check
+		ReadOnly:        false,
+		Managed:         true,
+		SupportsSELinux: true, // xattr change should be okay, TODO: double check
 	}
 }
 

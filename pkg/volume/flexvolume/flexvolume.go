@@ -231,10 +231,9 @@ func (f *flexVolumeBuilder) SetUp(fsGroup *int64) error {
 // using plugin callout after we finalize the callout syntax.
 func (f flexVolumeBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    f.readOnly,
-		Managed:                     false,
-		SupportsOwnershipManagement: false,
-		SupportsSELinux:             false,
+		ReadOnly:        f.readOnly,
+		Managed:         false,
+		SupportsSELinux: false,
 	}
 }
 

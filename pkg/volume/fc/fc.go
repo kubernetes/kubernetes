@@ -170,10 +170,9 @@ var _ volume.Builder = &fcDiskBuilder{}
 
 func (b *fcDiskBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    b.readOnly,
-		Managed:                     !b.readOnly,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        b.readOnly,
+		Managed:         !b.readOnly,
+		SupportsSELinux: true,
 	}
 }
 func (b *fcDiskBuilder) SetUp(fsGroup *int64) error {
