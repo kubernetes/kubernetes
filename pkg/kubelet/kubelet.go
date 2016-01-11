@@ -2683,12 +2683,14 @@ func (kl *Kubelet) syncNetworkStatus() {
 		if err := ensureIPTablesMasqRule(); err != nil {
 			err = fmt.Errorf("Error on adding ip table rules: %v", err)
 			glog.Error(err)
+			kl.runtimeState.setNetworkState(err)
+			return
 		}
 		podCIDR := kl.runtimeState.podCIDR()
 		if len(podCIDR) == 0 {
 			err = fmt.Errorf("ConfigureCBR0 requested, but PodCIDR not set. Will not configure CBR0 right now")
 			glog.Warning(err)
-		} else if err := kl.reconcileCBR0(podCIDR); err != nil {
+		} else if err = kl.reconcileCBR0(podCIDR); err != nil {
 			err = fmt.Errorf("Error configuring cbr0: %v", err)
 			glog.Error(err)
 		}
