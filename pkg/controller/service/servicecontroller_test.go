@@ -217,7 +217,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 
 		var services []*cachedService
 		for _, service := range item.services {
-			services = append(services, &cachedService{lastState: service, appliedState: service})
+			services = append(services, &cachedService{lastReceivedState: service, lastAppliedState: service})
 		}
 		if err := controller.updateLoadBalancerHosts(services, hosts); err != nil {
 			t.Errorf("unexpected error: %v", err)
