@@ -49,6 +49,8 @@ type ScaleStatus struct {
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
+// +genclient=true,noMethods=true
+
 // represents a scaling request for a resource.
 type Scale struct {
 	unversioned.TypeMeta `json:",inline"`
