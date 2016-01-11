@@ -256,6 +256,8 @@ type resourceRequest struct {
 	memory   int64
 }
 
+var FailedResourceType string
+
 func getResourceRequest(pod *api.Pod) resourceRequest {
 	result := resourceRequest{}
 	for _, container := range pod.Spec.Containers {
@@ -306,7 +308,8 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 
 	if int64(len(existingPods))+1 > info.Status.Capacity.Pods().Value() {
 		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %+v is full, running %v out of %v Pods.", podName(pod), node, len(existingPods), info.Status.Capacity.Pods().Value())
-		return false, ErrExceededMaxPodNumber
+		FailedResourceType = "PodExceedsMaxPodNumber"
+		return false, nil
 	}
 
 	podRequest := getResourceRequest(pod)
@@ -318,11 +321,13 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 	_, exceedingCPU, exceedingMemory := CheckPodsExceedingFreeResources(pods, info.Status.Capacity)
 	if len(exceedingCPU) > 0 {
 		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient CPU", podName(pod), node)
-		return false, ErrInsufficientFreeCPU
+		FailedResourceType = "PodExceedsFreeCPU"
+		return false, nil
 	}
 	if len(exceedingMemory) > 0 {
 		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %v does not have sufficient Memory", podName(pod), node)
-		return false, ErrInsufficientFreeMemory
+		FailedResourceType = "PodExceedsFreeMemory"
+		return false, nil
 	}
 	glog.V(10).Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.", podName(pod), node, len(pods)-1, info.Status.Capacity.Pods().Value())
 	return true, nil
