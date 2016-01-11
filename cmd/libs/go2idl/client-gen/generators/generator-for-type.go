@@ -84,12 +84,19 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	} else {
 		sw.Do(getterNonNamesapced, m)
 	}
+	noMethods := types.ExtractCommentTags("+", t.SecondClosestCommentLines)["noMethods"] == "true"
+
 	sw.Do(interfaceTemplate1, m)
-	// Include the UpdateStatus method if the type has a status
-	if hasStatus(t) {
-		sw.Do(interfaceUpdateStatusTemplate, m)
+	if !noMethods {
+		sw.Do(interfaceTemplate2, m)
+		// Include the UpdateStatus method if the type has a status
+		if hasStatus(t) {
+			sw.Do(interfaceUpdateStatusTemplate, m)
+		}
+		sw.Do(interfaceTemplate3, m)
 	}
-	sw.Do(interfaceTemplate2, m)
+	sw.Do(interfaceTemplate4, m)
+
 	if namespaced {
 		sw.Do(structNamespaced, m)
 		sw.Do(newStructNamespaced, m)
@@ -97,17 +104,20 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		sw.Do(structNonNamespaced, m)
 		sw.Do(newStructNonNamespaced, m)
 	}
-	sw.Do(createTemplate, m)
-	sw.Do(updateTemplate, m)
-	// Generate the UpdateStatus method if the type has a status
-	if hasStatus(t) {
-		sw.Do(updateStatusTemplate, m)
+
+	if !noMethods {
+		sw.Do(createTemplate, m)
+		sw.Do(updateTemplate, m)
+		// Generate the UpdateStatus method if the type has a status
+		if hasStatus(t) {
+			sw.Do(updateStatusTemplate, m)
+		}
+		sw.Do(deleteTemplate, m)
+		sw.Do(deleteCollectionTemplate, m)
+		sw.Do(getTemplate, m)
+		sw.Do(listTemplate, m)
+		sw.Do(watchTemplate, m)
 	}
-	sw.Do(deleteTemplate, m)
-	sw.Do(deleteCollectionTemplate, m)
-	sw.Do(getTemplate, m)
-	sw.Do(listTemplate, m)
-	sw.Do(watchTemplate, m)
 
 	return sw.Error()
 }
@@ -132,7 +142,9 @@ type $.type|publicPlural$Getter interface {
 // this type's interface, typed client will implement this interface.
 var interfaceTemplate1 = `
 // $.type|public$Interface has methods to work with $.type|public$ resources.
-type $.type|public$Interface interface {
+type $.type|public$Interface interface {`
+
+var interfaceTemplate2 = `
 	Create(*$.type|raw$) (*$.type|raw$, error)
 	Update(*$.type|raw$) (*$.type|raw$, error)`
 
@@ -140,12 +152,14 @@ var interfaceUpdateStatusTemplate = `
 	UpdateStatus(*$.type|raw$) (*$.type|raw$, error)`
 
 // template for the Interface
-var interfaceTemplate2 = `
+var interfaceTemplate3 = `
 	Delete(name string, options *$.apiDeleteOptions|raw$) error
 	DeleteCollection(options *$.apiDeleteOptions|raw$, listOptions $.apiListOptions|raw$) error
 	Get(name string) (*$.type|raw$, error)
 	List(opts $.apiListOptions|raw$) (*$.type|raw$List, error)
-	Watch(opts $.apiListOptions|raw$) ($.watchInterface|raw$, error)
+	Watch(opts $.apiListOptions|raw$) ($.watchInterface|raw$, error)`
+
+var interfaceTemplate4 = `
 	$.type|public$Expansion
 }
 `
