@@ -74,7 +74,11 @@ const (
 )
 
 // Won't compile if StdLogger can't be realized by a log.Logger
-var _ StdLogger = &log.Logger{}
+var (
+	_ StdLogger = &log.Logger{}
+	_ StdLogger = &Entry{}
+	_ StdLogger = &Logger{}
+)
 
 // StdLogger is what your logrus-enabled library should take, that way
 // it'll accept a stdlib logger and a logrus logger. There's no standard

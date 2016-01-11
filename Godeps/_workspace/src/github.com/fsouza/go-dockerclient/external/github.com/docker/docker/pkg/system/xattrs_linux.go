@@ -5,7 +5,9 @@ import (
 	"unsafe"
 )
 
-// Returns a nil slice and nil error if the xattr is not set
+// Lgetxattr retrieves the value of the extended attribute identified by attr
+// and associated with the given path in the file system.
+// It will returns a nil slice and nil error if the xattr is not set.
 func Lgetxattr(path string, attr string) ([]byte, error) {
 	pathBytes, err := syscall.BytePtrFromString(path)
 	if err != nil {
@@ -36,6 +38,8 @@ func Lgetxattr(path string, attr string) ([]byte, error) {
 
 var _zero uintptr
 
+// Lsetxattr sets the value of the extended attribute identified by attr
+// and associated with the given path in the file system.
 func Lsetxattr(path string, attr string, data []byte, flags int) error {
 	pathBytes, err := syscall.BytePtrFromString(path)
 	if err != nil {

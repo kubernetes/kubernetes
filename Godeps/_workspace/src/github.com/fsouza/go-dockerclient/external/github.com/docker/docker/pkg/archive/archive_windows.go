@@ -6,10 +6,25 @@ import (
 	"archive/tar"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/longpath"
 )
 
-// canonicalTarNameForPath returns platform-specific filepath
+// fixVolumePathPrefix does platform specific processing to ensure that if
+// the path being passed in is not in a volume path format, convert it to one.
+func fixVolumePathPrefix(srcPath string) string {
+	return longpath.AddPrefix(srcPath)
+}
+
+// getWalkRoot calculates the root path when performing a TarWithOptions.
+// We use a separate function as this is platform specific.
+func getWalkRoot(srcPath string, include string) string {
+	return filepath.Join(srcPath, include)
+}
+
+// CanonicalTarNameForPath returns platform-specific filepath
 // to canonical posix-style path for tar archival. p is relative
 // path.
 func CanonicalTarNameForPath(p string) (string, error) {
@@ -34,7 +49,7 @@ func chmodTarEntry(perm os.FileMode) os.FileMode {
 	return perm
 }
 
-func setHeaderForSpecialDevice(hdr *tar.Header, ta *tarAppender, name string, stat interface{}) (nlink uint32, inode uint64, err error) {
+func setHeaderForSpecialDevice(hdr *tar.Header, ta *tarAppender, name string, stat interface{}) (inode uint64, err error) {
 	// do nothing. no notion of Rdev, Inode, Nlink in stat on Windows
 	return
 }
@@ -47,4 +62,9 @@ func handleTarTypeBlockCharFifo(hdr *tar.Header, path string) error {
 
 func handleLChmod(hdr *tar.Header, path string, hdrInfo os.FileInfo) error {
 	return nil
+}
+
+func getFileUIDGID(stat interface{}) (int, int, error) {
+	// no notion of file ownership mapping yet on Windows
+	return 0, 0, nil
 }

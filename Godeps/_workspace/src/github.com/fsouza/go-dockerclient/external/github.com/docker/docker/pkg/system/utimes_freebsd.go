@@ -5,6 +5,8 @@ import (
 	"unsafe"
 )
 
+// LUtimesNano is used to change access and modification time of the specified path.
+// It's used for symbol link file because syscall.UtimesNano doesn't support a NOFOLLOW flag atm.
 func LUtimesNano(path string, ts []syscall.Timespec) error {
 	var _path *byte
 	_path, err := syscall.BytePtrFromString(path)
@@ -17,8 +19,4 @@ func LUtimesNano(path string, ts []syscall.Timespec) error {
 	}
 
 	return nil
-}
-
-func UtimesNano(path string, ts []syscall.Timespec) error {
-	return syscall.UtimesNano(path, ts)
 }

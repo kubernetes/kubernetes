@@ -4,18 +4,22 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 )
 
-var (
-	// EnvironmentVariableRegexp A regexp to validate correct environment variables
-	// Environment variables set by the user must have a name consisting solely of
-	// alphabetics, numerics, and underscores - the first of which must not be numeric.
-	EnvironmentVariableRegexp = regexp.MustCompile("^[[:alpha:]_][[:alpha:][:digit:]_]*$")
-)
-
-// ParseEnvFile Read in a line delimited file with environment variables enumerated
+// ParseEnvFile reads a file with environment variables enumerated by lines
+//
+// ``Environment variable names used by the utilities in the Shell and
+// Utilities volume of IEEE Std 1003.1-2001 consist solely of uppercase
+// letters, digits, and the '_' (underscore) from the characters defined in
+// Portable Character Set and do not begin with a digit. *But*, other
+// characters may be permitted by an implementation; applications shall
+// tolerate the presence of such names.''
+// -- http://pubs.opengroup.org/onlinepubs/009695399/basedefs/xbd_chap08.html
+//
+// As of #16585, it's up to application inside docker to validate or not
+// environment variables, that's why we just strip leading whitespace and
+// nothing more.
 func ParseEnvFile(filename string) ([]string, error) {
 	fh, err := os.Open(filename)
 	if err != nil {
@@ -26,17 +30,18 @@ func ParseEnvFile(filename string) ([]string, error) {
 	lines := []string{}
 	scanner := bufio.NewScanner(fh)
 	for scanner.Scan() {
-		line := scanner.Text()
+		// trim the line from all leading whitespace first
+		line := strings.TrimLeft(scanner.Text(), whiteSpaces)
 		// line is not empty, and not starting with '#'
 		if len(line) > 0 && !strings.HasPrefix(line, "#") {
 			data := strings.SplitN(line, "=", 2)
 
 			// trim the front of a variable, but nothing else
 			variable := strings.TrimLeft(data[0], whiteSpaces)
-
-			if !EnvironmentVariableRegexp.MatchString(variable) {
-				return []string{}, ErrBadEnvVariable{fmt.Sprintf("variable '%s' is not a valid environment variable", variable)}
+			if strings.ContainsAny(variable, whiteSpaces) {
+				return []string{}, ErrBadEnvVariable{fmt.Sprintf("variable '%s' has white spaces", variable)}
 			}
+
 			if len(data) > 1 {
 
 				// pass the value through, no trimming
