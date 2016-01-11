@@ -64,7 +64,7 @@ kubelet
 ### Options
 
 ```
-      --address=0.0.0.0: The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)
+      --address="0.0.0.0": The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)
       --allow-privileged[=false]: If true, allow containers to request privileged mode. [default=false]
       --api-servers=[]: List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.
       --cadvisor-port=4194: The port of the localhost cAdvisor endpoint
@@ -73,7 +73,7 @@ kubelet
       --chaos-chance=0: If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]
       --cloud-config="": The path to the cloud provider configuration file.  Empty string for no configuration file.
       --cloud-provider="": The provider for cloud services.  Empty string for no provider.
-      --cluster-dns=<nil>: IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers
+      --cluster-dns="": IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers
       --cluster-domain="": Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains
       --config="": Path to the config file or directory of files
       --configure-cbr0[=false]: If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.
@@ -89,7 +89,7 @@ kubelet
       --experimental-flannel-overlay[=false]: Experimental support for starting the kubelet with the default overlay network (flannel). Assumes flanneld is already running in client mode. [default=false]
       --file-check-frequency=20s: Duration between checking config files for new data
       --google-json-key="": The Google Cloud Platform Service Account JSON Key to use for authentication.
-      --healthz-bind-address=127.0.0.1: The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)
+      --healthz-bind-address="127.0.0.1": The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)
       --healthz-port=10248: The port of the localhost healthz endpoint
       --host-ipc-sources="*": Comma-separated list of sources from which the Kubelet allows pods to use the host ipc namespace. [default="*"]
       --host-network-sources="*": Comma-separated list of sources from which the Kubelet allows pods to use of host network. [default="*"]
@@ -114,8 +114,13 @@ kubelet
       --minimum-container-ttl-duration=1m0s: Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'
       --network-plugin="": <Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle
       --network-plugin-dir="/usr/libexec/kubernetes/kubelet-plugins/net/exec/": <Warning: Alpha feature> The full path of the directory in which to search for network plugins
+<<<<<<< HEAD
       --node-ip=<nil>: IP address of the node. If set, kubelet will use this IP address for the node
       --node-labels=: <Warning: Alpha feature> Labels to add when registering the node in the cluster.  Labels must are key=value pairs seperated by ','.
+=======
+      --node-ip="": IP address of the node. If set, kubelet will use this IP address for the node
+      --node-labels="": <Warning: Alpha feature> Labels to add when registering the node in the cluster.  Labels must be specified as a json map of key:value pairs.
+>>>>>>> kubelet: move most of kubelet server configuration to a config object.
       --node-status-update-frequency=10s: Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller. Default: 10s
       --oom-score-adj=-999: The oom-score-adj value for kubelet process. Values must be within the range [-1000, 1000]
       --outofdisk-transition-frequency=5m0s: Duration for which the kubelet has to wait before transitioning out of out-of-disk node condition status. Default: 5m0s

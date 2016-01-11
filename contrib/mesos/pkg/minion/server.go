@@ -135,7 +135,7 @@ func findMesosCgroup(prefix string) string {
 func (ms *MinionServer) launchProxyServer() {
 	bindAddress := "0.0.0.0"
 	if !ms.proxyBindall {
-		bindAddress = ms.KubeletExecutorServer.Address.String()
+		bindAddress = ms.KubeletExecutorServer.Address
 	}
 	args := []string{
 		fmt.Sprintf("--bind-address=%s", bindAddress),

@@ -51,7 +51,7 @@ func NewStatusUpdater(client *client.Client, relistPeriod time.Duration, nowFunc
 	return &StatusUpdater{
 		client:          client,
 		relistPeriod:    relistPeriod,
-		heartBeatPeriod: kubecfg.NodeStatusUpdateFrequency,
+		heartBeatPeriod: kubecfg.NodeStatusUpdateFrequency.Duration,
 		nowFunc:         nowFunc,
 	}
 }
