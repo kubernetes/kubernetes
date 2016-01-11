@@ -22,6 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "config-default.sh"
 KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
 export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
+export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
 
 function init {
   echo "Creating kube-system namespace..."
