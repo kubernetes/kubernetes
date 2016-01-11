@@ -164,7 +164,7 @@ func ValidateDaemonSetStatusUpdate(controller, oldController *extensions.DaemonS
 }
 
 // ValidateDaemonSetTemplateUpdate tests that certain fields in the daemon set's pod template are not updated.
-func ValidateDaemonSetTemplateUpdate(podTemplate, oldPodTemplate *api.PodTemplateSpec, fldPath *field.Path) field.ErrorList {
+func ValidateDaemonSetTemplateUpdate(podTemplate, oldPodTemplate api.PodTemplateSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	podSpec := podTemplate.Spec
 	// podTemplate.Spec is not a pointer, so we can modify NodeSelector and NodeName directly.
@@ -210,20 +210,14 @@ func ValidateDaemonSetUpdateStrategy(strategy *extensions.DaemonSetUpdateStrateg
 func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	// The order of these checks is important because spec.Template is tested for nil value here
-	// before accessing its labels in the following check.
-	if spec.Template == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("template"), ""))
-		return allErrs
-	}
-
 	allErrs = append(allErrs, ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
+
 	selector, err := extensions.LabelSelectorAsSelector(spec.Selector)
 	if err == nil && !selector.Matches(labels.Set(spec.Template.Labels)) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "metadata", "labels"), spec.Template.Labels, "`selector` does not match template `labels`"))
 	}
 
-	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(spec.Template, fldPath.Child("template"))...)
+	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"))...)
 	// Daemons typically run on more than one node, so mark Read-Write persistent disks as invalid.
 	allErrs = append(allErrs, apivalidation.ValidateReadOnlyPersistentDisks(spec.Template.Spec.Volumes, fldPath.Child("template", "spec", "volumes"))...)
 	// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().

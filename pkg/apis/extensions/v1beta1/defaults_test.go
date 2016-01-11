@@ -34,7 +34,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 	defaultIntOrString := intstr.FromInt(1)
 	defaultLabels := map[string]string{"foo": "bar"}
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
-	defaultTemplate := &v1.PodTemplateSpec{
+	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
 			DNSPolicy:                     v1.DNSClusterFirst,
 			RestartPolicy:                 v1.RestartPolicyAlways,
