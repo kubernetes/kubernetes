@@ -466,20 +466,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 			return
 		}
 
-		obj := r.New()
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
-
-		// PATCH requires same permission as UPDATE
-		if admit.Handles(admission.Update) {
-			userInfo, _ := api.UserFrom(ctx)
-
-			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Update, userInfo))
-			if err != nil {
-				errorJSON(err, scope.Codec, w)
-				return
-			}
-		}
 
 		versionedObj, err := converter.ConvertToVersion(r.New(), scope.Kind.GroupVersion().String())
 		if err != nil {
@@ -500,7 +488,16 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 			return
 		}
 
-		result, err := patchResource(ctx, timeout, versionedObj, r, name, patchType, patchJS, scope.Namer, scope.Codec)
+		updateAdmit := func(updatedObject runtime.Object) error {
+			if admit != nil && admit.Handles(admission.Update) {
+				userInfo, _ := api.UserFrom(ctx)
+				return admit.Admit(admission.NewAttributesRecord(updatedObject, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Update, userInfo))
+			}
+
+			return nil
+		}
+
+		result, err := patchResource(ctx, updateAdmit, timeout, versionedObj, r, name, patchType, patchJS, scope.Namer, scope.Codec)
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -516,8 +513,10 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 
 }
 
+type updateAdmissionFunc func(updatedObject runtime.Object) error
+
 // patchResource divides PatchResource for easier unit testing
-func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.Object, patcher rest.Patcher, name string, patchType api.PatchType, patchJS []byte, namer ScopeNamer, codec runtime.Codec) (runtime.Object, error) {
+func patchResource(ctx api.Context, admit updateAdmissionFunc, timeout time.Duration, versionedObj runtime.Object, patcher rest.Patcher, name string, patchType api.PatchType, patchJS []byte, namer ScopeNamer, codec runtime.Codec) (runtime.Object, error) {
 	namespace := api.NamespaceValue(ctx)
 
 	original, err := patcher.Get(ctx, name)
@@ -543,6 +542,10 @@ func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.
 	}
 
 	return finishRequest(timeout, func() (runtime.Object, error) {
+		if err := admit(objToUpdate); err != nil {
+			return nil, err
+		}
+
 		// update should never create as previous get would fail
 		updateObject, _, updateErr := patcher.Update(ctx, objToUpdate)
 		for i := 0; i < MaxPatchConflicts && (errors.IsConflict(updateErr)); i++ {
@@ -594,6 +597,10 @@ func patchResource(ctx api.Context, timeout time.Duration, versionedObj runtime.
 				return nil, err
 			}
 			if err := runtime.DecodeInto(codec, newlyPatchedObjJS, objToUpdate); err != nil {
+				return nil, err
+			}
+
+			if err := admit(objToUpdate); err != nil {
 				return nil, err
 			}
 
