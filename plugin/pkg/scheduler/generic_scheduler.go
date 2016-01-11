@@ -127,6 +127,7 @@ func findNodesThatFit(pod *api.Pod, machineToPods map[string][]*api.Pod, predica
 	for _, node := range nodes.Items {
 		fits := true
 		for name, predicate := range predicateFuncs {
+			predicates.FailedResourceType = ""
 			fit, err := predicate(pod, machineToPods[node.Name], node.Name)
 			if err != nil {
 				return api.NodeList{}, FailedPredicateMap{}, err
@@ -136,8 +137,8 @@ func findNodesThatFit(pod *api.Pod, machineToPods map[string][]*api.Pod, predica
 				if _, found := failedPredicateMap[node.Name]; !found {
 					failedPredicateMap[node.Name] = sets.String{}
 				}
-				if re, ok := err.(*predicates.InsufficientResourceError); ok {
-					failedPredicateMap[node.Name].Insert(re.ResourceName)
+				if predicates.FailedResourceType != "" {
+					failedPredicateMap[node.Name].Insert(predicates.FailedResourceType)
 					break
 				}
 				failedPredicateMap[node.Name].Insert(name)
