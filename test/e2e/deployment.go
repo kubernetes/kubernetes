@@ -34,13 +34,13 @@ var _ = Describe("Deployment", func() {
 	It("deployment should create new pods", func() {
 		testNewDeployment(f)
 	})
-	It("deployment should delete old pods and create new ones", func() {
+	It("deployment should delete old pods and create new ones [Flaky]", func() {
 		testRollingUpdateDeployment(f)
 	})
-	It("deployment should scale up and down in the right order", func() {
+	It("deployment should scale up and down in the right order [Flaky]", func() {
 		testRollingUpdateDeploymentEvents(f)
 	})
-	It("deployment should support rollover", func() {
+	It("deployment should support rollover [Flaky]", func() {
 		testRolloverDeployment(f)
 	})
 })
