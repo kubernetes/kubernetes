@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 )
 
 const (
@@ -721,7 +722,7 @@ func (r *Runtime) generateEvents(runtimePod *kubecontainer.Pod, reason string, f
 		}
 
 		// Note that 'rkt id' is the pod id.
-		uuid := util.ShortenString(id.uuid, 8)
+		uuid := utilstrings.ShortenString(id.uuid, 8)
 		switch reason {
 		case "Created":
 			r.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.CreatedContainer, "Created with rkt id %v", uuid)

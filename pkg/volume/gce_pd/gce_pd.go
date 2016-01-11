@@ -26,9 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -289,7 +289,7 @@ func makeGlobalPDName(host volume.VolumeHost, devName string) string {
 
 func (pd *gcePersistentDisk) GetPath() string {
 	name := gcePersistentDiskPluginName
-	return pd.plugin.host.GetPodVolumeDir(pd.podUID, util.EscapeQualifiedNameForDisk(name), pd.volName)
+	return pd.plugin.host.GetPodVolumeDir(pd.podUID, strings.EscapeQualifiedNameForDisk(name), pd.volName)
 }
 
 type gcePersistentDiskCleaner struct {
@@ -353,7 +353,7 @@ var _ volume.Deleter = &gcePersistentDiskDeleter{}
 
 func (d *gcePersistentDiskDeleter) GetPath() string {
 	name := gcePersistentDiskPluginName
-	return d.plugin.host.GetPodVolumeDir(d.podUID, util.EscapeQualifiedNameForDisk(name), d.volName)
+	return d.plugin.host.GetPodVolumeDir(d.podUID, strings.EscapeQualifiedNameForDisk(name), d.volName)
 }
 
 func (d *gcePersistentDiskDeleter) Delete() error {
