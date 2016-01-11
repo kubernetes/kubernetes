@@ -211,10 +211,9 @@ var _ volume.Builder = &gcePersistentDiskBuilder{}
 
 func (b *gcePersistentDiskBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    b.readOnly,
-		Managed:                     !b.readOnly,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        b.readOnly,
+		Managed:         !b.readOnly,
+		SupportsSELinux: true,
 	}
 }
 

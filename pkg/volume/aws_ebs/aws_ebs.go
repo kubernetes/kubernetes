@@ -222,10 +222,9 @@ var _ volume.Builder = &awsElasticBlockStoreBuilder{}
 
 func (b *awsElasticBlockStoreBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    b.readOnly,
-		Managed:                     !b.readOnly,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        b.readOnly,
+		Managed:         !b.readOnly,
+		SupportsSELinux: true,
 	}
 }
 

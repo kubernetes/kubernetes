@@ -151,10 +151,9 @@ var _ volume.Builder = &nfsBuilder{}
 
 func (b *nfsBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    b.readOnly,
-		Managed:                     false,
-		SupportsOwnershipManagement: false,
-		SupportsSELinux:             false,
+		ReadOnly:        b.readOnly,
+		Managed:         false,
+		SupportsSELinux: false,
 	}
 }
 

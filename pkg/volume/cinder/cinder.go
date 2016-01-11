@@ -216,10 +216,9 @@ func detachDiskLogError(cd *cinderVolume) {
 
 func (b *cinderVolumeBuilder) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    b.readOnly,
-		Managed:                     !b.readOnly,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        b.readOnly,
+		Managed:         !b.readOnly,
+		SupportsSELinux: true,
 	}
 }
 

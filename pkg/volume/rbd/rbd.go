@@ -196,10 +196,9 @@ var _ volume.Builder = &rbdBuilder{}
 
 func (b *rbd) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    b.ReadOnly,
-		Managed:                     !b.ReadOnly,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        b.ReadOnly,
+		Managed:         !b.ReadOnly,
+		SupportsSELinux: true,
 	}
 }
 
