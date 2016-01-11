@@ -48,14 +48,14 @@ type containerResourceGatherer struct {
 	wg              sync.WaitGroup
 }
 
-type singleContainerSummary struct {
+type SingleContainerSummary struct {
 	Name string
 	Cpu  float64
 	Mem  int64
 }
 
 // we can't have int here, as JSON does not accept integer keys.
-type ResourceUsageSummary map[string][]singleContainerSummary
+type ResourceUsageSummary map[string][]SingleContainerSummary
 
 func (s *ResourceUsageSummary) PrintHumanReadable() string {
 	buf := &bytes.Buffer{}
@@ -117,7 +117,7 @@ func (g *containerResourceGatherer) stopAndSummarize(percentiles []int, constrai
 	for _, perc := range percentiles {
 		for _, name := range sortedKeys {
 			usage := stats[perc][name]
-			summary[strconv.Itoa(perc)] = append(summary[strconv.Itoa(perc)], singleContainerSummary{
+			summary[strconv.Itoa(perc)] = append(summary[strconv.Itoa(perc)], SingleContainerSummary{
 				Name: name,
 				Cpu:  usage.CPUUsageInCores,
 				Mem:  usage.MemoryWorkingSetInBytes,
