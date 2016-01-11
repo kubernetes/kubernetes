@@ -28,8 +28,10 @@ func matches(t *testing.T, ls Set, want string) {
 
 func TestSetString(t *testing.T) {
 	matches(t, Set{"x": "y"}, "x=y")
+	matches(t, Set{"x": ""}, "x")
 	matches(t, Set{"foo": "bar"}, "foo=bar")
 	matches(t, Set{"foo": "bar", "baz": "qup"}, "baz=qup,foo=bar")
+	matches(t, Set{"foo": "bar", "baz": ""}, "baz,foo=bar")
 
 	// TODO: Make our label representation robust enough to handle labels
 	// with ",=!" characters in their names.
