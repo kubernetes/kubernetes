@@ -117,6 +117,14 @@ type ProvisionableVolumePlugin interface {
 	NewProvisioner(options VolumeOptions) (Provisioner, error)
 }
 
+// AttachableVolumePlugin is an extended interface of VolumePlugin and is used for volumes that require attachment
+// to a node before mounting.
+type AttachableVolumePlugin interface {
+	VolumePlugin
+	NewAttacher(spec *Spec) (Attacher, error)
+	NewDetacher(name string, podUID types.UID) (Detacher, error)
+}
+
 // VolumeHost is an interface that plugins can use to access the kubelet.
 type VolumeHost interface {
 	// GetPluginDir returns the absolute path to a directory under which
@@ -382,6 +390,34 @@ func (pm *VolumePluginMgr) FindCreatablePluginBySpec(spec *Spec) (ProvisionableV
 		return provisionableVolumePlugin, nil
 	}
 	return nil, fmt.Errorf("no creatable volume plugin matched")
+}
+
+// FindAttachablePluginBySpec fetches a persistent volume plugin by name.  Unlike the other "FindPlugin" methods, this
+// does not return error if no plugin is found.  All volumes require a builder and cleaner, but not every volume will
+// have an attacher/detacher.
+func (pm *VolumePluginMgr) FindAttachablePluginBySpec(spec *Spec) (AttachableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	if attachableVolumePlugin, ok := volumePlugin.(AttachableVolumePlugin); ok {
+		return attachableVolumePlugin, nil
+	}
+	return nil, nil
+}
+
+// FindAttachablePluginByName fetches an attachable volume plugin by name. Unlike the other "FindPlugin" methods, this
+// does not return error if no plugin is found.  All volumes require a builder and cleaner, but not every volume will
+// have an attacher/detacher.
+func (pm *VolumePluginMgr) FindAttachablePluginByName(name string) (AttachableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if attachablePlugin, ok := volumePlugin.(AttachableVolumePlugin); ok {
+		return attachablePlugin, nil
+	}
+	return nil, nil
 }
 
 // NewPersistentVolumeRecyclerPodTemplate creates a template for a recycler pod.  By default, a recycler pod simply runs

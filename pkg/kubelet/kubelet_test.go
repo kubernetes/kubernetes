@@ -480,7 +480,8 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 func TestMountExternalVolumes(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{&volume.FakeVolumePlugin{PluginName: "fake", Host: nil}}, &volumeHost{kubelet})
+	plug := &volume.FakeVolumePlugin{PluginName: "fake", Host: nil}
+	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plug}, &volumeHost{kubelet})
 
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -509,6 +510,9 @@ func TestMountExternalVolumes(t *testing.T) {
 		if _, ok := podVolumes[name]; !ok {
 			t.Errorf("api.Pod volumes map is missing key: %s. %#v", name, podVolumes)
 		}
+	}
+	if plug.NewAttacherCallCount != 1 {
+		t.Errorf("Expected plugin NewAttacher to be called %d times but got %d", 1, plug.NewAttacherCallCount)
 	}
 }
 
@@ -541,7 +545,7 @@ func TestGetPodVolumesFromDisk(t *testing.T) {
 	for _, ep := range expectedPaths {
 		found := false
 		for _, cl := range volumesFound {
-			if ep == cl.GetPath() {
+			if ep == cl.Cleaner.GetPath() {
 				found = true
 				break
 			}
@@ -549,6 +553,9 @@ func TestGetPodVolumesFromDisk(t *testing.T) {
 		if !found {
 			t.Errorf("Could not find a volume with path %s", ep)
 		}
+	}
+	if plug.NewDetacherCallCount != len(volsOnDisk) {
+		t.Errorf("Expected plugin NewDetacher to be called %d times but got %d", len(volsOnDisk), plug.NewDetacherCallCount)
 	}
 }
 
@@ -628,7 +635,7 @@ func TestCleanupOrphanedVolumes(t *testing.T) {
 	for _, ep := range pathsOnDisk {
 		found := false
 		for _, cl := range volumesFound {
-			if ep == cl.GetPath() {
+			if ep == cl.Cleaner.GetPath() {
 				found = true
 				break
 			}
@@ -648,7 +655,7 @@ func TestCleanupOrphanedVolumes(t *testing.T) {
 		t.Errorf("Expected to find 0 cleaners, got %d", len(volumesFound))
 	}
 	for _, cl := range volumesFound {
-		t.Errorf("Found unexpected volume %s", cl.GetPath())
+		t.Errorf("Found unexpected volume %s", cl.Cleaner.GetPath())
 	}
 }
 
