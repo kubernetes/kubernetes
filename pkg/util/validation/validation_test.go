@@ -154,6 +154,38 @@ func TestIsValidPortNum(t *testing.T) {
 	}
 }
 
+func TestIsValidGroupId(t *testing.T) {
+	goodValues := []int64{0, 1, 1000, 65535, 2147483647}
+	for _, val := range goodValues {
+		if !IsValidGroupId(val) {
+			t.Errorf("expected true for '%d'", val)
+		}
+	}
+
+	badValues := []int64{-1, -1003, 2147483648, 4147483647}
+	for _, val := range badValues {
+		if IsValidGroupId(val) {
+			t.Errorf("expected false for '%d'", val)
+		}
+	}
+}
+
+func TestIsValidUserId(t *testing.T) {
+	goodValues := []int64{0, 1, 1000, 65535, 2147483647}
+	for _, val := range goodValues {
+		if !IsValidUserId(val) {
+			t.Errorf("expected true for '%d'", val)
+		}
+	}
+
+	badValues := []int64{-1, -1003, 2147483648, 4147483647}
+	for _, val := range badValues {
+		if IsValidUserId(val) {
+			t.Errorf("expected false for '%d'", val)
+		}
+	}
+}
+
 func TestIsValidPortName(t *testing.T) {
 	goodValues := []string{"telnet", "re-mail-ck", "pop3", "a", "a-1", "1-a", "a-1-b-2-c", "1-a-2-b-3"}
 	for _, val := range goodValues {
