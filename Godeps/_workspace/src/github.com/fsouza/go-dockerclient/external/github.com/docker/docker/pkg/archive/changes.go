@@ -14,34 +14,46 @@ import (
 	"time"
 
 	"github.com/fsouza/go-dockerclient/external/github.com/Sirupsen/logrus"
+	"github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/idtools"
 	"github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/pools"
 	"github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/system"
 )
 
+// ChangeType represents the change type.
 type ChangeType int
 
 const (
+	// ChangeModify represents the modify operation.
 	ChangeModify = iota
+	// ChangeAdd represents the add operation.
 	ChangeAdd
+	// ChangeDelete represents the delete operation.
 	ChangeDelete
 )
 
+func (c ChangeType) String() string {
+	switch c {
+	case ChangeModify:
+		return "C"
+	case ChangeAdd:
+		return "A"
+	case ChangeDelete:
+		return "D"
+	}
+	return ""
+}
+
+// Change represents a change, it wraps the change type and path.
+// It describes changes of the files in the path respect to the
+// parent layers. The change could be modify, add, delete.
+// This is used for layer diff.
 type Change struct {
 	Path string
 	Kind ChangeType
 }
 
 func (change *Change) String() string {
-	var kind string
-	switch change.Kind {
-	case ChangeModify:
-		kind = "C"
-	case ChangeAdd:
-		kind = "A"
-	case ChangeDelete:
-		kind = "D"
-	}
-	return fmt.Sprintf("%s %s", kind, change.Path)
+	return fmt.Sprintf("%s %s", change.Kind, change.Path)
 }
 
 // for sort.Sort
@@ -94,7 +106,7 @@ func Changes(layers []string, rw string) ([]Change, error) {
 		}
 
 		// Skip AUFS metadata
-		if matched, err := filepath.Match(string(os.PathSeparator)+".wh..wh.*", path); err != nil || matched {
+		if matched, err := filepath.Match(string(os.PathSeparator)+WhiteoutMetaPrefix+"*", path); err != nil || matched {
 			return err
 		}
 
@@ -105,8 +117,8 @@ func Changes(layers []string, rw string) ([]Change, error) {
 		// Find out what kind of modification happened
 		file := filepath.Base(path)
 		// If there is a whiteout, then the file was removed
-		if strings.HasPrefix(file, ".wh.") {
-			originalFile := file[len(".wh."):]
+		if strings.HasPrefix(file, WhiteoutPrefix) {
+			originalFile := file[len(WhiteoutPrefix):]
 			change.Path = filepath.Join(filepath.Dir(path), originalFile)
 			change.Kind = ChangeDelete
 		} else {
@@ -138,7 +150,7 @@ func Changes(layers []string, rw string) ([]Change, error) {
 
 		// If /foo/bar/file.txt is modified, then /foo/bar must be part of the changed files.
 		// This block is here to ensure the change is recorded even if the
-		// modify time, mode and size of the parent directoriy in the rw and ro layers are all equal.
+		// modify time, mode and size of the parent directory in the rw and ro layers are all equal.
 		// Check https://github.com/docker/docker/pull/13590 for details.
 		if f.IsDir() {
 			changedDirs[path] = struct{}{}
@@ -161,20 +173,22 @@ func Changes(layers []string, rw string) ([]Change, error) {
 	return changes, nil
 }
 
+// FileInfo describes the information of a file.
 type FileInfo struct {
 	parent     *FileInfo
 	name       string
-	stat       *system.Stat_t
+	stat       *system.StatT
 	children   map[string]*FileInfo
 	capability []byte
 	added      bool
 }
 
-func (root *FileInfo) LookUp(path string) *FileInfo {
+// LookUp looks up the file information of a file.
+func (info *FileInfo) LookUp(path string) *FileInfo {
 	// As this runs on the daemon side, file paths are OS specific.
-	parent := root
+	parent := info
 	if path == string(os.PathSeparator) {
-		return root
+		return info
 	}
 
 	pathElements := strings.Split(path, string(os.PathSeparator))
@@ -275,6 +289,7 @@ func (info *FileInfo) addChanges(oldInfo *FileInfo, changes *[]Change) {
 
 }
 
+// Changes add changes to file information.
 func (info *FileInfo) Changes(oldInfo *FileInfo) []Change {
 	var changes []Change
 
@@ -316,13 +331,29 @@ func ChangesDirs(newDir, oldDir string) ([]Change, error) {
 
 // ChangesSize calculates the size in bytes of the provided changes, based on newDir.
 func ChangesSize(newDir string, changes []Change) int64 {
-	var size int64
+	var (
+		size int64
+		sf   = make(map[uint64]struct{})
+	)
 	for _, change := range changes {
 		if change.Kind == ChangeModify || change.Kind == ChangeAdd {
 			file := filepath.Join(newDir, change.Path)
-			fileInfo, _ := os.Lstat(file)
+			fileInfo, err := os.Lstat(file)
+			if err != nil {
+				logrus.Errorf("Can not stat %q: %s", file, err)
+				continue
+			}
+
 			if fileInfo != nil && !fileInfo.IsDir() {
-				size += fileInfo.Size()
+				if hasHardlinks(fileInfo) {
+					inode := getIno(fileInfo)
+					if _, ok := sf[inode]; !ok {
+						size += fileInfo.Size()
+						sf[inode] = struct{}{}
+					}
+				} else {
+					size += fileInfo.Size()
+				}
 			}
 		}
 	}
@@ -330,13 +361,15 @@ func ChangesSize(newDir string, changes []Change) int64 {
 }
 
 // ExportChanges produces an Archive from the provided changes, relative to dir.
-func ExportChanges(dir string, changes []Change) (Archive, error) {
+func ExportChanges(dir string, changes []Change, uidMaps, gidMaps []idtools.IDMap) (Archive, error) {
 	reader, writer := io.Pipe()
 	go func() {
 		ta := &tarAppender{
 			TarWriter: tar.NewWriter(writer),
 			Buffer:    pools.BufioWriter32KPool.Get(nil),
 			SeenFiles: make(map[uint64]string),
+			UIDMaps:   uidMaps,
+			GIDMaps:   gidMaps,
 		}
 		// this buffer is needed for the duration of this piped stream
 		defer pools.BufioWriter32KPool.Put(ta.Buffer)
@@ -351,7 +384,7 @@ func ExportChanges(dir string, changes []Change) (Archive, error) {
 			if change.Kind == ChangeDelete {
 				whiteOutDir := filepath.Dir(change.Path)
 				whiteOutBase := filepath.Base(change.Path)
-				whiteOut := filepath.Join(whiteOutDir, ".wh."+whiteOutBase)
+				whiteOut := filepath.Join(whiteOutDir, WhiteoutPrefix+whiteOutBase)
 				timestamp := time.Now()
 				hdr := &tar.Header{
 					Name:       whiteOut[1:],

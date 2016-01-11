@@ -53,7 +53,7 @@ func (r *multiReadSeeker) Seek(offset int64, whence int) (int64, error) {
 			}
 
 			if rdrOffset == s && i != len(r.readers)-1 {
-				idx += 1
+				idx++
 				rdrOffset = 0
 			}
 			r.pos = &pos{idx, rdrOffset}

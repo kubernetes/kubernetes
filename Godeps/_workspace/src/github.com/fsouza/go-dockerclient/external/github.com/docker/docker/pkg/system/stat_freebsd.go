@@ -5,8 +5,8 @@ import (
 )
 
 // fromStatT converts a syscall.Stat_t type to a system.Stat_t type
-func fromStatT(s *syscall.Stat_t) (*Stat_t, error) {
-	return &Stat_t{size: s.Size,
+func fromStatT(s *syscall.Stat_t) (*StatT, error) {
+	return &StatT{size: s.Size,
 		mode: uint32(s.Mode),
 		uid:  s.Uid,
 		gid:  s.Gid,
@@ -18,7 +18,7 @@ func fromStatT(s *syscall.Stat_t) (*Stat_t, error) {
 // a system.Stat_t type pertaining to that file.
 //
 // Throws an error if the file does not exist
-func Stat(path string) (*Stat_t, error) {
+func Stat(path string) (*StatT, error) {
 	s := &syscall.Stat_t{}
 	if err := syscall.Stat(path, s); err != nil {
 		return nil, err
