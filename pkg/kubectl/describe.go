@@ -1028,55 +1028,60 @@ func (i *IngressDescriber) Describe(namespace, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	events, _ := i.Events(namespace).Search(ing)
-	endpoints, _ := i.Endpoints(namespace).Get(ing.Spec.Backend.ServiceName)
-	service, _ := i.Services(namespace).Get(ing.Spec.Backend.ServiceName)
-	return describeIngress(ing, endpoints, service, events)
+	return i.describeIngress(ing)
 }
 
-func describeIngressEndpoints(out io.Writer, ing *extensions.Ingress, endpoints *api.Endpoints, service *api.Service) {
+func (i *IngressDescriber) describeBackend(ns string, backend *extensions.IngressBackend) string {
+	endpoints, _ := i.Endpoints(ns).Get(backend.ServiceName)
+	service, _ := i.Services(ns).Get(backend.ServiceName)
 	spName := ""
 	for i := range service.Spec.Ports {
 		sp := &service.Spec.Ports[i]
-		switch ing.Spec.Backend.ServicePort.Type {
+		switch backend.ServicePort.Type {
 		case intstr.String:
-			if ing.Spec.Backend.ServicePort.StrVal == sp.Name {
+			if backend.ServicePort.StrVal == sp.Name {
 				spName = sp.Name
 			}
 		case intstr.Int:
-			if int(ing.Spec.Backend.ServicePort.IntVal) == sp.Port {
+			if int(backend.ServicePort.IntVal) == sp.Port {
 				spName = sp.Name
 			}
 		}
 	}
-
-	fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints, sets.NewString(spName)))
+	return formatEndpoints(endpoints, sets.NewString(spName))
 }
 
-func describeIngress(ing *extensions.Ingress, endpoints *api.Endpoints, service *api.Service, events *api.EventList) (string, error) {
+func (i *IngressDescriber) describeIngress(ing *extensions.Ingress) (string, error) {
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", ing.Name)
-		fmt.Fprintf(out, "Namespace:\t%s\n", ing.Namespace)
-		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(ing.Labels))
-
-		fmt.Fprintf(out, "Rules:\n")
+		fmt.Fprintf(out, "Name:\t%v\n", ing.Name)
+		fmt.Fprintf(out, "Namespace:\t%v\n", ing.Namespace)
+		fmt.Fprintf(out, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer))
+		def := ing.Spec.Backend
+		ns := ing.Namespace
+		if def == nil {
+			// Ingresses that don't specify a default backend inherit the
+			// default backend in the kube-system namespace.
+			def = &extensions.IngressBackend{
+				ServiceName: "default-http-backend",
+				ServicePort: intstr.IntOrString{Type: intstr.Int, IntVal: 80},
+			}
+			ns = api.NamespaceSystem
+		}
+		fmt.Fprintf(out, "Default backend:\t%s (%s)\n", backendStringer(def), i.describeBackend(ns, def))
+		fmt.Fprint(out, "Rules:\n  Host\tPath\tBackends\n")
+		fmt.Fprint(out, "  ----\t----\t--------\n")
 		for _, rules := range ing.Spec.Rules {
 			if rules.HTTP == nil {
 				continue
 			}
-
-			fmt.Fprintf(out, "  Host\tPath\tBackend\n")
-			fmt.Fprintf(out, "  ----\t----\t--------\n")
+			fmt.Fprintf(out, "  %s\t\n", rules.Host)
 			for _, path := range rules.HTTP.Paths {
-				fmt.Fprintf(out, "  %s\t%s\t%s\n", rules.Host, path.Path, backendStringer(&path.Backend))
+				fmt.Fprintf(out, "    \t%s \t%s (%s)\n", path.Path, backendStringer(&path.Backend), i.describeBackend(ing.Namespace, &path.Backend))
 			}
 		}
-
-		fmt.Fprintf(out, "Backend:\t%v\t%v\n", backendStringer(ing.Spec.Backend),
-			loadBalancerStatusStringer(ing.Status.LoadBalancer))
-		describeIngressEndpoints(out, ing, endpoints, service)
-
 		describeIngressAnnotations(out, ing.Annotations)
+
+		events, _ := i.Events(ing.Namespace).Search(ing)
 		if events != nil {
 			DescribeEvents(events, out)
 		}
@@ -1093,7 +1098,7 @@ func describeIngressAnnotations(out io.Writer, annotations map[string]string) {
 		}
 		parts := strings.Split(k, "/")
 		name := parts[len(parts)-1]
-		fmt.Fprintf(out, "%v:\t%s\n", name, v)
+		fmt.Fprintf(out, "  %v:\t%s\n", name, v)
 	}
 	return
 }
