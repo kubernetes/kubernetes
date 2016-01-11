@@ -122,23 +122,25 @@ func processLink(in string, filePath string) (string, error) {
 // any relative links actually point to files that exist.
 func updateLinks(filePath string, mlines mungeLines) (mungeLines, error) {
 	var out mungeLines
-	errors := []string{}
+	allErrs := []string{}
 
-	for _, mline := range mlines {
+	for lineNum, mline := range mlines {
 		if mline.preformatted || !mline.link {
 			out = append(out, mline)
 			continue
 		}
 		line, err := processLink(mline.data, filePath)
 		if err != nil {
-			errors = append(errors, err.Error())
+			var s = fmt.Sprintf("On line %d: %s", lineNum, err.Error())
+			err := errors.New(s)
+			allErrs = append(allErrs, err.Error())
 		}
 		ml := newMungeLine(line)
 		out = append(out, ml)
 	}
 	err := error(nil)
-	if len(errors) != 0 {
-		err = fmt.Errorf("%s", strings.Join(errors, "\n"))
+	if len(allErrs) != 0 {
+		err = fmt.Errorf("%s", strings.Join(allErrs, "\n"))
 	}
 	return out, err
 }
