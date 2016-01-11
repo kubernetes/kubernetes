@@ -26,9 +26,9 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -45,7 +45,7 @@ func ProbeVolumePlugins(pluginDir string) []volume.VolumePlugin {
 		// then, executable will be pluginDir/dirname/cifs
 		if f.IsDir() {
 			execPath := path.Join(pluginDir, f.Name())
-			plugins = append(plugins, &flexVolumePlugin{driverName: util.UnescapePluginName(f.Name()), execPath: execPath})
+			plugins = append(plugins, &flexVolumePlugin{driverName: utilstrings.UnescapePluginName(f.Name()), execPath: execPath})
 		}
 	}
 	return plugins
@@ -326,7 +326,7 @@ func (f *flexVolumeBuilder) IsReadOnly() bool {
 // GetPathFromPlugin gets the actual volume mount directory based on plugin.
 func (f *flexVolumeDisk) GetPath() string {
 	name := f.driverName
-	return f.plugin.host.GetPodVolumeDir(f.podUID, util.EscapeQualifiedNameForDisk(name), f.volName)
+	return f.plugin.host.GetPodVolumeDir(f.podUID, utilstrings.EscapeQualifiedNameForDisk(name), f.volName)
 }
 
 // TearDown simply deletes everything in the directory.

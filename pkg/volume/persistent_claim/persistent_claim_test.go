@@ -26,7 +26,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/gce_pd"
 	"k8s.io/kubernetes/pkg/volume/host_path"
@@ -105,7 +105,7 @@ func TestNewBuilder(t *testing.T) {
 			},
 			plugin: gce_pd.ProbeVolumePlugins()[0],
 			testFunc: func(builder volume.Builder, plugin volume.VolumePlugin) error {
-				if !strings.Contains(builder.GetPath(), util.EscapeQualifiedNameForDisk(plugin.Name())) {
+				if !strings.Contains(builder.GetPath(), utilstrings.EscapeQualifiedNameForDisk(plugin.Name())) {
 					return fmt.Errorf("builder path expected to contain plugin name.  Got: %s", builder.GetPath())
 				}
 				return nil

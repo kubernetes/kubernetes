@@ -22,8 +22,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -137,7 +137,7 @@ type nfs struct {
 
 func (nfsVolume *nfs) GetPath() string {
 	name := nfsPluginName
-	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, util.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
+	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, strings.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
 }
 
 type nfsBuilder struct {
@@ -210,7 +210,7 @@ func (b *nfsBuilder) SetUpAt(dir string) error {
 //
 //func (c *nfsCleaner) GetPath() string {
 //	name := nfsPluginName
-//	return c.plugin.host.GetPodVolumeDir(c.pod.UID, util.EscapeQualifiedNameForDisk(name), c.volName)
+//	return c.plugin.host.GetPodVolumeDir(c.pod.UID, strings.EscapeQualifiedNameForDisk(name), c.volName)
 //}
 
 var _ volume.Cleaner = &nfsCleaner{}
