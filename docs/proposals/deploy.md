@@ -18,10 +18,6 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/proposals/deploy.md).
-
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -55,7 +51,7 @@ Documentation for other releases can be found at
 
 ## Motivation
 
-Users can use Deployments or `kubectl rolling-update` to deploy in their Kubernetes clusters. A Deployment provides declarative update for Pods and ReplicationControllers, whereas `rolling-update` allows the users to update their earlier deployment without worrying about schemas and configurations. Users need a way that's similar to `rolling-update` to manage their Deployments more easily.
+Users can use [Deployments](../user-guide/deployments.md) or [`kubectl rolling-update`](../user-guide/kubectl/kubectl_rolling-update.md) to deploy in their Kubernetes clusters. A Deployment provides declarative update for Pods and ReplicationControllers, whereas `rolling-update` allows the users to update their earlier deployment without worrying about schemas and configurations. Users need a way that's similar to `rolling-update` to manage their Deployments more easily.
 
 `rolling-update` expects ReplicationController as the only resource type it deals with. It's not trivial to support exactly the same behavior with Deployment, which requires:
 - Print out scaling up/down events.
@@ -88,10 +84,11 @@ Users may use `kubectl scale` or `kubectl autoscale` to scale up and down Deploy
 
 `kubectl rollout` supports both Deployment and DaemonSet. It has the following subcommands:
 - `kubectl rollout undo` works like rollback; it allows the users to rollback to a previous version of deployment.
-- `kubectl rollout pause` allows the users to pause a deployment.
+- `kubectl rollout pause` allows the users to pause a deployment. See [pause deployments](#pause-deployments).
 - `kubectl rollout resume` allows the users to resume a paused deployment.
 - `kubectl rollout status` shows the status of a deployment.
-- `kubectl rollout history` shows meaningful version information of all previous deployments.
+- `kubectl rollout history` shows meaningful version information of all previous deployments. See [development version](#deployment-version).
+- `kubectl rollout retry` retries a failed deployment. See [perm-failed deployments](#perm-failed-deployments).
 
 ### `kubectl set`
 
@@ -150,7 +147,21 @@ See issue [#17164](https://github.com/kubernetes/kubernetes/issues/17164).
 
 ### Deployment Version
 
-We store previous deployment versions information in deployment annotation `kubectl.kubernetes.io/deployment-version-<time>`. The value stored in the annotation can be a spec hash, a strategic merge patch or the kubectl commands previously executed. We choose strategic merge patch since it's more human-readable than spec hash, and commands like `kubectl edit` won't provide enough useful information.
+We store previous deployment version information in annotations `rollout.kubectl.kubernetes.io/change-source` and `rollout.kubectl.kubernetes.io/version` of replication controllers of the deployment, to support rolling back changes as well as for the users to view previous changes with `kubectl rollout history`.
+- `rollout.kubectl.kubernetes.io/change-source`, which is optional, records the kubectl command of the last mutation made to this rollout. Users may use `--record` in `kubectl` to record current command in this annotation.
+- `rollout.kubectl.kubernetes.io/version` records a version number to distinguish the change sequence of a deployment's
+replication controllers. A deployment obtains the largest version number from its replication controllers and increments the number by 1 upon update or creation of the deployment, and update the version annotation of its new replication controller.
+
+When the users perform a rollback, i.e. `kubectl rollout undo`, the deployment first looks at its existing replication controllers, regardless of their number of replicas. Then it finds the one with annotation `rollout.kubectl.kubernetes.io/version` that either contains the specified rollback version number or contains the second largest version number among all the replication controllers (current new replication controller should obtain the largest version number) if the user didn't specify any version number (the user wants to rollback to the last change). Lastly, it
+starts scaling up that replication controller it's rolling back to, and scaling down the current ones, and then update the version counter and the rollout annotations accordingly.
+
+Note that a deployment's replication controllers use PodTemplate hashes (i.e. the hash of `.spec.template`) to distinguish from each others. When doing rollout or rollback, a deployment reuses existing replication controller if it has the same PodTemplate, and its `rollout.kubectl.kubernetes.io/change-source` and `rollout.kubectl.kubernetes.io/version` annotations will be updated by the new rollout. At this point, the earlier state of this replication controller is lost in history. For example, if we had 3 replication controllers in
+deployment history, and then we do a rollout with the same PodTemplate as version 1, then version 1 is lost and becomes version 4 after the rollout.
+
+To make deployment versions more meaningful and readable for the users, we can add more annotations in the future. For example, we can add the following flags to `kubectl` for the users to describe and record their current rollout:
+- `--description`: adds `description` annotation to an object when it's created to describe the object.
+- `--note`: adds `note` annotation to an object when it's updated to record the change.
+- `--commit`: adds `commit` annotation to an object with the commit id.
 
 ### Pause Deployments
 
@@ -158,7 +169,7 @@ Users sometimes need to temporarily disable a deployment. See issue [#14516](htt
 
 ### Perm-failed Deployments
 
-The deployment could be marked as "permanently failed" for a given spec hash so that the system won't continue thrashing on a doomed deployment. See issue [#14519](https://github.com/kubernetes/kubernetes/issues/14519).
+The deployment could be marked as "permanently failed" for a given spec hash so that the system won't continue thrashing on a doomed deployment. The users can retry a failed deployment with `kubectl rollout retry`. See issue [#14519](https://github.com/kubernetes/kubernetes/issues/14519).
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/deploy.md?pixel)]()
