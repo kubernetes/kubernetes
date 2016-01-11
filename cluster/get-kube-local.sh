@@ -83,6 +83,8 @@ function create_cluster {
       --api-servers=http://localhost:8080 \
       --config=/etc/kubernetes/manifests \
       --allow-privileged=true \
+      --cluster-dns=10.0.0.10 \
+      --cluster-domain=cluster.local \
       --v=2"
 
   echo -e -n "\tWaiting for master components to start..."
