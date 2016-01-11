@@ -28,6 +28,7 @@ type ExtensionsInterface interface {
 	HorizontalPodAutoscalersGetter
 	IngressesGetter
 	JobsGetter
+	ScalesGetter
 	ThirdPartyResourcesGetter
 }
 
@@ -54,6 +55,10 @@ func (c *ExtensionsClient) Ingresses(namespace string) IngressInterface {
 
 func (c *ExtensionsClient) Jobs(namespace string) JobInterface {
 	return newJobs(c, namespace)
+}
+
+func (c *ExtensionsClient) Scales(namespace string) ScaleInterface {
+	return newScales(c, namespace)
 }
 
 func (c *ExtensionsClient) ThirdPartyResources(namespace string) ThirdPartyResourceInterface {
