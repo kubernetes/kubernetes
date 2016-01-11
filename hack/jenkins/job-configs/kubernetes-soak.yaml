@@ -1,0 +1,109 @@
+- job-template:
+    name: 'kubernetes-soak-weekly-deploy-{suffix}'
+    description: '{deploy-description} Test owner: {test-owner}'
+    logrotate:
+        daysToKeep: 14
+    builders:
+        - shell: curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
+    properties:
+        - build-blocker:
+            use-build-blocker: true
+            blocking-jobs:
+                - 'kubernetes-soak-continuous-e2e-{suffix}'
+    publishers:
+        - email-ext
+        - gcs-uploader
+    triggers:
+        - timed: 'H 0 * * 2'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: 90
+            fail: true
+        - timestamps
+        - workspace-cleanup
+
+- job-template:
+    name: 'kubernetes-soak-continuous-e2e-{suffix}'
+    description: '{e2e-description} Test Owner: {test-owner}'
+    logrotate:
+        daysToKeep: 7
+    builders:
+        - shell: curl -fsS --retry 3 "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
+    properties:
+        - build-blocker:
+            use-build-blocker: true
+            blocking-jobs:
+                - 'kubernetes-soak-weekly-deploy-{suffix}'
+            queue-scanning: ALL
+    publishers:
+        - claim-build
+        - email-ext
+        - gcs-uploader
+        - junit-publisher
+        - log-parser
+    triggers:
+        - timed: 'H/30 * * * *'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: 360
+            fail: true
+        - timestamps
+
+- project:
+    name: soak
+    test-owner: 'Build Cop'
+    suffix:
+        - 'gce':
+            deploy-description: |
+                Deploy Kubernetes to soak cluster using the latest successful
+                Kubernetes build every week.<br>
+                If a kubernetes-soak-continuous-e2e-gce build is running,
+                this deployment build will be blocked and remain in the queue
+                until the test run is complete.<br>
+            e2e-description: |
+                Assumes Kubernetes soak cluster is already deployed.<br>
+                If a kubernetes-soak-weekly-deploy-gce build is enqueued,
+                builds will be blocked and remain in the queue until the
+                deployment is complete.<br>
+            branch: 'master'
+        - 'gce-1.1':
+            deploy-description: |
+                Deploy Kubernetes to soak cluster using the latest successful
+                current release CI-produced Kubernetes build every week.<br>
+                If a kubernetes-soak-continuous-e2e-gce-1.1 build is running,
+                this deployment build will be blocked and remain in the queue
+                until the test run is complete.<br>
+            e2e-description: |
+                Assumes Kubernetes soak current-release cluster is already
+                deployed.<br>
+                If a kubernetes-soak-weekly-deploy-gce-1.1 build is enqueued,
+                builds will be blocked and remain in the queue until the
+                deployment is complete.<br>
+            branch: 'release-1.1'
+        - 'gke':
+            deploy-description: |
+                Deploy Kubernetes to a GKE soak cluster using the staging GKE
+                Kubernetes build every week.<br>
+                If a kubernetes-soak-continuous-e2e-gke build is running, this
+                deployment build will be blocked and remain in the queue until
+                the test run is complete.<br>
+                Current Settings:<br>
+                - provider: GKE<br>
+                - apiary: staging<br>
+                - borg job: staging<br>
+                - client (kubectl): release/stable.txt<br>
+                - cluster (k8s): release/stable.txt<br>
+                - tests: release/stable.txt<br>
+            e2e-description: |
+                Assumes Kubernetes GKE soak cluster is already deployed.<br>
+                If a kubernetes-soak-weekly-deploy-gke build is enqueued,
+                builds will be blocked and remain in the queue until the
+                deployment is complete.<br>
+            branch: 'master'
+    jobs:
+        - 'kubernetes-soak-weekly-deploy-{suffix}'
+        - 'kubernetes-soak-continuous-e2e-{suffix}'
