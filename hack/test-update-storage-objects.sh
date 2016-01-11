@@ -63,6 +63,9 @@ function startApiServer() {
 function killApiServer() {
   kube::log::status "Killing api server"
   [[ -n ${APISERVER_PID-} ]] && kill ${APISERVER_PID} 1>&2 2>/dev/null
+
+  wait ${APISERVER_PID} || true
+  kube::log::status "api server exited"
   unset APISERVER_PID
 }
 
@@ -114,12 +117,16 @@ ${UPDATE_ETCD_OBJECTS_SCRIPT}
 killApiServer
 
 
+
 #######################################################
 # Step 3 : Start a server which supports only the new api version.
 #######################################################
 
 KUBE_API_VERSIONS="${KUBE_NEW_API_VERSION}"
 RUNTIME_CONFIG="api/all=false,api/${KUBE_NEW_API_VERSION}=true"
+
+# This seems to reduce flakiness.
+sleep 1
 startApiServer
 
 # Verify that the server is able to read the object.
