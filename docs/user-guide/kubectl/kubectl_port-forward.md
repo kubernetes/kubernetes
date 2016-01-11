@@ -59,7 +59,7 @@ $ kubectl port-forward mypod 8888:5000
 $ kubectl port-forward mypod :5000
 
 # Listen on a random port locally, forwarding to 5000 in the pod
-$ kubectl port-forward  mypod 0:5000
+$ kubectl port-forward mypod 0:5000
 ```
 
 ### Options
