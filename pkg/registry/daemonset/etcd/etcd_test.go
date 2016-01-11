@@ -44,7 +44,7 @@ func newValidDaemonSet() *extensions.DaemonSet {
 		},
 		Spec: extensions.DaemonSetSpec{
 			Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
-			Template: &api.PodTemplateSpec{
+			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},
