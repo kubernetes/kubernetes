@@ -244,7 +244,7 @@ func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus, force
 	cachedStatus, isCached := m.podStatuses[pod.UID]
 	if isCached {
 		oldStatus = cachedStatus.status
-	} else if mirrorPod, ok := m.podManager.GetMirrorPodByPod(pod); ok {
+	} else if mirrorPod := m.podManager.GetMirrorOfStaticPod(pod); mirrorPod != nil {
 		oldStatus = mirrorPod.Status
 	} else {
 		oldStatus = pod.Status
@@ -320,28 +320,28 @@ func (m *manager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 // syncBatch syncs pods statuses with the apiserver.
 func (m *manager) syncBatch() {
 	var updatedStatuses []podStatusSyncRequest
-	podToMirror, mirrorToPod := m.podManager.GetUIDTranslations()
 	func() { // Critical section
 		m.podStatusesLock.RLock()
 		defer m.podStatusesLock.RUnlock()
 
 		// Clean up orphaned versions.
 		for uid := range m.apiStatusVersions {
-			_, hasPod := m.podStatuses[uid]
-			_, hasMirror := mirrorToPod[uid]
-			if !hasPod && !hasMirror {
+			// NOTE(random-liu): If a static pod doesn't have podStatuses, but has mirror pod,
+			// should we still keep it?
+			if _, hasPod := m.podStatuses[m.podManager.TranslatePodUID(uid)]; !hasPod {
 				delete(m.apiStatusVersions, uid)
 			}
 		}
 
 		for uid, status := range m.podStatuses {
 			syncedUID := uid
-			if mirrorUID, ok := podToMirror[uid]; ok {
-				syncedUID = mirrorUID
+			// NOTE(random-liu): Is this the same with the old implementation
+			if mirrorPod := m.podManager.GetMirrorPod(status.podName, status.podNamespace); mirrorPod != nil {
+				syncedUID = mirrorPod.UID
 			}
 			if m.needsUpdate(syncedUID, status) {
 				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status})
-			} else if m.needsReconcile(uid, status.status) {
+			} else if m.needsReconcile(syncedUID, status.status) {
 				// Delete the apiStatusVersions here to force an update on the pod status
 				// In most cases the deleted apiStatusVersions here should be filled
 				// soon after the following syncPod() [If the syncPod() sync an update
@@ -373,8 +373,8 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		return
 	}
 	if err == nil {
-		translatedUID := m.podManager.TranslatePodUID(pod.UID)
-		if len(translatedUID) > 0 && translatedUID != uid {
+		if m.podManager.TranslatePodUID(pod.UID) != uid {
+			// NOTE(random-liu): What does uid == "" mean? Why did we check len(translatedUID) > 0 here before?
 			glog.V(3).Infof("Pod %q was deleted and then recreated, skipping status update", format.Pod(pod))
 			m.deletePodStatus(uid)
 			return
@@ -423,25 +423,15 @@ func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
 // the apiserver. Now when pod status is inconsistent between apiserver and kubelet,
 // kubelet should forcibly send an update to reconclie the inconsistence, because kubelet
 // should be the source of truth of pod status.
-// NOTE(random-liu): It's simpler to pass in mirror pod uid and get mirror pod by uid, but
-// now the pod manager only supports getting mirror pod by static pod, so we have to pass
-// static pod uid here.
-// TODO(random-liu): Simplify the logic when mirror pod manager is added.
 func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
-	// The pod could be a static pod, so we should translate first.
 	pod, ok := m.podManager.GetPodByUID(uid)
 	if !ok {
+		// The pod could be a mirror pod.
+		pod = m.podManager.GetMirrorPodByUID(uid)
+	}
+	if pod == nil {
 		glog.V(4).Infof("Pod %q has been deleted, no need to reconcile", string(uid))
 		return false
-	}
-	// If the pod is a static pod, we should check its mirror pod, because only status in mirror pod is meaningful to us.
-	if kubepod.IsStaticPod(pod) {
-		mirrorPod, ok := m.podManager.GetMirrorPodByPod(pod)
-		if !ok {
-			glog.V(4).Infof("Static pod %q has no corresponding mirror pod, no need to reconcile", format.Pod(pod))
-			return false
-		}
-		pod = mirrorPod
 	}
 
 	podStatus, err := copyStatus(&pod.Status)

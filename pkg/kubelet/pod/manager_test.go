@@ -20,57 +20,42 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/kubernetes/pkg/api"
-	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
-// Stub out mirror client for testing purpose.
-func newTestManager() (*basicManager, *podtest.FakeMirrorClient) {
-	fakeMirrorClient := podtest.NewFakeMirrorClient()
-	manager := NewBasicPodManager(fakeMirrorClient).(*basicManager)
-	return manager, fakeMirrorClient
+func newTestManager() *basicManager {
+	return NewBasicPodManager(&fake.Clientset{}).(*basicManager)
 }
 
 // Tests that pods/maps are properly set after the pod update, and the basic
 // methods work correctly.
 func TestGetSetPods(t *testing.T) {
-	mirrorPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       "987654321",
-			Name:      "bar",
-			Namespace: "default",
-			Annotations: map[string]string{
-				kubetypes.ConfigSourceAnnotationKey: "api",
-				kubetypes.ConfigMirrorAnnotationKey: "mirror",
-			},
-		},
-	}
-	staticPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:         "123456789",
-			Name:        "bar",
-			Namespace:   "default",
-			Annotations: map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"},
-		},
-	}
-
-	expectedPods := []*api.Pod{
+	updates := []*api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
-				UID:         "999999999",
-				Name:        "taco",
-				Namespace:   "default",
-				Annotations: map[string]string{kubetypes.ConfigSourceAnnotationKey: "api"},
+				UID:       "123456789",
+				Name:      "bar",
+				Namespace: "default",
 			},
 		},
-		staticPod,
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "999999999",
+				Name:      "foo",
+				Namespace: "default",
+			},
+		},
 	}
-	updates := append(expectedPods, mirrorPod)
-	podManager, _ := newTestManager()
+	podManager := newTestManager()
 	podManager.SetPods(updates)
 
-	// Tests that all regular pods are recorded corrrectly.
+	// Tests that all regular pods are recorded correctly.
+	expectedPods := updates
 	actualPods := podManager.GetPods()
 	if len(actualPods) != len(expectedPods) {
 		t.Errorf("expected %d pods, got %d pods; expected pods %#v, got pods %#v", len(expectedPods), len(actualPods),
@@ -91,20 +76,58 @@ func TestGetSetPods(t *testing.T) {
 			t.Errorf("pod %q was not found in %#v", expected.UID, actualPods)
 		}
 	}
-	// Tests UID translation works as expected.
-	if uid := podManager.TranslatePodUID(mirrorPod.UID); uid != staticPod.UID {
-		t.Errorf("unable to translate UID %q to the static POD's UID %q; %#v",
-			mirrorPod.UID, staticPod.UID, podManager.mirrorPodByUID)
+
+	verifyGetMethods(t, podManager, updates[0], true)
+}
+
+func TestAddDeleteStaticPod(t *testing.T) {
+	// Static pod
+	staticPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:         "987654321",
+			Name:        "static",
+			Namespace:   "default",
+			Annotations: map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"},
+		},
+	}
+	updates := []*api.Pod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "123456789",
+				Name:      "bar",
+				Namespace: "default",
+			},
+		},
+		staticPod,
 	}
 
-	// Test the basic Get methods.
-	actualPod, ok := podManager.GetPodByFullName("bar_default")
-	if !ok || !reflect.DeepEqual(actualPod, staticPod) {
-		t.Errorf("unable to get pod by full name; expected: %#v, got: %#v", staticPod, actualPod)
-	}
-	actualPod, ok = podManager.GetPodByName("default", "bar")
-	if !ok || !reflect.DeepEqual(actualPod, staticPod) {
-		t.Errorf("unable to get pod by name; expected: %#v, got: %#v", staticPod, actualPod)
-	}
+	podManager := newTestManager()
 
+	// Test static pod are properly set
+	podManager.SetPods(updates)
+	assert.NoError(t, verifyChannel(podManager.mirrorPodManager, 1, 0))
+	verifyGetMethods(t, podManager, staticPod, true)
+
+	// Test static pod are properly deleted
+	podManager.DeletePod(staticPod)
+	assert.NoError(t, verifyChannel(podManager.mirrorPodManager, 0, 1))
+	verifyGetMethods(t, podManager, staticPod, false)
+}
+
+// Test the basic Get methods.
+func verifyGetMethods(t *testing.T, podManager *basicManager, pod *api.Pod, found bool) {
+	verifyPod := func(t *testing.T, actual, expected *api.Pod, ok, found bool) {
+		if found && (!ok || !reflect.DeepEqual(actual, expected)) {
+			t.Errorf("unable to get pod; expected: %#v, got: %#v", expected, actual)
+		}
+		if !found && ok {
+			t.Errorf("should not find pod; expected: %#v, got: %#v", expected, actual)
+		}
+	}
+	actualPod, ok := podManager.GetPodByFullName(kubecontainer.GetPodFullName(pod))
+	verifyPod(t, actualPod, pod, ok, found)
+	actualPod, ok = podManager.GetPodByName(pod.Namespace, pod.Name)
+	verifyPod(t, actualPod, pod, ok, found)
+	actualPod, ok = podManager.GetPodByUID(pod.UID)
+	verifyPod(t, actualPod, pod, ok, found)
 }

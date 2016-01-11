@@ -137,8 +137,7 @@ func (kl *Kubelet) getPodContainerDir(podUID types.UID, ctrName string) string {
 	return newPath
 }
 
-// GetPods returns all pods bound to the kubelet and their spec, and the mirror
-// pods.
+// GetPods returns all pods bound to the kubelet and their spec.
 func (kl *Kubelet) GetPods() []*api.Pod {
 	return kl.podManager.GetPods()
 }

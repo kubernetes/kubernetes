@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
-	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -60,8 +59,8 @@ func (m *manager) testSyncBatch() {
 		if ok {
 			pod.Status = status.status
 		}
-		pod, ok = m.podManager.GetMirrorPodByPod(pod)
-		if ok {
+		pod = m.podManager.GetMirrorOfStaticPod(pod)
+		if pod != nil {
 			pod.Status = status.status
 		}
 	}
@@ -69,7 +68,7 @@ func (m *manager) testSyncBatch() {
 }
 
 func newTestManager(kubeClient clientset.Interface) *manager {
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
+	podManager := kubepod.NewBasicPodManager(nil)
 	podManager.AddPod(getTestPod())
 	return NewManager(kubeClient, podManager).(*manager)
 }
@@ -486,7 +485,7 @@ func TestStaticPodStatus(t *testing.T) {
 	client := fake.NewSimpleClientset(mirrorPod)
 	m := newTestManager(client)
 	m.podManager.AddPod(staticPod)
-	m.podManager.AddPod(mirrorPod)
+	m.podManager.AddMirrorPod(mirrorPod)
 	// Verify setup.
 	assert.True(t, kubepod.IsStaticPod(staticPod), "SetUp error: staticPod")
 	assert.True(t, kubepod.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
@@ -519,10 +518,10 @@ func TestStaticPodStatus(t *testing.T) {
 	verifyActions(t, m.kubeClient, []core.Action{})
 
 	// Mirror pod identity changes.
-	m.podManager.DeletePod(mirrorPod)
+	m.podManager.DeleteMirrorPod(mirrorPod)
 	mirrorPod.UID = "new-mirror-pod"
 	mirrorPod.Status = api.PodStatus{}
-	m.podManager.AddPod(mirrorPod)
+	m.podManager.AddMirrorPod(mirrorPod)
 	// Expect update to new mirrorPod.
 	m.testSyncBatch()
 	verifyActions(t, m.kubeClient, []core.Action{
@@ -648,11 +647,12 @@ func TestSyncBatchCleanupVersions(t *testing.T) {
 
 	// Non-orphaned pods should not be removed.
 	m.SetPodStatus(testPod, getRandomPodStatus())
-	m.podManager.AddPod(mirrorPod)
+	m.podManager.AddMirrorPod(mirrorPod)
 	staticPod := mirrorPod
 	staticPod.UID = "static-uid"
 	staticPod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"}
 	m.podManager.AddPod(staticPod)
+	m.SetPodStatus(staticPod, getRandomPodStatus())
 	m.apiStatusVersions[testPod.UID] = 100
 	m.apiStatusVersions[mirrorPod.UID] = 200
 	m.testSyncBatch()
@@ -760,7 +760,7 @@ func TestDoNotDeleteMirrorPods(t *testing.T) {
 	client := fake.NewSimpleClientset(mirrorPod)
 	m := newTestManager(client)
 	m.podManager.AddPod(staticPod)
-	m.podManager.AddPod(mirrorPod)
+	m.podManager.AddMirrorPod(mirrorPod)
 	// Verify setup.
 	assert.True(t, kubepod.IsStaticPod(staticPod), "SetUp error: staticPod")
 	assert.True(t, kubepod.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
