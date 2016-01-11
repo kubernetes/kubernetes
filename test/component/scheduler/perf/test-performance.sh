@@ -20,7 +20,7 @@ set -o pipefail
 
 pushd "../../../.."
 source "./hack/lib/util.sh"
-source "./hack/lib/logging.sh"
+source "./cluster/lib/logging.sh"
 source "./hack/lib/etcd.sh"
 popd
 
