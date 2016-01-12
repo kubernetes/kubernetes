@@ -3701,41 +3701,42 @@ func TestGetNodeLabels(t *testing.T) {
 	kubelet := newTestKubelet(t).kubelet
 
 	testCases := []struct {
-		Expecting    map[string]string
-		LabelOptions []string
-		FileContent  string
-		Ok           bool
+		Expecting  map[string]string
+		NodeLabels string
+		Ok         bool
 	}{
 		{
-			Ok:           true,
-			Expecting:    map[string]string{"key1": "pair1", "key2": "pair2", "key3": "pair3", "key4": "pair4", "key5": "pair5"},
-			LabelOptions: []string{"key5=pair5"},
-			FileContent: `---
-key1: pair1
-key2: pair2
-key3: pair3
-key4: pair4
-`,
-		}, {
-			Ok:           true,
-			Expecting:    map[string]string{"key1": "pair1", "key2": "override"},
-			LabelOptions: []string{"key2=override"},
-			FileContent: `---
-key1: pair1
-key2: pair2
-`,
+			Expecting: map[string]string{"key1": "value1", "key2": "2", "key3": "3.3"},
+			NodeLabels: `---
+key1: value1
+key2: 2
+key3: 3.3`,
+			Ok: true,
+		},
+		{
+			Expecting: nil,
+			NodeLabels: `---
+key11: value11
+key12: 12
+key13: 13.3
+key14:
+  nested_key: nested_value`,
+			Ok: false,
+		},
+		{
+			Expecting:  map[string]string{"key21": "value21", "key22": "22", "key23": "23.3"},
+			NodeLabels: `{"key21": "value21", "key22": "22", "key23": "23.3"}`,
+			Ok:         true,
+		},
+		{
+			Expecting:  nil,
+			NodeLabels: `{"key31": "value31", "key32": "32", "key33": "33.3", "key34": {"nested_key": "nested_value"}}`,
+			Ok:         false,
 		},
 	}
 
 	for i, test := range testCases {
-		fd := createTestNodeLabelFile(t, test.FileContent)
-		defer func(f *os.File) {
-			os.Remove(f.Name())
-		}(fd)
-
-		kubelet.nodeLabels = test.LabelOptions
-		kubelet.nodeLabelsFile = fd.Name()
-
+		kubelet.nodeLabels = test.NodeLabels
 		list, err := kubelet.getNodeLabels()
 		if test.Ok && err != nil {
 			t.Errorf("test case %d should not have failed, error: %s", i, err)
@@ -3744,127 +3745,6 @@ key2: pair2
 			t.Errorf("test case %d are not the same, %v ~ %v", i, list, test.Expecting)
 		}
 	}
-}
-
-func TestRetrieveNodeLabels(t *testing.T) {
-	kubelet := newTestKubelet(t).kubelet
-
-	testCases := []struct {
-		Expecting    map[string]string
-		LabelOptions []string
-		Ok           bool
-	}{
-		{
-			Expecting:    map[string]string{"key1": "pair1", "key2": "pair2", "key3": "pair3", "key4": "pair4"},
-			LabelOptions: []string{"key1=pair1", "key2=pair2", "key3=pair3", "key4=pair4"},
-			Ok:           true,
-		},
-		{
-			Expecting:    map[string]string{"key1": "pair1"},
-			LabelOptions: []string{"key1=pair1", "key2paiwdsr2"},
-		},
-	}
-
-	for i, test := range testCases {
-		list, err := kubelet.retrieveNodeLabels(test.LabelOptions)
-		if test.Ok && err != nil {
-			t.Errorf("test case %d should not have failed, error: %s", i, err)
-		}
-		if !reflect.DeepEqual(test.Expecting, list) {
-			t.Errorf("test case %d are not the same, %v ~ %v", i, list, test.Expecting)
-		}
-	}
-}
-
-func TestRetrieveNodeLabelsFile(t *testing.T) {
-	kubelet := newTestKubelet(t).kubelet
-
-	testCases := []struct {
-		Expecting   map[string]string
-		Ok          bool
-		FileContent string
-	}{
-		{
-			Expecting: map[string]string{"key1": "pair1", "key2": "pair2", "key3": "pair3", "key4": "pair4"},
-			Ok:        true,
-			FileContent: `---
-key1: pair1
-key2: pair2
-key3: pair3
-key4: pair4`,
-		}, {
-			FileContent: `---
-key1: pair1
-hash_map:
-  key2: pair2
-`,
-		}, {
-			Expecting: map[string]string{"key1": "pair1", "key2": "pair2"},
-			Ok:        true,
-			FileContent: `
-
-key1: pair1
-key2: pair2
-`,
-		}, {
-			FileContent: `---
-key1: pair1
-bad_key_pair
-`,
-		}, {
-			Expecting: nil,
-			FileContent: `{
-	"key1": "pair1",
-	"key2": "pair2",
-	"key3": "pair3",
-	"key4": {
-		"some_key": "some_value"
-	}
-}`,
-		}, {
-			FileContent: "",
-		}, {
-			Expecting: map[string]string{"key1": "pair1", "key2": "pair2", "key3": "pair3", "key4": "pair4"},
-			Ok:        true,
-			FileContent: `---
-key1: pair1
-key2: pair2
-key3: pair3
-key4: pair4
-`,
-		},
-	}
-
-	for i, test := range testCases {
-		fd := createTestNodeLabelFile(t, test.FileContent)
-		defer func(f *os.File) {
-			os.Remove(f.Name())
-		}(fd)
-
-		labels, err := kubelet.retrieveNodeLabelsFile(fd.Name())
-		if test.Ok && err != nil {
-			t.Errorf("test case %d should not have returned an error, %s", i, err)
-			continue
-		}
-
-		if test.Expecting != nil && !reflect.DeepEqual(test.Expecting, labels) {
-			t.Errorf("test case %d not as expected, got: %#v, expecting: %#v", i, labels, test.Expecting)
-		}
-	}
-}
-
-func createTestNodeLabelFile(t *testing.T, content string) *os.File {
-	f, err := ioutil.TempFile("", "node_label_file")
-	if err != nil {
-		t.Fatalf("unexpected error creating node_label_file: %v", err)
-	}
-	f.Close()
-
-	if err := ioutil.WriteFile(f.Name(), []byte(content), 0700); err != nil {
-		t.Fatalf("unexpected error writing node label file: %v", err)
-	}
-
-	return f
 }
 
 func TestMakePortMappings(t *testing.T) {
