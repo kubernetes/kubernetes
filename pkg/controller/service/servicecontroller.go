@@ -343,7 +343,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 func (s *ServiceController) persistUpdate(service *api.Service) error {
 	var err error
 	for i := 0; i < clientRetryCount; i++ {
-		_, err = s.kubeClient.Services(service.Namespace).Update(service)
+		_, err = s.kubeClient.Services(service.Namespace).UpdateStatus(service)
 		if err == nil {
 			return nil
 		}

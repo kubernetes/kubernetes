@@ -1603,6 +1603,13 @@ func ValidateServiceUpdate(service, oldService *api.Service) field.ErrorList {
 	return allErrs
 }
 
+// ValidateServiceStatusUpdate tests if required fields in the Service are set when updating status.
+func ValidateServiceStatusUpdate(service, oldService *api.Service) field.ErrorList {
+	allErrs := ValidateObjectMetaUpdate(&service.ObjectMeta, &oldService.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateLoadBalancerStatus(&service.Status.LoadBalancer, field.NewPath("status", "loadBalancer"))...)
+	return allErrs
+}
+
 // ValidateReplicationController tests if required fields in the replication controller are set.
 func ValidateReplicationController(controller *api.ReplicationController) field.ErrorList {
 	allErrs := ValidateObjectMeta(&controller.ObjectMeta, true, ValidateReplicationControllerName, field.NewPath("metadata"))
