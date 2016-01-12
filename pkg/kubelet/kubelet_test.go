@@ -148,6 +148,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 
 	kubelet.containerRuntime = fakeRuntime
 	kubelet.runtimeCache = kubecontainer.NewFakeRuntimeCache(kubelet.containerRuntime)
+	kubelet.reasonCache = NewReasonCache()
 	kubelet.podWorkers = &fakePodWorkers{
 		syncPodFn:    kubelet.syncPod,
 		runtimeCache: kubelet.runtimeCache,

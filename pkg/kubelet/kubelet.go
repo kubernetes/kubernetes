@@ -441,6 +441,7 @@ func NewMainKubelet(
 		return nil, err
 	}
 	klet.runtimeCache = runtimeCache
+	klet.reasonCache = NewReasonCache()
 	klet.workQueue = queue.NewBasicWorkQueue()
 	klet.podWorkers = newPodWorkers(runtimeCache, klet.syncPod, recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
 
@@ -562,6 +563,10 @@ type Kubelet struct {
 
 	// Container runtime.
 	containerRuntime kubecontainer.Runtime
+
+	// reasonCache caches the failure reason of the last creation of all containers, which is
+	// used for generating ContainerStatus.
+	reasonCache *ReasonCache
 
 	// nodeStatusUpdateFrequency specifies how often kubelet posts node status to master.
 	// Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod
@@ -1676,8 +1681,8 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}
 
 	result := kl.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
-	err = result.Error()
-	if err != nil {
+	kl.reasonCache.Update(pod.UID, result)
+	if err = result.Error(); err != nil {
 		return err
 	}
 
