@@ -17,7 +17,6 @@ limitations under the License.
 package status
 
 import (
-	"reflect"
 	"sort"
 	"sync"
 	"time"
@@ -105,13 +104,12 @@ func NewManager(kubeClient client.Interface, podManager kubepod.Manager) Manager
 }
 
 // isStatusEqual returns true if the given pod statuses are equal, false otherwise.
-// This method sorts container statuses so order does not affect equality.
+// This method normalizes the status before comparing so as to make sure that meaningless
+// changes will be ignored.
 func isStatusEqual(oldStatus, status *api.PodStatus) bool {
-	sort.Sort(kubetypes.SortedContainerStatuses(status.ContainerStatuses))
-	sort.Sort(kubetypes.SortedContainerStatuses(oldStatus.ContainerStatuses))
-
-	// TODO: More sophisticated equality checking.
-	return reflect.DeepEqual(status, oldStatus)
+	normalizeStatus(oldStatus)
+	normalizeStatus(status)
+	return api.Semantic.DeepEqual(status, oldStatus)
 }
 
 func (m *manager) Start() {
@@ -329,6 +327,13 @@ func (m *manager) syncBatch() {
 			}
 			if m.needsUpdate(syncedUID, status) {
 				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status})
+			} else if m.needsReconcile(uid, status.status) {
+				// Delete the apiStatusVersions here to force an update on the pod status
+				// In most cases the deleted apiStatusVersions here should be filled
+				// soon after the following syncPod() [If the syncPod() sync an update
+				// successfully].
+				delete(m.apiStatusVersions, syncedUID)
+				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status})
 			}
 		}
 	}()
@@ -390,6 +395,82 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
 	latest, ok := m.apiStatusVersions[uid]
 	return !ok || latest < status.version
+}
+
+// needsReconcile compares the given status with the status in the pod manager (which
+// in fact comes from apiserver), returns whether the status needs to be reconciled with
+// the apiserver. Now when pod status is inconsistent between apiserver and kubelet,
+// kubelet should forcibly send an update to reconclie the inconsistence, because kubelet
+// should be the source of truth of pod status.
+// NOTE(random-liu): It's simpler to pass in mirror pod uid and get mirror pod by uid, but
+// now the pod manager only supports getting mirror pod by static pod, so we have to pass
+// static pod uid here.
+// TODO(random-liu): Simplify the logic when mirror pod manager is added.
+func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
+	// The pod could be a static pod, so we should translate first.
+	pod, ok := m.podManager.GetPodByUID(uid)
+	if !ok {
+		// Although we get uid from pod manager in syncBatch, it still could be deleted before here.
+		glog.V(4).Infof("Pod %q has been deleted, no need to reconcile", format.Pod(pod))
+		return false
+	}
+	// If the pod is a static pod, we should check its mirror pod, because only status in mirror pod is meaningful to us.
+	if kubepod.IsStaticPod(pod) {
+		mirrorPod, ok := m.podManager.GetMirrorPodByPod(pod)
+		if !ok {
+			glog.V(4).Infof("Static pod %q has no corresponding mirror pod, no need to reconcile", format.Pod(pod))
+			return false
+		}
+		pod = mirrorPod
+	}
+
+	if isStatusEqual(&pod.Status, &status) {
+		// If the status from the source is the same with the cached status,
+		// reconcile is not needed. Just return.
+		return false
+	}
+	glog.V(3).Infof("Pod status is inconsistent with cached status, a reconciliation should be triggered:\n %+v", util.ObjectDiff(pod.Status, status))
+
+	return true
+}
+
+// We add this function, because apiserver only supports *RFC3339* now, which means that the timestamp returned by
+// apiserver has no nanosecond infromation. However, the timestamp returned by unversioned.Now() contains nanosecond,
+// so when we do comparison between status from apiserver and cached status, isStatusEqual() will always return false.
+// There is related issue #15262 and PR #15263 about this.
+// In fact, the best way to solve this is to do it on api side. However for now, we normalize the status locally in
+// kubelet temporarily.
+// TODO(random-liu): Remove timestamp related logic after apiserver supports nanosecond or makes it consistent.
+func normalizeStatus(status *api.PodStatus) *api.PodStatus {
+	normalizeTimeStamp := func(t *unversioned.Time) {
+		*t = t.Rfc3339Copy()
+	}
+	normalizeContainerState := func(c *api.ContainerState) {
+		if c.Running != nil {
+			normalizeTimeStamp(&c.Running.StartedAt)
+		}
+		if c.Terminated != nil {
+			normalizeTimeStamp(&c.Terminated.StartedAt)
+			normalizeTimeStamp(&c.Terminated.FinishedAt)
+		}
+	}
+
+	if status.StartTime != nil {
+		normalizeTimeStamp(status.StartTime)
+	}
+	for i := range status.Conditions {
+		condition := &status.Conditions[i]
+		normalizeTimeStamp(&condition.LastProbeTime)
+		normalizeTimeStamp(&condition.LastTransitionTime)
+	}
+	for i := range status.ContainerStatuses {
+		cstatus := &status.ContainerStatuses[i]
+		normalizeContainerState(&cstatus.State)
+		normalizeContainerState(&cstatus.LastTerminationState)
+	}
+	// Sort the container statuses, so that the order won't affect the result of comparison
+	sort.Sort(kubetypes.SortedContainerStatuses(status.ContainerStatuses))
+	return status
 }
 
 // notRunning returns true if every status is terminated or waiting, or the status list
