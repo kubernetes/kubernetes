@@ -22,8 +22,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// DeploymentNamespacer has methods to work with Deployment resources in a namespace
-type DeploymentNamespacer interface {
+// DeploymentsGetter has a method to return a DeploymentInterface.
+// A group's client should implement this interface.
+type DeploymentsGetter interface {
 	Deployments(namespace string) DeploymentInterface
 }
 

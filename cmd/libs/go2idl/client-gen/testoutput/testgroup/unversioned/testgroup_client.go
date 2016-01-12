@@ -23,7 +23,7 @@ import (
 )
 
 type TestgroupInterface interface {
-	TestTypeNamespacer
+	TestTypesGetter
 }
 
 // TestgroupClient is used to interact with features provided by the Testgroup group.

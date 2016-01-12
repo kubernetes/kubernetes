@@ -66,6 +66,7 @@ func hasStatus(t *types.Type) bool {
 func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	pkg := filepath.Base(t.Name.Package)
+	namespaced := !(types.ExtractCommentTags("+", t.SecondClosestCommentLines)["nonNamespaced"] == "true")
 	m := map[string]interface{}{
 		"type":             t,
 		"package":          pkg,
@@ -74,16 +75,28 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"watchInterface":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
 		"apiDeleteOptions": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
 		"apiListOptions":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
+		"namespaced":       namespaced,
 	}
-	sw.Do(namespacerTemplate, m)
+
+	sw.Do(getterComment, m)
+	if namespaced {
+		sw.Do(getterNamesapced, m)
+	} else {
+		sw.Do(getterNonNamesapced, m)
+	}
 	sw.Do(interfaceTemplate1, m)
 	// Include the UpdateStatus method if the type has a status
 	if hasStatus(t) {
 		sw.Do(interfaceUpdateStatusTemplate, m)
 	}
 	sw.Do(interfaceTemplate2, m)
-	sw.Do(structTemplate, m)
-	sw.Do(newStructTemplate, m)
+	if namespaced {
+		sw.Do(structNamespaced, m)
+		sw.Do(newStructNamespaced, m)
+	} else {
+		sw.Do(structNonNamespaced, m)
+		sw.Do(newStructNonNamespaced, m)
+	}
 	sw.Do(createTemplate, m)
 	sw.Do(updateTemplate, m)
 	// Generate the UpdateStatus method if the type has a status
@@ -99,15 +112,24 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	return sw.Error()
 }
 
-// template for namespacer
-var namespacerTemplate = `
-// $.type|public$Namespacer has methods to work with $.type|public$ resources in a namespace
-type $.type|public$Namespacer interface {
+// group client will implement this interface.
+var getterComment = `
+// $.type|publicPlural$Getter has a method to return a $.type|public$Interface. 
+// A group's client should implement this interface.`
+
+var getterNamesapced = `
+type $.type|publicPlural$Getter interface {
 	$.type|publicPlural$(namespace string) $.type|public$Interface
 }
 `
 
-// template for the Interface
+var getterNonNamesapced = `
+type $.type|publicPlural$Getter interface {
+	$.type|publicPlural$() $.type|public$Interface
+}
+`
+
+// this type's interface, typed client will implement this interface.
 var interfaceTemplate1 = `
 // $.type|public$Interface has methods to work with $.type|public$ resources.
 type $.type|public$Interface interface {
@@ -128,15 +150,24 @@ var interfaceTemplate2 = `
 }
 `
 
-// template for the struct that implements the interface
-var structTemplate = `
+// template for the struct that implements the type's interface
+var structNamespaced = `
 // $.type|privatePlural$ implements $.type|public$Interface
 type $.type|privatePlural$ struct {
 	client *$.Group$Client
 	ns     string
 }
 `
-var newStructTemplate = `
+
+// template for the struct that implements the type's interface
+var structNonNamespaced = `
+// $.type|privatePlural$ implements $.type|public$Interface
+type $.type|privatePlural$ struct {
+	client *$.Group$Client
+}
+`
+
+var newStructNamespaced = `
 // new$.type|publicPlural$ returns a $.type|publicPlural$
 func new$.type|publicPlural$(c *$.Group$Client, namespace string) *$.type|privatePlural$ {
 	return &$.type|privatePlural${
@@ -145,12 +176,22 @@ func new$.type|publicPlural$(c *$.Group$Client, namespace string) *$.type|privat
 	}
 }
 `
+
+var newStructNonNamespaced = `
+// new$.type|publicPlural$ returns a $.type|publicPlural$
+func new$.type|publicPlural$(c *$.Group$Client) *$.type|privatePlural$ {
+	return &$.type|privatePlural${
+		client: c,
+	}
+}
+`
+
 var listTemplate = `
 // List takes label and field selectors, and returns the list of $.type|publicPlural$ that match those selectors.
 func (c *$.type|privatePlural$) List(opts $.apiListOptions|raw$) (result *$.type|raw$List, err error) {
 	result = &$.type|raw$List{}
 	err = c.client.Get().
-		Namespace(c.ns).
+		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|privatePlural$").
 		VersionedParams(&opts, api.Scheme).
 		Do().
@@ -163,7 +204,7 @@ var getTemplate = `
 func (c *$.type|privatePlural$) Get(name string) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
 	err = c.client.Get().
-		Namespace(c.ns).
+		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|privatePlural$").
 		Name(name).
 		Do().
@@ -176,7 +217,7 @@ var deleteTemplate = `
 // Delete takes name of the $.type|private$ and deletes it. Returns an error if one occurs.
 func (c *$.type|privatePlural$) Delete(name string, options *$.apiDeleteOptions|raw$) error {
 	return c.client.Delete().
-		Namespace(c.ns).
+		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|privatePlural$").
 		Name(name).
 		Body(options).
@@ -189,7 +230,7 @@ var deleteCollectionTemplate = `
 // DeleteCollection deletes a collection of objects.
 func (c *$.type|privatePlural$) DeleteCollection(options *$.apiDeleteOptions|raw$, listOptions $.apiListOptions|raw$) error {
 	return c.client.Delete().
-		Namespace(c.ns).
+		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|privatePlural$").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
@@ -203,7 +244,7 @@ var createTemplate = `
 func (c *$.type|privatePlural$) Create($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
 	err = c.client.Post().
-		Namespace(c.ns).
+		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|privatePlural$").
 		Body($.type|private$).
 		Do().
@@ -217,7 +258,7 @@ var updateTemplate = `
 func (c *$.type|privatePlural$) Update($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
 	err = c.client.Put().
-		Namespace(c.ns).
+		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|privatePlural$").
 		Name($.type|private$.Name).
 		Body($.type|private$).
@@ -240,7 +281,7 @@ var watchTemplate = `
 func (c *$.type|privatePlural$) Watch(opts $.apiListOptions|raw$) ($.watchInterface|raw$, error) {
 	return c.client.Get().
 		Prefix("watch").
-		Namespace(c.ns).
+		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|privatePlural$").
 		VersionedParams(&opts, api.Scheme).
 		Watch()

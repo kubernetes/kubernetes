@@ -21,8 +21,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// PodNamespacer has methods to work with Pod resources in a namespace
-type PodNamespacer interface {
+// PodsGetter has a method to return a PodInterface.
+// A group's client should implement this interface.
+type PodsGetter interface {
 	Pods(namespace string) PodInterface
 }
 

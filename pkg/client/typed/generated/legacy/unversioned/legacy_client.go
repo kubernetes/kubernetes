@@ -23,21 +23,21 @@ import (
 )
 
 type LegacyInterface interface {
-	ComponentStatusNamespacer
-	EndpointsNamespacer
-	EventNamespacer
-	LimitRangeNamespacer
-	NamespaceNamespacer
-	NodeNamespacer
-	PersistentVolumeNamespacer
-	PersistentVolumeClaimNamespacer
-	PodNamespacer
-	PodTemplateNamespacer
-	ReplicationControllerNamespacer
-	ResourceQuotaNamespacer
-	SecretNamespacer
-	ServiceNamespacer
-	ServiceAccountNamespacer
+	ComponentStatusGetter
+	EndpointsGetter
+	EventsGetter
+	LimitRangesGetter
+	NamespacesGetter
+	NodesGetter
+	PersistentVolumesGetter
+	PersistentVolumeClaimsGetter
+	PodsGetter
+	PodTemplatesGetter
+	ReplicationControllersGetter
+	ResourceQuotasGetter
+	SecretsGetter
+	ServicesGetter
+	ServiceAccountsGetter
 }
 
 // LegacyClient is used to interact with features provided by the Legacy group.
@@ -45,8 +45,8 @@ type LegacyClient struct {
 	*unversioned.RESTClient
 }
 
-func (c *LegacyClient) ComponentStatus(namespace string) ComponentStatusInterface {
-	return newComponentStatus(c, namespace)
+func (c *LegacyClient) ComponentStatus() ComponentStatusInterface {
+	return newComponentStatus(c)
 }
 
 func (c *LegacyClient) Endpoints(namespace string) EndpointsInterface {
@@ -61,16 +61,16 @@ func (c *LegacyClient) LimitRanges(namespace string) LimitRangeInterface {
 	return newLimitRanges(c, namespace)
 }
 
-func (c *LegacyClient) Namespaces(namespace string) NamespaceInterface {
-	return newNamespaces(c, namespace)
+func (c *LegacyClient) Namespaces() NamespaceInterface {
+	return newNamespaces(c)
 }
 
-func (c *LegacyClient) Nodes(namespace string) NodeInterface {
-	return newNodes(c, namespace)
+func (c *LegacyClient) Nodes() NodeInterface {
+	return newNodes(c)
 }
 
-func (c *LegacyClient) PersistentVolumes(namespace string) PersistentVolumeInterface {
-	return newPersistentVolumes(c, namespace)
+func (c *LegacyClient) PersistentVolumes() PersistentVolumeInterface {
+	return newPersistentVolumes(c)
 }
 
 func (c *LegacyClient) PersistentVolumeClaims(namespace string) PersistentVolumeClaimInterface {

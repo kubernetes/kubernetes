@@ -21,8 +21,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// PodTemplateNamespacer has methods to work with PodTemplate resources in a namespace
-type PodTemplateNamespacer interface {
+// PodTemplatesGetter has a method to return a PodTemplateInterface.
+// A group's client should implement this interface.
+type PodTemplatesGetter interface {
 	PodTemplates(namespace string) PodTemplateInterface
 }
 

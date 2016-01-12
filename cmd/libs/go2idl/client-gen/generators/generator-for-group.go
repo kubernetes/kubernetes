@@ -89,7 +89,13 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 			"type":  t,
 			"Group": namer.IC(g.group),
 		}
-		sw.Do(namespacerImplTemplate, wrapper)
+		namespaced := !(types.ExtractCommentTags("+", t.SecondClosestCommentLines)["nonNamespaced"] == "true")
+		if namespaced {
+			sw.Do(getterImplNamespaced, wrapper)
+		} else {
+			sw.Do(getterImplNonNamespaced, wrapper)
+
+		}
 	}
 	sw.Do(newClientForConfigTemplate, m)
 	sw.Do(newClientForConfigOrDieTemplate, m)
@@ -101,7 +107,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 
 var groupInterfaceTemplate = `
 type $.Group$Interface interface {
-    $range .types$ $.Name.Name$Namespacer
+    $range .types$ $.|publicPlural$Getter
     $end$
 }
 `
@@ -113,9 +119,15 @@ type $.Group$Client struct {
 }
 `
 
-var namespacerImplTemplate = `
-func (c *$.Group$Client) $.type|publicPlural$(namespace string) $.type.Name.Name$Interface {
+var getterImplNamespaced = `
+func (c *$.Group$Client) $.type|publicPlural$(namespace string) $.type|public$Interface {
 	return new$.type|publicPlural$(c, namespace)
+}
+`
+
+var getterImplNonNamespaced = `
+func (c *$.Group$Client) $.type|publicPlural$() $.type|public$Interface {
+	return new$.type|publicPlural$(c)
 }
 `
 
