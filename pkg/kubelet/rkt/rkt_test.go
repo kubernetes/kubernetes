@@ -294,21 +294,25 @@ func TestListImages(t *testing.T) {
 					Id:      "sha512-a2fb8f390702",
 					Name:    "quay.io/coreos/alpine-sh",
 					Version: "latest",
+					Size:    400,
 				},
 				{
 					Id:      "sha512-c6b597f42816",
 					Name:    "coreos.com/rkt/stage1-coreos",
 					Version: "0.10.0",
+					Size:    400,
 				},
 			},
 			[]kubecontainer.Image{
 				{
 					ID:       "sha512-a2fb8f390702",
 					RepoTags: []string{"quay.io/coreos/alpine-sh:latest"},
+					Size:     400,
 				},
 				{
 					ID:       "sha512-c6b597f42816",
 					RepoTags: []string{"coreos.com/rkt/stage1-coreos:0.10.0"},
+					Size:     400,
 				},
 			},
 		},
