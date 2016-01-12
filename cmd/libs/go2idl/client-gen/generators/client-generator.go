@@ -26,9 +26,28 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 
 	"github.com/golang/glog"
 )
+
+// ClientGenArgs is a wrapper for arguments to client-gen.
+type ClientGenArgs struct {
+	// TODO: we should make another type declaration of GroupVersion out of the
+	// unversioned package, which is part of our API. Tools like client-gen
+	// shouldn't depend on an API.
+	GroupVersions []unversioned.GroupVersion
+	// ClientsetName is the name of the clientset to be generated. It's
+	// populated from command-line arguments.
+	ClientsetName string
+	// ClientsetOutputPath is the path the clientset will be generated at. It's
+	// populated from command-line arguments.
+	ClientsetOutputPath string
+	// ClientsetOnly determines if we should generate the clients for groups and
+	// types along with the clientset. It's populated from command-line
+	// arguments.
+	ClientsetOnly bool
+}
 
 // NameSystems returns the name system used by the generators in this package.
 func NameSystems() namer.NameSystems {
@@ -110,6 +129,33 @@ func packageForGroup(group string, version string, typeList []*types.Type, packa
 	}
 }
 
+func packageForClientset(customArgs ClientGenArgs, typedClientBasePath string, boilerplate []byte) generator.Package {
+	return &generator.DefaultPackage{
+		PackageName: customArgs.ClientsetName,
+		PackagePath: filepath.Join(customArgs.ClientsetOutputPath, customArgs.ClientsetName),
+		HeaderText:  boilerplate,
+		PackageDocumentation: []byte(
+			`// This package has the automatically generated clientset.
+`),
+		// GeneratorFunc returns a list of generators. Each generator generates a
+		// single file.
+		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+			generators = []generator.Generator{
+				&genClientset{
+					DefaultGen: generator.DefaultGen{
+						OptionalName: "clientset",
+					},
+					groupVersions:   customArgs.GroupVersions,
+					typedClientPath: typedClientBasePath,
+					outputPackage:   customArgs.ClientsetName,
+					imports:         generator.NewImportTracker(),
+				},
+			}
+			return generators
+		},
+	}
+}
+
 // Packages makes the client package definition.
 func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
 	boilerplate, err := arguments.LoadGoBoilerplate()
@@ -136,11 +182,20 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 	}
 
-	var packageList []generator.Package
-	orderer := namer.Orderer{namer.NewPrivateNamer(0)}
-	for group, types := range groupToTypes {
-		packageList = append(packageList, packageForGroup(group, "unversioned", orderer.OrderTypes(types), arguments.OutputPackagePath, arguments.OutputBase, boilerplate))
+	customArgs, ok := arguments.CustomArgs.(ClientGenArgs)
+	if !ok {
+		glog.Fatalf("cannot convert arguments.CustomArgs to ClientGenArgs")
 	}
 
+	var packageList []generator.Package
+	// If --clientset-only=true, we don't regenerate the individual typed clients.
+	if !customArgs.ClientsetOnly {
+		orderer := namer.Orderer{namer.NewPrivateNamer(0)}
+		for group, types := range groupToTypes {
+			packageList = append(packageList, packageForGroup(group, "unversioned", orderer.OrderTypes(types), arguments.OutputPackagePath, arguments.OutputBase, boilerplate))
+		}
+	}
+
+	packageList = append(packageList, packageForClientset(customArgs, arguments.OutputPackagePath, boilerplate))
 	return generator.Packages(packageList)
 }
