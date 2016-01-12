@@ -704,6 +704,7 @@ function kube::release::package_server_tarballs() {
   local platform
   for platform in "${KUBE_SERVER_PLATFORMS[@]}" ; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
+    local arch=$(basename ${platform})
     kube::log::status "Building tarball: server $platform_tag"
 
     local release_stage="${RELEASE_STAGE}/server/${platform_tag}/kubernetes"
@@ -717,7 +718,7 @@ function kube::release::package_server_tarballs() {
     cp "${KUBE_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
 
-    kube::release::create_docker_images_for_server "${release_stage}/server/bin";
+    kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
     kube::release::write_addon_docker_images_for_server "${release_stage}/addons"
 
     # Include the client binaries here too as they are useful debugging tools.
@@ -755,12 +756,14 @@ function kube::release::sha1() {
 # that wrap the binary in them. (One docker image per binary)
 # Args:
 #  $1 - binary_dir, the directory to save the tared images to.
+#  $2 - arch, architecture for which we are building docker images.
 # Globals:
 #   KUBE_DOCKER_WRAPPED_BINARIES
 function kube::release::create_docker_images_for_server() {
   # Create a sub-shell so that we don't pollute the outer environment
   (
     local binary_dir="$1"
+    local arch="$2"
     local binary_name
     for wrappable in "${KUBE_DOCKER_WRAPPED_BINARIES[@]}"; do
 
@@ -788,11 +791,19 @@ function kube::release::create_docker_images_for_server() {
         printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
 
         local docker_image_tag=gcr.io/google_containers/$binary_name:$md5_sum
-        docker build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
-        docker save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
+        "${DOCKER[@]}" build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
+        "${DOCKER[@]}" save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
         echo $md5_sum > ${binary_dir}/${binary_name}.docker_tag
 
         rm -rf ${docker_build_path}
+
+        # If we are building an official/alpha/beta release we want to keep docker images
+        # and tag them appropriately.
+        if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
+          local release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
+          kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
+          "${DOCKER[@]}" tag -f "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
+        fi
 
         kube::log::status "Deleting docker image ${docker_image_tag}"
         "${DOCKER[@]}" rmi ${docker_image_tag} 2>/dev/null || true
@@ -1429,4 +1440,42 @@ function kube::release::gcs::publish() {
     kube::log::error "Expected contents of file to be ${KUBE_GCS_PUBLISH_VERSION}, but got ${contents}"
     return 1
   fi
+}
+
+# ---------------------------------------------------------------------------
+# Docker Release
+
+# Releases all docker images to a docker registry specified by KUBE_DOCKER_REGISTRY
+# using tag KUBE_DOCKER_IMAGE_TAG.
+#
+# Globals:
+#   KUBE_DOCKER_REGISTRY
+#   KUBE_DOCKER_IMAGE_TAG
+# Returns:
+#   If new pushing docker images was successful.
+function kube::release::docker::release() {
+  local binaries=(
+    "kube-apiserver"
+    "kube-controller-manager"
+    "kube-scheduler"
+    "kube-proxy"
+    "hyperkube"
+  )
+
+  local archs=(
+    "amd64"
+  )
+
+  local docker_push_cmd=("docker")
+  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
+    docker_push_cmd=("gcloud" "docker")
+  fi
+
+  for arch in "${archs[@]}"; do
+    for binary in "${binaries[@]}"; do
+      local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
+      kube::log::status "Pushing ${binary} to ${docker_target}"
+      "${docker_push_cmd[@]}" push "${docker_target}"
+    done
+  done
 }
