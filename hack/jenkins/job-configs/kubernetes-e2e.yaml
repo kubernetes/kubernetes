@@ -13,7 +13,8 @@
         - junit-publisher
         - gcs-uploader
         - log-parser
-        - email-ext
+        - email-ext:
+            recipients: "{emails}"
     triggers:
         - reverse:
             jobs: '{trigger-job}'
@@ -29,7 +30,7 @@
         - workspace-cleanup
 
 - project:
-    name: kubernetes-e2e
+    name: kubernetes-e2e-gce-master
     trigger-job: 'kubernetes-build'
     test-owner: 'Build Cop'
     branch: 'master'
@@ -61,6 +62,16 @@
         - 'gce-flannel':
             description: 'Run E2E tests on GCE using Flannel and the latest successful build. This suite is quarantined in a dedicated project because Flannel integration is experimental.'
             timeout: 90
+    jobs:
+        - 'kubernetes-e2e-{suffix}'
+
+- project:
+    name: kubernetes-e2e-gke-master
+    trigger-job: 'kubernetes-build'
+    test-owner: 'GKE on-call'
+    branch: 'master'
+    emails: '$DEFAULT_RECIPIENTS, cloud-kubernetes-alerts@google.com'
+    suffix:
         - 'gke-ci':
             description: |
                 Run e2e tests using the following config:<br>
@@ -81,5 +92,100 @@
                 - cluster (k8s): ci/latest.txt<br>
                 - tests: ci/latest.txt
             timeout: 120
+        - 'gke-flaky':
+            description: |
+                Run flaky e2e tests using the following config:<br>
+                - provider: GKE<br>
+                - apiary: staging<br>
+                - borg job: test<br>
+                - client (kubectl): ci/latest.txt<br>
+                - cluster (k8s): ci/latest.txt<br>
+                - tests: ci/latest.txt
+            timeout: 300
+    jobs:
+        - 'kubernetes-e2e-{suffix}'
+
+- project:
+    name: kubernetes-e2e-gke-1.1
+    trigger-job: 'kubernetes-build-1.1'
+    test-owner: 'GKE on-call'
+    branch: 'release-1.1'
+    emails: '$DEFAULT_RECIPIENTS, cloud-kubernetes-alerts@google.com'
+    suffix:
+        - 'gke-1.1':
+            timeout: 150
+            description: 'Run E2E tests on GKE from the current release branch.'
+        - 'gke-prod':
+            timeout: 180
+            description: |
+                Run e2e tests using the following config:<br>
+                - provider: GKE<br>
+                - apiary: prod<br>
+                - borg job: prod<br>
+                - client (kubectl): release/stable.txt<br>
+                - cluster (k8s): release/stable.txt<br>
+                - tests: release/stable.txt
+        - 'gke-staging':
+            timeout: 300
+            description: |
+                Run e2e tests using the following config:<br>
+                - provider: GKE<br>
+                - apiary: staging<br>
+                - borg job: staging<br>
+                - client (kubectl): release/stable.txt<br>
+                - cluster (k8s): release/stable.txt<br>
+                - tests: release/stable.txt
+        - 'gke-subnet':
+            test-owner: 'cjcullen'
+            timeout: 300
+            description: |
+                Run e2e tests using the following config:<br>
+                - provider: GKE<br>
+                - apiary: prod<br>
+                - borg job: prod<br>
+                - client (kubectl): release/stable.txt<br>
+                - cluster (k8s): release/stable.txt<br>
+                - tests: release/stable.txt
+            emails: 'cjcullen@google.com'
+        - 'gke-test':
+            timeout: 300
+            description: |
+                Run e2e tests using the following config:<br>
+                - provider: GKE<br>
+                - apiary: staging<br>
+                - borg job: test<br>
+                - client (kubectl): release/stable.txt<br>
+                - cluster (k8s): release/stable.txt<br>
+                - tests: release/stable.txt
+    jobs:
+        - 'kubernetes-e2e-{suffix}'
+
+- project:
+    name: kubernetes-e2e-gce-1.1
+    trigger-job: 'kubernetes-build-1.1'
+    test-owner: 'Build Cop'
+    branch: 'release-1.1'
+    suffix:
+        - 'gce-release-1.1':
+            timeout: 175
+            description: 'Run E2E tests on GCE from the current release branch.'
+        - 'gce-disruptive-1.1':
+            timeout: 180
+            description: 'Run disruptive E2E tests on GCE from the current release branch.'
+        - 'gce-scalability-1.1':
+            timeout: 210
+            description: 'Run scalability E2E tests on GCE from the current release branch.'
+    jobs:
+        - 'kubernetes-e2e-{suffix}'
+
+- project:
+    name: kubernetes-e2e-1.0
+    trigger-job: 'kubernetes-build-1.0'
+    test-owner: 'Build Cop'
+    branch: 'release-1.0'
+    suffix:
+        - 'gce-release-1.0':
+            timeout: 150
+            description: 'Run E2E tests on GCE from the release-1.0 branch.'
     jobs:
         - 'kubernetes-e2e-{suffix}'
