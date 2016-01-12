@@ -30007,7 +30007,7 @@ func (x *NodeStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 		} else {
 			yysep2347 := !z.EncBinary()
 			yy2arr2347 := z.EncBasicHandle().StructToArray
-			var yyq2347 [7]bool
+			var yyq2347 [8]bool
 			_, _, _ = yysep2347, yyq2347, yy2arr2347
 			const yyr2347 bool = false
 			yyq2347[0] = len(x.Capacity) != 0
@@ -30019,9 +30019,9 @@ func (x *NodeStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 			yyq2347[6] = true
 			var yynn2347 int
 			if yyr2347 || yy2arr2347 {
-				r.EncodeArrayStart(7)
+				r.EncodeArrayStart(8)
 			} else {
-				yynn2347 = 0
+				yynn2347 = 1
 				for _, b := range yyq2347 {
 					if b {
 						yynn2347++
@@ -30192,6 +30192,33 @@ func (x *NodeStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 				}
 			}
 			if yyr2347 || yy2arr2347 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if x.Images == nil {
+					r.EncodeNil()
+				} else {
+					yym2364 := z.EncBinary()
+					_ = yym2364
+					if false {
+					} else {
+						h.encSliceContainerImage(([]ContainerImage)(x.Images), e)
+					}
+				}
+			} else {
+				z.EncSendContainerState(codecSelfer_containerMapKey1234)
+				r.EncodeString(codecSelferC_UTF81234, string("images"))
+				z.EncSendContainerState(codecSelfer_containerMapValue1234)
+				if x.Images == nil {
+					r.EncodeNil()
+				} else {
+					yym2365 := z.EncBinary()
+					_ = yym2365
+					if false {
+					} else {
+						h.encSliceContainerImage(([]ContainerImage)(x.Images), e)
+					}
+				}
+			}
+			if yyr2347 || yy2arr2347 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -30204,25 +30231,25 @@ func (x *NodeStatus) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2363 := z.DecBinary()
-	_ = yym2363
+	yym2366 := z.DecBinary()
+	_ = yym2366
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2364 := r.ContainerType()
-		if yyct2364 == codecSelferValueTypeMap1234 {
-			yyl2364 := r.ReadMapStart()
-			if yyl2364 == 0 {
+		yyct2367 := r.ContainerType()
+		if yyct2367 == codecSelferValueTypeMap1234 {
+			yyl2367 := r.ReadMapStart()
+			if yyl2367 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2364, d)
+				x.codecDecodeSelfFromMap(yyl2367, d)
 			}
-		} else if yyct2364 == codecSelferValueTypeArray1234 {
-			yyl2364 := r.ReadArrayStart()
-			if yyl2364 == 0 {
+		} else if yyct2367 == codecSelferValueTypeArray1234 {
+			yyl2367 := r.ReadArrayStart()
+			if yyl2367 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2364, d)
+				x.codecDecodeSelfFromArray(yyl2367, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -30234,12 +30261,12 @@ func (x *NodeStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2365Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2365Slc
-	var yyhl2365 bool = l >= 0
-	for yyj2365 := 0; ; yyj2365++ {
-		if yyhl2365 {
-			if yyj2365 >= l {
+	var yys2368Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2368Slc
+	var yyhl2368 bool = l >= 0
+	for yyj2368 := 0; ; yyj2368++ {
+		if yyhl2368 {
+			if yyj2368 >= l {
 				break
 			}
 		} else {
@@ -30248,23 +30275,23 @@ func (x *NodeStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2365Slc = r.DecodeBytes(yys2365Slc, true, true)
-		yys2365 := string(yys2365Slc)
+		yys2368Slc = r.DecodeBytes(yys2368Slc, true, true)
+		yys2368 := string(yys2368Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2365 {
+		switch yys2368 {
 		case "capacity":
 			if r.TryDecodeAsNil() {
 				x.Capacity = nil
 			} else {
-				yyv2366 := &x.Capacity
-				yyv2366.CodecDecodeSelf(d)
+				yyv2369 := &x.Capacity
+				yyv2369.CodecDecodeSelf(d)
 			}
 		case "allocatable":
 			if r.TryDecodeAsNil() {
 				x.Allocatable = nil
 			} else {
-				yyv2367 := &x.Allocatable
-				yyv2367.CodecDecodeSelf(d)
+				yyv2370 := &x.Allocatable
+				yyv2370.CodecDecodeSelf(d)
 			}
 		case "phase":
 			if r.TryDecodeAsNil() {
@@ -30276,44 +30303,56 @@ func (x *NodeStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Conditions = nil
 			} else {
-				yyv2369 := &x.Conditions
-				yym2370 := z.DecBinary()
-				_ = yym2370
+				yyv2372 := &x.Conditions
+				yym2373 := z.DecBinary()
+				_ = yym2373
 				if false {
 				} else {
-					h.decSliceNodeCondition((*[]NodeCondition)(yyv2369), d)
+					h.decSliceNodeCondition((*[]NodeCondition)(yyv2372), d)
 				}
 			}
 		case "addresses":
 			if r.TryDecodeAsNil() {
 				x.Addresses = nil
 			} else {
-				yyv2371 := &x.Addresses
-				yym2372 := z.DecBinary()
-				_ = yym2372
+				yyv2374 := &x.Addresses
+				yym2375 := z.DecBinary()
+				_ = yym2375
 				if false {
 				} else {
-					h.decSliceNodeAddress((*[]NodeAddress)(yyv2371), d)
+					h.decSliceNodeAddress((*[]NodeAddress)(yyv2374), d)
 				}
 			}
 		case "daemonEndpoints":
 			if r.TryDecodeAsNil() {
 				x.DaemonEndpoints = NodeDaemonEndpoints{}
 			} else {
-				yyv2373 := &x.DaemonEndpoints
-				yyv2373.CodecDecodeSelf(d)
+				yyv2376 := &x.DaemonEndpoints
+				yyv2376.CodecDecodeSelf(d)
 			}
 		case "nodeInfo":
 			if r.TryDecodeAsNil() {
 				x.NodeInfo = NodeSystemInfo{}
 			} else {
-				yyv2374 := &x.NodeInfo
-				yyv2374.CodecDecodeSelf(d)
+				yyv2377 := &x.NodeInfo
+				yyv2377.CodecDecodeSelf(d)
+			}
+		case "images":
+			if r.TryDecodeAsNil() {
+				x.Images = nil
+			} else {
+				yyv2378 := &x.Images
+				yym2379 := z.DecBinary()
+				_ = yym2379
+				if false {
+				} else {
+					h.decSliceContainerImage((*[]ContainerImage)(yyv2378), d)
+				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2365)
-		} // end switch yys2365
-	} // end for yyj2365
+			z.DecStructFieldNotFound(-1, yys2368)
+		} // end switch yys2368
+	} // end for yyj2368
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -30321,16 +30360,16 @@ func (x *NodeStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2375 int
-	var yyb2375 bool
-	var yyhl2375 bool = l >= 0
-	yyj2375++
-	if yyhl2375 {
-		yyb2375 = yyj2375 > l
+	var yyj2380 int
+	var yyb2380 bool
+	var yyhl2380 bool = l >= 0
+	yyj2380++
+	if yyhl2380 {
+		yyb2380 = yyj2380 > l
 	} else {
-		yyb2375 = r.CheckBreak()
+		yyb2380 = r.CheckBreak()
 	}
-	if yyb2375 {
+	if yyb2380 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -30338,16 +30377,16 @@ func (x *NodeStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Capacity = nil
 	} else {
-		yyv2376 := &x.Capacity
-		yyv2376.CodecDecodeSelf(d)
+		yyv2381 := &x.Capacity
+		yyv2381.CodecDecodeSelf(d)
 	}
-	yyj2375++
-	if yyhl2375 {
-		yyb2375 = yyj2375 > l
+	yyj2380++
+	if yyhl2380 {
+		yyb2380 = yyj2380 > l
 	} else {
-		yyb2375 = r.CheckBreak()
+		yyb2380 = r.CheckBreak()
 	}
-	if yyb2375 {
+	if yyb2380 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -30355,16 +30394,16 @@ func (x *NodeStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Allocatable = nil
 	} else {
-		yyv2377 := &x.Allocatable
-		yyv2377.CodecDecodeSelf(d)
+		yyv2382 := &x.Allocatable
+		yyv2382.CodecDecodeSelf(d)
 	}
-	yyj2375++
-	if yyhl2375 {
-		yyb2375 = yyj2375 > l
+	yyj2380++
+	if yyhl2380 {
+		yyb2380 = yyj2380 > l
 	} else {
-		yyb2375 = r.CheckBreak()
+		yyb2380 = r.CheckBreak()
 	}
-	if yyb2375 {
+	if yyb2380 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -30374,13 +30413,13 @@ func (x *NodeStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Phase = NodePhase(r.DecodeString())
 	}
-	yyj2375++
-	if yyhl2375 {
-		yyb2375 = yyj2375 > l
+	yyj2380++
+	if yyhl2380 {
+		yyb2380 = yyj2380 > l
 	} else {
-		yyb2375 = r.CheckBreak()
+		yyb2380 = r.CheckBreak()
 	}
-	if yyb2375 {
+	if yyb2380 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -30388,21 +30427,21 @@ func (x *NodeStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Conditions = nil
 	} else {
-		yyv2379 := &x.Conditions
-		yym2380 := z.DecBinary()
-		_ = yym2380
+		yyv2384 := &x.Conditions
+		yym2385 := z.DecBinary()
+		_ = yym2385
 		if false {
 		} else {
-			h.decSliceNodeCondition((*[]NodeCondition)(yyv2379), d)
+			h.decSliceNodeCondition((*[]NodeCondition)(yyv2384), d)
 		}
 	}
-	yyj2375++
-	if yyhl2375 {
-		yyb2375 = yyj2375 > l
+	yyj2380++
+	if yyhl2380 {
+		yyb2380 = yyj2380 > l
 	} else {
-		yyb2375 = r.CheckBreak()
+		yyb2380 = r.CheckBreak()
 	}
-	if yyb2375 {
+	if yyb2380 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -30410,21 +30449,21 @@ func (x *NodeStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Addresses = nil
 	} else {
-		yyv2381 := &x.Addresses
-		yym2382 := z.DecBinary()
-		_ = yym2382
+		yyv2386 := &x.Addresses
+		yym2387 := z.DecBinary()
+		_ = yym2387
 		if false {
 		} else {
-			h.decSliceNodeAddress((*[]NodeAddress)(yyv2381), d)
+			h.decSliceNodeAddress((*[]NodeAddress)(yyv2386), d)
 		}
 	}
-	yyj2375++
-	if yyhl2375 {
-		yyb2375 = yyj2375 > l
+	yyj2380++
+	if yyhl2380 {
+		yyb2380 = yyj2380 > l
 	} else {
-		yyb2375 = r.CheckBreak()
+		yyb2380 = r.CheckBreak()
 	}
-	if yyb2375 {
+	if yyb2380 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -30432,16 +30471,16 @@ func (x *NodeStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.DaemonEndpoints = NodeDaemonEndpoints{}
 	} else {
-		yyv2383 := &x.DaemonEndpoints
-		yyv2383.CodecDecodeSelf(d)
+		yyv2388 := &x.DaemonEndpoints
+		yyv2388.CodecDecodeSelf(d)
 	}
-	yyj2375++
-	if yyhl2375 {
-		yyb2375 = yyj2375 > l
+	yyj2380++
+	if yyhl2380 {
+		yyb2380 = yyj2380 > l
 	} else {
-		yyb2375 = r.CheckBreak()
+		yyb2380 = r.CheckBreak()
 	}
-	if yyb2375 {
+	if yyb2380 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -30449,21 +30488,273 @@ func (x *NodeStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.NodeInfo = NodeSystemInfo{}
 	} else {
-		yyv2384 := &x.NodeInfo
-		yyv2384.CodecDecodeSelf(d)
+		yyv2389 := &x.NodeInfo
+		yyv2389.CodecDecodeSelf(d)
+	}
+	yyj2380++
+	if yyhl2380 {
+		yyb2380 = yyj2380 > l
+	} else {
+		yyb2380 = r.CheckBreak()
+	}
+	if yyb2380 {
+		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+		return
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+	if r.TryDecodeAsNil() {
+		x.Images = nil
+	} else {
+		yyv2390 := &x.Images
+		yym2391 := z.DecBinary()
+		_ = yym2391
+		if false {
+		} else {
+			h.decSliceContainerImage((*[]ContainerImage)(yyv2390), d)
+		}
 	}
 	for {
-		yyj2375++
-		if yyhl2375 {
-			yyb2375 = yyj2375 > l
+		yyj2380++
+		if yyhl2380 {
+			yyb2380 = yyj2380 > l
 		} else {
-			yyb2375 = r.CheckBreak()
+			yyb2380 = r.CheckBreak()
 		}
-		if yyb2375 {
+		if yyb2380 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2375-1, "")
+		z.DecStructFieldNotFound(yyj2380-1, "")
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+}
+
+func (x *ContainerImage) CodecEncodeSelf(e *codec1978.Encoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperEncoder(e)
+	_, _, _ = h, z, r
+	if x == nil {
+		r.EncodeNil()
+	} else {
+		yym2392 := z.EncBinary()
+		_ = yym2392
+		if false {
+		} else if z.HasExtensions() && z.EncExt(x) {
+		} else {
+			yysep2393 := !z.EncBinary()
+			yy2arr2393 := z.EncBasicHandle().StructToArray
+			var yyq2393 [2]bool
+			_, _, _ = yysep2393, yyq2393, yy2arr2393
+			const yyr2393 bool = false
+			yyq2393[1] = x.Size != 0
+			var yynn2393 int
+			if yyr2393 || yy2arr2393 {
+				r.EncodeArrayStart(2)
+			} else {
+				yynn2393 = 1
+				for _, b := range yyq2393 {
+					if b {
+						yynn2393++
+					}
+				}
+				r.EncodeMapStart(yynn2393)
+				yynn2393 = 0
+			}
+			if yyr2393 || yy2arr2393 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if x.RepoTags == nil {
+					r.EncodeNil()
+				} else {
+					yym2395 := z.EncBinary()
+					_ = yym2395
+					if false {
+					} else {
+						z.F.EncSliceStringV(x.RepoTags, false, e)
+					}
+				}
+			} else {
+				z.EncSendContainerState(codecSelfer_containerMapKey1234)
+				r.EncodeString(codecSelferC_UTF81234, string("repoTags"))
+				z.EncSendContainerState(codecSelfer_containerMapValue1234)
+				if x.RepoTags == nil {
+					r.EncodeNil()
+				} else {
+					yym2396 := z.EncBinary()
+					_ = yym2396
+					if false {
+					} else {
+						z.F.EncSliceStringV(x.RepoTags, false, e)
+					}
+				}
+			}
+			if yyr2393 || yy2arr2393 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq2393[1] {
+					yym2398 := z.EncBinary()
+					_ = yym2398
+					if false {
+					} else {
+						r.EncodeInt(int64(x.Size))
+					}
+				} else {
+					r.EncodeInt(0)
+				}
+			} else {
+				if yyq2393[1] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("size"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym2399 := z.EncBinary()
+					_ = yym2399
+					if false {
+					} else {
+						r.EncodeInt(int64(x.Size))
+					}
+				}
+			}
+			if yyr2393 || yy2arr2393 {
+				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
+			} else {
+				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
+			}
+		}
+	}
+}
+
+func (x *ContainerImage) CodecDecodeSelf(d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	yym2400 := z.DecBinary()
+	_ = yym2400
+	if false {
+	} else if z.HasExtensions() && z.DecExt(x) {
+	} else {
+		yyct2401 := r.ContainerType()
+		if yyct2401 == codecSelferValueTypeMap1234 {
+			yyl2401 := r.ReadMapStart()
+			if yyl2401 == 0 {
+				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
+			} else {
+				x.codecDecodeSelfFromMap(yyl2401, d)
+			}
+		} else if yyct2401 == codecSelferValueTypeArray1234 {
+			yyl2401 := r.ReadArrayStart()
+			if yyl2401 == 0 {
+				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+			} else {
+				x.codecDecodeSelfFromArray(yyl2401, d)
+			}
+		} else {
+			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
+		}
+	}
+}
+
+func (x *ContainerImage) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	var yys2402Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2402Slc
+	var yyhl2402 bool = l >= 0
+	for yyj2402 := 0; ; yyj2402++ {
+		if yyhl2402 {
+			if yyj2402 >= l {
+				break
+			}
+		} else {
+			if r.CheckBreak() {
+				break
+			}
+		}
+		z.DecSendContainerState(codecSelfer_containerMapKey1234)
+		yys2402Slc = r.DecodeBytes(yys2402Slc, true, true)
+		yys2402 := string(yys2402Slc)
+		z.DecSendContainerState(codecSelfer_containerMapValue1234)
+		switch yys2402 {
+		case "repoTags":
+			if r.TryDecodeAsNil() {
+				x.RepoTags = nil
+			} else {
+				yyv2403 := &x.RepoTags
+				yym2404 := z.DecBinary()
+				_ = yym2404
+				if false {
+				} else {
+					z.F.DecSliceStringX(yyv2403, false, d)
+				}
+			}
+		case "size":
+			if r.TryDecodeAsNil() {
+				x.Size = 0
+			} else {
+				x.Size = int64(r.DecodeInt(64))
+			}
+		default:
+			z.DecStructFieldNotFound(-1, yys2402)
+		} // end switch yys2402
+	} // end for yyj2402
+	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
+}
+
+func (x *ContainerImage) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	var yyj2406 int
+	var yyb2406 bool
+	var yyhl2406 bool = l >= 0
+	yyj2406++
+	if yyhl2406 {
+		yyb2406 = yyj2406 > l
+	} else {
+		yyb2406 = r.CheckBreak()
+	}
+	if yyb2406 {
+		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+		return
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+	if r.TryDecodeAsNil() {
+		x.RepoTags = nil
+	} else {
+		yyv2407 := &x.RepoTags
+		yym2408 := z.DecBinary()
+		_ = yym2408
+		if false {
+		} else {
+			z.F.DecSliceStringX(yyv2407, false, d)
+		}
+	}
+	yyj2406++
+	if yyhl2406 {
+		yyb2406 = yyj2406 > l
+	} else {
+		yyb2406 = r.CheckBreak()
+	}
+	if yyb2406 {
+		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+		return
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+	if r.TryDecodeAsNil() {
+		x.Size = 0
+	} else {
+		x.Size = int64(r.DecodeInt(64))
+	}
+	for {
+		yyj2406++
+		if yyhl2406 {
+			yyb2406 = yyj2406 > l
+		} else {
+			yyb2406 = r.CheckBreak()
+		}
+		if yyb2406 {
+			break
+		}
+		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+		z.DecStructFieldNotFound(yyj2406-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -30472,8 +30763,8 @@ func (x NodePhase) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
-	yym2385 := z.EncBinary()
-	_ = yym2385
+	yym2410 := z.EncBinary()
+	_ = yym2410
 	if false {
 	} else if z.HasExtensions() && z.EncExt(x) {
 	} else {
@@ -30485,8 +30776,8 @@ func (x *NodePhase) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2386 := z.DecBinary()
-	_ = yym2386
+	yym2411 := z.DecBinary()
+	_ = yym2411
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
@@ -30498,8 +30789,8 @@ func (x NodeConditionType) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
-	yym2387 := z.EncBinary()
-	_ = yym2387
+	yym2412 := z.EncBinary()
+	_ = yym2412
 	if false {
 	} else if z.HasExtensions() && z.EncExt(x) {
 	} else {
@@ -30511,8 +30802,8 @@ func (x *NodeConditionType) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2388 := z.DecBinary()
-	_ = yym2388
+	yym2413 := z.DecBinary()
+	_ = yym2413
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
@@ -30527,34 +30818,34 @@ func (x *NodeCondition) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2389 := z.EncBinary()
-		_ = yym2389
+		yym2414 := z.EncBinary()
+		_ = yym2414
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2390 := !z.EncBinary()
-			yy2arr2390 := z.EncBasicHandle().StructToArray
-			var yyq2390 [6]bool
-			_, _, _ = yysep2390, yyq2390, yy2arr2390
-			const yyr2390 bool = false
-			yyq2390[2] = true
-			yyq2390[3] = true
-			yyq2390[4] = x.Reason != ""
-			yyq2390[5] = x.Message != ""
-			var yynn2390 int
-			if yyr2390 || yy2arr2390 {
+			yysep2415 := !z.EncBinary()
+			yy2arr2415 := z.EncBasicHandle().StructToArray
+			var yyq2415 [6]bool
+			_, _, _ = yysep2415, yyq2415, yy2arr2415
+			const yyr2415 bool = false
+			yyq2415[2] = true
+			yyq2415[3] = true
+			yyq2415[4] = x.Reason != ""
+			yyq2415[5] = x.Message != ""
+			var yynn2415 int
+			if yyr2415 || yy2arr2415 {
 				r.EncodeArrayStart(6)
 			} else {
-				yynn2390 = 2
-				for _, b := range yyq2390 {
+				yynn2415 = 2
+				for _, b := range yyq2415 {
 					if b {
-						yynn2390++
+						yynn2415++
 					}
 				}
-				r.EncodeMapStart(yynn2390)
-				yynn2390 = 0
+				r.EncodeMapStart(yynn2415)
+				yynn2415 = 0
 			}
-			if yyr2390 || yy2arr2390 {
+			if yyr2415 || yy2arr2415 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				x.Type.CodecEncodeSelf(e)
 			} else {
@@ -30563,7 +30854,7 @@ func (x *NodeCondition) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
 				x.Type.CodecEncodeSelf(e)
 			}
-			if yyr2390 || yy2arr2390 {
+			if yyr2415 || yy2arr2415 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				x.Status.CodecEncodeSelf(e)
 			} else {
@@ -30572,85 +30863,85 @@ func (x *NodeCondition) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
 				x.Status.CodecEncodeSelf(e)
 			}
-			if yyr2390 || yy2arr2390 {
+			if yyr2415 || yy2arr2415 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2390[2] {
-					yy2394 := &x.LastHeartbeatTime
-					yym2395 := z.EncBinary()
-					_ = yym2395
+				if yyq2415[2] {
+					yy2419 := &x.LastHeartbeatTime
+					yym2420 := z.EncBinary()
+					_ = yym2420
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy2394) {
-					} else if yym2395 {
-						z.EncBinaryMarshal(yy2394)
-					} else if !yym2395 && z.IsJSONHandle() {
-						z.EncJSONMarshal(yy2394)
+					} else if z.HasExtensions() && z.EncExt(yy2419) {
+					} else if yym2420 {
+						z.EncBinaryMarshal(yy2419)
+					} else if !yym2420 && z.IsJSONHandle() {
+						z.EncJSONMarshal(yy2419)
 					} else {
-						z.EncFallback(yy2394)
+						z.EncFallback(yy2419)
 					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq2390[2] {
+				if yyq2415[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("lastHeartbeatTime"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy2396 := &x.LastHeartbeatTime
-					yym2397 := z.EncBinary()
-					_ = yym2397
+					yy2421 := &x.LastHeartbeatTime
+					yym2422 := z.EncBinary()
+					_ = yym2422
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy2396) {
-					} else if yym2397 {
-						z.EncBinaryMarshal(yy2396)
-					} else if !yym2397 && z.IsJSONHandle() {
-						z.EncJSONMarshal(yy2396)
+					} else if z.HasExtensions() && z.EncExt(yy2421) {
+					} else if yym2422 {
+						z.EncBinaryMarshal(yy2421)
+					} else if !yym2422 && z.IsJSONHandle() {
+						z.EncJSONMarshal(yy2421)
 					} else {
-						z.EncFallback(yy2396)
+						z.EncFallback(yy2421)
 					}
 				}
 			}
-			if yyr2390 || yy2arr2390 {
+			if yyr2415 || yy2arr2415 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2390[3] {
-					yy2399 := &x.LastTransitionTime
-					yym2400 := z.EncBinary()
-					_ = yym2400
+				if yyq2415[3] {
+					yy2424 := &x.LastTransitionTime
+					yym2425 := z.EncBinary()
+					_ = yym2425
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy2399) {
-					} else if yym2400 {
-						z.EncBinaryMarshal(yy2399)
-					} else if !yym2400 && z.IsJSONHandle() {
-						z.EncJSONMarshal(yy2399)
+					} else if z.HasExtensions() && z.EncExt(yy2424) {
+					} else if yym2425 {
+						z.EncBinaryMarshal(yy2424)
+					} else if !yym2425 && z.IsJSONHandle() {
+						z.EncJSONMarshal(yy2424)
 					} else {
-						z.EncFallback(yy2399)
+						z.EncFallback(yy2424)
 					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq2390[3] {
+				if yyq2415[3] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("lastTransitionTime"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy2401 := &x.LastTransitionTime
-					yym2402 := z.EncBinary()
-					_ = yym2402
+					yy2426 := &x.LastTransitionTime
+					yym2427 := z.EncBinary()
+					_ = yym2427
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy2401) {
-					} else if yym2402 {
-						z.EncBinaryMarshal(yy2401)
-					} else if !yym2402 && z.IsJSONHandle() {
-						z.EncJSONMarshal(yy2401)
+					} else if z.HasExtensions() && z.EncExt(yy2426) {
+					} else if yym2427 {
+						z.EncBinaryMarshal(yy2426)
+					} else if !yym2427 && z.IsJSONHandle() {
+						z.EncJSONMarshal(yy2426)
 					} else {
-						z.EncFallback(yy2401)
+						z.EncFallback(yy2426)
 					}
 				}
 			}
-			if yyr2390 || yy2arr2390 {
+			if yyr2415 || yy2arr2415 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2390[4] {
-					yym2404 := z.EncBinary()
-					_ = yym2404
+				if yyq2415[4] {
+					yym2429 := z.EncBinary()
+					_ = yym2429
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Reason))
@@ -30659,23 +30950,23 @@ func (x *NodeCondition) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2390[4] {
+				if yyq2415[4] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("reason"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2405 := z.EncBinary()
-					_ = yym2405
+					yym2430 := z.EncBinary()
+					_ = yym2430
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Reason))
 					}
 				}
 			}
-			if yyr2390 || yy2arr2390 {
+			if yyr2415 || yy2arr2415 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2390[5] {
-					yym2407 := z.EncBinary()
-					_ = yym2407
+				if yyq2415[5] {
+					yym2432 := z.EncBinary()
+					_ = yym2432
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Message))
@@ -30684,19 +30975,19 @@ func (x *NodeCondition) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2390[5] {
+				if yyq2415[5] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("message"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2408 := z.EncBinary()
-					_ = yym2408
+					yym2433 := z.EncBinary()
+					_ = yym2433
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Message))
 					}
 				}
 			}
-			if yyr2390 || yy2arr2390 {
+			if yyr2415 || yy2arr2415 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -30709,25 +31000,25 @@ func (x *NodeCondition) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2409 := z.DecBinary()
-	_ = yym2409
+	yym2434 := z.DecBinary()
+	_ = yym2434
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2410 := r.ContainerType()
-		if yyct2410 == codecSelferValueTypeMap1234 {
-			yyl2410 := r.ReadMapStart()
-			if yyl2410 == 0 {
+		yyct2435 := r.ContainerType()
+		if yyct2435 == codecSelferValueTypeMap1234 {
+			yyl2435 := r.ReadMapStart()
+			if yyl2435 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2410, d)
+				x.codecDecodeSelfFromMap(yyl2435, d)
 			}
-		} else if yyct2410 == codecSelferValueTypeArray1234 {
-			yyl2410 := r.ReadArrayStart()
-			if yyl2410 == 0 {
+		} else if yyct2435 == codecSelferValueTypeArray1234 {
+			yyl2435 := r.ReadArrayStart()
+			if yyl2435 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2410, d)
+				x.codecDecodeSelfFromArray(yyl2435, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -30739,12 +31030,12 @@ func (x *NodeCondition) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2411Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2411Slc
-	var yyhl2411 bool = l >= 0
-	for yyj2411 := 0; ; yyj2411++ {
-		if yyhl2411 {
-			if yyj2411 >= l {
+	var yys2436Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2436Slc
+	var yyhl2436 bool = l >= 0
+	for yyj2436 := 0; ; yyj2436++ {
+		if yyhl2436 {
+			if yyj2436 >= l {
 				break
 			}
 		} else {
@@ -30753,10 +31044,10 @@ func (x *NodeCondition) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2411Slc = r.DecodeBytes(yys2411Slc, true, true)
-		yys2411 := string(yys2411Slc)
+		yys2436Slc = r.DecodeBytes(yys2436Slc, true, true)
+		yys2436 := string(yys2436Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2411 {
+		switch yys2436 {
 		case "type":
 			if r.TryDecodeAsNil() {
 				x.Type = ""
@@ -30773,34 +31064,34 @@ func (x *NodeCondition) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.LastHeartbeatTime = pkg2_unversioned.Time{}
 			} else {
-				yyv2414 := &x.LastHeartbeatTime
-				yym2415 := z.DecBinary()
-				_ = yym2415
+				yyv2439 := &x.LastHeartbeatTime
+				yym2440 := z.DecBinary()
+				_ = yym2440
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv2414) {
-				} else if yym2415 {
-					z.DecBinaryUnmarshal(yyv2414)
-				} else if !yym2415 && z.IsJSONHandle() {
-					z.DecJSONUnmarshal(yyv2414)
+				} else if z.HasExtensions() && z.DecExt(yyv2439) {
+				} else if yym2440 {
+					z.DecBinaryUnmarshal(yyv2439)
+				} else if !yym2440 && z.IsJSONHandle() {
+					z.DecJSONUnmarshal(yyv2439)
 				} else {
-					z.DecFallback(yyv2414, false)
+					z.DecFallback(yyv2439, false)
 				}
 			}
 		case "lastTransitionTime":
 			if r.TryDecodeAsNil() {
 				x.LastTransitionTime = pkg2_unversioned.Time{}
 			} else {
-				yyv2416 := &x.LastTransitionTime
-				yym2417 := z.DecBinary()
-				_ = yym2417
+				yyv2441 := &x.LastTransitionTime
+				yym2442 := z.DecBinary()
+				_ = yym2442
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv2416) {
-				} else if yym2417 {
-					z.DecBinaryUnmarshal(yyv2416)
-				} else if !yym2417 && z.IsJSONHandle() {
-					z.DecJSONUnmarshal(yyv2416)
+				} else if z.HasExtensions() && z.DecExt(yyv2441) {
+				} else if yym2442 {
+					z.DecBinaryUnmarshal(yyv2441)
+				} else if !yym2442 && z.IsJSONHandle() {
+					z.DecJSONUnmarshal(yyv2441)
 				} else {
-					z.DecFallback(yyv2416, false)
+					z.DecFallback(yyv2441, false)
 				}
 			}
 		case "reason":
@@ -30816,9 +31107,9 @@ func (x *NodeCondition) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				x.Message = string(r.DecodeString())
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2411)
-		} // end switch yys2411
-	} // end for yyj2411
+			z.DecStructFieldNotFound(-1, yys2436)
+		} // end switch yys2436
+	} // end for yyj2436
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -30826,16 +31117,16 @@ func (x *NodeCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2420 int
-	var yyb2420 bool
-	var yyhl2420 bool = l >= 0
-	yyj2420++
-	if yyhl2420 {
-		yyb2420 = yyj2420 > l
+	var yyj2445 int
+	var yyb2445 bool
+	var yyhl2445 bool = l >= 0
+	yyj2445++
+	if yyhl2445 {
+		yyb2445 = yyj2445 > l
 	} else {
-		yyb2420 = r.CheckBreak()
+		yyb2445 = r.CheckBreak()
 	}
-	if yyb2420 {
+	if yyb2445 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -30845,13 +31136,13 @@ func (x *NodeCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Type = NodeConditionType(r.DecodeString())
 	}
-	yyj2420++
-	if yyhl2420 {
-		yyb2420 = yyj2420 > l
+	yyj2445++
+	if yyhl2445 {
+		yyb2445 = yyj2445 > l
 	} else {
-		yyb2420 = r.CheckBreak()
+		yyb2445 = r.CheckBreak()
 	}
-	if yyb2420 {
+	if yyb2445 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -30861,13 +31152,13 @@ func (x *NodeCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Status = ConditionStatus(r.DecodeString())
 	}
-	yyj2420++
-	if yyhl2420 {
-		yyb2420 = yyj2420 > l
+	yyj2445++
+	if yyhl2445 {
+		yyb2445 = yyj2445 > l
 	} else {
-		yyb2420 = r.CheckBreak()
+		yyb2445 = r.CheckBreak()
 	}
-	if yyb2420 {
+	if yyb2445 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -30875,26 +31166,26 @@ func (x *NodeCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.LastHeartbeatTime = pkg2_unversioned.Time{}
 	} else {
-		yyv2423 := &x.LastHeartbeatTime
-		yym2424 := z.DecBinary()
-		_ = yym2424
+		yyv2448 := &x.LastHeartbeatTime
+		yym2449 := z.DecBinary()
+		_ = yym2449
 		if false {
-		} else if z.HasExtensions() && z.DecExt(yyv2423) {
-		} else if yym2424 {
-			z.DecBinaryUnmarshal(yyv2423)
-		} else if !yym2424 && z.IsJSONHandle() {
-			z.DecJSONUnmarshal(yyv2423)
+		} else if z.HasExtensions() && z.DecExt(yyv2448) {
+		} else if yym2449 {
+			z.DecBinaryUnmarshal(yyv2448)
+		} else if !yym2449 && z.IsJSONHandle() {
+			z.DecJSONUnmarshal(yyv2448)
 		} else {
-			z.DecFallback(yyv2423, false)
+			z.DecFallback(yyv2448, false)
 		}
 	}
-	yyj2420++
-	if yyhl2420 {
-		yyb2420 = yyj2420 > l
+	yyj2445++
+	if yyhl2445 {
+		yyb2445 = yyj2445 > l
 	} else {
-		yyb2420 = r.CheckBreak()
+		yyb2445 = r.CheckBreak()
 	}
-	if yyb2420 {
+	if yyb2445 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -30902,26 +31193,26 @@ func (x *NodeCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.LastTransitionTime = pkg2_unversioned.Time{}
 	} else {
-		yyv2425 := &x.LastTransitionTime
-		yym2426 := z.DecBinary()
-		_ = yym2426
+		yyv2450 := &x.LastTransitionTime
+		yym2451 := z.DecBinary()
+		_ = yym2451
 		if false {
-		} else if z.HasExtensions() && z.DecExt(yyv2425) {
-		} else if yym2426 {
-			z.DecBinaryUnmarshal(yyv2425)
-		} else if !yym2426 && z.IsJSONHandle() {
-			z.DecJSONUnmarshal(yyv2425)
+		} else if z.HasExtensions() && z.DecExt(yyv2450) {
+		} else if yym2451 {
+			z.DecBinaryUnmarshal(yyv2450)
+		} else if !yym2451 && z.IsJSONHandle() {
+			z.DecJSONUnmarshal(yyv2450)
 		} else {
-			z.DecFallback(yyv2425, false)
+			z.DecFallback(yyv2450, false)
 		}
 	}
-	yyj2420++
-	if yyhl2420 {
-		yyb2420 = yyj2420 > l
+	yyj2445++
+	if yyhl2445 {
+		yyb2445 = yyj2445 > l
 	} else {
-		yyb2420 = r.CheckBreak()
+		yyb2445 = r.CheckBreak()
 	}
-	if yyb2420 {
+	if yyb2445 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -30931,13 +31222,13 @@ func (x *NodeCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Reason = string(r.DecodeString())
 	}
-	yyj2420++
-	if yyhl2420 {
-		yyb2420 = yyj2420 > l
+	yyj2445++
+	if yyhl2445 {
+		yyb2445 = yyj2445 > l
 	} else {
-		yyb2420 = r.CheckBreak()
+		yyb2445 = r.CheckBreak()
 	}
-	if yyb2420 {
+	if yyb2445 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -30948,17 +31239,17 @@ func (x *NodeCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		x.Message = string(r.DecodeString())
 	}
 	for {
-		yyj2420++
-		if yyhl2420 {
-			yyb2420 = yyj2420 > l
+		yyj2445++
+		if yyhl2445 {
+			yyb2445 = yyj2445 > l
 		} else {
-			yyb2420 = r.CheckBreak()
+			yyb2445 = r.CheckBreak()
 		}
-		if yyb2420 {
+		if yyb2445 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2420-1, "")
+		z.DecStructFieldNotFound(yyj2445-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -30967,8 +31258,8 @@ func (x NodeAddressType) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
-	yym2429 := z.EncBinary()
-	_ = yym2429
+	yym2454 := z.EncBinary()
+	_ = yym2454
 	if false {
 	} else if z.HasExtensions() && z.EncExt(x) {
 	} else {
@@ -30980,8 +31271,8 @@ func (x *NodeAddressType) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2430 := z.DecBinary()
-	_ = yym2430
+	yym2455 := z.DecBinary()
+	_ = yym2455
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
@@ -30996,30 +31287,30 @@ func (x *NodeAddress) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2431 := z.EncBinary()
-		_ = yym2431
+		yym2456 := z.EncBinary()
+		_ = yym2456
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2432 := !z.EncBinary()
-			yy2arr2432 := z.EncBasicHandle().StructToArray
-			var yyq2432 [2]bool
-			_, _, _ = yysep2432, yyq2432, yy2arr2432
-			const yyr2432 bool = false
-			var yynn2432 int
-			if yyr2432 || yy2arr2432 {
+			yysep2457 := !z.EncBinary()
+			yy2arr2457 := z.EncBasicHandle().StructToArray
+			var yyq2457 [2]bool
+			_, _, _ = yysep2457, yyq2457, yy2arr2457
+			const yyr2457 bool = false
+			var yynn2457 int
+			if yyr2457 || yy2arr2457 {
 				r.EncodeArrayStart(2)
 			} else {
-				yynn2432 = 2
-				for _, b := range yyq2432 {
+				yynn2457 = 2
+				for _, b := range yyq2457 {
 					if b {
-						yynn2432++
+						yynn2457++
 					}
 				}
-				r.EncodeMapStart(yynn2432)
-				yynn2432 = 0
+				r.EncodeMapStart(yynn2457)
+				yynn2457 = 0
 			}
-			if yyr2432 || yy2arr2432 {
+			if yyr2457 || yy2arr2457 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				x.Type.CodecEncodeSelf(e)
 			} else {
@@ -31028,10 +31319,10 @@ func (x *NodeAddress) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
 				x.Type.CodecEncodeSelf(e)
 			}
-			if yyr2432 || yy2arr2432 {
+			if yyr2457 || yy2arr2457 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2435 := z.EncBinary()
-				_ = yym2435
+				yym2460 := z.EncBinary()
+				_ = yym2460
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.Address))
@@ -31040,14 +31331,14 @@ func (x *NodeAddress) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("address"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2436 := z.EncBinary()
-				_ = yym2436
+				yym2461 := z.EncBinary()
+				_ = yym2461
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.Address))
 				}
 			}
-			if yyr2432 || yy2arr2432 {
+			if yyr2457 || yy2arr2457 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -31060,25 +31351,25 @@ func (x *NodeAddress) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2437 := z.DecBinary()
-	_ = yym2437
+	yym2462 := z.DecBinary()
+	_ = yym2462
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2438 := r.ContainerType()
-		if yyct2438 == codecSelferValueTypeMap1234 {
-			yyl2438 := r.ReadMapStart()
-			if yyl2438 == 0 {
+		yyct2463 := r.ContainerType()
+		if yyct2463 == codecSelferValueTypeMap1234 {
+			yyl2463 := r.ReadMapStart()
+			if yyl2463 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2438, d)
+				x.codecDecodeSelfFromMap(yyl2463, d)
 			}
-		} else if yyct2438 == codecSelferValueTypeArray1234 {
-			yyl2438 := r.ReadArrayStart()
-			if yyl2438 == 0 {
+		} else if yyct2463 == codecSelferValueTypeArray1234 {
+			yyl2463 := r.ReadArrayStart()
+			if yyl2463 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2438, d)
+				x.codecDecodeSelfFromArray(yyl2463, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -31090,12 +31381,12 @@ func (x *NodeAddress) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2439Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2439Slc
-	var yyhl2439 bool = l >= 0
-	for yyj2439 := 0; ; yyj2439++ {
-		if yyhl2439 {
-			if yyj2439 >= l {
+	var yys2464Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2464Slc
+	var yyhl2464 bool = l >= 0
+	for yyj2464 := 0; ; yyj2464++ {
+		if yyhl2464 {
+			if yyj2464 >= l {
 				break
 			}
 		} else {
@@ -31104,10 +31395,10 @@ func (x *NodeAddress) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2439Slc = r.DecodeBytes(yys2439Slc, true, true)
-		yys2439 := string(yys2439Slc)
+		yys2464Slc = r.DecodeBytes(yys2464Slc, true, true)
+		yys2464 := string(yys2464Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2439 {
+		switch yys2464 {
 		case "type":
 			if r.TryDecodeAsNil() {
 				x.Type = ""
@@ -31121,9 +31412,9 @@ func (x *NodeAddress) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				x.Address = string(r.DecodeString())
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2439)
-		} // end switch yys2439
-	} // end for yyj2439
+			z.DecStructFieldNotFound(-1, yys2464)
+		} // end switch yys2464
+	} // end for yyj2464
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -31131,16 +31422,16 @@ func (x *NodeAddress) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2442 int
-	var yyb2442 bool
-	var yyhl2442 bool = l >= 0
-	yyj2442++
-	if yyhl2442 {
-		yyb2442 = yyj2442 > l
+	var yyj2467 int
+	var yyb2467 bool
+	var yyhl2467 bool = l >= 0
+	yyj2467++
+	if yyhl2467 {
+		yyb2467 = yyj2467 > l
 	} else {
-		yyb2442 = r.CheckBreak()
+		yyb2467 = r.CheckBreak()
 	}
-	if yyb2442 {
+	if yyb2467 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -31150,13 +31441,13 @@ func (x *NodeAddress) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Type = NodeAddressType(r.DecodeString())
 	}
-	yyj2442++
-	if yyhl2442 {
-		yyb2442 = yyj2442 > l
+	yyj2467++
+	if yyhl2467 {
+		yyb2467 = yyj2467 > l
 	} else {
-		yyb2442 = r.CheckBreak()
+		yyb2467 = r.CheckBreak()
 	}
-	if yyb2442 {
+	if yyb2467 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -31167,17 +31458,17 @@ func (x *NodeAddress) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		x.Address = string(r.DecodeString())
 	}
 	for {
-		yyj2442++
-		if yyhl2442 {
-			yyb2442 = yyj2442 > l
+		yyj2467++
+		if yyhl2467 {
+			yyb2467 = yyj2467 > l
 		} else {
-			yyb2442 = r.CheckBreak()
+			yyb2467 = r.CheckBreak()
 		}
-		if yyb2442 {
+		if yyb2467 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2442-1, "")
+		z.DecStructFieldNotFound(yyj2467-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -31189,33 +31480,33 @@ func (x *NodeResources) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2445 := z.EncBinary()
-		_ = yym2445
+		yym2470 := z.EncBinary()
+		_ = yym2470
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2446 := !z.EncBinary()
-			yy2arr2446 := z.EncBasicHandle().StructToArray
-			var yyq2446 [1]bool
-			_, _, _ = yysep2446, yyq2446, yy2arr2446
-			const yyr2446 bool = false
-			yyq2446[0] = len(x.Capacity) != 0
-			var yynn2446 int
-			if yyr2446 || yy2arr2446 {
+			yysep2471 := !z.EncBinary()
+			yy2arr2471 := z.EncBasicHandle().StructToArray
+			var yyq2471 [1]bool
+			_, _, _ = yysep2471, yyq2471, yy2arr2471
+			const yyr2471 bool = false
+			yyq2471[0] = len(x.Capacity) != 0
+			var yynn2471 int
+			if yyr2471 || yy2arr2471 {
 				r.EncodeArrayStart(1)
 			} else {
-				yynn2446 = 0
-				for _, b := range yyq2446 {
+				yynn2471 = 0
+				for _, b := range yyq2471 {
 					if b {
-						yynn2446++
+						yynn2471++
 					}
 				}
-				r.EncodeMapStart(yynn2446)
-				yynn2446 = 0
+				r.EncodeMapStart(yynn2471)
+				yynn2471 = 0
 			}
-			if yyr2446 || yy2arr2446 {
+			if yyr2471 || yy2arr2471 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2446[0] {
+				if yyq2471[0] {
 					if x.Capacity == nil {
 						r.EncodeNil()
 					} else {
@@ -31225,7 +31516,7 @@ func (x *NodeResources) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq2446[0] {
+				if yyq2471[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("capacity"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
@@ -31236,7 +31527,7 @@ func (x *NodeResources) CodecEncodeSelf(e *codec1978.Encoder) {
 					}
 				}
 			}
-			if yyr2446 || yy2arr2446 {
+			if yyr2471 || yy2arr2471 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -31249,25 +31540,25 @@ func (x *NodeResources) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2448 := z.DecBinary()
-	_ = yym2448
+	yym2473 := z.DecBinary()
+	_ = yym2473
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2449 := r.ContainerType()
-		if yyct2449 == codecSelferValueTypeMap1234 {
-			yyl2449 := r.ReadMapStart()
-			if yyl2449 == 0 {
+		yyct2474 := r.ContainerType()
+		if yyct2474 == codecSelferValueTypeMap1234 {
+			yyl2474 := r.ReadMapStart()
+			if yyl2474 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2449, d)
+				x.codecDecodeSelfFromMap(yyl2474, d)
 			}
-		} else if yyct2449 == codecSelferValueTypeArray1234 {
-			yyl2449 := r.ReadArrayStart()
-			if yyl2449 == 0 {
+		} else if yyct2474 == codecSelferValueTypeArray1234 {
+			yyl2474 := r.ReadArrayStart()
+			if yyl2474 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2449, d)
+				x.codecDecodeSelfFromArray(yyl2474, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -31279,12 +31570,12 @@ func (x *NodeResources) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2450Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2450Slc
-	var yyhl2450 bool = l >= 0
-	for yyj2450 := 0; ; yyj2450++ {
-		if yyhl2450 {
-			if yyj2450 >= l {
+	var yys2475Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2475Slc
+	var yyhl2475 bool = l >= 0
+	for yyj2475 := 0; ; yyj2475++ {
+		if yyhl2475 {
+			if yyj2475 >= l {
 				break
 			}
 		} else {
@@ -31293,21 +31584,21 @@ func (x *NodeResources) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2450Slc = r.DecodeBytes(yys2450Slc, true, true)
-		yys2450 := string(yys2450Slc)
+		yys2475Slc = r.DecodeBytes(yys2475Slc, true, true)
+		yys2475 := string(yys2475Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2450 {
+		switch yys2475 {
 		case "capacity":
 			if r.TryDecodeAsNil() {
 				x.Capacity = nil
 			} else {
-				yyv2451 := &x.Capacity
-				yyv2451.CodecDecodeSelf(d)
+				yyv2476 := &x.Capacity
+				yyv2476.CodecDecodeSelf(d)
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2450)
-		} // end switch yys2450
-	} // end for yyj2450
+			z.DecStructFieldNotFound(-1, yys2475)
+		} // end switch yys2475
+	} // end for yyj2475
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -31315,16 +31606,16 @@ func (x *NodeResources) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2452 int
-	var yyb2452 bool
-	var yyhl2452 bool = l >= 0
-	yyj2452++
-	if yyhl2452 {
-		yyb2452 = yyj2452 > l
+	var yyj2477 int
+	var yyb2477 bool
+	var yyhl2477 bool = l >= 0
+	yyj2477++
+	if yyhl2477 {
+		yyb2477 = yyj2477 > l
 	} else {
-		yyb2452 = r.CheckBreak()
+		yyb2477 = r.CheckBreak()
 	}
-	if yyb2452 {
+	if yyb2477 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -31332,21 +31623,21 @@ func (x *NodeResources) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Capacity = nil
 	} else {
-		yyv2453 := &x.Capacity
-		yyv2453.CodecDecodeSelf(d)
+		yyv2478 := &x.Capacity
+		yyv2478.CodecDecodeSelf(d)
 	}
 	for {
-		yyj2452++
-		if yyhl2452 {
-			yyb2452 = yyj2452 > l
+		yyj2477++
+		if yyhl2477 {
+			yyb2477 = yyj2477 > l
 		} else {
-			yyb2452 = r.CheckBreak()
+			yyb2477 = r.CheckBreak()
 		}
-		if yyb2452 {
+		if yyb2477 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2452-1, "")
+		z.DecStructFieldNotFound(yyj2477-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -31355,8 +31646,8 @@ func (x ResourceName) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
-	yym2454 := z.EncBinary()
-	_ = yym2454
+	yym2479 := z.EncBinary()
+	_ = yym2479
 	if false {
 	} else if z.HasExtensions() && z.EncExt(x) {
 	} else {
@@ -31368,8 +31659,8 @@ func (x *ResourceName) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2455 := z.DecBinary()
-	_ = yym2455
+	yym2480 := z.DecBinary()
+	_ = yym2480
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
@@ -31384,8 +31675,8 @@ func (x ResourceList) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2456 := z.EncBinary()
-		_ = yym2456
+		yym2481 := z.EncBinary()
+		_ = yym2481
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
@@ -31398,8 +31689,8 @@ func (x *ResourceList) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2457 := z.DecBinary()
-	_ = yym2457
+	yym2482 := z.DecBinary()
+	_ = yym2482
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
@@ -31414,39 +31705,39 @@ func (x *Node) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2458 := z.EncBinary()
-		_ = yym2458
+		yym2483 := z.EncBinary()
+		_ = yym2483
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2459 := !z.EncBinary()
-			yy2arr2459 := z.EncBasicHandle().StructToArray
-			var yyq2459 [5]bool
-			_, _, _ = yysep2459, yyq2459, yy2arr2459
-			const yyr2459 bool = false
-			yyq2459[0] = x.Kind != ""
-			yyq2459[1] = x.APIVersion != ""
-			yyq2459[2] = true
-			yyq2459[3] = true
-			yyq2459[4] = true
-			var yynn2459 int
-			if yyr2459 || yy2arr2459 {
+			yysep2484 := !z.EncBinary()
+			yy2arr2484 := z.EncBasicHandle().StructToArray
+			var yyq2484 [5]bool
+			_, _, _ = yysep2484, yyq2484, yy2arr2484
+			const yyr2484 bool = false
+			yyq2484[0] = x.Kind != ""
+			yyq2484[1] = x.APIVersion != ""
+			yyq2484[2] = true
+			yyq2484[3] = true
+			yyq2484[4] = true
+			var yynn2484 int
+			if yyr2484 || yy2arr2484 {
 				r.EncodeArrayStart(5)
 			} else {
-				yynn2459 = 0
-				for _, b := range yyq2459 {
+				yynn2484 = 0
+				for _, b := range yyq2484 {
 					if b {
-						yynn2459++
+						yynn2484++
 					}
 				}
-				r.EncodeMapStart(yynn2459)
-				yynn2459 = 0
+				r.EncodeMapStart(yynn2484)
+				yynn2484 = 0
 			}
-			if yyr2459 || yy2arr2459 {
+			if yyr2484 || yy2arr2484 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2459[0] {
-					yym2461 := z.EncBinary()
-					_ = yym2461
+				if yyq2484[0] {
+					yym2486 := z.EncBinary()
+					_ = yym2486
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -31455,23 +31746,23 @@ func (x *Node) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2459[0] {
+				if yyq2484[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2462 := z.EncBinary()
-					_ = yym2462
+					yym2487 := z.EncBinary()
+					_ = yym2487
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr2459 || yy2arr2459 {
+			if yyr2484 || yy2arr2484 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2459[1] {
-					yym2464 := z.EncBinary()
-					_ = yym2464
+				if yyq2484[1] {
+					yym2489 := z.EncBinary()
+					_ = yym2489
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -31480,70 +31771,70 @@ func (x *Node) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2459[1] {
+				if yyq2484[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2465 := z.EncBinary()
-					_ = yym2465
+					yym2490 := z.EncBinary()
+					_ = yym2490
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr2459 || yy2arr2459 {
+			if yyr2484 || yy2arr2484 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2459[2] {
-					yy2467 := &x.ObjectMeta
-					yy2467.CodecEncodeSelf(e)
+				if yyq2484[2] {
+					yy2492 := &x.ObjectMeta
+					yy2492.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq2459[2] {
+				if yyq2484[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy2468 := &x.ObjectMeta
-					yy2468.CodecEncodeSelf(e)
+					yy2493 := &x.ObjectMeta
+					yy2493.CodecEncodeSelf(e)
 				}
 			}
-			if yyr2459 || yy2arr2459 {
+			if yyr2484 || yy2arr2484 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2459[3] {
-					yy2470 := &x.Spec
-					yy2470.CodecEncodeSelf(e)
+				if yyq2484[3] {
+					yy2495 := &x.Spec
+					yy2495.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq2459[3] {
+				if yyq2484[3] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("spec"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy2471 := &x.Spec
-					yy2471.CodecEncodeSelf(e)
+					yy2496 := &x.Spec
+					yy2496.CodecEncodeSelf(e)
 				}
 			}
-			if yyr2459 || yy2arr2459 {
+			if yyr2484 || yy2arr2484 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2459[4] {
-					yy2473 := &x.Status
-					yy2473.CodecEncodeSelf(e)
+				if yyq2484[4] {
+					yy2498 := &x.Status
+					yy2498.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq2459[4] {
+				if yyq2484[4] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("status"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy2474 := &x.Status
-					yy2474.CodecEncodeSelf(e)
+					yy2499 := &x.Status
+					yy2499.CodecEncodeSelf(e)
 				}
 			}
-			if yyr2459 || yy2arr2459 {
+			if yyr2484 || yy2arr2484 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -31556,25 +31847,25 @@ func (x *Node) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2475 := z.DecBinary()
-	_ = yym2475
+	yym2500 := z.DecBinary()
+	_ = yym2500
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2476 := r.ContainerType()
-		if yyct2476 == codecSelferValueTypeMap1234 {
-			yyl2476 := r.ReadMapStart()
-			if yyl2476 == 0 {
+		yyct2501 := r.ContainerType()
+		if yyct2501 == codecSelferValueTypeMap1234 {
+			yyl2501 := r.ReadMapStart()
+			if yyl2501 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2476, d)
+				x.codecDecodeSelfFromMap(yyl2501, d)
 			}
-		} else if yyct2476 == codecSelferValueTypeArray1234 {
-			yyl2476 := r.ReadArrayStart()
-			if yyl2476 == 0 {
+		} else if yyct2501 == codecSelferValueTypeArray1234 {
+			yyl2501 := r.ReadArrayStart()
+			if yyl2501 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2476, d)
+				x.codecDecodeSelfFromArray(yyl2501, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -31586,12 +31877,12 @@ func (x *Node) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2477Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2477Slc
-	var yyhl2477 bool = l >= 0
-	for yyj2477 := 0; ; yyj2477++ {
-		if yyhl2477 {
-			if yyj2477 >= l {
+	var yys2502Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2502Slc
+	var yyhl2502 bool = l >= 0
+	for yyj2502 := 0; ; yyj2502++ {
+		if yyhl2502 {
+			if yyj2502 >= l {
 				break
 			}
 		} else {
@@ -31600,10 +31891,10 @@ func (x *Node) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2477Slc = r.DecodeBytes(yys2477Slc, true, true)
-		yys2477 := string(yys2477Slc)
+		yys2502Slc = r.DecodeBytes(yys2502Slc, true, true)
+		yys2502 := string(yys2502Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2477 {
+		switch yys2502 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -31620,27 +31911,27 @@ func (x *Node) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.ObjectMeta = ObjectMeta{}
 			} else {
-				yyv2480 := &x.ObjectMeta
-				yyv2480.CodecDecodeSelf(d)
+				yyv2505 := &x.ObjectMeta
+				yyv2505.CodecDecodeSelf(d)
 			}
 		case "spec":
 			if r.TryDecodeAsNil() {
 				x.Spec = NodeSpec{}
 			} else {
-				yyv2481 := &x.Spec
-				yyv2481.CodecDecodeSelf(d)
+				yyv2506 := &x.Spec
+				yyv2506.CodecDecodeSelf(d)
 			}
 		case "status":
 			if r.TryDecodeAsNil() {
 				x.Status = NodeStatus{}
 			} else {
-				yyv2482 := &x.Status
-				yyv2482.CodecDecodeSelf(d)
+				yyv2507 := &x.Status
+				yyv2507.CodecDecodeSelf(d)
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2477)
-		} // end switch yys2477
-	} // end for yyj2477
+			z.DecStructFieldNotFound(-1, yys2502)
+		} // end switch yys2502
+	} // end for yyj2502
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -31648,16 +31939,16 @@ func (x *Node) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2483 int
-	var yyb2483 bool
-	var yyhl2483 bool = l >= 0
-	yyj2483++
-	if yyhl2483 {
-		yyb2483 = yyj2483 > l
+	var yyj2508 int
+	var yyb2508 bool
+	var yyhl2508 bool = l >= 0
+	yyj2508++
+	if yyhl2508 {
+		yyb2508 = yyj2508 > l
 	} else {
-		yyb2483 = r.CheckBreak()
+		yyb2508 = r.CheckBreak()
 	}
-	if yyb2483 {
+	if yyb2508 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -31667,13 +31958,13 @@ func (x *Node) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj2483++
-	if yyhl2483 {
-		yyb2483 = yyj2483 > l
+	yyj2508++
+	if yyhl2508 {
+		yyb2508 = yyj2508 > l
 	} else {
-		yyb2483 = r.CheckBreak()
+		yyb2508 = r.CheckBreak()
 	}
-	if yyb2483 {
+	if yyb2508 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -31683,13 +31974,13 @@ func (x *Node) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj2483++
-	if yyhl2483 {
-		yyb2483 = yyj2483 > l
+	yyj2508++
+	if yyhl2508 {
+		yyb2508 = yyj2508 > l
 	} else {
-		yyb2483 = r.CheckBreak()
+		yyb2508 = r.CheckBreak()
 	}
-	if yyb2483 {
+	if yyb2508 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -31697,16 +31988,16 @@ func (x *Node) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.ObjectMeta = ObjectMeta{}
 	} else {
-		yyv2486 := &x.ObjectMeta
-		yyv2486.CodecDecodeSelf(d)
+		yyv2511 := &x.ObjectMeta
+		yyv2511.CodecDecodeSelf(d)
 	}
-	yyj2483++
-	if yyhl2483 {
-		yyb2483 = yyj2483 > l
+	yyj2508++
+	if yyhl2508 {
+		yyb2508 = yyj2508 > l
 	} else {
-		yyb2483 = r.CheckBreak()
+		yyb2508 = r.CheckBreak()
 	}
-	if yyb2483 {
+	if yyb2508 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -31714,16 +32005,16 @@ func (x *Node) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Spec = NodeSpec{}
 	} else {
-		yyv2487 := &x.Spec
-		yyv2487.CodecDecodeSelf(d)
+		yyv2512 := &x.Spec
+		yyv2512.CodecDecodeSelf(d)
 	}
-	yyj2483++
-	if yyhl2483 {
-		yyb2483 = yyj2483 > l
+	yyj2508++
+	if yyhl2508 {
+		yyb2508 = yyj2508 > l
 	} else {
-		yyb2483 = r.CheckBreak()
+		yyb2508 = r.CheckBreak()
 	}
-	if yyb2483 {
+	if yyb2508 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -31731,21 +32022,21 @@ func (x *Node) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Status = NodeStatus{}
 	} else {
-		yyv2488 := &x.Status
-		yyv2488.CodecDecodeSelf(d)
+		yyv2513 := &x.Status
+		yyv2513.CodecDecodeSelf(d)
 	}
 	for {
-		yyj2483++
-		if yyhl2483 {
-			yyb2483 = yyj2483 > l
+		yyj2508++
+		if yyhl2508 {
+			yyb2508 = yyj2508 > l
 		} else {
-			yyb2483 = r.CheckBreak()
+			yyb2508 = r.CheckBreak()
 		}
-		if yyb2483 {
+		if yyb2508 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2483-1, "")
+		z.DecStructFieldNotFound(yyj2508-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -31757,37 +32048,37 @@ func (x *NodeList) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2489 := z.EncBinary()
-		_ = yym2489
+		yym2514 := z.EncBinary()
+		_ = yym2514
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2490 := !z.EncBinary()
-			yy2arr2490 := z.EncBasicHandle().StructToArray
-			var yyq2490 [4]bool
-			_, _, _ = yysep2490, yyq2490, yy2arr2490
-			const yyr2490 bool = false
-			yyq2490[0] = x.Kind != ""
-			yyq2490[1] = x.APIVersion != ""
-			yyq2490[2] = true
-			var yynn2490 int
-			if yyr2490 || yy2arr2490 {
+			yysep2515 := !z.EncBinary()
+			yy2arr2515 := z.EncBasicHandle().StructToArray
+			var yyq2515 [4]bool
+			_, _, _ = yysep2515, yyq2515, yy2arr2515
+			const yyr2515 bool = false
+			yyq2515[0] = x.Kind != ""
+			yyq2515[1] = x.APIVersion != ""
+			yyq2515[2] = true
+			var yynn2515 int
+			if yyr2515 || yy2arr2515 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn2490 = 1
-				for _, b := range yyq2490 {
+				yynn2515 = 1
+				for _, b := range yyq2515 {
 					if b {
-						yynn2490++
+						yynn2515++
 					}
 				}
-				r.EncodeMapStart(yynn2490)
-				yynn2490 = 0
+				r.EncodeMapStart(yynn2515)
+				yynn2515 = 0
 			}
-			if yyr2490 || yy2arr2490 {
+			if yyr2515 || yy2arr2515 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2490[0] {
-					yym2492 := z.EncBinary()
-					_ = yym2492
+				if yyq2515[0] {
+					yym2517 := z.EncBinary()
+					_ = yym2517
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -31796,23 +32087,23 @@ func (x *NodeList) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2490[0] {
+				if yyq2515[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2493 := z.EncBinary()
-					_ = yym2493
+					yym2518 := z.EncBinary()
+					_ = yym2518
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr2490 || yy2arr2490 {
+			if yyr2515 || yy2arr2515 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2490[1] {
-					yym2495 := z.EncBinary()
-					_ = yym2495
+				if yyq2515[1] {
+					yym2520 := z.EncBinary()
+					_ = yym2520
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -31821,54 +32112,54 @@ func (x *NodeList) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2490[1] {
+				if yyq2515[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2496 := z.EncBinary()
-					_ = yym2496
+					yym2521 := z.EncBinary()
+					_ = yym2521
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr2490 || yy2arr2490 {
+			if yyr2515 || yy2arr2515 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2490[2] {
-					yy2498 := &x.ListMeta
-					yym2499 := z.EncBinary()
-					_ = yym2499
+				if yyq2515[2] {
+					yy2523 := &x.ListMeta
+					yym2524 := z.EncBinary()
+					_ = yym2524
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy2498) {
+					} else if z.HasExtensions() && z.EncExt(yy2523) {
 					} else {
-						z.EncFallback(yy2498)
+						z.EncFallback(yy2523)
 					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq2490[2] {
+				if yyq2515[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy2500 := &x.ListMeta
-					yym2501 := z.EncBinary()
-					_ = yym2501
+					yy2525 := &x.ListMeta
+					yym2526 := z.EncBinary()
+					_ = yym2526
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy2500) {
+					} else if z.HasExtensions() && z.EncExt(yy2525) {
 					} else {
-						z.EncFallback(yy2500)
+						z.EncFallback(yy2525)
 					}
 				}
 			}
-			if yyr2490 || yy2arr2490 {
+			if yyr2515 || yy2arr2515 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym2503 := z.EncBinary()
-					_ = yym2503
+					yym2528 := z.EncBinary()
+					_ = yym2528
 					if false {
 					} else {
 						h.encSliceNode(([]Node)(x.Items), e)
@@ -31881,15 +32172,15 @@ func (x *NodeList) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym2504 := z.EncBinary()
-					_ = yym2504
+					yym2529 := z.EncBinary()
+					_ = yym2529
 					if false {
 					} else {
 						h.encSliceNode(([]Node)(x.Items), e)
 					}
 				}
 			}
-			if yyr2490 || yy2arr2490 {
+			if yyr2515 || yy2arr2515 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -31902,25 +32193,25 @@ func (x *NodeList) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2505 := z.DecBinary()
-	_ = yym2505
+	yym2530 := z.DecBinary()
+	_ = yym2530
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2506 := r.ContainerType()
-		if yyct2506 == codecSelferValueTypeMap1234 {
-			yyl2506 := r.ReadMapStart()
-			if yyl2506 == 0 {
+		yyct2531 := r.ContainerType()
+		if yyct2531 == codecSelferValueTypeMap1234 {
+			yyl2531 := r.ReadMapStart()
+			if yyl2531 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2506, d)
+				x.codecDecodeSelfFromMap(yyl2531, d)
 			}
-		} else if yyct2506 == codecSelferValueTypeArray1234 {
-			yyl2506 := r.ReadArrayStart()
-			if yyl2506 == 0 {
+		} else if yyct2531 == codecSelferValueTypeArray1234 {
+			yyl2531 := r.ReadArrayStart()
+			if yyl2531 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2506, d)
+				x.codecDecodeSelfFromArray(yyl2531, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -31932,12 +32223,12 @@ func (x *NodeList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2507Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2507Slc
-	var yyhl2507 bool = l >= 0
-	for yyj2507 := 0; ; yyj2507++ {
-		if yyhl2507 {
-			if yyj2507 >= l {
+	var yys2532Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2532Slc
+	var yyhl2532 bool = l >= 0
+	for yyj2532 := 0; ; yyj2532++ {
+		if yyhl2532 {
+			if yyj2532 >= l {
 				break
 			}
 		} else {
@@ -31946,10 +32237,10 @@ func (x *NodeList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2507Slc = r.DecodeBytes(yys2507Slc, true, true)
-		yys2507 := string(yys2507Slc)
+		yys2532Slc = r.DecodeBytes(yys2532Slc, true, true)
+		yys2532 := string(yys2532Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2507 {
+		switch yys2532 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -31966,31 +32257,31 @@ func (x *NodeList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.ListMeta = pkg2_unversioned.ListMeta{}
 			} else {
-				yyv2510 := &x.ListMeta
-				yym2511 := z.DecBinary()
-				_ = yym2511
+				yyv2535 := &x.ListMeta
+				yym2536 := z.DecBinary()
+				_ = yym2536
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv2510) {
+				} else if z.HasExtensions() && z.DecExt(yyv2535) {
 				} else {
-					z.DecFallback(yyv2510, false)
+					z.DecFallback(yyv2535, false)
 				}
 			}
 		case "items":
 			if r.TryDecodeAsNil() {
 				x.Items = nil
 			} else {
-				yyv2512 := &x.Items
-				yym2513 := z.DecBinary()
-				_ = yym2513
+				yyv2537 := &x.Items
+				yym2538 := z.DecBinary()
+				_ = yym2538
 				if false {
 				} else {
-					h.decSliceNode((*[]Node)(yyv2512), d)
+					h.decSliceNode((*[]Node)(yyv2537), d)
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2507)
-		} // end switch yys2507
-	} // end for yyj2507
+			z.DecStructFieldNotFound(-1, yys2532)
+		} // end switch yys2532
+	} // end for yyj2532
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -31998,16 +32289,16 @@ func (x *NodeList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2514 int
-	var yyb2514 bool
-	var yyhl2514 bool = l >= 0
-	yyj2514++
-	if yyhl2514 {
-		yyb2514 = yyj2514 > l
+	var yyj2539 int
+	var yyb2539 bool
+	var yyhl2539 bool = l >= 0
+	yyj2539++
+	if yyhl2539 {
+		yyb2539 = yyj2539 > l
 	} else {
-		yyb2514 = r.CheckBreak()
+		yyb2539 = r.CheckBreak()
 	}
-	if yyb2514 {
+	if yyb2539 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -32017,13 +32308,13 @@ func (x *NodeList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj2514++
-	if yyhl2514 {
-		yyb2514 = yyj2514 > l
+	yyj2539++
+	if yyhl2539 {
+		yyb2539 = yyj2539 > l
 	} else {
-		yyb2514 = r.CheckBreak()
+		yyb2539 = r.CheckBreak()
 	}
-	if yyb2514 {
+	if yyb2539 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -32033,13 +32324,13 @@ func (x *NodeList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj2514++
-	if yyhl2514 {
-		yyb2514 = yyj2514 > l
+	yyj2539++
+	if yyhl2539 {
+		yyb2539 = yyj2539 > l
 	} else {
-		yyb2514 = r.CheckBreak()
+		yyb2539 = r.CheckBreak()
 	}
-	if yyb2514 {
+	if yyb2539 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -32047,22 +32338,22 @@ func (x *NodeList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.ListMeta = pkg2_unversioned.ListMeta{}
 	} else {
-		yyv2517 := &x.ListMeta
-		yym2518 := z.DecBinary()
-		_ = yym2518
+		yyv2542 := &x.ListMeta
+		yym2543 := z.DecBinary()
+		_ = yym2543
 		if false {
-		} else if z.HasExtensions() && z.DecExt(yyv2517) {
+		} else if z.HasExtensions() && z.DecExt(yyv2542) {
 		} else {
-			z.DecFallback(yyv2517, false)
+			z.DecFallback(yyv2542, false)
 		}
 	}
-	yyj2514++
-	if yyhl2514 {
-		yyb2514 = yyj2514 > l
+	yyj2539++
+	if yyhl2539 {
+		yyb2539 = yyj2539 > l
 	} else {
-		yyb2514 = r.CheckBreak()
+		yyb2539 = r.CheckBreak()
 	}
-	if yyb2514 {
+	if yyb2539 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -32070,26 +32361,26 @@ func (x *NodeList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Items = nil
 	} else {
-		yyv2519 := &x.Items
-		yym2520 := z.DecBinary()
-		_ = yym2520
+		yyv2544 := &x.Items
+		yym2545 := z.DecBinary()
+		_ = yym2545
 		if false {
 		} else {
-			h.decSliceNode((*[]Node)(yyv2519), d)
+			h.decSliceNode((*[]Node)(yyv2544), d)
 		}
 	}
 	for {
-		yyj2514++
-		if yyhl2514 {
-			yyb2514 = yyj2514 > l
+		yyj2539++
+		if yyhl2539 {
+			yyb2539 = yyj2539 > l
 		} else {
-			yyb2514 = r.CheckBreak()
+			yyb2539 = r.CheckBreak()
 		}
-		if yyb2514 {
+		if yyb2539 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2514-1, "")
+		z.DecStructFieldNotFound(yyj2539-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -32101,36 +32392,36 @@ func (x *NamespaceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2521 := z.EncBinary()
-		_ = yym2521
+		yym2546 := z.EncBinary()
+		_ = yym2546
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2522 := !z.EncBinary()
-			yy2arr2522 := z.EncBasicHandle().StructToArray
-			var yyq2522 [1]bool
-			_, _, _ = yysep2522, yyq2522, yy2arr2522
-			const yyr2522 bool = false
-			var yynn2522 int
-			if yyr2522 || yy2arr2522 {
+			yysep2547 := !z.EncBinary()
+			yy2arr2547 := z.EncBasicHandle().StructToArray
+			var yyq2547 [1]bool
+			_, _, _ = yysep2547, yyq2547, yy2arr2547
+			const yyr2547 bool = false
+			var yynn2547 int
+			if yyr2547 || yy2arr2547 {
 				r.EncodeArrayStart(1)
 			} else {
-				yynn2522 = 1
-				for _, b := range yyq2522 {
+				yynn2547 = 1
+				for _, b := range yyq2547 {
 					if b {
-						yynn2522++
+						yynn2547++
 					}
 				}
-				r.EncodeMapStart(yynn2522)
-				yynn2522 = 0
+				r.EncodeMapStart(yynn2547)
+				yynn2547 = 0
 			}
-			if yyr2522 || yy2arr2522 {
+			if yyr2547 || yy2arr2547 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.Finalizers == nil {
 					r.EncodeNil()
 				} else {
-					yym2524 := z.EncBinary()
-					_ = yym2524
+					yym2549 := z.EncBinary()
+					_ = yym2549
 					if false {
 					} else {
 						h.encSliceFinalizerName(([]FinalizerName)(x.Finalizers), e)
@@ -32143,15 +32434,15 @@ func (x *NamespaceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.Finalizers == nil {
 					r.EncodeNil()
 				} else {
-					yym2525 := z.EncBinary()
-					_ = yym2525
+					yym2550 := z.EncBinary()
+					_ = yym2550
 					if false {
 					} else {
 						h.encSliceFinalizerName(([]FinalizerName)(x.Finalizers), e)
 					}
 				}
 			}
-			if yyr2522 || yy2arr2522 {
+			if yyr2547 || yy2arr2547 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -32164,25 +32455,25 @@ func (x *NamespaceSpec) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2526 := z.DecBinary()
-	_ = yym2526
+	yym2551 := z.DecBinary()
+	_ = yym2551
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2527 := r.ContainerType()
-		if yyct2527 == codecSelferValueTypeMap1234 {
-			yyl2527 := r.ReadMapStart()
-			if yyl2527 == 0 {
+		yyct2552 := r.ContainerType()
+		if yyct2552 == codecSelferValueTypeMap1234 {
+			yyl2552 := r.ReadMapStart()
+			if yyl2552 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2527, d)
+				x.codecDecodeSelfFromMap(yyl2552, d)
 			}
-		} else if yyct2527 == codecSelferValueTypeArray1234 {
-			yyl2527 := r.ReadArrayStart()
-			if yyl2527 == 0 {
+		} else if yyct2552 == codecSelferValueTypeArray1234 {
+			yyl2552 := r.ReadArrayStart()
+			if yyl2552 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2527, d)
+				x.codecDecodeSelfFromArray(yyl2552, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -32194,12 +32485,12 @@ func (x *NamespaceSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2528Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2528Slc
-	var yyhl2528 bool = l >= 0
-	for yyj2528 := 0; ; yyj2528++ {
-		if yyhl2528 {
-			if yyj2528 >= l {
+	var yys2553Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2553Slc
+	var yyhl2553 bool = l >= 0
+	for yyj2553 := 0; ; yyj2553++ {
+		if yyhl2553 {
+			if yyj2553 >= l {
 				break
 			}
 		} else {
@@ -32208,26 +32499,26 @@ func (x *NamespaceSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2528Slc = r.DecodeBytes(yys2528Slc, true, true)
-		yys2528 := string(yys2528Slc)
+		yys2553Slc = r.DecodeBytes(yys2553Slc, true, true)
+		yys2553 := string(yys2553Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2528 {
+		switch yys2553 {
 		case "Finalizers":
 			if r.TryDecodeAsNil() {
 				x.Finalizers = nil
 			} else {
-				yyv2529 := &x.Finalizers
-				yym2530 := z.DecBinary()
-				_ = yym2530
+				yyv2554 := &x.Finalizers
+				yym2555 := z.DecBinary()
+				_ = yym2555
 				if false {
 				} else {
-					h.decSliceFinalizerName((*[]FinalizerName)(yyv2529), d)
+					h.decSliceFinalizerName((*[]FinalizerName)(yyv2554), d)
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2528)
-		} // end switch yys2528
-	} // end for yyj2528
+			z.DecStructFieldNotFound(-1, yys2553)
+		} // end switch yys2553
+	} // end for yyj2553
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -32235,16 +32526,16 @@ func (x *NamespaceSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2531 int
-	var yyb2531 bool
-	var yyhl2531 bool = l >= 0
-	yyj2531++
-	if yyhl2531 {
-		yyb2531 = yyj2531 > l
+	var yyj2556 int
+	var yyb2556 bool
+	var yyhl2556 bool = l >= 0
+	yyj2556++
+	if yyhl2556 {
+		yyb2556 = yyj2556 > l
 	} else {
-		yyb2531 = r.CheckBreak()
+		yyb2556 = r.CheckBreak()
 	}
-	if yyb2531 {
+	if yyb2556 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -32252,26 +32543,26 @@ func (x *NamespaceSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Finalizers = nil
 	} else {
-		yyv2532 := &x.Finalizers
-		yym2533 := z.DecBinary()
-		_ = yym2533
+		yyv2557 := &x.Finalizers
+		yym2558 := z.DecBinary()
+		_ = yym2558
 		if false {
 		} else {
-			h.decSliceFinalizerName((*[]FinalizerName)(yyv2532), d)
+			h.decSliceFinalizerName((*[]FinalizerName)(yyv2557), d)
 		}
 	}
 	for {
-		yyj2531++
-		if yyhl2531 {
-			yyb2531 = yyj2531 > l
+		yyj2556++
+		if yyhl2556 {
+			yyb2556 = yyj2556 > l
 		} else {
-			yyb2531 = r.CheckBreak()
+			yyb2556 = r.CheckBreak()
 		}
-		if yyb2531 {
+		if yyb2556 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2531-1, "")
+		z.DecStructFieldNotFound(yyj2556-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -32280,8 +32571,8 @@ func (x FinalizerName) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
-	yym2534 := z.EncBinary()
-	_ = yym2534
+	yym2559 := z.EncBinary()
+	_ = yym2559
 	if false {
 	} else if z.HasExtensions() && z.EncExt(x) {
 	} else {
@@ -32293,8 +32584,8 @@ func (x *FinalizerName) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2535 := z.DecBinary()
-	_ = yym2535
+	yym2560 := z.DecBinary()
+	_ = yym2560
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
@@ -32309,46 +32600,46 @@ func (x *NamespaceStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2536 := z.EncBinary()
-		_ = yym2536
+		yym2561 := z.EncBinary()
+		_ = yym2561
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2537 := !z.EncBinary()
-			yy2arr2537 := z.EncBasicHandle().StructToArray
-			var yyq2537 [1]bool
-			_, _, _ = yysep2537, yyq2537, yy2arr2537
-			const yyr2537 bool = false
-			yyq2537[0] = x.Phase != ""
-			var yynn2537 int
-			if yyr2537 || yy2arr2537 {
+			yysep2562 := !z.EncBinary()
+			yy2arr2562 := z.EncBasicHandle().StructToArray
+			var yyq2562 [1]bool
+			_, _, _ = yysep2562, yyq2562, yy2arr2562
+			const yyr2562 bool = false
+			yyq2562[0] = x.Phase != ""
+			var yynn2562 int
+			if yyr2562 || yy2arr2562 {
 				r.EncodeArrayStart(1)
 			} else {
-				yynn2537 = 0
-				for _, b := range yyq2537 {
+				yynn2562 = 0
+				for _, b := range yyq2562 {
 					if b {
-						yynn2537++
+						yynn2562++
 					}
 				}
-				r.EncodeMapStart(yynn2537)
-				yynn2537 = 0
+				r.EncodeMapStart(yynn2562)
+				yynn2562 = 0
 			}
-			if yyr2537 || yy2arr2537 {
+			if yyr2562 || yy2arr2562 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2537[0] {
+				if yyq2562[0] {
 					x.Phase.CodecEncodeSelf(e)
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2537[0] {
+				if yyq2562[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("phase"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					x.Phase.CodecEncodeSelf(e)
 				}
 			}
-			if yyr2537 || yy2arr2537 {
+			if yyr2562 || yy2arr2562 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -32358,281 +32649,6 @@ func (x *NamespaceStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 }
 
 func (x *NamespaceStatus) CodecDecodeSelf(d *codec1978.Decoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperDecoder(d)
-	_, _, _ = h, z, r
-	yym2539 := z.DecBinary()
-	_ = yym2539
-	if false {
-	} else if z.HasExtensions() && z.DecExt(x) {
-	} else {
-		yyct2540 := r.ContainerType()
-		if yyct2540 == codecSelferValueTypeMap1234 {
-			yyl2540 := r.ReadMapStart()
-			if yyl2540 == 0 {
-				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
-			} else {
-				x.codecDecodeSelfFromMap(yyl2540, d)
-			}
-		} else if yyct2540 == codecSelferValueTypeArray1234 {
-			yyl2540 := r.ReadArrayStart()
-			if yyl2540 == 0 {
-				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-			} else {
-				x.codecDecodeSelfFromArray(yyl2540, d)
-			}
-		} else {
-			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
-		}
-	}
-}
-
-func (x *NamespaceStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperDecoder(d)
-	_, _, _ = h, z, r
-	var yys2541Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2541Slc
-	var yyhl2541 bool = l >= 0
-	for yyj2541 := 0; ; yyj2541++ {
-		if yyhl2541 {
-			if yyj2541 >= l {
-				break
-			}
-		} else {
-			if r.CheckBreak() {
-				break
-			}
-		}
-		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2541Slc = r.DecodeBytes(yys2541Slc, true, true)
-		yys2541 := string(yys2541Slc)
-		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2541 {
-		case "phase":
-			if r.TryDecodeAsNil() {
-				x.Phase = ""
-			} else {
-				x.Phase = NamespacePhase(r.DecodeString())
-			}
-		default:
-			z.DecStructFieldNotFound(-1, yys2541)
-		} // end switch yys2541
-	} // end for yyj2541
-	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
-}
-
-func (x *NamespaceStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperDecoder(d)
-	_, _, _ = h, z, r
-	var yyj2543 int
-	var yyb2543 bool
-	var yyhl2543 bool = l >= 0
-	yyj2543++
-	if yyhl2543 {
-		yyb2543 = yyj2543 > l
-	} else {
-		yyb2543 = r.CheckBreak()
-	}
-	if yyb2543 {
-		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-		return
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-	if r.TryDecodeAsNil() {
-		x.Phase = ""
-	} else {
-		x.Phase = NamespacePhase(r.DecodeString())
-	}
-	for {
-		yyj2543++
-		if yyhl2543 {
-			yyb2543 = yyj2543 > l
-		} else {
-			yyb2543 = r.CheckBreak()
-		}
-		if yyb2543 {
-			break
-		}
-		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2543-1, "")
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-}
-
-func (x NamespacePhase) CodecEncodeSelf(e *codec1978.Encoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperEncoder(e)
-	_, _, _ = h, z, r
-	yym2545 := z.EncBinary()
-	_ = yym2545
-	if false {
-	} else if z.HasExtensions() && z.EncExt(x) {
-	} else {
-		r.EncodeString(codecSelferC_UTF81234, string(x))
-	}
-}
-
-func (x *NamespacePhase) CodecDecodeSelf(d *codec1978.Decoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperDecoder(d)
-	_, _, _ = h, z, r
-	yym2546 := z.DecBinary()
-	_ = yym2546
-	if false {
-	} else if z.HasExtensions() && z.DecExt(x) {
-	} else {
-		*((*string)(x)) = r.DecodeString()
-	}
-}
-
-func (x *Namespace) CodecEncodeSelf(e *codec1978.Encoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperEncoder(e)
-	_, _, _ = h, z, r
-	if x == nil {
-		r.EncodeNil()
-	} else {
-		yym2547 := z.EncBinary()
-		_ = yym2547
-		if false {
-		} else if z.HasExtensions() && z.EncExt(x) {
-		} else {
-			yysep2548 := !z.EncBinary()
-			yy2arr2548 := z.EncBasicHandle().StructToArray
-			var yyq2548 [5]bool
-			_, _, _ = yysep2548, yyq2548, yy2arr2548
-			const yyr2548 bool = false
-			yyq2548[0] = x.Kind != ""
-			yyq2548[1] = x.APIVersion != ""
-			yyq2548[2] = true
-			yyq2548[3] = true
-			yyq2548[4] = true
-			var yynn2548 int
-			if yyr2548 || yy2arr2548 {
-				r.EncodeArrayStart(5)
-			} else {
-				yynn2548 = 0
-				for _, b := range yyq2548 {
-					if b {
-						yynn2548++
-					}
-				}
-				r.EncodeMapStart(yynn2548)
-				yynn2548 = 0
-			}
-			if yyr2548 || yy2arr2548 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2548[0] {
-					yym2550 := z.EncBinary()
-					_ = yym2550
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
-					}
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, "")
-				}
-			} else {
-				if yyq2548[0] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("kind"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2551 := z.EncBinary()
-					_ = yym2551
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
-					}
-				}
-			}
-			if yyr2548 || yy2arr2548 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2548[1] {
-					yym2553 := z.EncBinary()
-					_ = yym2553
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
-					}
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, "")
-				}
-			} else {
-				if yyq2548[1] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2554 := z.EncBinary()
-					_ = yym2554
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
-					}
-				}
-			}
-			if yyr2548 || yy2arr2548 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2548[2] {
-					yy2556 := &x.ObjectMeta
-					yy2556.CodecEncodeSelf(e)
-				} else {
-					r.EncodeNil()
-				}
-			} else {
-				if yyq2548[2] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy2557 := &x.ObjectMeta
-					yy2557.CodecEncodeSelf(e)
-				}
-			}
-			if yyr2548 || yy2arr2548 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2548[3] {
-					yy2559 := &x.Spec
-					yy2559.CodecEncodeSelf(e)
-				} else {
-					r.EncodeNil()
-				}
-			} else {
-				if yyq2548[3] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("spec"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy2560 := &x.Spec
-					yy2560.CodecEncodeSelf(e)
-				}
-			}
-			if yyr2548 || yy2arr2548 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2548[4] {
-					yy2562 := &x.Status
-					yy2562.CodecEncodeSelf(e)
-				} else {
-					r.EncodeNil()
-				}
-			} else {
-				if yyq2548[4] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("status"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy2563 := &x.Status
-					yy2563.CodecEncodeSelf(e)
-				}
-			}
-			if yyr2548 || yy2arr2548 {
-				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
-			} else {
-				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
-			}
-		}
-	}
-}
-
-func (x *Namespace) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -32662,7 +32678,7 @@ func (x *Namespace) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *Namespace) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *NamespaceStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -32684,6 +32700,281 @@ func (x *Namespace) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 		yys2566 := string(yys2566Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
 		switch yys2566 {
+		case "phase":
+			if r.TryDecodeAsNil() {
+				x.Phase = ""
+			} else {
+				x.Phase = NamespacePhase(r.DecodeString())
+			}
+		default:
+			z.DecStructFieldNotFound(-1, yys2566)
+		} // end switch yys2566
+	} // end for yyj2566
+	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
+}
+
+func (x *NamespaceStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	var yyj2568 int
+	var yyb2568 bool
+	var yyhl2568 bool = l >= 0
+	yyj2568++
+	if yyhl2568 {
+		yyb2568 = yyj2568 > l
+	} else {
+		yyb2568 = r.CheckBreak()
+	}
+	if yyb2568 {
+		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+		return
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+	if r.TryDecodeAsNil() {
+		x.Phase = ""
+	} else {
+		x.Phase = NamespacePhase(r.DecodeString())
+	}
+	for {
+		yyj2568++
+		if yyhl2568 {
+			yyb2568 = yyj2568 > l
+		} else {
+			yyb2568 = r.CheckBreak()
+		}
+		if yyb2568 {
+			break
+		}
+		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+		z.DecStructFieldNotFound(yyj2568-1, "")
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+}
+
+func (x NamespacePhase) CodecEncodeSelf(e *codec1978.Encoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperEncoder(e)
+	_, _, _ = h, z, r
+	yym2570 := z.EncBinary()
+	_ = yym2570
+	if false {
+	} else if z.HasExtensions() && z.EncExt(x) {
+	} else {
+		r.EncodeString(codecSelferC_UTF81234, string(x))
+	}
+}
+
+func (x *NamespacePhase) CodecDecodeSelf(d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	yym2571 := z.DecBinary()
+	_ = yym2571
+	if false {
+	} else if z.HasExtensions() && z.DecExt(x) {
+	} else {
+		*((*string)(x)) = r.DecodeString()
+	}
+}
+
+func (x *Namespace) CodecEncodeSelf(e *codec1978.Encoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperEncoder(e)
+	_, _, _ = h, z, r
+	if x == nil {
+		r.EncodeNil()
+	} else {
+		yym2572 := z.EncBinary()
+		_ = yym2572
+		if false {
+		} else if z.HasExtensions() && z.EncExt(x) {
+		} else {
+			yysep2573 := !z.EncBinary()
+			yy2arr2573 := z.EncBasicHandle().StructToArray
+			var yyq2573 [5]bool
+			_, _, _ = yysep2573, yyq2573, yy2arr2573
+			const yyr2573 bool = false
+			yyq2573[0] = x.Kind != ""
+			yyq2573[1] = x.APIVersion != ""
+			yyq2573[2] = true
+			yyq2573[3] = true
+			yyq2573[4] = true
+			var yynn2573 int
+			if yyr2573 || yy2arr2573 {
+				r.EncodeArrayStart(5)
+			} else {
+				yynn2573 = 0
+				for _, b := range yyq2573 {
+					if b {
+						yynn2573++
+					}
+				}
+				r.EncodeMapStart(yynn2573)
+				yynn2573 = 0
+			}
+			if yyr2573 || yy2arr2573 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq2573[0] {
+					yym2575 := z.EncBinary()
+					_ = yym2575
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
+					}
+				} else {
+					r.EncodeString(codecSelferC_UTF81234, "")
+				}
+			} else {
+				if yyq2573[0] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("kind"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym2576 := z.EncBinary()
+					_ = yym2576
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
+					}
+				}
+			}
+			if yyr2573 || yy2arr2573 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq2573[1] {
+					yym2578 := z.EncBinary()
+					_ = yym2578
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
+					}
+				} else {
+					r.EncodeString(codecSelferC_UTF81234, "")
+				}
+			} else {
+				if yyq2573[1] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym2579 := z.EncBinary()
+					_ = yym2579
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
+					}
+				}
+			}
+			if yyr2573 || yy2arr2573 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq2573[2] {
+					yy2581 := &x.ObjectMeta
+					yy2581.CodecEncodeSelf(e)
+				} else {
+					r.EncodeNil()
+				}
+			} else {
+				if yyq2573[2] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yy2582 := &x.ObjectMeta
+					yy2582.CodecEncodeSelf(e)
+				}
+			}
+			if yyr2573 || yy2arr2573 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq2573[3] {
+					yy2584 := &x.Spec
+					yy2584.CodecEncodeSelf(e)
+				} else {
+					r.EncodeNil()
+				}
+			} else {
+				if yyq2573[3] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("spec"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yy2585 := &x.Spec
+					yy2585.CodecEncodeSelf(e)
+				}
+			}
+			if yyr2573 || yy2arr2573 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq2573[4] {
+					yy2587 := &x.Status
+					yy2587.CodecEncodeSelf(e)
+				} else {
+					r.EncodeNil()
+				}
+			} else {
+				if yyq2573[4] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("status"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yy2588 := &x.Status
+					yy2588.CodecEncodeSelf(e)
+				}
+			}
+			if yyr2573 || yy2arr2573 {
+				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
+			} else {
+				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
+			}
+		}
+	}
+}
+
+func (x *Namespace) CodecDecodeSelf(d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	yym2589 := z.DecBinary()
+	_ = yym2589
+	if false {
+	} else if z.HasExtensions() && z.DecExt(x) {
+	} else {
+		yyct2590 := r.ContainerType()
+		if yyct2590 == codecSelferValueTypeMap1234 {
+			yyl2590 := r.ReadMapStart()
+			if yyl2590 == 0 {
+				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
+			} else {
+				x.codecDecodeSelfFromMap(yyl2590, d)
+			}
+		} else if yyct2590 == codecSelferValueTypeArray1234 {
+			yyl2590 := r.ReadArrayStart()
+			if yyl2590 == 0 {
+				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+			} else {
+				x.codecDecodeSelfFromArray(yyl2590, d)
+			}
+		} else {
+			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
+		}
+	}
+}
+
+func (x *Namespace) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	var yys2591Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2591Slc
+	var yyhl2591 bool = l >= 0
+	for yyj2591 := 0; ; yyj2591++ {
+		if yyhl2591 {
+			if yyj2591 >= l {
+				break
+			}
+		} else {
+			if r.CheckBreak() {
+				break
+			}
+		}
+		z.DecSendContainerState(codecSelfer_containerMapKey1234)
+		yys2591Slc = r.DecodeBytes(yys2591Slc, true, true)
+		yys2591 := string(yys2591Slc)
+		z.DecSendContainerState(codecSelfer_containerMapValue1234)
+		switch yys2591 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -32700,27 +32991,27 @@ func (x *Namespace) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.ObjectMeta = ObjectMeta{}
 			} else {
-				yyv2569 := &x.ObjectMeta
-				yyv2569.CodecDecodeSelf(d)
+				yyv2594 := &x.ObjectMeta
+				yyv2594.CodecDecodeSelf(d)
 			}
 		case "spec":
 			if r.TryDecodeAsNil() {
 				x.Spec = NamespaceSpec{}
 			} else {
-				yyv2570 := &x.Spec
-				yyv2570.CodecDecodeSelf(d)
+				yyv2595 := &x.Spec
+				yyv2595.CodecDecodeSelf(d)
 			}
 		case "status":
 			if r.TryDecodeAsNil() {
 				x.Status = NamespaceStatus{}
 			} else {
-				yyv2571 := &x.Status
-				yyv2571.CodecDecodeSelf(d)
+				yyv2596 := &x.Status
+				yyv2596.CodecDecodeSelf(d)
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2566)
-		} // end switch yys2566
-	} // end for yyj2566
+			z.DecStructFieldNotFound(-1, yys2591)
+		} // end switch yys2591
+	} // end for yyj2591
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -32728,16 +33019,16 @@ func (x *Namespace) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2572 int
-	var yyb2572 bool
-	var yyhl2572 bool = l >= 0
-	yyj2572++
-	if yyhl2572 {
-		yyb2572 = yyj2572 > l
+	var yyj2597 int
+	var yyb2597 bool
+	var yyhl2597 bool = l >= 0
+	yyj2597++
+	if yyhl2597 {
+		yyb2597 = yyj2597 > l
 	} else {
-		yyb2572 = r.CheckBreak()
+		yyb2597 = r.CheckBreak()
 	}
-	if yyb2572 {
+	if yyb2597 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -32747,13 +33038,13 @@ func (x *Namespace) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj2572++
-	if yyhl2572 {
-		yyb2572 = yyj2572 > l
+	yyj2597++
+	if yyhl2597 {
+		yyb2597 = yyj2597 > l
 	} else {
-		yyb2572 = r.CheckBreak()
+		yyb2597 = r.CheckBreak()
 	}
-	if yyb2572 {
+	if yyb2597 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -32763,13 +33054,13 @@ func (x *Namespace) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj2572++
-	if yyhl2572 {
-		yyb2572 = yyj2572 > l
+	yyj2597++
+	if yyhl2597 {
+		yyb2597 = yyj2597 > l
 	} else {
-		yyb2572 = r.CheckBreak()
+		yyb2597 = r.CheckBreak()
 	}
-	if yyb2572 {
+	if yyb2597 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -32777,16 +33068,16 @@ func (x *Namespace) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.ObjectMeta = ObjectMeta{}
 	} else {
-		yyv2575 := &x.ObjectMeta
-		yyv2575.CodecDecodeSelf(d)
+		yyv2600 := &x.ObjectMeta
+		yyv2600.CodecDecodeSelf(d)
 	}
-	yyj2572++
-	if yyhl2572 {
-		yyb2572 = yyj2572 > l
+	yyj2597++
+	if yyhl2597 {
+		yyb2597 = yyj2597 > l
 	} else {
-		yyb2572 = r.CheckBreak()
+		yyb2597 = r.CheckBreak()
 	}
-	if yyb2572 {
+	if yyb2597 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -32794,16 +33085,16 @@ func (x *Namespace) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Spec = NamespaceSpec{}
 	} else {
-		yyv2576 := &x.Spec
-		yyv2576.CodecDecodeSelf(d)
+		yyv2601 := &x.Spec
+		yyv2601.CodecDecodeSelf(d)
 	}
-	yyj2572++
-	if yyhl2572 {
-		yyb2572 = yyj2572 > l
+	yyj2597++
+	if yyhl2597 {
+		yyb2597 = yyj2597 > l
 	} else {
-		yyb2572 = r.CheckBreak()
+		yyb2597 = r.CheckBreak()
 	}
-	if yyb2572 {
+	if yyb2597 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -32811,21 +33102,21 @@ func (x *Namespace) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Status = NamespaceStatus{}
 	} else {
-		yyv2577 := &x.Status
-		yyv2577.CodecDecodeSelf(d)
+		yyv2602 := &x.Status
+		yyv2602.CodecDecodeSelf(d)
 	}
 	for {
-		yyj2572++
-		if yyhl2572 {
-			yyb2572 = yyj2572 > l
+		yyj2597++
+		if yyhl2597 {
+			yyb2597 = yyj2597 > l
 		} else {
-			yyb2572 = r.CheckBreak()
+			yyb2597 = r.CheckBreak()
 		}
-		if yyb2572 {
+		if yyb2597 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2572-1, "")
+		z.DecStructFieldNotFound(yyj2597-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -32837,37 +33128,37 @@ func (x *NamespaceList) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2578 := z.EncBinary()
-		_ = yym2578
+		yym2603 := z.EncBinary()
+		_ = yym2603
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2579 := !z.EncBinary()
-			yy2arr2579 := z.EncBasicHandle().StructToArray
-			var yyq2579 [4]bool
-			_, _, _ = yysep2579, yyq2579, yy2arr2579
-			const yyr2579 bool = false
-			yyq2579[0] = x.Kind != ""
-			yyq2579[1] = x.APIVersion != ""
-			yyq2579[2] = true
-			var yynn2579 int
-			if yyr2579 || yy2arr2579 {
+			yysep2604 := !z.EncBinary()
+			yy2arr2604 := z.EncBasicHandle().StructToArray
+			var yyq2604 [4]bool
+			_, _, _ = yysep2604, yyq2604, yy2arr2604
+			const yyr2604 bool = false
+			yyq2604[0] = x.Kind != ""
+			yyq2604[1] = x.APIVersion != ""
+			yyq2604[2] = true
+			var yynn2604 int
+			if yyr2604 || yy2arr2604 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn2579 = 1
-				for _, b := range yyq2579 {
+				yynn2604 = 1
+				for _, b := range yyq2604 {
 					if b {
-						yynn2579++
+						yynn2604++
 					}
 				}
-				r.EncodeMapStart(yynn2579)
-				yynn2579 = 0
+				r.EncodeMapStart(yynn2604)
+				yynn2604 = 0
 			}
-			if yyr2579 || yy2arr2579 {
+			if yyr2604 || yy2arr2604 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2579[0] {
-					yym2581 := z.EncBinary()
-					_ = yym2581
+				if yyq2604[0] {
+					yym2606 := z.EncBinary()
+					_ = yym2606
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -32876,23 +33167,23 @@ func (x *NamespaceList) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2579[0] {
+				if yyq2604[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2582 := z.EncBinary()
-					_ = yym2582
+					yym2607 := z.EncBinary()
+					_ = yym2607
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr2579 || yy2arr2579 {
+			if yyr2604 || yy2arr2604 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2579[1] {
-					yym2584 := z.EncBinary()
-					_ = yym2584
+				if yyq2604[1] {
+					yym2609 := z.EncBinary()
+					_ = yym2609
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -32901,54 +33192,54 @@ func (x *NamespaceList) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2579[1] {
+				if yyq2604[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2585 := z.EncBinary()
-					_ = yym2585
+					yym2610 := z.EncBinary()
+					_ = yym2610
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr2579 || yy2arr2579 {
+			if yyr2604 || yy2arr2604 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2579[2] {
-					yy2587 := &x.ListMeta
-					yym2588 := z.EncBinary()
-					_ = yym2588
+				if yyq2604[2] {
+					yy2612 := &x.ListMeta
+					yym2613 := z.EncBinary()
+					_ = yym2613
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy2587) {
+					} else if z.HasExtensions() && z.EncExt(yy2612) {
 					} else {
-						z.EncFallback(yy2587)
+						z.EncFallback(yy2612)
 					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq2579[2] {
+				if yyq2604[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy2589 := &x.ListMeta
-					yym2590 := z.EncBinary()
-					_ = yym2590
+					yy2614 := &x.ListMeta
+					yym2615 := z.EncBinary()
+					_ = yym2615
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy2589) {
+					} else if z.HasExtensions() && z.EncExt(yy2614) {
 					} else {
-						z.EncFallback(yy2589)
+						z.EncFallback(yy2614)
 					}
 				}
 			}
-			if yyr2579 || yy2arr2579 {
+			if yyr2604 || yy2arr2604 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym2592 := z.EncBinary()
-					_ = yym2592
+					yym2617 := z.EncBinary()
+					_ = yym2617
 					if false {
 					} else {
 						h.encSliceNamespace(([]Namespace)(x.Items), e)
@@ -32961,15 +33252,15 @@ func (x *NamespaceList) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym2593 := z.EncBinary()
-					_ = yym2593
+					yym2618 := z.EncBinary()
+					_ = yym2618
 					if false {
 					} else {
 						h.encSliceNamespace(([]Namespace)(x.Items), e)
 					}
 				}
 			}
-			if yyr2579 || yy2arr2579 {
+			if yyr2604 || yy2arr2604 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -32982,25 +33273,25 @@ func (x *NamespaceList) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2594 := z.DecBinary()
-	_ = yym2594
+	yym2619 := z.DecBinary()
+	_ = yym2619
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2595 := r.ContainerType()
-		if yyct2595 == codecSelferValueTypeMap1234 {
-			yyl2595 := r.ReadMapStart()
-			if yyl2595 == 0 {
+		yyct2620 := r.ContainerType()
+		if yyct2620 == codecSelferValueTypeMap1234 {
+			yyl2620 := r.ReadMapStart()
+			if yyl2620 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2595, d)
+				x.codecDecodeSelfFromMap(yyl2620, d)
 			}
-		} else if yyct2595 == codecSelferValueTypeArray1234 {
-			yyl2595 := r.ReadArrayStart()
-			if yyl2595 == 0 {
+		} else if yyct2620 == codecSelferValueTypeArray1234 {
+			yyl2620 := r.ReadArrayStart()
+			if yyl2620 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2595, d)
+				x.codecDecodeSelfFromArray(yyl2620, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -33012,12 +33303,12 @@ func (x *NamespaceList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2596Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2596Slc
-	var yyhl2596 bool = l >= 0
-	for yyj2596 := 0; ; yyj2596++ {
-		if yyhl2596 {
-			if yyj2596 >= l {
+	var yys2621Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2621Slc
+	var yyhl2621 bool = l >= 0
+	for yyj2621 := 0; ; yyj2621++ {
+		if yyhl2621 {
+			if yyj2621 >= l {
 				break
 			}
 		} else {
@@ -33026,10 +33317,10 @@ func (x *NamespaceList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2596Slc = r.DecodeBytes(yys2596Slc, true, true)
-		yys2596 := string(yys2596Slc)
+		yys2621Slc = r.DecodeBytes(yys2621Slc, true, true)
+		yys2621 := string(yys2621Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2596 {
+		switch yys2621 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -33046,31 +33337,31 @@ func (x *NamespaceList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.ListMeta = pkg2_unversioned.ListMeta{}
 			} else {
-				yyv2599 := &x.ListMeta
-				yym2600 := z.DecBinary()
-				_ = yym2600
+				yyv2624 := &x.ListMeta
+				yym2625 := z.DecBinary()
+				_ = yym2625
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv2599) {
+				} else if z.HasExtensions() && z.DecExt(yyv2624) {
 				} else {
-					z.DecFallback(yyv2599, false)
+					z.DecFallback(yyv2624, false)
 				}
 			}
 		case "items":
 			if r.TryDecodeAsNil() {
 				x.Items = nil
 			} else {
-				yyv2601 := &x.Items
-				yym2602 := z.DecBinary()
-				_ = yym2602
+				yyv2626 := &x.Items
+				yym2627 := z.DecBinary()
+				_ = yym2627
 				if false {
 				} else {
-					h.decSliceNamespace((*[]Namespace)(yyv2601), d)
+					h.decSliceNamespace((*[]Namespace)(yyv2626), d)
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2596)
-		} // end switch yys2596
-	} // end for yyj2596
+			z.DecStructFieldNotFound(-1, yys2621)
+		} // end switch yys2621
+	} // end for yyj2621
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -33078,16 +33369,16 @@ func (x *NamespaceList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2603 int
-	var yyb2603 bool
-	var yyhl2603 bool = l >= 0
-	yyj2603++
-	if yyhl2603 {
-		yyb2603 = yyj2603 > l
+	var yyj2628 int
+	var yyb2628 bool
+	var yyhl2628 bool = l >= 0
+	yyj2628++
+	if yyhl2628 {
+		yyb2628 = yyj2628 > l
 	} else {
-		yyb2603 = r.CheckBreak()
+		yyb2628 = r.CheckBreak()
 	}
-	if yyb2603 {
+	if yyb2628 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -33097,13 +33388,13 @@ func (x *NamespaceList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj2603++
-	if yyhl2603 {
-		yyb2603 = yyj2603 > l
+	yyj2628++
+	if yyhl2628 {
+		yyb2628 = yyj2628 > l
 	} else {
-		yyb2603 = r.CheckBreak()
+		yyb2628 = r.CheckBreak()
 	}
-	if yyb2603 {
+	if yyb2628 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -33113,13 +33404,13 @@ func (x *NamespaceList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj2603++
-	if yyhl2603 {
-		yyb2603 = yyj2603 > l
+	yyj2628++
+	if yyhl2628 {
+		yyb2628 = yyj2628 > l
 	} else {
-		yyb2603 = r.CheckBreak()
+		yyb2628 = r.CheckBreak()
 	}
-	if yyb2603 {
+	if yyb2628 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -33127,22 +33418,22 @@ func (x *NamespaceList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.ListMeta = pkg2_unversioned.ListMeta{}
 	} else {
-		yyv2606 := &x.ListMeta
-		yym2607 := z.DecBinary()
-		_ = yym2607
+		yyv2631 := &x.ListMeta
+		yym2632 := z.DecBinary()
+		_ = yym2632
 		if false {
-		} else if z.HasExtensions() && z.DecExt(yyv2606) {
+		} else if z.HasExtensions() && z.DecExt(yyv2631) {
 		} else {
-			z.DecFallback(yyv2606, false)
+			z.DecFallback(yyv2631, false)
 		}
 	}
-	yyj2603++
-	if yyhl2603 {
-		yyb2603 = yyj2603 > l
+	yyj2628++
+	if yyhl2628 {
+		yyb2628 = yyj2628 > l
 	} else {
-		yyb2603 = r.CheckBreak()
+		yyb2628 = r.CheckBreak()
 	}
-	if yyb2603 {
+	if yyb2628 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -33150,26 +33441,26 @@ func (x *NamespaceList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Items = nil
 	} else {
-		yyv2608 := &x.Items
-		yym2609 := z.DecBinary()
-		_ = yym2609
+		yyv2633 := &x.Items
+		yym2634 := z.DecBinary()
+		_ = yym2634
 		if false {
 		} else {
-			h.decSliceNamespace((*[]Namespace)(yyv2608), d)
+			h.decSliceNamespace((*[]Namespace)(yyv2633), d)
 		}
 	}
 	for {
-		yyj2603++
-		if yyhl2603 {
-			yyb2603 = yyj2603 > l
+		yyj2628++
+		if yyhl2628 {
+			yyb2628 = yyj2628 > l
 		} else {
-			yyb2603 = r.CheckBreak()
+			yyb2628 = r.CheckBreak()
 		}
-		if yyb2603 {
+		if yyb2628 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2603-1, "")
+		z.DecStructFieldNotFound(yyj2628-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -33181,37 +33472,37 @@ func (x *Binding) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2610 := z.EncBinary()
-		_ = yym2610
+		yym2635 := z.EncBinary()
+		_ = yym2635
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2611 := !z.EncBinary()
-			yy2arr2611 := z.EncBasicHandle().StructToArray
-			var yyq2611 [4]bool
-			_, _, _ = yysep2611, yyq2611, yy2arr2611
-			const yyr2611 bool = false
-			yyq2611[0] = x.Kind != ""
-			yyq2611[1] = x.APIVersion != ""
-			yyq2611[2] = true
-			var yynn2611 int
-			if yyr2611 || yy2arr2611 {
+			yysep2636 := !z.EncBinary()
+			yy2arr2636 := z.EncBasicHandle().StructToArray
+			var yyq2636 [4]bool
+			_, _, _ = yysep2636, yyq2636, yy2arr2636
+			const yyr2636 bool = false
+			yyq2636[0] = x.Kind != ""
+			yyq2636[1] = x.APIVersion != ""
+			yyq2636[2] = true
+			var yynn2636 int
+			if yyr2636 || yy2arr2636 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn2611 = 1
-				for _, b := range yyq2611 {
+				yynn2636 = 1
+				for _, b := range yyq2636 {
 					if b {
-						yynn2611++
+						yynn2636++
 					}
 				}
-				r.EncodeMapStart(yynn2611)
-				yynn2611 = 0
+				r.EncodeMapStart(yynn2636)
+				yynn2636 = 0
 			}
-			if yyr2611 || yy2arr2611 {
+			if yyr2636 || yy2arr2636 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2611[0] {
-					yym2613 := z.EncBinary()
-					_ = yym2613
+				if yyq2636[0] {
+					yym2638 := z.EncBinary()
+					_ = yym2638
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -33220,23 +33511,23 @@ func (x *Binding) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2611[0] {
+				if yyq2636[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2614 := z.EncBinary()
-					_ = yym2614
+					yym2639 := z.EncBinary()
+					_ = yym2639
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr2611 || yy2arr2611 {
+			if yyr2636 || yy2arr2636 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2611[1] {
-					yym2616 := z.EncBinary()
-					_ = yym2616
+				if yyq2636[1] {
+					yym2641 := z.EncBinary()
+					_ = yym2641
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -33245,47 +33536,47 @@ func (x *Binding) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2611[1] {
+				if yyq2636[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2617 := z.EncBinary()
-					_ = yym2617
+					yym2642 := z.EncBinary()
+					_ = yym2642
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr2611 || yy2arr2611 {
+			if yyr2636 || yy2arr2636 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2611[2] {
-					yy2619 := &x.ObjectMeta
-					yy2619.CodecEncodeSelf(e)
+				if yyq2636[2] {
+					yy2644 := &x.ObjectMeta
+					yy2644.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq2611[2] {
+				if yyq2636[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy2620 := &x.ObjectMeta
-					yy2620.CodecEncodeSelf(e)
+					yy2645 := &x.ObjectMeta
+					yy2645.CodecEncodeSelf(e)
 				}
 			}
-			if yyr2611 || yy2arr2611 {
+			if yyr2636 || yy2arr2636 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yy2622 := &x.Target
-				yy2622.CodecEncodeSelf(e)
+				yy2647 := &x.Target
+				yy2647.CodecEncodeSelf(e)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("target"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yy2623 := &x.Target
-				yy2623.CodecEncodeSelf(e)
+				yy2648 := &x.Target
+				yy2648.CodecEncodeSelf(e)
 			}
-			if yyr2611 || yy2arr2611 {
+			if yyr2636 || yy2arr2636 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -33295,300 +33586,6 @@ func (x *Binding) CodecEncodeSelf(e *codec1978.Encoder) {
 }
 
 func (x *Binding) CodecDecodeSelf(d *codec1978.Decoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperDecoder(d)
-	_, _, _ = h, z, r
-	yym2624 := z.DecBinary()
-	_ = yym2624
-	if false {
-	} else if z.HasExtensions() && z.DecExt(x) {
-	} else {
-		yyct2625 := r.ContainerType()
-		if yyct2625 == codecSelferValueTypeMap1234 {
-			yyl2625 := r.ReadMapStart()
-			if yyl2625 == 0 {
-				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
-			} else {
-				x.codecDecodeSelfFromMap(yyl2625, d)
-			}
-		} else if yyct2625 == codecSelferValueTypeArray1234 {
-			yyl2625 := r.ReadArrayStart()
-			if yyl2625 == 0 {
-				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-			} else {
-				x.codecDecodeSelfFromArray(yyl2625, d)
-			}
-		} else {
-			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
-		}
-	}
-}
-
-func (x *Binding) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperDecoder(d)
-	_, _, _ = h, z, r
-	var yys2626Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2626Slc
-	var yyhl2626 bool = l >= 0
-	for yyj2626 := 0; ; yyj2626++ {
-		if yyhl2626 {
-			if yyj2626 >= l {
-				break
-			}
-		} else {
-			if r.CheckBreak() {
-				break
-			}
-		}
-		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2626Slc = r.DecodeBytes(yys2626Slc, true, true)
-		yys2626 := string(yys2626Slc)
-		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2626 {
-		case "kind":
-			if r.TryDecodeAsNil() {
-				x.Kind = ""
-			} else {
-				x.Kind = string(r.DecodeString())
-			}
-		case "apiVersion":
-			if r.TryDecodeAsNil() {
-				x.APIVersion = ""
-			} else {
-				x.APIVersion = string(r.DecodeString())
-			}
-		case "metadata":
-			if r.TryDecodeAsNil() {
-				x.ObjectMeta = ObjectMeta{}
-			} else {
-				yyv2629 := &x.ObjectMeta
-				yyv2629.CodecDecodeSelf(d)
-			}
-		case "target":
-			if r.TryDecodeAsNil() {
-				x.Target = ObjectReference{}
-			} else {
-				yyv2630 := &x.Target
-				yyv2630.CodecDecodeSelf(d)
-			}
-		default:
-			z.DecStructFieldNotFound(-1, yys2626)
-		} // end switch yys2626
-	} // end for yyj2626
-	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
-}
-
-func (x *Binding) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperDecoder(d)
-	_, _, _ = h, z, r
-	var yyj2631 int
-	var yyb2631 bool
-	var yyhl2631 bool = l >= 0
-	yyj2631++
-	if yyhl2631 {
-		yyb2631 = yyj2631 > l
-	} else {
-		yyb2631 = r.CheckBreak()
-	}
-	if yyb2631 {
-		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-		return
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-	if r.TryDecodeAsNil() {
-		x.Kind = ""
-	} else {
-		x.Kind = string(r.DecodeString())
-	}
-	yyj2631++
-	if yyhl2631 {
-		yyb2631 = yyj2631 > l
-	} else {
-		yyb2631 = r.CheckBreak()
-	}
-	if yyb2631 {
-		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-		return
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-	if r.TryDecodeAsNil() {
-		x.APIVersion = ""
-	} else {
-		x.APIVersion = string(r.DecodeString())
-	}
-	yyj2631++
-	if yyhl2631 {
-		yyb2631 = yyj2631 > l
-	} else {
-		yyb2631 = r.CheckBreak()
-	}
-	if yyb2631 {
-		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-		return
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-	if r.TryDecodeAsNil() {
-		x.ObjectMeta = ObjectMeta{}
-	} else {
-		yyv2634 := &x.ObjectMeta
-		yyv2634.CodecDecodeSelf(d)
-	}
-	yyj2631++
-	if yyhl2631 {
-		yyb2631 = yyj2631 > l
-	} else {
-		yyb2631 = r.CheckBreak()
-	}
-	if yyb2631 {
-		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-		return
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-	if r.TryDecodeAsNil() {
-		x.Target = ObjectReference{}
-	} else {
-		yyv2635 := &x.Target
-		yyv2635.CodecDecodeSelf(d)
-	}
-	for {
-		yyj2631++
-		if yyhl2631 {
-			yyb2631 = yyj2631 > l
-		} else {
-			yyb2631 = r.CheckBreak()
-		}
-		if yyb2631 {
-			break
-		}
-		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2631-1, "")
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-}
-
-func (x *DeleteOptions) CodecEncodeSelf(e *codec1978.Encoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperEncoder(e)
-	_, _, _ = h, z, r
-	if x == nil {
-		r.EncodeNil()
-	} else {
-		yym2636 := z.EncBinary()
-		_ = yym2636
-		if false {
-		} else if z.HasExtensions() && z.EncExt(x) {
-		} else {
-			yysep2637 := !z.EncBinary()
-			yy2arr2637 := z.EncBasicHandle().StructToArray
-			var yyq2637 [3]bool
-			_, _, _ = yysep2637, yyq2637, yy2arr2637
-			const yyr2637 bool = false
-			yyq2637[0] = x.Kind != ""
-			yyq2637[1] = x.APIVersion != ""
-			var yynn2637 int
-			if yyr2637 || yy2arr2637 {
-				r.EncodeArrayStart(3)
-			} else {
-				yynn2637 = 1
-				for _, b := range yyq2637 {
-					if b {
-						yynn2637++
-					}
-				}
-				r.EncodeMapStart(yynn2637)
-				yynn2637 = 0
-			}
-			if yyr2637 || yy2arr2637 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2637[0] {
-					yym2639 := z.EncBinary()
-					_ = yym2639
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
-					}
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, "")
-				}
-			} else {
-				if yyq2637[0] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("kind"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2640 := z.EncBinary()
-					_ = yym2640
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
-					}
-				}
-			}
-			if yyr2637 || yy2arr2637 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2637[1] {
-					yym2642 := z.EncBinary()
-					_ = yym2642
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
-					}
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, "")
-				}
-			} else {
-				if yyq2637[1] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2643 := z.EncBinary()
-					_ = yym2643
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
-					}
-				}
-			}
-			if yyr2637 || yy2arr2637 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if x.GracePeriodSeconds == nil {
-					r.EncodeNil()
-				} else {
-					yy2645 := *x.GracePeriodSeconds
-					yym2646 := z.EncBinary()
-					_ = yym2646
-					if false {
-					} else {
-						r.EncodeInt(int64(yy2645))
-					}
-				}
-			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("gracePeriodSeconds"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				if x.GracePeriodSeconds == nil {
-					r.EncodeNil()
-				} else {
-					yy2647 := *x.GracePeriodSeconds
-					yym2648 := z.EncBinary()
-					_ = yym2648
-					if false {
-					} else {
-						r.EncodeInt(int64(yy2647))
-					}
-				}
-			}
-			if yyr2637 || yy2arr2637 {
-				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
-			} else {
-				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
-			}
-		}
-	}
-}
-
-func (x *DeleteOptions) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -33618,7 +33615,7 @@ func (x *DeleteOptions) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *DeleteOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *Binding) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -33652,21 +33649,19 @@ func (x *DeleteOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			} else {
 				x.APIVersion = string(r.DecodeString())
 			}
-		case "gracePeriodSeconds":
+		case "metadata":
 			if r.TryDecodeAsNil() {
-				if x.GracePeriodSeconds != nil {
-					x.GracePeriodSeconds = nil
-				}
+				x.ObjectMeta = ObjectMeta{}
 			} else {
-				if x.GracePeriodSeconds == nil {
-					x.GracePeriodSeconds = new(int64)
-				}
-				yym2655 := z.DecBinary()
-				_ = yym2655
-				if false {
-				} else {
-					*((*int64)(x.GracePeriodSeconds)) = int64(r.DecodeInt(64))
-				}
+				yyv2654 := &x.ObjectMeta
+				yyv2654.CodecDecodeSelf(d)
+			}
+		case "target":
+			if r.TryDecodeAsNil() {
+				x.Target = ObjectReference{}
+			} else {
+				yyv2655 := &x.Target
+				yyv2655.CodecDecodeSelf(d)
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys2651)
@@ -33675,7 +33670,7 @@ func (x *DeleteOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x *DeleteOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *Binding) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -33726,19 +33721,27 @@ func (x *DeleteOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		if x.GracePeriodSeconds != nil {
-			x.GracePeriodSeconds = nil
-		}
+		x.ObjectMeta = ObjectMeta{}
 	} else {
-		if x.GracePeriodSeconds == nil {
-			x.GracePeriodSeconds = new(int64)
-		}
-		yym2660 := z.DecBinary()
-		_ = yym2660
-		if false {
-		} else {
-			*((*int64)(x.GracePeriodSeconds)) = int64(r.DecodeInt(64))
-		}
+		yyv2659 := &x.ObjectMeta
+		yyv2659.CodecDecodeSelf(d)
+	}
+	yyj2656++
+	if yyhl2656 {
+		yyb2656 = yyj2656 > l
+	} else {
+		yyb2656 = r.CheckBreak()
+	}
+	if yyb2656 {
+		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+		return
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+	if r.TryDecodeAsNil() {
+		x.Target = ObjectReference{}
+	} else {
+		yyv2660 := &x.Target
+		yyv2660.CodecDecodeSelf(d)
 	}
 	for {
 		yyj2656++
@@ -33756,7 +33759,7 @@ func (x *DeleteOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x *ExportOptions) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *DeleteOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -33770,16 +33773,16 @@ func (x *ExportOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 		} else {
 			yysep2662 := !z.EncBinary()
 			yy2arr2662 := z.EncBasicHandle().StructToArray
-			var yyq2662 [4]bool
+			var yyq2662 [3]bool
 			_, _, _ = yysep2662, yyq2662, yy2arr2662
 			const yyr2662 bool = false
 			yyq2662[0] = x.Kind != ""
 			yyq2662[1] = x.APIVersion != ""
 			var yynn2662 int
 			if yyr2662 || yy2arr2662 {
-				r.EncodeArrayStart(4)
+				r.EncodeArrayStart(3)
 			} else {
-				yynn2662 = 2
+				yynn2662 = 1
 				for _, b := range yyq2662 {
 					if b {
 						yynn2662++
@@ -33840,8 +33843,296 @@ func (x *ExportOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2662 || yy2arr2662 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2670 := z.EncBinary()
-				_ = yym2670
+				if x.GracePeriodSeconds == nil {
+					r.EncodeNil()
+				} else {
+					yy2670 := *x.GracePeriodSeconds
+					yym2671 := z.EncBinary()
+					_ = yym2671
+					if false {
+					} else {
+						r.EncodeInt(int64(yy2670))
+					}
+				}
+			} else {
+				z.EncSendContainerState(codecSelfer_containerMapKey1234)
+				r.EncodeString(codecSelferC_UTF81234, string("gracePeriodSeconds"))
+				z.EncSendContainerState(codecSelfer_containerMapValue1234)
+				if x.GracePeriodSeconds == nil {
+					r.EncodeNil()
+				} else {
+					yy2672 := *x.GracePeriodSeconds
+					yym2673 := z.EncBinary()
+					_ = yym2673
+					if false {
+					} else {
+						r.EncodeInt(int64(yy2672))
+					}
+				}
+			}
+			if yyr2662 || yy2arr2662 {
+				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
+			} else {
+				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
+			}
+		}
+	}
+}
+
+func (x *DeleteOptions) CodecDecodeSelf(d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	yym2674 := z.DecBinary()
+	_ = yym2674
+	if false {
+	} else if z.HasExtensions() && z.DecExt(x) {
+	} else {
+		yyct2675 := r.ContainerType()
+		if yyct2675 == codecSelferValueTypeMap1234 {
+			yyl2675 := r.ReadMapStart()
+			if yyl2675 == 0 {
+				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
+			} else {
+				x.codecDecodeSelfFromMap(yyl2675, d)
+			}
+		} else if yyct2675 == codecSelferValueTypeArray1234 {
+			yyl2675 := r.ReadArrayStart()
+			if yyl2675 == 0 {
+				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+			} else {
+				x.codecDecodeSelfFromArray(yyl2675, d)
+			}
+		} else {
+			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
+		}
+	}
+}
+
+func (x *DeleteOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	var yys2676Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2676Slc
+	var yyhl2676 bool = l >= 0
+	for yyj2676 := 0; ; yyj2676++ {
+		if yyhl2676 {
+			if yyj2676 >= l {
+				break
+			}
+		} else {
+			if r.CheckBreak() {
+				break
+			}
+		}
+		z.DecSendContainerState(codecSelfer_containerMapKey1234)
+		yys2676Slc = r.DecodeBytes(yys2676Slc, true, true)
+		yys2676 := string(yys2676Slc)
+		z.DecSendContainerState(codecSelfer_containerMapValue1234)
+		switch yys2676 {
+		case "kind":
+			if r.TryDecodeAsNil() {
+				x.Kind = ""
+			} else {
+				x.Kind = string(r.DecodeString())
+			}
+		case "apiVersion":
+			if r.TryDecodeAsNil() {
+				x.APIVersion = ""
+			} else {
+				x.APIVersion = string(r.DecodeString())
+			}
+		case "gracePeriodSeconds":
+			if r.TryDecodeAsNil() {
+				if x.GracePeriodSeconds != nil {
+					x.GracePeriodSeconds = nil
+				}
+			} else {
+				if x.GracePeriodSeconds == nil {
+					x.GracePeriodSeconds = new(int64)
+				}
+				yym2680 := z.DecBinary()
+				_ = yym2680
+				if false {
+				} else {
+					*((*int64)(x.GracePeriodSeconds)) = int64(r.DecodeInt(64))
+				}
+			}
+		default:
+			z.DecStructFieldNotFound(-1, yys2676)
+		} // end switch yys2676
+	} // end for yyj2676
+	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
+}
+
+func (x *DeleteOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	var yyj2681 int
+	var yyb2681 bool
+	var yyhl2681 bool = l >= 0
+	yyj2681++
+	if yyhl2681 {
+		yyb2681 = yyj2681 > l
+	} else {
+		yyb2681 = r.CheckBreak()
+	}
+	if yyb2681 {
+		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+		return
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+	if r.TryDecodeAsNil() {
+		x.Kind = ""
+	} else {
+		x.Kind = string(r.DecodeString())
+	}
+	yyj2681++
+	if yyhl2681 {
+		yyb2681 = yyj2681 > l
+	} else {
+		yyb2681 = r.CheckBreak()
+	}
+	if yyb2681 {
+		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+		return
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+	if r.TryDecodeAsNil() {
+		x.APIVersion = ""
+	} else {
+		x.APIVersion = string(r.DecodeString())
+	}
+	yyj2681++
+	if yyhl2681 {
+		yyb2681 = yyj2681 > l
+	} else {
+		yyb2681 = r.CheckBreak()
+	}
+	if yyb2681 {
+		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+		return
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+	if r.TryDecodeAsNil() {
+		if x.GracePeriodSeconds != nil {
+			x.GracePeriodSeconds = nil
+		}
+	} else {
+		if x.GracePeriodSeconds == nil {
+			x.GracePeriodSeconds = new(int64)
+		}
+		yym2685 := z.DecBinary()
+		_ = yym2685
+		if false {
+		} else {
+			*((*int64)(x.GracePeriodSeconds)) = int64(r.DecodeInt(64))
+		}
+	}
+	for {
+		yyj2681++
+		if yyhl2681 {
+			yyb2681 = yyj2681 > l
+		} else {
+			yyb2681 = r.CheckBreak()
+		}
+		if yyb2681 {
+			break
+		}
+		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+		z.DecStructFieldNotFound(yyj2681-1, "")
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+}
+
+func (x *ExportOptions) CodecEncodeSelf(e *codec1978.Encoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperEncoder(e)
+	_, _, _ = h, z, r
+	if x == nil {
+		r.EncodeNil()
+	} else {
+		yym2686 := z.EncBinary()
+		_ = yym2686
+		if false {
+		} else if z.HasExtensions() && z.EncExt(x) {
+		} else {
+			yysep2687 := !z.EncBinary()
+			yy2arr2687 := z.EncBasicHandle().StructToArray
+			var yyq2687 [4]bool
+			_, _, _ = yysep2687, yyq2687, yy2arr2687
+			const yyr2687 bool = false
+			yyq2687[0] = x.Kind != ""
+			yyq2687[1] = x.APIVersion != ""
+			var yynn2687 int
+			if yyr2687 || yy2arr2687 {
+				r.EncodeArrayStart(4)
+			} else {
+				yynn2687 = 2
+				for _, b := range yyq2687 {
+					if b {
+						yynn2687++
+					}
+				}
+				r.EncodeMapStart(yynn2687)
+				yynn2687 = 0
+			}
+			if yyr2687 || yy2arr2687 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq2687[0] {
+					yym2689 := z.EncBinary()
+					_ = yym2689
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
+					}
+				} else {
+					r.EncodeString(codecSelferC_UTF81234, "")
+				}
+			} else {
+				if yyq2687[0] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("kind"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym2690 := z.EncBinary()
+					_ = yym2690
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
+					}
+				}
+			}
+			if yyr2687 || yy2arr2687 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq2687[1] {
+					yym2692 := z.EncBinary()
+					_ = yym2692
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
+					}
+				} else {
+					r.EncodeString(codecSelferC_UTF81234, "")
+				}
+			} else {
+				if yyq2687[1] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym2693 := z.EncBinary()
+					_ = yym2693
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
+					}
+				}
+			}
+			if yyr2687 || yy2arr2687 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				yym2695 := z.EncBinary()
+				_ = yym2695
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Export))
@@ -33850,17 +34141,17 @@ func (x *ExportOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("export"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2671 := z.EncBinary()
-				_ = yym2671
+				yym2696 := z.EncBinary()
+				_ = yym2696
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Export))
 				}
 			}
-			if yyr2662 || yy2arr2662 {
+			if yyr2687 || yy2arr2687 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2673 := z.EncBinary()
-				_ = yym2673
+				yym2698 := z.EncBinary()
+				_ = yym2698
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Exact))
@@ -33869,14 +34160,14 @@ func (x *ExportOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("exact"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2674 := z.EncBinary()
-				_ = yym2674
+				yym2699 := z.EncBinary()
+				_ = yym2699
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Exact))
 				}
 			}
-			if yyr2662 || yy2arr2662 {
+			if yyr2687 || yy2arr2687 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -33889,25 +34180,25 @@ func (x *ExportOptions) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2675 := z.DecBinary()
-	_ = yym2675
+	yym2700 := z.DecBinary()
+	_ = yym2700
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2676 := r.ContainerType()
-		if yyct2676 == codecSelferValueTypeMap1234 {
-			yyl2676 := r.ReadMapStart()
-			if yyl2676 == 0 {
+		yyct2701 := r.ContainerType()
+		if yyct2701 == codecSelferValueTypeMap1234 {
+			yyl2701 := r.ReadMapStart()
+			if yyl2701 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2676, d)
+				x.codecDecodeSelfFromMap(yyl2701, d)
 			}
-		} else if yyct2676 == codecSelferValueTypeArray1234 {
-			yyl2676 := r.ReadArrayStart()
-			if yyl2676 == 0 {
+		} else if yyct2701 == codecSelferValueTypeArray1234 {
+			yyl2701 := r.ReadArrayStart()
+			if yyl2701 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2676, d)
+				x.codecDecodeSelfFromArray(yyl2701, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -33919,12 +34210,12 @@ func (x *ExportOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2677Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2677Slc
-	var yyhl2677 bool = l >= 0
-	for yyj2677 := 0; ; yyj2677++ {
-		if yyhl2677 {
-			if yyj2677 >= l {
+	var yys2702Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2702Slc
+	var yyhl2702 bool = l >= 0
+	for yyj2702 := 0; ; yyj2702++ {
+		if yyhl2702 {
+			if yyj2702 >= l {
 				break
 			}
 		} else {
@@ -33933,10 +34224,10 @@ func (x *ExportOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2677Slc = r.DecodeBytes(yys2677Slc, true, true)
-		yys2677 := string(yys2677Slc)
+		yys2702Slc = r.DecodeBytes(yys2702Slc, true, true)
+		yys2702 := string(yys2702Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2677 {
+		switch yys2702 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -33962,9 +34253,9 @@ func (x *ExportOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				x.Exact = bool(r.DecodeBool())
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2677)
-		} // end switch yys2677
-	} // end for yyj2677
+			z.DecStructFieldNotFound(-1, yys2702)
+		} // end switch yys2702
+	} // end for yyj2702
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -33972,16 +34263,16 @@ func (x *ExportOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2682 int
-	var yyb2682 bool
-	var yyhl2682 bool = l >= 0
-	yyj2682++
-	if yyhl2682 {
-		yyb2682 = yyj2682 > l
+	var yyj2707 int
+	var yyb2707 bool
+	var yyhl2707 bool = l >= 0
+	yyj2707++
+	if yyhl2707 {
+		yyb2707 = yyj2707 > l
 	} else {
-		yyb2682 = r.CheckBreak()
+		yyb2707 = r.CheckBreak()
 	}
-	if yyb2682 {
+	if yyb2707 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -33991,13 +34282,13 @@ func (x *ExportOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj2682++
-	if yyhl2682 {
-		yyb2682 = yyj2682 > l
+	yyj2707++
+	if yyhl2707 {
+		yyb2707 = yyj2707 > l
 	} else {
-		yyb2682 = r.CheckBreak()
+		yyb2707 = r.CheckBreak()
 	}
-	if yyb2682 {
+	if yyb2707 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -34007,13 +34298,13 @@ func (x *ExportOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj2682++
-	if yyhl2682 {
-		yyb2682 = yyj2682 > l
+	yyj2707++
+	if yyhl2707 {
+		yyb2707 = yyj2707 > l
 	} else {
-		yyb2682 = r.CheckBreak()
+		yyb2707 = r.CheckBreak()
 	}
-	if yyb2682 {
+	if yyb2707 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -34023,13 +34314,13 @@ func (x *ExportOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Export = bool(r.DecodeBool())
 	}
-	yyj2682++
-	if yyhl2682 {
-		yyb2682 = yyj2682 > l
+	yyj2707++
+	if yyhl2707 {
+		yyb2707 = yyj2707 > l
 	} else {
-		yyb2682 = r.CheckBreak()
+		yyb2707 = r.CheckBreak()
 	}
-	if yyb2682 {
+	if yyb2707 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -34040,17 +34331,17 @@ func (x *ExportOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		x.Exact = bool(r.DecodeBool())
 	}
 	for {
-		yyj2682++
-		if yyhl2682 {
-			yyb2682 = yyj2682 > l
+		yyj2707++
+		if yyhl2707 {
+			yyb2707 = yyj2707 > l
 		} else {
-			yyb2682 = r.CheckBreak()
+			yyb2707 = r.CheckBreak()
 		}
-		if yyb2682 {
+		if yyb2707 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2682-1, "")
+		z.DecStructFieldNotFound(yyj2707-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -34062,36 +34353,36 @@ func (x *ListOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2687 := z.EncBinary()
-		_ = yym2687
+		yym2712 := z.EncBinary()
+		_ = yym2712
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2688 := !z.EncBinary()
-			yy2arr2688 := z.EncBasicHandle().StructToArray
-			var yyq2688 [7]bool
-			_, _, _ = yysep2688, yyq2688, yy2arr2688
-			const yyr2688 bool = false
-			yyq2688[0] = x.Kind != ""
-			yyq2688[1] = x.APIVersion != ""
-			var yynn2688 int
-			if yyr2688 || yy2arr2688 {
+			yysep2713 := !z.EncBinary()
+			yy2arr2713 := z.EncBasicHandle().StructToArray
+			var yyq2713 [7]bool
+			_, _, _ = yysep2713, yyq2713, yy2arr2713
+			const yyr2713 bool = false
+			yyq2713[0] = x.Kind != ""
+			yyq2713[1] = x.APIVersion != ""
+			var yynn2713 int
+			if yyr2713 || yy2arr2713 {
 				r.EncodeArrayStart(7)
 			} else {
-				yynn2688 = 5
-				for _, b := range yyq2688 {
+				yynn2713 = 5
+				for _, b := range yyq2713 {
 					if b {
-						yynn2688++
+						yynn2713++
 					}
 				}
-				r.EncodeMapStart(yynn2688)
-				yynn2688 = 0
+				r.EncodeMapStart(yynn2713)
+				yynn2713 = 0
 			}
-			if yyr2688 || yy2arr2688 {
+			if yyr2713 || yy2arr2713 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2688[0] {
-					yym2690 := z.EncBinary()
-					_ = yym2690
+				if yyq2713[0] {
+					yym2715 := z.EncBinary()
+					_ = yym2715
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -34100,23 +34391,23 @@ func (x *ListOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2688[0] {
+				if yyq2713[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2691 := z.EncBinary()
-					_ = yym2691
+					yym2716 := z.EncBinary()
+					_ = yym2716
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr2688 || yy2arr2688 {
+			if yyr2713 || yy2arr2713 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2688[1] {
-					yym2693 := z.EncBinary()
-					_ = yym2693
+				if yyq2713[1] {
+					yym2718 := z.EncBinary()
+					_ = yym2718
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -34125,25 +34416,25 @@ func (x *ListOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2688[1] {
+				if yyq2713[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2694 := z.EncBinary()
-					_ = yym2694
+					yym2719 := z.EncBinary()
+					_ = yym2719
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr2688 || yy2arr2688 {
+			if yyr2713 || yy2arr2713 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.LabelSelector == nil {
 					r.EncodeNil()
 				} else {
-					yym2696 := z.EncBinary()
-					_ = yym2696
+					yym2721 := z.EncBinary()
+					_ = yym2721
 					if false {
 					} else if z.HasExtensions() && z.EncExt(x.LabelSelector) {
 					} else {
@@ -34157,8 +34448,8 @@ func (x *ListOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.LabelSelector == nil {
 					r.EncodeNil()
 				} else {
-					yym2697 := z.EncBinary()
-					_ = yym2697
+					yym2722 := z.EncBinary()
+					_ = yym2722
 					if false {
 					} else if z.HasExtensions() && z.EncExt(x.LabelSelector) {
 					} else {
@@ -34166,13 +34457,13 @@ func (x *ListOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					}
 				}
 			}
-			if yyr2688 || yy2arr2688 {
+			if yyr2713 || yy2arr2713 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.FieldSelector == nil {
 					r.EncodeNil()
 				} else {
-					yym2699 := z.EncBinary()
-					_ = yym2699
+					yym2724 := z.EncBinary()
+					_ = yym2724
 					if false {
 					} else if z.HasExtensions() && z.EncExt(x.FieldSelector) {
 					} else {
@@ -34186,8 +34477,8 @@ func (x *ListOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.FieldSelector == nil {
 					r.EncodeNil()
 				} else {
-					yym2700 := z.EncBinary()
-					_ = yym2700
+					yym2725 := z.EncBinary()
+					_ = yym2725
 					if false {
 					} else if z.HasExtensions() && z.EncExt(x.FieldSelector) {
 					} else {
@@ -34195,10 +34486,10 @@ func (x *ListOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					}
 				}
 			}
-			if yyr2688 || yy2arr2688 {
+			if yyr2713 || yy2arr2713 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2702 := z.EncBinary()
-				_ = yym2702
+				yym2727 := z.EncBinary()
+				_ = yym2727
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Watch))
@@ -34207,17 +34498,17 @@ func (x *ListOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("Watch"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2703 := z.EncBinary()
-				_ = yym2703
+				yym2728 := z.EncBinary()
+				_ = yym2728
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Watch))
 				}
 			}
-			if yyr2688 || yy2arr2688 {
+			if yyr2713 || yy2arr2713 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2705 := z.EncBinary()
-				_ = yym2705
+				yym2730 := z.EncBinary()
+				_ = yym2730
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.ResourceVersion))
@@ -34226,24 +34517,24 @@ func (x *ListOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("ResourceVersion"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2706 := z.EncBinary()
-				_ = yym2706
+				yym2731 := z.EncBinary()
+				_ = yym2731
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.ResourceVersion))
 				}
 			}
-			if yyr2688 || yy2arr2688 {
+			if yyr2713 || yy2arr2713 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.TimeoutSeconds == nil {
 					r.EncodeNil()
 				} else {
-					yy2708 := *x.TimeoutSeconds
-					yym2709 := z.EncBinary()
-					_ = yym2709
+					yy2733 := *x.TimeoutSeconds
+					yym2734 := z.EncBinary()
+					_ = yym2734
 					if false {
 					} else {
-						r.EncodeInt(int64(yy2708))
+						r.EncodeInt(int64(yy2733))
 					}
 				}
 			} else {
@@ -34253,16 +34544,16 @@ func (x *ListOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.TimeoutSeconds == nil {
 					r.EncodeNil()
 				} else {
-					yy2710 := *x.TimeoutSeconds
-					yym2711 := z.EncBinary()
-					_ = yym2711
+					yy2735 := *x.TimeoutSeconds
+					yym2736 := z.EncBinary()
+					_ = yym2736
 					if false {
 					} else {
-						r.EncodeInt(int64(yy2710))
+						r.EncodeInt(int64(yy2735))
 					}
 				}
 			}
-			if yyr2688 || yy2arr2688 {
+			if yyr2713 || yy2arr2713 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -34275,25 +34566,25 @@ func (x *ListOptions) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2712 := z.DecBinary()
-	_ = yym2712
+	yym2737 := z.DecBinary()
+	_ = yym2737
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2713 := r.ContainerType()
-		if yyct2713 == codecSelferValueTypeMap1234 {
-			yyl2713 := r.ReadMapStart()
-			if yyl2713 == 0 {
+		yyct2738 := r.ContainerType()
+		if yyct2738 == codecSelferValueTypeMap1234 {
+			yyl2738 := r.ReadMapStart()
+			if yyl2738 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2713, d)
+				x.codecDecodeSelfFromMap(yyl2738, d)
 			}
-		} else if yyct2713 == codecSelferValueTypeArray1234 {
-			yyl2713 := r.ReadArrayStart()
-			if yyl2713 == 0 {
+		} else if yyct2738 == codecSelferValueTypeArray1234 {
+			yyl2738 := r.ReadArrayStart()
+			if yyl2738 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2713, d)
+				x.codecDecodeSelfFromArray(yyl2738, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -34305,12 +34596,12 @@ func (x *ListOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2714Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2714Slc
-	var yyhl2714 bool = l >= 0
-	for yyj2714 := 0; ; yyj2714++ {
-		if yyhl2714 {
-			if yyj2714 >= l {
+	var yys2739Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2739Slc
+	var yyhl2739 bool = l >= 0
+	for yyj2739 := 0; ; yyj2739++ {
+		if yyhl2739 {
+			if yyj2739 >= l {
 				break
 			}
 		} else {
@@ -34319,10 +34610,10 @@ func (x *ListOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2714Slc = r.DecodeBytes(yys2714Slc, true, true)
-		yys2714 := string(yys2714Slc)
+		yys2739Slc = r.DecodeBytes(yys2739Slc, true, true)
+		yys2739 := string(yys2739Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2714 {
+		switch yys2739 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -34339,26 +34630,26 @@ func (x *ListOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.LabelSelector = nil
 			} else {
-				yyv2717 := &x.LabelSelector
-				yym2718 := z.DecBinary()
-				_ = yym2718
+				yyv2742 := &x.LabelSelector
+				yym2743 := z.DecBinary()
+				_ = yym2743
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv2717) {
+				} else if z.HasExtensions() && z.DecExt(yyv2742) {
 				} else {
-					z.DecFallback(yyv2717, true)
+					z.DecFallback(yyv2742, true)
 				}
 			}
 		case "FieldSelector":
 			if r.TryDecodeAsNil() {
 				x.FieldSelector = nil
 			} else {
-				yyv2719 := &x.FieldSelector
-				yym2720 := z.DecBinary()
-				_ = yym2720
+				yyv2744 := &x.FieldSelector
+				yym2745 := z.DecBinary()
+				_ = yym2745
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv2719) {
+				} else if z.HasExtensions() && z.DecExt(yyv2744) {
 				} else {
-					z.DecFallback(yyv2719, true)
+					z.DecFallback(yyv2744, true)
 				}
 			}
 		case "Watch":
@@ -34382,17 +34673,17 @@ func (x *ListOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				if x.TimeoutSeconds == nil {
 					x.TimeoutSeconds = new(int64)
 				}
-				yym2724 := z.DecBinary()
-				_ = yym2724
+				yym2749 := z.DecBinary()
+				_ = yym2749
 				if false {
 				} else {
 					*((*int64)(x.TimeoutSeconds)) = int64(r.DecodeInt(64))
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2714)
-		} // end switch yys2714
-	} // end for yyj2714
+			z.DecStructFieldNotFound(-1, yys2739)
+		} // end switch yys2739
+	} // end for yyj2739
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -34400,16 +34691,16 @@ func (x *ListOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2725 int
-	var yyb2725 bool
-	var yyhl2725 bool = l >= 0
-	yyj2725++
-	if yyhl2725 {
-		yyb2725 = yyj2725 > l
+	var yyj2750 int
+	var yyb2750 bool
+	var yyhl2750 bool = l >= 0
+	yyj2750++
+	if yyhl2750 {
+		yyb2750 = yyj2750 > l
 	} else {
-		yyb2725 = r.CheckBreak()
+		yyb2750 = r.CheckBreak()
 	}
-	if yyb2725 {
+	if yyb2750 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -34419,13 +34710,13 @@ func (x *ListOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj2725++
-	if yyhl2725 {
-		yyb2725 = yyj2725 > l
+	yyj2750++
+	if yyhl2750 {
+		yyb2750 = yyj2750 > l
 	} else {
-		yyb2725 = r.CheckBreak()
+		yyb2750 = r.CheckBreak()
 	}
-	if yyb2725 {
+	if yyb2750 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -34435,13 +34726,13 @@ func (x *ListOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj2725++
-	if yyhl2725 {
-		yyb2725 = yyj2725 > l
+	yyj2750++
+	if yyhl2750 {
+		yyb2750 = yyj2750 > l
 	} else {
-		yyb2725 = r.CheckBreak()
+		yyb2750 = r.CheckBreak()
 	}
-	if yyb2725 {
+	if yyb2750 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -34449,22 +34740,22 @@ func (x *ListOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.LabelSelector = nil
 	} else {
-		yyv2728 := &x.LabelSelector
-		yym2729 := z.DecBinary()
-		_ = yym2729
+		yyv2753 := &x.LabelSelector
+		yym2754 := z.DecBinary()
+		_ = yym2754
 		if false {
-		} else if z.HasExtensions() && z.DecExt(yyv2728) {
+		} else if z.HasExtensions() && z.DecExt(yyv2753) {
 		} else {
-			z.DecFallback(yyv2728, true)
+			z.DecFallback(yyv2753, true)
 		}
 	}
-	yyj2725++
-	if yyhl2725 {
-		yyb2725 = yyj2725 > l
+	yyj2750++
+	if yyhl2750 {
+		yyb2750 = yyj2750 > l
 	} else {
-		yyb2725 = r.CheckBreak()
+		yyb2750 = r.CheckBreak()
 	}
-	if yyb2725 {
+	if yyb2750 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -34472,22 +34763,22 @@ func (x *ListOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.FieldSelector = nil
 	} else {
-		yyv2730 := &x.FieldSelector
-		yym2731 := z.DecBinary()
-		_ = yym2731
+		yyv2755 := &x.FieldSelector
+		yym2756 := z.DecBinary()
+		_ = yym2756
 		if false {
-		} else if z.HasExtensions() && z.DecExt(yyv2730) {
+		} else if z.HasExtensions() && z.DecExt(yyv2755) {
 		} else {
-			z.DecFallback(yyv2730, true)
+			z.DecFallback(yyv2755, true)
 		}
 	}
-	yyj2725++
-	if yyhl2725 {
-		yyb2725 = yyj2725 > l
+	yyj2750++
+	if yyhl2750 {
+		yyb2750 = yyj2750 > l
 	} else {
-		yyb2725 = r.CheckBreak()
+		yyb2750 = r.CheckBreak()
 	}
-	if yyb2725 {
+	if yyb2750 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -34497,13 +34788,13 @@ func (x *ListOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Watch = bool(r.DecodeBool())
 	}
-	yyj2725++
-	if yyhl2725 {
-		yyb2725 = yyj2725 > l
+	yyj2750++
+	if yyhl2750 {
+		yyb2750 = yyj2750 > l
 	} else {
-		yyb2725 = r.CheckBreak()
+		yyb2750 = r.CheckBreak()
 	}
-	if yyb2725 {
+	if yyb2750 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -34513,13 +34804,13 @@ func (x *ListOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.ResourceVersion = string(r.DecodeString())
 	}
-	yyj2725++
-	if yyhl2725 {
-		yyb2725 = yyj2725 > l
+	yyj2750++
+	if yyhl2750 {
+		yyb2750 = yyj2750 > l
 	} else {
-		yyb2725 = r.CheckBreak()
+		yyb2750 = r.CheckBreak()
 	}
-	if yyb2725 {
+	if yyb2750 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -34532,25 +34823,25 @@ func (x *ListOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		if x.TimeoutSeconds == nil {
 			x.TimeoutSeconds = new(int64)
 		}
-		yym2735 := z.DecBinary()
-		_ = yym2735
+		yym2760 := z.DecBinary()
+		_ = yym2760
 		if false {
 		} else {
 			*((*int64)(x.TimeoutSeconds)) = int64(r.DecodeInt(64))
 		}
 	}
 	for {
-		yyj2725++
-		if yyhl2725 {
-			yyb2725 = yyj2725 > l
+		yyj2750++
+		if yyhl2750 {
+			yyb2750 = yyj2750 > l
 		} else {
-			yyb2725 = r.CheckBreak()
+			yyb2750 = r.CheckBreak()
 		}
-		if yyb2725 {
+		if yyb2750 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2725-1, "")
+		z.DecStructFieldNotFound(yyj2750-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -34562,36 +34853,36 @@ func (x *PodLogOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2736 := z.EncBinary()
-		_ = yym2736
+		yym2761 := z.EncBinary()
+		_ = yym2761
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2737 := !z.EncBinary()
-			yy2arr2737 := z.EncBasicHandle().StructToArray
-			var yyq2737 [10]bool
-			_, _, _ = yysep2737, yyq2737, yy2arr2737
-			const yyr2737 bool = false
-			yyq2737[0] = x.Kind != ""
-			yyq2737[1] = x.APIVersion != ""
-			var yynn2737 int
-			if yyr2737 || yy2arr2737 {
+			yysep2762 := !z.EncBinary()
+			yy2arr2762 := z.EncBasicHandle().StructToArray
+			var yyq2762 [10]bool
+			_, _, _ = yysep2762, yyq2762, yy2arr2762
+			const yyr2762 bool = false
+			yyq2762[0] = x.Kind != ""
+			yyq2762[1] = x.APIVersion != ""
+			var yynn2762 int
+			if yyr2762 || yy2arr2762 {
 				r.EncodeArrayStart(10)
 			} else {
-				yynn2737 = 8
-				for _, b := range yyq2737 {
+				yynn2762 = 8
+				for _, b := range yyq2762 {
 					if b {
-						yynn2737++
+						yynn2762++
 					}
 				}
-				r.EncodeMapStart(yynn2737)
-				yynn2737 = 0
+				r.EncodeMapStart(yynn2762)
+				yynn2762 = 0
 			}
-			if yyr2737 || yy2arr2737 {
+			if yyr2762 || yy2arr2762 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2737[0] {
-					yym2739 := z.EncBinary()
-					_ = yym2739
+				if yyq2762[0] {
+					yym2764 := z.EncBinary()
+					_ = yym2764
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -34600,23 +34891,23 @@ func (x *PodLogOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2737[0] {
+				if yyq2762[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2740 := z.EncBinary()
-					_ = yym2740
+					yym2765 := z.EncBinary()
+					_ = yym2765
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr2737 || yy2arr2737 {
+			if yyr2762 || yy2arr2762 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2737[1] {
-					yym2742 := z.EncBinary()
-					_ = yym2742
+				if yyq2762[1] {
+					yym2767 := z.EncBinary()
+					_ = yym2767
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -34625,22 +34916,22 @@ func (x *PodLogOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2737[1] {
+				if yyq2762[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2743 := z.EncBinary()
-					_ = yym2743
+					yym2768 := z.EncBinary()
+					_ = yym2768
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr2737 || yy2arr2737 {
+			if yyr2762 || yy2arr2762 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2745 := z.EncBinary()
-				_ = yym2745
+				yym2770 := z.EncBinary()
+				_ = yym2770
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.Container))
@@ -34649,17 +34940,17 @@ func (x *PodLogOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("Container"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2746 := z.EncBinary()
-				_ = yym2746
+				yym2771 := z.EncBinary()
+				_ = yym2771
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.Container))
 				}
 			}
-			if yyr2737 || yy2arr2737 {
+			if yyr2762 || yy2arr2762 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2748 := z.EncBinary()
-				_ = yym2748
+				yym2773 := z.EncBinary()
+				_ = yym2773
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Follow))
@@ -34668,17 +34959,17 @@ func (x *PodLogOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("Follow"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2749 := z.EncBinary()
-				_ = yym2749
+				yym2774 := z.EncBinary()
+				_ = yym2774
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Follow))
 				}
 			}
-			if yyr2737 || yy2arr2737 {
+			if yyr2762 || yy2arr2762 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2751 := z.EncBinary()
-				_ = yym2751
+				yym2776 := z.EncBinary()
+				_ = yym2776
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Previous))
@@ -34687,24 +34978,24 @@ func (x *PodLogOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("Previous"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2752 := z.EncBinary()
-				_ = yym2752
+				yym2777 := z.EncBinary()
+				_ = yym2777
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Previous))
 				}
 			}
-			if yyr2737 || yy2arr2737 {
+			if yyr2762 || yy2arr2762 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.SinceSeconds == nil {
 					r.EncodeNil()
 				} else {
-					yy2754 := *x.SinceSeconds
-					yym2755 := z.EncBinary()
-					_ = yym2755
+					yy2779 := *x.SinceSeconds
+					yym2780 := z.EncBinary()
+					_ = yym2780
 					if false {
 					} else {
-						r.EncodeInt(int64(yy2754))
+						r.EncodeInt(int64(yy2779))
 					}
 				}
 			} else {
@@ -34714,27 +35005,27 @@ func (x *PodLogOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.SinceSeconds == nil {
 					r.EncodeNil()
 				} else {
-					yy2756 := *x.SinceSeconds
-					yym2757 := z.EncBinary()
-					_ = yym2757
+					yy2781 := *x.SinceSeconds
+					yym2782 := z.EncBinary()
+					_ = yym2782
 					if false {
 					} else {
-						r.EncodeInt(int64(yy2756))
+						r.EncodeInt(int64(yy2781))
 					}
 				}
 			}
-			if yyr2737 || yy2arr2737 {
+			if yyr2762 || yy2arr2762 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.SinceTime == nil {
 					r.EncodeNil()
 				} else {
-					yym2759 := z.EncBinary()
-					_ = yym2759
+					yym2784 := z.EncBinary()
+					_ = yym2784
 					if false {
 					} else if z.HasExtensions() && z.EncExt(x.SinceTime) {
-					} else if yym2759 {
+					} else if yym2784 {
 						z.EncBinaryMarshal(x.SinceTime)
-					} else if !yym2759 && z.IsJSONHandle() {
+					} else if !yym2784 && z.IsJSONHandle() {
 						z.EncJSONMarshal(x.SinceTime)
 					} else {
 						z.EncFallback(x.SinceTime)
@@ -34747,23 +35038,23 @@ func (x *PodLogOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.SinceTime == nil {
 					r.EncodeNil()
 				} else {
-					yym2760 := z.EncBinary()
-					_ = yym2760
+					yym2785 := z.EncBinary()
+					_ = yym2785
 					if false {
 					} else if z.HasExtensions() && z.EncExt(x.SinceTime) {
-					} else if yym2760 {
+					} else if yym2785 {
 						z.EncBinaryMarshal(x.SinceTime)
-					} else if !yym2760 && z.IsJSONHandle() {
+					} else if !yym2785 && z.IsJSONHandle() {
 						z.EncJSONMarshal(x.SinceTime)
 					} else {
 						z.EncFallback(x.SinceTime)
 					}
 				}
 			}
-			if yyr2737 || yy2arr2737 {
+			if yyr2762 || yy2arr2762 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2762 := z.EncBinary()
-				_ = yym2762
+				yym2787 := z.EncBinary()
+				_ = yym2787
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Timestamps))
@@ -34772,24 +35063,24 @@ func (x *PodLogOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("Timestamps"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2763 := z.EncBinary()
-				_ = yym2763
+				yym2788 := z.EncBinary()
+				_ = yym2788
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Timestamps))
 				}
 			}
-			if yyr2737 || yy2arr2737 {
+			if yyr2762 || yy2arr2762 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.TailLines == nil {
 					r.EncodeNil()
 				} else {
-					yy2765 := *x.TailLines
-					yym2766 := z.EncBinary()
-					_ = yym2766
+					yy2790 := *x.TailLines
+					yym2791 := z.EncBinary()
+					_ = yym2791
 					if false {
 					} else {
-						r.EncodeInt(int64(yy2765))
+						r.EncodeInt(int64(yy2790))
 					}
 				}
 			} else {
@@ -34799,26 +35090,26 @@ func (x *PodLogOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.TailLines == nil {
 					r.EncodeNil()
 				} else {
-					yy2767 := *x.TailLines
-					yym2768 := z.EncBinary()
-					_ = yym2768
+					yy2792 := *x.TailLines
+					yym2793 := z.EncBinary()
+					_ = yym2793
 					if false {
 					} else {
-						r.EncodeInt(int64(yy2767))
+						r.EncodeInt(int64(yy2792))
 					}
 				}
 			}
-			if yyr2737 || yy2arr2737 {
+			if yyr2762 || yy2arr2762 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.LimitBytes == nil {
 					r.EncodeNil()
 				} else {
-					yy2770 := *x.LimitBytes
-					yym2771 := z.EncBinary()
-					_ = yym2771
+					yy2795 := *x.LimitBytes
+					yym2796 := z.EncBinary()
+					_ = yym2796
 					if false {
 					} else {
-						r.EncodeInt(int64(yy2770))
+						r.EncodeInt(int64(yy2795))
 					}
 				}
 			} else {
@@ -34828,16 +35119,16 @@ func (x *PodLogOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.LimitBytes == nil {
 					r.EncodeNil()
 				} else {
-					yy2772 := *x.LimitBytes
-					yym2773 := z.EncBinary()
-					_ = yym2773
+					yy2797 := *x.LimitBytes
+					yym2798 := z.EncBinary()
+					_ = yym2798
 					if false {
 					} else {
-						r.EncodeInt(int64(yy2772))
+						r.EncodeInt(int64(yy2797))
 					}
 				}
 			}
-			if yyr2737 || yy2arr2737 {
+			if yyr2762 || yy2arr2762 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -34850,25 +35141,25 @@ func (x *PodLogOptions) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2774 := z.DecBinary()
-	_ = yym2774
+	yym2799 := z.DecBinary()
+	_ = yym2799
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2775 := r.ContainerType()
-		if yyct2775 == codecSelferValueTypeMap1234 {
-			yyl2775 := r.ReadMapStart()
-			if yyl2775 == 0 {
+		yyct2800 := r.ContainerType()
+		if yyct2800 == codecSelferValueTypeMap1234 {
+			yyl2800 := r.ReadMapStart()
+			if yyl2800 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2775, d)
+				x.codecDecodeSelfFromMap(yyl2800, d)
 			}
-		} else if yyct2775 == codecSelferValueTypeArray1234 {
-			yyl2775 := r.ReadArrayStart()
-			if yyl2775 == 0 {
+		} else if yyct2800 == codecSelferValueTypeArray1234 {
+			yyl2800 := r.ReadArrayStart()
+			if yyl2800 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2775, d)
+				x.codecDecodeSelfFromArray(yyl2800, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -34880,12 +35171,12 @@ func (x *PodLogOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2776Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2776Slc
-	var yyhl2776 bool = l >= 0
-	for yyj2776 := 0; ; yyj2776++ {
-		if yyhl2776 {
-			if yyj2776 >= l {
+	var yys2801Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2801Slc
+	var yyhl2801 bool = l >= 0
+	for yyj2801 := 0; ; yyj2801++ {
+		if yyhl2801 {
+			if yyj2801 >= l {
 				break
 			}
 		} else {
@@ -34894,10 +35185,10 @@ func (x *PodLogOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2776Slc = r.DecodeBytes(yys2776Slc, true, true)
-		yys2776 := string(yys2776Slc)
+		yys2801Slc = r.DecodeBytes(yys2801Slc, true, true)
+		yys2801 := string(yys2801Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2776 {
+		switch yys2801 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -34937,8 +35228,8 @@ func (x *PodLogOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				if x.SinceSeconds == nil {
 					x.SinceSeconds = new(int64)
 				}
-				yym2783 := z.DecBinary()
-				_ = yym2783
+				yym2808 := z.DecBinary()
+				_ = yym2808
 				if false {
 				} else {
 					*((*int64)(x.SinceSeconds)) = int64(r.DecodeInt(64))
@@ -34953,13 +35244,13 @@ func (x *PodLogOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				if x.SinceTime == nil {
 					x.SinceTime = new(pkg2_unversioned.Time)
 				}
-				yym2785 := z.DecBinary()
-				_ = yym2785
+				yym2810 := z.DecBinary()
+				_ = yym2810
 				if false {
 				} else if z.HasExtensions() && z.DecExt(x.SinceTime) {
-				} else if yym2785 {
+				} else if yym2810 {
 					z.DecBinaryUnmarshal(x.SinceTime)
-				} else if !yym2785 && z.IsJSONHandle() {
+				} else if !yym2810 && z.IsJSONHandle() {
 					z.DecJSONUnmarshal(x.SinceTime)
 				} else {
 					z.DecFallback(x.SinceTime, false)
@@ -34980,8 +35271,8 @@ func (x *PodLogOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				if x.TailLines == nil {
 					x.TailLines = new(int64)
 				}
-				yym2788 := z.DecBinary()
-				_ = yym2788
+				yym2813 := z.DecBinary()
+				_ = yym2813
 				if false {
 				} else {
 					*((*int64)(x.TailLines)) = int64(r.DecodeInt(64))
@@ -34996,17 +35287,17 @@ func (x *PodLogOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				if x.LimitBytes == nil {
 					x.LimitBytes = new(int64)
 				}
-				yym2790 := z.DecBinary()
-				_ = yym2790
+				yym2815 := z.DecBinary()
+				_ = yym2815
 				if false {
 				} else {
 					*((*int64)(x.LimitBytes)) = int64(r.DecodeInt(64))
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2776)
-		} // end switch yys2776
-	} // end for yyj2776
+			z.DecStructFieldNotFound(-1, yys2801)
+		} // end switch yys2801
+	} // end for yyj2801
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -35014,16 +35305,16 @@ func (x *PodLogOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2791 int
-	var yyb2791 bool
-	var yyhl2791 bool = l >= 0
-	yyj2791++
-	if yyhl2791 {
-		yyb2791 = yyj2791 > l
+	var yyj2816 int
+	var yyb2816 bool
+	var yyhl2816 bool = l >= 0
+	yyj2816++
+	if yyhl2816 {
+		yyb2816 = yyj2816 > l
 	} else {
-		yyb2791 = r.CheckBreak()
+		yyb2816 = r.CheckBreak()
 	}
-	if yyb2791 {
+	if yyb2816 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35033,13 +35324,13 @@ func (x *PodLogOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj2791++
-	if yyhl2791 {
-		yyb2791 = yyj2791 > l
+	yyj2816++
+	if yyhl2816 {
+		yyb2816 = yyj2816 > l
 	} else {
-		yyb2791 = r.CheckBreak()
+		yyb2816 = r.CheckBreak()
 	}
-	if yyb2791 {
+	if yyb2816 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35049,13 +35340,13 @@ func (x *PodLogOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj2791++
-	if yyhl2791 {
-		yyb2791 = yyj2791 > l
+	yyj2816++
+	if yyhl2816 {
+		yyb2816 = yyj2816 > l
 	} else {
-		yyb2791 = r.CheckBreak()
+		yyb2816 = r.CheckBreak()
 	}
-	if yyb2791 {
+	if yyb2816 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35065,13 +35356,13 @@ func (x *PodLogOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Container = string(r.DecodeString())
 	}
-	yyj2791++
-	if yyhl2791 {
-		yyb2791 = yyj2791 > l
+	yyj2816++
+	if yyhl2816 {
+		yyb2816 = yyj2816 > l
 	} else {
-		yyb2791 = r.CheckBreak()
+		yyb2816 = r.CheckBreak()
 	}
-	if yyb2791 {
+	if yyb2816 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35081,13 +35372,13 @@ func (x *PodLogOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Follow = bool(r.DecodeBool())
 	}
-	yyj2791++
-	if yyhl2791 {
-		yyb2791 = yyj2791 > l
+	yyj2816++
+	if yyhl2816 {
+		yyb2816 = yyj2816 > l
 	} else {
-		yyb2791 = r.CheckBreak()
+		yyb2816 = r.CheckBreak()
 	}
-	if yyb2791 {
+	if yyb2816 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35097,13 +35388,13 @@ func (x *PodLogOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Previous = bool(r.DecodeBool())
 	}
-	yyj2791++
-	if yyhl2791 {
-		yyb2791 = yyj2791 > l
+	yyj2816++
+	if yyhl2816 {
+		yyb2816 = yyj2816 > l
 	} else {
-		yyb2791 = r.CheckBreak()
+		yyb2816 = r.CheckBreak()
 	}
-	if yyb2791 {
+	if yyb2816 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35116,20 +35407,20 @@ func (x *PodLogOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		if x.SinceSeconds == nil {
 			x.SinceSeconds = new(int64)
 		}
-		yym2798 := z.DecBinary()
-		_ = yym2798
+		yym2823 := z.DecBinary()
+		_ = yym2823
 		if false {
 		} else {
 			*((*int64)(x.SinceSeconds)) = int64(r.DecodeInt(64))
 		}
 	}
-	yyj2791++
-	if yyhl2791 {
-		yyb2791 = yyj2791 > l
+	yyj2816++
+	if yyhl2816 {
+		yyb2816 = yyj2816 > l
 	} else {
-		yyb2791 = r.CheckBreak()
+		yyb2816 = r.CheckBreak()
 	}
-	if yyb2791 {
+	if yyb2816 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35142,25 +35433,25 @@ func (x *PodLogOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		if x.SinceTime == nil {
 			x.SinceTime = new(pkg2_unversioned.Time)
 		}
-		yym2800 := z.DecBinary()
-		_ = yym2800
+		yym2825 := z.DecBinary()
+		_ = yym2825
 		if false {
 		} else if z.HasExtensions() && z.DecExt(x.SinceTime) {
-		} else if yym2800 {
+		} else if yym2825 {
 			z.DecBinaryUnmarshal(x.SinceTime)
-		} else if !yym2800 && z.IsJSONHandle() {
+		} else if !yym2825 && z.IsJSONHandle() {
 			z.DecJSONUnmarshal(x.SinceTime)
 		} else {
 			z.DecFallback(x.SinceTime, false)
 		}
 	}
-	yyj2791++
-	if yyhl2791 {
-		yyb2791 = yyj2791 > l
+	yyj2816++
+	if yyhl2816 {
+		yyb2816 = yyj2816 > l
 	} else {
-		yyb2791 = r.CheckBreak()
+		yyb2816 = r.CheckBreak()
 	}
-	if yyb2791 {
+	if yyb2816 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35170,13 +35461,13 @@ func (x *PodLogOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Timestamps = bool(r.DecodeBool())
 	}
-	yyj2791++
-	if yyhl2791 {
-		yyb2791 = yyj2791 > l
+	yyj2816++
+	if yyhl2816 {
+		yyb2816 = yyj2816 > l
 	} else {
-		yyb2791 = r.CheckBreak()
+		yyb2816 = r.CheckBreak()
 	}
-	if yyb2791 {
+	if yyb2816 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35189,20 +35480,20 @@ func (x *PodLogOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		if x.TailLines == nil {
 			x.TailLines = new(int64)
 		}
-		yym2803 := z.DecBinary()
-		_ = yym2803
+		yym2828 := z.DecBinary()
+		_ = yym2828
 		if false {
 		} else {
 			*((*int64)(x.TailLines)) = int64(r.DecodeInt(64))
 		}
 	}
-	yyj2791++
-	if yyhl2791 {
-		yyb2791 = yyj2791 > l
+	yyj2816++
+	if yyhl2816 {
+		yyb2816 = yyj2816 > l
 	} else {
-		yyb2791 = r.CheckBreak()
+		yyb2816 = r.CheckBreak()
 	}
-	if yyb2791 {
+	if yyb2816 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35215,25 +35506,25 @@ func (x *PodLogOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		if x.LimitBytes == nil {
 			x.LimitBytes = new(int64)
 		}
-		yym2805 := z.DecBinary()
-		_ = yym2805
+		yym2830 := z.DecBinary()
+		_ = yym2830
 		if false {
 		} else {
 			*((*int64)(x.LimitBytes)) = int64(r.DecodeInt(64))
 		}
 	}
 	for {
-		yyj2791++
-		if yyhl2791 {
-			yyb2791 = yyj2791 > l
+		yyj2816++
+		if yyhl2816 {
+			yyb2816 = yyj2816 > l
 		} else {
-			yyb2791 = r.CheckBreak()
+			yyb2816 = r.CheckBreak()
 		}
-		if yyb2791 {
+		if yyb2816 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2791-1, "")
+		z.DecStructFieldNotFound(yyj2816-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -35245,41 +35536,41 @@ func (x *PodAttachOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2806 := z.EncBinary()
-		_ = yym2806
+		yym2831 := z.EncBinary()
+		_ = yym2831
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2807 := !z.EncBinary()
-			yy2arr2807 := z.EncBasicHandle().StructToArray
-			var yyq2807 [7]bool
-			_, _, _ = yysep2807, yyq2807, yy2arr2807
-			const yyr2807 bool = false
-			yyq2807[0] = x.Kind != ""
-			yyq2807[1] = x.APIVersion != ""
-			yyq2807[2] = x.Stdin != false
-			yyq2807[3] = x.Stdout != false
-			yyq2807[4] = x.Stderr != false
-			yyq2807[5] = x.TTY != false
-			yyq2807[6] = x.Container != ""
-			var yynn2807 int
-			if yyr2807 || yy2arr2807 {
+			yysep2832 := !z.EncBinary()
+			yy2arr2832 := z.EncBasicHandle().StructToArray
+			var yyq2832 [7]bool
+			_, _, _ = yysep2832, yyq2832, yy2arr2832
+			const yyr2832 bool = false
+			yyq2832[0] = x.Kind != ""
+			yyq2832[1] = x.APIVersion != ""
+			yyq2832[2] = x.Stdin != false
+			yyq2832[3] = x.Stdout != false
+			yyq2832[4] = x.Stderr != false
+			yyq2832[5] = x.TTY != false
+			yyq2832[6] = x.Container != ""
+			var yynn2832 int
+			if yyr2832 || yy2arr2832 {
 				r.EncodeArrayStart(7)
 			} else {
-				yynn2807 = 0
-				for _, b := range yyq2807 {
+				yynn2832 = 0
+				for _, b := range yyq2832 {
 					if b {
-						yynn2807++
+						yynn2832++
 					}
 				}
-				r.EncodeMapStart(yynn2807)
-				yynn2807 = 0
+				r.EncodeMapStart(yynn2832)
+				yynn2832 = 0
 			}
-			if yyr2807 || yy2arr2807 {
+			if yyr2832 || yy2arr2832 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2807[0] {
-					yym2809 := z.EncBinary()
-					_ = yym2809
+				if yyq2832[0] {
+					yym2834 := z.EncBinary()
+					_ = yym2834
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -35288,23 +35579,23 @@ func (x *PodAttachOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2807[0] {
+				if yyq2832[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2810 := z.EncBinary()
-					_ = yym2810
+					yym2835 := z.EncBinary()
+					_ = yym2835
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr2807 || yy2arr2807 {
+			if yyr2832 || yy2arr2832 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2807[1] {
-					yym2812 := z.EncBinary()
-					_ = yym2812
+				if yyq2832[1] {
+					yym2837 := z.EncBinary()
+					_ = yym2837
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -35313,23 +35604,23 @@ func (x *PodAttachOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2807[1] {
+				if yyq2832[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2813 := z.EncBinary()
-					_ = yym2813
+					yym2838 := z.EncBinary()
+					_ = yym2838
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr2807 || yy2arr2807 {
+			if yyr2832 || yy2arr2832 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2807[2] {
-					yym2815 := z.EncBinary()
-					_ = yym2815
+				if yyq2832[2] {
+					yym2840 := z.EncBinary()
+					_ = yym2840
 					if false {
 					} else {
 						r.EncodeBool(bool(x.Stdin))
@@ -35338,23 +35629,23 @@ func (x *PodAttachOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeBool(false)
 				}
 			} else {
-				if yyq2807[2] {
+				if yyq2832[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("stdin"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2816 := z.EncBinary()
-					_ = yym2816
+					yym2841 := z.EncBinary()
+					_ = yym2841
 					if false {
 					} else {
 						r.EncodeBool(bool(x.Stdin))
 					}
 				}
 			}
-			if yyr2807 || yy2arr2807 {
+			if yyr2832 || yy2arr2832 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2807[3] {
-					yym2818 := z.EncBinary()
-					_ = yym2818
+				if yyq2832[3] {
+					yym2843 := z.EncBinary()
+					_ = yym2843
 					if false {
 					} else {
 						r.EncodeBool(bool(x.Stdout))
@@ -35363,23 +35654,23 @@ func (x *PodAttachOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeBool(false)
 				}
 			} else {
-				if yyq2807[3] {
+				if yyq2832[3] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("stdout"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2819 := z.EncBinary()
-					_ = yym2819
+					yym2844 := z.EncBinary()
+					_ = yym2844
 					if false {
 					} else {
 						r.EncodeBool(bool(x.Stdout))
 					}
 				}
 			}
-			if yyr2807 || yy2arr2807 {
+			if yyr2832 || yy2arr2832 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2807[4] {
-					yym2821 := z.EncBinary()
-					_ = yym2821
+				if yyq2832[4] {
+					yym2846 := z.EncBinary()
+					_ = yym2846
 					if false {
 					} else {
 						r.EncodeBool(bool(x.Stderr))
@@ -35388,23 +35679,23 @@ func (x *PodAttachOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeBool(false)
 				}
 			} else {
-				if yyq2807[4] {
+				if yyq2832[4] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("stderr"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2822 := z.EncBinary()
-					_ = yym2822
+					yym2847 := z.EncBinary()
+					_ = yym2847
 					if false {
 					} else {
 						r.EncodeBool(bool(x.Stderr))
 					}
 				}
 			}
-			if yyr2807 || yy2arr2807 {
+			if yyr2832 || yy2arr2832 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2807[5] {
-					yym2824 := z.EncBinary()
-					_ = yym2824
+				if yyq2832[5] {
+					yym2849 := z.EncBinary()
+					_ = yym2849
 					if false {
 					} else {
 						r.EncodeBool(bool(x.TTY))
@@ -35413,23 +35704,23 @@ func (x *PodAttachOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeBool(false)
 				}
 			} else {
-				if yyq2807[5] {
+				if yyq2832[5] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("tty"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2825 := z.EncBinary()
-					_ = yym2825
+					yym2850 := z.EncBinary()
+					_ = yym2850
 					if false {
 					} else {
 						r.EncodeBool(bool(x.TTY))
 					}
 				}
 			}
-			if yyr2807 || yy2arr2807 {
+			if yyr2832 || yy2arr2832 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2807[6] {
-					yym2827 := z.EncBinary()
-					_ = yym2827
+				if yyq2832[6] {
+					yym2852 := z.EncBinary()
+					_ = yym2852
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Container))
@@ -35438,19 +35729,19 @@ func (x *PodAttachOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2807[6] {
+				if yyq2832[6] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("container"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2828 := z.EncBinary()
-					_ = yym2828
+					yym2853 := z.EncBinary()
+					_ = yym2853
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Container))
 					}
 				}
 			}
-			if yyr2807 || yy2arr2807 {
+			if yyr2832 || yy2arr2832 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -35463,25 +35754,25 @@ func (x *PodAttachOptions) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2829 := z.DecBinary()
-	_ = yym2829
+	yym2854 := z.DecBinary()
+	_ = yym2854
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2830 := r.ContainerType()
-		if yyct2830 == codecSelferValueTypeMap1234 {
-			yyl2830 := r.ReadMapStart()
-			if yyl2830 == 0 {
+		yyct2855 := r.ContainerType()
+		if yyct2855 == codecSelferValueTypeMap1234 {
+			yyl2855 := r.ReadMapStart()
+			if yyl2855 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2830, d)
+				x.codecDecodeSelfFromMap(yyl2855, d)
 			}
-		} else if yyct2830 == codecSelferValueTypeArray1234 {
-			yyl2830 := r.ReadArrayStart()
-			if yyl2830 == 0 {
+		} else if yyct2855 == codecSelferValueTypeArray1234 {
+			yyl2855 := r.ReadArrayStart()
+			if yyl2855 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2830, d)
+				x.codecDecodeSelfFromArray(yyl2855, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -35493,12 +35784,12 @@ func (x *PodAttachOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2831Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2831Slc
-	var yyhl2831 bool = l >= 0
-	for yyj2831 := 0; ; yyj2831++ {
-		if yyhl2831 {
-			if yyj2831 >= l {
+	var yys2856Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2856Slc
+	var yyhl2856 bool = l >= 0
+	for yyj2856 := 0; ; yyj2856++ {
+		if yyhl2856 {
+			if yyj2856 >= l {
 				break
 			}
 		} else {
@@ -35507,10 +35798,10 @@ func (x *PodAttachOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2831Slc = r.DecodeBytes(yys2831Slc, true, true)
-		yys2831 := string(yys2831Slc)
+		yys2856Slc = r.DecodeBytes(yys2856Slc, true, true)
+		yys2856 := string(yys2856Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2831 {
+		switch yys2856 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -35554,9 +35845,9 @@ func (x *PodAttachOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				x.Container = string(r.DecodeString())
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2831)
-		} // end switch yys2831
-	} // end for yyj2831
+			z.DecStructFieldNotFound(-1, yys2856)
+		} // end switch yys2856
+	} // end for yyj2856
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -35564,16 +35855,16 @@ func (x *PodAttachOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2839 int
-	var yyb2839 bool
-	var yyhl2839 bool = l >= 0
-	yyj2839++
-	if yyhl2839 {
-		yyb2839 = yyj2839 > l
+	var yyj2864 int
+	var yyb2864 bool
+	var yyhl2864 bool = l >= 0
+	yyj2864++
+	if yyhl2864 {
+		yyb2864 = yyj2864 > l
 	} else {
-		yyb2839 = r.CheckBreak()
+		yyb2864 = r.CheckBreak()
 	}
-	if yyb2839 {
+	if yyb2864 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35583,13 +35874,13 @@ func (x *PodAttachOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj2839++
-	if yyhl2839 {
-		yyb2839 = yyj2839 > l
+	yyj2864++
+	if yyhl2864 {
+		yyb2864 = yyj2864 > l
 	} else {
-		yyb2839 = r.CheckBreak()
+		yyb2864 = r.CheckBreak()
 	}
-	if yyb2839 {
+	if yyb2864 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35599,13 +35890,13 @@ func (x *PodAttachOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj2839++
-	if yyhl2839 {
-		yyb2839 = yyj2839 > l
+	yyj2864++
+	if yyhl2864 {
+		yyb2864 = yyj2864 > l
 	} else {
-		yyb2839 = r.CheckBreak()
+		yyb2864 = r.CheckBreak()
 	}
-	if yyb2839 {
+	if yyb2864 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35615,13 +35906,13 @@ func (x *PodAttachOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	} else {
 		x.Stdin = bool(r.DecodeBool())
 	}
-	yyj2839++
-	if yyhl2839 {
-		yyb2839 = yyj2839 > l
+	yyj2864++
+	if yyhl2864 {
+		yyb2864 = yyj2864 > l
 	} else {
-		yyb2839 = r.CheckBreak()
+		yyb2864 = r.CheckBreak()
 	}
-	if yyb2839 {
+	if yyb2864 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35631,13 +35922,13 @@ func (x *PodAttachOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	} else {
 		x.Stdout = bool(r.DecodeBool())
 	}
-	yyj2839++
-	if yyhl2839 {
-		yyb2839 = yyj2839 > l
+	yyj2864++
+	if yyhl2864 {
+		yyb2864 = yyj2864 > l
 	} else {
-		yyb2839 = r.CheckBreak()
+		yyb2864 = r.CheckBreak()
 	}
-	if yyb2839 {
+	if yyb2864 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35647,13 +35938,13 @@ func (x *PodAttachOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	} else {
 		x.Stderr = bool(r.DecodeBool())
 	}
-	yyj2839++
-	if yyhl2839 {
-		yyb2839 = yyj2839 > l
+	yyj2864++
+	if yyhl2864 {
+		yyb2864 = yyj2864 > l
 	} else {
-		yyb2839 = r.CheckBreak()
+		yyb2864 = r.CheckBreak()
 	}
-	if yyb2839 {
+	if yyb2864 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35663,13 +35954,13 @@ func (x *PodAttachOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 	} else {
 		x.TTY = bool(r.DecodeBool())
 	}
-	yyj2839++
-	if yyhl2839 {
-		yyb2839 = yyj2839 > l
+	yyj2864++
+	if yyhl2864 {
+		yyb2864 = yyj2864 > l
 	} else {
-		yyb2839 = r.CheckBreak()
+		yyb2864 = r.CheckBreak()
 	}
-	if yyb2839 {
+	if yyb2864 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -35680,17 +35971,17 @@ func (x *PodAttachOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 		x.Container = string(r.DecodeString())
 	}
 	for {
-		yyj2839++
-		if yyhl2839 {
-			yyb2839 = yyj2839 > l
+		yyj2864++
+		if yyhl2864 {
+			yyb2864 = yyj2864 > l
 		} else {
-			yyb2839 = r.CheckBreak()
+			yyb2864 = r.CheckBreak()
 		}
-		if yyb2839 {
+		if yyb2864 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2839-1, "")
+		z.DecStructFieldNotFound(yyj2864-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -35702,36 +35993,36 @@ func (x *PodExecOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2847 := z.EncBinary()
-		_ = yym2847
+		yym2872 := z.EncBinary()
+		_ = yym2872
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2848 := !z.EncBinary()
-			yy2arr2848 := z.EncBasicHandle().StructToArray
-			var yyq2848 [8]bool
-			_, _, _ = yysep2848, yyq2848, yy2arr2848
-			const yyr2848 bool = false
-			yyq2848[0] = x.Kind != ""
-			yyq2848[1] = x.APIVersion != ""
-			var yynn2848 int
-			if yyr2848 || yy2arr2848 {
+			yysep2873 := !z.EncBinary()
+			yy2arr2873 := z.EncBasicHandle().StructToArray
+			var yyq2873 [8]bool
+			_, _, _ = yysep2873, yyq2873, yy2arr2873
+			const yyr2873 bool = false
+			yyq2873[0] = x.Kind != ""
+			yyq2873[1] = x.APIVersion != ""
+			var yynn2873 int
+			if yyr2873 || yy2arr2873 {
 				r.EncodeArrayStart(8)
 			} else {
-				yynn2848 = 6
-				for _, b := range yyq2848 {
+				yynn2873 = 6
+				for _, b := range yyq2873 {
 					if b {
-						yynn2848++
+						yynn2873++
 					}
 				}
-				r.EncodeMapStart(yynn2848)
-				yynn2848 = 0
+				r.EncodeMapStart(yynn2873)
+				yynn2873 = 0
 			}
-			if yyr2848 || yy2arr2848 {
+			if yyr2873 || yy2arr2873 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2848[0] {
-					yym2850 := z.EncBinary()
-					_ = yym2850
+				if yyq2873[0] {
+					yym2875 := z.EncBinary()
+					_ = yym2875
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -35740,23 +36031,23 @@ func (x *PodExecOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2848[0] {
+				if yyq2873[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2851 := z.EncBinary()
-					_ = yym2851
+					yym2876 := z.EncBinary()
+					_ = yym2876
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr2848 || yy2arr2848 {
+			if yyr2873 || yy2arr2873 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2848[1] {
-					yym2853 := z.EncBinary()
-					_ = yym2853
+				if yyq2873[1] {
+					yym2878 := z.EncBinary()
+					_ = yym2878
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -35765,22 +36056,22 @@ func (x *PodExecOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2848[1] {
+				if yyq2873[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2854 := z.EncBinary()
-					_ = yym2854
+					yym2879 := z.EncBinary()
+					_ = yym2879
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr2848 || yy2arr2848 {
+			if yyr2873 || yy2arr2873 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2856 := z.EncBinary()
-				_ = yym2856
+				yym2881 := z.EncBinary()
+				_ = yym2881
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Stdin))
@@ -35789,17 +36080,17 @@ func (x *PodExecOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("Stdin"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2857 := z.EncBinary()
-				_ = yym2857
+				yym2882 := z.EncBinary()
+				_ = yym2882
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Stdin))
 				}
 			}
-			if yyr2848 || yy2arr2848 {
+			if yyr2873 || yy2arr2873 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2859 := z.EncBinary()
-				_ = yym2859
+				yym2884 := z.EncBinary()
+				_ = yym2884
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Stdout))
@@ -35808,17 +36099,17 @@ func (x *PodExecOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("Stdout"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2860 := z.EncBinary()
-				_ = yym2860
+				yym2885 := z.EncBinary()
+				_ = yym2885
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Stdout))
 				}
 			}
-			if yyr2848 || yy2arr2848 {
+			if yyr2873 || yy2arr2873 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2862 := z.EncBinary()
-				_ = yym2862
+				yym2887 := z.EncBinary()
+				_ = yym2887
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Stderr))
@@ -35827,17 +36118,17 @@ func (x *PodExecOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("Stderr"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2863 := z.EncBinary()
-				_ = yym2863
+				yym2888 := z.EncBinary()
+				_ = yym2888
 				if false {
 				} else {
 					r.EncodeBool(bool(x.Stderr))
 				}
 			}
-			if yyr2848 || yy2arr2848 {
+			if yyr2873 || yy2arr2873 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2865 := z.EncBinary()
-				_ = yym2865
+				yym2890 := z.EncBinary()
+				_ = yym2890
 				if false {
 				} else {
 					r.EncodeBool(bool(x.TTY))
@@ -35846,17 +36137,17 @@ func (x *PodExecOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("TTY"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2866 := z.EncBinary()
-				_ = yym2866
+				yym2891 := z.EncBinary()
+				_ = yym2891
 				if false {
 				} else {
 					r.EncodeBool(bool(x.TTY))
 				}
 			}
-			if yyr2848 || yy2arr2848 {
+			if yyr2873 || yy2arr2873 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2868 := z.EncBinary()
-				_ = yym2868
+				yym2893 := z.EncBinary()
+				_ = yym2893
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.Container))
@@ -35865,20 +36156,20 @@ func (x *PodExecOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("Container"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2869 := z.EncBinary()
-				_ = yym2869
+				yym2894 := z.EncBinary()
+				_ = yym2894
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.Container))
 				}
 			}
-			if yyr2848 || yy2arr2848 {
+			if yyr2873 || yy2arr2873 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.Command == nil {
 					r.EncodeNil()
 				} else {
-					yym2871 := z.EncBinary()
-					_ = yym2871
+					yym2896 := z.EncBinary()
+					_ = yym2896
 					if false {
 					} else {
 						z.F.EncSliceStringV(x.Command, false, e)
@@ -35891,15 +36182,15 @@ func (x *PodExecOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.Command == nil {
 					r.EncodeNil()
 				} else {
-					yym2872 := z.EncBinary()
-					_ = yym2872
+					yym2897 := z.EncBinary()
+					_ = yym2897
 					if false {
 					} else {
 						z.F.EncSliceStringV(x.Command, false, e)
 					}
 				}
 			}
-			if yyr2848 || yy2arr2848 {
+			if yyr2873 || yy2arr2873 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -35912,25 +36203,25 @@ func (x *PodExecOptions) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2873 := z.DecBinary()
-	_ = yym2873
+	yym2898 := z.DecBinary()
+	_ = yym2898
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2874 := r.ContainerType()
-		if yyct2874 == codecSelferValueTypeMap1234 {
-			yyl2874 := r.ReadMapStart()
-			if yyl2874 == 0 {
+		yyct2899 := r.ContainerType()
+		if yyct2899 == codecSelferValueTypeMap1234 {
+			yyl2899 := r.ReadMapStart()
+			if yyl2899 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2874, d)
+				x.codecDecodeSelfFromMap(yyl2899, d)
 			}
-		} else if yyct2874 == codecSelferValueTypeArray1234 {
-			yyl2874 := r.ReadArrayStart()
-			if yyl2874 == 0 {
+		} else if yyct2899 == codecSelferValueTypeArray1234 {
+			yyl2899 := r.ReadArrayStart()
+			if yyl2899 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2874, d)
+				x.codecDecodeSelfFromArray(yyl2899, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -35942,12 +36233,12 @@ func (x *PodExecOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2875Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2875Slc
-	var yyhl2875 bool = l >= 0
-	for yyj2875 := 0; ; yyj2875++ {
-		if yyhl2875 {
-			if yyj2875 >= l {
+	var yys2900Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2900Slc
+	var yyhl2900 bool = l >= 0
+	for yyj2900 := 0; ; yyj2900++ {
+		if yyhl2900 {
+			if yyj2900 >= l {
 				break
 			}
 		} else {
@@ -35956,10 +36247,10 @@ func (x *PodExecOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2875Slc = r.DecodeBytes(yys2875Slc, true, true)
-		yys2875 := string(yys2875Slc)
+		yys2900Slc = r.DecodeBytes(yys2900Slc, true, true)
+		yys2900 := string(yys2900Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2875 {
+		switch yys2900 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -36006,18 +36297,18 @@ func (x *PodExecOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Command = nil
 			} else {
-				yyv2883 := &x.Command
-				yym2884 := z.DecBinary()
-				_ = yym2884
+				yyv2908 := &x.Command
+				yym2909 := z.DecBinary()
+				_ = yym2909
 				if false {
 				} else {
-					z.F.DecSliceStringX(yyv2883, false, d)
+					z.F.DecSliceStringX(yyv2908, false, d)
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2875)
-		} // end switch yys2875
-	} // end for yyj2875
+			z.DecStructFieldNotFound(-1, yys2900)
+		} // end switch yys2900
+	} // end for yyj2900
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -36025,16 +36316,16 @@ func (x *PodExecOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2885 int
-	var yyb2885 bool
-	var yyhl2885 bool = l >= 0
-	yyj2885++
-	if yyhl2885 {
-		yyb2885 = yyj2885 > l
+	var yyj2910 int
+	var yyb2910 bool
+	var yyhl2910 bool = l >= 0
+	yyj2910++
+	if yyhl2910 {
+		yyb2910 = yyj2910 > l
 	} else {
-		yyb2885 = r.CheckBreak()
+		yyb2910 = r.CheckBreak()
 	}
-	if yyb2885 {
+	if yyb2910 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36044,13 +36335,13 @@ func (x *PodExecOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj2885++
-	if yyhl2885 {
-		yyb2885 = yyj2885 > l
+	yyj2910++
+	if yyhl2910 {
+		yyb2910 = yyj2910 > l
 	} else {
-		yyb2885 = r.CheckBreak()
+		yyb2910 = r.CheckBreak()
 	}
-	if yyb2885 {
+	if yyb2910 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36060,13 +36351,13 @@ func (x *PodExecOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj2885++
-	if yyhl2885 {
-		yyb2885 = yyj2885 > l
+	yyj2910++
+	if yyhl2910 {
+		yyb2910 = yyj2910 > l
 	} else {
-		yyb2885 = r.CheckBreak()
+		yyb2910 = r.CheckBreak()
 	}
-	if yyb2885 {
+	if yyb2910 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36076,13 +36367,13 @@ func (x *PodExecOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Stdin = bool(r.DecodeBool())
 	}
-	yyj2885++
-	if yyhl2885 {
-		yyb2885 = yyj2885 > l
+	yyj2910++
+	if yyhl2910 {
+		yyb2910 = yyj2910 > l
 	} else {
-		yyb2885 = r.CheckBreak()
+		yyb2910 = r.CheckBreak()
 	}
-	if yyb2885 {
+	if yyb2910 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36092,13 +36383,13 @@ func (x *PodExecOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Stdout = bool(r.DecodeBool())
 	}
-	yyj2885++
-	if yyhl2885 {
-		yyb2885 = yyj2885 > l
+	yyj2910++
+	if yyhl2910 {
+		yyb2910 = yyj2910 > l
 	} else {
-		yyb2885 = r.CheckBreak()
+		yyb2910 = r.CheckBreak()
 	}
-	if yyb2885 {
+	if yyb2910 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36108,13 +36399,13 @@ func (x *PodExecOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Stderr = bool(r.DecodeBool())
 	}
-	yyj2885++
-	if yyhl2885 {
-		yyb2885 = yyj2885 > l
+	yyj2910++
+	if yyhl2910 {
+		yyb2910 = yyj2910 > l
 	} else {
-		yyb2885 = r.CheckBreak()
+		yyb2910 = r.CheckBreak()
 	}
-	if yyb2885 {
+	if yyb2910 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36124,13 +36415,13 @@ func (x *PodExecOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.TTY = bool(r.DecodeBool())
 	}
-	yyj2885++
-	if yyhl2885 {
-		yyb2885 = yyj2885 > l
+	yyj2910++
+	if yyhl2910 {
+		yyb2910 = yyj2910 > l
 	} else {
-		yyb2885 = r.CheckBreak()
+		yyb2910 = r.CheckBreak()
 	}
-	if yyb2885 {
+	if yyb2910 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36140,13 +36431,13 @@ func (x *PodExecOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Container = string(r.DecodeString())
 	}
-	yyj2885++
-	if yyhl2885 {
-		yyb2885 = yyj2885 > l
+	yyj2910++
+	if yyhl2910 {
+		yyb2910 = yyj2910 > l
 	} else {
-		yyb2885 = r.CheckBreak()
+		yyb2910 = r.CheckBreak()
 	}
-	if yyb2885 {
+	if yyb2910 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36154,26 +36445,26 @@ func (x *PodExecOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Command = nil
 	} else {
-		yyv2893 := &x.Command
-		yym2894 := z.DecBinary()
-		_ = yym2894
+		yyv2918 := &x.Command
+		yym2919 := z.DecBinary()
+		_ = yym2919
 		if false {
 		} else {
-			z.F.DecSliceStringX(yyv2893, false, d)
+			z.F.DecSliceStringX(yyv2918, false, d)
 		}
 	}
 	for {
-		yyj2885++
-		if yyhl2885 {
-			yyb2885 = yyj2885 > l
+		yyj2910++
+		if yyhl2910 {
+			yyb2910 = yyj2910 > l
 		} else {
-			yyb2885 = r.CheckBreak()
+			yyb2910 = r.CheckBreak()
 		}
-		if yyb2885 {
+		if yyb2910 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2885-1, "")
+		z.DecStructFieldNotFound(yyj2910-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -36185,36 +36476,36 @@ func (x *PodProxyOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2895 := z.EncBinary()
-		_ = yym2895
+		yym2920 := z.EncBinary()
+		_ = yym2920
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2896 := !z.EncBinary()
-			yy2arr2896 := z.EncBasicHandle().StructToArray
-			var yyq2896 [3]bool
-			_, _, _ = yysep2896, yyq2896, yy2arr2896
-			const yyr2896 bool = false
-			yyq2896[0] = x.Kind != ""
-			yyq2896[1] = x.APIVersion != ""
-			var yynn2896 int
-			if yyr2896 || yy2arr2896 {
+			yysep2921 := !z.EncBinary()
+			yy2arr2921 := z.EncBasicHandle().StructToArray
+			var yyq2921 [3]bool
+			_, _, _ = yysep2921, yyq2921, yy2arr2921
+			const yyr2921 bool = false
+			yyq2921[0] = x.Kind != ""
+			yyq2921[1] = x.APIVersion != ""
+			var yynn2921 int
+			if yyr2921 || yy2arr2921 {
 				r.EncodeArrayStart(3)
 			} else {
-				yynn2896 = 1
-				for _, b := range yyq2896 {
+				yynn2921 = 1
+				for _, b := range yyq2921 {
 					if b {
-						yynn2896++
+						yynn2921++
 					}
 				}
-				r.EncodeMapStart(yynn2896)
-				yynn2896 = 0
+				r.EncodeMapStart(yynn2921)
+				yynn2921 = 0
 			}
-			if yyr2896 || yy2arr2896 {
+			if yyr2921 || yy2arr2921 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2896[0] {
-					yym2898 := z.EncBinary()
-					_ = yym2898
+				if yyq2921[0] {
+					yym2923 := z.EncBinary()
+					_ = yym2923
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -36223,23 +36514,23 @@ func (x *PodProxyOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2896[0] {
+				if yyq2921[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2899 := z.EncBinary()
-					_ = yym2899
+					yym2924 := z.EncBinary()
+					_ = yym2924
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr2896 || yy2arr2896 {
+			if yyr2921 || yy2arr2921 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2896[1] {
-					yym2901 := z.EncBinary()
-					_ = yym2901
+				if yyq2921[1] {
+					yym2926 := z.EncBinary()
+					_ = yym2926
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -36248,22 +36539,22 @@ func (x *PodProxyOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2896[1] {
+				if yyq2921[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2902 := z.EncBinary()
-					_ = yym2902
+					yym2927 := z.EncBinary()
+					_ = yym2927
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr2896 || yy2arr2896 {
+			if yyr2921 || yy2arr2921 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2904 := z.EncBinary()
-				_ = yym2904
+				yym2929 := z.EncBinary()
+				_ = yym2929
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.Path))
@@ -36272,14 +36563,14 @@ func (x *PodProxyOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("Path"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2905 := z.EncBinary()
-				_ = yym2905
+				yym2930 := z.EncBinary()
+				_ = yym2930
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.Path))
 				}
 			}
-			if yyr2896 || yy2arr2896 {
+			if yyr2921 || yy2arr2921 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -36292,25 +36583,25 @@ func (x *PodProxyOptions) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2906 := z.DecBinary()
-	_ = yym2906
+	yym2931 := z.DecBinary()
+	_ = yym2931
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2907 := r.ContainerType()
-		if yyct2907 == codecSelferValueTypeMap1234 {
-			yyl2907 := r.ReadMapStart()
-			if yyl2907 == 0 {
+		yyct2932 := r.ContainerType()
+		if yyct2932 == codecSelferValueTypeMap1234 {
+			yyl2932 := r.ReadMapStart()
+			if yyl2932 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2907, d)
+				x.codecDecodeSelfFromMap(yyl2932, d)
 			}
-		} else if yyct2907 == codecSelferValueTypeArray1234 {
-			yyl2907 := r.ReadArrayStart()
-			if yyl2907 == 0 {
+		} else if yyct2932 == codecSelferValueTypeArray1234 {
+			yyl2932 := r.ReadArrayStart()
+			if yyl2932 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2907, d)
+				x.codecDecodeSelfFromArray(yyl2932, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -36322,12 +36613,12 @@ func (x *PodProxyOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2908Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2908Slc
-	var yyhl2908 bool = l >= 0
-	for yyj2908 := 0; ; yyj2908++ {
-		if yyhl2908 {
-			if yyj2908 >= l {
+	var yys2933Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2933Slc
+	var yyhl2933 bool = l >= 0
+	for yyj2933 := 0; ; yyj2933++ {
+		if yyhl2933 {
+			if yyj2933 >= l {
 				break
 			}
 		} else {
@@ -36336,10 +36627,10 @@ func (x *PodProxyOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2908Slc = r.DecodeBytes(yys2908Slc, true, true)
-		yys2908 := string(yys2908Slc)
+		yys2933Slc = r.DecodeBytes(yys2933Slc, true, true)
+		yys2933 := string(yys2933Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2908 {
+		switch yys2933 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -36359,9 +36650,9 @@ func (x *PodProxyOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				x.Path = string(r.DecodeString())
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2908)
-		} // end switch yys2908
-	} // end for yyj2908
+			z.DecStructFieldNotFound(-1, yys2933)
+		} // end switch yys2933
+	} // end for yyj2933
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -36369,16 +36660,16 @@ func (x *PodProxyOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2912 int
-	var yyb2912 bool
-	var yyhl2912 bool = l >= 0
-	yyj2912++
-	if yyhl2912 {
-		yyb2912 = yyj2912 > l
+	var yyj2937 int
+	var yyb2937 bool
+	var yyhl2937 bool = l >= 0
+	yyj2937++
+	if yyhl2937 {
+		yyb2937 = yyj2937 > l
 	} else {
-		yyb2912 = r.CheckBreak()
+		yyb2937 = r.CheckBreak()
 	}
-	if yyb2912 {
+	if yyb2937 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36388,13 +36679,13 @@ func (x *PodProxyOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj2912++
-	if yyhl2912 {
-		yyb2912 = yyj2912 > l
+	yyj2937++
+	if yyhl2937 {
+		yyb2937 = yyj2937 > l
 	} else {
-		yyb2912 = r.CheckBreak()
+		yyb2937 = r.CheckBreak()
 	}
-	if yyb2912 {
+	if yyb2937 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36404,13 +36695,13 @@ func (x *PodProxyOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj2912++
-	if yyhl2912 {
-		yyb2912 = yyj2912 > l
+	yyj2937++
+	if yyhl2937 {
+		yyb2937 = yyj2937 > l
 	} else {
-		yyb2912 = r.CheckBreak()
+		yyb2937 = r.CheckBreak()
 	}
-	if yyb2912 {
+	if yyb2937 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36421,17 +36712,17 @@ func (x *PodProxyOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 		x.Path = string(r.DecodeString())
 	}
 	for {
-		yyj2912++
-		if yyhl2912 {
-			yyb2912 = yyj2912 > l
+		yyj2937++
+		if yyhl2937 {
+			yyb2937 = yyj2937 > l
 		} else {
-			yyb2912 = r.CheckBreak()
+			yyb2937 = r.CheckBreak()
 		}
-		if yyb2912 {
+		if yyb2937 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2912-1, "")
+		z.DecStructFieldNotFound(yyj2937-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -36443,41 +36734,41 @@ func (x *ObjectReference) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2916 := z.EncBinary()
-		_ = yym2916
+		yym2941 := z.EncBinary()
+		_ = yym2941
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2917 := !z.EncBinary()
-			yy2arr2917 := z.EncBasicHandle().StructToArray
-			var yyq2917 [7]bool
-			_, _, _ = yysep2917, yyq2917, yy2arr2917
-			const yyr2917 bool = false
-			yyq2917[0] = x.Kind != ""
-			yyq2917[1] = x.Namespace != ""
-			yyq2917[2] = x.Name != ""
-			yyq2917[3] = x.UID != ""
-			yyq2917[4] = x.APIVersion != ""
-			yyq2917[5] = x.ResourceVersion != ""
-			yyq2917[6] = x.FieldPath != ""
-			var yynn2917 int
-			if yyr2917 || yy2arr2917 {
+			yysep2942 := !z.EncBinary()
+			yy2arr2942 := z.EncBasicHandle().StructToArray
+			var yyq2942 [7]bool
+			_, _, _ = yysep2942, yyq2942, yy2arr2942
+			const yyr2942 bool = false
+			yyq2942[0] = x.Kind != ""
+			yyq2942[1] = x.Namespace != ""
+			yyq2942[2] = x.Name != ""
+			yyq2942[3] = x.UID != ""
+			yyq2942[4] = x.APIVersion != ""
+			yyq2942[5] = x.ResourceVersion != ""
+			yyq2942[6] = x.FieldPath != ""
+			var yynn2942 int
+			if yyr2942 || yy2arr2942 {
 				r.EncodeArrayStart(7)
 			} else {
-				yynn2917 = 0
-				for _, b := range yyq2917 {
+				yynn2942 = 0
+				for _, b := range yyq2942 {
 					if b {
-						yynn2917++
+						yynn2942++
 					}
 				}
-				r.EncodeMapStart(yynn2917)
-				yynn2917 = 0
+				r.EncodeMapStart(yynn2942)
+				yynn2942 = 0
 			}
-			if yyr2917 || yy2arr2917 {
+			if yyr2942 || yy2arr2942 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2917[0] {
-					yym2919 := z.EncBinary()
-					_ = yym2919
+				if yyq2942[0] {
+					yym2944 := z.EncBinary()
+					_ = yym2944
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -36486,23 +36777,23 @@ func (x *ObjectReference) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2917[0] {
+				if yyq2942[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2920 := z.EncBinary()
-					_ = yym2920
+					yym2945 := z.EncBinary()
+					_ = yym2945
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr2917 || yy2arr2917 {
+			if yyr2942 || yy2arr2942 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2917[1] {
-					yym2922 := z.EncBinary()
-					_ = yym2922
+				if yyq2942[1] {
+					yym2947 := z.EncBinary()
+					_ = yym2947
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Namespace))
@@ -36511,23 +36802,23 @@ func (x *ObjectReference) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2917[1] {
+				if yyq2942[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("namespace"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2923 := z.EncBinary()
-					_ = yym2923
+					yym2948 := z.EncBinary()
+					_ = yym2948
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Namespace))
 					}
 				}
 			}
-			if yyr2917 || yy2arr2917 {
+			if yyr2942 || yy2arr2942 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2917[2] {
-					yym2925 := z.EncBinary()
-					_ = yym2925
+				if yyq2942[2] {
+					yym2950 := z.EncBinary()
+					_ = yym2950
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Name))
@@ -36536,23 +36827,23 @@ func (x *ObjectReference) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2917[2] {
+				if yyq2942[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("name"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2926 := z.EncBinary()
-					_ = yym2926
+					yym2951 := z.EncBinary()
+					_ = yym2951
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Name))
 					}
 				}
 			}
-			if yyr2917 || yy2arr2917 {
+			if yyr2942 || yy2arr2942 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2917[3] {
-					yym2928 := z.EncBinary()
-					_ = yym2928
+				if yyq2942[3] {
+					yym2953 := z.EncBinary()
+					_ = yym2953
 					if false {
 					} else if z.HasExtensions() && z.EncExt(x.UID) {
 					} else {
@@ -36562,12 +36853,12 @@ func (x *ObjectReference) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2917[3] {
+				if yyq2942[3] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("uid"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2929 := z.EncBinary()
-					_ = yym2929
+					yym2954 := z.EncBinary()
+					_ = yym2954
 					if false {
 					} else if z.HasExtensions() && z.EncExt(x.UID) {
 					} else {
@@ -36575,11 +36866,11 @@ func (x *ObjectReference) CodecEncodeSelf(e *codec1978.Encoder) {
 					}
 				}
 			}
-			if yyr2917 || yy2arr2917 {
+			if yyr2942 || yy2arr2942 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2917[4] {
-					yym2931 := z.EncBinary()
-					_ = yym2931
+				if yyq2942[4] {
+					yym2956 := z.EncBinary()
+					_ = yym2956
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -36588,23 +36879,23 @@ func (x *ObjectReference) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2917[4] {
+				if yyq2942[4] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2932 := z.EncBinary()
-					_ = yym2932
+					yym2957 := z.EncBinary()
+					_ = yym2957
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr2917 || yy2arr2917 {
+			if yyr2942 || yy2arr2942 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2917[5] {
-					yym2934 := z.EncBinary()
-					_ = yym2934
+				if yyq2942[5] {
+					yym2959 := z.EncBinary()
+					_ = yym2959
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.ResourceVersion))
@@ -36613,23 +36904,23 @@ func (x *ObjectReference) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2917[5] {
+				if yyq2942[5] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("resourceVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2935 := z.EncBinary()
-					_ = yym2935
+					yym2960 := z.EncBinary()
+					_ = yym2960
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.ResourceVersion))
 					}
 				}
 			}
-			if yyr2917 || yy2arr2917 {
+			if yyr2942 || yy2arr2942 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2917[6] {
-					yym2937 := z.EncBinary()
-					_ = yym2937
+				if yyq2942[6] {
+					yym2962 := z.EncBinary()
+					_ = yym2962
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.FieldPath))
@@ -36638,19 +36929,19 @@ func (x *ObjectReference) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2917[6] {
+				if yyq2942[6] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("fieldPath"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2938 := z.EncBinary()
-					_ = yym2938
+					yym2963 := z.EncBinary()
+					_ = yym2963
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.FieldPath))
 					}
 				}
 			}
-			if yyr2917 || yy2arr2917 {
+			if yyr2942 || yy2arr2942 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -36663,25 +36954,25 @@ func (x *ObjectReference) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2939 := z.DecBinary()
-	_ = yym2939
+	yym2964 := z.DecBinary()
+	_ = yym2964
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2940 := r.ContainerType()
-		if yyct2940 == codecSelferValueTypeMap1234 {
-			yyl2940 := r.ReadMapStart()
-			if yyl2940 == 0 {
+		yyct2965 := r.ContainerType()
+		if yyct2965 == codecSelferValueTypeMap1234 {
+			yyl2965 := r.ReadMapStart()
+			if yyl2965 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2940, d)
+				x.codecDecodeSelfFromMap(yyl2965, d)
 			}
-		} else if yyct2940 == codecSelferValueTypeArray1234 {
-			yyl2940 := r.ReadArrayStart()
-			if yyl2940 == 0 {
+		} else if yyct2965 == codecSelferValueTypeArray1234 {
+			yyl2965 := r.ReadArrayStart()
+			if yyl2965 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2940, d)
+				x.codecDecodeSelfFromArray(yyl2965, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -36693,12 +36984,12 @@ func (x *ObjectReference) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2941Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2941Slc
-	var yyhl2941 bool = l >= 0
-	for yyj2941 := 0; ; yyj2941++ {
-		if yyhl2941 {
-			if yyj2941 >= l {
+	var yys2966Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2966Slc
+	var yyhl2966 bool = l >= 0
+	for yyj2966 := 0; ; yyj2966++ {
+		if yyhl2966 {
+			if yyj2966 >= l {
 				break
 			}
 		} else {
@@ -36707,10 +36998,10 @@ func (x *ObjectReference) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2941Slc = r.DecodeBytes(yys2941Slc, true, true)
-		yys2941 := string(yys2941Slc)
+		yys2966Slc = r.DecodeBytes(yys2966Slc, true, true)
+		yys2966 := string(yys2966Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2941 {
+		switch yys2966 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -36754,9 +37045,9 @@ func (x *ObjectReference) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				x.FieldPath = string(r.DecodeString())
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2941)
-		} // end switch yys2941
-	} // end for yyj2941
+			z.DecStructFieldNotFound(-1, yys2966)
+		} // end switch yys2966
+	} // end for yyj2966
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -36764,16 +37055,16 @@ func (x *ObjectReference) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2949 int
-	var yyb2949 bool
-	var yyhl2949 bool = l >= 0
-	yyj2949++
-	if yyhl2949 {
-		yyb2949 = yyj2949 > l
+	var yyj2974 int
+	var yyb2974 bool
+	var yyhl2974 bool = l >= 0
+	yyj2974++
+	if yyhl2974 {
+		yyb2974 = yyj2974 > l
 	} else {
-		yyb2949 = r.CheckBreak()
+		yyb2974 = r.CheckBreak()
 	}
-	if yyb2949 {
+	if yyb2974 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36783,13 +37074,13 @@ func (x *ObjectReference) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj2949++
-	if yyhl2949 {
-		yyb2949 = yyj2949 > l
+	yyj2974++
+	if yyhl2974 {
+		yyb2974 = yyj2974 > l
 	} else {
-		yyb2949 = r.CheckBreak()
+		yyb2974 = r.CheckBreak()
 	}
-	if yyb2949 {
+	if yyb2974 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36799,13 +37090,13 @@ func (x *ObjectReference) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	} else {
 		x.Namespace = string(r.DecodeString())
 	}
-	yyj2949++
-	if yyhl2949 {
-		yyb2949 = yyj2949 > l
+	yyj2974++
+	if yyhl2974 {
+		yyb2974 = yyj2974 > l
 	} else {
-		yyb2949 = r.CheckBreak()
+		yyb2974 = r.CheckBreak()
 	}
-	if yyb2949 {
+	if yyb2974 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36815,13 +37106,13 @@ func (x *ObjectReference) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	} else {
 		x.Name = string(r.DecodeString())
 	}
-	yyj2949++
-	if yyhl2949 {
-		yyb2949 = yyj2949 > l
+	yyj2974++
+	if yyhl2974 {
+		yyb2974 = yyj2974 > l
 	} else {
-		yyb2949 = r.CheckBreak()
+		yyb2974 = r.CheckBreak()
 	}
-	if yyb2949 {
+	if yyb2974 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36831,13 +37122,13 @@ func (x *ObjectReference) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	} else {
 		x.UID = pkg1_types.UID(r.DecodeString())
 	}
-	yyj2949++
-	if yyhl2949 {
-		yyb2949 = yyj2949 > l
+	yyj2974++
+	if yyhl2974 {
+		yyb2974 = yyj2974 > l
 	} else {
-		yyb2949 = r.CheckBreak()
+		yyb2974 = r.CheckBreak()
 	}
-	if yyb2949 {
+	if yyb2974 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36847,13 +37138,13 @@ func (x *ObjectReference) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj2949++
-	if yyhl2949 {
-		yyb2949 = yyj2949 > l
+	yyj2974++
+	if yyhl2974 {
+		yyb2974 = yyj2974 > l
 	} else {
-		yyb2949 = r.CheckBreak()
+		yyb2974 = r.CheckBreak()
 	}
-	if yyb2949 {
+	if yyb2974 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36863,13 +37154,13 @@ func (x *ObjectReference) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	} else {
 		x.ResourceVersion = string(r.DecodeString())
 	}
-	yyj2949++
-	if yyhl2949 {
-		yyb2949 = yyj2949 > l
+	yyj2974++
+	if yyhl2974 {
+		yyb2974 = yyj2974 > l
 	} else {
-		yyb2949 = r.CheckBreak()
+		yyb2974 = r.CheckBreak()
 	}
-	if yyb2949 {
+	if yyb2974 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -36880,17 +37171,17 @@ func (x *ObjectReference) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 		x.FieldPath = string(r.DecodeString())
 	}
 	for {
-		yyj2949++
-		if yyhl2949 {
-			yyb2949 = yyj2949 > l
+		yyj2974++
+		if yyhl2974 {
+			yyb2974 = yyj2974 > l
 		} else {
-			yyb2949 = r.CheckBreak()
+			yyb2974 = r.CheckBreak()
 		}
-		if yyb2949 {
+		if yyb2974 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2949-1, "")
+		z.DecStructFieldNotFound(yyj2974-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -36902,33 +37193,33 @@ func (x *LocalObjectReference) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2957 := z.EncBinary()
-		_ = yym2957
+		yym2982 := z.EncBinary()
+		_ = yym2982
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2958 := !z.EncBinary()
-			yy2arr2958 := z.EncBasicHandle().StructToArray
-			var yyq2958 [1]bool
-			_, _, _ = yysep2958, yyq2958, yy2arr2958
-			const yyr2958 bool = false
-			var yynn2958 int
-			if yyr2958 || yy2arr2958 {
+			yysep2983 := !z.EncBinary()
+			yy2arr2983 := z.EncBasicHandle().StructToArray
+			var yyq2983 [1]bool
+			_, _, _ = yysep2983, yyq2983, yy2arr2983
+			const yyr2983 bool = false
+			var yynn2983 int
+			if yyr2983 || yy2arr2983 {
 				r.EncodeArrayStart(1)
 			} else {
-				yynn2958 = 1
-				for _, b := range yyq2958 {
+				yynn2983 = 1
+				for _, b := range yyq2983 {
 					if b {
-						yynn2958++
+						yynn2983++
 					}
 				}
-				r.EncodeMapStart(yynn2958)
-				yynn2958 = 0
+				r.EncodeMapStart(yynn2983)
+				yynn2983 = 0
 			}
-			if yyr2958 || yy2arr2958 {
+			if yyr2983 || yy2arr2983 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym2960 := z.EncBinary()
-				_ = yym2960
+				yym2985 := z.EncBinary()
+				_ = yym2985
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.Name))
@@ -36937,14 +37228,14 @@ func (x *LocalObjectReference) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("Name"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym2961 := z.EncBinary()
-				_ = yym2961
+				yym2986 := z.EncBinary()
+				_ = yym2986
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.Name))
 				}
 			}
-			if yyr2958 || yy2arr2958 {
+			if yyr2983 || yy2arr2983 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -36957,25 +37248,25 @@ func (x *LocalObjectReference) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2962 := z.DecBinary()
-	_ = yym2962
+	yym2987 := z.DecBinary()
+	_ = yym2987
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2963 := r.ContainerType()
-		if yyct2963 == codecSelferValueTypeMap1234 {
-			yyl2963 := r.ReadMapStart()
-			if yyl2963 == 0 {
+		yyct2988 := r.ContainerType()
+		if yyct2988 == codecSelferValueTypeMap1234 {
+			yyl2988 := r.ReadMapStart()
+			if yyl2988 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2963, d)
+				x.codecDecodeSelfFromMap(yyl2988, d)
 			}
-		} else if yyct2963 == codecSelferValueTypeArray1234 {
-			yyl2963 := r.ReadArrayStart()
-			if yyl2963 == 0 {
+		} else if yyct2988 == codecSelferValueTypeArray1234 {
+			yyl2988 := r.ReadArrayStart()
+			if yyl2988 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2963, d)
+				x.codecDecodeSelfFromArray(yyl2988, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -36987,12 +37278,12 @@ func (x *LocalObjectReference) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2964Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2964Slc
-	var yyhl2964 bool = l >= 0
-	for yyj2964 := 0; ; yyj2964++ {
-		if yyhl2964 {
-			if yyj2964 >= l {
+	var yys2989Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys2989Slc
+	var yyhl2989 bool = l >= 0
+	for yyj2989 := 0; ; yyj2989++ {
+		if yyhl2989 {
+			if yyj2989 >= l {
 				break
 			}
 		} else {
@@ -37001,10 +37292,10 @@ func (x *LocalObjectReference) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2964Slc = r.DecodeBytes(yys2964Slc, true, true)
-		yys2964 := string(yys2964Slc)
+		yys2989Slc = r.DecodeBytes(yys2989Slc, true, true)
+		yys2989 := string(yys2989Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2964 {
+		switch yys2989 {
 		case "Name":
 			if r.TryDecodeAsNil() {
 				x.Name = ""
@@ -37012,9 +37303,9 @@ func (x *LocalObjectReference) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 				x.Name = string(r.DecodeString())
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2964)
-		} // end switch yys2964
-	} // end for yyj2964
+			z.DecStructFieldNotFound(-1, yys2989)
+		} // end switch yys2989
+	} // end for yyj2989
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -37022,16 +37313,16 @@ func (x *LocalObjectReference) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2966 int
-	var yyb2966 bool
-	var yyhl2966 bool = l >= 0
-	yyj2966++
-	if yyhl2966 {
-		yyb2966 = yyj2966 > l
+	var yyj2991 int
+	var yyb2991 bool
+	var yyhl2991 bool = l >= 0
+	yyj2991++
+	if yyhl2991 {
+		yyb2991 = yyj2991 > l
 	} else {
-		yyb2966 = r.CheckBreak()
+		yyb2991 = r.CheckBreak()
 	}
-	if yyb2966 {
+	if yyb2991 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -37042,17 +37333,17 @@ func (x *LocalObjectReference) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 		x.Name = string(r.DecodeString())
 	}
 	for {
-		yyj2966++
-		if yyhl2966 {
-			yyb2966 = yyj2966 > l
+		yyj2991++
+		if yyhl2991 {
+			yyb2991 = yyj2991 > l
 		} else {
-			yyb2966 = r.CheckBreak()
+			yyb2991 = r.CheckBreak()
 		}
-		if yyb2966 {
+		if yyb2991 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2966-1, "")
+		z.DecStructFieldNotFound(yyj2991-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -37064,37 +37355,37 @@ func (x *SerializedReference) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2968 := z.EncBinary()
-		_ = yym2968
+		yym2993 := z.EncBinary()
+		_ = yym2993
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2969 := !z.EncBinary()
-			yy2arr2969 := z.EncBasicHandle().StructToArray
-			var yyq2969 [3]bool
-			_, _, _ = yysep2969, yyq2969, yy2arr2969
-			const yyr2969 bool = false
-			yyq2969[0] = x.Kind != ""
-			yyq2969[1] = x.APIVersion != ""
-			yyq2969[2] = true
-			var yynn2969 int
-			if yyr2969 || yy2arr2969 {
+			yysep2994 := !z.EncBinary()
+			yy2arr2994 := z.EncBasicHandle().StructToArray
+			var yyq2994 [3]bool
+			_, _, _ = yysep2994, yyq2994, yy2arr2994
+			const yyr2994 bool = false
+			yyq2994[0] = x.Kind != ""
+			yyq2994[1] = x.APIVersion != ""
+			yyq2994[2] = true
+			var yynn2994 int
+			if yyr2994 || yy2arr2994 {
 				r.EncodeArrayStart(3)
 			} else {
-				yynn2969 = 0
-				for _, b := range yyq2969 {
+				yynn2994 = 0
+				for _, b := range yyq2994 {
 					if b {
-						yynn2969++
+						yynn2994++
 					}
 				}
-				r.EncodeMapStart(yynn2969)
-				yynn2969 = 0
+				r.EncodeMapStart(yynn2994)
+				yynn2994 = 0
 			}
-			if yyr2969 || yy2arr2969 {
+			if yyr2994 || yy2arr2994 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2969[0] {
-					yym2971 := z.EncBinary()
-					_ = yym2971
+				if yyq2994[0] {
+					yym2996 := z.EncBinary()
+					_ = yym2996
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -37103,23 +37394,23 @@ func (x *SerializedReference) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2969[0] {
+				if yyq2994[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2972 := z.EncBinary()
-					_ = yym2972
+					yym2997 := z.EncBinary()
+					_ = yym2997
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr2969 || yy2arr2969 {
+			if yyr2994 || yy2arr2994 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2969[1] {
-					yym2974 := z.EncBinary()
-					_ = yym2974
+				if yyq2994[1] {
+					yym2999 := z.EncBinary()
+					_ = yym2999
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -37128,36 +37419,36 @@ func (x *SerializedReference) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2969[1] {
+				if yyq2994[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2975 := z.EncBinary()
-					_ = yym2975
+					yym3000 := z.EncBinary()
+					_ = yym3000
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr2969 || yy2arr2969 {
+			if yyr2994 || yy2arr2994 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2969[2] {
-					yy2977 := &x.Reference
-					yy2977.CodecEncodeSelf(e)
+				if yyq2994[2] {
+					yy3002 := &x.Reference
+					yy3002.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq2969[2] {
+				if yyq2994[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("reference"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy2978 := &x.Reference
-					yy2978.CodecEncodeSelf(e)
+					yy3003 := &x.Reference
+					yy3003.CodecEncodeSelf(e)
 				}
 			}
-			if yyr2969 || yy2arr2969 {
+			if yyr2994 || yy2arr2994 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -37170,25 +37461,25 @@ func (x *SerializedReference) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2979 := z.DecBinary()
-	_ = yym2979
+	yym3004 := z.DecBinary()
+	_ = yym3004
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2980 := r.ContainerType()
-		if yyct2980 == codecSelferValueTypeMap1234 {
-			yyl2980 := r.ReadMapStart()
-			if yyl2980 == 0 {
+		yyct3005 := r.ContainerType()
+		if yyct3005 == codecSelferValueTypeMap1234 {
+			yyl3005 := r.ReadMapStart()
+			if yyl3005 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2980, d)
+				x.codecDecodeSelfFromMap(yyl3005, d)
 			}
-		} else if yyct2980 == codecSelferValueTypeArray1234 {
-			yyl2980 := r.ReadArrayStart()
-			if yyl2980 == 0 {
+		} else if yyct3005 == codecSelferValueTypeArray1234 {
+			yyl3005 := r.ReadArrayStart()
+			if yyl3005 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2980, d)
+				x.codecDecodeSelfFromArray(yyl3005, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -37200,12 +37491,12 @@ func (x *SerializedReference) codecDecodeSelfFromMap(l int, d *codec1978.Decoder
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2981Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2981Slc
-	var yyhl2981 bool = l >= 0
-	for yyj2981 := 0; ; yyj2981++ {
-		if yyhl2981 {
-			if yyj2981 >= l {
+	var yys3006Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3006Slc
+	var yyhl3006 bool = l >= 0
+	for yyj3006 := 0; ; yyj3006++ {
+		if yyhl3006 {
+			if yyj3006 >= l {
 				break
 			}
 		} else {
@@ -37214,10 +37505,10 @@ func (x *SerializedReference) codecDecodeSelfFromMap(l int, d *codec1978.Decoder
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2981Slc = r.DecodeBytes(yys2981Slc, true, true)
-		yys2981 := string(yys2981Slc)
+		yys3006Slc = r.DecodeBytes(yys3006Slc, true, true)
+		yys3006 := string(yys3006Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2981 {
+		switch yys3006 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -37234,13 +37525,13 @@ func (x *SerializedReference) codecDecodeSelfFromMap(l int, d *codec1978.Decoder
 			if r.TryDecodeAsNil() {
 				x.Reference = ObjectReference{}
 			} else {
-				yyv2984 := &x.Reference
-				yyv2984.CodecDecodeSelf(d)
+				yyv3009 := &x.Reference
+				yyv3009.CodecDecodeSelf(d)
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2981)
-		} // end switch yys2981
-	} // end for yyj2981
+			z.DecStructFieldNotFound(-1, yys3006)
+		} // end switch yys3006
+	} // end for yyj3006
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -37248,16 +37539,16 @@ func (x *SerializedReference) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj2985 int
-	var yyb2985 bool
-	var yyhl2985 bool = l >= 0
-	yyj2985++
-	if yyhl2985 {
-		yyb2985 = yyj2985 > l
+	var yyj3010 int
+	var yyb3010 bool
+	var yyhl3010 bool = l >= 0
+	yyj3010++
+	if yyhl3010 {
+		yyb3010 = yyj3010 > l
 	} else {
-		yyb2985 = r.CheckBreak()
+		yyb3010 = r.CheckBreak()
 	}
-	if yyb2985 {
+	if yyb3010 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -37267,13 +37558,13 @@ func (x *SerializedReference) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj2985++
-	if yyhl2985 {
-		yyb2985 = yyj2985 > l
+	yyj3010++
+	if yyhl3010 {
+		yyb3010 = yyj3010 > l
 	} else {
-		yyb2985 = r.CheckBreak()
+		yyb3010 = r.CheckBreak()
 	}
-	if yyb2985 {
+	if yyb3010 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -37283,13 +37574,13 @@ func (x *SerializedReference) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj2985++
-	if yyhl2985 {
-		yyb2985 = yyj2985 > l
+	yyj3010++
+	if yyhl3010 {
+		yyb3010 = yyj3010 > l
 	} else {
-		yyb2985 = r.CheckBreak()
+		yyb3010 = r.CheckBreak()
 	}
-	if yyb2985 {
+	if yyb3010 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -37297,21 +37588,21 @@ func (x *SerializedReference) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	if r.TryDecodeAsNil() {
 		x.Reference = ObjectReference{}
 	} else {
-		yyv2988 := &x.Reference
-		yyv2988.CodecDecodeSelf(d)
+		yyv3013 := &x.Reference
+		yyv3013.CodecDecodeSelf(d)
 	}
 	for {
-		yyj2985++
-		if yyhl2985 {
-			yyb2985 = yyj2985 > l
+		yyj3010++
+		if yyhl3010 {
+			yyb3010 = yyj3010 > l
 		} else {
-			yyb2985 = r.CheckBreak()
+			yyb3010 = r.CheckBreak()
 		}
-		if yyb2985 {
+		if yyb3010 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj2985-1, "")
+		z.DecStructFieldNotFound(yyj3010-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -37323,36 +37614,36 @@ func (x *EventSource) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym2989 := z.EncBinary()
-		_ = yym2989
+		yym3014 := z.EncBinary()
+		_ = yym3014
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep2990 := !z.EncBinary()
-			yy2arr2990 := z.EncBasicHandle().StructToArray
-			var yyq2990 [2]bool
-			_, _, _ = yysep2990, yyq2990, yy2arr2990
-			const yyr2990 bool = false
-			yyq2990[0] = x.Component != ""
-			yyq2990[1] = x.Host != ""
-			var yynn2990 int
-			if yyr2990 || yy2arr2990 {
+			yysep3015 := !z.EncBinary()
+			yy2arr3015 := z.EncBasicHandle().StructToArray
+			var yyq3015 [2]bool
+			_, _, _ = yysep3015, yyq3015, yy2arr3015
+			const yyr3015 bool = false
+			yyq3015[0] = x.Component != ""
+			yyq3015[1] = x.Host != ""
+			var yynn3015 int
+			if yyr3015 || yy2arr3015 {
 				r.EncodeArrayStart(2)
 			} else {
-				yynn2990 = 0
-				for _, b := range yyq2990 {
+				yynn3015 = 0
+				for _, b := range yyq3015 {
 					if b {
-						yynn2990++
+						yynn3015++
 					}
 				}
-				r.EncodeMapStart(yynn2990)
-				yynn2990 = 0
+				r.EncodeMapStart(yynn3015)
+				yynn3015 = 0
 			}
-			if yyr2990 || yy2arr2990 {
+			if yyr3015 || yy2arr3015 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2990[0] {
-					yym2992 := z.EncBinary()
-					_ = yym2992
+				if yyq3015[0] {
+					yym3017 := z.EncBinary()
+					_ = yym3017
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Component))
@@ -37361,23 +37652,23 @@ func (x *EventSource) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2990[0] {
+				if yyq3015[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("component"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2993 := z.EncBinary()
-					_ = yym2993
+					yym3018 := z.EncBinary()
+					_ = yym3018
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Component))
 					}
 				}
 			}
-			if yyr2990 || yy2arr2990 {
+			if yyr3015 || yy2arr3015 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq2990[1] {
-					yym2995 := z.EncBinary()
-					_ = yym2995
+				if yyq3015[1] {
+					yym3020 := z.EncBinary()
+					_ = yym3020
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Host))
@@ -37386,19 +37677,19 @@ func (x *EventSource) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq2990[1] {
+				if yyq3015[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("host"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym2996 := z.EncBinary()
-					_ = yym2996
+					yym3021 := z.EncBinary()
+					_ = yym3021
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Host))
 					}
 				}
 			}
-			if yyr2990 || yy2arr2990 {
+			if yyr3015 || yy2arr3015 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -37411,25 +37702,25 @@ func (x *EventSource) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym2997 := z.DecBinary()
-	_ = yym2997
+	yym3022 := z.DecBinary()
+	_ = yym3022
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct2998 := r.ContainerType()
-		if yyct2998 == codecSelferValueTypeMap1234 {
-			yyl2998 := r.ReadMapStart()
-			if yyl2998 == 0 {
+		yyct3023 := r.ContainerType()
+		if yyct3023 == codecSelferValueTypeMap1234 {
+			yyl3023 := r.ReadMapStart()
+			if yyl3023 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl2998, d)
+				x.codecDecodeSelfFromMap(yyl3023, d)
 			}
-		} else if yyct2998 == codecSelferValueTypeArray1234 {
-			yyl2998 := r.ReadArrayStart()
-			if yyl2998 == 0 {
+		} else if yyct3023 == codecSelferValueTypeArray1234 {
+			yyl3023 := r.ReadArrayStart()
+			if yyl3023 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl2998, d)
+				x.codecDecodeSelfFromArray(yyl3023, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -37441,12 +37732,12 @@ func (x *EventSource) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys2999Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys2999Slc
-	var yyhl2999 bool = l >= 0
-	for yyj2999 := 0; ; yyj2999++ {
-		if yyhl2999 {
-			if yyj2999 >= l {
+	var yys3024Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3024Slc
+	var yyhl3024 bool = l >= 0
+	for yyj3024 := 0; ; yyj3024++ {
+		if yyhl3024 {
+			if yyj3024 >= l {
 				break
 			}
 		} else {
@@ -37455,10 +37746,10 @@ func (x *EventSource) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys2999Slc = r.DecodeBytes(yys2999Slc, true, true)
-		yys2999 := string(yys2999Slc)
+		yys3024Slc = r.DecodeBytes(yys3024Slc, true, true)
+		yys3024 := string(yys3024Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys2999 {
+		switch yys3024 {
 		case "component":
 			if r.TryDecodeAsNil() {
 				x.Component = ""
@@ -37472,9 +37763,9 @@ func (x *EventSource) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				x.Host = string(r.DecodeString())
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys2999)
-		} // end switch yys2999
-	} // end for yyj2999
+			z.DecStructFieldNotFound(-1, yys3024)
+		} // end switch yys3024
+	} // end for yyj3024
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -37482,16 +37773,16 @@ func (x *EventSource) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3002 int
-	var yyb3002 bool
-	var yyhl3002 bool = l >= 0
-	yyj3002++
-	if yyhl3002 {
-		yyb3002 = yyj3002 > l
+	var yyj3027 int
+	var yyb3027 bool
+	var yyhl3027 bool = l >= 0
+	yyj3027++
+	if yyhl3027 {
+		yyb3027 = yyj3027 > l
 	} else {
-		yyb3002 = r.CheckBreak()
+		yyb3027 = r.CheckBreak()
 	}
-	if yyb3002 {
+	if yyb3027 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -37501,13 +37792,13 @@ func (x *EventSource) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Component = string(r.DecodeString())
 	}
-	yyj3002++
-	if yyhl3002 {
-		yyb3002 = yyj3002 > l
+	yyj3027++
+	if yyhl3027 {
+		yyb3027 = yyj3027 > l
 	} else {
-		yyb3002 = r.CheckBreak()
+		yyb3027 = r.CheckBreak()
 	}
-	if yyb3002 {
+	if yyb3027 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -37518,17 +37809,17 @@ func (x *EventSource) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		x.Host = string(r.DecodeString())
 	}
 	for {
-		yyj3002++
-		if yyhl3002 {
-			yyb3002 = yyj3002 > l
+		yyj3027++
+		if yyhl3027 {
+			yyb3027 = yyj3027 > l
 		} else {
-			yyb3002 = r.CheckBreak()
+			yyb3027 = r.CheckBreak()
 		}
-		if yyb3002 {
+		if yyb3027 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3002-1, "")
+		z.DecStructFieldNotFound(yyj3027-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -37540,45 +37831,45 @@ func (x *Event) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3005 := z.EncBinary()
-		_ = yym3005
+		yym3030 := z.EncBinary()
+		_ = yym3030
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3006 := !z.EncBinary()
-			yy2arr3006 := z.EncBasicHandle().StructToArray
-			var yyq3006 [11]bool
-			_, _, _ = yysep3006, yyq3006, yy2arr3006
-			const yyr3006 bool = false
-			yyq3006[0] = x.Kind != ""
-			yyq3006[1] = x.APIVersion != ""
-			yyq3006[2] = true
-			yyq3006[3] = true
-			yyq3006[4] = x.Reason != ""
-			yyq3006[5] = x.Message != ""
-			yyq3006[6] = true
-			yyq3006[7] = true
-			yyq3006[8] = true
-			yyq3006[9] = x.Count != 0
-			yyq3006[10] = x.Type != ""
-			var yynn3006 int
-			if yyr3006 || yy2arr3006 {
+			yysep3031 := !z.EncBinary()
+			yy2arr3031 := z.EncBasicHandle().StructToArray
+			var yyq3031 [11]bool
+			_, _, _ = yysep3031, yyq3031, yy2arr3031
+			const yyr3031 bool = false
+			yyq3031[0] = x.Kind != ""
+			yyq3031[1] = x.APIVersion != ""
+			yyq3031[2] = true
+			yyq3031[3] = true
+			yyq3031[4] = x.Reason != ""
+			yyq3031[5] = x.Message != ""
+			yyq3031[6] = true
+			yyq3031[7] = true
+			yyq3031[8] = true
+			yyq3031[9] = x.Count != 0
+			yyq3031[10] = x.Type != ""
+			var yynn3031 int
+			if yyr3031 || yy2arr3031 {
 				r.EncodeArrayStart(11)
 			} else {
-				yynn3006 = 0
-				for _, b := range yyq3006 {
+				yynn3031 = 0
+				for _, b := range yyq3031 {
 					if b {
-						yynn3006++
+						yynn3031++
 					}
 				}
-				r.EncodeMapStart(yynn3006)
-				yynn3006 = 0
+				r.EncodeMapStart(yynn3031)
+				yynn3031 = 0
 			}
-			if yyr3006 || yy2arr3006 {
+			if yyr3031 || yy2arr3031 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3006[0] {
-					yym3008 := z.EncBinary()
-					_ = yym3008
+				if yyq3031[0] {
+					yym3033 := z.EncBinary()
+					_ = yym3033
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -37587,23 +37878,23 @@ func (x *Event) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3006[0] {
+				if yyq3031[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3009 := z.EncBinary()
-					_ = yym3009
+					yym3034 := z.EncBinary()
+					_ = yym3034
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr3006 || yy2arr3006 {
+			if yyr3031 || yy2arr3031 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3006[1] {
-					yym3011 := z.EncBinary()
-					_ = yym3011
+				if yyq3031[1] {
+					yym3036 := z.EncBinary()
+					_ = yym3036
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -37612,57 +37903,57 @@ func (x *Event) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3006[1] {
+				if yyq3031[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3012 := z.EncBinary()
-					_ = yym3012
+					yym3037 := z.EncBinary()
+					_ = yym3037
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr3006 || yy2arr3006 {
+			if yyr3031 || yy2arr3031 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3006[2] {
-					yy3014 := &x.ObjectMeta
-					yy3014.CodecEncodeSelf(e)
+				if yyq3031[2] {
+					yy3039 := &x.ObjectMeta
+					yy3039.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3006[2] {
+				if yyq3031[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3015 := &x.ObjectMeta
-					yy3015.CodecEncodeSelf(e)
+					yy3040 := &x.ObjectMeta
+					yy3040.CodecEncodeSelf(e)
 				}
 			}
-			if yyr3006 || yy2arr3006 {
+			if yyr3031 || yy2arr3031 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3006[3] {
-					yy3017 := &x.InvolvedObject
-					yy3017.CodecEncodeSelf(e)
+				if yyq3031[3] {
+					yy3042 := &x.InvolvedObject
+					yy3042.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3006[3] {
+				if yyq3031[3] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("involvedObject"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3018 := &x.InvolvedObject
-					yy3018.CodecEncodeSelf(e)
+					yy3043 := &x.InvolvedObject
+					yy3043.CodecEncodeSelf(e)
 				}
 			}
-			if yyr3006 || yy2arr3006 {
+			if yyr3031 || yy2arr3031 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3006[4] {
-					yym3020 := z.EncBinary()
-					_ = yym3020
+				if yyq3031[4] {
+					yym3045 := z.EncBinary()
+					_ = yym3045
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Reason))
@@ -37671,23 +37962,23 @@ func (x *Event) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3006[4] {
+				if yyq3031[4] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("reason"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3021 := z.EncBinary()
-					_ = yym3021
+					yym3046 := z.EncBinary()
+					_ = yym3046
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Reason))
 					}
 				}
 			}
-			if yyr3006 || yy2arr3006 {
+			if yyr3031 || yy2arr3031 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3006[5] {
-					yym3023 := z.EncBinary()
-					_ = yym3023
+				if yyq3031[5] {
+					yym3048 := z.EncBinary()
+					_ = yym3048
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Message))
@@ -37696,114 +37987,114 @@ func (x *Event) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3006[5] {
+				if yyq3031[5] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("message"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3024 := z.EncBinary()
-					_ = yym3024
+					yym3049 := z.EncBinary()
+					_ = yym3049
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Message))
 					}
 				}
 			}
-			if yyr3006 || yy2arr3006 {
+			if yyr3031 || yy2arr3031 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3006[6] {
-					yy3026 := &x.Source
-					yy3026.CodecEncodeSelf(e)
+				if yyq3031[6] {
+					yy3051 := &x.Source
+					yy3051.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3006[6] {
+				if yyq3031[6] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("source"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3027 := &x.Source
-					yy3027.CodecEncodeSelf(e)
+					yy3052 := &x.Source
+					yy3052.CodecEncodeSelf(e)
 				}
 			}
-			if yyr3006 || yy2arr3006 {
+			if yyr3031 || yy2arr3031 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3006[7] {
-					yy3029 := &x.FirstTimestamp
-					yym3030 := z.EncBinary()
-					_ = yym3030
+				if yyq3031[7] {
+					yy3054 := &x.FirstTimestamp
+					yym3055 := z.EncBinary()
+					_ = yym3055
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3029) {
-					} else if yym3030 {
-						z.EncBinaryMarshal(yy3029)
-					} else if !yym3030 && z.IsJSONHandle() {
-						z.EncJSONMarshal(yy3029)
+					} else if z.HasExtensions() && z.EncExt(yy3054) {
+					} else if yym3055 {
+						z.EncBinaryMarshal(yy3054)
+					} else if !yym3055 && z.IsJSONHandle() {
+						z.EncJSONMarshal(yy3054)
 					} else {
-						z.EncFallback(yy3029)
+						z.EncFallback(yy3054)
 					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3006[7] {
+				if yyq3031[7] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("firstTimestamp"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3031 := &x.FirstTimestamp
-					yym3032 := z.EncBinary()
-					_ = yym3032
+					yy3056 := &x.FirstTimestamp
+					yym3057 := z.EncBinary()
+					_ = yym3057
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3031) {
-					} else if yym3032 {
-						z.EncBinaryMarshal(yy3031)
-					} else if !yym3032 && z.IsJSONHandle() {
-						z.EncJSONMarshal(yy3031)
+					} else if z.HasExtensions() && z.EncExt(yy3056) {
+					} else if yym3057 {
+						z.EncBinaryMarshal(yy3056)
+					} else if !yym3057 && z.IsJSONHandle() {
+						z.EncJSONMarshal(yy3056)
 					} else {
-						z.EncFallback(yy3031)
+						z.EncFallback(yy3056)
 					}
 				}
 			}
-			if yyr3006 || yy2arr3006 {
+			if yyr3031 || yy2arr3031 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3006[8] {
-					yy3034 := &x.LastTimestamp
-					yym3035 := z.EncBinary()
-					_ = yym3035
+				if yyq3031[8] {
+					yy3059 := &x.LastTimestamp
+					yym3060 := z.EncBinary()
+					_ = yym3060
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3034) {
-					} else if yym3035 {
-						z.EncBinaryMarshal(yy3034)
-					} else if !yym3035 && z.IsJSONHandle() {
-						z.EncJSONMarshal(yy3034)
+					} else if z.HasExtensions() && z.EncExt(yy3059) {
+					} else if yym3060 {
+						z.EncBinaryMarshal(yy3059)
+					} else if !yym3060 && z.IsJSONHandle() {
+						z.EncJSONMarshal(yy3059)
 					} else {
-						z.EncFallback(yy3034)
+						z.EncFallback(yy3059)
 					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3006[8] {
+				if yyq3031[8] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("lastTimestamp"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3036 := &x.LastTimestamp
-					yym3037 := z.EncBinary()
-					_ = yym3037
+					yy3061 := &x.LastTimestamp
+					yym3062 := z.EncBinary()
+					_ = yym3062
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3036) {
-					} else if yym3037 {
-						z.EncBinaryMarshal(yy3036)
-					} else if !yym3037 && z.IsJSONHandle() {
-						z.EncJSONMarshal(yy3036)
+					} else if z.HasExtensions() && z.EncExt(yy3061) {
+					} else if yym3062 {
+						z.EncBinaryMarshal(yy3061)
+					} else if !yym3062 && z.IsJSONHandle() {
+						z.EncJSONMarshal(yy3061)
 					} else {
-						z.EncFallback(yy3036)
+						z.EncFallback(yy3061)
 					}
 				}
 			}
-			if yyr3006 || yy2arr3006 {
+			if yyr3031 || yy2arr3031 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3006[9] {
-					yym3039 := z.EncBinary()
-					_ = yym3039
+				if yyq3031[9] {
+					yym3064 := z.EncBinary()
+					_ = yym3064
 					if false {
 					} else {
 						r.EncodeInt(int64(x.Count))
@@ -37812,23 +38103,23 @@ func (x *Event) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeInt(0)
 				}
 			} else {
-				if yyq3006[9] {
+				if yyq3031[9] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("count"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3040 := z.EncBinary()
-					_ = yym3040
+					yym3065 := z.EncBinary()
+					_ = yym3065
 					if false {
 					} else {
 						r.EncodeInt(int64(x.Count))
 					}
 				}
 			}
-			if yyr3006 || yy2arr3006 {
+			if yyr3031 || yy2arr3031 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3006[10] {
-					yym3042 := z.EncBinary()
-					_ = yym3042
+				if yyq3031[10] {
+					yym3067 := z.EncBinary()
+					_ = yym3067
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Type))
@@ -37837,19 +38128,19 @@ func (x *Event) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3006[10] {
+				if yyq3031[10] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("type"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3043 := z.EncBinary()
-					_ = yym3043
+					yym3068 := z.EncBinary()
+					_ = yym3068
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Type))
 					}
 				}
 			}
-			if yyr3006 || yy2arr3006 {
+			if yyr3031 || yy2arr3031 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -37862,25 +38153,25 @@ func (x *Event) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3044 := z.DecBinary()
-	_ = yym3044
+	yym3069 := z.DecBinary()
+	_ = yym3069
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3045 := r.ContainerType()
-		if yyct3045 == codecSelferValueTypeMap1234 {
-			yyl3045 := r.ReadMapStart()
-			if yyl3045 == 0 {
+		yyct3070 := r.ContainerType()
+		if yyct3070 == codecSelferValueTypeMap1234 {
+			yyl3070 := r.ReadMapStart()
+			if yyl3070 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3045, d)
+				x.codecDecodeSelfFromMap(yyl3070, d)
 			}
-		} else if yyct3045 == codecSelferValueTypeArray1234 {
-			yyl3045 := r.ReadArrayStart()
-			if yyl3045 == 0 {
+		} else if yyct3070 == codecSelferValueTypeArray1234 {
+			yyl3070 := r.ReadArrayStart()
+			if yyl3070 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3045, d)
+				x.codecDecodeSelfFromArray(yyl3070, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -37892,12 +38183,12 @@ func (x *Event) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3046Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3046Slc
-	var yyhl3046 bool = l >= 0
-	for yyj3046 := 0; ; yyj3046++ {
-		if yyhl3046 {
-			if yyj3046 >= l {
+	var yys3071Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3071Slc
+	var yyhl3071 bool = l >= 0
+	for yyj3071 := 0; ; yyj3071++ {
+		if yyhl3071 {
+			if yyj3071 >= l {
 				break
 			}
 		} else {
@@ -37906,10 +38197,10 @@ func (x *Event) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3046Slc = r.DecodeBytes(yys3046Slc, true, true)
-		yys3046 := string(yys3046Slc)
+		yys3071Slc = r.DecodeBytes(yys3071Slc, true, true)
+		yys3071 := string(yys3071Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3046 {
+		switch yys3071 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -37926,15 +38217,15 @@ func (x *Event) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.ObjectMeta = ObjectMeta{}
 			} else {
-				yyv3049 := &x.ObjectMeta
-				yyv3049.CodecDecodeSelf(d)
+				yyv3074 := &x.ObjectMeta
+				yyv3074.CodecDecodeSelf(d)
 			}
 		case "involvedObject":
 			if r.TryDecodeAsNil() {
 				x.InvolvedObject = ObjectReference{}
 			} else {
-				yyv3050 := &x.InvolvedObject
-				yyv3050.CodecDecodeSelf(d)
+				yyv3075 := &x.InvolvedObject
+				yyv3075.CodecDecodeSelf(d)
 			}
 		case "reason":
 			if r.TryDecodeAsNil() {
@@ -37952,41 +38243,41 @@ func (x *Event) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Source = EventSource{}
 			} else {
-				yyv3053 := &x.Source
-				yyv3053.CodecDecodeSelf(d)
+				yyv3078 := &x.Source
+				yyv3078.CodecDecodeSelf(d)
 			}
 		case "firstTimestamp":
 			if r.TryDecodeAsNil() {
 				x.FirstTimestamp = pkg2_unversioned.Time{}
 			} else {
-				yyv3054 := &x.FirstTimestamp
-				yym3055 := z.DecBinary()
-				_ = yym3055
+				yyv3079 := &x.FirstTimestamp
+				yym3080 := z.DecBinary()
+				_ = yym3080
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv3054) {
-				} else if yym3055 {
-					z.DecBinaryUnmarshal(yyv3054)
-				} else if !yym3055 && z.IsJSONHandle() {
-					z.DecJSONUnmarshal(yyv3054)
+				} else if z.HasExtensions() && z.DecExt(yyv3079) {
+				} else if yym3080 {
+					z.DecBinaryUnmarshal(yyv3079)
+				} else if !yym3080 && z.IsJSONHandle() {
+					z.DecJSONUnmarshal(yyv3079)
 				} else {
-					z.DecFallback(yyv3054, false)
+					z.DecFallback(yyv3079, false)
 				}
 			}
 		case "lastTimestamp":
 			if r.TryDecodeAsNil() {
 				x.LastTimestamp = pkg2_unversioned.Time{}
 			} else {
-				yyv3056 := &x.LastTimestamp
-				yym3057 := z.DecBinary()
-				_ = yym3057
+				yyv3081 := &x.LastTimestamp
+				yym3082 := z.DecBinary()
+				_ = yym3082
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv3056) {
-				} else if yym3057 {
-					z.DecBinaryUnmarshal(yyv3056)
-				} else if !yym3057 && z.IsJSONHandle() {
-					z.DecJSONUnmarshal(yyv3056)
+				} else if z.HasExtensions() && z.DecExt(yyv3081) {
+				} else if yym3082 {
+					z.DecBinaryUnmarshal(yyv3081)
+				} else if !yym3082 && z.IsJSONHandle() {
+					z.DecJSONUnmarshal(yyv3081)
 				} else {
-					z.DecFallback(yyv3056, false)
+					z.DecFallback(yyv3081, false)
 				}
 			}
 		case "count":
@@ -38002,9 +38293,9 @@ func (x *Event) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				x.Type = string(r.DecodeString())
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3046)
-		} // end switch yys3046
-	} // end for yyj3046
+			z.DecStructFieldNotFound(-1, yys3071)
+		} // end switch yys3071
+	} // end for yyj3071
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -38012,16 +38303,16 @@ func (x *Event) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3060 int
-	var yyb3060 bool
-	var yyhl3060 bool = l >= 0
-	yyj3060++
-	if yyhl3060 {
-		yyb3060 = yyj3060 > l
+	var yyj3085 int
+	var yyb3085 bool
+	var yyhl3085 bool = l >= 0
+	yyj3085++
+	if yyhl3085 {
+		yyb3085 = yyj3085 > l
 	} else {
-		yyb3060 = r.CheckBreak()
+		yyb3085 = r.CheckBreak()
 	}
-	if yyb3060 {
+	if yyb3085 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38031,13 +38322,13 @@ func (x *Event) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj3060++
-	if yyhl3060 {
-		yyb3060 = yyj3060 > l
+	yyj3085++
+	if yyhl3085 {
+		yyb3085 = yyj3085 > l
 	} else {
-		yyb3060 = r.CheckBreak()
+		yyb3085 = r.CheckBreak()
 	}
-	if yyb3060 {
+	if yyb3085 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38047,13 +38338,13 @@ func (x *Event) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj3060++
-	if yyhl3060 {
-		yyb3060 = yyj3060 > l
+	yyj3085++
+	if yyhl3085 {
+		yyb3085 = yyj3085 > l
 	} else {
-		yyb3060 = r.CheckBreak()
+		yyb3085 = r.CheckBreak()
 	}
-	if yyb3060 {
+	if yyb3085 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38061,16 +38352,16 @@ func (x *Event) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.ObjectMeta = ObjectMeta{}
 	} else {
-		yyv3063 := &x.ObjectMeta
-		yyv3063.CodecDecodeSelf(d)
+		yyv3088 := &x.ObjectMeta
+		yyv3088.CodecDecodeSelf(d)
 	}
-	yyj3060++
-	if yyhl3060 {
-		yyb3060 = yyj3060 > l
+	yyj3085++
+	if yyhl3085 {
+		yyb3085 = yyj3085 > l
 	} else {
-		yyb3060 = r.CheckBreak()
+		yyb3085 = r.CheckBreak()
 	}
-	if yyb3060 {
+	if yyb3085 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38078,16 +38369,16 @@ func (x *Event) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.InvolvedObject = ObjectReference{}
 	} else {
-		yyv3064 := &x.InvolvedObject
-		yyv3064.CodecDecodeSelf(d)
+		yyv3089 := &x.InvolvedObject
+		yyv3089.CodecDecodeSelf(d)
 	}
-	yyj3060++
-	if yyhl3060 {
-		yyb3060 = yyj3060 > l
+	yyj3085++
+	if yyhl3085 {
+		yyb3085 = yyj3085 > l
 	} else {
-		yyb3060 = r.CheckBreak()
+		yyb3085 = r.CheckBreak()
 	}
-	if yyb3060 {
+	if yyb3085 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38097,13 +38388,13 @@ func (x *Event) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Reason = string(r.DecodeString())
 	}
-	yyj3060++
-	if yyhl3060 {
-		yyb3060 = yyj3060 > l
+	yyj3085++
+	if yyhl3085 {
+		yyb3085 = yyj3085 > l
 	} else {
-		yyb3060 = r.CheckBreak()
+		yyb3085 = r.CheckBreak()
 	}
-	if yyb3060 {
+	if yyb3085 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38113,13 +38404,13 @@ func (x *Event) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Message = string(r.DecodeString())
 	}
-	yyj3060++
-	if yyhl3060 {
-		yyb3060 = yyj3060 > l
+	yyj3085++
+	if yyhl3085 {
+		yyb3085 = yyj3085 > l
 	} else {
-		yyb3060 = r.CheckBreak()
+		yyb3085 = r.CheckBreak()
 	}
-	if yyb3060 {
+	if yyb3085 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38127,16 +38418,16 @@ func (x *Event) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Source = EventSource{}
 	} else {
-		yyv3067 := &x.Source
-		yyv3067.CodecDecodeSelf(d)
+		yyv3092 := &x.Source
+		yyv3092.CodecDecodeSelf(d)
 	}
-	yyj3060++
-	if yyhl3060 {
-		yyb3060 = yyj3060 > l
+	yyj3085++
+	if yyhl3085 {
+		yyb3085 = yyj3085 > l
 	} else {
-		yyb3060 = r.CheckBreak()
+		yyb3085 = r.CheckBreak()
 	}
-	if yyb3060 {
+	if yyb3085 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38144,26 +38435,26 @@ func (x *Event) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.FirstTimestamp = pkg2_unversioned.Time{}
 	} else {
-		yyv3068 := &x.FirstTimestamp
-		yym3069 := z.DecBinary()
-		_ = yym3069
+		yyv3093 := &x.FirstTimestamp
+		yym3094 := z.DecBinary()
+		_ = yym3094
 		if false {
-		} else if z.HasExtensions() && z.DecExt(yyv3068) {
-		} else if yym3069 {
-			z.DecBinaryUnmarshal(yyv3068)
-		} else if !yym3069 && z.IsJSONHandle() {
-			z.DecJSONUnmarshal(yyv3068)
+		} else if z.HasExtensions() && z.DecExt(yyv3093) {
+		} else if yym3094 {
+			z.DecBinaryUnmarshal(yyv3093)
+		} else if !yym3094 && z.IsJSONHandle() {
+			z.DecJSONUnmarshal(yyv3093)
 		} else {
-			z.DecFallback(yyv3068, false)
+			z.DecFallback(yyv3093, false)
 		}
 	}
-	yyj3060++
-	if yyhl3060 {
-		yyb3060 = yyj3060 > l
+	yyj3085++
+	if yyhl3085 {
+		yyb3085 = yyj3085 > l
 	} else {
-		yyb3060 = r.CheckBreak()
+		yyb3085 = r.CheckBreak()
 	}
-	if yyb3060 {
+	if yyb3085 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38171,26 +38462,26 @@ func (x *Event) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.LastTimestamp = pkg2_unversioned.Time{}
 	} else {
-		yyv3070 := &x.LastTimestamp
-		yym3071 := z.DecBinary()
-		_ = yym3071
+		yyv3095 := &x.LastTimestamp
+		yym3096 := z.DecBinary()
+		_ = yym3096
 		if false {
-		} else if z.HasExtensions() && z.DecExt(yyv3070) {
-		} else if yym3071 {
-			z.DecBinaryUnmarshal(yyv3070)
-		} else if !yym3071 && z.IsJSONHandle() {
-			z.DecJSONUnmarshal(yyv3070)
+		} else if z.HasExtensions() && z.DecExt(yyv3095) {
+		} else if yym3096 {
+			z.DecBinaryUnmarshal(yyv3095)
+		} else if !yym3096 && z.IsJSONHandle() {
+			z.DecJSONUnmarshal(yyv3095)
 		} else {
-			z.DecFallback(yyv3070, false)
+			z.DecFallback(yyv3095, false)
 		}
 	}
-	yyj3060++
-	if yyhl3060 {
-		yyb3060 = yyj3060 > l
+	yyj3085++
+	if yyhl3085 {
+		yyb3085 = yyj3085 > l
 	} else {
-		yyb3060 = r.CheckBreak()
+		yyb3085 = r.CheckBreak()
 	}
-	if yyb3060 {
+	if yyb3085 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38200,13 +38491,13 @@ func (x *Event) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Count = int(r.DecodeInt(codecSelferBitsize1234))
 	}
-	yyj3060++
-	if yyhl3060 {
-		yyb3060 = yyj3060 > l
+	yyj3085++
+	if yyhl3085 {
+		yyb3085 = yyj3085 > l
 	} else {
-		yyb3060 = r.CheckBreak()
+		yyb3085 = r.CheckBreak()
 	}
-	if yyb3060 {
+	if yyb3085 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38217,17 +38508,17 @@ func (x *Event) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		x.Type = string(r.DecodeString())
 	}
 	for {
-		yyj3060++
-		if yyhl3060 {
-			yyb3060 = yyj3060 > l
+		yyj3085++
+		if yyhl3085 {
+			yyb3085 = yyj3085 > l
 		} else {
-			yyb3060 = r.CheckBreak()
+			yyb3085 = r.CheckBreak()
 		}
-		if yyb3060 {
+		if yyb3085 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3060-1, "")
+		z.DecStructFieldNotFound(yyj3085-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -38239,37 +38530,37 @@ func (x *EventList) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3074 := z.EncBinary()
-		_ = yym3074
+		yym3099 := z.EncBinary()
+		_ = yym3099
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3075 := !z.EncBinary()
-			yy2arr3075 := z.EncBasicHandle().StructToArray
-			var yyq3075 [4]bool
-			_, _, _ = yysep3075, yyq3075, yy2arr3075
-			const yyr3075 bool = false
-			yyq3075[0] = x.Kind != ""
-			yyq3075[1] = x.APIVersion != ""
-			yyq3075[2] = true
-			var yynn3075 int
-			if yyr3075 || yy2arr3075 {
+			yysep3100 := !z.EncBinary()
+			yy2arr3100 := z.EncBasicHandle().StructToArray
+			var yyq3100 [4]bool
+			_, _, _ = yysep3100, yyq3100, yy2arr3100
+			const yyr3100 bool = false
+			yyq3100[0] = x.Kind != ""
+			yyq3100[1] = x.APIVersion != ""
+			yyq3100[2] = true
+			var yynn3100 int
+			if yyr3100 || yy2arr3100 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn3075 = 1
-				for _, b := range yyq3075 {
+				yynn3100 = 1
+				for _, b := range yyq3100 {
 					if b {
-						yynn3075++
+						yynn3100++
 					}
 				}
-				r.EncodeMapStart(yynn3075)
-				yynn3075 = 0
+				r.EncodeMapStart(yynn3100)
+				yynn3100 = 0
 			}
-			if yyr3075 || yy2arr3075 {
+			if yyr3100 || yy2arr3100 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3075[0] {
-					yym3077 := z.EncBinary()
-					_ = yym3077
+				if yyq3100[0] {
+					yym3102 := z.EncBinary()
+					_ = yym3102
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -38278,23 +38569,23 @@ func (x *EventList) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3075[0] {
+				if yyq3100[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3078 := z.EncBinary()
-					_ = yym3078
+					yym3103 := z.EncBinary()
+					_ = yym3103
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr3075 || yy2arr3075 {
+			if yyr3100 || yy2arr3100 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3075[1] {
-					yym3080 := z.EncBinary()
-					_ = yym3080
+				if yyq3100[1] {
+					yym3105 := z.EncBinary()
+					_ = yym3105
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -38303,54 +38594,54 @@ func (x *EventList) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3075[1] {
+				if yyq3100[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3081 := z.EncBinary()
-					_ = yym3081
+					yym3106 := z.EncBinary()
+					_ = yym3106
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr3075 || yy2arr3075 {
+			if yyr3100 || yy2arr3100 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3075[2] {
-					yy3083 := &x.ListMeta
-					yym3084 := z.EncBinary()
-					_ = yym3084
+				if yyq3100[2] {
+					yy3108 := &x.ListMeta
+					yym3109 := z.EncBinary()
+					_ = yym3109
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3083) {
+					} else if z.HasExtensions() && z.EncExt(yy3108) {
 					} else {
-						z.EncFallback(yy3083)
+						z.EncFallback(yy3108)
 					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3075[2] {
+				if yyq3100[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3085 := &x.ListMeta
-					yym3086 := z.EncBinary()
-					_ = yym3086
+					yy3110 := &x.ListMeta
+					yym3111 := z.EncBinary()
+					_ = yym3111
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3085) {
+					} else if z.HasExtensions() && z.EncExt(yy3110) {
 					} else {
-						z.EncFallback(yy3085)
+						z.EncFallback(yy3110)
 					}
 				}
 			}
-			if yyr3075 || yy2arr3075 {
+			if yyr3100 || yy2arr3100 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym3088 := z.EncBinary()
-					_ = yym3088
+					yym3113 := z.EncBinary()
+					_ = yym3113
 					if false {
 					} else {
 						h.encSliceEvent(([]Event)(x.Items), e)
@@ -38363,15 +38654,15 @@ func (x *EventList) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym3089 := z.EncBinary()
-					_ = yym3089
+					yym3114 := z.EncBinary()
+					_ = yym3114
 					if false {
 					} else {
 						h.encSliceEvent(([]Event)(x.Items), e)
 					}
 				}
 			}
-			if yyr3075 || yy2arr3075 {
+			if yyr3100 || yy2arr3100 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -38384,25 +38675,25 @@ func (x *EventList) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3090 := z.DecBinary()
-	_ = yym3090
+	yym3115 := z.DecBinary()
+	_ = yym3115
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3091 := r.ContainerType()
-		if yyct3091 == codecSelferValueTypeMap1234 {
-			yyl3091 := r.ReadMapStart()
-			if yyl3091 == 0 {
+		yyct3116 := r.ContainerType()
+		if yyct3116 == codecSelferValueTypeMap1234 {
+			yyl3116 := r.ReadMapStart()
+			if yyl3116 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3091, d)
+				x.codecDecodeSelfFromMap(yyl3116, d)
 			}
-		} else if yyct3091 == codecSelferValueTypeArray1234 {
-			yyl3091 := r.ReadArrayStart()
-			if yyl3091 == 0 {
+		} else if yyct3116 == codecSelferValueTypeArray1234 {
+			yyl3116 := r.ReadArrayStart()
+			if yyl3116 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3091, d)
+				x.codecDecodeSelfFromArray(yyl3116, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -38414,12 +38705,12 @@ func (x *EventList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3092Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3092Slc
-	var yyhl3092 bool = l >= 0
-	for yyj3092 := 0; ; yyj3092++ {
-		if yyhl3092 {
-			if yyj3092 >= l {
+	var yys3117Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3117Slc
+	var yyhl3117 bool = l >= 0
+	for yyj3117 := 0; ; yyj3117++ {
+		if yyhl3117 {
+			if yyj3117 >= l {
 				break
 			}
 		} else {
@@ -38428,10 +38719,10 @@ func (x *EventList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3092Slc = r.DecodeBytes(yys3092Slc, true, true)
-		yys3092 := string(yys3092Slc)
+		yys3117Slc = r.DecodeBytes(yys3117Slc, true, true)
+		yys3117 := string(yys3117Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3092 {
+		switch yys3117 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -38448,31 +38739,31 @@ func (x *EventList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.ListMeta = pkg2_unversioned.ListMeta{}
 			} else {
-				yyv3095 := &x.ListMeta
-				yym3096 := z.DecBinary()
-				_ = yym3096
+				yyv3120 := &x.ListMeta
+				yym3121 := z.DecBinary()
+				_ = yym3121
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv3095) {
+				} else if z.HasExtensions() && z.DecExt(yyv3120) {
 				} else {
-					z.DecFallback(yyv3095, false)
+					z.DecFallback(yyv3120, false)
 				}
 			}
 		case "items":
 			if r.TryDecodeAsNil() {
 				x.Items = nil
 			} else {
-				yyv3097 := &x.Items
-				yym3098 := z.DecBinary()
-				_ = yym3098
+				yyv3122 := &x.Items
+				yym3123 := z.DecBinary()
+				_ = yym3123
 				if false {
 				} else {
-					h.decSliceEvent((*[]Event)(yyv3097), d)
+					h.decSliceEvent((*[]Event)(yyv3122), d)
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3092)
-		} // end switch yys3092
-	} // end for yyj3092
+			z.DecStructFieldNotFound(-1, yys3117)
+		} // end switch yys3117
+	} // end for yyj3117
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -38480,16 +38771,16 @@ func (x *EventList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3099 int
-	var yyb3099 bool
-	var yyhl3099 bool = l >= 0
-	yyj3099++
-	if yyhl3099 {
-		yyb3099 = yyj3099 > l
+	var yyj3124 int
+	var yyb3124 bool
+	var yyhl3124 bool = l >= 0
+	yyj3124++
+	if yyhl3124 {
+		yyb3124 = yyj3124 > l
 	} else {
-		yyb3099 = r.CheckBreak()
+		yyb3124 = r.CheckBreak()
 	}
-	if yyb3099 {
+	if yyb3124 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38499,13 +38790,13 @@ func (x *EventList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj3099++
-	if yyhl3099 {
-		yyb3099 = yyj3099 > l
+	yyj3124++
+	if yyhl3124 {
+		yyb3124 = yyj3124 > l
 	} else {
-		yyb3099 = r.CheckBreak()
+		yyb3124 = r.CheckBreak()
 	}
-	if yyb3099 {
+	if yyb3124 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38515,13 +38806,13 @@ func (x *EventList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj3099++
-	if yyhl3099 {
-		yyb3099 = yyj3099 > l
+	yyj3124++
+	if yyhl3124 {
+		yyb3124 = yyj3124 > l
 	} else {
-		yyb3099 = r.CheckBreak()
+		yyb3124 = r.CheckBreak()
 	}
-	if yyb3099 {
+	if yyb3124 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38529,22 +38820,22 @@ func (x *EventList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.ListMeta = pkg2_unversioned.ListMeta{}
 	} else {
-		yyv3102 := &x.ListMeta
-		yym3103 := z.DecBinary()
-		_ = yym3103
+		yyv3127 := &x.ListMeta
+		yym3128 := z.DecBinary()
+		_ = yym3128
 		if false {
-		} else if z.HasExtensions() && z.DecExt(yyv3102) {
+		} else if z.HasExtensions() && z.DecExt(yyv3127) {
 		} else {
-			z.DecFallback(yyv3102, false)
+			z.DecFallback(yyv3127, false)
 		}
 	}
-	yyj3099++
-	if yyhl3099 {
-		yyb3099 = yyj3099 > l
+	yyj3124++
+	if yyhl3124 {
+		yyb3124 = yyj3124 > l
 	} else {
-		yyb3099 = r.CheckBreak()
+		yyb3124 = r.CheckBreak()
 	}
-	if yyb3099 {
+	if yyb3124 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38552,26 +38843,26 @@ func (x *EventList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Items = nil
 	} else {
-		yyv3104 := &x.Items
-		yym3105 := z.DecBinary()
-		_ = yym3105
+		yyv3129 := &x.Items
+		yym3130 := z.DecBinary()
+		_ = yym3130
 		if false {
 		} else {
-			h.decSliceEvent((*[]Event)(yyv3104), d)
+			h.decSliceEvent((*[]Event)(yyv3129), d)
 		}
 	}
 	for {
-		yyj3099++
-		if yyhl3099 {
-			yyb3099 = yyj3099 > l
+		yyj3124++
+		if yyhl3124 {
+			yyb3124 = yyj3124 > l
 		} else {
-			yyb3099 = r.CheckBreak()
+			yyb3124 = r.CheckBreak()
 		}
-		if yyb3099 {
+		if yyb3124 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3099-1, "")
+		z.DecStructFieldNotFound(yyj3124-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -38583,37 +38874,37 @@ func (x *List) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3106 := z.EncBinary()
-		_ = yym3106
+		yym3131 := z.EncBinary()
+		_ = yym3131
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3107 := !z.EncBinary()
-			yy2arr3107 := z.EncBasicHandle().StructToArray
-			var yyq3107 [4]bool
-			_, _, _ = yysep3107, yyq3107, yy2arr3107
-			const yyr3107 bool = false
-			yyq3107[0] = x.Kind != ""
-			yyq3107[1] = x.APIVersion != ""
-			yyq3107[2] = true
-			var yynn3107 int
-			if yyr3107 || yy2arr3107 {
+			yysep3132 := !z.EncBinary()
+			yy2arr3132 := z.EncBasicHandle().StructToArray
+			var yyq3132 [4]bool
+			_, _, _ = yysep3132, yyq3132, yy2arr3132
+			const yyr3132 bool = false
+			yyq3132[0] = x.Kind != ""
+			yyq3132[1] = x.APIVersion != ""
+			yyq3132[2] = true
+			var yynn3132 int
+			if yyr3132 || yy2arr3132 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn3107 = 1
-				for _, b := range yyq3107 {
+				yynn3132 = 1
+				for _, b := range yyq3132 {
 					if b {
-						yynn3107++
+						yynn3132++
 					}
 				}
-				r.EncodeMapStart(yynn3107)
-				yynn3107 = 0
+				r.EncodeMapStart(yynn3132)
+				yynn3132 = 0
 			}
-			if yyr3107 || yy2arr3107 {
+			if yyr3132 || yy2arr3132 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3107[0] {
-					yym3109 := z.EncBinary()
-					_ = yym3109
+				if yyq3132[0] {
+					yym3134 := z.EncBinary()
+					_ = yym3134
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -38622,23 +38913,23 @@ func (x *List) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3107[0] {
+				if yyq3132[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3110 := z.EncBinary()
-					_ = yym3110
+					yym3135 := z.EncBinary()
+					_ = yym3135
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr3107 || yy2arr3107 {
+			if yyr3132 || yy2arr3132 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3107[1] {
-					yym3112 := z.EncBinary()
-					_ = yym3112
+				if yyq3132[1] {
+					yym3137 := z.EncBinary()
+					_ = yym3137
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -38647,54 +38938,54 @@ func (x *List) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3107[1] {
+				if yyq3132[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3113 := z.EncBinary()
-					_ = yym3113
+					yym3138 := z.EncBinary()
+					_ = yym3138
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr3107 || yy2arr3107 {
+			if yyr3132 || yy2arr3132 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3107[2] {
-					yy3115 := &x.ListMeta
-					yym3116 := z.EncBinary()
-					_ = yym3116
+				if yyq3132[2] {
+					yy3140 := &x.ListMeta
+					yym3141 := z.EncBinary()
+					_ = yym3141
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3115) {
+					} else if z.HasExtensions() && z.EncExt(yy3140) {
 					} else {
-						z.EncFallback(yy3115)
+						z.EncFallback(yy3140)
 					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3107[2] {
+				if yyq3132[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3117 := &x.ListMeta
-					yym3118 := z.EncBinary()
-					_ = yym3118
+					yy3142 := &x.ListMeta
+					yym3143 := z.EncBinary()
+					_ = yym3143
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3117) {
+					} else if z.HasExtensions() && z.EncExt(yy3142) {
 					} else {
-						z.EncFallback(yy3117)
+						z.EncFallback(yy3142)
 					}
 				}
 			}
-			if yyr3107 || yy2arr3107 {
+			if yyr3132 || yy2arr3132 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym3120 := z.EncBinary()
-					_ = yym3120
+					yym3145 := z.EncBinary()
+					_ = yym3145
 					if false {
 					} else {
 						h.encSliceruntime_Object(([]pkg8_runtime.Object)(x.Items), e)
@@ -38707,15 +38998,15 @@ func (x *List) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym3121 := z.EncBinary()
-					_ = yym3121
+					yym3146 := z.EncBinary()
+					_ = yym3146
 					if false {
 					} else {
 						h.encSliceruntime_Object(([]pkg8_runtime.Object)(x.Items), e)
 					}
 				}
 			}
-			if yyr3107 || yy2arr3107 {
+			if yyr3132 || yy2arr3132 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -38728,25 +39019,25 @@ func (x *List) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3122 := z.DecBinary()
-	_ = yym3122
+	yym3147 := z.DecBinary()
+	_ = yym3147
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3123 := r.ContainerType()
-		if yyct3123 == codecSelferValueTypeMap1234 {
-			yyl3123 := r.ReadMapStart()
-			if yyl3123 == 0 {
+		yyct3148 := r.ContainerType()
+		if yyct3148 == codecSelferValueTypeMap1234 {
+			yyl3148 := r.ReadMapStart()
+			if yyl3148 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3123, d)
+				x.codecDecodeSelfFromMap(yyl3148, d)
 			}
-		} else if yyct3123 == codecSelferValueTypeArray1234 {
-			yyl3123 := r.ReadArrayStart()
-			if yyl3123 == 0 {
+		} else if yyct3148 == codecSelferValueTypeArray1234 {
+			yyl3148 := r.ReadArrayStart()
+			if yyl3148 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3123, d)
+				x.codecDecodeSelfFromArray(yyl3148, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -38758,12 +39049,12 @@ func (x *List) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3124Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3124Slc
-	var yyhl3124 bool = l >= 0
-	for yyj3124 := 0; ; yyj3124++ {
-		if yyhl3124 {
-			if yyj3124 >= l {
+	var yys3149Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3149Slc
+	var yyhl3149 bool = l >= 0
+	for yyj3149 := 0; ; yyj3149++ {
+		if yyhl3149 {
+			if yyj3149 >= l {
 				break
 			}
 		} else {
@@ -38772,10 +39063,10 @@ func (x *List) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3124Slc = r.DecodeBytes(yys3124Slc, true, true)
-		yys3124 := string(yys3124Slc)
+		yys3149Slc = r.DecodeBytes(yys3149Slc, true, true)
+		yys3149 := string(yys3149Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3124 {
+		switch yys3149 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -38792,31 +39083,31 @@ func (x *List) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.ListMeta = pkg2_unversioned.ListMeta{}
 			} else {
-				yyv3127 := &x.ListMeta
-				yym3128 := z.DecBinary()
-				_ = yym3128
+				yyv3152 := &x.ListMeta
+				yym3153 := z.DecBinary()
+				_ = yym3153
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv3127) {
+				} else if z.HasExtensions() && z.DecExt(yyv3152) {
 				} else {
-					z.DecFallback(yyv3127, false)
+					z.DecFallback(yyv3152, false)
 				}
 			}
 		case "items":
 			if r.TryDecodeAsNil() {
 				x.Items = nil
 			} else {
-				yyv3129 := &x.Items
-				yym3130 := z.DecBinary()
-				_ = yym3130
+				yyv3154 := &x.Items
+				yym3155 := z.DecBinary()
+				_ = yym3155
 				if false {
 				} else {
-					h.decSliceruntime_Object((*[]pkg8_runtime.Object)(yyv3129), d)
+					h.decSliceruntime_Object((*[]pkg8_runtime.Object)(yyv3154), d)
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3124)
-		} // end switch yys3124
-	} // end for yyj3124
+			z.DecStructFieldNotFound(-1, yys3149)
+		} // end switch yys3149
+	} // end for yyj3149
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -38824,16 +39115,16 @@ func (x *List) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3131 int
-	var yyb3131 bool
-	var yyhl3131 bool = l >= 0
-	yyj3131++
-	if yyhl3131 {
-		yyb3131 = yyj3131 > l
+	var yyj3156 int
+	var yyb3156 bool
+	var yyhl3156 bool = l >= 0
+	yyj3156++
+	if yyhl3156 {
+		yyb3156 = yyj3156 > l
 	} else {
-		yyb3131 = r.CheckBreak()
+		yyb3156 = r.CheckBreak()
 	}
-	if yyb3131 {
+	if yyb3156 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38843,13 +39134,13 @@ func (x *List) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj3131++
-	if yyhl3131 {
-		yyb3131 = yyj3131 > l
+	yyj3156++
+	if yyhl3156 {
+		yyb3156 = yyj3156 > l
 	} else {
-		yyb3131 = r.CheckBreak()
+		yyb3156 = r.CheckBreak()
 	}
-	if yyb3131 {
+	if yyb3156 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38859,13 +39150,13 @@ func (x *List) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj3131++
-	if yyhl3131 {
-		yyb3131 = yyj3131 > l
+	yyj3156++
+	if yyhl3156 {
+		yyb3156 = yyj3156 > l
 	} else {
-		yyb3131 = r.CheckBreak()
+		yyb3156 = r.CheckBreak()
 	}
-	if yyb3131 {
+	if yyb3156 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38873,22 +39164,22 @@ func (x *List) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.ListMeta = pkg2_unversioned.ListMeta{}
 	} else {
-		yyv3134 := &x.ListMeta
-		yym3135 := z.DecBinary()
-		_ = yym3135
+		yyv3159 := &x.ListMeta
+		yym3160 := z.DecBinary()
+		_ = yym3160
 		if false {
-		} else if z.HasExtensions() && z.DecExt(yyv3134) {
+		} else if z.HasExtensions() && z.DecExt(yyv3159) {
 		} else {
-			z.DecFallback(yyv3134, false)
+			z.DecFallback(yyv3159, false)
 		}
 	}
-	yyj3131++
-	if yyhl3131 {
-		yyb3131 = yyj3131 > l
+	yyj3156++
+	if yyhl3156 {
+		yyb3156 = yyj3156 > l
 	} else {
-		yyb3131 = r.CheckBreak()
+		yyb3156 = r.CheckBreak()
 	}
-	if yyb3131 {
+	if yyb3156 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -38896,26 +39187,26 @@ func (x *List) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Items = nil
 	} else {
-		yyv3136 := &x.Items
-		yym3137 := z.DecBinary()
-		_ = yym3137
+		yyv3161 := &x.Items
+		yym3162 := z.DecBinary()
+		_ = yym3162
 		if false {
 		} else {
-			h.decSliceruntime_Object((*[]pkg8_runtime.Object)(yyv3136), d)
+			h.decSliceruntime_Object((*[]pkg8_runtime.Object)(yyv3161), d)
 		}
 	}
 	for {
-		yyj3131++
-		if yyhl3131 {
-			yyb3131 = yyj3131 > l
+		yyj3156++
+		if yyhl3156 {
+			yyb3156 = yyj3156 > l
 		} else {
-			yyb3131 = r.CheckBreak()
+			yyb3156 = r.CheckBreak()
 		}
-		if yyb3131 {
+		if yyb3156 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3131-1, "")
+		z.DecStructFieldNotFound(yyj3156-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -38924,8 +39215,8 @@ func (x LimitType) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
-	yym3138 := z.EncBinary()
-	_ = yym3138
+	yym3163 := z.EncBinary()
+	_ = yym3163
 	if false {
 	} else if z.HasExtensions() && z.EncExt(x) {
 	} else {
@@ -38937,8 +39228,8 @@ func (x *LimitType) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3139 := z.DecBinary()
-	_ = yym3139
+	yym3164 := z.DecBinary()
+	_ = yym3164
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
@@ -38953,53 +39244,53 @@ func (x *LimitRangeItem) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3140 := z.EncBinary()
-		_ = yym3140
+		yym3165 := z.EncBinary()
+		_ = yym3165
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3141 := !z.EncBinary()
-			yy2arr3141 := z.EncBasicHandle().StructToArray
-			var yyq3141 [6]bool
-			_, _, _ = yysep3141, yyq3141, yy2arr3141
-			const yyr3141 bool = false
-			yyq3141[0] = x.Type != ""
-			yyq3141[1] = len(x.Max) != 0
-			yyq3141[2] = len(x.Min) != 0
-			yyq3141[3] = len(x.Default) != 0
-			yyq3141[4] = len(x.DefaultRequest) != 0
-			yyq3141[5] = len(x.MaxLimitRequestRatio) != 0
-			var yynn3141 int
-			if yyr3141 || yy2arr3141 {
+			yysep3166 := !z.EncBinary()
+			yy2arr3166 := z.EncBasicHandle().StructToArray
+			var yyq3166 [6]bool
+			_, _, _ = yysep3166, yyq3166, yy2arr3166
+			const yyr3166 bool = false
+			yyq3166[0] = x.Type != ""
+			yyq3166[1] = len(x.Max) != 0
+			yyq3166[2] = len(x.Min) != 0
+			yyq3166[3] = len(x.Default) != 0
+			yyq3166[4] = len(x.DefaultRequest) != 0
+			yyq3166[5] = len(x.MaxLimitRequestRatio) != 0
+			var yynn3166 int
+			if yyr3166 || yy2arr3166 {
 				r.EncodeArrayStart(6)
 			} else {
-				yynn3141 = 0
-				for _, b := range yyq3141 {
+				yynn3166 = 0
+				for _, b := range yyq3166 {
 					if b {
-						yynn3141++
+						yynn3166++
 					}
 				}
-				r.EncodeMapStart(yynn3141)
-				yynn3141 = 0
+				r.EncodeMapStart(yynn3166)
+				yynn3166 = 0
 			}
-			if yyr3141 || yy2arr3141 {
+			if yyr3166 || yy2arr3166 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3141[0] {
+				if yyq3166[0] {
 					x.Type.CodecEncodeSelf(e)
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3141[0] {
+				if yyq3166[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("type"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					x.Type.CodecEncodeSelf(e)
 				}
 			}
-			if yyr3141 || yy2arr3141 {
+			if yyr3166 || yy2arr3166 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3141[1] {
+				if yyq3166[1] {
 					if x.Max == nil {
 						r.EncodeNil()
 					} else {
@@ -39009,7 +39300,7 @@ func (x *LimitRangeItem) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3141[1] {
+				if yyq3166[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("max"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
@@ -39020,9 +39311,9 @@ func (x *LimitRangeItem) CodecEncodeSelf(e *codec1978.Encoder) {
 					}
 				}
 			}
-			if yyr3141 || yy2arr3141 {
+			if yyr3166 || yy2arr3166 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3141[2] {
+				if yyq3166[2] {
 					if x.Min == nil {
 						r.EncodeNil()
 					} else {
@@ -39032,7 +39323,7 @@ func (x *LimitRangeItem) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3141[2] {
+				if yyq3166[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("min"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
@@ -39043,9 +39334,9 @@ func (x *LimitRangeItem) CodecEncodeSelf(e *codec1978.Encoder) {
 					}
 				}
 			}
-			if yyr3141 || yy2arr3141 {
+			if yyr3166 || yy2arr3166 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3141[3] {
+				if yyq3166[3] {
 					if x.Default == nil {
 						r.EncodeNil()
 					} else {
@@ -39055,7 +39346,7 @@ func (x *LimitRangeItem) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3141[3] {
+				if yyq3166[3] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("default"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
@@ -39066,9 +39357,9 @@ func (x *LimitRangeItem) CodecEncodeSelf(e *codec1978.Encoder) {
 					}
 				}
 			}
-			if yyr3141 || yy2arr3141 {
+			if yyr3166 || yy2arr3166 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3141[4] {
+				if yyq3166[4] {
 					if x.DefaultRequest == nil {
 						r.EncodeNil()
 					} else {
@@ -39078,7 +39369,7 @@ func (x *LimitRangeItem) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3141[4] {
+				if yyq3166[4] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("defaultRequest"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
@@ -39089,9 +39380,9 @@ func (x *LimitRangeItem) CodecEncodeSelf(e *codec1978.Encoder) {
 					}
 				}
 			}
-			if yyr3141 || yy2arr3141 {
+			if yyr3166 || yy2arr3166 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3141[5] {
+				if yyq3166[5] {
 					if x.MaxLimitRequestRatio == nil {
 						r.EncodeNil()
 					} else {
@@ -39101,7 +39392,7 @@ func (x *LimitRangeItem) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3141[5] {
+				if yyq3166[5] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("maxLimitRequestRatio"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
@@ -39112,7 +39403,7 @@ func (x *LimitRangeItem) CodecEncodeSelf(e *codec1978.Encoder) {
 					}
 				}
 			}
-			if yyr3141 || yy2arr3141 {
+			if yyr3166 || yy2arr3166 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -39125,25 +39416,25 @@ func (x *LimitRangeItem) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3148 := z.DecBinary()
-	_ = yym3148
+	yym3173 := z.DecBinary()
+	_ = yym3173
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3149 := r.ContainerType()
-		if yyct3149 == codecSelferValueTypeMap1234 {
-			yyl3149 := r.ReadMapStart()
-			if yyl3149 == 0 {
+		yyct3174 := r.ContainerType()
+		if yyct3174 == codecSelferValueTypeMap1234 {
+			yyl3174 := r.ReadMapStart()
+			if yyl3174 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3149, d)
+				x.codecDecodeSelfFromMap(yyl3174, d)
 			}
-		} else if yyct3149 == codecSelferValueTypeArray1234 {
-			yyl3149 := r.ReadArrayStart()
-			if yyl3149 == 0 {
+		} else if yyct3174 == codecSelferValueTypeArray1234 {
+			yyl3174 := r.ReadArrayStart()
+			if yyl3174 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3149, d)
+				x.codecDecodeSelfFromArray(yyl3174, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -39155,12 +39446,12 @@ func (x *LimitRangeItem) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3150Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3150Slc
-	var yyhl3150 bool = l >= 0
-	for yyj3150 := 0; ; yyj3150++ {
-		if yyhl3150 {
-			if yyj3150 >= l {
+	var yys3175Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3175Slc
+	var yyhl3175 bool = l >= 0
+	for yyj3175 := 0; ; yyj3175++ {
+		if yyhl3175 {
+			if yyj3175 >= l {
 				break
 			}
 		} else {
@@ -39169,10 +39460,10 @@ func (x *LimitRangeItem) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3150Slc = r.DecodeBytes(yys3150Slc, true, true)
-		yys3150 := string(yys3150Slc)
+		yys3175Slc = r.DecodeBytes(yys3175Slc, true, true)
+		yys3175 := string(yys3175Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3150 {
+		switch yys3175 {
 		case "type":
 			if r.TryDecodeAsNil() {
 				x.Type = ""
@@ -39183,41 +39474,41 @@ func (x *LimitRangeItem) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Max = nil
 			} else {
-				yyv3152 := &x.Max
-				yyv3152.CodecDecodeSelf(d)
+				yyv3177 := &x.Max
+				yyv3177.CodecDecodeSelf(d)
 			}
 		case "min":
 			if r.TryDecodeAsNil() {
 				x.Min = nil
 			} else {
-				yyv3153 := &x.Min
-				yyv3153.CodecDecodeSelf(d)
+				yyv3178 := &x.Min
+				yyv3178.CodecDecodeSelf(d)
 			}
 		case "default":
 			if r.TryDecodeAsNil() {
 				x.Default = nil
 			} else {
-				yyv3154 := &x.Default
-				yyv3154.CodecDecodeSelf(d)
+				yyv3179 := &x.Default
+				yyv3179.CodecDecodeSelf(d)
 			}
 		case "defaultRequest":
 			if r.TryDecodeAsNil() {
 				x.DefaultRequest = nil
 			} else {
-				yyv3155 := &x.DefaultRequest
-				yyv3155.CodecDecodeSelf(d)
+				yyv3180 := &x.DefaultRequest
+				yyv3180.CodecDecodeSelf(d)
 			}
 		case "maxLimitRequestRatio":
 			if r.TryDecodeAsNil() {
 				x.MaxLimitRequestRatio = nil
 			} else {
-				yyv3156 := &x.MaxLimitRequestRatio
-				yyv3156.CodecDecodeSelf(d)
+				yyv3181 := &x.MaxLimitRequestRatio
+				yyv3181.CodecDecodeSelf(d)
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3150)
-		} // end switch yys3150
-	} // end for yyj3150
+			z.DecStructFieldNotFound(-1, yys3175)
+		} // end switch yys3175
+	} // end for yyj3175
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -39225,16 +39516,16 @@ func (x *LimitRangeItem) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3157 int
-	var yyb3157 bool
-	var yyhl3157 bool = l >= 0
-	yyj3157++
-	if yyhl3157 {
-		yyb3157 = yyj3157 > l
+	var yyj3182 int
+	var yyb3182 bool
+	var yyhl3182 bool = l >= 0
+	yyj3182++
+	if yyhl3182 {
+		yyb3182 = yyj3182 > l
 	} else {
-		yyb3157 = r.CheckBreak()
+		yyb3182 = r.CheckBreak()
 	}
-	if yyb3157 {
+	if yyb3182 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -39244,13 +39535,13 @@ func (x *LimitRangeItem) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Type = LimitType(r.DecodeString())
 	}
-	yyj3157++
-	if yyhl3157 {
-		yyb3157 = yyj3157 > l
+	yyj3182++
+	if yyhl3182 {
+		yyb3182 = yyj3182 > l
 	} else {
-		yyb3157 = r.CheckBreak()
+		yyb3182 = r.CheckBreak()
 	}
-	if yyb3157 {
+	if yyb3182 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -39258,16 +39549,16 @@ func (x *LimitRangeItem) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Max = nil
 	} else {
-		yyv3159 := &x.Max
-		yyv3159.CodecDecodeSelf(d)
+		yyv3184 := &x.Max
+		yyv3184.CodecDecodeSelf(d)
 	}
-	yyj3157++
-	if yyhl3157 {
-		yyb3157 = yyj3157 > l
+	yyj3182++
+	if yyhl3182 {
+		yyb3182 = yyj3182 > l
 	} else {
-		yyb3157 = r.CheckBreak()
+		yyb3182 = r.CheckBreak()
 	}
-	if yyb3157 {
+	if yyb3182 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -39275,16 +39566,16 @@ func (x *LimitRangeItem) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Min = nil
 	} else {
-		yyv3160 := &x.Min
-		yyv3160.CodecDecodeSelf(d)
+		yyv3185 := &x.Min
+		yyv3185.CodecDecodeSelf(d)
 	}
-	yyj3157++
-	if yyhl3157 {
-		yyb3157 = yyj3157 > l
+	yyj3182++
+	if yyhl3182 {
+		yyb3182 = yyj3182 > l
 	} else {
-		yyb3157 = r.CheckBreak()
+		yyb3182 = r.CheckBreak()
 	}
-	if yyb3157 {
+	if yyb3182 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -39292,16 +39583,16 @@ func (x *LimitRangeItem) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Default = nil
 	} else {
-		yyv3161 := &x.Default
-		yyv3161.CodecDecodeSelf(d)
+		yyv3186 := &x.Default
+		yyv3186.CodecDecodeSelf(d)
 	}
-	yyj3157++
-	if yyhl3157 {
-		yyb3157 = yyj3157 > l
+	yyj3182++
+	if yyhl3182 {
+		yyb3182 = yyj3182 > l
 	} else {
-		yyb3157 = r.CheckBreak()
+		yyb3182 = r.CheckBreak()
 	}
-	if yyb3157 {
+	if yyb3182 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -39309,16 +39600,16 @@ func (x *LimitRangeItem) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.DefaultRequest = nil
 	} else {
-		yyv3162 := &x.DefaultRequest
-		yyv3162.CodecDecodeSelf(d)
+		yyv3187 := &x.DefaultRequest
+		yyv3187.CodecDecodeSelf(d)
 	}
-	yyj3157++
-	if yyhl3157 {
-		yyb3157 = yyj3157 > l
+	yyj3182++
+	if yyhl3182 {
+		yyb3182 = yyj3182 > l
 	} else {
-		yyb3157 = r.CheckBreak()
+		yyb3182 = r.CheckBreak()
 	}
-	if yyb3157 {
+	if yyb3182 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -39326,21 +39617,21 @@ func (x *LimitRangeItem) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.MaxLimitRequestRatio = nil
 	} else {
-		yyv3163 := &x.MaxLimitRequestRatio
-		yyv3163.CodecDecodeSelf(d)
+		yyv3188 := &x.MaxLimitRequestRatio
+		yyv3188.CodecDecodeSelf(d)
 	}
 	for {
-		yyj3157++
-		if yyhl3157 {
-			yyb3157 = yyj3157 > l
+		yyj3182++
+		if yyhl3182 {
+			yyb3182 = yyj3182 > l
 		} else {
-			yyb3157 = r.CheckBreak()
+			yyb3182 = r.CheckBreak()
 		}
-		if yyb3157 {
+		if yyb3182 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3157-1, "")
+		z.DecStructFieldNotFound(yyj3182-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -39352,36 +39643,36 @@ func (x *LimitRangeSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3164 := z.EncBinary()
-		_ = yym3164
+		yym3189 := z.EncBinary()
+		_ = yym3189
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3165 := !z.EncBinary()
-			yy2arr3165 := z.EncBasicHandle().StructToArray
-			var yyq3165 [1]bool
-			_, _, _ = yysep3165, yyq3165, yy2arr3165
-			const yyr3165 bool = false
-			var yynn3165 int
-			if yyr3165 || yy2arr3165 {
+			yysep3190 := !z.EncBinary()
+			yy2arr3190 := z.EncBasicHandle().StructToArray
+			var yyq3190 [1]bool
+			_, _, _ = yysep3190, yyq3190, yy2arr3190
+			const yyr3190 bool = false
+			var yynn3190 int
+			if yyr3190 || yy2arr3190 {
 				r.EncodeArrayStart(1)
 			} else {
-				yynn3165 = 1
-				for _, b := range yyq3165 {
+				yynn3190 = 1
+				for _, b := range yyq3190 {
 					if b {
-						yynn3165++
+						yynn3190++
 					}
 				}
-				r.EncodeMapStart(yynn3165)
-				yynn3165 = 0
+				r.EncodeMapStart(yynn3190)
+				yynn3190 = 0
 			}
-			if yyr3165 || yy2arr3165 {
+			if yyr3190 || yy2arr3190 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.Limits == nil {
 					r.EncodeNil()
 				} else {
-					yym3167 := z.EncBinary()
-					_ = yym3167
+					yym3192 := z.EncBinary()
+					_ = yym3192
 					if false {
 					} else {
 						h.encSliceLimitRangeItem(([]LimitRangeItem)(x.Limits), e)
@@ -39394,15 +39685,15 @@ func (x *LimitRangeSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.Limits == nil {
 					r.EncodeNil()
 				} else {
-					yym3168 := z.EncBinary()
-					_ = yym3168
+					yym3193 := z.EncBinary()
+					_ = yym3193
 					if false {
 					} else {
 						h.encSliceLimitRangeItem(([]LimitRangeItem)(x.Limits), e)
 					}
 				}
 			}
-			if yyr3165 || yy2arr3165 {
+			if yyr3190 || yy2arr3190 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -39415,25 +39706,25 @@ func (x *LimitRangeSpec) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3169 := z.DecBinary()
-	_ = yym3169
+	yym3194 := z.DecBinary()
+	_ = yym3194
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3170 := r.ContainerType()
-		if yyct3170 == codecSelferValueTypeMap1234 {
-			yyl3170 := r.ReadMapStart()
-			if yyl3170 == 0 {
+		yyct3195 := r.ContainerType()
+		if yyct3195 == codecSelferValueTypeMap1234 {
+			yyl3195 := r.ReadMapStart()
+			if yyl3195 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3170, d)
+				x.codecDecodeSelfFromMap(yyl3195, d)
 			}
-		} else if yyct3170 == codecSelferValueTypeArray1234 {
-			yyl3170 := r.ReadArrayStart()
-			if yyl3170 == 0 {
+		} else if yyct3195 == codecSelferValueTypeArray1234 {
+			yyl3195 := r.ReadArrayStart()
+			if yyl3195 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3170, d)
+				x.codecDecodeSelfFromArray(yyl3195, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -39445,12 +39736,12 @@ func (x *LimitRangeSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3171Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3171Slc
-	var yyhl3171 bool = l >= 0
-	for yyj3171 := 0; ; yyj3171++ {
-		if yyhl3171 {
-			if yyj3171 >= l {
+	var yys3196Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3196Slc
+	var yyhl3196 bool = l >= 0
+	for yyj3196 := 0; ; yyj3196++ {
+		if yyhl3196 {
+			if yyj3196 >= l {
 				break
 			}
 		} else {
@@ -39459,26 +39750,26 @@ func (x *LimitRangeSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3171Slc = r.DecodeBytes(yys3171Slc, true, true)
-		yys3171 := string(yys3171Slc)
+		yys3196Slc = r.DecodeBytes(yys3196Slc, true, true)
+		yys3196 := string(yys3196Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3171 {
+		switch yys3196 {
 		case "limits":
 			if r.TryDecodeAsNil() {
 				x.Limits = nil
 			} else {
-				yyv3172 := &x.Limits
-				yym3173 := z.DecBinary()
-				_ = yym3173
+				yyv3197 := &x.Limits
+				yym3198 := z.DecBinary()
+				_ = yym3198
 				if false {
 				} else {
-					h.decSliceLimitRangeItem((*[]LimitRangeItem)(yyv3172), d)
+					h.decSliceLimitRangeItem((*[]LimitRangeItem)(yyv3197), d)
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3171)
-		} // end switch yys3171
-	} // end for yyj3171
+			z.DecStructFieldNotFound(-1, yys3196)
+		} // end switch yys3196
+	} // end for yyj3196
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -39486,16 +39777,16 @@ func (x *LimitRangeSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3174 int
-	var yyb3174 bool
-	var yyhl3174 bool = l >= 0
-	yyj3174++
-	if yyhl3174 {
-		yyb3174 = yyj3174 > l
+	var yyj3199 int
+	var yyb3199 bool
+	var yyhl3199 bool = l >= 0
+	yyj3199++
+	if yyhl3199 {
+		yyb3199 = yyj3199 > l
 	} else {
-		yyb3174 = r.CheckBreak()
+		yyb3199 = r.CheckBreak()
 	}
-	if yyb3174 {
+	if yyb3199 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -39503,26 +39794,26 @@ func (x *LimitRangeSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Limits = nil
 	} else {
-		yyv3175 := &x.Limits
-		yym3176 := z.DecBinary()
-		_ = yym3176
+		yyv3200 := &x.Limits
+		yym3201 := z.DecBinary()
+		_ = yym3201
 		if false {
 		} else {
-			h.decSliceLimitRangeItem((*[]LimitRangeItem)(yyv3175), d)
+			h.decSliceLimitRangeItem((*[]LimitRangeItem)(yyv3200), d)
 		}
 	}
 	for {
-		yyj3174++
-		if yyhl3174 {
-			yyb3174 = yyj3174 > l
+		yyj3199++
+		if yyhl3199 {
+			yyb3199 = yyj3199 > l
 		} else {
-			yyb3174 = r.CheckBreak()
+			yyb3199 = r.CheckBreak()
 		}
-		if yyb3174 {
+		if yyb3199 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3174-1, "")
+		z.DecStructFieldNotFound(yyj3199-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -39534,38 +39825,38 @@ func (x *LimitRange) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3177 := z.EncBinary()
-		_ = yym3177
+		yym3202 := z.EncBinary()
+		_ = yym3202
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3178 := !z.EncBinary()
-			yy2arr3178 := z.EncBasicHandle().StructToArray
-			var yyq3178 [4]bool
-			_, _, _ = yysep3178, yyq3178, yy2arr3178
-			const yyr3178 bool = false
-			yyq3178[0] = x.Kind != ""
-			yyq3178[1] = x.APIVersion != ""
-			yyq3178[2] = true
-			yyq3178[3] = true
-			var yynn3178 int
-			if yyr3178 || yy2arr3178 {
+			yysep3203 := !z.EncBinary()
+			yy2arr3203 := z.EncBasicHandle().StructToArray
+			var yyq3203 [4]bool
+			_, _, _ = yysep3203, yyq3203, yy2arr3203
+			const yyr3203 bool = false
+			yyq3203[0] = x.Kind != ""
+			yyq3203[1] = x.APIVersion != ""
+			yyq3203[2] = true
+			yyq3203[3] = true
+			var yynn3203 int
+			if yyr3203 || yy2arr3203 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn3178 = 0
-				for _, b := range yyq3178 {
+				yynn3203 = 0
+				for _, b := range yyq3203 {
 					if b {
-						yynn3178++
+						yynn3203++
 					}
 				}
-				r.EncodeMapStart(yynn3178)
-				yynn3178 = 0
+				r.EncodeMapStart(yynn3203)
+				yynn3203 = 0
 			}
-			if yyr3178 || yy2arr3178 {
+			if yyr3203 || yy2arr3203 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3178[0] {
-					yym3180 := z.EncBinary()
-					_ = yym3180
+				if yyq3203[0] {
+					yym3205 := z.EncBinary()
+					_ = yym3205
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -39574,23 +39865,23 @@ func (x *LimitRange) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3178[0] {
+				if yyq3203[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3181 := z.EncBinary()
-					_ = yym3181
+					yym3206 := z.EncBinary()
+					_ = yym3206
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr3178 || yy2arr3178 {
+			if yyr3203 || yy2arr3203 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3178[1] {
-					yym3183 := z.EncBinary()
-					_ = yym3183
+				if yyq3203[1] {
+					yym3208 := z.EncBinary()
+					_ = yym3208
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -39599,53 +39890,53 @@ func (x *LimitRange) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3178[1] {
+				if yyq3203[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3184 := z.EncBinary()
-					_ = yym3184
+					yym3209 := z.EncBinary()
+					_ = yym3209
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr3178 || yy2arr3178 {
+			if yyr3203 || yy2arr3203 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3178[2] {
-					yy3186 := &x.ObjectMeta
-					yy3186.CodecEncodeSelf(e)
+				if yyq3203[2] {
+					yy3211 := &x.ObjectMeta
+					yy3211.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3178[2] {
+				if yyq3203[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3187 := &x.ObjectMeta
-					yy3187.CodecEncodeSelf(e)
+					yy3212 := &x.ObjectMeta
+					yy3212.CodecEncodeSelf(e)
 				}
 			}
-			if yyr3178 || yy2arr3178 {
+			if yyr3203 || yy2arr3203 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3178[3] {
-					yy3189 := &x.Spec
-					yy3189.CodecEncodeSelf(e)
+				if yyq3203[3] {
+					yy3214 := &x.Spec
+					yy3214.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3178[3] {
+				if yyq3203[3] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("spec"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3190 := &x.Spec
-					yy3190.CodecEncodeSelf(e)
+					yy3215 := &x.Spec
+					yy3215.CodecEncodeSelf(e)
 				}
 			}
-			if yyr3178 || yy2arr3178 {
+			if yyr3203 || yy2arr3203 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -39658,25 +39949,25 @@ func (x *LimitRange) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3191 := z.DecBinary()
-	_ = yym3191
+	yym3216 := z.DecBinary()
+	_ = yym3216
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3192 := r.ContainerType()
-		if yyct3192 == codecSelferValueTypeMap1234 {
-			yyl3192 := r.ReadMapStart()
-			if yyl3192 == 0 {
+		yyct3217 := r.ContainerType()
+		if yyct3217 == codecSelferValueTypeMap1234 {
+			yyl3217 := r.ReadMapStart()
+			if yyl3217 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3192, d)
+				x.codecDecodeSelfFromMap(yyl3217, d)
 			}
-		} else if yyct3192 == codecSelferValueTypeArray1234 {
-			yyl3192 := r.ReadArrayStart()
-			if yyl3192 == 0 {
+		} else if yyct3217 == codecSelferValueTypeArray1234 {
+			yyl3217 := r.ReadArrayStart()
+			if yyl3217 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3192, d)
+				x.codecDecodeSelfFromArray(yyl3217, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -39688,12 +39979,12 @@ func (x *LimitRange) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3193Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3193Slc
-	var yyhl3193 bool = l >= 0
-	for yyj3193 := 0; ; yyj3193++ {
-		if yyhl3193 {
-			if yyj3193 >= l {
+	var yys3218Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3218Slc
+	var yyhl3218 bool = l >= 0
+	for yyj3218 := 0; ; yyj3218++ {
+		if yyhl3218 {
+			if yyj3218 >= l {
 				break
 			}
 		} else {
@@ -39702,10 +39993,10 @@ func (x *LimitRange) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3193Slc = r.DecodeBytes(yys3193Slc, true, true)
-		yys3193 := string(yys3193Slc)
+		yys3218Slc = r.DecodeBytes(yys3218Slc, true, true)
+		yys3218 := string(yys3218Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3193 {
+		switch yys3218 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -39722,20 +40013,20 @@ func (x *LimitRange) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.ObjectMeta = ObjectMeta{}
 			} else {
-				yyv3196 := &x.ObjectMeta
-				yyv3196.CodecDecodeSelf(d)
+				yyv3221 := &x.ObjectMeta
+				yyv3221.CodecDecodeSelf(d)
 			}
 		case "spec":
 			if r.TryDecodeAsNil() {
 				x.Spec = LimitRangeSpec{}
 			} else {
-				yyv3197 := &x.Spec
-				yyv3197.CodecDecodeSelf(d)
+				yyv3222 := &x.Spec
+				yyv3222.CodecDecodeSelf(d)
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3193)
-		} // end switch yys3193
-	} // end for yyj3193
+			z.DecStructFieldNotFound(-1, yys3218)
+		} // end switch yys3218
+	} // end for yyj3218
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -39743,16 +40034,16 @@ func (x *LimitRange) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3198 int
-	var yyb3198 bool
-	var yyhl3198 bool = l >= 0
-	yyj3198++
-	if yyhl3198 {
-		yyb3198 = yyj3198 > l
+	var yyj3223 int
+	var yyb3223 bool
+	var yyhl3223 bool = l >= 0
+	yyj3223++
+	if yyhl3223 {
+		yyb3223 = yyj3223 > l
 	} else {
-		yyb3198 = r.CheckBreak()
+		yyb3223 = r.CheckBreak()
 	}
-	if yyb3198 {
+	if yyb3223 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -39762,13 +40053,13 @@ func (x *LimitRange) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj3198++
-	if yyhl3198 {
-		yyb3198 = yyj3198 > l
+	yyj3223++
+	if yyhl3223 {
+		yyb3223 = yyj3223 > l
 	} else {
-		yyb3198 = r.CheckBreak()
+		yyb3223 = r.CheckBreak()
 	}
-	if yyb3198 {
+	if yyb3223 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -39778,13 +40069,13 @@ func (x *LimitRange) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj3198++
-	if yyhl3198 {
-		yyb3198 = yyj3198 > l
+	yyj3223++
+	if yyhl3223 {
+		yyb3223 = yyj3223 > l
 	} else {
-		yyb3198 = r.CheckBreak()
+		yyb3223 = r.CheckBreak()
 	}
-	if yyb3198 {
+	if yyb3223 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -39792,16 +40083,16 @@ func (x *LimitRange) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.ObjectMeta = ObjectMeta{}
 	} else {
-		yyv3201 := &x.ObjectMeta
-		yyv3201.CodecDecodeSelf(d)
+		yyv3226 := &x.ObjectMeta
+		yyv3226.CodecDecodeSelf(d)
 	}
-	yyj3198++
-	if yyhl3198 {
-		yyb3198 = yyj3198 > l
+	yyj3223++
+	if yyhl3223 {
+		yyb3223 = yyj3223 > l
 	} else {
-		yyb3198 = r.CheckBreak()
+		yyb3223 = r.CheckBreak()
 	}
-	if yyb3198 {
+	if yyb3223 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -39809,21 +40100,21 @@ func (x *LimitRange) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Spec = LimitRangeSpec{}
 	} else {
-		yyv3202 := &x.Spec
-		yyv3202.CodecDecodeSelf(d)
+		yyv3227 := &x.Spec
+		yyv3227.CodecDecodeSelf(d)
 	}
 	for {
-		yyj3198++
-		if yyhl3198 {
-			yyb3198 = yyj3198 > l
+		yyj3223++
+		if yyhl3223 {
+			yyb3223 = yyj3223 > l
 		} else {
-			yyb3198 = r.CheckBreak()
+			yyb3223 = r.CheckBreak()
 		}
-		if yyb3198 {
+		if yyb3223 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3198-1, "")
+		z.DecStructFieldNotFound(yyj3223-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -39835,37 +40126,37 @@ func (x *LimitRangeList) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3203 := z.EncBinary()
-		_ = yym3203
+		yym3228 := z.EncBinary()
+		_ = yym3228
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3204 := !z.EncBinary()
-			yy2arr3204 := z.EncBasicHandle().StructToArray
-			var yyq3204 [4]bool
-			_, _, _ = yysep3204, yyq3204, yy2arr3204
-			const yyr3204 bool = false
-			yyq3204[0] = x.Kind != ""
-			yyq3204[1] = x.APIVersion != ""
-			yyq3204[2] = true
-			var yynn3204 int
-			if yyr3204 || yy2arr3204 {
+			yysep3229 := !z.EncBinary()
+			yy2arr3229 := z.EncBasicHandle().StructToArray
+			var yyq3229 [4]bool
+			_, _, _ = yysep3229, yyq3229, yy2arr3229
+			const yyr3229 bool = false
+			yyq3229[0] = x.Kind != ""
+			yyq3229[1] = x.APIVersion != ""
+			yyq3229[2] = true
+			var yynn3229 int
+			if yyr3229 || yy2arr3229 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn3204 = 1
-				for _, b := range yyq3204 {
+				yynn3229 = 1
+				for _, b := range yyq3229 {
 					if b {
-						yynn3204++
+						yynn3229++
 					}
 				}
-				r.EncodeMapStart(yynn3204)
-				yynn3204 = 0
+				r.EncodeMapStart(yynn3229)
+				yynn3229 = 0
 			}
-			if yyr3204 || yy2arr3204 {
+			if yyr3229 || yy2arr3229 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3204[0] {
-					yym3206 := z.EncBinary()
-					_ = yym3206
+				if yyq3229[0] {
+					yym3231 := z.EncBinary()
+					_ = yym3231
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -39874,23 +40165,23 @@ func (x *LimitRangeList) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3204[0] {
+				if yyq3229[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3207 := z.EncBinary()
-					_ = yym3207
+					yym3232 := z.EncBinary()
+					_ = yym3232
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr3204 || yy2arr3204 {
+			if yyr3229 || yy2arr3229 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3204[1] {
-					yym3209 := z.EncBinary()
-					_ = yym3209
+				if yyq3229[1] {
+					yym3234 := z.EncBinary()
+					_ = yym3234
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -39899,54 +40190,54 @@ func (x *LimitRangeList) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3204[1] {
+				if yyq3229[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3210 := z.EncBinary()
-					_ = yym3210
+					yym3235 := z.EncBinary()
+					_ = yym3235
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr3204 || yy2arr3204 {
+			if yyr3229 || yy2arr3229 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3204[2] {
-					yy3212 := &x.ListMeta
-					yym3213 := z.EncBinary()
-					_ = yym3213
+				if yyq3229[2] {
+					yy3237 := &x.ListMeta
+					yym3238 := z.EncBinary()
+					_ = yym3238
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3212) {
+					} else if z.HasExtensions() && z.EncExt(yy3237) {
 					} else {
-						z.EncFallback(yy3212)
+						z.EncFallback(yy3237)
 					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3204[2] {
+				if yyq3229[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3214 := &x.ListMeta
-					yym3215 := z.EncBinary()
-					_ = yym3215
+					yy3239 := &x.ListMeta
+					yym3240 := z.EncBinary()
+					_ = yym3240
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3214) {
+					} else if z.HasExtensions() && z.EncExt(yy3239) {
 					} else {
-						z.EncFallback(yy3214)
+						z.EncFallback(yy3239)
 					}
 				}
 			}
-			if yyr3204 || yy2arr3204 {
+			if yyr3229 || yy2arr3229 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym3217 := z.EncBinary()
-					_ = yym3217
+					yym3242 := z.EncBinary()
+					_ = yym3242
 					if false {
 					} else {
 						h.encSliceLimitRange(([]LimitRange)(x.Items), e)
@@ -39959,15 +40250,15 @@ func (x *LimitRangeList) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym3218 := z.EncBinary()
-					_ = yym3218
+					yym3243 := z.EncBinary()
+					_ = yym3243
 					if false {
 					} else {
 						h.encSliceLimitRange(([]LimitRange)(x.Items), e)
 					}
 				}
 			}
-			if yyr3204 || yy2arr3204 {
+			if yyr3229 || yy2arr3229 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -39980,25 +40271,25 @@ func (x *LimitRangeList) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3219 := z.DecBinary()
-	_ = yym3219
+	yym3244 := z.DecBinary()
+	_ = yym3244
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3220 := r.ContainerType()
-		if yyct3220 == codecSelferValueTypeMap1234 {
-			yyl3220 := r.ReadMapStart()
-			if yyl3220 == 0 {
+		yyct3245 := r.ContainerType()
+		if yyct3245 == codecSelferValueTypeMap1234 {
+			yyl3245 := r.ReadMapStart()
+			if yyl3245 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3220, d)
+				x.codecDecodeSelfFromMap(yyl3245, d)
 			}
-		} else if yyct3220 == codecSelferValueTypeArray1234 {
-			yyl3220 := r.ReadArrayStart()
-			if yyl3220 == 0 {
+		} else if yyct3245 == codecSelferValueTypeArray1234 {
+			yyl3245 := r.ReadArrayStart()
+			if yyl3245 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3220, d)
+				x.codecDecodeSelfFromArray(yyl3245, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -40010,12 +40301,12 @@ func (x *LimitRangeList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3221Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3221Slc
-	var yyhl3221 bool = l >= 0
-	for yyj3221 := 0; ; yyj3221++ {
-		if yyhl3221 {
-			if yyj3221 >= l {
+	var yys3246Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3246Slc
+	var yyhl3246 bool = l >= 0
+	for yyj3246 := 0; ; yyj3246++ {
+		if yyhl3246 {
+			if yyj3246 >= l {
 				break
 			}
 		} else {
@@ -40024,10 +40315,10 @@ func (x *LimitRangeList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3221Slc = r.DecodeBytes(yys3221Slc, true, true)
-		yys3221 := string(yys3221Slc)
+		yys3246Slc = r.DecodeBytes(yys3246Slc, true, true)
+		yys3246 := string(yys3246Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3221 {
+		switch yys3246 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -40044,464 +40335,35 @@ func (x *LimitRangeList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.ListMeta = pkg2_unversioned.ListMeta{}
 			} else {
-				yyv3224 := &x.ListMeta
-				yym3225 := z.DecBinary()
-				_ = yym3225
+				yyv3249 := &x.ListMeta
+				yym3250 := z.DecBinary()
+				_ = yym3250
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv3224) {
+				} else if z.HasExtensions() && z.DecExt(yyv3249) {
 				} else {
-					z.DecFallback(yyv3224, false)
+					z.DecFallback(yyv3249, false)
 				}
 			}
 		case "items":
 			if r.TryDecodeAsNil() {
 				x.Items = nil
 			} else {
-				yyv3226 := &x.Items
-				yym3227 := z.DecBinary()
-				_ = yym3227
+				yyv3251 := &x.Items
+				yym3252 := z.DecBinary()
+				_ = yym3252
 				if false {
 				} else {
-					h.decSliceLimitRange((*[]LimitRange)(yyv3226), d)
+					h.decSliceLimitRange((*[]LimitRange)(yyv3251), d)
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3221)
-		} // end switch yys3221
-	} // end for yyj3221
+			z.DecStructFieldNotFound(-1, yys3246)
+		} // end switch yys3246
+	} // end for yyj3246
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
 func (x *LimitRangeList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperDecoder(d)
-	_, _, _ = h, z, r
-	var yyj3228 int
-	var yyb3228 bool
-	var yyhl3228 bool = l >= 0
-	yyj3228++
-	if yyhl3228 {
-		yyb3228 = yyj3228 > l
-	} else {
-		yyb3228 = r.CheckBreak()
-	}
-	if yyb3228 {
-		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-		return
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-	if r.TryDecodeAsNil() {
-		x.Kind = ""
-	} else {
-		x.Kind = string(r.DecodeString())
-	}
-	yyj3228++
-	if yyhl3228 {
-		yyb3228 = yyj3228 > l
-	} else {
-		yyb3228 = r.CheckBreak()
-	}
-	if yyb3228 {
-		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-		return
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-	if r.TryDecodeAsNil() {
-		x.APIVersion = ""
-	} else {
-		x.APIVersion = string(r.DecodeString())
-	}
-	yyj3228++
-	if yyhl3228 {
-		yyb3228 = yyj3228 > l
-	} else {
-		yyb3228 = r.CheckBreak()
-	}
-	if yyb3228 {
-		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-		return
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-	if r.TryDecodeAsNil() {
-		x.ListMeta = pkg2_unversioned.ListMeta{}
-	} else {
-		yyv3231 := &x.ListMeta
-		yym3232 := z.DecBinary()
-		_ = yym3232
-		if false {
-		} else if z.HasExtensions() && z.DecExt(yyv3231) {
-		} else {
-			z.DecFallback(yyv3231, false)
-		}
-	}
-	yyj3228++
-	if yyhl3228 {
-		yyb3228 = yyj3228 > l
-	} else {
-		yyb3228 = r.CheckBreak()
-	}
-	if yyb3228 {
-		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-		return
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-	if r.TryDecodeAsNil() {
-		x.Items = nil
-	} else {
-		yyv3233 := &x.Items
-		yym3234 := z.DecBinary()
-		_ = yym3234
-		if false {
-		} else {
-			h.decSliceLimitRange((*[]LimitRange)(yyv3233), d)
-		}
-	}
-	for {
-		yyj3228++
-		if yyhl3228 {
-			yyb3228 = yyj3228 > l
-		} else {
-			yyb3228 = r.CheckBreak()
-		}
-		if yyb3228 {
-			break
-		}
-		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3228-1, "")
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-}
-
-func (x *ResourceQuotaSpec) CodecEncodeSelf(e *codec1978.Encoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperEncoder(e)
-	_, _, _ = h, z, r
-	if x == nil {
-		r.EncodeNil()
-	} else {
-		yym3235 := z.EncBinary()
-		_ = yym3235
-		if false {
-		} else if z.HasExtensions() && z.EncExt(x) {
-		} else {
-			yysep3236 := !z.EncBinary()
-			yy2arr3236 := z.EncBasicHandle().StructToArray
-			var yyq3236 [1]bool
-			_, _, _ = yysep3236, yyq3236, yy2arr3236
-			const yyr3236 bool = false
-			yyq3236[0] = len(x.Hard) != 0
-			var yynn3236 int
-			if yyr3236 || yy2arr3236 {
-				r.EncodeArrayStart(1)
-			} else {
-				yynn3236 = 0
-				for _, b := range yyq3236 {
-					if b {
-						yynn3236++
-					}
-				}
-				r.EncodeMapStart(yynn3236)
-				yynn3236 = 0
-			}
-			if yyr3236 || yy2arr3236 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3236[0] {
-					if x.Hard == nil {
-						r.EncodeNil()
-					} else {
-						x.Hard.CodecEncodeSelf(e)
-					}
-				} else {
-					r.EncodeNil()
-				}
-			} else {
-				if yyq3236[0] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("hard"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					if x.Hard == nil {
-						r.EncodeNil()
-					} else {
-						x.Hard.CodecEncodeSelf(e)
-					}
-				}
-			}
-			if yyr3236 || yy2arr3236 {
-				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
-			} else {
-				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
-			}
-		}
-	}
-}
-
-func (x *ResourceQuotaSpec) CodecDecodeSelf(d *codec1978.Decoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperDecoder(d)
-	_, _, _ = h, z, r
-	yym3238 := z.DecBinary()
-	_ = yym3238
-	if false {
-	} else if z.HasExtensions() && z.DecExt(x) {
-	} else {
-		yyct3239 := r.ContainerType()
-		if yyct3239 == codecSelferValueTypeMap1234 {
-			yyl3239 := r.ReadMapStart()
-			if yyl3239 == 0 {
-				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
-			} else {
-				x.codecDecodeSelfFromMap(yyl3239, d)
-			}
-		} else if yyct3239 == codecSelferValueTypeArray1234 {
-			yyl3239 := r.ReadArrayStart()
-			if yyl3239 == 0 {
-				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-			} else {
-				x.codecDecodeSelfFromArray(yyl3239, d)
-			}
-		} else {
-			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
-		}
-	}
-}
-
-func (x *ResourceQuotaSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperDecoder(d)
-	_, _, _ = h, z, r
-	var yys3240Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3240Slc
-	var yyhl3240 bool = l >= 0
-	for yyj3240 := 0; ; yyj3240++ {
-		if yyhl3240 {
-			if yyj3240 >= l {
-				break
-			}
-		} else {
-			if r.CheckBreak() {
-				break
-			}
-		}
-		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3240Slc = r.DecodeBytes(yys3240Slc, true, true)
-		yys3240 := string(yys3240Slc)
-		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3240 {
-		case "hard":
-			if r.TryDecodeAsNil() {
-				x.Hard = nil
-			} else {
-				yyv3241 := &x.Hard
-				yyv3241.CodecDecodeSelf(d)
-			}
-		default:
-			z.DecStructFieldNotFound(-1, yys3240)
-		} // end switch yys3240
-	} // end for yyj3240
-	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
-}
-
-func (x *ResourceQuotaSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperDecoder(d)
-	_, _, _ = h, z, r
-	var yyj3242 int
-	var yyb3242 bool
-	var yyhl3242 bool = l >= 0
-	yyj3242++
-	if yyhl3242 {
-		yyb3242 = yyj3242 > l
-	} else {
-		yyb3242 = r.CheckBreak()
-	}
-	if yyb3242 {
-		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-		return
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-	if r.TryDecodeAsNil() {
-		x.Hard = nil
-	} else {
-		yyv3243 := &x.Hard
-		yyv3243.CodecDecodeSelf(d)
-	}
-	for {
-		yyj3242++
-		if yyhl3242 {
-			yyb3242 = yyj3242 > l
-		} else {
-			yyb3242 = r.CheckBreak()
-		}
-		if yyb3242 {
-			break
-		}
-		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3242-1, "")
-	}
-	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-}
-
-func (x *ResourceQuotaStatus) CodecEncodeSelf(e *codec1978.Encoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperEncoder(e)
-	_, _, _ = h, z, r
-	if x == nil {
-		r.EncodeNil()
-	} else {
-		yym3244 := z.EncBinary()
-		_ = yym3244
-		if false {
-		} else if z.HasExtensions() && z.EncExt(x) {
-		} else {
-			yysep3245 := !z.EncBinary()
-			yy2arr3245 := z.EncBasicHandle().StructToArray
-			var yyq3245 [2]bool
-			_, _, _ = yysep3245, yyq3245, yy2arr3245
-			const yyr3245 bool = false
-			yyq3245[0] = len(x.Hard) != 0
-			yyq3245[1] = len(x.Used) != 0
-			var yynn3245 int
-			if yyr3245 || yy2arr3245 {
-				r.EncodeArrayStart(2)
-			} else {
-				yynn3245 = 0
-				for _, b := range yyq3245 {
-					if b {
-						yynn3245++
-					}
-				}
-				r.EncodeMapStart(yynn3245)
-				yynn3245 = 0
-			}
-			if yyr3245 || yy2arr3245 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3245[0] {
-					if x.Hard == nil {
-						r.EncodeNil()
-					} else {
-						x.Hard.CodecEncodeSelf(e)
-					}
-				} else {
-					r.EncodeNil()
-				}
-			} else {
-				if yyq3245[0] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("hard"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					if x.Hard == nil {
-						r.EncodeNil()
-					} else {
-						x.Hard.CodecEncodeSelf(e)
-					}
-				}
-			}
-			if yyr3245 || yy2arr3245 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3245[1] {
-					if x.Used == nil {
-						r.EncodeNil()
-					} else {
-						x.Used.CodecEncodeSelf(e)
-					}
-				} else {
-					r.EncodeNil()
-				}
-			} else {
-				if yyq3245[1] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("used"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					if x.Used == nil {
-						r.EncodeNil()
-					} else {
-						x.Used.CodecEncodeSelf(e)
-					}
-				}
-			}
-			if yyr3245 || yy2arr3245 {
-				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
-			} else {
-				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
-			}
-		}
-	}
-}
-
-func (x *ResourceQuotaStatus) CodecDecodeSelf(d *codec1978.Decoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperDecoder(d)
-	_, _, _ = h, z, r
-	yym3248 := z.DecBinary()
-	_ = yym3248
-	if false {
-	} else if z.HasExtensions() && z.DecExt(x) {
-	} else {
-		yyct3249 := r.ContainerType()
-		if yyct3249 == codecSelferValueTypeMap1234 {
-			yyl3249 := r.ReadMapStart()
-			if yyl3249 == 0 {
-				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
-			} else {
-				x.codecDecodeSelfFromMap(yyl3249, d)
-			}
-		} else if yyct3249 == codecSelferValueTypeArray1234 {
-			yyl3249 := r.ReadArrayStart()
-			if yyl3249 == 0 {
-				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
-			} else {
-				x.codecDecodeSelfFromArray(yyl3249, d)
-			}
-		} else {
-			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
-		}
-	}
-}
-
-func (x *ResourceQuotaStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
-	var h codecSelfer1234
-	z, r := codec1978.GenHelperDecoder(d)
-	_, _, _ = h, z, r
-	var yys3250Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3250Slc
-	var yyhl3250 bool = l >= 0
-	for yyj3250 := 0; ; yyj3250++ {
-		if yyhl3250 {
-			if yyj3250 >= l {
-				break
-			}
-		} else {
-			if r.CheckBreak() {
-				break
-			}
-		}
-		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3250Slc = r.DecodeBytes(yys3250Slc, true, true)
-		yys3250 := string(yys3250Slc)
-		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3250 {
-		case "hard":
-			if r.TryDecodeAsNil() {
-				x.Hard = nil
-			} else {
-				yyv3251 := &x.Hard
-				yyv3251.CodecDecodeSelf(d)
-			}
-		case "used":
-			if r.TryDecodeAsNil() {
-				x.Used = nil
-			} else {
-				yyv3252 := &x.Used
-				yyv3252.CodecDecodeSelf(d)
-			}
-		default:
-			z.DecStructFieldNotFound(-1, yys3250)
-		} // end switch yys3250
-	} // end for yyj3250
-	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
-}
-
-func (x *ResourceQuotaStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -40520,10 +40382,9 @@ func (x *ResourceQuotaStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Hard = nil
+		x.Kind = ""
 	} else {
-		yyv3254 := &x.Hard
-		yyv3254.CodecDecodeSelf(d)
+		x.Kind = string(r.DecodeString())
 	}
 	yyj3253++
 	if yyhl3253 {
@@ -40537,10 +40398,54 @@ func (x *ResourceQuotaStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Used = nil
+		x.APIVersion = ""
 	} else {
-		yyv3255 := &x.Used
-		yyv3255.CodecDecodeSelf(d)
+		x.APIVersion = string(r.DecodeString())
+	}
+	yyj3253++
+	if yyhl3253 {
+		yyb3253 = yyj3253 > l
+	} else {
+		yyb3253 = r.CheckBreak()
+	}
+	if yyb3253 {
+		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+		return
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+	if r.TryDecodeAsNil() {
+		x.ListMeta = pkg2_unversioned.ListMeta{}
+	} else {
+		yyv3256 := &x.ListMeta
+		yym3257 := z.DecBinary()
+		_ = yym3257
+		if false {
+		} else if z.HasExtensions() && z.DecExt(yyv3256) {
+		} else {
+			z.DecFallback(yyv3256, false)
+		}
+	}
+	yyj3253++
+	if yyhl3253 {
+		yyb3253 = yyj3253 > l
+	} else {
+		yyb3253 = r.CheckBreak()
+	}
+	if yyb3253 {
+		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+		return
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+	if r.TryDecodeAsNil() {
+		x.Items = nil
+	} else {
+		yyv3258 := &x.Items
+		yym3259 := z.DecBinary()
+		_ = yym3259
+		if false {
+		} else {
+			h.decSliceLimitRange((*[]LimitRange)(yyv3258), d)
+		}
 	}
 	for {
 		yyj3253++
@@ -40558,143 +40463,61 @@ func (x *ResourceQuotaStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x *ResourceQuota) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *ResourceQuotaSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3256 := z.EncBinary()
-		_ = yym3256
+		yym3260 := z.EncBinary()
+		_ = yym3260
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3257 := !z.EncBinary()
-			yy2arr3257 := z.EncBasicHandle().StructToArray
-			var yyq3257 [5]bool
-			_, _, _ = yysep3257, yyq3257, yy2arr3257
-			const yyr3257 bool = false
-			yyq3257[0] = x.Kind != ""
-			yyq3257[1] = x.APIVersion != ""
-			yyq3257[2] = true
-			yyq3257[3] = true
-			yyq3257[4] = true
-			var yynn3257 int
-			if yyr3257 || yy2arr3257 {
-				r.EncodeArrayStart(5)
+			yysep3261 := !z.EncBinary()
+			yy2arr3261 := z.EncBasicHandle().StructToArray
+			var yyq3261 [1]bool
+			_, _, _ = yysep3261, yyq3261, yy2arr3261
+			const yyr3261 bool = false
+			yyq3261[0] = len(x.Hard) != 0
+			var yynn3261 int
+			if yyr3261 || yy2arr3261 {
+				r.EncodeArrayStart(1)
 			} else {
-				yynn3257 = 0
-				for _, b := range yyq3257 {
+				yynn3261 = 0
+				for _, b := range yyq3261 {
 					if b {
-						yynn3257++
+						yynn3261++
 					}
 				}
-				r.EncodeMapStart(yynn3257)
-				yynn3257 = 0
+				r.EncodeMapStart(yynn3261)
+				yynn3261 = 0
 			}
-			if yyr3257 || yy2arr3257 {
+			if yyr3261 || yy2arr3261 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3257[0] {
-					yym3259 := z.EncBinary()
-					_ = yym3259
-					if false {
+				if yyq3261[0] {
+					if x.Hard == nil {
+						r.EncodeNil()
 					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
+						x.Hard.CodecEncodeSelf(e)
 					}
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, "")
-				}
-			} else {
-				if yyq3257[0] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("kind"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3260 := z.EncBinary()
-					_ = yym3260
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
-					}
-				}
-			}
-			if yyr3257 || yy2arr3257 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3257[1] {
-					yym3262 := z.EncBinary()
-					_ = yym3262
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
-					}
-				} else {
-					r.EncodeString(codecSelferC_UTF81234, "")
-				}
-			} else {
-				if yyq3257[1] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3263 := z.EncBinary()
-					_ = yym3263
-					if false {
-					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
-					}
-				}
-			}
-			if yyr3257 || yy2arr3257 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3257[2] {
-					yy3265 := &x.ObjectMeta
-					yy3265.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3257[2] {
+				if yyq3261[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
+					r.EncodeString(codecSelferC_UTF81234, string("hard"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3266 := &x.ObjectMeta
-					yy3266.CodecEncodeSelf(e)
+					if x.Hard == nil {
+						r.EncodeNil()
+					} else {
+						x.Hard.CodecEncodeSelf(e)
+					}
 				}
 			}
-			if yyr3257 || yy2arr3257 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3257[3] {
-					yy3268 := &x.Spec
-					yy3268.CodecEncodeSelf(e)
-				} else {
-					r.EncodeNil()
-				}
-			} else {
-				if yyq3257[3] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("spec"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3269 := &x.Spec
-					yy3269.CodecEncodeSelf(e)
-				}
-			}
-			if yyr3257 || yy2arr3257 {
-				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3257[4] {
-					yy3271 := &x.Status
-					yy3271.CodecEncodeSelf(e)
-				} else {
-					r.EncodeNil()
-				}
-			} else {
-				if yyq3257[4] {
-					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("status"))
-					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3272 := &x.Status
-					yy3272.CodecEncodeSelf(e)
-				}
-			}
-			if yyr3257 || yy2arr3257 {
+			if yyr3261 || yy2arr3261 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -40703,7 +40526,200 @@ func (x *ResourceQuota) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *ResourceQuota) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *ResourceQuotaSpec) CodecDecodeSelf(d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	yym3263 := z.DecBinary()
+	_ = yym3263
+	if false {
+	} else if z.HasExtensions() && z.DecExt(x) {
+	} else {
+		yyct3264 := r.ContainerType()
+		if yyct3264 == codecSelferValueTypeMap1234 {
+			yyl3264 := r.ReadMapStart()
+			if yyl3264 == 0 {
+				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
+			} else {
+				x.codecDecodeSelfFromMap(yyl3264, d)
+			}
+		} else if yyct3264 == codecSelferValueTypeArray1234 {
+			yyl3264 := r.ReadArrayStart()
+			if yyl3264 == 0 {
+				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+			} else {
+				x.codecDecodeSelfFromArray(yyl3264, d)
+			}
+		} else {
+			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
+		}
+	}
+}
+
+func (x *ResourceQuotaSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	var yys3265Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3265Slc
+	var yyhl3265 bool = l >= 0
+	for yyj3265 := 0; ; yyj3265++ {
+		if yyhl3265 {
+			if yyj3265 >= l {
+				break
+			}
+		} else {
+			if r.CheckBreak() {
+				break
+			}
+		}
+		z.DecSendContainerState(codecSelfer_containerMapKey1234)
+		yys3265Slc = r.DecodeBytes(yys3265Slc, true, true)
+		yys3265 := string(yys3265Slc)
+		z.DecSendContainerState(codecSelfer_containerMapValue1234)
+		switch yys3265 {
+		case "hard":
+			if r.TryDecodeAsNil() {
+				x.Hard = nil
+			} else {
+				yyv3266 := &x.Hard
+				yyv3266.CodecDecodeSelf(d)
+			}
+		default:
+			z.DecStructFieldNotFound(-1, yys3265)
+		} // end switch yys3265
+	} // end for yyj3265
+	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
+}
+
+func (x *ResourceQuotaSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	var yyj3267 int
+	var yyb3267 bool
+	var yyhl3267 bool = l >= 0
+	yyj3267++
+	if yyhl3267 {
+		yyb3267 = yyj3267 > l
+	} else {
+		yyb3267 = r.CheckBreak()
+	}
+	if yyb3267 {
+		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+		return
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+	if r.TryDecodeAsNil() {
+		x.Hard = nil
+	} else {
+		yyv3268 := &x.Hard
+		yyv3268.CodecDecodeSelf(d)
+	}
+	for {
+		yyj3267++
+		if yyhl3267 {
+			yyb3267 = yyj3267 > l
+		} else {
+			yyb3267 = r.CheckBreak()
+		}
+		if yyb3267 {
+			break
+		}
+		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+		z.DecStructFieldNotFound(yyj3267-1, "")
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+}
+
+func (x *ResourceQuotaStatus) CodecEncodeSelf(e *codec1978.Encoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperEncoder(e)
+	_, _, _ = h, z, r
+	if x == nil {
+		r.EncodeNil()
+	} else {
+		yym3269 := z.EncBinary()
+		_ = yym3269
+		if false {
+		} else if z.HasExtensions() && z.EncExt(x) {
+		} else {
+			yysep3270 := !z.EncBinary()
+			yy2arr3270 := z.EncBasicHandle().StructToArray
+			var yyq3270 [2]bool
+			_, _, _ = yysep3270, yyq3270, yy2arr3270
+			const yyr3270 bool = false
+			yyq3270[0] = len(x.Hard) != 0
+			yyq3270[1] = len(x.Used) != 0
+			var yynn3270 int
+			if yyr3270 || yy2arr3270 {
+				r.EncodeArrayStart(2)
+			} else {
+				yynn3270 = 0
+				for _, b := range yyq3270 {
+					if b {
+						yynn3270++
+					}
+				}
+				r.EncodeMapStart(yynn3270)
+				yynn3270 = 0
+			}
+			if yyr3270 || yy2arr3270 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq3270[0] {
+					if x.Hard == nil {
+						r.EncodeNil()
+					} else {
+						x.Hard.CodecEncodeSelf(e)
+					}
+				} else {
+					r.EncodeNil()
+				}
+			} else {
+				if yyq3270[0] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("hard"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.Hard == nil {
+						r.EncodeNil()
+					} else {
+						x.Hard.CodecEncodeSelf(e)
+					}
+				}
+			}
+			if yyr3270 || yy2arr3270 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq3270[1] {
+					if x.Used == nil {
+						r.EncodeNil()
+					} else {
+						x.Used.CodecEncodeSelf(e)
+					}
+				} else {
+					r.EncodeNil()
+				}
+			} else {
+				if yyq3270[1] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("used"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.Used == nil {
+						r.EncodeNil()
+					} else {
+						x.Used.CodecEncodeSelf(e)
+					}
+				}
+			}
+			if yyr3270 || yy2arr3270 {
+				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
+			} else {
+				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
+			}
+		}
+	}
+}
+
+func (x *ResourceQuotaStatus) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -40733,7 +40749,7 @@ func (x *ResourceQuota) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *ResourceQuota) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *ResourceQuotaStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -40755,6 +40771,281 @@ func (x *ResourceQuota) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 		yys3275 := string(yys3275Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
 		switch yys3275 {
+		case "hard":
+			if r.TryDecodeAsNil() {
+				x.Hard = nil
+			} else {
+				yyv3276 := &x.Hard
+				yyv3276.CodecDecodeSelf(d)
+			}
+		case "used":
+			if r.TryDecodeAsNil() {
+				x.Used = nil
+			} else {
+				yyv3277 := &x.Used
+				yyv3277.CodecDecodeSelf(d)
+			}
+		default:
+			z.DecStructFieldNotFound(-1, yys3275)
+		} // end switch yys3275
+	} // end for yyj3275
+	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
+}
+
+func (x *ResourceQuotaStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	var yyj3278 int
+	var yyb3278 bool
+	var yyhl3278 bool = l >= 0
+	yyj3278++
+	if yyhl3278 {
+		yyb3278 = yyj3278 > l
+	} else {
+		yyb3278 = r.CheckBreak()
+	}
+	if yyb3278 {
+		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+		return
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+	if r.TryDecodeAsNil() {
+		x.Hard = nil
+	} else {
+		yyv3279 := &x.Hard
+		yyv3279.CodecDecodeSelf(d)
+	}
+	yyj3278++
+	if yyhl3278 {
+		yyb3278 = yyj3278 > l
+	} else {
+		yyb3278 = r.CheckBreak()
+	}
+	if yyb3278 {
+		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+		return
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+	if r.TryDecodeAsNil() {
+		x.Used = nil
+	} else {
+		yyv3280 := &x.Used
+		yyv3280.CodecDecodeSelf(d)
+	}
+	for {
+		yyj3278++
+		if yyhl3278 {
+			yyb3278 = yyj3278 > l
+		} else {
+			yyb3278 = r.CheckBreak()
+		}
+		if yyb3278 {
+			break
+		}
+		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
+		z.DecStructFieldNotFound(yyj3278-1, "")
+	}
+	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+}
+
+func (x *ResourceQuota) CodecEncodeSelf(e *codec1978.Encoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperEncoder(e)
+	_, _, _ = h, z, r
+	if x == nil {
+		r.EncodeNil()
+	} else {
+		yym3281 := z.EncBinary()
+		_ = yym3281
+		if false {
+		} else if z.HasExtensions() && z.EncExt(x) {
+		} else {
+			yysep3282 := !z.EncBinary()
+			yy2arr3282 := z.EncBasicHandle().StructToArray
+			var yyq3282 [5]bool
+			_, _, _ = yysep3282, yyq3282, yy2arr3282
+			const yyr3282 bool = false
+			yyq3282[0] = x.Kind != ""
+			yyq3282[1] = x.APIVersion != ""
+			yyq3282[2] = true
+			yyq3282[3] = true
+			yyq3282[4] = true
+			var yynn3282 int
+			if yyr3282 || yy2arr3282 {
+				r.EncodeArrayStart(5)
+			} else {
+				yynn3282 = 0
+				for _, b := range yyq3282 {
+					if b {
+						yynn3282++
+					}
+				}
+				r.EncodeMapStart(yynn3282)
+				yynn3282 = 0
+			}
+			if yyr3282 || yy2arr3282 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq3282[0] {
+					yym3284 := z.EncBinary()
+					_ = yym3284
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
+					}
+				} else {
+					r.EncodeString(codecSelferC_UTF81234, "")
+				}
+			} else {
+				if yyq3282[0] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("kind"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym3285 := z.EncBinary()
+					_ = yym3285
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
+					}
+				}
+			}
+			if yyr3282 || yy2arr3282 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq3282[1] {
+					yym3287 := z.EncBinary()
+					_ = yym3287
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
+					}
+				} else {
+					r.EncodeString(codecSelferC_UTF81234, "")
+				}
+			} else {
+				if yyq3282[1] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yym3288 := z.EncBinary()
+					_ = yym3288
+					if false {
+					} else {
+						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
+					}
+				}
+			}
+			if yyr3282 || yy2arr3282 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq3282[2] {
+					yy3290 := &x.ObjectMeta
+					yy3290.CodecEncodeSelf(e)
+				} else {
+					r.EncodeNil()
+				}
+			} else {
+				if yyq3282[2] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yy3291 := &x.ObjectMeta
+					yy3291.CodecEncodeSelf(e)
+				}
+			}
+			if yyr3282 || yy2arr3282 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq3282[3] {
+					yy3293 := &x.Spec
+					yy3293.CodecEncodeSelf(e)
+				} else {
+					r.EncodeNil()
+				}
+			} else {
+				if yyq3282[3] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("spec"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yy3294 := &x.Spec
+					yy3294.CodecEncodeSelf(e)
+				}
+			}
+			if yyr3282 || yy2arr3282 {
+				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+				if yyq3282[4] {
+					yy3296 := &x.Status
+					yy3296.CodecEncodeSelf(e)
+				} else {
+					r.EncodeNil()
+				}
+			} else {
+				if yyq3282[4] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("status"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yy3297 := &x.Status
+					yy3297.CodecEncodeSelf(e)
+				}
+			}
+			if yyr3282 || yy2arr3282 {
+				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
+			} else {
+				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
+			}
+		}
+	}
+}
+
+func (x *ResourceQuota) CodecDecodeSelf(d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	yym3298 := z.DecBinary()
+	_ = yym3298
+	if false {
+	} else if z.HasExtensions() && z.DecExt(x) {
+	} else {
+		yyct3299 := r.ContainerType()
+		if yyct3299 == codecSelferValueTypeMap1234 {
+			yyl3299 := r.ReadMapStart()
+			if yyl3299 == 0 {
+				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
+			} else {
+				x.codecDecodeSelfFromMap(yyl3299, d)
+			}
+		} else if yyct3299 == codecSelferValueTypeArray1234 {
+			yyl3299 := r.ReadArrayStart()
+			if yyl3299 == 0 {
+				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
+			} else {
+				x.codecDecodeSelfFromArray(yyl3299, d)
+			}
+		} else {
+			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
+		}
+	}
+}
+
+func (x *ResourceQuota) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+	var yys3300Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3300Slc
+	var yyhl3300 bool = l >= 0
+	for yyj3300 := 0; ; yyj3300++ {
+		if yyhl3300 {
+			if yyj3300 >= l {
+				break
+			}
+		} else {
+			if r.CheckBreak() {
+				break
+			}
+		}
+		z.DecSendContainerState(codecSelfer_containerMapKey1234)
+		yys3300Slc = r.DecodeBytes(yys3300Slc, true, true)
+		yys3300 := string(yys3300Slc)
+		z.DecSendContainerState(codecSelfer_containerMapValue1234)
+		switch yys3300 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -40771,27 +41062,27 @@ func (x *ResourceQuota) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.ObjectMeta = ObjectMeta{}
 			} else {
-				yyv3278 := &x.ObjectMeta
-				yyv3278.CodecDecodeSelf(d)
+				yyv3303 := &x.ObjectMeta
+				yyv3303.CodecDecodeSelf(d)
 			}
 		case "spec":
 			if r.TryDecodeAsNil() {
 				x.Spec = ResourceQuotaSpec{}
 			} else {
-				yyv3279 := &x.Spec
-				yyv3279.CodecDecodeSelf(d)
+				yyv3304 := &x.Spec
+				yyv3304.CodecDecodeSelf(d)
 			}
 		case "status":
 			if r.TryDecodeAsNil() {
 				x.Status = ResourceQuotaStatus{}
 			} else {
-				yyv3280 := &x.Status
-				yyv3280.CodecDecodeSelf(d)
+				yyv3305 := &x.Status
+				yyv3305.CodecDecodeSelf(d)
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3275)
-		} // end switch yys3275
-	} // end for yyj3275
+			z.DecStructFieldNotFound(-1, yys3300)
+		} // end switch yys3300
+	} // end for yyj3300
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -40799,16 +41090,16 @@ func (x *ResourceQuota) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3281 int
-	var yyb3281 bool
-	var yyhl3281 bool = l >= 0
-	yyj3281++
-	if yyhl3281 {
-		yyb3281 = yyj3281 > l
+	var yyj3306 int
+	var yyb3306 bool
+	var yyhl3306 bool = l >= 0
+	yyj3306++
+	if yyhl3306 {
+		yyb3306 = yyj3306 > l
 	} else {
-		yyb3281 = r.CheckBreak()
+		yyb3306 = r.CheckBreak()
 	}
-	if yyb3281 {
+	if yyb3306 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -40818,13 +41109,13 @@ func (x *ResourceQuota) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj3281++
-	if yyhl3281 {
-		yyb3281 = yyj3281 > l
+	yyj3306++
+	if yyhl3306 {
+		yyb3306 = yyj3306 > l
 	} else {
-		yyb3281 = r.CheckBreak()
+		yyb3306 = r.CheckBreak()
 	}
-	if yyb3281 {
+	if yyb3306 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -40834,13 +41125,13 @@ func (x *ResourceQuota) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj3281++
-	if yyhl3281 {
-		yyb3281 = yyj3281 > l
+	yyj3306++
+	if yyhl3306 {
+		yyb3306 = yyj3306 > l
 	} else {
-		yyb3281 = r.CheckBreak()
+		yyb3306 = r.CheckBreak()
 	}
-	if yyb3281 {
+	if yyb3306 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -40848,16 +41139,16 @@ func (x *ResourceQuota) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.ObjectMeta = ObjectMeta{}
 	} else {
-		yyv3284 := &x.ObjectMeta
-		yyv3284.CodecDecodeSelf(d)
+		yyv3309 := &x.ObjectMeta
+		yyv3309.CodecDecodeSelf(d)
 	}
-	yyj3281++
-	if yyhl3281 {
-		yyb3281 = yyj3281 > l
+	yyj3306++
+	if yyhl3306 {
+		yyb3306 = yyj3306 > l
 	} else {
-		yyb3281 = r.CheckBreak()
+		yyb3306 = r.CheckBreak()
 	}
-	if yyb3281 {
+	if yyb3306 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -40865,16 +41156,16 @@ func (x *ResourceQuota) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Spec = ResourceQuotaSpec{}
 	} else {
-		yyv3285 := &x.Spec
-		yyv3285.CodecDecodeSelf(d)
+		yyv3310 := &x.Spec
+		yyv3310.CodecDecodeSelf(d)
 	}
-	yyj3281++
-	if yyhl3281 {
-		yyb3281 = yyj3281 > l
+	yyj3306++
+	if yyhl3306 {
+		yyb3306 = yyj3306 > l
 	} else {
-		yyb3281 = r.CheckBreak()
+		yyb3306 = r.CheckBreak()
 	}
-	if yyb3281 {
+	if yyb3306 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -40882,21 +41173,21 @@ func (x *ResourceQuota) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Status = ResourceQuotaStatus{}
 	} else {
-		yyv3286 := &x.Status
-		yyv3286.CodecDecodeSelf(d)
+		yyv3311 := &x.Status
+		yyv3311.CodecDecodeSelf(d)
 	}
 	for {
-		yyj3281++
-		if yyhl3281 {
-			yyb3281 = yyj3281 > l
+		yyj3306++
+		if yyhl3306 {
+			yyb3306 = yyj3306 > l
 		} else {
-			yyb3281 = r.CheckBreak()
+			yyb3306 = r.CheckBreak()
 		}
-		if yyb3281 {
+		if yyb3306 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3281-1, "")
+		z.DecStructFieldNotFound(yyj3306-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -40908,37 +41199,37 @@ func (x *ResourceQuotaList) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3287 := z.EncBinary()
-		_ = yym3287
+		yym3312 := z.EncBinary()
+		_ = yym3312
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3288 := !z.EncBinary()
-			yy2arr3288 := z.EncBasicHandle().StructToArray
-			var yyq3288 [4]bool
-			_, _, _ = yysep3288, yyq3288, yy2arr3288
-			const yyr3288 bool = false
-			yyq3288[0] = x.Kind != ""
-			yyq3288[1] = x.APIVersion != ""
-			yyq3288[2] = true
-			var yynn3288 int
-			if yyr3288 || yy2arr3288 {
+			yysep3313 := !z.EncBinary()
+			yy2arr3313 := z.EncBasicHandle().StructToArray
+			var yyq3313 [4]bool
+			_, _, _ = yysep3313, yyq3313, yy2arr3313
+			const yyr3313 bool = false
+			yyq3313[0] = x.Kind != ""
+			yyq3313[1] = x.APIVersion != ""
+			yyq3313[2] = true
+			var yynn3313 int
+			if yyr3313 || yy2arr3313 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn3288 = 1
-				for _, b := range yyq3288 {
+				yynn3313 = 1
+				for _, b := range yyq3313 {
 					if b {
-						yynn3288++
+						yynn3313++
 					}
 				}
-				r.EncodeMapStart(yynn3288)
-				yynn3288 = 0
+				r.EncodeMapStart(yynn3313)
+				yynn3313 = 0
 			}
-			if yyr3288 || yy2arr3288 {
+			if yyr3313 || yy2arr3313 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3288[0] {
-					yym3290 := z.EncBinary()
-					_ = yym3290
+				if yyq3313[0] {
+					yym3315 := z.EncBinary()
+					_ = yym3315
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -40947,23 +41238,23 @@ func (x *ResourceQuotaList) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3288[0] {
+				if yyq3313[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3291 := z.EncBinary()
-					_ = yym3291
+					yym3316 := z.EncBinary()
+					_ = yym3316
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr3288 || yy2arr3288 {
+			if yyr3313 || yy2arr3313 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3288[1] {
-					yym3293 := z.EncBinary()
-					_ = yym3293
+				if yyq3313[1] {
+					yym3318 := z.EncBinary()
+					_ = yym3318
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -40972,54 +41263,54 @@ func (x *ResourceQuotaList) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3288[1] {
+				if yyq3313[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3294 := z.EncBinary()
-					_ = yym3294
+					yym3319 := z.EncBinary()
+					_ = yym3319
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr3288 || yy2arr3288 {
+			if yyr3313 || yy2arr3313 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3288[2] {
-					yy3296 := &x.ListMeta
-					yym3297 := z.EncBinary()
-					_ = yym3297
+				if yyq3313[2] {
+					yy3321 := &x.ListMeta
+					yym3322 := z.EncBinary()
+					_ = yym3322
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3296) {
+					} else if z.HasExtensions() && z.EncExt(yy3321) {
 					} else {
-						z.EncFallback(yy3296)
+						z.EncFallback(yy3321)
 					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3288[2] {
+				if yyq3313[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3298 := &x.ListMeta
-					yym3299 := z.EncBinary()
-					_ = yym3299
+					yy3323 := &x.ListMeta
+					yym3324 := z.EncBinary()
+					_ = yym3324
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3298) {
+					} else if z.HasExtensions() && z.EncExt(yy3323) {
 					} else {
-						z.EncFallback(yy3298)
+						z.EncFallback(yy3323)
 					}
 				}
 			}
-			if yyr3288 || yy2arr3288 {
+			if yyr3313 || yy2arr3313 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym3301 := z.EncBinary()
-					_ = yym3301
+					yym3326 := z.EncBinary()
+					_ = yym3326
 					if false {
 					} else {
 						h.encSliceResourceQuota(([]ResourceQuota)(x.Items), e)
@@ -41032,15 +41323,15 @@ func (x *ResourceQuotaList) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym3302 := z.EncBinary()
-					_ = yym3302
+					yym3327 := z.EncBinary()
+					_ = yym3327
 					if false {
 					} else {
 						h.encSliceResourceQuota(([]ResourceQuota)(x.Items), e)
 					}
 				}
 			}
-			if yyr3288 || yy2arr3288 {
+			if yyr3313 || yy2arr3313 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -41053,25 +41344,25 @@ func (x *ResourceQuotaList) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3303 := z.DecBinary()
-	_ = yym3303
+	yym3328 := z.DecBinary()
+	_ = yym3328
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3304 := r.ContainerType()
-		if yyct3304 == codecSelferValueTypeMap1234 {
-			yyl3304 := r.ReadMapStart()
-			if yyl3304 == 0 {
+		yyct3329 := r.ContainerType()
+		if yyct3329 == codecSelferValueTypeMap1234 {
+			yyl3329 := r.ReadMapStart()
+			if yyl3329 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3304, d)
+				x.codecDecodeSelfFromMap(yyl3329, d)
 			}
-		} else if yyct3304 == codecSelferValueTypeArray1234 {
-			yyl3304 := r.ReadArrayStart()
-			if yyl3304 == 0 {
+		} else if yyct3329 == codecSelferValueTypeArray1234 {
+			yyl3329 := r.ReadArrayStart()
+			if yyl3329 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3304, d)
+				x.codecDecodeSelfFromArray(yyl3329, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -41083,12 +41374,12 @@ func (x *ResourceQuotaList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) 
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3305Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3305Slc
-	var yyhl3305 bool = l >= 0
-	for yyj3305 := 0; ; yyj3305++ {
-		if yyhl3305 {
-			if yyj3305 >= l {
+	var yys3330Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3330Slc
+	var yyhl3330 bool = l >= 0
+	for yyj3330 := 0; ; yyj3330++ {
+		if yyhl3330 {
+			if yyj3330 >= l {
 				break
 			}
 		} else {
@@ -41097,10 +41388,10 @@ func (x *ResourceQuotaList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) 
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3305Slc = r.DecodeBytes(yys3305Slc, true, true)
-		yys3305 := string(yys3305Slc)
+		yys3330Slc = r.DecodeBytes(yys3330Slc, true, true)
+		yys3330 := string(yys3330Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3305 {
+		switch yys3330 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -41117,31 +41408,31 @@ func (x *ResourceQuotaList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) 
 			if r.TryDecodeAsNil() {
 				x.ListMeta = pkg2_unversioned.ListMeta{}
 			} else {
-				yyv3308 := &x.ListMeta
-				yym3309 := z.DecBinary()
-				_ = yym3309
+				yyv3333 := &x.ListMeta
+				yym3334 := z.DecBinary()
+				_ = yym3334
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv3308) {
+				} else if z.HasExtensions() && z.DecExt(yyv3333) {
 				} else {
-					z.DecFallback(yyv3308, false)
+					z.DecFallback(yyv3333, false)
 				}
 			}
 		case "items":
 			if r.TryDecodeAsNil() {
 				x.Items = nil
 			} else {
-				yyv3310 := &x.Items
-				yym3311 := z.DecBinary()
-				_ = yym3311
+				yyv3335 := &x.Items
+				yym3336 := z.DecBinary()
+				_ = yym3336
 				if false {
 				} else {
-					h.decSliceResourceQuota((*[]ResourceQuota)(yyv3310), d)
+					h.decSliceResourceQuota((*[]ResourceQuota)(yyv3335), d)
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3305)
-		} // end switch yys3305
-	} // end for yyj3305
+			z.DecStructFieldNotFound(-1, yys3330)
+		} // end switch yys3330
+	} // end for yyj3330
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -41149,16 +41440,16 @@ func (x *ResourceQuotaList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3312 int
-	var yyb3312 bool
-	var yyhl3312 bool = l >= 0
-	yyj3312++
-	if yyhl3312 {
-		yyb3312 = yyj3312 > l
+	var yyj3337 int
+	var yyb3337 bool
+	var yyhl3337 bool = l >= 0
+	yyj3337++
+	if yyhl3337 {
+		yyb3337 = yyj3337 > l
 	} else {
-		yyb3312 = r.CheckBreak()
+		yyb3337 = r.CheckBreak()
 	}
-	if yyb3312 {
+	if yyb3337 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -41168,13 +41459,13 @@ func (x *ResourceQuotaList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj3312++
-	if yyhl3312 {
-		yyb3312 = yyj3312 > l
+	yyj3337++
+	if yyhl3337 {
+		yyb3337 = yyj3337 > l
 	} else {
-		yyb3312 = r.CheckBreak()
+		yyb3337 = r.CheckBreak()
 	}
-	if yyb3312 {
+	if yyb3337 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -41184,13 +41475,13 @@ func (x *ResourceQuotaList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj3312++
-	if yyhl3312 {
-		yyb3312 = yyj3312 > l
+	yyj3337++
+	if yyhl3337 {
+		yyb3337 = yyj3337 > l
 	} else {
-		yyb3312 = r.CheckBreak()
+		yyb3337 = r.CheckBreak()
 	}
-	if yyb3312 {
+	if yyb3337 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -41198,22 +41489,22 @@ func (x *ResourceQuotaList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder
 	if r.TryDecodeAsNil() {
 		x.ListMeta = pkg2_unversioned.ListMeta{}
 	} else {
-		yyv3315 := &x.ListMeta
-		yym3316 := z.DecBinary()
-		_ = yym3316
+		yyv3340 := &x.ListMeta
+		yym3341 := z.DecBinary()
+		_ = yym3341
 		if false {
-		} else if z.HasExtensions() && z.DecExt(yyv3315) {
+		} else if z.HasExtensions() && z.DecExt(yyv3340) {
 		} else {
-			z.DecFallback(yyv3315, false)
+			z.DecFallback(yyv3340, false)
 		}
 	}
-	yyj3312++
-	if yyhl3312 {
-		yyb3312 = yyj3312 > l
+	yyj3337++
+	if yyhl3337 {
+		yyb3337 = yyj3337 > l
 	} else {
-		yyb3312 = r.CheckBreak()
+		yyb3337 = r.CheckBreak()
 	}
-	if yyb3312 {
+	if yyb3337 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -41221,26 +41512,26 @@ func (x *ResourceQuotaList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder
 	if r.TryDecodeAsNil() {
 		x.Items = nil
 	} else {
-		yyv3317 := &x.Items
-		yym3318 := z.DecBinary()
-		_ = yym3318
+		yyv3342 := &x.Items
+		yym3343 := z.DecBinary()
+		_ = yym3343
 		if false {
 		} else {
-			h.decSliceResourceQuota((*[]ResourceQuota)(yyv3317), d)
+			h.decSliceResourceQuota((*[]ResourceQuota)(yyv3342), d)
 		}
 	}
 	for {
-		yyj3312++
-		if yyhl3312 {
-			yyb3312 = yyj3312 > l
+		yyj3337++
+		if yyhl3337 {
+			yyb3337 = yyj3337 > l
 		} else {
-			yyb3312 = r.CheckBreak()
+			yyb3337 = r.CheckBreak()
 		}
-		if yyb3312 {
+		if yyb3337 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3312-1, "")
+		z.DecStructFieldNotFound(yyj3337-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -41252,39 +41543,39 @@ func (x *Secret) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3319 := z.EncBinary()
-		_ = yym3319
+		yym3344 := z.EncBinary()
+		_ = yym3344
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3320 := !z.EncBinary()
-			yy2arr3320 := z.EncBasicHandle().StructToArray
-			var yyq3320 [5]bool
-			_, _, _ = yysep3320, yyq3320, yy2arr3320
-			const yyr3320 bool = false
-			yyq3320[0] = x.Kind != ""
-			yyq3320[1] = x.APIVersion != ""
-			yyq3320[2] = true
-			yyq3320[3] = len(x.Data) != 0
-			yyq3320[4] = x.Type != ""
-			var yynn3320 int
-			if yyr3320 || yy2arr3320 {
+			yysep3345 := !z.EncBinary()
+			yy2arr3345 := z.EncBasicHandle().StructToArray
+			var yyq3345 [5]bool
+			_, _, _ = yysep3345, yyq3345, yy2arr3345
+			const yyr3345 bool = false
+			yyq3345[0] = x.Kind != ""
+			yyq3345[1] = x.APIVersion != ""
+			yyq3345[2] = true
+			yyq3345[3] = len(x.Data) != 0
+			yyq3345[4] = x.Type != ""
+			var yynn3345 int
+			if yyr3345 || yy2arr3345 {
 				r.EncodeArrayStart(5)
 			} else {
-				yynn3320 = 0
-				for _, b := range yyq3320 {
+				yynn3345 = 0
+				for _, b := range yyq3345 {
 					if b {
-						yynn3320++
+						yynn3345++
 					}
 				}
-				r.EncodeMapStart(yynn3320)
-				yynn3320 = 0
+				r.EncodeMapStart(yynn3345)
+				yynn3345 = 0
 			}
-			if yyr3320 || yy2arr3320 {
+			if yyr3345 || yy2arr3345 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3320[0] {
-					yym3322 := z.EncBinary()
-					_ = yym3322
+				if yyq3345[0] {
+					yym3347 := z.EncBinary()
+					_ = yym3347
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -41293,23 +41584,23 @@ func (x *Secret) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3320[0] {
+				if yyq3345[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3323 := z.EncBinary()
-					_ = yym3323
+					yym3348 := z.EncBinary()
+					_ = yym3348
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr3320 || yy2arr3320 {
+			if yyr3345 || yy2arr3345 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3320[1] {
-					yym3325 := z.EncBinary()
-					_ = yym3325
+				if yyq3345[1] {
+					yym3350 := z.EncBinary()
+					_ = yym3350
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -41318,43 +41609,43 @@ func (x *Secret) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3320[1] {
+				if yyq3345[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3326 := z.EncBinary()
-					_ = yym3326
+					yym3351 := z.EncBinary()
+					_ = yym3351
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr3320 || yy2arr3320 {
+			if yyr3345 || yy2arr3345 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3320[2] {
-					yy3328 := &x.ObjectMeta
-					yy3328.CodecEncodeSelf(e)
+				if yyq3345[2] {
+					yy3353 := &x.ObjectMeta
+					yy3353.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3320[2] {
+				if yyq3345[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3329 := &x.ObjectMeta
-					yy3329.CodecEncodeSelf(e)
+					yy3354 := &x.ObjectMeta
+					yy3354.CodecEncodeSelf(e)
 				}
 			}
-			if yyr3320 || yy2arr3320 {
+			if yyr3345 || yy2arr3345 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3320[3] {
+				if yyq3345[3] {
 					if x.Data == nil {
 						r.EncodeNil()
 					} else {
-						yym3331 := z.EncBinary()
-						_ = yym3331
+						yym3356 := z.EncBinary()
+						_ = yym3356
 						if false {
 						} else {
 							h.encMapstringSliceuint8((map[string][]uint8)(x.Data), e)
@@ -41364,15 +41655,15 @@ func (x *Secret) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3320[3] {
+				if yyq3345[3] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("data"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					if x.Data == nil {
 						r.EncodeNil()
 					} else {
-						yym3332 := z.EncBinary()
-						_ = yym3332
+						yym3357 := z.EncBinary()
+						_ = yym3357
 						if false {
 						} else {
 							h.encMapstringSliceuint8((map[string][]uint8)(x.Data), e)
@@ -41380,22 +41671,22 @@ func (x *Secret) CodecEncodeSelf(e *codec1978.Encoder) {
 					}
 				}
 			}
-			if yyr3320 || yy2arr3320 {
+			if yyr3345 || yy2arr3345 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3320[4] {
+				if yyq3345[4] {
 					x.Type.CodecEncodeSelf(e)
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3320[4] {
+				if yyq3345[4] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("type"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					x.Type.CodecEncodeSelf(e)
 				}
 			}
-			if yyr3320 || yy2arr3320 {
+			if yyr3345 || yy2arr3345 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -41408,25 +41699,25 @@ func (x *Secret) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3334 := z.DecBinary()
-	_ = yym3334
+	yym3359 := z.DecBinary()
+	_ = yym3359
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3335 := r.ContainerType()
-		if yyct3335 == codecSelferValueTypeMap1234 {
-			yyl3335 := r.ReadMapStart()
-			if yyl3335 == 0 {
+		yyct3360 := r.ContainerType()
+		if yyct3360 == codecSelferValueTypeMap1234 {
+			yyl3360 := r.ReadMapStart()
+			if yyl3360 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3335, d)
+				x.codecDecodeSelfFromMap(yyl3360, d)
 			}
-		} else if yyct3335 == codecSelferValueTypeArray1234 {
-			yyl3335 := r.ReadArrayStart()
-			if yyl3335 == 0 {
+		} else if yyct3360 == codecSelferValueTypeArray1234 {
+			yyl3360 := r.ReadArrayStart()
+			if yyl3360 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3335, d)
+				x.codecDecodeSelfFromArray(yyl3360, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -41438,12 +41729,12 @@ func (x *Secret) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3336Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3336Slc
-	var yyhl3336 bool = l >= 0
-	for yyj3336 := 0; ; yyj3336++ {
-		if yyhl3336 {
-			if yyj3336 >= l {
+	var yys3361Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3361Slc
+	var yyhl3361 bool = l >= 0
+	for yyj3361 := 0; ; yyj3361++ {
+		if yyhl3361 {
+			if yyj3361 >= l {
 				break
 			}
 		} else {
@@ -41452,10 +41743,10 @@ func (x *Secret) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3336Slc = r.DecodeBytes(yys3336Slc, true, true)
-		yys3336 := string(yys3336Slc)
+		yys3361Slc = r.DecodeBytes(yys3361Slc, true, true)
+		yys3361 := string(yys3361Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3336 {
+		switch yys3361 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -41472,19 +41763,19 @@ func (x *Secret) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.ObjectMeta = ObjectMeta{}
 			} else {
-				yyv3339 := &x.ObjectMeta
-				yyv3339.CodecDecodeSelf(d)
+				yyv3364 := &x.ObjectMeta
+				yyv3364.CodecDecodeSelf(d)
 			}
 		case "data":
 			if r.TryDecodeAsNil() {
 				x.Data = nil
 			} else {
-				yyv3340 := &x.Data
-				yym3341 := z.DecBinary()
-				_ = yym3341
+				yyv3365 := &x.Data
+				yym3366 := z.DecBinary()
+				_ = yym3366
 				if false {
 				} else {
-					h.decMapstringSliceuint8((*map[string][]uint8)(yyv3340), d)
+					h.decMapstringSliceuint8((*map[string][]uint8)(yyv3365), d)
 				}
 			}
 		case "type":
@@ -41494,9 +41785,9 @@ func (x *Secret) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				x.Type = SecretType(r.DecodeString())
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3336)
-		} // end switch yys3336
-	} // end for yyj3336
+			z.DecStructFieldNotFound(-1, yys3361)
+		} // end switch yys3361
+	} // end for yyj3361
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -41504,16 +41795,16 @@ func (x *Secret) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3343 int
-	var yyb3343 bool
-	var yyhl3343 bool = l >= 0
-	yyj3343++
-	if yyhl3343 {
-		yyb3343 = yyj3343 > l
+	var yyj3368 int
+	var yyb3368 bool
+	var yyhl3368 bool = l >= 0
+	yyj3368++
+	if yyhl3368 {
+		yyb3368 = yyj3368 > l
 	} else {
-		yyb3343 = r.CheckBreak()
+		yyb3368 = r.CheckBreak()
 	}
-	if yyb3343 {
+	if yyb3368 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -41523,13 +41814,13 @@ func (x *Secret) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj3343++
-	if yyhl3343 {
-		yyb3343 = yyj3343 > l
+	yyj3368++
+	if yyhl3368 {
+		yyb3368 = yyj3368 > l
 	} else {
-		yyb3343 = r.CheckBreak()
+		yyb3368 = r.CheckBreak()
 	}
-	if yyb3343 {
+	if yyb3368 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -41539,13 +41830,13 @@ func (x *Secret) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj3343++
-	if yyhl3343 {
-		yyb3343 = yyj3343 > l
+	yyj3368++
+	if yyhl3368 {
+		yyb3368 = yyj3368 > l
 	} else {
-		yyb3343 = r.CheckBreak()
+		yyb3368 = r.CheckBreak()
 	}
-	if yyb3343 {
+	if yyb3368 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -41553,16 +41844,16 @@ func (x *Secret) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.ObjectMeta = ObjectMeta{}
 	} else {
-		yyv3346 := &x.ObjectMeta
-		yyv3346.CodecDecodeSelf(d)
+		yyv3371 := &x.ObjectMeta
+		yyv3371.CodecDecodeSelf(d)
 	}
-	yyj3343++
-	if yyhl3343 {
-		yyb3343 = yyj3343 > l
+	yyj3368++
+	if yyhl3368 {
+		yyb3368 = yyj3368 > l
 	} else {
-		yyb3343 = r.CheckBreak()
+		yyb3368 = r.CheckBreak()
 	}
-	if yyb3343 {
+	if yyb3368 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -41570,21 +41861,21 @@ func (x *Secret) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Data = nil
 	} else {
-		yyv3347 := &x.Data
-		yym3348 := z.DecBinary()
-		_ = yym3348
+		yyv3372 := &x.Data
+		yym3373 := z.DecBinary()
+		_ = yym3373
 		if false {
 		} else {
-			h.decMapstringSliceuint8((*map[string][]uint8)(yyv3347), d)
+			h.decMapstringSliceuint8((*map[string][]uint8)(yyv3372), d)
 		}
 	}
-	yyj3343++
-	if yyhl3343 {
-		yyb3343 = yyj3343 > l
+	yyj3368++
+	if yyhl3368 {
+		yyb3368 = yyj3368 > l
 	} else {
-		yyb3343 = r.CheckBreak()
+		yyb3368 = r.CheckBreak()
 	}
-	if yyb3343 {
+	if yyb3368 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -41595,17 +41886,17 @@ func (x *Secret) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		x.Type = SecretType(r.DecodeString())
 	}
 	for {
-		yyj3343++
-		if yyhl3343 {
-			yyb3343 = yyj3343 > l
+		yyj3368++
+		if yyhl3368 {
+			yyb3368 = yyj3368 > l
 		} else {
-			yyb3343 = r.CheckBreak()
+			yyb3368 = r.CheckBreak()
 		}
-		if yyb3343 {
+		if yyb3368 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3343-1, "")
+		z.DecStructFieldNotFound(yyj3368-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -41614,8 +41905,8 @@ func (x SecretType) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
-	yym3350 := z.EncBinary()
-	_ = yym3350
+	yym3375 := z.EncBinary()
+	_ = yym3375
 	if false {
 	} else if z.HasExtensions() && z.EncExt(x) {
 	} else {
@@ -41627,8 +41918,8 @@ func (x *SecretType) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3351 := z.DecBinary()
-	_ = yym3351
+	yym3376 := z.DecBinary()
+	_ = yym3376
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
@@ -41643,37 +41934,37 @@ func (x *SecretList) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3352 := z.EncBinary()
-		_ = yym3352
+		yym3377 := z.EncBinary()
+		_ = yym3377
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3353 := !z.EncBinary()
-			yy2arr3353 := z.EncBasicHandle().StructToArray
-			var yyq3353 [4]bool
-			_, _, _ = yysep3353, yyq3353, yy2arr3353
-			const yyr3353 bool = false
-			yyq3353[0] = x.Kind != ""
-			yyq3353[1] = x.APIVersion != ""
-			yyq3353[2] = true
-			var yynn3353 int
-			if yyr3353 || yy2arr3353 {
+			yysep3378 := !z.EncBinary()
+			yy2arr3378 := z.EncBasicHandle().StructToArray
+			var yyq3378 [4]bool
+			_, _, _ = yysep3378, yyq3378, yy2arr3378
+			const yyr3378 bool = false
+			yyq3378[0] = x.Kind != ""
+			yyq3378[1] = x.APIVersion != ""
+			yyq3378[2] = true
+			var yynn3378 int
+			if yyr3378 || yy2arr3378 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn3353 = 1
-				for _, b := range yyq3353 {
+				yynn3378 = 1
+				for _, b := range yyq3378 {
 					if b {
-						yynn3353++
+						yynn3378++
 					}
 				}
-				r.EncodeMapStart(yynn3353)
-				yynn3353 = 0
+				r.EncodeMapStart(yynn3378)
+				yynn3378 = 0
 			}
-			if yyr3353 || yy2arr3353 {
+			if yyr3378 || yy2arr3378 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3353[0] {
-					yym3355 := z.EncBinary()
-					_ = yym3355
+				if yyq3378[0] {
+					yym3380 := z.EncBinary()
+					_ = yym3380
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -41682,23 +41973,23 @@ func (x *SecretList) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3353[0] {
+				if yyq3378[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3356 := z.EncBinary()
-					_ = yym3356
+					yym3381 := z.EncBinary()
+					_ = yym3381
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr3353 || yy2arr3353 {
+			if yyr3378 || yy2arr3378 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3353[1] {
-					yym3358 := z.EncBinary()
-					_ = yym3358
+				if yyq3378[1] {
+					yym3383 := z.EncBinary()
+					_ = yym3383
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -41707,54 +41998,54 @@ func (x *SecretList) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3353[1] {
+				if yyq3378[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3359 := z.EncBinary()
-					_ = yym3359
+					yym3384 := z.EncBinary()
+					_ = yym3384
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr3353 || yy2arr3353 {
+			if yyr3378 || yy2arr3378 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3353[2] {
-					yy3361 := &x.ListMeta
-					yym3362 := z.EncBinary()
-					_ = yym3362
+				if yyq3378[2] {
+					yy3386 := &x.ListMeta
+					yym3387 := z.EncBinary()
+					_ = yym3387
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3361) {
+					} else if z.HasExtensions() && z.EncExt(yy3386) {
 					} else {
-						z.EncFallback(yy3361)
+						z.EncFallback(yy3386)
 					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3353[2] {
+				if yyq3378[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3363 := &x.ListMeta
-					yym3364 := z.EncBinary()
-					_ = yym3364
+					yy3388 := &x.ListMeta
+					yym3389 := z.EncBinary()
+					_ = yym3389
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3363) {
+					} else if z.HasExtensions() && z.EncExt(yy3388) {
 					} else {
-						z.EncFallback(yy3363)
+						z.EncFallback(yy3388)
 					}
 				}
 			}
-			if yyr3353 || yy2arr3353 {
+			if yyr3378 || yy2arr3378 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym3366 := z.EncBinary()
-					_ = yym3366
+					yym3391 := z.EncBinary()
+					_ = yym3391
 					if false {
 					} else {
 						h.encSliceSecret(([]Secret)(x.Items), e)
@@ -41767,15 +42058,15 @@ func (x *SecretList) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym3367 := z.EncBinary()
-					_ = yym3367
+					yym3392 := z.EncBinary()
+					_ = yym3392
 					if false {
 					} else {
 						h.encSliceSecret(([]Secret)(x.Items), e)
 					}
 				}
 			}
-			if yyr3353 || yy2arr3353 {
+			if yyr3378 || yy2arr3378 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -41788,25 +42079,25 @@ func (x *SecretList) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3368 := z.DecBinary()
-	_ = yym3368
+	yym3393 := z.DecBinary()
+	_ = yym3393
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3369 := r.ContainerType()
-		if yyct3369 == codecSelferValueTypeMap1234 {
-			yyl3369 := r.ReadMapStart()
-			if yyl3369 == 0 {
+		yyct3394 := r.ContainerType()
+		if yyct3394 == codecSelferValueTypeMap1234 {
+			yyl3394 := r.ReadMapStart()
+			if yyl3394 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3369, d)
+				x.codecDecodeSelfFromMap(yyl3394, d)
 			}
-		} else if yyct3369 == codecSelferValueTypeArray1234 {
-			yyl3369 := r.ReadArrayStart()
-			if yyl3369 == 0 {
+		} else if yyct3394 == codecSelferValueTypeArray1234 {
+			yyl3394 := r.ReadArrayStart()
+			if yyl3394 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3369, d)
+				x.codecDecodeSelfFromArray(yyl3394, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -41818,12 +42109,12 @@ func (x *SecretList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3370Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3370Slc
-	var yyhl3370 bool = l >= 0
-	for yyj3370 := 0; ; yyj3370++ {
-		if yyhl3370 {
-			if yyj3370 >= l {
+	var yys3395Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3395Slc
+	var yyhl3395 bool = l >= 0
+	for yyj3395 := 0; ; yyj3395++ {
+		if yyhl3395 {
+			if yyj3395 >= l {
 				break
 			}
 		} else {
@@ -41832,10 +42123,10 @@ func (x *SecretList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3370Slc = r.DecodeBytes(yys3370Slc, true, true)
-		yys3370 := string(yys3370Slc)
+		yys3395Slc = r.DecodeBytes(yys3395Slc, true, true)
+		yys3395 := string(yys3395Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3370 {
+		switch yys3395 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -41852,31 +42143,31 @@ func (x *SecretList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.ListMeta = pkg2_unversioned.ListMeta{}
 			} else {
-				yyv3373 := &x.ListMeta
-				yym3374 := z.DecBinary()
-				_ = yym3374
+				yyv3398 := &x.ListMeta
+				yym3399 := z.DecBinary()
+				_ = yym3399
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv3373) {
+				} else if z.HasExtensions() && z.DecExt(yyv3398) {
 				} else {
-					z.DecFallback(yyv3373, false)
+					z.DecFallback(yyv3398, false)
 				}
 			}
 		case "items":
 			if r.TryDecodeAsNil() {
 				x.Items = nil
 			} else {
-				yyv3375 := &x.Items
-				yym3376 := z.DecBinary()
-				_ = yym3376
+				yyv3400 := &x.Items
+				yym3401 := z.DecBinary()
+				_ = yym3401
 				if false {
 				} else {
-					h.decSliceSecret((*[]Secret)(yyv3375), d)
+					h.decSliceSecret((*[]Secret)(yyv3400), d)
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3370)
-		} // end switch yys3370
-	} // end for yyj3370
+			z.DecStructFieldNotFound(-1, yys3395)
+		} // end switch yys3395
+	} // end for yyj3395
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -41884,16 +42175,16 @@ func (x *SecretList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3377 int
-	var yyb3377 bool
-	var yyhl3377 bool = l >= 0
-	yyj3377++
-	if yyhl3377 {
-		yyb3377 = yyj3377 > l
+	var yyj3402 int
+	var yyb3402 bool
+	var yyhl3402 bool = l >= 0
+	yyj3402++
+	if yyhl3402 {
+		yyb3402 = yyj3402 > l
 	} else {
-		yyb3377 = r.CheckBreak()
+		yyb3402 = r.CheckBreak()
 	}
-	if yyb3377 {
+	if yyb3402 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -41903,13 +42194,13 @@ func (x *SecretList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj3377++
-	if yyhl3377 {
-		yyb3377 = yyj3377 > l
+	yyj3402++
+	if yyhl3402 {
+		yyb3402 = yyj3402 > l
 	} else {
-		yyb3377 = r.CheckBreak()
+		yyb3402 = r.CheckBreak()
 	}
-	if yyb3377 {
+	if yyb3402 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -41919,13 +42210,13 @@ func (x *SecretList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj3377++
-	if yyhl3377 {
-		yyb3377 = yyj3377 > l
+	yyj3402++
+	if yyhl3402 {
+		yyb3402 = yyj3402 > l
 	} else {
-		yyb3377 = r.CheckBreak()
+		yyb3402 = r.CheckBreak()
 	}
-	if yyb3377 {
+	if yyb3402 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -41933,22 +42224,22 @@ func (x *SecretList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.ListMeta = pkg2_unversioned.ListMeta{}
 	} else {
-		yyv3380 := &x.ListMeta
-		yym3381 := z.DecBinary()
-		_ = yym3381
+		yyv3405 := &x.ListMeta
+		yym3406 := z.DecBinary()
+		_ = yym3406
 		if false {
-		} else if z.HasExtensions() && z.DecExt(yyv3380) {
+		} else if z.HasExtensions() && z.DecExt(yyv3405) {
 		} else {
-			z.DecFallback(yyv3380, false)
+			z.DecFallback(yyv3405, false)
 		}
 	}
-	yyj3377++
-	if yyhl3377 {
-		yyb3377 = yyj3377 > l
+	yyj3402++
+	if yyhl3402 {
+		yyb3402 = yyj3402 > l
 	} else {
-		yyb3377 = r.CheckBreak()
+		yyb3402 = r.CheckBreak()
 	}
-	if yyb3377 {
+	if yyb3402 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -41956,26 +42247,26 @@ func (x *SecretList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	if r.TryDecodeAsNil() {
 		x.Items = nil
 	} else {
-		yyv3382 := &x.Items
-		yym3383 := z.DecBinary()
-		_ = yym3383
+		yyv3407 := &x.Items
+		yym3408 := z.DecBinary()
+		_ = yym3408
 		if false {
 		} else {
-			h.decSliceSecret((*[]Secret)(yyv3382), d)
+			h.decSliceSecret((*[]Secret)(yyv3407), d)
 		}
 	}
 	for {
-		yyj3377++
-		if yyhl3377 {
-			yyb3377 = yyj3377 > l
+		yyj3402++
+		if yyhl3402 {
+			yyb3402 = yyj3402 > l
 		} else {
-			yyb3377 = r.CheckBreak()
+			yyb3402 = r.CheckBreak()
 		}
-		if yyb3377 {
+		if yyb3402 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3377-1, "")
+		z.DecStructFieldNotFound(yyj3402-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -41984,8 +42275,8 @@ func (x PatchType) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
-	yym3384 := z.EncBinary()
-	_ = yym3384
+	yym3409 := z.EncBinary()
+	_ = yym3409
 	if false {
 	} else if z.HasExtensions() && z.EncExt(x) {
 	} else {
@@ -41997,8 +42288,8 @@ func (x *PatchType) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3385 := z.DecBinary()
-	_ = yym3385
+	yym3410 := z.DecBinary()
+	_ = yym3410
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
@@ -42010,8 +42301,8 @@ func (x ComponentConditionType) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
-	yym3386 := z.EncBinary()
-	_ = yym3386
+	yym3411 := z.EncBinary()
+	_ = yym3411
 	if false {
 	} else if z.HasExtensions() && z.EncExt(x) {
 	} else {
@@ -42023,8 +42314,8 @@ func (x *ComponentConditionType) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3387 := z.DecBinary()
-	_ = yym3387
+	yym3412 := z.DecBinary()
+	_ = yym3412
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
@@ -42039,32 +42330,32 @@ func (x *ComponentCondition) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3388 := z.EncBinary()
-		_ = yym3388
+		yym3413 := z.EncBinary()
+		_ = yym3413
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3389 := !z.EncBinary()
-			yy2arr3389 := z.EncBasicHandle().StructToArray
-			var yyq3389 [4]bool
-			_, _, _ = yysep3389, yyq3389, yy2arr3389
-			const yyr3389 bool = false
-			yyq3389[2] = x.Message != ""
-			yyq3389[3] = x.Error != ""
-			var yynn3389 int
-			if yyr3389 || yy2arr3389 {
+			yysep3414 := !z.EncBinary()
+			yy2arr3414 := z.EncBasicHandle().StructToArray
+			var yyq3414 [4]bool
+			_, _, _ = yysep3414, yyq3414, yy2arr3414
+			const yyr3414 bool = false
+			yyq3414[2] = x.Message != ""
+			yyq3414[3] = x.Error != ""
+			var yynn3414 int
+			if yyr3414 || yy2arr3414 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn3389 = 2
-				for _, b := range yyq3389 {
+				yynn3414 = 2
+				for _, b := range yyq3414 {
 					if b {
-						yynn3389++
+						yynn3414++
 					}
 				}
-				r.EncodeMapStart(yynn3389)
-				yynn3389 = 0
+				r.EncodeMapStart(yynn3414)
+				yynn3414 = 0
 			}
-			if yyr3389 || yy2arr3389 {
+			if yyr3414 || yy2arr3414 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				x.Type.CodecEncodeSelf(e)
 			} else {
@@ -42073,7 +42364,7 @@ func (x *ComponentCondition) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
 				x.Type.CodecEncodeSelf(e)
 			}
-			if yyr3389 || yy2arr3389 {
+			if yyr3414 || yy2arr3414 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				x.Status.CodecEncodeSelf(e)
 			} else {
@@ -42082,11 +42373,11 @@ func (x *ComponentCondition) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
 				x.Status.CodecEncodeSelf(e)
 			}
-			if yyr3389 || yy2arr3389 {
+			if yyr3414 || yy2arr3414 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3389[2] {
-					yym3393 := z.EncBinary()
-					_ = yym3393
+				if yyq3414[2] {
+					yym3418 := z.EncBinary()
+					_ = yym3418
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Message))
@@ -42095,23 +42386,23 @@ func (x *ComponentCondition) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3389[2] {
+				if yyq3414[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("message"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3394 := z.EncBinary()
-					_ = yym3394
+					yym3419 := z.EncBinary()
+					_ = yym3419
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Message))
 					}
 				}
 			}
-			if yyr3389 || yy2arr3389 {
+			if yyr3414 || yy2arr3414 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3389[3] {
-					yym3396 := z.EncBinary()
-					_ = yym3396
+				if yyq3414[3] {
+					yym3421 := z.EncBinary()
+					_ = yym3421
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Error))
@@ -42120,19 +42411,19 @@ func (x *ComponentCondition) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3389[3] {
+				if yyq3414[3] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("error"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3397 := z.EncBinary()
-					_ = yym3397
+					yym3422 := z.EncBinary()
+					_ = yym3422
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Error))
 					}
 				}
 			}
-			if yyr3389 || yy2arr3389 {
+			if yyr3414 || yy2arr3414 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -42145,25 +42436,25 @@ func (x *ComponentCondition) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3398 := z.DecBinary()
-	_ = yym3398
+	yym3423 := z.DecBinary()
+	_ = yym3423
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3399 := r.ContainerType()
-		if yyct3399 == codecSelferValueTypeMap1234 {
-			yyl3399 := r.ReadMapStart()
-			if yyl3399 == 0 {
+		yyct3424 := r.ContainerType()
+		if yyct3424 == codecSelferValueTypeMap1234 {
+			yyl3424 := r.ReadMapStart()
+			if yyl3424 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3399, d)
+				x.codecDecodeSelfFromMap(yyl3424, d)
 			}
-		} else if yyct3399 == codecSelferValueTypeArray1234 {
-			yyl3399 := r.ReadArrayStart()
-			if yyl3399 == 0 {
+		} else if yyct3424 == codecSelferValueTypeArray1234 {
+			yyl3424 := r.ReadArrayStart()
+			if yyl3424 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3399, d)
+				x.codecDecodeSelfFromArray(yyl3424, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -42175,12 +42466,12 @@ func (x *ComponentCondition) codecDecodeSelfFromMap(l int, d *codec1978.Decoder)
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3400Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3400Slc
-	var yyhl3400 bool = l >= 0
-	for yyj3400 := 0; ; yyj3400++ {
-		if yyhl3400 {
-			if yyj3400 >= l {
+	var yys3425Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3425Slc
+	var yyhl3425 bool = l >= 0
+	for yyj3425 := 0; ; yyj3425++ {
+		if yyhl3425 {
+			if yyj3425 >= l {
 				break
 			}
 		} else {
@@ -42189,10 +42480,10 @@ func (x *ComponentCondition) codecDecodeSelfFromMap(l int, d *codec1978.Decoder)
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3400Slc = r.DecodeBytes(yys3400Slc, true, true)
-		yys3400 := string(yys3400Slc)
+		yys3425Slc = r.DecodeBytes(yys3425Slc, true, true)
+		yys3425 := string(yys3425Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3400 {
+		switch yys3425 {
 		case "type":
 			if r.TryDecodeAsNil() {
 				x.Type = ""
@@ -42218,9 +42509,9 @@ func (x *ComponentCondition) codecDecodeSelfFromMap(l int, d *codec1978.Decoder)
 				x.Error = string(r.DecodeString())
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3400)
-		} // end switch yys3400
-	} // end for yyj3400
+			z.DecStructFieldNotFound(-1, yys3425)
+		} // end switch yys3425
+	} // end for yyj3425
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -42228,16 +42519,16 @@ func (x *ComponentCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decode
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3405 int
-	var yyb3405 bool
-	var yyhl3405 bool = l >= 0
-	yyj3405++
-	if yyhl3405 {
-		yyb3405 = yyj3405 > l
+	var yyj3430 int
+	var yyb3430 bool
+	var yyhl3430 bool = l >= 0
+	yyj3430++
+	if yyhl3430 {
+		yyb3430 = yyj3430 > l
 	} else {
-		yyb3405 = r.CheckBreak()
+		yyb3430 = r.CheckBreak()
 	}
-	if yyb3405 {
+	if yyb3430 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -42247,13 +42538,13 @@ func (x *ComponentCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decode
 	} else {
 		x.Type = ComponentConditionType(r.DecodeString())
 	}
-	yyj3405++
-	if yyhl3405 {
-		yyb3405 = yyj3405 > l
+	yyj3430++
+	if yyhl3430 {
+		yyb3430 = yyj3430 > l
 	} else {
-		yyb3405 = r.CheckBreak()
+		yyb3430 = r.CheckBreak()
 	}
-	if yyb3405 {
+	if yyb3430 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -42263,13 +42554,13 @@ func (x *ComponentCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decode
 	} else {
 		x.Status = ConditionStatus(r.DecodeString())
 	}
-	yyj3405++
-	if yyhl3405 {
-		yyb3405 = yyj3405 > l
+	yyj3430++
+	if yyhl3430 {
+		yyb3430 = yyj3430 > l
 	} else {
-		yyb3405 = r.CheckBreak()
+		yyb3430 = r.CheckBreak()
 	}
-	if yyb3405 {
+	if yyb3430 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -42279,13 +42570,13 @@ func (x *ComponentCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decode
 	} else {
 		x.Message = string(r.DecodeString())
 	}
-	yyj3405++
-	if yyhl3405 {
-		yyb3405 = yyj3405 > l
+	yyj3430++
+	if yyhl3430 {
+		yyb3430 = yyj3430 > l
 	} else {
-		yyb3405 = r.CheckBreak()
+		yyb3430 = r.CheckBreak()
 	}
-	if yyb3405 {
+	if yyb3430 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -42296,17 +42587,17 @@ func (x *ComponentCondition) codecDecodeSelfFromArray(l int, d *codec1978.Decode
 		x.Error = string(r.DecodeString())
 	}
 	for {
-		yyj3405++
-		if yyhl3405 {
-			yyb3405 = yyj3405 > l
+		yyj3430++
+		if yyhl3430 {
+			yyb3430 = yyj3430 > l
 		} else {
-			yyb3405 = r.CheckBreak()
+			yyb3430 = r.CheckBreak()
 		}
-		if yyb3405 {
+		if yyb3430 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3405-1, "")
+		z.DecStructFieldNotFound(yyj3430-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -42318,38 +42609,38 @@ func (x *ComponentStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3410 := z.EncBinary()
-		_ = yym3410
+		yym3435 := z.EncBinary()
+		_ = yym3435
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3411 := !z.EncBinary()
-			yy2arr3411 := z.EncBasicHandle().StructToArray
-			var yyq3411 [4]bool
-			_, _, _ = yysep3411, yyq3411, yy2arr3411
-			const yyr3411 bool = false
-			yyq3411[0] = x.Kind != ""
-			yyq3411[1] = x.APIVersion != ""
-			yyq3411[2] = true
-			yyq3411[3] = len(x.Conditions) != 0
-			var yynn3411 int
-			if yyr3411 || yy2arr3411 {
+			yysep3436 := !z.EncBinary()
+			yy2arr3436 := z.EncBasicHandle().StructToArray
+			var yyq3436 [4]bool
+			_, _, _ = yysep3436, yyq3436, yy2arr3436
+			const yyr3436 bool = false
+			yyq3436[0] = x.Kind != ""
+			yyq3436[1] = x.APIVersion != ""
+			yyq3436[2] = true
+			yyq3436[3] = len(x.Conditions) != 0
+			var yynn3436 int
+			if yyr3436 || yy2arr3436 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn3411 = 0
-				for _, b := range yyq3411 {
+				yynn3436 = 0
+				for _, b := range yyq3436 {
 					if b {
-						yynn3411++
+						yynn3436++
 					}
 				}
-				r.EncodeMapStart(yynn3411)
-				yynn3411 = 0
+				r.EncodeMapStart(yynn3436)
+				yynn3436 = 0
 			}
-			if yyr3411 || yy2arr3411 {
+			if yyr3436 || yy2arr3436 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3411[0] {
-					yym3413 := z.EncBinary()
-					_ = yym3413
+				if yyq3436[0] {
+					yym3438 := z.EncBinary()
+					_ = yym3438
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -42358,23 +42649,23 @@ func (x *ComponentStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3411[0] {
+				if yyq3436[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3414 := z.EncBinary()
-					_ = yym3414
+					yym3439 := z.EncBinary()
+					_ = yym3439
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr3411 || yy2arr3411 {
+			if yyr3436 || yy2arr3436 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3411[1] {
-					yym3416 := z.EncBinary()
-					_ = yym3416
+				if yyq3436[1] {
+					yym3441 := z.EncBinary()
+					_ = yym3441
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -42383,43 +42674,43 @@ func (x *ComponentStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3411[1] {
+				if yyq3436[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3417 := z.EncBinary()
-					_ = yym3417
+					yym3442 := z.EncBinary()
+					_ = yym3442
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr3411 || yy2arr3411 {
+			if yyr3436 || yy2arr3436 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3411[2] {
-					yy3419 := &x.ObjectMeta
-					yy3419.CodecEncodeSelf(e)
+				if yyq3436[2] {
+					yy3444 := &x.ObjectMeta
+					yy3444.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3411[2] {
+				if yyq3436[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3420 := &x.ObjectMeta
-					yy3420.CodecEncodeSelf(e)
+					yy3445 := &x.ObjectMeta
+					yy3445.CodecEncodeSelf(e)
 				}
 			}
-			if yyr3411 || yy2arr3411 {
+			if yyr3436 || yy2arr3436 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3411[3] {
+				if yyq3436[3] {
 					if x.Conditions == nil {
 						r.EncodeNil()
 					} else {
-						yym3422 := z.EncBinary()
-						_ = yym3422
+						yym3447 := z.EncBinary()
+						_ = yym3447
 						if false {
 						} else {
 							h.encSliceComponentCondition(([]ComponentCondition)(x.Conditions), e)
@@ -42429,15 +42720,15 @@ func (x *ComponentStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3411[3] {
+				if yyq3436[3] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("conditions"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					if x.Conditions == nil {
 						r.EncodeNil()
 					} else {
-						yym3423 := z.EncBinary()
-						_ = yym3423
+						yym3448 := z.EncBinary()
+						_ = yym3448
 						if false {
 						} else {
 							h.encSliceComponentCondition(([]ComponentCondition)(x.Conditions), e)
@@ -42445,7 +42736,7 @@ func (x *ComponentStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 					}
 				}
 			}
-			if yyr3411 || yy2arr3411 {
+			if yyr3436 || yy2arr3436 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -42458,25 +42749,25 @@ func (x *ComponentStatus) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3424 := z.DecBinary()
-	_ = yym3424
+	yym3449 := z.DecBinary()
+	_ = yym3449
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3425 := r.ContainerType()
-		if yyct3425 == codecSelferValueTypeMap1234 {
-			yyl3425 := r.ReadMapStart()
-			if yyl3425 == 0 {
+		yyct3450 := r.ContainerType()
+		if yyct3450 == codecSelferValueTypeMap1234 {
+			yyl3450 := r.ReadMapStart()
+			if yyl3450 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3425, d)
+				x.codecDecodeSelfFromMap(yyl3450, d)
 			}
-		} else if yyct3425 == codecSelferValueTypeArray1234 {
-			yyl3425 := r.ReadArrayStart()
-			if yyl3425 == 0 {
+		} else if yyct3450 == codecSelferValueTypeArray1234 {
+			yyl3450 := r.ReadArrayStart()
+			if yyl3450 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3425, d)
+				x.codecDecodeSelfFromArray(yyl3450, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -42488,12 +42779,12 @@ func (x *ComponentStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3426Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3426Slc
-	var yyhl3426 bool = l >= 0
-	for yyj3426 := 0; ; yyj3426++ {
-		if yyhl3426 {
-			if yyj3426 >= l {
+	var yys3451Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3451Slc
+	var yyhl3451 bool = l >= 0
+	for yyj3451 := 0; ; yyj3451++ {
+		if yyhl3451 {
+			if yyj3451 >= l {
 				break
 			}
 		} else {
@@ -42502,10 +42793,10 @@ func (x *ComponentStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3426Slc = r.DecodeBytes(yys3426Slc, true, true)
-		yys3426 := string(yys3426Slc)
+		yys3451Slc = r.DecodeBytes(yys3451Slc, true, true)
+		yys3451 := string(yys3451Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3426 {
+		switch yys3451 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -42522,25 +42813,25 @@ func (x *ComponentStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.ObjectMeta = ObjectMeta{}
 			} else {
-				yyv3429 := &x.ObjectMeta
-				yyv3429.CodecDecodeSelf(d)
+				yyv3454 := &x.ObjectMeta
+				yyv3454.CodecDecodeSelf(d)
 			}
 		case "conditions":
 			if r.TryDecodeAsNil() {
 				x.Conditions = nil
 			} else {
-				yyv3430 := &x.Conditions
-				yym3431 := z.DecBinary()
-				_ = yym3431
+				yyv3455 := &x.Conditions
+				yym3456 := z.DecBinary()
+				_ = yym3456
 				if false {
 				} else {
-					h.decSliceComponentCondition((*[]ComponentCondition)(yyv3430), d)
+					h.decSliceComponentCondition((*[]ComponentCondition)(yyv3455), d)
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3426)
-		} // end switch yys3426
-	} // end for yyj3426
+			z.DecStructFieldNotFound(-1, yys3451)
+		} // end switch yys3451
+	} // end for yyj3451
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -42548,16 +42839,16 @@ func (x *ComponentStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3432 int
-	var yyb3432 bool
-	var yyhl3432 bool = l >= 0
-	yyj3432++
-	if yyhl3432 {
-		yyb3432 = yyj3432 > l
+	var yyj3457 int
+	var yyb3457 bool
+	var yyhl3457 bool = l >= 0
+	yyj3457++
+	if yyhl3457 {
+		yyb3457 = yyj3457 > l
 	} else {
-		yyb3432 = r.CheckBreak()
+		yyb3457 = r.CheckBreak()
 	}
-	if yyb3432 {
+	if yyb3457 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -42567,13 +42858,13 @@ func (x *ComponentStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj3432++
-	if yyhl3432 {
-		yyb3432 = yyj3432 > l
+	yyj3457++
+	if yyhl3457 {
+		yyb3457 = yyj3457 > l
 	} else {
-		yyb3432 = r.CheckBreak()
+		yyb3457 = r.CheckBreak()
 	}
-	if yyb3432 {
+	if yyb3457 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -42583,13 +42874,13 @@ func (x *ComponentStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj3432++
-	if yyhl3432 {
-		yyb3432 = yyj3432 > l
+	yyj3457++
+	if yyhl3457 {
+		yyb3457 = yyj3457 > l
 	} else {
-		yyb3432 = r.CheckBreak()
+		yyb3457 = r.CheckBreak()
 	}
-	if yyb3432 {
+	if yyb3457 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -42597,16 +42888,16 @@ func (x *ComponentStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	if r.TryDecodeAsNil() {
 		x.ObjectMeta = ObjectMeta{}
 	} else {
-		yyv3435 := &x.ObjectMeta
-		yyv3435.CodecDecodeSelf(d)
+		yyv3460 := &x.ObjectMeta
+		yyv3460.CodecDecodeSelf(d)
 	}
-	yyj3432++
-	if yyhl3432 {
-		yyb3432 = yyj3432 > l
+	yyj3457++
+	if yyhl3457 {
+		yyb3457 = yyj3457 > l
 	} else {
-		yyb3432 = r.CheckBreak()
+		yyb3457 = r.CheckBreak()
 	}
-	if yyb3432 {
+	if yyb3457 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -42614,26 +42905,26 @@ func (x *ComponentStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	if r.TryDecodeAsNil() {
 		x.Conditions = nil
 	} else {
-		yyv3436 := &x.Conditions
-		yym3437 := z.DecBinary()
-		_ = yym3437
+		yyv3461 := &x.Conditions
+		yym3462 := z.DecBinary()
+		_ = yym3462
 		if false {
 		} else {
-			h.decSliceComponentCondition((*[]ComponentCondition)(yyv3436), d)
+			h.decSliceComponentCondition((*[]ComponentCondition)(yyv3461), d)
 		}
 	}
 	for {
-		yyj3432++
-		if yyhl3432 {
-			yyb3432 = yyj3432 > l
+		yyj3457++
+		if yyhl3457 {
+			yyb3457 = yyj3457 > l
 		} else {
-			yyb3432 = r.CheckBreak()
+			yyb3457 = r.CheckBreak()
 		}
-		if yyb3432 {
+		if yyb3457 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3432-1, "")
+		z.DecStructFieldNotFound(yyj3457-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -42645,37 +42936,37 @@ func (x *ComponentStatusList) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3438 := z.EncBinary()
-		_ = yym3438
+		yym3463 := z.EncBinary()
+		_ = yym3463
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3439 := !z.EncBinary()
-			yy2arr3439 := z.EncBasicHandle().StructToArray
-			var yyq3439 [4]bool
-			_, _, _ = yysep3439, yyq3439, yy2arr3439
-			const yyr3439 bool = false
-			yyq3439[0] = x.Kind != ""
-			yyq3439[1] = x.APIVersion != ""
-			yyq3439[2] = true
-			var yynn3439 int
-			if yyr3439 || yy2arr3439 {
+			yysep3464 := !z.EncBinary()
+			yy2arr3464 := z.EncBasicHandle().StructToArray
+			var yyq3464 [4]bool
+			_, _, _ = yysep3464, yyq3464, yy2arr3464
+			const yyr3464 bool = false
+			yyq3464[0] = x.Kind != ""
+			yyq3464[1] = x.APIVersion != ""
+			yyq3464[2] = true
+			var yynn3464 int
+			if yyr3464 || yy2arr3464 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn3439 = 1
-				for _, b := range yyq3439 {
+				yynn3464 = 1
+				for _, b := range yyq3464 {
 					if b {
-						yynn3439++
+						yynn3464++
 					}
 				}
-				r.EncodeMapStart(yynn3439)
-				yynn3439 = 0
+				r.EncodeMapStart(yynn3464)
+				yynn3464 = 0
 			}
-			if yyr3439 || yy2arr3439 {
+			if yyr3464 || yy2arr3464 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3439[0] {
-					yym3441 := z.EncBinary()
-					_ = yym3441
+				if yyq3464[0] {
+					yym3466 := z.EncBinary()
+					_ = yym3466
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -42684,23 +42975,23 @@ func (x *ComponentStatusList) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3439[0] {
+				if yyq3464[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3442 := z.EncBinary()
-					_ = yym3442
+					yym3467 := z.EncBinary()
+					_ = yym3467
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr3439 || yy2arr3439 {
+			if yyr3464 || yy2arr3464 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3439[1] {
-					yym3444 := z.EncBinary()
-					_ = yym3444
+				if yyq3464[1] {
+					yym3469 := z.EncBinary()
+					_ = yym3469
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -42709,54 +43000,54 @@ func (x *ComponentStatusList) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3439[1] {
+				if yyq3464[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3445 := z.EncBinary()
-					_ = yym3445
+					yym3470 := z.EncBinary()
+					_ = yym3470
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr3439 || yy2arr3439 {
+			if yyr3464 || yy2arr3464 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3439[2] {
-					yy3447 := &x.ListMeta
-					yym3448 := z.EncBinary()
-					_ = yym3448
+				if yyq3464[2] {
+					yy3472 := &x.ListMeta
+					yym3473 := z.EncBinary()
+					_ = yym3473
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3447) {
+					} else if z.HasExtensions() && z.EncExt(yy3472) {
 					} else {
-						z.EncFallback(yy3447)
+						z.EncFallback(yy3472)
 					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3439[2] {
+				if yyq3464[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3449 := &x.ListMeta
-					yym3450 := z.EncBinary()
-					_ = yym3450
+					yy3474 := &x.ListMeta
+					yym3475 := z.EncBinary()
+					_ = yym3475
 					if false {
-					} else if z.HasExtensions() && z.EncExt(yy3449) {
+					} else if z.HasExtensions() && z.EncExt(yy3474) {
 					} else {
-						z.EncFallback(yy3449)
+						z.EncFallback(yy3474)
 					}
 				}
 			}
-			if yyr3439 || yy2arr3439 {
+			if yyr3464 || yy2arr3464 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym3452 := z.EncBinary()
-					_ = yym3452
+					yym3477 := z.EncBinary()
+					_ = yym3477
 					if false {
 					} else {
 						h.encSliceComponentStatus(([]ComponentStatus)(x.Items), e)
@@ -42769,15 +43060,15 @@ func (x *ComponentStatusList) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.Items == nil {
 					r.EncodeNil()
 				} else {
-					yym3453 := z.EncBinary()
-					_ = yym3453
+					yym3478 := z.EncBinary()
+					_ = yym3478
 					if false {
 					} else {
 						h.encSliceComponentStatus(([]ComponentStatus)(x.Items), e)
 					}
 				}
 			}
-			if yyr3439 || yy2arr3439 {
+			if yyr3464 || yy2arr3464 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -42790,25 +43081,25 @@ func (x *ComponentStatusList) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3454 := z.DecBinary()
-	_ = yym3454
+	yym3479 := z.DecBinary()
+	_ = yym3479
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3455 := r.ContainerType()
-		if yyct3455 == codecSelferValueTypeMap1234 {
-			yyl3455 := r.ReadMapStart()
-			if yyl3455 == 0 {
+		yyct3480 := r.ContainerType()
+		if yyct3480 == codecSelferValueTypeMap1234 {
+			yyl3480 := r.ReadMapStart()
+			if yyl3480 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3455, d)
+				x.codecDecodeSelfFromMap(yyl3480, d)
 			}
-		} else if yyct3455 == codecSelferValueTypeArray1234 {
-			yyl3455 := r.ReadArrayStart()
-			if yyl3455 == 0 {
+		} else if yyct3480 == codecSelferValueTypeArray1234 {
+			yyl3480 := r.ReadArrayStart()
+			if yyl3480 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3455, d)
+				x.codecDecodeSelfFromArray(yyl3480, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -42820,12 +43111,12 @@ func (x *ComponentStatusList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3456Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3456Slc
-	var yyhl3456 bool = l >= 0
-	for yyj3456 := 0; ; yyj3456++ {
-		if yyhl3456 {
-			if yyj3456 >= l {
+	var yys3481Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3481Slc
+	var yyhl3481 bool = l >= 0
+	for yyj3481 := 0; ; yyj3481++ {
+		if yyhl3481 {
+			if yyj3481 >= l {
 				break
 			}
 		} else {
@@ -42834,10 +43125,10 @@ func (x *ComponentStatusList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3456Slc = r.DecodeBytes(yys3456Slc, true, true)
-		yys3456 := string(yys3456Slc)
+		yys3481Slc = r.DecodeBytes(yys3481Slc, true, true)
+		yys3481 := string(yys3481Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3456 {
+		switch yys3481 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -42854,31 +43145,31 @@ func (x *ComponentStatusList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder
 			if r.TryDecodeAsNil() {
 				x.ListMeta = pkg2_unversioned.ListMeta{}
 			} else {
-				yyv3459 := &x.ListMeta
-				yym3460 := z.DecBinary()
-				_ = yym3460
+				yyv3484 := &x.ListMeta
+				yym3485 := z.DecBinary()
+				_ = yym3485
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv3459) {
+				} else if z.HasExtensions() && z.DecExt(yyv3484) {
 				} else {
-					z.DecFallback(yyv3459, false)
+					z.DecFallback(yyv3484, false)
 				}
 			}
 		case "items":
 			if r.TryDecodeAsNil() {
 				x.Items = nil
 			} else {
-				yyv3461 := &x.Items
-				yym3462 := z.DecBinary()
-				_ = yym3462
+				yyv3486 := &x.Items
+				yym3487 := z.DecBinary()
+				_ = yym3487
 				if false {
 				} else {
-					h.decSliceComponentStatus((*[]ComponentStatus)(yyv3461), d)
+					h.decSliceComponentStatus((*[]ComponentStatus)(yyv3486), d)
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3456)
-		} // end switch yys3456
-	} // end for yyj3456
+			z.DecStructFieldNotFound(-1, yys3481)
+		} // end switch yys3481
+	} // end for yyj3481
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -42886,16 +43177,16 @@ func (x *ComponentStatusList) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3463 int
-	var yyb3463 bool
-	var yyhl3463 bool = l >= 0
-	yyj3463++
-	if yyhl3463 {
-		yyb3463 = yyj3463 > l
+	var yyj3488 int
+	var yyb3488 bool
+	var yyhl3488 bool = l >= 0
+	yyj3488++
+	if yyhl3488 {
+		yyb3488 = yyj3488 > l
 	} else {
-		yyb3463 = r.CheckBreak()
+		yyb3488 = r.CheckBreak()
 	}
-	if yyb3463 {
+	if yyb3488 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -42905,13 +43196,13 @@ func (x *ComponentStatusList) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj3463++
-	if yyhl3463 {
-		yyb3463 = yyj3463 > l
+	yyj3488++
+	if yyhl3488 {
+		yyb3488 = yyj3488 > l
 	} else {
-		yyb3463 = r.CheckBreak()
+		yyb3488 = r.CheckBreak()
 	}
-	if yyb3463 {
+	if yyb3488 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -42921,13 +43212,13 @@ func (x *ComponentStatusList) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj3463++
-	if yyhl3463 {
-		yyb3463 = yyj3463 > l
+	yyj3488++
+	if yyhl3488 {
+		yyb3488 = yyj3488 > l
 	} else {
-		yyb3463 = r.CheckBreak()
+		yyb3488 = r.CheckBreak()
 	}
-	if yyb3463 {
+	if yyb3488 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -42935,22 +43226,22 @@ func (x *ComponentStatusList) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	if r.TryDecodeAsNil() {
 		x.ListMeta = pkg2_unversioned.ListMeta{}
 	} else {
-		yyv3466 := &x.ListMeta
-		yym3467 := z.DecBinary()
-		_ = yym3467
+		yyv3491 := &x.ListMeta
+		yym3492 := z.DecBinary()
+		_ = yym3492
 		if false {
-		} else if z.HasExtensions() && z.DecExt(yyv3466) {
+		} else if z.HasExtensions() && z.DecExt(yyv3491) {
 		} else {
-			z.DecFallback(yyv3466, false)
+			z.DecFallback(yyv3491, false)
 		}
 	}
-	yyj3463++
-	if yyhl3463 {
-		yyb3463 = yyj3463 > l
+	yyj3488++
+	if yyhl3488 {
+		yyb3488 = yyj3488 > l
 	} else {
-		yyb3463 = r.CheckBreak()
+		yyb3488 = r.CheckBreak()
 	}
-	if yyb3463 {
+	if yyb3488 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -42958,26 +43249,26 @@ func (x *ComponentStatusList) codecDecodeSelfFromArray(l int, d *codec1978.Decod
 	if r.TryDecodeAsNil() {
 		x.Items = nil
 	} else {
-		yyv3468 := &x.Items
-		yym3469 := z.DecBinary()
-		_ = yym3469
+		yyv3493 := &x.Items
+		yym3494 := z.DecBinary()
+		_ = yym3494
 		if false {
 		} else {
-			h.decSliceComponentStatus((*[]ComponentStatus)(yyv3468), d)
+			h.decSliceComponentStatus((*[]ComponentStatus)(yyv3493), d)
 		}
 	}
 	for {
-		yyj3463++
-		if yyhl3463 {
-			yyb3463 = yyj3463 > l
+		yyj3488++
+		if yyhl3488 {
+			yyb3488 = yyj3488 > l
 		} else {
-			yyb3463 = r.CheckBreak()
+			yyb3488 = r.CheckBreak()
 		}
-		if yyb3463 {
+		if yyb3488 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3463-1, "")
+		z.DecStructFieldNotFound(yyj3488-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -42989,37 +43280,37 @@ func (x *SecurityContext) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3470 := z.EncBinary()
-		_ = yym3470
+		yym3495 := z.EncBinary()
+		_ = yym3495
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3471 := !z.EncBinary()
-			yy2arr3471 := z.EncBasicHandle().StructToArray
-			var yyq3471 [5]bool
-			_, _, _ = yysep3471, yyq3471, yy2arr3471
-			const yyr3471 bool = false
-			yyq3471[0] = x.Capabilities != nil
-			yyq3471[1] = x.Privileged != nil
-			yyq3471[2] = x.SELinuxOptions != nil
-			yyq3471[3] = x.RunAsUser != nil
-			yyq3471[4] = x.RunAsNonRoot != nil
-			var yynn3471 int
-			if yyr3471 || yy2arr3471 {
+			yysep3496 := !z.EncBinary()
+			yy2arr3496 := z.EncBasicHandle().StructToArray
+			var yyq3496 [5]bool
+			_, _, _ = yysep3496, yyq3496, yy2arr3496
+			const yyr3496 bool = false
+			yyq3496[0] = x.Capabilities != nil
+			yyq3496[1] = x.Privileged != nil
+			yyq3496[2] = x.SELinuxOptions != nil
+			yyq3496[3] = x.RunAsUser != nil
+			yyq3496[4] = x.RunAsNonRoot != nil
+			var yynn3496 int
+			if yyr3496 || yy2arr3496 {
 				r.EncodeArrayStart(5)
 			} else {
-				yynn3471 = 0
-				for _, b := range yyq3471 {
+				yynn3496 = 0
+				for _, b := range yyq3496 {
 					if b {
-						yynn3471++
+						yynn3496++
 					}
 				}
-				r.EncodeMapStart(yynn3471)
-				yynn3471 = 0
+				r.EncodeMapStart(yynn3496)
+				yynn3496 = 0
 			}
-			if yyr3471 || yy2arr3471 {
+			if yyr3496 || yy2arr3496 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3471[0] {
+				if yyq3496[0] {
 					if x.Capabilities == nil {
 						r.EncodeNil()
 					} else {
@@ -43029,7 +43320,7 @@ func (x *SecurityContext) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3471[0] {
+				if yyq3496[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("capabilities"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
@@ -43040,44 +43331,44 @@ func (x *SecurityContext) CodecEncodeSelf(e *codec1978.Encoder) {
 					}
 				}
 			}
-			if yyr3471 || yy2arr3471 {
+			if yyr3496 || yy2arr3496 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3471[1] {
+				if yyq3496[1] {
 					if x.Privileged == nil {
 						r.EncodeNil()
 					} else {
-						yy3474 := *x.Privileged
-						yym3475 := z.EncBinary()
-						_ = yym3475
+						yy3499 := *x.Privileged
+						yym3500 := z.EncBinary()
+						_ = yym3500
 						if false {
 						} else {
-							r.EncodeBool(bool(yy3474))
+							r.EncodeBool(bool(yy3499))
 						}
 					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3471[1] {
+				if yyq3496[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("privileged"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					if x.Privileged == nil {
 						r.EncodeNil()
 					} else {
-						yy3476 := *x.Privileged
-						yym3477 := z.EncBinary()
-						_ = yym3477
+						yy3501 := *x.Privileged
+						yym3502 := z.EncBinary()
+						_ = yym3502
 						if false {
 						} else {
-							r.EncodeBool(bool(yy3476))
+							r.EncodeBool(bool(yy3501))
 						}
 					}
 				}
 			}
-			if yyr3471 || yy2arr3471 {
+			if yyr3496 || yy2arr3496 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3471[2] {
+				if yyq3496[2] {
 					if x.SELinuxOptions == nil {
 						r.EncodeNil()
 					} else {
@@ -43087,7 +43378,7 @@ func (x *SecurityContext) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3471[2] {
+				if yyq3496[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("seLinuxOptions"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
@@ -43098,77 +43389,77 @@ func (x *SecurityContext) CodecEncodeSelf(e *codec1978.Encoder) {
 					}
 				}
 			}
-			if yyr3471 || yy2arr3471 {
+			if yyr3496 || yy2arr3496 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3471[3] {
+				if yyq3496[3] {
 					if x.RunAsUser == nil {
 						r.EncodeNil()
 					} else {
-						yy3480 := *x.RunAsUser
-						yym3481 := z.EncBinary()
-						_ = yym3481
+						yy3505 := *x.RunAsUser
+						yym3506 := z.EncBinary()
+						_ = yym3506
 						if false {
 						} else {
-							r.EncodeInt(int64(yy3480))
+							r.EncodeInt(int64(yy3505))
 						}
 					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3471[3] {
+				if yyq3496[3] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("runAsUser"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					if x.RunAsUser == nil {
 						r.EncodeNil()
 					} else {
-						yy3482 := *x.RunAsUser
-						yym3483 := z.EncBinary()
-						_ = yym3483
+						yy3507 := *x.RunAsUser
+						yym3508 := z.EncBinary()
+						_ = yym3508
 						if false {
 						} else {
-							r.EncodeInt(int64(yy3482))
+							r.EncodeInt(int64(yy3507))
 						}
 					}
 				}
 			}
-			if yyr3471 || yy2arr3471 {
+			if yyr3496 || yy2arr3496 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3471[4] {
+				if yyq3496[4] {
 					if x.RunAsNonRoot == nil {
 						r.EncodeNil()
 					} else {
-						yy3485 := *x.RunAsNonRoot
-						yym3486 := z.EncBinary()
-						_ = yym3486
+						yy3510 := *x.RunAsNonRoot
+						yym3511 := z.EncBinary()
+						_ = yym3511
 						if false {
 						} else {
-							r.EncodeBool(bool(yy3485))
+							r.EncodeBool(bool(yy3510))
 						}
 					}
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3471[4] {
+				if yyq3496[4] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("runAsNonRoot"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					if x.RunAsNonRoot == nil {
 						r.EncodeNil()
 					} else {
-						yy3487 := *x.RunAsNonRoot
-						yym3488 := z.EncBinary()
-						_ = yym3488
+						yy3512 := *x.RunAsNonRoot
+						yym3513 := z.EncBinary()
+						_ = yym3513
 						if false {
 						} else {
-							r.EncodeBool(bool(yy3487))
+							r.EncodeBool(bool(yy3512))
 						}
 					}
 				}
 			}
-			if yyr3471 || yy2arr3471 {
+			if yyr3496 || yy2arr3496 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -43181,25 +43472,25 @@ func (x *SecurityContext) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3489 := z.DecBinary()
-	_ = yym3489
+	yym3514 := z.DecBinary()
+	_ = yym3514
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3490 := r.ContainerType()
-		if yyct3490 == codecSelferValueTypeMap1234 {
-			yyl3490 := r.ReadMapStart()
-			if yyl3490 == 0 {
+		yyct3515 := r.ContainerType()
+		if yyct3515 == codecSelferValueTypeMap1234 {
+			yyl3515 := r.ReadMapStart()
+			if yyl3515 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3490, d)
+				x.codecDecodeSelfFromMap(yyl3515, d)
 			}
-		} else if yyct3490 == codecSelferValueTypeArray1234 {
-			yyl3490 := r.ReadArrayStart()
-			if yyl3490 == 0 {
+		} else if yyct3515 == codecSelferValueTypeArray1234 {
+			yyl3515 := r.ReadArrayStart()
+			if yyl3515 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3490, d)
+				x.codecDecodeSelfFromArray(yyl3515, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -43211,12 +43502,12 @@ func (x *SecurityContext) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3491Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3491Slc
-	var yyhl3491 bool = l >= 0
-	for yyj3491 := 0; ; yyj3491++ {
-		if yyhl3491 {
-			if yyj3491 >= l {
+	var yys3516Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3516Slc
+	var yyhl3516 bool = l >= 0
+	for yyj3516 := 0; ; yyj3516++ {
+		if yyhl3516 {
+			if yyj3516 >= l {
 				break
 			}
 		} else {
@@ -43225,10 +43516,10 @@ func (x *SecurityContext) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3491Slc = r.DecodeBytes(yys3491Slc, true, true)
-		yys3491 := string(yys3491Slc)
+		yys3516Slc = r.DecodeBytes(yys3516Slc, true, true)
+		yys3516 := string(yys3516Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3491 {
+		switch yys3516 {
 		case "capabilities":
 			if r.TryDecodeAsNil() {
 				if x.Capabilities != nil {
@@ -43249,8 +43540,8 @@ func (x *SecurityContext) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				if x.Privileged == nil {
 					x.Privileged = new(bool)
 				}
-				yym3494 := z.DecBinary()
-				_ = yym3494
+				yym3519 := z.DecBinary()
+				_ = yym3519
 				if false {
 				} else {
 					*((*bool)(x.Privileged)) = r.DecodeBool()
@@ -43276,8 +43567,8 @@ func (x *SecurityContext) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				if x.RunAsUser == nil {
 					x.RunAsUser = new(int64)
 				}
-				yym3497 := z.DecBinary()
-				_ = yym3497
+				yym3522 := z.DecBinary()
+				_ = yym3522
 				if false {
 				} else {
 					*((*int64)(x.RunAsUser)) = int64(r.DecodeInt(64))
@@ -43292,17 +43583,17 @@ func (x *SecurityContext) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				if x.RunAsNonRoot == nil {
 					x.RunAsNonRoot = new(bool)
 				}
-				yym3499 := z.DecBinary()
-				_ = yym3499
+				yym3524 := z.DecBinary()
+				_ = yym3524
 				if false {
 				} else {
 					*((*bool)(x.RunAsNonRoot)) = r.DecodeBool()
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3491)
-		} // end switch yys3491
-	} // end for yyj3491
+			z.DecStructFieldNotFound(-1, yys3516)
+		} // end switch yys3516
+	} // end for yyj3516
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -43310,16 +43601,16 @@ func (x *SecurityContext) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3500 int
-	var yyb3500 bool
-	var yyhl3500 bool = l >= 0
-	yyj3500++
-	if yyhl3500 {
-		yyb3500 = yyj3500 > l
+	var yyj3525 int
+	var yyb3525 bool
+	var yyhl3525 bool = l >= 0
+	yyj3525++
+	if yyhl3525 {
+		yyb3525 = yyj3525 > l
 	} else {
-		yyb3500 = r.CheckBreak()
+		yyb3525 = r.CheckBreak()
 	}
-	if yyb3500 {
+	if yyb3525 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -43334,13 +43625,13 @@ func (x *SecurityContext) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 		}
 		x.Capabilities.CodecDecodeSelf(d)
 	}
-	yyj3500++
-	if yyhl3500 {
-		yyb3500 = yyj3500 > l
+	yyj3525++
+	if yyhl3525 {
+		yyb3525 = yyj3525 > l
 	} else {
-		yyb3500 = r.CheckBreak()
+		yyb3525 = r.CheckBreak()
 	}
-	if yyb3500 {
+	if yyb3525 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -43353,20 +43644,20 @@ func (x *SecurityContext) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 		if x.Privileged == nil {
 			x.Privileged = new(bool)
 		}
-		yym3503 := z.DecBinary()
-		_ = yym3503
+		yym3528 := z.DecBinary()
+		_ = yym3528
 		if false {
 		} else {
 			*((*bool)(x.Privileged)) = r.DecodeBool()
 		}
 	}
-	yyj3500++
-	if yyhl3500 {
-		yyb3500 = yyj3500 > l
+	yyj3525++
+	if yyhl3525 {
+		yyb3525 = yyj3525 > l
 	} else {
-		yyb3500 = r.CheckBreak()
+		yyb3525 = r.CheckBreak()
 	}
-	if yyb3500 {
+	if yyb3525 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -43381,13 +43672,13 @@ func (x *SecurityContext) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 		}
 		x.SELinuxOptions.CodecDecodeSelf(d)
 	}
-	yyj3500++
-	if yyhl3500 {
-		yyb3500 = yyj3500 > l
+	yyj3525++
+	if yyhl3525 {
+		yyb3525 = yyj3525 > l
 	} else {
-		yyb3500 = r.CheckBreak()
+		yyb3525 = r.CheckBreak()
 	}
-	if yyb3500 {
+	if yyb3525 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -43400,20 +43691,20 @@ func (x *SecurityContext) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 		if x.RunAsUser == nil {
 			x.RunAsUser = new(int64)
 		}
-		yym3506 := z.DecBinary()
-		_ = yym3506
+		yym3531 := z.DecBinary()
+		_ = yym3531
 		if false {
 		} else {
 			*((*int64)(x.RunAsUser)) = int64(r.DecodeInt(64))
 		}
 	}
-	yyj3500++
-	if yyhl3500 {
-		yyb3500 = yyj3500 > l
+	yyj3525++
+	if yyhl3525 {
+		yyb3525 = yyj3525 > l
 	} else {
-		yyb3500 = r.CheckBreak()
+		yyb3525 = r.CheckBreak()
 	}
-	if yyb3500 {
+	if yyb3525 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -43426,25 +43717,25 @@ func (x *SecurityContext) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 		if x.RunAsNonRoot == nil {
 			x.RunAsNonRoot = new(bool)
 		}
-		yym3508 := z.DecBinary()
-		_ = yym3508
+		yym3533 := z.DecBinary()
+		_ = yym3533
 		if false {
 		} else {
 			*((*bool)(x.RunAsNonRoot)) = r.DecodeBool()
 		}
 	}
 	for {
-		yyj3500++
-		if yyhl3500 {
-			yyb3500 = yyj3500 > l
+		yyj3525++
+		if yyhl3525 {
+			yyb3525 = yyj3525 > l
 		} else {
-			yyb3500 = r.CheckBreak()
+			yyb3525 = r.CheckBreak()
 		}
-		if yyb3500 {
+		if yyb3525 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3500-1, "")
+		z.DecStructFieldNotFound(yyj3525-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -43456,38 +43747,38 @@ func (x *SELinuxOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3509 := z.EncBinary()
-		_ = yym3509
+		yym3534 := z.EncBinary()
+		_ = yym3534
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3510 := !z.EncBinary()
-			yy2arr3510 := z.EncBasicHandle().StructToArray
-			var yyq3510 [4]bool
-			_, _, _ = yysep3510, yyq3510, yy2arr3510
-			const yyr3510 bool = false
-			yyq3510[0] = x.User != ""
-			yyq3510[1] = x.Role != ""
-			yyq3510[2] = x.Type != ""
-			yyq3510[3] = x.Level != ""
-			var yynn3510 int
-			if yyr3510 || yy2arr3510 {
+			yysep3535 := !z.EncBinary()
+			yy2arr3535 := z.EncBasicHandle().StructToArray
+			var yyq3535 [4]bool
+			_, _, _ = yysep3535, yyq3535, yy2arr3535
+			const yyr3535 bool = false
+			yyq3535[0] = x.User != ""
+			yyq3535[1] = x.Role != ""
+			yyq3535[2] = x.Type != ""
+			yyq3535[3] = x.Level != ""
+			var yynn3535 int
+			if yyr3535 || yy2arr3535 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn3510 = 0
-				for _, b := range yyq3510 {
+				yynn3535 = 0
+				for _, b := range yyq3535 {
 					if b {
-						yynn3510++
+						yynn3535++
 					}
 				}
-				r.EncodeMapStart(yynn3510)
-				yynn3510 = 0
+				r.EncodeMapStart(yynn3535)
+				yynn3535 = 0
 			}
-			if yyr3510 || yy2arr3510 {
+			if yyr3535 || yy2arr3535 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3510[0] {
-					yym3512 := z.EncBinary()
-					_ = yym3512
+				if yyq3535[0] {
+					yym3537 := z.EncBinary()
+					_ = yym3537
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.User))
@@ -43496,23 +43787,23 @@ func (x *SELinuxOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3510[0] {
+				if yyq3535[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("user"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3513 := z.EncBinary()
-					_ = yym3513
+					yym3538 := z.EncBinary()
+					_ = yym3538
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.User))
 					}
 				}
 			}
-			if yyr3510 || yy2arr3510 {
+			if yyr3535 || yy2arr3535 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3510[1] {
-					yym3515 := z.EncBinary()
-					_ = yym3515
+				if yyq3535[1] {
+					yym3540 := z.EncBinary()
+					_ = yym3540
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Role))
@@ -43521,23 +43812,23 @@ func (x *SELinuxOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3510[1] {
+				if yyq3535[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("role"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3516 := z.EncBinary()
-					_ = yym3516
+					yym3541 := z.EncBinary()
+					_ = yym3541
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Role))
 					}
 				}
 			}
-			if yyr3510 || yy2arr3510 {
+			if yyr3535 || yy2arr3535 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3510[2] {
-					yym3518 := z.EncBinary()
-					_ = yym3518
+				if yyq3535[2] {
+					yym3543 := z.EncBinary()
+					_ = yym3543
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Type))
@@ -43546,23 +43837,23 @@ func (x *SELinuxOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3510[2] {
+				if yyq3535[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("type"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3519 := z.EncBinary()
-					_ = yym3519
+					yym3544 := z.EncBinary()
+					_ = yym3544
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Type))
 					}
 				}
 			}
-			if yyr3510 || yy2arr3510 {
+			if yyr3535 || yy2arr3535 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3510[3] {
-					yym3521 := z.EncBinary()
-					_ = yym3521
+				if yyq3535[3] {
+					yym3546 := z.EncBinary()
+					_ = yym3546
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Level))
@@ -43571,19 +43862,19 @@ func (x *SELinuxOptions) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3510[3] {
+				if yyq3535[3] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("level"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3522 := z.EncBinary()
-					_ = yym3522
+					yym3547 := z.EncBinary()
+					_ = yym3547
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Level))
 					}
 				}
 			}
-			if yyr3510 || yy2arr3510 {
+			if yyr3535 || yy2arr3535 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -43596,25 +43887,25 @@ func (x *SELinuxOptions) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3523 := z.DecBinary()
-	_ = yym3523
+	yym3548 := z.DecBinary()
+	_ = yym3548
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3524 := r.ContainerType()
-		if yyct3524 == codecSelferValueTypeMap1234 {
-			yyl3524 := r.ReadMapStart()
-			if yyl3524 == 0 {
+		yyct3549 := r.ContainerType()
+		if yyct3549 == codecSelferValueTypeMap1234 {
+			yyl3549 := r.ReadMapStart()
+			if yyl3549 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3524, d)
+				x.codecDecodeSelfFromMap(yyl3549, d)
 			}
-		} else if yyct3524 == codecSelferValueTypeArray1234 {
-			yyl3524 := r.ReadArrayStart()
-			if yyl3524 == 0 {
+		} else if yyct3549 == codecSelferValueTypeArray1234 {
+			yyl3549 := r.ReadArrayStart()
+			if yyl3549 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3524, d)
+				x.codecDecodeSelfFromArray(yyl3549, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -43626,12 +43917,12 @@ func (x *SELinuxOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3525Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3525Slc
-	var yyhl3525 bool = l >= 0
-	for yyj3525 := 0; ; yyj3525++ {
-		if yyhl3525 {
-			if yyj3525 >= l {
+	var yys3550Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3550Slc
+	var yyhl3550 bool = l >= 0
+	for yyj3550 := 0; ; yyj3550++ {
+		if yyhl3550 {
+			if yyj3550 >= l {
 				break
 			}
 		} else {
@@ -43640,10 +43931,10 @@ func (x *SELinuxOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3525Slc = r.DecodeBytes(yys3525Slc, true, true)
-		yys3525 := string(yys3525Slc)
+		yys3550Slc = r.DecodeBytes(yys3550Slc, true, true)
+		yys3550 := string(yys3550Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3525 {
+		switch yys3550 {
 		case "user":
 			if r.TryDecodeAsNil() {
 				x.User = ""
@@ -43669,9 +43960,9 @@ func (x *SELinuxOptions) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				x.Level = string(r.DecodeString())
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3525)
-		} // end switch yys3525
-	} // end for yyj3525
+			z.DecStructFieldNotFound(-1, yys3550)
+		} // end switch yys3550
+	} // end for yyj3550
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -43679,16 +43970,16 @@ func (x *SELinuxOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3530 int
-	var yyb3530 bool
-	var yyhl3530 bool = l >= 0
-	yyj3530++
-	if yyhl3530 {
-		yyb3530 = yyj3530 > l
+	var yyj3555 int
+	var yyb3555 bool
+	var yyhl3555 bool = l >= 0
+	yyj3555++
+	if yyhl3555 {
+		yyb3555 = yyj3555 > l
 	} else {
-		yyb3530 = r.CheckBreak()
+		yyb3555 = r.CheckBreak()
 	}
-	if yyb3530 {
+	if yyb3555 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -43698,13 +43989,13 @@ func (x *SELinuxOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.User = string(r.DecodeString())
 	}
-	yyj3530++
-	if yyhl3530 {
-		yyb3530 = yyj3530 > l
+	yyj3555++
+	if yyhl3555 {
+		yyb3555 = yyj3555 > l
 	} else {
-		yyb3530 = r.CheckBreak()
+		yyb3555 = r.CheckBreak()
 	}
-	if yyb3530 {
+	if yyb3555 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -43714,13 +44005,13 @@ func (x *SELinuxOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Role = string(r.DecodeString())
 	}
-	yyj3530++
-	if yyhl3530 {
-		yyb3530 = yyj3530 > l
+	yyj3555++
+	if yyhl3555 {
+		yyb3555 = yyj3555 > l
 	} else {
-		yyb3530 = r.CheckBreak()
+		yyb3555 = r.CheckBreak()
 	}
-	if yyb3530 {
+	if yyb3555 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -43730,13 +44021,13 @@ func (x *SELinuxOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	} else {
 		x.Type = string(r.DecodeString())
 	}
-	yyj3530++
-	if yyhl3530 {
-		yyb3530 = yyj3530 > l
+	yyj3555++
+	if yyhl3555 {
+		yyb3555 = yyj3555 > l
 	} else {
-		yyb3530 = r.CheckBreak()
+		yyb3555 = r.CheckBreak()
 	}
-	if yyb3530 {
+	if yyb3555 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -43747,17 +44038,17 @@ func (x *SELinuxOptions) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		x.Level = string(r.DecodeString())
 	}
 	for {
-		yyj3530++
-		if yyhl3530 {
-			yyb3530 = yyj3530 > l
+		yyj3555++
+		if yyhl3555 {
+			yyb3555 = yyj3555 > l
 		} else {
-			yyb3530 = r.CheckBreak()
+			yyb3555 = r.CheckBreak()
 		}
-		if yyb3530 {
+		if yyb3555 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3530-1, "")
+		z.DecStructFieldNotFound(yyj3555-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -43769,37 +44060,37 @@ func (x *RangeAllocation) CodecEncodeSelf(e *codec1978.Encoder) {
 	if x == nil {
 		r.EncodeNil()
 	} else {
-		yym3535 := z.EncBinary()
-		_ = yym3535
+		yym3560 := z.EncBinary()
+		_ = yym3560
 		if false {
 		} else if z.HasExtensions() && z.EncExt(x) {
 		} else {
-			yysep3536 := !z.EncBinary()
-			yy2arr3536 := z.EncBasicHandle().StructToArray
-			var yyq3536 [5]bool
-			_, _, _ = yysep3536, yyq3536, yy2arr3536
-			const yyr3536 bool = false
-			yyq3536[0] = x.Kind != ""
-			yyq3536[1] = x.APIVersion != ""
-			yyq3536[2] = true
-			var yynn3536 int
-			if yyr3536 || yy2arr3536 {
+			yysep3561 := !z.EncBinary()
+			yy2arr3561 := z.EncBasicHandle().StructToArray
+			var yyq3561 [5]bool
+			_, _, _ = yysep3561, yyq3561, yy2arr3561
+			const yyr3561 bool = false
+			yyq3561[0] = x.Kind != ""
+			yyq3561[1] = x.APIVersion != ""
+			yyq3561[2] = true
+			var yynn3561 int
+			if yyr3561 || yy2arr3561 {
 				r.EncodeArrayStart(5)
 			} else {
-				yynn3536 = 2
-				for _, b := range yyq3536 {
+				yynn3561 = 2
+				for _, b := range yyq3561 {
 					if b {
-						yynn3536++
+						yynn3561++
 					}
 				}
-				r.EncodeMapStart(yynn3536)
-				yynn3536 = 0
+				r.EncodeMapStart(yynn3561)
+				yynn3561 = 0
 			}
-			if yyr3536 || yy2arr3536 {
+			if yyr3561 || yy2arr3561 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3536[0] {
-					yym3538 := z.EncBinary()
-					_ = yym3538
+				if yyq3561[0] {
+					yym3563 := z.EncBinary()
+					_ = yym3563
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
@@ -43808,23 +44099,23 @@ func (x *RangeAllocation) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3536[0] {
+				if yyq3561[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("kind"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3539 := z.EncBinary()
-					_ = yym3539
+					yym3564 := z.EncBinary()
+					_ = yym3564
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Kind))
 					}
 				}
 			}
-			if yyr3536 || yy2arr3536 {
+			if yyr3561 || yy2arr3561 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3536[1] {
-					yym3541 := z.EncBinary()
-					_ = yym3541
+				if yyq3561[1] {
+					yym3566 := z.EncBinary()
+					_ = yym3566
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
@@ -43833,39 +44124,39 @@ func (x *RangeAllocation) CodecEncodeSelf(e *codec1978.Encoder) {
 					r.EncodeString(codecSelferC_UTF81234, "")
 				}
 			} else {
-				if yyq3536[1] {
+				if yyq3561[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("apiVersion"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym3542 := z.EncBinary()
-					_ = yym3542
+					yym3567 := z.EncBinary()
+					_ = yym3567
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.APIVersion))
 					}
 				}
 			}
-			if yyr3536 || yy2arr3536 {
+			if yyr3561 || yy2arr3561 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if yyq3536[2] {
-					yy3544 := &x.ObjectMeta
-					yy3544.CodecEncodeSelf(e)
+				if yyq3561[2] {
+					yy3569 := &x.ObjectMeta
+					yy3569.CodecEncodeSelf(e)
 				} else {
 					r.EncodeNil()
 				}
 			} else {
-				if yyq3536[2] {
+				if yyq3561[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("metadata"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy3545 := &x.ObjectMeta
-					yy3545.CodecEncodeSelf(e)
+					yy3570 := &x.ObjectMeta
+					yy3570.CodecEncodeSelf(e)
 				}
 			}
-			if yyr3536 || yy2arr3536 {
+			if yyr3561 || yy2arr3561 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym3547 := z.EncBinary()
-				_ = yym3547
+				yym3572 := z.EncBinary()
+				_ = yym3572
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.Range))
@@ -43874,20 +44165,20 @@ func (x *RangeAllocation) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("range"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym3548 := z.EncBinary()
-				_ = yym3548
+				yym3573 := z.EncBinary()
+				_ = yym3573
 				if false {
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, string(x.Range))
 				}
 			}
-			if yyr3536 || yy2arr3536 {
+			if yyr3561 || yy2arr3561 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if x.Data == nil {
 					r.EncodeNil()
 				} else {
-					yym3550 := z.EncBinary()
-					_ = yym3550
+					yym3575 := z.EncBinary()
+					_ = yym3575
 					if false {
 					} else {
 						r.EncodeStringBytes(codecSelferC_RAW1234, []byte(x.Data))
@@ -43900,15 +44191,15 @@ func (x *RangeAllocation) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.Data == nil {
 					r.EncodeNil()
 				} else {
-					yym3551 := z.EncBinary()
-					_ = yym3551
+					yym3576 := z.EncBinary()
+					_ = yym3576
 					if false {
 					} else {
 						r.EncodeStringBytes(codecSelferC_RAW1234, []byte(x.Data))
 					}
 				}
 			}
-			if yyr3536 || yy2arr3536 {
+			if yyr3561 || yy2arr3561 {
 				z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -43921,25 +44212,25 @@ func (x *RangeAllocation) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	yym3552 := z.DecBinary()
-	_ = yym3552
+	yym3577 := z.DecBinary()
+	_ = yym3577
 	if false {
 	} else if z.HasExtensions() && z.DecExt(x) {
 	} else {
-		yyct3553 := r.ContainerType()
-		if yyct3553 == codecSelferValueTypeMap1234 {
-			yyl3553 := r.ReadMapStart()
-			if yyl3553 == 0 {
+		yyct3578 := r.ContainerType()
+		if yyct3578 == codecSelferValueTypeMap1234 {
+			yyl3578 := r.ReadMapStart()
+			if yyl3578 == 0 {
 				z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 			} else {
-				x.codecDecodeSelfFromMap(yyl3553, d)
+				x.codecDecodeSelfFromMap(yyl3578, d)
 			}
-		} else if yyct3553 == codecSelferValueTypeArray1234 {
-			yyl3553 := r.ReadArrayStart()
-			if yyl3553 == 0 {
+		} else if yyct3578 == codecSelferValueTypeArray1234 {
+			yyl3578 := r.ReadArrayStart()
+			if yyl3578 == 0 {
 				z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 			} else {
-				x.codecDecodeSelfFromArray(yyl3553, d)
+				x.codecDecodeSelfFromArray(yyl3578, d)
 			}
 		} else {
 			panic(codecSelferOnlyMapOrArrayEncodeToStructErr1234)
@@ -43951,12 +44242,12 @@ func (x *RangeAllocation) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yys3554Slc = z.DecScratchBuffer() // default slice to decode into
-	_ = yys3554Slc
-	var yyhl3554 bool = l >= 0
-	for yyj3554 := 0; ; yyj3554++ {
-		if yyhl3554 {
-			if yyj3554 >= l {
+	var yys3579Slc = z.DecScratchBuffer() // default slice to decode into
+	_ = yys3579Slc
+	var yyhl3579 bool = l >= 0
+	for yyj3579 := 0; ; yyj3579++ {
+		if yyhl3579 {
+			if yyj3579 >= l {
 				break
 			}
 		} else {
@@ -43965,10 +44256,10 @@ func (x *RangeAllocation) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		}
 		z.DecSendContainerState(codecSelfer_containerMapKey1234)
-		yys3554Slc = r.DecodeBytes(yys3554Slc, true, true)
-		yys3554 := string(yys3554Slc)
+		yys3579Slc = r.DecodeBytes(yys3579Slc, true, true)
+		yys3579 := string(yys3579Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
-		switch yys3554 {
+		switch yys3579 {
 		case "kind":
 			if r.TryDecodeAsNil() {
 				x.Kind = ""
@@ -43985,8 +44276,8 @@ func (x *RangeAllocation) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.ObjectMeta = ObjectMeta{}
 			} else {
-				yyv3557 := &x.ObjectMeta
-				yyv3557.CodecDecodeSelf(d)
+				yyv3582 := &x.ObjectMeta
+				yyv3582.CodecDecodeSelf(d)
 			}
 		case "range":
 			if r.TryDecodeAsNil() {
@@ -43998,18 +44289,18 @@ func (x *RangeAllocation) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			if r.TryDecodeAsNil() {
 				x.Data = nil
 			} else {
-				yyv3559 := &x.Data
-				yym3560 := z.DecBinary()
-				_ = yym3560
+				yyv3584 := &x.Data
+				yym3585 := z.DecBinary()
+				_ = yym3585
 				if false {
 				} else {
-					*yyv3559 = r.DecodeBytes(*(*[]byte)(yyv3559), false, false)
+					*yyv3584 = r.DecodeBytes(*(*[]byte)(yyv3584), false, false)
 				}
 			}
 		default:
-			z.DecStructFieldNotFound(-1, yys3554)
-		} // end switch yys3554
-	} // end for yyj3554
+			z.DecStructFieldNotFound(-1, yys3579)
+		} // end switch yys3579
+	} // end for yyj3579
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
@@ -44017,16 +44308,16 @@ func (x *RangeAllocation) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj3561 int
-	var yyb3561 bool
-	var yyhl3561 bool = l >= 0
-	yyj3561++
-	if yyhl3561 {
-		yyb3561 = yyj3561 > l
+	var yyj3586 int
+	var yyb3586 bool
+	var yyhl3586 bool = l >= 0
+	yyj3586++
+	if yyhl3586 {
+		yyb3586 = yyj3586 > l
 	} else {
-		yyb3561 = r.CheckBreak()
+		yyb3586 = r.CheckBreak()
 	}
-	if yyb3561 {
+	if yyb3586 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -44036,13 +44327,13 @@ func (x *RangeAllocation) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	} else {
 		x.Kind = string(r.DecodeString())
 	}
-	yyj3561++
-	if yyhl3561 {
-		yyb3561 = yyj3561 > l
+	yyj3586++
+	if yyhl3586 {
+		yyb3586 = yyj3586 > l
 	} else {
-		yyb3561 = r.CheckBreak()
+		yyb3586 = r.CheckBreak()
 	}
-	if yyb3561 {
+	if yyb3586 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -44052,13 +44343,13 @@ func (x *RangeAllocation) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	} else {
 		x.APIVersion = string(r.DecodeString())
 	}
-	yyj3561++
-	if yyhl3561 {
-		yyb3561 = yyj3561 > l
+	yyj3586++
+	if yyhl3586 {
+		yyb3586 = yyj3586 > l
 	} else {
-		yyb3561 = r.CheckBreak()
+		yyb3586 = r.CheckBreak()
 	}
-	if yyb3561 {
+	if yyb3586 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -44066,16 +44357,16 @@ func (x *RangeAllocation) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	if r.TryDecodeAsNil() {
 		x.ObjectMeta = ObjectMeta{}
 	} else {
-		yyv3564 := &x.ObjectMeta
-		yyv3564.CodecDecodeSelf(d)
+		yyv3589 := &x.ObjectMeta
+		yyv3589.CodecDecodeSelf(d)
 	}
-	yyj3561++
-	if yyhl3561 {
-		yyb3561 = yyj3561 > l
+	yyj3586++
+	if yyhl3586 {
+		yyb3586 = yyj3586 > l
 	} else {
-		yyb3561 = r.CheckBreak()
+		yyb3586 = r.CheckBreak()
 	}
-	if yyb3561 {
+	if yyb3586 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -44085,13 +44376,13 @@ func (x *RangeAllocation) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	} else {
 		x.Range = string(r.DecodeString())
 	}
-	yyj3561++
-	if yyhl3561 {
-		yyb3561 = yyj3561 > l
+	yyj3586++
+	if yyhl3586 {
+		yyb3586 = yyj3586 > l
 	} else {
-		yyb3561 = r.CheckBreak()
+		yyb3586 = r.CheckBreak()
 	}
-	if yyb3561 {
+	if yyb3586 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -44099,26 +44390,26 @@ func (x *RangeAllocation) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	if r.TryDecodeAsNil() {
 		x.Data = nil
 	} else {
-		yyv3566 := &x.Data
-		yym3567 := z.DecBinary()
-		_ = yym3567
+		yyv3591 := &x.Data
+		yym3592 := z.DecBinary()
+		_ = yym3592
 		if false {
 		} else {
-			*yyv3566 = r.DecodeBytes(*(*[]byte)(yyv3566), false, false)
+			*yyv3591 = r.DecodeBytes(*(*[]byte)(yyv3591), false, false)
 		}
 	}
 	for {
-		yyj3561++
-		if yyhl3561 {
-			yyb3561 = yyj3561 > l
+		yyj3586++
+		if yyhl3586 {
+			yyb3586 = yyj3586 > l
 		} else {
-			yyb3561 = r.CheckBreak()
+			yyb3586 = r.CheckBreak()
 		}
-		if yyb3561 {
+		if yyb3586 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj3561-1, "")
+		z.DecStructFieldNotFound(yyj3586-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -44128,9 +44419,9 @@ func (x codecSelfer1234) encSlicePersistentVolumeAccessMode(v []PersistentVolume
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3568 := range v {
+	for _, yyv3593 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yyv3568.CodecEncodeSelf(e)
+		yyv3593.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -44140,75 +44431,75 @@ func (x codecSelfer1234) decSlicePersistentVolumeAccessMode(v *[]PersistentVolum
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3569 := *v
-	yyh3569, yyl3569 := z.DecSliceHelperStart()
-	var yyc3569 bool
-	if yyl3569 == 0 {
-		if yyv3569 == nil {
-			yyv3569 = []PersistentVolumeAccessMode{}
-			yyc3569 = true
-		} else if len(yyv3569) != 0 {
-			yyv3569 = yyv3569[:0]
-			yyc3569 = true
+	yyv3594 := *v
+	yyh3594, yyl3594 := z.DecSliceHelperStart()
+	var yyc3594 bool
+	if yyl3594 == 0 {
+		if yyv3594 == nil {
+			yyv3594 = []PersistentVolumeAccessMode{}
+			yyc3594 = true
+		} else if len(yyv3594) != 0 {
+			yyv3594 = yyv3594[:0]
+			yyc3594 = true
 		}
-	} else if yyl3569 > 0 {
-		var yyrr3569, yyrl3569 int
-		var yyrt3569 bool
-		if yyl3569 > cap(yyv3569) {
+	} else if yyl3594 > 0 {
+		var yyrr3594, yyrl3594 int
+		var yyrt3594 bool
+		if yyl3594 > cap(yyv3594) {
 
-			yyrl3569, yyrt3569 = z.DecInferLen(yyl3569, z.DecBasicHandle().MaxInitLen, 16)
-			if yyrt3569 {
-				if yyrl3569 <= cap(yyv3569) {
-					yyv3569 = yyv3569[:yyrl3569]
+			yyrl3594, yyrt3594 = z.DecInferLen(yyl3594, z.DecBasicHandle().MaxInitLen, 16)
+			if yyrt3594 {
+				if yyrl3594 <= cap(yyv3594) {
+					yyv3594 = yyv3594[:yyrl3594]
 				} else {
-					yyv3569 = make([]PersistentVolumeAccessMode, yyrl3569)
+					yyv3594 = make([]PersistentVolumeAccessMode, yyrl3594)
 				}
 			} else {
-				yyv3569 = make([]PersistentVolumeAccessMode, yyrl3569)
+				yyv3594 = make([]PersistentVolumeAccessMode, yyrl3594)
 			}
-			yyc3569 = true
-			yyrr3569 = len(yyv3569)
-		} else if yyl3569 != len(yyv3569) {
-			yyv3569 = yyv3569[:yyl3569]
-			yyc3569 = true
+			yyc3594 = true
+			yyrr3594 = len(yyv3594)
+		} else if yyl3594 != len(yyv3594) {
+			yyv3594 = yyv3594[:yyl3594]
+			yyc3594 = true
 		}
-		yyj3569 := 0
-		for ; yyj3569 < yyrr3569; yyj3569++ {
-			yyh3569.ElemContainerState(yyj3569)
+		yyj3594 := 0
+		for ; yyj3594 < yyrr3594; yyj3594++ {
+			yyh3594.ElemContainerState(yyj3594)
 			if r.TryDecodeAsNil() {
-				yyv3569[yyj3569] = ""
+				yyv3594[yyj3594] = ""
 			} else {
-				yyv3569[yyj3569] = PersistentVolumeAccessMode(r.DecodeString())
+				yyv3594[yyj3594] = PersistentVolumeAccessMode(r.DecodeString())
 			}
 
 		}
-		if yyrt3569 {
-			for ; yyj3569 < yyl3569; yyj3569++ {
-				yyv3569 = append(yyv3569, "")
-				yyh3569.ElemContainerState(yyj3569)
+		if yyrt3594 {
+			for ; yyj3594 < yyl3594; yyj3594++ {
+				yyv3594 = append(yyv3594, "")
+				yyh3594.ElemContainerState(yyj3594)
 				if r.TryDecodeAsNil() {
-					yyv3569[yyj3569] = ""
+					yyv3594[yyj3594] = ""
 				} else {
-					yyv3569[yyj3569] = PersistentVolumeAccessMode(r.DecodeString())
+					yyv3594[yyj3594] = PersistentVolumeAccessMode(r.DecodeString())
 				}
 
 			}
 		}
 
 	} else {
-		yyj3569 := 0
-		for ; !r.CheckBreak(); yyj3569++ {
+		yyj3594 := 0
+		for ; !r.CheckBreak(); yyj3594++ {
 
-			if yyj3569 >= len(yyv3569) {
-				yyv3569 = append(yyv3569, "") // var yyz3569 PersistentVolumeAccessMode
-				yyc3569 = true
+			if yyj3594 >= len(yyv3594) {
+				yyv3594 = append(yyv3594, "") // var yyz3594 PersistentVolumeAccessMode
+				yyc3594 = true
 			}
-			yyh3569.ElemContainerState(yyj3569)
-			if yyj3569 < len(yyv3569) {
+			yyh3594.ElemContainerState(yyj3594)
+			if yyj3594 < len(yyv3594) {
 				if r.TryDecodeAsNil() {
-					yyv3569[yyj3569] = ""
+					yyv3594[yyj3594] = ""
 				} else {
-					yyv3569[yyj3569] = PersistentVolumeAccessMode(r.DecodeString())
+					yyv3594[yyj3594] = PersistentVolumeAccessMode(r.DecodeString())
 				}
 
 			} else {
@@ -44216,17 +44507,17 @@ func (x codecSelfer1234) decSlicePersistentVolumeAccessMode(v *[]PersistentVolum
 			}
 
 		}
-		if yyj3569 < len(yyv3569) {
-			yyv3569 = yyv3569[:yyj3569]
-			yyc3569 = true
-		} else if yyj3569 == 0 && yyv3569 == nil {
-			yyv3569 = []PersistentVolumeAccessMode{}
-			yyc3569 = true
+		if yyj3594 < len(yyv3594) {
+			yyv3594 = yyv3594[:yyj3594]
+			yyc3594 = true
+		} else if yyj3594 == 0 && yyv3594 == nil {
+			yyv3594 = []PersistentVolumeAccessMode{}
+			yyc3594 = true
 		}
 	}
-	yyh3569.End()
-	if yyc3569 {
-		*v = yyv3569
+	yyh3594.End()
+	if yyc3594 {
+		*v = yyv3594
 	}
 }
 
@@ -44235,10 +44526,10 @@ func (x codecSelfer1234) encSlicePersistentVolume(v []PersistentVolume, e *codec
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3573 := range v {
+	for _, yyv3598 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3574 := &yyv3573
-		yy3574.CodecEncodeSelf(e)
+		yy3599 := &yyv3598
+		yy3599.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -44248,83 +44539,83 @@ func (x codecSelfer1234) decSlicePersistentVolume(v *[]PersistentVolume, d *code
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3575 := *v
-	yyh3575, yyl3575 := z.DecSliceHelperStart()
-	var yyc3575 bool
-	if yyl3575 == 0 {
-		if yyv3575 == nil {
-			yyv3575 = []PersistentVolume{}
-			yyc3575 = true
-		} else if len(yyv3575) != 0 {
-			yyv3575 = yyv3575[:0]
-			yyc3575 = true
+	yyv3600 := *v
+	yyh3600, yyl3600 := z.DecSliceHelperStart()
+	var yyc3600 bool
+	if yyl3600 == 0 {
+		if yyv3600 == nil {
+			yyv3600 = []PersistentVolume{}
+			yyc3600 = true
+		} else if len(yyv3600) != 0 {
+			yyv3600 = yyv3600[:0]
+			yyc3600 = true
 		}
-	} else if yyl3575 > 0 {
-		var yyrr3575, yyrl3575 int
-		var yyrt3575 bool
-		if yyl3575 > cap(yyv3575) {
+	} else if yyl3600 > 0 {
+		var yyrr3600, yyrl3600 int
+		var yyrt3600 bool
+		if yyl3600 > cap(yyv3600) {
 
-			yyrg3575 := len(yyv3575) > 0
-			yyv23575 := yyv3575
-			yyrl3575, yyrt3575 = z.DecInferLen(yyl3575, z.DecBasicHandle().MaxInitLen, 392)
-			if yyrt3575 {
-				if yyrl3575 <= cap(yyv3575) {
-					yyv3575 = yyv3575[:yyrl3575]
+			yyrg3600 := len(yyv3600) > 0
+			yyv23600 := yyv3600
+			yyrl3600, yyrt3600 = z.DecInferLen(yyl3600, z.DecBasicHandle().MaxInitLen, 392)
+			if yyrt3600 {
+				if yyrl3600 <= cap(yyv3600) {
+					yyv3600 = yyv3600[:yyrl3600]
 				} else {
-					yyv3575 = make([]PersistentVolume, yyrl3575)
+					yyv3600 = make([]PersistentVolume, yyrl3600)
 				}
 			} else {
-				yyv3575 = make([]PersistentVolume, yyrl3575)
+				yyv3600 = make([]PersistentVolume, yyrl3600)
 			}
-			yyc3575 = true
-			yyrr3575 = len(yyv3575)
-			if yyrg3575 {
-				copy(yyv3575, yyv23575)
+			yyc3600 = true
+			yyrr3600 = len(yyv3600)
+			if yyrg3600 {
+				copy(yyv3600, yyv23600)
 			}
-		} else if yyl3575 != len(yyv3575) {
-			yyv3575 = yyv3575[:yyl3575]
-			yyc3575 = true
+		} else if yyl3600 != len(yyv3600) {
+			yyv3600 = yyv3600[:yyl3600]
+			yyc3600 = true
 		}
-		yyj3575 := 0
-		for ; yyj3575 < yyrr3575; yyj3575++ {
-			yyh3575.ElemContainerState(yyj3575)
+		yyj3600 := 0
+		for ; yyj3600 < yyrr3600; yyj3600++ {
+			yyh3600.ElemContainerState(yyj3600)
 			if r.TryDecodeAsNil() {
-				yyv3575[yyj3575] = PersistentVolume{}
+				yyv3600[yyj3600] = PersistentVolume{}
 			} else {
-				yyv3576 := &yyv3575[yyj3575]
-				yyv3576.CodecDecodeSelf(d)
+				yyv3601 := &yyv3600[yyj3600]
+				yyv3601.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3575 {
-			for ; yyj3575 < yyl3575; yyj3575++ {
-				yyv3575 = append(yyv3575, PersistentVolume{})
-				yyh3575.ElemContainerState(yyj3575)
+		if yyrt3600 {
+			for ; yyj3600 < yyl3600; yyj3600++ {
+				yyv3600 = append(yyv3600, PersistentVolume{})
+				yyh3600.ElemContainerState(yyj3600)
 				if r.TryDecodeAsNil() {
-					yyv3575[yyj3575] = PersistentVolume{}
+					yyv3600[yyj3600] = PersistentVolume{}
 				} else {
-					yyv3577 := &yyv3575[yyj3575]
-					yyv3577.CodecDecodeSelf(d)
+					yyv3602 := &yyv3600[yyj3600]
+					yyv3602.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3575 := 0
-		for ; !r.CheckBreak(); yyj3575++ {
+		yyj3600 := 0
+		for ; !r.CheckBreak(); yyj3600++ {
 
-			if yyj3575 >= len(yyv3575) {
-				yyv3575 = append(yyv3575, PersistentVolume{}) // var yyz3575 PersistentVolume
-				yyc3575 = true
+			if yyj3600 >= len(yyv3600) {
+				yyv3600 = append(yyv3600, PersistentVolume{}) // var yyz3600 PersistentVolume
+				yyc3600 = true
 			}
-			yyh3575.ElemContainerState(yyj3575)
-			if yyj3575 < len(yyv3575) {
+			yyh3600.ElemContainerState(yyj3600)
+			if yyj3600 < len(yyv3600) {
 				if r.TryDecodeAsNil() {
-					yyv3575[yyj3575] = PersistentVolume{}
+					yyv3600[yyj3600] = PersistentVolume{}
 				} else {
-					yyv3578 := &yyv3575[yyj3575]
-					yyv3578.CodecDecodeSelf(d)
+					yyv3603 := &yyv3600[yyj3600]
+					yyv3603.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -44332,17 +44623,17 @@ func (x codecSelfer1234) decSlicePersistentVolume(v *[]PersistentVolume, d *code
 			}
 
 		}
-		if yyj3575 < len(yyv3575) {
-			yyv3575 = yyv3575[:yyj3575]
-			yyc3575 = true
-		} else if yyj3575 == 0 && yyv3575 == nil {
-			yyv3575 = []PersistentVolume{}
-			yyc3575 = true
+		if yyj3600 < len(yyv3600) {
+			yyv3600 = yyv3600[:yyj3600]
+			yyc3600 = true
+		} else if yyj3600 == 0 && yyv3600 == nil {
+			yyv3600 = []PersistentVolume{}
+			yyc3600 = true
 		}
 	}
-	yyh3575.End()
-	if yyc3575 {
-		*v = yyv3575
+	yyh3600.End()
+	if yyc3600 {
+		*v = yyv3600
 	}
 }
 
@@ -44351,10 +44642,10 @@ func (x codecSelfer1234) encSlicePersistentVolumeClaim(v []PersistentVolumeClaim
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3579 := range v {
+	for _, yyv3604 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3580 := &yyv3579
-		yy3580.CodecEncodeSelf(e)
+		yy3605 := &yyv3604
+		yy3605.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -44364,83 +44655,83 @@ func (x codecSelfer1234) decSlicePersistentVolumeClaim(v *[]PersistentVolumeClai
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3581 := *v
-	yyh3581, yyl3581 := z.DecSliceHelperStart()
-	var yyc3581 bool
-	if yyl3581 == 0 {
-		if yyv3581 == nil {
-			yyv3581 = []PersistentVolumeClaim{}
-			yyc3581 = true
-		} else if len(yyv3581) != 0 {
-			yyv3581 = yyv3581[:0]
-			yyc3581 = true
+	yyv3606 := *v
+	yyh3606, yyl3606 := z.DecSliceHelperStart()
+	var yyc3606 bool
+	if yyl3606 == 0 {
+		if yyv3606 == nil {
+			yyv3606 = []PersistentVolumeClaim{}
+			yyc3606 = true
+		} else if len(yyv3606) != 0 {
+			yyv3606 = yyv3606[:0]
+			yyc3606 = true
 		}
-	} else if yyl3581 > 0 {
-		var yyrr3581, yyrl3581 int
-		var yyrt3581 bool
-		if yyl3581 > cap(yyv3581) {
+	} else if yyl3606 > 0 {
+		var yyrr3606, yyrl3606 int
+		var yyrt3606 bool
+		if yyl3606 > cap(yyv3606) {
 
-			yyrg3581 := len(yyv3581) > 0
-			yyv23581 := yyv3581
-			yyrl3581, yyrt3581 = z.DecInferLen(yyl3581, z.DecBasicHandle().MaxInitLen, 296)
-			if yyrt3581 {
-				if yyrl3581 <= cap(yyv3581) {
-					yyv3581 = yyv3581[:yyrl3581]
+			yyrg3606 := len(yyv3606) > 0
+			yyv23606 := yyv3606
+			yyrl3606, yyrt3606 = z.DecInferLen(yyl3606, z.DecBasicHandle().MaxInitLen, 296)
+			if yyrt3606 {
+				if yyrl3606 <= cap(yyv3606) {
+					yyv3606 = yyv3606[:yyrl3606]
 				} else {
-					yyv3581 = make([]PersistentVolumeClaim, yyrl3581)
+					yyv3606 = make([]PersistentVolumeClaim, yyrl3606)
 				}
 			} else {
-				yyv3581 = make([]PersistentVolumeClaim, yyrl3581)
+				yyv3606 = make([]PersistentVolumeClaim, yyrl3606)
 			}
-			yyc3581 = true
-			yyrr3581 = len(yyv3581)
-			if yyrg3581 {
-				copy(yyv3581, yyv23581)
+			yyc3606 = true
+			yyrr3606 = len(yyv3606)
+			if yyrg3606 {
+				copy(yyv3606, yyv23606)
 			}
-		} else if yyl3581 != len(yyv3581) {
-			yyv3581 = yyv3581[:yyl3581]
-			yyc3581 = true
+		} else if yyl3606 != len(yyv3606) {
+			yyv3606 = yyv3606[:yyl3606]
+			yyc3606 = true
 		}
-		yyj3581 := 0
-		for ; yyj3581 < yyrr3581; yyj3581++ {
-			yyh3581.ElemContainerState(yyj3581)
+		yyj3606 := 0
+		for ; yyj3606 < yyrr3606; yyj3606++ {
+			yyh3606.ElemContainerState(yyj3606)
 			if r.TryDecodeAsNil() {
-				yyv3581[yyj3581] = PersistentVolumeClaim{}
+				yyv3606[yyj3606] = PersistentVolumeClaim{}
 			} else {
-				yyv3582 := &yyv3581[yyj3581]
-				yyv3582.CodecDecodeSelf(d)
+				yyv3607 := &yyv3606[yyj3606]
+				yyv3607.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3581 {
-			for ; yyj3581 < yyl3581; yyj3581++ {
-				yyv3581 = append(yyv3581, PersistentVolumeClaim{})
-				yyh3581.ElemContainerState(yyj3581)
+		if yyrt3606 {
+			for ; yyj3606 < yyl3606; yyj3606++ {
+				yyv3606 = append(yyv3606, PersistentVolumeClaim{})
+				yyh3606.ElemContainerState(yyj3606)
 				if r.TryDecodeAsNil() {
-					yyv3581[yyj3581] = PersistentVolumeClaim{}
+					yyv3606[yyj3606] = PersistentVolumeClaim{}
 				} else {
-					yyv3583 := &yyv3581[yyj3581]
-					yyv3583.CodecDecodeSelf(d)
+					yyv3608 := &yyv3606[yyj3606]
+					yyv3608.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3581 := 0
-		for ; !r.CheckBreak(); yyj3581++ {
+		yyj3606 := 0
+		for ; !r.CheckBreak(); yyj3606++ {
 
-			if yyj3581 >= len(yyv3581) {
-				yyv3581 = append(yyv3581, PersistentVolumeClaim{}) // var yyz3581 PersistentVolumeClaim
-				yyc3581 = true
+			if yyj3606 >= len(yyv3606) {
+				yyv3606 = append(yyv3606, PersistentVolumeClaim{}) // var yyz3606 PersistentVolumeClaim
+				yyc3606 = true
 			}
-			yyh3581.ElemContainerState(yyj3581)
-			if yyj3581 < len(yyv3581) {
+			yyh3606.ElemContainerState(yyj3606)
+			if yyj3606 < len(yyv3606) {
 				if r.TryDecodeAsNil() {
-					yyv3581[yyj3581] = PersistentVolumeClaim{}
+					yyv3606[yyj3606] = PersistentVolumeClaim{}
 				} else {
-					yyv3584 := &yyv3581[yyj3581]
-					yyv3584.CodecDecodeSelf(d)
+					yyv3609 := &yyv3606[yyj3606]
+					yyv3609.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -44448,17 +44739,17 @@ func (x codecSelfer1234) decSlicePersistentVolumeClaim(v *[]PersistentVolumeClai
 			}
 
 		}
-		if yyj3581 < len(yyv3581) {
-			yyv3581 = yyv3581[:yyj3581]
-			yyc3581 = true
-		} else if yyj3581 == 0 && yyv3581 == nil {
-			yyv3581 = []PersistentVolumeClaim{}
-			yyc3581 = true
+		if yyj3606 < len(yyv3606) {
+			yyv3606 = yyv3606[:yyj3606]
+			yyc3606 = true
+		} else if yyj3606 == 0 && yyv3606 == nil {
+			yyv3606 = []PersistentVolumeClaim{}
+			yyc3606 = true
 		}
 	}
-	yyh3581.End()
-	if yyc3581 {
-		*v = yyv3581
+	yyh3606.End()
+	if yyc3606 {
+		*v = yyv3606
 	}
 }
 
@@ -44467,10 +44758,10 @@ func (x codecSelfer1234) encSliceDownwardAPIVolumeFile(v []DownwardAPIVolumeFile
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3585 := range v {
+	for _, yyv3610 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3586 := &yyv3585
-		yy3586.CodecEncodeSelf(e)
+		yy3611 := &yyv3610
+		yy3611.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -44480,83 +44771,83 @@ func (x codecSelfer1234) decSliceDownwardAPIVolumeFile(v *[]DownwardAPIVolumeFil
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3587 := *v
-	yyh3587, yyl3587 := z.DecSliceHelperStart()
-	var yyc3587 bool
-	if yyl3587 == 0 {
-		if yyv3587 == nil {
-			yyv3587 = []DownwardAPIVolumeFile{}
-			yyc3587 = true
-		} else if len(yyv3587) != 0 {
-			yyv3587 = yyv3587[:0]
-			yyc3587 = true
+	yyv3612 := *v
+	yyh3612, yyl3612 := z.DecSliceHelperStart()
+	var yyc3612 bool
+	if yyl3612 == 0 {
+		if yyv3612 == nil {
+			yyv3612 = []DownwardAPIVolumeFile{}
+			yyc3612 = true
+		} else if len(yyv3612) != 0 {
+			yyv3612 = yyv3612[:0]
+			yyc3612 = true
 		}
-	} else if yyl3587 > 0 {
-		var yyrr3587, yyrl3587 int
-		var yyrt3587 bool
-		if yyl3587 > cap(yyv3587) {
+	} else if yyl3612 > 0 {
+		var yyrr3612, yyrl3612 int
+		var yyrt3612 bool
+		if yyl3612 > cap(yyv3612) {
 
-			yyrg3587 := len(yyv3587) > 0
-			yyv23587 := yyv3587
-			yyrl3587, yyrt3587 = z.DecInferLen(yyl3587, z.DecBasicHandle().MaxInitLen, 48)
-			if yyrt3587 {
-				if yyrl3587 <= cap(yyv3587) {
-					yyv3587 = yyv3587[:yyrl3587]
+			yyrg3612 := len(yyv3612) > 0
+			yyv23612 := yyv3612
+			yyrl3612, yyrt3612 = z.DecInferLen(yyl3612, z.DecBasicHandle().MaxInitLen, 48)
+			if yyrt3612 {
+				if yyrl3612 <= cap(yyv3612) {
+					yyv3612 = yyv3612[:yyrl3612]
 				} else {
-					yyv3587 = make([]DownwardAPIVolumeFile, yyrl3587)
+					yyv3612 = make([]DownwardAPIVolumeFile, yyrl3612)
 				}
 			} else {
-				yyv3587 = make([]DownwardAPIVolumeFile, yyrl3587)
+				yyv3612 = make([]DownwardAPIVolumeFile, yyrl3612)
 			}
-			yyc3587 = true
-			yyrr3587 = len(yyv3587)
-			if yyrg3587 {
-				copy(yyv3587, yyv23587)
+			yyc3612 = true
+			yyrr3612 = len(yyv3612)
+			if yyrg3612 {
+				copy(yyv3612, yyv23612)
 			}
-		} else if yyl3587 != len(yyv3587) {
-			yyv3587 = yyv3587[:yyl3587]
-			yyc3587 = true
+		} else if yyl3612 != len(yyv3612) {
+			yyv3612 = yyv3612[:yyl3612]
+			yyc3612 = true
 		}
-		yyj3587 := 0
-		for ; yyj3587 < yyrr3587; yyj3587++ {
-			yyh3587.ElemContainerState(yyj3587)
+		yyj3612 := 0
+		for ; yyj3612 < yyrr3612; yyj3612++ {
+			yyh3612.ElemContainerState(yyj3612)
 			if r.TryDecodeAsNil() {
-				yyv3587[yyj3587] = DownwardAPIVolumeFile{}
+				yyv3612[yyj3612] = DownwardAPIVolumeFile{}
 			} else {
-				yyv3588 := &yyv3587[yyj3587]
-				yyv3588.CodecDecodeSelf(d)
+				yyv3613 := &yyv3612[yyj3612]
+				yyv3613.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3587 {
-			for ; yyj3587 < yyl3587; yyj3587++ {
-				yyv3587 = append(yyv3587, DownwardAPIVolumeFile{})
-				yyh3587.ElemContainerState(yyj3587)
+		if yyrt3612 {
+			for ; yyj3612 < yyl3612; yyj3612++ {
+				yyv3612 = append(yyv3612, DownwardAPIVolumeFile{})
+				yyh3612.ElemContainerState(yyj3612)
 				if r.TryDecodeAsNil() {
-					yyv3587[yyj3587] = DownwardAPIVolumeFile{}
+					yyv3612[yyj3612] = DownwardAPIVolumeFile{}
 				} else {
-					yyv3589 := &yyv3587[yyj3587]
-					yyv3589.CodecDecodeSelf(d)
+					yyv3614 := &yyv3612[yyj3612]
+					yyv3614.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3587 := 0
-		for ; !r.CheckBreak(); yyj3587++ {
+		yyj3612 := 0
+		for ; !r.CheckBreak(); yyj3612++ {
 
-			if yyj3587 >= len(yyv3587) {
-				yyv3587 = append(yyv3587, DownwardAPIVolumeFile{}) // var yyz3587 DownwardAPIVolumeFile
-				yyc3587 = true
+			if yyj3612 >= len(yyv3612) {
+				yyv3612 = append(yyv3612, DownwardAPIVolumeFile{}) // var yyz3612 DownwardAPIVolumeFile
+				yyc3612 = true
 			}
-			yyh3587.ElemContainerState(yyj3587)
-			if yyj3587 < len(yyv3587) {
+			yyh3612.ElemContainerState(yyj3612)
+			if yyj3612 < len(yyv3612) {
 				if r.TryDecodeAsNil() {
-					yyv3587[yyj3587] = DownwardAPIVolumeFile{}
+					yyv3612[yyj3612] = DownwardAPIVolumeFile{}
 				} else {
-					yyv3590 := &yyv3587[yyj3587]
-					yyv3590.CodecDecodeSelf(d)
+					yyv3615 := &yyv3612[yyj3612]
+					yyv3615.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -44564,17 +44855,17 @@ func (x codecSelfer1234) decSliceDownwardAPIVolumeFile(v *[]DownwardAPIVolumeFil
 			}
 
 		}
-		if yyj3587 < len(yyv3587) {
-			yyv3587 = yyv3587[:yyj3587]
-			yyc3587 = true
-		} else if yyj3587 == 0 && yyv3587 == nil {
-			yyv3587 = []DownwardAPIVolumeFile{}
-			yyc3587 = true
+		if yyj3612 < len(yyv3612) {
+			yyv3612 = yyv3612[:yyj3612]
+			yyc3612 = true
+		} else if yyj3612 == 0 && yyv3612 == nil {
+			yyv3612 = []DownwardAPIVolumeFile{}
+			yyc3612 = true
 		}
 	}
-	yyh3587.End()
-	if yyc3587 {
-		*v = yyv3587
+	yyh3612.End()
+	if yyc3612 {
+		*v = yyv3612
 	}
 }
 
@@ -44583,9 +44874,9 @@ func (x codecSelfer1234) encSliceCapability(v []Capability, e *codec1978.Encoder
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3591 := range v {
+	for _, yyv3616 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yyv3591.CodecEncodeSelf(e)
+		yyv3616.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -44595,75 +44886,75 @@ func (x codecSelfer1234) decSliceCapability(v *[]Capability, d *codec1978.Decode
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3592 := *v
-	yyh3592, yyl3592 := z.DecSliceHelperStart()
-	var yyc3592 bool
-	if yyl3592 == 0 {
-		if yyv3592 == nil {
-			yyv3592 = []Capability{}
-			yyc3592 = true
-		} else if len(yyv3592) != 0 {
-			yyv3592 = yyv3592[:0]
-			yyc3592 = true
+	yyv3617 := *v
+	yyh3617, yyl3617 := z.DecSliceHelperStart()
+	var yyc3617 bool
+	if yyl3617 == 0 {
+		if yyv3617 == nil {
+			yyv3617 = []Capability{}
+			yyc3617 = true
+		} else if len(yyv3617) != 0 {
+			yyv3617 = yyv3617[:0]
+			yyc3617 = true
 		}
-	} else if yyl3592 > 0 {
-		var yyrr3592, yyrl3592 int
-		var yyrt3592 bool
-		if yyl3592 > cap(yyv3592) {
+	} else if yyl3617 > 0 {
+		var yyrr3617, yyrl3617 int
+		var yyrt3617 bool
+		if yyl3617 > cap(yyv3617) {
 
-			yyrl3592, yyrt3592 = z.DecInferLen(yyl3592, z.DecBasicHandle().MaxInitLen, 16)
-			if yyrt3592 {
-				if yyrl3592 <= cap(yyv3592) {
-					yyv3592 = yyv3592[:yyrl3592]
+			yyrl3617, yyrt3617 = z.DecInferLen(yyl3617, z.DecBasicHandle().MaxInitLen, 16)
+			if yyrt3617 {
+				if yyrl3617 <= cap(yyv3617) {
+					yyv3617 = yyv3617[:yyrl3617]
 				} else {
-					yyv3592 = make([]Capability, yyrl3592)
+					yyv3617 = make([]Capability, yyrl3617)
 				}
 			} else {
-				yyv3592 = make([]Capability, yyrl3592)
+				yyv3617 = make([]Capability, yyrl3617)
 			}
-			yyc3592 = true
-			yyrr3592 = len(yyv3592)
-		} else if yyl3592 != len(yyv3592) {
-			yyv3592 = yyv3592[:yyl3592]
-			yyc3592 = true
+			yyc3617 = true
+			yyrr3617 = len(yyv3617)
+		} else if yyl3617 != len(yyv3617) {
+			yyv3617 = yyv3617[:yyl3617]
+			yyc3617 = true
 		}
-		yyj3592 := 0
-		for ; yyj3592 < yyrr3592; yyj3592++ {
-			yyh3592.ElemContainerState(yyj3592)
+		yyj3617 := 0
+		for ; yyj3617 < yyrr3617; yyj3617++ {
+			yyh3617.ElemContainerState(yyj3617)
 			if r.TryDecodeAsNil() {
-				yyv3592[yyj3592] = ""
+				yyv3617[yyj3617] = ""
 			} else {
-				yyv3592[yyj3592] = Capability(r.DecodeString())
+				yyv3617[yyj3617] = Capability(r.DecodeString())
 			}
 
 		}
-		if yyrt3592 {
-			for ; yyj3592 < yyl3592; yyj3592++ {
-				yyv3592 = append(yyv3592, "")
-				yyh3592.ElemContainerState(yyj3592)
+		if yyrt3617 {
+			for ; yyj3617 < yyl3617; yyj3617++ {
+				yyv3617 = append(yyv3617, "")
+				yyh3617.ElemContainerState(yyj3617)
 				if r.TryDecodeAsNil() {
-					yyv3592[yyj3592] = ""
+					yyv3617[yyj3617] = ""
 				} else {
-					yyv3592[yyj3592] = Capability(r.DecodeString())
+					yyv3617[yyj3617] = Capability(r.DecodeString())
 				}
 
 			}
 		}
 
 	} else {
-		yyj3592 := 0
-		for ; !r.CheckBreak(); yyj3592++ {
+		yyj3617 := 0
+		for ; !r.CheckBreak(); yyj3617++ {
 
-			if yyj3592 >= len(yyv3592) {
-				yyv3592 = append(yyv3592, "") // var yyz3592 Capability
-				yyc3592 = true
+			if yyj3617 >= len(yyv3617) {
+				yyv3617 = append(yyv3617, "") // var yyz3617 Capability
+				yyc3617 = true
 			}
-			yyh3592.ElemContainerState(yyj3592)
-			if yyj3592 < len(yyv3592) {
+			yyh3617.ElemContainerState(yyj3617)
+			if yyj3617 < len(yyv3617) {
 				if r.TryDecodeAsNil() {
-					yyv3592[yyj3592] = ""
+					yyv3617[yyj3617] = ""
 				} else {
-					yyv3592[yyj3592] = Capability(r.DecodeString())
+					yyv3617[yyj3617] = Capability(r.DecodeString())
 				}
 
 			} else {
@@ -44671,17 +44962,17 @@ func (x codecSelfer1234) decSliceCapability(v *[]Capability, d *codec1978.Decode
 			}
 
 		}
-		if yyj3592 < len(yyv3592) {
-			yyv3592 = yyv3592[:yyj3592]
-			yyc3592 = true
-		} else if yyj3592 == 0 && yyv3592 == nil {
-			yyv3592 = []Capability{}
-			yyc3592 = true
+		if yyj3617 < len(yyv3617) {
+			yyv3617 = yyv3617[:yyj3617]
+			yyc3617 = true
+		} else if yyj3617 == 0 && yyv3617 == nil {
+			yyv3617 = []Capability{}
+			yyc3617 = true
 		}
 	}
-	yyh3592.End()
-	if yyc3592 {
-		*v = yyv3592
+	yyh3617.End()
+	if yyc3617 {
+		*v = yyv3617
 	}
 }
 
@@ -44690,10 +44981,10 @@ func (x codecSelfer1234) encSliceContainerPort(v []ContainerPort, e *codec1978.E
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3596 := range v {
+	for _, yyv3621 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3597 := &yyv3596
-		yy3597.CodecEncodeSelf(e)
+		yy3622 := &yyv3621
+		yy3622.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -44703,83 +44994,83 @@ func (x codecSelfer1234) decSliceContainerPort(v *[]ContainerPort, d *codec1978.
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3598 := *v
-	yyh3598, yyl3598 := z.DecSliceHelperStart()
-	var yyc3598 bool
-	if yyl3598 == 0 {
-		if yyv3598 == nil {
-			yyv3598 = []ContainerPort{}
-			yyc3598 = true
-		} else if len(yyv3598) != 0 {
-			yyv3598 = yyv3598[:0]
-			yyc3598 = true
+	yyv3623 := *v
+	yyh3623, yyl3623 := z.DecSliceHelperStart()
+	var yyc3623 bool
+	if yyl3623 == 0 {
+		if yyv3623 == nil {
+			yyv3623 = []ContainerPort{}
+			yyc3623 = true
+		} else if len(yyv3623) != 0 {
+			yyv3623 = yyv3623[:0]
+			yyc3623 = true
 		}
-	} else if yyl3598 > 0 {
-		var yyrr3598, yyrl3598 int
-		var yyrt3598 bool
-		if yyl3598 > cap(yyv3598) {
+	} else if yyl3623 > 0 {
+		var yyrr3623, yyrl3623 int
+		var yyrt3623 bool
+		if yyl3623 > cap(yyv3623) {
 
-			yyrg3598 := len(yyv3598) > 0
-			yyv23598 := yyv3598
-			yyrl3598, yyrt3598 = z.DecInferLen(yyl3598, z.DecBasicHandle().MaxInitLen, 64)
-			if yyrt3598 {
-				if yyrl3598 <= cap(yyv3598) {
-					yyv3598 = yyv3598[:yyrl3598]
+			yyrg3623 := len(yyv3623) > 0
+			yyv23623 := yyv3623
+			yyrl3623, yyrt3623 = z.DecInferLen(yyl3623, z.DecBasicHandle().MaxInitLen, 64)
+			if yyrt3623 {
+				if yyrl3623 <= cap(yyv3623) {
+					yyv3623 = yyv3623[:yyrl3623]
 				} else {
-					yyv3598 = make([]ContainerPort, yyrl3598)
+					yyv3623 = make([]ContainerPort, yyrl3623)
 				}
 			} else {
-				yyv3598 = make([]ContainerPort, yyrl3598)
+				yyv3623 = make([]ContainerPort, yyrl3623)
 			}
-			yyc3598 = true
-			yyrr3598 = len(yyv3598)
-			if yyrg3598 {
-				copy(yyv3598, yyv23598)
+			yyc3623 = true
+			yyrr3623 = len(yyv3623)
+			if yyrg3623 {
+				copy(yyv3623, yyv23623)
 			}
-		} else if yyl3598 != len(yyv3598) {
-			yyv3598 = yyv3598[:yyl3598]
-			yyc3598 = true
+		} else if yyl3623 != len(yyv3623) {
+			yyv3623 = yyv3623[:yyl3623]
+			yyc3623 = true
 		}
-		yyj3598 := 0
-		for ; yyj3598 < yyrr3598; yyj3598++ {
-			yyh3598.ElemContainerState(yyj3598)
+		yyj3623 := 0
+		for ; yyj3623 < yyrr3623; yyj3623++ {
+			yyh3623.ElemContainerState(yyj3623)
 			if r.TryDecodeAsNil() {
-				yyv3598[yyj3598] = ContainerPort{}
+				yyv3623[yyj3623] = ContainerPort{}
 			} else {
-				yyv3599 := &yyv3598[yyj3598]
-				yyv3599.CodecDecodeSelf(d)
+				yyv3624 := &yyv3623[yyj3623]
+				yyv3624.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3598 {
-			for ; yyj3598 < yyl3598; yyj3598++ {
-				yyv3598 = append(yyv3598, ContainerPort{})
-				yyh3598.ElemContainerState(yyj3598)
+		if yyrt3623 {
+			for ; yyj3623 < yyl3623; yyj3623++ {
+				yyv3623 = append(yyv3623, ContainerPort{})
+				yyh3623.ElemContainerState(yyj3623)
 				if r.TryDecodeAsNil() {
-					yyv3598[yyj3598] = ContainerPort{}
+					yyv3623[yyj3623] = ContainerPort{}
 				} else {
-					yyv3600 := &yyv3598[yyj3598]
-					yyv3600.CodecDecodeSelf(d)
+					yyv3625 := &yyv3623[yyj3623]
+					yyv3625.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3598 := 0
-		for ; !r.CheckBreak(); yyj3598++ {
+		yyj3623 := 0
+		for ; !r.CheckBreak(); yyj3623++ {
 
-			if yyj3598 >= len(yyv3598) {
-				yyv3598 = append(yyv3598, ContainerPort{}) // var yyz3598 ContainerPort
-				yyc3598 = true
+			if yyj3623 >= len(yyv3623) {
+				yyv3623 = append(yyv3623, ContainerPort{}) // var yyz3623 ContainerPort
+				yyc3623 = true
 			}
-			yyh3598.ElemContainerState(yyj3598)
-			if yyj3598 < len(yyv3598) {
+			yyh3623.ElemContainerState(yyj3623)
+			if yyj3623 < len(yyv3623) {
 				if r.TryDecodeAsNil() {
-					yyv3598[yyj3598] = ContainerPort{}
+					yyv3623[yyj3623] = ContainerPort{}
 				} else {
-					yyv3601 := &yyv3598[yyj3598]
-					yyv3601.CodecDecodeSelf(d)
+					yyv3626 := &yyv3623[yyj3623]
+					yyv3626.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -44787,17 +45078,17 @@ func (x codecSelfer1234) decSliceContainerPort(v *[]ContainerPort, d *codec1978.
 			}
 
 		}
-		if yyj3598 < len(yyv3598) {
-			yyv3598 = yyv3598[:yyj3598]
-			yyc3598 = true
-		} else if yyj3598 == 0 && yyv3598 == nil {
-			yyv3598 = []ContainerPort{}
-			yyc3598 = true
+		if yyj3623 < len(yyv3623) {
+			yyv3623 = yyv3623[:yyj3623]
+			yyc3623 = true
+		} else if yyj3623 == 0 && yyv3623 == nil {
+			yyv3623 = []ContainerPort{}
+			yyc3623 = true
 		}
 	}
-	yyh3598.End()
-	if yyc3598 {
-		*v = yyv3598
+	yyh3623.End()
+	if yyc3623 {
+		*v = yyv3623
 	}
 }
 
@@ -44806,10 +45097,10 @@ func (x codecSelfer1234) encSliceEnvVar(v []EnvVar, e *codec1978.Encoder) {
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3602 := range v {
+	for _, yyv3627 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3603 := &yyv3602
-		yy3603.CodecEncodeSelf(e)
+		yy3628 := &yyv3627
+		yy3628.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -44819,83 +45110,83 @@ func (x codecSelfer1234) decSliceEnvVar(v *[]EnvVar, d *codec1978.Decoder) {
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3604 := *v
-	yyh3604, yyl3604 := z.DecSliceHelperStart()
-	var yyc3604 bool
-	if yyl3604 == 0 {
-		if yyv3604 == nil {
-			yyv3604 = []EnvVar{}
-			yyc3604 = true
-		} else if len(yyv3604) != 0 {
-			yyv3604 = yyv3604[:0]
-			yyc3604 = true
+	yyv3629 := *v
+	yyh3629, yyl3629 := z.DecSliceHelperStart()
+	var yyc3629 bool
+	if yyl3629 == 0 {
+		if yyv3629 == nil {
+			yyv3629 = []EnvVar{}
+			yyc3629 = true
+		} else if len(yyv3629) != 0 {
+			yyv3629 = yyv3629[:0]
+			yyc3629 = true
 		}
-	} else if yyl3604 > 0 {
-		var yyrr3604, yyrl3604 int
-		var yyrt3604 bool
-		if yyl3604 > cap(yyv3604) {
+	} else if yyl3629 > 0 {
+		var yyrr3629, yyrl3629 int
+		var yyrt3629 bool
+		if yyl3629 > cap(yyv3629) {
 
-			yyrg3604 := len(yyv3604) > 0
-			yyv23604 := yyv3604
-			yyrl3604, yyrt3604 = z.DecInferLen(yyl3604, z.DecBasicHandle().MaxInitLen, 40)
-			if yyrt3604 {
-				if yyrl3604 <= cap(yyv3604) {
-					yyv3604 = yyv3604[:yyrl3604]
+			yyrg3629 := len(yyv3629) > 0
+			yyv23629 := yyv3629
+			yyrl3629, yyrt3629 = z.DecInferLen(yyl3629, z.DecBasicHandle().MaxInitLen, 40)
+			if yyrt3629 {
+				if yyrl3629 <= cap(yyv3629) {
+					yyv3629 = yyv3629[:yyrl3629]
 				} else {
-					yyv3604 = make([]EnvVar, yyrl3604)
+					yyv3629 = make([]EnvVar, yyrl3629)
 				}
 			} else {
-				yyv3604 = make([]EnvVar, yyrl3604)
+				yyv3629 = make([]EnvVar, yyrl3629)
 			}
-			yyc3604 = true
-			yyrr3604 = len(yyv3604)
-			if yyrg3604 {
-				copy(yyv3604, yyv23604)
+			yyc3629 = true
+			yyrr3629 = len(yyv3629)
+			if yyrg3629 {
+				copy(yyv3629, yyv23629)
 			}
-		} else if yyl3604 != len(yyv3604) {
-			yyv3604 = yyv3604[:yyl3604]
-			yyc3604 = true
+		} else if yyl3629 != len(yyv3629) {
+			yyv3629 = yyv3629[:yyl3629]
+			yyc3629 = true
 		}
-		yyj3604 := 0
-		for ; yyj3604 < yyrr3604; yyj3604++ {
-			yyh3604.ElemContainerState(yyj3604)
+		yyj3629 := 0
+		for ; yyj3629 < yyrr3629; yyj3629++ {
+			yyh3629.ElemContainerState(yyj3629)
 			if r.TryDecodeAsNil() {
-				yyv3604[yyj3604] = EnvVar{}
+				yyv3629[yyj3629] = EnvVar{}
 			} else {
-				yyv3605 := &yyv3604[yyj3604]
-				yyv3605.CodecDecodeSelf(d)
+				yyv3630 := &yyv3629[yyj3629]
+				yyv3630.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3604 {
-			for ; yyj3604 < yyl3604; yyj3604++ {
-				yyv3604 = append(yyv3604, EnvVar{})
-				yyh3604.ElemContainerState(yyj3604)
+		if yyrt3629 {
+			for ; yyj3629 < yyl3629; yyj3629++ {
+				yyv3629 = append(yyv3629, EnvVar{})
+				yyh3629.ElemContainerState(yyj3629)
 				if r.TryDecodeAsNil() {
-					yyv3604[yyj3604] = EnvVar{}
+					yyv3629[yyj3629] = EnvVar{}
 				} else {
-					yyv3606 := &yyv3604[yyj3604]
-					yyv3606.CodecDecodeSelf(d)
+					yyv3631 := &yyv3629[yyj3629]
+					yyv3631.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3604 := 0
-		for ; !r.CheckBreak(); yyj3604++ {
+		yyj3629 := 0
+		for ; !r.CheckBreak(); yyj3629++ {
 
-			if yyj3604 >= len(yyv3604) {
-				yyv3604 = append(yyv3604, EnvVar{}) // var yyz3604 EnvVar
-				yyc3604 = true
+			if yyj3629 >= len(yyv3629) {
+				yyv3629 = append(yyv3629, EnvVar{}) // var yyz3629 EnvVar
+				yyc3629 = true
 			}
-			yyh3604.ElemContainerState(yyj3604)
-			if yyj3604 < len(yyv3604) {
+			yyh3629.ElemContainerState(yyj3629)
+			if yyj3629 < len(yyv3629) {
 				if r.TryDecodeAsNil() {
-					yyv3604[yyj3604] = EnvVar{}
+					yyv3629[yyj3629] = EnvVar{}
 				} else {
-					yyv3607 := &yyv3604[yyj3604]
-					yyv3607.CodecDecodeSelf(d)
+					yyv3632 := &yyv3629[yyj3629]
+					yyv3632.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -44903,17 +45194,17 @@ func (x codecSelfer1234) decSliceEnvVar(v *[]EnvVar, d *codec1978.Decoder) {
 			}
 
 		}
-		if yyj3604 < len(yyv3604) {
-			yyv3604 = yyv3604[:yyj3604]
-			yyc3604 = true
-		} else if yyj3604 == 0 && yyv3604 == nil {
-			yyv3604 = []EnvVar{}
-			yyc3604 = true
+		if yyj3629 < len(yyv3629) {
+			yyv3629 = yyv3629[:yyj3629]
+			yyc3629 = true
+		} else if yyj3629 == 0 && yyv3629 == nil {
+			yyv3629 = []EnvVar{}
+			yyc3629 = true
 		}
 	}
-	yyh3604.End()
-	if yyc3604 {
-		*v = yyv3604
+	yyh3629.End()
+	if yyc3629 {
+		*v = yyv3629
 	}
 }
 
@@ -44922,10 +45213,10 @@ func (x codecSelfer1234) encSliceVolumeMount(v []VolumeMount, e *codec1978.Encod
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3608 := range v {
+	for _, yyv3633 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3609 := &yyv3608
-		yy3609.CodecEncodeSelf(e)
+		yy3634 := &yyv3633
+		yy3634.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -44935,83 +45226,83 @@ func (x codecSelfer1234) decSliceVolumeMount(v *[]VolumeMount, d *codec1978.Deco
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3610 := *v
-	yyh3610, yyl3610 := z.DecSliceHelperStart()
-	var yyc3610 bool
-	if yyl3610 == 0 {
-		if yyv3610 == nil {
-			yyv3610 = []VolumeMount{}
-			yyc3610 = true
-		} else if len(yyv3610) != 0 {
-			yyv3610 = yyv3610[:0]
-			yyc3610 = true
+	yyv3635 := *v
+	yyh3635, yyl3635 := z.DecSliceHelperStart()
+	var yyc3635 bool
+	if yyl3635 == 0 {
+		if yyv3635 == nil {
+			yyv3635 = []VolumeMount{}
+			yyc3635 = true
+		} else if len(yyv3635) != 0 {
+			yyv3635 = yyv3635[:0]
+			yyc3635 = true
 		}
-	} else if yyl3610 > 0 {
-		var yyrr3610, yyrl3610 int
-		var yyrt3610 bool
-		if yyl3610 > cap(yyv3610) {
+	} else if yyl3635 > 0 {
+		var yyrr3635, yyrl3635 int
+		var yyrt3635 bool
+		if yyl3635 > cap(yyv3635) {
 
-			yyrg3610 := len(yyv3610) > 0
-			yyv23610 := yyv3610
-			yyrl3610, yyrt3610 = z.DecInferLen(yyl3610, z.DecBasicHandle().MaxInitLen, 40)
-			if yyrt3610 {
-				if yyrl3610 <= cap(yyv3610) {
-					yyv3610 = yyv3610[:yyrl3610]
+			yyrg3635 := len(yyv3635) > 0
+			yyv23635 := yyv3635
+			yyrl3635, yyrt3635 = z.DecInferLen(yyl3635, z.DecBasicHandle().MaxInitLen, 40)
+			if yyrt3635 {
+				if yyrl3635 <= cap(yyv3635) {
+					yyv3635 = yyv3635[:yyrl3635]
 				} else {
-					yyv3610 = make([]VolumeMount, yyrl3610)
+					yyv3635 = make([]VolumeMount, yyrl3635)
 				}
 			} else {
-				yyv3610 = make([]VolumeMount, yyrl3610)
+				yyv3635 = make([]VolumeMount, yyrl3635)
 			}
-			yyc3610 = true
-			yyrr3610 = len(yyv3610)
-			if yyrg3610 {
-				copy(yyv3610, yyv23610)
+			yyc3635 = true
+			yyrr3635 = len(yyv3635)
+			if yyrg3635 {
+				copy(yyv3635, yyv23635)
 			}
-		} else if yyl3610 != len(yyv3610) {
-			yyv3610 = yyv3610[:yyl3610]
-			yyc3610 = true
+		} else if yyl3635 != len(yyv3635) {
+			yyv3635 = yyv3635[:yyl3635]
+			yyc3635 = true
 		}
-		yyj3610 := 0
-		for ; yyj3610 < yyrr3610; yyj3610++ {
-			yyh3610.ElemContainerState(yyj3610)
+		yyj3635 := 0
+		for ; yyj3635 < yyrr3635; yyj3635++ {
+			yyh3635.ElemContainerState(yyj3635)
 			if r.TryDecodeAsNil() {
-				yyv3610[yyj3610] = VolumeMount{}
+				yyv3635[yyj3635] = VolumeMount{}
 			} else {
-				yyv3611 := &yyv3610[yyj3610]
-				yyv3611.CodecDecodeSelf(d)
+				yyv3636 := &yyv3635[yyj3635]
+				yyv3636.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3610 {
-			for ; yyj3610 < yyl3610; yyj3610++ {
-				yyv3610 = append(yyv3610, VolumeMount{})
-				yyh3610.ElemContainerState(yyj3610)
+		if yyrt3635 {
+			for ; yyj3635 < yyl3635; yyj3635++ {
+				yyv3635 = append(yyv3635, VolumeMount{})
+				yyh3635.ElemContainerState(yyj3635)
 				if r.TryDecodeAsNil() {
-					yyv3610[yyj3610] = VolumeMount{}
+					yyv3635[yyj3635] = VolumeMount{}
 				} else {
-					yyv3612 := &yyv3610[yyj3610]
-					yyv3612.CodecDecodeSelf(d)
+					yyv3637 := &yyv3635[yyj3635]
+					yyv3637.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3610 := 0
-		for ; !r.CheckBreak(); yyj3610++ {
+		yyj3635 := 0
+		for ; !r.CheckBreak(); yyj3635++ {
 
-			if yyj3610 >= len(yyv3610) {
-				yyv3610 = append(yyv3610, VolumeMount{}) // var yyz3610 VolumeMount
-				yyc3610 = true
+			if yyj3635 >= len(yyv3635) {
+				yyv3635 = append(yyv3635, VolumeMount{}) // var yyz3635 VolumeMount
+				yyc3635 = true
 			}
-			yyh3610.ElemContainerState(yyj3610)
-			if yyj3610 < len(yyv3610) {
+			yyh3635.ElemContainerState(yyj3635)
+			if yyj3635 < len(yyv3635) {
 				if r.TryDecodeAsNil() {
-					yyv3610[yyj3610] = VolumeMount{}
+					yyv3635[yyj3635] = VolumeMount{}
 				} else {
-					yyv3613 := &yyv3610[yyj3610]
-					yyv3613.CodecDecodeSelf(d)
+					yyv3638 := &yyv3635[yyj3635]
+					yyv3638.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -45019,17 +45310,17 @@ func (x codecSelfer1234) decSliceVolumeMount(v *[]VolumeMount, d *codec1978.Deco
 			}
 
 		}
-		if yyj3610 < len(yyv3610) {
-			yyv3610 = yyv3610[:yyj3610]
-			yyc3610 = true
-		} else if yyj3610 == 0 && yyv3610 == nil {
-			yyv3610 = []VolumeMount{}
-			yyc3610 = true
+		if yyj3635 < len(yyv3635) {
+			yyv3635 = yyv3635[:yyj3635]
+			yyc3635 = true
+		} else if yyj3635 == 0 && yyv3635 == nil {
+			yyv3635 = []VolumeMount{}
+			yyc3635 = true
 		}
 	}
-	yyh3610.End()
-	if yyc3610 {
-		*v = yyv3610
+	yyh3635.End()
+	if yyc3635 {
+		*v = yyv3635
 	}
 }
 
@@ -45038,10 +45329,10 @@ func (x codecSelfer1234) encSlicePod(v []Pod, e *codec1978.Encoder) {
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3614 := range v {
+	for _, yyv3639 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3615 := &yyv3614
-		yy3615.CodecEncodeSelf(e)
+		yy3640 := &yyv3639
+		yy3640.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -45051,83 +45342,83 @@ func (x codecSelfer1234) decSlicePod(v *[]Pod, d *codec1978.Decoder) {
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3616 := *v
-	yyh3616, yyl3616 := z.DecSliceHelperStart()
-	var yyc3616 bool
-	if yyl3616 == 0 {
-		if yyv3616 == nil {
-			yyv3616 = []Pod{}
-			yyc3616 = true
-		} else if len(yyv3616) != 0 {
-			yyv3616 = yyv3616[:0]
-			yyc3616 = true
+	yyv3641 := *v
+	yyh3641, yyl3641 := z.DecSliceHelperStart()
+	var yyc3641 bool
+	if yyl3641 == 0 {
+		if yyv3641 == nil {
+			yyv3641 = []Pod{}
+			yyc3641 = true
+		} else if len(yyv3641) != 0 {
+			yyv3641 = yyv3641[:0]
+			yyc3641 = true
 		}
-	} else if yyl3616 > 0 {
-		var yyrr3616, yyrl3616 int
-		var yyrt3616 bool
-		if yyl3616 > cap(yyv3616) {
+	} else if yyl3641 > 0 {
+		var yyrr3641, yyrl3641 int
+		var yyrt3641 bool
+		if yyl3641 > cap(yyv3641) {
 
-			yyrg3616 := len(yyv3616) > 0
-			yyv23616 := yyv3616
-			yyrl3616, yyrt3616 = z.DecInferLen(yyl3616, z.DecBasicHandle().MaxInitLen, 496)
-			if yyrt3616 {
-				if yyrl3616 <= cap(yyv3616) {
-					yyv3616 = yyv3616[:yyrl3616]
+			yyrg3641 := len(yyv3641) > 0
+			yyv23641 := yyv3641
+			yyrl3641, yyrt3641 = z.DecInferLen(yyl3641, z.DecBasicHandle().MaxInitLen, 496)
+			if yyrt3641 {
+				if yyrl3641 <= cap(yyv3641) {
+					yyv3641 = yyv3641[:yyrl3641]
 				} else {
-					yyv3616 = make([]Pod, yyrl3616)
+					yyv3641 = make([]Pod, yyrl3641)
 				}
 			} else {
-				yyv3616 = make([]Pod, yyrl3616)
+				yyv3641 = make([]Pod, yyrl3641)
 			}
-			yyc3616 = true
-			yyrr3616 = len(yyv3616)
-			if yyrg3616 {
-				copy(yyv3616, yyv23616)
+			yyc3641 = true
+			yyrr3641 = len(yyv3641)
+			if yyrg3641 {
+				copy(yyv3641, yyv23641)
 			}
-		} else if yyl3616 != len(yyv3616) {
-			yyv3616 = yyv3616[:yyl3616]
-			yyc3616 = true
+		} else if yyl3641 != len(yyv3641) {
+			yyv3641 = yyv3641[:yyl3641]
+			yyc3641 = true
 		}
-		yyj3616 := 0
-		for ; yyj3616 < yyrr3616; yyj3616++ {
-			yyh3616.ElemContainerState(yyj3616)
+		yyj3641 := 0
+		for ; yyj3641 < yyrr3641; yyj3641++ {
+			yyh3641.ElemContainerState(yyj3641)
 			if r.TryDecodeAsNil() {
-				yyv3616[yyj3616] = Pod{}
+				yyv3641[yyj3641] = Pod{}
 			} else {
-				yyv3617 := &yyv3616[yyj3616]
-				yyv3617.CodecDecodeSelf(d)
+				yyv3642 := &yyv3641[yyj3641]
+				yyv3642.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3616 {
-			for ; yyj3616 < yyl3616; yyj3616++ {
-				yyv3616 = append(yyv3616, Pod{})
-				yyh3616.ElemContainerState(yyj3616)
+		if yyrt3641 {
+			for ; yyj3641 < yyl3641; yyj3641++ {
+				yyv3641 = append(yyv3641, Pod{})
+				yyh3641.ElemContainerState(yyj3641)
 				if r.TryDecodeAsNil() {
-					yyv3616[yyj3616] = Pod{}
+					yyv3641[yyj3641] = Pod{}
 				} else {
-					yyv3618 := &yyv3616[yyj3616]
-					yyv3618.CodecDecodeSelf(d)
+					yyv3643 := &yyv3641[yyj3641]
+					yyv3643.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3616 := 0
-		for ; !r.CheckBreak(); yyj3616++ {
+		yyj3641 := 0
+		for ; !r.CheckBreak(); yyj3641++ {
 
-			if yyj3616 >= len(yyv3616) {
-				yyv3616 = append(yyv3616, Pod{}) // var yyz3616 Pod
-				yyc3616 = true
+			if yyj3641 >= len(yyv3641) {
+				yyv3641 = append(yyv3641, Pod{}) // var yyz3641 Pod
+				yyc3641 = true
 			}
-			yyh3616.ElemContainerState(yyj3616)
-			if yyj3616 < len(yyv3616) {
+			yyh3641.ElemContainerState(yyj3641)
+			if yyj3641 < len(yyv3641) {
 				if r.TryDecodeAsNil() {
-					yyv3616[yyj3616] = Pod{}
+					yyv3641[yyj3641] = Pod{}
 				} else {
-					yyv3619 := &yyv3616[yyj3616]
-					yyv3619.CodecDecodeSelf(d)
+					yyv3644 := &yyv3641[yyj3641]
+					yyv3644.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -45135,17 +45426,17 @@ func (x codecSelfer1234) decSlicePod(v *[]Pod, d *codec1978.Decoder) {
 			}
 
 		}
-		if yyj3616 < len(yyv3616) {
-			yyv3616 = yyv3616[:yyj3616]
-			yyc3616 = true
-		} else if yyj3616 == 0 && yyv3616 == nil {
-			yyv3616 = []Pod{}
-			yyc3616 = true
+		if yyj3641 < len(yyv3641) {
+			yyv3641 = yyv3641[:yyj3641]
+			yyc3641 = true
+		} else if yyj3641 == 0 && yyv3641 == nil {
+			yyv3641 = []Pod{}
+			yyc3641 = true
 		}
 	}
-	yyh3616.End()
-	if yyc3616 {
-		*v = yyv3616
+	yyh3641.End()
+	if yyc3641 {
+		*v = yyv3641
 	}
 }
 
@@ -45154,10 +45445,10 @@ func (x codecSelfer1234) encSliceVolume(v []Volume, e *codec1978.Encoder) {
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3620 := range v {
+	for _, yyv3645 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3621 := &yyv3620
-		yy3621.CodecEncodeSelf(e)
+		yy3646 := &yyv3645
+		yy3646.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -45167,83 +45458,83 @@ func (x codecSelfer1234) decSliceVolume(v *[]Volume, d *codec1978.Decoder) {
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3622 := *v
-	yyh3622, yyl3622 := z.DecSliceHelperStart()
-	var yyc3622 bool
-	if yyl3622 == 0 {
-		if yyv3622 == nil {
-			yyv3622 = []Volume{}
-			yyc3622 = true
-		} else if len(yyv3622) != 0 {
-			yyv3622 = yyv3622[:0]
-			yyc3622 = true
+	yyv3647 := *v
+	yyh3647, yyl3647 := z.DecSliceHelperStart()
+	var yyc3647 bool
+	if yyl3647 == 0 {
+		if yyv3647 == nil {
+			yyv3647 = []Volume{}
+			yyc3647 = true
+		} else if len(yyv3647) != 0 {
+			yyv3647 = yyv3647[:0]
+			yyc3647 = true
 		}
-	} else if yyl3622 > 0 {
-		var yyrr3622, yyrl3622 int
-		var yyrt3622 bool
-		if yyl3622 > cap(yyv3622) {
+	} else if yyl3647 > 0 {
+		var yyrr3647, yyrl3647 int
+		var yyrt3647 bool
+		if yyl3647 > cap(yyv3647) {
 
-			yyrg3622 := len(yyv3622) > 0
-			yyv23622 := yyv3622
-			yyrl3622, yyrt3622 = z.DecInferLen(yyl3622, z.DecBasicHandle().MaxInitLen, 152)
-			if yyrt3622 {
-				if yyrl3622 <= cap(yyv3622) {
-					yyv3622 = yyv3622[:yyrl3622]
+			yyrg3647 := len(yyv3647) > 0
+			yyv23647 := yyv3647
+			yyrl3647, yyrt3647 = z.DecInferLen(yyl3647, z.DecBasicHandle().MaxInitLen, 152)
+			if yyrt3647 {
+				if yyrl3647 <= cap(yyv3647) {
+					yyv3647 = yyv3647[:yyrl3647]
 				} else {
-					yyv3622 = make([]Volume, yyrl3622)
+					yyv3647 = make([]Volume, yyrl3647)
 				}
 			} else {
-				yyv3622 = make([]Volume, yyrl3622)
+				yyv3647 = make([]Volume, yyrl3647)
 			}
-			yyc3622 = true
-			yyrr3622 = len(yyv3622)
-			if yyrg3622 {
-				copy(yyv3622, yyv23622)
+			yyc3647 = true
+			yyrr3647 = len(yyv3647)
+			if yyrg3647 {
+				copy(yyv3647, yyv23647)
 			}
-		} else if yyl3622 != len(yyv3622) {
-			yyv3622 = yyv3622[:yyl3622]
-			yyc3622 = true
+		} else if yyl3647 != len(yyv3647) {
+			yyv3647 = yyv3647[:yyl3647]
+			yyc3647 = true
 		}
-		yyj3622 := 0
-		for ; yyj3622 < yyrr3622; yyj3622++ {
-			yyh3622.ElemContainerState(yyj3622)
+		yyj3647 := 0
+		for ; yyj3647 < yyrr3647; yyj3647++ {
+			yyh3647.ElemContainerState(yyj3647)
 			if r.TryDecodeAsNil() {
-				yyv3622[yyj3622] = Volume{}
+				yyv3647[yyj3647] = Volume{}
 			} else {
-				yyv3623 := &yyv3622[yyj3622]
-				yyv3623.CodecDecodeSelf(d)
+				yyv3648 := &yyv3647[yyj3647]
+				yyv3648.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3622 {
-			for ; yyj3622 < yyl3622; yyj3622++ {
-				yyv3622 = append(yyv3622, Volume{})
-				yyh3622.ElemContainerState(yyj3622)
+		if yyrt3647 {
+			for ; yyj3647 < yyl3647; yyj3647++ {
+				yyv3647 = append(yyv3647, Volume{})
+				yyh3647.ElemContainerState(yyj3647)
 				if r.TryDecodeAsNil() {
-					yyv3622[yyj3622] = Volume{}
+					yyv3647[yyj3647] = Volume{}
 				} else {
-					yyv3624 := &yyv3622[yyj3622]
-					yyv3624.CodecDecodeSelf(d)
+					yyv3649 := &yyv3647[yyj3647]
+					yyv3649.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3622 := 0
-		for ; !r.CheckBreak(); yyj3622++ {
+		yyj3647 := 0
+		for ; !r.CheckBreak(); yyj3647++ {
 
-			if yyj3622 >= len(yyv3622) {
-				yyv3622 = append(yyv3622, Volume{}) // var yyz3622 Volume
-				yyc3622 = true
+			if yyj3647 >= len(yyv3647) {
+				yyv3647 = append(yyv3647, Volume{}) // var yyz3647 Volume
+				yyc3647 = true
 			}
-			yyh3622.ElemContainerState(yyj3622)
-			if yyj3622 < len(yyv3622) {
+			yyh3647.ElemContainerState(yyj3647)
+			if yyj3647 < len(yyv3647) {
 				if r.TryDecodeAsNil() {
-					yyv3622[yyj3622] = Volume{}
+					yyv3647[yyj3647] = Volume{}
 				} else {
-					yyv3625 := &yyv3622[yyj3622]
-					yyv3625.CodecDecodeSelf(d)
+					yyv3650 := &yyv3647[yyj3647]
+					yyv3650.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -45251,17 +45542,17 @@ func (x codecSelfer1234) decSliceVolume(v *[]Volume, d *codec1978.Decoder) {
 			}
 
 		}
-		if yyj3622 < len(yyv3622) {
-			yyv3622 = yyv3622[:yyj3622]
-			yyc3622 = true
-		} else if yyj3622 == 0 && yyv3622 == nil {
-			yyv3622 = []Volume{}
-			yyc3622 = true
+		if yyj3647 < len(yyv3647) {
+			yyv3647 = yyv3647[:yyj3647]
+			yyc3647 = true
+		} else if yyj3647 == 0 && yyv3647 == nil {
+			yyv3647 = []Volume{}
+			yyc3647 = true
 		}
 	}
-	yyh3622.End()
-	if yyc3622 {
-		*v = yyv3622
+	yyh3647.End()
+	if yyc3647 {
+		*v = yyv3647
 	}
 }
 
@@ -45270,10 +45561,10 @@ func (x codecSelfer1234) encSliceContainer(v []Container, e *codec1978.Encoder) 
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3626 := range v {
+	for _, yyv3651 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3627 := &yyv3626
-		yy3627.CodecEncodeSelf(e)
+		yy3652 := &yyv3651
+		yy3652.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -45283,83 +45574,83 @@ func (x codecSelfer1234) decSliceContainer(v *[]Container, d *codec1978.Decoder)
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3628 := *v
-	yyh3628, yyl3628 := z.DecSliceHelperStart()
-	var yyc3628 bool
-	if yyl3628 == 0 {
-		if yyv3628 == nil {
-			yyv3628 = []Container{}
-			yyc3628 = true
-		} else if len(yyv3628) != 0 {
-			yyv3628 = yyv3628[:0]
-			yyc3628 = true
+	yyv3653 := *v
+	yyh3653, yyl3653 := z.DecSliceHelperStart()
+	var yyc3653 bool
+	if yyl3653 == 0 {
+		if yyv3653 == nil {
+			yyv3653 = []Container{}
+			yyc3653 = true
+		} else if len(yyv3653) != 0 {
+			yyv3653 = yyv3653[:0]
+			yyc3653 = true
 		}
-	} else if yyl3628 > 0 {
-		var yyrr3628, yyrl3628 int
-		var yyrt3628 bool
-		if yyl3628 > cap(yyv3628) {
+	} else if yyl3653 > 0 {
+		var yyrr3653, yyrl3653 int
+		var yyrt3653 bool
+		if yyl3653 > cap(yyv3653) {
 
-			yyrg3628 := len(yyv3628) > 0
-			yyv23628 := yyv3628
-			yyrl3628, yyrt3628 = z.DecInferLen(yyl3628, z.DecBasicHandle().MaxInitLen, 256)
-			if yyrt3628 {
-				if yyrl3628 <= cap(yyv3628) {
-					yyv3628 = yyv3628[:yyrl3628]
+			yyrg3653 := len(yyv3653) > 0
+			yyv23653 := yyv3653
+			yyrl3653, yyrt3653 = z.DecInferLen(yyl3653, z.DecBasicHandle().MaxInitLen, 256)
+			if yyrt3653 {
+				if yyrl3653 <= cap(yyv3653) {
+					yyv3653 = yyv3653[:yyrl3653]
 				} else {
-					yyv3628 = make([]Container, yyrl3628)
+					yyv3653 = make([]Container, yyrl3653)
 				}
 			} else {
-				yyv3628 = make([]Container, yyrl3628)
+				yyv3653 = make([]Container, yyrl3653)
 			}
-			yyc3628 = true
-			yyrr3628 = len(yyv3628)
-			if yyrg3628 {
-				copy(yyv3628, yyv23628)
+			yyc3653 = true
+			yyrr3653 = len(yyv3653)
+			if yyrg3653 {
+				copy(yyv3653, yyv23653)
 			}
-		} else if yyl3628 != len(yyv3628) {
-			yyv3628 = yyv3628[:yyl3628]
-			yyc3628 = true
+		} else if yyl3653 != len(yyv3653) {
+			yyv3653 = yyv3653[:yyl3653]
+			yyc3653 = true
 		}
-		yyj3628 := 0
-		for ; yyj3628 < yyrr3628; yyj3628++ {
-			yyh3628.ElemContainerState(yyj3628)
+		yyj3653 := 0
+		for ; yyj3653 < yyrr3653; yyj3653++ {
+			yyh3653.ElemContainerState(yyj3653)
 			if r.TryDecodeAsNil() {
-				yyv3628[yyj3628] = Container{}
+				yyv3653[yyj3653] = Container{}
 			} else {
-				yyv3629 := &yyv3628[yyj3628]
-				yyv3629.CodecDecodeSelf(d)
+				yyv3654 := &yyv3653[yyj3653]
+				yyv3654.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3628 {
-			for ; yyj3628 < yyl3628; yyj3628++ {
-				yyv3628 = append(yyv3628, Container{})
-				yyh3628.ElemContainerState(yyj3628)
+		if yyrt3653 {
+			for ; yyj3653 < yyl3653; yyj3653++ {
+				yyv3653 = append(yyv3653, Container{})
+				yyh3653.ElemContainerState(yyj3653)
 				if r.TryDecodeAsNil() {
-					yyv3628[yyj3628] = Container{}
+					yyv3653[yyj3653] = Container{}
 				} else {
-					yyv3630 := &yyv3628[yyj3628]
-					yyv3630.CodecDecodeSelf(d)
+					yyv3655 := &yyv3653[yyj3653]
+					yyv3655.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3628 := 0
-		for ; !r.CheckBreak(); yyj3628++ {
+		yyj3653 := 0
+		for ; !r.CheckBreak(); yyj3653++ {
 
-			if yyj3628 >= len(yyv3628) {
-				yyv3628 = append(yyv3628, Container{}) // var yyz3628 Container
-				yyc3628 = true
+			if yyj3653 >= len(yyv3653) {
+				yyv3653 = append(yyv3653, Container{}) // var yyz3653 Container
+				yyc3653 = true
 			}
-			yyh3628.ElemContainerState(yyj3628)
-			if yyj3628 < len(yyv3628) {
+			yyh3653.ElemContainerState(yyj3653)
+			if yyj3653 < len(yyv3653) {
 				if r.TryDecodeAsNil() {
-					yyv3628[yyj3628] = Container{}
+					yyv3653[yyj3653] = Container{}
 				} else {
-					yyv3631 := &yyv3628[yyj3628]
-					yyv3631.CodecDecodeSelf(d)
+					yyv3656 := &yyv3653[yyj3653]
+					yyv3656.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -45367,17 +45658,17 @@ func (x codecSelfer1234) decSliceContainer(v *[]Container, d *codec1978.Decoder)
 			}
 
 		}
-		if yyj3628 < len(yyv3628) {
-			yyv3628 = yyv3628[:yyj3628]
-			yyc3628 = true
-		} else if yyj3628 == 0 && yyv3628 == nil {
-			yyv3628 = []Container{}
-			yyc3628 = true
+		if yyj3653 < len(yyv3653) {
+			yyv3653 = yyv3653[:yyj3653]
+			yyc3653 = true
+		} else if yyj3653 == 0 && yyv3653 == nil {
+			yyv3653 = []Container{}
+			yyc3653 = true
 		}
 	}
-	yyh3628.End()
-	if yyc3628 {
-		*v = yyv3628
+	yyh3653.End()
+	if yyc3653 {
+		*v = yyv3653
 	}
 }
 
@@ -45386,10 +45677,10 @@ func (x codecSelfer1234) encSliceLocalObjectReference(v []LocalObjectReference, 
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3632 := range v {
+	for _, yyv3657 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3633 := &yyv3632
-		yy3633.CodecEncodeSelf(e)
+		yy3658 := &yyv3657
+		yy3658.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -45399,83 +45690,83 @@ func (x codecSelfer1234) decSliceLocalObjectReference(v *[]LocalObjectReference,
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3634 := *v
-	yyh3634, yyl3634 := z.DecSliceHelperStart()
-	var yyc3634 bool
-	if yyl3634 == 0 {
-		if yyv3634 == nil {
-			yyv3634 = []LocalObjectReference{}
-			yyc3634 = true
-		} else if len(yyv3634) != 0 {
-			yyv3634 = yyv3634[:0]
-			yyc3634 = true
+	yyv3659 := *v
+	yyh3659, yyl3659 := z.DecSliceHelperStart()
+	var yyc3659 bool
+	if yyl3659 == 0 {
+		if yyv3659 == nil {
+			yyv3659 = []LocalObjectReference{}
+			yyc3659 = true
+		} else if len(yyv3659) != 0 {
+			yyv3659 = yyv3659[:0]
+			yyc3659 = true
 		}
-	} else if yyl3634 > 0 {
-		var yyrr3634, yyrl3634 int
-		var yyrt3634 bool
-		if yyl3634 > cap(yyv3634) {
+	} else if yyl3659 > 0 {
+		var yyrr3659, yyrl3659 int
+		var yyrt3659 bool
+		if yyl3659 > cap(yyv3659) {
 
-			yyrg3634 := len(yyv3634) > 0
-			yyv23634 := yyv3634
-			yyrl3634, yyrt3634 = z.DecInferLen(yyl3634, z.DecBasicHandle().MaxInitLen, 16)
-			if yyrt3634 {
-				if yyrl3634 <= cap(yyv3634) {
-					yyv3634 = yyv3634[:yyrl3634]
+			yyrg3659 := len(yyv3659) > 0
+			yyv23659 := yyv3659
+			yyrl3659, yyrt3659 = z.DecInferLen(yyl3659, z.DecBasicHandle().MaxInitLen, 16)
+			if yyrt3659 {
+				if yyrl3659 <= cap(yyv3659) {
+					yyv3659 = yyv3659[:yyrl3659]
 				} else {
-					yyv3634 = make([]LocalObjectReference, yyrl3634)
+					yyv3659 = make([]LocalObjectReference, yyrl3659)
 				}
 			} else {
-				yyv3634 = make([]LocalObjectReference, yyrl3634)
+				yyv3659 = make([]LocalObjectReference, yyrl3659)
 			}
-			yyc3634 = true
-			yyrr3634 = len(yyv3634)
-			if yyrg3634 {
-				copy(yyv3634, yyv23634)
+			yyc3659 = true
+			yyrr3659 = len(yyv3659)
+			if yyrg3659 {
+				copy(yyv3659, yyv23659)
 			}
-		} else if yyl3634 != len(yyv3634) {
-			yyv3634 = yyv3634[:yyl3634]
-			yyc3634 = true
+		} else if yyl3659 != len(yyv3659) {
+			yyv3659 = yyv3659[:yyl3659]
+			yyc3659 = true
 		}
-		yyj3634 := 0
-		for ; yyj3634 < yyrr3634; yyj3634++ {
-			yyh3634.ElemContainerState(yyj3634)
+		yyj3659 := 0
+		for ; yyj3659 < yyrr3659; yyj3659++ {
+			yyh3659.ElemContainerState(yyj3659)
 			if r.TryDecodeAsNil() {
-				yyv3634[yyj3634] = LocalObjectReference{}
+				yyv3659[yyj3659] = LocalObjectReference{}
 			} else {
-				yyv3635 := &yyv3634[yyj3634]
-				yyv3635.CodecDecodeSelf(d)
+				yyv3660 := &yyv3659[yyj3659]
+				yyv3660.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3634 {
-			for ; yyj3634 < yyl3634; yyj3634++ {
-				yyv3634 = append(yyv3634, LocalObjectReference{})
-				yyh3634.ElemContainerState(yyj3634)
+		if yyrt3659 {
+			for ; yyj3659 < yyl3659; yyj3659++ {
+				yyv3659 = append(yyv3659, LocalObjectReference{})
+				yyh3659.ElemContainerState(yyj3659)
 				if r.TryDecodeAsNil() {
-					yyv3634[yyj3634] = LocalObjectReference{}
+					yyv3659[yyj3659] = LocalObjectReference{}
 				} else {
-					yyv3636 := &yyv3634[yyj3634]
-					yyv3636.CodecDecodeSelf(d)
+					yyv3661 := &yyv3659[yyj3659]
+					yyv3661.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3634 := 0
-		for ; !r.CheckBreak(); yyj3634++ {
+		yyj3659 := 0
+		for ; !r.CheckBreak(); yyj3659++ {
 
-			if yyj3634 >= len(yyv3634) {
-				yyv3634 = append(yyv3634, LocalObjectReference{}) // var yyz3634 LocalObjectReference
-				yyc3634 = true
+			if yyj3659 >= len(yyv3659) {
+				yyv3659 = append(yyv3659, LocalObjectReference{}) // var yyz3659 LocalObjectReference
+				yyc3659 = true
 			}
-			yyh3634.ElemContainerState(yyj3634)
-			if yyj3634 < len(yyv3634) {
+			yyh3659.ElemContainerState(yyj3659)
+			if yyj3659 < len(yyv3659) {
 				if r.TryDecodeAsNil() {
-					yyv3634[yyj3634] = LocalObjectReference{}
+					yyv3659[yyj3659] = LocalObjectReference{}
 				} else {
-					yyv3637 := &yyv3634[yyj3634]
-					yyv3637.CodecDecodeSelf(d)
+					yyv3662 := &yyv3659[yyj3659]
+					yyv3662.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -45483,17 +45774,17 @@ func (x codecSelfer1234) decSliceLocalObjectReference(v *[]LocalObjectReference,
 			}
 
 		}
-		if yyj3634 < len(yyv3634) {
-			yyv3634 = yyv3634[:yyj3634]
-			yyc3634 = true
-		} else if yyj3634 == 0 && yyv3634 == nil {
-			yyv3634 = []LocalObjectReference{}
-			yyc3634 = true
+		if yyj3659 < len(yyv3659) {
+			yyv3659 = yyv3659[:yyj3659]
+			yyc3659 = true
+		} else if yyj3659 == 0 && yyv3659 == nil {
+			yyv3659 = []LocalObjectReference{}
+			yyc3659 = true
 		}
 	}
-	yyh3634.End()
-	if yyc3634 {
-		*v = yyv3634
+	yyh3659.End()
+	if yyc3659 {
+		*v = yyv3659
 	}
 }
 
@@ -45502,10 +45793,10 @@ func (x codecSelfer1234) encSlicePodCondition(v []PodCondition, e *codec1978.Enc
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3638 := range v {
+	for _, yyv3663 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3639 := &yyv3638
-		yy3639.CodecEncodeSelf(e)
+		yy3664 := &yyv3663
+		yy3664.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -45515,83 +45806,83 @@ func (x codecSelfer1234) decSlicePodCondition(v *[]PodCondition, d *codec1978.De
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3640 := *v
-	yyh3640, yyl3640 := z.DecSliceHelperStart()
-	var yyc3640 bool
-	if yyl3640 == 0 {
-		if yyv3640 == nil {
-			yyv3640 = []PodCondition{}
-			yyc3640 = true
-		} else if len(yyv3640) != 0 {
-			yyv3640 = yyv3640[:0]
-			yyc3640 = true
+	yyv3665 := *v
+	yyh3665, yyl3665 := z.DecSliceHelperStart()
+	var yyc3665 bool
+	if yyl3665 == 0 {
+		if yyv3665 == nil {
+			yyv3665 = []PodCondition{}
+			yyc3665 = true
+		} else if len(yyv3665) != 0 {
+			yyv3665 = yyv3665[:0]
+			yyc3665 = true
 		}
-	} else if yyl3640 > 0 {
-		var yyrr3640, yyrl3640 int
-		var yyrt3640 bool
-		if yyl3640 > cap(yyv3640) {
+	} else if yyl3665 > 0 {
+		var yyrr3665, yyrl3665 int
+		var yyrt3665 bool
+		if yyl3665 > cap(yyv3665) {
 
-			yyrg3640 := len(yyv3640) > 0
-			yyv23640 := yyv3640
-			yyrl3640, yyrt3640 = z.DecInferLen(yyl3640, z.DecBasicHandle().MaxInitLen, 112)
-			if yyrt3640 {
-				if yyrl3640 <= cap(yyv3640) {
-					yyv3640 = yyv3640[:yyrl3640]
+			yyrg3665 := len(yyv3665) > 0
+			yyv23665 := yyv3665
+			yyrl3665, yyrt3665 = z.DecInferLen(yyl3665, z.DecBasicHandle().MaxInitLen, 112)
+			if yyrt3665 {
+				if yyrl3665 <= cap(yyv3665) {
+					yyv3665 = yyv3665[:yyrl3665]
 				} else {
-					yyv3640 = make([]PodCondition, yyrl3640)
+					yyv3665 = make([]PodCondition, yyrl3665)
 				}
 			} else {
-				yyv3640 = make([]PodCondition, yyrl3640)
+				yyv3665 = make([]PodCondition, yyrl3665)
 			}
-			yyc3640 = true
-			yyrr3640 = len(yyv3640)
-			if yyrg3640 {
-				copy(yyv3640, yyv23640)
+			yyc3665 = true
+			yyrr3665 = len(yyv3665)
+			if yyrg3665 {
+				copy(yyv3665, yyv23665)
 			}
-		} else if yyl3640 != len(yyv3640) {
-			yyv3640 = yyv3640[:yyl3640]
-			yyc3640 = true
+		} else if yyl3665 != len(yyv3665) {
+			yyv3665 = yyv3665[:yyl3665]
+			yyc3665 = true
 		}
-		yyj3640 := 0
-		for ; yyj3640 < yyrr3640; yyj3640++ {
-			yyh3640.ElemContainerState(yyj3640)
+		yyj3665 := 0
+		for ; yyj3665 < yyrr3665; yyj3665++ {
+			yyh3665.ElemContainerState(yyj3665)
 			if r.TryDecodeAsNil() {
-				yyv3640[yyj3640] = PodCondition{}
+				yyv3665[yyj3665] = PodCondition{}
 			} else {
-				yyv3641 := &yyv3640[yyj3640]
-				yyv3641.CodecDecodeSelf(d)
+				yyv3666 := &yyv3665[yyj3665]
+				yyv3666.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3640 {
-			for ; yyj3640 < yyl3640; yyj3640++ {
-				yyv3640 = append(yyv3640, PodCondition{})
-				yyh3640.ElemContainerState(yyj3640)
+		if yyrt3665 {
+			for ; yyj3665 < yyl3665; yyj3665++ {
+				yyv3665 = append(yyv3665, PodCondition{})
+				yyh3665.ElemContainerState(yyj3665)
 				if r.TryDecodeAsNil() {
-					yyv3640[yyj3640] = PodCondition{}
+					yyv3665[yyj3665] = PodCondition{}
 				} else {
-					yyv3642 := &yyv3640[yyj3640]
-					yyv3642.CodecDecodeSelf(d)
+					yyv3667 := &yyv3665[yyj3665]
+					yyv3667.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3640 := 0
-		for ; !r.CheckBreak(); yyj3640++ {
+		yyj3665 := 0
+		for ; !r.CheckBreak(); yyj3665++ {
 
-			if yyj3640 >= len(yyv3640) {
-				yyv3640 = append(yyv3640, PodCondition{}) // var yyz3640 PodCondition
-				yyc3640 = true
+			if yyj3665 >= len(yyv3665) {
+				yyv3665 = append(yyv3665, PodCondition{}) // var yyz3665 PodCondition
+				yyc3665 = true
 			}
-			yyh3640.ElemContainerState(yyj3640)
-			if yyj3640 < len(yyv3640) {
+			yyh3665.ElemContainerState(yyj3665)
+			if yyj3665 < len(yyv3665) {
 				if r.TryDecodeAsNil() {
-					yyv3640[yyj3640] = PodCondition{}
+					yyv3665[yyj3665] = PodCondition{}
 				} else {
-					yyv3643 := &yyv3640[yyj3640]
-					yyv3643.CodecDecodeSelf(d)
+					yyv3668 := &yyv3665[yyj3665]
+					yyv3668.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -45599,17 +45890,17 @@ func (x codecSelfer1234) decSlicePodCondition(v *[]PodCondition, d *codec1978.De
 			}
 
 		}
-		if yyj3640 < len(yyv3640) {
-			yyv3640 = yyv3640[:yyj3640]
-			yyc3640 = true
-		} else if yyj3640 == 0 && yyv3640 == nil {
-			yyv3640 = []PodCondition{}
-			yyc3640 = true
+		if yyj3665 < len(yyv3665) {
+			yyv3665 = yyv3665[:yyj3665]
+			yyc3665 = true
+		} else if yyj3665 == 0 && yyv3665 == nil {
+			yyv3665 = []PodCondition{}
+			yyc3665 = true
 		}
 	}
-	yyh3640.End()
-	if yyc3640 {
-		*v = yyv3640
+	yyh3665.End()
+	if yyc3665 {
+		*v = yyv3665
 	}
 }
 
@@ -45618,10 +45909,10 @@ func (x codecSelfer1234) encSliceContainerStatus(v []ContainerStatus, e *codec19
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3644 := range v {
+	for _, yyv3669 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3645 := &yyv3644
-		yy3645.CodecEncodeSelf(e)
+		yy3670 := &yyv3669
+		yy3670.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -45631,83 +45922,83 @@ func (x codecSelfer1234) decSliceContainerStatus(v *[]ContainerStatus, d *codec1
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3646 := *v
-	yyh3646, yyl3646 := z.DecSliceHelperStart()
-	var yyc3646 bool
-	if yyl3646 == 0 {
-		if yyv3646 == nil {
-			yyv3646 = []ContainerStatus{}
-			yyc3646 = true
-		} else if len(yyv3646) != 0 {
-			yyv3646 = yyv3646[:0]
-			yyc3646 = true
+	yyv3671 := *v
+	yyh3671, yyl3671 := z.DecSliceHelperStart()
+	var yyc3671 bool
+	if yyl3671 == 0 {
+		if yyv3671 == nil {
+			yyv3671 = []ContainerStatus{}
+			yyc3671 = true
+		} else if len(yyv3671) != 0 {
+			yyv3671 = yyv3671[:0]
+			yyc3671 = true
 		}
-	} else if yyl3646 > 0 {
-		var yyrr3646, yyrl3646 int
-		var yyrt3646 bool
-		if yyl3646 > cap(yyv3646) {
+	} else if yyl3671 > 0 {
+		var yyrr3671, yyrl3671 int
+		var yyrt3671 bool
+		if yyl3671 > cap(yyv3671) {
 
-			yyrg3646 := len(yyv3646) > 0
-			yyv23646 := yyv3646
-			yyrl3646, yyrt3646 = z.DecInferLen(yyl3646, z.DecBasicHandle().MaxInitLen, 128)
-			if yyrt3646 {
-				if yyrl3646 <= cap(yyv3646) {
-					yyv3646 = yyv3646[:yyrl3646]
+			yyrg3671 := len(yyv3671) > 0
+			yyv23671 := yyv3671
+			yyrl3671, yyrt3671 = z.DecInferLen(yyl3671, z.DecBasicHandle().MaxInitLen, 128)
+			if yyrt3671 {
+				if yyrl3671 <= cap(yyv3671) {
+					yyv3671 = yyv3671[:yyrl3671]
 				} else {
-					yyv3646 = make([]ContainerStatus, yyrl3646)
+					yyv3671 = make([]ContainerStatus, yyrl3671)
 				}
 			} else {
-				yyv3646 = make([]ContainerStatus, yyrl3646)
+				yyv3671 = make([]ContainerStatus, yyrl3671)
 			}
-			yyc3646 = true
-			yyrr3646 = len(yyv3646)
-			if yyrg3646 {
-				copy(yyv3646, yyv23646)
+			yyc3671 = true
+			yyrr3671 = len(yyv3671)
+			if yyrg3671 {
+				copy(yyv3671, yyv23671)
 			}
-		} else if yyl3646 != len(yyv3646) {
-			yyv3646 = yyv3646[:yyl3646]
-			yyc3646 = true
+		} else if yyl3671 != len(yyv3671) {
+			yyv3671 = yyv3671[:yyl3671]
+			yyc3671 = true
 		}
-		yyj3646 := 0
-		for ; yyj3646 < yyrr3646; yyj3646++ {
-			yyh3646.ElemContainerState(yyj3646)
+		yyj3671 := 0
+		for ; yyj3671 < yyrr3671; yyj3671++ {
+			yyh3671.ElemContainerState(yyj3671)
 			if r.TryDecodeAsNil() {
-				yyv3646[yyj3646] = ContainerStatus{}
+				yyv3671[yyj3671] = ContainerStatus{}
 			} else {
-				yyv3647 := &yyv3646[yyj3646]
-				yyv3647.CodecDecodeSelf(d)
+				yyv3672 := &yyv3671[yyj3671]
+				yyv3672.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3646 {
-			for ; yyj3646 < yyl3646; yyj3646++ {
-				yyv3646 = append(yyv3646, ContainerStatus{})
-				yyh3646.ElemContainerState(yyj3646)
+		if yyrt3671 {
+			for ; yyj3671 < yyl3671; yyj3671++ {
+				yyv3671 = append(yyv3671, ContainerStatus{})
+				yyh3671.ElemContainerState(yyj3671)
 				if r.TryDecodeAsNil() {
-					yyv3646[yyj3646] = ContainerStatus{}
+					yyv3671[yyj3671] = ContainerStatus{}
 				} else {
-					yyv3648 := &yyv3646[yyj3646]
-					yyv3648.CodecDecodeSelf(d)
+					yyv3673 := &yyv3671[yyj3671]
+					yyv3673.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3646 := 0
-		for ; !r.CheckBreak(); yyj3646++ {
+		yyj3671 := 0
+		for ; !r.CheckBreak(); yyj3671++ {
 
-			if yyj3646 >= len(yyv3646) {
-				yyv3646 = append(yyv3646, ContainerStatus{}) // var yyz3646 ContainerStatus
-				yyc3646 = true
+			if yyj3671 >= len(yyv3671) {
+				yyv3671 = append(yyv3671, ContainerStatus{}) // var yyz3671 ContainerStatus
+				yyc3671 = true
 			}
-			yyh3646.ElemContainerState(yyj3646)
-			if yyj3646 < len(yyv3646) {
+			yyh3671.ElemContainerState(yyj3671)
+			if yyj3671 < len(yyv3671) {
 				if r.TryDecodeAsNil() {
-					yyv3646[yyj3646] = ContainerStatus{}
+					yyv3671[yyj3671] = ContainerStatus{}
 				} else {
-					yyv3649 := &yyv3646[yyj3646]
-					yyv3649.CodecDecodeSelf(d)
+					yyv3674 := &yyv3671[yyj3671]
+					yyv3674.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -45715,17 +46006,17 @@ func (x codecSelfer1234) decSliceContainerStatus(v *[]ContainerStatus, d *codec1
 			}
 
 		}
-		if yyj3646 < len(yyv3646) {
-			yyv3646 = yyv3646[:yyj3646]
-			yyc3646 = true
-		} else if yyj3646 == 0 && yyv3646 == nil {
-			yyv3646 = []ContainerStatus{}
-			yyc3646 = true
+		if yyj3671 < len(yyv3671) {
+			yyv3671 = yyv3671[:yyj3671]
+			yyc3671 = true
+		} else if yyj3671 == 0 && yyv3671 == nil {
+			yyv3671 = []ContainerStatus{}
+			yyc3671 = true
 		}
 	}
-	yyh3646.End()
-	if yyc3646 {
-		*v = yyv3646
+	yyh3671.End()
+	if yyc3671 {
+		*v = yyv3671
 	}
 }
 
@@ -45734,10 +46025,10 @@ func (x codecSelfer1234) encSlicePodTemplate(v []PodTemplate, e *codec1978.Encod
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3650 := range v {
+	for _, yyv3675 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3651 := &yyv3650
-		yy3651.CodecEncodeSelf(e)
+		yy3676 := &yyv3675
+		yy3676.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -45747,83 +46038,83 @@ func (x codecSelfer1234) decSlicePodTemplate(v *[]PodTemplate, d *codec1978.Deco
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3652 := *v
-	yyh3652, yyl3652 := z.DecSliceHelperStart()
-	var yyc3652 bool
-	if yyl3652 == 0 {
-		if yyv3652 == nil {
-			yyv3652 = []PodTemplate{}
-			yyc3652 = true
-		} else if len(yyv3652) != 0 {
-			yyv3652 = yyv3652[:0]
-			yyc3652 = true
+	yyv3677 := *v
+	yyh3677, yyl3677 := z.DecSliceHelperStart()
+	var yyc3677 bool
+	if yyl3677 == 0 {
+		if yyv3677 == nil {
+			yyv3677 = []PodTemplate{}
+			yyc3677 = true
+		} else if len(yyv3677) != 0 {
+			yyv3677 = yyv3677[:0]
+			yyc3677 = true
 		}
-	} else if yyl3652 > 0 {
-		var yyrr3652, yyrl3652 int
-		var yyrt3652 bool
-		if yyl3652 > cap(yyv3652) {
+	} else if yyl3677 > 0 {
+		var yyrr3677, yyrl3677 int
+		var yyrt3677 bool
+		if yyl3677 > cap(yyv3677) {
 
-			yyrg3652 := len(yyv3652) > 0
-			yyv23652 := yyv3652
-			yyrl3652, yyrt3652 = z.DecInferLen(yyl3652, z.DecBasicHandle().MaxInitLen, 520)
-			if yyrt3652 {
-				if yyrl3652 <= cap(yyv3652) {
-					yyv3652 = yyv3652[:yyrl3652]
+			yyrg3677 := len(yyv3677) > 0
+			yyv23677 := yyv3677
+			yyrl3677, yyrt3677 = z.DecInferLen(yyl3677, z.DecBasicHandle().MaxInitLen, 520)
+			if yyrt3677 {
+				if yyrl3677 <= cap(yyv3677) {
+					yyv3677 = yyv3677[:yyrl3677]
 				} else {
-					yyv3652 = make([]PodTemplate, yyrl3652)
+					yyv3677 = make([]PodTemplate, yyrl3677)
 				}
 			} else {
-				yyv3652 = make([]PodTemplate, yyrl3652)
+				yyv3677 = make([]PodTemplate, yyrl3677)
 			}
-			yyc3652 = true
-			yyrr3652 = len(yyv3652)
-			if yyrg3652 {
-				copy(yyv3652, yyv23652)
+			yyc3677 = true
+			yyrr3677 = len(yyv3677)
+			if yyrg3677 {
+				copy(yyv3677, yyv23677)
 			}
-		} else if yyl3652 != len(yyv3652) {
-			yyv3652 = yyv3652[:yyl3652]
-			yyc3652 = true
+		} else if yyl3677 != len(yyv3677) {
+			yyv3677 = yyv3677[:yyl3677]
+			yyc3677 = true
 		}
-		yyj3652 := 0
-		for ; yyj3652 < yyrr3652; yyj3652++ {
-			yyh3652.ElemContainerState(yyj3652)
+		yyj3677 := 0
+		for ; yyj3677 < yyrr3677; yyj3677++ {
+			yyh3677.ElemContainerState(yyj3677)
 			if r.TryDecodeAsNil() {
-				yyv3652[yyj3652] = PodTemplate{}
+				yyv3677[yyj3677] = PodTemplate{}
 			} else {
-				yyv3653 := &yyv3652[yyj3652]
-				yyv3653.CodecDecodeSelf(d)
+				yyv3678 := &yyv3677[yyj3677]
+				yyv3678.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3652 {
-			for ; yyj3652 < yyl3652; yyj3652++ {
-				yyv3652 = append(yyv3652, PodTemplate{})
-				yyh3652.ElemContainerState(yyj3652)
+		if yyrt3677 {
+			for ; yyj3677 < yyl3677; yyj3677++ {
+				yyv3677 = append(yyv3677, PodTemplate{})
+				yyh3677.ElemContainerState(yyj3677)
 				if r.TryDecodeAsNil() {
-					yyv3652[yyj3652] = PodTemplate{}
+					yyv3677[yyj3677] = PodTemplate{}
 				} else {
-					yyv3654 := &yyv3652[yyj3652]
-					yyv3654.CodecDecodeSelf(d)
+					yyv3679 := &yyv3677[yyj3677]
+					yyv3679.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3652 := 0
-		for ; !r.CheckBreak(); yyj3652++ {
+		yyj3677 := 0
+		for ; !r.CheckBreak(); yyj3677++ {
 
-			if yyj3652 >= len(yyv3652) {
-				yyv3652 = append(yyv3652, PodTemplate{}) // var yyz3652 PodTemplate
-				yyc3652 = true
+			if yyj3677 >= len(yyv3677) {
+				yyv3677 = append(yyv3677, PodTemplate{}) // var yyz3677 PodTemplate
+				yyc3677 = true
 			}
-			yyh3652.ElemContainerState(yyj3652)
-			if yyj3652 < len(yyv3652) {
+			yyh3677.ElemContainerState(yyj3677)
+			if yyj3677 < len(yyv3677) {
 				if r.TryDecodeAsNil() {
-					yyv3652[yyj3652] = PodTemplate{}
+					yyv3677[yyj3677] = PodTemplate{}
 				} else {
-					yyv3655 := &yyv3652[yyj3652]
-					yyv3655.CodecDecodeSelf(d)
+					yyv3680 := &yyv3677[yyj3677]
+					yyv3680.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -45831,17 +46122,17 @@ func (x codecSelfer1234) decSlicePodTemplate(v *[]PodTemplate, d *codec1978.Deco
 			}
 
 		}
-		if yyj3652 < len(yyv3652) {
-			yyv3652 = yyv3652[:yyj3652]
-			yyc3652 = true
-		} else if yyj3652 == 0 && yyv3652 == nil {
-			yyv3652 = []PodTemplate{}
-			yyc3652 = true
+		if yyj3677 < len(yyv3677) {
+			yyv3677 = yyv3677[:yyj3677]
+			yyc3677 = true
+		} else if yyj3677 == 0 && yyv3677 == nil {
+			yyv3677 = []PodTemplate{}
+			yyc3677 = true
 		}
 	}
-	yyh3652.End()
-	if yyc3652 {
-		*v = yyv3652
+	yyh3677.End()
+	if yyc3677 {
+		*v = yyv3677
 	}
 }
 
@@ -45850,10 +46141,10 @@ func (x codecSelfer1234) encSliceReplicationController(v []ReplicationController
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3656 := range v {
+	for _, yyv3681 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3657 := &yyv3656
-		yy3657.CodecEncodeSelf(e)
+		yy3682 := &yyv3681
+		yy3682.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -45863,83 +46154,83 @@ func (x codecSelfer1234) decSliceReplicationController(v *[]ReplicationControlle
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3658 := *v
-	yyh3658, yyl3658 := z.DecSliceHelperStart()
-	var yyc3658 bool
-	if yyl3658 == 0 {
-		if yyv3658 == nil {
-			yyv3658 = []ReplicationController{}
-			yyc3658 = true
-		} else if len(yyv3658) != 0 {
-			yyv3658 = yyv3658[:0]
-			yyc3658 = true
+	yyv3683 := *v
+	yyh3683, yyl3683 := z.DecSliceHelperStart()
+	var yyc3683 bool
+	if yyl3683 == 0 {
+		if yyv3683 == nil {
+			yyv3683 = []ReplicationController{}
+			yyc3683 = true
+		} else if len(yyv3683) != 0 {
+			yyv3683 = yyv3683[:0]
+			yyc3683 = true
 		}
-	} else if yyl3658 > 0 {
-		var yyrr3658, yyrl3658 int
-		var yyrt3658 bool
-		if yyl3658 > cap(yyv3658) {
+	} else if yyl3683 > 0 {
+		var yyrr3683, yyrl3683 int
+		var yyrt3683 bool
+		if yyl3683 > cap(yyv3683) {
 
-			yyrg3658 := len(yyv3658) > 0
-			yyv23658 := yyv3658
-			yyrl3658, yyrt3658 = z.DecInferLen(yyl3658, z.DecBasicHandle().MaxInitLen, 232)
-			if yyrt3658 {
-				if yyrl3658 <= cap(yyv3658) {
-					yyv3658 = yyv3658[:yyrl3658]
+			yyrg3683 := len(yyv3683) > 0
+			yyv23683 := yyv3683
+			yyrl3683, yyrt3683 = z.DecInferLen(yyl3683, z.DecBasicHandle().MaxInitLen, 232)
+			if yyrt3683 {
+				if yyrl3683 <= cap(yyv3683) {
+					yyv3683 = yyv3683[:yyrl3683]
 				} else {
-					yyv3658 = make([]ReplicationController, yyrl3658)
+					yyv3683 = make([]ReplicationController, yyrl3683)
 				}
 			} else {
-				yyv3658 = make([]ReplicationController, yyrl3658)
+				yyv3683 = make([]ReplicationController, yyrl3683)
 			}
-			yyc3658 = true
-			yyrr3658 = len(yyv3658)
-			if yyrg3658 {
-				copy(yyv3658, yyv23658)
+			yyc3683 = true
+			yyrr3683 = len(yyv3683)
+			if yyrg3683 {
+				copy(yyv3683, yyv23683)
 			}
-		} else if yyl3658 != len(yyv3658) {
-			yyv3658 = yyv3658[:yyl3658]
-			yyc3658 = true
+		} else if yyl3683 != len(yyv3683) {
+			yyv3683 = yyv3683[:yyl3683]
+			yyc3683 = true
 		}
-		yyj3658 := 0
-		for ; yyj3658 < yyrr3658; yyj3658++ {
-			yyh3658.ElemContainerState(yyj3658)
+		yyj3683 := 0
+		for ; yyj3683 < yyrr3683; yyj3683++ {
+			yyh3683.ElemContainerState(yyj3683)
 			if r.TryDecodeAsNil() {
-				yyv3658[yyj3658] = ReplicationController{}
+				yyv3683[yyj3683] = ReplicationController{}
 			} else {
-				yyv3659 := &yyv3658[yyj3658]
-				yyv3659.CodecDecodeSelf(d)
+				yyv3684 := &yyv3683[yyj3683]
+				yyv3684.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3658 {
-			for ; yyj3658 < yyl3658; yyj3658++ {
-				yyv3658 = append(yyv3658, ReplicationController{})
-				yyh3658.ElemContainerState(yyj3658)
+		if yyrt3683 {
+			for ; yyj3683 < yyl3683; yyj3683++ {
+				yyv3683 = append(yyv3683, ReplicationController{})
+				yyh3683.ElemContainerState(yyj3683)
 				if r.TryDecodeAsNil() {
-					yyv3658[yyj3658] = ReplicationController{}
+					yyv3683[yyj3683] = ReplicationController{}
 				} else {
-					yyv3660 := &yyv3658[yyj3658]
-					yyv3660.CodecDecodeSelf(d)
+					yyv3685 := &yyv3683[yyj3683]
+					yyv3685.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3658 := 0
-		for ; !r.CheckBreak(); yyj3658++ {
+		yyj3683 := 0
+		for ; !r.CheckBreak(); yyj3683++ {
 
-			if yyj3658 >= len(yyv3658) {
-				yyv3658 = append(yyv3658, ReplicationController{}) // var yyz3658 ReplicationController
-				yyc3658 = true
+			if yyj3683 >= len(yyv3683) {
+				yyv3683 = append(yyv3683, ReplicationController{}) // var yyz3683 ReplicationController
+				yyc3683 = true
 			}
-			yyh3658.ElemContainerState(yyj3658)
-			if yyj3658 < len(yyv3658) {
+			yyh3683.ElemContainerState(yyj3683)
+			if yyj3683 < len(yyv3683) {
 				if r.TryDecodeAsNil() {
-					yyv3658[yyj3658] = ReplicationController{}
+					yyv3683[yyj3683] = ReplicationController{}
 				} else {
-					yyv3661 := &yyv3658[yyj3658]
-					yyv3661.CodecDecodeSelf(d)
+					yyv3686 := &yyv3683[yyj3683]
+					yyv3686.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -45947,17 +46238,17 @@ func (x codecSelfer1234) decSliceReplicationController(v *[]ReplicationControlle
 			}
 
 		}
-		if yyj3658 < len(yyv3658) {
-			yyv3658 = yyv3658[:yyj3658]
-			yyc3658 = true
-		} else if yyj3658 == 0 && yyv3658 == nil {
-			yyv3658 = []ReplicationController{}
-			yyc3658 = true
+		if yyj3683 < len(yyv3683) {
+			yyv3683 = yyv3683[:yyj3683]
+			yyc3683 = true
+		} else if yyj3683 == 0 && yyv3683 == nil {
+			yyv3683 = []ReplicationController{}
+			yyc3683 = true
 		}
 	}
-	yyh3658.End()
-	if yyc3658 {
-		*v = yyv3658
+	yyh3683.End()
+	if yyc3683 {
+		*v = yyv3683
 	}
 }
 
@@ -45966,10 +46257,10 @@ func (x codecSelfer1234) encSliceService(v []Service, e *codec1978.Encoder) {
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3662 := range v {
+	for _, yyv3687 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3663 := &yyv3662
-		yy3663.CodecEncodeSelf(e)
+		yy3688 := &yyv3687
+		yy3688.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -45979,83 +46270,83 @@ func (x codecSelfer1234) decSliceService(v *[]Service, d *codec1978.Decoder) {
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3664 := *v
-	yyh3664, yyl3664 := z.DecSliceHelperStart()
-	var yyc3664 bool
-	if yyl3664 == 0 {
-		if yyv3664 == nil {
-			yyv3664 = []Service{}
-			yyc3664 = true
-		} else if len(yyv3664) != 0 {
-			yyv3664 = yyv3664[:0]
-			yyc3664 = true
+	yyv3689 := *v
+	yyh3689, yyl3689 := z.DecSliceHelperStart()
+	var yyc3689 bool
+	if yyl3689 == 0 {
+		if yyv3689 == nil {
+			yyv3689 = []Service{}
+			yyc3689 = true
+		} else if len(yyv3689) != 0 {
+			yyv3689 = yyv3689[:0]
+			yyc3689 = true
 		}
-	} else if yyl3664 > 0 {
-		var yyrr3664, yyrl3664 int
-		var yyrt3664 bool
-		if yyl3664 > cap(yyv3664) {
+	} else if yyl3689 > 0 {
+		var yyrr3689, yyrl3689 int
+		var yyrt3689 bool
+		if yyl3689 > cap(yyv3689) {
 
-			yyrg3664 := len(yyv3664) > 0
-			yyv23664 := yyv3664
-			yyrl3664, yyrt3664 = z.DecInferLen(yyl3664, z.DecBasicHandle().MaxInitLen, 336)
-			if yyrt3664 {
-				if yyrl3664 <= cap(yyv3664) {
-					yyv3664 = yyv3664[:yyrl3664]
+			yyrg3689 := len(yyv3689) > 0
+			yyv23689 := yyv3689
+			yyrl3689, yyrt3689 = z.DecInferLen(yyl3689, z.DecBasicHandle().MaxInitLen, 336)
+			if yyrt3689 {
+				if yyrl3689 <= cap(yyv3689) {
+					yyv3689 = yyv3689[:yyrl3689]
 				} else {
-					yyv3664 = make([]Service, yyrl3664)
+					yyv3689 = make([]Service, yyrl3689)
 				}
 			} else {
-				yyv3664 = make([]Service, yyrl3664)
+				yyv3689 = make([]Service, yyrl3689)
 			}
-			yyc3664 = true
-			yyrr3664 = len(yyv3664)
-			if yyrg3664 {
-				copy(yyv3664, yyv23664)
+			yyc3689 = true
+			yyrr3689 = len(yyv3689)
+			if yyrg3689 {
+				copy(yyv3689, yyv23689)
 			}
-		} else if yyl3664 != len(yyv3664) {
-			yyv3664 = yyv3664[:yyl3664]
-			yyc3664 = true
+		} else if yyl3689 != len(yyv3689) {
+			yyv3689 = yyv3689[:yyl3689]
+			yyc3689 = true
 		}
-		yyj3664 := 0
-		for ; yyj3664 < yyrr3664; yyj3664++ {
-			yyh3664.ElemContainerState(yyj3664)
+		yyj3689 := 0
+		for ; yyj3689 < yyrr3689; yyj3689++ {
+			yyh3689.ElemContainerState(yyj3689)
 			if r.TryDecodeAsNil() {
-				yyv3664[yyj3664] = Service{}
+				yyv3689[yyj3689] = Service{}
 			} else {
-				yyv3665 := &yyv3664[yyj3664]
-				yyv3665.CodecDecodeSelf(d)
+				yyv3690 := &yyv3689[yyj3689]
+				yyv3690.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3664 {
-			for ; yyj3664 < yyl3664; yyj3664++ {
-				yyv3664 = append(yyv3664, Service{})
-				yyh3664.ElemContainerState(yyj3664)
+		if yyrt3689 {
+			for ; yyj3689 < yyl3689; yyj3689++ {
+				yyv3689 = append(yyv3689, Service{})
+				yyh3689.ElemContainerState(yyj3689)
 				if r.TryDecodeAsNil() {
-					yyv3664[yyj3664] = Service{}
+					yyv3689[yyj3689] = Service{}
 				} else {
-					yyv3666 := &yyv3664[yyj3664]
-					yyv3666.CodecDecodeSelf(d)
+					yyv3691 := &yyv3689[yyj3689]
+					yyv3691.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3664 := 0
-		for ; !r.CheckBreak(); yyj3664++ {
+		yyj3689 := 0
+		for ; !r.CheckBreak(); yyj3689++ {
 
-			if yyj3664 >= len(yyv3664) {
-				yyv3664 = append(yyv3664, Service{}) // var yyz3664 Service
-				yyc3664 = true
+			if yyj3689 >= len(yyv3689) {
+				yyv3689 = append(yyv3689, Service{}) // var yyz3689 Service
+				yyc3689 = true
 			}
-			yyh3664.ElemContainerState(yyj3664)
-			if yyj3664 < len(yyv3664) {
+			yyh3689.ElemContainerState(yyj3689)
+			if yyj3689 < len(yyv3689) {
 				if r.TryDecodeAsNil() {
-					yyv3664[yyj3664] = Service{}
+					yyv3689[yyj3689] = Service{}
 				} else {
-					yyv3667 := &yyv3664[yyj3664]
-					yyv3667.CodecDecodeSelf(d)
+					yyv3692 := &yyv3689[yyj3689]
+					yyv3692.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -46063,17 +46354,17 @@ func (x codecSelfer1234) decSliceService(v *[]Service, d *codec1978.Decoder) {
 			}
 
 		}
-		if yyj3664 < len(yyv3664) {
-			yyv3664 = yyv3664[:yyj3664]
-			yyc3664 = true
-		} else if yyj3664 == 0 && yyv3664 == nil {
-			yyv3664 = []Service{}
-			yyc3664 = true
+		if yyj3689 < len(yyv3689) {
+			yyv3689 = yyv3689[:yyj3689]
+			yyc3689 = true
+		} else if yyj3689 == 0 && yyv3689 == nil {
+			yyv3689 = []Service{}
+			yyc3689 = true
 		}
 	}
-	yyh3664.End()
-	if yyc3664 {
-		*v = yyv3664
+	yyh3689.End()
+	if yyc3689 {
+		*v = yyv3689
 	}
 }
 
@@ -46082,10 +46373,10 @@ func (x codecSelfer1234) encSliceLoadBalancerIngress(v []LoadBalancerIngress, e 
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3668 := range v {
+	for _, yyv3693 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3669 := &yyv3668
-		yy3669.CodecEncodeSelf(e)
+		yy3694 := &yyv3693
+		yy3694.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -46095,83 +46386,83 @@ func (x codecSelfer1234) decSliceLoadBalancerIngress(v *[]LoadBalancerIngress, d
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3670 := *v
-	yyh3670, yyl3670 := z.DecSliceHelperStart()
-	var yyc3670 bool
-	if yyl3670 == 0 {
-		if yyv3670 == nil {
-			yyv3670 = []LoadBalancerIngress{}
-			yyc3670 = true
-		} else if len(yyv3670) != 0 {
-			yyv3670 = yyv3670[:0]
-			yyc3670 = true
+	yyv3695 := *v
+	yyh3695, yyl3695 := z.DecSliceHelperStart()
+	var yyc3695 bool
+	if yyl3695 == 0 {
+		if yyv3695 == nil {
+			yyv3695 = []LoadBalancerIngress{}
+			yyc3695 = true
+		} else if len(yyv3695) != 0 {
+			yyv3695 = yyv3695[:0]
+			yyc3695 = true
 		}
-	} else if yyl3670 > 0 {
-		var yyrr3670, yyrl3670 int
-		var yyrt3670 bool
-		if yyl3670 > cap(yyv3670) {
+	} else if yyl3695 > 0 {
+		var yyrr3695, yyrl3695 int
+		var yyrt3695 bool
+		if yyl3695 > cap(yyv3695) {
 
-			yyrg3670 := len(yyv3670) > 0
-			yyv23670 := yyv3670
-			yyrl3670, yyrt3670 = z.DecInferLen(yyl3670, z.DecBasicHandle().MaxInitLen, 32)
-			if yyrt3670 {
-				if yyrl3670 <= cap(yyv3670) {
-					yyv3670 = yyv3670[:yyrl3670]
+			yyrg3695 := len(yyv3695) > 0
+			yyv23695 := yyv3695
+			yyrl3695, yyrt3695 = z.DecInferLen(yyl3695, z.DecBasicHandle().MaxInitLen, 32)
+			if yyrt3695 {
+				if yyrl3695 <= cap(yyv3695) {
+					yyv3695 = yyv3695[:yyrl3695]
 				} else {
-					yyv3670 = make([]LoadBalancerIngress, yyrl3670)
+					yyv3695 = make([]LoadBalancerIngress, yyrl3695)
 				}
 			} else {
-				yyv3670 = make([]LoadBalancerIngress, yyrl3670)
+				yyv3695 = make([]LoadBalancerIngress, yyrl3695)
 			}
-			yyc3670 = true
-			yyrr3670 = len(yyv3670)
-			if yyrg3670 {
-				copy(yyv3670, yyv23670)
+			yyc3695 = true
+			yyrr3695 = len(yyv3695)
+			if yyrg3695 {
+				copy(yyv3695, yyv23695)
 			}
-		} else if yyl3670 != len(yyv3670) {
-			yyv3670 = yyv3670[:yyl3670]
-			yyc3670 = true
+		} else if yyl3695 != len(yyv3695) {
+			yyv3695 = yyv3695[:yyl3695]
+			yyc3695 = true
 		}
-		yyj3670 := 0
-		for ; yyj3670 < yyrr3670; yyj3670++ {
-			yyh3670.ElemContainerState(yyj3670)
+		yyj3695 := 0
+		for ; yyj3695 < yyrr3695; yyj3695++ {
+			yyh3695.ElemContainerState(yyj3695)
 			if r.TryDecodeAsNil() {
-				yyv3670[yyj3670] = LoadBalancerIngress{}
+				yyv3695[yyj3695] = LoadBalancerIngress{}
 			} else {
-				yyv3671 := &yyv3670[yyj3670]
-				yyv3671.CodecDecodeSelf(d)
+				yyv3696 := &yyv3695[yyj3695]
+				yyv3696.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3670 {
-			for ; yyj3670 < yyl3670; yyj3670++ {
-				yyv3670 = append(yyv3670, LoadBalancerIngress{})
-				yyh3670.ElemContainerState(yyj3670)
+		if yyrt3695 {
+			for ; yyj3695 < yyl3695; yyj3695++ {
+				yyv3695 = append(yyv3695, LoadBalancerIngress{})
+				yyh3695.ElemContainerState(yyj3695)
 				if r.TryDecodeAsNil() {
-					yyv3670[yyj3670] = LoadBalancerIngress{}
+					yyv3695[yyj3695] = LoadBalancerIngress{}
 				} else {
-					yyv3672 := &yyv3670[yyj3670]
-					yyv3672.CodecDecodeSelf(d)
+					yyv3697 := &yyv3695[yyj3695]
+					yyv3697.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3670 := 0
-		for ; !r.CheckBreak(); yyj3670++ {
+		yyj3695 := 0
+		for ; !r.CheckBreak(); yyj3695++ {
 
-			if yyj3670 >= len(yyv3670) {
-				yyv3670 = append(yyv3670, LoadBalancerIngress{}) // var yyz3670 LoadBalancerIngress
-				yyc3670 = true
+			if yyj3695 >= len(yyv3695) {
+				yyv3695 = append(yyv3695, LoadBalancerIngress{}) // var yyz3695 LoadBalancerIngress
+				yyc3695 = true
 			}
-			yyh3670.ElemContainerState(yyj3670)
-			if yyj3670 < len(yyv3670) {
+			yyh3695.ElemContainerState(yyj3695)
+			if yyj3695 < len(yyv3695) {
 				if r.TryDecodeAsNil() {
-					yyv3670[yyj3670] = LoadBalancerIngress{}
+					yyv3695[yyj3695] = LoadBalancerIngress{}
 				} else {
-					yyv3673 := &yyv3670[yyj3670]
-					yyv3673.CodecDecodeSelf(d)
+					yyv3698 := &yyv3695[yyj3695]
+					yyv3698.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -46179,17 +46470,17 @@ func (x codecSelfer1234) decSliceLoadBalancerIngress(v *[]LoadBalancerIngress, d
 			}
 
 		}
-		if yyj3670 < len(yyv3670) {
-			yyv3670 = yyv3670[:yyj3670]
-			yyc3670 = true
-		} else if yyj3670 == 0 && yyv3670 == nil {
-			yyv3670 = []LoadBalancerIngress{}
-			yyc3670 = true
+		if yyj3695 < len(yyv3695) {
+			yyv3695 = yyv3695[:yyj3695]
+			yyc3695 = true
+		} else if yyj3695 == 0 && yyv3695 == nil {
+			yyv3695 = []LoadBalancerIngress{}
+			yyc3695 = true
 		}
 	}
-	yyh3670.End()
-	if yyc3670 {
-		*v = yyv3670
+	yyh3695.End()
+	if yyc3695 {
+		*v = yyv3695
 	}
 }
 
@@ -46198,10 +46489,10 @@ func (x codecSelfer1234) encSliceServicePort(v []ServicePort, e *codec1978.Encod
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3674 := range v {
+	for _, yyv3699 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3675 := &yyv3674
-		yy3675.CodecEncodeSelf(e)
+		yy3700 := &yyv3699
+		yy3700.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -46211,83 +46502,83 @@ func (x codecSelfer1234) decSliceServicePort(v *[]ServicePort, d *codec1978.Deco
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3676 := *v
-	yyh3676, yyl3676 := z.DecSliceHelperStart()
-	var yyc3676 bool
-	if yyl3676 == 0 {
-		if yyv3676 == nil {
-			yyv3676 = []ServicePort{}
-			yyc3676 = true
-		} else if len(yyv3676) != 0 {
-			yyv3676 = yyv3676[:0]
-			yyc3676 = true
+	yyv3701 := *v
+	yyh3701, yyl3701 := z.DecSliceHelperStart()
+	var yyc3701 bool
+	if yyl3701 == 0 {
+		if yyv3701 == nil {
+			yyv3701 = []ServicePort{}
+			yyc3701 = true
+		} else if len(yyv3701) != 0 {
+			yyv3701 = yyv3701[:0]
+			yyc3701 = true
 		}
-	} else if yyl3676 > 0 {
-		var yyrr3676, yyrl3676 int
-		var yyrt3676 bool
-		if yyl3676 > cap(yyv3676) {
+	} else if yyl3701 > 0 {
+		var yyrr3701, yyrl3701 int
+		var yyrt3701 bool
+		if yyl3701 > cap(yyv3701) {
 
-			yyrg3676 := len(yyv3676) > 0
-			yyv23676 := yyv3676
-			yyrl3676, yyrt3676 = z.DecInferLen(yyl3676, z.DecBasicHandle().MaxInitLen, 80)
-			if yyrt3676 {
-				if yyrl3676 <= cap(yyv3676) {
-					yyv3676 = yyv3676[:yyrl3676]
+			yyrg3701 := len(yyv3701) > 0
+			yyv23701 := yyv3701
+			yyrl3701, yyrt3701 = z.DecInferLen(yyl3701, z.DecBasicHandle().MaxInitLen, 80)
+			if yyrt3701 {
+				if yyrl3701 <= cap(yyv3701) {
+					yyv3701 = yyv3701[:yyrl3701]
 				} else {
-					yyv3676 = make([]ServicePort, yyrl3676)
+					yyv3701 = make([]ServicePort, yyrl3701)
 				}
 			} else {
-				yyv3676 = make([]ServicePort, yyrl3676)
+				yyv3701 = make([]ServicePort, yyrl3701)
 			}
-			yyc3676 = true
-			yyrr3676 = len(yyv3676)
-			if yyrg3676 {
-				copy(yyv3676, yyv23676)
+			yyc3701 = true
+			yyrr3701 = len(yyv3701)
+			if yyrg3701 {
+				copy(yyv3701, yyv23701)
 			}
-		} else if yyl3676 != len(yyv3676) {
-			yyv3676 = yyv3676[:yyl3676]
-			yyc3676 = true
+		} else if yyl3701 != len(yyv3701) {
+			yyv3701 = yyv3701[:yyl3701]
+			yyc3701 = true
 		}
-		yyj3676 := 0
-		for ; yyj3676 < yyrr3676; yyj3676++ {
-			yyh3676.ElemContainerState(yyj3676)
+		yyj3701 := 0
+		for ; yyj3701 < yyrr3701; yyj3701++ {
+			yyh3701.ElemContainerState(yyj3701)
 			if r.TryDecodeAsNil() {
-				yyv3676[yyj3676] = ServicePort{}
+				yyv3701[yyj3701] = ServicePort{}
 			} else {
-				yyv3677 := &yyv3676[yyj3676]
-				yyv3677.CodecDecodeSelf(d)
+				yyv3702 := &yyv3701[yyj3701]
+				yyv3702.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3676 {
-			for ; yyj3676 < yyl3676; yyj3676++ {
-				yyv3676 = append(yyv3676, ServicePort{})
-				yyh3676.ElemContainerState(yyj3676)
+		if yyrt3701 {
+			for ; yyj3701 < yyl3701; yyj3701++ {
+				yyv3701 = append(yyv3701, ServicePort{})
+				yyh3701.ElemContainerState(yyj3701)
 				if r.TryDecodeAsNil() {
-					yyv3676[yyj3676] = ServicePort{}
+					yyv3701[yyj3701] = ServicePort{}
 				} else {
-					yyv3678 := &yyv3676[yyj3676]
-					yyv3678.CodecDecodeSelf(d)
+					yyv3703 := &yyv3701[yyj3701]
+					yyv3703.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3676 := 0
-		for ; !r.CheckBreak(); yyj3676++ {
+		yyj3701 := 0
+		for ; !r.CheckBreak(); yyj3701++ {
 
-			if yyj3676 >= len(yyv3676) {
-				yyv3676 = append(yyv3676, ServicePort{}) // var yyz3676 ServicePort
-				yyc3676 = true
+			if yyj3701 >= len(yyv3701) {
+				yyv3701 = append(yyv3701, ServicePort{}) // var yyz3701 ServicePort
+				yyc3701 = true
 			}
-			yyh3676.ElemContainerState(yyj3676)
-			if yyj3676 < len(yyv3676) {
+			yyh3701.ElemContainerState(yyj3701)
+			if yyj3701 < len(yyv3701) {
 				if r.TryDecodeAsNil() {
-					yyv3676[yyj3676] = ServicePort{}
+					yyv3701[yyj3701] = ServicePort{}
 				} else {
-					yyv3679 := &yyv3676[yyj3676]
-					yyv3679.CodecDecodeSelf(d)
+					yyv3704 := &yyv3701[yyj3701]
+					yyv3704.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -46295,17 +46586,17 @@ func (x codecSelfer1234) decSliceServicePort(v *[]ServicePort, d *codec1978.Deco
 			}
 
 		}
-		if yyj3676 < len(yyv3676) {
-			yyv3676 = yyv3676[:yyj3676]
-			yyc3676 = true
-		} else if yyj3676 == 0 && yyv3676 == nil {
-			yyv3676 = []ServicePort{}
-			yyc3676 = true
+		if yyj3701 < len(yyv3701) {
+			yyv3701 = yyv3701[:yyj3701]
+			yyc3701 = true
+		} else if yyj3701 == 0 && yyv3701 == nil {
+			yyv3701 = []ServicePort{}
+			yyc3701 = true
 		}
 	}
-	yyh3676.End()
-	if yyc3676 {
-		*v = yyv3676
+	yyh3701.End()
+	if yyc3701 {
+		*v = yyv3701
 	}
 }
 
@@ -46314,10 +46605,10 @@ func (x codecSelfer1234) encSliceObjectReference(v []ObjectReference, e *codec19
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3680 := range v {
+	for _, yyv3705 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3681 := &yyv3680
-		yy3681.CodecEncodeSelf(e)
+		yy3706 := &yyv3705
+		yy3706.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -46327,83 +46618,83 @@ func (x codecSelfer1234) decSliceObjectReference(v *[]ObjectReference, d *codec1
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3682 := *v
-	yyh3682, yyl3682 := z.DecSliceHelperStart()
-	var yyc3682 bool
-	if yyl3682 == 0 {
-		if yyv3682 == nil {
-			yyv3682 = []ObjectReference{}
-			yyc3682 = true
-		} else if len(yyv3682) != 0 {
-			yyv3682 = yyv3682[:0]
-			yyc3682 = true
+	yyv3707 := *v
+	yyh3707, yyl3707 := z.DecSliceHelperStart()
+	var yyc3707 bool
+	if yyl3707 == 0 {
+		if yyv3707 == nil {
+			yyv3707 = []ObjectReference{}
+			yyc3707 = true
+		} else if len(yyv3707) != 0 {
+			yyv3707 = yyv3707[:0]
+			yyc3707 = true
 		}
-	} else if yyl3682 > 0 {
-		var yyrr3682, yyrl3682 int
-		var yyrt3682 bool
-		if yyl3682 > cap(yyv3682) {
+	} else if yyl3707 > 0 {
+		var yyrr3707, yyrl3707 int
+		var yyrt3707 bool
+		if yyl3707 > cap(yyv3707) {
 
-			yyrg3682 := len(yyv3682) > 0
-			yyv23682 := yyv3682
-			yyrl3682, yyrt3682 = z.DecInferLen(yyl3682, z.DecBasicHandle().MaxInitLen, 112)
-			if yyrt3682 {
-				if yyrl3682 <= cap(yyv3682) {
-					yyv3682 = yyv3682[:yyrl3682]
+			yyrg3707 := len(yyv3707) > 0
+			yyv23707 := yyv3707
+			yyrl3707, yyrt3707 = z.DecInferLen(yyl3707, z.DecBasicHandle().MaxInitLen, 112)
+			if yyrt3707 {
+				if yyrl3707 <= cap(yyv3707) {
+					yyv3707 = yyv3707[:yyrl3707]
 				} else {
-					yyv3682 = make([]ObjectReference, yyrl3682)
+					yyv3707 = make([]ObjectReference, yyrl3707)
 				}
 			} else {
-				yyv3682 = make([]ObjectReference, yyrl3682)
+				yyv3707 = make([]ObjectReference, yyrl3707)
 			}
-			yyc3682 = true
-			yyrr3682 = len(yyv3682)
-			if yyrg3682 {
-				copy(yyv3682, yyv23682)
+			yyc3707 = true
+			yyrr3707 = len(yyv3707)
+			if yyrg3707 {
+				copy(yyv3707, yyv23707)
 			}
-		} else if yyl3682 != len(yyv3682) {
-			yyv3682 = yyv3682[:yyl3682]
-			yyc3682 = true
+		} else if yyl3707 != len(yyv3707) {
+			yyv3707 = yyv3707[:yyl3707]
+			yyc3707 = true
 		}
-		yyj3682 := 0
-		for ; yyj3682 < yyrr3682; yyj3682++ {
-			yyh3682.ElemContainerState(yyj3682)
+		yyj3707 := 0
+		for ; yyj3707 < yyrr3707; yyj3707++ {
+			yyh3707.ElemContainerState(yyj3707)
 			if r.TryDecodeAsNil() {
-				yyv3682[yyj3682] = ObjectReference{}
+				yyv3707[yyj3707] = ObjectReference{}
 			} else {
-				yyv3683 := &yyv3682[yyj3682]
-				yyv3683.CodecDecodeSelf(d)
+				yyv3708 := &yyv3707[yyj3707]
+				yyv3708.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3682 {
-			for ; yyj3682 < yyl3682; yyj3682++ {
-				yyv3682 = append(yyv3682, ObjectReference{})
-				yyh3682.ElemContainerState(yyj3682)
+		if yyrt3707 {
+			for ; yyj3707 < yyl3707; yyj3707++ {
+				yyv3707 = append(yyv3707, ObjectReference{})
+				yyh3707.ElemContainerState(yyj3707)
 				if r.TryDecodeAsNil() {
-					yyv3682[yyj3682] = ObjectReference{}
+					yyv3707[yyj3707] = ObjectReference{}
 				} else {
-					yyv3684 := &yyv3682[yyj3682]
-					yyv3684.CodecDecodeSelf(d)
+					yyv3709 := &yyv3707[yyj3707]
+					yyv3709.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3682 := 0
-		for ; !r.CheckBreak(); yyj3682++ {
+		yyj3707 := 0
+		for ; !r.CheckBreak(); yyj3707++ {
 
-			if yyj3682 >= len(yyv3682) {
-				yyv3682 = append(yyv3682, ObjectReference{}) // var yyz3682 ObjectReference
-				yyc3682 = true
+			if yyj3707 >= len(yyv3707) {
+				yyv3707 = append(yyv3707, ObjectReference{}) // var yyz3707 ObjectReference
+				yyc3707 = true
 			}
-			yyh3682.ElemContainerState(yyj3682)
-			if yyj3682 < len(yyv3682) {
+			yyh3707.ElemContainerState(yyj3707)
+			if yyj3707 < len(yyv3707) {
 				if r.TryDecodeAsNil() {
-					yyv3682[yyj3682] = ObjectReference{}
+					yyv3707[yyj3707] = ObjectReference{}
 				} else {
-					yyv3685 := &yyv3682[yyj3682]
-					yyv3685.CodecDecodeSelf(d)
+					yyv3710 := &yyv3707[yyj3707]
+					yyv3710.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -46411,17 +46702,17 @@ func (x codecSelfer1234) decSliceObjectReference(v *[]ObjectReference, d *codec1
 			}
 
 		}
-		if yyj3682 < len(yyv3682) {
-			yyv3682 = yyv3682[:yyj3682]
-			yyc3682 = true
-		} else if yyj3682 == 0 && yyv3682 == nil {
-			yyv3682 = []ObjectReference{}
-			yyc3682 = true
+		if yyj3707 < len(yyv3707) {
+			yyv3707 = yyv3707[:yyj3707]
+			yyc3707 = true
+		} else if yyj3707 == 0 && yyv3707 == nil {
+			yyv3707 = []ObjectReference{}
+			yyc3707 = true
 		}
 	}
-	yyh3682.End()
-	if yyc3682 {
-		*v = yyv3682
+	yyh3707.End()
+	if yyc3707 {
+		*v = yyv3707
 	}
 }
 
@@ -46430,10 +46721,10 @@ func (x codecSelfer1234) encSliceServiceAccount(v []ServiceAccount, e *codec1978
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3686 := range v {
+	for _, yyv3711 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3687 := &yyv3686
-		yy3687.CodecEncodeSelf(e)
+		yy3712 := &yyv3711
+		yy3712.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -46443,83 +46734,83 @@ func (x codecSelfer1234) decSliceServiceAccount(v *[]ServiceAccount, d *codec197
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3688 := *v
-	yyh3688, yyl3688 := z.DecSliceHelperStart()
-	var yyc3688 bool
-	if yyl3688 == 0 {
-		if yyv3688 == nil {
-			yyv3688 = []ServiceAccount{}
-			yyc3688 = true
-		} else if len(yyv3688) != 0 {
-			yyv3688 = yyv3688[:0]
-			yyc3688 = true
+	yyv3713 := *v
+	yyh3713, yyl3713 := z.DecSliceHelperStart()
+	var yyc3713 bool
+	if yyl3713 == 0 {
+		if yyv3713 == nil {
+			yyv3713 = []ServiceAccount{}
+			yyc3713 = true
+		} else if len(yyv3713) != 0 {
+			yyv3713 = yyv3713[:0]
+			yyc3713 = true
 		}
-	} else if yyl3688 > 0 {
-		var yyrr3688, yyrl3688 int
-		var yyrt3688 bool
-		if yyl3688 > cap(yyv3688) {
+	} else if yyl3713 > 0 {
+		var yyrr3713, yyrl3713 int
+		var yyrt3713 bool
+		if yyl3713 > cap(yyv3713) {
 
-			yyrg3688 := len(yyv3688) > 0
-			yyv23688 := yyv3688
-			yyrl3688, yyrt3688 = z.DecInferLen(yyl3688, z.DecBasicHandle().MaxInitLen, 240)
-			if yyrt3688 {
-				if yyrl3688 <= cap(yyv3688) {
-					yyv3688 = yyv3688[:yyrl3688]
+			yyrg3713 := len(yyv3713) > 0
+			yyv23713 := yyv3713
+			yyrl3713, yyrt3713 = z.DecInferLen(yyl3713, z.DecBasicHandle().MaxInitLen, 240)
+			if yyrt3713 {
+				if yyrl3713 <= cap(yyv3713) {
+					yyv3713 = yyv3713[:yyrl3713]
 				} else {
-					yyv3688 = make([]ServiceAccount, yyrl3688)
+					yyv3713 = make([]ServiceAccount, yyrl3713)
 				}
 			} else {
-				yyv3688 = make([]ServiceAccount, yyrl3688)
+				yyv3713 = make([]ServiceAccount, yyrl3713)
 			}
-			yyc3688 = true
-			yyrr3688 = len(yyv3688)
-			if yyrg3688 {
-				copy(yyv3688, yyv23688)
+			yyc3713 = true
+			yyrr3713 = len(yyv3713)
+			if yyrg3713 {
+				copy(yyv3713, yyv23713)
 			}
-		} else if yyl3688 != len(yyv3688) {
-			yyv3688 = yyv3688[:yyl3688]
-			yyc3688 = true
+		} else if yyl3713 != len(yyv3713) {
+			yyv3713 = yyv3713[:yyl3713]
+			yyc3713 = true
 		}
-		yyj3688 := 0
-		for ; yyj3688 < yyrr3688; yyj3688++ {
-			yyh3688.ElemContainerState(yyj3688)
+		yyj3713 := 0
+		for ; yyj3713 < yyrr3713; yyj3713++ {
+			yyh3713.ElemContainerState(yyj3713)
 			if r.TryDecodeAsNil() {
-				yyv3688[yyj3688] = ServiceAccount{}
+				yyv3713[yyj3713] = ServiceAccount{}
 			} else {
-				yyv3689 := &yyv3688[yyj3688]
-				yyv3689.CodecDecodeSelf(d)
+				yyv3714 := &yyv3713[yyj3713]
+				yyv3714.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3688 {
-			for ; yyj3688 < yyl3688; yyj3688++ {
-				yyv3688 = append(yyv3688, ServiceAccount{})
-				yyh3688.ElemContainerState(yyj3688)
+		if yyrt3713 {
+			for ; yyj3713 < yyl3713; yyj3713++ {
+				yyv3713 = append(yyv3713, ServiceAccount{})
+				yyh3713.ElemContainerState(yyj3713)
 				if r.TryDecodeAsNil() {
-					yyv3688[yyj3688] = ServiceAccount{}
+					yyv3713[yyj3713] = ServiceAccount{}
 				} else {
-					yyv3690 := &yyv3688[yyj3688]
-					yyv3690.CodecDecodeSelf(d)
+					yyv3715 := &yyv3713[yyj3713]
+					yyv3715.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3688 := 0
-		for ; !r.CheckBreak(); yyj3688++ {
+		yyj3713 := 0
+		for ; !r.CheckBreak(); yyj3713++ {
 
-			if yyj3688 >= len(yyv3688) {
-				yyv3688 = append(yyv3688, ServiceAccount{}) // var yyz3688 ServiceAccount
-				yyc3688 = true
+			if yyj3713 >= len(yyv3713) {
+				yyv3713 = append(yyv3713, ServiceAccount{}) // var yyz3713 ServiceAccount
+				yyc3713 = true
 			}
-			yyh3688.ElemContainerState(yyj3688)
-			if yyj3688 < len(yyv3688) {
+			yyh3713.ElemContainerState(yyj3713)
+			if yyj3713 < len(yyv3713) {
 				if r.TryDecodeAsNil() {
-					yyv3688[yyj3688] = ServiceAccount{}
+					yyv3713[yyj3713] = ServiceAccount{}
 				} else {
-					yyv3691 := &yyv3688[yyj3688]
-					yyv3691.CodecDecodeSelf(d)
+					yyv3716 := &yyv3713[yyj3713]
+					yyv3716.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -46527,17 +46818,17 @@ func (x codecSelfer1234) decSliceServiceAccount(v *[]ServiceAccount, d *codec197
 			}
 
 		}
-		if yyj3688 < len(yyv3688) {
-			yyv3688 = yyv3688[:yyj3688]
-			yyc3688 = true
-		} else if yyj3688 == 0 && yyv3688 == nil {
-			yyv3688 = []ServiceAccount{}
-			yyc3688 = true
+		if yyj3713 < len(yyv3713) {
+			yyv3713 = yyv3713[:yyj3713]
+			yyc3713 = true
+		} else if yyj3713 == 0 && yyv3713 == nil {
+			yyv3713 = []ServiceAccount{}
+			yyc3713 = true
 		}
 	}
-	yyh3688.End()
-	if yyc3688 {
-		*v = yyv3688
+	yyh3713.End()
+	if yyc3713 {
+		*v = yyv3713
 	}
 }
 
@@ -46546,10 +46837,10 @@ func (x codecSelfer1234) encSliceEndpointSubset(v []EndpointSubset, e *codec1978
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3692 := range v {
+	for _, yyv3717 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3693 := &yyv3692
-		yy3693.CodecEncodeSelf(e)
+		yy3718 := &yyv3717
+		yy3718.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -46559,83 +46850,83 @@ func (x codecSelfer1234) decSliceEndpointSubset(v *[]EndpointSubset, d *codec197
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3694 := *v
-	yyh3694, yyl3694 := z.DecSliceHelperStart()
-	var yyc3694 bool
-	if yyl3694 == 0 {
-		if yyv3694 == nil {
-			yyv3694 = []EndpointSubset{}
-			yyc3694 = true
-		} else if len(yyv3694) != 0 {
-			yyv3694 = yyv3694[:0]
-			yyc3694 = true
+	yyv3719 := *v
+	yyh3719, yyl3719 := z.DecSliceHelperStart()
+	var yyc3719 bool
+	if yyl3719 == 0 {
+		if yyv3719 == nil {
+			yyv3719 = []EndpointSubset{}
+			yyc3719 = true
+		} else if len(yyv3719) != 0 {
+			yyv3719 = yyv3719[:0]
+			yyc3719 = true
 		}
-	} else if yyl3694 > 0 {
-		var yyrr3694, yyrl3694 int
-		var yyrt3694 bool
-		if yyl3694 > cap(yyv3694) {
+	} else if yyl3719 > 0 {
+		var yyrr3719, yyrl3719 int
+		var yyrt3719 bool
+		if yyl3719 > cap(yyv3719) {
 
-			yyrg3694 := len(yyv3694) > 0
-			yyv23694 := yyv3694
-			yyrl3694, yyrt3694 = z.DecInferLen(yyl3694, z.DecBasicHandle().MaxInitLen, 72)
-			if yyrt3694 {
-				if yyrl3694 <= cap(yyv3694) {
-					yyv3694 = yyv3694[:yyrl3694]
+			yyrg3719 := len(yyv3719) > 0
+			yyv23719 := yyv3719
+			yyrl3719, yyrt3719 = z.DecInferLen(yyl3719, z.DecBasicHandle().MaxInitLen, 72)
+			if yyrt3719 {
+				if yyrl3719 <= cap(yyv3719) {
+					yyv3719 = yyv3719[:yyrl3719]
 				} else {
-					yyv3694 = make([]EndpointSubset, yyrl3694)
+					yyv3719 = make([]EndpointSubset, yyrl3719)
 				}
 			} else {
-				yyv3694 = make([]EndpointSubset, yyrl3694)
+				yyv3719 = make([]EndpointSubset, yyrl3719)
 			}
-			yyc3694 = true
-			yyrr3694 = len(yyv3694)
-			if yyrg3694 {
-				copy(yyv3694, yyv23694)
+			yyc3719 = true
+			yyrr3719 = len(yyv3719)
+			if yyrg3719 {
+				copy(yyv3719, yyv23719)
 			}
-		} else if yyl3694 != len(yyv3694) {
-			yyv3694 = yyv3694[:yyl3694]
-			yyc3694 = true
+		} else if yyl3719 != len(yyv3719) {
+			yyv3719 = yyv3719[:yyl3719]
+			yyc3719 = true
 		}
-		yyj3694 := 0
-		for ; yyj3694 < yyrr3694; yyj3694++ {
-			yyh3694.ElemContainerState(yyj3694)
+		yyj3719 := 0
+		for ; yyj3719 < yyrr3719; yyj3719++ {
+			yyh3719.ElemContainerState(yyj3719)
 			if r.TryDecodeAsNil() {
-				yyv3694[yyj3694] = EndpointSubset{}
+				yyv3719[yyj3719] = EndpointSubset{}
 			} else {
-				yyv3695 := &yyv3694[yyj3694]
-				yyv3695.CodecDecodeSelf(d)
+				yyv3720 := &yyv3719[yyj3719]
+				yyv3720.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3694 {
-			for ; yyj3694 < yyl3694; yyj3694++ {
-				yyv3694 = append(yyv3694, EndpointSubset{})
-				yyh3694.ElemContainerState(yyj3694)
+		if yyrt3719 {
+			for ; yyj3719 < yyl3719; yyj3719++ {
+				yyv3719 = append(yyv3719, EndpointSubset{})
+				yyh3719.ElemContainerState(yyj3719)
 				if r.TryDecodeAsNil() {
-					yyv3694[yyj3694] = EndpointSubset{}
+					yyv3719[yyj3719] = EndpointSubset{}
 				} else {
-					yyv3696 := &yyv3694[yyj3694]
-					yyv3696.CodecDecodeSelf(d)
+					yyv3721 := &yyv3719[yyj3719]
+					yyv3721.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3694 := 0
-		for ; !r.CheckBreak(); yyj3694++ {
+		yyj3719 := 0
+		for ; !r.CheckBreak(); yyj3719++ {
 
-			if yyj3694 >= len(yyv3694) {
-				yyv3694 = append(yyv3694, EndpointSubset{}) // var yyz3694 EndpointSubset
-				yyc3694 = true
+			if yyj3719 >= len(yyv3719) {
+				yyv3719 = append(yyv3719, EndpointSubset{}) // var yyz3719 EndpointSubset
+				yyc3719 = true
 			}
-			yyh3694.ElemContainerState(yyj3694)
-			if yyj3694 < len(yyv3694) {
+			yyh3719.ElemContainerState(yyj3719)
+			if yyj3719 < len(yyv3719) {
 				if r.TryDecodeAsNil() {
-					yyv3694[yyj3694] = EndpointSubset{}
+					yyv3719[yyj3719] = EndpointSubset{}
 				} else {
-					yyv3697 := &yyv3694[yyj3694]
-					yyv3697.CodecDecodeSelf(d)
+					yyv3722 := &yyv3719[yyj3719]
+					yyv3722.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -46643,17 +46934,17 @@ func (x codecSelfer1234) decSliceEndpointSubset(v *[]EndpointSubset, d *codec197
 			}
 
 		}
-		if yyj3694 < len(yyv3694) {
-			yyv3694 = yyv3694[:yyj3694]
-			yyc3694 = true
-		} else if yyj3694 == 0 && yyv3694 == nil {
-			yyv3694 = []EndpointSubset{}
-			yyc3694 = true
+		if yyj3719 < len(yyv3719) {
+			yyv3719 = yyv3719[:yyj3719]
+			yyc3719 = true
+		} else if yyj3719 == 0 && yyv3719 == nil {
+			yyv3719 = []EndpointSubset{}
+			yyc3719 = true
 		}
 	}
-	yyh3694.End()
-	if yyc3694 {
-		*v = yyv3694
+	yyh3719.End()
+	if yyc3719 {
+		*v = yyv3719
 	}
 }
 
@@ -46662,10 +46953,10 @@ func (x codecSelfer1234) encSliceEndpointAddress(v []EndpointAddress, e *codec19
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3698 := range v {
+	for _, yyv3723 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3699 := &yyv3698
-		yy3699.CodecEncodeSelf(e)
+		yy3724 := &yyv3723
+		yy3724.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -46675,83 +46966,83 @@ func (x codecSelfer1234) decSliceEndpointAddress(v *[]EndpointAddress, d *codec1
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3700 := *v
-	yyh3700, yyl3700 := z.DecSliceHelperStart()
-	var yyc3700 bool
-	if yyl3700 == 0 {
-		if yyv3700 == nil {
-			yyv3700 = []EndpointAddress{}
-			yyc3700 = true
-		} else if len(yyv3700) != 0 {
-			yyv3700 = yyv3700[:0]
-			yyc3700 = true
+	yyv3725 := *v
+	yyh3725, yyl3725 := z.DecSliceHelperStart()
+	var yyc3725 bool
+	if yyl3725 == 0 {
+		if yyv3725 == nil {
+			yyv3725 = []EndpointAddress{}
+			yyc3725 = true
+		} else if len(yyv3725) != 0 {
+			yyv3725 = yyv3725[:0]
+			yyc3725 = true
 		}
-	} else if yyl3700 > 0 {
-		var yyrr3700, yyrl3700 int
-		var yyrt3700 bool
-		if yyl3700 > cap(yyv3700) {
+	} else if yyl3725 > 0 {
+		var yyrr3725, yyrl3725 int
+		var yyrt3725 bool
+		if yyl3725 > cap(yyv3725) {
 
-			yyrg3700 := len(yyv3700) > 0
-			yyv23700 := yyv3700
-			yyrl3700, yyrt3700 = z.DecInferLen(yyl3700, z.DecBasicHandle().MaxInitLen, 24)
-			if yyrt3700 {
-				if yyrl3700 <= cap(yyv3700) {
-					yyv3700 = yyv3700[:yyrl3700]
+			yyrg3725 := len(yyv3725) > 0
+			yyv23725 := yyv3725
+			yyrl3725, yyrt3725 = z.DecInferLen(yyl3725, z.DecBasicHandle().MaxInitLen, 24)
+			if yyrt3725 {
+				if yyrl3725 <= cap(yyv3725) {
+					yyv3725 = yyv3725[:yyrl3725]
 				} else {
-					yyv3700 = make([]EndpointAddress, yyrl3700)
+					yyv3725 = make([]EndpointAddress, yyrl3725)
 				}
 			} else {
-				yyv3700 = make([]EndpointAddress, yyrl3700)
+				yyv3725 = make([]EndpointAddress, yyrl3725)
 			}
-			yyc3700 = true
-			yyrr3700 = len(yyv3700)
-			if yyrg3700 {
-				copy(yyv3700, yyv23700)
+			yyc3725 = true
+			yyrr3725 = len(yyv3725)
+			if yyrg3725 {
+				copy(yyv3725, yyv23725)
 			}
-		} else if yyl3700 != len(yyv3700) {
-			yyv3700 = yyv3700[:yyl3700]
-			yyc3700 = true
+		} else if yyl3725 != len(yyv3725) {
+			yyv3725 = yyv3725[:yyl3725]
+			yyc3725 = true
 		}
-		yyj3700 := 0
-		for ; yyj3700 < yyrr3700; yyj3700++ {
-			yyh3700.ElemContainerState(yyj3700)
+		yyj3725 := 0
+		for ; yyj3725 < yyrr3725; yyj3725++ {
+			yyh3725.ElemContainerState(yyj3725)
 			if r.TryDecodeAsNil() {
-				yyv3700[yyj3700] = EndpointAddress{}
+				yyv3725[yyj3725] = EndpointAddress{}
 			} else {
-				yyv3701 := &yyv3700[yyj3700]
-				yyv3701.CodecDecodeSelf(d)
+				yyv3726 := &yyv3725[yyj3725]
+				yyv3726.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3700 {
-			for ; yyj3700 < yyl3700; yyj3700++ {
-				yyv3700 = append(yyv3700, EndpointAddress{})
-				yyh3700.ElemContainerState(yyj3700)
+		if yyrt3725 {
+			for ; yyj3725 < yyl3725; yyj3725++ {
+				yyv3725 = append(yyv3725, EndpointAddress{})
+				yyh3725.ElemContainerState(yyj3725)
 				if r.TryDecodeAsNil() {
-					yyv3700[yyj3700] = EndpointAddress{}
+					yyv3725[yyj3725] = EndpointAddress{}
 				} else {
-					yyv3702 := &yyv3700[yyj3700]
-					yyv3702.CodecDecodeSelf(d)
+					yyv3727 := &yyv3725[yyj3725]
+					yyv3727.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3700 := 0
-		for ; !r.CheckBreak(); yyj3700++ {
+		yyj3725 := 0
+		for ; !r.CheckBreak(); yyj3725++ {
 
-			if yyj3700 >= len(yyv3700) {
-				yyv3700 = append(yyv3700, EndpointAddress{}) // var yyz3700 EndpointAddress
-				yyc3700 = true
+			if yyj3725 >= len(yyv3725) {
+				yyv3725 = append(yyv3725, EndpointAddress{}) // var yyz3725 EndpointAddress
+				yyc3725 = true
 			}
-			yyh3700.ElemContainerState(yyj3700)
-			if yyj3700 < len(yyv3700) {
+			yyh3725.ElemContainerState(yyj3725)
+			if yyj3725 < len(yyv3725) {
 				if r.TryDecodeAsNil() {
-					yyv3700[yyj3700] = EndpointAddress{}
+					yyv3725[yyj3725] = EndpointAddress{}
 				} else {
-					yyv3703 := &yyv3700[yyj3700]
-					yyv3703.CodecDecodeSelf(d)
+					yyv3728 := &yyv3725[yyj3725]
+					yyv3728.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -46759,17 +47050,17 @@ func (x codecSelfer1234) decSliceEndpointAddress(v *[]EndpointAddress, d *codec1
 			}
 
 		}
-		if yyj3700 < len(yyv3700) {
-			yyv3700 = yyv3700[:yyj3700]
-			yyc3700 = true
-		} else if yyj3700 == 0 && yyv3700 == nil {
-			yyv3700 = []EndpointAddress{}
-			yyc3700 = true
+		if yyj3725 < len(yyv3725) {
+			yyv3725 = yyv3725[:yyj3725]
+			yyc3725 = true
+		} else if yyj3725 == 0 && yyv3725 == nil {
+			yyv3725 = []EndpointAddress{}
+			yyc3725 = true
 		}
 	}
-	yyh3700.End()
-	if yyc3700 {
-		*v = yyv3700
+	yyh3725.End()
+	if yyc3725 {
+		*v = yyv3725
 	}
 }
 
@@ -46778,10 +47069,10 @@ func (x codecSelfer1234) encSliceEndpointPort(v []EndpointPort, e *codec1978.Enc
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3704 := range v {
+	for _, yyv3729 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3705 := &yyv3704
-		yy3705.CodecEncodeSelf(e)
+		yy3730 := &yyv3729
+		yy3730.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -46791,83 +47082,83 @@ func (x codecSelfer1234) decSliceEndpointPort(v *[]EndpointPort, d *codec1978.De
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3706 := *v
-	yyh3706, yyl3706 := z.DecSliceHelperStart()
-	var yyc3706 bool
-	if yyl3706 == 0 {
-		if yyv3706 == nil {
-			yyv3706 = []EndpointPort{}
-			yyc3706 = true
-		} else if len(yyv3706) != 0 {
-			yyv3706 = yyv3706[:0]
-			yyc3706 = true
+	yyv3731 := *v
+	yyh3731, yyl3731 := z.DecSliceHelperStart()
+	var yyc3731 bool
+	if yyl3731 == 0 {
+		if yyv3731 == nil {
+			yyv3731 = []EndpointPort{}
+			yyc3731 = true
+		} else if len(yyv3731) != 0 {
+			yyv3731 = yyv3731[:0]
+			yyc3731 = true
 		}
-	} else if yyl3706 > 0 {
-		var yyrr3706, yyrl3706 int
-		var yyrt3706 bool
-		if yyl3706 > cap(yyv3706) {
+	} else if yyl3731 > 0 {
+		var yyrr3731, yyrl3731 int
+		var yyrt3731 bool
+		if yyl3731 > cap(yyv3731) {
 
-			yyrg3706 := len(yyv3706) > 0
-			yyv23706 := yyv3706
-			yyrl3706, yyrt3706 = z.DecInferLen(yyl3706, z.DecBasicHandle().MaxInitLen, 40)
-			if yyrt3706 {
-				if yyrl3706 <= cap(yyv3706) {
-					yyv3706 = yyv3706[:yyrl3706]
+			yyrg3731 := len(yyv3731) > 0
+			yyv23731 := yyv3731
+			yyrl3731, yyrt3731 = z.DecInferLen(yyl3731, z.DecBasicHandle().MaxInitLen, 40)
+			if yyrt3731 {
+				if yyrl3731 <= cap(yyv3731) {
+					yyv3731 = yyv3731[:yyrl3731]
 				} else {
-					yyv3706 = make([]EndpointPort, yyrl3706)
+					yyv3731 = make([]EndpointPort, yyrl3731)
 				}
 			} else {
-				yyv3706 = make([]EndpointPort, yyrl3706)
+				yyv3731 = make([]EndpointPort, yyrl3731)
 			}
-			yyc3706 = true
-			yyrr3706 = len(yyv3706)
-			if yyrg3706 {
-				copy(yyv3706, yyv23706)
+			yyc3731 = true
+			yyrr3731 = len(yyv3731)
+			if yyrg3731 {
+				copy(yyv3731, yyv23731)
 			}
-		} else if yyl3706 != len(yyv3706) {
-			yyv3706 = yyv3706[:yyl3706]
-			yyc3706 = true
+		} else if yyl3731 != len(yyv3731) {
+			yyv3731 = yyv3731[:yyl3731]
+			yyc3731 = true
 		}
-		yyj3706 := 0
-		for ; yyj3706 < yyrr3706; yyj3706++ {
-			yyh3706.ElemContainerState(yyj3706)
+		yyj3731 := 0
+		for ; yyj3731 < yyrr3731; yyj3731++ {
+			yyh3731.ElemContainerState(yyj3731)
 			if r.TryDecodeAsNil() {
-				yyv3706[yyj3706] = EndpointPort{}
+				yyv3731[yyj3731] = EndpointPort{}
 			} else {
-				yyv3707 := &yyv3706[yyj3706]
-				yyv3707.CodecDecodeSelf(d)
+				yyv3732 := &yyv3731[yyj3731]
+				yyv3732.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3706 {
-			for ; yyj3706 < yyl3706; yyj3706++ {
-				yyv3706 = append(yyv3706, EndpointPort{})
-				yyh3706.ElemContainerState(yyj3706)
+		if yyrt3731 {
+			for ; yyj3731 < yyl3731; yyj3731++ {
+				yyv3731 = append(yyv3731, EndpointPort{})
+				yyh3731.ElemContainerState(yyj3731)
 				if r.TryDecodeAsNil() {
-					yyv3706[yyj3706] = EndpointPort{}
+					yyv3731[yyj3731] = EndpointPort{}
 				} else {
-					yyv3708 := &yyv3706[yyj3706]
-					yyv3708.CodecDecodeSelf(d)
+					yyv3733 := &yyv3731[yyj3731]
+					yyv3733.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3706 := 0
-		for ; !r.CheckBreak(); yyj3706++ {
+		yyj3731 := 0
+		for ; !r.CheckBreak(); yyj3731++ {
 
-			if yyj3706 >= len(yyv3706) {
-				yyv3706 = append(yyv3706, EndpointPort{}) // var yyz3706 EndpointPort
-				yyc3706 = true
+			if yyj3731 >= len(yyv3731) {
+				yyv3731 = append(yyv3731, EndpointPort{}) // var yyz3731 EndpointPort
+				yyc3731 = true
 			}
-			yyh3706.ElemContainerState(yyj3706)
-			if yyj3706 < len(yyv3706) {
+			yyh3731.ElemContainerState(yyj3731)
+			if yyj3731 < len(yyv3731) {
 				if r.TryDecodeAsNil() {
-					yyv3706[yyj3706] = EndpointPort{}
+					yyv3731[yyj3731] = EndpointPort{}
 				} else {
-					yyv3709 := &yyv3706[yyj3706]
-					yyv3709.CodecDecodeSelf(d)
+					yyv3734 := &yyv3731[yyj3731]
+					yyv3734.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -46875,17 +47166,17 @@ func (x codecSelfer1234) decSliceEndpointPort(v *[]EndpointPort, d *codec1978.De
 			}
 
 		}
-		if yyj3706 < len(yyv3706) {
-			yyv3706 = yyv3706[:yyj3706]
-			yyc3706 = true
-		} else if yyj3706 == 0 && yyv3706 == nil {
-			yyv3706 = []EndpointPort{}
-			yyc3706 = true
+		if yyj3731 < len(yyv3731) {
+			yyv3731 = yyv3731[:yyj3731]
+			yyc3731 = true
+		} else if yyj3731 == 0 && yyv3731 == nil {
+			yyv3731 = []EndpointPort{}
+			yyc3731 = true
 		}
 	}
-	yyh3706.End()
-	if yyc3706 {
-		*v = yyv3706
+	yyh3731.End()
+	if yyc3731 {
+		*v = yyv3731
 	}
 }
 
@@ -46894,10 +47185,10 @@ func (x codecSelfer1234) encSliceEndpoints(v []Endpoints, e *codec1978.Encoder) 
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3710 := range v {
+	for _, yyv3735 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3711 := &yyv3710
-		yy3711.CodecEncodeSelf(e)
+		yy3736 := &yyv3735
+		yy3736.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -46907,83 +47198,83 @@ func (x codecSelfer1234) decSliceEndpoints(v *[]Endpoints, d *codec1978.Decoder)
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3712 := *v
-	yyh3712, yyl3712 := z.DecSliceHelperStart()
-	var yyc3712 bool
-	if yyl3712 == 0 {
-		if yyv3712 == nil {
-			yyv3712 = []Endpoints{}
-			yyc3712 = true
-		} else if len(yyv3712) != 0 {
-			yyv3712 = yyv3712[:0]
-			yyc3712 = true
+	yyv3737 := *v
+	yyh3737, yyl3737 := z.DecSliceHelperStart()
+	var yyc3737 bool
+	if yyl3737 == 0 {
+		if yyv3737 == nil {
+			yyv3737 = []Endpoints{}
+			yyc3737 = true
+		} else if len(yyv3737) != 0 {
+			yyv3737 = yyv3737[:0]
+			yyc3737 = true
 		}
-	} else if yyl3712 > 0 {
-		var yyrr3712, yyrl3712 int
-		var yyrt3712 bool
-		if yyl3712 > cap(yyv3712) {
+	} else if yyl3737 > 0 {
+		var yyrr3737, yyrl3737 int
+		var yyrt3737 bool
+		if yyl3737 > cap(yyv3737) {
 
-			yyrg3712 := len(yyv3712) > 0
-			yyv23712 := yyv3712
-			yyrl3712, yyrt3712 = z.DecInferLen(yyl3712, z.DecBasicHandle().MaxInitLen, 216)
-			if yyrt3712 {
-				if yyrl3712 <= cap(yyv3712) {
-					yyv3712 = yyv3712[:yyrl3712]
+			yyrg3737 := len(yyv3737) > 0
+			yyv23737 := yyv3737
+			yyrl3737, yyrt3737 = z.DecInferLen(yyl3737, z.DecBasicHandle().MaxInitLen, 216)
+			if yyrt3737 {
+				if yyrl3737 <= cap(yyv3737) {
+					yyv3737 = yyv3737[:yyrl3737]
 				} else {
-					yyv3712 = make([]Endpoints, yyrl3712)
+					yyv3737 = make([]Endpoints, yyrl3737)
 				}
 			} else {
-				yyv3712 = make([]Endpoints, yyrl3712)
+				yyv3737 = make([]Endpoints, yyrl3737)
 			}
-			yyc3712 = true
-			yyrr3712 = len(yyv3712)
-			if yyrg3712 {
-				copy(yyv3712, yyv23712)
+			yyc3737 = true
+			yyrr3737 = len(yyv3737)
+			if yyrg3737 {
+				copy(yyv3737, yyv23737)
 			}
-		} else if yyl3712 != len(yyv3712) {
-			yyv3712 = yyv3712[:yyl3712]
-			yyc3712 = true
+		} else if yyl3737 != len(yyv3737) {
+			yyv3737 = yyv3737[:yyl3737]
+			yyc3737 = true
 		}
-		yyj3712 := 0
-		for ; yyj3712 < yyrr3712; yyj3712++ {
-			yyh3712.ElemContainerState(yyj3712)
+		yyj3737 := 0
+		for ; yyj3737 < yyrr3737; yyj3737++ {
+			yyh3737.ElemContainerState(yyj3737)
 			if r.TryDecodeAsNil() {
-				yyv3712[yyj3712] = Endpoints{}
+				yyv3737[yyj3737] = Endpoints{}
 			} else {
-				yyv3713 := &yyv3712[yyj3712]
-				yyv3713.CodecDecodeSelf(d)
+				yyv3738 := &yyv3737[yyj3737]
+				yyv3738.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3712 {
-			for ; yyj3712 < yyl3712; yyj3712++ {
-				yyv3712 = append(yyv3712, Endpoints{})
-				yyh3712.ElemContainerState(yyj3712)
+		if yyrt3737 {
+			for ; yyj3737 < yyl3737; yyj3737++ {
+				yyv3737 = append(yyv3737, Endpoints{})
+				yyh3737.ElemContainerState(yyj3737)
 				if r.TryDecodeAsNil() {
-					yyv3712[yyj3712] = Endpoints{}
+					yyv3737[yyj3737] = Endpoints{}
 				} else {
-					yyv3714 := &yyv3712[yyj3712]
-					yyv3714.CodecDecodeSelf(d)
+					yyv3739 := &yyv3737[yyj3737]
+					yyv3739.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3712 := 0
-		for ; !r.CheckBreak(); yyj3712++ {
+		yyj3737 := 0
+		for ; !r.CheckBreak(); yyj3737++ {
 
-			if yyj3712 >= len(yyv3712) {
-				yyv3712 = append(yyv3712, Endpoints{}) // var yyz3712 Endpoints
-				yyc3712 = true
+			if yyj3737 >= len(yyv3737) {
+				yyv3737 = append(yyv3737, Endpoints{}) // var yyz3737 Endpoints
+				yyc3737 = true
 			}
-			yyh3712.ElemContainerState(yyj3712)
-			if yyj3712 < len(yyv3712) {
+			yyh3737.ElemContainerState(yyj3737)
+			if yyj3737 < len(yyv3737) {
 				if r.TryDecodeAsNil() {
-					yyv3712[yyj3712] = Endpoints{}
+					yyv3737[yyj3737] = Endpoints{}
 				} else {
-					yyv3715 := &yyv3712[yyj3712]
-					yyv3715.CodecDecodeSelf(d)
+					yyv3740 := &yyv3737[yyj3737]
+					yyv3740.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -46991,17 +47282,17 @@ func (x codecSelfer1234) decSliceEndpoints(v *[]Endpoints, d *codec1978.Decoder)
 			}
 
 		}
-		if yyj3712 < len(yyv3712) {
-			yyv3712 = yyv3712[:yyj3712]
-			yyc3712 = true
-		} else if yyj3712 == 0 && yyv3712 == nil {
-			yyv3712 = []Endpoints{}
-			yyc3712 = true
+		if yyj3737 < len(yyv3737) {
+			yyv3737 = yyv3737[:yyj3737]
+			yyc3737 = true
+		} else if yyj3737 == 0 && yyv3737 == nil {
+			yyv3737 = []Endpoints{}
+			yyc3737 = true
 		}
 	}
-	yyh3712.End()
-	if yyc3712 {
-		*v = yyv3712
+	yyh3737.End()
+	if yyc3737 {
+		*v = yyv3737
 	}
 }
 
@@ -47010,10 +47301,10 @@ func (x codecSelfer1234) encSliceNodeCondition(v []NodeCondition, e *codec1978.E
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3716 := range v {
+	for _, yyv3741 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3717 := &yyv3716
-		yy3717.CodecEncodeSelf(e)
+		yy3742 := &yyv3741
+		yy3742.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -47023,83 +47314,83 @@ func (x codecSelfer1234) decSliceNodeCondition(v *[]NodeCondition, d *codec1978.
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3718 := *v
-	yyh3718, yyl3718 := z.DecSliceHelperStart()
-	var yyc3718 bool
-	if yyl3718 == 0 {
-		if yyv3718 == nil {
-			yyv3718 = []NodeCondition{}
-			yyc3718 = true
-		} else if len(yyv3718) != 0 {
-			yyv3718 = yyv3718[:0]
-			yyc3718 = true
+	yyv3743 := *v
+	yyh3743, yyl3743 := z.DecSliceHelperStart()
+	var yyc3743 bool
+	if yyl3743 == 0 {
+		if yyv3743 == nil {
+			yyv3743 = []NodeCondition{}
+			yyc3743 = true
+		} else if len(yyv3743) != 0 {
+			yyv3743 = yyv3743[:0]
+			yyc3743 = true
 		}
-	} else if yyl3718 > 0 {
-		var yyrr3718, yyrl3718 int
-		var yyrt3718 bool
-		if yyl3718 > cap(yyv3718) {
+	} else if yyl3743 > 0 {
+		var yyrr3743, yyrl3743 int
+		var yyrt3743 bool
+		if yyl3743 > cap(yyv3743) {
 
-			yyrg3718 := len(yyv3718) > 0
-			yyv23718 := yyv3718
-			yyrl3718, yyrt3718 = z.DecInferLen(yyl3718, z.DecBasicHandle().MaxInitLen, 112)
-			if yyrt3718 {
-				if yyrl3718 <= cap(yyv3718) {
-					yyv3718 = yyv3718[:yyrl3718]
+			yyrg3743 := len(yyv3743) > 0
+			yyv23743 := yyv3743
+			yyrl3743, yyrt3743 = z.DecInferLen(yyl3743, z.DecBasicHandle().MaxInitLen, 112)
+			if yyrt3743 {
+				if yyrl3743 <= cap(yyv3743) {
+					yyv3743 = yyv3743[:yyrl3743]
 				} else {
-					yyv3718 = make([]NodeCondition, yyrl3718)
+					yyv3743 = make([]NodeCondition, yyrl3743)
 				}
 			} else {
-				yyv3718 = make([]NodeCondition, yyrl3718)
+				yyv3743 = make([]NodeCondition, yyrl3743)
 			}
-			yyc3718 = true
-			yyrr3718 = len(yyv3718)
-			if yyrg3718 {
-				copy(yyv3718, yyv23718)
+			yyc3743 = true
+			yyrr3743 = len(yyv3743)
+			if yyrg3743 {
+				copy(yyv3743, yyv23743)
 			}
-		} else if yyl3718 != len(yyv3718) {
-			yyv3718 = yyv3718[:yyl3718]
-			yyc3718 = true
+		} else if yyl3743 != len(yyv3743) {
+			yyv3743 = yyv3743[:yyl3743]
+			yyc3743 = true
 		}
-		yyj3718 := 0
-		for ; yyj3718 < yyrr3718; yyj3718++ {
-			yyh3718.ElemContainerState(yyj3718)
+		yyj3743 := 0
+		for ; yyj3743 < yyrr3743; yyj3743++ {
+			yyh3743.ElemContainerState(yyj3743)
 			if r.TryDecodeAsNil() {
-				yyv3718[yyj3718] = NodeCondition{}
+				yyv3743[yyj3743] = NodeCondition{}
 			} else {
-				yyv3719 := &yyv3718[yyj3718]
-				yyv3719.CodecDecodeSelf(d)
+				yyv3744 := &yyv3743[yyj3743]
+				yyv3744.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3718 {
-			for ; yyj3718 < yyl3718; yyj3718++ {
-				yyv3718 = append(yyv3718, NodeCondition{})
-				yyh3718.ElemContainerState(yyj3718)
+		if yyrt3743 {
+			for ; yyj3743 < yyl3743; yyj3743++ {
+				yyv3743 = append(yyv3743, NodeCondition{})
+				yyh3743.ElemContainerState(yyj3743)
 				if r.TryDecodeAsNil() {
-					yyv3718[yyj3718] = NodeCondition{}
+					yyv3743[yyj3743] = NodeCondition{}
 				} else {
-					yyv3720 := &yyv3718[yyj3718]
-					yyv3720.CodecDecodeSelf(d)
+					yyv3745 := &yyv3743[yyj3743]
+					yyv3745.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3718 := 0
-		for ; !r.CheckBreak(); yyj3718++ {
+		yyj3743 := 0
+		for ; !r.CheckBreak(); yyj3743++ {
 
-			if yyj3718 >= len(yyv3718) {
-				yyv3718 = append(yyv3718, NodeCondition{}) // var yyz3718 NodeCondition
-				yyc3718 = true
+			if yyj3743 >= len(yyv3743) {
+				yyv3743 = append(yyv3743, NodeCondition{}) // var yyz3743 NodeCondition
+				yyc3743 = true
 			}
-			yyh3718.ElemContainerState(yyj3718)
-			if yyj3718 < len(yyv3718) {
+			yyh3743.ElemContainerState(yyj3743)
+			if yyj3743 < len(yyv3743) {
 				if r.TryDecodeAsNil() {
-					yyv3718[yyj3718] = NodeCondition{}
+					yyv3743[yyj3743] = NodeCondition{}
 				} else {
-					yyv3721 := &yyv3718[yyj3718]
-					yyv3721.CodecDecodeSelf(d)
+					yyv3746 := &yyv3743[yyj3743]
+					yyv3746.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -47107,17 +47398,17 @@ func (x codecSelfer1234) decSliceNodeCondition(v *[]NodeCondition, d *codec1978.
 			}
 
 		}
-		if yyj3718 < len(yyv3718) {
-			yyv3718 = yyv3718[:yyj3718]
-			yyc3718 = true
-		} else if yyj3718 == 0 && yyv3718 == nil {
-			yyv3718 = []NodeCondition{}
-			yyc3718 = true
+		if yyj3743 < len(yyv3743) {
+			yyv3743 = yyv3743[:yyj3743]
+			yyc3743 = true
+		} else if yyj3743 == 0 && yyv3743 == nil {
+			yyv3743 = []NodeCondition{}
+			yyc3743 = true
 		}
 	}
-	yyh3718.End()
-	if yyc3718 {
-		*v = yyv3718
+	yyh3743.End()
+	if yyc3743 {
+		*v = yyv3743
 	}
 }
 
@@ -47126,10 +47417,10 @@ func (x codecSelfer1234) encSliceNodeAddress(v []NodeAddress, e *codec1978.Encod
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3722 := range v {
+	for _, yyv3747 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3723 := &yyv3722
-		yy3723.CodecEncodeSelf(e)
+		yy3748 := &yyv3747
+		yy3748.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -47139,83 +47430,83 @@ func (x codecSelfer1234) decSliceNodeAddress(v *[]NodeAddress, d *codec1978.Deco
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3724 := *v
-	yyh3724, yyl3724 := z.DecSliceHelperStart()
-	var yyc3724 bool
-	if yyl3724 == 0 {
-		if yyv3724 == nil {
-			yyv3724 = []NodeAddress{}
-			yyc3724 = true
-		} else if len(yyv3724) != 0 {
-			yyv3724 = yyv3724[:0]
-			yyc3724 = true
+	yyv3749 := *v
+	yyh3749, yyl3749 := z.DecSliceHelperStart()
+	var yyc3749 bool
+	if yyl3749 == 0 {
+		if yyv3749 == nil {
+			yyv3749 = []NodeAddress{}
+			yyc3749 = true
+		} else if len(yyv3749) != 0 {
+			yyv3749 = yyv3749[:0]
+			yyc3749 = true
 		}
-	} else if yyl3724 > 0 {
-		var yyrr3724, yyrl3724 int
-		var yyrt3724 bool
-		if yyl3724 > cap(yyv3724) {
+	} else if yyl3749 > 0 {
+		var yyrr3749, yyrl3749 int
+		var yyrt3749 bool
+		if yyl3749 > cap(yyv3749) {
 
-			yyrg3724 := len(yyv3724) > 0
-			yyv23724 := yyv3724
-			yyrl3724, yyrt3724 = z.DecInferLen(yyl3724, z.DecBasicHandle().MaxInitLen, 32)
-			if yyrt3724 {
-				if yyrl3724 <= cap(yyv3724) {
-					yyv3724 = yyv3724[:yyrl3724]
+			yyrg3749 := len(yyv3749) > 0
+			yyv23749 := yyv3749
+			yyrl3749, yyrt3749 = z.DecInferLen(yyl3749, z.DecBasicHandle().MaxInitLen, 32)
+			if yyrt3749 {
+				if yyrl3749 <= cap(yyv3749) {
+					yyv3749 = yyv3749[:yyrl3749]
 				} else {
-					yyv3724 = make([]NodeAddress, yyrl3724)
+					yyv3749 = make([]NodeAddress, yyrl3749)
 				}
 			} else {
-				yyv3724 = make([]NodeAddress, yyrl3724)
+				yyv3749 = make([]NodeAddress, yyrl3749)
 			}
-			yyc3724 = true
-			yyrr3724 = len(yyv3724)
-			if yyrg3724 {
-				copy(yyv3724, yyv23724)
+			yyc3749 = true
+			yyrr3749 = len(yyv3749)
+			if yyrg3749 {
+				copy(yyv3749, yyv23749)
 			}
-		} else if yyl3724 != len(yyv3724) {
-			yyv3724 = yyv3724[:yyl3724]
-			yyc3724 = true
+		} else if yyl3749 != len(yyv3749) {
+			yyv3749 = yyv3749[:yyl3749]
+			yyc3749 = true
 		}
-		yyj3724 := 0
-		for ; yyj3724 < yyrr3724; yyj3724++ {
-			yyh3724.ElemContainerState(yyj3724)
+		yyj3749 := 0
+		for ; yyj3749 < yyrr3749; yyj3749++ {
+			yyh3749.ElemContainerState(yyj3749)
 			if r.TryDecodeAsNil() {
-				yyv3724[yyj3724] = NodeAddress{}
+				yyv3749[yyj3749] = NodeAddress{}
 			} else {
-				yyv3725 := &yyv3724[yyj3724]
-				yyv3725.CodecDecodeSelf(d)
+				yyv3750 := &yyv3749[yyj3749]
+				yyv3750.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3724 {
-			for ; yyj3724 < yyl3724; yyj3724++ {
-				yyv3724 = append(yyv3724, NodeAddress{})
-				yyh3724.ElemContainerState(yyj3724)
+		if yyrt3749 {
+			for ; yyj3749 < yyl3749; yyj3749++ {
+				yyv3749 = append(yyv3749, NodeAddress{})
+				yyh3749.ElemContainerState(yyj3749)
 				if r.TryDecodeAsNil() {
-					yyv3724[yyj3724] = NodeAddress{}
+					yyv3749[yyj3749] = NodeAddress{}
 				} else {
-					yyv3726 := &yyv3724[yyj3724]
-					yyv3726.CodecDecodeSelf(d)
+					yyv3751 := &yyv3749[yyj3749]
+					yyv3751.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3724 := 0
-		for ; !r.CheckBreak(); yyj3724++ {
+		yyj3749 := 0
+		for ; !r.CheckBreak(); yyj3749++ {
 
-			if yyj3724 >= len(yyv3724) {
-				yyv3724 = append(yyv3724, NodeAddress{}) // var yyz3724 NodeAddress
-				yyc3724 = true
+			if yyj3749 >= len(yyv3749) {
+				yyv3749 = append(yyv3749, NodeAddress{}) // var yyz3749 NodeAddress
+				yyc3749 = true
 			}
-			yyh3724.ElemContainerState(yyj3724)
-			if yyj3724 < len(yyv3724) {
+			yyh3749.ElemContainerState(yyj3749)
+			if yyj3749 < len(yyv3749) {
 				if r.TryDecodeAsNil() {
-					yyv3724[yyj3724] = NodeAddress{}
+					yyv3749[yyj3749] = NodeAddress{}
 				} else {
-					yyv3727 := &yyv3724[yyj3724]
-					yyv3727.CodecDecodeSelf(d)
+					yyv3752 := &yyv3749[yyj3749]
+					yyv3752.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -47223,17 +47514,133 @@ func (x codecSelfer1234) decSliceNodeAddress(v *[]NodeAddress, d *codec1978.Deco
 			}
 
 		}
-		if yyj3724 < len(yyv3724) {
-			yyv3724 = yyv3724[:yyj3724]
-			yyc3724 = true
-		} else if yyj3724 == 0 && yyv3724 == nil {
-			yyv3724 = []NodeAddress{}
-			yyc3724 = true
+		if yyj3749 < len(yyv3749) {
+			yyv3749 = yyv3749[:yyj3749]
+			yyc3749 = true
+		} else if yyj3749 == 0 && yyv3749 == nil {
+			yyv3749 = []NodeAddress{}
+			yyc3749 = true
 		}
 	}
-	yyh3724.End()
-	if yyc3724 {
-		*v = yyv3724
+	yyh3749.End()
+	if yyc3749 {
+		*v = yyv3749
+	}
+}
+
+func (x codecSelfer1234) encSliceContainerImage(v []ContainerImage, e *codec1978.Encoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperEncoder(e)
+	_, _, _ = h, z, r
+	r.EncodeArrayStart(len(v))
+	for _, yyv3753 := range v {
+		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
+		yy3754 := &yyv3753
+		yy3754.CodecEncodeSelf(e)
+	}
+	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
+}
+
+func (x codecSelfer1234) decSliceContainerImage(v *[]ContainerImage, d *codec1978.Decoder) {
+	var h codecSelfer1234
+	z, r := codec1978.GenHelperDecoder(d)
+	_, _, _ = h, z, r
+
+	yyv3755 := *v
+	yyh3755, yyl3755 := z.DecSliceHelperStart()
+	var yyc3755 bool
+	if yyl3755 == 0 {
+		if yyv3755 == nil {
+			yyv3755 = []ContainerImage{}
+			yyc3755 = true
+		} else if len(yyv3755) != 0 {
+			yyv3755 = yyv3755[:0]
+			yyc3755 = true
+		}
+	} else if yyl3755 > 0 {
+		var yyrr3755, yyrl3755 int
+		var yyrt3755 bool
+		if yyl3755 > cap(yyv3755) {
+
+			yyrg3755 := len(yyv3755) > 0
+			yyv23755 := yyv3755
+			yyrl3755, yyrt3755 = z.DecInferLen(yyl3755, z.DecBasicHandle().MaxInitLen, 32)
+			if yyrt3755 {
+				if yyrl3755 <= cap(yyv3755) {
+					yyv3755 = yyv3755[:yyrl3755]
+				} else {
+					yyv3755 = make([]ContainerImage, yyrl3755)
+				}
+			} else {
+				yyv3755 = make([]ContainerImage, yyrl3755)
+			}
+			yyc3755 = true
+			yyrr3755 = len(yyv3755)
+			if yyrg3755 {
+				copy(yyv3755, yyv23755)
+			}
+		} else if yyl3755 != len(yyv3755) {
+			yyv3755 = yyv3755[:yyl3755]
+			yyc3755 = true
+		}
+		yyj3755 := 0
+		for ; yyj3755 < yyrr3755; yyj3755++ {
+			yyh3755.ElemContainerState(yyj3755)
+			if r.TryDecodeAsNil() {
+				yyv3755[yyj3755] = ContainerImage{}
+			} else {
+				yyv3756 := &yyv3755[yyj3755]
+				yyv3756.CodecDecodeSelf(d)
+			}
+
+		}
+		if yyrt3755 {
+			for ; yyj3755 < yyl3755; yyj3755++ {
+				yyv3755 = append(yyv3755, ContainerImage{})
+				yyh3755.ElemContainerState(yyj3755)
+				if r.TryDecodeAsNil() {
+					yyv3755[yyj3755] = ContainerImage{}
+				} else {
+					yyv3757 := &yyv3755[yyj3755]
+					yyv3757.CodecDecodeSelf(d)
+				}
+
+			}
+		}
+
+	} else {
+		yyj3755 := 0
+		for ; !r.CheckBreak(); yyj3755++ {
+
+			if yyj3755 >= len(yyv3755) {
+				yyv3755 = append(yyv3755, ContainerImage{}) // var yyz3755 ContainerImage
+				yyc3755 = true
+			}
+			yyh3755.ElemContainerState(yyj3755)
+			if yyj3755 < len(yyv3755) {
+				if r.TryDecodeAsNil() {
+					yyv3755[yyj3755] = ContainerImage{}
+				} else {
+					yyv3758 := &yyv3755[yyj3755]
+					yyv3758.CodecDecodeSelf(d)
+				}
+
+			} else {
+				z.DecSwallow()
+			}
+
+		}
+		if yyj3755 < len(yyv3755) {
+			yyv3755 = yyv3755[:yyj3755]
+			yyc3755 = true
+		} else if yyj3755 == 0 && yyv3755 == nil {
+			yyv3755 = []ContainerImage{}
+			yyc3755 = true
+		}
+	}
+	yyh3755.End()
+	if yyc3755 {
+		*v = yyv3755
 	}
 }
 
@@ -47242,19 +47649,19 @@ func (x codecSelfer1234) encResourceList(v ResourceList, e *codec1978.Encoder) {
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeMapStart(len(v))
-	for yyk3728, yyv3728 := range v {
+	for yyk3759, yyv3759 := range v {
 		z.EncSendContainerState(codecSelfer_containerMapKey1234)
-		yyk3728.CodecEncodeSelf(e)
+		yyk3759.CodecEncodeSelf(e)
 		z.EncSendContainerState(codecSelfer_containerMapValue1234)
-		yy3729 := &yyv3728
-		yym3730 := z.EncBinary()
-		_ = yym3730
+		yy3760 := &yyv3759
+		yym3761 := z.EncBinary()
+		_ = yym3761
 		if false {
-		} else if z.HasExtensions() && z.EncExt(yy3729) {
-		} else if !yym3730 && z.IsJSONHandle() {
-			z.EncJSONMarshal(yy3729)
+		} else if z.HasExtensions() && z.EncExt(yy3760) {
+		} else if !yym3761 && z.IsJSONHandle() {
+			z.EncJSONMarshal(yy3760)
 		} else {
-			z.EncFallback(yy3729)
+			z.EncFallback(yy3760)
 		}
 	}
 	z.EncSendContainerState(codecSelfer_containerMapEnd1234)
@@ -47265,86 +47672,86 @@ func (x codecSelfer1234) decResourceList(v *ResourceList, d *codec1978.Decoder) 
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3731 := *v
-	yyl3731 := r.ReadMapStart()
-	yybh3731 := z.DecBasicHandle()
-	if yyv3731 == nil {
-		yyrl3731, _ := z.DecInferLen(yyl3731, yybh3731.MaxInitLen, 40)
-		yyv3731 = make(map[ResourceName]pkg3_resource.Quantity, yyrl3731)
-		*v = yyv3731
+	yyv3762 := *v
+	yyl3762 := r.ReadMapStart()
+	yybh3762 := z.DecBasicHandle()
+	if yyv3762 == nil {
+		yyrl3762, _ := z.DecInferLen(yyl3762, yybh3762.MaxInitLen, 40)
+		yyv3762 = make(map[ResourceName]pkg3_resource.Quantity, yyrl3762)
+		*v = yyv3762
 	}
-	var yymk3731 ResourceName
-	var yymv3731 pkg3_resource.Quantity
-	var yymg3731 bool
-	if yybh3731.MapValueReset {
-		yymg3731 = true
+	var yymk3762 ResourceName
+	var yymv3762 pkg3_resource.Quantity
+	var yymg3762 bool
+	if yybh3762.MapValueReset {
+		yymg3762 = true
 	}
-	if yyl3731 > 0 {
-		for yyj3731 := 0; yyj3731 < yyl3731; yyj3731++ {
+	if yyl3762 > 0 {
+		for yyj3762 := 0; yyj3762 < yyl3762; yyj3762++ {
 			z.DecSendContainerState(codecSelfer_containerMapKey1234)
 			if r.TryDecodeAsNil() {
-				yymk3731 = ""
+				yymk3762 = ""
 			} else {
-				yymk3731 = ResourceName(r.DecodeString())
+				yymk3762 = ResourceName(r.DecodeString())
 			}
 
-			if yymg3731 {
-				yymv3731 = yyv3731[yymk3731]
+			if yymg3762 {
+				yymv3762 = yyv3762[yymk3762]
 			} else {
-				yymv3731 = pkg3_resource.Quantity{}
+				yymv3762 = pkg3_resource.Quantity{}
 			}
 			z.DecSendContainerState(codecSelfer_containerMapValue1234)
 			if r.TryDecodeAsNil() {
-				yymv3731 = pkg3_resource.Quantity{}
+				yymv3762 = pkg3_resource.Quantity{}
 			} else {
-				yyv3733 := &yymv3731
-				yym3734 := z.DecBinary()
-				_ = yym3734
+				yyv3764 := &yymv3762
+				yym3765 := z.DecBinary()
+				_ = yym3765
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv3733) {
-				} else if !yym3734 && z.IsJSONHandle() {
-					z.DecJSONUnmarshal(yyv3733)
+				} else if z.HasExtensions() && z.DecExt(yyv3764) {
+				} else if !yym3765 && z.IsJSONHandle() {
+					z.DecJSONUnmarshal(yyv3764)
 				} else {
-					z.DecFallback(yyv3733, false)
+					z.DecFallback(yyv3764, false)
 				}
 			}
 
-			if yyv3731 != nil {
-				yyv3731[yymk3731] = yymv3731
+			if yyv3762 != nil {
+				yyv3762[yymk3762] = yymv3762
 			}
 		}
-	} else if yyl3731 < 0 {
-		for yyj3731 := 0; !r.CheckBreak(); yyj3731++ {
+	} else if yyl3762 < 0 {
+		for yyj3762 := 0; !r.CheckBreak(); yyj3762++ {
 			z.DecSendContainerState(codecSelfer_containerMapKey1234)
 			if r.TryDecodeAsNil() {
-				yymk3731 = ""
+				yymk3762 = ""
 			} else {
-				yymk3731 = ResourceName(r.DecodeString())
+				yymk3762 = ResourceName(r.DecodeString())
 			}
 
-			if yymg3731 {
-				yymv3731 = yyv3731[yymk3731]
+			if yymg3762 {
+				yymv3762 = yyv3762[yymk3762]
 			} else {
-				yymv3731 = pkg3_resource.Quantity{}
+				yymv3762 = pkg3_resource.Quantity{}
 			}
 			z.DecSendContainerState(codecSelfer_containerMapValue1234)
 			if r.TryDecodeAsNil() {
-				yymv3731 = pkg3_resource.Quantity{}
+				yymv3762 = pkg3_resource.Quantity{}
 			} else {
-				yyv3736 := &yymv3731
-				yym3737 := z.DecBinary()
-				_ = yym3737
+				yyv3767 := &yymv3762
+				yym3768 := z.DecBinary()
+				_ = yym3768
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv3736) {
-				} else if !yym3737 && z.IsJSONHandle() {
-					z.DecJSONUnmarshal(yyv3736)
+				} else if z.HasExtensions() && z.DecExt(yyv3767) {
+				} else if !yym3768 && z.IsJSONHandle() {
+					z.DecJSONUnmarshal(yyv3767)
 				} else {
-					z.DecFallback(yyv3736, false)
+					z.DecFallback(yyv3767, false)
 				}
 			}
 
-			if yyv3731 != nil {
-				yyv3731[yymk3731] = yymv3731
+			if yyv3762 != nil {
+				yyv3762[yymk3762] = yymv3762
 			}
 		}
 	} // else len==0: TODO: Should we clear map entries?
@@ -47356,10 +47763,10 @@ func (x codecSelfer1234) encSliceNode(v []Node, e *codec1978.Encoder) {
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3738 := range v {
+	for _, yyv3769 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3739 := &yyv3738
-		yy3739.CodecEncodeSelf(e)
+		yy3770 := &yyv3769
+		yy3770.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -47369,83 +47776,83 @@ func (x codecSelfer1234) decSliceNode(v *[]Node, d *codec1978.Decoder) {
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3740 := *v
-	yyh3740, yyl3740 := z.DecSliceHelperStart()
-	var yyc3740 bool
-	if yyl3740 == 0 {
-		if yyv3740 == nil {
-			yyv3740 = []Node{}
-			yyc3740 = true
-		} else if len(yyv3740) != 0 {
-			yyv3740 = yyv3740[:0]
-			yyc3740 = true
+	yyv3771 := *v
+	yyh3771, yyl3771 := z.DecSliceHelperStart()
+	var yyc3771 bool
+	if yyl3771 == 0 {
+		if yyv3771 == nil {
+			yyv3771 = []Node{}
+			yyc3771 = true
+		} else if len(yyv3771) != 0 {
+			yyv3771 = yyv3771[:0]
+			yyc3771 = true
 		}
-	} else if yyl3740 > 0 {
-		var yyrr3740, yyrl3740 int
-		var yyrt3740 bool
-		if yyl3740 > cap(yyv3740) {
+	} else if yyl3771 > 0 {
+		var yyrr3771, yyrl3771 int
+		var yyrt3771 bool
+		if yyl3771 > cap(yyv3771) {
 
-			yyrg3740 := len(yyv3740) > 0
-			yyv23740 := yyv3740
-			yyrl3740, yyrt3740 = z.DecInferLen(yyl3740, z.DecBasicHandle().MaxInitLen, 464)
-			if yyrt3740 {
-				if yyrl3740 <= cap(yyv3740) {
-					yyv3740 = yyv3740[:yyrl3740]
+			yyrg3771 := len(yyv3771) > 0
+			yyv23771 := yyv3771
+			yyrl3771, yyrt3771 = z.DecInferLen(yyl3771, z.DecBasicHandle().MaxInitLen, 488)
+			if yyrt3771 {
+				if yyrl3771 <= cap(yyv3771) {
+					yyv3771 = yyv3771[:yyrl3771]
 				} else {
-					yyv3740 = make([]Node, yyrl3740)
+					yyv3771 = make([]Node, yyrl3771)
 				}
 			} else {
-				yyv3740 = make([]Node, yyrl3740)
+				yyv3771 = make([]Node, yyrl3771)
 			}
-			yyc3740 = true
-			yyrr3740 = len(yyv3740)
-			if yyrg3740 {
-				copy(yyv3740, yyv23740)
+			yyc3771 = true
+			yyrr3771 = len(yyv3771)
+			if yyrg3771 {
+				copy(yyv3771, yyv23771)
 			}
-		} else if yyl3740 != len(yyv3740) {
-			yyv3740 = yyv3740[:yyl3740]
-			yyc3740 = true
+		} else if yyl3771 != len(yyv3771) {
+			yyv3771 = yyv3771[:yyl3771]
+			yyc3771 = true
 		}
-		yyj3740 := 0
-		for ; yyj3740 < yyrr3740; yyj3740++ {
-			yyh3740.ElemContainerState(yyj3740)
+		yyj3771 := 0
+		for ; yyj3771 < yyrr3771; yyj3771++ {
+			yyh3771.ElemContainerState(yyj3771)
 			if r.TryDecodeAsNil() {
-				yyv3740[yyj3740] = Node{}
+				yyv3771[yyj3771] = Node{}
 			} else {
-				yyv3741 := &yyv3740[yyj3740]
-				yyv3741.CodecDecodeSelf(d)
+				yyv3772 := &yyv3771[yyj3771]
+				yyv3772.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3740 {
-			for ; yyj3740 < yyl3740; yyj3740++ {
-				yyv3740 = append(yyv3740, Node{})
-				yyh3740.ElemContainerState(yyj3740)
+		if yyrt3771 {
+			for ; yyj3771 < yyl3771; yyj3771++ {
+				yyv3771 = append(yyv3771, Node{})
+				yyh3771.ElemContainerState(yyj3771)
 				if r.TryDecodeAsNil() {
-					yyv3740[yyj3740] = Node{}
+					yyv3771[yyj3771] = Node{}
 				} else {
-					yyv3742 := &yyv3740[yyj3740]
-					yyv3742.CodecDecodeSelf(d)
+					yyv3773 := &yyv3771[yyj3771]
+					yyv3773.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3740 := 0
-		for ; !r.CheckBreak(); yyj3740++ {
+		yyj3771 := 0
+		for ; !r.CheckBreak(); yyj3771++ {
 
-			if yyj3740 >= len(yyv3740) {
-				yyv3740 = append(yyv3740, Node{}) // var yyz3740 Node
-				yyc3740 = true
+			if yyj3771 >= len(yyv3771) {
+				yyv3771 = append(yyv3771, Node{}) // var yyz3771 Node
+				yyc3771 = true
 			}
-			yyh3740.ElemContainerState(yyj3740)
-			if yyj3740 < len(yyv3740) {
+			yyh3771.ElemContainerState(yyj3771)
+			if yyj3771 < len(yyv3771) {
 				if r.TryDecodeAsNil() {
-					yyv3740[yyj3740] = Node{}
+					yyv3771[yyj3771] = Node{}
 				} else {
-					yyv3743 := &yyv3740[yyj3740]
-					yyv3743.CodecDecodeSelf(d)
+					yyv3774 := &yyv3771[yyj3771]
+					yyv3774.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -47453,17 +47860,17 @@ func (x codecSelfer1234) decSliceNode(v *[]Node, d *codec1978.Decoder) {
 			}
 
 		}
-		if yyj3740 < len(yyv3740) {
-			yyv3740 = yyv3740[:yyj3740]
-			yyc3740 = true
-		} else if yyj3740 == 0 && yyv3740 == nil {
-			yyv3740 = []Node{}
-			yyc3740 = true
+		if yyj3771 < len(yyv3771) {
+			yyv3771 = yyv3771[:yyj3771]
+			yyc3771 = true
+		} else if yyj3771 == 0 && yyv3771 == nil {
+			yyv3771 = []Node{}
+			yyc3771 = true
 		}
 	}
-	yyh3740.End()
-	if yyc3740 {
-		*v = yyv3740
+	yyh3771.End()
+	if yyc3771 {
+		*v = yyv3771
 	}
 }
 
@@ -47472,9 +47879,9 @@ func (x codecSelfer1234) encSliceFinalizerName(v []FinalizerName, e *codec1978.E
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3744 := range v {
+	for _, yyv3775 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yyv3744.CodecEncodeSelf(e)
+		yyv3775.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -47484,75 +47891,75 @@ func (x codecSelfer1234) decSliceFinalizerName(v *[]FinalizerName, d *codec1978.
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3745 := *v
-	yyh3745, yyl3745 := z.DecSliceHelperStart()
-	var yyc3745 bool
-	if yyl3745 == 0 {
-		if yyv3745 == nil {
-			yyv3745 = []FinalizerName{}
-			yyc3745 = true
-		} else if len(yyv3745) != 0 {
-			yyv3745 = yyv3745[:0]
-			yyc3745 = true
+	yyv3776 := *v
+	yyh3776, yyl3776 := z.DecSliceHelperStart()
+	var yyc3776 bool
+	if yyl3776 == 0 {
+		if yyv3776 == nil {
+			yyv3776 = []FinalizerName{}
+			yyc3776 = true
+		} else if len(yyv3776) != 0 {
+			yyv3776 = yyv3776[:0]
+			yyc3776 = true
 		}
-	} else if yyl3745 > 0 {
-		var yyrr3745, yyrl3745 int
-		var yyrt3745 bool
-		if yyl3745 > cap(yyv3745) {
+	} else if yyl3776 > 0 {
+		var yyrr3776, yyrl3776 int
+		var yyrt3776 bool
+		if yyl3776 > cap(yyv3776) {
 
-			yyrl3745, yyrt3745 = z.DecInferLen(yyl3745, z.DecBasicHandle().MaxInitLen, 16)
-			if yyrt3745 {
-				if yyrl3745 <= cap(yyv3745) {
-					yyv3745 = yyv3745[:yyrl3745]
+			yyrl3776, yyrt3776 = z.DecInferLen(yyl3776, z.DecBasicHandle().MaxInitLen, 16)
+			if yyrt3776 {
+				if yyrl3776 <= cap(yyv3776) {
+					yyv3776 = yyv3776[:yyrl3776]
 				} else {
-					yyv3745 = make([]FinalizerName, yyrl3745)
+					yyv3776 = make([]FinalizerName, yyrl3776)
 				}
 			} else {
-				yyv3745 = make([]FinalizerName, yyrl3745)
+				yyv3776 = make([]FinalizerName, yyrl3776)
 			}
-			yyc3745 = true
-			yyrr3745 = len(yyv3745)
-		} else if yyl3745 != len(yyv3745) {
-			yyv3745 = yyv3745[:yyl3745]
-			yyc3745 = true
+			yyc3776 = true
+			yyrr3776 = len(yyv3776)
+		} else if yyl3776 != len(yyv3776) {
+			yyv3776 = yyv3776[:yyl3776]
+			yyc3776 = true
 		}
-		yyj3745 := 0
-		for ; yyj3745 < yyrr3745; yyj3745++ {
-			yyh3745.ElemContainerState(yyj3745)
+		yyj3776 := 0
+		for ; yyj3776 < yyrr3776; yyj3776++ {
+			yyh3776.ElemContainerState(yyj3776)
 			if r.TryDecodeAsNil() {
-				yyv3745[yyj3745] = ""
+				yyv3776[yyj3776] = ""
 			} else {
-				yyv3745[yyj3745] = FinalizerName(r.DecodeString())
+				yyv3776[yyj3776] = FinalizerName(r.DecodeString())
 			}
 
 		}
-		if yyrt3745 {
-			for ; yyj3745 < yyl3745; yyj3745++ {
-				yyv3745 = append(yyv3745, "")
-				yyh3745.ElemContainerState(yyj3745)
+		if yyrt3776 {
+			for ; yyj3776 < yyl3776; yyj3776++ {
+				yyv3776 = append(yyv3776, "")
+				yyh3776.ElemContainerState(yyj3776)
 				if r.TryDecodeAsNil() {
-					yyv3745[yyj3745] = ""
+					yyv3776[yyj3776] = ""
 				} else {
-					yyv3745[yyj3745] = FinalizerName(r.DecodeString())
+					yyv3776[yyj3776] = FinalizerName(r.DecodeString())
 				}
 
 			}
 		}
 
 	} else {
-		yyj3745 := 0
-		for ; !r.CheckBreak(); yyj3745++ {
+		yyj3776 := 0
+		for ; !r.CheckBreak(); yyj3776++ {
 
-			if yyj3745 >= len(yyv3745) {
-				yyv3745 = append(yyv3745, "") // var yyz3745 FinalizerName
-				yyc3745 = true
+			if yyj3776 >= len(yyv3776) {
+				yyv3776 = append(yyv3776, "") // var yyz3776 FinalizerName
+				yyc3776 = true
 			}
-			yyh3745.ElemContainerState(yyj3745)
-			if yyj3745 < len(yyv3745) {
+			yyh3776.ElemContainerState(yyj3776)
+			if yyj3776 < len(yyv3776) {
 				if r.TryDecodeAsNil() {
-					yyv3745[yyj3745] = ""
+					yyv3776[yyj3776] = ""
 				} else {
-					yyv3745[yyj3745] = FinalizerName(r.DecodeString())
+					yyv3776[yyj3776] = FinalizerName(r.DecodeString())
 				}
 
 			} else {
@@ -47560,17 +47967,17 @@ func (x codecSelfer1234) decSliceFinalizerName(v *[]FinalizerName, d *codec1978.
 			}
 
 		}
-		if yyj3745 < len(yyv3745) {
-			yyv3745 = yyv3745[:yyj3745]
-			yyc3745 = true
-		} else if yyj3745 == 0 && yyv3745 == nil {
-			yyv3745 = []FinalizerName{}
-			yyc3745 = true
+		if yyj3776 < len(yyv3776) {
+			yyv3776 = yyv3776[:yyj3776]
+			yyc3776 = true
+		} else if yyj3776 == 0 && yyv3776 == nil {
+			yyv3776 = []FinalizerName{}
+			yyc3776 = true
 		}
 	}
-	yyh3745.End()
-	if yyc3745 {
-		*v = yyv3745
+	yyh3776.End()
+	if yyc3776 {
+		*v = yyv3776
 	}
 }
 
@@ -47579,10 +47986,10 @@ func (x codecSelfer1234) encSliceNamespace(v []Namespace, e *codec1978.Encoder) 
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3749 := range v {
+	for _, yyv3780 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3750 := &yyv3749
-		yy3750.CodecEncodeSelf(e)
+		yy3781 := &yyv3780
+		yy3781.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -47592,83 +47999,83 @@ func (x codecSelfer1234) decSliceNamespace(v *[]Namespace, d *codec1978.Decoder)
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3751 := *v
-	yyh3751, yyl3751 := z.DecSliceHelperStart()
-	var yyc3751 bool
-	if yyl3751 == 0 {
-		if yyv3751 == nil {
-			yyv3751 = []Namespace{}
-			yyc3751 = true
-		} else if len(yyv3751) != 0 {
-			yyv3751 = yyv3751[:0]
-			yyc3751 = true
+	yyv3782 := *v
+	yyh3782, yyl3782 := z.DecSliceHelperStart()
+	var yyc3782 bool
+	if yyl3782 == 0 {
+		if yyv3782 == nil {
+			yyv3782 = []Namespace{}
+			yyc3782 = true
+		} else if len(yyv3782) != 0 {
+			yyv3782 = yyv3782[:0]
+			yyc3782 = true
 		}
-	} else if yyl3751 > 0 {
-		var yyrr3751, yyrl3751 int
-		var yyrt3751 bool
-		if yyl3751 > cap(yyv3751) {
+	} else if yyl3782 > 0 {
+		var yyrr3782, yyrl3782 int
+		var yyrt3782 bool
+		if yyl3782 > cap(yyv3782) {
 
-			yyrg3751 := len(yyv3751) > 0
-			yyv23751 := yyv3751
-			yyrl3751, yyrt3751 = z.DecInferLen(yyl3751, z.DecBasicHandle().MaxInitLen, 232)
-			if yyrt3751 {
-				if yyrl3751 <= cap(yyv3751) {
-					yyv3751 = yyv3751[:yyrl3751]
+			yyrg3782 := len(yyv3782) > 0
+			yyv23782 := yyv3782
+			yyrl3782, yyrt3782 = z.DecInferLen(yyl3782, z.DecBasicHandle().MaxInitLen, 232)
+			if yyrt3782 {
+				if yyrl3782 <= cap(yyv3782) {
+					yyv3782 = yyv3782[:yyrl3782]
 				} else {
-					yyv3751 = make([]Namespace, yyrl3751)
+					yyv3782 = make([]Namespace, yyrl3782)
 				}
 			} else {
-				yyv3751 = make([]Namespace, yyrl3751)
+				yyv3782 = make([]Namespace, yyrl3782)
 			}
-			yyc3751 = true
-			yyrr3751 = len(yyv3751)
-			if yyrg3751 {
-				copy(yyv3751, yyv23751)
+			yyc3782 = true
+			yyrr3782 = len(yyv3782)
+			if yyrg3782 {
+				copy(yyv3782, yyv23782)
 			}
-		} else if yyl3751 != len(yyv3751) {
-			yyv3751 = yyv3751[:yyl3751]
-			yyc3751 = true
+		} else if yyl3782 != len(yyv3782) {
+			yyv3782 = yyv3782[:yyl3782]
+			yyc3782 = true
 		}
-		yyj3751 := 0
-		for ; yyj3751 < yyrr3751; yyj3751++ {
-			yyh3751.ElemContainerState(yyj3751)
+		yyj3782 := 0
+		for ; yyj3782 < yyrr3782; yyj3782++ {
+			yyh3782.ElemContainerState(yyj3782)
 			if r.TryDecodeAsNil() {
-				yyv3751[yyj3751] = Namespace{}
+				yyv3782[yyj3782] = Namespace{}
 			} else {
-				yyv3752 := &yyv3751[yyj3751]
-				yyv3752.CodecDecodeSelf(d)
+				yyv3783 := &yyv3782[yyj3782]
+				yyv3783.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3751 {
-			for ; yyj3751 < yyl3751; yyj3751++ {
-				yyv3751 = append(yyv3751, Namespace{})
-				yyh3751.ElemContainerState(yyj3751)
+		if yyrt3782 {
+			for ; yyj3782 < yyl3782; yyj3782++ {
+				yyv3782 = append(yyv3782, Namespace{})
+				yyh3782.ElemContainerState(yyj3782)
 				if r.TryDecodeAsNil() {
-					yyv3751[yyj3751] = Namespace{}
+					yyv3782[yyj3782] = Namespace{}
 				} else {
-					yyv3753 := &yyv3751[yyj3751]
-					yyv3753.CodecDecodeSelf(d)
+					yyv3784 := &yyv3782[yyj3782]
+					yyv3784.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3751 := 0
-		for ; !r.CheckBreak(); yyj3751++ {
+		yyj3782 := 0
+		for ; !r.CheckBreak(); yyj3782++ {
 
-			if yyj3751 >= len(yyv3751) {
-				yyv3751 = append(yyv3751, Namespace{}) // var yyz3751 Namespace
-				yyc3751 = true
+			if yyj3782 >= len(yyv3782) {
+				yyv3782 = append(yyv3782, Namespace{}) // var yyz3782 Namespace
+				yyc3782 = true
 			}
-			yyh3751.ElemContainerState(yyj3751)
-			if yyj3751 < len(yyv3751) {
+			yyh3782.ElemContainerState(yyj3782)
+			if yyj3782 < len(yyv3782) {
 				if r.TryDecodeAsNil() {
-					yyv3751[yyj3751] = Namespace{}
+					yyv3782[yyj3782] = Namespace{}
 				} else {
-					yyv3754 := &yyv3751[yyj3751]
-					yyv3754.CodecDecodeSelf(d)
+					yyv3785 := &yyv3782[yyj3782]
+					yyv3785.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -47676,17 +48083,17 @@ func (x codecSelfer1234) decSliceNamespace(v *[]Namespace, d *codec1978.Decoder)
 			}
 
 		}
-		if yyj3751 < len(yyv3751) {
-			yyv3751 = yyv3751[:yyj3751]
-			yyc3751 = true
-		} else if yyj3751 == 0 && yyv3751 == nil {
-			yyv3751 = []Namespace{}
-			yyc3751 = true
+		if yyj3782 < len(yyv3782) {
+			yyv3782 = yyv3782[:yyj3782]
+			yyc3782 = true
+		} else if yyj3782 == 0 && yyv3782 == nil {
+			yyv3782 = []Namespace{}
+			yyc3782 = true
 		}
 	}
-	yyh3751.End()
-	if yyc3751 {
-		*v = yyv3751
+	yyh3782.End()
+	if yyc3782 {
+		*v = yyv3782
 	}
 }
 
@@ -47695,10 +48102,10 @@ func (x codecSelfer1234) encSliceEvent(v []Event, e *codec1978.Encoder) {
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3755 := range v {
+	for _, yyv3786 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3756 := &yyv3755
-		yy3756.CodecEncodeSelf(e)
+		yy3787 := &yyv3786
+		yy3787.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -47708,83 +48115,83 @@ func (x codecSelfer1234) decSliceEvent(v *[]Event, d *codec1978.Decoder) {
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3757 := *v
-	yyh3757, yyl3757 := z.DecSliceHelperStart()
-	var yyc3757 bool
-	if yyl3757 == 0 {
-		if yyv3757 == nil {
-			yyv3757 = []Event{}
-			yyc3757 = true
-		} else if len(yyv3757) != 0 {
-			yyv3757 = yyv3757[:0]
-			yyc3757 = true
+	yyv3788 := *v
+	yyh3788, yyl3788 := z.DecSliceHelperStart()
+	var yyc3788 bool
+	if yyl3788 == 0 {
+		if yyv3788 == nil {
+			yyv3788 = []Event{}
+			yyc3788 = true
+		} else if len(yyv3788) != 0 {
+			yyv3788 = yyv3788[:0]
+			yyc3788 = true
 		}
-	} else if yyl3757 > 0 {
-		var yyrr3757, yyrl3757 int
-		var yyrt3757 bool
-		if yyl3757 > cap(yyv3757) {
+	} else if yyl3788 > 0 {
+		var yyrr3788, yyrl3788 int
+		var yyrt3788 bool
+		if yyl3788 > cap(yyv3788) {
 
-			yyrg3757 := len(yyv3757) > 0
-			yyv23757 := yyv3757
-			yyrl3757, yyrt3757 = z.DecInferLen(yyl3757, z.DecBasicHandle().MaxInitLen, 440)
-			if yyrt3757 {
-				if yyrl3757 <= cap(yyv3757) {
-					yyv3757 = yyv3757[:yyrl3757]
+			yyrg3788 := len(yyv3788) > 0
+			yyv23788 := yyv3788
+			yyrl3788, yyrt3788 = z.DecInferLen(yyl3788, z.DecBasicHandle().MaxInitLen, 440)
+			if yyrt3788 {
+				if yyrl3788 <= cap(yyv3788) {
+					yyv3788 = yyv3788[:yyrl3788]
 				} else {
-					yyv3757 = make([]Event, yyrl3757)
+					yyv3788 = make([]Event, yyrl3788)
 				}
 			} else {
-				yyv3757 = make([]Event, yyrl3757)
+				yyv3788 = make([]Event, yyrl3788)
 			}
-			yyc3757 = true
-			yyrr3757 = len(yyv3757)
-			if yyrg3757 {
-				copy(yyv3757, yyv23757)
+			yyc3788 = true
+			yyrr3788 = len(yyv3788)
+			if yyrg3788 {
+				copy(yyv3788, yyv23788)
 			}
-		} else if yyl3757 != len(yyv3757) {
-			yyv3757 = yyv3757[:yyl3757]
-			yyc3757 = true
+		} else if yyl3788 != len(yyv3788) {
+			yyv3788 = yyv3788[:yyl3788]
+			yyc3788 = true
 		}
-		yyj3757 := 0
-		for ; yyj3757 < yyrr3757; yyj3757++ {
-			yyh3757.ElemContainerState(yyj3757)
+		yyj3788 := 0
+		for ; yyj3788 < yyrr3788; yyj3788++ {
+			yyh3788.ElemContainerState(yyj3788)
 			if r.TryDecodeAsNil() {
-				yyv3757[yyj3757] = Event{}
+				yyv3788[yyj3788] = Event{}
 			} else {
-				yyv3758 := &yyv3757[yyj3757]
-				yyv3758.CodecDecodeSelf(d)
+				yyv3789 := &yyv3788[yyj3788]
+				yyv3789.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3757 {
-			for ; yyj3757 < yyl3757; yyj3757++ {
-				yyv3757 = append(yyv3757, Event{})
-				yyh3757.ElemContainerState(yyj3757)
+		if yyrt3788 {
+			for ; yyj3788 < yyl3788; yyj3788++ {
+				yyv3788 = append(yyv3788, Event{})
+				yyh3788.ElemContainerState(yyj3788)
 				if r.TryDecodeAsNil() {
-					yyv3757[yyj3757] = Event{}
+					yyv3788[yyj3788] = Event{}
 				} else {
-					yyv3759 := &yyv3757[yyj3757]
-					yyv3759.CodecDecodeSelf(d)
+					yyv3790 := &yyv3788[yyj3788]
+					yyv3790.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3757 := 0
-		for ; !r.CheckBreak(); yyj3757++ {
+		yyj3788 := 0
+		for ; !r.CheckBreak(); yyj3788++ {
 
-			if yyj3757 >= len(yyv3757) {
-				yyv3757 = append(yyv3757, Event{}) // var yyz3757 Event
-				yyc3757 = true
+			if yyj3788 >= len(yyv3788) {
+				yyv3788 = append(yyv3788, Event{}) // var yyz3788 Event
+				yyc3788 = true
 			}
-			yyh3757.ElemContainerState(yyj3757)
-			if yyj3757 < len(yyv3757) {
+			yyh3788.ElemContainerState(yyj3788)
+			if yyj3788 < len(yyv3788) {
 				if r.TryDecodeAsNil() {
-					yyv3757[yyj3757] = Event{}
+					yyv3788[yyj3788] = Event{}
 				} else {
-					yyv3760 := &yyv3757[yyj3757]
-					yyv3760.CodecDecodeSelf(d)
+					yyv3791 := &yyv3788[yyj3788]
+					yyv3791.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -47792,17 +48199,17 @@ func (x codecSelfer1234) decSliceEvent(v *[]Event, d *codec1978.Decoder) {
 			}
 
 		}
-		if yyj3757 < len(yyv3757) {
-			yyv3757 = yyv3757[:yyj3757]
-			yyc3757 = true
-		} else if yyj3757 == 0 && yyv3757 == nil {
-			yyv3757 = []Event{}
-			yyc3757 = true
+		if yyj3788 < len(yyv3788) {
+			yyv3788 = yyv3788[:yyj3788]
+			yyc3788 = true
+		} else if yyj3788 == 0 && yyv3788 == nil {
+			yyv3788 = []Event{}
+			yyc3788 = true
 		}
 	}
-	yyh3757.End()
-	if yyc3757 {
-		*v = yyv3757
+	yyh3788.End()
+	if yyc3788 {
+		*v = yyv3788
 	}
 }
 
@@ -47811,17 +48218,17 @@ func (x codecSelfer1234) encSliceruntime_Object(v []pkg8_runtime.Object, e *code
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3761 := range v {
+	for _, yyv3792 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		if yyv3761 == nil {
+		if yyv3792 == nil {
 			r.EncodeNil()
 		} else {
-			yym3762 := z.EncBinary()
-			_ = yym3762
+			yym3793 := z.EncBinary()
+			_ = yym3793
 			if false {
-			} else if z.HasExtensions() && z.EncExt(yyv3761) {
+			} else if z.HasExtensions() && z.EncExt(yyv3792) {
 			} else {
-				z.EncFallback(yyv3761)
+				z.EncFallback(yyv3792)
 			}
 		}
 	}
@@ -47833,74 +48240,74 @@ func (x codecSelfer1234) decSliceruntime_Object(v *[]pkg8_runtime.Object, d *cod
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3763 := *v
-	yyh3763, yyl3763 := z.DecSliceHelperStart()
-	var yyc3763 bool
-	if yyl3763 == 0 {
-		if yyv3763 == nil {
-			yyv3763 = []pkg8_runtime.Object{}
-			yyc3763 = true
-		} else if len(yyv3763) != 0 {
-			yyv3763 = yyv3763[:0]
-			yyc3763 = true
+	yyv3794 := *v
+	yyh3794, yyl3794 := z.DecSliceHelperStart()
+	var yyc3794 bool
+	if yyl3794 == 0 {
+		if yyv3794 == nil {
+			yyv3794 = []pkg8_runtime.Object{}
+			yyc3794 = true
+		} else if len(yyv3794) != 0 {
+			yyv3794 = yyv3794[:0]
+			yyc3794 = true
 		}
-	} else if yyl3763 > 0 {
-		var yyrr3763, yyrl3763 int
-		var yyrt3763 bool
-		if yyl3763 > cap(yyv3763) {
+	} else if yyl3794 > 0 {
+		var yyrr3794, yyrl3794 int
+		var yyrt3794 bool
+		if yyl3794 > cap(yyv3794) {
 
-			yyrg3763 := len(yyv3763) > 0
-			yyv23763 := yyv3763
-			yyrl3763, yyrt3763 = z.DecInferLen(yyl3763, z.DecBasicHandle().MaxInitLen, 16)
-			if yyrt3763 {
-				if yyrl3763 <= cap(yyv3763) {
-					yyv3763 = yyv3763[:yyrl3763]
+			yyrg3794 := len(yyv3794) > 0
+			yyv23794 := yyv3794
+			yyrl3794, yyrt3794 = z.DecInferLen(yyl3794, z.DecBasicHandle().MaxInitLen, 16)
+			if yyrt3794 {
+				if yyrl3794 <= cap(yyv3794) {
+					yyv3794 = yyv3794[:yyrl3794]
 				} else {
-					yyv3763 = make([]pkg8_runtime.Object, yyrl3763)
+					yyv3794 = make([]pkg8_runtime.Object, yyrl3794)
 				}
 			} else {
-				yyv3763 = make([]pkg8_runtime.Object, yyrl3763)
+				yyv3794 = make([]pkg8_runtime.Object, yyrl3794)
 			}
-			yyc3763 = true
-			yyrr3763 = len(yyv3763)
-			if yyrg3763 {
-				copy(yyv3763, yyv23763)
+			yyc3794 = true
+			yyrr3794 = len(yyv3794)
+			if yyrg3794 {
+				copy(yyv3794, yyv23794)
 			}
-		} else if yyl3763 != len(yyv3763) {
-			yyv3763 = yyv3763[:yyl3763]
-			yyc3763 = true
+		} else if yyl3794 != len(yyv3794) {
+			yyv3794 = yyv3794[:yyl3794]
+			yyc3794 = true
 		}
-		yyj3763 := 0
-		for ; yyj3763 < yyrr3763; yyj3763++ {
-			yyh3763.ElemContainerState(yyj3763)
+		yyj3794 := 0
+		for ; yyj3794 < yyrr3794; yyj3794++ {
+			yyh3794.ElemContainerState(yyj3794)
 			if r.TryDecodeAsNil() {
-				yyv3763[yyj3763] = nil
+				yyv3794[yyj3794] = nil
 			} else {
-				yyv3764 := &yyv3763[yyj3763]
-				yym3765 := z.DecBinary()
-				_ = yym3765
+				yyv3795 := &yyv3794[yyj3794]
+				yym3796 := z.DecBinary()
+				_ = yym3796
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv3764) {
+				} else if z.HasExtensions() && z.DecExt(yyv3795) {
 				} else {
-					z.DecFallback(yyv3764, true)
+					z.DecFallback(yyv3795, true)
 				}
 			}
 
 		}
-		if yyrt3763 {
-			for ; yyj3763 < yyl3763; yyj3763++ {
-				yyv3763 = append(yyv3763, nil)
-				yyh3763.ElemContainerState(yyj3763)
+		if yyrt3794 {
+			for ; yyj3794 < yyl3794; yyj3794++ {
+				yyv3794 = append(yyv3794, nil)
+				yyh3794.ElemContainerState(yyj3794)
 				if r.TryDecodeAsNil() {
-					yyv3763[yyj3763] = nil
+					yyv3794[yyj3794] = nil
 				} else {
-					yyv3766 := &yyv3763[yyj3763]
-					yym3767 := z.DecBinary()
-					_ = yym3767
+					yyv3797 := &yyv3794[yyj3794]
+					yym3798 := z.DecBinary()
+					_ = yym3798
 					if false {
-					} else if z.HasExtensions() && z.DecExt(yyv3766) {
+					} else if z.HasExtensions() && z.DecExt(yyv3797) {
 					} else {
-						z.DecFallback(yyv3766, true)
+						z.DecFallback(yyv3797, true)
 					}
 				}
 
@@ -47908,25 +48315,25 @@ func (x codecSelfer1234) decSliceruntime_Object(v *[]pkg8_runtime.Object, d *cod
 		}
 
 	} else {
-		yyj3763 := 0
-		for ; !r.CheckBreak(); yyj3763++ {
+		yyj3794 := 0
+		for ; !r.CheckBreak(); yyj3794++ {
 
-			if yyj3763 >= len(yyv3763) {
-				yyv3763 = append(yyv3763, nil) // var yyz3763 pkg8_runtime.Object
-				yyc3763 = true
+			if yyj3794 >= len(yyv3794) {
+				yyv3794 = append(yyv3794, nil) // var yyz3794 pkg8_runtime.Object
+				yyc3794 = true
 			}
-			yyh3763.ElemContainerState(yyj3763)
-			if yyj3763 < len(yyv3763) {
+			yyh3794.ElemContainerState(yyj3794)
+			if yyj3794 < len(yyv3794) {
 				if r.TryDecodeAsNil() {
-					yyv3763[yyj3763] = nil
+					yyv3794[yyj3794] = nil
 				} else {
-					yyv3768 := &yyv3763[yyj3763]
-					yym3769 := z.DecBinary()
-					_ = yym3769
+					yyv3799 := &yyv3794[yyj3794]
+					yym3800 := z.DecBinary()
+					_ = yym3800
 					if false {
-					} else if z.HasExtensions() && z.DecExt(yyv3768) {
+					} else if z.HasExtensions() && z.DecExt(yyv3799) {
 					} else {
-						z.DecFallback(yyv3768, true)
+						z.DecFallback(yyv3799, true)
 					}
 				}
 
@@ -47935,17 +48342,17 @@ func (x codecSelfer1234) decSliceruntime_Object(v *[]pkg8_runtime.Object, d *cod
 			}
 
 		}
-		if yyj3763 < len(yyv3763) {
-			yyv3763 = yyv3763[:yyj3763]
-			yyc3763 = true
-		} else if yyj3763 == 0 && yyv3763 == nil {
-			yyv3763 = []pkg8_runtime.Object{}
-			yyc3763 = true
+		if yyj3794 < len(yyv3794) {
+			yyv3794 = yyv3794[:yyj3794]
+			yyc3794 = true
+		} else if yyj3794 == 0 && yyv3794 == nil {
+			yyv3794 = []pkg8_runtime.Object{}
+			yyc3794 = true
 		}
 	}
-	yyh3763.End()
-	if yyc3763 {
-		*v = yyv3763
+	yyh3794.End()
+	if yyc3794 {
+		*v = yyv3794
 	}
 }
 
@@ -47954,10 +48361,10 @@ func (x codecSelfer1234) encSliceLimitRangeItem(v []LimitRangeItem, e *codec1978
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3770 := range v {
+	for _, yyv3801 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3771 := &yyv3770
-		yy3771.CodecEncodeSelf(e)
+		yy3802 := &yyv3801
+		yy3802.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -47967,83 +48374,83 @@ func (x codecSelfer1234) decSliceLimitRangeItem(v *[]LimitRangeItem, d *codec197
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3772 := *v
-	yyh3772, yyl3772 := z.DecSliceHelperStart()
-	var yyc3772 bool
-	if yyl3772 == 0 {
-		if yyv3772 == nil {
-			yyv3772 = []LimitRangeItem{}
-			yyc3772 = true
-		} else if len(yyv3772) != 0 {
-			yyv3772 = yyv3772[:0]
-			yyc3772 = true
+	yyv3803 := *v
+	yyh3803, yyl3803 := z.DecSliceHelperStart()
+	var yyc3803 bool
+	if yyl3803 == 0 {
+		if yyv3803 == nil {
+			yyv3803 = []LimitRangeItem{}
+			yyc3803 = true
+		} else if len(yyv3803) != 0 {
+			yyv3803 = yyv3803[:0]
+			yyc3803 = true
 		}
-	} else if yyl3772 > 0 {
-		var yyrr3772, yyrl3772 int
-		var yyrt3772 bool
-		if yyl3772 > cap(yyv3772) {
+	} else if yyl3803 > 0 {
+		var yyrr3803, yyrl3803 int
+		var yyrt3803 bool
+		if yyl3803 > cap(yyv3803) {
 
-			yyrg3772 := len(yyv3772) > 0
-			yyv23772 := yyv3772
-			yyrl3772, yyrt3772 = z.DecInferLen(yyl3772, z.DecBasicHandle().MaxInitLen, 56)
-			if yyrt3772 {
-				if yyrl3772 <= cap(yyv3772) {
-					yyv3772 = yyv3772[:yyrl3772]
+			yyrg3803 := len(yyv3803) > 0
+			yyv23803 := yyv3803
+			yyrl3803, yyrt3803 = z.DecInferLen(yyl3803, z.DecBasicHandle().MaxInitLen, 56)
+			if yyrt3803 {
+				if yyrl3803 <= cap(yyv3803) {
+					yyv3803 = yyv3803[:yyrl3803]
 				} else {
-					yyv3772 = make([]LimitRangeItem, yyrl3772)
+					yyv3803 = make([]LimitRangeItem, yyrl3803)
 				}
 			} else {
-				yyv3772 = make([]LimitRangeItem, yyrl3772)
+				yyv3803 = make([]LimitRangeItem, yyrl3803)
 			}
-			yyc3772 = true
-			yyrr3772 = len(yyv3772)
-			if yyrg3772 {
-				copy(yyv3772, yyv23772)
+			yyc3803 = true
+			yyrr3803 = len(yyv3803)
+			if yyrg3803 {
+				copy(yyv3803, yyv23803)
 			}
-		} else if yyl3772 != len(yyv3772) {
-			yyv3772 = yyv3772[:yyl3772]
-			yyc3772 = true
+		} else if yyl3803 != len(yyv3803) {
+			yyv3803 = yyv3803[:yyl3803]
+			yyc3803 = true
 		}
-		yyj3772 := 0
-		for ; yyj3772 < yyrr3772; yyj3772++ {
-			yyh3772.ElemContainerState(yyj3772)
+		yyj3803 := 0
+		for ; yyj3803 < yyrr3803; yyj3803++ {
+			yyh3803.ElemContainerState(yyj3803)
 			if r.TryDecodeAsNil() {
-				yyv3772[yyj3772] = LimitRangeItem{}
+				yyv3803[yyj3803] = LimitRangeItem{}
 			} else {
-				yyv3773 := &yyv3772[yyj3772]
-				yyv3773.CodecDecodeSelf(d)
+				yyv3804 := &yyv3803[yyj3803]
+				yyv3804.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3772 {
-			for ; yyj3772 < yyl3772; yyj3772++ {
-				yyv3772 = append(yyv3772, LimitRangeItem{})
-				yyh3772.ElemContainerState(yyj3772)
+		if yyrt3803 {
+			for ; yyj3803 < yyl3803; yyj3803++ {
+				yyv3803 = append(yyv3803, LimitRangeItem{})
+				yyh3803.ElemContainerState(yyj3803)
 				if r.TryDecodeAsNil() {
-					yyv3772[yyj3772] = LimitRangeItem{}
+					yyv3803[yyj3803] = LimitRangeItem{}
 				} else {
-					yyv3774 := &yyv3772[yyj3772]
-					yyv3774.CodecDecodeSelf(d)
+					yyv3805 := &yyv3803[yyj3803]
+					yyv3805.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3772 := 0
-		for ; !r.CheckBreak(); yyj3772++ {
+		yyj3803 := 0
+		for ; !r.CheckBreak(); yyj3803++ {
 
-			if yyj3772 >= len(yyv3772) {
-				yyv3772 = append(yyv3772, LimitRangeItem{}) // var yyz3772 LimitRangeItem
-				yyc3772 = true
+			if yyj3803 >= len(yyv3803) {
+				yyv3803 = append(yyv3803, LimitRangeItem{}) // var yyz3803 LimitRangeItem
+				yyc3803 = true
 			}
-			yyh3772.ElemContainerState(yyj3772)
-			if yyj3772 < len(yyv3772) {
+			yyh3803.ElemContainerState(yyj3803)
+			if yyj3803 < len(yyv3803) {
 				if r.TryDecodeAsNil() {
-					yyv3772[yyj3772] = LimitRangeItem{}
+					yyv3803[yyj3803] = LimitRangeItem{}
 				} else {
-					yyv3775 := &yyv3772[yyj3772]
-					yyv3775.CodecDecodeSelf(d)
+					yyv3806 := &yyv3803[yyj3803]
+					yyv3806.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -48051,17 +48458,17 @@ func (x codecSelfer1234) decSliceLimitRangeItem(v *[]LimitRangeItem, d *codec197
 			}
 
 		}
-		if yyj3772 < len(yyv3772) {
-			yyv3772 = yyv3772[:yyj3772]
-			yyc3772 = true
-		} else if yyj3772 == 0 && yyv3772 == nil {
-			yyv3772 = []LimitRangeItem{}
-			yyc3772 = true
+		if yyj3803 < len(yyv3803) {
+			yyv3803 = yyv3803[:yyj3803]
+			yyc3803 = true
+		} else if yyj3803 == 0 && yyv3803 == nil {
+			yyv3803 = []LimitRangeItem{}
+			yyc3803 = true
 		}
 	}
-	yyh3772.End()
-	if yyc3772 {
-		*v = yyv3772
+	yyh3803.End()
+	if yyc3803 {
+		*v = yyv3803
 	}
 }
 
@@ -48070,10 +48477,10 @@ func (x codecSelfer1234) encSliceLimitRange(v []LimitRange, e *codec1978.Encoder
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3776 := range v {
+	for _, yyv3807 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3777 := &yyv3776
-		yy3777.CodecEncodeSelf(e)
+		yy3808 := &yyv3807
+		yy3808.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -48083,83 +48490,83 @@ func (x codecSelfer1234) decSliceLimitRange(v *[]LimitRange, d *codec1978.Decode
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3778 := *v
-	yyh3778, yyl3778 := z.DecSliceHelperStart()
-	var yyc3778 bool
-	if yyl3778 == 0 {
-		if yyv3778 == nil {
-			yyv3778 = []LimitRange{}
-			yyc3778 = true
-		} else if len(yyv3778) != 0 {
-			yyv3778 = yyv3778[:0]
-			yyc3778 = true
+	yyv3809 := *v
+	yyh3809, yyl3809 := z.DecSliceHelperStart()
+	var yyc3809 bool
+	if yyl3809 == 0 {
+		if yyv3809 == nil {
+			yyv3809 = []LimitRange{}
+			yyc3809 = true
+		} else if len(yyv3809) != 0 {
+			yyv3809 = yyv3809[:0]
+			yyc3809 = true
 		}
-	} else if yyl3778 > 0 {
-		var yyrr3778, yyrl3778 int
-		var yyrt3778 bool
-		if yyl3778 > cap(yyv3778) {
+	} else if yyl3809 > 0 {
+		var yyrr3809, yyrl3809 int
+		var yyrt3809 bool
+		if yyl3809 > cap(yyv3809) {
 
-			yyrg3778 := len(yyv3778) > 0
-			yyv23778 := yyv3778
-			yyrl3778, yyrt3778 = z.DecInferLen(yyl3778, z.DecBasicHandle().MaxInitLen, 216)
-			if yyrt3778 {
-				if yyrl3778 <= cap(yyv3778) {
-					yyv3778 = yyv3778[:yyrl3778]
+			yyrg3809 := len(yyv3809) > 0
+			yyv23809 := yyv3809
+			yyrl3809, yyrt3809 = z.DecInferLen(yyl3809, z.DecBasicHandle().MaxInitLen, 216)
+			if yyrt3809 {
+				if yyrl3809 <= cap(yyv3809) {
+					yyv3809 = yyv3809[:yyrl3809]
 				} else {
-					yyv3778 = make([]LimitRange, yyrl3778)
+					yyv3809 = make([]LimitRange, yyrl3809)
 				}
 			} else {
-				yyv3778 = make([]LimitRange, yyrl3778)
+				yyv3809 = make([]LimitRange, yyrl3809)
 			}
-			yyc3778 = true
-			yyrr3778 = len(yyv3778)
-			if yyrg3778 {
-				copy(yyv3778, yyv23778)
+			yyc3809 = true
+			yyrr3809 = len(yyv3809)
+			if yyrg3809 {
+				copy(yyv3809, yyv23809)
 			}
-		} else if yyl3778 != len(yyv3778) {
-			yyv3778 = yyv3778[:yyl3778]
-			yyc3778 = true
+		} else if yyl3809 != len(yyv3809) {
+			yyv3809 = yyv3809[:yyl3809]
+			yyc3809 = true
 		}
-		yyj3778 := 0
-		for ; yyj3778 < yyrr3778; yyj3778++ {
-			yyh3778.ElemContainerState(yyj3778)
+		yyj3809 := 0
+		for ; yyj3809 < yyrr3809; yyj3809++ {
+			yyh3809.ElemContainerState(yyj3809)
 			if r.TryDecodeAsNil() {
-				yyv3778[yyj3778] = LimitRange{}
+				yyv3809[yyj3809] = LimitRange{}
 			} else {
-				yyv3779 := &yyv3778[yyj3778]
-				yyv3779.CodecDecodeSelf(d)
+				yyv3810 := &yyv3809[yyj3809]
+				yyv3810.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3778 {
-			for ; yyj3778 < yyl3778; yyj3778++ {
-				yyv3778 = append(yyv3778, LimitRange{})
-				yyh3778.ElemContainerState(yyj3778)
+		if yyrt3809 {
+			for ; yyj3809 < yyl3809; yyj3809++ {
+				yyv3809 = append(yyv3809, LimitRange{})
+				yyh3809.ElemContainerState(yyj3809)
 				if r.TryDecodeAsNil() {
-					yyv3778[yyj3778] = LimitRange{}
+					yyv3809[yyj3809] = LimitRange{}
 				} else {
-					yyv3780 := &yyv3778[yyj3778]
-					yyv3780.CodecDecodeSelf(d)
+					yyv3811 := &yyv3809[yyj3809]
+					yyv3811.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3778 := 0
-		for ; !r.CheckBreak(); yyj3778++ {
+		yyj3809 := 0
+		for ; !r.CheckBreak(); yyj3809++ {
 
-			if yyj3778 >= len(yyv3778) {
-				yyv3778 = append(yyv3778, LimitRange{}) // var yyz3778 LimitRange
-				yyc3778 = true
+			if yyj3809 >= len(yyv3809) {
+				yyv3809 = append(yyv3809, LimitRange{}) // var yyz3809 LimitRange
+				yyc3809 = true
 			}
-			yyh3778.ElemContainerState(yyj3778)
-			if yyj3778 < len(yyv3778) {
+			yyh3809.ElemContainerState(yyj3809)
+			if yyj3809 < len(yyv3809) {
 				if r.TryDecodeAsNil() {
-					yyv3778[yyj3778] = LimitRange{}
+					yyv3809[yyj3809] = LimitRange{}
 				} else {
-					yyv3781 := &yyv3778[yyj3778]
-					yyv3781.CodecDecodeSelf(d)
+					yyv3812 := &yyv3809[yyj3809]
+					yyv3812.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -48167,17 +48574,17 @@ func (x codecSelfer1234) decSliceLimitRange(v *[]LimitRange, d *codec1978.Decode
 			}
 
 		}
-		if yyj3778 < len(yyv3778) {
-			yyv3778 = yyv3778[:yyj3778]
-			yyc3778 = true
-		} else if yyj3778 == 0 && yyv3778 == nil {
-			yyv3778 = []LimitRange{}
-			yyc3778 = true
+		if yyj3809 < len(yyv3809) {
+			yyv3809 = yyv3809[:yyj3809]
+			yyc3809 = true
+		} else if yyj3809 == 0 && yyv3809 == nil {
+			yyv3809 = []LimitRange{}
+			yyc3809 = true
 		}
 	}
-	yyh3778.End()
-	if yyc3778 {
-		*v = yyv3778
+	yyh3809.End()
+	if yyc3809 {
+		*v = yyv3809
 	}
 }
 
@@ -48186,10 +48593,10 @@ func (x codecSelfer1234) encSliceResourceQuota(v []ResourceQuota, e *codec1978.E
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3782 := range v {
+	for _, yyv3813 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3783 := &yyv3782
-		yy3783.CodecEncodeSelf(e)
+		yy3814 := &yyv3813
+		yy3814.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -48199,83 +48606,83 @@ func (x codecSelfer1234) decSliceResourceQuota(v *[]ResourceQuota, d *codec1978.
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3784 := *v
-	yyh3784, yyl3784 := z.DecSliceHelperStart()
-	var yyc3784 bool
-	if yyl3784 == 0 {
-		if yyv3784 == nil {
-			yyv3784 = []ResourceQuota{}
-			yyc3784 = true
-		} else if len(yyv3784) != 0 {
-			yyv3784 = yyv3784[:0]
-			yyc3784 = true
+	yyv3815 := *v
+	yyh3815, yyl3815 := z.DecSliceHelperStart()
+	var yyc3815 bool
+	if yyl3815 == 0 {
+		if yyv3815 == nil {
+			yyv3815 = []ResourceQuota{}
+			yyc3815 = true
+		} else if len(yyv3815) != 0 {
+			yyv3815 = yyv3815[:0]
+			yyc3815 = true
 		}
-	} else if yyl3784 > 0 {
-		var yyrr3784, yyrl3784 int
-		var yyrt3784 bool
-		if yyl3784 > cap(yyv3784) {
+	} else if yyl3815 > 0 {
+		var yyrr3815, yyrl3815 int
+		var yyrt3815 bool
+		if yyl3815 > cap(yyv3815) {
 
-			yyrg3784 := len(yyv3784) > 0
-			yyv23784 := yyv3784
-			yyrl3784, yyrt3784 = z.DecInferLen(yyl3784, z.DecBasicHandle().MaxInitLen, 216)
-			if yyrt3784 {
-				if yyrl3784 <= cap(yyv3784) {
-					yyv3784 = yyv3784[:yyrl3784]
+			yyrg3815 := len(yyv3815) > 0
+			yyv23815 := yyv3815
+			yyrl3815, yyrt3815 = z.DecInferLen(yyl3815, z.DecBasicHandle().MaxInitLen, 216)
+			if yyrt3815 {
+				if yyrl3815 <= cap(yyv3815) {
+					yyv3815 = yyv3815[:yyrl3815]
 				} else {
-					yyv3784 = make([]ResourceQuota, yyrl3784)
+					yyv3815 = make([]ResourceQuota, yyrl3815)
 				}
 			} else {
-				yyv3784 = make([]ResourceQuota, yyrl3784)
+				yyv3815 = make([]ResourceQuota, yyrl3815)
 			}
-			yyc3784 = true
-			yyrr3784 = len(yyv3784)
-			if yyrg3784 {
-				copy(yyv3784, yyv23784)
+			yyc3815 = true
+			yyrr3815 = len(yyv3815)
+			if yyrg3815 {
+				copy(yyv3815, yyv23815)
 			}
-		} else if yyl3784 != len(yyv3784) {
-			yyv3784 = yyv3784[:yyl3784]
-			yyc3784 = true
+		} else if yyl3815 != len(yyv3815) {
+			yyv3815 = yyv3815[:yyl3815]
+			yyc3815 = true
 		}
-		yyj3784 := 0
-		for ; yyj3784 < yyrr3784; yyj3784++ {
-			yyh3784.ElemContainerState(yyj3784)
+		yyj3815 := 0
+		for ; yyj3815 < yyrr3815; yyj3815++ {
+			yyh3815.ElemContainerState(yyj3815)
 			if r.TryDecodeAsNil() {
-				yyv3784[yyj3784] = ResourceQuota{}
+				yyv3815[yyj3815] = ResourceQuota{}
 			} else {
-				yyv3785 := &yyv3784[yyj3784]
-				yyv3785.CodecDecodeSelf(d)
+				yyv3816 := &yyv3815[yyj3815]
+				yyv3816.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3784 {
-			for ; yyj3784 < yyl3784; yyj3784++ {
-				yyv3784 = append(yyv3784, ResourceQuota{})
-				yyh3784.ElemContainerState(yyj3784)
+		if yyrt3815 {
+			for ; yyj3815 < yyl3815; yyj3815++ {
+				yyv3815 = append(yyv3815, ResourceQuota{})
+				yyh3815.ElemContainerState(yyj3815)
 				if r.TryDecodeAsNil() {
-					yyv3784[yyj3784] = ResourceQuota{}
+					yyv3815[yyj3815] = ResourceQuota{}
 				} else {
-					yyv3786 := &yyv3784[yyj3784]
-					yyv3786.CodecDecodeSelf(d)
+					yyv3817 := &yyv3815[yyj3815]
+					yyv3817.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3784 := 0
-		for ; !r.CheckBreak(); yyj3784++ {
+		yyj3815 := 0
+		for ; !r.CheckBreak(); yyj3815++ {
 
-			if yyj3784 >= len(yyv3784) {
-				yyv3784 = append(yyv3784, ResourceQuota{}) // var yyz3784 ResourceQuota
-				yyc3784 = true
+			if yyj3815 >= len(yyv3815) {
+				yyv3815 = append(yyv3815, ResourceQuota{}) // var yyz3815 ResourceQuota
+				yyc3815 = true
 			}
-			yyh3784.ElemContainerState(yyj3784)
-			if yyj3784 < len(yyv3784) {
+			yyh3815.ElemContainerState(yyj3815)
+			if yyj3815 < len(yyv3815) {
 				if r.TryDecodeAsNil() {
-					yyv3784[yyj3784] = ResourceQuota{}
+					yyv3815[yyj3815] = ResourceQuota{}
 				} else {
-					yyv3787 := &yyv3784[yyj3784]
-					yyv3787.CodecDecodeSelf(d)
+					yyv3818 := &yyv3815[yyj3815]
+					yyv3818.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -48283,17 +48690,17 @@ func (x codecSelfer1234) decSliceResourceQuota(v *[]ResourceQuota, d *codec1978.
 			}
 
 		}
-		if yyj3784 < len(yyv3784) {
-			yyv3784 = yyv3784[:yyj3784]
-			yyc3784 = true
-		} else if yyj3784 == 0 && yyv3784 == nil {
-			yyv3784 = []ResourceQuota{}
-			yyc3784 = true
+		if yyj3815 < len(yyv3815) {
+			yyv3815 = yyv3815[:yyj3815]
+			yyc3815 = true
+		} else if yyj3815 == 0 && yyv3815 == nil {
+			yyv3815 = []ResourceQuota{}
+			yyc3815 = true
 		}
 	}
-	yyh3784.End()
-	if yyc3784 {
-		*v = yyv3784
+	yyh3815.End()
+	if yyc3815 {
+		*v = yyv3815
 	}
 }
 
@@ -48302,23 +48709,23 @@ func (x codecSelfer1234) encMapstringSliceuint8(v map[string][]uint8, e *codec19
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeMapStart(len(v))
-	for yyk3788, yyv3788 := range v {
+	for yyk3819, yyv3819 := range v {
 		z.EncSendContainerState(codecSelfer_containerMapKey1234)
-		yym3789 := z.EncBinary()
-		_ = yym3789
+		yym3820 := z.EncBinary()
+		_ = yym3820
 		if false {
 		} else {
-			r.EncodeString(codecSelferC_UTF81234, string(yyk3788))
+			r.EncodeString(codecSelferC_UTF81234, string(yyk3819))
 		}
 		z.EncSendContainerState(codecSelfer_containerMapValue1234)
-		if yyv3788 == nil {
+		if yyv3819 == nil {
 			r.EncodeNil()
 		} else {
-			yym3790 := z.EncBinary()
-			_ = yym3790
+			yym3821 := z.EncBinary()
+			_ = yym3821
 			if false {
 			} else {
-				r.EncodeStringBytes(codecSelferC_RAW1234, []byte(yyv3788))
+				r.EncodeStringBytes(codecSelferC_RAW1234, []byte(yyv3819))
 			}
 		}
 	}
@@ -48330,80 +48737,80 @@ func (x codecSelfer1234) decMapstringSliceuint8(v *map[string][]uint8, d *codec1
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3791 := *v
-	yyl3791 := r.ReadMapStart()
-	yybh3791 := z.DecBasicHandle()
-	if yyv3791 == nil {
-		yyrl3791, _ := z.DecInferLen(yyl3791, yybh3791.MaxInitLen, 40)
-		yyv3791 = make(map[string][]uint8, yyrl3791)
-		*v = yyv3791
+	yyv3822 := *v
+	yyl3822 := r.ReadMapStart()
+	yybh3822 := z.DecBasicHandle()
+	if yyv3822 == nil {
+		yyrl3822, _ := z.DecInferLen(yyl3822, yybh3822.MaxInitLen, 40)
+		yyv3822 = make(map[string][]uint8, yyrl3822)
+		*v = yyv3822
 	}
-	var yymk3791 string
-	var yymv3791 []uint8
-	var yymg3791 bool
-	if yybh3791.MapValueReset {
-		yymg3791 = true
+	var yymk3822 string
+	var yymv3822 []uint8
+	var yymg3822 bool
+	if yybh3822.MapValueReset {
+		yymg3822 = true
 	}
-	if yyl3791 > 0 {
-		for yyj3791 := 0; yyj3791 < yyl3791; yyj3791++ {
+	if yyl3822 > 0 {
+		for yyj3822 := 0; yyj3822 < yyl3822; yyj3822++ {
 			z.DecSendContainerState(codecSelfer_containerMapKey1234)
 			if r.TryDecodeAsNil() {
-				yymk3791 = ""
+				yymk3822 = ""
 			} else {
-				yymk3791 = string(r.DecodeString())
+				yymk3822 = string(r.DecodeString())
 			}
 
-			if yymg3791 {
-				yymv3791 = yyv3791[yymk3791]
+			if yymg3822 {
+				yymv3822 = yyv3822[yymk3822]
 			} else {
-				yymv3791 = nil
+				yymv3822 = nil
 			}
 			z.DecSendContainerState(codecSelfer_containerMapValue1234)
 			if r.TryDecodeAsNil() {
-				yymv3791 = nil
+				yymv3822 = nil
 			} else {
-				yyv3793 := &yymv3791
-				yym3794 := z.DecBinary()
-				_ = yym3794
+				yyv3824 := &yymv3822
+				yym3825 := z.DecBinary()
+				_ = yym3825
 				if false {
 				} else {
-					*yyv3793 = r.DecodeBytes(*(*[]byte)(yyv3793), false, false)
+					*yyv3824 = r.DecodeBytes(*(*[]byte)(yyv3824), false, false)
 				}
 			}
 
-			if yyv3791 != nil {
-				yyv3791[yymk3791] = yymv3791
+			if yyv3822 != nil {
+				yyv3822[yymk3822] = yymv3822
 			}
 		}
-	} else if yyl3791 < 0 {
-		for yyj3791 := 0; !r.CheckBreak(); yyj3791++ {
+	} else if yyl3822 < 0 {
+		for yyj3822 := 0; !r.CheckBreak(); yyj3822++ {
 			z.DecSendContainerState(codecSelfer_containerMapKey1234)
 			if r.TryDecodeAsNil() {
-				yymk3791 = ""
+				yymk3822 = ""
 			} else {
-				yymk3791 = string(r.DecodeString())
+				yymk3822 = string(r.DecodeString())
 			}
 
-			if yymg3791 {
-				yymv3791 = yyv3791[yymk3791]
+			if yymg3822 {
+				yymv3822 = yyv3822[yymk3822]
 			} else {
-				yymv3791 = nil
+				yymv3822 = nil
 			}
 			z.DecSendContainerState(codecSelfer_containerMapValue1234)
 			if r.TryDecodeAsNil() {
-				yymv3791 = nil
+				yymv3822 = nil
 			} else {
-				yyv3796 := &yymv3791
-				yym3797 := z.DecBinary()
-				_ = yym3797
+				yyv3827 := &yymv3822
+				yym3828 := z.DecBinary()
+				_ = yym3828
 				if false {
 				} else {
-					*yyv3796 = r.DecodeBytes(*(*[]byte)(yyv3796), false, false)
+					*yyv3827 = r.DecodeBytes(*(*[]byte)(yyv3827), false, false)
 				}
 			}
 
-			if yyv3791 != nil {
-				yyv3791[yymk3791] = yymv3791
+			if yyv3822 != nil {
+				yyv3822[yymk3822] = yymv3822
 			}
 		}
 	} // else len==0: TODO: Should we clear map entries?
@@ -48415,10 +48822,10 @@ func (x codecSelfer1234) encSliceSecret(v []Secret, e *codec1978.Encoder) {
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3798 := range v {
+	for _, yyv3829 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3799 := &yyv3798
-		yy3799.CodecEncodeSelf(e)
+		yy3830 := &yyv3829
+		yy3830.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -48428,83 +48835,83 @@ func (x codecSelfer1234) decSliceSecret(v *[]Secret, d *codec1978.Decoder) {
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3800 := *v
-	yyh3800, yyl3800 := z.DecSliceHelperStart()
-	var yyc3800 bool
-	if yyl3800 == 0 {
-		if yyv3800 == nil {
-			yyv3800 = []Secret{}
-			yyc3800 = true
-		} else if len(yyv3800) != 0 {
-			yyv3800 = yyv3800[:0]
-			yyc3800 = true
+	yyv3831 := *v
+	yyh3831, yyl3831 := z.DecSliceHelperStart()
+	var yyc3831 bool
+	if yyl3831 == 0 {
+		if yyv3831 == nil {
+			yyv3831 = []Secret{}
+			yyc3831 = true
+		} else if len(yyv3831) != 0 {
+			yyv3831 = yyv3831[:0]
+			yyc3831 = true
 		}
-	} else if yyl3800 > 0 {
-		var yyrr3800, yyrl3800 int
-		var yyrt3800 bool
-		if yyl3800 > cap(yyv3800) {
+	} else if yyl3831 > 0 {
+		var yyrr3831, yyrl3831 int
+		var yyrt3831 bool
+		if yyl3831 > cap(yyv3831) {
 
-			yyrg3800 := len(yyv3800) > 0
-			yyv23800 := yyv3800
-			yyrl3800, yyrt3800 = z.DecInferLen(yyl3800, z.DecBasicHandle().MaxInitLen, 216)
-			if yyrt3800 {
-				if yyrl3800 <= cap(yyv3800) {
-					yyv3800 = yyv3800[:yyrl3800]
+			yyrg3831 := len(yyv3831) > 0
+			yyv23831 := yyv3831
+			yyrl3831, yyrt3831 = z.DecInferLen(yyl3831, z.DecBasicHandle().MaxInitLen, 216)
+			if yyrt3831 {
+				if yyrl3831 <= cap(yyv3831) {
+					yyv3831 = yyv3831[:yyrl3831]
 				} else {
-					yyv3800 = make([]Secret, yyrl3800)
+					yyv3831 = make([]Secret, yyrl3831)
 				}
 			} else {
-				yyv3800 = make([]Secret, yyrl3800)
+				yyv3831 = make([]Secret, yyrl3831)
 			}
-			yyc3800 = true
-			yyrr3800 = len(yyv3800)
-			if yyrg3800 {
-				copy(yyv3800, yyv23800)
+			yyc3831 = true
+			yyrr3831 = len(yyv3831)
+			if yyrg3831 {
+				copy(yyv3831, yyv23831)
 			}
-		} else if yyl3800 != len(yyv3800) {
-			yyv3800 = yyv3800[:yyl3800]
-			yyc3800 = true
+		} else if yyl3831 != len(yyv3831) {
+			yyv3831 = yyv3831[:yyl3831]
+			yyc3831 = true
 		}
-		yyj3800 := 0
-		for ; yyj3800 < yyrr3800; yyj3800++ {
-			yyh3800.ElemContainerState(yyj3800)
+		yyj3831 := 0
+		for ; yyj3831 < yyrr3831; yyj3831++ {
+			yyh3831.ElemContainerState(yyj3831)
 			if r.TryDecodeAsNil() {
-				yyv3800[yyj3800] = Secret{}
+				yyv3831[yyj3831] = Secret{}
 			} else {
-				yyv3801 := &yyv3800[yyj3800]
-				yyv3801.CodecDecodeSelf(d)
+				yyv3832 := &yyv3831[yyj3831]
+				yyv3832.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3800 {
-			for ; yyj3800 < yyl3800; yyj3800++ {
-				yyv3800 = append(yyv3800, Secret{})
-				yyh3800.ElemContainerState(yyj3800)
+		if yyrt3831 {
+			for ; yyj3831 < yyl3831; yyj3831++ {
+				yyv3831 = append(yyv3831, Secret{})
+				yyh3831.ElemContainerState(yyj3831)
 				if r.TryDecodeAsNil() {
-					yyv3800[yyj3800] = Secret{}
+					yyv3831[yyj3831] = Secret{}
 				} else {
-					yyv3802 := &yyv3800[yyj3800]
-					yyv3802.CodecDecodeSelf(d)
+					yyv3833 := &yyv3831[yyj3831]
+					yyv3833.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3800 := 0
-		for ; !r.CheckBreak(); yyj3800++ {
+		yyj3831 := 0
+		for ; !r.CheckBreak(); yyj3831++ {
 
-			if yyj3800 >= len(yyv3800) {
-				yyv3800 = append(yyv3800, Secret{}) // var yyz3800 Secret
-				yyc3800 = true
+			if yyj3831 >= len(yyv3831) {
+				yyv3831 = append(yyv3831, Secret{}) // var yyz3831 Secret
+				yyc3831 = true
 			}
-			yyh3800.ElemContainerState(yyj3800)
-			if yyj3800 < len(yyv3800) {
+			yyh3831.ElemContainerState(yyj3831)
+			if yyj3831 < len(yyv3831) {
 				if r.TryDecodeAsNil() {
-					yyv3800[yyj3800] = Secret{}
+					yyv3831[yyj3831] = Secret{}
 				} else {
-					yyv3803 := &yyv3800[yyj3800]
-					yyv3803.CodecDecodeSelf(d)
+					yyv3834 := &yyv3831[yyj3831]
+					yyv3834.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -48512,17 +48919,17 @@ func (x codecSelfer1234) decSliceSecret(v *[]Secret, d *codec1978.Decoder) {
 			}
 
 		}
-		if yyj3800 < len(yyv3800) {
-			yyv3800 = yyv3800[:yyj3800]
-			yyc3800 = true
-		} else if yyj3800 == 0 && yyv3800 == nil {
-			yyv3800 = []Secret{}
-			yyc3800 = true
+		if yyj3831 < len(yyv3831) {
+			yyv3831 = yyv3831[:yyj3831]
+			yyc3831 = true
+		} else if yyj3831 == 0 && yyv3831 == nil {
+			yyv3831 = []Secret{}
+			yyc3831 = true
 		}
 	}
-	yyh3800.End()
-	if yyc3800 {
-		*v = yyv3800
+	yyh3831.End()
+	if yyc3831 {
+		*v = yyv3831
 	}
 }
 
@@ -48531,10 +48938,10 @@ func (x codecSelfer1234) encSliceComponentCondition(v []ComponentCondition, e *c
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3804 := range v {
+	for _, yyv3835 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3805 := &yyv3804
-		yy3805.CodecEncodeSelf(e)
+		yy3836 := &yyv3835
+		yy3836.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -48544,83 +48951,83 @@ func (x codecSelfer1234) decSliceComponentCondition(v *[]ComponentCondition, d *
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3806 := *v
-	yyh3806, yyl3806 := z.DecSliceHelperStart()
-	var yyc3806 bool
-	if yyl3806 == 0 {
-		if yyv3806 == nil {
-			yyv3806 = []ComponentCondition{}
-			yyc3806 = true
-		} else if len(yyv3806) != 0 {
-			yyv3806 = yyv3806[:0]
-			yyc3806 = true
+	yyv3837 := *v
+	yyh3837, yyl3837 := z.DecSliceHelperStart()
+	var yyc3837 bool
+	if yyl3837 == 0 {
+		if yyv3837 == nil {
+			yyv3837 = []ComponentCondition{}
+			yyc3837 = true
+		} else if len(yyv3837) != 0 {
+			yyv3837 = yyv3837[:0]
+			yyc3837 = true
 		}
-	} else if yyl3806 > 0 {
-		var yyrr3806, yyrl3806 int
-		var yyrt3806 bool
-		if yyl3806 > cap(yyv3806) {
+	} else if yyl3837 > 0 {
+		var yyrr3837, yyrl3837 int
+		var yyrt3837 bool
+		if yyl3837 > cap(yyv3837) {
 
-			yyrg3806 := len(yyv3806) > 0
-			yyv23806 := yyv3806
-			yyrl3806, yyrt3806 = z.DecInferLen(yyl3806, z.DecBasicHandle().MaxInitLen, 64)
-			if yyrt3806 {
-				if yyrl3806 <= cap(yyv3806) {
-					yyv3806 = yyv3806[:yyrl3806]
+			yyrg3837 := len(yyv3837) > 0
+			yyv23837 := yyv3837
+			yyrl3837, yyrt3837 = z.DecInferLen(yyl3837, z.DecBasicHandle().MaxInitLen, 64)
+			if yyrt3837 {
+				if yyrl3837 <= cap(yyv3837) {
+					yyv3837 = yyv3837[:yyrl3837]
 				} else {
-					yyv3806 = make([]ComponentCondition, yyrl3806)
+					yyv3837 = make([]ComponentCondition, yyrl3837)
 				}
 			} else {
-				yyv3806 = make([]ComponentCondition, yyrl3806)
+				yyv3837 = make([]ComponentCondition, yyrl3837)
 			}
-			yyc3806 = true
-			yyrr3806 = len(yyv3806)
-			if yyrg3806 {
-				copy(yyv3806, yyv23806)
+			yyc3837 = true
+			yyrr3837 = len(yyv3837)
+			if yyrg3837 {
+				copy(yyv3837, yyv23837)
 			}
-		} else if yyl3806 != len(yyv3806) {
-			yyv3806 = yyv3806[:yyl3806]
-			yyc3806 = true
+		} else if yyl3837 != len(yyv3837) {
+			yyv3837 = yyv3837[:yyl3837]
+			yyc3837 = true
 		}
-		yyj3806 := 0
-		for ; yyj3806 < yyrr3806; yyj3806++ {
-			yyh3806.ElemContainerState(yyj3806)
+		yyj3837 := 0
+		for ; yyj3837 < yyrr3837; yyj3837++ {
+			yyh3837.ElemContainerState(yyj3837)
 			if r.TryDecodeAsNil() {
-				yyv3806[yyj3806] = ComponentCondition{}
+				yyv3837[yyj3837] = ComponentCondition{}
 			} else {
-				yyv3807 := &yyv3806[yyj3806]
-				yyv3807.CodecDecodeSelf(d)
+				yyv3838 := &yyv3837[yyj3837]
+				yyv3838.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3806 {
-			for ; yyj3806 < yyl3806; yyj3806++ {
-				yyv3806 = append(yyv3806, ComponentCondition{})
-				yyh3806.ElemContainerState(yyj3806)
+		if yyrt3837 {
+			for ; yyj3837 < yyl3837; yyj3837++ {
+				yyv3837 = append(yyv3837, ComponentCondition{})
+				yyh3837.ElemContainerState(yyj3837)
 				if r.TryDecodeAsNil() {
-					yyv3806[yyj3806] = ComponentCondition{}
+					yyv3837[yyj3837] = ComponentCondition{}
 				} else {
-					yyv3808 := &yyv3806[yyj3806]
-					yyv3808.CodecDecodeSelf(d)
+					yyv3839 := &yyv3837[yyj3837]
+					yyv3839.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3806 := 0
-		for ; !r.CheckBreak(); yyj3806++ {
+		yyj3837 := 0
+		for ; !r.CheckBreak(); yyj3837++ {
 
-			if yyj3806 >= len(yyv3806) {
-				yyv3806 = append(yyv3806, ComponentCondition{}) // var yyz3806 ComponentCondition
-				yyc3806 = true
+			if yyj3837 >= len(yyv3837) {
+				yyv3837 = append(yyv3837, ComponentCondition{}) // var yyz3837 ComponentCondition
+				yyc3837 = true
 			}
-			yyh3806.ElemContainerState(yyj3806)
-			if yyj3806 < len(yyv3806) {
+			yyh3837.ElemContainerState(yyj3837)
+			if yyj3837 < len(yyv3837) {
 				if r.TryDecodeAsNil() {
-					yyv3806[yyj3806] = ComponentCondition{}
+					yyv3837[yyj3837] = ComponentCondition{}
 				} else {
-					yyv3809 := &yyv3806[yyj3806]
-					yyv3809.CodecDecodeSelf(d)
+					yyv3840 := &yyv3837[yyj3837]
+					yyv3840.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -48628,17 +49035,17 @@ func (x codecSelfer1234) decSliceComponentCondition(v *[]ComponentCondition, d *
 			}
 
 		}
-		if yyj3806 < len(yyv3806) {
-			yyv3806 = yyv3806[:yyj3806]
-			yyc3806 = true
-		} else if yyj3806 == 0 && yyv3806 == nil {
-			yyv3806 = []ComponentCondition{}
-			yyc3806 = true
+		if yyj3837 < len(yyv3837) {
+			yyv3837 = yyv3837[:yyj3837]
+			yyc3837 = true
+		} else if yyj3837 == 0 && yyv3837 == nil {
+			yyv3837 = []ComponentCondition{}
+			yyc3837 = true
 		}
 	}
-	yyh3806.End()
-	if yyc3806 {
-		*v = yyv3806
+	yyh3837.End()
+	if yyc3837 {
+		*v = yyv3837
 	}
 }
 
@@ -48647,10 +49054,10 @@ func (x codecSelfer1234) encSliceComponentStatus(v []ComponentStatus, e *codec19
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
 	r.EncodeArrayStart(len(v))
-	for _, yyv3810 := range v {
+	for _, yyv3841 := range v {
 		z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-		yy3811 := &yyv3810
-		yy3811.CodecEncodeSelf(e)
+		yy3842 := &yyv3841
+		yy3842.CodecEncodeSelf(e)
 	}
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
@@ -48660,83 +49067,83 @@ func (x codecSelfer1234) decSliceComponentStatus(v *[]ComponentStatus, d *codec1
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
 
-	yyv3812 := *v
-	yyh3812, yyl3812 := z.DecSliceHelperStart()
-	var yyc3812 bool
-	if yyl3812 == 0 {
-		if yyv3812 == nil {
-			yyv3812 = []ComponentStatus{}
-			yyc3812 = true
-		} else if len(yyv3812) != 0 {
-			yyv3812 = yyv3812[:0]
-			yyc3812 = true
+	yyv3843 := *v
+	yyh3843, yyl3843 := z.DecSliceHelperStart()
+	var yyc3843 bool
+	if yyl3843 == 0 {
+		if yyv3843 == nil {
+			yyv3843 = []ComponentStatus{}
+			yyc3843 = true
+		} else if len(yyv3843) != 0 {
+			yyv3843 = yyv3843[:0]
+			yyc3843 = true
 		}
-	} else if yyl3812 > 0 {
-		var yyrr3812, yyrl3812 int
-		var yyrt3812 bool
-		if yyl3812 > cap(yyv3812) {
+	} else if yyl3843 > 0 {
+		var yyrr3843, yyrl3843 int
+		var yyrt3843 bool
+		if yyl3843 > cap(yyv3843) {
 
-			yyrg3812 := len(yyv3812) > 0
-			yyv23812 := yyv3812
-			yyrl3812, yyrt3812 = z.DecInferLen(yyl3812, z.DecBasicHandle().MaxInitLen, 216)
-			if yyrt3812 {
-				if yyrl3812 <= cap(yyv3812) {
-					yyv3812 = yyv3812[:yyrl3812]
+			yyrg3843 := len(yyv3843) > 0
+			yyv23843 := yyv3843
+			yyrl3843, yyrt3843 = z.DecInferLen(yyl3843, z.DecBasicHandle().MaxInitLen, 216)
+			if yyrt3843 {
+				if yyrl3843 <= cap(yyv3843) {
+					yyv3843 = yyv3843[:yyrl3843]
 				} else {
-					yyv3812 = make([]ComponentStatus, yyrl3812)
+					yyv3843 = make([]ComponentStatus, yyrl3843)
 				}
 			} else {
-				yyv3812 = make([]ComponentStatus, yyrl3812)
+				yyv3843 = make([]ComponentStatus, yyrl3843)
 			}
-			yyc3812 = true
-			yyrr3812 = len(yyv3812)
-			if yyrg3812 {
-				copy(yyv3812, yyv23812)
+			yyc3843 = true
+			yyrr3843 = len(yyv3843)
+			if yyrg3843 {
+				copy(yyv3843, yyv23843)
 			}
-		} else if yyl3812 != len(yyv3812) {
-			yyv3812 = yyv3812[:yyl3812]
-			yyc3812 = true
+		} else if yyl3843 != len(yyv3843) {
+			yyv3843 = yyv3843[:yyl3843]
+			yyc3843 = true
 		}
-		yyj3812 := 0
-		for ; yyj3812 < yyrr3812; yyj3812++ {
-			yyh3812.ElemContainerState(yyj3812)
+		yyj3843 := 0
+		for ; yyj3843 < yyrr3843; yyj3843++ {
+			yyh3843.ElemContainerState(yyj3843)
 			if r.TryDecodeAsNil() {
-				yyv3812[yyj3812] = ComponentStatus{}
+				yyv3843[yyj3843] = ComponentStatus{}
 			} else {
-				yyv3813 := &yyv3812[yyj3812]
-				yyv3813.CodecDecodeSelf(d)
+				yyv3844 := &yyv3843[yyj3843]
+				yyv3844.CodecDecodeSelf(d)
 			}
 
 		}
-		if yyrt3812 {
-			for ; yyj3812 < yyl3812; yyj3812++ {
-				yyv3812 = append(yyv3812, ComponentStatus{})
-				yyh3812.ElemContainerState(yyj3812)
+		if yyrt3843 {
+			for ; yyj3843 < yyl3843; yyj3843++ {
+				yyv3843 = append(yyv3843, ComponentStatus{})
+				yyh3843.ElemContainerState(yyj3843)
 				if r.TryDecodeAsNil() {
-					yyv3812[yyj3812] = ComponentStatus{}
+					yyv3843[yyj3843] = ComponentStatus{}
 				} else {
-					yyv3814 := &yyv3812[yyj3812]
-					yyv3814.CodecDecodeSelf(d)
+					yyv3845 := &yyv3843[yyj3843]
+					yyv3845.CodecDecodeSelf(d)
 				}
 
 			}
 		}
 
 	} else {
-		yyj3812 := 0
-		for ; !r.CheckBreak(); yyj3812++ {
+		yyj3843 := 0
+		for ; !r.CheckBreak(); yyj3843++ {
 
-			if yyj3812 >= len(yyv3812) {
-				yyv3812 = append(yyv3812, ComponentStatus{}) // var yyz3812 ComponentStatus
-				yyc3812 = true
+			if yyj3843 >= len(yyv3843) {
+				yyv3843 = append(yyv3843, ComponentStatus{}) // var yyz3843 ComponentStatus
+				yyc3843 = true
 			}
-			yyh3812.ElemContainerState(yyj3812)
-			if yyj3812 < len(yyv3812) {
+			yyh3843.ElemContainerState(yyj3843)
+			if yyj3843 < len(yyv3843) {
 				if r.TryDecodeAsNil() {
-					yyv3812[yyj3812] = ComponentStatus{}
+					yyv3843[yyj3843] = ComponentStatus{}
 				} else {
-					yyv3815 := &yyv3812[yyj3812]
-					yyv3815.CodecDecodeSelf(d)
+					yyv3846 := &yyv3843[yyj3843]
+					yyv3846.CodecDecodeSelf(d)
 				}
 
 			} else {
@@ -48744,16 +49151,16 @@ func (x codecSelfer1234) decSliceComponentStatus(v *[]ComponentStatus, d *codec1
 			}
 
 		}
-		if yyj3812 < len(yyv3812) {
-			yyv3812 = yyv3812[:yyj3812]
-			yyc3812 = true
-		} else if yyj3812 == 0 && yyv3812 == nil {
-			yyv3812 = []ComponentStatus{}
-			yyc3812 = true
+		if yyj3843 < len(yyv3843) {
+			yyv3843 = yyv3843[:yyj3843]
+			yyc3843 = true
+		} else if yyj3843 == 0 && yyv3843 == nil {
+			yyv3843 = []ComponentStatus{}
+			yyc3843 = true
 		}
 	}
-	yyh3812.End()
-	if yyc3812 {
-		*v = yyv3812
+	yyh3843.End()
+	if yyc3843 {
+		*v = yyv3843
 	}
 }
