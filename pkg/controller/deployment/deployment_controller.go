@@ -34,6 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
+	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	podutil "k8s.io/kubernetes/pkg/util/pod"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -477,10 +479,10 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment) (*api
 	}
 	// new RC does not exist, create one.
 	namespace := deployment.ObjectMeta.Namespace
-	podTemplateSpecHash := deploymentutil.GetPodTemplateSpecHash(deployment.Spec.Template)
+	podTemplateSpecHash := podutil.GetPodTemplateSpecHash(deployment.Spec.Template)
 	newRCTemplate := deploymentutil.GetNewRCTemplate(deployment)
 	// Add podTemplateHash label to selector.
-	newRCSelector := deploymentutil.CloneAndAddLabel(deployment.Spec.Selector, deployment.Spec.UniqueLabelKey, podTemplateSpecHash)
+	newRCSelector := labelsutil.CloneAndAddLabel(deployment.Spec.Selector, deployment.Spec.UniqueLabelKey, podTemplateSpecHash)
 
 	newRC := api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{

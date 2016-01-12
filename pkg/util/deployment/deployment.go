@@ -18,14 +18,14 @@ package deployment
 
 import (
 	"fmt"
-	"hash/adler32"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
-	hashutil "k8s.io/kubernetes/pkg/util/hash"
+	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	podutil "k8s.io/kubernetes/pkg/util/pod"
 )
 
 // GetOldRCs returns the old RCs targeted by the given Deployment; get PodList and RCList from client interface.
@@ -116,33 +116,11 @@ func GetNewRCTemplate(deployment extensions.Deployment) api.PodTemplateSpec {
 		ObjectMeta: deployment.Spec.Template.ObjectMeta,
 		Spec:       deployment.Spec.Template.Spec,
 	}
-	newRCTemplate.ObjectMeta.Labels = CloneAndAddLabel(
+	newRCTemplate.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
 		deployment.Spec.Template.ObjectMeta.Labels,
 		deployment.Spec.UniqueLabelKey,
-		GetPodTemplateSpecHash(newRCTemplate))
+		podutil.GetPodTemplateSpecHash(newRCTemplate))
 	return newRCTemplate
-}
-
-// Clones the given map and returns a new map with the given key and value added.
-// Returns the given map, if labelKey is empty.
-func CloneAndAddLabel(labels map[string]string, labelKey string, labelValue uint32) map[string]string {
-	if labelKey == "" {
-		// Dont need to add a label.
-		return labels
-	}
-	// Clone.
-	newLabels := map[string]string{}
-	for key, value := range labels {
-		newLabels[key] = value
-	}
-	newLabels[labelKey] = fmt.Sprintf("%d", labelValue)
-	return newLabels
-}
-
-func GetPodTemplateSpecHash(template api.PodTemplateSpec) uint32 {
-	podTemplateSpecHasher := adler32.New()
-	hashutil.DeepHashObject(podTemplateSpecHasher, template)
-	return podTemplateSpecHasher.Sum32()
 }
 
 // Returns the sum of Replicas of the given replication controllers.
