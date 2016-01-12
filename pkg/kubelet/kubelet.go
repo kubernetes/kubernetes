@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -33,6 +32,7 @@ import (
 	"sync"
 	"time"
 
+	"encoding/json"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
@@ -168,8 +168,7 @@ func NewMainKubelet(
 	imageGCPolicy ImageGCPolicy,
 	diskSpacePolicy DiskSpacePolicy,
 	cloud cloudprovider.Interface,
-	nodeLabels []string,
-	nodeLabelsFile string,
+	nodeLabels string,
 	nodeStatusUpdateFrequency time.Duration,
 	resourceContainer string,
 	osInterface kubecontainer.OSInterface,
@@ -292,7 +291,6 @@ func NewMainKubelet(
 		cloud:                          cloud,
 		nodeRef:                        nodeRef,
 		nodeLabels:                     nodeLabels,
-		nodeLabelsFile:                 nodeLabelsFile,
 		nodeStatusUpdateFrequency:      nodeStatusUpdateFrequency,
 		resourceContainer:              resourceContainer,
 		os:                             osInterface,
@@ -512,10 +510,7 @@ type Kubelet struct {
 	nodeInfo               predicates.NodeInfo
 
 	// a list of node labels to register
-	nodeLabels []string
-
-	// the path to a yaml or json file container series of node labels
-	nodeLabelsFile string
+	nodeLabels string
 
 	// Last timestamp when runtime responded on ping.
 	// Mutex is used to protect this value.
@@ -1025,77 +1020,23 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 	return node, nil
 }
 
-// getNodeLabels is just a wrapper method for the two below, not to duplicate above
+// getNodeLabels extracts the node labels specified on the command line
 func (kl *Kubelet) getNodeLabels() (map[string]string, error) {
-	var err error
 	labels := make(map[string]string, 0)
-
-	if kl.nodeLabelsFile != "" {
-		labels, err = kl.retrieveNodeLabelsFile(kl.nodeLabelsFile)
-		if err != nil {
-			return labels, err
-		}
+	if kl.nodeLabels == "" {
+		return labels, nil
 	}
-	// step: apply the command line label - permitted to override those from file
-	if len(kl.nodeLabels) > 0 {
-		nl, err := kl.retrieveNodeLabels(kl.nodeLabels)
-		if err != nil {
-			return labels, err
-		}
-		for k, v := range nl {
-			if vl, found := labels[k]; found {
-				glog.Warningf("the --node-label %s=%s option will overwrite %s from node-labels-file", k, v, vl)
-			}
-			labels[k] = v
-		}
-	}
+	rawLabels := make(map[string]json.Number, 0)
 
-	return labels, nil
-}
-
-// retrieveNodeLabels extracts the node labels specified on the command line
-func (kl *Kubelet) retrieveNodeLabels(labels []string) (map[string]string, error) {
-	nodeLabels := make(map[string]string, 0)
-
-	for _, label := range labels {
-		items := strings.Split(label, "=")
-		if len(items) != 2 {
-			return nodeLabels, fmt.Errorf("--node-label %s, should be in the form key=pair", label)
-		}
-		nodeLabels[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
-	}
-
-	return nodeLabels, nil
-}
-
-// retrieveNodeLabelsFile reads in and parses the yaml or json node labels file
-func (kl *Kubelet) retrieveNodeLabelsFile(path string) (map[string]string, error) {
-	labels := make(map[string]string, 0)
-	kps := make(map[string]interface{}, 0)
-
-	fd, err := os.Open(path)
+	err := yaml.NewYAMLOrJSONDecoder(strings.NewReader(kl.nodeLabels), 12).Decode(&rawLabels)
 	if err != nil {
-		return nil, err
-	}
-	defer fd.Close()
-
-	err = yaml.NewYAMLOrJSONDecoder(bufio.NewReader(fd), 12).Decode(&kps)
-	if err != nil {
-		return nil, fmt.Errorf("the --node-labels-file %s content is invalid, %s", path, err)
+		return nil, fmt.Errorf("the --node-labels content '%s' is invalid, %s", kl.nodeLabels, err)
 	}
 
-	for k, v := range kps {
-		// we ONLY accept key=value pairs, no complex types
-		switch v.(type) {
-		case string:
-			labels[k] = v.(string)
-		case float64:
-			labels[k] = fmt.Sprintf("%d", v.(float64))
-		default:
-			return nil, fmt.Errorf("--node-labels-file only supports key:string, not complex values e.g arrays, maps")
-		}
+	// Parse the labels
+	for k, v := range rawLabels {
+		labels[k] = v.String()
 	}
-
 	return labels, nil
 }
 
