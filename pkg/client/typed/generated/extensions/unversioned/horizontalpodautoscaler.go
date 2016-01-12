@@ -36,6 +36,7 @@ type HorizontalPodAutoscalerInterface interface {
 	Get(name string) (*extensions.HorizontalPodAutoscaler, error)
 	List(opts api.ListOptions) (*extensions.HorizontalPodAutoscalerList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	HorizontalPodAutoscalerExpansion
 }
 
 // horizontalPodAutoscalers implements HorizontalPodAutoscalerInterface

@@ -36,6 +36,7 @@ type DaemonSetInterface interface {
 	Get(name string) (*extensions.DaemonSet, error)
 	List(opts api.ListOptions) (*extensions.DaemonSetList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	DaemonSetExpansion
 }
 
 // daemonSets implements DaemonSetInterface

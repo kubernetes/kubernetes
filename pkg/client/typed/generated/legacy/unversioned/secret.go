@@ -35,6 +35,7 @@ type SecretInterface interface {
 	Get(name string) (*api.Secret, error)
 	List(opts api.ListOptions) (*api.SecretList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	SecretExpansion
 }
 
 // secrets implements SecretInterface

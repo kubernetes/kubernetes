@@ -35,6 +35,7 @@ type PodInterface interface {
 	Get(name string) (*api.Pod, error)
 	List(opts api.ListOptions) (*api.PodList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	PodExpansion
 }
 
 // pods implements PodInterface
