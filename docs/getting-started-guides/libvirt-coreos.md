@@ -40,6 +40,9 @@ Getting started with libvirt CoreOS
 - [Warnings about `libvirt-coreos` use case](#warnings-about-libvirt-coreos-use-case)
 - [Prerequisites](#prerequisites)
 - [Setup](#setup)
+     - [Automated setup](#automated-setup)
+     - [Manual setup](#manual-setup)
+- [Management](#management)
 - [Interacting with your Kubernetes cluster with the `kube-*` scripts.](#interacting-with-your-kubernetes-cluster-with-the-kube--scripts)
 - [Troubleshooting](#troubleshooting)
     - [!!! Cannot find kubernetes-server-linux-amd64.tar.gz](#-cannot-find-kubernetes-server-linux-amd64targz)
@@ -158,6 +161,26 @@ setfacl -m g:kvm:--x ~
 
 By default, the libvirt-coreos setup will create a single Kubernetes master and 3 Kubernetes nodes. Because the VM drives use Copy-on-Write and because of memory ballooning and KSM, there is a lot of resource over-allocation.
 
+There are two major options how-to run and configure the libvirt-based Kubernetes cluster on CoreOS instances:
+
+#### Automated setup
+
+To start and setup your local CoreOS-Kubernetes cluster the following command might be easily runned:
+
+`export KUBERNETES_PROVIDER=libvirt-coreos; wget -q -O - https://get.k8s.io | bash`
+
+or, in favor of curl:
+
+`export KUBERNETES_PROVIDER=libvirt-coreos; curl -sS https://get.k8s.io | bash`
+
+Just wait a few minutes, the tarball with the latest Kubernetes release will be downloaded; CoreOS instances will be spawned and Kubernetes cluster on them will be launched.
+
+Cluster configuration will be the following: 4 KVM/QEMU instances, where 1 instance will act as a Kubernetes Master node and 3 as Minion nodes.
+
+If you'd like to run this cluster with customized settings, run it in a manual way:
+
+#### Manual setup
+
 To start your local cluster, open a shell and run:
 
 ```sh
@@ -175,6 +198,8 @@ The `KUBE_PUSH` environment variable may be set to specify which Kubernetes bina
 
 * `release` (default if `KUBE_PUSH` is not set) will deploy the binaries of `_output/release-tars/kubernetes-server-….tar.gz`. This is built with `make release` or `make release-skip-tests`.
 * `local` will deploy the binaries of `_output/local/go/bin`. These are built with `make`.
+
+### Management
 
 You can check that your machines are there and running with:
 
