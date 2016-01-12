@@ -35,6 +35,7 @@ type LimitRangeInterface interface {
 	Get(name string) (*api.LimitRange, error)
 	List(opts api.ListOptions) (*api.LimitRangeList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	LimitRangeExpansion
 }
 
 // limitRanges implements LimitRangeInterface

@@ -35,6 +35,7 @@ type ServiceAccountInterface interface {
 	Get(name string) (*api.ServiceAccount, error)
 	List(opts api.ListOptions) (*api.ServiceAccountList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	ServiceAccountExpansion
 }
 
 // serviceAccounts implements ServiceAccountInterface

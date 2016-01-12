@@ -94,6 +94,7 @@ type $.type|public$Interface interface {
 	Get(name string) (*$.type|raw$, error)
 	List(opts $.apiListOptions|raw$) (*$.type|raw$List, error)
 	Watch(opts $.apiListOptions|raw$) ($.watchInterface|raw$, error)
+	$.type|public$Expansion
 }
 `
 

@@ -35,6 +35,7 @@ type EndpointsInterface interface {
 	Get(name string) (*api.Endpoints, error)
 	List(opts api.ListOptions) (*api.EndpointsList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	EndpointsExpansion
 }
 
 // endpoints implements EndpointsInterface

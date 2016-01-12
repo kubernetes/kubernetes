@@ -36,6 +36,7 @@ type JobInterface interface {
 	Get(name string) (*extensions.Job, error)
 	List(opts api.ListOptions) (*extensions.JobList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	JobExpansion
 }
 
 // jobs implements JobInterface

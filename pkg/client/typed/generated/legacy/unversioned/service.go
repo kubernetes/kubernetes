@@ -35,6 +35,7 @@ type ServiceInterface interface {
 	Get(name string) (*api.Service, error)
 	List(opts api.ListOptions) (*api.ServiceList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	ServiceExpansion
 }
 
 // services implements ServiceInterface

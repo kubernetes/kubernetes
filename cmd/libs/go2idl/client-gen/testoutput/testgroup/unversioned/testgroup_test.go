@@ -214,3 +214,10 @@ func TestListTestTypesLabels(t *testing.T) {
 	receivedTestTypeList, err := c.TestTypes(ns).List(options)
 	c.simpleClient.Validate(t, receivedTestTypeList, err)
 }
+
+func TestExpansionInterface(t *testing.T) {
+	c := New(nil)
+	if e, a := "hello!", c.TestTypes("").Hello(); e != a {
+		t.Errorf("expansion failed")
+	}
+}
