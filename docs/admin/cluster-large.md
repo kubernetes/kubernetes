@@ -36,7 +36,7 @@ Documentation for other releases can be found at
 
 ## Support
 
-At v1.0, Kubernetes supports clusters up to 100 nodes with 30 pods per node and 1-2 containers per pod.
+At v1.1, Kubernetes supports clusters up to 250 nodes with 30 pods per node and 1-2 containers per pod.
 
 ## Setup
 
