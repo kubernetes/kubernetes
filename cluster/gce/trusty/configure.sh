@@ -61,7 +61,7 @@ download_kube_env() {
   eval $(python -c '''
 import pipes,sys,yaml
 for k,v in yaml.load(sys.stdin).iteritems():
-  print "readonly {var}={value}".format(var = k, value = pipes.quote(str(v)))
+  print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
 ''' < /tmp/kube-env-yaml > /etc/kube-env)
 }
 
