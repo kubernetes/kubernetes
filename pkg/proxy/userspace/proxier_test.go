@@ -90,6 +90,7 @@ func init() {
 	util.ReallyCrash = true
 
 	// TCP setup.
+	// TODO: Close() this when fix #19254
 	tcp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(r.URL.Path[1:]))

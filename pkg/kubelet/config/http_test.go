@@ -111,7 +111,8 @@ func TestExtractInvalidPods(t *testing.T) {
 			ResponseBody: string(data),
 		}
 		testServer := httptest.NewServer(&fakeHandler)
-		defer testServer.Close()
+		// TODO: Uncomment when fix #19254
+		// defer testServer.Close()
 		ch := make(chan interface{}, 1)
 		c := sourceURL{testServer.URL, http.Header{}, "localhost", ch, nil, 0}
 		if err := c.extractFromURL(); err == nil {
@@ -271,7 +272,8 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 			ResponseBody: string(data),
 		}
 		testServer := httptest.NewServer(&fakeHandler)
-		defer testServer.Close()
+		// TODO: Uncomment when fix #19254
+		// defer testServer.Close()
 		ch := make(chan interface{}, 1)
 		c := sourceURL{testServer.URL, http.Header{}, hostname, ch, nil, 0}
 		if err := c.extractFromURL(); err != nil {
@@ -316,7 +318,8 @@ func TestURLWithHeader(t *testing.T) {
 		ResponseBody: string(data),
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	ch := make(chan interface{}, 1)
 	header := make(http.Header)
 	header.Set("Metadata-Flavor", "Google")

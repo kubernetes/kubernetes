@@ -114,6 +114,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	}
 	s.InstallAPIGroups(apiGroupsInfo)
 
+	// TODO: Close() this server when fix #19254
 	server := httptest.NewServer(s.HandlerContainer.ServeMux)
 	validPaths := []string{
 		// "/api"

@@ -732,7 +732,8 @@ func TestNotFound(t *testing.T) {
 		"simpleroots": &SimpleRESTStorage{},
 	})
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := http.Client{}
 	for k, v := range cases {
 		request, err := http.NewRequest(v.Method, server.URL+v.Path, nil)
@@ -794,7 +795,8 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 		"foo": UnimplementedRESTStorage{},
 	})
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := http.Client{}
 	for k, v := range cases {
 		request, err := http.NewRequest(v.Method, server.URL+v.Path, bytes.NewReader([]byte(`{"kind":"Simple","apiVersion":"version"}`)))
@@ -821,7 +823,8 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 func TestVersion(t *testing.T) {
 	handler := handle(map[string]rest.Storage{})
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := http.Client{}
 
 	request, err := http.NewRequest("GET", server.URL+"/version", nil)
@@ -1017,7 +1020,8 @@ func TestList(t *testing.T) {
 		}
 		var handler = handleInternal(storage, admissionControl, selfLinker)
 		server := httptest.NewServer(handler)
-		defer server.Close()
+		// TODO: Uncomment when fix #19254
+		// defer server.Close()
 
 		resp, err := http.Get(server.URL + testCase.url)
 		if err != nil {
@@ -1061,7 +1065,8 @@ func TestErrorList(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple")
 	if err != nil {
@@ -1086,7 +1091,8 @@ func TestNonEmptyList(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple")
 	if err != nil {
@@ -1137,7 +1143,8 @@ func TestSelfLinkSkipsEmptyName(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple")
 	if err != nil {
@@ -1214,7 +1221,8 @@ func TestExport(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handleLinker(storage, selfLinker)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id?export=true")
 	if err != nil {
@@ -1259,7 +1267,8 @@ func TestGet(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handleLinker(storage, selfLinker)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
 	if err != nil {
@@ -1291,7 +1300,8 @@ func TestGetBinary(t *testing.T) {
 	}
 	stream := simpleStorage.stream
 	server := httptest.NewServer(handle(map[string]rest.Storage{"simple": &simpleStorage}))
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	req, err := http.NewRequest("GET", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/binary", nil)
 	if err != nil {
@@ -1368,7 +1378,8 @@ func TestGetWithOptions(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id?param1=test1&param2=test2")
 	if err != nil {
@@ -1410,7 +1421,8 @@ func TestGetWithOptionsAndPath(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id/a/different/path?param1=test1&param2=test2&atAPath=not")
 	if err != nil {
@@ -1454,7 +1466,8 @@ func TestGetAlternateSelfLink(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handleLinker(storage, selfLinker)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/test/simple/id")
 	if err != nil {
@@ -1492,7 +1505,8 @@ func TestGetNamespaceSelfLink(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handleInternal(storage, admissionControl, selfLinker)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/foo/simple/id")
 	if err != nil {
@@ -1521,7 +1535,8 @@ func TestGetMissing(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/id")
 	if err != nil {
@@ -1547,7 +1562,8 @@ func TestConnect(t *testing.T) {
 	}
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect")
 
@@ -1585,7 +1601,8 @@ func TestConnectResponderObject(t *testing.T) {
 	}
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect")
 
@@ -1626,7 +1643,8 @@ func TestConnectResponderError(t *testing.T) {
 	}
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect")
 
@@ -1695,7 +1713,8 @@ func TestConnectWithOptions(t *testing.T) {
 	}
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect?param1=value1&param2=value2")
 
@@ -1745,7 +1764,8 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 	}
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect/" + testPath + "?param1=value1&param2=value2")
 
@@ -1785,7 +1805,8 @@ func TestDelete(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	client := http.Client{}
 	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
@@ -1808,7 +1829,8 @@ func TestDeleteWithOptions(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	grace := int64(300)
 	item := &api.DeleteOptions{
@@ -1849,7 +1871,8 @@ func TestLegacyDelete(t *testing.T) {
 	var _ rest.Deleter = storage["simple"].(LegacyRESTStorage)
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	client := http.Client{}
 	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
@@ -1875,7 +1898,8 @@ func TestLegacyDeleteIgnoresOptions(t *testing.T) {
 	storage["simple"] = LegacyRESTStorage{&simpleStorage}
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	item := api.NewDeleteOptions(300)
 	body, err := runtime.Encode(codec, item)
@@ -1907,7 +1931,8 @@ func TestDeleteInvokesAdmissionControl(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handleDeny(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	client := http.Client{}
 	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
@@ -1929,7 +1954,8 @@ func TestDeleteMissing(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	client := http.Client{}
 	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
@@ -1963,7 +1989,8 @@ func TestPatch(t *testing.T) {
 	}
 	handler := handleLinker(storage, selfLinker)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	client := http.Client{}
 	request, err := http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
@@ -1995,7 +2022,8 @@ func TestPatchRequiresMatchingName(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	client := http.Client{}
 	request, err := http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"metadata":{"name":"idbar"}}`)))
@@ -2022,7 +2050,8 @@ func TestUpdate(t *testing.T) {
 	}
 	handler := handleLinker(storage, selfLinker)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	item := &apiservertesting.Simple{
 		ObjectMeta: api.ObjectMeta{
@@ -2059,7 +2088,8 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handleDeny(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	item := &apiservertesting.Simple{
 		ObjectMeta: api.ObjectMeta{
@@ -2092,7 +2122,8 @@ func TestUpdateRequiresMatchingName(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handleDeny(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	item := &apiservertesting.Simple{
 		Other: "bar",
@@ -2121,7 +2152,8 @@ func TestUpdateAllowsMissingNamespace(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	item := &apiservertesting.Simple{
 		ObjectMeta: api.ObjectMeta{
@@ -2158,7 +2190,8 @@ func TestUpdateAllowsMismatchedNamespaceOnError(t *testing.T) {
 	}
 	handler := handleLinker(storage, selfLinker)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	item := &apiservertesting.Simple{
 		ObjectMeta: api.ObjectMeta{
@@ -2195,7 +2228,8 @@ func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	item := &apiservertesting.Simple{
 		ObjectMeta: api.ObjectMeta{
@@ -2230,7 +2264,8 @@ func TestUpdateMissing(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	item := &apiservertesting.Simple{
 		ObjectMeta: api.ObjectMeta{
@@ -2264,7 +2299,8 @@ func TestCreateNotFound(t *testing.T) {
 		},
 	})
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{Other: "foo"}
@@ -2290,7 +2326,8 @@ func TestCreateNotFound(t *testing.T) {
 func TestCreateChecksDecode(t *testing.T) {
 	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := http.Client{}
 
 	simple := &api.Pod{}
@@ -2480,7 +2517,8 @@ func TestCreateWithName(t *testing.T) {
 		"simple/sub": storage,
 	})
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{Other: "foo"}
@@ -2507,7 +2545,8 @@ func TestCreateWithName(t *testing.T) {
 func TestUpdateChecksDecode(t *testing.T) {
 	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := http.Client{}
 
 	simple := &api.Pod{}
@@ -2581,7 +2620,8 @@ func TestCreate(t *testing.T) {
 	}
 	handler := handleLinker(map[string]rest.Storage{"foo": &storage}, selfLinker)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{
@@ -2640,7 +2680,8 @@ func TestCreateInNamespace(t *testing.T) {
 	}
 	handler := handleLinker(map[string]rest.Storage{"foo": &storage}, selfLinker)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{
@@ -2699,7 +2740,8 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 	}
 	handler := handleInternal(map[string]rest.Storage{"foo": &storage}, deny.NewAlwaysDeny(), selfLinker)
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{
@@ -2761,7 +2803,8 @@ func TestDelayReturnsError(t *testing.T) {
 	}
 	handler := handle(map[string]rest.Storage{"foo": &storage})
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo/bar", server.URL), nil, http.StatusConflict)
 	if status.Status != unversioned.StatusFailure || status.Message == "" || status.Details == nil || status.Reason != unversioned.StatusReasonAlreadyExists {
@@ -2781,7 +2824,8 @@ func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		writeJSON(http.StatusOK, codec, &UnregisteredAPIObject{"Undecodable"}, w, false)
 	}))
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	// We send a 200 status code before we encode the object, so we expect OK, but there will
 	// still be an error object.  This seems ok, the alternative is to validate the object before
 	// encoding, but this really should never happen, so it's wasted compute for every API request.
@@ -2806,7 +2850,8 @@ func TestWriteRAWJSONMarshalError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		writeRawJSON(http.StatusOK, &marshalError{errors.New("Undecodable")}, w)
 	}))
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := http.Client{}
 	resp, err := client.Get(server.URL)
 	if err != nil {
@@ -2832,7 +2877,8 @@ func TestCreateTimeout(t *testing.T) {
 		"foo": &storage,
 	})
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	simple := &apiservertesting.Simple{Other: "foo"}
 	data, err := runtime.Encode(codec, simple)
@@ -2869,7 +2915,8 @@ func TestCORSAllowedOrigins(t *testing.T) {
 			allowedOriginRegexps, nil, nil, "true",
 		)
 		server := httptest.NewServer(handler)
-		defer server.Close()
+		// TODO: Uncomment when fix #19254
+		// defer server.Close()
 		client := http.Client{}
 
 		request, err := http.NewRequest("GET", server.URL+"/version", nil)
@@ -2922,7 +2969,8 @@ func TestCORSAllowedOrigins(t *testing.T) {
 func TestCreateChecksAPIVersion(t *testing.T) {
 	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{}
@@ -2953,7 +3001,8 @@ func TestCreateChecksAPIVersion(t *testing.T) {
 func TestCreateDefaultsAPIVersion(t *testing.T) {
 	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{}
@@ -2988,7 +3037,8 @@ func TestCreateDefaultsAPIVersion(t *testing.T) {
 func TestUpdateChecksAPIVersion(t *testing.T) {
 	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
 	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := http.Client{}
 
 	simple := &apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}

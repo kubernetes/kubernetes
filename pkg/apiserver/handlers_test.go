@@ -111,7 +111,8 @@ func TestMaxInFlight(t *testing.T) {
 			}),
 		),
 	)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	// These should hang, but not affect accounting.
 	for i := 0; i < AllowedInflightRequestsNo; i++ {
@@ -173,7 +174,8 @@ func TestReadOnly(t *testing.T) {
 			}
 		},
 	)))
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	for _, verb := range []string{"GET", "POST", "PUT", "DELETE", "CREATE"} {
 		req, err := http.NewRequest(verb, server.URL, nil)
 		if err != nil {
@@ -199,7 +201,8 @@ func TestTimeout(t *testing.T) {
 		func(*http.Request) (<-chan time.Time, string) {
 			return timeout, timeoutResp
 		}))
-	defer ts.Close()
+	// TODO: Uncomment when fix #19254
+	// defer ts.Close()
 
 	// No timeouts
 	sendResponse <- struct{}{}
