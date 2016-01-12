@@ -30,7 +30,7 @@ set -o errtrace
 RUN_CMD="$@"
 [ -z "${RUN_CMD:-}" ] && echo "No command supplied" && exit 1
 
-KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
+KUBE_ROOT=$(CDPATH="" cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 
 echo "Detecting docker client"
 # Mount docker client binary to avoid client/compose/daemon version conflicts

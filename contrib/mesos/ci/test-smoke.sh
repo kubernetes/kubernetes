@@ -29,6 +29,6 @@ set -o errtrace
 
 TEST_ARGS="$@"
 
-KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
+KUBE_ROOT=$(CDPATH="" cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 
 "${KUBE_ROOT}/contrib/mesos/ci/run-with-cluster.sh" ./cluster/test-smoke.sh ${TEST_ARGS}

@@ -25,7 +25,7 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
-KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
+KUBE_ROOT=$(CDPATH="" cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 provider_root="${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}"
 
 source "${provider_root}/${KUBE_CONFIG_FILE-"config-default.sh"}"

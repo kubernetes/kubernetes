@@ -18,7 +18,7 @@
 
 set -o errexit
 set -o nounset
-set -o pipefailscript_dir=$(cd $(dirname "${BASH_SOURCE}") && pwd -P)
+set -o pipefailscript_dir=$(CDPATH="" cd $(dirname "${BASH_SOURCE}") && pwd -P)
 
 cd "${script_dir}"
 

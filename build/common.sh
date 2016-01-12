@@ -667,7 +667,7 @@ function kube::release::package_tarballs() {
 function kube::release::package_client_tarballs() {
    # Find all of the built client binaries
   local platform platforms
-  platforms=($(cd "${LOCAL_OUTPUT_BINPATH}" ; echo */*))
+  platforms=($(CDPATH="" cd "${LOCAL_OUTPUT_BINPATH}" ; echo */*))
   for platform in "${platforms[@]}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
     kube::log::status "Starting tarball: client $platform_tag"
@@ -863,7 +863,7 @@ function kube::release::package_salt_tarball() {
   # them into kube-addons, where we expect them. (This pipeline is a
   # fancy copy, stripping anything but the files we don't want.)
   local objects
-  objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
+  objects=$(CDPATH="" cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
   tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${release_stage}/saltbase/salt/kube-addons"
 
   kube::release::clean_cruft
@@ -1095,7 +1095,7 @@ function kube::release::gcs::copy_release_artifacts() {
   # Upload the "naked" binaries to GCS.  This is useful for install scripts that
   # download the binaries directly and don't need tars.
   local platform platforms
-  platforms=($(cd "${RELEASE_STAGE}/client" ; echo *))
+  platforms=($(CDPATH="" cd "${RELEASE_STAGE}/client" ; echo *))
   for platform in "${platforms[@]}"; do
     local src="${RELEASE_STAGE}/client/${platform}/kubernetes/client/bin/*"
     local dst="bin/${platform/-//}/"

@@ -49,7 +49,7 @@ function readlinkdashf {
     path="$(readlink $path)"
   done 
   # Convert to canonical path.
-  path=$(cd "$(dirname "${path}")" && pwd -P)
+  path=$(CDPATH="" cd "$(dirname "${path}")" && pwd -P)
   echo "$path"
 }
 

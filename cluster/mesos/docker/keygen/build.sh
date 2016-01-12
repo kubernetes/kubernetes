@@ -23,9 +23,9 @@ set -o pipefail
 IMAGE_REPO=${IMAGE_REPO:-mesosphere/kubernetes-mesos-keygen}
 IMAGE_TAG=${IMAGE_TAG:-latest}
 
-script_dir=$(cd $(dirname "${BASH_SOURCE}") && pwd -P)
-common_bin_path=$(cd ${script_dir}/../common/bin && pwd -P)
-KUBE_ROOT=$(cd ${script_dir}/../../../.. && pwd -P)
+script_dir=$(CDPATH="" cd $(dirname "${BASH_SOURCE}") && pwd -P)
+common_bin_path=$(CDPATH="" cd ${script_dir}/../common/bin && pwd -P)
+KUBE_ROOT=$(CDPATH="" cd ${script_dir}/../../../.. && pwd -P)
 
 source "${common_bin_path}/util-temp-dir.sh"
 

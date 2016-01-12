@@ -21,7 +21,7 @@ set -o nounset
 set -o pipefail
 set -o errtrace
 
-bin="$(cd "$(dirname "${BASH_SOURCE}")" && pwd -P)"
+bin="$(CDPATH="" cd "$(dirname "${BASH_SOURCE}")" && pwd -P)"
 source "${bin}/util-temp-dir.sh"
 
 function cluster::mesos::docker::find_openssl_config {
