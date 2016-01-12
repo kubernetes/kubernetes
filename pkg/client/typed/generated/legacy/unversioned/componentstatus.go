@@ -21,9 +21,10 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// ComponentStatusNamespacer has methods to work with ComponentStatus resources in a namespace
-type ComponentStatusNamespacer interface {
-	ComponentStatus(namespace string) ComponentStatusInterface
+// ComponentStatusGetter has a method to return a ComponentStatusInterface.
+// A group's client should implement this interface.
+type ComponentStatusGetter interface {
+	ComponentStatus() ComponentStatusInterface
 }
 
 // ComponentStatusInterface has methods to work with ComponentStatus resources.
@@ -41,14 +42,12 @@ type ComponentStatusInterface interface {
 // componentStatus implements ComponentStatusInterface
 type componentStatus struct {
 	client *LegacyClient
-	ns     string
 }
 
 // newComponentStatus returns a ComponentStatus
-func newComponentStatus(c *LegacyClient, namespace string) *componentStatus {
+func newComponentStatus(c *LegacyClient) *componentStatus {
 	return &componentStatus{
 		client: c,
-		ns:     namespace,
 	}
 }
 
@@ -56,7 +55,6 @@ func newComponentStatus(c *LegacyClient, namespace string) *componentStatus {
 func (c *componentStatus) Create(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
 	result = &api.ComponentStatus{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("componentStatus").
 		Body(componentStatus).
 		Do().
@@ -68,7 +66,6 @@ func (c *componentStatus) Create(componentStatus *api.ComponentStatus) (result *
 func (c *componentStatus) Update(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
 	result = &api.ComponentStatus{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("componentStatus").
 		Name(componentStatus.Name).
 		Body(componentStatus).
@@ -80,7 +77,6 @@ func (c *componentStatus) Update(componentStatus *api.ComponentStatus) (result *
 // Delete takes name of the componentStatus and deletes it. Returns an error if one occurs.
 func (c *componentStatus) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("componentStatus").
 		Name(name).
 		Body(options).
@@ -91,7 +87,6 @@ func (c *componentStatus) Delete(name string, options *api.DeleteOptions) error 
 // DeleteCollection deletes a collection of objects.
 func (c *componentStatus) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("componentStatus").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
@@ -103,7 +98,6 @@ func (c *componentStatus) DeleteCollection(options *api.DeleteOptions, listOptio
 func (c *componentStatus) Get(name string) (result *api.ComponentStatus, err error) {
 	result = &api.ComponentStatus{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("componentStatus").
 		Name(name).
 		Do().
@@ -115,7 +109,6 @@ func (c *componentStatus) Get(name string) (result *api.ComponentStatus, err err
 func (c *componentStatus) List(opts api.ListOptions) (result *api.ComponentStatusList, err error) {
 	result = &api.ComponentStatusList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("componentStatus").
 		VersionedParams(&opts, api.Scheme).
 		Do().
@@ -127,7 +120,6 @@ func (c *componentStatus) List(opts api.ListOptions) (result *api.ComponentStatu
 func (c *componentStatus) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
-		Namespace(c.ns).
 		Resource("componentStatus").
 		VersionedParams(&opts, api.Scheme).
 		Watch()

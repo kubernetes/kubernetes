@@ -22,8 +22,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// DaemonSetNamespacer has methods to work with DaemonSet resources in a namespace
-type DaemonSetNamespacer interface {
+// DaemonSetsGetter has a method to return a DaemonSetInterface.
+// A group's client should implement this interface.
+type DaemonSetsGetter interface {
 	DaemonSets(namespace string) DaemonSetInterface
 }
 

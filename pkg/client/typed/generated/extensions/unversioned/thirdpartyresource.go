@@ -22,8 +22,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// ThirdPartyResourceNamespacer has methods to work with ThirdPartyResource resources in a namespace
-type ThirdPartyResourceNamespacer interface {
+// ThirdPartyResourcesGetter has a method to return a ThirdPartyResourceInterface.
+// A group's client should implement this interface.
+type ThirdPartyResourcesGetter interface {
 	ThirdPartyResources(namespace string) ThirdPartyResourceInterface
 }
 

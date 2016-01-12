@@ -22,8 +22,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// IngressNamespacer has methods to work with Ingress resources in a namespace
-type IngressNamespacer interface {
+// IngressesGetter has a method to return a IngressInterface.
+// A group's client should implement this interface.
+type IngressesGetter interface {
 	Ingresses(namespace string) IngressInterface
 }
 

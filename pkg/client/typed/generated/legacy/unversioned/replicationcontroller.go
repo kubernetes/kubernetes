@@ -21,8 +21,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// ReplicationControllerNamespacer has methods to work with ReplicationController resources in a namespace
-type ReplicationControllerNamespacer interface {
+// ReplicationControllersGetter has a method to return a ReplicationControllerInterface.
+// A group's client should implement this interface.
+type ReplicationControllersGetter interface {
 	ReplicationControllers(namespace string) ReplicationControllerInterface
 }
 

@@ -21,8 +21,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// PersistentVolumeClaimNamespacer has methods to work with PersistentVolumeClaim resources in a namespace
-type PersistentVolumeClaimNamespacer interface {
+// PersistentVolumeClaimsGetter has a method to return a PersistentVolumeClaimInterface.
+// A group's client should implement this interface.
+type PersistentVolumeClaimsGetter interface {
 	PersistentVolumeClaims(namespace string) PersistentVolumeClaimInterface
 }
 
