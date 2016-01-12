@@ -321,8 +321,8 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/rkt/api/v1alpha",
-			"Comment": "v0.13.0-98-gddfa976",
-			"Rev": "ddfa97689c1f8e89aff51368300c34da4c74091b"
+			"Comment": "v0.15.0-22-g8ac03ac",
+			"Rev": "8ac03ace42034b4d6b31af9e3ef574b9e71ccc1a"
 		},
 		{
 			"ImportPath": "github.com/cpuguy83/go-md2man/md2man",
