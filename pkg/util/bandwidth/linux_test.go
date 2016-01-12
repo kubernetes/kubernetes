@@ -490,11 +490,11 @@ func TestReconcileInterfaceExists(t *testing.T) {
 	}
 }
 
-func TestReconcileInterfaceDoesntExist(t *testing.T) {
+func testReconcileInterfaceHasNoData(t *testing.T, output string) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte("\n"), nil },
-			func() ([]byte, error) { return []byte("\n"), nil },
+			func() ([]byte, error) { return []byte(output), nil },
+			func() ([]byte, error) { return []byte(output), nil },
 		},
 	}
 
@@ -545,6 +545,16 @@ func TestReconcileInterfaceDoesntExist(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestReconcileInterfaceDoesntExist(t *testing.T) {
+	testReconcileInterfaceHasNoData(t, "\n")
+}
+
+var tcQdiscNoqueue = "qdisc noqueue 0: root refcnt 2 \n"
+
+func TestReconcileInterfaceExistsWithNoqueue(t *testing.T) {
+	testReconcileInterfaceHasNoData(t, tcQdiscNoqueue)
 }
 
 var tcQdiscWrong = []string{

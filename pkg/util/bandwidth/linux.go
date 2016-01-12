@@ -224,6 +224,12 @@ func (t *tcShaper) interfaceExists() (bool, string, error) {
 	if len(value) == 0 {
 		return false, "", nil
 	}
+	// Newer versions of tc and/or the kernel return the following instead of nothing:
+	// qdisc noqueue 0: root refcnt 2
+	fields := strings.Fields(value)
+	if len(fields) > 1 && fields[1] == "noqueue" {
+		return false, "", nil
+	}
 	return true, value, nil
 }
 
