@@ -174,7 +174,7 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	return f.PodList, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(pod *api.Pod, _ api.PodStatus, _ *PodStatus, _ []api.Secret, backOff *util.Backoff) error {
+func (f *FakeRuntime) SyncPod(pod *api.Pod, _ api.PodStatus, _ *PodStatus, _ []api.Secret, backOff *util.Backoff) (result PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -183,7 +183,11 @@ func (f *FakeRuntime) SyncPod(pod *api.Pod, _ api.PodStatus, _ *PodStatus, _ []a
 	for _, c := range pod.Spec.Containers {
 		f.StartedContainers = append(f.StartedContainers, c.Name)
 	}
-	return f.Err
+	// TODO(random-liu): Add SyncResult for starting and killing containers
+	if f.Err != nil {
+		result.Fail(f.Err)
+	}
+	return
 }
 
 func (f *FakeRuntime) KillPod(pod *api.Pod, runningPod Pod) error {
