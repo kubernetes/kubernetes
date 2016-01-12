@@ -157,7 +157,7 @@ func (f *Framework) afterEach() {
 			if err != nil {
 				Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
 			} else {
-				summaries = append(summaries, (*metricsForE2E)(&received))
+				summaries = append(summaries, (*MetricsForE2E)(&received))
 			}
 		}
 	}
