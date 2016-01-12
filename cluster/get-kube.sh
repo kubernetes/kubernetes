@@ -30,6 +30,8 @@
 #   * export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | bash
 #  Libvirt (with CoreOS as a guest operating system)
 #   * export KUBERNETES_PROVIDER=libvirt-coreos; wget -q -O - https://get.k8s.io | bash
+#  Microsoft Azure
+#   * export KUBERNETES_PROVIDER=azure; wget -q -O - https://get.k8s.io | bash
 #  Vagrant (local virtual machines)
 #   * export KUBERNETES_PROVIDER=vagrant; wget -q -O - https://get.k8s.io | bash
 #  VMWare VSphere
