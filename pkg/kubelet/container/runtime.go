@@ -65,8 +65,9 @@ type Runtime interface {
 	// GarbageCollect removes dead containers using the specified container gc policy
 	GarbageCollect(gcPolicy ContainerGCPolicy) error
 	// Syncs the running pod into the desired pod.
-	SyncPod(pod *api.Pod, apiPodStatus api.PodStatus, podStatus *PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error
+	SyncPod(pod *api.Pod, apiPodStatus api.PodStatus, podStatus *PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
+	// TODO(random-liu): Return PodSyncResult in KillPod.
 	KillPod(pod *api.Pod, runningPod Pod) error
 	// GetAPIPodStatus retrieves the api.PodStatus of the pod, including the information of
 	// all containers in the pod. Clients of this interface assume the
