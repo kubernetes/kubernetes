@@ -254,8 +254,8 @@ if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
     : ${NUM_NODES:="100"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\]"}
   else
-    : ${MASTER_SIZE:="m3.large"}
-    : ${NODE_SIZE:="m3.large"}
+    : ${MASTER_SIZE:="m3.medium"}
+    : ${NODE_SIZE:="m3.medium"}
     : ${NUM_NODES:="3"}
   fi
 fi
