@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 
 	"github.com/emicklei/go-restful"
@@ -77,6 +78,24 @@ type RequestScope struct {
 	Resource    unversioned.GroupVersionResource
 	Kind        unversioned.GroupVersionKind
 	Subresource string
+}
+
+func addWarningHeaders(warning admission.Warning, source string, res *restful.Response) {
+	if warning == nil {
+		return
+	}
+	aggregate, ok := warning.(utilerrors.Aggregate)
+	var errs []error
+	if ok {
+		errs = aggregate.Errors()
+	} else {
+		errs = []error{warning}
+	}
+	for ix := range errs {
+		// HTTP 'Warning' Header: https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.46
+		// 199 is a status code indicating "Miscellaneous warning"
+		res.AddHeader("Warning", fmt.Sprintf("199 %s %s", source, errs[ix].Error()))
+	}
 }
 
 // getterFunc performs a get request with the given context and object name. The request
@@ -209,7 +228,8 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 			}
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(connectRequest, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Connect, userInfo))
+			warn, err := admit.Admit(admission.NewAttributesRecord(connectRequest, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Connect, userInfo))
+			addWarningHeaders(warn, scope.Kind.String(), res)
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -400,7 +420,8 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		if admit != nil && admit.Handles(admission.Create) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Create, userInfo))
+			warn, err := admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Create, userInfo))
+			addWarningHeaders(warn, scope.Kind.String(), res)
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -474,7 +495,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 		if admit.Handles(admission.Update) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Update, userInfo))
+			warn, err := admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Update, userInfo))
+			addWarningHeaders(warn, scope.Kind.String(), res)
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -647,7 +669,8 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		if admit != nil && admit.Handles(admission.Update) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Update, userInfo))
+			warn, err := admit.Admit(admission.NewAttributesRecord(obj, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Update, userInfo))
+			addWarningHeaders(warn, scope.Kind.String(), res)
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -719,7 +742,8 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 		if admit != nil && admit.Handles(admission.Delete) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Delete, userInfo))
+			warn, err := admit.Admit(admission.NewAttributesRecord(nil, scope.Kind.GroupKind(), namespace, name, scope.Resource.GroupResource(), scope.Subresource, admission.Delete, userInfo))
+			addWarningHeaders(warn, scope.Kind.String(), res)
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return
@@ -780,7 +804,8 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		if admit != nil && admit.Handles(admission.Delete) {
 			userInfo, _ := api.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind.GroupKind(), namespace, "", scope.Resource.GroupResource(), scope.Subresource, admission.Delete, userInfo))
+			warn, err := admit.Admit(admission.NewAttributesRecord(nil, scope.Kind.GroupKind(), namespace, "", scope.Resource.GroupResource(), scope.Subresource, admission.Delete, userInfo))
+			addWarningHeaders(warn, scope.Kind.String(), res)
 			if err != nil {
 				errorJSON(err, scope.Codec, w)
 				return

@@ -43,12 +43,12 @@ type provision struct {
 	store  cache.Store
 }
 
-func (p *provision) Admit(a admission.Attributes) (err error) {
+func (p *provision) Admit(a admission.Attributes) (warn admission.Warning, err error) {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
 	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
 	// its a namespaced resource.
 	if len(a.GetNamespace()) == 0 || a.GetKind() == api.Kind("Namespace") {
-		return nil
+		return nil, nil
 	}
 
 	namespace := &api.Namespace{
@@ -60,16 +60,16 @@ func (p *provision) Admit(a admission.Attributes) (err error) {
 	}
 	_, exists, err := p.store.Get(namespace)
 	if err != nil {
-		return admission.NewForbidden(a, err)
+		return nil, admission.NewForbidden(a, err)
 	}
 	if exists {
-		return nil
+		return nil, nil
 	}
 	_, err = p.client.Namespaces().Create(namespace)
 	if err != nil && !errors.IsAlreadyExists(err) {
-		return admission.NewForbidden(a, err)
+		return nil, admission.NewForbidden(a, err)
 	}
-	return nil
+	return nil, nil
 }
 
 // NewProvision creates a new namespace provision admission control handler
