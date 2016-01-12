@@ -55,4 +55,4 @@ ENV KUBE_GIT_VERSION_FILE /kube-version-defs
 ENV KUBE_OUTPUT_SUBPATH _output/dockerized
 
 # Upload Kubernetes source
-ADD kube-source.tar.gz /go/src/k8s.io/kubernetes
+ADD kube-source.tar.gz /go/src/k8s.io/kubernetes/
