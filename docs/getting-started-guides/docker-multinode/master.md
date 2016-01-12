@@ -36,7 +36,17 @@ Documentation for other releases can be found at
 
 We'll begin by setting up the master node.  For the purposes of illustration, we'll assume that the IP of this machine
 is `${MASTER_IP}`.  We'll need to run several versioned Kubernetes components, so we'll assume that the version we want
-to run is `${K8S_VERSION}`, which should hold a value such as "1.0.7".
+to run is `${K8S_VERSION}`, which should hold a value such as "1.1.3".
+
+Enviroinment variables used:
+
+```sh
+export MASTER_IP=<the_master_ip_here>
+export K8S_VERSION=<your_k8s_version (e.g. 1.1.3)>
+export ETCD_VERSION=<your_etcd_version (e.g. 2.2.1)>
+export FLANNEL_VERSION=<your_flannel_version (e.g. 0.5.5)>
+export FLANNEL_IFACE=<flannel_interface (defaults to eth0)>
+```
 
 There are two main phases to installing the master:
    * [Setting up `flanneld` and `etcd`](#setting-up-flanneld-and-etcd)
@@ -46,10 +56,9 @@ There are two main phases to installing the master:
 ## Setting up flanneld and etcd
 
 _Note_:
-There is a [bug](https://github.com/docker/docker/issues/14106) in Docker 1.7.0 that prevents this from working correctly.
-Please install Docker 1.6.2 or Docker 1.7.1 or Docker 1.8.3.
+This guide expects **Docker 1.7.1 or higher**.
 
-### Setup Docker-Bootstrap
+### Setup Docker Bootstrap
 
 We're going to use `flannel` to set up networking between Docker daemons.  Flannel itself (and etcd on which it relies) will run inside of
 Docker containers themselves.  To achieve this, we need a separate "bootstrap" instance of the Docker daemon.  This daemon will be started with
@@ -71,13 +80,22 @@ across reboots and failures.
 Run:
 
 ```sh
-sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host -d gcr.io/google_containers/etcd:2.2.1 /usr/local/bin/etcd --listen-client-urls=http://127.0.0.1:4001,http://${MASTER_IP}:4001 --advertise-client-urls=http://${MASTER_IP}:4001 --data-dir=/var/etcd/data
+sudo docker -H unix:///var/run/docker-bootstrap.sock run -d \
+    --net=host \
+    gcr.io/google_containers/etcd:${ETCD_VERSION} \
+    /usr/local/bin/etcd \
+        --listen-client-urls=http://127.0.0.1:4001,http://${MASTER_IP}:4001 \
+        --advertise-client-urls=http://${MASTER_IP}:4001 \
+        --data-dir=/var/etcd/data
 ```
 
 Next, you need to set a CIDR range for flannel.  This CIDR should be chosen to be non-overlapping with any existing network you are using:
 
 ```sh
-sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/google_containers/etcd:2.2.1 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
+sudo docker -H unix:///var/run/docker-bootstrap.sock run \
+    --net=host \
+    gcr.io/google_containers/etcd:${ETCD_VERSION} \
+    etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
 ```
 
 
@@ -116,10 +134,16 @@ or it may be something else.
 Now run flanneld itself:
 
 ```sh
-sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.5 --ip-masq
+sudo docker -H unix:///var/run/docker-bootstrap.sock run -d \
+    --net=host \
+    --privileged \
+    -v /dev/net:/dev/net \
+    quay.io/coreos/flannel:${FLANNEL_VERSION} \
+        --ip-masq \
+        --iface=${FLANNEL_IFACE}
 ```
 
-The previous command should have printed a really long hash, copy this hash.
+The previous command should have printed a really long hash, the container id, copy this hash.
 
 Now get the subnet settings from flannel:
 
@@ -180,24 +204,29 @@ sudo docker run \
     --privileged=true \
     --pid=host \
     -d \
-    gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube kubelet --api-servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=127.0.0.1 --config=/etc/kubernetes/manifests-multi --cluster-dns=10.0.0.10 --cluster-domain=cluster.local
+    gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+    /hyperkube kubelet \
+        --allow-privileged=true \
+        --api-servers=http://localhost:8080 \
+        --v=2 \
+        --address=0.0.0.0 \
+        --enable-server \
+        --hostname-override=127.0.0.1 \
+        --config=/etc/kubernetes/manifests-multi \
+        --containerized \
+        --cluster-dns=10.0.0.10 \
+        --cluster-domain=cluster.local
 ```
 
 > Note that `--cluster-dns` and `--cluster-domain` is used to deploy dns, feel free to discard them if dns is not needed.
-
-### Also run the service proxy
-
-```sh
-sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v${K8S_VERSION} /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
-```
 
 ### Test it out
 
 At this point, you should have a functioning 1-node cluster.  Let's test it out!
 
 Download the kubectl binary for `${K8S_VERSION}` (look at the URL in the following links) and make it available by editing your PATH environment variable.
-([OS X](http://storage.googleapis.com/kubernetes-release/release/v1.0.7/bin/darwin/amd64/kubectl))
-([linux](http://storage.googleapis.com/kubernetes-release/release/v1.0.7/bin/linux/amd64/kubectl))
+([OS X](http://storage.googleapis.com/kubernetes-release/release/v1.1.3/bin/darwin/amd64/kubectl))
+([linux](http://storage.googleapis.com/kubernetes-release/release/v1.1.3/bin/linux/amd64/kubectl))
 
 For example, OS X:
 

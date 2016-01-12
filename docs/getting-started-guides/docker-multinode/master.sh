@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A scripts to install k8s worker node.
-# Author @wizard_cxy @reouser
+# A script to setup the k8s master in docker containers.
+# Authors @wizard_cxy @resouer
 
 set -e
 
@@ -26,12 +26,10 @@ if ( ! ps -ef | grep "/usr/bin/docker" | grep -v 'grep' &> /dev/null ); then
 fi
 
 # Make sure k8s version env is properly set
-if [ -z ${K8S_VERSION} ]; then
-    K8S_VERSION="1.0.7"
-    echo "K8S_VERSION is not set, using default: ${K8S_VERSION}"
-else
-    echo "k8s version is set to: ${K8S_VERSION}"
-fi
+K8S_VERSION=${K8S_VERSION:-"1.1.3"}
+ETCD_VERSION=${ETCD_VERSION:-"2.2.1"}
+FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.5"}
+FLANNEL_IFACE=${FLANNEL_IFACE:-"eth0"}
 
 # Run as root
 if [ "$(id -u)" != "0" ]; then
@@ -41,11 +39,14 @@ fi
 
 # Make sure master ip is properly set
 if [ -z ${MASTER_IP} ]; then
-    echo "Please export MASTER_IP in your env"
-    exit 1
-else
-    echo "k8s master is set to: ${MASTER_IP}"
+    MASTER_IP=$(hostname -I | awk '{print $1}')
 fi
+
+echo "K8S_VERSION is set to: ${K8S_VERSION}"
+echo "ETCD_VERSION is set to: ${ETCD_VERSION}"
+echo "FLANNEL_VERSION is set to: ${FLANNEL_VERSION}"
+echo "FLANNEL_IFACE is set to: ${FLANNEL_IFACE}"
+echo "MASTER_IP is set to: ${MASTER_IP}"
 
 # Check if a command is valid
 command_exists() {
@@ -95,16 +96,17 @@ detect_lsb() {
 
 
 # Start the bootstrap daemon
+# TODO: do not start docker-bootstrap if it's already running
 bootstrap_daemon() {
-    sudo -b docker -d \
-    -H unix:///var/run/docker-bootstrap.sock \
-    -p /var/run/docker-bootstrap.pid \
-    --iptables=false \
-    --ip-masq=false \
-    --bridge=none \
-    --graph=/var/lib/docker-bootstrap \
-    2> /var/log/docker-bootstrap.log \
-    1> /dev/null
+    docker -d \
+        -H unix:///var/run/docker-bootstrap.sock \
+        -p /var/run/docker-bootstrap.pid \
+        --iptables=false \
+        --ip-masq=false \
+        --bridge=none \
+        --graph=/var/lib/docker-bootstrap \
+            2> /var/log/docker-bootstrap.log \
+            1> /dev/null &
     
     sleep 5
 }
@@ -115,34 +117,34 @@ DOCKER_CONF=""
 start_k8s(){
     # Start etcd 
     docker -H unix:///var/run/docker-bootstrap.sock run \
-    --restart=always \
-    --net=host \
-    -d \
-    gcr.io/google_containers/etcd:2.2.1 \
-    /usr/local/bin/etcd \
-    --listen-client-urls=http://127.0.0.1:4001,http://${MASTER_IP}:4001 \
-    --advertise-client-urls=http://${MASTER_IP}:4001 \
-    --data-dir=/var/etcd/data
+        --restart=always \
+        --net=host \
+        -d \
+        gcr.io/google_containers/etcd:${ETCD_VERSION} \
+        /usr/local/bin/etcd \
+            --listen-client-urls=http://127.0.0.1:4001,http://${MASTER_IP}:4001 \
+            --advertise-client-urls=http://${MASTER_IP}:4001 \
+            --data-dir=/var/etcd/data
 
     sleep 5
     # Set flannel net config
     docker -H unix:///var/run/docker-bootstrap.sock run \
-    --net=host gcr.io/google_containers/etcd:2.2.1 \
-    etcdctl \
-    set /coreos.com/network/config \
-    '{ "Network": "10.1.0.0/16", "Backend": {"Type": "vxlan"}}'
+        --net=host gcr.io/google_containers/etcd:${ETCD_VERSION} \
+        etcdctl \
+        set /coreos.com/network/config \
+            '{ "Network": "10.1.0.0/16", "Backend": {"Type": "vxlan"}}'
 
     # iface may change to a private network interface, eth0 is for default
     flannelCID=$(docker -H unix:///var/run/docker-bootstrap.sock run \
-    --restart=always \
-    -d \
-    --net=host \
-    --privileged \
-    -v /dev/net:/dev/net \
-    quay.io/coreos/flannel:0.5.5 \
-    /opt/bin/flanneld \
-    --ip-masq \
-    -iface="eth0")
+        --restart=always \
+        -d \
+        --net=host \
+        --privileged \
+        -v /dev/net:/dev/net \
+        quay.io/coreos/flannel:${FLANNEL_VERSION} \
+        /opt/bin/flanneld \
+            --ip-masq \
+            --iface="${FLANNEL_IFACE}")
 
     sleep 8
 
@@ -155,13 +157,13 @@ start_k8s(){
     case "${lsb_dist}" in
         amzn)
             DOCKER_CONF="/etc/sysconfig/docker"
-            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | tee -a ${DOCKER_CONF}
             ifconfig docker0 down
             yum -y -q install bridge-utils && brctl delbr docker0 && service docker restart
             ;;
         centos)
             DOCKER_CONF="/etc/sysconfig/docker"
-            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | tee -a ${DOCKER_CONF}
             if ! command_exists ifconfig; then
                 yum -y -q install net-tools
             fi
@@ -170,7 +172,7 @@ start_k8s(){
             ;;
         ubuntu|debian)
             DOCKER_CONF="/etc/default/docker"
-            echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+            echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | tee -a ${DOCKER_CONF}
             ifconfig docker0 down
             apt-get install bridge-utils
             brctl delbr docker0
@@ -190,7 +192,7 @@ start_k8s(){
     # sleep a little bit
     sleep 5
 
-    # Start kubelet & proxy, then start master components as pods
+    # Start kubelet and then start master components as pods
     docker run \
         --net=host \
         --pid=host \
@@ -205,18 +207,16 @@ start_k8s(){
         -v /var/lib/kubelet/:/var/lib/kubelet:rw \
         gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
         /hyperkube kubelet \
-        --v=2 --address=0.0.0.0 --enable-server \
-        --config=/etc/kubernetes/manifests-multi \
-        --cluster-dns=10.0.0.10 \
-        --cluster-domain=cluster.local \
-        --containerized
+            --address=0.0.0.0 \
+            --allow-privileged=true \
+            --enable-server \
+            --api-servers=http://localhost:8080 \
+            --config=/etc/kubernetes/manifests-multi \
+            --cluster-dns=10.0.0.10 \
+            --cluster-domain=cluster.local \
+            --containerized \
+            --v=2
 
-    docker run \
-        -d \
-        --net=host \
-        --privileged \
-        gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
-        /hyperkube proxy --master=http://127.0.0.1:8080 --v=2   
 }
 
 echo "Detecting your OS distro ..."
