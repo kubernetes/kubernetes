@@ -34,6 +34,8 @@ type genClientForType struct {
 	imports       *generator.ImportTracker
 }
 
+var _ generator.Generator = &genClientForType{}
+
 // Filter ignores all but one type because we're making a single file per type.
 func (g *genClientForType) Filter(c *generator.Context, t *types.Type) bool { return t == g.typeToMatch }
 

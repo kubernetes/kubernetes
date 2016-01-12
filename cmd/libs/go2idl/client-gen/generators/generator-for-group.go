@@ -34,6 +34,8 @@ type genGroup struct {
 	imports *generator.ImportTracker
 }
 
+var _ generator.Generator = &genGroup{}
+
 // We only want to call GenerateType() once per group.
 func (g *genGroup) Filter(c *generator.Context, t *types.Type) bool {
 	return t == g.types[0]
