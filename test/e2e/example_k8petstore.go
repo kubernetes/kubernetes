@@ -150,7 +150,7 @@ T:
 	Ω(totalTransactions).Should(BeNumerically(">", minExpected))
 }
 
-var _ = Describe("[Example] Pet Store [Skipped]", func() {
+var _ = Describe("Pet Store [Feature:Example]", func() {
 
 	// The number of nodes dictates total number of generators/transaction expectations.
 	var nodeCount int

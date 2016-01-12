@@ -41,7 +41,7 @@ try:
 except:
 	print 'err'`
 
-var _ = Describe("[Example] ClusterDns", func() {
+var _ = Describe("ClusterDns [Feature:Example]", func() {
 	framework := NewFramework("cluster-dns")
 
 	var c *client.Client
