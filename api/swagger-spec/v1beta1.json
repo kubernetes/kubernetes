@@ -4374,7 +4374,7 @@
     "properties": {
      "type": {
       "type": "string",
-      "description": "Type of job condition, currently only Complete."
+      "description": "Type of job condition, Complete or Failed."
      },
      "status": {
       "type": "string",

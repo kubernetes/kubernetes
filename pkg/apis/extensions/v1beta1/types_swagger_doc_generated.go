@@ -345,7 +345,7 @@ func (Job) SwaggerDoc() map[string]string {
 
 var map_JobCondition = map[string]string{
 	"":                   "JobCondition describes current state of a job.",
-	"type":               "Type of job condition, currently only Complete.",
+	"type":               "Type of job condition, Complete or Failed.",
 	"status":             "Status of the condition, one of True, False, Unknown.",
 	"lastProbeTime":      "Last time the condition was checked.",
 	"lastTransitionTime": "Last time the condition transit from one status to another.",
