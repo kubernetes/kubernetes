@@ -39,6 +39,7 @@ import (
 	"io"
 	"net"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -79,11 +80,12 @@ type service struct {
 
 // Server is a gRPC server to serve RPC requests.
 type Server struct {
-	opts  options
-	mu    sync.Mutex
-	lis   map[net.Listener]bool
-	conns map[transport.ServerTransport]bool
-	m     map[string]*service // service name -> service info
+	opts   options
+	mu     sync.Mutex
+	lis    map[net.Listener]bool
+	conns  map[transport.ServerTransport]bool
+	m      map[string]*service // service name -> service info
+	events trace.EventLog
 }
 
 type options struct {
@@ -128,11 +130,32 @@ func NewServer(opt ...ServerOption) *Server {
 		// Set the default codec.
 		opts.codec = protoCodec{}
 	}
-	return &Server{
+	s := &Server{
 		lis:   make(map[net.Listener]bool),
 		opts:  opts,
 		conns: make(map[transport.ServerTransport]bool),
 		m:     make(map[string]*service),
+	}
+	if EnableTracing {
+		_, file, line, _ := runtime.Caller(1)
+		s.events = trace.NewEventLog("grpc.Server", fmt.Sprintf("%s:%d", file, line))
+	}
+	return s
+}
+
+// printf records an event in s's event log, unless s has been stopped.
+// REQUIRES s.mu is held.
+func (s *Server) printf(format string, a ...interface{}) {
+	if s.events != nil {
+		s.events.Printf(format, a...)
+	}
+}
+
+// errorf records an error in s's event log, unless s has been stopped.
+// REQUIRES s.mu is held.
+func (s *Server) errorf(format string, a ...interface{}) {
+	if s.events != nil {
+		s.events.Errorf(format, a...)
 	}
 }
 
@@ -151,6 +174,7 @@ func (s *Server) RegisterService(sd *ServiceDesc, ss interface{}) {
 func (s *Server) register(sd *ServiceDesc, ss interface{}) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.printf("RegisterService(%q)", sd.ServiceName)
 	if _, ok := s.m[sd.ServiceName]; ok {
 		grpclog.Fatalf("grpc: Server.RegisterService found duplicate service registration for %q", sd.ServiceName)
 	}
@@ -182,6 +206,7 @@ var (
 // Service returns when lis.Accept fails.
 func (s *Server) Serve(lis net.Listener) error {
 	s.mu.Lock()
+	s.printf("serving")
 	if s.lis == nil {
 		s.mu.Unlock()
 		return ErrServerStopped
@@ -197,15 +222,23 @@ func (s *Server) Serve(lis net.Listener) error {
 	for {
 		c, err := lis.Accept()
 		if err != nil {
+			s.mu.Lock()
+			s.printf("done serving; Accept = %v", err)
+			s.mu.Unlock()
 			return err
 		}
 		var authInfo credentials.AuthInfo
 		if creds, ok := s.opts.creds.(credentials.TransportAuthenticator); ok {
-			c, authInfo, err = creds.ServerHandshake(c)
+			var conn net.Conn
+			conn, authInfo, err = creds.ServerHandshake(c)
 			if err != nil {
+				s.mu.Lock()
+				s.errorf("ServerHandshake(%q) failed: %v", c.RemoteAddr(), err)
+				s.mu.Unlock()
 				grpclog.Println("grpc: Server.Serve failed to complete security handshake.")
 				continue
 			}
+			c = conn
 		}
 		s.mu.Lock()
 		if s.conns == nil {
@@ -215,6 +248,7 @@ func (s *Server) Serve(lis net.Listener) error {
 		}
 		st, err := transport.NewServerTransport("http2", c, s.opts.maxConcurrentStreams, authInfo)
 		if err != nil {
+			s.errorf("NewServerTransport(%q) failed: %v", c.RemoteAddr(), err)
 			s.mu.Unlock()
 			c.Close()
 			grpclog.Println("grpc: Server.Serve failed to create ServerTransport: ", err)
@@ -250,12 +284,15 @@ func (s *Server) sendResponse(t transport.ServerTransport, stream *transport.Str
 }
 
 func (s *Server) processUnaryRPC(t transport.ServerTransport, stream *transport.Stream, srv *service, md *MethodDesc) (err error) {
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
 	var traceInfo traceInfo
 	if EnableTracing {
 		traceInfo.tr = trace.New("grpc.Recv."+methodFamily(stream.Method()), stream.Method())
 		defer traceInfo.tr.Finish()
 		traceInfo.firstLine.client = false
 		traceInfo.tr.LazyLog(&traceInfo.firstLine, false)
+		ctx = trace.NewContext(ctx, traceInfo.tr)
 		defer func() {
 			if err != nil && err != io.EOF {
 				traceInfo.tr.LazyLog(&fmtStringer{"%v", []interface{}{err}}, true)
@@ -284,13 +321,15 @@ func (s *Server) processUnaryRPC(t transport.ServerTransport, stream *transport.
 			return err
 		}
 		if traceInfo.tr != nil {
-			traceInfo.tr.LazyLog(&payload{sent: false, msg: req}, true)
+			// TODO: set payload.msg to something that
+			// prints usefully with %s; req is a []byte.
+			traceInfo.tr.LazyLog(&payload{sent: false}, true)
 		}
 		switch pf {
 		case compressionNone:
 			statusCode := codes.OK
 			statusDesc := ""
-			reply, appErr := md.Handler(srv.server, stream.Context(), s.opts.codec, req)
+			reply, appErr := md.Handler(srv.server, ctx, s.opts.codec, req)
 			if appErr != nil {
 				if err, ok := appErr.(rpcError); ok {
 					statusCode = err.code
@@ -299,11 +338,19 @@ func (s *Server) processUnaryRPC(t transport.ServerTransport, stream *transport.
 					statusCode = convertCode(appErr)
 					statusDesc = appErr.Error()
 				}
+				if traceInfo.tr != nil && statusCode != codes.OK {
+					traceInfo.tr.LazyLog(stringer(statusDesc), true)
+					traceInfo.tr.SetError()
+				}
+
 				if err := t.WriteStatus(stream, statusCode, statusDesc); err != nil {
 					grpclog.Printf("grpc: Server.processUnaryRPC failed to write status: %v", err)
 					return err
 				}
 				return nil
+			}
+			if traceInfo.tr != nil {
+				traceInfo.tr.LazyLog(stringer("OK"), false)
 			}
 			opts := &transport.Options{
 				Last:  true,
@@ -333,9 +380,12 @@ func (s *Server) processUnaryRPC(t transport.ServerTransport, stream *transport.
 }
 
 func (s *Server) processStreamingRPC(t transport.ServerTransport, stream *transport.Stream, srv *service, sd *StreamDesc) (err error) {
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
 	ss := &serverStream{
 		t:       t,
 		s:       stream,
+		ctx:     ctx,
 		p:       &parser{s: stream},
 		codec:   s.opts.codec,
 		tracing: EnableTracing,
@@ -344,6 +394,7 @@ func (s *Server) processStreamingRPC(t transport.ServerTransport, stream *transp
 		ss.traceInfo.tr = trace.New("grpc.Recv."+methodFamily(stream.Method()), stream.Method())
 		ss.traceInfo.firstLine.client = false
 		ss.traceInfo.tr.LazyLog(&ss.traceInfo.firstLine, false)
+		ss.ctx = trace.NewContext(ss.ctx, ss.traceInfo.tr)
 		defer func() {
 			ss.mu.Lock()
 			if err != nil && err != io.EOF {
@@ -363,6 +414,16 @@ func (s *Server) processStreamingRPC(t transport.ServerTransport, stream *transp
 			ss.statusCode = convertCode(appErr)
 			ss.statusDesc = appErr.Error()
 		}
+	}
+	if ss.tracing {
+		ss.mu.Lock()
+		if ss.statusCode != codes.OK {
+			ss.traceInfo.tr.LazyLog(stringer(ss.statusDesc), true)
+			ss.traceInfo.tr.SetError()
+		} else {
+			ss.traceInfo.tr.LazyLog(stringer("OK"), false)
+		}
+		ss.mu.Unlock()
 	}
 	return t.WriteStatus(ss.s, ss.statusCode, ss.statusDesc)
 
@@ -418,6 +479,12 @@ func (s *Server) Stop() {
 	for c := range cs {
 		c.Close()
 	}
+	s.mu.Lock()
+	if s.events != nil {
+		s.events.Finish()
+		s.events = nil
+	}
+	s.mu.Unlock()
 }
 
 // TestingCloseConns closes all exiting transports but keeps s.lis accepting new

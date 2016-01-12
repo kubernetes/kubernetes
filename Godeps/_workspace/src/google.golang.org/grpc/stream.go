@@ -96,14 +96,33 @@ type ClientStream interface {
 // NewClientStream creates a new Stream for the client side. This is called
 // by generated code.
 func NewClientStream(ctx context.Context, desc *StreamDesc, cc *ClientConn, method string, opts ...CallOption) (ClientStream, error) {
+	var (
+		conn *Conn
+		t    transport.ClientTransport
+		err  error
+	)
+	for {
+		conn, err = cc.dopts.picker.Pick()
+		if err != nil {
+			return nil, toRPCErr(err)
+		}
+		t, err = conn.Wait(ctx)
+		if err != nil {
+			if err == ErrTransientFailure {
+				continue
+			}
+			return nil, toRPCErr(err)
+		}
+		break
+	}
 	// TODO(zhaoq): CallOption is omitted. Add support when it is needed.
 	callHdr := &transport.CallHdr{
-		Host:   cc.authority,
+		Host:   conn.authority,
 		Method: method,
 	}
 	cs := &clientStream{
 		desc:    desc,
-		codec:   cc.dopts.codec,
+		codec:   conn.dopts.codec,
 		tracing: EnableTracing,
 	}
 	if cs.tracing {
@@ -113,10 +132,7 @@ func NewClientStream(ctx context.Context, desc *StreamDesc, cc *ClientConn, meth
 			cs.traceInfo.firstLine.deadline = deadline.Sub(time.Now())
 		}
 		cs.traceInfo.tr.LazyLog(&cs.traceInfo.firstLine, false)
-	}
-	t, _, err := cc.wait(ctx, 0)
-	if err != nil {
-		return nil, toRPCErr(err)
+		ctx = trace.NewContext(ctx, cs.traceInfo.tr)
 	}
 	s, err := t.NewStream(ctx, callHdr)
 	if err != nil {
@@ -278,6 +294,7 @@ type ServerStream interface {
 type serverStream struct {
 	t          transport.ServerTransport
 	s          *transport.Stream
+	ctx        context.Context // provides trace.FromContext when tracing
 	p          *parser
 	codec      Codec
 	statusCode codes.Code
@@ -292,7 +309,7 @@ type serverStream struct {
 }
 
 func (ss *serverStream) Context() context.Context {
-	return ss.s.Context()
+	return ss.ctx
 }
 
 func (ss *serverStream) SendHeader(md metadata.MD) error {
@@ -317,7 +334,6 @@ func (ss *serverStream) SendMsg(m interface{}) (err error) {
 				ss.traceInfo.tr.LazyLog(&fmtStringer{"%v", []interface{}{err}}, true)
 				ss.traceInfo.tr.SetError()
 			}
-
 			ss.mu.Unlock()
 		}
 	}()

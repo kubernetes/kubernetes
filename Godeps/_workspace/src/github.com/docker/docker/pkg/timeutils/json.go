@@ -1,3 +1,4 @@
+// Package timeutils provides helper functions to parse and print time (time.Time).
 package timeutils
 
 import (

@@ -217,6 +217,18 @@ func Code(err error) codes.Code {
 	return codes.Unknown
 }
 
+// ErrorDesc returns the error description of err if it was produced by the rpc system.
+// Otherwise, it returns err.Error() or empty string when err is nil.
+func ErrorDesc(err error) string {
+	if err == nil {
+		return ""
+	}
+	if e, ok := err.(rpcError); ok {
+		return e.desc
+	}
+	return err.Error()
+}
+
 // Errorf returns an error containing an error code and a description;
 // Errorf returns nil if c is OK.
 func Errorf(c codes.Code, format string, a ...interface{}) error {

@@ -10,6 +10,9 @@ import (
 // #include <termios.h>
 import "C"
 
+// Termios is the Unix API for terminal I/O.
+// It is passthgrouh for syscall.Termios in order to make it portable with
+// other platforms where it is not available or handled differently.
 type Termios syscall.Termios
 
 // MakeRaw put the terminal connected to the given file descriptor into raw

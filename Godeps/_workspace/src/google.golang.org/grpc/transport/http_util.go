@@ -43,8 +43,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/bradfitz/http2"
-	"github.com/bradfitz/http2/hpack"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/hpack"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/metadata"
@@ -52,7 +52,7 @@ import (
 
 const (
 	// The primary user agent
-	primaryUA = "grpc-go/0.7"
+	primaryUA = "grpc-go/0.11"
 	// http2MaxFrameLen specifies the max length of a HTTP2 frame.
 	http2MaxFrameLen = 16384 // 16KB frame
 	// http://http2.github.io/http2-spec/#SettingValues
@@ -140,6 +140,14 @@ func newHPACKDecoder() *hpackDecoder {
 	d := &hpackDecoder{}
 	d.h = hpack.NewDecoder(http2InitHeaderTableSize, func(f hpack.HeaderField) {
 		switch f.Name {
+		case "content-type":
+			// TODO(zhaoq): Tentatively disable the check until a bug is fixed.
+			/*
+				if !strings.Contains(f.Value, "application/grpc") {
+					d.err = StreamErrorf(codes.FailedPrecondition, "transport: received the unexpected header")
+					return
+				}
+			*/
 		case "grpc-status":
 			code, err := strconv.Atoi(f.Value)
 			if err != nil {

@@ -114,3 +114,7 @@ type fmtStringer struct {
 func (f *fmtStringer) String() string {
 	return fmt.Sprintf(f.format, f.a...)
 }
+
+type stringer string
+
+func (s stringer) String() string { return string(s) }

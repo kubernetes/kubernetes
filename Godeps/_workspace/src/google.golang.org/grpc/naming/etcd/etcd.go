@@ -1,145 +1,158 @@
+/*
+ *
+ * Copyright 2014, Google Inc.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above
+ * copyright notice, this list of conditions and the following disclaimer
+ * in the documentation and/or other materials provided with the
+ * distribution.
+ *     * Neither the name of Google Inc. nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ */
+
 package etcd
 
 import (
-	"log"
-	"sync"
-
 	etcdcl "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/naming"
 )
-
-type kv struct {
-	key, value string
+// update defines an etcd key-value update.
+type update struct {
+	key, val string
 }
 
-// recvBuffer is an unbounded channel of *kv to record all the pending changes from etcd server.
-type recvBuffer struct {
-	c        chan *kv
-	mu       sync.Mutex
-	stopping bool
-	backlog  []*kv
-}
-
-func newRecvBuffer() *recvBuffer {
-	b := &recvBuffer{
-		c: make(chan *kv, 1),
+// getNode reports the set of changes starting from node recursively.
+func getNode(node *etcdcl.Node) (updates []*update) {
+	for _, v := range node.Nodes {
+		updates = append(updates, getNode(v)...)
 	}
-	return b
-}
-
-func (b *recvBuffer) put(r *kv) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.stopping {
-		return
+	if !node.Dir {
+		u := &update{
+			key: node.Key,
+			val: node.Value,
+		}
+		updates = []*update{u}
 	}
-	b.backlog = append(b.backlog, r)
-	select {
-	case b.c <- b.backlog[0]:
-		b.backlog = b.backlog[1:]
-	default:
-	}
+	return
 }
 
-func (b *recvBuffer) load() {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.stopping || len(b.backlog) == 0 {
-		return
-	}
-	select {
-	case b.c <- b.backlog[0]:
-		b.backlog = b.backlog[1:]
-	default:
-	}
-}
-
-func (b *recvBuffer) get() <-chan *kv {
-	return b.c
-}
-
-// stop terminates the recvBuffer. After it is called, the recvBuffer is not usable any more.
-func (b *recvBuffer) stop() {
-	b.mu.Lock()
-	b.stopping = true
-	close(b.c)
-	b.mu.Unlock()
-}
-
-type etcdNR struct {
-	kAPI   etcdcl.KeysAPI
-	recv   *recvBuffer
+type watcher struct {
+	wr     etcdcl.Watcher
 	ctx    context.Context
 	cancel context.CancelFunc
+	kv     map[string]string
 }
 
-// NewETCDNR creates an etcd NameResolver.
-func NewETCDNR(cfg etcdcl.Config) (naming.Resolver, error) {
+func (w *watcher) Next() (nu []*naming.Update, _ error) {
+	for {
+		resp, err := w.wr.Next(w.ctx)
+		if err != nil {
+			return nil, err
+		}
+		updates := getNode(resp.Node)
+		for _, u := range updates {
+			switch resp.Action {
+			case "set":
+				if resp.PrevNode == nil {
+					w.kv[u.key] = u.val
+					nu = append(nu, &naming.Update{
+						Op:   naming.Add,
+						Addr: u.val,
+					})
+				} else {
+					nu = append(nu, &naming.Update{
+						Op:   naming.Delete,
+						Addr: w.kv[u.key],
+					})
+					nu = append(nu, &naming.Update{
+						Op:   naming.Add,
+						Addr: u.val,
+					})
+					w.kv[u.key] = u.val
+				}
+			case "delete":
+				nu = append(nu, &naming.Update{
+					Op:   naming.Delete,
+					Addr: w.kv[u.key],
+				})
+				delete(w.kv, u.key)
+			}
+		}
+		if len(nu) > 0 {
+			break
+		}
+	}
+	return nu, nil
+}
+
+func (w *watcher) Stop() {
+	w.cancel()
+}
+
+type resolver struct {
+	kapi etcdcl.KeysAPI
+	kv   map[string]string
+}
+
+func (r *resolver) NewWatcher(target string) naming.Watcher {
+	ctx, cancel := context.WithCancel(context.Background())
+	w := &watcher{
+		wr:     r.kapi.Watcher(target, &etcdcl.WatcherOptions{Recursive: true}),
+		ctx:    ctx,
+		cancel: cancel,
+	}
+	for k, v := range r.kv {
+		w.kv[k] = v
+	}
+	return w
+}
+
+func (r *resolver) Resolve(target string) (nu []*naming.Update, _ error) {
+	resp, err := r.kapi.Get(context.Background(), target, &etcdcl.GetOptions{Recursive: true})
+	if err != nil {
+		return nil, err
+	}
+	updates := getNode(resp.Node)
+	for _, u := range updates {
+		r.kv[u.key] = u.val
+		nu = append(nu, &naming.Update{
+			Op:   naming.Add,
+			Addr: u.val,
+		})
+	}
+	return nu, nil
+}
+
+// NewResolver creates an etcd-based naming.Resolver.
+func NewResolver(cfg etcdcl.Config) (naming.Resolver, error) {
 	c, err := etcdcl.New(cfg)
 	if err != nil {
 		return nil, err
 	}
-	kAPI := etcdcl.NewKeysAPI(c)
-	ctx, cancel := context.WithCancel(context.Background())
-	return &etcdNR{
-		kAPI:   kAPI,
-		recv:   newRecvBuffer(),
-		ctx:    ctx,
-		cancel: cancel,
+	return &resolver{
+		kapi: etcdcl.NewKeysAPI(c),
+		kv:   make(map[string]string),
 	}, nil
-}
-
-// getNode builds the resulting key-value map starting from node recursively.
-func getNode(node *etcdcl.Node, res map[string]string) {
-	if !node.Dir {
-		res[node.Key] = node.Value
-		return
-	}
-	for _, val := range node.Nodes {
-		getNode(val, res)
-	}
-}
-
-func (nr *etcdNR) Get(target string) map[string]string {
-	resp, err := nr.kAPI.Get(nr.ctx, target, &etcdcl.GetOptions{Recursive: true, Sort: true})
-	if err != nil {
-		log.Printf("etcdNR.Get(_) stopped: %v", err)
-		return nil
-	}
-	res := make(map[string]string)
-	getNode(resp.Node, res)
-	return res
-}
-
-func (nr *etcdNR) Watch(target string) {
-	watcher := nr.kAPI.Watcher(target, &etcdcl.WatcherOptions{Recursive: true})
-	for {
-		resp, err := watcher.Next(nr.ctx)
-		if err != nil {
-			log.Printf("etcdNR.Watch(_) stopped: %v", err)
-			break
-		}
-		if resp.Node.Dir {
-			continue
-		}
-		entry := &kv{key: resp.Node.Key, value: resp.Node.Value}
-		nr.recv.put(entry)
-	}
-}
-
-func (nr *etcdNR) GetUpdate() (string, string) {
-	i := <-nr.recv.get()
-	nr.recv.load()
-	if i == nil {
-		return "", ""
-	}
-	// returns key and the corresponding value of the updated kv pair
-	return i.key, i.value
-
-}
-
-func (nr *etcdNR) Stop() {
-	nr.recv.stop()
-	nr.cancel()
 }

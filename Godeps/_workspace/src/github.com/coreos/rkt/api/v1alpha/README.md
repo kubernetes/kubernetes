@@ -10,3 +10,4 @@ For more information, see:
 - #1208
 - #1359
 - #1468
+- [API Service Subcommand](../../Documentation/subcommands/api-service.md)

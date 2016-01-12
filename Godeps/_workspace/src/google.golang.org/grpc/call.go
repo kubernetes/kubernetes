@@ -116,7 +116,6 @@ func Invoke(ctx context.Context, method string, args, reply interface{}, cc *Cli
 			o.after(&c)
 		}
 	}()
-
 	if EnableTracing {
 		c.traceInfo.tr = trace.New("grpc.Sent."+methodFamily(method), method)
 		defer c.traceInfo.tr.Finish()
@@ -133,16 +132,11 @@ func Invoke(ctx context.Context, method string, args, reply interface{}, cc *Cli
 			}
 		}()
 	}
-	callHdr := &transport.CallHdr{
-		Host:   cc.authority,
-		Method: method,
-	}
 	topts := &transport.Options{
 		Last:  true,
 		Delay: false,
 	}
 	var (
-		ts      int   // track the transport sequence number
 		lastErr error // record the error that happened
 	)
 	for {
@@ -150,13 +144,25 @@ func Invoke(ctx context.Context, method string, args, reply interface{}, cc *Cli
 			err    error
 			t      transport.ClientTransport
 			stream *transport.Stream
+			conn   *Conn
 		)
 		// TODO(zhaoq): Need a formal spec of retry strategy for non-failfast rpcs.
 		if lastErr != nil && c.failFast {
 			return toRPCErr(lastErr)
 		}
-		t, ts, err = cc.wait(ctx, ts)
+		conn, err = cc.dopts.picker.Pick()
 		if err != nil {
+			return toRPCErr(err)
+		}
+		callHdr := &transport.CallHdr{
+			Host:   conn.authority,
+			Method: method,
+		}
+		t, err = conn.Wait(ctx)
+		if err != nil {
+			if err == ErrTransientFailure {
+				continue
+			}
 			if lastErr != nil {
 				// This was a retry; return the error from the last attempt.
 				return toRPCErr(lastErr)
@@ -166,7 +172,7 @@ func Invoke(ctx context.Context, method string, args, reply interface{}, cc *Cli
 		if c.traceInfo.tr != nil {
 			c.traceInfo.tr.LazyLog(&payload{sent: true, msg: args}, true)
 		}
-		stream, err = sendRequest(ctx, cc.dopts.codec, callHdr, t, args, topts)
+		stream, err = sendRequest(ctx, conn.dopts.codec, callHdr, t, args, topts)
 		if err != nil {
 			if _, ok := err.(transport.ConnectionError); ok {
 				lastErr = err
@@ -178,7 +184,7 @@ func Invoke(ctx context.Context, method string, args, reply interface{}, cc *Cli
 			return toRPCErr(err)
 		}
 		// Receive the response
-		lastErr = recvResponse(cc.dopts.codec, t, &c, stream, reply)
+		lastErr = recvResponse(conn.dopts.codec, t, &c, stream, reply)
 		if _, ok := lastErr.(transport.ConnectionError); ok {
 			continue
 		}

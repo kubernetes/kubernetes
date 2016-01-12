@@ -12,6 +12,7 @@ const (
 	setTermios = syscall.TCSETS
 )
 
+// Termios is the Unix API for terminal I/O.
 type Termios struct {
 	Iflag  uint32
 	Oflag  uint32
