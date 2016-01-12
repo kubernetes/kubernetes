@@ -57,7 +57,7 @@ a user runs.
 
 Use case 1:
 As an administrator, I can create a namespace for a person that can't create privileged containers
-AND enforces that the UID of the containers is set to a certain value
+AND enforce that the UID of the containers is set to a certain value
 
 Use case 2:
 As a cluster operator, an infrastructure component should be able to create a pod with elevated
@@ -76,7 +76,7 @@ pods and service accounts within a project
 ## Requirements
 
 1.  Provide a set of restrictions that controls how a security context is created for pods and containers
-as a new, cluster-scoped, object called PodSecurityPolicy.
+as a new cluster-scoped object called `PodSecurityPolicy`.
 1.  User information in `user.Info` must be available to admission controllers. (Completed in
 https://github.com/GoogleCloudPlatform/kubernetes/pull/8203)
 1.  Some authorizers may restrict a user’s ability to reference a service account.  Systems requiring
@@ -88,7 +88,7 @@ referencing specific service accounts themselves.
 
 ### Model
 
-PodSecurityPolicy objects exists in the root scope, outside of a namespace.  The
+PodSecurityPolicy objects exist in the root scope, outside of a namespace.  The
 PodSecurityPolicy will reference users and groups that are allowed
 to operate under the constraints.  In order to support this, `ServiceAccounts` must be mapped
 to a user name or group list by the authentication/authorization layers.  This allows the security
@@ -96,10 +96,10 @@ context to treat users, groups, and service accounts uniformly.
 
 Below is a list of PodSecurityPolicies which will likely serve most use cases:
 
-1.  A default policy object.  This object is permissioned to something covers all actors such
-as a `system:authenticated` group and will likely be the most restrictive set of constraints.
+1.  A default policy object.  This object is permissioned to something which covers all actors, such
+as a `system:authenticated` group, and will likely be the most restrictive set of constraints.
 1.  A default constraints object for service accounts.  This object can be identified as serving
-a group identified by `system:service-accounts` which can be imposed by the service account authenticator / token generator.
+a group identified by `system:service-accounts`, which can be imposed by the service account authenticator / token generator.
 1.  Cluster admin constraints identified by `system:cluster-admins` group - a set of constraints with elevated privileges that can be used
 by an administrative user or group.
 1.  Infrastructure components constraints which can be identified either by a specific service
@@ -259,27 +259,27 @@ that the administrator has defined for the groups they are assigned.
 
 ## Default PodSecurityPolicy And Overrides
 
-In order to establish policy for service accounts and users there must be a way
+In order to establish policy for service accounts and users, there must be a way
 to identify the default set of constraints that is to be used.  This is best accomplished by using
 groups.  As mentioned above, groups may be used by the authentication/authorization layer to ensure
 that every user maps to at least one group (with a default example of `system:authenticated`) and it
-is up to the cluster administrator to ensure that a PodSecurityPolicy object exists that
+is up to the cluster administrator to ensure that a `PodSecurityPolicy` object exists that
 references the group.
 
-If an administrator would like to provide a user with a changed set of security context permissions
+If an administrator would like to provide a user with a changed set of security context permissions,
 they may do the following:
 
-1.  Create a new PodSecurityPolicy object and add a reference to the user or a group
+1.  Create a new `PodSecurityPolicy` object and add a reference to the user or a group
 that the user belongs to.
-1.  Add the user (or group) to an existing PodSecurityPolicy object with the proper
+1.  Add the user (or group) to an existing `PodSecurityPolicy` object with the proper
 elevated privileges.
 
 ## Admission
 
-Admission control using an authorizer allows the ability to control the creation of resources
-based on capabilities granted to a user.  In terms of the PodSecurityPolicy it means
+Admission control using an authorizer provides the ability to control the creation of resources
+based on capabilities granted to a user.  In terms of the `PodSecurityPolicy`, it means
 that an admission controller may inspect the user info made available in the context to retrieve
-and appropriate set of policies for validation.
+an appropriate set of policies for validation.
 
 The appropriate set of PodSecurityPolicies is defined as all of the policies
 available that have reference to the user or groups that the user belongs to.
@@ -287,26 +287,27 @@ available that have reference to the user or groups that the user belongs to.
 Admission will use the PodSecurityPolicy to ensure that any requests for a
 specific security context setting are valid and to generate settings using the following approach:
 
-1.  Determine all the available PodSecurityPolicy objects that are allowed to be used
-1.  Sort the PodSecurityPolicy objects in a most restrictive to least restrictive order.
-1.  For each PodSecurityPolicy, generate a SecurityContext for each container.  The generation phase will not override
-and user requested settings in the SecurityContext and will rely on the validation phase to ensure that
+1.  Determine all the available `PodSecurityPolicy` objects that are allowed to be used
+1.  Sort the `PodSecurityPolicy` objects in a most restrictive to least restrictive order.
+1.  For each `PodSecurityPolicy`, generate a `SecurityContext` for each container.  The generation phase will not override
+any user requested settings in the `SecurityContext`, and will rely on the validation phase to ensure that
 the user requests are valid.
-1.  Validate the generated SecurityContext to ensure it falls within the boundaries of the PodSecurityPolicy
-1.  If all containers validate under a single PodSecurityPolicy then the pod will be admitted
-1.  If all containers DO NOT validate under the PodSecurityPolicy then try the next PodSecurityPolicy
-1.  If no PodSecurityPolicy validates for the pod then the pod will not be admitted
+1.  Validate the generated `SecurityContext` to ensure it falls within the boundaries of the `PodSecurityPolicy`
+1.  If all containers validate under a single `PodSecurityPolicy` then the pod will be admitted
+1.  If all containers DO NOT validate under the `PodSecurityPolicy` then try the next `PodSecurityPolicy`
+1.  If no `PodSecurityPolicy` validates for the pod then the pod will not be admitted
 
 
 ## Creation of a SecurityContext Based on PodSecurityPolicy
 
-The creation of a SecurityContext based on a PodSecurityPolicy is based upon the configured
-settings of the PodSecurityPolicy.
+The creation of a `SecurityContext` based on a `PodSecurityPolicy` is based upon the configured
+settings of the `PodSecurityPolicy`.
 
-There are three scenarios under which a PodSecurityPolicy field may fall:
+There are three scenarios under which a `PodSecurityPolicy` field may fall:
 
 1.  Governed by a boolean: fields of this type will be defaulted to the most restrictive value.
 For instance, `AllowPrivileged` will always be set to false if unspecified.
+
 1.  Governed by an allowable set: fields of this type will be checked against the set to ensure
 their value is allowed.  For example, `AllowCapabilities` will ensure that only capabilities
 that are allowed to be requested are considered valid.  `HostNetworkSources` will ensure that
@@ -346,7 +347,7 @@ type RunAsUserStrategy interface {
 
 An administrator may wish to create a resource in a namespace that runs with
 escalated privileges.   By allowing security context
-constraints to operate on both the requesting user and pod's service account administrators are able to
+constraints to operate on both the requesting user and the pod's service account, administrators are able to
 create pods in namespaces with elevated privileges based on the administrator's security context
 constraints.
 
@@ -354,7 +355,7 @@ This also allows the system to guard commands being executed in the non-conformi
 instance, an `exec` command can first check the security context of the pod against the security
 context constraints of the user or the user's ability to reference a service account.
 If it does not validate then it can block users from executing the command.  Since the validation
-will be user aware administrators would still be able to run the commands that are restricted to normal users.
+will be user aware, administrators would still be able to run the commands that are restricted to normal users.
 
 ## Interaction with the Kubelet
 
@@ -362,11 +363,11 @@ In certain cases, the Kubelet may need provide information about
 the image in order to validate the security context.  An example of this is a cluster
 that is configured to run with a UID strategy of `MustRunAsNonRoot`.
 
-In this case the admission controller can set the existing `MustRunAsNonRoot` flag on the SecurityContext
-based on the UID strategy of the SecurityPolicy.  It should still validate any requests on the pod
+In this case the admission controller can set the existing `MustRunAsNonRoot` flag on the `SecurityContext`
+based on the UID strategy of the `SecurityPolicy`.  It should still validate any requests on the pod
 for a specific UID and fail early if possible.  However, if the `RunAsUser` is not set on the pod
 it should still admit the pod and allow the Kubelet to ensure that the image does not run as
-root with the existing non-root checks.
+`root` with the existing non-root checks.
 
 
 
