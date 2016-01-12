@@ -429,7 +429,8 @@ func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
 		// reconcile is not needed. Just return.
 		return false
 	}
-	glog.V(3).Infof("Pod status is inconsistent with cached status, a reconciliation should be triggered:\n %+v", util.ObjectDiff(pod.Status, status))
+	glog.V(3).Infof("Pod status is inconsistent with cached status for pod %q, a reconciliation should be triggered:\n %+v", format.Pod(pod),
+		util.ObjectDiff(pod.Status, status))
 
 	return true
 }
