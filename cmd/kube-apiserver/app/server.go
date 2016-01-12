@@ -23,15 +23,10 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
-	"path"
-	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
-	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -394,98 +389,7 @@ func Run(s *options.APIServer) error {
 		Tunneler: tunneler,
 	}
 	m := master.New(config)
-
-	// We serve on 2 ports.  See docs/accessing_the_api.md
-	secureLocation := ""
-	if s.SecurePort != 0 {
-		secureLocation = net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.SecurePort))
-	}
-	insecureLocation := net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort))
-
-	// See the flag commentary to understand our assumptions when opening the read-only and read-write ports.
-
-	var sem chan bool
-	if s.MaxRequestsInFlight > 0 {
-		sem = make(chan bool, s.MaxRequestsInFlight)
-	}
-
-	longRunningRE := regexp.MustCompile(s.LongRunningRequestRE)
-	longRunningTimeout := func(req *http.Request) (<-chan time.Time, string) {
-		// TODO unify this with apiserver.MaxInFlightLimit
-		if longRunningRE.MatchString(req.URL.Path) || req.URL.Query().Get("watch") == "true" {
-			return nil, ""
-		}
-		return time.After(time.Minute), ""
-	}
-
-	if secureLocation != "" {
-		handler := apiserver.TimeoutHandler(m.Handler, longRunningTimeout)
-		secureServer := &http.Server{
-			Addr:           secureLocation,
-			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(handler)),
-			MaxHeaderBytes: 1 << 20,
-			TLSConfig: &tls.Config{
-				// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
-				MinVersion: tls.VersionTLS10,
-			},
-		}
-
-		if len(s.ClientCAFile) > 0 {
-			clientCAs, err := util.CertPoolFromFile(s.ClientCAFile)
-			if err != nil {
-				glog.Fatalf("Unable to load client CA file: %v", err)
-			}
-			// Populate PeerCertificates in requests, but don't reject connections without certificates
-			// This allows certificates to be validated by authenticators, while still allowing other auth types
-			secureServer.TLSConfig.ClientAuth = tls.RequestClientCert
-			// Specify allowed CAs for client certificates
-			secureServer.TLSConfig.ClientCAs = clientCAs
-		}
-
-		glog.Infof("Serving securely on %s", secureLocation)
-		if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
-			s.TLSCertFile = path.Join(s.CertDirectory, "apiserver.crt")
-			s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "apiserver.key")
-			// TODO (cjcullen): Is PublicAddress the right address to sign a cert with?
-			alternateIPs := []net.IP{config.ServiceReadWriteIP}
-			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}
-			// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
-			// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-			if err := util.GenerateSelfSignedCert(config.PublicAddress.String(), s.TLSCertFile, s.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
-				glog.Errorf("Unable to generate self signed cert: %v", err)
-			} else {
-				glog.Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
-			}
-		}
-
-		go func() {
-			defer util.HandleCrash()
-			for {
-				// err == systemd.SdNotifyNoSocket when not running on a systemd system
-				if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
-					glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
-				}
-				if err := secureServer.ListenAndServeTLS(s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
-					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
-				}
-				time.Sleep(15 * time.Second)
-			}
-		}()
-	}
-	handler := apiserver.TimeoutHandler(m.InsecureHandler, longRunningTimeout)
-	http := &http.Server{
-		Addr:           insecureLocation,
-		Handler:        apiserver.RecoverPanics(handler),
-		MaxHeaderBytes: 1 << 20,
-	}
-	if secureLocation == "" {
-		// err == systemd.SdNotifyNoSocket when not running on a systemd system
-		if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
-			glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
-		}
-	}
-	glog.Infof("Serving insecurely on %s", insecureLocation)
-	glog.Fatal(http.ListenAndServe())
+	m.Run(s.ServerRunOptions)
 	return nil
 }
 
