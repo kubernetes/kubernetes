@@ -56,7 +56,8 @@ func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	// Make a transport that reroutes all traffic to the example server
 	transport := &http.Transport{
@@ -128,7 +129,8 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	// Make a transport that reroutes all traffic to the example server
 	transport := &http.Transport{
@@ -201,7 +203,8 @@ func TestContainerRegistryBasics(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	// Make a transport that reroutes all traffic to the example server
 	transport := &http.Transport{
@@ -257,7 +260,8 @@ func TestContainerRegistryNoStorageScope(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	// Make a transport that reroutes all traffic to the example server
 	transport := &http.Transport{
@@ -290,7 +294,8 @@ func TestComputePlatformScopeSubstitutesStorageScope(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	// Make a transport that reroutes all traffic to the example server
 	transport := &http.Transport{
@@ -312,7 +317,8 @@ func TestAllProvidersNoMetadata(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	// Make a transport that reroutes all traffic to the example server
 	transport := &http.Transport{

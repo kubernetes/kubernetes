@@ -215,13 +215,15 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 				}
 			}
 
-			server.Close()
+			// TODO: Uncomment when fix #19254
+			// server.Close()
 			continue
 		}
 
 		if hasErr {
 			t.Errorf("%d: unexpected error: %v", i, err)
-			server.Close()
+			// TODO: Uncomment when fix #19254
+			// server.Close()
 			continue
 		}
 
@@ -237,7 +239,8 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 			}
 		}
 
-		server.Close()
+		// TODO: Uncomment when fix #19254
+		// server.Close()
 	}
 }
 
@@ -295,13 +298,15 @@ func TestRequestAttachRemoteCommand(t *testing.T) {
 				}
 			}
 
-			server.Close()
+			// TODO: Uncomment when fix #19254
+			// server.Close()
 			continue
 		}
 
 		if hasErr {
 			t.Errorf("%d: unexpected error: %v", i, err)
-			server.Close()
+			// TODO: Uncomment when fix #19254
+			// server.Close()
 			continue
 		}
 
@@ -317,7 +322,8 @@ func TestRequestAttachRemoteCommand(t *testing.T) {
 			}
 		}
 
-		server.Close()
+		// TODO: Uncomment when fix #19254
+		// server.Close()
 	}
 }
 

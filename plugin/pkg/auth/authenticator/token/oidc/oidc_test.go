@@ -237,7 +237,8 @@ func TestOIDCDiscoverySecureConnection(t *testing.T) {
 	// Verify that plain HTTP issuer URL is forbidden.
 	op := newOIDCProvider(t)
 	srv := httptest.NewServer(op.mux)
-	defer srv.Close()
+	// TODO: Uncomment when fix #19254
+	// defer srv.Close()
 
 	op.pcfg = oidc.ProviderConfig{
 		Issuer:       srv.URL,

@@ -36,7 +36,8 @@ func TestInputStreamReader(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(resultString))
 	}))
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 	u, err := url.Parse(s.URL)
 	if err != nil {
 		t.Errorf("Error parsing server URL: %v", err)

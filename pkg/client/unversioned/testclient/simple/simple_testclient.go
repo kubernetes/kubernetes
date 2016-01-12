@@ -93,7 +93,8 @@ func (c *Client) Setup(t *testing.T) *Client {
 
 func (c *Client) Close() {
 	if c.server != nil {
-		c.server.Close()
+		// TODO: Uncomment when fix #19254
+		// c.server.Close()
 	}
 }
 

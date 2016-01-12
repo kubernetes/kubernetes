@@ -400,7 +400,8 @@ func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
 	for _, test := range tests {
 		func() {
 			master, etcdserver, server, assert := initThirdParty(t, version)
-			defer server.Close()
+			// TODO: Uncomment when fix #19254
+			// defer server.Close()
 			defer etcdserver.Terminate(t)
 
 			if test.items != nil {
@@ -509,7 +510,8 @@ func TestInstallThirdPartyAPIGet(t *testing.T) {
 
 func testInstallThirdPartyAPIGetVersion(t *testing.T, version string) {
 	master, etcdserver, server, assert := initThirdParty(t, version)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	defer etcdserver.Terminate(t)
 
 	expectedObj := Foo{
@@ -556,7 +558,8 @@ func TestInstallThirdPartyAPIPost(t *testing.T) {
 
 func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 	master, etcdserver, server, assert := initThirdParty(t, version)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	defer etcdserver.Terminate(t)
 
 	inputObj := Foo{
@@ -621,7 +624,8 @@ func TestInstallThirdPartyAPIDelete(t *testing.T) {
 
 func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
 	master, etcdserver, server, assert := initThirdParty(t, version)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	defer etcdserver.Terminate(t)
 
 	expectedObj := Foo{
@@ -698,7 +702,8 @@ func TestInstallThirdPartyResourceRemove(t *testing.T) {
 
 func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 	master, etcdserver, server, assert := initThirdParty(t, version)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	defer etcdserver.Terminate(t)
 
 	expectedObj := Foo{

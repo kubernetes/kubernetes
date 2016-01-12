@@ -193,7 +193,8 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 			// Write successful response
 			w.Write([]byte(successfulResponse))
 		}))
-		defer downstreamServer.Close()
+		// TODO: Uncomment when fix #19254
+		// defer downstreamServer.Close()
 
 		// Start the proxy server
 		serverURL, _ := url.Parse(downstreamServer.URL)
@@ -204,7 +205,8 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 		}
 		namespaceHandler := handleNamespaced(map[string]rest.Storage{"foo": simpleStorage})
 		server := httptest.NewServer(namespaceHandler)
-		defer server.Close()
+		// TODO: Uncomment when fix #19254
+		// defer server.Close()
 
 		// Dial the proxy server
 		conn, err := net.Dial(server.Listener.Addr().Network(), server.Listener.Addr().String())
@@ -299,7 +301,8 @@ func TestProxy(t *testing.T) {
 			}
 			fmt.Fprint(out, item.respBody)
 		}))
-		defer downstreamServer.Close()
+		// TODO: Uncomment when fix #19254
+		// defer downstreamServer.Close()
 
 		serverURL, _ := url.Parse(downstreamServer.URL)
 		simpleStorage := &SimpleRESTStorage{
@@ -310,7 +313,8 @@ func TestProxy(t *testing.T) {
 
 		namespaceHandler := handleNamespaced(map[string]rest.Storage{"foo": simpleStorage})
 		namespaceServer := httptest.NewServer(namespaceHandler)
-		defer namespaceServer.Close()
+		// TODO: Uncomment when fix #19254
+		// defer namespaceServer.Close()
 
 		// test each supported URL pattern for finding the redirection resource in the proxy in a particular namespace
 		serverPatterns := []struct {
@@ -419,7 +423,8 @@ func TestProxyUpgrade(t *testing.T) {
 			ws.Read(body)
 			ws.Write([]byte("hello " + string(body)))
 		}))
-		defer backendServer.Close()
+		// TODO: Uncomment when fix #19254
+		// defer backendServer.Close()
 
 		serverURL, _ := url.Parse(backendServer.URL)
 		simpleStorage := &SimpleRESTStorage{
@@ -432,7 +437,8 @@ func TestProxyUpgrade(t *testing.T) {
 		namespaceHandler := handleNamespaced(map[string]rest.Storage{"foo": simpleStorage})
 
 		server := httptest.NewServer(namespaceHandler)
-		defer server.Close()
+		// TODO: Uncomment when fix #19254
+		// defer server.Close()
 
 		ws, err := websocket.Dial("ws://"+server.Listener.Addr().String()+"/"+prefix+"/"+newGroupVersion.Group+"/"+newGroupVersion.Version+"/proxy/namespaces/myns/foo/123", "", "http://127.0.0.1/")
 		if err != nil {
@@ -485,7 +491,8 @@ func TestRedirectOnMissingTrailingSlash(t *testing.T) {
 				t.Errorf("Unexpected query on url: %s, expected: %s", req.URL.RawQuery, item.query)
 			}
 		}))
-		defer downstreamServer.Close()
+		// TODO: Uncomment when fix #19254
+		// defer downstreamServer.Close()
 
 		serverURL, _ := url.Parse(downstreamServer.URL)
 		simpleStorage := &SimpleRESTStorage{
@@ -496,7 +503,8 @@ func TestRedirectOnMissingTrailingSlash(t *testing.T) {
 
 		handler := handleNamespaced(map[string]rest.Storage{"foo": simpleStorage})
 		server := httptest.NewServer(handler)
-		defer server.Close()
+		// TODO: Uncomment when fix #19254
+		// defer server.Close()
 
 		proxyTestPattern := "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/proxy/namespaces/ns/foo/id" + item.path
 		req, err := http.NewRequest(
