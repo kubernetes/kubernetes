@@ -175,7 +175,7 @@ if [ ! -e "${kubelet_kubeconfig_file}" ]; then
 import pipes,sys,yaml
 
 for k,v in yaml.load(sys.stdin).iteritems():
-  print "readonly {var}={value}".format(var = k, value = pipes.quote(str(v)))
+  print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
 ''' < "${kube_env_yaml}")
 fi
 

@@ -297,6 +297,6 @@ function get-password {
   if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
     KUBE_USER=admin
     KUBE_PASSWORD=$(python -c 'import string,random; \
-      print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
+      print("".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16)))')
   fi
 }
