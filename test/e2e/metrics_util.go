@@ -47,9 +47,9 @@ const (
 	apiCallLatencyLargeThreshold  time.Duration = 1 * time.Second
 )
 
-type metricsForE2E metrics.MetricsCollection
+type MetricsForE2E metrics.MetricsCollection
 
-func (m *metricsForE2E) PrintHumanReadable() string {
+func (m *MetricsForE2E) PrintHumanReadable() string {
 	buf := bytes.Buffer{}
 	for _, interestingMetric := range InterestingApiServerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
@@ -69,7 +69,7 @@ func (m *metricsForE2E) PrintHumanReadable() string {
 	return buf.String()
 }
 
-func (m *metricsForE2E) PrintJSON() string {
+func (m *MetricsForE2E) PrintJSON() string {
 	return prettyPrintJSON(*m)
 }
 
