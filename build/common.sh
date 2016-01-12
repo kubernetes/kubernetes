@@ -114,10 +114,6 @@ readonly KUBE_ADDON_PATHS=(
 # Verify that the right utilities and such are installed for building Kube.  Set
 # up some dynamic constants.
 #
-# Args:
-#   $1 The type of operation to verify for.  Only 'clean' is supported in which
-#   case we don't verify docker.
-#
 # Vars set:
 #   KUBE_ROOT_HASH
 #   KUBE_BUILD_IMAGE_TAG
