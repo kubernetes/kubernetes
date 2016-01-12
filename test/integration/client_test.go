@@ -45,7 +45,7 @@ func TestClient(t *testing.T) {
 	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&client.Config{Host: s.URL, GroupVersion: testapi.Default.GroupVersion()})
 
-	info, err := client.ServerVersion()
+	info, err := client.Discovery().ServerVersion()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
