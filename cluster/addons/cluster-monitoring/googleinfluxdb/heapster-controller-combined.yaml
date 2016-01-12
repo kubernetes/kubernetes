@@ -1,5 +1,5 @@
 {% set heapster_memory = "300Mi" -%}
-{% if pillar['num_nodes'] is defined -%}
+{% if pillar['num_nodes'] is defined and pillar['num_nodes'] is not None -%}
   {% set heapster_memory = (200 + pillar['num_nodes'] * 12)|string + "Mi" -%}
 {% endif -%}
 
