@@ -91,7 +91,7 @@
                 - client (kubectl): ci/latest.txt<br>
                 - cluster (k8s): ci/latest.txt<br>
                 - tests: ci/latest.txt
-            timeout: 120
+            timeout: 300
         - 'gke-flaky':
             description: |
                 Run flaky e2e tests using the following config:<br>
