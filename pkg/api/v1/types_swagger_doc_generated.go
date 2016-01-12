@@ -141,6 +141,16 @@ func (Container) SwaggerDoc() map[string]string {
 	return map_Container
 }
 
+var map_ContainerImage = map[string]string{
+	"":         "Describe a container image",
+	"repoTags": "Names by which this image is known. e.g. [\"gcr.io/google_containers/hyperkube:v1.0.7\", \"dockerhub.io/google_containers/hyperkube:v1.0.7\"]",
+	"size":     "The size of the image in bytes.",
+}
+
+func (ContainerImage) SwaggerDoc() map[string]string {
+	return map_ContainerImage
+}
+
 var map_ContainerPort = map[string]string{
 	"":              "ContainerPort represents a network port in a single container.",
 	"name":          "If specified, this must be an IANA_SVC_NAME and unique within the pod. Each named port in a pod must have a unique name. Name for the port that can be referred to by services.",
@@ -732,6 +742,7 @@ var map_NodeStatus = map[string]string{
 	"addresses":       "List of addresses reachable to the node. Queried from cloud provider, if available. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-addresses",
 	"daemonEndpoints": "Endpoints of daemons running on the Node.",
 	"nodeInfo":        "Set of ids/uuids to uniquely identify the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-info",
+	"images":          "List of container images on this node",
 }
 
 func (NodeStatus) SwaggerDoc() map[string]string {
