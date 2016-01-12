@@ -631,6 +631,7 @@ func (dc *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationControl
 		return false, nil
 	}
 	totalScaleDownCount := readyPodCount - minAvailable
+	totalScaledDown := 0
 	for _, targetRC := range oldRCs {
 		if totalScaleDownCount == 0 {
 			// No further scaling required.
@@ -647,14 +648,16 @@ func (dc *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationControl
 		if err != nil {
 			return false, err
 		}
+		totalScaledDown += scaleDownCount
 		totalScaleDownCount -= scaleDownCount
-		dKey, err := controller.KeyFunc(&deployment)
-		if err != nil {
-			return false, fmt.Errorf("Couldn't get key for deployment %#v: %v", deployment, err)
-		}
-		if expectationsCheck {
-			dc.podExpectations.ExpectDeletions(dKey, scaleDownCount)
-		}
+	}
+	// Expect to see old rcs scaled down by exactly totalScaledDownCount (sum of scaleDownCount) replicas.
+	dKey, err = controller.KeyFunc(&deployment)
+	if err != nil {
+		return false, fmt.Errorf("Couldn't get key for deployment %#v: %v", deployment, err)
+	}
+	if expectationsCheck {
+		dc.podExpectations.ExpectDeletions(dKey, totalScaledDown)
 	}
 	return true, err
 }
