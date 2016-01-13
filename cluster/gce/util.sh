@@ -21,13 +21,11 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
-
-if [[ "${OS_DISTRIBUTION}" == "debian" || "${OS_DISTRIBUTION}" == "coreos" || "${OS_DISTRIBUTION}" == "trusty" ]]; then
-  source "${KUBE_ROOT}/cluster/gce/${OS_DISTRIBUTION}/helper.sh"
-else
-  echo "Cannot operate on cluster using os distro: ${OS_DISTRIBUTION}" >&2
-  exit 1
-fi
+source "${KUBE_ROOT}/cluster/gce/common.sh"
+source "${KUBE_ROOT}/cluster/gce/addons.sh"
+source "${KUBE_ROOT}/cluster/gce/nodes.sh"
+source "${KUBE_ROOT}/cluster/gce/master.sh"
+source "${KUBE_ROOT}/cluster/gce/cluster.sh"
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 
@@ -92,29 +90,6 @@ function ensure-temp-dir {
   if [[ -z ${KUBE_TEMP-} ]]; then
     KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
     trap 'rm -rf "${KUBE_TEMP}"' EXIT
-  fi
-}
-
-# Use the gcloud defaults to find the project.  If it is already set in the
-# environment then go with that.
-#
-# Vars set:
-#   PROJECT
-#   PROJECT_REPORTED
-function detect-project () {
-  if [[ -z "${PROJECT-}" ]]; then
-    PROJECT=$(gcloud config list project | tail -n 1 | cut -f 3 -d ' ')
-  fi
-
-  if [[ -z "${PROJECT-}" ]]; then
-    echo "Could not detect Google Cloud Platform project.  Set the default project using " >&2
-    echo "'gcloud config set project <PROJECT>'" >&2
-    exit 1
-  fi
-  if [[ -z "${PROJECT_REPORTED-}" ]]; then
-    echo "Project: ${PROJECT}" >&2
-    echo "Zone: ${ZONE}" >&2
-    PROJECT_REPORTED=true
   fi
 }
 
@@ -301,72 +276,6 @@ function detect-master () {
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
 }
 
-# Wait for background jobs to finish. Exit with
-# an error status if any of the jobs failed.
-function wait-for-jobs {
-  local fail=0
-  local job
-  for job in $(jobs -p); do
-    wait "${job}" || fail=$((fail + 1))
-  done
-  if (( fail != 0 )); then
-    echo -e "${color_red}${fail} commands failed.  Exiting.${color_norm}" >&2
-    # Ignore failures for now.
-    # exit 2
-  fi
-}
-
-# Robustly try to create a static ip.
-# $1: The name of the ip to create
-# $2: The name of the region to create the ip in.
-function create-static-ip {
-  detect-project
-  local attempt=0
-  local REGION="$2"
-  while true; do
-    if ! gcloud compute addresses create "$1" \
-      --project "${PROJECT}" \
-      --region "${REGION}" -q > /dev/null; then
-      if (( attempt > 4 )); then
-        echo -e "${color_red}Failed to create static ip $1 ${color_norm}" >&2
-        exit 2
-      fi
-      attempt=$(($attempt+1)) 
-      echo -e "${color_yellow}Attempt $attempt failed to create static ip $1. Retrying.${color_norm}" >&2
-      sleep $(($attempt * 5))
-    else
-      break
-    fi
-  done
-}
-
-# Robustly try to create a firewall rule.
-# $1: The name of firewall rule.
-# $2: IP ranges.
-# $3: Target tags for this firewall rule.
-function create-firewall-rule {
-  detect-project
-  local attempt=0
-  while true; do
-    if ! gcloud compute firewall-rules create "$1" \
-      --project "${PROJECT}" \
-      --network "${NETWORK}" \
-      --source-ranges "$2" \
-      --target-tags "$3" \
-      --allow tcp,udp,icmp,esp,ah,sctp; then
-      if (( attempt > 4 )); then
-        echo -e "${color_red}Failed to create firewall rule $1 ${color_norm}" >&2
-        exit 2
-      fi
-      echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create firewall rule $1. Retrying.${color_norm}" >&2
-      attempt=$(($attempt+1))
-      sleep $(($attempt * 5))
-    else
-        break
-    fi
-  done
-}
-
 # $1: version (required)
 function get-template-name-from-version {
   # trim template name to pass gce name validation
@@ -483,29 +392,6 @@ function add-instance-metadata-from-file {
   done
 }
 
-# Quote something appropriate for a yaml string.
-#
-# TODO(zmerlynn): Note that this function doesn't so much "quote" as
-# "strip out quotes", and we really should be using a YAML library for
-# this, but PyYAML isn't shipped by default, and *rant rant rant ... SIGH*
-function yaml-quote {
-  echo "'$(echo "${@}" | sed -e "s/'/''/g")'"
-}
-
-function write-master-env {
-  # If the user requested that the master be part of the cluster, set the
-  # environment variable to program the master kubelet to register itself.
-  if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
-    KUBELET_APISERVER="${MASTER_NAME}"
-  fi
-
-  build-kube-env true "${KUBE_TEMP}/master-kube-env.yaml"
-}
-
-function write-node-env {
-  build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
-}
-
 # Create certificate pairs for the cluster.
 # $1: The public IP for the master.
 #
@@ -531,11 +417,20 @@ function write-node-env {
 #   CA_CERT_BASE64
 #   MASTER_CERT_BASE64
 #   MASTER_KEY_BASE64
+#   KUBE_PROXY_TOKEN
 #   KUBELET_CERT_BASE64
 #   KUBELET_KEY_BASE64
+#   KUBELET_TOKEN
 #   KUBECFG_CERT_BASE64
 #   KUBECFG_KEY_BASE64
 function create-certs {
+  # Generate a bearer token for this cluster. We push this separately
+  # from the other cluster variables so that the client (this
+  # computer) can forget it later. This should disappear with
+  # http://issue.k8s.io/3168
+  KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+
   local -r cert_ip="${1}"
 
   local octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
@@ -610,172 +505,23 @@ function kube-up {
     fi
   fi
 
-  if ! gcloud compute networks --project "${PROJECT}" describe "${NETWORK}" &>/dev/null; then
-    echo "Creating new network: ${NETWORK}"
-    # The network needs to be created synchronously or we have a race. The
-    # firewalls can be added concurrent with instance creation.
-    gcloud compute networks create --project "${PROJECT}" "${NETWORK}" --range "10.240.0.0/16"
-  fi
-
-  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${NETWORK}-default-internal" &>/dev/null; then
-    gcloud compute firewall-rules create "${NETWORK}-default-internal" \
-      --project "${PROJECT}" \
-      --network "${NETWORK}" \
-      --source-ranges "10.0.0.0/8" \
-      --allow "tcp:1-65535,udp:1-65535,icmp" &
-  fi
-
-  if ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NETWORK}-default-ssh" &>/dev/null; then
-    gcloud compute firewall-rules create "${NETWORK}-default-ssh" \
-      --project "${PROJECT}" \
-      --network "${NETWORK}" \
-      --source-ranges "0.0.0.0/0" \
-      --allow "tcp:22" &
-  fi
-
-  echo "Starting master and configuring firewalls"
-  gcloud compute firewall-rules create "${MASTER_NAME}-https" \
-    --project "${PROJECT}" \
-    --network "${NETWORK}" \
-    --target-tags "${MASTER_TAG}" \
-    --allow tcp:443 &
-
-  # We have to make sure the disk is created before creating the master VM, so
-  # run this in the foreground.
-  gcloud compute disks create "${MASTER_NAME}-pd" \
-    --project "${PROJECT}" \
-    --zone "${ZONE}" \
-    --type "${MASTER_DISK_TYPE}" \
-    --size "${MASTER_DISK_SIZE}"
-
   # Create disk for cluster registry if enabled
+  # TODO: This should move to addons::deploy, but currently addons are deployed when master
+  # is created so this disk have to be created earlier.
   if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
     gcloud compute disks create "${CLUSTER_REGISTRY_DISK}" \
       --project "${PROJECT}" \
       --zone "${ZONE}" \
       --type "${CLUSTER_REGISTRY_DISK_TYPE_GCE}" \
-      --size "${CLUSTER_REGISTRY_DISK_SIZE}" &
+      --size "${CLUSTER_REGISTRY_DISK_SIZE}"
   fi
 
-  # Generate a bearer token for this cluster. We push this separately
-  # from the other cluster variables so that the client (this
-  # computer) can forget it later. This should disappear with
-  # http://issue.k8s.io/3168
-  KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-  KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-
-  # Reserve the master's IP so that it can later be transferred to another VM
-  # without disrupting the kubelets. IPs are associated with regions, not zones,
-  # so extract the region name, which is the same as the zone but with the final
-  # dash and characters trailing the dash removed.
-  local REGION=${ZONE%-*}
-  create-static-ip "${MASTER_NAME}-ip" "${REGION}"
-  MASTER_RESERVED_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
-    --project "${PROJECT}" \
-    --region "${REGION}" -q --format yaml | awk '/^address:/ { print $2 }')
-
-  create-certs "${MASTER_RESERVED_IP}"
-
-  create-master-instance "${MASTER_RESERVED_IP}" &
-
-  # Create a single firewall rule for all minions.
-  create-firewall-rule "${NODE_TAG}-all" "${CLUSTER_IP_RANGE}" "${NODE_TAG}" &
-
-  # Report logging choice (if any).
-  if [[ "${ENABLE_NODE_LOGGING-}" == "true" ]]; then
-    echo "+++ Logging using Fluentd to ${LOGGING_DESTINATION:-unknown}"
-  fi
-
-  # Wait for last batch of jobs
-  wait-for-jobs
-
-  echo "Creating minions."
-
-  # TODO(zmerlynn): Refactor setting scope flags.
-  local scope_flags=
-  if [ -n "${NODE_SCOPES}" ]; then
-    scope_flags="--scopes ${NODE_SCOPES}"
-  else
-    scope_flags="--no-scopes"
-  fi
-
-  write-node-env
-
-  local template_name="${NODE_INSTANCE_PREFIX}-template"
-  
-  create-node-instance-template $template_name
-
-  local defaulted_max_instances_per_mig=${MAX_INSTANCES_PER_MIG:-500}
-
-  if [[ ${defaulted_max_instances_per_mig} -le "0" ]]; then
-    echo "MAX_INSTANCES_PER_MIG cannot be negative. Assuming default 500"
-    defaulted_max_instances_per_mig=500
-  fi
-  local num_migs=$(((${NUM_NODES} + ${defaulted_max_instances_per_mig} - 1) / ${defaulted_max_instances_per_mig}))
-  local instances_per_mig=$(((${NUM_NODES} + ${num_migs} - 1) / ${num_migs}))
-  local last_mig_size=$((${NUM_NODES} - (${num_migs} - 1) * ${instances_per_mig}))
-
-  #TODO: parallelize this loop to speed up the process
-  for i in $(seq $((${num_migs} - 1))); do
-    gcloud compute instance-groups managed \
-        create "${NODE_INSTANCE_PREFIX}-group-$i" \
-        --project "${PROJECT}" \
-        --zone "${ZONE}" \
-        --base-instance-name "${NODE_INSTANCE_PREFIX}" \
-        --size "${instances_per_mig}" \
-        --template "$template_name" || true;
-    gcloud compute instance-groups managed wait-until-stable \
-        "${NODE_INSTANCE_PREFIX}-group-$i" \
-	      --zone "${ZONE}" \
-	      --project "${PROJECT}" || true;
-  done
-
-  # TODO: We don't add a suffix for the last group to keep backward compatibility when there's only one MIG.
-  # We should change it at some point, but note #18545 when changing this.
-  gcloud compute instance-groups managed \
-      create "${NODE_INSTANCE_PREFIX}-group" \
-      --project "${PROJECT}" \
-      --zone "${ZONE}" \
-      --base-instance-name "${NODE_INSTANCE_PREFIX}" \
-      --size "${last_mig_size}" \
-      --template "$template_name" || true;
-  gcloud compute instance-groups managed wait-until-stable \
-      "${NODE_INSTANCE_PREFIX}-group" \
-      --zone "${ZONE}" \
-      --project "${PROJECT}" || true;
-
-  detect-node-names
-  detect-master
-
-  # Create autoscaler for nodes if requested
-  if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
-    METRICS=""
-    # Current usage
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_utilization,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_utilization,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
-
-    # Reservation
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/cpu/node_reservation,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
-    METRICS+="--custom-metric-utilization metric=custom.cloudmonitoring.googleapis.com/kubernetes.io/memory/node_reservation,"
-    METRICS+="utilization-target=${TARGET_NODE_UTILIZATION},utilization-target-type=GAUGE "
-
-    echo "Creating node autoscalers."
-
-    local max_instances_per_mig=$(((${AUTOSCALER_MAX_NODES} + ${num_migs} - 1) / ${num_migs}))
-    local last_max_instances=$((${AUTOSCALER_MAX_NODES} - (${num_migs} - 1) * ${max_instances_per_mig}))
-    local min_instances_per_mig=$(((${AUTOSCALER_MIN_NODES} + ${num_migs} - 1) / ${num_migs}))
-    local last_min_instances=$((${AUTOSCALER_MIN_NODES} - (${num_migs} - 1) * ${min_instances_per_mig}))
-
-    for i in $(seq $((${num_migs} - 1))); do
-      gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group-$i" --zone "${ZONE}" --project "${PROJECT}" \
-          --min-num-replicas "${min_instances_per_mig}" --max-num-replicas "${max_instances_per_mig}" ${METRICS} || true
-    done
-    gcloud compute instance-groups managed set-autoscaling "${NODE_INSTANCE_PREFIX}-group" --zone "${ZONE}" --project "${PROJECT}" \
-      --min-num-replicas "${last_min_instances}" --max-num-replicas "${last_max_instances}" ${METRICS} || true
-  fi
+  cluster::provision
+  master::provision
+  create-certs "${KUBE_MASTER_IP}"
+  master::deploy
+  nodes::provision
+  addons::deploy
 
   echo "Waiting up to ${KUBE_CLUSTER_INITIALIZATION_TIMEOUT} seconds for cluster initialization."
   echo
@@ -1123,7 +869,7 @@ function prepare-push() {
     # Ugly hack: Since it is not possible to delete instance-template that is currently
     # being used, create a temp one, then delete the old one and recreate it once again.
     local tmp_template_name="${NODE_INSTANCE_PREFIX}-template-tmp"
-    create-node-instance-template $tmp_template_name
+    nodes::create-instance-template $tmp_template_name
 
     local template_name="${NODE_INSTANCE_PREFIX}-template"
     for group in ${INSTANCE_GROUPS[@]:-}; do
@@ -1139,7 +885,7 @@ function prepare-push() {
       --quiet \
       "$template_name" || true
 
-    create-node-instance-template "$template_name"
+    nodes::create-instance-template "$template_name"
 
     for group in ${INSTANCE_GROUPS[@]:-}; do
       gcloud compute instance-groups managed \
@@ -1336,167 +1082,5 @@ function build-runtime-config() {
             RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/daemonsets=true"
           fi
       fi
-  fi
-}
-
-# $1: if 'true', we're building a master yaml, else a node
-function build-kube-env {
-  local master=$1
-  local file=$2
-
-  build-runtime-config
-
-  rm -f ${file}
-  cat >$file <<EOF
-ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
-INSTANCE_PREFIX: $(yaml-quote ${INSTANCE_PREFIX})
-NODE_INSTANCE_PREFIX: $(yaml-quote ${NODE_INSTANCE_PREFIX})
-CLUSTER_IP_RANGE: $(yaml-quote ${CLUSTER_IP_RANGE:-10.244.0.0/16})
-SERVER_BINARY_TAR_URL: $(yaml-quote ${SERVER_BINARY_TAR_URL})
-SERVER_BINARY_TAR_HASH: $(yaml-quote ${SERVER_BINARY_TAR_HASH})
-SALT_TAR_URL: $(yaml-quote ${SALT_TAR_URL})
-SALT_TAR_HASH: $(yaml-quote ${SALT_TAR_HASH})
-SERVICE_CLUSTER_IP_RANGE: $(yaml-quote ${SERVICE_CLUSTER_IP_RANGE})
-KUBERNETES_MASTER_NAME: $(yaml-quote ${MASTER_NAME})
-ALLOCATE_NODE_CIDRS: $(yaml-quote ${ALLOCATE_NODE_CIDRS:-false})
-ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-none})
-ENABLE_L7_LOADBALANCING: $(yaml-quote ${ENABLE_L7_LOADBALANCING:-none})
-ENABLE_CLUSTER_LOGGING: $(yaml-quote ${ENABLE_CLUSTER_LOGGING:-false})
-ENABLE_CLUSTER_UI: $(yaml-quote ${ENABLE_CLUSTER_UI:-false})
-ENABLE_NODE_LOGGING: $(yaml-quote ${ENABLE_NODE_LOGGING:-false})
-LOGGING_DESTINATION: $(yaml-quote ${LOGGING_DESTINATION:-})
-ELASTICSEARCH_LOGGING_REPLICAS: $(yaml-quote ${ELASTICSEARCH_LOGGING_REPLICAS:-})
-ENABLE_CLUSTER_DNS: $(yaml-quote ${ENABLE_CLUSTER_DNS:-false})
-ENABLE_CLUSTER_REGISTRY: $(yaml-quote ${ENABLE_CLUSTER_REGISTRY:-false})
-CLUSTER_REGISTRY_DISK: $(yaml-quote ${CLUSTER_REGISTRY_DISK})
-CLUSTER_REGISTRY_DISK_SIZE: $(yaml-quote ${CLUSTER_REGISTRY_DISK_SIZE})
-DNS_REPLICAS: $(yaml-quote ${DNS_REPLICAS:-})
-DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
-DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
-KUBELET_TOKEN: $(yaml-quote ${KUBELET_TOKEN:-})
-KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
-ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
-MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
-RUNTIME_CONFIG: $(yaml-quote ${RUNTIME_CONFIG})
-CA_CERT: $(yaml-quote ${CA_CERT_BASE64:-})
-KUBELET_CERT: $(yaml-quote ${KUBELET_CERT_BASE64:-})
-KUBELET_KEY: $(yaml-quote ${KUBELET_KEY_BASE64:-})
-NETWORK_PROVIDER: $(yaml-quote ${NETWORK_PROVIDER:-})
-OPENCONTRAIL_TAG: $(yaml-quote ${OPENCONTRAIL_TAG:-})
-OPENCONTRAIL_KUBERNETES_TAG: $(yaml-quote ${OPENCONTRAIL_KUBERNETES_TAG:-})
-OPENCONTRAIL_PUBLIC_SUBNET: $(yaml-quote ${OPENCONTRAIL_PUBLIC_SUBNET:-})
-E2E_STORAGE_TEST_ENVIRONMENT: $(yaml-quote ${E2E_STORAGE_TEST_ENVIRONMENT:-})
-KUBE_IMAGE_TAG: $(yaml-quote ${KUBE_IMAGE_TAG:-})
-KUBE_DOCKER_REGISTRY: $(yaml-quote ${KUBE_DOCKER_REGISTRY:-})
-EOF
-  if [ -n "${KUBELET_PORT:-}" ]; then
-    cat >>$file <<EOF
-KUBELET_PORT: $(yaml-quote ${KUBELET_PORT})
-EOF
-  fi
-  if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
-    cat >>$file <<EOF
-KUBE_APISERVER_REQUEST_TIMEOUT: $(yaml-quote ${KUBE_APISERVER_REQUEST_TIMEOUT})
-EOF
-  fi
-  if [ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]; then
-    cat >>$file <<EOF
-TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
-EOF
-  fi
-  if [[ "${OS_DISTRIBUTION}" == "trusty" ]]; then
-    cat >>$file <<EOF
-KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${KUBE_MANIFESTS_TAR_URL})
-KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
-EOF
-  fi
-  if [ -n "${TEST_CLUSTER:-}" ]; then
-    cat >>$file <<EOF
-TEST_CLUSTER: $(yaml-quote ${TEST_CLUSTER})
-EOF
-  fi
-  if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
-KUBELET_TEST_ARGS: $(yaml-quote ${KUBELET_TEST_ARGS})
-EOF
-  fi
-  if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
-KUBELET_TEST_LOG_LEVEL: $(yaml-quote ${KUBELET_TEST_LOG_LEVEL})
-EOF
-  fi
-  if [[ "${master}" == "true" ]]; then
-    # Master-only env vars.
-    cat >>$file <<EOF
-KUBERNETES_MASTER: $(yaml-quote "true")
-KUBE_USER: $(yaml-quote ${KUBE_USER})
-KUBE_PASSWORD: $(yaml-quote ${KUBE_PASSWORD})
-KUBE_BEARER_TOKEN: $(yaml-quote ${KUBE_BEARER_TOKEN})
-MASTER_CERT: $(yaml-quote ${MASTER_CERT_BASE64:-})
-MASTER_KEY: $(yaml-quote ${MASTER_KEY_BASE64:-})
-KUBECFG_CERT: $(yaml-quote ${KUBECFG_CERT_BASE64:-})
-KUBECFG_KEY: $(yaml-quote ${KUBECFG_KEY_BASE64:-})
-KUBELET_APISERVER: $(yaml-quote ${KUBELET_APISERVER:-})
-ENABLE_MANIFEST_URL: $(yaml-quote ${ENABLE_MANIFEST_URL:-false})
-MANIFEST_URL: $(yaml-quote ${MANIFEST_URL:-})
-MANIFEST_URL_HEADER: $(yaml-quote ${MANIFEST_URL_HEADER:-})
-NUM_NODES: $(yaml-quote ${NUM_NODES})
-EOF
-    if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
-APISERVER_TEST_ARGS: $(yaml-quote ${APISERVER_TEST_ARGS})
-EOF
-    fi
-    if [ -n "${APISERVER_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
-APISERVER_TEST_LOG_LEVEL: $(yaml-quote ${APISERVER_TEST_LOG_LEVEL})
-EOF
-    fi
-    if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
-CONTROLLER_MANAGER_TEST_ARGS: $(yaml-quote ${CONTROLLER_MANAGER_TEST_ARGS})
-EOF
-    fi
-    if [ -n "${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
-CONTROLLER_MANAGER_TEST_LOG_LEVEL: $(yaml-quote ${CONTROLLER_MANAGER_TEST_LOG_LEVEL})
-EOF
-    fi
-    if [ -n "${SCHEDULER_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
-SCHEDULER_TEST_ARGS: $(yaml-quote ${SCHEDULER_TEST_ARGS})
-EOF
-    fi
-    if [ -n "${SCHEDULER_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
-SCHEDULER_TEST_LOG_LEVEL: $(yaml-quote ${SCHEDULER_TEST_LOG_LEVEL})
-EOF
-    fi
-  else
-    # Node-only env vars.
-    cat >>$file <<EOF
-KUBERNETES_MASTER: $(yaml-quote "false")
-ZONE: $(yaml-quote ${ZONE})
-EXTRA_DOCKER_OPTS: $(yaml-quote ${EXTRA_DOCKER_OPTS:-})
-EOF
-    if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
-KUBEPROXY_TEST_ARGS: $(yaml-quote ${KUBEPROXY_TEST_ARGS})
-EOF
-    fi
-    if [ -n "${KUBEPROXY_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
-KUBEPROXY_TEST_LOG_LEVEL: $(yaml-quote ${KUBEPROXY_TEST_LOG_LEVEL})
-EOF
-    fi
-  fi
-  if [[ "${OS_DISTRIBUTION}" == "coreos" ]]; then
-    # CoreOS-only env vars. TODO(yifan): Make them available on other distros.
-    cat >>$file <<EOF
-KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-docker})
-RKT_VERSION: $(yaml-quote ${RKT_VERSION:-})
-RKT_PATH: $(yaml-quote ${RKT_PATH:-})
-KUBERNETES_CONFIGURE_CBR0: $(yaml-quote ${KUBERNETES_CONFIGURE_CBR0:-true})
-EOF
   fi
 }
