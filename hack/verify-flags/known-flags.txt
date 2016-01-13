@@ -196,6 +196,7 @@ grace-period
 ha-domain
 hairpin-mode
 hard-pod-affinity-symmetric-weight
+hard
 healthz-bind-address
 healthz-port
 horizontal-pod-autoscaler-sync-period
