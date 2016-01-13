@@ -16,7 +16,7 @@
 {% endif -%}
 
 # TODO: remove nginx for other cloud providers.
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant' ]  %}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere' ]  %}
   {% set api_servers_with_port = api_servers -%}
 {% else -%}
   {% set api_servers_with_port = api_servers + ":6443" -%}
@@ -27,7 +27,7 @@
 {% set debugging_handlers = "--enable-debugging-handlers=true" -%}
 
 {% if grains['roles'][0] == 'kubernetes-master' -%}
-  {% if grains.cloud in ['aws', 'gce', 'vagrant'] -%}
+  {% if grains.cloud in ['aws', 'gce', 'vagrant', 'vsphere'] -%}
 
     # Unless given a specific directive, disable registration for the kubelet
     # running on the master.
@@ -46,7 +46,7 @@
 {% endif -%}
 
 {% set cloud_provider = "" -%}
-{% if grains.cloud is defined and grains.cloud != 'vagrant' -%}
+{% if grains.cloud is defined and grains.cloud not in ['vagrant', 'vsphere'] -%}
   {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
 {% endif -%}
 
@@ -100,7 +100,11 @@
 {% set cgroup_root = "" -%}
 {% if grains['os_family'] == 'Debian' -%}
   {% set system_container = "--system-container=/system" -%}
-  {% set cgroup_root = "--cgroup-root=/" -%}
+  {% if pillar.get('is_systemd') %}
+    {% set cgroup_root = "--cgroup-root=docker" -%}
+  {% else %}
+    {% set cgroup_root = "--cgroup-root=/" -%}
+  {% endif %}
 {% endif -%}
 {% if grains['oscodename'] == 'vivid' -%}
   {% set cgroup_root = "--cgroup-root=docker" -%}

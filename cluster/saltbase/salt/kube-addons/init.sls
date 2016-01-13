@@ -133,7 +133,7 @@ addon-dir-create:
 {% endif %}
 
 {% if pillar.get('enable_node_logging', '').lower() == 'true'
-   and pillar.get('logging_destination').lower() == 'elasticsearch'
+   and pillar.get('logging_destination', '').lower() == 'elasticsearch'
    and pillar.get('enable_cluster_logging', '').lower() == 'true' %}
 /etc/kubernetes/addons/fluentd-elasticsearch:
   file.recurse:

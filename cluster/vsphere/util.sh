@@ -18,6 +18,7 @@
 
 # Use the config file specified in $KUBE_CONFIG_FILE, or default to
 # config-default.sh.
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/vsphere/config-common.sh"
 source "${KUBE_ROOT}/cluster/vsphere/${KUBE_CONFIG_FILE-"config-default.sh"}"
@@ -30,6 +31,7 @@ source "${KUBE_ROOT}/cluster/common.sh"
 # Vars set:
 #   KUBE_MASTER
 #   KUBE_MASTER_IP
+
 function detect-master {
   KUBE_MASTER=${MASTER_NAME}
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
@@ -42,7 +44,7 @@ function detect-master {
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
 }
 
-# Detect the information about the minions
+# Detect the information about the nodes
 #
 # Assumed vars:
 #   NODE_NAMES
@@ -51,16 +53,16 @@ function detect-master {
 function detect-nodes {
   KUBE_NODE_IP_ADDRESSES=()
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
-    local minion_ip=$(govc vm.ip ${NODE_NAMES[$i]})
-    if [[ -z "${minion_ip-}" ]] ; then
+    local nodeip=$(govc vm.ip ${NODE_NAMES[$i]})
+    if [[ -z "${nodeip-}" ]] ; then
       echo "Did not find ${NODE_NAMES[$i]}" >&2
     else
-      echo "Found ${NODE_NAMES[$i]} at ${minion_ip}"
-      KUBE_NODE_IP_ADDRESSES+=("${minion_ip}")
+      echo "Found ${NODE_NAMES[$i]} at ${nodeip}"
+      KUBE_NODE_IP_ADDRESSES+=("${nodeip}")
     fi
   done
   if [[ -z "${KUBE_NODE_IP_ADDRESSES-}" ]]; then
-    echo "Could not detect Kubernetes minion nodes. Make sure you've launched a cluster with 'kube-up.sh'" >&2
+    echo "Could not detect Kubernetes nodes. Make sure you've launched a cluster with 'kube-up.sh'" >&2
     exit 1
   fi
 }
@@ -159,7 +161,7 @@ function kube-scp {
   scp ${SSH_OPTS-} "${src}" "kube@${host}:${dst}"
 }
 
-# Instantiate a generic kubernetes virtual machine (master or minion)
+# Instantiate a generic kubernetes virtual machine (master or node)
 #
 # Usage:
 #   kube-up-vm VM_NAME [options to pass to govc vm.create]
@@ -199,7 +201,7 @@ function kube-up-vm {
     /home/kube/.ssh/authorized_keys
 }
 
-# Kick off a local script on a kubernetes virtual machine (master or minion)
+# Kick off a local script on a kubernetes virtual machine (master or node)
 #
 # Usage:
 #   kube-run VM_NAME LOCAL_FILE
@@ -208,10 +210,98 @@ function kube-run {
   local file="$2"
   local dst="/tmp/$(basename "${file}")"
   govc guest.upload -vm="${vm_name}" -f -perm=0755 "${file}" "${dst}"
-
+  echo "uploaded ${file} to ${dst}"
   local vm_ip
   vm_ip=$(govc vm.ip "${vm_name}")
   kube-ssh ${vm_ip} "nohup sudo ${dst} < /dev/null 1> ${dst}.out 2> ${dst}.err &"
+}
+
+#
+# run the command remotely and check if the specific kube artifact is running or not.
+# keep checking till the you hit the timeout. default timeout 300s
+#
+# Usage:
+#   kube_check 10.0.0.1 cmd timeout
+function kube-check {
+  nodeip=$1
+  cmd=$2
+  sleepstep=5
+  if [[ $# -lt 3 || -z $3 ]]; then
+    timeout=300
+  else
+    timeout=$3
+  fi
+  let effective_timeout=($timeout/$sleepstep)
+  attempt=0
+  echo
+  printf "This may take several minutes. Bound to $effective_timeout attemmps"
+  while true; do
+    local rc=0
+    output=$(kube-ssh ${nodeip} "${cmd}") || rc=1
+    if [[ $rc != 0 ]]; then
+      if (( $attempt == $effective_timeout )); then
+        echo
+        echo "(Failed) rc: $rc Output: ${output}"
+        echo
+        echo -e "${cmd} failed to start on ${nodeip}. Your cluster is unlikely" >&2
+        echo "to work correctly. You may have to debug it by logging in." >&2
+        echo
+        exit 1
+      fi
+    else
+      echo
+      echo -e "[${cmd}] passed"
+      echo
+      break
+    fi
+    printf "."
+    attempt=$(($attempt+1))
+    sleep $sleepstep
+  done
+}
+
+
+
+
+#
+# verify if salt master is up. check 30 times and then echo out bad output and return 0
+#
+# Usage:
+#   remote-pgrep 10.0.0.1 salt-master
+#
+function remote-pgrep {
+  nodeip=$1
+  regex=$2
+
+  max_attempt=60
+
+  printf "This may take several minutes. Bound to $max_attempt attemmps"
+
+  attempt=0
+  while true; do
+    local rc=0
+    output=$(kube-ssh ${nodeip} pgrep ${regex}) || rc=1
+
+    if [[ $rc != 0 ]]; then
+      if (( $attempt == $max_attempt )); then
+        echo
+        echo "(Failed) rc: $rc, output:${output}"
+        echo
+        echo -e "${regex} failed to start on ${nodeip} after checking for $attempt attempts. Your cluster is unlikely" >&2
+        echo "to work correctly. You may have to debug it by logging in." >&2
+        echo
+        exit 1
+      fi
+    else
+      echo
+      echo -e "[${regex} running]"
+      echo
+      break
+    fi
+    printf "."
+    attempt=$(($attempt+1))
+    sleep 10
+  done
 }
 
 # Instantiate a kubernetes cluster
@@ -240,13 +330,15 @@ function kube-up {
     echo "cd /home/kube/cache/kubernetes-install"
     echo "readonly MASTER_NAME='${MASTER_NAME}'"
     echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
-    echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
+    echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-node'"
     echo "readonly SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
     echo "readonly ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
     echo "readonly LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
     echo "readonly ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
     echo "readonly DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
     echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"
+    echo "readonly KUBE_USER='${KUBE_USER:-}'"
+    echo "readonly KUBE_PASSWORD='${KUBE_PASSWORD:-}'"
     echo "readonly SERVER_BINARY_TAR='${SERVER_BINARY_TAR##*/}'"
     echo "readonly SALT_TAR='${SALT_TAR##*/}'"
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
@@ -259,13 +351,11 @@ function kube-up {
   kube-up-vm ${MASTER_NAME} -c ${MASTER_CPU-1} -m ${MASTER_MEMORY_MB-1024}
   upload-server-tars
   kube-run ${MASTER_NAME} "${KUBE_TEMP}/master-start.sh"
-
   # Print master IP, so user can log in for debugging.
   detect-master
   echo
 
-  echo "Starting minion VMs (this can take a minute)..."
-
+  echo "Starting node VMs (this can take a minute)..."
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     (
       echo "#! /bin/bash"
@@ -275,11 +365,11 @@ function kube-up {
       echo "KUBE_MASTER_IP=${KUBE_MASTER_IP}"
       echo "NODE_IP_RANGE=${NODE_IP_RANGES[$i]}"
       grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/salt-minion.sh"
-    ) > "${KUBE_TEMP}/minion-start-${i}.sh"
+    ) > "${KUBE_TEMP}/node-start-${i}.sh"
 
     (
       kube-up-vm "${NODE_NAMES[$i]}" -c ${NODE_CPU-1} -m ${NODE_MEMORY_MB-1024}
-      kube-run "${NODE_NAMES[$i]}" "${KUBE_TEMP}/minion-start-${i}.sh"
+      kube-run "${NODE_NAMES[$i]}" "${KUBE_TEMP}/node-start-${i}.sh"
     ) &
   done
 
@@ -293,17 +383,32 @@ function kube-up {
     exit 2
   fi
 
-  # Print minion IPs, so user can log in for debugging.
+  # Print node IPs, so user can log in for debugging.
   detect-nodes
+
+  printf "Waiting for salt-master to be up on ${KUBE_MASTER} ...\n"
+  remote-pgrep ${KUBE_MASTER_IP} "salt-master"
+
+  printf "Waiting for all packages to be installed on ${KUBE_MASTER} ...\n"
+  kube-check  ${KUBE_MASTER_IP} 'sudo salt "kubernetes-master" state.highstate -t 30 | grep -E "Failed:[[:space:]]+0"'
+
+  local i
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+    printf "Waiting for salt-minion to be up on ${NODE_NAMES[$i]} ....\n"
+    remote-pgrep ${KUBE_NODE_IP_ADDRESSES[$i]} "salt-minion"
+    printf "Waiting for all salt packages to be installed on ${NODE_NAMES[$i]} .... \n"
+    kube-check  ${KUBE_MASTER_IP} 'sudo salt '"${NODE_NAMES[$i]}"' state.highstate -t 30 | grep -E "Failed:[[:space:]]+0"'
+    printf " OK\n"
+  done
+
   echo
 
-  echo "Waiting for master and minion initialization."
+  echo "Waiting for master and node initialization."
   echo
   echo "  This will continually check to see if the API for kubernetes is reachable."
   echo "  This might loop forever if there was some uncaught error during start up."
   echo
 
-  printf "Waiting for ${KUBE_MASTER} to become available..."
   until curl --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" --max-time 5 \
           --fail --output /dev/null --silent "https://${KUBE_MASTER_IP}/healthz"; do
       printf "."
@@ -311,7 +416,6 @@ function kube-up {
   done
   printf " OK\n"
 
-  local i
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     printf "Waiting for ${NODE_NAMES[$i]} to become available..."
     until curl --max-time 5 \
@@ -321,7 +425,6 @@ function kube-up {
     done
     printf " OK\n"
   done
-
   echo "Kubernetes cluster created."
 
   # TODO use token instead of basic auth
