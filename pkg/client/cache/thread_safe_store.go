@@ -243,6 +243,6 @@ func NewThreadSafeStore(indexers Indexers, indices Indices) ThreadSafeStore {
 	return &threadSafeMap{
 		items:    map[string]interface{}{},
 		indexers: indexers,
-		indices:  Indices{},
+		indices:  indices,
 	}
 }
