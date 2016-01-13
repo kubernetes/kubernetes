@@ -145,6 +145,14 @@ func testNewDeployment(f *Framework) {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(deployment.Status.Replicas).Should(Equal(replicas))
 	Expect(deployment.Status.UpdatedReplicas).Should(Equal(replicas))
+	// The new RC of this deployment should be revision 1
+	newRC, err := deploymentutil.GetNewRC(*deployment, c)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(newRC.Annotations).NotTo(Equal(nil))
+	Expect(newRC.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal("1"))
+	// This deployment should be revision 1
+	Expect(deployment.Annotations).NotTo(Equal(nil))
+	Expect(deployment.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal("1"))
 }
 
 func testRollingUpdateDeployment(f *Framework) {
@@ -175,7 +183,7 @@ func testRollingUpdateDeployment(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "redis-deployment"
 	Logf("Creating deployment %s", deploymentName)
-	_, err = c.Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RollingUpdateDeploymentStrategyType, nil))
+	deployment, err := c.Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RollingUpdateDeploymentStrategyType, nil))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		deployment, err := c.Deployments(ns).Get(deploymentName)
@@ -190,6 +198,17 @@ func testRollingUpdateDeployment(f *Framework) {
 
 	err = waitForDeploymentStatus(c, ns, deploymentName, replicas, replicas-1, replicas+1, 0)
 	Expect(err).NotTo(HaveOccurred())
+
+	// The new RC of this deployment should be revision 1
+	newRC, err := deploymentutil.GetNewRC(*deployment, c)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(newRC.Annotations).NotTo(Equal(nil))
+	Expect(newRC.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal("1"))
+	// This deployment should be revision 1
+	deployment, err = c.Deployments(ns).Get(deploymentName)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(deployment.Annotations).NotTo(Equal(nil))
+	Expect(deployment.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal("1"))
 }
 
 func testRollingUpdateDeploymentEvents(f *Framework) {
@@ -203,7 +222,14 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	}
 	rcName := "nginx-controller"
 	replicas := 1
-	_, err := c.ReplicationControllers(ns).Create(newRC(rcName, replicas, rcPodLabels, "nginx", "nginx"))
+
+	rcRevision := "3"
+	annotations := make(map[string]string)
+	annotations[deploymentutil.RevisionAnnotation] = rcRevision
+	rc := newRC(rcName, replicas, rcPodLabels, "nginx", "nginx")
+	rc.Annotations = annotations
+
+	_, err := c.ReplicationControllers(ns).Create(rc)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		Logf("deleting replication controller %s", rcName)
@@ -250,6 +276,12 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	Expect(newRC).NotTo(Equal(nil))
 	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled up rc %s to 1", newRC.Name)))
 	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled down rc %s to 0", rcName)))
+	// The new RC of this deployment should be revision 4
+	Expect(newRC.Annotations).NotTo(Equal(nil))
+	Expect(newRC.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal("4"))
+	// This deployment should be revision 4
+	Expect(deployment.Annotations).NotTo(Equal(nil))
+	Expect(deployment.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal("4"))
 }
 
 func testRecreateDeployment(f *Framework) {
@@ -316,6 +348,12 @@ func testRecreateDeployment(f *Framework) {
 	Expect(newRC).NotTo(Equal(nil))
 	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled down rc %s to 0", rcName)))
 	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled up rc %s to 3", newRC.Name)))
+	// The new RC of this deployment should be revision 1
+	Expect(newRC.Annotations).NotTo(Equal(nil))
+	Expect(newRC.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal("1"))
+	// This deployment should be revision 1
+	Expect(deployment.Annotations).NotTo(Equal(nil))
+	Expect(deployment.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal("1"))
 }
 
 // testDeploymentCleanUpPolicy tests that deployment supports cleanup policy
@@ -416,11 +454,20 @@ func testRolloverDeployment(f *Framework) {
 	}()
 	// Verify that the pods were scaled up and down as expected. We use events to verify that.
 	deployment, err := c.Deployments(ns).Get(deploymentName)
+	Expect(err).NotTo(HaveOccurred())
 	// Make sure the deployment starts to scale up and down RCs
 	waitForPartialEvents(c, ns, deployment, 2)
 	newRC, err := deploymentutil.GetNewRC(*deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRC).NotTo(Equal(nil))
+	// The new RC of this deployment should be revision 1
+	Expect(newRC.Annotations).NotTo(Equal(nil))
+	Expect(newRC.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal("1"))
+	// This deployment should be revision 1
+	deployment, err = c.Deployments(ns).Get(deploymentName)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(deployment.Annotations).NotTo(Equal(nil))
+	Expect(deployment.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal("1"))
 
 	// Before the deployment finishes, update the deployment to rollover the above 2 rcs and bring up redis pods.
 	// If the deployment already finished here, the test would fail. When this happens, increase its minReadySeconds or replicas to prevent it.
@@ -442,6 +489,12 @@ func testRolloverDeployment(f *Framework) {
 	// Make sure new RC contains "redis" image
 	newRC, err = deploymentutil.GetNewRC(*deployment, c)
 	Expect(newRC.Spec.Template.Spec.Containers[0].Image).Should(Equal(updatedDeploymentImage))
+	// The new RC of this deployment should be revision 2
+	Expect(newRC.Annotations).NotTo(Equal(nil))
+	Expect(newRC.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal("2"))
+	// This deployment should be revision 2
+	Expect(deployment.Annotations).NotTo(Equal(nil))
+	Expect(deployment.Annotations[deploymentutil.RevisionAnnotation]).Should(Equal("2"))
 }
 
 func testPausedDeployment(f *Framework) {

@@ -314,7 +314,7 @@ func TestGetOldRCs(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		rcs, err := GetOldRCs(newDeployment, testclient.NewSimpleFake(test.objs...))
+		rcs, _, err := GetOldRCs(newDeployment, testclient.NewSimpleFake(test.objs...))
 		if err != nil {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}
