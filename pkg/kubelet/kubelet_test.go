@@ -3726,56 +3726,6 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 	}
 }
 
-func TestGetNodeLabels(t *testing.T) {
-	kubelet := newTestKubelet(t).kubelet
-
-	testCases := []struct {
-		Expecting  map[string]string
-		NodeLabels string
-		Ok         bool
-	}{
-		{
-			Expecting: map[string]string{"key1": "value1", "key2": "2", "key3": "3.3"},
-			NodeLabels: `---
-key1: value1
-key2: 2
-key3: 3.3`,
-			Ok: true,
-		},
-		{
-			Expecting: nil,
-			NodeLabels: `---
-key11: value11
-key12: 12
-key13: 13.3
-key14:
-  nested_key: nested_value`,
-			Ok: false,
-		},
-		{
-			Expecting:  map[string]string{"key21": "value21", "key22": "22", "key23": "23.3"},
-			NodeLabels: `{"key21": "value21", "key22": "22", "key23": "23.3"}`,
-			Ok:         true,
-		},
-		{
-			Expecting:  nil,
-			NodeLabels: `{"key31": "value31", "key32": "32", "key33": "33.3", "key34": {"nested_key": "nested_value"}}`,
-			Ok:         false,
-		},
-	}
-
-	for i, test := range testCases {
-		kubelet.nodeLabels = test.NodeLabels
-		list, err := kubelet.getNodeLabels()
-		if test.Ok && err != nil {
-			t.Errorf("test case %d should not have failed, error: %s", i, err)
-		}
-		if !reflect.DeepEqual(test.Expecting, list) {
-			t.Errorf("test case %d are not the same, %v ~ %v", i, list, test.Expecting)
-		}
-	}
-}
-
 func TestMakePortMappings(t *testing.T) {
 	tests := []struct {
 		container            *api.Container
