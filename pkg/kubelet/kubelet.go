@@ -196,6 +196,7 @@ func NewMainKubelet(
 	outOfDiskTransitionFrequency time.Duration,
 	flannelExperimentalOverlay bool,
 	nodeIP net.IP,
+	reservation kubetypes.Reservation,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -313,6 +314,7 @@ func NewMainKubelet(
 		nodeIP:                         nodeIP,
 		clock:                          util.RealClock{},
 		outOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
+		reservation:                  reservation,
 	}
 	if klet.flannelExperimentalOverlay {
 		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
@@ -659,6 +661,10 @@ type Kubelet struct {
 	// not-out-of-disk. This prevents a pod that causes out-of-disk condition from repeatedly
 	// getting rescheduled onto the node.
 	outOfDiskTransitionFrequency time.Duration
+
+	// reservation specifies resources which are reserved for non-pod usage, including kubernetes and
+	// non-kubernetes system processes.
+	reservation kubetypes.Reservation
 }
 
 // Validate given node IP belongs to the current host
@@ -2738,6 +2744,23 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *api.Node) {
 				"Node %s has been rebooted, boot id: %s", kl.nodeName, info.BootID)
 		}
 		node.Status.NodeInfo.BootID = info.BootID
+	}
+
+	// Set Allocatable.
+	node.Status.Allocatable = make(api.ResourceList)
+	for k, v := range node.Status.Capacity {
+		value := *(v.Copy())
+		if kl.reservation.System != nil {
+			value.Sub(kl.reservation.System[k])
+		}
+		if kl.reservation.Kubernetes != nil {
+			value.Sub(kl.reservation.Kubernetes[k])
+		}
+		if value.Amount != nil && value.Amount.Sign() < 0 {
+			// Negative Allocatable resources don't make sense.
+			value.Set(0)
+		}
+		node.Status.Allocatable[k] = value
 	}
 }
 

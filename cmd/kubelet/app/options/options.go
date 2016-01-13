@@ -108,6 +108,8 @@ type KubeletServer struct {
 	TLSCertFile                    string
 	TLSPrivateKeyFile              string
 	ReconcileCIDR                  bool
+	SystemReserved                 util.ConfigurationMap
+	KubeReserved                   util.ConfigurationMap
 
 	// Flags intended for testing
 	// Is the kubelet containerized?
@@ -183,6 +185,8 @@ func NewKubeletServer() *KubeletServer {
 		SyncFrequency:                  1 * time.Minute,
 		SystemContainer:                "",
 		ReconcileCIDR:                  true,
+		SystemReserved:                 make(util.ConfigurationMap),
+		KubeReserved:                   make(util.ConfigurationMap),
 		KubeAPIQPS:                     5.0,
 		KubeAPIBurst:                   10,
 		ExperimentalFlannelOverlay:     experimentalFlannelOverlay,
@@ -267,6 +271,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.Containerized, "containerized", s.Containerized, "Experimental support for running kubelet in a container.  Intended for testing. [default=false]")
 	fs.Uint64Var(&s.MaxOpenFiles, "max-open-files", s.MaxOpenFiles, "Number of files that can be opened by Kubelet process. [default=1000000]")
 	fs.BoolVar(&s.ReconcileCIDR, "reconcile-cidr", s.ReconcileCIDR, "Reconcile node CIDR with the CIDR specified by the API server. No-op if register-node or configure-cbr0 is false. [default=true]")
+	fs.Var(&s.SystemReserved, "system-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for non-kubernetes components. Currently only cpu and memory are supported. See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.html for more detail. [default=none]")
+	fs.Var(&s.KubeReserved, "kube-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for kubernetes system components. Currently only cpu and memory are supported. See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.html for more detail. [default=none]")
 	fs.BoolVar(&s.RegisterSchedulable, "register-schedulable", s.RegisterSchedulable, "Register the node as schedulable. No-op if register-node is false. [default=true]")
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
