@@ -19,6 +19,7 @@ package node
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"strconv"
 	"strings"
@@ -211,8 +212,9 @@ func (nc *NodeController) generateAvailableCIDRs() {
 	nc.generatedCIDR = true
 	// Generate all available CIDRs here, since there will not be manay
 	// available CIDRs. Set will be small, it will use less than 1MB memory
-	cidrIP := nc.clusterCIDR.IP.To4()
-	nc.maxCIDRs = (256-int(cidrIP[1]))*256 - int(cidrIP[2])
+
+	cidrSize, _ := nc.clusterCIDR.Mask.Size()
+	nc.maxCIDRs = int(math.Pow(2, (float64)(24-cidrSize)))
 
 	for i := 0; i <= nc.maxCIDRs; i++ {
 		nc.availableCIDRs.Insert(i)
