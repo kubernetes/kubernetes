@@ -14,50 +14,55 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package latest
+package registered
 
 import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery"
 )
 
 func TestAllPreferredGroupVersions(t *testing.T) {
 	testCases := []struct {
-		groupMetaMap GroupMetaMap
-		expect       string
+		groupMetas []apimachinery.GroupMeta
+		expect     string
 	}{
 		{
-			groupMetaMap: GroupMetaMap{
-				"group1": &GroupMeta{
+			groupMetas: []apimachinery.GroupMeta{
+				{
 					GroupVersion: unversioned.GroupVersion{"group1", "v1"},
 				},
-				"group2": &GroupMeta{
+				{
 					GroupVersion: unversioned.GroupVersion{"group2", "v2"},
 				},
-				"": &GroupMeta{
+				{
 					GroupVersion: unversioned.GroupVersion{"", "v1"},
 				},
 			},
 			expect: "group1/v1,group2/v2,v1",
 		},
 		{
-			groupMetaMap: GroupMetaMap{
-				"": &GroupMeta{
+			groupMetas: []apimachinery.GroupMeta{
+				{
 					GroupVersion: unversioned.GroupVersion{"", "v1"},
 				},
 			},
 			expect: "v1",
 		},
 		{
-			groupMetaMap: GroupMetaMap{},
-			expect:       "",
+			groupMetas: []apimachinery.GroupMeta{},
+			expect:     "",
 		},
 	}
 	for _, testCase := range testCases {
-		output := testCase.groupMetaMap.AllPreferredGroupVersions()
+		for _, groupMeta := range testCase.groupMetas {
+			RegisterGroup(groupMeta)
+		}
+		output := AllPreferredGroupVersions()
 		if testCase.expect != output {
 			t.Errorf("Error. expect: %s, got: %s", testCase.expect, output)
 		}
+		reset()
 	}
 }

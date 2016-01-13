@@ -22,7 +22,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
@@ -187,7 +187,7 @@ func supplyContainerInfoWithOldLabel(labels map[string]string, containerInfo *la
 		return
 	}
 	pod = &api.Pod{}
-	err := latest.GroupOrDie(api.GroupName).Codec.DecodeInto([]byte(data), pod)
+	err := registered.GroupOrDie(api.GroupName).Codec.DecodeInto([]byte(data), pod)
 	if err != nil {
 		// If the pod label can't be parsed, we should report an error
 		logError(containerInfo, kubernetesPodLabel, err)

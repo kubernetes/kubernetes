@@ -25,9 +25,9 @@ import (
 	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup/install"
 	. "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/testgroup/unversioned"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 	"k8s.io/kubernetes/pkg/labels"
@@ -40,7 +40,7 @@ func init() {
 		return
 	}
 	testapi.Groups[testgroup.SchemeGroupVersion.Group] = testapi.NewTestGroup(
-		unversioned.GroupVersion{Group: testgroup.SchemeGroupVersion.Group, Version: latest.GroupOrDie(testgroup.SchemeGroupVersion.Group).GroupVersion.Version},
+		unversioned.GroupVersion{Group: testgroup.SchemeGroupVersion.Group, Version: registered.GroupOrDie(testgroup.SchemeGroupVersion.Group).GroupVersion.Version},
 		testgroup.SchemeGroupVersion)
 	testHelper = testapi.Groups[testgroup.SchemeGroupVersion.Group]
 }

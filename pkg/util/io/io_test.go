@@ -23,7 +23,7 @@ import (
 
 	"github.com/pborman/uuid"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -32,8 +32,8 @@ func TestSavePodToFile(t *testing.T) {
 	pod := volume.NewPersistentVolumeRecyclerPodTemplate()
 
 	// sets all default values on a pod for equality comparison after decoding from file
-	encoded, err := latest.GroupOrDie(api.GroupName).Codec.Encode(pod)
-	latest.GroupOrDie(api.GroupName).Codec.DecodeInto(encoded, pod)
+	encoded, err := registered.GroupOrDie(api.GroupName).Codec.Encode(pod)
+	registered.GroupOrDie(api.GroupName).Codec.DecodeInto(encoded, pod)
 
 	path := fmt.Sprintf("/tmp/kube-io-test-%s", uuid.New())
 	defer os.Remove(path)
