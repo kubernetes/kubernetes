@@ -46,7 +46,11 @@ for ((i=0; i < NUM_NODES; i++)) do
   VAGRANT_NODE_NAMES[$i]="node-$((i+1))"
 done
 
+# define the IP range used for service cluster IPs.
 SERVICE_CLUSTER_IP_RANGE=10.247.0.0/16  # formerly PORTAL_NET
+
+# A port range to reserve for services with NodePort visibility
+SERVICE_NODE_PORT_RANGE=${SERVICE_NODE_PORT_RANGE:-"30000-32767"}
 
 # Since this isn't exposed on the network, default to a simple user/passwd
 MASTER_USER=vagrant
