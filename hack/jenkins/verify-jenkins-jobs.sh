@@ -33,8 +33,10 @@ kubernetes-build-1.0
 kubernetes-build-1.1
 kubernetes-check-links
 kubernetes-test-go
+kubernetes-test-go-release-1.1
 kubernetes-pull-build-test-e2e-gce
 kubernetes-pull-test-unit-integration
+kubernetes-update-jenkins-jobs
 kubernetes-verify-jenkins-jobs
 '
 
@@ -72,5 +74,11 @@ e2e_builds=$(grep "^  kubernetes-.*)$" "${E2E}" | tr -d " )")
 jenkins_builds=$(curl -sg "${JENKINS}/api/json?tree=jobs[name]&pretty=true" \
   | grep -Po '(?<="name" : ")[^"]*')
 
-search_build "${e2e_builds}" "${jenkins_builds}" "Jenkins" \
-  || search_build "${jenkins_builds}" "${e2e_builds}" "e2e.sh"
+exit_code=0
+if ! search_build "${e2e_builds}" "${jenkins_builds}" "Jenkins"; then
+  exit_code=1
+fi
+if ! search_build "${jenkins_builds}" "${e2e_builds}" "e2e.sh"; then
+  exit_code=1
+fi
+exit ${exit_code}
