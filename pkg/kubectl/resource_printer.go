@@ -428,6 +428,7 @@ var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 var horizontalPodAutoscalerColumns = []string{"NAME", "REFERENCE", "TARGET", "CURRENT", "MINPODS", "MAXPODS", "AGE"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 var deploymentColumns = []string{"NAME", "UPDATEDREPLICAS", "AGE"}
+var configMapColumns = []string{"NAME", "DATA", "AGE"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -473,6 +474,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(deploymentColumns, printDeploymentList)
 	h.Handler(horizontalPodAutoscalerColumns, printHorizontalPodAutoscaler)
 	h.Handler(horizontalPodAutoscalerColumns, printHorizontalPodAutoscalerList)
+	h.Handler(configMapColumns, printConfigMap)
+	h.Handler(configMapColumns, printConfigMapList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -1455,6 +1458,31 @@ func printHorizontalPodAutoscaler(hpa *extensions.HorizontalPodAutoscaler, w io.
 func printHorizontalPodAutoscalerList(list *extensions.HorizontalPodAutoscalerList, w io.Writer, options printOptions) error {
 	for i := range list.Items {
 		if err := printHorizontalPodAutoscaler(&list.Items[i], w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printConfigMap(configMap *extensions.ConfigMap, w io.Writer, options printOptions) error {
+	name := configMap.Name
+	namespace := configMap.Namespace
+
+	if options.withNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
+			return err
+		}
+	}
+	if _, err := fmt.Fprintf(w, "%s\t%v\t%s", name, len(configMap.Data), translateTimestamp(configMap.CreationTimestamp)); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(configMap.Labels, options.columnLabels))
+	return err
+}
+
+func printConfigMapList(list *extensions.ConfigMapList, w io.Writer, options printOptions) error {
+	for i := range list.Items {
+		if err := printConfigMap(&list.Items[i], w, options); err != nil {
 			return err
 		}
 	}
