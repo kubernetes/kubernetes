@@ -1101,6 +1101,7 @@ export E2E_DOWN="${E2E_DOWN:-true}"
 export E2E_CLEAN_START="${E2E_CLEAN_START:-}"
 # Used by hack/ginkgo-e2e.sh to enable ginkgo's parallel test runner.
 export GINKGO_PARALLEL=${GINKGO_PARALLEL:-}
+export GINKGO_PARALLEL_NODES=${GINKGO_PARALLEL_NODES:-}
 export GINKGO_TEST_ARGS="${GINKGO_TEST_ARGS:-}"
 
 # If we are on PR Jenkins merging into master, use the local e2e.sh. Otherwise, use the latest on github.
