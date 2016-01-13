@@ -239,7 +239,8 @@ func AddApiWebService(s runtime.NegotiatedSerializer, container *restful.Contain
 		Doc("get available API versions").
 		Operation("getAPIVersions").
 		Produces(s.SupportedMediaTypes()...).
-		Consumes(s.SupportedMediaTypes()...))
+		Consumes(s.SupportedMediaTypes()...).
+		Writes(unversioned.APIVersions{}))
 	container.Add(ws)
 }
 
@@ -296,7 +297,8 @@ func AddApisWebService(s runtime.NegotiatedSerializer, container *restful.Contai
 		Doc("get available API versions").
 		Operation("getAPIVersions").
 		Produces(s.SupportedMediaTypes()...).
-		Consumes(s.SupportedMediaTypes()...))
+		Consumes(s.SupportedMediaTypes()...).
+		Writes(unversioned.APIGroupList{}))
 	container.Add(ws)
 }
 
@@ -318,7 +320,8 @@ func AddGroupWebService(s runtime.NegotiatedSerializer, container *restful.Conta
 		Doc("get information of a group").
 		Operation("getAPIGroup").
 		Produces(s.SupportedMediaTypes()...).
-		Consumes(s.SupportedMediaTypes()...))
+		Consumes(s.SupportedMediaTypes()...).
+		Writes(unversioned.APIGroup{}))
 	container.Add(ws)
 }
 
@@ -337,7 +340,8 @@ func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful
 		Doc("get available resources").
 		Operation("getAPIResources").
 		Produces(s.SupportedMediaTypes()...).
-		Consumes(s.SupportedMediaTypes()...))
+		Consumes(s.SupportedMediaTypes()...).
+		Writes(unversioned.APIResourceList{}))
 }
 
 // handleVersion writes the server's version information.
