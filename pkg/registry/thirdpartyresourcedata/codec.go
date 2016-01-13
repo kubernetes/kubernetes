@@ -24,10 +24,11 @@ import (
 	"net/url"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -111,7 +112,7 @@ func (t *thirdPartyResourceDataMapper) RESTMapping(gk unversioned.GroupKind, ver
 	// TODO figure out why we're doing this rewriting
 	extensionGK := unversioned.GroupKind{Group: extensions.GroupName, Kind: "ThirdPartyResourceData"}
 
-	mapping, err := t.mapper.RESTMapping(extensionGK, latest.GroupOrDie(extensions.GroupName).GroupVersion.Version)
+	mapping, err := t.mapper.RESTMapping(extensionGK, registered.GroupOrDie(extensions.GroupName).GroupVersion.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +346,7 @@ func (t *thirdPartyResourceDataCreator) New(kind unversioned.GroupVersionKind) (
 	case "ListOptions":
 		if apiutil.GetGroupVersion(t.group, t.version) == kind.GroupVersion().String() {
 			// Translate third party group to external group.
-			gvk := latest.ExternalVersions[0].WithKind(kind.Kind)
+			gvk := registered.EnabledVersionsForGroup(api.GroupName)[0].WithKind(kind.Kind)
 			return t.delegate.New(gvk)
 		}
 		return t.delegate.New(kind)

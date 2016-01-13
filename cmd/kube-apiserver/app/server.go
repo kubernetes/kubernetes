@@ -34,10 +34,10 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
@@ -138,7 +138,7 @@ func updateEtcdOverrides(overrides []string, storageVersions map[string]string, 
 		group := apiresource[0]
 		resource := apiresource[1]
 
-		apigroup, err := latest.Group(group)
+		apigroup, err := registered.Group(group)
 		if err != nil {
 			glog.Errorf("invalid api group %s: %v", group, err)
 			continue
@@ -249,7 +249,7 @@ func Run(s *options.APIServer) error {
 		glog.Fatalf("Invalid server address: %v", err)
 	}
 
-	legacyV1Group, err := latest.Group(api.GroupName)
+	legacyV1Group, err := registered.Group(api.GroupName)
 	if err != nil {
 		return err
 	}
@@ -267,7 +267,7 @@ func Run(s *options.APIServer) error {
 	storageDestinations.AddAPIGroup("", etcdStorage)
 
 	if !apiGroupVersionOverrides["extensions/v1beta1"].Disable {
-		expGroup, err := latest.Group(extensions.GroupName)
+		expGroup, err := registered.Group(extensions.GroupName)
 		if err != nil {
 			glog.Fatalf("Extensions API is enabled in runtime config, but not enabled in the environment variable KUBE_API_VERSIONS. Error: %v", err)
 		}

@@ -76,8 +76,8 @@ func main() {
 		"k8s.io/kubernetes/pkg/labels",
 		"k8s.io/kubernetes/pkg/watch",
 		"k8s.io/kubernetes/pkg/client/unversioned",
-		"k8s.io/kubernetes/pkg/api/latest",
 		"k8s.io/kubernetes/pkg/client/testing/fake",
+		"k8s.io/kubernetes/pkg/apimachinery/registered",
 	}
 
 	if *test {

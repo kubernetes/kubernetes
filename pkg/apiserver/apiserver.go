@@ -33,10 +33,10 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -212,7 +212,7 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 	glog.Errorln(buffer.String())
 
 	// TODO: make status unversioned or plumb enough of the request to deduce the requested API version
-	errorJSON(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", api.Resource(""), "", "", 0, false), latest.GroupOrDie(api.GroupName).Codec, httpWriter)
+	errorJSON(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", api.Resource(""), "", "", 0, false), registered.GroupOrDie(api.GroupName).Codec, httpWriter)
 }
 
 func InstallServiceErrorHandler(container *restful.Container, requestResolver *RequestInfoResolver, apiVersions []string) {
@@ -223,7 +223,7 @@ func InstallServiceErrorHandler(container *restful.Container, requestResolver *R
 
 func serviceErrorHandler(requestResolver *RequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
 	requestInfo, err := requestResolver.GetRequestInfo(request.Request)
-	codec := latest.GroupOrDie(api.GroupName).Codec
+	codec := registered.GroupOrDie(api.GroupName).Codec
 	if err == nil && requestInfo.APIVersion != "" {
 		// check if the api version is valid.
 		for _, version := range apiVersions {
