@@ -166,8 +166,6 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	var prevObject runtime.Object
 	if exists {
 		prevObject = previous.(runtime.Object)
-	} else {
-		prevObject = nil
 	}
 	watchCacheEvent := watchCacheEvent{event.Type, event.Object, prevObject}
 	if w.onEvent != nil {
