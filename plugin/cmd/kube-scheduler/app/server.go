@@ -27,6 +27,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -110,9 +111,44 @@ func Run(s *options.SchedulerServer) error {
 	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
 
 	sched := scheduler.New(config)
-	sched.Run()
 
-	select {}
+	run := func(_ <-chan struct{}) {
+		sched.Run()
+		select {}
+	}
+
+	if !s.LeaderElection.LeaderElect {
+		run(nil)
+		glog.Fatal("this statement is unreachable")
+		panic("unreachable")
+	}
+
+	id, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+
+	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+		EndpointsMeta: api.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "kube-scheduler",
+		},
+		Client:        kubeClient,
+		Identity:      id,
+		EventRecorder: config.Recorder,
+		LeaseDuration: s.LeaderElection.LeaseDuration,
+		RenewDeadline: s.LeaderElection.RenewDeadline,
+		RetryPeriod:   s.LeaderElection.RetryPeriod,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: run,
+			OnStoppedLeading: func() {
+				glog.Fatalf("lost master")
+			},
+		},
+	})
+
+	glog.Fatal("this statement is unreachable")
+	panic("unreachable")
 }
 
 func createConfig(s *options.SchedulerServer, configFactory *factory.ConfigFactory) (*scheduler.Config, error) {
