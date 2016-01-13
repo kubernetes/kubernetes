@@ -18,6 +18,7 @@ package app
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -199,6 +200,12 @@ func Test_getProxyMode(t *testing.T) {
 		},
 	}
 	for i, c := range cases {
+		if c.expected == proxyModeIptables {
+			if _, err := os.Stat("/proc/sys/net/ipv4/conf/all/route_localnet"); os.IsNotExist(err) {
+				t.Logf("iptables not supported on this OS")
+				continue
+			}
+		}
 		getter := &fakeNodeInterface{}
 		getter.node.Annotations = map[string]string{c.annotationKey: c.annotationVal}
 		versioner := &fakeIptablesVersioner{c.iptablesVersion, c.iptablesError}
