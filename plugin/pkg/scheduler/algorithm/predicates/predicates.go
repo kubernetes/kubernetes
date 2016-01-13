@@ -305,7 +305,6 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 	}
 
 	allocatable := info.Status.Allocatable
-
 	if int64(len(existingPods))+1 > allocatable.Pods().Value() {
 		glog.V(10).Infof("Cannot schedule Pod %+v, because Node %+v is full, running %v out of %v Pods.", podName(pod), node, len(existingPods), allocatable.Pods().Value())
 		return false, ErrExceededMaxPodNumber
