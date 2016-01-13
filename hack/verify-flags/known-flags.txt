@@ -156,6 +156,7 @@ km-path
 kube-api-burst
 kube-api-qps
 kube-master
+kube-reserved
 kubectl-path
 kubelet-address
 kubelet-cadvisor-port
@@ -331,6 +332,7 @@ streaming-connection-idle-timeout
 suicide-timeout
 sync-frequency
 system-container
+system-reserved
 target-port
 tcp-services
 terminated-pod-gc-threshold
