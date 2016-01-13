@@ -92,7 +92,7 @@ func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOption
 // DeleteCollection deletes a collection of objects.
 func (c *horizontalPodAutoscalers) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Namespace(c.ns).
 		Resource("horizontalPodAutoscalers").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
