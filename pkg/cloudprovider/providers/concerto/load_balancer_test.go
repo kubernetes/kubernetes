@@ -23,42 +23,42 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-func TestGetTCPLoadBalancer(t *testing.T) {
+func TestGetLoadBalancer(t *testing.T) {
 	apiMock := &ConcertoAPIServiceMock{
 		balancers: []ConcertoLoadBalancer{
 			{Id: "123456", Name: "mybalancer", FQDN: "mybalancer.concerto.mock"},
 		},
 	}
 	concerto := ConcertoCloud{service: apiMock}
-	status, exists, err := concerto.GetTCPLoadBalancer("mybalancer", "whatever region")
+	status, exists, err := concerto.GetLoadBalancer("mybalancer", "whatever region")
 	if err != nil {
-		t.Errorf("GetTCPLoadBalancer: should not have returned error")
+		t.Errorf("GetLoadBalancer: should not have returned error")
 	}
 	if !exists {
-		t.Errorf("GetTCPLoadBalancer: should have found the LB")
+		t.Errorf("GetLoadBalancer: should have found the LB")
 	}
 	if status.Ingress[0].Hostname != "mybalancer.concerto.mock" {
-		t.Errorf("GetTCPLoadBalancer: should have returned the correct status")
+		t.Errorf("GetLoadBalancer: should have returned the correct status")
 	}
 }
 
-func TestGetTCPLoadBalancer_NonExisting(t *testing.T) {
+func TestGetLoadBalancer_NonExisting(t *testing.T) {
 	apiMock := &ConcertoAPIServiceMock{
 		balancers: []ConcertoLoadBalancer{
 			{Id: "123456", Name: "mybalancer", FQDN: "mybalancer.concerto.mock"},
 		},
 	}
 	concerto := ConcertoCloud{service: apiMock}
-	_, exists, err := concerto.GetTCPLoadBalancer("otherbalancer", "whatever region")
+	_, exists, err := concerto.GetLoadBalancer("otherbalancer", "whatever region")
 	if err != nil {
-		t.Errorf("GetTCPLoadBalancer: should not have returned error")
+		t.Errorf("GetLoadBalancer: should not have returned error")
 	}
 	if exists {
-		t.Errorf("GetTCPLoadBalancer: should not have found the LB")
+		t.Errorf("GetLoadBalancer: should not have found the LB")
 	}
 }
 
-func TestEnsureTCPLoadBalancer_CreatesTheLBInConcerto(t *testing.T) {
+func TestEnsureLoadBalancer_CreatesTheLBInConcerto(t *testing.T) {
 	apiMock := &ConcertoAPIServiceMock{
 		balancers:         []ConcertoLoadBalancer{},
 		balancedInstances: map[string][]string{},
@@ -67,23 +67,23 @@ func TestEnsureTCPLoadBalancer_CreatesTheLBInConcerto(t *testing.T) {
 		{Port: 1234},
 	}
 	concerto := ConcertoCloud{service: apiMock}
-	concerto.EnsureTCPLoadBalancer("myloadbalancer",
+	concerto.EnsureLoadBalancer("myloadbalancer",
 		"region",
 		nil,   // external ip
 		ports, // ports
 		[]string{"host1", "host2"},
 		api.ServiceAffinityNone)
 	if len(apiMock.balancers) != 1 {
-		t.Errorf("EnsureTCPLoadBalancer: should have created the LB")
+		t.Errorf("EnsureLoadBalancer: should have created the LB")
 	} else {
 		lb := apiMock.balancers[0]
 		if lb.Name != "myloadbalancer" || lb.Port != 1234 {
-			t.Errorf("EnsureTCPLoadBalancer: should have created the LB with correct data")
+			t.Errorf("EnsureLoadBalancer: should have created the LB with correct data")
 		}
 	}
 }
 
-func TestEnsureTCPLoadBalancerAddsTheNodes(t *testing.T) {
+func TestEnsureLoadBalancerAddsTheNodes(t *testing.T) {
 	apiMock := &ConcertoAPIServiceMock{
 		balancers:         []ConcertoLoadBalancer{},
 		balancedInstances: map[string][]string{},
@@ -96,85 +96,85 @@ func TestEnsureTCPLoadBalancerAddsTheNodes(t *testing.T) {
 		{Port: 1234},
 	}
 	concerto := ConcertoCloud{service: apiMock}
-	_, err := concerto.EnsureTCPLoadBalancer("myloadbalancer",
+	_, err := concerto.EnsureLoadBalancer("myloadbalancer",
 		"region",
 		nil,   // external ip
 		ports, // ports
 		[]string{"host1", "host2"},
 		api.ServiceAffinityNone)
 	if err != nil {
-		t.Errorf("EnsureTCPLoadBalancer: should not have returned any errors")
+		t.Errorf("EnsureLoadBalancer: should not have returned any errors")
 	}
 	lb, _ := apiMock.GetLoadBalancerByName("myloadbalancer")
 	if len(apiMock.balancedInstances[lb.Id]) != 2 {
-		t.Errorf("EnsureTCPLoadBalancer: should have registered the nodes with the LB")
+		t.Errorf("EnsureLoadBalancer: should have registered the nodes with the LB")
 	}
 }
 
-func TestEnsureTCPLoadBalancerWithUnsupportedAffinity(t *testing.T) {
+func TestEnsureLoadBalancerWithUnsupportedAffinity(t *testing.T) {
 	concerto := ConcertoCloud{}
 	ports := []*api.ServicePort{
 		{},
 	}
-	_, err := concerto.EnsureTCPLoadBalancer("name",
+	_, err := concerto.EnsureLoadBalancer("name",
 		"region",
 		nil,   // external ip
 		ports, // ports
 		[]string{"host1", "host2"},
 		api.ServiceAffinityClientIP)
 	if err == nil {
-		t.Errorf("EnsureTCPLoadBalancer: should not support ServiceAffinity")
+		t.Errorf("EnsureLoadBalancer: should not support ServiceAffinity")
 	}
 }
 
-func TestEnsureTCPLoadBalancerWithNoPort(t *testing.T) {
+func TestEnsureLoadBalancerWithNoPort(t *testing.T) {
 	concerto := ConcertoCloud{}
 	ports := []*api.ServicePort{}
-	_, err := concerto.EnsureTCPLoadBalancer("name",
+	_, err := concerto.EnsureLoadBalancer("name",
 		"region",
 		nil,   // external ip
 		ports, // ports
 		[]string{"host1", "host2"},
 		api.ServiceAffinityNone)
 	if err == nil {
-		t.Errorf("EnsureTCPLoadBalancer: should return error if no port specified")
+		t.Errorf("EnsureLoadBalancer: should return error if no port specified")
 	}
 }
 
-func TestEnsureTCPLoadBalancerWithMultiplePorts(t *testing.T) {
+func TestEnsureLoadBalancerWithMultiplePorts(t *testing.T) {
 	concerto := ConcertoCloud{}
 	ports := []*api.ServicePort{
 		{},
 		{},
 	}
-	_, err := concerto.EnsureTCPLoadBalancer("name",
+	_, err := concerto.EnsureLoadBalancer("name",
 		"region",
 		nil,   // external ip
 		ports, // ports
 		[]string{"host1", "host2"},
 		api.ServiceAffinityNone)
 	if err == nil {
-		t.Errorf("EnsureTCPLoadBalancer: should return error if no port specified")
+		t.Errorf("EnsureLoadBalancer: should return error if no port specified")
 	}
 }
 
-func TestEnsureTCPLoadBalancerWithExternalIP(t *testing.T) {
+func TestEnsureLoadBalancerWithExternalIP(t *testing.T) {
 	concerto := ConcertoCloud{}
 	ports := []*api.ServicePort{
 		{},
 	}
-	_, err := concerto.EnsureTCPLoadBalancer("name",
+	_, err := concerto.EnsureLoadBalancer("name",
 		"region",
 		net.IP{}, // external ip
 		ports,    // ports
 		[]string{"host1", "host2"},
 		api.ServiceAffinityNone)
 	if err == nil {
-		t.Errorf("EnsureTCPLoadBalancer: should not support ExternalIP specification")
+		t.Errorf("EnsureLoadBalancer: should not support ExternalIP specification")
 	}
 }
 
-func TestEnsureTCPLoadBalancer_UpdatesTheLBInConcerto(t *testing.T) {
+func TestEnsureLoadBalancer_UpdatesTheLBInConcerto(t *testing.T) {
 	apiMock := &ConcertoAPIServiceMock{
 		balancers: []ConcertoLoadBalancer{
 			{Id: "LB1", Name: "mybalancer"},
@@ -192,7 +192,7 @@ func TestEnsureTCPLoadBalancer_UpdatesTheLBInConcerto(t *testing.T) {
 		{Port: 1234},
 	}
 	concerto := ConcertoCloud{service: apiMock}
-	_, err := concerto.EnsureTCPLoadBalancer("mybalancer",
+	_, err := concerto.EnsureLoadBalancer("mybalancer",
 		"region",
 		nil,   // external ip
 		ports, // ports
@@ -202,17 +202,17 @@ func TestEnsureTCPLoadBalancer_UpdatesTheLBInConcerto(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if len(apiMock.balancers) > 1 {
-		t.Errorf("EnsureTCPLoadBalancer: should not have created the LB")
+		t.Errorf("EnsureLoadBalancer: should not have created the LB")
 	} else if len(apiMock.balancers) < 1 {
-		t.Errorf("EnsureTCPLoadBalancer: should not have deleted the LB")
+		t.Errorf("EnsureLoadBalancer: should not have deleted the LB")
 	} else {
 		if apiMock.balancedInstances["LB1"][0] != "123.123.123.123" || apiMock.balancedInstances["LB1"][1] != "123.123.123.125" {
-			t.Errorf("EnsureTCPLoadBalancer: should have updated the load balancer: %v", apiMock.balancedInstances["LB1"])
+			t.Errorf("EnsureLoadBalancer: should have updated the load balancer: %v", apiMock.balancedInstances["LB1"])
 		}
 	}
 }
 
-func TestUpdateTCPLoadBalancer(t *testing.T) {
+func TestUpdateLoadBalancer(t *testing.T) {
 	apiMock := &ConcertoAPIServiceMock{
 		balancers: []ConcertoLoadBalancer{
 			{Id: "LB1", Name: "mybalancer"},
@@ -227,55 +227,55 @@ func TestUpdateTCPLoadBalancer(t *testing.T) {
 		},
 	}
 	concerto := ConcertoCloud{service: apiMock}
-	err := concerto.UpdateTCPLoadBalancer("mybalancer", "noregion", []string{"host1", "host3"})
+	err := concerto.UpdateLoadBalancer("mybalancer", "noregion", []string{"host1", "host3"})
 	if err != nil {
-		t.Errorf("UpdateTCPLoadBalancer: should not have returned error")
+		t.Errorf("UpdateLoadBalancer: should not have returned error")
 	}
 	if apiMock.balancedInstances["LB1"][0] != "123.123.123.123" || apiMock.balancedInstances["LB1"][1] != "123.123.123.125" {
-		t.Errorf("UpdateTCPLoadBalancer: should have updated the load balancer: %v", apiMock.balancedInstances["LB1"])
+		t.Errorf("UpdateLoadBalancer: should have updated the load balancer: %v", apiMock.balancedInstances["LB1"])
 	}
 }
 
-func TestEnsureTCPLoadBalancerDeleted(t *testing.T) {
+func TestEnsureLoadBalancerDeleted(t *testing.T) {
 	apiMock := &ConcertoAPIServiceMock{
 		balancers: []ConcertoLoadBalancer{
 			{Id: "123456", Name: "mybalancer"},
 		},
 	}
 	concerto := ConcertoCloud{service: apiMock}
-	err := concerto.EnsureTCPLoadBalancerDeleted("mybalancer", "whatever region")
+	err := concerto.EnsureLoadBalancerDeleted("mybalancer", "whatever region")
 	if err != nil {
-		t.Errorf("EnsureTCPLoadBalancerDeleted: should not have returned error")
+		t.Errorf("EnsureLoadBalancerDeleted: should not have returned error")
 	}
 	if len(apiMock.balancers) > 0 {
-		t.Errorf("EnsureTCPLoadBalancerDeleted: should have deleted the load balancer")
+		t.Errorf("EnsureLoadBalancerDeleted: should have deleted the load balancer")
 	}
 }
 
-func Test_EnsureTCPLoadBalancerDeleted_NonExisting(t *testing.T) {
+func Test_EnsureLoadBalancerDeleted_NonExisting(t *testing.T) {
 	apiMock := &ConcertoAPIServiceMock{
 		balancers: []ConcertoLoadBalancer{
 			{Id: "123456", Name: "mybalancer"},
 		},
 	}
 	concerto := ConcertoCloud{service: apiMock}
-	err := concerto.EnsureTCPLoadBalancerDeleted("anotherbalancer", "whatever region")
+	err := concerto.EnsureLoadBalancerDeleted("anotherbalancer", "whatever region")
 	if err != nil {
-		t.Errorf("EnsureTCPLoadBalancerDeleted: should not have returned error")
+		t.Errorf("EnsureLoadBalancerDeleted: should not have returned error")
 	}
 	if len(apiMock.balancers) == 0 {
-		t.Errorf("EnsureTCPLoadBalancerDeleted: should not have deleted any load balancer")
+		t.Errorf("EnsureLoadBalancerDeleted: should not have deleted any load balancer")
 	}
 }
 
-func Test_EnsureTCPLoadBalancerDeleted_Error(t *testing.T) {
+func Test_EnsureLoadBalancerDeleted_Error(t *testing.T) {
 	apiMock := &ConcertoAPIServiceMock{
 		balancers: []ConcertoLoadBalancer{
 			{Id: "123456", Name: "mybalancer"},
 		},
 	}
 	concerto := ConcertoCloud{service: apiMock}
-	err := concerto.EnsureTCPLoadBalancerDeleted("GiveMeAnError", "whatever region")
+	err := concerto.EnsureLoadBalancerDeleted("GiveMeAnError", "whatever region")
 	if err == nil {
 		t.Errorf("Error was expected but got none")
 	}

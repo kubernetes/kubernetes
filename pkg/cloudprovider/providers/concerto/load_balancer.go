@@ -23,8 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// GetTCPLoadBalancer implementation for Flexiant Concerto.
-func (c *ConcertoCloud) GetTCPLoadBalancer(name, _region string) (status *api.LoadBalancerStatus, exists bool, err error) {
+// GetLoadBalancer implementation for Flexiant Concerto.
+func (c *ConcertoCloud) GetLoadBalancer(name, _region string) (status *api.LoadBalancerStatus, exists bool, err error) {
 	lb, err := c.service.GetLoadBalancerByName(name)
 	if err != nil {
 		return nil, false, fmt.Errorf("error getting Concerto load balancer by name '%s' : %v", name, err)
@@ -48,8 +48,8 @@ func toStatus(lb *ConcertoLoadBalancer) *api.LoadBalancerStatus {
 	return status
 }
 
-// EnsureTCPLoadBalancer implementation for Flexiant Concerto.
-func (c *ConcertoCloud) EnsureTCPLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+// EnsureLoadBalancer implementation for Flexiant Concerto.
+func (c *ConcertoCloud) EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
 	// Concerto LB does not support session affinity
 	if affinityType != api.ServiceAffinityNone {
 		return nil, fmt.Errorf("Unsupported load balancer affinity: %v", affinityType)
@@ -71,13 +71,13 @@ func (c *ConcertoCloud) EnsureTCPLoadBalancer(name, region string, loadBalancerI
 
 	if lb == nil {
 		// It does not exist: create it
-		lb, err = c.createTCPLoadBalancer(name, ports, hosts)
+		lb, err = c.createLoadBalancer(name, ports, hosts)
 		if err != nil {
 			return nil, fmt.Errorf("error creating load balancer '%s' in Concerto: %v", name, err)
 		}
 	} else {
 		// It already exists: update it
-		err = c.UpdateTCPLoadBalancer(name, region, hosts)
+		err = c.UpdateLoadBalancer(name, region, hosts)
 		if err != nil {
 			return nil, fmt.Errorf("error updating load balancer '%s' in Concerto: %v", name, err)
 		}
@@ -86,7 +86,7 @@ func (c *ConcertoCloud) EnsureTCPLoadBalancer(name, region string, loadBalancerI
 	return toStatus(lb), nil
 }
 
-func (c *ConcertoCloud) createTCPLoadBalancer(name string, ports []*api.ServicePort, hosts []string) (*ConcertoLoadBalancer, error) {
+func (c *ConcertoCloud) createLoadBalancer(name string, ports []*api.ServicePort, hosts []string) (*ConcertoLoadBalancer, error) {
 	// Create the LB
 	port := ports[0].Port // The port that will be exposed on the service.
 	// targetPort := ports[0].TargetPort // Optional: The target port on pods selected by this service
@@ -111,8 +111,8 @@ func (c *ConcertoCloud) createTCPLoadBalancer(name string, ports []*api.ServiceP
 	return lb, nil
 }
 
-// UpdateTCPLoadBalancer implementation for Flexiant Concerto.
-func (c *ConcertoCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
+// UpdateLoadBalancer implementation for Flexiant Concerto.
+func (c *ConcertoCloud) UpdateLoadBalancer(name, region string, hosts []string) error {
 	// Get the load balancer
 	lb, err := c.service.GetLoadBalancerByName(name)
 	if err != nil {
@@ -145,8 +145,8 @@ func (c *ConcertoCloud) UpdateTCPLoadBalancer(name, region string, hosts []strin
 	return nil
 }
 
-// EnsureTCPLoadBalancerDeleted implementation for Flexiant Concerto.
-func (c *ConcertoCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
+// EnsureLoadBalancerDeleted implementation for Flexiant Concerto.
+func (c *ConcertoCloud) EnsureLoadBalancerDeleted(name, region string) error {
 	// Get the LB
 	lb, err := c.service.GetLoadBalancerByName(name)
 	if err != nil {

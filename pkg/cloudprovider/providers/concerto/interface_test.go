@@ -39,14 +39,14 @@ func TestInstances(t *testing.T) {
 	}
 }
 
-func TestTCPLoadBalancer(t *testing.T) {
+func TestLoadBalancer(t *testing.T) {
 	concerto := &ConcertoCloud{}
-	loadbalancers, ok := concerto.TCPLoadBalancer()
+	loadbalancers, ok := concerto.LoadBalancer()
 	if !ok {
-		t.Errorf("Unexpected error fetching Concerto 'TCPLoadBalancer' component")
+		t.Errorf("Unexpected error fetching Concerto 'LoadBalancer' component")
 	}
 	if loadbalancers != concerto {
-		t.Errorf("Unexpected error fetching Concerto 'TCPLoadBalancer' component")
+		t.Errorf("Unexpected error fetching Concerto 'LoadBalancer' component")
 	}
 }
 

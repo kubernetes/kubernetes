@@ -30,8 +30,8 @@ func (concerto *ConcertoCloud) Instances() (cloudprovider.Instances, bool) {
 	return concerto, true
 }
 
-// TCPLoadBalancer returns an implementation of TCPLoadBalancer for Concerto.
-func (concerto *ConcertoCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
+// LoadBalancer returns an implementation of LoadBalancer for Concerto.
+func (concerto *ConcertoCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return concerto, true
 }
 

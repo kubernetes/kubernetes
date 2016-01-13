@@ -27,7 +27,7 @@ import (
 // ProviderName is the name under which Concerto cloud provider is registered
 const ProviderName = "concerto"
 
-// ConcertoCloud is an implementation of Interface, TCPLoadBalancer, and Instances
+// ConcertoCloud is an implementation of Interface, LoadBalancer, and Instances
 // for Flexiant Concerto.
 type ConcertoCloud struct {
 	// Abstracting access to Concerto API
