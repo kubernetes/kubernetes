@@ -43,7 +43,7 @@ func newTestGenericPLEG() *TestGenericPLEG {
 		relistPeriod: time.Hour,
 		runtime:      fakeRuntime,
 		eventChannel: make(chan *PodLifecycleEvent, 100),
-		containers:   make(map[string]containerInfo),
+		podRecords:   make(podRecords),
 	}
 	return &TestGenericPLEG{pleg: pleg, runtime: fakeRuntime}
 }
@@ -79,7 +79,7 @@ func verifyEvents(t *testing.T, expected, actual []*PodLifecycleEvent) {
 	sort.Sort(sortableEvents(expected))
 	sort.Sort(sortableEvents(actual))
 	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("Actual events differ from the expected; diff: %v", util.ObjectDiff(expected, actual))
+		t.Errorf("Actual events differ from the expected; diff:\n %v", util.ObjectDiff(expected, actual))
 	}
 }
 
@@ -87,7 +87,6 @@ func TestRelisting(t *testing.T) {
 	testPleg := newTestGenericPLEG()
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
-
 	// The first relist should send a PodSync event to each pod.
 	runtime.AllPodList = []*kubecontainer.Pod{
 		{
@@ -144,5 +143,69 @@ func TestRelisting(t *testing.T) {
 	}
 
 	actual = getEventsFromChannel(ch)
+	verifyEvents(t, expected, actual)
+}
+
+func TestReportMissingContainers(t *testing.T) {
+	testPleg := newTestGenericPLEG()
+	pleg, runtime := testPleg.pleg, testPleg.runtime
+	ch := pleg.Watch()
+	runtime.AllPodList = []*kubecontainer.Pod{
+		{
+			ID: "1234",
+			Containers: []*kubecontainer.Container{
+				createTestContainer("c1", kubecontainer.ContainerStateRunning),
+				createTestContainer("c2", kubecontainer.ContainerStateRunning),
+				createTestContainer("c3", kubecontainer.ContainerStateExited),
+			},
+		},
+	}
+	// Drain the events from the channel
+	pleg.relist()
+	getEventsFromChannel(ch)
+
+	// Container c2 was stopped and removed between relists. We should report
+	// the event. The exited container c3 was garbage collected (i.e., removed)
+	// between relists. We should ignore that event.
+	runtime.AllPodList = []*kubecontainer.Pod{
+		{
+			ID: "1234",
+			Containers: []*kubecontainer.Container{
+				createTestContainer("c1", kubecontainer.ContainerStateRunning),
+			},
+		},
+	}
+	pleg.relist()
+	expected := []*PodLifecycleEvent{
+		{ID: "1234", Type: ContainerDied, Data: "c2"},
+	}
+	actual := getEventsFromChannel(ch)
+	verifyEvents(t, expected, actual)
+}
+
+func TestReportMissingPods(t *testing.T) {
+	testPleg := newTestGenericPLEG()
+	pleg, runtime := testPleg.pleg, testPleg.runtime
+	ch := pleg.Watch()
+	runtime.AllPodList = []*kubecontainer.Pod{
+		{
+			ID: "1234",
+			Containers: []*kubecontainer.Container{
+				createTestContainer("c2", kubecontainer.ContainerStateRunning),
+			},
+		},
+	}
+	// Drain the events from the channel
+	pleg.relist()
+	getEventsFromChannel(ch)
+
+	// Container c2 was stopped and removed between relists. We should report
+	// the event.
+	runtime.AllPodList = []*kubecontainer.Pod{}
+	pleg.relist()
+	expected := []*PodLifecycleEvent{
+		{ID: "1234", Type: ContainerDied, Data: "c2"},
+	}
+	actual := getEventsFromChannel(ch)
 	verifyEvents(t, expected, actual)
 }
