@@ -90,11 +90,6 @@ func enableVersions(externalVersions []unversioned.GroupVersion) error {
 var userResources = []string{"rc", "svc", "pods", "pvc"}
 
 func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper {
-	worstToBestGroupVersions := []unversioned.GroupVersion{}
-	for i := len(externalVersions) - 1; i >= 0; i-- {
-		worstToBestGroupVersions = append(worstToBestGroupVersions, externalVersions[i])
-	}
-
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
 	rootScoped := sets.NewString(
@@ -117,7 +112,7 @@ func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper 
 		"ThirdPartyResourceData",
 		"ThirdPartyResourceList")
 
-	mapper := api.NewDefaultRESTMapper(worstToBestGroupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
+	mapper := api.NewDefaultRESTMapper(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 	// setup aliases for groups of resources
 	mapper.AddResourceAlias("all", userResources...)
 
