@@ -1593,7 +1593,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 			ru := d.Spec.Strategy.RollingUpdate
 			fmt.Fprintf(out, "RollingUpdateStrategy:\t%s max unavailable, %s max surge, %d min ready seconds\n", ru.MaxUnavailable.String(), ru.MaxSurge.String(), ru.MinReadySeconds)
 		}
-		oldRCs, err := deploymentutil.GetOldRCs(*d, dd)
+		oldRCs, _, err := deploymentutil.GetOldRCs(*d, dd)
 		if err == nil {
 			fmt.Fprintf(out, "OldReplicationControllers:\t%s\n", printReplicationControllersByLabels(oldRCs))
 		}
