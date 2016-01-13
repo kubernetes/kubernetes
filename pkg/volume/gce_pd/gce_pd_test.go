@@ -90,7 +90,7 @@ type fakePDManager struct {
 
 // TODO(jonesdl) To fully test this, we could create a loopback device
 // and mount that instead.
-func (fake *fakePDManager) AttachAndMountDisk(b *gcePersistentDiskBuilder, globalPDPath string) error {
+func (fake *fakePDManager) AttachAndMountDisk(b *gcePersistentDiskMounter, globalPDPath string) error {
 	globalPath := makeGlobalPDName(b.plugin.host, b.pdName)
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
@@ -103,7 +103,7 @@ func (fake *fakePDManager) AttachAndMountDisk(b *gcePersistentDiskBuilder, globa
 	return nil
 }
 
-func (fake *fakePDManager) DetachDisk(c *gcePersistentDiskCleaner) error {
+func (fake *fakePDManager) DetachDisk(c *gcePersistentDiskUnmounter) error {
 	globalPath := makeGlobalPDName(c.plugin.host, c.pdName)
 	err := os.RemoveAll(globalPath)
 	if err != nil {
@@ -148,21 +148,21 @@ func TestPlugin(t *testing.T) {
 	}
 	fakeManager := &fakePDManager{}
 	fakeMounter := &mount.FakeMounter{}
-	builder, err := plug.(*gcePersistentDiskPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), fakeManager, fakeMounter)
+	mounter, err := plug.(*gcePersistentDiskPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
-		t.Errorf("Failed to make a new Builder: %v", err)
+		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
-	if builder == nil {
-		t.Errorf("Got a nil Builder")
+	if mounter == nil {
+		t.Errorf("Got a nil Mounter")
 	}
 
 	volPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~gce-pd/vol1")
-	path := builder.GetPath()
+	path := mounter.GetPath()
 	if path != volPath {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := builder.SetUp(nil); err != nil {
+	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -184,15 +184,15 @@ func TestPlugin(t *testing.T) {
 	}
 
 	fakeManager = &fakePDManager{}
-	cleaner, err := plug.(*gcePersistentDiskPlugin).newCleanerInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
+	unmounter, err := plug.(*gcePersistentDiskPlugin).newUnmounterInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
-		t.Errorf("Failed to make a new Cleaner: %v", err)
+		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
-	if cleaner == nil {
-		t.Errorf("Got a nil Cleaner")
+	if unmounter == nil {
+		t.Errorf("Got a nil Unmounter")
 	}
 
-	if err := cleaner.TearDown(); err != nil {
+	if err := unmounter.TearDown(); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err == nil {
@@ -285,12 +285,12 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(gcePersistentDiskPluginName)
 
-	// readOnly bool is supplied by persistent-claim volume source when its builder creates other volumes
+	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{})
+	mounter, _ := plug.NewMounter(spec, pod, volume.VolumeOptions{})
 
-	if !builder.GetAttributes().ReadOnly {
-		t.Errorf("Expected true for builder.IsReadOnly")
+	if !mounter.GetAttributes().ReadOnly {
+		t.Errorf("Expected true for mounter.IsReadOnly")
 	}
 }

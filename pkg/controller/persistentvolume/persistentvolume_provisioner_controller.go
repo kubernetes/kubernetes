@@ -502,12 +502,12 @@ func (c *PersistentVolumeProvisionerController) GetKubeClient() clientset.Interf
 	return c.client.GetKubeClient()
 }
 
-func (c *PersistentVolumeProvisionerController) NewWrapperBuilder(volName string, spec volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
-	return nil, fmt.Errorf("NewWrapperBuilder not supported by PVClaimBinder's VolumeHost implementation")
+func (c *PersistentVolumeProvisionerController) NewWrapperMounter(volName string, spec volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+	return nil, fmt.Errorf("NewWrapperMounter not supported by PVClaimBinder's VolumeHost implementation")
 }
 
-func (c *PersistentVolumeProvisionerController) NewWrapperCleaner(volName string, spec volume.Spec, podUID types.UID) (volume.Cleaner, error) {
-	return nil, fmt.Errorf("NewWrapperCleaner not supported by PVClaimBinder's VolumeHost implementation")
+func (c *PersistentVolumeProvisionerController) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
+	return nil, fmt.Errorf("NewWrapperUnmounter not supported by PVClaimBinder's VolumeHost implementation")
 }
 
 func (c *PersistentVolumeProvisionerController) GetCloudProvider() cloudprovider.Interface {

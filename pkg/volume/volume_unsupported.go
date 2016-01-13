@@ -18,6 +18,6 @@ limitations under the License.
 
 package volume
 
-func SetVolumeOwnership(builder Builder, fsGroup *int64) error {
+func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 	return nil
 }

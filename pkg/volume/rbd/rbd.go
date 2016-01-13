@@ -74,7 +74,7 @@ func (plugin *rbdPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	}
 }
 
-func (plugin *rbdPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	secret := ""
 	source, _ := plugin.getRBDVolumeSource(spec)
 
@@ -96,7 +96,7 @@ func (plugin *rbdPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 
 	}
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, pod.UID, &RBDUtil{}, plugin.host.GetMounter(), secret)
+	return plugin.newMounterInternal(spec, pod.UID, &RBDUtil{}, plugin.host.GetMounter(), secret)
 }
 
 func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*api.RBDVolumeSource, bool) {
@@ -109,7 +109,7 @@ func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*api.RBDVolumeSo
 	}
 }
 
-func (plugin *rbdPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret string) (volume.Builder, error) {
+func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret string) (volume.Mounter, error) {
 	source, readOnly := plugin.getRBDVolumeSource(spec)
 	pool := source.RBDPool
 	if pool == "" {
@@ -124,7 +124,7 @@ func (plugin *rbdPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID,
 		keyring = "/etc/ceph/keyring"
 	}
 
-	return &rbdBuilder{
+	return &rbdMounter{
 		rbd: &rbd{
 			podUID:   podUID,
 			volName:  spec.Name(),
@@ -143,14 +143,14 @@ func (plugin *rbdPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID,
 	}, nil
 }
 
-func (plugin *rbdPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *rbdPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, &RBDUtil{}, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, &RBDUtil{}, plugin.host.GetMounter())
 }
 
-func (plugin *rbdPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
-	return &rbdCleaner{
-		rbdBuilder: &rbdBuilder{
+func (plugin *rbdPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Unmounter, error) {
+	return &rbdUnmounter{
+		rbdMounter: &rbdMounter{
 			rbd: &rbd{
 				podUID:  podUID,
 				volName: volName,
@@ -182,7 +182,7 @@ func (rbd *rbd) GetPath() string {
 	return rbd.plugin.host.GetPodVolumeDir(rbd.podUID, strings.EscapeQualifiedNameForDisk(name), rbd.volName)
 }
 
-type rbdBuilder struct {
+type rbdMounter struct {
 	*rbd
 	// capitalized so they can be exported in persistRBD()
 	Mon     []string
@@ -192,7 +192,7 @@ type rbdBuilder struct {
 	fsType  string
 }
 
-var _ volume.Builder = &rbdBuilder{}
+var _ volume.Mounter = &rbdMounter{}
 
 func (b *rbd) GetAttributes() volume.Attributes {
 	return volume.Attributes{
@@ -202,11 +202,11 @@ func (b *rbd) GetAttributes() volume.Attributes {
 	}
 }
 
-func (b *rbdBuilder) SetUp(fsGroup *int64) error {
+func (b *rbdMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *rbdBuilder) SetUpAt(dir string, fsGroup *int64) error {
+func (b *rbdMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
 	if err != nil {
@@ -215,19 +215,19 @@ func (b *rbdBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	return err
 }
 
-type rbdCleaner struct {
-	*rbdBuilder
+type rbdUnmounter struct {
+	*rbdMounter
 }
 
-var _ volume.Cleaner = &rbdCleaner{}
+var _ volume.Unmounter = &rbdUnmounter{}
 
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.
-func (c *rbdCleaner) TearDown() error {
+func (c *rbdUnmounter) TearDown() error {
 	return c.TearDownAt(c.GetPath())
 }
 
-func (c *rbdCleaner) TearDownAt(dir string) error {
+func (c *rbdUnmounter) TearDownAt(dir string) error {
 	return diskTearDown(c.manager, *c, dir, c.mounter)
 }
 

@@ -100,8 +100,8 @@ func (plugin *flexVolumePlugin) getVolumeSource(spec *volume.Spec) *api.FlexVolu
 	return source
 }
 
-// NewBuilder is the builder routine to build the volume.
-func (plugin *flexVolumePlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
+// NewMounter is the mounter routine to build the volume.
+func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	fv := plugin.getVolumeSource(spec)
 	secret := ""
 	if fv.SecretRef != nil {
@@ -120,13 +120,13 @@ func (plugin *flexVolumePlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ vo
 			glog.V(1).Infof("found flex volume secret info: %s", name)
 		}
 	}
-	return plugin.newBuilderInternal(spec, pod, &flexVolumeUtil{}, plugin.host.GetMounter(), exec.New(), secret)
+	return plugin.newMounterInternal(spec, pod, &flexVolumeUtil{}, plugin.host.GetMounter(), exec.New(), secret)
 }
 
-// newBuilderInternal is the internal builder routine to build the volume.
-func (plugin *flexVolumePlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, manager flexVolumeManager, mounter mount.Interface, runner exec.Interface, secret string) (volume.Builder, error) {
+// newMounterInternal is the internal mounter routine to build the volume.
+func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod, manager flexVolumeManager, mounter mount.Interface, runner exec.Interface, secret string) (volume.Mounter, error) {
 	source := plugin.getVolumeSource(spec)
-	return &flexVolumeBuilder{
+	return &flexVolumeMounter{
 		flexVolumeDisk: &flexVolumeDisk{
 			podUID:       pod.UID,
 			podNamespace: pod.Namespace,
@@ -147,14 +147,14 @@ func (plugin *flexVolumePlugin) newBuilderInternal(spec *volume.Spec, pod *api.P
 	}, nil
 }
 
-// NewCleaner is the cleaner routine to clean the volume.
-func (plugin *flexVolumePlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return plugin.newCleanerInternal(volName, podUID, &flexVolumeUtil{}, plugin.host.GetMounter(), exec.New())
+// NewUnmounter is the unmounter routine to clean the volume.
+func (plugin *flexVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	return plugin.newUnmounterInternal(volName, podUID, &flexVolumeUtil{}, plugin.host.GetMounter(), exec.New())
 }
 
-// newCleanerInternal is the internal cleaner routine to clean the volume.
-func (plugin *flexVolumePlugin) newCleanerInternal(volName string, podUID types.UID, manager flexVolumeManager, mounter mount.Interface, runner exec.Interface) (volume.Cleaner, error) {
-	return &flexVolumeCleaner{
+// newUnmounterInternal is the internal unmounter routine to clean the volume.
+func (plugin *flexVolumePlugin) newUnmounterInternal(volName string, podUID types.UID, manager flexVolumeManager, mounter mount.Interface, runner exec.Interface) (volume.Unmounter, error) {
+	return &flexVolumeUnmounter{
 		flexVolumeDisk: &flexVolumeDisk{
 			podUID:     podUID,
 			volName:    volName,
@@ -190,8 +190,8 @@ type flexVolumeDisk struct {
 	plugin *flexVolumePlugin
 }
 
-// FlexVolumeCleaner is the disk that will be cleaned by this plugin.
-type flexVolumeCleaner struct {
+// FlexVolumeUnmounter is the disk that will be cleaned by this plugin.
+type flexVolumeUnmounter struct {
 	*flexVolumeDisk
 	// Runner used to teardown the volume.
 	runner exec.Interface
@@ -201,8 +201,8 @@ type flexVolumeCleaner struct {
 	volume.MetricsNil
 }
 
-// FlexVolumeBuilder is the disk that will be exposed by this plugin.
-type flexVolumeBuilder struct {
+// FlexVolumeMounter is the disk that will be exposed by this plugin.
+type flexVolumeMounter struct {
 	*flexVolumeDisk
 	// fsType is the type of the filesystem to create on the volume.
 	fsType string
@@ -223,13 +223,13 @@ type flexVolumeBuilder struct {
 }
 
 // SetUp creates new directory.
-func (f *flexVolumeBuilder) SetUp(fsGroup *int64) error {
+func (f *flexVolumeMounter) SetUp(fsGroup *int64) error {
 	return f.SetUpAt(f.GetPath(), fsGroup)
 }
 
 // GetAttributes get the flex volume attributes. The attributes will be queried
 // using plugin callout after we finalize the callout syntax.
-func (f flexVolumeBuilder) GetAttributes() volume.Attributes {
+func (f flexVolumeMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		ReadOnly:        f.readOnly,
 		Managed:         false,
@@ -240,17 +240,17 @@ func (f flexVolumeBuilder) GetAttributes() volume.Attributes {
 // flexVolumeManager is the abstract interface to flex volume ops.
 type flexVolumeManager interface {
 	// Attaches the disk to the kubelet's host machine.
-	attach(builder *flexVolumeBuilder) (string, error)
+	attach(mounter *flexVolumeMounter) (string, error)
 	// Detaches the disk from the kubelet's host machine.
-	detach(cleaner *flexVolumeCleaner, dir string) error
+	detach(unmounter *flexVolumeUnmounter, dir string) error
 	// Mounts the disk on the Kubelet's host machine.
-	mount(builder *flexVolumeBuilder, mnt, dir string) error
+	mount(mounter *flexVolumeMounter, mnt, dir string) error
 	// Unmounts the disk from the Kubelet's host machine.
-	unmount(builder *flexVolumeCleaner, dir string) error
+	unmount(unounter *flexVolumeUnmounter, dir string) error
 }
 
 // SetUpAt creates new directory.
-func (f *flexVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
+func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	notmnt, err := f.blockDeviceMounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
@@ -318,7 +318,7 @@ func (f *flexVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 // IsReadOnly returns true if the volume is read only.
-func (f *flexVolumeBuilder) IsReadOnly() bool {
+func (f *flexVolumeMounter) IsReadOnly() bool {
 	return f.readOnly
 }
 
@@ -329,13 +329,13 @@ func (f *flexVolumeDisk) GetPath() string {
 }
 
 // TearDown simply deletes everything in the directory.
-func (f *flexVolumeCleaner) TearDown() error {
+func (f *flexVolumeUnmounter) TearDown() error {
 	path := f.GetPath()
 	return f.TearDownAt(path)
 }
 
 // TearDownAt simply deletes everything in the directory.
-func (f *flexVolumeCleaner) TearDownAt(dir string) error {
+func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 
 	notmnt, err := f.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {

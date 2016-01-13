@@ -80,11 +80,11 @@ func (plugin *nfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	}
 }
 
-func (plugin *nfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
-	return plugin.newBuilderInternal(spec, pod, plugin.host.GetMounter())
+func (plugin *nfsPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter())
 }
 
-func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface) (volume.Mounter, error) {
 	var source *api.NFSVolumeSource
 	var readOnly bool
 	if spec.Volume != nil && spec.Volume.NFS != nil {
@@ -94,7 +94,7 @@ func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mou
 		source = spec.PersistentVolume.Spec.NFS
 		readOnly = spec.ReadOnly
 	}
-	return &nfsBuilder{
+	return &nfsMounter{
 		nfs: &nfs{
 			volName: spec.Name(),
 			mounter: mounter,
@@ -107,12 +107,12 @@ func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mou
 	}, nil
 }
 
-func (plugin *nfsPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return plugin.newCleanerInternal(volName, podUID, plugin.host.GetMounter())
+func (plugin *nfsPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
 }
 
-func (plugin *nfsPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
-	return &nfsCleaner{&nfs{
+func (plugin *nfsPlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Unmounter, error) {
+	return &nfsUnmounter{&nfs{
 		volName: volName,
 		mounter: mounter,
 		pod:     &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
@@ -140,16 +140,16 @@ func (nfsVolume *nfs) GetPath() string {
 	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, strings.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
 }
 
-type nfsBuilder struct {
+type nfsMounter struct {
 	*nfs
 	server     string
 	exportPath string
 	readOnly   bool
 }
 
-var _ volume.Builder = &nfsBuilder{}
+var _ volume.Mounter = &nfsMounter{}
 
-func (b *nfsBuilder) GetAttributes() volume.Attributes {
+func (b *nfsMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		ReadOnly:        b.readOnly,
 		Managed:         false,
@@ -158,11 +158,11 @@ func (b *nfsBuilder) GetAttributes() volume.Attributes {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *nfsBuilder) SetUp(fsGroup *int64) error {
+func (b *nfsMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *nfsBuilder) SetUpAt(dir string, fsGroup *int64) error {
+func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("NFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -207,22 +207,22 @@ func (b *nfsBuilder) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 //
-//func (c *nfsCleaner) GetPath() string {
+//func (c *nfsUnmounter) GetPath() string {
 //	name := nfsPluginName
 //	return c.plugin.host.GetPodVolumeDir(c.pod.UID, strings.EscapeQualifiedNameForDisk(name), c.volName)
 //}
 
-var _ volume.Cleaner = &nfsCleaner{}
+var _ volume.Unmounter = &nfsUnmounter{}
 
-type nfsCleaner struct {
+type nfsUnmounter struct {
 	*nfs
 }
 
-func (c *nfsCleaner) TearDown() error {
+func (c *nfsUnmounter) TearDown() error {
 	return c.TearDownAt(c.GetPath())
 }
 
-func (c *nfsCleaner) TearDownAt(dir string) error {
+func (c *nfsUnmounter) TearDownAt(dir string) error {
 	notMnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
 		glog.Errorf("Error checking IsLikelyNotMountPoint: %v", err)

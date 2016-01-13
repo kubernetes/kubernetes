@@ -97,7 +97,7 @@ func (util *ISCSIUtil) MakeGlobalPDName(iscsi iscsiDisk) string {
 	return makePDNameInternal(iscsi.plugin.host, iscsi.portal, iscsi.iqn, iscsi.lun)
 }
 
-func (util *ISCSIUtil) AttachDisk(b iscsiDiskBuilder) error {
+func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) error {
 	var devicePath string
 	if b.iface == "default" {
 		devicePath = strings.Join([]string{"/dev/disk/by-path/ip", b.portal, "iscsi", b.iqn, "lun", b.lun}, "-")
@@ -144,7 +144,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskBuilder) error {
 	return err
 }
 
-func (util *ISCSIUtil) DetachDisk(c iscsiDiskCleaner, mntPath string) error {
+func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	_, cnt, err := mount.GetDeviceNameFromMount(c.mounter, mntPath)
 	if err != nil {
 		glog.Errorf("iscsi detach disk: failed to get device from mnt: %s\nError: %v", mntPath, err)

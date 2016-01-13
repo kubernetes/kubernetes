@@ -28,13 +28,13 @@ import (
 type diskManager interface {
 	MakeGlobalPDName(disk iscsiDisk) string
 	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(b iscsiDiskBuilder) error
+	AttachDisk(b iscsiDiskMounter) error
 	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(disk iscsiDiskCleaner, mntPath string) error
+	DetachDisk(disk iscsiDiskUnmounter, mntPath string) error
 }
 
 // utility to mount a disk based filesystem
-func diskSetUp(manager diskManager, b iscsiDiskBuilder, volPath string, mounter mount.Interface, fsGroup *int64) error {
+func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter mount.Interface, fsGroup *int64) error {
 	globalPDPath := manager.MakeGlobalPDName(*b.iscsiDisk)
 	// TODO: handle failed mounts here.
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
@@ -74,7 +74,7 @@ func diskSetUp(manager diskManager, b iscsiDiskBuilder, volPath string, mounter 
 }
 
 // utility to tear down a disk based filesystem
-func diskTearDown(manager diskManager, c iscsiDiskCleaner, volPath string, mounter mount.Interface) error {
+func diskTearDown(manager diskManager, c iscsiDiskUnmounter, volPath string, mounter mount.Interface) error {
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
 	if err != nil {
 		glog.Errorf("cannot validate mountpoint %s", volPath)

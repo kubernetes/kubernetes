@@ -54,7 +54,7 @@ type GCEDiskUtil struct{}
 
 // Attaches a disk specified by a volume.GCEPersistentDisk to the current kubelet.
 // Mounts the disk to it's global path.
-func (diskUtil *GCEDiskUtil) AttachAndMountDisk(b *gcePersistentDiskBuilder, globalPDPath string) error {
+func (diskUtil *GCEDiskUtil) AttachAndMountDisk(b *gcePersistentDiskMounter, globalPDPath string) error {
 	glog.V(5).Infof("AttachAndMountDisk(...) called for PD %q. Will block for existing operations, if any. (globalPDPath=%q)\r\n", b.pdName, globalPDPath)
 
 	// Block execution until any pending detach operations for this PD have completed
@@ -101,7 +101,7 @@ func (diskUtil *GCEDiskUtil) AttachAndMountDisk(b *gcePersistentDiskBuilder, glo
 }
 
 // Unmounts the device and detaches the disk from the kubelet's host machine.
-func (util *GCEDiskUtil) DetachDisk(c *gcePersistentDiskCleaner) error {
+func (util *GCEDiskUtil) DetachDisk(c *gcePersistentDiskUnmounter) error {
 	glog.V(5).Infof("DetachDisk(...) for PD %q\r\n", c.pdName)
 
 	if err := unmountPDAndRemoveGlobalPath(c); err != nil {
@@ -156,7 +156,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (volum
 }
 
 // Attaches the specified persistent disk device to node, verifies that it is attached, and retries if it fails.
-func attachDiskAndVerify(b *gcePersistentDiskBuilder, sdBeforeSet sets.String) (string, error) {
+func attachDiskAndVerify(b *gcePersistentDiskMounter, sdBeforeSet sets.String) (string, error) {
 	devicePaths := getDiskByIdPaths(b.gcePersistentDisk)
 	var gceCloud *gcecloud.GCECloud
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
@@ -221,7 +221,7 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String) (string, er
 
 // Detaches the specified persistent disk device from node, verifies that it is detached, and retries if it fails.
 // This function is intended to be called asynchronously as a go routine.
-func detachDiskAndVerify(c *gcePersistentDiskCleaner) {
+func detachDiskAndVerify(c *gcePersistentDiskUnmounter) {
 	glog.V(5).Infof("detachDiskAndVerify(...) for pd %q. Will block for pending operations", c.pdName)
 	defer runtime.HandleCrash()
 
@@ -278,7 +278,7 @@ func detachDiskAndVerify(c *gcePersistentDiskCleaner) {
 }
 
 // Unmount the global PD mount, which should be the only one, and delete it.
-func unmountPDAndRemoveGlobalPath(c *gcePersistentDiskCleaner) error {
+func unmountPDAndRemoveGlobalPath(c *gcePersistentDiskUnmounter) error {
 	globalPDPath := makeGlobalPDName(c.plugin.host, c.pdName)
 
 	err := c.mounter.Unmount(globalPDPath)

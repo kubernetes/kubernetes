@@ -53,7 +53,7 @@ func (plugin *persistentClaimPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.PersistentVolumeClaim != nil
 }
 
-func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *persistentClaimPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	claim, err := plugin.host.GetKubeClient().Core().PersistentVolumeClaims(pod.Namespace).Get(spec.Volume.PersistentVolumeClaim.ClaimName)
 	if err != nil {
 		glog.Errorf("Error finding claim: %+v\n", spec.Volume.PersistentVolumeClaim.ClaimName)
@@ -80,15 +80,15 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod,
 		return nil, err
 	}
 
-	builder, err := plugin.host.NewWrapperBuilder(claim.Spec.VolumeName, *volume.NewSpecFromPersistentVolume(pv, spec.ReadOnly), pod, opts)
+	mounter, err := plugin.host.NewWrapperMounter(claim.Spec.VolumeName, *volume.NewSpecFromPersistentVolume(pv, spec.ReadOnly), pod, opts)
 	if err != nil {
-		glog.Errorf("Error creating builder for claim: %+v\n", claim.Name)
+		glog.Errorf("Error creating mounter for claim: %+v\n", claim.Name)
 		return nil, err
 	}
 
-	return builder, nil
+	return mounter, nil
 }
 
-func (plugin *persistentClaimPlugin) NewCleaner(_ string, _ types.UID) (volume.Cleaner, error) {
-	return nil, fmt.Errorf("This will never be called directly. The PV backing this claim has a cleaner.  Kubelet uses that cleaner, not this one, when removing orphaned volumes.")
+func (plugin *persistentClaimPlugin) NewUnmounter(_ string, _ types.UID) (volume.Unmounter, error) {
+	return nil, fmt.Errorf("This will never be called directly. The PV backing this claim has a unmounter.  Kubelet uses that unmounter, not this one, when removing orphaned volumes.")
 }

@@ -546,12 +546,12 @@ func TestGetPodVolumesFromDisk(t *testing.T) {
 
 	volumesFound := kubelet.getPodVolumesFromDisk()
 	if len(volumesFound) != len(expectedPaths) {
-		t.Errorf("Expected to find %d cleaners, got %d", len(expectedPaths), len(volumesFound))
+		t.Errorf("Expected to find %d unmounters, got %d", len(expectedPaths), len(volumesFound))
 	}
 	for _, ep := range expectedPaths {
 		found := false
 		for _, cl := range volumesFound {
-			if ep == cl.Cleaner.GetPath() {
+			if ep == cl.Unmounter.GetPath() {
 				found = true
 				break
 			}
@@ -642,7 +642,7 @@ func TestCleanupOrphanedVolumes(t *testing.T) {
 	for _, ep := range pathsOnDisk {
 		found := false
 		for _, cl := range volumesFound {
-			if ep == cl.Cleaner.GetPath() {
+			if ep == cl.Unmounter.GetPath() {
 				found = true
 				break
 			}
@@ -662,7 +662,7 @@ func TestCleanupOrphanedVolumes(t *testing.T) {
 		t.Errorf("Expected to find 0 cleaners, got %d", len(volumesFound))
 	}
 	for _, cl := range volumesFound {
-		t.Errorf("Found unexpected volume %s", cl.Cleaner.GetPath())
+		t.Errorf("Found unexpected volume %s", cl.Unmounter.GetPath())
 	}
 }
 
@@ -714,9 +714,9 @@ func TestMakeVolumeMounts(t *testing.T) {
 	}
 
 	podVolumes := kubecontainer.VolumeMap{
-		"disk":  kubecontainer.VolumeInfo{Builder: &stubVolume{path: "/mnt/disk"}},
-		"disk4": kubecontainer.VolumeInfo{Builder: &stubVolume{path: "/mnt/host"}},
-		"disk5": kubecontainer.VolumeInfo{Builder: &stubVolume{path: "/var/lib/kubelet/podID/volumes/empty/disk5"}},
+		"disk":  kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
+		"disk4": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/host"}},
+		"disk5": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/var/lib/kubelet/podID/volumes/empty/disk5"}},
 	}
 
 	pod := api.Pod{

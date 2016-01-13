@@ -82,7 +82,7 @@ func (f *fakeVolumeHost) GetWriter() io.Writer {
 	return f.writer
 }
 
-func (f *fakeVolumeHost) NewWrapperBuilder(volName string, spec Spec, pod *api.Pod, opts VolumeOptions) (Builder, error) {
+func (f *fakeVolumeHost) NewWrapperMounter(volName string, spec Spec, pod *api.Pod, opts VolumeOptions) (Mounter, error) {
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
 	if spec.Volume != nil {
@@ -92,10 +92,10 @@ func (f *fakeVolumeHost) NewWrapperBuilder(volName string, spec Spec, pod *api.P
 	if err != nil {
 		return nil, err
 	}
-	return plug.NewBuilder(&spec, pod, opts)
+	return plug.NewMounter(&spec, pod, opts)
 }
 
-func (f *fakeVolumeHost) NewWrapperCleaner(volName string, spec Spec, podUID types.UID) (Cleaner, error) {
+func (f *fakeVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID types.UID) (Unmounter, error) {
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
 	if spec.Volume != nil {
@@ -105,7 +105,7 @@ func (f *fakeVolumeHost) NewWrapperCleaner(volName string, spec Spec, podUID typ
 	if err != nil {
 		return nil, err
 	}
-	return plug.NewCleaner(spec.Name(), podUID)
+	return plug.NewUnmounter(spec.Name(), podUID)
 }
 
 // Returns the hostname of the host kubelet is running on
@@ -159,11 +159,11 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) NewBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions) (Builder, error) {
+func (plugin *FakeVolumePlugin) NewMounter(spec *Spec, pod *api.Pod, opts VolumeOptions) (Mounter, error) {
 	return &FakeVolume{pod.UID, spec.Name(), plugin, MetricsNil{}}, nil
 }
 
-func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID) (Cleaner, error) {
+func (plugin *FakeVolumePlugin) NewUnmounter(volName string, podUID types.UID) (Unmounter, error) {
 	return &FakeVolume{podUID, volName, plugin, MetricsNil{}}, nil
 }
 

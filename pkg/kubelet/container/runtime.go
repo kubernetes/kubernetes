@@ -360,8 +360,8 @@ type RunContainerOptions struct {
 
 // VolumeInfo contains information about the volume.
 type VolumeInfo struct {
-	// Builder is the volume's builder
-	Builder volume.Builder
+	// Mounter is the volume's mounter
+	Mounter volume.Mounter
 	// SELinuxLabeled indicates whether this volume has had the
 	// pod's SELinux label applied to it or not
 	SELinuxLabeled bool

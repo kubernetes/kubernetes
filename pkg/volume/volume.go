@@ -58,15 +58,15 @@ type Metrics struct {
 	Available *resource.Quantity
 }
 
-// Attributes represents the attributes of this builder.
+// Attributes represents the attributes of this mounter.
 type Attributes struct {
 	ReadOnly        bool
 	Managed         bool
 	SupportsSELinux bool
 }
 
-// Builder interface provides methods to set up/mount the volume.
-type Builder interface {
+// Mounter interface provides methods to set up/mount the volume.
+type Mounter interface {
 	// Uses Interface to provide the path for Docker binds.
 	Volume
 	// SetUp prepares and mounts/unpacks the volume to a
@@ -82,12 +82,12 @@ type Builder interface {
 	// be called more than once, so implementations must be
 	// idempotent.
 	SetUpAt(dir string, fsGroup *int64) error
-	// GetAttributes returns the attributes of the builder.
+	// GetAttributes returns the attributes of the mounter.
 	GetAttributes() Attributes
 }
 
-// Cleaner interface provides methods to cleanup/unmount the volumes.
-type Cleaner interface {
+// Unmounter interface provides methods to cleanup/unmount the volumes.
+type Unmounter interface {
 	Volume
 	// TearDown unmounts the volume from a self-determined directory and
 	// removes traces of the SetUp procedure.

@@ -48,7 +48,7 @@ type AWSDiskUtil struct{}
 
 // Attaches a disk to the current kubelet.
 // Mounts the disk to it's global path.
-func (diskUtil *AWSDiskUtil) AttachAndMountDisk(b *awsElasticBlockStoreBuilder, globalPDPath string) error {
+func (diskUtil *AWSDiskUtil) AttachAndMountDisk(b *awsElasticBlockStoreMounter, globalPDPath string) error {
 	glog.V(5).Infof("AttachAndMountDisk(...) called for PD %q. Will block for existing operations, if any. (globalPDPath=%q)\r\n", b.volumeID, globalPDPath)
 
 	// Block execution until any pending detach operations for this PD have completed
@@ -95,7 +95,7 @@ func (diskUtil *AWSDiskUtil) AttachAndMountDisk(b *awsElasticBlockStoreBuilder, 
 }
 
 // Unmounts the device and detaches the disk from the kubelet's host machine.
-func (util *AWSDiskUtil) DetachDisk(c *awsElasticBlockStoreCleaner) error {
+func (util *AWSDiskUtil) DetachDisk(c *awsElasticBlockStoreUnmounter) error {
 	glog.V(5).Infof("DetachDisk(...) for PD %q\r\n", c.volumeID)
 
 	if err := unmountPDAndRemoveGlobalPath(c); err != nil {
@@ -159,7 +159,7 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (volum
 }
 
 // Attaches the specified persistent disk device to node, verifies that it is attached, and retries if it fails.
-func attachDiskAndVerify(b *awsElasticBlockStoreBuilder, xvdBeforeSet sets.String) (string, error) {
+func attachDiskAndVerify(b *awsElasticBlockStoreMounter, xvdBeforeSet sets.String) (string, error) {
 	var awsCloud *aws.AWSCloud
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
 		var err error
@@ -221,7 +221,7 @@ func verifyDevicePath(devicePaths []string) (string, error) {
 
 // Detaches the specified persistent disk device from node, verifies that it is detached, and retries if it fails.
 // This function is intended to be called asynchronously as a go routine.
-func detachDiskAndVerify(c *awsElasticBlockStoreCleaner) {
+func detachDiskAndVerify(c *awsElasticBlockStoreUnmounter) {
 	glog.V(5).Infof("detachDiskAndVerify(...) for pd %q. Will block for pending operations", c.volumeID)
 	defer runtime.HandleCrash()
 
@@ -280,7 +280,7 @@ func detachDiskAndVerify(c *awsElasticBlockStoreCleaner) {
 }
 
 // Unmount the global PD mount, which should be the only one, and delete it.
-func unmountPDAndRemoveGlobalPath(c *awsElasticBlockStoreCleaner) error {
+func unmountPDAndRemoveGlobalPath(c *awsElasticBlockStoreUnmounter) error {
 	globalPDPath := makeGlobalPDPath(c.plugin.host, c.volumeID)
 
 	err := c.mounter.Unmount(globalPDPath)

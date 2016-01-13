@@ -58,16 +58,16 @@ func (plugin *configMapPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.ConfigMap != nil
 }
 
-func (plugin *configMapPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
-	return &configMapVolumeBuilder{
+func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+	return &configMapVolumeMounter{
 		configMapVolume: &configMapVolume{spec.Name(), pod.UID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}},
 		source:          *spec.Volume.ConfigMap,
 		pod:             *pod,
 		opts:            &opts}, nil
 }
 
-func (plugin *configMapPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return &configMapVolumeCleaner{&configMapVolume{volName, podUID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}}}, nil
+func (plugin *configMapPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	return &configMapVolumeUnmounter{&configMapVolume{volName, podUID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}}}, nil
 }
 
 type configMapVolume struct {
@@ -85,9 +85,9 @@ func (sv *configMapVolume) GetPath() string {
 	return sv.plugin.host.GetPodVolumeDir(sv.podUID, strings.EscapeQualifiedNameForDisk(configMapPluginName), sv.volName)
 }
 
-// configMapVolumeBuilder handles retrieving secrets from the API server
+// configMapVolumeMounter handles retrieving secrets from the API server
 // and placing them into the volume on the host.
-type configMapVolumeBuilder struct {
+type configMapVolumeMounter struct {
 	*configMapVolume
 
 	source api.ConfigMapVolumeSource
@@ -95,7 +95,7 @@ type configMapVolumeBuilder struct {
 	opts   *volume.VolumeOptions
 }
 
-var _ volume.Builder = &configMapVolumeBuilder{}
+var _ volume.Mounter = &configMapVolumeMounter{}
 
 func (sv *configMapVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{
@@ -110,15 +110,15 @@ var wrappedVolumeSpec = volume.Spec{
 	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
 }
 
-func (b *configMapVolumeBuilder) SetUp(fsGroup *int64) error {
+func (b *configMapVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *configMapVolumeBuilder) SetUpAt(dir string, fsGroup *int64) error {
+func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperBuilder(b.volName, wrappedVolumeSpec, &b.pod, *b.opts)
+	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec, &b.pod, *b.opts)
 	if err != nil {
 		return err
 	}
@@ -202,22 +202,22 @@ func totalBytes(configMap *api.ConfigMap) int {
 	return totalSize
 }
 
-// configMapVolumeCleaner handles cleaning up configMap volumes.
-type configMapVolumeCleaner struct {
+// configMapVolumeUnmounter handles cleaning up configMap volumes.
+type configMapVolumeUnmounter struct {
 	*configMapVolume
 }
 
-var _ volume.Cleaner = &configMapVolumeCleaner{}
+var _ volume.Unmounter = &configMapVolumeUnmounter{}
 
-func (c *configMapVolumeCleaner) TearDown() error {
+func (c *configMapVolumeUnmounter) TearDown() error {
 	return c.TearDownAt(c.GetPath())
 }
 
-func (c *configMapVolumeCleaner) TearDownAt(dir string) error {
+func (c *configMapVolumeUnmounter) TearDownAt(dir string) error {
 	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", c.volName, c.podUID, dir)
 
 	// Wrap EmptyDir, let it do the teardown.
-	wrapped, err := c.plugin.host.NewWrapperCleaner(c.volName, wrappedVolumeSpec, c.podUID)
+	wrapped, err := c.plugin.host.NewWrapperUnmounter(c.volName, wrappedVolumeSpec, c.podUID)
 	if err != nil {
 		return err
 	}

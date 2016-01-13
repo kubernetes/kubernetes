@@ -95,7 +95,7 @@ func (util *RBDUtil) MakeGlobalPDName(rbd rbd) string {
 	return makePDNameInternal(rbd.plugin.host, rbd.Pool, rbd.Image)
 }
 
-func (util *RBDUtil) rbdLock(b rbdBuilder, lock bool) error {
+func (util *RBDUtil) rbdLock(b rbdMounter, lock bool) error {
 	var err error
 	var output, locker string
 	var cmd []byte
@@ -159,7 +159,7 @@ func (util *RBDUtil) rbdLock(b rbdBuilder, lock bool) error {
 	return err
 }
 
-func (util *RBDUtil) persistRBD(rbd rbdBuilder, mnt string) error {
+func (util *RBDUtil) persistRBD(rbd rbdMounter, mnt string) error {
 	file := path.Join(mnt, "rbd.json")
 	fp, err := os.Create(file)
 	if err != nil {
@@ -175,7 +175,7 @@ func (util *RBDUtil) persistRBD(rbd rbdBuilder, mnt string) error {
 	return nil
 }
 
-func (util *RBDUtil) loadRBD(builder *rbdBuilder, mnt string) error {
+func (util *RBDUtil) loadRBD(mounter *rbdMounter, mnt string) error {
 	file := path.Join(mnt, "rbd.json")
 	fp, err := os.Open(file)
 	if err != nil {
@@ -184,14 +184,14 @@ func (util *RBDUtil) loadRBD(builder *rbdBuilder, mnt string) error {
 	defer fp.Close()
 
 	decoder := json.NewDecoder(fp)
-	if err = decoder.Decode(builder); err != nil {
+	if err = decoder.Decode(mounter); err != nil {
 		return fmt.Errorf("rbd: decode err: %v.", err)
 	}
 
 	return nil
 }
 
-func (util *RBDUtil) fencing(b rbdBuilder) error {
+func (util *RBDUtil) fencing(b rbdMounter) error {
 	// no need to fence readOnly
 	if (&b).GetAttributes().ReadOnly {
 		return nil
@@ -199,16 +199,16 @@ func (util *RBDUtil) fencing(b rbdBuilder) error {
 	return util.rbdLock(b, true)
 }
 
-func (util *RBDUtil) defencing(c rbdCleaner) error {
+func (util *RBDUtil) defencing(c rbdUnmounter) error {
 	// no need to fence readOnly
 	if c.ReadOnly {
 		return nil
 	}
 
-	return util.rbdLock(*c.rbdBuilder, false)
+	return util.rbdLock(*c.rbdMounter, false)
 }
 
-func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
+func (util *RBDUtil) AttachDisk(b rbdMounter) error {
 	var err error
 	var output []byte
 
@@ -281,7 +281,7 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 	return err
 }
 
-func (util *RBDUtil) DetachDisk(c rbdCleaner, mntPath string) error {
+func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 	device, cnt, err := mount.GetDeviceNameFromMount(c.mounter, mntPath)
 	if err != nil {
 		return fmt.Errorf("rbd detach disk: failed to get device from mnt: %s\nError: %v", mntPath, err)
@@ -298,7 +298,7 @@ func (util *RBDUtil) DetachDisk(c rbdCleaner, mntPath string) error {
 		}
 
 		// load ceph and image/pool info to remove fencing
-		if err := util.loadRBD(c.rbdBuilder, mntPath); err == nil {
+		if err := util.loadRBD(c.rbdMounter, mntPath); err == nil {
 			// remove rbd lock
 			util.defencing(c)
 		}

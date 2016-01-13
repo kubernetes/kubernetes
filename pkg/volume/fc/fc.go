@@ -77,12 +77,12 @@ func (plugin *fcPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	}
 }
 
-func (plugin *fcPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *fcPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, pod.UID, &FCUtil{}, plugin.host.GetMounter())
+	return plugin.newMounterInternal(spec, pod.UID, &FCUtil{}, plugin.host.GetMounter())
 }
 
-func (plugin *fcPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Mounter, error) {
 	// fc volumes used directly in a pod have a ReadOnly flag set by the pod author.
 	// fc volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
 	var readOnly bool
@@ -101,7 +101,7 @@ func (plugin *fcPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, 
 
 	lun := strconv.Itoa(*fc.Lun)
 
-	return &fcDiskBuilder{
+	return &fcDiskMounter{
 		fcDisk: &fcDisk{
 			podUID:  podUID,
 			volName: spec.Name(),
@@ -116,13 +116,13 @@ func (plugin *fcPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, 
 	}, nil
 }
 
-func (plugin *fcPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *fcPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, &FCUtil{}, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, &FCUtil{}, plugin.host.GetMounter())
 }
 
-func (plugin *fcPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
-	return &fcDiskCleaner{
+func (plugin *fcPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Unmounter, error) {
+	return &fcDiskUnmounter{
 		fcDisk: &fcDisk{
 			podUID:  podUID,
 			volName: volName,
@@ -159,27 +159,27 @@ func (fc *fcDisk) GetPath() string {
 	return fc.plugin.host.GetPodVolumeDir(fc.podUID, strings.EscapeQualifiedNameForDisk(name), fc.volName)
 }
 
-type fcDiskBuilder struct {
+type fcDiskMounter struct {
 	*fcDisk
 	readOnly bool
 	fsType   string
 	mounter  *mount.SafeFormatAndMount
 }
 
-var _ volume.Builder = &fcDiskBuilder{}
+var _ volume.Mounter = &fcDiskMounter{}
 
-func (b *fcDiskBuilder) GetAttributes() volume.Attributes {
+func (b *fcDiskMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		ReadOnly:        b.readOnly,
 		Managed:         !b.readOnly,
 		SupportsSELinux: true,
 	}
 }
-func (b *fcDiskBuilder) SetUp(fsGroup *int64) error {
+func (b *fcDiskMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *fcDiskBuilder) SetUpAt(dir string, fsGroup *int64) error {
+func (b *fcDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
 	if err != nil {
@@ -188,19 +188,19 @@ func (b *fcDiskBuilder) SetUpAt(dir string, fsGroup *int64) error {
 	return err
 }
 
-type fcDiskCleaner struct {
+type fcDiskUnmounter struct {
 	*fcDisk
 	mounter mount.Interface
 }
 
-var _ volume.Cleaner = &fcDiskCleaner{}
+var _ volume.Unmounter = &fcDiskUnmounter{}
 
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.
-func (c *fcDiskCleaner) TearDown() error {
+func (c *fcDiskUnmounter) TearDown() error {
 	return c.TearDownAt(c.GetPath())
 }
 
-func (c *fcDiskCleaner) TearDownAt(dir string) error {
+func (c *fcDiskUnmounter) TearDownAt(dir string) error {
 	return diskTearDown(c.manager, *c, dir, c.mounter)
 }

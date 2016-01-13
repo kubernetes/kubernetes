@@ -16,7 +16,7 @@ limitations under the License.
 
 //
 // diskManager interface and diskSetup/TearDown functions abtract commonly used procedures to setup a block volume
-// rbd volume implements diskManager, calls diskSetup when creating a volume, and calls diskTearDown inside volume cleaner.
+// rbd volume implements diskManager, calls diskSetup when creating a volume, and calls diskTearDown inside volume unmounter.
 // TODO: consolidate, refactor, and share diskManager among iSCSI, GCE PD, and RBD
 //
 
@@ -34,13 +34,13 @@ import (
 type diskManager interface {
 	MakeGlobalPDName(disk rbd) string
 	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(disk rbdBuilder) error
+	AttachDisk(disk rbdMounter) error
 	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(disk rbdCleaner, mntPath string) error
+	DetachDisk(disk rbdUnmounter, mntPath string) error
 }
 
 // utility to mount a disk based filesystem
-func diskSetUp(manager diskManager, b rbdBuilder, volPath string, mounter mount.Interface, fsGroup *int64) error {
+func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.Interface, fsGroup *int64) error {
 	globalPDPath := manager.MakeGlobalPDName(*b.rbd)
 	// TODO: handle failed mounts here.
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
@@ -80,7 +80,7 @@ func diskSetUp(manager diskManager, b rbdBuilder, volPath string, mounter mount.
 }
 
 // utility to tear down a disk based filesystem
-func diskTearDown(manager diskManager, c rbdCleaner, volPath string, mounter mount.Interface) error {
+func diskTearDown(manager diskManager, c rbdUnmounter, volPath string, mounter mount.Interface) error {
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
 	if err != nil {
 		glog.Errorf("cannot validate mountpoint %s", volPath)

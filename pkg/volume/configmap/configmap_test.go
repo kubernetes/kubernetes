@@ -229,21 +229,21 @@ func TestPlugin(t *testing.T) {
 	}
 
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID}}
-	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
-		t.Errorf("Failed to make a new Builder: %v", err)
+		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
-	if builder == nil {
-		t.Errorf("Got a nil Builder")
+	if mounter == nil {
+		t.Errorf("Got a nil Mounter")
 	}
 
-	volumePath := builder.GetPath()
+	volumePath := mounter.GetPath()
 	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid/volumes/kubernetes.io~configmap/test_volume_name")) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
 	fsGroup := int64(1001)
-	err = builder.SetUp(&fsGroup)
+	err = mounter.SetUp(&fsGroup)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -284,23 +284,23 @@ func TestPluginReboot(t *testing.T) {
 	}
 
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID}}
-	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
-		t.Errorf("Failed to make a new Builder: %v", err)
+		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
-	if builder == nil {
-		t.Errorf("Got a nil Builder")
+	if mounter == nil {
+		t.Errorf("Got a nil Mounter")
 	}
 
 	podMetadataDir := fmt.Sprintf("%v/pods/test_pod_uid3/plugins/kubernetes.io~configmap/test_volume_name", rootDir)
 	util.SetReady(podMetadataDir)
-	volumePath := builder.GetPath()
+	volumePath := mounter.GetPath()
 	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid3/volumes/kubernetes.io~configmap/test_volume_name")) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
 	fsGroup := int64(1001)
-	err = builder.SetUp(&fsGroup)
+	err = mounter.SetUp(&fsGroup)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -362,15 +362,15 @@ func doTestConfigMapDataInVolume(volumePath string, configMap api.ConfigMap, t *
 }
 
 func doTestCleanAndTeardown(plugin volume.VolumePlugin, podUID types.UID, testVolumeName, volumePath string, t *testing.T) {
-	cleaner, err := plugin.NewCleaner(testVolumeName, podUID)
+	unmounter, err := plugin.NewUnmounter(testVolumeName, podUID)
 	if err != nil {
-		t.Errorf("Failed to make a new Cleaner: %v", err)
+		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
-	if cleaner == nil {
-		t.Errorf("Got a nil Cleaner")
+	if unmounter == nil {
+		t.Errorf("Got a nil Unmounter")
 	}
 
-	if err := cleaner.TearDown(); err != nil {
+	if err := unmounter.TearDown(); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(volumePath); err == nil {

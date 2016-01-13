@@ -1193,9 +1193,9 @@ func (kl *Kubelet) relabelVolumes(pod *api.Pod, volumes kubecontainer.VolumeMap)
 	volumeContext := fmt.Sprintf("%s:%s:%s:%s", rootDirSELinuxOptions.User, rootDirSELinuxOptions.Role, rootDirSELinuxOptions.Type, rootDirSELinuxOptions.Level)
 
 	for _, vol := range volumes {
-		if vol.Builder.GetAttributes().Managed && vol.Builder.GetAttributes().SupportsSELinux {
+		if vol.Mounter.GetAttributes().Managed && vol.Mounter.GetAttributes().SupportsSELinux {
 			// Relabel the volume and its content to match the 'Level' of the pod
-			err := filepath.Walk(vol.Builder.GetPath(), func(path string, info os.FileInfo, err error) error {
+			err := filepath.Walk(vol.Mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
 				if err != nil {
 					return err
 				}
@@ -1231,14 +1231,14 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, podVolume
 		// If the volume supports SELinux and it has not been
 		// relabeled already and it is not a read-only volume,
 		// relabel it and mark it as labeled
-		if vol.Builder.GetAttributes().Managed && vol.Builder.GetAttributes().SupportsSELinux && !vol.SELinuxLabeled {
+		if vol.Mounter.GetAttributes().Managed && vol.Mounter.GetAttributes().SupportsSELinux && !vol.SELinuxLabeled {
 			vol.SELinuxLabeled = true
 			relabelVolume = true
 		}
 		mounts = append(mounts, kubecontainer.Mount{
 			Name:           mount.Name,
 			ContainerPath:  mount.MountPath,
-			HostPath:       vol.Builder.GetPath(),
+			HostPath:       vol.Mounter.GetPath(),
 			ReadOnly:       mount.ReadOnly,
 			SELinuxRelabel: relabelVolume,
 		})
@@ -1931,12 +1931,12 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 			// TODO(yifan): Refactor this hacky string manipulation.
 			kl.volumeManager.DeleteVolumes(types.UID(parts[0]))
 			// Get path reference count
-			refs, err := mount.GetMountRefs(kl.mounter, cleanerTuple.Cleaner.GetPath())
+			refs, err := mount.GetMountRefs(kl.mounter, cleanerTuple.Unmounter.GetPath())
 			if err != nil {
 				return fmt.Errorf("Could not get mount path references %v", err)
 			}
 			//TODO (jonesdl) This should not block other kubelet synchronization procedures
-			err = cleanerTuple.Cleaner.TearDown()
+			err = cleanerTuple.Unmounter.TearDown()
 			if err != nil {
 				glog.Errorf("Could not tear down volume %q: %v", name, err)
 			}

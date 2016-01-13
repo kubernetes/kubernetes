@@ -75,16 +75,16 @@ type VolumePlugin interface {
 	// const.
 	CanSupport(spec *Spec) bool
 
-	// NewBuilder creates a new volume.Builder from an API specification.
+	// NewMounter creates a new volume.Mounter from an API specification.
 	// Ownership of the spec pointer in *not* transferred.
 	// - spec: The api.Volume spec
 	// - pod: The enclosing pod
-	NewBuilder(spec *Spec, podRef *api.Pod, opts VolumeOptions) (Builder, error)
+	NewMounter(spec *Spec, podRef *api.Pod, opts VolumeOptions) (Mounter, error)
 
-	// NewCleaner creates a new volume.Cleaner from recoverable state.
+	// NewUnmounter creates a new volume.Unmounter from recoverable state.
 	// - name: The volume name, as per the api.Volume spec.
 	// - podUID: The UID of the enclosing pod
-	NewCleaner(name string, podUID types.UID) (Cleaner, error)
+	NewUnmounter(name string, podUID types.UID) (Unmounter, error)
 }
 
 // PersistentVolumePlugin is an extended interface of VolumePlugin and is used
@@ -158,16 +158,16 @@ type VolumeHost interface {
 	// GetKubeClient returns a client interface
 	GetKubeClient() clientset.Interface
 
-	// NewWrapperBuilder finds an appropriate plugin with which to handle
+	// NewWrapperMounter finds an appropriate plugin with which to handle
 	// the provided spec.  This is used to implement volume plugins which
 	// "wrap" other plugins.  For example, the "secret" volume is
 	// implemented in terms of the "emptyDir" volume.
-	NewWrapperBuilder(volName string, spec Spec, pod *api.Pod, opts VolumeOptions) (Builder, error)
+	NewWrapperMounter(volName string, spec Spec, pod *api.Pod, opts VolumeOptions) (Mounter, error)
 
-	// NewWrapperCleaner finds an appropriate plugin with which to handle
-	// the provided spec.  See comments on NewWrapperBuilder for more
+	// NewWrapperUnmounter finds an appropriate plugin with which to handle
+	// the provided spec.  See comments on NewWrapperMounter for more
 	// context.
-	NewWrapperCleaner(volName string, spec Spec, podUID types.UID) (Cleaner, error)
+	NewWrapperUnmounter(volName string, spec Spec, podUID types.UID) (Unmounter, error)
 
 	// Get cloud provider from kubelet.
 	GetCloudProvider() cloudprovider.Interface
@@ -403,7 +403,7 @@ func (pm *VolumePluginMgr) FindCreatablePluginBySpec(spec *Spec) (ProvisionableV
 }
 
 // FindAttachablePluginBySpec fetches a persistent volume plugin by name.  Unlike the other "FindPlugin" methods, this
-// does not return error if no plugin is found.  All volumes require a builder and cleaner, but not every volume will
+// does not return error if no plugin is found.  All volumes require a mounter and unmounter, but not every volume will
 // have an attacher/detacher.
 func (pm *VolumePluginMgr) FindAttachablePluginBySpec(spec *Spec) (AttachableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
@@ -417,7 +417,7 @@ func (pm *VolumePluginMgr) FindAttachablePluginBySpec(spec *Spec) (AttachableVol
 }
 
 // FindAttachablePluginByName fetches an attachable volume plugin by name. Unlike the other "FindPlugin" methods, this
-// does not return error if no plugin is found.  All volumes require a builder and cleaner, but not every volume will
+// does not return error if no plugin is found.  All volumes require a mounter and unmounter, but not every volume will
 // have an attacher/detacher.
 func (pm *VolumePluginMgr) FindAttachablePluginByName(name string) (AttachableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginByName(name)
