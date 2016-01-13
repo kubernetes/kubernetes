@@ -1,5 +1,5 @@
 {% if grains.cloud is defined %}
-{% if grains.cloud in ['aws', 'gce', 'vagrant'] %}
+{% if grains.cloud in ['aws', 'gce', 'vagrant', 'vsphere'] %}
 # TODO: generate and distribute tokens on other cloud providers.
 /srv/kubernetes/known_tokens.csv:
   file.managed:
@@ -9,7 +9,7 @@
 {% endif %}
 {% endif %}
 
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant' ]  %}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant' ,'vsphere']  %}
 /srv/kubernetes/basic_auth.csv:
   file.managed:
     - source: salt://kube-apiserver/basic_auth.csv
