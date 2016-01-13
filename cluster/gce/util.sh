@@ -21,6 +21,7 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
+source "${KUBE_ROOT}/cluster/lib/util.sh"
 
 if [[ "${OS_DISTRIBUTION}" == "debian" || "${OS_DISTRIBUTION}" == "coreos" || "${OS_DISTRIBUTION}" == "trusty" ]]; then
   source "${KUBE_ROOT}/cluster/gce/${OS_DISTRIBUTION}/helper.sh"
@@ -299,21 +300,6 @@ function detect-master () {
     exit 1
   fi
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
-}
-
-# Wait for background jobs to finish. Exit with
-# an error status if any of the jobs failed.
-function wait-for-jobs {
-  local fail=0
-  local job
-  for job in $(jobs -p); do
-    wait "${job}" || fail=$((fail + 1))
-  done
-  if (( fail != 0 )); then
-    echo -e "${color_red}${fail} commands failed.  Exiting.${color_norm}" >&2
-    # Ignore failures for now.
-    # exit 2
-  fi
 }
 
 # Robustly try to create a static ip.
@@ -687,7 +673,9 @@ function kube-up {
   fi
 
   # Wait for last batch of jobs
-  wait-for-jobs
+  kube::util::wait-for-jobs || {
+    echo -e "${color_red}${fail} commands failed.${color_norm}" >&2
+  }
 
   echo "Creating minions."
 
@@ -1192,7 +1180,10 @@ function kube-push {
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     push-node "${NODE_NAMES[$i]}" &
   done
-  wait-for-jobs
+
+  kube::util::wait-for-jobs || {
+    echo -e "${color_red}${fail} commands failed.${color_norm}" >&2
+  }
 
   # TODO(zmerlynn): Re-create instance-template with the new
   # node-kube-env. This isn't important until the node-ip-range issue
