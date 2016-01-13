@@ -21,6 +21,7 @@ import (
 	"net"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 
@@ -41,6 +42,7 @@ type SchedulerServer struct {
 	KubeAPIQPS        float32
 	KubeAPIBurst      int
 	SchedulerName     string
+	LeaderElection    leaderelection.LeaderElectionCLIConfig
 }
 
 // NewSchedulerServer creates a new SchedulerServer with default parameters
@@ -54,6 +56,7 @@ func NewSchedulerServer() *SchedulerServer {
 		KubeAPIQPS:        50.0,
 		KubeAPIBurst:      100,
 		SchedulerName:     api.DefaultSchedulerName,
+		LeaderElection:    leaderelection.DefaultLeaderElectionCLIConfig(),
 	}
 	return &s
 }
@@ -72,4 +75,5 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.StringVar(&s.SchedulerName, "scheduler-name", s.SchedulerName, "Name of the scheduler, used to select which pods will be processed by this scheduler, based on pod's annotation with key 'scheduler.alpha.kubernetes.io/name'")
+	s.LeaderElection.BindFlags(fs)
 }
