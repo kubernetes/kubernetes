@@ -317,7 +317,7 @@ func newReplicationController(d *exp.Deployment, name string, replicas int) *api
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: 0,
+			Replicas: replicas,
 			Template: &d.Spec.Template,
 		},
 	}

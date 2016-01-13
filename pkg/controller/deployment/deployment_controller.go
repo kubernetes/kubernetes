@@ -406,7 +406,38 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 }
 
 func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Deployment) error {
-	// TODO: implement me.
+	newRC, err := dc.getNewRC(deployment)
+	if err != nil {
+		return err
+	}
+
+	oldRCs, err := dc.getOldRCs(deployment)
+	if err != nil {
+		return err
+	}
+
+	allRCs := append(oldRCs, newRC)
+
+	// scale down old rcs
+	scaledDown, err := dc.scaleDownOldRCsForRecreate(oldRCs, deployment)
+	if err != nil {
+		return err
+	}
+	if scaledDown {
+		// Update DeploymentStatus
+		return dc.updateDeploymentStatus(allRCs, newRC, deployment)
+	}
+
+	// scale up new rc
+	scaledUp, err := dc.scaleUpNewRCForRecreate(newRC, deployment)
+	if err != nil {
+		return err
+	}
+	if scaledUp {
+		// Update DeploymentStatus
+		return dc.updateDeploymentStatus(allRCs, newRC, deployment)
+	}
+
 	return nil
 }
 
@@ -596,6 +627,33 @@ func (dc *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationControl
 			dc.expectations.ExpectDeletions(dKey, scaleDownCount)
 		}
 	}
+	return true, err
+}
+
+// scaleDownOldRCsForRecreate scales down old rcs when deployment strategy is "Recreate"
+func (dc *DeploymentController) scaleDownOldRCsForRecreate(oldRCs []*api.ReplicationController, deployment extensions.Deployment) (bool, error) {
+	scaled := false
+	for _, rc := range oldRCs {
+		// Scaling not required.
+		if rc.Spec.Replicas == 0 {
+			continue
+		}
+		_, err := dc.scaleRCAndRecordEvent(rc, 0, deployment)
+		if err != nil {
+			return false, err
+		}
+		scaled = true
+	}
+	return scaled, nil
+}
+
+// scaleUpNewRCForRecreate scales up new rc when deployment strategy is "Recreate"
+func (dc *DeploymentController) scaleUpNewRCForRecreate(newRC *api.ReplicationController, deployment extensions.Deployment) (bool, error) {
+	if newRC.Spec.Replicas == deployment.Spec.Replicas {
+		// Scaling not required.
+		return false, nil
+	}
+	_, err := dc.scaleRCAndRecordEvent(newRC, deployment.Spec.Replicas, deployment)
 	return true, err
 }
 
