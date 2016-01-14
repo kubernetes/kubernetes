@@ -17,17 +17,9 @@ limitations under the License.
 package unversioned
 
 import (
-	"encoding/json"
-	"fmt"
 	"net"
 	"net/url"
 	"strings"
-
-	"github.com/emicklei/go-restful/swagger"
-
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 // Interface holds the methods for clients of Kubernetes,
@@ -38,7 +30,6 @@ type Interface interface {
 	ReplicationControllersNamespacer
 	ServicesNamespacer
 	EndpointsNamespacer
-	VersionInterface
 	NodesInterface
 	EventNamespacer
 	LimitRangesNamespacer
@@ -49,7 +40,6 @@ type Interface interface {
 	PersistentVolumesInterface
 	PersistentVolumeClaimsNamespacer
 	ComponentStatusesInterface
-	SwaggerSchemaInterface
 	Extensions() ExtensionsInterface
 	Discovery() DiscoveryInterface
 }
@@ -113,71 +103,11 @@ func (c *Client) ComponentStatuses() ComponentStatusInterface {
 	return newComponentStatuses(c)
 }
 
-// VersionInterface has a method to retrieve the server version.
-type VersionInterface interface {
-	ServerVersion() (*version.Info, error)
-}
-
 // Client is the implementation of a Kubernetes client.
 type Client struct {
 	*RESTClient
 	*ExtensionsClient
-	// TODO: remove this when we re-structure pkg/client.
 	*DiscoveryClient
-}
-
-// ServerVersion retrieves and parses the server's version.
-func (c *Client) ServerVersion() (*version.Info, error) {
-	body, err := c.Get().AbsPath("/version").Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var info version.Info
-	err = json.Unmarshal(body, &info)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &info, nil
-}
-
-// SwaggerSchemaInterface has a method to retrieve the swagger schema. Used in
-// client.Interface
-type SwaggerSchemaInterface interface {
-	SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error)
-}
-
-// SwaggerSchema retrieves and parses the swagger API schema the server supports.
-func (c *Client) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
-	if version.IsEmpty() {
-		return nil, fmt.Errorf("groupVersion cannot be empty")
-	}
-
-	groupList, err := c.Discovery().ServerGroups()
-	if err != nil {
-		return nil, err
-	}
-	groupVersions := ExtractGroupVersions(groupList)
-	// This check also takes care the case that kubectl is newer than the running endpoint
-	if stringDoesntExistIn(version.String(), groupVersions) {
-		return nil, fmt.Errorf("API version: %v is not supported by the server. Use one of: %v", version, groupVersions)
-	}
-	var path string
-	if version == v1.SchemeGroupVersion {
-		path = "/swaggerapi/api/" + version.Version
-	} else {
-		path = "/swaggerapi/apis/" + version.Group + "/" + version.Version
-	}
-
-	body, err := c.Get().AbsPath(path).Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var schema swagger.ApiDeclaration
-	err = json.Unmarshal(body, &schema)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &schema, nil
 }
 
 func stringDoesntExistIn(str string, slice []string) bool {
