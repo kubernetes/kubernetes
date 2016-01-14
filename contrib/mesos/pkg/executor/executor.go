@@ -91,7 +91,6 @@ func (s *stateType) transitionTo(to stateType, unless ...stateType) bool {
 type Executor struct {
 	state                stateType
 	lock                 sync.Mutex
-	client               *client.Client
 	terminate            chan struct{}                     // signals that the executor is shutting down
 	outgoing             chan func() (mesos.Status, error) // outgoing queue to the mesos driver
 	dockerClient         dockertools.DockerInterface
@@ -106,6 +105,8 @@ type Executor struct {
 	initCompleted        chan struct{} // closes upon completion of Init()
 	registry             Registry
 	podWatcher           *podWatcher
+	kubeAPI              kubeAPI
+	nodeAPI              nodeAPI
 }
 
 type Config struct {
@@ -136,7 +137,6 @@ func New(config Config) *Executor {
 	}
 	k := &Executor{
 		state:                disconnectedState,
-		client:               config.APIClient,
 		terminate:            make(chan struct{}),
 		outgoing:             make(chan func() (mesos.Status, error), 1024),
 		dockerClient:         config.Docker,
@@ -150,6 +150,8 @@ func New(config Config) *Executor {
 		nodeInfos:            config.NodeInfos,
 		initCompleted:        make(chan struct{}),
 		registry:             config.Registry,
+		kubeAPI:              &clientAPIWrapper{config.APIClient},
+		nodeAPI:              &clientAPIWrapper{config.APIClient},
 	}
 
 	runtime.On(k.initCompleted, k.runSendLoop)
@@ -183,9 +185,9 @@ func (k *Executor) Init(driver bindings.ExecutorDriver) {
 
 		case RegistrationEventDeleted:
 			k.resetSuicideWatch(driver)
-			// send back a TASK_FINISHED status here since we completed the
+			// send back a TASK_KILLED status here since we completed the
 			// pod-task lifecycle normally.
-			k.sendStatus(driver, newStatus(mutil.NewTaskID(pod.taskID), mesos.TaskState_TASK_FINISHED, "pod-deleted"))
+			k.sendStatus(driver, newStatus(mutil.NewTaskID(pod.taskID), mesos.TaskState_TASK_KILLED, "pod-deleted"))
 		}
 		return true
 	})
@@ -238,8 +240,7 @@ func (k *Executor) Registered(
 	}
 
 	if slaveInfo != nil {
-		_, err := node.CreateOrUpdate(
-			k.client,
+		_, err := k.nodeAPI.createOrUpdate(
 			slaveInfo.GetHostname(),
 			node.SlaveAttributesToLabels(slaveInfo.Attributes),
 			annotations,
@@ -270,8 +271,7 @@ func (k *Executor) Reregistered(driver bindings.ExecutorDriver, slaveInfo *mesos
 	}
 
 	if slaveInfo != nil {
-		_, err := node.CreateOrUpdate(
-			k.client,
+		_, err := k.nodeAPI.createOrUpdate(
 			slaveInfo.GetHostname(),
 			node.SlaveAttributesToLabels(slaveInfo.Attributes),
 			nil, // don't change annotations
@@ -564,7 +564,7 @@ func (k *Executor) killPodTask(driver bindings.ExecutorDriver, taskID string) {
 
 	// force-delete the pod from the API server
 	// TODO(jdef) possibly re-use eviction code from stock k8s once it lands?
-	err := k.client.Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0))
+	err := k.kubeAPI.killPod(pod.Namespace, pod.Name)
 	if err != nil {
 		log.V(1).Infof("failed to delete task %v pod %v/%v from apiserver: %+v", taskID, pod.Namespace, pod.Name, err)
 	}
