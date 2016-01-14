@@ -442,6 +442,15 @@ func (p *Pod) FindContainerByName(containerName string) *Container {
 	return nil
 }
 
+func (p *Pod) FindContainerByID(id ContainerID) *Container {
+	for _, c := range p.Containers {
+		if c.ID == id {
+			return c
+		}
+	}
+	return nil
+}
+
 // ToAPIPod converts Pod to api.Pod. Note that if a field in api.Pod has no
 // corresponding field in Pod, the field would not be populated.
 func (p *Pod) ToAPIPod() *api.Pod {
