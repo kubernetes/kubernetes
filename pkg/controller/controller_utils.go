@@ -76,16 +76,16 @@ func StaticResyncPeriodFunc(resyncPeriod time.Duration) ResyncPeriodFunc {
 //	}
 //
 // Implementation:
-//	PodExpectation = pair of atomic counters to track pod creation/deletion
-//	ControllerExpectationsStore = TTLStore + a PodExpectation per controller
+//	ControlleeExpectation = pair of atomic counters to track controllee's creation/deletion
+//	ControllerExpectationsStore = TTLStore + a ControlleeExpectation per controller
 //
 // * Once set expectations can only be lowered
 // * A controller isn't synced till its expectations are either fulfilled, or expire
-// * Controllers that don't set expectations will get woken up for every matching pod
+// * Controllers that don't set expectations will get woken up for every matching controllee
 
-// ExpKeyFunc to parse out the key from a PodExpectation
+// ExpKeyFunc to parse out the key from a ControlleeExpectation
 var ExpKeyFunc = func(obj interface{}) (string, error) {
-	if e, ok := obj.(*PodExpectations); ok {
+	if e, ok := obj.(*ControlleeExpectations); ok {
 		return e.key, nil
 	}
 	return "", fmt.Errorf("Could not find key for obj %#v", obj)
@@ -96,7 +96,7 @@ var ExpKeyFunc = func(obj interface{}) (string, error) {
 // Warning: if using KeyFunc it is not safe to use a single ControllerExpectationsInterface with different
 // types of controllers, because the keys might conflict across types.
 type ControllerExpectationsInterface interface {
-	GetExpectations(controllerKey string) (*PodExpectations, bool, error)
+	GetExpectations(controllerKey string) (*ControlleeExpectations, bool, error)
 	SatisfiedExpectations(controllerKey string) bool
 	DeleteExpectations(controllerKey string)
 	SetExpectations(controllerKey string, add, del int) error
@@ -111,10 +111,10 @@ type ControllerExpectations struct {
 	cache.Store
 }
 
-// GetExpectations returns the PodExpectations of the given controller.
-func (r *ControllerExpectations) GetExpectations(controllerKey string) (*PodExpectations, bool, error) {
-	if podExp, exists, err := r.GetByKey(controllerKey); err == nil && exists {
-		return podExp.(*PodExpectations), true, nil
+// GetExpectations returns the ControlleeExpectations of the given controller.
+func (r *ControllerExpectations) GetExpectations(controllerKey string) (*ControlleeExpectations, bool, error) {
+	if exp, exists, err := r.GetByKey(controllerKey); err == nil && exists {
+		return exp.(*ControlleeExpectations), true, nil
 	} else {
 		return nil, false, err
 	}
@@ -122,22 +122,22 @@ func (r *ControllerExpectations) GetExpectations(controllerKey string) (*PodExpe
 
 // DeleteExpectations deletes the expectations of the given controller from the TTLStore.
 func (r *ControllerExpectations) DeleteExpectations(controllerKey string) {
-	if podExp, exists, err := r.GetByKey(controllerKey); err == nil && exists {
-		if err := r.Delete(podExp); err != nil {
+	if exp, exists, err := r.GetByKey(controllerKey); err == nil && exists {
+		if err := r.Delete(exp); err != nil {
 			glog.V(2).Infof("Error deleting expectations for controller %v: %v", controllerKey, err)
 		}
 	}
 }
 
 // SatisfiedExpectations returns true if the required adds/dels for the given controller have been observed.
-// Add/del counts are established by the controller at sync time, and updated as pods are observed by the controller
+// Add/del counts are established by the controller at sync time, and updated as controllees are observed by the controller
 // manager.
 func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) bool {
-	if podExp, exists, err := r.GetExpectations(controllerKey); exists {
-		if podExp.Fulfilled() {
+	if exp, exists, err := r.GetExpectations(controllerKey); exists {
+		if exp.Fulfilled() {
 			return true
 		} else {
-			glog.V(4).Infof("Controller still waiting on expectations %#v", podExp)
+			glog.V(4).Infof("Controller still waiting on expectations %#v", exp)
 			return false
 		}
 	} else if err != nil {
@@ -145,9 +145,9 @@ func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) boo
 	} else {
 		// When a new controller is created, it doesn't have expectations.
 		// When it doesn't see expected watch events for > TTL, the expectations expire.
-		//	- In this case it wakes up, creates/deletes pods, and sets expectations again.
-		// When it has satisfied expectations and no pods need to be created/destroyed > TTL, the expectations expire.
-		//	- In this case it continues without setting expectations till it needs to create/delete pods.
+		//	- In this case it wakes up, creates/deletes controllees, and sets expectations again.
+		// When it has satisfied expectations and no controllees need to be created/destroyed > TTL, the expectations expire.
+		//	- In this case it continues without setting expectations till it needs to create/delete controllees.
 		glog.V(4).Infof("Controller %v either never recorded expectations, or the ttl expired.", controllerKey)
 	}
 	// Trigger a sync if we either encountered and error (which shouldn't happen since we're
@@ -157,9 +157,9 @@ func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) boo
 
 // SetExpectations registers new expectations for the given controller. Forgets existing expectations.
 func (r *ControllerExpectations) SetExpectations(controllerKey string, add, del int) error {
-	podExp := &PodExpectations{add: int64(add), del: int64(del), key: controllerKey}
-	glog.V(4).Infof("Setting expectations %+v", podExp)
-	return r.Add(podExp)
+	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey}
+	glog.V(4).Infof("Setting expectations %+v", exp)
+	return r.Add(exp)
 }
 
 func (r *ControllerExpectations) ExpectCreations(controllerKey string, adds int) error {
@@ -172,10 +172,10 @@ func (r *ControllerExpectations) ExpectDeletions(controllerKey string, dels int)
 
 // Decrements the expectation counts of the given controller.
 func (r *ControllerExpectations) lowerExpectations(controllerKey string, add, del int) {
-	if podExp, exists, err := r.GetExpectations(controllerKey); err == nil && exists {
-		podExp.Seen(int64(add), int64(del))
+	if exp, exists, err := r.GetExpectations(controllerKey); err == nil && exists {
+		exp.Seen(int64(add), int64(del))
 		// The expectations might've been modified since the update on the previous line.
-		glog.V(4).Infof("Lowering expectations %+v", podExp)
+		glog.V(4).Infof("Lowering expectations %+v", exp)
 	}
 }
 
@@ -194,31 +194,31 @@ type Expectations interface {
 	Fulfilled() bool
 }
 
-// PodExpectations track pod creates/deletes.
-type PodExpectations struct {
+// ControlleeExpectations track controllee creates/deletes.
+type ControlleeExpectations struct {
 	add int64
 	del int64
 	key string
 }
 
 // Seen decrements the add and del counters.
-func (e *PodExpectations) Seen(add, del int64) {
+func (e *ControlleeExpectations) Seen(add, del int64) {
 	atomic.AddInt64(&e.add, -add)
 	atomic.AddInt64(&e.del, -del)
 }
 
 // Fulfilled returns true if this expectation has been fulfilled.
-func (e *PodExpectations) Fulfilled() bool {
+func (e *ControlleeExpectations) Fulfilled() bool {
 	// TODO: think about why this line being atomic doesn't matter
 	return atomic.LoadInt64(&e.add) <= 0 && atomic.LoadInt64(&e.del) <= 0
 }
 
-// GetExpectations returns the add and del expectations of the pod.
-func (e *PodExpectations) GetExpectations() (int64, int64) {
+// GetExpectations returns the add and del expectations of the controllee.
+func (e *ControlleeExpectations) GetExpectations() (int64, int64) {
 	return atomic.LoadInt64(&e.add), atomic.LoadInt64(&e.del)
 }
 
-// NewControllerExpectations returns a store for PodExpectations.
+// NewControllerExpectations returns a store for ControlleeExpectations.
 func NewControllerExpectations() *ControllerExpectations {
 	return &ControllerExpectations{cache.NewTTLStore(ExpKeyFunc, ExpectationsTimeout)}
 }
