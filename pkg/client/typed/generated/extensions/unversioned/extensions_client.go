@@ -23,12 +23,12 @@ import (
 )
 
 type ExtensionsInterface interface {
-	DaemonSetNamespacer
-	DeploymentNamespacer
-	HorizontalPodAutoscalerNamespacer
-	IngressNamespacer
-	JobNamespacer
-	ThirdPartyResourceNamespacer
+	DaemonSetsGetter
+	DeploymentsGetter
+	HorizontalPodAutoscalersGetter
+	IngressesGetter
+	JobsGetter
+	ThirdPartyResourcesGetter
 }
 
 // ExtensionsClient is used to interact with features provided by the Extensions group.

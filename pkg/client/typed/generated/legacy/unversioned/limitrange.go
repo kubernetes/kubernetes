@@ -21,8 +21,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// LimitRangeNamespacer has methods to work with LimitRange resources in a namespace
-type LimitRangeNamespacer interface {
+// LimitRangesGetter has a method to return a LimitRangeInterface.
+// A group's client should implement this interface.
+type LimitRangesGetter interface {
 	LimitRanges(namespace string) LimitRangeInterface
 }
 

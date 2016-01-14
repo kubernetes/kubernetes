@@ -21,8 +21,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// ResourceQuotaNamespacer has methods to work with ResourceQuota resources in a namespace
-type ResourceQuotaNamespacer interface {
+// ResourceQuotasGetter has a method to return a ResourceQuotaInterface.
+// A group's client should implement this interface.
+type ResourceQuotasGetter interface {
 	ResourceQuotas(namespace string) ResourceQuotaInterface
 }
 

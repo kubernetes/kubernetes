@@ -22,8 +22,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// JobNamespacer has methods to work with Job resources in a namespace
-type JobNamespacer interface {
+// JobsGetter has a method to return a JobInterface.
+// A group's client should implement this interface.
+type JobsGetter interface {
 	Jobs(namespace string) JobInterface
 }
 

@@ -21,8 +21,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// ServiceAccountNamespacer has methods to work with ServiceAccount resources in a namespace
-type ServiceAccountNamespacer interface {
+// ServiceAccountsGetter has a method to return a ServiceAccountInterface.
+// A group's client should implement this interface.
+type ServiceAccountsGetter interface {
 	ServiceAccounts(namespace string) ServiceAccountInterface
 }
 

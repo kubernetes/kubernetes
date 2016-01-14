@@ -21,9 +21,10 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// NodeNamespacer has methods to work with Node resources in a namespace
-type NodeNamespacer interface {
-	Nodes(namespace string) NodeInterface
+// NodesGetter has a method to return a NodeInterface.
+// A group's client should implement this interface.
+type NodesGetter interface {
+	Nodes() NodeInterface
 }
 
 // NodeInterface has methods to work with Node resources.
@@ -42,14 +43,12 @@ type NodeInterface interface {
 // nodes implements NodeInterface
 type nodes struct {
 	client *LegacyClient
-	ns     string
 }
 
 // newNodes returns a Nodes
-func newNodes(c *LegacyClient, namespace string) *nodes {
+func newNodes(c *LegacyClient) *nodes {
 	return &nodes{
 		client: c,
-		ns:     namespace,
 	}
 }
 
@@ -57,7 +56,6 @@ func newNodes(c *LegacyClient, namespace string) *nodes {
 func (c *nodes) Create(node *api.Node) (result *api.Node, err error) {
 	result = &api.Node{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("nodes").
 		Body(node).
 		Do().
@@ -69,7 +67,6 @@ func (c *nodes) Create(node *api.Node) (result *api.Node, err error) {
 func (c *nodes) Update(node *api.Node) (result *api.Node, err error) {
 	result = &api.Node{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("nodes").
 		Name(node.Name).
 		Body(node).
@@ -87,7 +84,6 @@ func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
 // Delete takes name of the node and deletes it. Returns an error if one occurs.
 func (c *nodes) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("nodes").
 		Name(name).
 		Body(options).
@@ -98,7 +94,6 @@ func (c *nodes) Delete(name string, options *api.DeleteOptions) error {
 // DeleteCollection deletes a collection of objects.
 func (c *nodes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("nodes").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
@@ -110,7 +105,6 @@ func (c *nodes) DeleteCollection(options *api.DeleteOptions, listOptions api.Lis
 func (c *nodes) Get(name string) (result *api.Node, err error) {
 	result = &api.Node{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("nodes").
 		Name(name).
 		Do().
@@ -122,7 +116,6 @@ func (c *nodes) Get(name string) (result *api.Node, err error) {
 func (c *nodes) List(opts api.ListOptions) (result *api.NodeList, err error) {
 	result = &api.NodeList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("nodes").
 		VersionedParams(&opts, api.Scheme).
 		Do().
@@ -134,7 +127,6 @@ func (c *nodes) List(opts api.ListOptions) (result *api.NodeList, err error) {
 func (c *nodes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
-		Namespace(c.ns).
 		Resource("nodes").
 		VersionedParams(&opts, api.Scheme).
 		Watch()

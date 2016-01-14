@@ -22,8 +22,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// HorizontalPodAutoscalerNamespacer has methods to work with HorizontalPodAutoscaler resources in a namespace
-type HorizontalPodAutoscalerNamespacer interface {
+// HorizontalPodAutoscalersGetter has a method to return a HorizontalPodAutoscalerInterface.
+// A group's client should implement this interface.
+type HorizontalPodAutoscalersGetter interface {
 	HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface
 }
 

@@ -21,8 +21,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// SecretNamespacer has methods to work with Secret resources in a namespace
-type SecretNamespacer interface {
+// SecretsGetter has a method to return a SecretInterface.
+// A group's client should implement this interface.
+type SecretsGetter interface {
 	Secrets(namespace string) SecretInterface
 }
 
