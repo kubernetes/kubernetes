@@ -210,6 +210,7 @@ func (util *RBDUtil) defencing(c rbdCleaner) error {
 
 func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 	var err error
+	var output []byte
 
 	devicePath, found := waitForPath(b.Pool, b.Image, 1)
 	if !found {
@@ -227,18 +228,19 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 			mon := b.Mon[i%l]
 			glog.V(1).Infof("rbd: map mon %s", mon)
 			if b.Secret != "" {
-				_, err = b.plugin.execCommand("rbd",
+				output, err = b.plugin.execCommand("rbd",
 					[]string{"map", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon, "--key=" + b.Secret})
 			} else {
-				_, err = b.plugin.execCommand("rbd",
+				output, err = b.plugin.execCommand("rbd",
 					[]string{"map", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon, "-k", b.Keyring})
 			}
 			if err == nil {
 				break
 			}
+			glog.V(1).Infof("rbd: map error %v %s", err, string(output))
 		}
 		if err != nil {
-			return err
+			return fmt.Errorf("rbd: map failed %v %s", err, string(output))
 		}
 		devicePath, found = waitForPath(b.Pool, b.Image, 10)
 		if !found {
