@@ -636,6 +636,8 @@ func (r *Runtime) preparePod(pod *api.Pod, pullSecrets []api.Secret) (string, *k
 	if err != nil {
 		return "", nil, err
 	}
+
+	glog.V(4).Infof("Generating pod manifest for pod %q: %v", format.Pod(pod), string(data))
 	// Since File.Write returns error if the written length is less than len(data),
 	// so check error is enough for us.
 	if _, err := manifestFile.Write(data); err != nil {
