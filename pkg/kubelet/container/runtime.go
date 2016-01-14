@@ -320,6 +320,7 @@ type Image struct {
 	// Other names by which this image is known.
 	RepoTags []string
 	// The size of the image in bytes.
+	// FIXME: Don't expose virtual size. It is of no use to kubelet.
 	Size int64
 }
 

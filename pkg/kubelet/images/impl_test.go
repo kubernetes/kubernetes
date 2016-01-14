@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package container_test
+package images
 
 import (
 	"errors"
@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
-	. "k8s.io/kubernetes/pkg/kubelet/container"
+	runtime "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -41,56 +41,64 @@ func TestPuller(t *testing.T) {
 		}}
 
 	cases := []struct {
-		containerImage  string
-		policy          api.PullPolicy
-		calledFunctions []string
-		inspectErr      error
-		pullerErr       error
-		expectedErr     []error
+		containerImage     string
+		policy             api.PullPolicy
+		calledFunctions    [][]string
+		pullerErr          error
+		expectedErr        []error
+		deleteUnusedImages bool
 	}{
 		{ // pull missing image
 			containerImage:  "missing_image",
 			policy:          api.PullIfNotPresent,
-			calledFunctions: []string{"IsImagePresent", "PullImage"},
-			inspectErr:      nil,
+			calledFunctions: [][]string{{"ListImages", "GetPods", "PullImage"}},
 			pullerErr:       nil,
 			expectedErr:     []error{nil}},
 
 		{ // image present, dont pull
-			containerImage:  "present_image",
-			policy:          api.PullIfNotPresent,
-			calledFunctions: []string{"IsImagePresent"},
-			inspectErr:      nil,
-			pullerErr:       nil,
-			expectedErr:     []error{nil, nil, nil}},
+			containerImage: "present_image",
+			policy:         api.PullIfNotPresent,
+			calledFunctions: [][]string{
+				{"ListImages", "GetPods"},
+				{"ListImages", "GetPods"},
+				{"ListImages", "GetPods"}},
+			pullerErr:   nil,
+			expectedErr: []error{nil, nil, nil}},
 		// image present, pull it
 		{containerImage: "present_image",
 			policy:          api.PullAlways,
-			calledFunctions: []string{"IsImagePresent", "PullImage"},
-			inspectErr:      nil,
+			calledFunctions: [][]string{{"ListImages", "GetPods", "PullImage"}},
 			pullerErr:       nil,
-			expectedErr:     []error{nil, nil, nil}},
+			expectedErr:     []error{nil}},
 		// missing image, error PullNever
 		{containerImage: "missing_image",
-			policy:          api.PullNever,
-			calledFunctions: []string{"IsImagePresent"},
-			inspectErr:      nil,
-			pullerErr:       nil,
-			expectedErr:     []error{ErrImageNeverPull, ErrImageNeverPull, ErrImageNeverPull}},
-		// missing image, unable to inspect
-		{containerImage: "missing_image",
-			policy:          api.PullIfNotPresent,
-			calledFunctions: []string{"IsImagePresent"},
-			inspectErr:      errors.New("unknown inspectError"),
-			pullerErr:       nil,
-			expectedErr:     []error{ErrImageInspect, ErrImageInspect, ErrImageInspect}},
+			policy: api.PullNever,
+			calledFunctions: [][]string{
+				{"ListImages", "GetPods"},
+				{"ListImages", "GetPods"},
+				{"ListImages", "GetPods"}},
+			pullerErr:   nil,
+			expectedErr: []error{ErrImageNeverPull, ErrImageNeverPull, ErrImageNeverPull}},
 		// missing image, unable to fetch
 		{containerImage: "typo_image",
-			policy:          api.PullIfNotPresent,
-			calledFunctions: []string{"IsImagePresent", "PullImage"},
-			inspectErr:      nil,
-			pullerErr:       errors.New("404"),
-			expectedErr:     []error{ErrImagePull, ErrImagePull, ErrImagePullBackOff, ErrImagePull, ErrImagePullBackOff, ErrImagePullBackOff}},
+			policy: api.PullIfNotPresent,
+			calledFunctions: [][]string{{"ListImages", "GetPods", "PullImage"},
+				{"ListImages", "GetPods", "PullImage", "PullImage"},
+				{"ListImages", "GetPods", "PullImage", "PullImage"},
+				{"ListImages", "GetPods", "PullImage", "PullImage", "PullImage"},
+				{"ListImages", "GetPods", "PullImage", "PullImage", "PullImage"},
+				{"ListImages", "GetPods", "PullImage", "PullImage", "PullImage"}},
+			pullerErr:   errors.New("404"),
+			expectedErr: []error{ErrImagePull, ErrImagePull, ErrImagePullBackOff, ErrImagePull, ErrImagePullBackOff, ErrImagePullBackOff}},
+		// image present, then GCed, so pull it.
+		{containerImage: "present_image",
+			policy: api.PullIfNotPresent,
+			calledFunctions: [][]string{{"ListImages", "GetPods"},
+				{"ListImages", "GetPods", "PullImage"},
+				{"ListImages", "GetPods", "PullImage"}},
+			pullerErr:          nil,
+			expectedErr:        []error{nil},
+			deleteUnusedImages: true},
 	}
 
 	for i, c := range cases {
@@ -104,20 +112,27 @@ func TestPuller(t *testing.T) {
 		fakeClock := util.NewFakeClock(time.Now())
 		backOff.Clock = fakeClock
 
-		fakeRuntime := &ctest.FakeRuntime{}
-		fakeRecorder := &record.FakeRecorder{}
-		puller := NewImagemanager(fakeRecorder, fakeRuntime, backOff, false /*parallel*/)
+		fakeRuntime := &ctest.FakeRuntime{
+			ImageList: []runtime.Image{{RepoTags: []string{"present_image"}, ID: "", Size: 0}},
+			PullErr:   c.pullerErr,
+		}
 
-		fakeRuntime.ImageList = []Image{{"present_image", nil, 0}}
-		fakeRuntime.Err = c.pullerErr
-		fakeRuntime.InspectErr = c.inspectErr
+		fakeRecorder := &record.FakeRecorder{}
+		manager, err := NewImageManager(fakeRecorder, fakeRuntime, backOff, false /*parallel*/)
+		assert.Nil(t, err, "image manager creation failed")
 
 		for tick, expected := range c.expectedErr {
 			fakeClock.Step(time.Second)
-			err, _ := puller.PullImage(pod, container, nil)
-			fakeRuntime.AssertCalls(c.calledFunctions)
+			err := manager.EnsureImageExists(pod, container, nil)
+			assert.Nil(t, fakeRuntime.AssertCalls(c.calledFunctions[tick]), "in test %d tick=%d", i, tick)
 			assert.Equal(t, expected, err, "in test %d tick=%d", i, tick)
+			if c.deleteUnusedImages {
+				manager.DeleteUnusedImages()
+			}
 		}
 
 	}
+}
+
+func TestGarbageCollection(t *testing.T) {
 }

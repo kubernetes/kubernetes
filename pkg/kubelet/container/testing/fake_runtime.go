@@ -49,6 +49,7 @@ type FakeRuntime struct {
 	Err               error
 	InspectErr        error
 	StatusErr         error
+	PullErr           error
 }
 
 // FakeRuntime should implement Runtime.
@@ -297,7 +298,7 @@ func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []api.Secret) error
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
-	return f.Err
+	return f.PullErr
 }
 
 func (f *FakeRuntime) IsImagePresent(image ImageSpec) (bool, error) {

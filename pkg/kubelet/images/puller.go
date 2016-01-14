@@ -20,7 +20,7 @@ import "k8s.io/kubernetes/pkg/kubelet/container"
 
 // imagePuller pulls an image.
 type imagePuller interface {
-	pullImage(spec container.ImageSpec, prePullChan chan<- struct{}, errChan chan<- error)
+	pullImage(spec ImageSpec, prePullChan chan<- struct{}, errChan chan<- error)
 }
 
 type parallelImagePuller struct {
@@ -31,10 +31,10 @@ func newParallelImagePuller(runtime container.Runtime) imagePuller {
 	return &parallelImagePuller{runtime}
 }
 
-func (pip *parallelImagePuller) pullImage(spec container.ImageSpec, prePullChan chan<- struct{}, errChan chan<- error) {
+func (pip *parallelImagePuller) pullImage(spec ImageSpec, prePullChan chan<- struct{}, errChan chan<- error) {
 	go func() {
 		prePullChan <- struct{}{}
-		errChan <- pip.runtime.PullImage(spec, pullSecrets)
+		errChan <- pip.runtime.PullImage(container.ImageSpec{spec.Image}, spec.PullSecrets)
 	}()
 }
 
@@ -51,12 +51,12 @@ func newSerialImagePuller(runtime container.Runtime) imagePuller {
 }
 
 type imagePullRequest struct {
-	spec        container.ImageSpec
+	spec        ImageSpec
 	prePullChan chan<- struct{}
 	errChan     chan<- error
 }
 
-func (sip *serialImagePuller) pullImage(spec container.ImageSpec, prePullChan chan<- struct{}, errChan chan<- error) {
+func (sip *serialImagePuller) pullImage(spec ImageSpec, prePullChan chan<- struct{}, errChan chan<- error) {
 	sip.pullRequests <- &imagePullRequest{
 		spec:        spec,
 		prePullChan: prePullChan,
@@ -65,8 +65,8 @@ func (sip *serialImagePuller) pullImage(spec container.ImageSpec, prePullChan ch
 }
 
 func (sip *serialImagePuller) processImagePullRequests() {
-	for pullRequest := range puller.pullRequests {
-		prePullChan <- struct{}{}
-		errChan <- pip.runtime.PullImage(spec, pullSecrets)
+	for pullRequest := range sip.pullRequests {
+		pullRequest.prePullChan <- struct{}{}
+		pullRequest.errChan <- sip.runtime.PullImage(container.ImageSpec{pullRequest.spec.Image}, pullRequest.spec.PullSecrets)
 	}
 }
