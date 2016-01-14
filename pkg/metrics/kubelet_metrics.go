@@ -110,6 +110,10 @@ var KubeletMetricsLabelsToSkip = sets.NewString(
 
 type KubeletMetrics Metrics
 
+func (m *KubeletMetrics) Equal(o KubeletMetrics) bool {
+	return (*Metrics)(m).Equal(Metrics(o))
+}
+
 func NewKubeletMetrics() KubeletMetrics {
 	result := NewMetrics()
 	for metric := range KnownKubeletMetrics {
