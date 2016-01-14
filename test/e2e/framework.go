@@ -19,6 +19,7 @@ package e2e
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -185,7 +186,9 @@ func (f *Framework) afterEach() {
 			}
 		case "json":
 			for i := range summaries {
-				Logf(summaries[i].PrintJSON())
+				typeName := reflect.TypeOf(summaries[i]).String()
+				Logf("%v JSON\n%v", typeName[strings.LastIndex(typeName, ".")+1:len(typeName)], summaries[i].PrintJSON())
+				Logf("Finished")
 			}
 		default:
 			Logf("Unknown ouptut type: %v. Skipping.", printType)
