@@ -31,6 +31,7 @@ type JobNamespacer interface {
 type JobInterface interface {
 	Create(*extensions.Job) (*extensions.Job, error)
 	Update(*extensions.Job) (*extensions.Job, error)
+	UpdateStatus(*extensions.Job) (*extensions.Job, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*extensions.Job, error)
@@ -76,6 +77,12 @@ func (c *jobs) Update(job *extensions.Job) (result *extensions.Job, err error) {
 		Do().
 		Into(result)
 	return
+}
+
+func (c *jobs) UpdateStatus(job *extensions.Job) (*extensions.Job, error) {
+	result := &extensions.Job{}
+	err := c.client.Put().Resource("jobs").Name(job.Name).SubResource("status").Body(job).Do().Into(result)
+	return result, err
 }
 
 // Delete takes name of the job and deletes it. Returns an error if one occurs.

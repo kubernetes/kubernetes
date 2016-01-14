@@ -31,6 +31,7 @@ type DaemonSetNamespacer interface {
 type DaemonSetInterface interface {
 	Create(*extensions.DaemonSet) (*extensions.DaemonSet, error)
 	Update(*extensions.DaemonSet) (*extensions.DaemonSet, error)
+	UpdateStatus(*extensions.DaemonSet) (*extensions.DaemonSet, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*extensions.DaemonSet, error)
@@ -76,6 +77,12 @@ func (c *daemonSets) Update(daemonSet *extensions.DaemonSet) (result *extensions
 		Do().
 		Into(result)
 	return
+}
+
+func (c *daemonSets) UpdateStatus(daemonSet *extensions.DaemonSet) (*extensions.DaemonSet, error) {
+	result := &extensions.DaemonSet{}
+	err := c.client.Put().Resource("daemonSets").Name(daemonSet.Name).SubResource("status").Body(daemonSet).Do().Into(result)
+	return result, err
 }
 
 // Delete takes name of the daemonSet and deletes it. Returns an error if one occurs.

@@ -30,6 +30,7 @@ type ReplicationControllerNamespacer interface {
 type ReplicationControllerInterface interface {
 	Create(*api.ReplicationController) (*api.ReplicationController, error)
 	Update(*api.ReplicationController) (*api.ReplicationController, error)
+	UpdateStatus(*api.ReplicationController) (*api.ReplicationController, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.ReplicationController, error)
@@ -75,6 +76,12 @@ func (c *replicationControllers) Update(replicationController *api.ReplicationCo
 		Do().
 		Into(result)
 	return
+}
+
+func (c *replicationControllers) UpdateStatus(replicationController *api.ReplicationController) (*api.ReplicationController, error) {
+	result := &api.ReplicationController{}
+	err := c.client.Put().Resource("replicationControllers").Name(replicationController.Name).SubResource("status").Body(replicationController).Do().Into(result)
+	return result, err
 }
 
 // Delete takes name of the replicationController and deletes it. Returns an error if one occurs.

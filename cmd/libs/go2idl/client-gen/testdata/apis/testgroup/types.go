@@ -26,6 +26,7 @@ import (
 type TestType struct {
 	unversioned.TypeMeta `json:",inline"`
 	api.ObjectMeta       `json:"metadata,omitempty"`
+	Status               TestTypeStatus `json:"status,omitempty"`
 }
 
 type TestTypeList struct {
@@ -33,4 +34,8 @@ type TestTypeList struct {
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	Items []TestType `json:"items"`
+}
+
+type TestTypeStatus struct {
+	Blah string
 }
