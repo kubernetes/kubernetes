@@ -12695,7 +12695,7 @@
   "models": {
    "v1.Binding": {
     "id": "v1.Binding",
-    "description": "Binding ties one object to another. For example, a pod is bound to a node by a scheduler.",
+    "description": "Ties one object to another. For example, a pod is bound to a node by a scheduler.",
     "required": [
      "target"
     ],
@@ -12720,7 +12720,7 @@
    },
    "v1.ObjectMeta": {
     "id": "v1.ObjectMeta",
-    "description": "ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.",
+    "description": "Represents metadata that all persisted resources must have, which includes all objects users must create.",
     "properties": {
      "name": {
       "type": "string",
@@ -12776,7 +12776,7 @@
    },
    "v1.ObjectReference": {
     "id": "v1.ObjectReference",
-    "description": "ObjectReference contains enough information to let you inspect or modify the referred object.",
+    "description": "A reference to an object or piece of an object.",
     "properties": {
      "kind": {
       "type": "string",
@@ -12852,7 +12852,7 @@
    },
    "v1.ComponentStatus": {
     "id": "v1.ComponentStatus",
-    "description": "ComponentStatus (and ComponentStatusList) holds the cluster validation info.",
+    "description": "Holds the cluster validation info.",
     "properties": {
      "kind": {
       "type": "string",
@@ -12903,7 +12903,7 @@
    },
    "v1.EndpointsList": {
     "id": "v1.EndpointsList",
-    "description": "EndpointsList is a list of endpoints.",
+    "description": "Represents a list of endpoints.",
     "required": [
      "items"
     ],
@@ -12931,7 +12931,7 @@
    },
    "v1.Endpoints": {
     "id": "v1.Endpoints",
-    "description": "Endpoints is a collection of endpoints that implement the actual service. Example:\n  Name: \"mysvc\",\n  Subsets: [\n    {\n      Addresses: [{\"ip\": \"10.10.1.1\"}, {\"ip\": \"10.10.2.2\"}],\n      Ports: [{\"name\": \"a\", \"port\": 8675}, {\"name\": \"b\", \"port\": 309}]\n    },\n    {\n      Addresses: [{\"ip\": \"10.10.3.3\"}],\n      Ports: [{\"name\": \"a\", \"port\": 93}, {\"name\": \"b\", \"port\": 76}]\n    },\n ]",
+    "description": "Represents a collection of endpoints that implement the actual service. Example:\n  Name: \"mysvc\",\n  Subsets: [\n    {\n      Addresses: [{\"ip\": \"10.10.1.1\"}, {\"ip\": \"10.10.2.2\"}],\n      Ports: [{\"name\": \"a\", \"port\": 8675}, {\"name\": \"b\", \"port\": 309}]\n    },\n    {\n      Addresses: [{\"ip\": \"10.10.3.3\"}],\n      Ports: [{\"name\": \"a\", \"port\": 93}, {\"name\": \"b\", \"port\": 76}]\n    },\n ]",
     "required": [
      "subsets"
     ],
@@ -12959,7 +12959,7 @@
    },
    "v1.EndpointSubset": {
     "id": "v1.EndpointSubset",
-    "description": "EndpointSubset is a group of addresses with a common set of ports. The expanded set of endpoints is the Cartesian product of Addresses x Ports. For example, given:\n  {\n    Addresses: [{\"ip\": \"10.10.1.1\"}, {\"ip\": \"10.10.2.2\"}],\n    Ports:     [{\"name\": \"a\", \"port\": 8675}, {\"name\": \"b\", \"port\": 309}]\n  }\nThe resulting set of endpoints can be viewed as:\n    a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],\n    b: [ 10.10.1.1:309, 10.10.2.2:309 ]",
+    "description": "Represents a group of addresses with a common set of ports. The expanded set of endpoints is the Cartesian product of Addresses x Ports. For example, given:\n  {\n    Addresses: [{\"ip\": \"10.10.1.1\"}, {\"ip\": \"10.10.2.2\"}],\n    Ports:     [{\"name\": \"a\", \"port\": 8675}, {\"name\": \"b\", \"port\": 309}]\n  }\nThe resulting set of endpoints can be viewed as:\n    a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],\n    b: [ 10.10.1.1:309, 10.10.2.2:309 ]",
     "properties": {
      "addresses": {
       "type": "array",
@@ -12986,7 +12986,7 @@
    },
    "v1.EndpointAddress": {
     "id": "v1.EndpointAddress",
-    "description": "EndpointAddress is a tuple that describes single IP address.",
+    "description": "Represents a tuple that describes a single IP address.",
     "required": [
      "ip"
     ],
@@ -13003,7 +13003,7 @@
    },
    "v1.EndpointPort": {
     "id": "v1.EndpointPort",
-    "description": "EndpointPort is a tuple that describes a single port.",
+    "description": "Represents a tuple that describes a single port.",
     "required": [
      "port"
     ],
@@ -13130,7 +13130,7 @@
    },
    "v1.DeleteOptions": {
     "id": "v1.DeleteOptions",
-    "description": "DeleteOptions may be provided when deleting an API object",
+    "description": "Describes options that may be provided when deleting an object.",
     "required": [
      "gracePeriodSeconds"
     ],
@@ -13152,7 +13152,7 @@
    },
    "v1.EventList": {
     "id": "v1.EventList",
-    "description": "EventList is a list of events.",
+    "description": "Represents a list of events.",
     "required": [
      "items"
     ],
@@ -13180,7 +13180,7 @@
    },
    "v1.Event": {
     "id": "v1.Event",
-    "description": "Event is a report of an event somewhere in the cluster.",
+    "description": "Represents a report of an event somewhere in the cluster.",
     "required": [
      "metadata",
      "involvedObject"
@@ -13235,7 +13235,7 @@
    },
    "v1.EventSource": {
     "id": "v1.EventSource",
-    "description": "EventSource contains information for an event.",
+    "description": "Contains information for an event.",
     "properties": {
      "component": {
       "type": "string",
@@ -13249,7 +13249,7 @@
    },
    "v1.LimitRangeList": {
     "id": "v1.LimitRangeList",
-    "description": "LimitRangeList is a list of LimitRange items.",
+    "description": "Represents a list of LimitRange items.",
     "required": [
      "items"
     ],
@@ -13277,7 +13277,7 @@
    },
    "v1.LimitRange": {
     "id": "v1.LimitRange",
-    "description": "LimitRange sets resource usage limits for each kind of resource in a Namespace.",
+    "description": "Sets resource usage limits for each kind of resource in a Namespace.",
     "properties": {
      "kind": {
       "type": "string",
@@ -13299,7 +13299,7 @@
    },
    "v1.LimitRangeSpec": {
     "id": "v1.LimitRangeSpec",
-    "description": "LimitRangeSpec defines a min/max usage limit for resources that match on kind.",
+    "description": "Defines a min/max usage limit for resources that match on kind.",
     "required": [
      "limits"
     ],
@@ -13315,7 +13315,7 @@
    },
    "v1.LimitRangeItem": {
     "id": "v1.LimitRangeItem",
-    "description": "LimitRangeItem defines a min/max usage limit for any resource that matches on kind.",
+    "description": "Defines a min/max usage limit for any resource that matches on kind.",
     "properties": {
      "type": {
       "type": "string",
@@ -13345,7 +13345,7 @@
    },
    "v1.NamespaceList": {
     "id": "v1.NamespaceList",
-    "description": "NamespaceList is a list of Namespaces.",
+    "description": "Represents a list of Namespaces.",
     "required": [
      "items"
     ],
@@ -13373,7 +13373,7 @@
    },
    "v1.Namespace": {
     "id": "v1.Namespace",
-    "description": "Namespace provides a scope for Names. Use of multiple namespaces is optional.",
+    "description": "Provides a scope for Names. Use of multiple namespaces is optional.",
     "properties": {
      "kind": {
       "type": "string",
@@ -13399,7 +13399,7 @@
    },
    "v1.NamespaceSpec": {
     "id": "v1.NamespaceSpec",
-    "description": "NamespaceSpec describes the attributes on a Namespace.",
+    "description": "Describes the attributes on a Namespace.",
     "properties": {
      "finalizers": {
       "type": "array",
@@ -13416,7 +13416,7 @@
    },
    "v1.NamespaceStatus": {
     "id": "v1.NamespaceStatus",
-    "description": "NamespaceStatus is information about the current status of a Namespace.",
+    "description": "Represents information about the current status of a Namespace.",
     "properties": {
      "phase": {
       "type": "string",
@@ -13426,7 +13426,7 @@
    },
    "v1.NodeList": {
     "id": "v1.NodeList",
-    "description": "NodeList is the whole list of all Nodes which have been registered with master.",
+    "description": "Represents the whole list of all Nodes which have been registered with master.",
     "required": [
      "items"
     ],
@@ -13454,7 +13454,7 @@
    },
    "v1.Node": {
     "id": "v1.Node",
-    "description": "Node is a worker node in Kubernetes, formerly known as minion. Each node will have a unique identifier in the cache (i.e. in etcd).",
+    "description": "Represents a worker node in Kubernetes, formerly known as minion. Each node will have a unique identifier in the cache (i.e. in etcd).",
     "properties": {
      "kind": {
       "type": "string",
@@ -13480,7 +13480,7 @@
    },
    "v1.NodeSpec": {
     "id": "v1.NodeSpec",
-    "description": "NodeSpec describes the attributes that a node is created with.",
+    "description": "Describes the attributes that a node is created with.",
     "properties": {
      "podCIDR": {
       "type": "string",
@@ -13502,7 +13502,7 @@
    },
    "v1.NodeStatus": {
     "id": "v1.NodeStatus",
-    "description": "NodeStatus is information about the current status of a node.",
+    "description": "Represents information about the current status of a node.",
     "required": [
      "images"
     ],
@@ -13552,7 +13552,7 @@
    },
    "v1.NodeCondition": {
     "id": "v1.NodeCondition",
-    "description": "NodeCondition contains condition infromation for a node.",
+    "description": "Represents condition infromation for a node.",
     "required": [
      "type",
      "status"
@@ -13586,7 +13586,7 @@
    },
    "v1.NodeAddress": {
     "id": "v1.NodeAddress",
-    "description": "NodeAddress contains information for the node's address.",
+    "description": "Represents information for the node's address.",
     "required": [
      "type",
      "address"
@@ -13604,7 +13604,7 @@
    },
    "v1.NodeDaemonEndpoints": {
     "id": "v1.NodeDaemonEndpoints",
-    "description": "NodeDaemonEndpoints lists ports opened by daemons running on the Node.",
+    "description": "Lists ports opened by daemons running on a Node.",
     "properties": {
      "kubeletEndpoint": {
       "$ref": "v1.DaemonEndpoint",
@@ -13614,7 +13614,7 @@
    },
    "v1.DaemonEndpoint": {
     "id": "v1.DaemonEndpoint",
-    "description": "DaemonEndpoint contains information about a single Daemon endpoint.",
+    "description": "Represents information about a single Daemon endpoint.",
     "required": [
      "Port"
     ],
@@ -13628,7 +13628,7 @@
    },
    "v1.NodeSystemInfo": {
     "id": "v1.NodeSystemInfo",
-    "description": "NodeSystemInfo is a set of ids/uuids to uniquely identify the node.",
+    "description": "Represents a set of ids/uuids to uniquely identify a node.",
     "required": [
      "machineID",
      "systemUUID",
@@ -13697,7 +13697,7 @@
    },
    "v1.PersistentVolumeClaimList": {
     "id": "v1.PersistentVolumeClaimList",
-    "description": "PersistentVolumeClaimList is a list of PersistentVolumeClaim items.",
+    "description": "Represents a list of PersistentVolumeClaim items.",
     "required": [
      "items"
     ],
@@ -13725,7 +13725,7 @@
    },
    "v1.PersistentVolumeClaim": {
     "id": "v1.PersistentVolumeClaim",
-    "description": "PersistentVolumeClaim is a user's request for and claim to a persistent volume",
+    "description": "Represents a user's request for and claim to a persistent volume.",
     "properties": {
      "kind": {
       "type": "string",
@@ -13751,7 +13751,7 @@
    },
    "v1.PersistentVolumeClaimSpec": {
     "id": "v1.PersistentVolumeClaimSpec",
-    "description": "PersistentVolumeClaimSpec describes the common attributes of storage devices and allows a Source for provider-specific attributes",
+    "description": "Represents the request attributes a user can make for a claim to match a persistent volume. and allows a Source for provider-specific attributes",
     "properties": {
      "accessModes": {
       "type": "array",
@@ -13776,7 +13776,7 @@
    },
    "v1.ResourceRequirements": {
     "id": "v1.ResourceRequirements",
-    "description": "ResourceRequirements describes the compute resource requirements.",
+    "description": "Describes the compute resource requirements.",
     "properties": {
      "limits": {
       "type": "any",
@@ -13790,7 +13790,7 @@
    },
    "v1.PersistentVolumeClaimStatus": {
     "id": "v1.PersistentVolumeClaimStatus",
-    "description": "PersistentVolumeClaimStatus is the current status of a persistent volume claim.",
+    "description": "Represents the current status of a persistent volume claim.",
     "properties": {
      "phase": {
       "type": "string",
@@ -13811,7 +13811,7 @@
    },
    "v1.PersistentVolumeList": {
     "id": "v1.PersistentVolumeList",
-    "description": "PersistentVolumeList is a list of PersistentVolume items.",
+    "description": "Represents a list of PersistentVolume items.",
     "required": [
      "items"
     ],
@@ -13839,7 +13839,7 @@
    },
    "v1.PersistentVolume": {
     "id": "v1.PersistentVolume",
-    "description": "PersistentVolume (PV) is a storage resource provisioned by an administrator. It is analogous to a node. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md",
+    "description": "Represents a storage resource provisioned by an administrator. It is analogous to a node. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md",
     "properties": {
      "kind": {
       "type": "string",
@@ -13865,7 +13865,7 @@
    },
    "v1.PersistentVolumeSpec": {
     "id": "v1.PersistentVolumeSpec",
-    "description": "PersistentVolumeSpec is the specification of a persistent volume.",
+    "description": "Represents the specification of a persistent volume.",
     "properties": {
      "capacity": {
       "type": "any",
@@ -14098,7 +14098,7 @@
    },
    "v1.LocalObjectReference": {
     "id": "v1.LocalObjectReference",
-    "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
+    "description": "Contains enough information to let you locate the referenced object inside the same namespace.",
     "properties": {
      "name": {
       "type": "string",
@@ -14166,7 +14166,7 @@
    },
    "v1.CephFSVolumeSource": {
     "id": "v1.CephFSVolumeSource",
-    "description": "Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.",
+    "description": "Represents a Ceph Filesystem mount that lasts the lifetime of a pod. Cephfs volumes do not support ownership management or SELinux relabeling.",
     "required": [
      "monitors"
     ],
@@ -14242,7 +14242,7 @@
    },
    "v1.FlexVolumeSource": {
     "id": "v1.FlexVolumeSource",
-    "description": "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
+    "description": "Represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
     "required": [
      "driver"
     ],
@@ -14271,7 +14271,7 @@
    },
    "v1.PersistentVolumeStatus": {
     "id": "v1.PersistentVolumeStatus",
-    "description": "PersistentVolumeStatus is the current status of a persistent volume.",
+    "description": "Represents the current status of a persistent volume.",
     "properties": {
      "phase": {
       "type": "string",
@@ -14289,7 +14289,7 @@
    },
    "v1.PodList": {
     "id": "v1.PodList",
-    "description": "PodList is a list of Pods.",
+    "description": "Represents a list of Pods.",
     "required": [
      "items"
     ],
@@ -14317,7 +14317,7 @@
    },
    "v1.Pod": {
     "id": "v1.Pod",
-    "description": "Pod is a collection of containers that can run on a host. This resource is created by clients and scheduled onto hosts.",
+    "description": "Represents a collection of containers that can run on a host. This resource is created by clients and scheduled onto hosts.",
     "properties": {
      "kind": {
       "type": "string",
@@ -14343,7 +14343,7 @@
    },
    "v1.PodSpec": {
     "id": "v1.PodSpec",
-    "description": "PodSpec is a description of a pod.",
+    "description": "Represents a description of a pod.",
     "required": [
      "containers"
     ],
@@ -14410,7 +14410,7 @@
      },
      "securityContext": {
       "$ref": "v1.PodSecurityContext",
-      "description": "SecurityContext holds pod-level security attributes and common container settings. Optional: Defaults to empty.  See type description for default values of each field."
+      "description": "Represents pod-level and common container security attributes. Optional: Defaults to empty.  See type description for default values of each field."
      },
      "imagePullSecrets": {
       "type": "array",
@@ -14423,7 +14423,7 @@
    },
    "v1.Volume": {
     "id": "v1.Volume",
-    "description": "Volume represents a named volume in a pod that may be accessed by any container in the pod.",
+    "description": "Represents a named volume in a pod that may be accessed by any containers in the pod.",
     "required": [
      "name"
     ],
@@ -14548,7 +14548,7 @@
    },
    "v1.PersistentVolumeClaimVolumeSource": {
     "id": "v1.PersistentVolumeClaimVolumeSource",
-    "description": "PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace. This volume finds the bound PV and mounts that volume for the pod. A PersistentVolumeClaimVolumeSource is, essentially, a wrapper around another type of volume that is owned by someone else (the system).",
+    "description": "References the user's PVC in the same namespace. This volume finds the bound PV and mounts that volume for the pod. A PersistentVolumeClaimVolumeSource is, essentially, a wrapper around another type of volume that is owned by someone else (the system).",
     "required": [
      "claimName"
     ],
@@ -14565,7 +14565,7 @@
    },
    "v1.DownwardAPIVolumeSource": {
     "id": "v1.DownwardAPIVolumeSource",
-    "description": "DownwardAPIVolumeSource represents a volume containing downward API info. Downward API volumes support ownership management and SELinux relabeling.",
+    "description": "Represents a volume containing downward API info. Downward API volumes support ownership management and SELinux relabeling.",
     "properties": {
      "items": {
       "type": "array",
@@ -14578,7 +14578,7 @@
    },
    "v1.DownwardAPIVolumeFile": {
     "id": "v1.DownwardAPIVolumeFile",
-    "description": "DownwardAPIVolumeFile represents information to create the file containing the pod field",
+    "description": "Represents information to create the file containing the pod field",
     "required": [
      "path",
      "fieldRef"
@@ -14596,7 +14596,7 @@
    },
    "v1.ObjectFieldSelector": {
     "id": "v1.ObjectFieldSelector",
-    "description": "ObjectFieldSelector selects an APIVersioned field of an object.",
+    "description": "Selects an APIVersioned field of an object.",
     "required": [
      "fieldPath"
     ],
@@ -14613,7 +14613,7 @@
    },
    "v1.Container": {
     "id": "v1.Container",
-    "description": "A single application container that you want to run within a pod.",
+    "description": "Represents a single container in a pod.",
     "required": [
      "name"
     ],
@@ -14709,7 +14709,7 @@
    },
    "v1.ContainerPort": {
     "id": "v1.ContainerPort",
-    "description": "ContainerPort represents a network port in a single container.",
+    "description": "Represents a network port in a single container.",
     "required": [
      "containerPort"
     ],
@@ -14740,7 +14740,7 @@
    },
    "v1.EnvVar": {
     "id": "v1.EnvVar",
-    "description": "EnvVar represents an environment variable present in a Container.",
+    "description": "Represents an environment variable in a Container.",
     "required": [
      "name"
     ],
@@ -14761,7 +14761,7 @@
    },
    "v1.EnvVarSource": {
     "id": "v1.EnvVarSource",
-    "description": "EnvVarSource represents a source for the value of an EnvVar.",
+    "description": "Represents a source for the value of an EnvVar.",
     "required": [
      "fieldRef"
     ],
@@ -14774,7 +14774,7 @@
    },
    "v1.VolumeMount": {
     "id": "v1.VolumeMount",
-    "description": "VolumeMount describes a mounting of a Volume within a container.",
+    "description": "Represents how a volume should be mounted into a container.",
     "required": [
      "name",
      "mountPath"
@@ -14796,7 +14796,7 @@
    },
    "v1.Probe": {
     "id": "v1.Probe",
-    "description": "Probe describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.",
+    "description": "Describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.",
     "properties": {
      "exec": {
       "$ref": "v1.ExecAction",
@@ -14839,7 +14839,7 @@
    },
    "v1.ExecAction": {
     "id": "v1.ExecAction",
-    "description": "ExecAction describes a \"run in container\" action.",
+    "description": "Describes a \"run in container\" action.",
     "properties": {
      "command": {
       "type": "array",
@@ -14852,7 +14852,7 @@
    },
    "v1.HTTPGetAction": {
     "id": "v1.HTTPGetAction",
-    "description": "HTTPGetAction describes an action based on HTTP Get requests.",
+    "description": "Describes an action based on HTTP Get requests.",
     "required": [
      "port"
     ],
@@ -14877,7 +14877,7 @@
    },
    "v1.TCPSocketAction": {
     "id": "v1.TCPSocketAction",
-    "description": "TCPSocketAction describes an action based on opening a socket",
+    "description": "Describes an action based on opening a socket",
     "required": [
      "port"
     ],
@@ -14890,7 +14890,7 @@
    },
    "v1.Lifecycle": {
     "id": "v1.Lifecycle",
-    "description": "Lifecycle describes actions that the management system should take in response to container lifecycle events. For the PostStart and PreStop lifecycle handlers, management of the container blocks until the action is complete, unless the container process fails, in which case the handler is aborted.",
+    "description": "Describes actions that the management system should take in response to container lifecycle events. For the PostStart and PreStop lifecycle handlers, management of the container blocks until the action is complete, unless the container process fails, in which case the handler is aborted.",
     "properties": {
      "postStart": {
       "$ref": "v1.Handler",
@@ -14904,7 +14904,7 @@
    },
    "v1.Handler": {
     "id": "v1.Handler",
-    "description": "Handler defines a specific action that should be taken",
+    "description": "Defines an action to take.",
     "properties": {
      "exec": {
       "$ref": "v1.ExecAction",
@@ -14922,7 +14922,7 @@
    },
    "v1.SecurityContext": {
     "id": "v1.SecurityContext",
-    "description": "SecurityContext holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.",
+    "description": "Holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.",
     "properties": {
      "capabilities": {
       "$ref": "v1.Capabilities",
@@ -14973,7 +14973,7 @@
    },
    "v1.SELinuxOptions": {
     "id": "v1.SELinuxOptions",
-    "description": "SELinuxOptions are the labels to be applied to the container",
+    "description": "Represents the labels to be applied to the container",
     "properties": {
      "user": {
       "type": "string",
@@ -14995,7 +14995,7 @@
    },
    "v1.PodSecurityContext": {
     "id": "v1.PodSecurityContext",
-    "description": "PodSecurityContext holds pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.",
+    "description": "Represents pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.",
     "properties": {
      "seLinuxOptions": {
       "$ref": "v1.SELinuxOptions",
@@ -15030,7 +15030,7 @@
    },
    "v1.PodStatus": {
     "id": "v1.PodStatus",
-    "description": "PodStatus represents information about the status of a pod. Status may trail the actual state of a system.",
+    "description": "Represents the status of a pod. Status may trail the actual state of a system.",
     "properties": {
      "phase": {
       "type": "string",
@@ -15074,7 +15074,7 @@
    },
    "v1.PodCondition": {
     "id": "v1.PodCondition",
-    "description": "PodCondition contains details for the current condition of this pod.",
+    "description": "Represents details for the current condition of this pod.",
     "required": [
      "type",
      "status"
@@ -15108,7 +15108,7 @@
    },
    "v1.ContainerStatus": {
     "id": "v1.ContainerStatus",
-    "description": "ContainerStatus contains details for the current status of this container.",
+    "description": "Represents details for the current status of this container.",
     "required": [
      "name",
      "ready",
@@ -15154,7 +15154,7 @@
    },
    "v1.ContainerState": {
     "id": "v1.ContainerState",
-    "description": "ContainerState holds a possible state of container. Only one of its members may be specified. If none of them is specified, the default one is ContainerStateWaiting.",
+    "description": "Represents a possible state of container. Only one of its members may be specified. If none of them is specified, the default one is ContainerStateWaiting.",
     "properties": {
      "waiting": {
       "$ref": "v1.ContainerStateWaiting",
@@ -15172,7 +15172,7 @@
    },
    "v1.ContainerStateWaiting": {
     "id": "v1.ContainerStateWaiting",
-    "description": "ContainerStateWaiting is a waiting state of a container.",
+    "description": "Represents the state of a container.",
     "properties": {
      "reason": {
       "type": "string",
@@ -15186,7 +15186,7 @@
    },
    "v1.ContainerStateRunning": {
     "id": "v1.ContainerStateRunning",
-    "description": "ContainerStateRunning is a running state of a container.",
+    "description": "Represents a running state of a container.",
     "properties": {
      "startedAt": {
       "type": "string",
@@ -15196,7 +15196,7 @@
    },
    "v1.ContainerStateTerminated": {
     "id": "v1.ContainerStateTerminated",
-    "description": "ContainerStateTerminated is a terminated state of a container.",
+    "description": "Represents a terminated state of a container.",
     "required": [
      "exitCode"
     ],
@@ -15235,7 +15235,7 @@
    },
    "v1.PodTemplateList": {
     "id": "v1.PodTemplateList",
-    "description": "PodTemplateList is a list of PodTemplates.",
+    "description": "Represents a list of PodTemplates.",
     "required": [
      "items"
     ],
@@ -15263,7 +15263,7 @@
    },
    "v1.PodTemplate": {
     "id": "v1.PodTemplate",
-    "description": "PodTemplate describes a template for creating copies of a predefined pod.",
+    "description": "Describes a template for creating copies of a predefined pod.",
     "properties": {
      "kind": {
       "type": "string",
@@ -15285,7 +15285,7 @@
    },
    "v1.PodTemplateSpec": {
     "id": "v1.PodTemplateSpec",
-    "description": "PodTemplateSpec describes the data a pod should have when created from a template",
+    "description": "Describes the data a pod should have when created from a template",
     "properties": {
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -15299,7 +15299,7 @@
    },
    "v1.ReplicationControllerList": {
     "id": "v1.ReplicationControllerList",
-    "description": "ReplicationControllerList is a collection of replication controllers.",
+    "description": "Represents a collection of replication controllers.",
     "required": [
      "items"
     ],
@@ -15327,7 +15327,7 @@
    },
    "v1.ReplicationController": {
     "id": "v1.ReplicationController",
-    "description": "ReplicationController represents the configuration of a replication controller.",
+    "description": "Represents the configuration of a replication controller.",
     "properties": {
      "kind": {
       "type": "string",
@@ -15353,7 +15353,7 @@
    },
    "v1.ReplicationControllerSpec": {
     "id": "v1.ReplicationControllerSpec",
-    "description": "ReplicationControllerSpec is the specification of a replication controller.",
+    "description": "Represents the specification of a replication controller.",
     "properties": {
      "replicas": {
       "type": "integer",
@@ -15372,7 +15372,7 @@
    },
    "v1.ReplicationControllerStatus": {
     "id": "v1.ReplicationControllerStatus",
-    "description": "ReplicationControllerStatus represents the current status of a replication controller.",
+    "description": "Represents the current status of a replication controller.",
     "required": [
      "replicas"
     ],
@@ -15391,7 +15391,7 @@
    },
    "v1.ResourceQuotaList": {
     "id": "v1.ResourceQuotaList",
-    "description": "ResourceQuotaList is a list of ResourceQuota items.",
+    "description": "Represents a list of ResourceQuota items.",
     "required": [
      "items"
     ],
@@ -15419,7 +15419,7 @@
    },
    "v1.ResourceQuota": {
     "id": "v1.ResourceQuota",
-    "description": "ResourceQuota sets aggregate quota restrictions enforced per namespace",
+    "description": "Sets aggregate quota restrictions enforced per namespace",
     "properties": {
      "kind": {
       "type": "string",
@@ -15445,7 +15445,7 @@
    },
    "v1.ResourceQuotaSpec": {
     "id": "v1.ResourceQuotaSpec",
-    "description": "ResourceQuotaSpec defines the desired hard limits to enforce for Quota.",
+    "description": "Defines the desired hard limits to enforce for Quota.",
     "properties": {
      "hard": {
       "type": "any",
@@ -15455,7 +15455,7 @@
    },
    "v1.ResourceQuotaStatus": {
     "id": "v1.ResourceQuotaStatus",
-    "description": "ResourceQuotaStatus defines the enforced hard limits and observed use.",
+    "description": "Defines the enforced hard limits and observed use.",
     "properties": {
      "hard": {
       "type": "any",
@@ -15469,7 +15469,7 @@
    },
    "v1.SecretList": {
     "id": "v1.SecretList",
-    "description": "SecretList is a list of Secret.",
+    "description": "Represents a list of Secret.",
     "required": [
      "items"
     ],
@@ -15497,7 +15497,7 @@
    },
    "v1.Secret": {
     "id": "v1.Secret",
-    "description": "Secret holds secret data of a certain type. The total bytes of the values in the Data field must be less than MaxSecretSize bytes.",
+    "description": "Holds secret data of a certain type. The total bytes of the values in the Data field must be less than MaxSecretSize bytes.",
     "properties": {
      "kind": {
       "type": "string",
@@ -15523,7 +15523,7 @@
    },
    "v1.ServiceAccountList": {
     "id": "v1.ServiceAccountList",
-    "description": "ServiceAccountList is a list of ServiceAccount objects",
+    "description": "Represents a list of ServiceAccount objects",
     "required": [
      "items"
     ],
@@ -15551,7 +15551,7 @@
    },
    "v1.ServiceAccount": {
     "id": "v1.ServiceAccount",
-    "description": "ServiceAccount binds together: * a name, understood by users, and perhaps by peripheral systems, for an identity * a principal that can be authenticated and authorized * a set of secrets",
+    "description": "A service account binds together: * a name, understood by users, and perhaps by peripheral systems, for an identity * a principal that can be authenticated and authorized * a set of secrets",
     "properties": {
      "kind": {
       "type": "string",
@@ -15583,7 +15583,7 @@
    },
    "v1.ServiceList": {
     "id": "v1.ServiceList",
-    "description": "ServiceList holds a list of services.",
+    "description": "Represents a list of services.",
     "required": [
      "items"
     ],
@@ -15611,7 +15611,7 @@
    },
    "v1.Service": {
     "id": "v1.Service",
-    "description": "Service is a named abstraction of software service (for example, mysql) consisting of local port (for example 3306) that the proxy listens on, and the selector that determines which pods will answer requests sent through the proxy.",
+    "description": "A named abstraction of software service (for example, mysql) consisting of local port (for example 3306) that the proxy listens on, and the selector that determines which pods will answer requests sent through the proxy.",
     "properties": {
      "kind": {
       "type": "string",
@@ -15637,7 +15637,7 @@
    },
    "v1.ServiceSpec": {
     "id": "v1.ServiceSpec",
-    "description": "ServiceSpec describes the attributes that a user creates on a service.",
+    "description": "Describes the attributes that a user creates on a service.",
     "required": [
      "ports"
     ],
@@ -15687,7 +15687,7 @@
    },
    "v1.ServicePort": {
     "id": "v1.ServicePort",
-    "description": "ServicePort conatins information on service's port.",
+    "description": "Represents information on service's port.",
     "required": [
      "port"
     ],
@@ -15718,7 +15718,7 @@
    },
    "v1.ServiceStatus": {
     "id": "v1.ServiceStatus",
-    "description": "ServiceStatus represents the current status of a service.",
+    "description": "Represents the current status of a service.",
     "properties": {
      "loadBalancer": {
       "$ref": "v1.LoadBalancerStatus",
@@ -15728,7 +15728,7 @@
    },
    "v1.LoadBalancerStatus": {
     "id": "v1.LoadBalancerStatus",
-    "description": "LoadBalancerStatus represents the status of a load-balancer.",
+    "description": "Represents the status of a load-balancer.",
     "properties": {
      "ingress": {
       "type": "array",
@@ -15741,7 +15741,7 @@
    },
    "v1.LoadBalancerIngress": {
     "id": "v1.LoadBalancerIngress",
-    "description": "LoadBalancerIngress represents the status of a load-balancer ingress point: traffic intended for the service should be sent to an ingress point.",
+    "description": "Represents the status of a load-balancer ingress point: traffic intended for the service should be sent to an ingress point.",
     "properties": {
      "ip": {
       "type": "string",

@@ -3452,7 +3452,7 @@
    },
    "v1.ObjectMeta": {
     "id": "v1.ObjectMeta",
-    "description": "ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.",
+    "description": "Represents metadata that all persisted resources must have, which includes all objects users must create.",
     "properties": {
      "name": {
       "type": "string",
@@ -3613,7 +3613,7 @@
    },
    "v1.DeleteOptions": {
     "id": "v1.DeleteOptions",
-    "description": "DeleteOptions may be provided when deleting an API object",
+    "description": "Describes options that may be provided when deleting an object.",
     "required": [
      "gracePeriodSeconds"
     ],
@@ -3931,7 +3931,7 @@
    },
    "v1.LoadBalancerStatus": {
     "id": "v1.LoadBalancerStatus",
-    "description": "LoadBalancerStatus represents the status of a load-balancer.",
+    "description": "Represents the status of a load-balancer.",
     "properties": {
      "ingress": {
       "type": "array",
@@ -3944,7 +3944,7 @@
    },
    "v1.LoadBalancerIngress": {
     "id": "v1.LoadBalancerIngress",
-    "description": "LoadBalancerIngress represents the status of a load-balancer ingress point: traffic intended for the service should be sent to an ingress point.",
+    "description": "Represents the status of a load-balancer ingress point: traffic intended for the service should be sent to an ingress point.",
     "properties": {
      "ip": {
       "type": "string",
@@ -4086,7 +4086,7 @@
    },
    "v1.PodTemplateSpec": {
     "id": "v1.PodTemplateSpec",
-    "description": "PodTemplateSpec describes the data a pod should have when created from a template",
+    "description": "Describes the data a pod should have when created from a template",
     "properties": {
      "metadata": {
       "$ref": "v1.ObjectMeta",
@@ -4100,7 +4100,7 @@
    },
    "v1.PodSpec": {
     "id": "v1.PodSpec",
-    "description": "PodSpec is a description of a pod.",
+    "description": "Represents a description of a pod.",
     "required": [
      "containers"
     ],
@@ -4167,7 +4167,7 @@
      },
      "securityContext": {
       "$ref": "v1.PodSecurityContext",
-      "description": "SecurityContext holds pod-level security attributes and common container settings. Optional: Defaults to empty.  See type description for default values of each field."
+      "description": "Represents pod-level and common container security attributes. Optional: Defaults to empty.  See type description for default values of each field."
      },
      "imagePullSecrets": {
       "type": "array",
@@ -4180,7 +4180,7 @@
    },
    "v1.Volume": {
     "id": "v1.Volume",
-    "description": "Volume represents a named volume in a pod that may be accessed by any container in the pod.",
+    "description": "Represents a named volume in a pod that may be accessed by any containers in the pod.",
     "required": [
      "name"
     ],
@@ -4453,7 +4453,7 @@
    },
    "v1.PersistentVolumeClaimVolumeSource": {
     "id": "v1.PersistentVolumeClaimVolumeSource",
-    "description": "PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace. This volume finds the bound PV and mounts that volume for the pod. A PersistentVolumeClaimVolumeSource is, essentially, a wrapper around another type of volume that is owned by someone else (the system).",
+    "description": "References the user's PVC in the same namespace. This volume finds the bound PV and mounts that volume for the pod. A PersistentVolumeClaimVolumeSource is, essentially, a wrapper around another type of volume that is owned by someone else (the system).",
     "required": [
      "claimName"
     ],
@@ -4519,7 +4519,7 @@
    },
    "v1.LocalObjectReference": {
     "id": "v1.LocalObjectReference",
-    "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
+    "description": "Contains enough information to let you locate the referenced object inside the same namespace.",
     "properties": {
      "name": {
       "type": "string",
@@ -4529,7 +4529,7 @@
    },
    "v1.FlexVolumeSource": {
     "id": "v1.FlexVolumeSource",
-    "description": "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
+    "description": "Represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
     "required": [
      "driver"
     ],
@@ -4579,7 +4579,7 @@
    },
    "v1.CephFSVolumeSource": {
     "id": "v1.CephFSVolumeSource",
-    "description": "Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.",
+    "description": "Represents a Ceph Filesystem mount that lasts the lifetime of a pod. Cephfs volumes do not support ownership management or SELinux relabeling.",
     "required": [
      "monitors"
     ],
@@ -4624,7 +4624,7 @@
    },
    "v1.DownwardAPIVolumeSource": {
     "id": "v1.DownwardAPIVolumeSource",
-    "description": "DownwardAPIVolumeSource represents a volume containing downward API info. Downward API volumes support ownership management and SELinux relabeling.",
+    "description": "Represents a volume containing downward API info. Downward API volumes support ownership management and SELinux relabeling.",
     "properties": {
      "items": {
       "type": "array",
@@ -4637,7 +4637,7 @@
    },
    "v1.DownwardAPIVolumeFile": {
     "id": "v1.DownwardAPIVolumeFile",
-    "description": "DownwardAPIVolumeFile represents information to create the file containing the pod field",
+    "description": "Represents information to create the file containing the pod field",
     "required": [
      "path",
      "fieldRef"
@@ -4655,7 +4655,7 @@
    },
    "v1.ObjectFieldSelector": {
     "id": "v1.ObjectFieldSelector",
-    "description": "ObjectFieldSelector selects an APIVersioned field of an object.",
+    "description": "Selects an APIVersioned field of an object.",
     "required": [
      "fieldPath"
     ],
@@ -4703,7 +4703,7 @@
    },
    "v1.Container": {
     "id": "v1.Container",
-    "description": "A single application container that you want to run within a pod.",
+    "description": "Represents a single container in a pod.",
     "required": [
      "name"
     ],
@@ -4799,7 +4799,7 @@
    },
    "v1.ContainerPort": {
     "id": "v1.ContainerPort",
-    "description": "ContainerPort represents a network port in a single container.",
+    "description": "Represents a network port in a single container.",
     "required": [
      "containerPort"
     ],
@@ -4830,7 +4830,7 @@
    },
    "v1.EnvVar": {
     "id": "v1.EnvVar",
-    "description": "EnvVar represents an environment variable present in a Container.",
+    "description": "Represents an environment variable in a Container.",
     "required": [
      "name"
     ],
@@ -4851,7 +4851,7 @@
    },
    "v1.EnvVarSource": {
     "id": "v1.EnvVarSource",
-    "description": "EnvVarSource represents a source for the value of an EnvVar.",
+    "description": "Represents a source for the value of an EnvVar.",
     "required": [
      "fieldRef"
     ],
@@ -4864,7 +4864,7 @@
    },
    "v1.ResourceRequirements": {
     "id": "v1.ResourceRequirements",
-    "description": "ResourceRequirements describes the compute resource requirements.",
+    "description": "Describes the compute resource requirements.",
     "properties": {
      "limits": {
       "type": "any",
@@ -4878,7 +4878,7 @@
    },
    "v1.VolumeMount": {
     "id": "v1.VolumeMount",
-    "description": "VolumeMount describes a mounting of a Volume within a container.",
+    "description": "Represents how a volume should be mounted into a container.",
     "required": [
      "name",
      "mountPath"
@@ -4900,7 +4900,7 @@
    },
    "v1.Probe": {
     "id": "v1.Probe",
-    "description": "Probe describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.",
+    "description": "Describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.",
     "properties": {
      "exec": {
       "$ref": "v1.ExecAction",
@@ -4943,7 +4943,7 @@
    },
    "v1.ExecAction": {
     "id": "v1.ExecAction",
-    "description": "ExecAction describes a \"run in container\" action.",
+    "description": "Describes a \"run in container\" action.",
     "properties": {
      "command": {
       "type": "array",
@@ -4956,7 +4956,7 @@
    },
    "v1.HTTPGetAction": {
     "id": "v1.HTTPGetAction",
-    "description": "HTTPGetAction describes an action based on HTTP Get requests.",
+    "description": "Describes an action based on HTTP Get requests.",
     "required": [
      "port"
     ],
@@ -4981,7 +4981,7 @@
    },
    "v1.TCPSocketAction": {
     "id": "v1.TCPSocketAction",
-    "description": "TCPSocketAction describes an action based on opening a socket",
+    "description": "Describes an action based on opening a socket",
     "required": [
      "port"
     ],
@@ -4994,7 +4994,7 @@
    },
    "v1.Lifecycle": {
     "id": "v1.Lifecycle",
-    "description": "Lifecycle describes actions that the management system should take in response to container lifecycle events. For the PostStart and PreStop lifecycle handlers, management of the container blocks until the action is complete, unless the container process fails, in which case the handler is aborted.",
+    "description": "Describes actions that the management system should take in response to container lifecycle events. For the PostStart and PreStop lifecycle handlers, management of the container blocks until the action is complete, unless the container process fails, in which case the handler is aborted.",
     "properties": {
      "postStart": {
       "$ref": "v1.Handler",
@@ -5008,7 +5008,7 @@
    },
    "v1.Handler": {
     "id": "v1.Handler",
-    "description": "Handler defines a specific action that should be taken",
+    "description": "Defines an action to take.",
     "properties": {
      "exec": {
       "$ref": "v1.ExecAction",
@@ -5026,7 +5026,7 @@
    },
    "v1.SecurityContext": {
     "id": "v1.SecurityContext",
-    "description": "SecurityContext holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.",
+    "description": "Holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.",
     "properties": {
      "capabilities": {
       "$ref": "v1.Capabilities",
@@ -5077,7 +5077,7 @@
    },
    "v1.SELinuxOptions": {
     "id": "v1.SELinuxOptions",
-    "description": "SELinuxOptions are the labels to be applied to the container",
+    "description": "Represents the labels to be applied to the container",
     "properties": {
      "user": {
       "type": "string",
@@ -5099,7 +5099,7 @@
    },
    "v1.PodSecurityContext": {
     "id": "v1.PodSecurityContext",
-    "description": "PodSecurityContext holds pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.",
+    "description": "Represents pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.",
     "properties": {
      "seLinuxOptions": {
       "$ref": "v1.SELinuxOptions",
