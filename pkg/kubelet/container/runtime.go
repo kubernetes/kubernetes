@@ -82,6 +82,9 @@ type Runtime interface {
 
 	// Version returns the version information of the container runtime.
 	Version() (Version, error)
+	// APIVersion returns the API version information of the container
+	// runtime. This may be different from the runtime engine's version.
+	APIVersion() (Version, error)
 	// GetPods returns a list containers group by pods. The boolean parameter
 	// specifies whether the runtime returns all containers including those already
 	// exited and dead containers (used for garbage collection).
