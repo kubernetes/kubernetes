@@ -519,7 +519,8 @@ case ${JOB_NAME} in
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Performance\] \
         --gather-resource-usage=true \
         --gather-metrics-at-teardown=true \
-        --gather-logs-sizes=true"}
+        --gather-logs-sizes=true \
+        --output-print-type=json"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-scalability"}
     : ${PROJECT:="kubernetes-jenkins"}
     # Override GCE defaults.
