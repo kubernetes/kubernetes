@@ -717,6 +717,7 @@ var map_NodeSpec = map[string]string{
 	"externalID":    "External ID of the node assigned by some machine database (e.g. a cloud provider). Deprecated.",
 	"providerID":    "ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>",
 	"unschedulable": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration\"`",
+	"taints":        "Taints is a list of taints applied to a node A pod had to tolerate all the taints applied to a node in order to be scheduled onto that node Multiple taints with the same key are not allowed.",
 }
 
 func (NodeSpec) SwaggerDoc() map[string]string {
@@ -732,6 +733,7 @@ var map_NodeStatus = map[string]string{
 	"addresses":       "List of addresses reachable to the node. Queried from cloud provider, if available. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-addresses",
 	"daemonEndpoints": "Endpoints of daemons running on the Node.",
 	"nodeInfo":        "Set of ids/uuids to uniquely identify the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-info",
+	"taints":          "Taints is the union of the taints specified by various sources. For now, the only source is the NodeSpec itself. Multiple taints with the same key are not allowed.",
 }
 
 func (NodeStatus) SwaggerDoc() map[string]string {
@@ -1033,6 +1035,7 @@ var map_PodSpec = map[string]string{
 	"hostIPC":                       "Use the host's ipc namespace. Optional: Default to false.",
 	"securityContext":               "SecurityContext holds pod-level security attributes and common container settings. Optional: Defaults to empty.  See type description for default values of each field.",
 	"imagePullSecrets":              "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md#specifying-imagepullsecrets-on-a-pod",
+	"tolerations":                   "Tolerations is a list of tolerations a pod had to tolerate in order to be be scheduled onto a node Multiple tolerations with the same key are allowed.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {
@@ -1378,6 +1381,29 @@ var map_TCPSocketAction = map[string]string{
 
 func (TCPSocketAction) SwaggerDoc() map[string]string {
 	return map_TCPSocketAction
+}
+
+var map_Taint = map[string]string{
+	"":       "A taint is a new type that is part of the NodeSpec; when present, it prevents pods from scheduling onto the node unless the pod tolerates the taint",
+	"key":    "The taint key to be applied to a node . For classifying a node as \"dedicated\", the taint key to be applied to a node woule be \"dedicated\"",
+	"value":  "The taint key value. This could be a group ( e.g namespace ) that a dedicated node is a part of.",
+	"effect": "The node this Taint is attached to has the effect \"effect\" on any pod that that does not tolerate the Taint.",
+}
+
+func (Taint) SwaggerDoc() map[string]string {
+	return map_Taint
+}
+
+var map_Toleration = map[string]string{
+	"":         "The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
+	"key":      "The toleration key to match against ( e.g if a pod has to be scheduled only on a \"dedicated\" node ), the toleration key would be \"dedicated\"",
+	"operator": "operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
+	"value":    "The toleration key value to match against. ( e.g if a pod has to be scheduled on a \"dedicated\" node belonging to a \"group\" ( e.g namespace ) , the value would be the group name.",
+	"effect":   "The effect on the pod tolerating the node's taint",
+}
+
+func (Toleration) SwaggerDoc() map[string]string {
+	return map_Toleration
 }
 
 var map_Volume = map[string]string{

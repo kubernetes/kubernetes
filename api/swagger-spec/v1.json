@@ -13497,6 +13497,35 @@
      "unschedulable": {
       "type": "boolean",
       "description": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration\"`"
+     },
+     "taints": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Taint"
+      },
+      "description": "Taints is a list of taints applied to a node A pod had to tolerate all the taints applied to a node in order to be scheduled onto that node Multiple taints with the same key are not allowed."
+     }
+    }
+   },
+   "v1.Taint": {
+    "id": "v1.Taint",
+    "description": "A taint is a new type that is part of the NodeSpec; when present, it prevents pods from scheduling onto the node unless the pod tolerates the taint",
+    "required": [
+     "key",
+     "effect"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "The taint key to be applied to a node . For classifying a node as \"dedicated\", the taint key to be applied to a node woule be \"dedicated\""
+     },
+     "value": {
+      "type": "string",
+      "description": "The taint key value. This could be a group ( e.g namespace ) that a dedicated node is a part of."
+     },
+     "effect": {
+      "type": "string",
+      "description": "The node this Taint is attached to has the effect \"effect\" on any pod that that does not tolerate the Taint."
      }
     }
    },
@@ -13537,6 +13566,13 @@
      "nodeInfo": {
       "$ref": "v1.NodeSystemInfo",
       "description": "Set of ids/uuids to uniquely identify the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-info"
+     },
+     "taints": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Taint"
+      },
+      "description": "Taints is the union of the taints specified by various sources. For now, the only source is the NodeSpec itself. Multiple taints with the same key are not allowed."
      }
     }
    },
@@ -14387,6 +14423,13 @@
        "$ref": "v1.LocalObjectReference"
       },
       "description": "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md#specifying-imagepullsecrets-on-a-pod"
+     },
+     "tolerations": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Toleration"
+      },
+      "description": "Tolerations is a list of tolerations a pod had to tolerate in order to be be scheduled onto a node Multiple tolerations with the same key are allowed."
      }
     }
    },
@@ -14996,6 +15039,33 @@
    "integer": {
     "id": "integer",
     "properties": {}
+   },
+   "v1.Toleration": {
+    "id": "v1.Toleration",
+    "description": "The pod this Toleration is attached to tolerates any taint that matches the triple \u003ckey,value,effect\u003e using the matching operator \u003coperator\u003e.",
+    "required": [
+     "key",
+     "operator",
+     "effect"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "The toleration key to match against ( e.g if a pod has to be scheduled only on a \"dedicated\" node ), the toleration key would be \"dedicated\""
+     },
+     "operator": {
+      "type": "string",
+      "description": "operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category."
+     },
+     "value": {
+      "type": "string",
+      "description": "The toleration key value to match against. ( e.g if a pod has to be scheduled on a \"dedicated\" node belonging to a \"group\" ( e.g namespace ) , the value would be the group name."
+     },
+     "effect": {
+      "type": "string",
+      "description": "The effect on the pod tolerating the node's taint"
+     }
+    }
    },
    "v1.PodStatus": {
     "id": "v1.PodStatus",

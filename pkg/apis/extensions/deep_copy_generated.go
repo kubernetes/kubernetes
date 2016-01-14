@@ -589,6 +589,16 @@ func deepCopy_api_PodSpec(in api.PodSpec, out *api.PodSpec, c *conversion.Cloner
 	} else {
 		out.ImagePullSecrets = nil
 	}
+	if in.Tolerations != nil {
+		out.Tolerations = make([]api.Toleration, len(in.Tolerations))
+		for i := range in.Tolerations {
+			if err := deepCopy_api_Toleration(in.Tolerations[i], &out.Tolerations[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Tolerations = nil
+	}
 	return nil
 }
 
@@ -723,6 +733,14 @@ func deepCopy_api_TCPSocketAction(in api.TCPSocketAction, out *api.TCPSocketActi
 	if err := deepCopy_intstr_IntOrString(in.Port, &out.Port, c); err != nil {
 		return err
 	}
+	return nil
+}
+
+func deepCopy_api_Toleration(in api.Toleration, out *api.Toleration, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	out.Value = in.Value
+	out.Effect = in.Effect
 	return nil
 }
 
@@ -1697,6 +1715,7 @@ func init() {
 		deepCopy_api_SecretVolumeSource,
 		deepCopy_api_SecurityContext,
 		deepCopy_api_TCPSocketAction,
+		deepCopy_api_Toleration,
 		deepCopy_api_Volume,
 		deepCopy_api_VolumeMount,
 		deepCopy_api_VolumeSource,

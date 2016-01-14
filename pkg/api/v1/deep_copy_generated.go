@@ -1041,6 +1041,16 @@ func deepCopy_v1_NodeSpec(in NodeSpec, out *NodeSpec, c *conversion.Cloner) erro
 	out.ExternalID = in.ExternalID
 	out.ProviderID = in.ProviderID
 	out.Unschedulable = in.Unschedulable
+	if in.Taints != nil {
+		out.Taints = make([]Taint, len(in.Taints))
+		for i := range in.Taints {
+			if err := deepCopy_v1_Taint(in.Taints[i], &out.Taints[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Taints = nil
+	}
 	return nil
 }
 
@@ -1095,6 +1105,16 @@ func deepCopy_v1_NodeStatus(in NodeStatus, out *NodeStatus, c *conversion.Cloner
 	}
 	if err := deepCopy_v1_NodeSystemInfo(in.NodeInfo, &out.NodeInfo, c); err != nil {
 		return err
+	}
+	if in.Taints != nil {
+		out.Taints = make([]Taint, len(in.Taints))
+		for i := range in.Taints {
+			if err := deepCopy_v1_Taint(in.Taints[i], &out.Taints[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Taints = nil
 	}
 	return nil
 }
@@ -1665,6 +1685,16 @@ func deepCopy_v1_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error {
 		}
 	} else {
 		out.ImagePullSecrets = nil
+	}
+	if in.Tolerations != nil {
+		out.Tolerations = make([]Toleration, len(in.Tolerations))
+		for i := range in.Tolerations {
+			if err := deepCopy_v1_Toleration(in.Tolerations[i], &out.Tolerations[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Tolerations = nil
 	}
 	return nil
 }
@@ -2252,6 +2282,21 @@ func deepCopy_v1_TCPSocketAction(in TCPSocketAction, out *TCPSocketAction, c *co
 	return nil
 }
 
+func deepCopy_v1_Taint(in Taint, out *Taint, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Value = in.Value
+	out.Effect = in.Effect
+	return nil
+}
+
+func deepCopy_v1_Toleration(in Toleration, out *Toleration, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	out.Value = in.Value
+	out.Effect = in.Effect
+	return nil
+}
+
 func deepCopy_v1_Volume(in Volume, out *Volume, c *conversion.Cloner) error {
 	out.Name = in.Name
 	if err := deepCopy_v1_VolumeSource(in.VolumeSource, &out.VolumeSource, c); err != nil {
@@ -2550,6 +2595,8 @@ func init() {
 		deepCopy_v1_ServiceSpec,
 		deepCopy_v1_ServiceStatus,
 		deepCopy_v1_TCPSocketAction,
+		deepCopy_v1_Taint,
+		deepCopy_v1_Toleration,
 		deepCopy_v1_Volume,
 		deepCopy_v1_VolumeMount,
 		deepCopy_v1_VolumeSource,
