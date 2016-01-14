@@ -42,8 +42,6 @@ var KnownApiServerMetrics = map[string][]string{
 	"etcd_request_latencies_summary":                 {"operation", "type", "quantile"},
 	"etcd_request_latencies_summary_count":           {"operation", "type"},
 	"etcd_request_latencies_summary_sum":             {"operation", "type"},
-	"get_token_count":                                {},
-	"get_token_fail_count":                           {},
 	"rest_client_request_latency_microseconds":       {"url", "verb", "quantile"},
 	"rest_client_request_latency_microseconds_count": {"url", "verb"},
 	"rest_client_request_latency_microseconds_sum":   {"url", "verb"},

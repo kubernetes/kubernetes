@@ -67,18 +67,18 @@ type signer struct {
 func Sign(req *request.Request) {
 	// If the request does not need to be signed ignore the signing of the
 	// request if the AnonymousCredentials object is used.
-	if req.Service.Config.Credentials == credentials.AnonymousCredentials {
+	if req.Config.Credentials == credentials.AnonymousCredentials {
 		return
 	}
 
-	region := req.Service.SigningRegion
+	region := req.ClientInfo.SigningRegion
 	if region == "" {
-		region = aws.StringValue(req.Service.Config.Region)
+		region = aws.StringValue(req.Config.Region)
 	}
 
-	name := req.Service.SigningName
+	name := req.ClientInfo.SigningName
 	if name == "" {
-		name = req.Service.ServiceName
+		name = req.ClientInfo.ServiceName
 	}
 
 	s := signer{
@@ -89,9 +89,9 @@ func Sign(req *request.Request) {
 		Body:        req.Body,
 		ServiceName: name,
 		Region:      region,
-		Credentials: req.Service.Config.Credentials,
-		Debug:       req.Service.Config.LogLevel.Value(),
-		Logger:      req.Service.Config.Logger,
+		Credentials: req.Config.Credentials,
+		Debug:       req.Config.LogLevel.Value(),
+		Logger:      req.Config.Logger,
 	}
 
 	req.Error = s.sign()

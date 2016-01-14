@@ -41,8 +41,8 @@ var allowedUsage = resourceUsagePerContainer{
 		MemoryWorkingSetInBytes: 300000000,
 	},
 	"/system": &containerResourceUsage{
-		CPUUsageInCores:         0.05,
-		MemoryWorkingSetInBytes: 700000000,
+		CPUUsageInCores:         0.30,
+		MemoryWorkingSetInBytes: 1500000000,
 	},
 }
 
@@ -108,6 +108,8 @@ var _ = Describe("Resource usage of system containers [Serial] [Flaky]", func() 
 		for _, node := range nodeList.Items {
 			averageResourceUsagePerNode[node.Name] = computeAverage(resourceUsagePerNode[node.Name])
 		}
+
+		Logf("Observed resource usage:\n%v", averageResourceUsagePerNode)
 
 		violating := make(map[string]resourceUsagePerContainer)
 		for node, usage := range averageResourceUsagePerNode {

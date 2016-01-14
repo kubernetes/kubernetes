@@ -54,8 +54,10 @@ const (
 	emptyDirPluginName = "kubernetes.io/empty-dir"
 )
 
-func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) {
+func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+
+	return nil
 }
 
 func (plugin *emptyDirPlugin) Name() string {

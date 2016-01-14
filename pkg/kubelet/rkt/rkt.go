@@ -31,15 +31,13 @@ import (
 	"syscall"
 	"time"
 
-	"google.golang.org/grpc"
-
 	appcschema "github.com/appc/spec/schema"
 	appctypes "github.com/appc/spec/schema/types"
 	"github.com/coreos/go-systemd/unit"
 	rktapi "github.com/coreos/rkt/api/v1alpha"
-	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -51,7 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -199,6 +196,14 @@ func (r *Runtime) buildCommand(args ...string) *exec.Cmd {
 	return cmd
 }
 
+// convertToACName converts a string into ACName.
+func convertToACName(name string) appctypes.ACName {
+	// Note that as the 'name' already matches 'DNS_LABEL'
+	// defined in pkg/api/types.go, there shouldn't be error or panic.
+	acname, _ := appctypes.SanitizeACName(name)
+	return *appctypes.MustACName(acname)
+}
+
 // runCommand invokes rkt binary with arguments and returns the result
 // from stdout in a list of strings. Each string in the list is a line.
 func (r *Runtime) runCommand(args ...string) ([]string, error) {
@@ -323,14 +328,68 @@ func setIsolators(app *appctypes.App, c *api.Container) error {
 	return nil
 }
 
-// findEnvInList returns the index of environment variable in the environment whose Name equals env.Name.
-func findEnvInList(envs appctypes.Environment, env kubecontainer.EnvVar) int {
-	for i, e := range envs {
-		if e.Name == env.Name {
-			return i
+// mergeEnv merges the optEnv with the image's environments.
+// The environments defined in the image will be overridden by
+// the ones with the same name in optEnv.
+func mergeEnv(app *appctypes.App, optEnv []kubecontainer.EnvVar) {
+	envMap := make(map[string]string)
+	for _, e := range app.Environment {
+		envMap[e.Name] = e.Value
+	}
+	for _, e := range optEnv {
+		envMap[e.Name] = e.Value
+	}
+	app.Environment = nil
+	for name, value := range envMap {
+		app.Environment = append(app.Environment, appctypes.EnvironmentVariable{
+			Name:  name,
+			Value: value,
+		})
+	}
+}
+
+// mergeMounts merges the optMounts with the image's mount points.
+// The mount points defined in the image will be overridden by the ones
+// with the same name in optMounts.
+func mergeMounts(app *appctypes.App, optMounts []kubecontainer.Mount) {
+	mountMap := make(map[appctypes.ACName]appctypes.MountPoint)
+	for _, m := range app.MountPoints {
+		mountMap[m.Name] = m
+	}
+	for _, m := range optMounts {
+		mpName := convertToACName(m.Name)
+		mountMap[mpName] = appctypes.MountPoint{
+			Name:     mpName,
+			Path:     m.ContainerPath,
+			ReadOnly: m.ReadOnly,
 		}
 	}
-	return -1
+	app.MountPoints = nil
+	for _, mount := range mountMap {
+		app.MountPoints = append(app.MountPoints, mount)
+	}
+}
+
+// mergePortMappings merges the optPortMappings with the image's port mappings.
+// The port mappings defined in the image will be overridden by the ones
+// with the same name in optPortMappings.
+func mergePortMappings(app *appctypes.App, optPortMappings []kubecontainer.PortMapping) {
+	portMap := make(map[appctypes.ACName]appctypes.Port)
+	for _, p := range app.Ports {
+		portMap[p.Name] = p
+	}
+	for _, p := range optPortMappings {
+		pName := convertToACName(p.Name)
+		portMap[pName] = appctypes.Port{
+			Name:     pName,
+			Protocol: string(p.Protocol),
+			Port:     uint(p.ContainerPort),
+		}
+	}
+	app.Ports = nil
+	for _, port := range portMap {
+		app.Ports = append(app.Ports, port)
+	}
 }
 
 // setApp overrides the app's fields if any of them are specified in the
@@ -354,103 +413,14 @@ func setApp(app *appctypes.App, c *api.Container, opts *kubecontainer.RunContain
 		app.WorkingDirectory = c.WorkingDir
 	}
 
-	// Merge the environment. Override the image with the ones defined in the spec if necessary.
-	for _, env := range opts.Envs {
-		if ix := findEnvInList(app.Environment, env); ix >= 0 {
-			app.Environment[ix].Value = env.Value
-			continue
-		}
-		app.Environment = append(app.Environment, appctypes.EnvironmentVariable{
-			Name:  env.Name,
-			Value: env.Value,
-		})
-	}
-
-	// Override the mount points.
-	if len(opts.Mounts) > 0 {
-		app.MountPoints = []appctypes.MountPoint{}
-	}
-	for _, m := range opts.Mounts {
-		mountPointName, err := appctypes.NewACName(m.Name)
-		if err != nil {
-			return err
-		}
-		app.MountPoints = append(app.MountPoints, appctypes.MountPoint{
-			Name:     *mountPointName,
-			Path:     m.ContainerPath,
-			ReadOnly: m.ReadOnly,
-		})
-	}
-
-	// Override the ports.
-	if len(opts.PortMappings) > 0 {
-		app.Ports = []appctypes.Port{}
-	}
-	for _, p := range opts.PortMappings {
-		name, err := appctypes.SanitizeACName(p.Name)
-		if err != nil {
-			return err
-		}
-		portName := appctypes.MustACName(name)
-		app.Ports = append(app.Ports, appctypes.Port{
-			Name:     *portName,
-			Protocol: string(p.Protocol),
-			Port:     uint(p.ContainerPort),
-		})
-	}
+	// Notes that we don't create Mounts section in the pod manifest here,
+	// as Mounts will be automatically generated by rkt.
+	mergeMounts(app, opts.Mounts)
+	mergeEnv(app, opts.Envs)
+	mergePortMappings(app, opts.PortMappings)
 
 	// Override isolators.
 	return setIsolators(app, c)
-}
-
-type sortByImportTime []*rktapi.Image
-
-func (s sortByImportTime) Len() int           { return len(s) }
-func (s sortByImportTime) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s sortByImportTime) Less(i, j int) bool { return s[i].ImportTimestamp < s[j].ImportTimestamp }
-
-// listImages lists the images that have the given name. If detail is true,
-// then image manifest is also included in the result.
-// Note that there could be more than one images that have the given name, we
-// will return the result reversely sorted by the import time, so that the latest
-// image comes first.
-func (r *Runtime) listImages(image string, detail bool) ([]*rktapi.Image, error) {
-	repoToPull, tag := parsers.ParseImageName(image)
-	listResp, err := r.apisvc.ListImages(context.Background(), &rktapi.ListImagesRequest{
-		Detail: detail,
-		Filters: []*rktapi.ImageFilter{
-			{
-				// TODO(yifan): Add a field in the ImageFilter to match the whole name,
-				// not just keywords.
-				// https://github.com/coreos/rkt/issues/1872#issuecomment-166456938
-				Keywords: []string{repoToPull},
-				Labels:   []*rktapi.KeyValue{{Key: "version", Value: tag}},
-			},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("couldn't list images: %v", err)
-	}
-
-	// TODO(yifan): Let the API service to sort the result:
-	// See https://github.com/coreos/rkt/issues/1911.
-	sort.Sort(sort.Reverse(sortByImportTime(listResp.Images)))
-	return listResp.Images, nil
-}
-
-// getImageManifest retrieves the image manifest for the given image.
-func (r *Runtime) getImageManifest(image string) (*appcschema.ImageManifest, error) {
-	var manifest appcschema.ImageManifest
-
-	images, err := r.listImages(image, true)
-	if err != nil {
-		return nil, err
-	}
-	if len(images) == 0 {
-		return nil, fmt.Errorf("cannot find the image %q", image)
-	}
-
-	return &manifest, json.Unmarshal(images[0].Manifest, &manifest)
 }
 
 // makePodManifest transforms a kubelet pod spec to the rkt pod manifest.
@@ -509,13 +479,9 @@ func (r *Runtime) makePodManifest(pod *api.Pod, pullSecrets []api.Secret) (*appc
 	}
 
 	// Set global volumes.
-	for name, volume := range volumeMap {
-		volName, err := appctypes.NewACName(name)
-		if err != nil {
-			return nil, fmt.Errorf("cannot use the volume's name %q as ACName: %v", name, err)
-		}
+	for vname, volume := range volumeMap {
 		manifest.Volumes = append(manifest.Volumes, appctypes.Volume{
-			Name:   *volName,
+			Name:   convertToACName(vname),
 			Kind:   "host",
 			Source: volume.Builder.GetPath(),
 		})
@@ -523,13 +489,8 @@ func (r *Runtime) makePodManifest(pod *api.Pod, pullSecrets []api.Secret) (*appc
 
 	// Set global ports.
 	for _, port := range globalPortMappings {
-		name, err := appctypes.SanitizeACName(port.Name)
-		if err != nil {
-			return nil, fmt.Errorf("cannot use the port's name %q as ACName: %v", port.Name, err)
-		}
-		portName := appctypes.MustACName(name)
 		manifest.Ports = append(manifest.Ports, appctypes.ExposedPort{
-			Name:     *portName,
+			Name:     convertToACName(port.Name),
 			HostPort: uint(port.HostPort),
 		})
 	}
@@ -568,22 +529,14 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, c api.Container, pullSecrets [
 		return nil, nil, err
 	}
 
-	name, err := appctypes.SanitizeACName(c.Name)
-	if err != nil {
-		return nil, nil, err
-	}
-	appName := appctypes.MustACName(name)
-
-	kubehash := kubecontainer.HashContainer(&c)
-
 	return &appcschema.RuntimeApp{
-		Name:  *appName,
+		Name:  convertToACName(c.Name),
 		Image: appcschema.RuntimeImage{ID: *hash},
 		App:   imgManifest.App,
 		Annotations: []appctypes.Annotation{
 			{
 				Name:  *appctypes.MustACIdentifier(k8sRktContainerHashAnno),
-				Value: strconv.FormatUint(kubehash, 10),
+				Value: strconv.FormatUint(kubecontainer.HashContainer(&c), 10),
 			},
 		},
 	}, opts.PortMappings, nil
@@ -990,87 +943,12 @@ func (r *Runtime) Version() (kubecontainer.Version, error) {
 	return r.binVersion, nil
 }
 
-// TODO(yifan): This is very racy, unefficient, and unsafe, we need to provide
-// different namespaces. See: https://github.com/coreos/rkt/issues/836.
-func (r *Runtime) writeDockerAuthConfig(image string, credsSlice []docker.AuthConfiguration) error {
-	if len(credsSlice) == 0 {
-		return nil
-	}
-
-	creds := docker.AuthConfiguration{}
-	// TODO handle multiple creds
-	if len(credsSlice) >= 1 {
-		creds = credsSlice[0]
-	}
-
-	registry := "index.docker.io"
-	// Image spec: [<registry>/]<repository>/<image>[:<version]
-	explicitRegistry := (strings.Count(image, "/") == 2)
-	if explicitRegistry {
-		registry = strings.Split(image, "/")[0]
-	}
-
-	localConfigDir := rktLocalConfigDir
-	if r.config.LocalConfigDir != "" {
-		localConfigDir = r.config.LocalConfigDir
-	}
-	authDir := path.Join(localConfigDir, "auth.d")
-	if _, err := os.Stat(authDir); os.IsNotExist(err) {
-		if err := os.Mkdir(authDir, 0600); err != nil {
-			glog.Errorf("rkt: Cannot create auth dir: %v", err)
-			return err
-		}
-	}
-
-	config := fmt.Sprintf(dockerAuthTemplate, registry, creds.Username, creds.Password)
-	if err := ioutil.WriteFile(path.Join(authDir, registry+".json"), []byte(config), 0600); err != nil {
-		glog.Errorf("rkt: Cannot write docker auth config file: %v", err)
-		return err
-	}
-	return nil
-}
-
-// PullImage invokes 'rkt fetch' to download an aci.
-// TODO(yifan): Now we only support docker images, this should be changed
-// once the format of image is landed, see:
-//
-// http://issue.k8s.io/7203
-//
-func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Secret) error {
-	img := image.Image
-	// TODO(yifan): The credential operation is a copy from dockertools package,
-	// Need to resolve the code duplication.
-	repoToPull, _ := parsers.ParseImageName(img)
-	keyring, err := credentialprovider.MakeDockerKeyring(pullSecrets, r.dockerKeyring)
-	if err != nil {
-		return err
-	}
-
-	creds, ok := keyring.Lookup(repoToPull)
-	if !ok {
-		glog.V(1).Infof("Pulling image %s without credentials", img)
-	}
-
-	// Let's update a json.
-	// TODO(yifan): Find a way to feed this to rkt.
-	if err := r.writeDockerAuthConfig(img, creds); err != nil {
-		return err
-	}
-
-	if _, err := r.runCommand("fetch", dockerPrefix+img); err != nil {
-		glog.Errorf("Failed to fetch: %v", err)
-		return err
-	}
-	return nil
-}
-
-func (r *Runtime) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
-	images, err := r.listImages(image.Image, false)
-	return len(images) > 0, err
-}
-
 // SyncPod syncs the running pod to match the specified desired pod.
-func (r *Runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus, _ *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error {
+func (r *Runtime) SyncPod(pod *api.Pod, podStatus api.PodStatus, internalPodStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error {
+	// TODO: (random-liu) Stop using running pod in SyncPod()
+	// TODO: (random-liu) Rename podStatus to apiPodStatus, rename internalPodStatus to podStatus, and use new pod status as much as possible,
+	// we may stop using apiPodStatus someday.
+	runningPod := kubecontainer.ConvertPodStatusToRunningPod(internalPodStatus)
 	// Add references to all containers.
 	unidentifiedContainers := make(map[kubecontainer.ContainerID]*kubecontainer.Container)
 	for _, c := range runningPod.Containers {
@@ -1329,56 +1207,6 @@ func (r *Runtime) PortForward(pod *kubecontainer.Pod, port uint16, stream io.Rea
 	}()
 
 	return command.Run()
-}
-
-// buildImageName constructs the image name for kubecontainer.Image.
-func buildImageName(img *rktapi.Image) string {
-	return fmt.Sprintf("%s:%s", img.Name, img.Version)
-}
-
-// getImageID tries to find the image ID for the given image name.
-// imageName should be in the form of 'name[:version]', e.g., 'example.com/app:latest'.
-// The name should matches the result of 'rkt image list'. If the version is empty,
-// then 'latest' is assumed.
-func (r *Runtime) getImageID(imageName string) (string, error) {
-	images, err := r.listImages(imageName, false)
-	if err != nil {
-		return "", err
-	}
-	if len(images) == 0 {
-		return "", fmt.Errorf("cannot find the image %q", imageName)
-	}
-	return images[0].Id, nil
-}
-
-// ListImages lists all the available appc images on the machine by invoking 'rkt image list'.
-func (r *Runtime) ListImages() ([]kubecontainer.Image, error) {
-	listResp, err := r.apisvc.ListImages(context.Background(), &rktapi.ListImagesRequest{})
-	if err != nil {
-		return nil, fmt.Errorf("couldn't list images: %v", err)
-	}
-
-	images := make([]kubecontainer.Image, len(listResp.Images))
-	for i, image := range listResp.Images {
-		images[i] = kubecontainer.Image{
-			ID:   image.Id,
-			Tags: []string{buildImageName(image)},
-			//TODO: fill in the size of the image
-		}
-	}
-	return images, nil
-}
-
-// RemoveImage removes an on-disk image using 'rkt image rm'.
-func (r *Runtime) RemoveImage(image kubecontainer.ImageSpec) error {
-	imageID, err := r.getImageID(image.Image)
-	if err != nil {
-		return err
-	}
-	if _, err := r.runCommand("image", "rm", imageID); err != nil {
-		return err
-	}
-	return nil
 }
 
 // appStateToContainerState converts rktapi.AppState to kubecontainer.ContainerState.

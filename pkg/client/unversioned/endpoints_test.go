@@ -47,6 +47,7 @@ func TestListEndpoints(t *testing.T) {
 		},
 	}
 	receivedEndpointsList, err := c.Setup(t).Endpoints(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, receivedEndpointsList, err)
 }
 
@@ -57,6 +58,7 @@ func TestGetEndpoints(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "endpoint-1"}}},
 	}
 	response, err := c.Setup(t).Endpoints(ns).Get("endpoint-1")
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -64,6 +66,7 @@ func TestGetEndpointWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &simple.Client{Error: true}
 	receivedPod, err := c.Setup(t).Endpoints(ns).Get("")
+	defer c.Close()
 	if (err != nil) && (err.Error() != simple.NameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
 	}

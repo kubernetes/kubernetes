@@ -23,7 +23,9 @@ import (
 
 	"fmt"
 
-	//Cloud providers
+	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
+
+	// Cloud providers
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Volume plugins
@@ -43,7 +45,7 @@ import (
 )
 
 // ProbeRecyclableVolumePlugins collects all persistent volume plugins into an easy to use list.
-func ProbeRecyclableVolumePlugins(flags VolumeConfigFlags) []volume.VolumePlugin {
+func ProbeRecyclableVolumePlugins(flags options.VolumeConfigFlags) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by this binary, not
@@ -86,7 +88,7 @@ func ProbeRecyclableVolumePlugins(flags VolumeConfigFlags) []volume.VolumePlugin
 // The beta implementation of provisioning allows 1 implied provisioner per cloud, until we allow configuration of many.
 // We explicitly map clouds to volume plugins here which allows us to configure many later without backwards compatibility issues.
 // Not all cloudproviders have provisioning capability, which is the reason for the bool in the return to tell the caller to expect one or not.
-func NewVolumeProvisioner(cloud cloudprovider.Interface, flags VolumeConfigFlags) (volume.ProvisionableVolumePlugin, error) {
+func NewVolumeProvisioner(cloud cloudprovider.Interface, flags options.VolumeConfigFlags) (volume.ProvisionableVolumePlugin, error) {
 	switch {
 	case cloud == nil && flags.EnableHostPathProvisioning:
 		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(volume.VolumeConfig{}))

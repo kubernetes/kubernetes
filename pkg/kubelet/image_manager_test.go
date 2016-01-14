@@ -312,9 +312,9 @@ func TestFreeSpaceImagesAlsoDoesLookupByRepoTags(t *testing.T) {
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		{
-			ID:   "5678",
-			Tags: []string{"potato", "salad"},
-			Size: 2048,
+			ID:       "5678",
+			RepoTags: []string{"potato", "salad"},
+			Size:     2048,
 		},
 	}
 	fakeRuntime.AllPodList = []*container.Pod{

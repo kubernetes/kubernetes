@@ -22,6 +22,16 @@ It is **strongly** recommended that all of the Kubernetes-Mesos executors are de
 Not following the above steps prior to upgrading the scheduler can result in a cluster wherein pods will never again be scheduled upon one or more nodes.
 This issue is being tracked here: https://github.com/mesosphere/kubernetes-mesos/issues/572.
 
+### Netfilter Connection Tracking
+
+The scheduler offers flags to tweak connection tracking for kube-proxy instances that are launched on slave nodes:
+
+- conntrack-max (do **NOT** set this to a non-zero value if the Mesos slave process is running in a non-root network namespace)
+- conntrack-tcp-timeout-established
+
+By default both of these are set to 0 when running Kubernetes-Mesos.
+Setting either of these flags to non-zero values may impact connection tracking for the entire slave.
+
 ### Port Specifications
 
 In order for pods (replicated, or otherwise) to be scheduled on the cluster, it is strongly recommended that:

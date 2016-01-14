@@ -89,8 +89,7 @@ type Runtime interface {
 	// GarbageCollect removes dead containers using the specified container gc policy
 	GarbageCollect(gcPolicy ContainerGCPolicy) error
 	// Syncs the running pod into the desired pod.
-	// TODO (random-liu) The runningPod will be removed after #17420 is done.
-	SyncPod(pod *api.Pod, runningPod Pod, apiPodStatus api.PodStatus, podStatus *PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error
+	SyncPod(pod *api.Pod, apiPodStatus api.PodStatus, podStatus *PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	KillPod(pod *api.Pod, runningPod Pod) error
 	// GetAPIPodStatus retrieves the api.PodStatus of the pod, including the information of
@@ -108,7 +107,7 @@ type Runtime interface {
 	// for all container runtimes in kubelet and remove this funciton.
 	ConvertPodStatusToAPIPodStatus(*api.Pod, *PodStatus) (*api.PodStatus, error)
 	// Return both PodStatus and api.PodStatus, this is just a temporary function.
-	// TODO (random-liu) Remove this method later
+	// TODO(random-liu): Remove this method later
 	GetPodStatusAndAPIPodStatus(*api.Pod) (*PodStatus, *api.PodStatus, error)
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary.
@@ -217,6 +216,16 @@ func (c *ContainerID) UnmarshalJSON(data []byte) error {
 	return c.ParseString(string(data))
 }
 
+// DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
+type DockerID string
+
+func (id DockerID) ContainerID() ContainerID {
+	return ContainerID{
+		Type: "docker",
+		ID:   string(id),
+	}
+}
+
 type ContainerState string
 
 const (
@@ -320,7 +329,7 @@ type Image struct {
 	// ID of the image.
 	ID string
 	// Other names by which this image is known.
-	Tags []string
+	RepoTags []string
 	// The size of the image in bytes.
 	Size int64
 }

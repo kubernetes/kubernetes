@@ -22,16 +22,11 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/secret"
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
-	"k8s.io/kubernetes/pkg/registry/serviceaccount"
+	serviceaccountregistry "k8s.io/kubernetes/pkg/registry/serviceaccount"
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/storage"
 )
-
-// ServiceAccountTokenGetter defines functions to retrieve a named service account and secret
-type ServiceAccountTokenGetter interface {
-	GetServiceAccount(namespace, name string) (*api.ServiceAccount, error)
-	GetSecret(namespace, name string) (*api.Secret, error)
-}
 
 // clientGetter implements ServiceAccountTokenGetter using a client.Interface
 type clientGetter struct {
@@ -42,7 +37,7 @@ type clientGetter struct {
 // uses the specified client to retrieve service accounts and secrets.
 // The client should NOT authenticate using a service account token
 // the returned getter will be used to retrieve, or recursion will result.
-func NewGetterFromClient(c client.Interface) ServiceAccountTokenGetter {
+func NewGetterFromClient(c client.Interface) serviceaccount.ServiceAccountTokenGetter {
 	return clientGetter{c}
 }
 func (c clientGetter) GetServiceAccount(namespace, name string) (*api.ServiceAccount, error) {
@@ -54,13 +49,13 @@ func (c clientGetter) GetSecret(namespace, name string) (*api.Secret, error) {
 
 // registryGetter implements ServiceAccountTokenGetter using a service account and secret registry
 type registryGetter struct {
-	serviceAccounts serviceaccount.Registry
+	serviceAccounts serviceaccountregistry.Registry
 	secrets         secret.Registry
 }
 
 // NewGetterFromRegistries returns a ServiceAccountTokenGetter that
 // uses the specified registries to retrieve service accounts and secrets.
-func NewGetterFromRegistries(serviceAccounts serviceaccount.Registry, secrets secret.Registry) ServiceAccountTokenGetter {
+func NewGetterFromRegistries(serviceAccounts serviceaccountregistry.Registry, secrets secret.Registry) serviceaccount.ServiceAccountTokenGetter {
 	return &registryGetter{serviceAccounts, secrets}
 }
 func (r *registryGetter) GetServiceAccount(namespace, name string) (*api.ServiceAccount, error) {
@@ -74,9 +69,9 @@ func (r *registryGetter) GetSecret(namespace, name string) (*api.Secret, error) 
 
 // NewGetterFromStorageInterface returns a ServiceAccountTokenGetter that
 // uses the specified storage to retrieve service accounts and secrets.
-func NewGetterFromStorageInterface(s storage.Interface) ServiceAccountTokenGetter {
+func NewGetterFromStorageInterface(s storage.Interface) serviceaccount.ServiceAccountTokenGetter {
 	return NewGetterFromRegistries(
-		serviceaccount.NewRegistry(serviceaccountetcd.NewREST(s, generic.UndecoratedStorage)),
+		serviceaccountregistry.NewRegistry(serviceaccountetcd.NewREST(s, generic.UndecoratedStorage)),
 		secret.NewRegistry(secretetcd.NewREST(s, generic.UndecoratedStorage)),
 	)
 }

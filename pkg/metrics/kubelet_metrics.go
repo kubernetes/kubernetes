@@ -61,8 +61,6 @@ var KnownKubeletMetrics = map[string][]string{
 	"container_spec_memory_swap_limit_bytes":                 {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
 	"container_start_time_seconds":                           {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name"},
 	"container_tasks_state":                                  {"id", "image", "kubernetes_container_name", "kubernetes_namespace", "kubernetes_pod_name", "name", "state"},
-	"get_token_count":                                        {},
-	"get_token_fail_count":                                   {},
 	"kubelet_container_manager_latency_microseconds":         {"operation_type", "quantile"},
 	"kubelet_container_manager_latency_microseconds_count":   {"operation_type"},
 	"kubelet_container_manager_latency_microseconds_sum":     {"operation_type"},
@@ -76,6 +74,12 @@ var KnownKubeletMetrics = map[string][]string{
 	"kubelet_generate_pod_status_latency_microseconds":       {"quantile"},
 	"kubelet_generate_pod_status_latency_microseconds_count": {},
 	"kubelet_generate_pod_status_latency_microseconds_sum":   {},
+	"kubelet_pleg_relist_latency_microseconds":               {"quantile"},
+	"kubelet_pleg_relist_latency_microseconds_sum":           {},
+	"kubelet_pleg_relist_latency_microseconds_count":         {},
+	"kubelet_pleg_relist_interval_microseconds":              {"quantile"},
+	"kubelet_pleg_relist_interval_microseconds_sum":          {},
+	"kubelet_pleg_relist_interval_microseconds_count":        {},
 	"kubelet_pod_start_latency_microseconds":                 {"quantile"},
 	"kubelet_pod_start_latency_microseconds_count":           {},
 	"kubelet_pod_start_latency_microseconds_sum":             {},
@@ -98,6 +102,12 @@ var KnownKubeletMetrics = map[string][]string{
 	"rest_client_request_status_codes":                       {"code", "host", "method"},
 }
 
+var KubeletMetricsLabelsToSkip = sets.NewString(
+	"kubernetes_namespace",
+	"image",
+	"name",
+)
+
 type KubeletMetrics Metrics
 
 func NewKubeletMetrics() KubeletMetrics {
@@ -116,11 +126,11 @@ func parseKubeletMetrics(data string, unknownMetrics sets.String) (KubeletMetric
 	return result, nil
 }
 
-func (g *MetricsGrabber) getMetricsFromNode(nodeName string) (string, error) {
+func (g *MetricsGrabber) getMetricsFromNode(nodeName string, kubeletPort int) (string, error) {
 	rawOutput, err := g.client.Get().
 		Prefix("proxy").
 		Resource("nodes").
-		Name(fmt.Sprintf("%v:%v", nodeName, g.kubeletPort)).
+		Name(fmt.Sprintf("%v:%v", nodeName, kubeletPort)).
 		Suffix("metrics").
 		Do().Raw()
 	if err != nil {

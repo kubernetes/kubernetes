@@ -47,8 +47,9 @@ type secretPlugin struct {
 
 var _ volume.VolumePlugin = &secretPlugin{}
 
-func (plugin *secretPlugin) Init(host volume.VolumeHost) {
+func (plugin *secretPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *secretPlugin) Name() string {

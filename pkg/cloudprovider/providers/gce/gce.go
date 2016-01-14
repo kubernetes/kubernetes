@@ -60,7 +60,7 @@ const (
 	operationPollTimeoutDuration = 30 * time.Minute
 )
 
-// GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
+// GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
 	service           *compute.Service
 	containerService  *container.Service
@@ -253,8 +253,8 @@ func (gce *GCECloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []
 	return nameservers, srchOut
 }
 
-// TCPLoadBalancer returns an implementation of TCPLoadBalancer for Google Compute Engine.
-func (gce *GCECloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
+// LoadBalancer returns an implementation of LoadBalancer for Google Compute Engine.
+func (gce *GCECloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return gce, true
 }
 
@@ -350,8 +350,8 @@ func (gce *GCECloud) waitForZoneOp(op *compute.Operation) error {
 	})
 }
 
-// GetTCPLoadBalancer is an implementation of TCPLoadBalancer.GetTCPLoadBalancer
-func (gce *GCECloud) GetTCPLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
+// GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
+func (gce *GCECloud) GetLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
 	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
 	if err == nil {
 		status := &api.LoadBalancerStatus{}
@@ -370,16 +370,18 @@ func isHTTPErrorCode(err error, code int) bool {
 	return ok && apiErr.Code == code
 }
 
-// EnsureTCPLoadBalancer is an implementation of TCPLoadBalancer.EnsureTCPLoadBalancer.
+// EnsureLoadBalancer is an implementation of LoadBalancer.EnsureLoadBalancer.
 // Our load balancers in GCE consist of four separate GCE resources - a static
 // IP address, a firewall rule, a target pool, and a forwarding rule. This
 // function has to manage all of them.
 // Due to an interesting series of design decisions, this handles both creating
 // new load balancers and updating existing load balancers, recognizing when
 // each is needed.
-func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, requestedIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+func (gce *GCECloud) EnsureLoadBalancer(name, region string, requestedIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v)", name, region, requestedIP, ports, hosts)
+
 	if len(hosts) == 0 {
-		return nil, fmt.Errorf("Cannot EnsureTCPLoadBalancer() with no hosts")
+		return nil, fmt.Errorf("Cannot EnsureLoadBalancer() with no hosts")
 	}
 
 	// Check if the forwarding rule exists, and if so, what its IP is.
@@ -426,7 +428,7 @@ func (gce *GCECloud) EnsureTCPLoadBalancer(name, region string, requestedIP net.
 
 	// Deal with the firewall next. The reason we do this here rather than last
 	// is because the forwarding rule is used as the indicator that the load
-	// balancer is fully created - it's what getTCPLoadBalancer checks for.
+	// balancer is fully created - it's what getLoadBalancer checks for.
 	firewallExists, firewallNeedsUpdate, err := gce.firewallNeedsUpdate(name, region, ipAddress, ports)
 	if err != nil {
 		return nil, err
@@ -515,6 +517,11 @@ func (gce *GCECloud) forwardingRuleNeedsUpdate(name, region string, requestedIP 
 	if portRange != fwd.PortRange {
 		return true, true, fwd.IPAddress, nil
 	}
+	// The service controller verified all the protocols match on the ports, just check the first one
+	if string(ports[0].Protocol) != fwd.IPProtocol {
+		return true, true, fwd.IPAddress, nil
+	}
+
 	return true, false, fwd.IPAddress, nil
 }
 
@@ -522,6 +529,12 @@ func loadBalancerPortRange(ports []*api.ServicePort) (string, error) {
 	if len(ports) == 0 {
 		return "", fmt.Errorf("no ports specified for GCE load balancer")
 	}
+
+	// The service controller verified all the protocols match on the ports, just check and use the first one
+	if ports[0].Protocol != api.ProtocolTCP && ports[0].Protocol != api.ProtocolUDP {
+		return "", fmt.Errorf("Invalid protocol %s, only TCP and UDP are supported", string(ports[0].Protocol))
+	}
+
 	minPort := 65536
 	maxPort := 0
 	for i := range ports {
@@ -575,7 +588,7 @@ func (gce *GCECloud) firewallNeedsUpdate(name, region, ipAddress string, ports [
 	if fw.Description != makeFirewallDescription(ipAddress) {
 		return true, true, nil
 	}
-	if len(fw.Allowed) != 1 || fw.Allowed[0].IPProtocol != "tcp" {
+	if len(fw.Allowed) != 1 || (fw.Allowed[0].IPProtocol != "tcp" && fw.Allowed[0].IPProtocol != "udp") {
 		return true, true, nil
 	}
 	// Make sure the allowed ports match.
@@ -586,6 +599,8 @@ func (gce *GCECloud) firewallNeedsUpdate(name, region, ipAddress string, ports [
 	if !slicesEqual(allowedPorts, fw.Allowed[0].Ports) {
 		return true, true, nil
 	}
+	// The service controller already verified that the protocol matches on all ports, no need to check.
+
 	return true, false, nil
 }
 
@@ -617,11 +632,10 @@ func (gce *GCECloud) createForwardingRule(name, region, ipAddress string, ports 
 		return err
 	}
 	req := &compute.ForwardingRule{
-		Name:       name,
-		IPAddress:  ipAddress,
-		IPProtocol: "TCP",
-		PortRange:  portRange,
-		Target:     gce.targetPoolURL(name, region),
+		Name:      name,
+		IPAddress: ipAddress, IPProtocol: string(ports[0].Protocol),
+		PortRange: portRange,
+		Target:    gce.targetPoolURL(name, region),
 	}
 
 	op, err := gce.service.ForwardingRules.Insert(gce.projectID, region, req).Do()
@@ -713,7 +727,7 @@ func (gce *GCECloud) firewallObject(name, region, ipAddress string, ports []*api
 		TargetTags:   hostTags,
 		Allowed: []*compute.FirewallAllowed{
 			{
-				IPProtocol: "tcp",
+				IPProtocol: strings.ToLower(string(ports[0].Protocol)),
 				Ports:      allowedPorts,
 			},
 		},
@@ -803,8 +817,8 @@ func (gce *GCECloud) createOrPromoteStaticIP(name, region, existingIP string) (i
 	return address.Address, nil
 }
 
-// UpdateTCPLoadBalancer is an implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.
-func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
+// UpdateLoadBalancer is an implementation of LoadBalancer.UpdateLoadBalancer.
+func (gce *GCECloud) UpdateLoadBalancer(name, region string, hosts []string) error {
 	pool, err := gce.service.TargetPools.Get(gce.projectID, region, name).Do()
 	if err != nil {
 		return err
@@ -864,12 +878,12 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 	return nil
 }
 
-// EnsureTCPLoadBalancerDeleted is an implementation of TCPLoadBalancer.EnsureTCPLoadBalancerDeleted.
-func (gce *GCECloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
+// EnsureLoadBalancerDeleted is an implementation of LoadBalancer.EnsureLoadBalancerDeleted.
+func (gce *GCECloud) EnsureLoadBalancerDeleted(name, region string) error {
 	err := utilerrors.AggregateGoroutines(
 		func() error { return gce.deleteFirewall(name, region) },
 		// Even though we don't hold on to static IPs for load balancers, it's
-		// possible that EnsureTCPLoadBalancer left one around in a failed
+		// possible that EnsureLoadBalancer left one around in a failed
 		// creation/update attempt, so make sure we clean it up here just in case.
 		func() error { return gce.deleteStaticIP(name, region) },
 		func() error {

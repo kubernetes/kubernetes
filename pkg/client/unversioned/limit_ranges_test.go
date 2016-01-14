@@ -67,6 +67,7 @@ func TestLimitRangeCreate(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).LimitRanges(ns).Create(limitRange)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -103,6 +104,7 @@ func TestLimitRangeGet(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).LimitRanges(ns).Get("abc")
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -126,6 +128,7 @@ func TestLimitRangeList(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: limitRangeList},
 	}
 	response, err := c.Setup(t).LimitRanges(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -157,6 +160,7 @@ func TestLimitRangeUpdate(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: limitRange},
 	}
 	response, err := c.Setup(t).LimitRanges(ns).Update(limitRange)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -187,6 +191,7 @@ func TestInvalidLimitRangeUpdate(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: limitRange},
 	}
 	_, err := c.Setup(t).LimitRanges(ns).Update(limitRange)
+	defer c.Close()
 	if err == nil {
 		t.Errorf("Expected an error due to missing ResourceVersion")
 	}
@@ -199,6 +204,7 @@ func TestLimitRangeDelete(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).LimitRanges(ns).Delete("foo")
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -211,5 +217,6 @@ func TestLimitRangeWatch(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	_, err := c.Setup(t).LimitRanges(api.NamespaceAll).Watch(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, nil, err)
 }

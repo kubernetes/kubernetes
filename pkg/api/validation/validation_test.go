@@ -508,12 +508,13 @@ func TestValidateVolumes(t *testing.T) {
 				FieldPath:  "metadata.labels"}},
 		}}}},
 		{Name: "fc", VolumeSource: api.VolumeSource{FC: &api.FCVolumeSource{[]string{"some_wwn"}, &lun, "ext4", false}}},
+		{Name: "flexvolume", VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{Driver: "kubernetes.io/blue", FSType: "ext4"}}},
 	}
 	names, errs := validateVolumes(successCase, field.NewPath("field"))
 	if len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
-	if len(names) != len(successCase) || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd", "gitrepo", "secret", "iscsidisk", "cinder", "cephfs", "fc") {
+	if len(names) != len(successCase) || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd", "gitrepo", "secret", "iscsidisk", "cinder", "cephfs", "flexvolume", "fc") {
 		t.Errorf("wrong names result: %v", names)
 	}
 	emptyVS := api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}
@@ -1391,6 +1392,8 @@ func TestValidateDNSPolicy(t *testing.T) {
 
 func TestValidatePodSpec(t *testing.T) {
 	activeDeadlineSeconds := int64(30)
+	minID := int64(0)
+	maxID := int64(2147483647)
 	successCases := []api.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
@@ -1424,6 +1427,26 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
+		{ // Populate RunAsUser SupplementalGroups FSGroup with minID 0
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			SecurityContext: &api.PodSecurityContext{
+				SupplementalGroups: []int64{minID},
+				RunAsUser:          &minID,
+				FSGroup:            &minID,
+			},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
+		{ // Populate RunAsUser SupplementalGroups FSGroup with maxID 2147483647
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			SecurityContext: &api.PodSecurityContext{
+				SupplementalGroups: []int64{maxID},
+				RunAsUser:          &maxID,
+				FSGroup:            &maxID,
+			},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 		{ // Populate HostIPC.
 			SecurityContext: &api.PodSecurityContext{
 				HostIPC: true,
@@ -1450,6 +1473,8 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 
 	activeDeadlineSeconds = int64(0)
+	minID = int64(-1)
+	maxID = int64(2147483648)
 	failureCases := map[string]api.PodSpec{
 		"bad volume": {
 			Volumes:       []api.Volume{{}},
@@ -1490,6 +1515,60 @@ func TestValidatePodSpec(t *testing.T) {
 			},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: true,
+			},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
+		"bad supplementalGroups large than math.MaxInt32": {
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork:        false,
+				SupplementalGroups: []int64{maxID, 1234},
+			},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
+		"bad supplementalGroups less than 0": {
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork:        false,
+				SupplementalGroups: []int64{minID, 1234},
+			},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
+		"bad runAsUser large than math.MaxInt32": {
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: false,
+				RunAsUser:   &maxID,
+			},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
+		"bad runAsUser less than 0": {
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: false,
+				RunAsUser:   &minID,
+			},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
+		"bad fsGroup large than math.MaxInt32": {
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: false,
+				FSGroup:     &maxID,
+			},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
+		"bad fsGroup less than 0": {
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: false,
+				FSGroup:     &minID,
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -2094,20 +2173,20 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "invalid load balancer protocol 1",
+			name: "valid load balancer protocol UDP 1",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeLoadBalancer
 				s.Spec.Ports[0].Protocol = "UDP"
 			},
-			numErrs: 1,
+			numErrs: 0,
 		},
 		{
-			name: "invalid load balancer protocol 2",
+			name: "valid load balancer protocol UDP 2",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeLoadBalancer
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(12345)})
 			},
-			numErrs: 1,
+			numErrs: 0,
 		},
 		{
 			name: "valid 1",

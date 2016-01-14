@@ -43,6 +43,9 @@ const (
 	// of all deployments that have fulfilled their expectations at least this often.
 	// This recomputation happens based on contents in the local caches.
 	FullDeploymentResyncPeriod = 30 * time.Second
+	// We must avoid creating new rc until the rc store has synced. If it hasn't synced, to
+	// avoid a hot loop, we'll wait this long between checks.
+	RcStoreSyncedPollPeriod = 100 * time.Millisecond
 )
 
 // DeploymentController is responsible for synchronizing Deployment objects stored
@@ -107,13 +110,23 @@ func NewDeploymentController(client client.Interface, resyncPeriod controller.Re
 		&extensions.Deployment{},
 		FullDeploymentResyncPeriod,
 		framework.ResourceEventHandlerFuncs{
-			AddFunc: dc.enqueueDeployment,
+			AddFunc: func(obj interface{}) {
+				d := obj.(*extensions.Deployment)
+				glog.V(4).Infof("Adding deployment %s", d.Name)
+				dc.enqueueDeployment(obj)
+			},
 			UpdateFunc: func(old, cur interface{}) {
+				oldD := old.(*extensions.Deployment)
+				glog.V(4).Infof("Updating deployment %s", oldD.Name)
 				// Resync on deployment object relist.
 				dc.enqueueDeployment(cur)
 			},
 			// This will enter the sync loop and no-op, because the deployment has been deleted from the store.
-			DeleteFunc: dc.enqueueDeployment,
+			DeleteFunc: func(obj interface{}) {
+				d := obj.(*extensions.Deployment)
+				glog.V(4).Infof("Deleting deployment %s", d.Name)
+				dc.enqueueDeployment(obj)
+			},
 		},
 	)
 
@@ -375,6 +388,14 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return nil
 	}
 	d := *obj.(*extensions.Deployment)
+	if !dc.rcStoreSynced() {
+		// Sleep so we give the rc reflector goroutine a chance to run.
+		time.Sleep(RcStoreSyncedPollPeriod)
+		glog.Infof("Waiting for rc controller to sync, requeuing deployment %s", d.Name)
+		dc.enqueueDeployment(d)
+		return nil
+	}
+
 	switch d.Spec.Strategy.Type {
 	case extensions.RecreateDeploymentStrategyType:
 		return dc.syncRecreateDeployment(d)
@@ -385,7 +406,38 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 }
 
 func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Deployment) error {
-	// TODO: implement me.
+	newRC, err := dc.getNewRC(deployment)
+	if err != nil {
+		return err
+	}
+
+	oldRCs, err := dc.getOldRCs(deployment)
+	if err != nil {
+		return err
+	}
+
+	allRCs := append(oldRCs, newRC)
+
+	// scale down old rcs
+	scaledDown, err := dc.scaleDownOldRCsForRecreate(oldRCs, deployment)
+	if err != nil {
+		return err
+	}
+	if scaledDown {
+		// Update DeploymentStatus
+		return dc.updateDeploymentStatus(allRCs, newRC, deployment)
+	}
+
+	// scale up new rc
+	scaledUp, err := dc.scaleUpNewRCForRecreate(newRC, deployment)
+	if err != nil {
+		return err
+	}
+	if scaledUp {
+		// Update DeploymentStatus
+		return dc.updateDeploymentStatus(allRCs, newRC, deployment)
+	}
+
 	return nil
 }
 
@@ -575,6 +627,33 @@ func (dc *DeploymentController) reconcileOldRCs(allRCs []*api.ReplicationControl
 			dc.expectations.ExpectDeletions(dKey, scaleDownCount)
 		}
 	}
+	return true, err
+}
+
+// scaleDownOldRCsForRecreate scales down old rcs when deployment strategy is "Recreate"
+func (dc *DeploymentController) scaleDownOldRCsForRecreate(oldRCs []*api.ReplicationController, deployment extensions.Deployment) (bool, error) {
+	scaled := false
+	for _, rc := range oldRCs {
+		// Scaling not required.
+		if rc.Spec.Replicas == 0 {
+			continue
+		}
+		_, err := dc.scaleRCAndRecordEvent(rc, 0, deployment)
+		if err != nil {
+			return false, err
+		}
+		scaled = true
+	}
+	return scaled, nil
+}
+
+// scaleUpNewRCForRecreate scales up new rc when deployment strategy is "Recreate"
+func (dc *DeploymentController) scaleUpNewRCForRecreate(newRC *api.ReplicationController, deployment extensions.Deployment) (bool, error) {
+	if newRC.Spec.Replicas == deployment.Spec.Replicas {
+		// Scaling not required.
+		return false, nil
+	}
+	_, err := dc.scaleRCAndRecordEvent(newRC, deployment.Spec.Replicas, deployment)
 	return true, err
 }
 

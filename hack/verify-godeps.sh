@@ -18,11 +18,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# release v33 fails because of godep: error restoring dep (github.com/google/btree): found packages btree (btree.go) and main (btree_mem.go) in /tmp/gopath.aSHREx/src/github.com/google/btree
-# release v34 fails because godep save just hangs forever
-# release v35 fails because of godep: error restoring dep (github.com/Sirupsen/logrus): Unable to find dependent package golang.org/x/sys/unix in context of /tmp/gopath.aSHREx/src/github.com/Sirupsen/logrus
-# https://github.com/tools/godep/issues/359
-GODEP_RELEASE=v32
+# Lock this to a release that is known to work.  We can bump this as needed.
+GODEP_RELEASE=v45
 
 #### HACK ####
 # Sometimes godep just can't handle things. This lets use manually put
@@ -73,6 +70,9 @@ echo "Starting to download all kubernetes godeps. This takes a while"
 
 # Remove once either godep works properly or we bump docker version
 preload-dep github.com/docker docker 0f5c9d301b9b1cca66b3ea0f9dec3b5317d3686d
+
+# Remove once either godep works properly or we bump camlistore deps
+preload-dep github.com/camlistore camlistore 9868aa0f8d8a93ff0b30ff0de46cc351b6b88b30
 
 "${GODEP}" restore
 echo "Download finished"

@@ -40,8 +40,9 @@ const (
 	persistentClaimPluginName = "kubernetes.io/persistent-claim"
 )
 
-func (plugin *persistentClaimPlugin) Init(host volume.VolumeHost) {
+func (plugin *persistentClaimPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *persistentClaimPlugin) Name() string {

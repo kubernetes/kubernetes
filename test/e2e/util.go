@@ -153,6 +153,9 @@ type TestContextType struct {
 	// It will read the data every 30 seconds from all Nodes and print summary during afterEach.
 	GatherKubeSystemResourceUsageData bool
 	GatherLogsSizes                   bool
+	GatherMetricsAfterTest            bool
+	// Currently supported values are 'hr' for human-readable and 'json'. It's a comma separated list.
+	OutputPrintType string
 }
 
 var testContext TestContextType
@@ -1936,9 +1939,11 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 			return false, err
 		}
 		if totalCreated > maxCreated {
+			logRCsOfDeployment(deploymentName, oldRCs, newRC)
 			return false, fmt.Errorf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
 		}
 		if totalAvailable < minAvailable {
+			logRCsOfDeployment(deploymentName, oldRCs, newRC)
 			return false, fmt.Errorf("total pods available: %d, less than the min required: %d", totalAvailable, minAvailable)
 		}
 
@@ -1946,15 +1951,24 @@ func waitForDeploymentStatus(c *client.Client, ns, deploymentName string, desire
 			deployment.Status.UpdatedReplicas == desiredUpdatedReplicas {
 			// Verify RCs.
 			if deploymentutil.GetReplicaCountForRCs(oldRCs) != 0 {
+				logRCsOfDeployment(deploymentName, oldRCs, newRC)
 				return false, fmt.Errorf("old RCs are not fully scaled down")
 			}
 			if deploymentutil.GetReplicaCountForRCs([]*api.ReplicationController{newRC}) != desiredUpdatedReplicas {
-				return false, fmt.Errorf("new RCs is not fully scaled up")
+				logRCsOfDeployment(deploymentName, oldRCs, newRC)
+				return false, fmt.Errorf("new RC is not fully scaled up")
 			}
 			return true, nil
 		}
 		return false, nil
 	})
+}
+
+func logRCsOfDeployment(deploymentName string, oldRCs []*api.ReplicationController, newRC *api.ReplicationController) {
+	for i := range oldRCs {
+		Logf("Old RCs (%d/%d) of deployment %s: %+v", i+1, len(oldRCs), deploymentName, oldRCs[i])
+	}
+	Logf("New RC of deployment %s: %+v", deploymentName, newRC)
 }
 
 // Waits for the number of events on the given object to reach a desired count.
@@ -1973,6 +1987,21 @@ func waitForEvents(c *client.Client, ns string, objOrRef runtime.Object, desired
 		}
 		// Number of events has exceeded the desired count.
 		return false, fmt.Errorf("number of events has exceeded the desired count, eventsCount: %d, desiredCount: %d", eventsCount, desiredEventsCount)
+	})
+}
+
+// Waits for the number of events on the given object to be at least a desired count.
+func waitForPartialEvents(c *client.Client, ns string, objOrRef runtime.Object, atLeastEventsCount int) error {
+	return wait.Poll(poll, 5*time.Minute, func() (bool, error) {
+		events, err := c.Events(ns).Search(objOrRef)
+		if err != nil {
+			return false, fmt.Errorf("error in listing events: %s", err)
+		}
+		eventsCount := len(events.Items)
+		if eventsCount >= atLeastEventsCount {
+			return true, nil
+		}
+		return false, nil
 	})
 }
 
@@ -2265,16 +2294,19 @@ func waitForNodeToBeNotReady(c *client.Client, name string, timeout time.Duratio
 
 func isNodeConditionSetAsExpected(node *api.Node, conditionType api.NodeConditionType, wantTrue bool) bool {
 	// Check the node readiness condition (logging all).
-	for i, cond := range node.Status.Conditions {
-		Logf("Node %s condition %d/%d: type: %v, status: %v, reason: %q, message: %q, last transition time: %v",
-			node.Name, i+1, len(node.Status.Conditions), cond.Type, cond.Status,
-			cond.Reason, cond.Message, cond.LastTransitionTime)
+	for _, cond := range node.Status.Conditions {
 		// Ensure that the condition type and the status matches as desired.
-		if cond.Type == conditionType && (cond.Status == api.ConditionTrue) == wantTrue {
-			Logf("Successfully found condition %s of node %s to be %t", conditionType, node.Name, wantTrue)
-			return true
+		if cond.Type == conditionType {
+			if (cond.Status == api.ConditionTrue) == wantTrue {
+				return true
+			} else {
+				Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+					conditionType, node.Name, cond.Status == api.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+				return false
+			}
 		}
 	}
+	Logf("Couldn't find condition %v on node %v", conditionType, node.Name)
 	return false
 }
 

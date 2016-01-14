@@ -87,18 +87,13 @@ func enableVersions(externalVersions []unversioned.GroupVersion) error {
 }
 
 func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper {
-	worstToBestGroupVersions := []unversioned.GroupVersion{}
-	for i := len(externalVersions) - 1; i >= 0; i-- {
-		worstToBestGroupVersions = append(worstToBestGroupVersions, externalVersions[i])
-	}
-
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
 	rootScoped := sets.NewString()
 
 	ignoredKinds := sets.NewString()
 
-	return api.NewDefaultRESTMapper(worstToBestGroupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
+	return api.NewDefaultRESTMapper(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 }
 
 // interfacesFor returns the default Codec and ResourceVersioner for a given version

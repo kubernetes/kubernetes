@@ -162,10 +162,10 @@ var _ = Describe("Cluster Upgrade [Skipped]", func() {
 	})
 
 	f := NewFramework("cluster-upgrade")
-	var w *WebserverTest
+	var w *ServerTest
 	BeforeEach(func() {
 		By("Setting up the service, RC, and pods")
-		w = NewWebserverTest(f.Client, f.Namespace.Name, svcName)
+		w = NewServerTest(f.Client, f.Namespace.Name, svcName)
 		rc := w.CreateWebserverRC(replicas)
 		rcName = rc.ObjectMeta.Name
 		svc := w.BuildServiceSpec()

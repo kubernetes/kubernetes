@@ -117,10 +117,11 @@ type SchedulerServer struct {
 	checkpoint          bool
 	failoverTimeout     float64
 
-	executorLogV           int
-	executorBindall        bool
-	executorSuicideTimeout time.Duration
-	launchGracePeriod      time.Duration
+	executorLogV                   int
+	executorBindall                bool
+	executorSuicideTimeout         time.Duration
+	launchGracePeriod              time.Duration
+	kubeletEnableDebuggingHandlers bool
 
 	runProxy     bool
 	proxyBindall bool
@@ -132,36 +133,38 @@ type SchedulerServer struct {
 	minionLogMaxBackups   int
 	minionLogMaxAgeInDays int
 
-	mesosAuthProvider             string
-	driverPort                    uint
-	hostnameOverride              string
-	reconcileInterval             int64
-	reconcileCooldown             time.Duration
-	defaultContainerCPULimit      mresource.CPUShares
-	defaultContainerMemLimit      mresource.MegaBytes
-	schedulerConfigFileName       string
-	graceful                      bool
-	frameworkName                 string
-	frameworkWebURI               string
-	ha                            bool
-	advertisedAddress             string
-	serviceAddress                net.IP
-	haDomain                      string
-	kmPath                        string
-	clusterDNS                    net.IP
-	clusterDomain                 string
-	kubeletRootDirectory          string
-	kubeletDockerEndpoint         string
-	kubeletPodInfraContainerImage string
-	kubeletCadvisorPort           uint
-	kubeletHostNetworkSources     string
-	kubeletSyncFrequency          time.Duration
-	kubeletNetworkPluginName      string
-	staticPodsConfigPath          string
-	dockerCfgPath                 string
-	containPodResources           bool
-	nodeRelistPeriod              time.Duration
-	sandboxOverlay                string
+	mesosAuthProvider              string
+	driverPort                     uint
+	hostnameOverride               string
+	reconcileInterval              int64
+	reconcileCooldown              time.Duration
+	defaultContainerCPULimit       mresource.CPUShares
+	defaultContainerMemLimit       mresource.MegaBytes
+	schedulerConfigFileName        string
+	graceful                       bool
+	frameworkName                  string
+	frameworkWebURI                string
+	ha                             bool
+	advertisedAddress              string
+	serviceAddress                 net.IP
+	haDomain                       string
+	kmPath                         string
+	clusterDNS                     net.IP
+	clusterDomain                  string
+	kubeletRootDirectory           string
+	kubeletDockerEndpoint          string
+	kubeletPodInfraContainerImage  string
+	kubeletCadvisorPort            uint
+	kubeletHostNetworkSources      string
+	kubeletSyncFrequency           time.Duration
+	kubeletNetworkPluginName       string
+	staticPodsConfigPath           string
+	dockerCfgPath                  string
+	containPodResources            bool
+	nodeRelistPeriod               time.Duration
+	sandboxOverlay                 string
+	conntrackMax                   int
+	conntrackTCPTimeoutEstablished int
 
 	executable  string // path to the binary running this service
 	client      *client.Client
@@ -196,24 +199,31 @@ func NewSchedulerServer() *SchedulerServer {
 		minionLogMaxBackups:   minioncfg.DefaultLogMaxBackups,
 		minionLogMaxAgeInDays: minioncfg.DefaultLogMaxAgeInDays,
 
-		mesosAuthProvider:    sasl.ProviderName,
-		mesosCgroupPrefix:    minioncfg.DefaultCgroupPrefix,
-		mesosMaster:          defaultMesosMaster,
-		mesosUser:            defaultMesosUser,
-		mesosExecutorCPUs:    defaultExecutorCPUs,
-		mesosExecutorMem:     defaultExecutorMem,
-		frameworkRoles:       strings.Split(defaultFrameworkRoles, ","),
-		defaultPodRoles:      strings.Split(defaultPodRoles, ","),
-		reconcileInterval:    defaultReconcileInterval,
-		reconcileCooldown:    defaultReconcileCooldown,
-		checkpoint:           true,
-		frameworkName:        defaultFrameworkName,
-		ha:                   false,
-		mux:                  http.NewServeMux(),
-		kubeletCadvisorPort:  4194, // copied from github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kubelet/app/server.go
-		kubeletSyncFrequency: 10 * time.Second,
-		containPodResources:  true,
-		nodeRelistPeriod:     defaultNodeRelistPeriod,
+		mesosAuthProvider:              sasl.ProviderName,
+		mesosCgroupPrefix:              minioncfg.DefaultCgroupPrefix,
+		mesosMaster:                    defaultMesosMaster,
+		mesosUser:                      defaultMesosUser,
+		mesosExecutorCPUs:              defaultExecutorCPUs,
+		mesosExecutorMem:               defaultExecutorMem,
+		frameworkRoles:                 strings.Split(defaultFrameworkRoles, ","),
+		defaultPodRoles:                strings.Split(defaultPodRoles, ","),
+		reconcileInterval:              defaultReconcileInterval,
+		reconcileCooldown:              defaultReconcileCooldown,
+		checkpoint:                     true,
+		frameworkName:                  defaultFrameworkName,
+		ha:                             false,
+		mux:                            http.NewServeMux(),
+		kubeletCadvisorPort:            4194, // copied from github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kubelet/app/server.go
+		kubeletSyncFrequency:           10 * time.Second,
+		kubeletEnableDebuggingHandlers: true,
+		containPodResources:            true,
+		nodeRelistPeriod:               defaultNodeRelistPeriod,
+		conntrackTCPTimeoutEstablished: 0, // non-zero values may require hand-tuning other sysctl's on the host; do so with caution
+
+		// non-zero values can trigger failures when updating /sys/module/nf_conntrack/parameters/hashsize
+		// when kube-proxy is running in a non-root netns (init_net); setting this to a non-zero value will
+		// impact connection tracking for the entire host on which kube-proxy is running. xref (k8s#19182)
+		conntrackMax: 0,
 	}
 	// cache this for later use. also useful in case the original binary gets deleted, e.g.
 	// during upgrades, development deployments, etc.
@@ -291,6 +301,9 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.kubeletHostNetworkSources, "kubelet-host-network-sources", s.kubeletHostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network. For all sources use \"*\" [default=\"file\"]")
 	fs.DurationVar(&s.kubeletSyncFrequency, "kubelet-sync-frequency", s.kubeletSyncFrequency, "Max period between synchronizing running containers and config")
 	fs.StringVar(&s.kubeletNetworkPluginName, "kubelet-network-plugin", s.kubeletNetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
+	fs.BoolVar(&s.kubeletEnableDebuggingHandlers, "kubelet-enable-debugging-handlers", s.kubeletEnableDebuggingHandlers, "Enables kubelet endpoints for log collection and local running of containers and commands")
+	fs.IntVar(&s.conntrackMax, "conntrack-max", s.conntrackMax, "Maximum number of NAT connections to track on agent nodes (0 to leave as-is)")
+	fs.IntVar(&s.conntrackTCPTimeoutEstablished, "conntrack-tcp-timeout-established", s.conntrackTCPTimeoutEstablished, "Idle timeout for established TCP connections on agent nodes (0 to leave as-is)")
 
 	//TODO(jdef) support this flag once we have a better handle on mesos-dns and k8s DNS integration
 	//fs.StringVar(&s.HADomain, "ha-domain", s.HADomain, "Domain of the HA scheduler service, only used in HA mode. If specified may be used to construct artifact download URIs.")
@@ -409,6 +422,9 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--cadvisor-port=%v", s.kubeletCadvisorPort))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--sync-frequency=%v", s.kubeletSyncFrequency))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--contain-pod-resources=%t", s.containPodResources))
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--enable-debugging-handlers=%t", s.kubeletEnableDebuggingHandlers))
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-max=%d", s.conntrackMax))
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-tcp-timeout-established=%d", s.conntrackTCPTimeoutEstablished))
 
 	if s.authPath != "" {
 		//TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file

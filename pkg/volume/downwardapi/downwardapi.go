@@ -51,8 +51,9 @@ type downwardAPIPlugin struct {
 
 var _ volume.VolumePlugin = &downwardAPIPlugin{}
 
-func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost) {
+func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *downwardAPIPlugin) Name() string {

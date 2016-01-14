@@ -31,7 +31,8 @@ KUBE_OUTPUT="${KUBE_ROOT}/${KUBE_OUTPUT_SUBPATH}"
 KUBE_OUTPUT_BINPATH="${KUBE_OUTPUT}/bin"
 
 source "${KUBE_ROOT}/hack/lib/util.sh"
-source "${KUBE_ROOT}/hack/lib/logging.sh"
+source "${KUBE_ROOT}/cluster/lib/util.sh"
+source "${KUBE_ROOT}/cluster/lib/logging.sh"
 
 kube::log::install_errexit
 

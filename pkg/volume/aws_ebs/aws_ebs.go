@@ -53,8 +53,9 @@ const (
 	awsElasticBlockStorePluginName = "kubernetes.io/aws-ebs"
 )
 
-func (plugin *awsElasticBlockStorePlugin) Init(host volume.VolumeHost) {
+func (plugin *awsElasticBlockStorePlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *awsElasticBlockStorePlugin) Name() string {

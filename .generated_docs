@@ -20,6 +20,7 @@ docs/man/man1/kubectl-config-use-context.1
 docs/man/man1/kubectl-config-view.1
 docs/man/man1/kubectl-config.1
 docs/man/man1/kubectl-convert.1
+docs/man/man1/kubectl-cordon.1
 docs/man/man1/kubectl-create-namespace.1
 docs/man/man1/kubectl-create-secret-docker-registry.1
 docs/man/man1/kubectl-create-secret-generic.1
@@ -27,6 +28,7 @@ docs/man/man1/kubectl-create-secret.1
 docs/man/man1/kubectl-create.1
 docs/man/man1/kubectl-delete.1
 docs/man/man1/kubectl-describe.1
+docs/man/man1/kubectl-drain.1
 docs/man/man1/kubectl-edit.1
 docs/man/man1/kubectl-exec.1
 docs/man/man1/kubectl-explain.1
@@ -43,6 +45,7 @@ docs/man/man1/kubectl-rolling-update.1
 docs/man/man1/kubectl-run.1
 docs/man/man1/kubectl-scale.1
 docs/man/man1/kubectl-stop.1
+docs/man/man1/kubectl-uncordon.1
 docs/man/man1/kubectl-version.1
 docs/man/man1/kubectl.1
 docs/user-guide/kubectl/kubectl.md
@@ -61,6 +64,7 @@ docs/user-guide/kubectl/kubectl_config_unset.md
 docs/user-guide/kubectl/kubectl_config_use-context.md
 docs/user-guide/kubectl/kubectl_config_view.md
 docs/user-guide/kubectl/kubectl_convert.md
+docs/user-guide/kubectl/kubectl_cordon.md
 docs/user-guide/kubectl/kubectl_create.md
 docs/user-guide/kubectl/kubectl_create_namespace.md
 docs/user-guide/kubectl/kubectl_create_secret.md
@@ -68,6 +72,7 @@ docs/user-guide/kubectl/kubectl_create_secret_docker-registry.md
 docs/user-guide/kubectl/kubectl_create_secret_generic.md
 docs/user-guide/kubectl/kubectl_delete.md
 docs/user-guide/kubectl/kubectl_describe.md
+docs/user-guide/kubectl/kubectl_drain.md
 docs/user-guide/kubectl/kubectl_edit.md
 docs/user-guide/kubectl/kubectl_exec.md
 docs/user-guide/kubectl/kubectl_explain.md
@@ -83,4 +88,5 @@ docs/user-guide/kubectl/kubectl_replace.md
 docs/user-guide/kubectl/kubectl_rolling-update.md
 docs/user-guide/kubectl/kubectl_run.md
 docs/user-guide/kubectl/kubectl_scale.md
+docs/user-guide/kubectl/kubectl_uncordon.md
 docs/user-guide/kubectl/kubectl_version.md

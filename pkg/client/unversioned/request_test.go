@@ -241,6 +241,7 @@ func TestRequestBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create temp file")
 	}
+	defer f.Close()
 	os.Remove(f.Name())
 	r = (&Request{}).Body(f.Name())
 	if r.err == nil || r.body != nil {
@@ -703,7 +704,8 @@ func TestDoRequestNewWay(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	c := testRESTClient(t, testServer)
 	obj, err := c.Verb("POST").
 		Prefix("foo", "bar").
@@ -739,7 +741,8 @@ func TestBackoffLifecycle(t *testing.T) {
 			return
 		}
 	}))
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	c := testRESTClient(t, testServer)
 
 	// Test backoff recovery and increase.  This correlates to the constants
@@ -775,7 +778,8 @@ func TestCheckRetryClosesBody(t *testing.T) {
 		w.Header().Set("Retry-After", "0")
 		w.WriteHeader(apierrors.StatusTooManyRequests)
 	}))
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 
 	c := testRESTClient(t, testServer)
 	_, err := c.Verb("POST").
@@ -807,7 +811,8 @@ func TestCheckRetryHandles429And5xx(t *testing.T) {
 		w.WriteHeader([]int{apierrors.StatusTooManyRequests, 500, 501, 504}[count])
 		count++
 	}))
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 
 	c := testRESTClient(t, testServer)
 	_, err := c.Verb("POST").
@@ -836,7 +841,8 @@ func BenchmarkCheckRetryClosesBody(b *testing.B) {
 		w.Header().Set("Retry-After", "0")
 		w.WriteHeader(apierrors.StatusTooManyRequests)
 	}))
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 
 	c := testRESTClient(b, testServer)
 	r := c.Verb("POST").
@@ -867,7 +873,8 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	c := testRESTClient(t, testServer)
 	obj, err := c.Verb("POST").
 		Resource("bar").
@@ -907,7 +914,8 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	c := testRESTClient(t, testServer)
 	obj, err := c.Verb("POST").
 		Suffix("baz").
@@ -943,6 +951,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	defer file.Close()
 
 	_, err = file.Write(reqBodyExpected)
 	if err != nil {
@@ -961,7 +970,8 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	c := testRESTClient(t, testServer)
 	wasCreated := true
 	obj, err := c.Verb("POST").
@@ -1006,7 +1016,8 @@ func TestWasCreated(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	c := testRESTClient(t, testServer)
 	wasCreated := false
 	obj, err := c.Verb("PUT").
@@ -1175,7 +1186,8 @@ func TestWatch(t *testing.T) {
 			flusher.Flush()
 		}
 	}))
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 
 	s := testRESTClient(t, testServer)
 	watching, err := s.Get().Prefix("path/to/watch/thing").Watch()
@@ -1215,7 +1227,8 @@ func TestStream(t *testing.T) {
 		w.Write([]byte(expectedBody))
 		flusher.Flush()
 	}))
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 
 	s := testRESTClient(t, testServer)
 	readCloser, err := s.Get().Prefix("path/to/stream/thing").Stream()

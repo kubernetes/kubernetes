@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -94,6 +95,10 @@ var (
 	// GCE only allows names < 64 characters, and the loadbalancer controller inserts
 	// a single character of padding.
 	nameLenLimit = 62
+
+	// Timing out requests will lead to retries, and more importantly, the test
+	// finishing in a deterministic manner.
+	timeoutClient = &http.Client{Timeout: 60 * time.Second}
 )
 
 // timeSlice allows sorting of time.Duration
@@ -173,7 +178,7 @@ func createApp(c *client.Client, ns string, i int) {
 	Expect(err).NotTo(HaveOccurred())
 
 	Logf("Creating rc %v", name)
-	rc := rcByNamePort(name, 1, testImage, httpContainerPort, l)
+	rc := rcByNamePort(name, 1, testImage, httpContainerPort, api.ProtocolTCP, l)
 	rc.Spec.Template.Spec.Containers[0].Args = []string{
 		"--num=1",
 		fmt.Sprintf("--start=%d", i),
@@ -186,12 +191,21 @@ func createApp(c *client.Client, ns string, i int) {
 
 // gcloudUnmarshal unmarshals json output of gcloud into given out interface.
 func gcloudUnmarshal(resource, regex, project string, out interface{}) {
-	output, err := exec.Command("gcloud", "compute", resource, "list",
+	// gcloud prints a message to stderr if it has an available update
+	// so we only look at stdout.
+	command := []string{
+		"compute", resource, "list",
 		fmt.Sprintf("--regex=%v", regex),
 		fmt.Sprintf("--project=%v", project),
-		"-q", "--format=json").CombinedOutput()
+		"-q", "--format=json",
+	}
+	output, err := exec.Command("gcloud", command...).Output()
 	if err != nil {
-		Logf("Error unmarshalling gcloud err: %v, output: %v", err, string(output))
+		errCode := -1
+		if exitErr, ok := err.(utilexec.ExitError); ok {
+			errCode = exitErr.ExitStatus()
+		}
+		Logf("Error running gcloud command 'gcloud %s': err: %v, output: %v, status: %d", strings.Join(command, " "), err, string(output), errCode)
 	}
 	if err := json.Unmarshal([]byte(output), out); err != nil {
 		Logf("Error unmarshalling gcloud output for %v: %v, output: %v", resource, err, string(output))
@@ -376,6 +390,11 @@ func (cont *IngressController) Cleanup(del bool) error {
 	return fmt.Errorf(errMsg)
 }
 
+// Before enabling this loadbalancer test in any other test list you must
+// make sure the associated project has enough quota. At the time of this
+// writing a GCE project is allowed 3 backend services by default. This
+// test requires at least 5.
+//
 // Slow by design (10 min)
 // Flaky issue #17518
 var _ = Describe("GCE L7 LoadBalancer Controller [Serial] [Slow] [Flaky]", func() {
@@ -521,7 +540,7 @@ var _ = Describe("GCE L7 LoadBalancer Controller [Serial] [Slow] [Flaky]", func(
 					var lastBody string
 					pollErr := wait.Poll(lbPollInterval, lbPollTimeout, func() (bool, error) {
 						var err error
-						lastBody, err = simpleGET(http.DefaultClient, route, rules.Host)
+						lastBody, err = simpleGET(timeoutClient, route, rules.Host)
 						if err != nil {
 							Logf("host %v path %v: %v", rules.Host, route, err)
 							return false, nil
@@ -569,7 +588,7 @@ func curlServiceNodePort(client *client.Client, ns, name string, port int) error
 	if err != nil {
 		return err
 	}
-	svcCurlBody, err := simpleGET(http.DefaultClient, u, "")
+	svcCurlBody, err := simpleGET(timeoutClient, u, "")
 	if err != nil {
 		return fmt.Errorf("Failed to curl service node port, body: %v\nerror %v", svcCurlBody, err)
 	}

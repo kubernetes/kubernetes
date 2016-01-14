@@ -24,12 +24,17 @@ import (
 )
 
 type FakeCmd struct {
-	out []byte
-	err error
+	out    []byte
+	stdout []byte
+	err    error
 }
 
 func (f *FakeCmd) CombinedOutput() ([]byte, error) {
 	return f.out, f.err
+}
+
+func (f *FakeCmd) Output() ([]byte, error) {
+	return f.stdout, f.err
 }
 
 func (f *FakeCmd) SetDir(dir string) {}

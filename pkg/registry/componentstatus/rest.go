@@ -18,25 +18,25 @@ package componentstatus
 
 import (
 	"fmt"
-	"net/http"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/probe"
+	httpprober "k8s.io/kubernetes/pkg/probe/http"
 	"k8s.io/kubernetes/pkg/runtime"
 	"sync"
 )
 
 type REST struct {
 	GetServersToValidate func() map[string]apiserver.Server
-	rt                   http.RoundTripper
+	prober               httpprober.HTTPProber
 }
 
 // NewStorage returns a new REST.
 func NewStorage(serverRetriever func() map[string]apiserver.Server) *REST {
 	return &REST{
 		GetServersToValidate: serverRetriever,
-		rt:                   http.DefaultTransport,
+		prober:               httpprober.New(),
 	}
 }
 
@@ -95,8 +95,7 @@ func ToConditionStatus(s probe.Result) api.ConditionStatus {
 }
 
 func (rs *REST) getComponentStatus(name string, server apiserver.Server) *api.ComponentStatus {
-	transport := rs.rt
-	status, msg, err := server.DoServerCheck(transport)
+	status, msg, err := server.DoServerCheck(rs.prober)
 	errorMsg := ""
 	if err != nil {
 		errorMsg = err.Error()

@@ -16,6 +16,8 @@
 
 # A library of helper functions that each provider hosting Kubernetes must implement to use cluster/kube-*.sh scripts.
 
+[ ! -z ${UTIL_SH_DEBUG+x} ] && set -x
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 readonly ROOT=$(dirname "${BASH_SOURCE}")
 source "$ROOT/${KUBE_CONFIG_FILE:-"config-default.sh"}"
@@ -25,7 +27,9 @@ export LIBVIRT_DEFAULT_URI=qemu:///system
 export SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-false}
 export ADMISSION_CONTROL=${ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota}
 readonly POOL=kubernetes
-readonly POOL_PATH="$(cd $ROOT && pwd)/libvirt_storage_pool"
+readonly POOL_PATH=/var/lib/libvirt/images/kubernetes
+
+[ ! -d "${POOL_PATH}" ] && (echo "$POOL_PATH" does not exist ; exit 1 )
 
 # join <delim> <list...>
 # Concatenates the list elements with the delimiter passed as first parameter
@@ -130,12 +134,11 @@ function initialize-pool {
   if [[ "$ROOT/coreos_production_qemu_image.img.bz2" -nt "$POOL_PATH/coreos_base.img" ]]; then
       bunzip2 -f -k "$ROOT/coreos_production_qemu_image.img.bz2"
       virsh vol-delete coreos_base.img --pool $POOL 2> /dev/null || true
-      mv "$ROOT/coreos_production_qemu_image.img" "$POOL_PATH/coreos_base.img"
   fi
-  # if ! virsh vol-list $POOL | grep -q coreos_base.img; then
-  #     virsh vol-create-as $POOL coreos_base.img 10G --format qcow2
-  #     virsh vol-upload coreos_base.img "$ROOT/coreos_production_qemu_image.img" --pool $POOL
-  # fi
+  if ! virsh vol-list $POOL | grep -q coreos_base.img; then
+      virsh vol-create-as $POOL coreos_base.img 10G --format qcow2
+      virsh vol-upload coreos_base.img "$ROOT/coreos_production_qemu_image.img" --pool $POOL
+  fi
 
   mkdir -p "$POOL_PATH/kubernetes"
   kube-push-internal
@@ -202,7 +205,7 @@ function kube-up {
   set_service_accounts
   initialize-network
 
-  readonly ssh_keys="$(cat ~/.ssh/id_*.pub | sed 's/^/  - /')"
+  readonly ssh_keys="$(cat ~/.ssh/*.pub | sed 's/^/  - /')"
   readonly kubernetes_dir="$POOL_PATH/kubernetes"
 
   local i

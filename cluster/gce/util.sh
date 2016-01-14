@@ -21,6 +21,7 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
+source "${KUBE_ROOT}/cluster/lib/util.sh"
 
 if [[ "${OS_DISTRIBUTION}" == "debian" || "${OS_DISTRIBUTION}" == "coreos" || "${OS_DISTRIBUTION}" == "trusty" ]]; then
   source "${KUBE_ROOT}/cluster/gce/${OS_DISTRIBUTION}/helper.sh"
@@ -299,21 +300,6 @@ function detect-master () {
     exit 1
   fi
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
-}
-
-# Wait for background jobs to finish. Exit with
-# an error status if any of the jobs failed.
-function wait-for-jobs {
-  local fail=0
-  local job
-  for job in $(jobs -p); do
-    wait "${job}" || fail=$((fail + 1))
-  done
-  if (( fail != 0 )); then
-    echo -e "${color_red}${fail} commands failed.  Exiting.${color_norm}" >&2
-    # Ignore failures for now.
-    # exit 2
-  fi
 }
 
 # Robustly try to create a static ip.
@@ -687,7 +673,9 @@ function kube-up {
   fi
 
   # Wait for last batch of jobs
-  wait-for-jobs
+  kube::util::wait-for-jobs || {
+    echo -e "${color_red}${fail} commands failed.${color_norm}" >&2
+  }
 
   echo "Creating minions."
 
@@ -1192,7 +1180,10 @@ function kube-push {
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     push-node "${NODE_NAMES[$i]}" &
   done
-  wait-for-jobs
+
+  kube::util::wait-for-jobs || {
+    echo -e "${color_red}${fail} commands failed.${color_norm}" >&2
+  }
 
   # TODO(zmerlynn): Re-create instance-template with the new
   # node-kube-env. This isn't important until the node-ip-range issue
@@ -1415,6 +1406,16 @@ EOF
 TEST_CLUSTER: $(yaml-quote ${TEST_CLUSTER})
 EOF
   fi
+  if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
+      cat >>$file <<EOF
+KUBELET_TEST_ARGS: $(yaml-quote ${KUBELET_TEST_ARGS})
+EOF
+  fi
+  if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
+      cat >>$file <<EOF
+KUBELET_TEST_LOG_LEVEL: $(yaml-quote ${KUBELET_TEST_LOG_LEVEL})
+EOF
+  fi
   if [[ "${master}" == "true" ]]; then
     # Master-only env vars.
     cat >>$file <<EOF
@@ -1437,9 +1438,9 @@ EOF
 APISERVER_TEST_ARGS: $(yaml-quote ${APISERVER_TEST_ARGS})
 EOF
     fi
-    if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
+    if [ -n "${APISERVER_TEST_LOG_LEVEL:-}" ]; then
       cat >>$file <<EOF
-KUBELET_TEST_ARGS: $(yaml-quote ${KUBELET_TEST_ARGS})
+APISERVER_TEST_LOG_LEVEL: $(yaml-quote ${APISERVER_TEST_LOG_LEVEL})
 EOF
     fi
     if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
@@ -1447,9 +1448,19 @@ EOF
 CONTROLLER_MANAGER_TEST_ARGS: $(yaml-quote ${CONTROLLER_MANAGER_TEST_ARGS})
 EOF
     fi
+    if [ -n "${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-}" ]; then
+      cat >>$file <<EOF
+CONTROLLER_MANAGER_TEST_LOG_LEVEL: $(yaml-quote ${CONTROLLER_MANAGER_TEST_LOG_LEVEL})
+EOF
+    fi
     if [ -n "${SCHEDULER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
 SCHEDULER_TEST_ARGS: $(yaml-quote ${SCHEDULER_TEST_ARGS})
+EOF
+    fi
+    if [ -n "${SCHEDULER_TEST_LOG_LEVEL:-}" ]; then
+      cat >>$file <<EOF
+SCHEDULER_TEST_LOG_LEVEL: $(yaml-quote ${SCHEDULER_TEST_LOG_LEVEL})
 EOF
     fi
   else
@@ -1459,14 +1470,14 @@ KUBERNETES_MASTER: $(yaml-quote "false")
 ZONE: $(yaml-quote ${ZONE})
 EXTRA_DOCKER_OPTS: $(yaml-quote ${EXTRA_DOCKER_OPTS:-})
 EOF
-    if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
-KUBELET_TEST_ARGS: $(yaml-quote ${KUBELET_TEST_ARGS})
-EOF
-    fi
     if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
 KUBEPROXY_TEST_ARGS: $(yaml-quote ${KUBEPROXY_TEST_ARGS})
+EOF
+    fi
+    if [ -n "${KUBEPROXY_TEST_LOG_LEVEL:-}" ]; then
+      cat >>$file <<EOF
+KUBEPROXY_TEST_LOG_LEVEL: $(yaml-quote ${KUBEPROXY_TEST_LOG_LEVEL})
 EOF
     fi
   fi

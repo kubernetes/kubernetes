@@ -46,7 +46,7 @@ dependencies (etcd & mesos).
   - [Prerequisites](#prerequisites)
     - [Install on Mac (Homebrew)](#install-on-mac-homebrew)
     - [Install on Linux](#install-on-linux)
-    - [Boot2Docker Config (Mac)](#boot2docker-config-mac)
+      - [Docker Machine Config (Mac)](#docker-machine-config-mac)
   - [Walkthrough](#walkthrough)
   - [Addons](#addons)
     - [KubeUI](#kubeui)
@@ -100,12 +100,12 @@ Required:
 - [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) - version control system
 - [Docker CLI](https://docs.docker.com/) - container management command line client
 - [Docker Engine](https://docs.docker.com/) - container management daemon
-  - On Mac, use [Boot2Docker](http://boot2docker.io/) or [Docker Machine](https://docs.docker.com/machine/install-machine/)
+  - On Mac, use [Docker Machine](https://docs.docker.com/machine/install-machine/)
 - [Docker Compose](https://docs.docker.com/compose/install/) - multi-container application orchestration
 
 Optional:
-- [Virtual Box](https://www.virtualbox.org/wiki/Downloads) - x86 hardware virtualizer
-  - Required by Boot2Docker and Docker Machine
+- [Virtual Box](https://www.virtualbox.org/wiki/Downloads)
+  - Free x86 virtualization engine with a Docker Machine driver
 - [Golang](https://golang.org/doc/install) - Go programming language
   - Required to build Kubernetes locally
 - [Make](https://en.wikipedia.org/wiki/Make_(software))  - Utility for building executables from source
@@ -122,9 +122,7 @@ brew install git
 brew install caskroom/cask/brew-cask
 brew cask install virtualbox
 brew install docker
-brew install boot2docker
-boot2docker init
-boot2docker up
+brew install docker-machine
 brew install docker-compose
 ```
 
@@ -140,17 +138,28 @@ In order to build Kubernetes, the current user must be in a docker group with su
 See the docker docs for [instructions](https://docs.docker.com/installation/ubuntulinux/#create-a-docker-group).
 
 
-### Boot2Docker Config (Mac)
+#### Docker Machine Config (Mac)
 
-If on a mac using boot2docker, the following steps will make the docker IPs (in the virtualbox VM) reachable from the
+If on a mac using docker-machine, the following steps will make the docker IPs (in the virtualbox VM) reachable from the
 host machine (mac).
 
-1. Set the VM's host-only network to "promiscuous mode":
+1. Create VM
+
+   oracle-virtualbox
+
+   ```
+   docker-machine create --driver virtualbox kube-dev
+   eval "$(docker-machine env kube-dev)"
+   ```
+
+2. Set the VM's host-only network to "promiscuous mode":
+
+    oracle-virtualbox
 
     ```
-    boot2docker stop
-    VBoxManage modifyvm boot2docker-vm --nicpromisc2 allow-all
-    boot2docker start
+    docker-machine stop kube-dev
+    VBoxManage modifyvm kube-dev --nicpromisc2 allow-all
+    docker-machine start kube-dev
     ```
 
     This allows the VM to accept packets that were sent to a different IP.
@@ -158,13 +167,13 @@ host machine (mac).
     Since the host-only network routes traffic between VMs and the host, other VMs will also be able to access the docker
     IPs, if they have the following route.
 
-1. Route traffic to docker through the boot2docker IP:
+1. Route traffic to docker through the docker-machine IP:
 
     ```
-    sudo route -n add -net 172.17.0.0 $(boot2docker ip)
+    sudo route -n add -net 172.17.0.0 $(docker-machine ip kube-dev)
     ```
 
-    Since the boot2docker IP can change when the VM is restarted, this route may need to be updated over time.
+    Since the docker-machine IP can change when the VM is restarted, this route may need to be updated over time.
     To delete the route later: `sudo route delete 172.17.0.0`
 
 
@@ -220,9 +229,9 @@ host machine (mac).
     If you delete the `MESOS_RESOURCES` environment variables, the resource amounts will be auto-detected based on the host resources, which will over-provision by > 2x.
 
     If the configured resources are not available on the host, you may want to increase the resources available to Docker Engine.
-    You may have to increase you VM disk, memory, or cpu allocation in VirtualBox,
-    [Docker Machine](https://docs.docker.com/machine/#oracle-virtualbox), or
-    [Boot2Docker](https://ryanfb.github.io/etc/2015/01/28/increasing_boot2docker_allocations_on_os_x.html).
+    You may have to increase you VM disk, memory, or cpu allocation. See the Docker Machine docs for details
+    ([Virtualbox](https://docs.docker.com/machine/drivers/virtualbox))
+
 
 1. Configure provider
 

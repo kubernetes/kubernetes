@@ -248,11 +248,6 @@ This needs to be done for each pod that is using a private registry.
 However, setting of this field can be automated by setting the imagePullSecrets
 in a [serviceAccount](service-accounts.md) resource.
 
-Currently, all pods will potentially have read access to any images which were
-pulled using imagePullSecrets.  That is, imagePullSecrets does *NOT* protect your
-images from being seen by other users in the cluster.  Our intent
-is to fix that.
-
 You can use this in conjunction with a per-node `.docker/config.json`.  The credentials
 will be merged.  This approach will work on Google Container Engine (GKE).
 
@@ -261,11 +256,11 @@ will be merged.  This approach will work on Google Container Engine (GKE).
 There are a number of solutions for configuring private registries.  Here are some
 common use cases and suggested solutions.
 
- 1. Cluster running only non-proprietary (e.g open-source) images.  No need to hide images.
+1. Cluster running only non-proprietary (e.g open-source) images.  No need to hide images.
    - Use public images on the Docker hub.
      - no configuration required
      - on GCE/GKE, a local mirror is automatically used for improved speed and availability
- 1. Cluster running some proprietary images which should be hidden to those outside the company, but
+1. Cluster running some proprietary images which should be hidden to those outside the company, but
    visible to all cluster users.
    - Use a hosted private [Docker registry](https://docs.docker.com/registry/)
      - may be hosted on the [Docker Hub](https://hub.docker.com/account/signup/), or elsewhere.
@@ -275,11 +270,14 @@ common use cases and suggested solutions.
    - Or, when on GCE/GKE, use the project's Google Container Registry.
      - will work better with cluster autoscaling than manual node configuration
    - Or, on a cluster where changing the node configuration is inconvenient, use `imagePullSecrets`.
-  1. Cluster with a proprietary images, a few of which require stricter access control
-     - Move sensitive data into a "Secret" resource, instead of packaging it in an image.
-     - DO NOT use imagePullSecrets for this use case yet.
-  1. A multi-tenant cluster where each tenant needs own private registry
-     - NOT supported yet.
+1. Cluster with a proprietary images, a few of which require stricter access control
+   - ensure [AlwaysPullImages admission controller](../../docs/admin/admission-controllers.md#alwayspullimages) is active, otherwise, all Pods potentially have access to all images
+   - Move sensitive data into a "Secret" resource, instead of packaging it in an image.
+1. A multi-tenant cluster where each tenant needs own private registry
+   - ensure [AlwaysPullImages admission controller](../../docs/admin/admission-controllers.md#alwayspullimages) is active, otherwise, all Pods of all tenants potentially have access to all images
+   - run a private registry with authorization required.
+   - generate registry credential for each tenant, put into secret, and populate secret to each tenant namespace.
+   - tenant adds that secret to imagePullSecrets of each namespace.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

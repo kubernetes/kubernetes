@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ type JobInterface interface {
 	Get(name string) (*extensions.Job, error)
 	List(opts api.ListOptions) (*extensions.JobList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	JobExpansion
 }
 
 // jobs implements JobInterface

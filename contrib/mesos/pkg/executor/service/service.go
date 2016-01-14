@@ -27,6 +27,7 @@ import (
 	bindings "github.com/mesos/mesos-go/executor"
 	"github.com/spf13/pflag"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
@@ -42,7 +43,7 @@ import (
 )
 
 type KubeletExecutorServer struct {
-	*kubeletapp.KubeletServer
+	*options.KubeletServer
 	SuicideTimeout    time.Duration
 	LaunchGracePeriod time.Duration
 
@@ -54,7 +55,7 @@ type KubeletExecutorServer struct {
 
 func NewKubeletExecutorServer() *KubeletExecutorServer {
 	k := &KubeletExecutorServer{
-		KubeletServer:     kubeletapp.NewKubeletServer(),
+		KubeletServer:     options.NewKubeletServer(),
 		SuicideTimeout:    config.DefaultSuicideTimeout,
 		LaunchGracePeriod: config.DefaultLaunchGracePeriod,
 		kletReady:         make(chan struct{}),
@@ -156,7 +157,7 @@ func (s *KubeletExecutorServer) runKubelet(
 		}
 	}()
 
-	kcfg, err := s.UnsecuredKubeletConfig()
+	kcfg, err := kubeletapp.UnsecuredKubeletConfig(s.KubeletServer)
 	if err != nil {
 		return err
 	}
@@ -186,7 +187,7 @@ func (s *KubeletExecutorServer) runKubelet(
 	kcfg.KubeClient = apiclient
 
 	// taken from KubeletServer#Run(*KubeletConfig)
-	eventClientConfig, err := s.CreateAPIServerClientConfig()
+	eventClientConfig, err := kubeletapp.CreateAPIServerClientConfig(s.KubeletServer)
 	if err != nil {
 		return err
 	}
@@ -242,7 +243,7 @@ func (s *KubeletExecutorServer) runKubelet(
 	//       initialize the cloud provider. We explicitly wouldn't want
 	//       that because then every kubelet instance would query the master
 	//       state.json which does not scale.
-	err = s.KubeletServer.Run(kcfg)
+	err = kubeletapp.Run(s.KubeletServer, kcfg)
 
 	return
 }
@@ -263,7 +264,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 
 	// create apiserver client
 	var apiclient *client.Client
-	clientConfig, err := s.CreateAPIServerClientConfig()
+	clientConfig, err := kubeletapp.CreateAPIServerClientConfig(s.KubeletServer)
 	if err == nil {
 		apiclient, err = client.New(clientConfig)
 	}

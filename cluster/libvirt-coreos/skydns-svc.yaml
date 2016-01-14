@@ -6,7 +6,7 @@ metadata:
   name: skydns
   namespace: kube-system
 spec:
-  portalIP: ${DNS_SERVER_IP}
+  clusterIP: ${DNS_SERVER_IP}
   ports:
   - port: 53
     protocol: UDP

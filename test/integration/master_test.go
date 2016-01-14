@@ -37,3 +37,17 @@ func TestExperimentalPrefix(t *testing.T) {
 		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
 	}
 }
+
+func TestWatchSucceedsWithoutArgs(t *testing.T) {
+	_, s := framework.RunAMaster(t)
+	defer s.Close()
+
+	resp, err := http.Get(s.URL + "/api/v1/namespaces?watch=1")
+	if err != nil {
+		t.Fatalf("unexpected error getting experimental prefix: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
+	}
+	resp.Body.Close()
+}

@@ -19,19 +19,20 @@ limitations under the License.
 package main
 
 import (
-	scheduler "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
+	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
+	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 )
 
 // NewScheduler creates a new hyperkube Server object that includes the
 // description and flags.
 func NewScheduler() *Server {
-	s := scheduler.NewSchedulerServer()
+	s := options.NewSchedulerServer()
 
 	hks := Server{
 		SimpleUsage: "scheduler",
 		Long:        "Implements a Kubernetes scheduler.  This will assign pods to kubelets based on capacity and constraints.",
-		Run: func(_ *Server, args []string) error {
-			return s.Run(args)
+		Run: func(_ *Server, _ []string) error {
+			return app.Run(s)
 		},
 	}
 	s.AddFlags(hks.Flags())

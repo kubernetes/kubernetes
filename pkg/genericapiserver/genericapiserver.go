@@ -18,16 +18,21 @@ package genericapiserver
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -40,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 
+	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
@@ -126,6 +132,21 @@ type APIGroupVersionOverride struct {
 	Disable bool
 	// List of overrides for individual resources in this group version.
 	ResourceOverrides map[string]bool
+}
+
+// Info about an API group.
+type APIGroupInfo struct {
+	GroupMeta latest.GroupMeta
+	// Info about the resources in this group. Its a map from version to resource to the storage.
+	VersionedResourcesStorageMap map[string]map[string]rest.Storage
+	// True, if this is the legacy group ("/v1").
+	IsLegacyGroup bool
+	// OptionsExternalVersion controls the APIVersion used for common objects in the
+	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
+	// define a version "v1beta1" but want to use the Kubernetes "v1" internal objects.
+	// If nil, defaults to groupMeta.GroupVersion.
+	// TODO: Remove this when https://github.com/kubernetes/kubernetes/issues/19018 is fixed.
+	OptionsExternalVersion *unversioned.GroupVersion
 }
 
 // Config is a structure used to configure a GenericAPIServer.
@@ -229,8 +250,8 @@ type GenericAPIServer struct {
 	enableSwaggerSupport     bool
 	enableProfiling          bool
 	enableWatchCache         bool
-	ApiPrefix                string
-	ApiGroupPrefix           string
+	APIPrefix                string
+	APIGroupPrefix           string
 	corsAllowedOriginList    []string
 	authenticator            authenticator.Request
 	authorizer               authorizer.Authorizer
@@ -351,8 +372,8 @@ func New(c *Config) *GenericAPIServer {
 		enableSwaggerSupport:     c.EnableSwaggerSupport,
 		enableProfiling:          c.EnableProfiling,
 		enableWatchCache:         c.EnableWatchCache,
-		ApiPrefix:                c.APIPrefix,
-		ApiGroupPrefix:           c.APIGroupPrefix,
+		APIPrefix:                c.APIPrefix,
+		APIGroupPrefix:           c.APIGroupPrefix,
 		corsAllowedOriginList:    c.CorsAllowedOriginList,
 		authenticator:            c.Authenticator,
 		authorizer:               c.Authorizer,
@@ -397,8 +418,8 @@ func New(c *Config) *GenericAPIServer {
 
 func (s *GenericAPIServer) NewRequestInfoResolver() *apiserver.RequestInfoResolver {
 	return &apiserver.RequestInfoResolver{
-		sets.NewString(strings.Trim(s.ApiPrefix, "/"), strings.Trim(s.ApiGroupPrefix, "/")), // all possible API prefixes
-		sets.NewString(strings.Trim(s.ApiPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
+		sets.NewString(strings.Trim(s.APIPrefix, "/"), strings.Trim(s.APIGroupPrefix, "/")), // all possible API prefixes
+		sets.NewString(strings.Trim(s.APIPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
 	}
 }
 
@@ -502,6 +523,194 @@ func (s *GenericAPIServer) init(c *Config) {
 	} else {
 		s.InsecureHandler = handler
 	}
+}
+
+// Exposes the given group versions in API.
+func (s *GenericAPIServer) InstallAPIGroups(groupsInfo []APIGroupInfo) error {
+	for _, apiGroupInfo := range groupsInfo {
+		if err := s.installAPIGroup(&apiGroupInfo); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *GenericAPIServer) Run(options *ServerRunOptions) {
+	// We serve on 2 ports.  See docs/accessing_the_api.md
+	secureLocation := ""
+	if options.SecurePort != 0 {
+		secureLocation = net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
+	}
+	insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
+
+	var sem chan bool
+	if options.MaxRequestsInFlight > 0 {
+		sem = make(chan bool, options.MaxRequestsInFlight)
+	}
+
+	longRunningRE := regexp.MustCompile(options.LongRunningRequestRE)
+	longRunningTimeout := func(req *http.Request) (<-chan time.Time, string) {
+		// TODO unify this with apiserver.MaxInFlightLimit
+		if longRunningRE.MatchString(req.URL.Path) || req.URL.Query().Get("watch") == "true" {
+			return nil, ""
+		}
+		return time.After(time.Minute), ""
+	}
+
+	if secureLocation != "" {
+		handler := apiserver.TimeoutHandler(s.Handler, longRunningTimeout)
+		secureServer := &http.Server{
+			Addr:           secureLocation,
+			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(handler)),
+			MaxHeaderBytes: 1 << 20,
+			TLSConfig: &tls.Config{
+				// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
+				MinVersion: tls.VersionTLS10,
+			},
+		}
+
+		if len(options.ClientCAFile) > 0 {
+			clientCAs, err := util.CertPoolFromFile(options.ClientCAFile)
+			if err != nil {
+				glog.Fatalf("Unable to load client CA file: %v", err)
+			}
+			// Populate PeerCertificates in requests, but don't reject connections without certificates
+			// This allows certificates to be validated by authenticators, while still allowing other auth types
+			secureServer.TLSConfig.ClientAuth = tls.RequestClientCert
+			// Specify allowed CAs for client certificates
+			secureServer.TLSConfig.ClientCAs = clientCAs
+		}
+
+		glog.Infof("Serving securely on %s", secureLocation)
+		if options.TLSCertFile == "" && options.TLSPrivateKeyFile == "" {
+			options.TLSCertFile = path.Join(options.CertDirectory, "apiserver.crt")
+			options.TLSPrivateKeyFile = path.Join(options.CertDirectory, "apiserver.key")
+			// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
+			alternateIPs := []net.IP{s.ServiceReadWriteIP}
+			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}
+			// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
+			// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
+			if err := util.GenerateSelfSignedCert(s.ClusterIP.String(), options.TLSCertFile, options.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
+				glog.Errorf("Unable to generate self signed cert: %v", err)
+			} else {
+				glog.Infof("Using self-signed cert (%options, %options)", options.TLSCertFile, options.TLSPrivateKeyFile)
+			}
+		}
+
+		go func() {
+			defer util.HandleCrash()
+			for {
+				// err == systemd.SdNotifyNoSocket when not running on a systemd system
+				if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
+					glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
+				}
+				if err := secureServer.ListenAndServeTLS(options.TLSCertFile, options.TLSPrivateKeyFile); err != nil {
+					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
+				}
+				time.Sleep(15 * time.Second)
+			}
+		}()
+	} else {
+		// err == systemd.SdNotifyNoSocket when not running on a systemd system
+		if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
+			glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
+		}
+	}
+
+	handler := apiserver.TimeoutHandler(s.InsecureHandler, longRunningTimeout)
+	http := &http.Server{
+		Addr:           insecureLocation,
+		Handler:        apiserver.RecoverPanics(handler),
+		MaxHeaderBytes: 1 << 20,
+	}
+	glog.Infof("Serving insecurely on %s", insecureLocation)
+	glog.Fatal(http.ListenAndServe())
+}
+
+func (s *GenericAPIServer) installAPIGroup(apiGroupInfo *APIGroupInfo) error {
+	apiPrefix := s.APIGroupPrefix
+	if apiGroupInfo.IsLegacyGroup {
+		apiPrefix = s.APIPrefix
+	}
+
+	// Install REST handlers for all the versions in this group.
+	apiVersions := []string{}
+	for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
+		apiVersions = append(apiVersions, groupVersion.Version)
+
+		apiGroupVersion, err := s.getAPIGroupVersion(apiGroupInfo, groupVersion, apiPrefix)
+		if err != nil {
+			return err
+		}
+		if apiGroupInfo.OptionsExternalVersion != nil {
+			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
+		}
+
+		if err := apiGroupVersion.InstallREST(s.HandlerContainer); err != nil {
+			return fmt.Errorf("Unable to setup API %v: %v", apiGroupInfo, err)
+		}
+	}
+	// Install the version handler.
+	if apiGroupInfo.IsLegacyGroup {
+		// Add a handler at /api to enumerate the supported api versions.
+		apiserver.AddApiWebService(s.HandlerContainer, apiPrefix, apiVersions)
+	} else {
+		// Add a handler at /apis/<groupName> to enumerate all versions supported by this group.
+		apiVersionsForDiscovery := []unversioned.GroupVersionForDiscovery{}
+		for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
+			apiVersionsForDiscovery = append(apiVersionsForDiscovery, unversioned.GroupVersionForDiscovery{
+				GroupVersion: groupVersion.String(),
+				Version:      groupVersion.Version,
+			})
+		}
+		preferedVersionForDiscovery := unversioned.GroupVersionForDiscovery{
+			GroupVersion: apiGroupInfo.GroupMeta.GroupVersion.String(),
+			Version:      apiGroupInfo.GroupMeta.GroupVersion.Version,
+		}
+		apiGroup := unversioned.APIGroup{
+			Name:             apiGroupInfo.GroupMeta.GroupVersion.Group,
+			Versions:         apiVersionsForDiscovery,
+			PreferredVersion: preferedVersionForDiscovery,
+		}
+		apiserver.AddGroupWebService(s.HandlerContainer, apiPrefix+"/"+apiGroup.Name, apiGroup)
+	}
+	apiserver.InstallServiceErrorHandler(s.HandlerContainer, s.NewRequestInfoResolver(), apiVersions)
+	return nil
+}
+
+func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion unversioned.GroupVersion, apiPrefix string) (*apiserver.APIGroupVersion, error) {
+	storage := make(map[string]rest.Storage)
+	for k, v := range apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version] {
+		storage[strings.ToLower(k)] = v
+	}
+	version, err := s.newAPIGroupVersion(apiGroupInfo.GroupMeta, groupVersion)
+	version.Root = apiPrefix
+	version.Storage = storage
+	return version, err
+}
+
+func (s *GenericAPIServer) newAPIGroupVersion(groupMeta latest.GroupMeta, groupVersion unversioned.GroupVersion) (*apiserver.APIGroupVersion, error) {
+	versionInterface, err := groupMeta.InterfacesFor(groupVersion)
+	if err != nil {
+		return nil, err
+	}
+	return &apiserver.APIGroupVersion{
+		RequestInfoResolver: s.NewRequestInfoResolver(),
+
+		Creater:   api.Scheme,
+		Convertor: api.Scheme,
+		Typer:     api.Scheme,
+
+		GroupVersion: groupVersion,
+		Linker:       groupMeta.SelfLinker,
+		Mapper:       groupMeta.RESTMapper,
+		Codec:        versionInterface.Codec,
+
+		Admit:   s.AdmissionControl,
+		Context: s.RequestContextMapper,
+
+		MinRequestTimeout: s.MinRequestTimeout,
+	}, nil
 }
 
 // InstallSwaggerAPI installs the /swaggerapi/ endpoint to allow schema discovery

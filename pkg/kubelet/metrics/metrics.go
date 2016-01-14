@@ -35,6 +35,8 @@ const (
 	DockerOperationsKey           = "docker_operations_latency_microseconds"
 	DockerErrorsKey               = "docker_errors"
 	PodWorkerStartLatencyKey      = "pod_worker_start_latency_microseconds"
+	PLEGRelistLatencyKey          = "pleg_relist_latency_microseconds"
+	PLEGRelistIntervalKey         = "pleg_relist_interval_microseconds"
 )
 
 var (
@@ -105,6 +107,20 @@ var (
 		},
 		[]string{"operation_type"},
 	)
+	PLEGRelistLatency = prometheus.NewSummary(
+		prometheus.SummaryOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      PLEGRelistLatencyKey,
+			Help:      "Latency in microseconds for relisting pods in PLEG.",
+		},
+	)
+	PLEGRelistInterval = prometheus.NewSummary(
+		prometheus.SummaryOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      PLEGRelistIntervalKey,
+			Help:      "Interval in microseconds between relisting in PLEG.",
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -123,6 +139,8 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 		prometheus.MustRegister(ContainersPerPodCount)
 		prometheus.MustRegister(DockerErrors)
 		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
+		prometheus.MustRegister(PLEGRelistLatency)
+		prometheus.MustRegister(PLEGRelistInterval)
 	})
 }
 

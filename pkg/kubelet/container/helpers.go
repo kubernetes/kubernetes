@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/third_party/golang/expansion"
 
 	"github.com/golang/glog"
@@ -71,7 +71,7 @@ func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 	return true
 }
 
-// TODO (random-liu) This should be removed soon after rkt implements GetPodStatus.
+// TODO(random-liu): This should be removed soon after rkt implements GetPodStatus.
 func ShouldContainerBeRestartedOldVersion(container *api.Container, pod *api.Pod, podStatus *api.PodStatus) bool {
 	// Get all dead container status.
 	var resultStatus []*api.ContainerStatus
@@ -99,7 +99,7 @@ func ShouldContainerBeRestartedOldVersion(container *api.Container, pod *api.Pod
 	return true
 }
 
-// TODO (random-liu) Convert PodStatus to running Pod, should be deprecated soon
+// TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon
 func ConvertPodStatusToRunningPod(podStatus *PodStatus) Pod {
 	runningPod := Pod{
 		ID:        podStatus.ID,
@@ -127,7 +127,7 @@ func ConvertPodStatusToRunningPod(podStatus *PodStatus) Pod {
 // the running container with its desired spec.
 func HashContainer(container *api.Container) uint64 {
 	hash := adler32.New()
-	util.DeepHashObject(hash, *container)
+	hashutil.DeepHashObject(hash, *container)
 	return uint64(hash.Sum32())
 }
 

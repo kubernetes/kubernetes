@@ -39,25 +39,37 @@ func TestUntil(t *testing.T) {
 
 	<-called
 	close(ch)
-	<-called
+
+	// wait for 'called' to be closed
+	for {
+		if _, ok := <-called; !ok {
+			break
+		}
+	}
 
 	//--
 	ch = make(chan struct{})
-	called = make(chan struct{})
+	called2 := make(chan struct{})
 	running := make(chan struct{})
 	After(func() {
 		Until(func() {
 			close(running)
-			called <- struct{}{}
+			called2 <- struct{}{}
 		}, 2*time.Second, ch)
-	}).Then(func() { close(called) })
+	}).Then(func() { close(called2) })
 
 	<-running
 	close(ch)
-	<-called // unblock the goroutine
+	<-called2 // unblock the goroutine
 	now := time.Now()
 
-	<-called
+	// wait for 'called2' to be closed
+	for {
+		if _, ok := <-called2; !ok {
+			break
+		}
+	}
+
 	if time.Since(now) > 1800*time.Millisecond {
 		t.Fatalf("Until should not have waited the full timeout period since we closed the stop chan")
 	}

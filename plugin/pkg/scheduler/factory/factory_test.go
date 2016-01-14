@@ -43,7 +43,8 @@ func TestCreate(t *testing.T) {
 		T:            t,
 	}
 	server := httptest.NewServer(&handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
 	factory := NewConfigFactory(client, nil, api.DefaultSchedulerName)
 	factory.Create()
@@ -61,7 +62,8 @@ func TestCreateFromConfig(t *testing.T) {
 		T:            t,
 	}
 	server := httptest.NewServer(&handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
 	factory := NewConfigFactory(client, nil, api.DefaultSchedulerName)
 
@@ -103,7 +105,8 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 		T:            t,
 	}
 	server := httptest.NewServer(&handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
 	factory := NewConfigFactory(client, nil, api.DefaultSchedulerName)
 
@@ -147,7 +150,8 @@ func TestDefaultErrorFunc(t *testing.T) {
 	// FakeHandler musn't be sent requests other than the one you want to test.
 	mux.Handle(testapi.Default.ResourcePath("pods", "bar", "foo"), &handler)
 	server := httptest.NewServer(mux)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()}), nil, api.DefaultSchedulerName)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := podBackoff{
@@ -230,7 +234,8 @@ func TestBind(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		defer server.Close()
+		// TODO: Uncomment when fix #19254
+		// defer server.Close()
 		client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
 		b := binder{client}
 
@@ -315,7 +320,8 @@ func TestResponsibleForPod(t *testing.T) {
 		T:            t,
 	}
 	server := httptest.NewServer(&handler)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
 	// factory of "default-scheduler"
 	factoryDefaultScheduler := NewConfigFactory(client, nil, api.DefaultSchedulerName)

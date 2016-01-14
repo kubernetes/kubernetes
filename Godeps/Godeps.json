@@ -49,53 +49,58 @@
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/aws",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/private/endpoints",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/ec2query",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/query",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/rest",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/private/signer/v4",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
+		},
+		{
+			"ImportPath": "github.com/aws/aws-sdk-go/private/waiter",
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/autoscaling",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/ec2",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/elb",
-			"Comment": "v0.9.16-3-g4944a94",
-			"Rev": "4944a94a3b092d1dad8a964415700a70f55e580a"
+			"Comment": "v1.0.7",
+			"Rev": "bf2f8fe7f45e68017086d069498638893feddf64"
 		},
 		{
 			"ImportPath": "github.com/beorn7/perks/quantile",
@@ -412,14 +417,129 @@
 			"Rev": "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
 		},
 		{
+			"ImportPath": "github.com/go-ini/ini",
+			"Comment": "v0-54-g2e44421",
+			"Rev": "2e44421e256d82ebbf3d4d4fcabe8930b905eff3"
+		},
+		{
 			"ImportPath": "github.com/godbus/dbus",
 			"Comment": "v3",
 			"Rev": "c7fdd8b5cd55e87b4e1f4e372cdb1db61dd6c66f"
 		},
 		{
+			"ImportPath": "github.com/gogo/protobuf/gogoproto",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/defaultcheck",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/description",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/embedcheck",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/enumstringer",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/equal",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/face",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/gostring",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/grpc",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/marshalto",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/oneofcheck",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/populate",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/size",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/stringer",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/testgen",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/union",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/plugin/unmarshal",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
-			"Comment": "v0.1-55-g2093b57",
-			"Rev": "2093b57e5ca2ccbee4626814100bc1aada691b18"
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/protoc-gen-gogo/generator",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/protoc-gen-gogo/plugin",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/sortkeys",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/vanity",
+			"Comment": "v0.1-108-g9dc5109",
+			"Rev": "9dc510915846dd5a05607d3b5bf41f5ca5cce972"
 		},
 		{
 			"ImportPath": "github.com/golang/glog",
@@ -554,6 +674,11 @@
 			"Rev": "afde71eb1740fd763ab9450e1f700ba0e53c36d0"
 		},
 		{
+			"ImportPath": "github.com/jmespath/go-jmespath",
+			"Comment": "0.2.2",
+			"Rev": "3433f3ea46d9f8019119e7dd41274e112a2359a9"
+		},
+		{
 			"ImportPath": "github.com/jonboulle/clockwork",
 			"Rev": "3f831b65b61282ba6bece21b91beea2edc4c887a"
 		},
@@ -686,6 +811,10 @@
 			"Rev": "37aabad69cfd3d20b8390d902a8b10e245c615ff"
 		},
 		{
+			"ImportPath": "github.com/seccomp/libseccomp-golang",
+			"Rev": "1b506fc7c24eec5a3693cdcbed40d9c226cfc6a1"
+		},
+		{
 			"ImportPath": "github.com/shurcooL/sanitized_anchor_name",
 			"Rev": "9a8b7d4e8f347bfa230879db9d7d4e4d9e19f962"
 		},
@@ -728,10 +857,6 @@
 		{
 			"ImportPath": "github.com/ugorji/go/codec",
 			"Rev": "f1f1a805ed361a0e078bb537e4ea78cd37dcf065"
-		},
-		{
-			"ImportPath": "github.com/vaughan0/go-ini",
-			"Rev": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1"
 		},
 		{
 			"ImportPath": "github.com/vishvananda/netlink",
@@ -785,6 +910,10 @@
 		{
 			"ImportPath": "golang.org/x/oauth2",
 			"Rev": "b5adcc2dcdf009d0391547edc6ecbaff889f5bb9"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/unix",
+			"Rev": "833a04a10549a95dc34458c195cbad61bbb6cb4d"
 		},
 		{
 			"ImportPath": "golang.org/x/tools/go/ast/astutil",

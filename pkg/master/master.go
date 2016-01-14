@@ -30,8 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	apiutil "k8s.io/kubernetes/pkg/api/util"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -159,14 +157,8 @@ func New(c *Config) *Master {
 }
 
 func (m *Master) InstallAPIs(c *Config) {
-	apiVersions := []string{}
-	// Install v1 unless disabled.
-	if !m.ApiGroupVersionOverrides["api/v1"].Disable {
-		if err := m.api_v1(c).InstallREST(m.HandlerContainer); err != nil {
-			glog.Fatalf("Unable to setup API v1: %v", err)
-		}
-		apiVersions = append(apiVersions, "v1")
-	}
+	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
+
 	// Run the tunnel.
 	healthzChecks := []healthz.HealthzChecker{}
 	if m.tunneler != nil {
@@ -180,11 +172,23 @@ func (m *Master) InstallAPIs(c *Config) {
 
 	// TODO(nikhiljindal): Refactor generic parts of support services (like /versions) to genericapiserver.
 	apiserver.InstallSupport(m.MuxHelper, m.RootWebService, c.EnableProfiling, healthzChecks...)
+
+	// Install v1 unless disabled.
+	if !m.ApiGroupVersionOverrides["api/v1"].Disable {
+		// Install v1 API.
+		m.initV1ResourcesStorage(c)
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *latest.GroupOrDie(api.GroupName),
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": m.v1ResourcesStorage,
+			},
+			IsLegacyGroup: true,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+	}
+
 	// Install root web services
 	m.HandlerContainer.Add(m.RootWebService)
-
-	apiserver.AddApiWebService(m.HandlerContainer, c.APIPrefix, apiVersions)
-	apiserver.InstallServiceErrorHandler(m.HandlerContainer, m.NewRequestInfoResolver(), apiVersions)
 
 	// allGroups records all supported groups at /apis
 	allGroups := []unversioned.APIGroup{}
@@ -193,33 +197,41 @@ func (m *Master) InstallAPIs(c *Config) {
 		m.thirdPartyStorage = c.StorageDestinations.APIGroups[extensions.GroupName].Default
 		m.thirdPartyResources = map[string]thirdPartyEntry{}
 
-		expVersion := m.experimental(c)
-
-		if err := expVersion.InstallREST(m.HandlerContainer); err != nil {
-			glog.Fatalf("Unable to setup experimental api: %v", err)
-		}
-		g, err := latest.Group(extensions.GroupName)
-		if err != nil {
-			glog.Fatalf("Unable to setup experimental api: %v", err)
-		}
-		expAPIVersions := []unversioned.GroupVersionForDiscovery{
-			{
-				GroupVersion: expVersion.GroupVersion.String(),
-				Version:      expVersion.GroupVersion.Version,
-			},
-		}
-		storageVersion, found := c.StorageVersions[g.GroupVersion.Group]
+		extensionResources := m.getExtensionResources(c)
+		extensionsGroupMeta := latest.GroupOrDie(extensions.GroupName)
+		// Update the prefered version as per StorageVersions in the config.
+		storageVersion, found := c.StorageVersions[extensionsGroupMeta.GroupVersion.Group]
 		if !found {
-			glog.Fatalf("Couldn't find storage version of group %v", g.GroupVersion.Group)
+			glog.Fatalf("Couldn't find storage version of group %v", extensionsGroupMeta.GroupVersion.Group)
+		}
+		preferedGroupVersion, err := unversioned.ParseGroupVersion(storageVersion)
+		if err != nil {
+			glog.Fatalf("Error in parsing group version %s: %v", storageVersion, err)
+		}
+		extensionsGroupMeta.GroupVersion = preferedGroupVersion
+
+		apiGroupInfo := genericapiserver.APIGroupInfo{
+			GroupMeta: *extensionsGroupMeta,
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1beta1": extensionResources,
+			},
+			OptionsExternalVersion: &latest.GroupOrDie(api.GroupName).GroupVersion,
+		}
+		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
+
+		extensionsGVForDiscovery := unversioned.GroupVersionForDiscovery{
+			GroupVersion: extensionsGroupMeta.GroupVersion.String(),
+			Version:      extensionsGroupMeta.GroupVersion.Version,
 		}
 		group := unversioned.APIGroup{
-			Name:             g.GroupVersion.Group,
-			Versions:         expAPIVersions,
-			PreferredVersion: unversioned.GroupVersionForDiscovery{GroupVersion: storageVersion, Version: apiutil.GetVersion(storageVersion)},
+			Name:             extensionsGroupMeta.GroupVersion.Group,
+			Versions:         []unversioned.GroupVersionForDiscovery{extensionsGVForDiscovery},
+			PreferredVersion: extensionsGVForDiscovery,
 		}
-		apiserver.AddGroupWebService(m.HandlerContainer, c.APIGroupPrefix+"/"+latest.GroupOrDie(extensions.GroupName).GroupVersion.Group, group)
 		allGroups = append(allGroups, group)
-		apiserver.InstallServiceErrorHandler(m.HandlerContainer, m.NewRequestInfoResolver(), []string{expVersion.GroupVersion.String()})
+	}
+	if err := m.InstallAPIGroups(apiGroupsInfo); err != nil {
+		glog.Fatalf("Error in registering group versions: %v", err)
 	}
 
 	// This should be done after all groups are registered
@@ -398,39 +410,6 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 	return serversToValidate
 }
 
-func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
-	return &apiserver.APIGroupVersion{
-		Root:                m.ApiPrefix,
-		RequestInfoResolver: m.NewRequestInfoResolver(),
-
-		Mapper: latest.GroupOrDie(api.GroupName).RESTMapper,
-
-		Creater:   api.Scheme,
-		Convertor: api.Scheme,
-		Typer:     api.Scheme,
-		Linker:    latest.GroupOrDie(api.GroupName).SelfLinker,
-
-		Admit:   m.AdmissionControl,
-		Context: m.RequestContextMapper,
-
-		MinRequestTimeout: m.MinRequestTimeout,
-	}
-}
-
-// api_v1 returns the resources and codec for API version v1.
-func (m *Master) api_v1(c *Config) *apiserver.APIGroupVersion {
-	m.initV1ResourcesStorage(c)
-	storage := make(map[string]rest.Storage)
-	for k, v := range m.v1ResourcesStorage {
-		storage[strings.ToLower(k)] = v
-	}
-	version := m.defaultAPIGroupVersion()
-	version.Storage = storage
-	version.GroupVersion = unversioned.GroupVersion{Version: "v1"}
-	version.Codec = v1.Codec
-	return version
-}
-
 // HasThirdPartyResource returns true if a particular third party resource currently installed.
 func (m *Master) HasThirdPartyResource(rsrc *extensions.ThirdPartyResource) (bool, error) {
 	_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
@@ -575,8 +554,8 @@ func (m *Master) thirdpartyapi(group, kind, version string) *apiserver.APIGroupV
 	}
 }
 
-// experimental returns the resources and codec for the experimental api
-func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
+// getExperimentalResources returns the resources for extenstions api
+func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	// All resources except these are disabled by default.
 	enabledResources := sets.NewString("jobs", "horizontalpodautoscalers", "ingresses")
 	resourceOverrides := m.ApiGroupVersionOverrides["extensions/v1beta1"].ResourceOverrides
@@ -640,30 +619,7 @@ func (m *Master) experimental(c *Config) *apiserver.APIGroupVersion {
 		storage["ingresses"] = ingressStorage
 		storage["ingresses/status"] = ingressStatusStorage
 	}
-
-	extensionsGroup := latest.GroupOrDie(extensions.GroupName)
-	optionsExternalVersion := latest.GroupOrDie(api.GroupName).GroupVersion
-
-	return &apiserver.APIGroupVersion{
-		Root:                m.ApiGroupPrefix,
-		RequestInfoResolver: m.NewRequestInfoResolver(),
-
-		Creater:   api.Scheme,
-		Convertor: api.Scheme,
-		Typer:     api.Scheme,
-
-		Mapper:                 extensionsGroup.RESTMapper,
-		Codec:                  extensionsGroup.Codec,
-		Linker:                 extensionsGroup.SelfLinker,
-		Storage:                storage,
-		GroupVersion:           extensionsGroup.GroupVersion,
-		OptionsExternalVersion: &optionsExternalVersion,
-
-		Admit:   m.AdmissionControl,
-		Context: m.RequestContextMapper,
-
-		MinRequestTimeout: m.MinRequestTimeout,
-	}
+	return storage
 }
 
 // findExternalAddress returns ExternalIP of provided node with fallback to LegacyHostIP.

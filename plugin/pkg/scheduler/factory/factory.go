@@ -58,6 +58,10 @@ type ConfigFactory struct {
 	PodLister algorithm.PodLister
 	// a means to list all nodes
 	NodeLister *cache.StoreToNodeLister
+	// a means to list all PersistentVolumes
+	PVLister *cache.StoreToPVFetcher
+	// a means to list all PersistentVolumeClaims
+	PVCLister *cache.StoreToPVCFetcher
 	// a means to list all services
 	ServiceLister *cache.StoreToServiceLister
 	// a means to list all controllers
@@ -85,6 +89,8 @@ func NewConfigFactory(client *client.Client, rateLimiter util.RateLimiter, sched
 		ScheduledPodLister: &cache.StoreToPodLister{},
 		// Only nodes in the "Ready" condition with status == "True" are schedulable
 		NodeLister:       &cache.StoreToNodeLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		PVLister:         &cache.StoreToPVFetcher{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		PVCLister:        &cache.StoreToPVCFetcher{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		ServiceLister:    &cache.StoreToServiceLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		ControllerLister: &cache.StoreToReplicationControllerLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		StopEverything:   make(chan struct{}),
@@ -188,6 +194,8 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		// All fit predicates only need to consider schedulable nodes.
 		NodeLister: f.NodeLister.NodeCondition(getNodeConditionPredicate()),
 		NodeInfo:   &predicates.CachedNodeInfo{f.NodeLister},
+		PVInfo:     f.PVLister,
+		PVCInfo:    f.PVCLister,
 	}
 	predicateFuncs, err := getFitPredicateFunctions(predicateKeys, pluginArgs)
 	if err != nil {
@@ -208,6 +216,11 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	// Watch nodes.
 	// Nodes may be listed frequently, so provide a local up-to-date cache.
 	cache.NewReflector(f.createNodeLW(), &api.Node{}, f.NodeLister.Store, 0).RunUntil(f.StopEverything)
+
+	// Watch PVs & PVCs
+	// They may be listed frequently for scheduling constraints, so provide a local up-to-date cache.
+	cache.NewReflector(f.createPersistentVolumeLW(), &api.PersistentVolume{}, f.PVLister.Store, 0).RunUntil(f.StopEverything)
+	cache.NewReflector(f.createPersistentVolumeClaimLW(), &api.PersistentVolumeClaim{}, f.PVCLister.Store, 0).RunUntil(f.StopEverything)
 
 	// Watch and cache all service objects. Scheduler needs to find all pods
 	// created by the same services or ReplicationControllers, so that it can spread them correctly.
@@ -301,6 +314,16 @@ func (factory *ConfigFactory) createNodeLW() *cache.ListWatch {
 	// TODO: Filter out nodes that doesn't have NodeReady condition.
 	fields := fields.Set{client.NodeUnschedulable: "false"}.AsSelector()
 	return cache.NewListWatchFromClient(factory.Client, "nodes", api.NamespaceAll, fields)
+}
+
+// createPersistentVolumeLW returns a cache.ListWatch that gets all changes to persistentVolumes.
+func (factory *ConfigFactory) createPersistentVolumeLW() *cache.ListWatch {
+	return cache.NewListWatchFromClient(factory.Client, "persistentVolumes", api.NamespaceAll, fields.ParseSelectorOrDie(""))
+}
+
+// createPersistentVolumeClaimLW returns a cache.ListWatch that gets all changes to persistentVolumeClaims.
+func (factory *ConfigFactory) createPersistentVolumeClaimLW() *cache.ListWatch {
+	return cache.NewListWatchFromClient(factory.Client, "persistentVolumeClaims", api.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 // Returns a cache.ListWatch that gets all changes to services.

@@ -44,6 +44,24 @@ var testPod *api.Pod = &api.Pod{
 	},
 }
 
+// After adding reconciliation, if status in pod manager is different from the cached status, a reconciliation
+// will be triggered, which will mess up all the old unit test.
+// To simplify the implementation of unit test, we add testSyncBatch() here, it will make sure the statuses in
+// pod manager the same with cached ones before syncBatch() so as to avoid reconciling.
+func (m *manager) testSyncBatch() {
+	for uid, status := range m.podStatuses {
+		pod, ok := m.podManager.GetPodByUID(uid)
+		if ok {
+			pod.Status = status.status
+		}
+		pod, ok = m.podManager.GetMirrorPodByPod(pod)
+		if ok {
+			pod.Status = status.status
+		}
+	}
+	m.syncBatch()
+}
+
 func newTestManager(kubeClient client.Interface) *manager {
 	podManager := kubepod.NewBasicPodManager(kubepod.NewFakeMirrorClient())
 	podManager.AddPod(testPod)
@@ -209,8 +227,8 @@ func TestChangedStatusUpdatesLastTransitionTime(t *testing.T) {
 	if newReadyCondition.LastTransitionTime.IsZero() {
 		t.Errorf("Unexpected: last transition time not set")
 	}
-	if !oldReadyCondition.LastTransitionTime.Before(newReadyCondition.LastTransitionTime) {
-		t.Errorf("Unexpected: new transition time %s, is not after old transition time %s", newReadyCondition.LastTransitionTime, oldReadyCondition.LastTransitionTime)
+	if newReadyCondition.LastTransitionTime.Before(oldReadyCondition.LastTransitionTime) {
+		t.Errorf("Unexpected: new transition time %s, is before old transition time %s", newReadyCondition.LastTransitionTime, oldReadyCondition.LastTransitionTime)
 	}
 }
 
@@ -259,7 +277,7 @@ func TestSyncBatchIgnoresNotFound(t *testing.T) {
 		return true, nil, errors.NewNotFound(api.Resource("pods"), "test-pod")
 	})
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
-	syncer.syncBatch()
+	syncer.testSyncBatch()
 
 	verifyActions(t, syncer.kubeClient, []testclient.Action{
 		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
@@ -270,7 +288,7 @@ func TestSyncBatch(t *testing.T) {
 	syncer := newTestManager(&testclient.Fake{})
 	syncer.kubeClient = testclient.NewSimpleFake(testPod)
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
-	syncer.syncBatch()
+	syncer.testSyncBatch()
 	verifyActions(t, syncer.kubeClient, []testclient.Action{
 		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
 		testclient.UpdateActionImpl{ActionImpl: testclient.ActionImpl{Verb: "update", Resource: "pods", Subresource: "status"}},
@@ -288,7 +306,7 @@ func TestSyncBatchChecksMismatchedUID(t *testing.T) {
 	syncer.podManager.AddPod(&differentPod)
 	syncer.kubeClient = testclient.NewSimpleFake(&pod)
 	syncer.SetPodStatus(&differentPod, getRandomPodStatus())
-	syncer.syncBatch()
+	syncer.testSyncBatch()
 	verifyActions(t, syncer.kubeClient, []testclient.Action{
 		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
 	})
@@ -324,7 +342,7 @@ func TestSyncBatchNoDeadlock(t *testing.T) {
 	ret = *pod
 	err = errors.NewNotFound(api.Resource("pods"), pod.Name)
 	m.SetPodStatus(pod, getRandomPodStatus())
-	m.syncBatch()
+	m.testSyncBatch()
 	verifyActions(t, client, []testclient.Action{getAction})
 	client.ClearActions()
 
@@ -332,21 +350,21 @@ func TestSyncBatchNoDeadlock(t *testing.T) {
 	ret.UID = "other_pod"
 	err = nil
 	m.SetPodStatus(pod, getRandomPodStatus())
-	m.syncBatch()
+	m.testSyncBatch()
 	verifyActions(t, client, []testclient.Action{getAction})
 	client.ClearActions()
 
 	// Pod not deleted (success case).
 	ret = *pod
 	m.SetPodStatus(pod, getRandomPodStatus())
-	m.syncBatch()
+	m.testSyncBatch()
 	verifyActions(t, client, []testclient.Action{getAction, updateAction})
 	client.ClearActions()
 
 	// Pod is terminated, but still running.
 	pod.DeletionTimestamp = new(unversioned.Time)
 	m.SetPodStatus(pod, getRandomPodStatus())
-	m.syncBatch()
+	m.testSyncBatch()
 	verifyActions(t, client, []testclient.Action{getAction, updateAction})
 	client.ClearActions()
 
@@ -354,14 +372,14 @@ func TestSyncBatchNoDeadlock(t *testing.T) {
 	pod.Status.ContainerStatuses[0].State.Running = nil
 	pod.Status.ContainerStatuses[0].State.Terminated = &api.ContainerStateTerminated{}
 	m.SetPodStatus(pod, getRandomPodStatus())
-	m.syncBatch()
+	m.testSyncBatch()
 	verifyActions(t, client, []testclient.Action{getAction, updateAction})
 	client.ClearActions()
 
 	// Error case.
 	err = fmt.Errorf("intentional test error")
 	m.SetPodStatus(pod, getRandomPodStatus())
-	m.syncBatch()
+	m.testSyncBatch()
 	verifyActions(t, client, []testclient.Action{getAction})
 	client.ClearActions()
 }
@@ -380,7 +398,7 @@ func TestStaleUpdates(t *testing.T) {
 	verifyUpdates(t, m, 3)
 
 	t.Logf("First sync pushes latest status.")
-	m.syncBatch()
+	m.testSyncBatch()
 	verifyActions(t, m.kubeClient, []testclient.Action{
 		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
 		testclient.UpdateActionImpl{ActionImpl: testclient.ActionImpl{Verb: "update", Resource: "pods", Subresource: "status"}},
@@ -389,7 +407,7 @@ func TestStaleUpdates(t *testing.T) {
 
 	for i := 0; i < 2; i++ {
 		t.Logf("Next 2 syncs should be ignored (%d).", i)
-		m.syncBatch()
+		m.testSyncBatch()
 		verifyActions(t, m.kubeClient, []testclient.Action{})
 	}
 
@@ -401,7 +419,7 @@ func TestStaleUpdates(t *testing.T) {
 	m.apiStatusVersions[pod.UID] = m.apiStatusVersions[pod.UID] - 1
 
 	m.SetPodStatus(&pod, status)
-	m.syncBatch()
+	m.testSyncBatch()
 	verifyActions(t, m.kubeClient, []testclient.Action{
 		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
 		testclient.UpdateActionImpl{ActionImpl: testclient.ActionImpl{Verb: "update", Resource: "pods", Subresource: "status"}},
@@ -471,7 +489,7 @@ func TestStaticPodStatus(t *testing.T) {
 	retrievedStatus, _ = m.GetPodStatus(mirrorPod.UID)
 	assert.True(t, isStatusEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
 	// Should translate mirrorPod / staticPod UID.
-	m.syncBatch()
+	m.testSyncBatch()
 	verifyActions(t, m.kubeClient, []testclient.Action{
 		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
 		testclient.UpdateActionImpl{ActionImpl: testclient.ActionImpl{Verb: "update", Resource: "pods", Subresource: "status"}},
@@ -483,7 +501,7 @@ func TestStaticPodStatus(t *testing.T) {
 	client.ClearActions()
 
 	// No changes.
-	m.syncBatch()
+	m.testSyncBatch()
 	verifyActions(t, m.kubeClient, []testclient.Action{})
 
 	// Mirror pod identity changes.
@@ -492,7 +510,7 @@ func TestStaticPodStatus(t *testing.T) {
 	mirrorPod.Status = api.PodStatus{}
 	m.podManager.AddPod(&mirrorPod)
 	// Expect update to new mirrorPod.
-	m.syncBatch()
+	m.testSyncBatch()
 	verifyActions(t, m.kubeClient, []testclient.Action{
 		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
 		testclient.UpdateActionImpl{ActionImpl: testclient.ActionImpl{Verb: "update", Resource: "pods", Subresource: "status"}},
@@ -604,7 +622,7 @@ func TestSyncBatchCleanupVersions(t *testing.T) {
 	// Orphaned pods should be removed.
 	m.apiStatusVersions[testPod.UID] = 100
 	m.apiStatusVersions[mirrorPod.UID] = 200
-	m.syncBatch()
+	m.testSyncBatch()
 	if _, ok := m.apiStatusVersions[testPod.UID]; ok {
 		t.Errorf("Should have cleared status for testPod")
 	}
@@ -621,13 +639,68 @@ func TestSyncBatchCleanupVersions(t *testing.T) {
 	m.podManager.AddPod(&staticPod)
 	m.apiStatusVersions[testPod.UID] = 100
 	m.apiStatusVersions[mirrorPod.UID] = 200
-	m.syncBatch()
+	m.testSyncBatch()
 	if _, ok := m.apiStatusVersions[testPod.UID]; !ok {
 		t.Errorf("Should not have cleared status for testPod")
 	}
 	if _, ok := m.apiStatusVersions[mirrorPod.UID]; !ok {
 		t.Errorf("Should not have cleared status for mirrorPod")
 	}
+}
+
+func TestReconcilePodStatus(t *testing.T) {
+	client := testclient.NewSimpleFake(testPod)
+	syncer := newTestManager(client)
+	syncer.SetPodStatus(testPod, getRandomPodStatus())
+	// Call syncBatch directly to test reconcile
+	syncer.syncBatch() // The apiStatusVersions should be set now
+
+	originalStatus := testPod.Status
+	podStatus, ok := syncer.GetPodStatus(testPod.UID)
+	if !ok {
+		t.Fatal("Should find pod status for pod: %+v", testPod)
+	}
+	testPod.Status = podStatus
+
+	// If the pod status is the same, a reconciliation is not needed,
+	// syncBatch should do nothing
+	syncer.podManager.UpdatePod(testPod)
+	if syncer.needsReconcile(testPod.UID, podStatus) {
+		t.Errorf("Pod status is the same, a reconciliation is not needed")
+	}
+	client.ClearActions()
+	syncer.syncBatch()
+	verifyActions(t, client, []testclient.Action{})
+
+	// If the pod status is the same, only the timestamp is in Rfc3339 format (lower precision without nanosecond),
+	// a reconciliation is not needed, syncBatch should do nothing.
+	// The StartTime should have been set in SetPodStatus().
+	// TODO(random-liu): Remove this later when api becomes consistent for timestamp.
+	normalizedStartTime := testPod.Status.StartTime.Rfc3339Copy()
+	testPod.Status.StartTime = &normalizedStartTime
+	syncer.podManager.UpdatePod(testPod)
+	if syncer.needsReconcile(testPod.UID, podStatus) {
+		t.Errorf("Pod status only differs for timestamp format, a reconciliation is not needed")
+	}
+	client.ClearActions()
+	syncer.syncBatch()
+	verifyActions(t, client, []testclient.Action{})
+
+	// If the pod status is different, a reconciliation is needed, syncBatch should trigger an update
+	testPod.Status = getRandomPodStatus()
+	syncer.podManager.UpdatePod(testPod)
+	if !syncer.needsReconcile(testPod.UID, podStatus) {
+		t.Errorf("Pod status is different, a reconciliation is needed")
+	}
+	client.ClearActions()
+	syncer.syncBatch()
+	verifyActions(t, client, []testclient.Action{
+		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
+		testclient.UpdateActionImpl{ActionImpl: testclient.ActionImpl{Verb: "update", Resource: "pods", Subresource: "status"}},
+	})
+
+	// Just in case that testPod is shared among different test functions, set it back.
+	testPod.Status = originalStatus
 }
 
 func expectPodStatus(t *testing.T, m *manager, pod *api.Pod) api.PodStatus {

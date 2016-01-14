@@ -183,7 +183,8 @@ func (m *MasterComponents) Stop(apiServer, rcManager bool) {
 		m.once.Do(m.stopRCManager)
 	}
 	if apiServer {
-		m.ApiServer.Close()
+		// TODO: Uncomment when fix #19254
+		// m.ApiServer.Close()
 	}
 }
 

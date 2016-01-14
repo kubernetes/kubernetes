@@ -310,6 +310,29 @@ func deepCopy_v1_FCVolumeSource(in v1.FCVolumeSource, out *v1.FCVolumeSource, c 
 	return nil
 }
 
+func deepCopy_v1_FlexVolumeSource(in v1.FlexVolumeSource, out *v1.FlexVolumeSource, c *conversion.Cloner) error {
+	out.Driver = in.Driver
+	out.FSType = in.FSType
+	if in.SecretRef != nil {
+		out.SecretRef = new(v1.LocalObjectReference)
+		if err := deepCopy_v1_LocalObjectReference(*in.SecretRef, out.SecretRef, c); err != nil {
+			return err
+		}
+	} else {
+		out.SecretRef = nil
+	}
+	out.ReadOnly = in.ReadOnly
+	if in.Options != nil {
+		out.Options = make(map[string]string)
+		for key, val := range in.Options {
+			out.Options[key] = val
+		}
+	} else {
+		out.Options = nil
+	}
+	return nil
+}
+
 func deepCopy_v1_FlockerVolumeSource(in v1.FlockerVolumeSource, out *v1.FlockerVolumeSource, c *conversion.Cloner) error {
 	out.DatasetName = in.DatasetName
 	return nil
@@ -843,6 +866,14 @@ func deepCopy_v1_VolumeSource(in v1.VolumeSource, out *v1.VolumeSource, c *conve
 		}
 	} else {
 		out.RBD = nil
+	}
+	if in.FlexVolume != nil {
+		out.FlexVolume = new(v1.FlexVolumeSource)
+		if err := deepCopy_v1_FlexVolumeSource(*in.FlexVolume, out.FlexVolume, c); err != nil {
+			return err
+		}
+	} else {
+		out.FlexVolume = nil
 	}
 	if in.Cinder != nil {
 		out.Cinder = new(v1.CinderVolumeSource)
@@ -1682,6 +1713,7 @@ func init() {
 		deepCopy_v1_EnvVarSource,
 		deepCopy_v1_ExecAction,
 		deepCopy_v1_FCVolumeSource,
+		deepCopy_v1_FlexVolumeSource,
 		deepCopy_v1_FlockerVolumeSource,
 		deepCopy_v1_GCEPersistentDiskVolumeSource,
 		deepCopy_v1_GitRepoVolumeSource,

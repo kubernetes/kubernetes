@@ -141,6 +141,16 @@ func (Container) SwaggerDoc() map[string]string {
 	return map_Container
 }
 
+var map_ContainerImage = map[string]string{
+	"":         "Describe a container image",
+	"repoTags": "Names by which this image is known. e.g. [\"gcr.io/google_containers/hyperkube:v1.0.7\", \"dockerhub.io/google_containers/hyperkube:v1.0.7\"]",
+	"size":     "The size of the image in bytes.",
+}
+
+func (ContainerImage) SwaggerDoc() map[string]string {
+	return map_ContainerImage
+}
+
 var map_ContainerPort = map[string]string{
 	"":              "ContainerPort represents a network port in a single container.",
 	"name":          "If specified, this must be an IANA_SVC_NAME and unique within the pod. Each named port in a pod must have a unique name. Name for the port that can be referred to by services.",
@@ -399,6 +409,19 @@ var map_FCVolumeSource = map[string]string{
 
 func (FCVolumeSource) SwaggerDoc() map[string]string {
 	return map_FCVolumeSource
+}
+
+var map_FlexVolumeSource = map[string]string{
+	"":          "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
+	"driver":    "Driver is the name of the driver to use for this volume.",
+	"fsType":    "Required: Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\"",
+	"secretRef": "Optional: SecretRef is reference to the authentication secret for User, default is empty.",
+	"readOnly":  "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"options":   "Optional: Extra command options if any.",
+}
+
+func (FlexVolumeSource) SwaggerDoc() map[string]string {
+	return map_FlexVolumeSource
 }
 
 var map_FlockerVolumeSource = map[string]string{
@@ -719,6 +742,7 @@ var map_NodeStatus = map[string]string{
 	"addresses":       "List of addresses reachable to the node. Queried from cloud provider, if available. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-addresses",
 	"daemonEndpoints": "Endpoints of daemons running on the Node.",
 	"nodeInfo":        "Set of ids/uuids to uniquely identify the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-info",
+	"images":          "List of container images on this node",
 }
 
 func (NodeStatus) SwaggerDoc() map[string]string {
@@ -873,6 +897,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"cephfs":               "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
 	"fc":                   "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
 	"flocker":              "Flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running",
+	"flexVolume":           "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1399,6 +1424,7 @@ var map_VolumeSource = map[string]string{
 	"glusterfs":             "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md",
 	"persistentVolumeClaim": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims",
 	"rbd":         "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/rbd/README.md",
+	"flexVolume":  "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
 	"cinder":      "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 	"cephfs":      "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
 	"flocker":     "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",

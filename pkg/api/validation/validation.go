@@ -19,6 +19,7 @@ package validation
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"path"
@@ -58,6 +59,7 @@ var DNS1123LabelErrorMsg string = fmt.Sprintf(`must be a DNS label (at most %d c
 var DNS952LabelErrorMsg string = fmt.Sprintf(`must be a DNS 952 label (at most %d characters, matching regex %s): e.g. "my-name"`, validation.DNS952LabelMaxLength, validation.DNS952LabelFmt)
 var pdPartitionErrorMsg string = InclusiveRangeErrorMsg(1, 255)
 var PortRangeErrorMsg string = InclusiveRangeErrorMsg(1, 65535)
+var IdRangeErrorMsg string = InclusiveRangeErrorMsg(0, math.MaxInt32)
 var PortNameErrorMsg string = fmt.Sprintf(`must be an IANA_SVC_NAME (at most 15 characters, matching regex %s, it must contain at least one letter [a-z], and hyphens cannot be adjacent to other hyphens): e.g. "http"`, validation.IdentifierNoHyphensBeginEndFmt)
 
 const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
@@ -484,6 +486,10 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 			allErrs = append(allErrs, validateFCVolumeSource(source.FC, fldPath.Child("fc"))...)
 		}
 	}
+	if source.FlexVolume != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateFlexVolumeSource(source.FlexVolume, fldPath.Child("flexVolume"))...)
+	}
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
 	}
@@ -697,6 +703,17 @@ func validateCephFSVolumeSource(cephfs *api.CephFSVolumeSource, fldPath *field.P
 	return allErrs
 }
 
+func validateFlexVolumeSource(fv *api.FlexVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(fv.Driver) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), ""))
+	}
+	if len(fv.FSType) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("fsType"), ""))
+	}
+	return allErrs
+}
+
 func ValidatePersistentVolumeName(name string, prefix bool) (bool, string) {
 	return NameIsDNSSubdomain(name, prefix)
 }
@@ -816,6 +833,10 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 			numVolumes++
 			allErrs = append(allErrs, validateFCVolumeSource(pv.Spec.FC, specPath.Child("fc"))...)
 		}
+	}
+	if pv.Spec.FlexVolume != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateFlexVolumeSource(pv.Spec.FlexVolume, specPath.Child("flexVolume"))...)
 	}
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(specPath, "must specify a volume type"))
@@ -1290,6 +1311,18 @@ func ValidatePodSecurityContext(securityContext *api.PodSecurityContext, spec *a
 
 	if securityContext != nil {
 		allErrs = append(allErrs, validateHostNetwork(securityContext.HostNetwork, spec.Containers, specPath.Child("containers"))...)
+		if securityContext.FSGroup != nil && !validation.IsValidGroupId(*securityContext.FSGroup) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("fsGroup"), *(securityContext.FSGroup), IdRangeErrorMsg))
+		}
+		if securityContext.RunAsUser != nil && !validation.IsValidUserId(*securityContext.RunAsUser) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("runAsUser"), *(securityContext.RunAsUser), IdRangeErrorMsg))
+		}
+		for i, gid := range securityContext.SupplementalGroups {
+			if !validation.IsValidGroupId(gid) {
+				supplementalGroup := fmt.Sprintf(`supplementalGroups[%d]`, i)
+				allErrs = append(allErrs, field.Invalid(fldPath.Child(supplementalGroup), gid, IdRangeErrorMsg))
+			}
+		}
 	}
 
 	return allErrs
@@ -1438,8 +1471,8 @@ func ValidateService(service *api.Service) field.ErrorList {
 		portsPath := specPath.Child("ports")
 		for i := range service.Spec.Ports {
 			portPath := portsPath.Index(i)
-			if service.Spec.Ports[i].Protocol != api.ProtocolTCP {
-				allErrs = append(allErrs, field.Invalid(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, "may not use protocols other than 'TCP' when `type` is 'LoadBalancer'"))
+			if !supportedPortProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
+				allErrs = append(allErrs, field.Invalid(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, "cannot create an external load balancer with non-TCP/UDP ports"))
 			}
 		}
 	}

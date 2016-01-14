@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/prometheus/common/expfmt"
@@ -45,6 +46,74 @@ const (
 	apiCallLatencyMediumThreshold time.Duration = 500 * time.Millisecond
 	apiCallLatencyLargeThreshold  time.Duration = 1 * time.Second
 )
+
+type MetricsForE2E metrics.MetricsCollection
+
+func (m *MetricsForE2E) PrintHumanReadable() string {
+	buf := bytes.Buffer{}
+	for _, interestingMetric := range InterestingApiServerMetrics {
+		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
+		for _, sample := range (*m).ApiServerMetrics[interestingMetric] {
+			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+		}
+	}
+	for kubelet, grabbed := range (*m).KubeletMetrics {
+		buf.WriteString(fmt.Sprintf("For %v:\n", kubelet))
+		for _, interestingMetric := range InterestingKubeletMetrics {
+			buf.WriteString(fmt.Sprintf("\tFor %v:\n", interestingMetric))
+			for _, sample := range grabbed[interestingMetric] {
+				buf.WriteString(fmt.Sprintf("\t\t%v\n", metrics.PrintSample(sample)))
+			}
+		}
+	}
+	return buf.String()
+}
+
+func (m *MetricsForE2E) PrintJSON() string {
+	return prettyPrintJSON(*m)
+}
+
+var InterestingApiServerMetrics = []string{
+	"apiserver_request_count",
+	"apiserver_request_latencies_bucket",
+	"etcd_helper_cache_entry_count",
+	"etcd_helper_cache_hit_count",
+	"etcd_helper_cache_miss_count",
+	"etcd_request_cache_add_latencies_summary",
+	"etcd_request_cache_get_latencies_summary",
+	"etcd_request_latencies_summary",
+	"go_gc_duration_seconds",
+	"go_goroutines",
+	"process_cpu_seconds_total",
+	"process_open_fds",
+	"process_resident_memory_bytes",
+	"process_start_time_seconds",
+	"process_virtual_memory_bytes",
+}
+
+var InterestingKubeletMetrics = []string{
+	"container_cpu_system_seconds_total",
+	"container_cpu_user_seconds_total",
+	"container_fs_io_time_weighted_seconds_total",
+	"container_memory_usage_bytes",
+	"container_spec_cpu_shares",
+	"container_start_time_seconds",
+	"go_gc_duration_seconds",
+	"go_goroutines",
+	"kubelet_container_manager_latency_microseconds",
+	"kubelet_docker_errors",
+	"kubelet_docker_operations_latency_microseconds",
+	"kubelet_generate_pod_status_latency_microseconds",
+	"kubelet_pod_start_latency_microseconds",
+	"kubelet_pod_worker_latency_microseconds",
+	"kubelet_pod_worker_start_latency_microseconds",
+	"kubelet_sync_pods_latency_microseconds",
+	"process_cpu_seconds_total",
+	"process_open_fds",
+	"process_resident_memory_bytes",
+	"process_start_time_seconds",
+	"process_virtual_memory_bytes",
+}
 
 // Dashboard metrics
 type LatencyMetric struct {
@@ -333,10 +402,12 @@ func VerifySchedulerLatency(c *client.Client) error {
 func prettyPrintJSON(metrics interface{}) string {
 	output := &bytes.Buffer{}
 	if err := json.NewEncoder(output).Encode(metrics); err != nil {
+		Logf("Error building encoder: %v", err)
 		return ""
 	}
 	formatted := &bytes.Buffer{}
 	if err := json.Indent(formatted, output.Bytes(), "", "  "); err != nil {
+		Logf("Error indenting: %v", err)
 		return ""
 	}
 	return string(formatted.Bytes())

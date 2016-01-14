@@ -180,6 +180,7 @@ func newServerTest() *serverTestFramework {
 	}
 	server := NewServer(fw.fakeKubelet, fw.fakeAuth, true)
 	fw.serverUnderTest = &server
+	// TODO: Close() this when fix #19254
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
 }

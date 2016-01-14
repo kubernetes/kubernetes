@@ -41,6 +41,7 @@ For each unscheduled Pod, the Kubernetes scheduler tries to find a node across t
 The purpose of filtering the nodes is to filter out the nodes that do not meet certain requirements of the Pod. For example, if the free resource on a node (measured by the capacity minus the sum of the resource requests of all the Pods that already run on the node) is less than the Pod's required resource, the node should not be considered in the ranking phase so it is filtered out. Currently, there are several "predicates" implementing different filtering policies, including:
 
 - `NoDiskConflict`: Evaluate if a pod can fit due to the volumes it requests, and those that are already mounted.
+- `NoVolumeZoneConflict`: Evaluate if the volumes a pod requests are available on the node, given the Zone restrictions.
 - `PodFitsResources`: Check if the free resource (CPU and Memory) meets the requirement of the Pod. The free resource is measured by the capacity minus the sum of requests of all Pods on the node. To learn more about the resource QoS in Kubernetes, please check [QoS proposal](../proposals/resource-qos.md).
 - `PodFitsHostPorts`: Check if any HostPort required by the Pod is already occupied on the node.
 - `PodFitsHost`: Filter out all nodes except the one specified in the PodSpec's NodeName field.

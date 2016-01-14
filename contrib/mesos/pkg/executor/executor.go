@@ -49,6 +49,7 @@ import (
 
 const (
 	containerPollTime = 1 * time.Second
+	lostPodPollTime   = 1 * time.Minute
 	podRelistPeriod   = 5 * time.Minute
 )
 
@@ -656,7 +657,7 @@ func (k *Executor) __launchTask(driver bindings.ExecutorDriver, taskId, podFullN
 	// Wait for the pod to go away and stop monitoring once it does
 	// TODO (jdefelice) replace with an /events watch?
 	for {
-		time.Sleep(containerPollTime)
+		time.Sleep(lostPodPollTime)
 		if k.checkForLostPodTask(driver, taskId, knownPod) {
 			return
 		}

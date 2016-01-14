@@ -63,6 +63,7 @@ func TestResourceQuotaCreate(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).ResourceQuotas(ns).Create(resourceQuota)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -95,6 +96,7 @@ func TestResourceQuotaGet(t *testing.T) {
 	}
 
 	response, err := c.Setup(t).ResourceQuotas(ns).Get("abc")
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -118,6 +120,7 @@ func TestResourceQuotaList(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: resourceQuotaList},
 	}
 	response, err := c.Setup(t).ResourceQuotas(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -145,6 +148,7 @@ func TestResourceQuotaUpdate(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: resourceQuota},
 	}
 	response, err := c.Setup(t).ResourceQuotas(ns).Update(resourceQuota)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -175,6 +179,7 @@ func TestResourceQuotaStatusUpdate(t *testing.T) {
 		Response: simple.Response{StatusCode: 200, Body: resourceQuota},
 	}
 	response, err := c.Setup(t).ResourceQuotas(ns).UpdateStatus(resourceQuota)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -185,6 +190,7 @@ func TestResourceQuotaDelete(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).ResourceQuotas(ns).Delete("foo")
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -197,5 +203,6 @@ func TestResourceQuotaWatch(t *testing.T) {
 		Response: simple.Response{StatusCode: 200},
 	}
 	_, err := c.Setup(t).ResourceQuotas(api.NamespaceAll).Watch(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, nil, err)
 }

@@ -283,8 +283,8 @@ func TestListImages(t *testing.T) {
 			},
 			[]kubecontainer.Image{
 				{
-					ID:   "sha512-a2fb8f390702",
-					Tags: []string{"quay.io/coreos/alpine-sh:latest"},
+					ID:       "sha512-a2fb8f390702",
+					RepoTags: []string{"quay.io/coreos/alpine-sh:latest"},
 				},
 			},
 		},
@@ -303,12 +303,12 @@ func TestListImages(t *testing.T) {
 			},
 			[]kubecontainer.Image{
 				{
-					ID:   "sha512-a2fb8f390702",
-					Tags: []string{"quay.io/coreos/alpine-sh:latest"},
+					ID:       "sha512-a2fb8f390702",
+					RepoTags: []string{"quay.io/coreos/alpine-sh:latest"},
 				},
 				{
-					ID:   "sha512-c6b597f42816",
-					Tags: []string{"coreos.com/rkt/stage1-coreos:0.10.0"},
+					ID:       "sha512-c6b597f42816",
+					RepoTags: []string{"coreos.com/rkt/stage1-coreos:0.10.0"},
 				},
 			},
 		},

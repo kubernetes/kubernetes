@@ -45,8 +45,9 @@ const (
 	rbdPluginName = "kubernetes.io/rbd"
 )
 
-func (plugin *rbdPlugin) Init(host volume.VolumeHost) {
+func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *rbdPlugin) Name() string {

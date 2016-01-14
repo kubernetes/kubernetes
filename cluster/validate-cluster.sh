@@ -21,6 +21,11 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
+if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
+    source "${KUBE_ROOT}/cluster/env.sh"
+fi
+
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
@@ -40,9 +45,9 @@ while true; do
   # Suppress errors from kubectl output because during cluster bootstrapping
   # for clusters where the master node is registered, the apiserver will become
   # available and then get restarted as the kubelet configures the docker bridge.
-  nodes=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes) || true
-  found=$(($(echo "${nodes}" | wc -l) - 1)) || true
-  ready=$(echo "${nodes}" | grep -c "Ready") || true
+  node=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes) || true
+  found=$(($(echo "${node}" | wc -l) - 1)) || true
+  ready=$(echo "${node}" | grep -c "Ready") || true
 
   if (( "${found}" == "${EXPECTED_NUM_NODES}" )) && (( "${ready}" == "${EXPECTED_NUM_NODES}")); then
     break

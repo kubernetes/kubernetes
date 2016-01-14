@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -33,6 +32,7 @@ import (
 	"sync"
 	"time"
 
+	"encoding/json"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
@@ -106,9 +106,6 @@ const (
 	// not block on anything else.
 	podKillingChannelCapacity = 50
 
-	// system default DNS resolver configuration
-	ResolvConfDefault = "/etc/resolv.conf"
-
 	// Period for performing global cleanup tasks.
 	housekeepingPeriod = time.Second * 2
 
@@ -133,6 +130,7 @@ type SyncHandler interface {
 	HandlePodAdditions(pods []*api.Pod)
 	HandlePodUpdates(pods []*api.Pod)
 	HandlePodDeletions(pods []*api.Pod)
+	HandlePodReconcile(pods []*api.Pod)
 	HandlePodSyncs(pods []*api.Pod)
 	HandlePodCleanups() error
 }
@@ -170,8 +168,7 @@ func NewMainKubelet(
 	imageGCPolicy ImageGCPolicy,
 	diskSpacePolicy DiskSpacePolicy,
 	cloud cloudprovider.Interface,
-	nodeLabels []string,
-	nodeLabelsFile string,
+	nodeLabels string,
 	nodeStatusUpdateFrequency time.Duration,
 	resourceContainer string,
 	osInterface kubecontainer.OSInterface,
@@ -196,9 +193,11 @@ func NewMainKubelet(
 	oomAdjuster *oom.OOMAdjuster,
 	serializeImagePulls bool,
 	containerManager cm.ContainerManager,
+	outOfDiskTransitionFrequency time.Duration,
 	flannelExperimentalOverlay bool,
+	nodeIP net.IP,
+	reservation kubetypes.Reservation,
 ) (*Kubelet, error) {
-
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -293,7 +292,6 @@ func NewMainKubelet(
 		cloud:                          cloud,
 		nodeRef:                        nodeRef,
 		nodeLabels:                     nodeLabels,
-		nodeLabelsFile:                 nodeLabelsFile,
 		nodeStatusUpdateFrequency:      nodeStatusUpdateFrequency,
 		resourceContainer:              resourceContainer,
 		os:                             osInterface,
@@ -313,9 +311,19 @@ func NewMainKubelet(
 		containerManager:               containerManager,
 		flannelExperimentalOverlay:     flannelExperimentalOverlay,
 		flannelHelper:                  NewFlannelHelper(),
+		nodeIP:                         nodeIP,
+		clock:                          util.RealClock{},
+		outOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
+		reservation:                  reservation,
 	}
 	if klet.flannelExperimentalOverlay {
 		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
+	}
+	if klet.nodeIP != nil {
+		if err := klet.validateNodeIP(); err != nil {
+			return nil, err
+		}
+		glog.Infof("Using node IP: %q", klet.nodeIP.String())
 	}
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
 		return nil, err
@@ -411,7 +419,7 @@ func NewMainKubelet(
 		SystemContainerName:       systemContainer,
 		KubeletContainerName:      resourceContainer,
 	}
-	klet.runtimeState.setRuntimeSync(time.Now())
+	klet.runtimeState.setRuntimeSync(klet.clock.Now())
 
 	klet.runner = klet.containerRuntime
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
@@ -504,10 +512,7 @@ type Kubelet struct {
 	nodeInfo               predicates.NodeInfo
 
 	// a list of node labels to register
-	nodeLabels []string
-
-	// the path to a yaml or json file container series of node labels
-	nodeLabelsFile string
+	nodeLabels string
 
 	// Last timestamp when runtime responded on ping.
 	// Mutex is used to protect this value.
@@ -643,6 +648,56 @@ type Kubelet struct {
 	// on the fly if we're confident the dbus connetions it opens doesn't
 	// put the system under duress.
 	flannelHelper *FlannelHelper
+
+	// If non-nil, use this IP address for the node
+	nodeIP net.IP
+
+	// clock is an interface that provides time related functionality in a way that makes it
+	// easy to test the code.
+	clock util.Clock
+
+	// outOfDiskTransitionFrequency specifies the amount of time the kubelet has to be actually
+	// not out of disk before it can transition the node condition status from out-of-disk to
+	// not-out-of-disk. This prevents a pod that causes out-of-disk condition from repeatedly
+	// getting rescheduled onto the node.
+	outOfDiskTransitionFrequency time.Duration
+
+	// reservation specifies resources which are reserved for non-pod usage, including kubernetes and
+	// non-kubernetes system processes.
+	reservation kubetypes.Reservation
+}
+
+// Validate given node IP belongs to the current host
+func (kl *Kubelet) validateNodeIP() error {
+	if kl.nodeIP == nil {
+		return nil
+	}
+
+	// Honor IP limitations set in setNodeStatus()
+	if kl.nodeIP.IsLoopback() {
+		return fmt.Errorf("nodeIP can't be loopback address")
+	}
+	if kl.nodeIP.To4() == nil {
+		return fmt.Errorf("nodeIP must be IPv4 address")
+	}
+
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return err
+	}
+	for _, addr := range addrs {
+		var ip net.IP
+		switch v := addr.(type) {
+		case *net.IPNet:
+			ip = v.IP
+		case *net.IPAddr:
+			ip = v.IP
+		}
+		if ip != nil && ip.Equal(kl.nodeIP) {
+			return nil
+		}
+	}
+	return fmt.Errorf("Node IP: %q not found in the host's network interfaces", kl.nodeIP.String())
 }
 
 func (kl *Kubelet) allSourcesReady() bool {
@@ -971,77 +1026,23 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 	return node, nil
 }
 
-// getNodeLabels is just a wrapper method for the two below, not to duplicate above
+// getNodeLabels extracts the node labels specified on the command line
 func (kl *Kubelet) getNodeLabels() (map[string]string, error) {
-	var err error
 	labels := make(map[string]string, 0)
-
-	if kl.nodeLabelsFile != "" {
-		labels, err = kl.retrieveNodeLabelsFile(kl.nodeLabelsFile)
-		if err != nil {
-			return labels, err
-		}
+	if kl.nodeLabels == "" {
+		return labels, nil
 	}
-	// step: apply the command line label - permitted to override those from file
-	if len(kl.nodeLabels) > 0 {
-		nl, err := kl.retrieveNodeLabels(kl.nodeLabels)
-		if err != nil {
-			return labels, err
-		}
-		for k, v := range nl {
-			if vl, found := labels[k]; found {
-				glog.Warningf("the --node-label %s=%s option will overwrite %s from node-labels-file", k, v, vl)
-			}
-			labels[k] = v
-		}
-	}
+	rawLabels := make(map[string]json.Number, 0)
 
-	return labels, nil
-}
-
-// retrieveNodeLabels extracts the node labels specified on the command line
-func (kl *Kubelet) retrieveNodeLabels(labels []string) (map[string]string, error) {
-	nodeLabels := make(map[string]string, 0)
-
-	for _, label := range labels {
-		items := strings.Split(label, "=")
-		if len(items) != 2 {
-			return nodeLabels, fmt.Errorf("--node-label %s, should be in the form key=pair", label)
-		}
-		nodeLabels[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
-	}
-
-	return nodeLabels, nil
-}
-
-// retrieveNodeLabelsFile reads in and parses the yaml or json node labels file
-func (kl *Kubelet) retrieveNodeLabelsFile(path string) (map[string]string, error) {
-	labels := make(map[string]string, 0)
-	kps := make(map[string]interface{}, 0)
-
-	fd, err := os.Open(path)
+	err := yaml.NewYAMLOrJSONDecoder(strings.NewReader(kl.nodeLabels), 12).Decode(&rawLabels)
 	if err != nil {
-		return nil, err
-	}
-	defer fd.Close()
-
-	err = yaml.NewYAMLOrJSONDecoder(bufio.NewReader(fd), 12).Decode(&kps)
-	if err != nil {
-		return nil, fmt.Errorf("the --node-labels-file %s content is invalid, %s", path, err)
+		return nil, fmt.Errorf("the --node-labels content '%s' is invalid, %s", kl.nodeLabels, err)
 	}
 
-	for k, v := range kps {
-		// we ONLY accept key=value pairs, no complex types
-		switch v.(type) {
-		case string:
-			labels[k] = v.(string)
-		case float64:
-			labels[k] = fmt.Sprintf("%d", v.(float64))
-		default:
-			return nil, fmt.Errorf("--node-labels-file only supports key:string, not complex values e.g arrays, maps")
-		}
+	// Parse the labels
+	for k, v := range rawLabels {
+		labels[k] = v.String()
 	}
-
 	return labels, nil
 }
 
@@ -1570,7 +1571,7 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 }
 
 func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) (syncErr error) {
-	start := time.Now()
+	start := kl.clock.Now()
 	var firstSeenTime time.Time
 	if firstSeenTimeStr, ok := pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey]; !ok {
 		glog.V(3).Infof("First seen time not recorded for pod %q", pod.UID)
@@ -1665,30 +1666,28 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	var apiPodStatus api.PodStatus
 	var podStatus *kubecontainer.PodStatus
 
+	// Always generate the kubecontainer.PodStatus to know whether there are
+	// running containers associated with the pod.
+	podStatusPtr, apiPodStatusPtr, err := kl.containerRuntime.GetPodStatusAndAPIPodStatus(pod)
+	if err != nil {
+		glog.Errorf("Unable to get status for pod %q: %v", format.Pod(pod), err)
+		return err
+	}
+	apiPodStatus = *apiPodStatusPtr
+	podStatus = podStatusPtr
+
 	if updateType == kubetypes.SyncPodCreate {
 		// This is the first time we are syncing the pod. Record the latency
 		// since kubelet first saw the pod if firstSeenTime is set.
 		if !firstSeenTime.IsZero() {
 			metrics.PodWorkerStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
 		}
-
+		// kubelet may have just been restarted. Re-use the last known
+		// apiPodStatus.
 		apiPodStatus = pod.Status
 		apiPodStatus.StartTime = &unversioned.Time{Time: start}
 		kl.statusManager.SetPodStatus(pod, apiPodStatus)
-		podStatus = &kubecontainer.PodStatus{
-			ID:        pod.UID,
-			Name:      pod.Name,
-			Namespace: pod.Namespace,
-		}
-		glog.V(3).Infof("Not generating pod status for new pod %q", format.Pod(pod))
-	} else {
-		podStatusPtr, apiPodStatusPtr, err := kl.containerRuntime.GetPodStatusAndAPIPodStatus(pod)
-		if err != nil {
-			glog.Errorf("Unable to get status for pod %q: %v", format.Pod(pod), err)
-			return err
-		}
-		apiPodStatus = *apiPodStatusPtr
-		podStatus = podStatusPtr
+		glog.V(3).Infof("Reusing api pod status for new pod %q", format.Pod(pod))
 	}
 
 	pullSecrets, err := kl.getPullSecretsForPod(pod)
@@ -1697,7 +1696,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		return err
 	}
 
-	err = kl.containerRuntime.SyncPod(pod, runningPod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
+	err = kl.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
 	if err != nil {
 		return err
 	}
@@ -1901,7 +1900,6 @@ func (kl *Kubelet) cleanupTerminatedPods(pods []*api.Pod, runningPods []*kubecon
 // pastActiveDeadline returns true if the pod has been active for more than
 // ActiveDeadlineSeconds.
 func (kl *Kubelet) pastActiveDeadline(pod *api.Pod) bool {
-	now := unversioned.Now()
 	if pod.Spec.ActiveDeadlineSeconds != nil {
 		podStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
 		if !ok {
@@ -1909,7 +1907,7 @@ func (kl *Kubelet) pastActiveDeadline(pod *api.Pod) bool {
 		}
 		if !podStatus.StartTime.IsZero() {
 			startTime := podStatus.StartTime.Time
-			duration := now.Time.Sub(startTime)
+			duration := kl.clock.Since(startTime)
 			allowedDuration := time.Duration(*pod.Spec.ActiveDeadlineSeconds) * time.Second
 			if duration >= allowedDuration {
 				return true
@@ -2190,11 +2188,6 @@ func (kl *Kubelet) isOutOfDisk() bool {
 	if err == nil && !withinBounds {
 		outOfRootDisk = true
 	}
-	// Kubelet would indicate all pods as newly created on the first run after restart.
-	// We ignore the first disk check to ensure that running pods are not killed.
-	// Disk manager will only declare out of disk problems if unfreeze has been called.
-	kl.diskSpaceManager.Unfreeze()
-
 	return outOfDockerDisk || outOfRootDisk
 }
 
@@ -2271,7 +2264,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 
 func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler SyncHandler,
 	syncCh <-chan time.Time, housekeepingCh <-chan time.Time, plegCh <-chan *pleg.PodLifecycleEvent) bool {
-	kl.syncLoopMonitor.Store(time.Now())
+	kl.syncLoopMonitor.Store(kl.clock.Now())
 	select {
 	case u, open := <-updates:
 		if !open {
@@ -2290,6 +2283,9 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 		case kubetypes.REMOVE:
 			glog.V(2).Infof("SyncLoop (REMOVE, %q): %q", u.Source, format.Pods(u.Pods))
 			handler.HandlePodDeletions(u.Pods)
+		case kubetypes.RECONCILE:
+			glog.V(4).Infof("SyncLoop (RECONCILE, %q): %q", u.Source, format.Pods(u.Pods))
+			handler.HandlePodReconcile(u.Pods)
 		case kubetypes.SET:
 			// TODO: Do we want to support this?
 			glog.Errorf("Kubelet does not support snapshot update")
@@ -2307,7 +2303,7 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 		}
 		glog.V(2).Infof("SyncLoop (PLEG): %q, event: %#v", format.Pod(pod), e)
 		// Force the container runtime cache to update.
-		if err := kl.runtimeCache.ForceUpdateIfOlder(time.Now()); err != nil {
+		if err := kl.runtimeCache.ForceUpdateIfOlder(kl.clock.Now()); err != nil {
 			glog.Errorf("SyncLoop: unable to update runtime cache")
 			// TODO (yujuhong): should we delay the sync until container
 			// runtime can be updated?
@@ -2338,7 +2334,7 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan kubetypes.PodUpdate, handler
 			}
 		}
 	}
-	kl.syncLoopMonitor.Store(time.Now())
+	kl.syncLoopMonitor.Store(kl.clock.Now())
 	return true
 }
 
@@ -2367,7 +2363,7 @@ func (kl *Kubelet) handleMirrorPod(mirrorPod *api.Pod, start time.Time) {
 }
 
 func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) {
-	start := time.Now()
+	start := kl.clock.Now()
 	sort.Sort(podsByCreationTime(pods))
 	for _, pod := range pods {
 		kl.podManager.AddPod(pod)
@@ -2393,7 +2389,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) {
 }
 
 func (kl *Kubelet) HandlePodUpdates(pods []*api.Pod) {
-	start := time.Now()
+	start := kl.clock.Now()
 	for _, pod := range pods {
 		kl.podManager.UpdatePod(pod)
 		if kubepod.IsMirrorPod(pod) {
@@ -2408,7 +2404,7 @@ func (kl *Kubelet) HandlePodUpdates(pods []*api.Pod) {
 }
 
 func (kl *Kubelet) HandlePodDeletions(pods []*api.Pod) {
-	start := time.Now()
+	start := kl.clock.Now()
 	for _, pod := range pods {
 		kl.podManager.DeletePod(pod)
 		if kubepod.IsMirrorPod(pod) {
@@ -2424,8 +2420,16 @@ func (kl *Kubelet) HandlePodDeletions(pods []*api.Pod) {
 	}
 }
 
+func (kl *Kubelet) HandlePodReconcile(pods []*api.Pod) {
+	for _, pod := range pods {
+		// Update the pod in pod manager, status manager will do periodically reconcile according
+		// to the pod manager.
+		kl.podManager.UpdatePod(pod)
+	}
+}
+
 func (kl *Kubelet) HandlePodSyncs(pods []*api.Pod) {
-	start := time.Now()
+	start := kl.clock.Now()
 	for _, pod := range pods {
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
@@ -2573,7 +2577,7 @@ func (kl *Kubelet) updateRuntimeUp() {
 		return
 	}
 	kl.oneTimeInitializer.Do(kl.initializeRuntimeDependentModules)
-	kl.runtimeState.setRuntimeSync(time.Now())
+	kl.runtimeState.setRuntimeSync(kl.clock.Now())
 }
 
 func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
@@ -2663,8 +2667,12 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 		}
 		node.Status.Addresses = nodeAddresses
 	} else {
-		addr := net.ParseIP(kl.hostname)
-		if addr != nil {
+		if kl.nodeIP != nil {
+			node.Status.Addresses = []api.NodeAddress{
+				{Type: api.NodeLegacyHostIP, Address: kl.nodeIP.String()},
+				{Type: api.NodeInternalIP, Address: kl.nodeIP.String()},
+			}
+		} else if addr := net.ParseIP(kl.hostname); addr != nil {
 			node.Status.Addresses = []api.NodeAddress{
 				{Type: api.NodeLegacyHostIP, Address: addr.String()},
 				{Type: api.NodeInternalIP, Address: addr.String()},
@@ -2737,6 +2745,23 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *api.Node) {
 		}
 		node.Status.NodeInfo.BootID = info.BootID
 	}
+
+	// Set Allocatable.
+	node.Status.Allocatable = make(api.ResourceList)
+	for k, v := range node.Status.Capacity {
+		value := *(v.Copy())
+		if kl.reservation.System != nil {
+			value.Sub(kl.reservation.System[k])
+		}
+		if kl.reservation.Kubernetes != nil {
+			value.Sub(kl.reservation.Kubernetes[k])
+		}
+		if value.Amount != nil && value.Amount.Sign() < 0 {
+			// Negative Allocatable resources don't make sense.
+			value.Set(0)
+		}
+		node.Status.Allocatable[k] = value
+	}
 }
 
 // Set versioninfo for the node.
@@ -2761,11 +2786,30 @@ func (kl *Kubelet) setNodeStatusDaemonEndpoints(node *api.Node) {
 	node.Status.DaemonEndpoints = *kl.daemonEndpoints
 }
 
+// Set images list fot this node
+func (kl *Kubelet) setNodeStatusImages(node *api.Node) {
+	// Update image list of this node
+	var imagesOnNode []api.ContainerImage
+	containerImages, err := kl.imageManager.GetImageList()
+	if err != nil {
+		glog.Errorf("Error getting image list: %v", err)
+	} else {
+		for _, image := range containerImages {
+			imagesOnNode = append(imagesOnNode, api.ContainerImage{
+				RepoTags: image.RepoTags,
+				Size:     image.Size,
+			})
+		}
+	}
+	node.Status.Images = imagesOnNode
+}
+
 // Set status for the node.
 func (kl *Kubelet) setNodeStatusInfo(node *api.Node) {
 	kl.setNodeStatusMachineInfo(node)
 	kl.setNodeStatusVersionInfo(node)
 	kl.setNodeStatusDaemonEndpoints(node)
+	kl.setNodeStatusImages(node)
 }
 
 // Set Readycondition for the node.
@@ -2773,7 +2817,7 @@ func (kl *Kubelet) setNodeReadyCondition(node *api.Node) {
 	// NOTE(aaronlevy): NodeReady condition needs to be the last in the list of node conditions.
 	// This is due to an issue with version skewed kubelet and master components.
 	// ref: https://github.com/kubernetes/kubernetes/issues/16961
-	currentTime := unversioned.Now()
+	currentTime := unversioned.NewTime(kl.clock.Now())
 	var newNodeReadyCondition api.NodeCondition
 	if rs := kl.runtimeState.errors(); len(rs) == 0 {
 		newNodeReadyCondition = api.NodeCondition{
@@ -2823,7 +2867,7 @@ func (kl *Kubelet) setNodeReadyCondition(node *api.Node) {
 
 // Set OODcondition for the node.
 func (kl *Kubelet) setNodeOODCondition(node *api.Node) {
-	currentTime := unversioned.Now()
+	currentTime := unversioned.NewTime(kl.clock.Now())
 	var nodeOODCondition *api.NodeCondition
 
 	// Check if NodeOutOfDisk condition already exists and if it does, just pick it up for update.
@@ -2837,9 +2881,8 @@ func (kl *Kubelet) setNodeOODCondition(node *api.Node) {
 	// If the NodeOutOfDisk condition doesn't exist, create one.
 	if nodeOODCondition == nil {
 		nodeOODCondition = &api.NodeCondition{
-			Type:               api.NodeOutOfDisk,
-			Status:             api.ConditionUnknown,
-			LastTransitionTime: currentTime,
+			Type:   api.NodeOutOfDisk,
+			Status: api.ConditionUnknown,
 		}
 		// nodeOODCondition cannot be appended to node.Status.Conditions here because it gets
 		// copied to the slice. So if we append nodeOODCondition to the slice here none of the
@@ -2866,11 +2909,18 @@ func (kl *Kubelet) setNodeOODCondition(node *api.Node) {
 		}
 	} else {
 		if nodeOODCondition.Status != api.ConditionFalse {
-			nodeOODCondition.Status = api.ConditionFalse
-			nodeOODCondition.Reason = "KubeletHasSufficientDisk"
-			nodeOODCondition.Message = "kubelet has sufficient disk space available"
-			nodeOODCondition.LastTransitionTime = currentTime
-			kl.recordNodeStatusEvent(api.EventTypeNormal, "NodeHasSufficientDisk")
+			// Update the out of disk condition when the condition status is unknown even if we
+			// are within the outOfDiskTransitionFrequency duration. We do this to set the
+			// condition status correctly at kubelet startup.
+			if nodeOODCondition.Status == api.ConditionUnknown || kl.clock.Since(nodeOODCondition.LastTransitionTime.Time) >= kl.outOfDiskTransitionFrequency {
+				nodeOODCondition.Status = api.ConditionFalse
+				nodeOODCondition.Reason = "KubeletHasSufficientDisk"
+				nodeOODCondition.Message = "kubelet has sufficient disk space available"
+				nodeOODCondition.LastTransitionTime = currentTime
+				kl.recordNodeStatusEvent(api.EventTypeNormal, "NodeHasSufficientDisk")
+			} else {
+				glog.Infof("Node condition status for OutOfDisk is false, but last transition time is less than %s", kl.outOfDiskTransitionFrequency)
+			}
 		}
 	}
 
@@ -3040,11 +3090,11 @@ func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 
 // By passing the pod directly, this method avoids pod lookup, which requires
 // grabbing a lock.
-// TODO (random-liu) api.PodStatus is named as podStatus, this maybe confusing, this may happen in other functions
+// TODO(random-liu): api.PodStatus is named as podStatus, this maybe confusing, this may happen in other functions
 // after refactoring, modify them later.
 func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 
-	start := time.Now()
+	start := kl.clock.Now()
 	defer func() {
 		metrics.PodStatusLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()

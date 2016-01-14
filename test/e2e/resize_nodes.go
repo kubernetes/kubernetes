@@ -173,11 +173,11 @@ func rcByName(name string, replicas int, image string, labels map[string]string)
 	})
 }
 
-func rcByNamePort(name string, replicas int, image string, port int, labels map[string]string) *api.ReplicationController {
+func rcByNamePort(name string, replicas int, image string, port int, protocol api.Protocol, labels map[string]string) *api.ReplicationController {
 	return rcByNameContainer(name, replicas, image, labels, api.Container{
 		Name:  name,
 		Image: image,
-		Ports: []api.ContainerPort{{ContainerPort: port}},
+		Ports: []api.ContainerPort{{ContainerPort: port, Protocol: protocol}},
 	})
 }
 
@@ -215,7 +215,7 @@ func rcByNameContainer(name string, replicas int, image string, labels map[strin
 func newRCByName(c *client.Client, ns, name string, replicas int) (*api.ReplicationController, error) {
 	By(fmt.Sprintf("creating replication controller %s", name))
 	return c.ReplicationControllers(ns).Create(rcByNamePort(
-		name, replicas, serveHostnameImage, 9376, map[string]string{}))
+		name, replicas, serveHostnameImage, 9376, api.ProtocolTCP, map[string]string{}))
 }
 
 func resizeRC(c *client.Client, ns, name string, replicas int) error {
@@ -421,6 +421,18 @@ var _ = Describe("Nodes [Disruptive]", func() {
 			By("restoring the original node instance group size")
 			if err := resizeGroup(testContext.CloudConfig.NumNodes); err != nil {
 				Failf("Couldn't restore the original node instance group size: %v", err)
+			}
+			// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
+			// rebooted/deleted node) for up to 5 minutes before all tunnels are dropped and recreated.
+			// Most tests make use of some proxy feature to verify functionality. So, if a reboot test runs
+			// right before a test that tries to get logs, for example, we may get unlucky and try to use a
+			// closed tunnel to a node that was recently rebooted. There's no good way to poll for proxies
+			// being closed, so we sleep.
+			//
+			// TODO(cjcullen) reduce this sleep (#19314)
+			if providerIs("gke") {
+				By("waiting 5 minutes for all dead tunnels to be dropped")
+				time.Sleep(5 * time.Minute)
 			}
 			if err := waitForGroupSize(testContext.CloudConfig.NumNodes); err != nil {
 				Failf("Couldn't restore the original node instance group size: %v", err)

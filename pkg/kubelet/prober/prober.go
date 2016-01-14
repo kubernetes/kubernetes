@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 	httprobe "k8s.io/kubernetes/pkg/probe/http"
@@ -80,7 +81,7 @@ func (pb *prober) probe(probeType probeType, pod *api.Pod, status api.PodStatus,
 		return results.Failure, fmt.Errorf("Unknown probe type: %q", probeType)
 	}
 
-	ctrName := fmt.Sprintf("%s:%s", kubecontainer.GetPodFullName(pod), container.Name)
+	ctrName := fmt.Sprintf("%s:%s", format.Pod(pod), container.Name)
 	if probeSpec == nil {
 		glog.Warningf("%s probe for %s is nil", probeType, ctrName)
 		return results.Success, nil
@@ -155,7 +156,7 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 		return pb.tcp.Probe(status.PodIP, port, timeout)
 	}
 	glog.Warningf("Failed to find probe builder for container: %v", container)
-	return probe.Unknown, "", fmt.Errorf("Missing probe handler for %s:%s", kubecontainer.GetPodFullName(pod), container.Name)
+	return probe.Unknown, "", fmt.Errorf("Missing probe handler for %s:%s", format.Pod(pod), container.Name)
 }
 
 func extractPort(param intstr.IntOrString, container api.Container) (int, error) {
@@ -211,6 +212,10 @@ func (p *prober) newExecInContainer(container api.Container, containerID kubecon
 
 func (eic execInContainer) CombinedOutput() ([]byte, error) {
 	return eic.run()
+}
+
+func (eic execInContainer) Output() ([]byte, error) {
+	return nil, fmt.Errorf("unimplemented")
 }
 
 func (eic execInContainer) SetDir(dir string) {
