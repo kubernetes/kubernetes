@@ -136,9 +136,9 @@ func Run(s *options.SchedulerServer) error {
 		Client:        kubeClient,
 		Identity:      id,
 		EventRecorder: config.Recorder,
-		LeaseDuration: s.LeaderElection.LeaseDuration,
-		RenewDeadline: s.LeaderElection.RenewDeadline,
-		RetryPeriod:   s.LeaderElection.RetryPeriod,
+		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
