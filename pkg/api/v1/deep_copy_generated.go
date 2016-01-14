@@ -184,6 +184,14 @@ func deepCopy_v1_ComponentStatusList(in ComponentStatusList, out *ComponentStatu
 	return nil
 }
 
+func deepCopy_v1_ConfigMapKeySelector(in ConfigMapKeySelector, out *ConfigMapKeySelector, c *conversion.Cloner) error {
+	if err := deepCopy_v1_LocalObjectReference(in.LocalObjectReference, &out.LocalObjectReference, c); err != nil {
+		return err
+	}
+	out.Key = in.Key
+	return nil
+}
+
 func deepCopy_v1_Container(in Container, out *Container, c *conversion.Cloner) error {
 	out.Name = in.Name
 	out.Image = in.Image
@@ -532,6 +540,14 @@ func deepCopy_v1_EnvVarSource(in EnvVarSource, out *EnvVarSource, c *conversion.
 		}
 	} else {
 		out.FieldRef = nil
+	}
+	if in.ConfigMapKeyRef != nil {
+		out.ConfigMapKeyRef = new(ConfigMapKeySelector)
+		if err := deepCopy_v1_ConfigMapKeySelector(*in.ConfigMapKeyRef, out.ConfigMapKeyRef, c); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMapKeyRef = nil
 	}
 	return nil
 }
@@ -2463,6 +2479,7 @@ func init() {
 		deepCopy_v1_ComponentCondition,
 		deepCopy_v1_ComponentStatus,
 		deepCopy_v1_ComponentStatusList,
+		deepCopy_v1_ConfigMapKeySelector,
 		deepCopy_v1_Container,
 		deepCopy_v1_ContainerImage,
 		deepCopy_v1_ContainerPort,

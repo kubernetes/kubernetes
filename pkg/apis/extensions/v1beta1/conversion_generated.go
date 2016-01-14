@@ -116,6 +116,21 @@ func Convert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in *api.CinderVolum
 	return autoConvert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in, out, s)
 }
 
+func autoConvert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in *api.ConfigMapKeySelector, out *v1.ConfigMapKeySelector, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ConfigMapKeySelector))(in)
+	}
+	if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	out.Key = in.Key
+	return nil
+}
+
+func Convert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in *api.ConfigMapKeySelector, out *v1.ConfigMapKeySelector, s conversion.Scope) error {
+	return autoConvert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in, out, s)
+}
+
 func autoConvert_api_Container_To_v1_Container(in *api.Container, out *v1.Container, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Container))(in)
@@ -318,6 +333,15 @@ func autoConvert_api_EnvVarSource_To_v1_EnvVarSource(in *api.EnvVarSource, out *
 		}
 	} else {
 		out.FieldRef = nil
+	}
+	// unable to generate simple pointer conversion for api.ConfigMapKeySelector -> v1.ConfigMapKeySelector
+	if in.ConfigMapKeyRef != nil {
+		out.ConfigMapKeyRef = new(v1.ConfigMapKeySelector)
+		if err := Convert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in.ConfigMapKeyRef, out.ConfigMapKeyRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMapKeyRef = nil
 	}
 	return nil
 }
@@ -1279,6 +1303,21 @@ func Convert_v1_CinderVolumeSource_To_api_CinderVolumeSource(in *v1.CinderVolume
 	return autoConvert_v1_CinderVolumeSource_To_api_CinderVolumeSource(in, out, s)
 }
 
+func autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in *v1.ConfigMapKeySelector, out *api.ConfigMapKeySelector, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.ConfigMapKeySelector))(in)
+	}
+	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	out.Key = in.Key
+	return nil
+}
+
+func Convert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in *v1.ConfigMapKeySelector, out *api.ConfigMapKeySelector, s conversion.Scope) error {
+	return autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in, out, s)
+}
+
 func autoConvert_v1_Container_To_api_Container(in *v1.Container, out *api.Container, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*v1.Container))(in)
@@ -1481,6 +1520,15 @@ func autoConvert_v1_EnvVarSource_To_api_EnvVarSource(in *v1.EnvVarSource, out *a
 		}
 	} else {
 		out.FieldRef = nil
+	}
+	// unable to generate simple pointer conversion for v1.ConfigMapKeySelector -> api.ConfigMapKeySelector
+	if in.ConfigMapKeyRef != nil {
+		out.ConfigMapKeyRef = new(api.ConfigMapKeySelector)
+		if err := Convert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in.ConfigMapKeyRef, out.ConfigMapKeyRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMapKeyRef = nil
 	}
 	return nil
 }
@@ -4456,6 +4504,7 @@ func init() {
 		autoConvert_api_Capabilities_To_v1_Capabilities,
 		autoConvert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource,
 		autoConvert_api_CinderVolumeSource_To_v1_CinderVolumeSource,
+		autoConvert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector,
 		autoConvert_api_ContainerPort_To_v1_ContainerPort,
 		autoConvert_api_Container_To_v1_Container,
 		autoConvert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile,
@@ -4546,6 +4595,7 @@ func init() {
 		autoConvert_v1_Capabilities_To_api_Capabilities,
 		autoConvert_v1_CephFSVolumeSource_To_api_CephFSVolumeSource,
 		autoConvert_v1_CinderVolumeSource_To_api_CinderVolumeSource,
+		autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector,
 		autoConvert_v1_ContainerPort_To_api_ContainerPort,
 		autoConvert_v1_Container_To_api_Container,
 		autoConvert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile,
