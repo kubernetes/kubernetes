@@ -980,11 +980,26 @@ func (dm *DockerManager) Version() (kubecontainer.Version, error) {
 		return nil, fmt.Errorf("docker: failed to get docker version: %v", err)
 	}
 
+	engineVersion := env.Get("Version")
+	version, err := docker.NewAPIVersion(engineVersion)
+	if err != nil {
+		glog.Errorf("docker: failed to parse docker server version %q: %v", engineVersion, err)
+		return nil, fmt.Errorf("docker: failed to parse docker server version %q: %v", engineVersion, err)
+	}
+	return dockerVersion(version), nil
+}
+
+func (dm *DockerManager) APIVersion() (kubecontainer.Version, error) {
+	env, err := dm.client.Version()
+	if err != nil {
+		return nil, fmt.Errorf("docker: failed to get docker version: %v", err)
+	}
+
 	apiVersion := env.Get("ApiVersion")
 	version, err := docker.NewAPIVersion(apiVersion)
 	if err != nil {
-		glog.Errorf("docker: failed to parse docker server version %q: %v", apiVersion, err)
-		return nil, fmt.Errorf("docker: failed to parse docker server version %q: %v", apiVersion, err)
+		glog.Errorf("docker: failed to parse docker api version %q: %v", apiVersion, err)
+		return nil, fmt.Errorf("docker: failed to parse docker api version %q: %v", apiVersion, err)
 	}
 	return dockerVersion(version), nil
 }
@@ -993,7 +1008,7 @@ func (dm *DockerManager) Version() (kubecontainer.Version, error) {
 var dockerAPIVersionWithExec = "1.15"
 
 func (dm *DockerManager) nativeExecSupportExists() (bool, error) {
-	version, err := dm.Version()
+	version, err := dm.APIVersion()
 	if err != nil {
 		return false, err
 	}
