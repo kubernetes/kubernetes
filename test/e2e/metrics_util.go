@@ -92,12 +92,6 @@ var InterestingApiServerMetrics = []string{
 }
 
 var InterestingKubeletMetrics = []string{
-	"container_cpu_system_seconds_total",
-	"container_cpu_user_seconds_total",
-	"container_fs_io_time_weighted_seconds_total",
-	"container_memory_usage_bytes",
-	"container_spec_cpu_shares",
-	"container_start_time_seconds",
 	"go_gc_duration_seconds",
 	"go_goroutines",
 	"kubelet_container_manager_latency_microseconds",
