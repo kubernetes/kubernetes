@@ -168,15 +168,28 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 	// defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
 	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
+	addPods(endpoints.podStore.Store, ns, 1, 1, 0)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{},
-			Ports:    []api.ServicePort{{Port: 80}},
+			Ports:    []api.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "TCP"}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	endpointsHandler.ValidateRequestCount(t, 0)
+	endpointsHandler.ValidateRequestCount(t, 2)
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		}},
+	})
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }
 
 func TestSyncEndpointsProtocolUDP(t *testing.T) {
@@ -197,15 +210,28 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 	// defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
 	endpoints := NewEndpointController(client, controller.NoResyncPeriodFunc)
+	addPods(endpoints.podStore.Store, ns, 1, 1, 0)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{},
-			Ports:    []api.ServicePort{{Port: 80}},
+			Ports:    []api.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "UDP"}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	endpointsHandler.ValidateRequestCount(t, 0)
+	endpointsHandler.ValidateRequestCount(t, 2)
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "UDP"}},
+		}},
+	})
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }
 
 func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
