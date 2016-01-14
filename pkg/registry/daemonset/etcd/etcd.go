@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/capability"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -39,7 +40,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 
 	newListFunc := func() runtime.Object { return &extensions.DaemonSetList{} }
 	storageInterface := storageDecorator(
-		s, 100, &extensions.DaemonSet{}, prefix, false, newListFunc)
+		s, capability.GetDaemonSetsSize(), &extensions.DaemonSet{}, prefix, false, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.DaemonSet{} },
