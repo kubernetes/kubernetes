@@ -698,7 +698,7 @@ type KubeletConfig struct {
 	NetworkPluginName              string
 	NetworkPlugins                 []network.NetworkPlugin
 	NodeName                       string
-	NodeLabels                     string
+	NodeLabels                     map[string]string
 	NodeStatusUpdateFrequency      time.Duration
 	OOMAdjuster                    *oom.OOMAdjuster
 	OSInterface                    kubecontainer.OSInterface

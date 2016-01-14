@@ -32,7 +32,6 @@ import (
 	"sync"
 	"time"
 
-	"encoding/json"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
@@ -80,7 +79,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/watch"
@@ -168,7 +166,7 @@ func NewMainKubelet(
 	imageGCPolicy ImageGCPolicy,
 	diskSpacePolicy DiskSpacePolicy,
 	cloud cloudprovider.Interface,
-	nodeLabels string,
+	nodeLabels map[string]string,
 	nodeStatusUpdateFrequency time.Duration,
 	resourceContainer string,
 	osInterface kubecontainer.OSInterface,
@@ -512,7 +510,7 @@ type Kubelet struct {
 	nodeInfo               predicates.NodeInfo
 
 	// a list of node labels to register
-	nodeLabels string
+	nodeLabels map[string]string
 
 	// Last timestamp when runtime responded on ping.
 	// Mutex is used to protect this value.
@@ -966,12 +964,8 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 		},
 	}
 
-	labels, err := kl.getNodeLabels()
-	if err != nil {
-		return nil, err
-	}
 	// @question: should this be place after the call to the cloud provider? which also applies labels
-	for k, v := range labels {
+	for k, v := range kl.nodeLabels {
 		if cv, found := node.ObjectMeta.Labels[k]; found {
 			glog.Warningf("the node label %s=%s will overwrite default setting %s", k, v, cv)
 		}
@@ -1024,26 +1018,6 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 		return nil, err
 	}
 	return node, nil
-}
-
-// getNodeLabels extracts the node labels specified on the command line
-func (kl *Kubelet) getNodeLabels() (map[string]string, error) {
-	labels := make(map[string]string, 0)
-	if kl.nodeLabels == "" {
-		return labels, nil
-	}
-	rawLabels := make(map[string]json.Number, 0)
-
-	err := yaml.NewYAMLOrJSONDecoder(strings.NewReader(kl.nodeLabels), 12).Decode(&rawLabels)
-	if err != nil {
-		return nil, fmt.Errorf("the --node-labels content '%s' is invalid, %s", kl.nodeLabels, err)
-	}
-
-	// Parse the labels
-	for k, v := range rawLabels {
-		labels[k] = v.String()
-	}
-	return labels, nil
 }
 
 // registerWithApiserver registers the node with the cluster master. It is safe
