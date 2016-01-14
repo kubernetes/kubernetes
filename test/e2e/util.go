@@ -1221,7 +1221,7 @@ func (b kubectlBuilder) exec() (string, error) {
 
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("Error running %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
+		return "", fmt.Errorf("Error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v\n", cmd, cmd.Stdout, cmd.Stderr, err)
 	}
 	Logf("stdout: %q", stdout.String())
 	Logf("stderr: %q", stderr.String())
