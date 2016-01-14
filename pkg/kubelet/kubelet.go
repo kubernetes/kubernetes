@@ -1580,11 +1580,15 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 
 // TODO: Remove runningPod from the arguments.
 func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) error {
+	var firstSeenTime time.Time
+	if firstSeenTimeStr, ok := pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey]; ok {
+		firstSeenTime = kubetypes.ConvertToTimestamp(firstSeenTimeStr).Get()
+	}
+
 	if updateType == kubetypes.SyncPodCreate {
-		// This is the first time we are syncing the pod. Record the latency
-		// since kubelet first saw the pod if firstSeenTime is set.
-		if firstSeenTimeStr, ok := pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey]; ok {
-			firstSeenTime := kubetypes.ConvertToTimestamp(firstSeenTimeStr).Get()
+		if !firstSeenTime.IsZero() {
+			// This is the first time we are syncing the pod. Record the latency
+			// since kubelet first saw the pod if firstSeenTime is set.
 			metrics.PodWorkerStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
 		} else {
 			glog.V(3).Infof("First seen time not recorded for pod %q", pod.UID)
@@ -1593,17 +1597,23 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 
 	// Query the container runtime (or cache) to retrieve the pod status, and
 	// update it in the status manager.
-	podStatus, err := kl.getRuntimePodStatus(pod)
+	podStatus, statusErr := kl.getRuntimePodStatus(pod)
+	apiPodStatus, err := kl.generatePodStatus(pod, podStatus, statusErr)
 	if err != nil {
-		glog.Infof("Query container info for pod %q failed with error (%v)", format.Pod(pod), err)
 		return err
 	}
-	var apiPodStatus api.PodStatus
-	apiPodStatus, err = kl.generatePodStatus(pod, podStatus)
-	if err != nil {
-		return err
+	// Record the time it takes for the pod to become running.
+	existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
+	// TODO: The logic seems wrong since the pod phase can become pending when
+	// the container runtime is temporarily not available.
+	if statusErr == nil && !ok || existingStatus.Phase == api.PodPending && apiPodStatus.Phase == api.PodRunning &&
+		!firstSeenTime.IsZero() {
+		metrics.PodStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
 	}
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
+	if statusErr != nil {
+		return statusErr
+	}
 
 	// Kill pods we can't run.
 	if err := canRunPod(pod); err != nil || pod.DeletionTimestamp != nil {
@@ -3061,7 +3071,7 @@ func (kl *Kubelet) getRuntimePodStatus(pod *api.Pod) (*kubecontainer.PodStatus, 
 	return kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 }
 
-func (kl *Kubelet) generatePodStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus) (api.PodStatus, error) {
+func (kl *Kubelet) generatePodStatus(pod *api.Pod, podStatus *kubecontainer.PodStatus, statusErr error) (api.PodStatus, error) {
 	glog.V(3).Infof("Generating status for %q", format.Pod(pod))
 	// TODO: Consider include the container information.
 	if kl.pastActiveDeadline(pod) {
@@ -3073,6 +3083,15 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod, podStatus *kubecontainer.PodS
 			Message: "Pod was active on the node longer than specified deadline"}, nil
 	}
 
+	if statusErr != nil {
+		// TODO: Re-evaluate whether we should set the status to "Pending".
+		glog.Infof("Query container info for pod %q failed with error (%v)", format.Pod(pod), statusErr)
+		return api.PodStatus{
+			Phase:   api.PodPending,
+			Reason:  "GeneralError",
+			Message: fmt.Sprintf("Query container info failed with error (%v)", statusErr),
+		}, nil
+	}
 	// Ask the runtime to convert the internal PodStatus to api.PodStatus.
 	s, err := kl.containerRuntime.ConvertPodStatusToAPIPodStatus(pod, podStatus)
 	if err != nil {
