@@ -1099,6 +1099,10 @@ func deepCopy_extensions_DaemonSetSpec(in DaemonSetSpec, out *DaemonSetSpec, c *
 	} else {
 		out.Template = nil
 	}
+	if err := deepCopy_extensions_DaemonSetUpdateStrategy(in.UpdateStrategy, &out.UpdateStrategy, c); err != nil {
+		return err
+	}
+	out.UniqueLabelKey = in.UniqueLabelKey
 	return nil
 }
 
@@ -1106,6 +1110,19 @@ func deepCopy_extensions_DaemonSetStatus(in DaemonSetStatus, out *DaemonSetStatu
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
+	return nil
+}
+
+func deepCopy_extensions_DaemonSetUpdateStrategy(in DaemonSetUpdateStrategy, out *DaemonSetUpdateStrategy, c *conversion.Cloner) error {
+	out.Type = in.Type
+	if in.RollingUpdate != nil {
+		out.RollingUpdate = new(RollingUpdateDaemonSet)
+		if err := deepCopy_extensions_RollingUpdateDaemonSet(*in.RollingUpdate, out.RollingUpdate, c); err != nil {
+			return err
+		}
+	} else {
+		out.RollingUpdate = nil
+	}
 	return nil
 }
 
@@ -1548,6 +1565,14 @@ func deepCopy_extensions_ReplicationControllerDummy(in ReplicationControllerDumm
 	return nil
 }
 
+func deepCopy_extensions_RollingUpdateDaemonSet(in RollingUpdateDaemonSet, out *RollingUpdateDaemonSet, c *conversion.Cloner) error {
+	if err := deepCopy_intstr_IntOrString(in.MaxUnavailable, &out.MaxUnavailable, c); err != nil {
+		return err
+	}
+	out.MinReadySeconds = in.MinReadySeconds
+	return nil
+}
+
 func deepCopy_extensions_RollingUpdateDeployment(in RollingUpdateDeployment, out *RollingUpdateDeployment, c *conversion.Cloner) error {
 	if err := deepCopy_intstr_IntOrString(in.MaxUnavailable, &out.MaxUnavailable, c); err != nil {
 		return err
@@ -1749,6 +1774,7 @@ func init() {
 		deepCopy_extensions_DaemonSetList,
 		deepCopy_extensions_DaemonSetSpec,
 		deepCopy_extensions_DaemonSetStatus,
+		deepCopy_extensions_DaemonSetUpdateStrategy,
 		deepCopy_extensions_Deployment,
 		deepCopy_extensions_DeploymentList,
 		deepCopy_extensions_DeploymentSpec,
@@ -1776,6 +1802,7 @@ func init() {
 		deepCopy_extensions_LabelSelectorRequirement,
 		deepCopy_extensions_NodeUtilization,
 		deepCopy_extensions_ReplicationControllerDummy,
+		deepCopy_extensions_RollingUpdateDaemonSet,
 		deepCopy_extensions_RollingUpdateDeployment,
 		deepCopy_extensions_Scale,
 		deepCopy_extensions_ScaleSpec,
