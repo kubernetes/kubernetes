@@ -23,6 +23,8 @@ DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER_NATIVE=${DOCKER_NATIVE:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKER_HOST=${DOCKER_HOST:-""}
+readonly DOCKER_MACHINE_NAME=${DOCKER_MACHINE_NAME:-"kube-dev"}
+readonly DOCKER_MACHINE_DRIVER=${DOCKER_MACHINE_DRIVER:-"virtualbox"}
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd "${KUBE_ROOT}"
@@ -163,18 +165,22 @@ function kube::build::docker_available_on_osx() {
 
 function kube::build::prepare_docker_machine() {
   kube::log::status "docker-machine was found."
-  docker-machine inspect kube-dev >/dev/null || {
+  docker-machine inspect "${DOCKER_MACHINE_NAME}" >/dev/null || {
     kube::log::status "Creating a machine to build Kubernetes"
-    docker-machine create -d virtualbox kube-dev > /dev/null || {
+    docker-machine create --driver "${DOCKER_MACHINE_DRIVER}" "${DOCKER_MACHINE_NAME}" > /dev/null || {
       kube::log::error "Something went wrong creating a machine."
       kube::log::error "Try the following: "
-      kube::log::error "docker-machine create -d <provider> kube-dev"
+      kube::log::error "docker-machine create -d ${DOCKER_MACHINE_DRIVER} ${DOCKER_MACHINE_NAME}"
       return 1
     }
   }
-  docker-machine start kube-dev > /dev/null
-  eval $(docker-machine env kube-dev)
-  kube::log::status "A Docker host using docker-machine named kube-dev is ready to go!"
+  docker-machine start "${DOCKER_MACHINE_NAME}" > /dev/null
+  # it takes `docker-machine env` a few seconds to work if the machine was just started
+  while ! docker-machine env ${DOCKER_MACHINE_NAME} &> /dev/null; do
+    sleep 1
+  done
+  eval $(docker-machine env "${DOCKER_MACHINE_NAME}")
+  kube::log::status "A Docker host using docker-machine named '${DOCKER_MACHINE_NAME}' is ready to go!"
   return 0
 }
 
@@ -221,10 +227,10 @@ function kube::build::ensure_docker_daemon_connectivity {
       echo "Possible causes:"
       echo "  - On Mac OS X, DOCKER_HOST hasn't been set. You may need to: "
       echo "    - Create and start your VM using docker-machine or boot2docker: "
-      echo "      - docker-machine create -d <driver> kube-dev"
+      echo "      - docker-machine create -d ${DOCKER_MACHINE_DRIVER} ${DOCKER_MACHINE_NAME}"
       echo "      - boot2docker init && boot2docker start"
       echo "    - Set your environment variables using: "
-      echo "      - eval \$(docker-machine env kube-dev)"
+      echo "      - eval \$(docker-machine env ${DOCKER_MACHINE_NAME})"
       echo "      - \$(boot2docker shellinit)"
       echo "  - On Linux, user isn't in 'docker' group.  Add and relogin."
       echo "    - Something like 'sudo usermod -a -G docker ${USER-user}'"
