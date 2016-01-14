@@ -157,7 +157,7 @@ func MatchesServerVersion(client *Client, c *Config) error {
 		}
 	}
 	clientVersion := version.Get()
-	serverVersion, err := client.ServerVersion()
+	serverVersion, err := client.Discovery().ServerVersion()
 	if err != nil {
 		return fmt.Errorf("couldn't read version from server: %v\n", err)
 	}

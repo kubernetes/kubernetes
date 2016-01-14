@@ -220,7 +220,7 @@ func contactOthers(state *State) {
 		log.Fatalf("Unable to create client; error: %v\n", err)
 	}
 	// Double check that that worked by getting the server version.
-	if v, err := client.ServerVersion(); err != nil {
+	if v, err := client.Discovery().ServerVersion(); err != nil {
 		log.Fatalf("Unable to get server version: %v\n", err)
 	} else {
 		log.Printf("Server version: %#v\n", v)
