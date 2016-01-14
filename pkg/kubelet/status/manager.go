@@ -410,8 +410,7 @@ func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
 	// The pod could be a static pod, so we should translate first.
 	pod, ok := m.podManager.GetPodByUID(uid)
 	if !ok {
-		// Although we get uid from pod manager in syncBatch, it still could be deleted before here.
-		glog.V(4).Infof("Pod %q has been deleted, no need to reconcile", format.Pod(pod))
+		glog.V(4).Infof("Pod %q has been deleted, no need to reconcile", string(uid))
 		return false
 	}
 	// If the pod is a static pod, we should check its mirror pod, because only status in mirror pod is meaningful to us.
