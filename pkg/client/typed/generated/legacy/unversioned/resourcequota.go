@@ -30,6 +30,7 @@ type ResourceQuotaNamespacer interface {
 type ResourceQuotaInterface interface {
 	Create(*api.ResourceQuota) (*api.ResourceQuota, error)
 	Update(*api.ResourceQuota) (*api.ResourceQuota, error)
+	UpdateStatus(*api.ResourceQuota) (*api.ResourceQuota, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.ResourceQuota, error)
@@ -75,6 +76,12 @@ func (c *resourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.R
 		Do().
 		Into(result)
 	return
+}
+
+func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
+	result := &api.ResourceQuota{}
+	err := c.client.Put().Resource("resourceQuotas").Name(resourceQuota.Name).SubResource("status").Body(resourceQuota).Do().Into(result)
+	return result, err
 }
 
 // Delete takes name of the resourceQuota and deletes it. Returns an error if one occurs.
