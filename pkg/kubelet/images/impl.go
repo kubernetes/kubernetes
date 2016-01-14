@@ -38,22 +38,46 @@ type imageManager struct {
 
 var _ ImageManager = &imageManager{}
 
-func NewImageManager(recorder record.EventRecorder, runtime container.Runtime, backOff *flowcontrol.Backoff, serialized bool) ImageManager {
+func NewImageManager(recorder record.EventRecorder, runtime container.Runtime, backOff *flowcontrol.Backoff, serialized bool) (ImageManager, error) {
 	var puller imagePuller
 	if serialized {
 		puller = newSerialImagePuller(runtime)
 	} else {
 		puller = newParallelImagePuller(runtime)
 	}
-	return &imageManager{
+	im := &imageManager{
 		recorder: recorder,
 		runtime:  runtime,
 		backOff:  backOff,
 		puller:   puller,
 		images:   make(map[string]uint64),
 	}
-	// TODO: Add recovery here.
+	return im, im.detectExistingImages()
 
+}
+
+func (im *imageManager) detectExistingImages() error {
+	images, err := im.runtime.ListImages()
+	if err != nil {
+		return err
+	}
+
+	for _, image := range images {
+		for _, tag := range image.Tags {
+			// register images
+			im.images[tag] = 0
+		}
+	}
+	allPods, err := im.runtime.GetPods(true)
+	if err != nil {
+		return err
+	}
+	for _, pod := range allPods {
+		for _, container := range pod.Containers {
+			im.incrementImageUsage(container.Image)
+		}
+	}
+	return nil
 }
 
 func (im *imageManager) DecImageUsage(container *api.Container) error {
