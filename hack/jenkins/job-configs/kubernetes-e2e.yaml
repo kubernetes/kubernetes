@@ -52,7 +52,7 @@
             timeout: 90
         - 'gce-reboot':
             description: 'Run E2E reboot tests on GCE using the latest successful build. The reboot tests are currently flaky and causing other tests to fail, so we quarantine them into this project and dedicated test cluster.'
-            timeout: 90
+            timeout: 300
         - 'gce-scalability':
             description: 'Run scalability E2E tests on GCE using the latest successful build.'
             timeout: 210
