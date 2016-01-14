@@ -75,6 +75,17 @@ func ExampleView() {
 	//     token: red-token
 }
 
+func TestCurrentContext(t *testing.T) {
+	startingConfig := newRedFederalCowHammerConfig()
+	test := configCommandTest{
+		args:            []string{"current-context"},
+		startingConfig:  startingConfig,
+		expectedConfig:  startingConfig,
+		expectedOutputs: []string{startingConfig.CurrentContext},
+	}
+	test.run(t)
+}
+
 func TestSetCurrentContext(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	startingConfig := newRedFederalCowHammerConfig()
