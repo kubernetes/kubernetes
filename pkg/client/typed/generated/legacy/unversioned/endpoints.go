@@ -21,8 +21,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// EndpointsNamespacer has methods to work with Endpoints resources in a namespace
-type EndpointsNamespacer interface {
+// EndpointsGetter has a method to return a EndpointsInterface.
+// A group's client should implement this interface.
+type EndpointsGetter interface {
 	Endpoints(namespace string) EndpointsInterface
 }
 

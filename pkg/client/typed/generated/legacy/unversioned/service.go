@@ -21,8 +21,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// ServiceNamespacer has methods to work with Service resources in a namespace
-type ServiceNamespacer interface {
+// ServicesGetter has a method to return a ServiceInterface.
+// A group's client should implement this interface.
+type ServicesGetter interface {
 	Services(namespace string) ServiceInterface
 }
 

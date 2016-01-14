@@ -21,9 +21,10 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// PersistentVolumeNamespacer has methods to work with PersistentVolume resources in a namespace
-type PersistentVolumeNamespacer interface {
-	PersistentVolumes(namespace string) PersistentVolumeInterface
+// PersistentVolumesGetter has a method to return a PersistentVolumeInterface.
+// A group's client should implement this interface.
+type PersistentVolumesGetter interface {
+	PersistentVolumes() PersistentVolumeInterface
 }
 
 // PersistentVolumeInterface has methods to work with PersistentVolume resources.
@@ -42,14 +43,12 @@ type PersistentVolumeInterface interface {
 // persistentVolumes implements PersistentVolumeInterface
 type persistentVolumes struct {
 	client *LegacyClient
-	ns     string
 }
 
 // newPersistentVolumes returns a PersistentVolumes
-func newPersistentVolumes(c *LegacyClient, namespace string) *persistentVolumes {
+func newPersistentVolumes(c *LegacyClient) *persistentVolumes {
 	return &persistentVolumes{
 		client: c,
-		ns:     namespace,
 	}
 }
 
@@ -57,7 +56,6 @@ func newPersistentVolumes(c *LegacyClient, namespace string) *persistentVolumes 
 func (c *persistentVolumes) Create(persistentVolume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("persistentVolumes").
 		Body(persistentVolume).
 		Do().
@@ -69,7 +67,6 @@ func (c *persistentVolumes) Create(persistentVolume *api.PersistentVolume) (resu
 func (c *persistentVolumes) Update(persistentVolume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("persistentVolumes").
 		Name(persistentVolume.Name).
 		Body(persistentVolume).
@@ -87,7 +84,6 @@ func (c *persistentVolumes) UpdateStatus(persistentVolume *api.PersistentVolume)
 // Delete takes name of the persistentVolume and deletes it. Returns an error if one occurs.
 func (c *persistentVolumes) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("persistentVolumes").
 		Name(name).
 		Body(options).
@@ -98,7 +94,6 @@ func (c *persistentVolumes) Delete(name string, options *api.DeleteOptions) erro
 // DeleteCollection deletes a collection of objects.
 func (c *persistentVolumes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("persistentVolumes").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
@@ -110,7 +105,6 @@ func (c *persistentVolumes) DeleteCollection(options *api.DeleteOptions, listOpt
 func (c *persistentVolumes) Get(name string) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("persistentVolumes").
 		Name(name).
 		Do().
@@ -122,7 +116,6 @@ func (c *persistentVolumes) Get(name string) (result *api.PersistentVolume, err 
 func (c *persistentVolumes) List(opts api.ListOptions) (result *api.PersistentVolumeList, err error) {
 	result = &api.PersistentVolumeList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("persistentVolumes").
 		VersionedParams(&opts, api.Scheme).
 		Do().
@@ -134,7 +127,6 @@ func (c *persistentVolumes) List(opts api.ListOptions) (result *api.PersistentVo
 func (c *persistentVolumes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
-		Namespace(c.ns).
 		Resource("persistentVolumes").
 		VersionedParams(&opts, api.Scheme).
 		Watch()

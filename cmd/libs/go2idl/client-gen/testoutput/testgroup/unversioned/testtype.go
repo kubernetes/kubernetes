@@ -22,8 +22,9 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// TestTypeNamespacer has methods to work with TestType resources in a namespace
-type TestTypeNamespacer interface {
+// TestTypesGetter has a method to return a TestTypeInterface.
+// A group's client should implement this interface.
+type TestTypesGetter interface {
 	TestTypes(namespace string) TestTypeInterface
 }
 
