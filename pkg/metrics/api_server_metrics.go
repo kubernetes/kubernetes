@@ -50,6 +50,10 @@ var KnownApiServerMetrics = map[string][]string{
 
 type ApiServerMetrics Metrics
 
+func (m *ApiServerMetrics) Equal(o ApiServerMetrics) bool {
+	return (*Metrics)(m).Equal(Metrics(o))
+}
+
 func NewApiServerMetrics() ApiServerMetrics {
 	result := NewMetrics()
 	for metric := range KnownApiServerMetrics {
