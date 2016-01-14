@@ -99,7 +99,7 @@ func (r registryImpl) watch() <-chan *RegisteredPod {
 		log.Error(err)
 		return nil
 	}
-	return x.in
+	return x.input()
 }
 
 func taskIDFor(pod *api.Pod) (taskID string, err error) {
@@ -247,8 +247,6 @@ func (r registryImpl) bind(taskID string, pod *api.Pod) error {
 		r.boundTasks[taskID] = pod
 	}()
 
-	// TODO(k8s): use Pods interface for binding once clusters are upgraded
-	// return b.Pods(binding.Namespace).Bind(binding)
 	if pod.Spec.NodeName == "" {
 		//HACK(jdef): cloned binding construction from k8s plugin/pkg/scheduler/framework.go
 		binding := &api.Binding{
@@ -269,10 +267,12 @@ func (r registryImpl) bind(taskID string, pod *api.Pod) error {
 		}
 
 		// create binding on apiserver
-		log.Infof("Binding '%v/%v' to '%v' with annotations %+v...", pod.Namespace, pod.Name, binding.Target.Name, binding.Annotations)
+		log.Infof("Binding task %v pod '%v/%v' to '%v' with annotations %+v...",
+			taskID, pod.Namespace, pod.Name, binding.Target.Name, binding.Annotations)
 		ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
 		err := r.client.Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
 		if err != nil {
+			log.Warningf("failed to bind task %v pod %v/%v: %v", taskID, pod.Namespace, pod.Name, err)
 			return errCreateBindingFailed
 		}
 	} else {
@@ -284,10 +284,10 @@ func (r registryImpl) bind(taskID string, pod *api.Pod) error {
 		}{}
 		patch.Metadata.Annotations = pod.Annotations
 		patchJson, _ := json.Marshal(patch)
-		log.V(4).Infof("Patching annotations %v of pod %v/%v: %v", pod.Annotations, pod.Namespace, pod.Name, string(patchJson))
+		log.V(4).Infof("Patching annotations %v of task %v pod %v/%v: %v", pod.Annotations, taskID, pod.Namespace, pod.Name, string(patchJson))
 		err := r.client.Patch(api.MergePatchType).RequestURI(pod.SelfLink).Body(patchJson).Do().Error()
 		if err != nil {
-			log.Errorf("Error updating annotations of ready-to-launch pod %v/%v: %v", pod.Namespace, pod.Name, err)
+			log.Errorf("Error updating annotations of ready-to-launch task %v pod %v/%v: %v", taskID, pod.Namespace, pod.Name, err)
 			return errAnnotationUpdateFailure
 		}
 	}

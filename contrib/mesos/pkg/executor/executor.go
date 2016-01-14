@@ -177,6 +177,9 @@ func (k *Executor) Init(driver bindings.ExecutorDriver) {
 		case RegistrationEventIncompatibleUpdate:
 			log.Warningf("killing task %v pod %v/%v because of an incompatible update", pod.taskID, pod.Namespace, pod.Name)
 			k.killPodTask(driver, pod.taskID)
+			// halt processing of this event; when the pod is deleted we'll receive another
+			// event for that.
+			return false
 
 		case RegistrationEventDeleted:
 			k.resetSuicideWatch(driver)
@@ -330,7 +333,7 @@ func (k *Executor) LaunchTask(driver bindings.ExecutorDriver, taskInfo *mesos.Ta
 	if p := k.registry.pod(taskID); p != nil {
 		log.Warningf("task %v already launched", taskID)
 		// Not to send back TASK_RUNNING or TASK_FAILED here, because
-		// may be duplicated messages or duplicated task id.
+		// may be duplicated messages
 		return
 	}
 
@@ -359,7 +362,7 @@ func (k *Executor) LaunchTask(driver bindings.ExecutorDriver, taskInfo *mesos.Ta
 	k.resetSuicideWatch(driver)
 
 	// run the next step aync because it calls out to apiserver and we don't want to block here
-	go k.launchTask(driver, taskInfo, time.NewTimer(k.launchGracePeriod), pod)
+	go k.bindAndWatchTask(driver, taskInfo, time.NewTimer(k.launchGracePeriod), pod)
 }
 
 // determine whether we need to start a suicide countdown. if so, then start
@@ -436,7 +439,7 @@ func podStatusData(pod *api.Pod, status api.PodStatus) ([]byte, string, error) {
 }
 
 // async continuation of LaunchTask
-func (k *Executor) launchTask(driver bindings.ExecutorDriver, task *mesos.TaskInfo, launchTimer *time.Timer, pod *api.Pod) {
+func (k *Executor) bindAndWatchTask(driver bindings.ExecutorDriver, task *mesos.TaskInfo, launchTimer *time.Timer, pod *api.Pod) {
 	success := false
 	defer func() {
 		if !success {
@@ -453,14 +456,16 @@ func (k *Executor) launchTask(driver bindings.ExecutorDriver, task *mesos.TaskIn
 	// the apiserver should be up-to-date.
 	startingData, _, err := podStatusData(pod, api.PodStatus{})
 	if err != nil {
-		log.Errorf("failed to generate pod-task starting data: %v", err)
+		log.Errorf("failed to generate pod-task starting data for task %v pod %v/%v: %v",
+			task.TaskId.GetValue(), pod.Namespace, pod.Name, err)
 		k.sendStatus(driver, newStatus(task.TaskId, mesos.TaskState_TASK_FAILED, err.Error()))
 		return
 	}
 
 	err = k.registry.bind(task.TaskId.GetValue(), pod)
 	if err != nil {
-		log.Errorf("failed to bind pod %v/%v: %v", pod.Namespace, pod.Name, err)
+		log.Errorf("failed to bind task %v pod %v/%v: %v",
+			task.TaskId.GetValue(), pod.Namespace, pod.Name, err)
 		k.sendStatus(driver, newStatus(task.TaskId, mesos.TaskState_TASK_FAILED, err.Error()))
 		return
 	}
@@ -473,7 +478,7 @@ func (k *Executor) launchTask(driver bindings.ExecutorDriver, task *mesos.TaskIn
 		Data:    startingData,
 	})
 
-	// within the launch timeout window we should see a pod-task update via k.registry.
+	// within the launch timeout window we should see a pod-task update via the registry.
 	// if we see a Running update then we need to generate a TASK_RUNNING status update for mesos.
 	handlerFinished := make(chan struct{})
 	expired := make(chan struct{})
@@ -496,17 +501,23 @@ func (k *Executor) launchTask(driver bindings.ExecutorDriver, task *mesos.TaskIn
 				return true, nil
 			}
 
-			if pod.event == RegistrationEventDeleted {
+			switch pod.event {
+			case RegistrationEventDeleted:
 				defer launchTimer.Stop()
 				defer close(handlerFinished)
 
 				// we're done monitoring because pod has been deleted
 				return true, nil
-			}
 
-			if !podTaskRunning(pod) {
-				// still waiting for pod to transition to a running state, so
-				// we're not done monitoring yet; check back later..
+			case RegistrationEventUpdated:
+				if pod.Status.Phase != api.PodRunning {
+					// still waiting for pod to transition to a running state, so
+					// we're not done monitoring yet; check back later..
+					return false, nil
+				}
+
+			default:
+				// some other event that isn't very meaningful for us...
 				return false, nil
 			}
 
@@ -534,11 +545,6 @@ func (k *Executor) launchTask(driver bindings.ExecutorDriver, task *mesos.TaskIn
 	}
 	k.podWatcher.forTask(task.TaskId.GetValue(), handler)
 	success = true
-}
-
-func podTaskRunning(pod *RegisteredPod) bool {
-	log.V(1).Infof("is-running? task %v pod %v/%v status %v", pod.taskID, pod.Namespace, pod.Name, pod.Status.Phase)
-	return pod.Status.Phase == api.PodRunning
 }
 
 // KillTask is called when the executor receives a request to kill a task.
@@ -579,7 +585,12 @@ func (k *Executor) FrameworkMessage(driver bindings.ExecutorDriver, message stri
 	if strings.HasPrefix(message, messages.TaskLost+":") {
 		taskId := message[len(messages.TaskLost)+1:]
 		if taskId != "" {
+			// TODO(jdef) would it make more sense to check the status of the task and
+			// just replay the last non-terminal message that we sent if the task is
+			// still active?
+
 			// clean up pod state
+			k.sendStatus(driver, newStatus(&mesos.TaskID{Value: &taskId}, mesos.TaskState_TASK_LOST, messages.TaskLostAck))
 			k.killPodTask(driver, taskId)
 		}
 		return

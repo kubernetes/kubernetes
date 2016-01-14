@@ -85,8 +85,13 @@ func (source *sourceMesos) send(objs []interface{}) {
 			// so we'll allow it through
 			addPod = true
 			podNames[podName{p.Namespace, p.Name}] = rpod.Task()
+		} else if rpod != nil {
+			// we were able to ID the pod but the update still failed...
+			log.Warningf("failed to update registry for task %v pod %v/%v: %v",
+				rpod.Task(), p.Namespace, p.Name, err)
 		} else {
-			log.V(1).Infof("skipping pod %v/%v", p.Namespace, p.Name)
+			// unrecognized pod, skip!
+			log.V(2).Infof("skipping pod %v/%v", p.Namespace, p.Name)
 		}
 
 		if addPod {
@@ -116,5 +121,5 @@ func (source *sourceMesos) send(objs []interface{}) {
 		case source.out <- u:
 		}
 	}
-	log.V(1).Infof("sent %d pod updates", len(pods))
+	log.V(2).Infof("sent %d pod updates", len(pods))
 }

@@ -29,9 +29,8 @@ type (
 	podWatchFilter func(*RegisteredPod) (accept bool)
 
 	podWatchHandler struct {
-		predicate podWatchFilter
-		action    podWatchAction
-		expired   <-chan struct{}
+		action  podWatchAction
+		expired <-chan struct{}
 	}
 
 	podWatcher struct {
@@ -39,6 +38,7 @@ type (
 		rw       sync.RWMutex
 		handlers map[string]podWatchHandler
 		filters  []podWatchFilter
+		runOnce  chan struct{}
 	}
 )
 
@@ -46,10 +46,18 @@ func newPodWatcher(updates <-chan *RegisteredPod) *podWatcher {
 	return &podWatcher{
 		updates:  updates,
 		handlers: make(map[string]podWatchHandler),
+		runOnce:  make(chan struct{}),
 	}
 }
 
 func (pw *podWatcher) run() {
+	select {
+	case <-pw.runOnce:
+		log.Error("run() has already been invoked for this pod-watcher")
+		return
+	default:
+		close(pw.runOnce)
+	}
 updateLoop:
 	for u := range pw.updates {
 		log.V(1).Infof("filtering task %v pod %v/%v", u.taskID, u.Namespace, u.Name)
@@ -85,9 +93,12 @@ updateLoop:
 }
 
 func (pw *podWatcher) filter(f podWatchFilter) {
-	pw.rw.Lock()
-	defer pw.rw.Unlock()
-	pw.filters = append(pw.filters, f)
+	select {
+	case <-pw.runOnce:
+		log.Errorf("failed to add filter because pod-watcher is already running")
+	default:
+		pw.filters = append(pw.filters, f)
+	}
 }
 
 func (pw *podWatcher) forTask(taskID string, h podWatchHandler) {
