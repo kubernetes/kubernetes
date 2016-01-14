@@ -17,12 +17,12 @@ limitations under the License.
 package service
 
 import (
-	"fmt"
-
-	log "github.com/golang/glog"
+	"k8s.io/kubernetes/contrib/mesos/pkg/executor"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+
+	log "github.com/golang/glog"
 )
 
 const (
@@ -32,97 +32,95 @@ const (
 	mesosSource = kubetypes.ApiserverSource
 )
 
-// sourceMesos merges pods from mesos, and mirror pods from the apiserver. why?
-// (a) can't have two sources with the same name;
-// (b) all sources, other than ApiserverSource are considered static/mirror
-// sources, and;
-// (c) kubelet wants to see mirror pods reflected in a non-static source.
-//
-// Mesos pods must appear to come from apiserver due to (b), while reflected
-// static pods (mirror pods) must appear to come from apiserver due to (c).
-//
-// The only option I could think of was creating a source that merges the pod
-// streams. I don't like it. But I could think of anything else, other than
-// starting to hack up the kubelet's understanding of mirror/static pod
-// sources (ouch!)
-type sourceMesos struct {
-	sourceFinished chan struct{}              // sourceFinished closes when mergeAndForward exits
-	out            chan<- interface{}         // out is the sink for merged pod snapshots
-	mirrorPods     chan []*api.Pod            // mirrorPods communicates snapshots of the current set of mirror pods
-	execUpdates    <-chan kubetypes.PodUpdate // execUpdates receives snapshots of the current set of mesos pods
-}
+type (
+	podName struct {
+		namespace, name string
+	}
 
-// newSourceMesos creates a pod config source that merges pod updates from
-// mesos (via execUpdates), and mirror pod updates from the apiserver (via
-// podWatch) writing the merged update stream to the out chan. It is expected
-// that execUpdates will only ever contain SET operations. The source takes
-// ownership of the sourceFinished chan, closing it when the source terminates.
-// Source termination happens when the execUpdates chan is closed and fully
-// drained of updates.
+	sourceMesos struct {
+		stop          <-chan struct{}
+		out           chan<- interface{} // never close this because pkg/util/config.mux doesn't handle that very well
+		registry      executor.Registry
+		priorPodNames map[podName]string // map podName to taskID
+	}
+)
+
 func newSourceMesos(
-	sourceFinished chan struct{},
-	execUpdates <-chan kubetypes.PodUpdate,
+	stop <-chan struct{},
 	out chan<- interface{},
 	podWatch *cache.ListWatch,
+	registry executor.Registry,
 ) {
 	source := &sourceMesos{
-		sourceFinished: sourceFinished,
-		mirrorPods:     make(chan []*api.Pod),
-		execUpdates:    execUpdates,
-		out:            out,
+		stop:          stop,
+		out:           out,
+		registry:      registry,
+		priorPodNames: make(map[podName]string),
 	}
-	// reflect changes from the watch into a chan, filtered to include only mirror pods (have an ConfigMirrorAnnotationKey attr)
-	cache.NewReflector(podWatch, &api.Pod{}, cache.NewUndeltaStore(source.send, cache.MetaNamespaceKeyFunc), 0).RunUntil(sourceFinished)
-	go source.mergeAndForward()
+	// reflect changes from the watch into a chan, filtered to include only mirror pods
+	// (have an ConfigMirrorAnnotationKey attr)
+	cache.NewReflector(
+		podWatch,
+		&api.Pod{},
+		cache.NewUndeltaStore(source.send, cache.MetaNamespaceKeyFunc),
+		0,
+	).RunUntil(stop)
 }
 
+// send is an update callback invoked by NewUndeltaStore
 func (source *sourceMesos) send(objs []interface{}) {
-	var mirrors []*api.Pod
+	var (
+		pods     = make([]*api.Pod, 0, len(objs))
+		podNames = make(map[podName]string, len(objs))
+	)
+
 	for _, o := range objs {
 		p := o.(*api.Pod)
+		addPod := false
 		if _, ok := p.Annotations[kubetypes.ConfigMirrorAnnotationKey]; ok {
-			mirrors = append(mirrors, p)
+			// pass through all mirror pods
+			addPod = true
+		} else if rpod, err := source.registry.Update(p); err == nil {
+			// pod is bound to a task, and the update is compatible
+			// so we'll allow it through
+			addPod = true
+			p = rpod.Pod() // use the (possibly) updated pod spec!
+			podNames[podName{p.Namespace, p.Name}] = rpod.Task()
+		} else if rpod != nil {
+			// we were able to ID the pod but the update still failed...
+			log.Warningf("failed to update registry for task %v pod %v/%v: %v",
+				rpod.Task(), p.Namespace, p.Name, err)
+		} else {
+			// unrecognized pod, skip!
+			log.V(2).Infof("skipping pod %v/%v", p.Namespace, p.Name)
 		}
+
+		if addPod {
+			pods = append(pods, p)
+		}
+	}
+
+	// detect when pods are deleted and notify the registry
+	for k, taskID := range source.priorPodNames {
+		if _, found := podNames[k]; !found {
+			source.registry.Remove(taskID)
+		}
+	}
+
+	source.priorPodNames = podNames
+
+	u := kubetypes.PodUpdate{
+		Op:     kubetypes.SET,
+		Pods:   pods,
+		Source: mesosSource,
 	}
 	select {
-	case <-source.sourceFinished:
-	case source.mirrorPods <- mirrors:
-	}
-}
-
-func (source *sourceMesos) mergeAndForward() {
-	// execUpdates will be closed by the executor on shutdown
-	defer close(source.sourceFinished)
-	var (
-		mirrors = []*api.Pod{}
-		pods    = []*api.Pod{}
-	)
-eventLoop:
-	for {
+	case <-source.stop:
+	default:
 		select {
-		case m := <-source.mirrorPods:
-			mirrors = m[:]
-			u := kubetypes.PodUpdate{
-				Op:     kubetypes.SET,
-				Pods:   append(m, pods...),
-				Source: mesosSource,
-			}
-			log.V(3).Infof("mirror update, sending snapshot of size %d", len(u.Pods))
-			source.out <- u
-		case u, ok := <-source.execUpdates:
-			if !ok {
-				break eventLoop
-			}
-			if u.Op != kubetypes.SET {
-				panic(fmt.Sprintf("unexpected Op type: %v", u.Op))
-			}
-
-			pods = u.Pods[:]
-			u.Pods = append(u.Pods, mirrors...)
-			u.Source = mesosSource
-			log.V(3).Infof("pods update, sending snapshot of size %d", len(u.Pods))
-			source.out <- u
+		case <-source.stop:
+		case source.out <- u:
 		}
 	}
-	log.V(2).Infoln("mesos pod source terminating normally")
+	log.V(2).Infof("sent %d pod updates", len(pods))
 }

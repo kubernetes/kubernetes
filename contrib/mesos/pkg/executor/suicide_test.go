@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	bindings "github.com/mesos/mesos-go/executor"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 type suicideTracker struct {
@@ -67,7 +68,7 @@ func (t *suicideTracker) makeJumper(_ jumper) jumper {
 func TestSuicide_zeroTimeout(t *testing.T) {
 	defer glog.Flush()
 
-	k, _ := NewTestKubernetesExecutor()
+	k := NewTestKubernetesExecutor()
 	tracker := &suicideTracker{suicideWatcher: k.suicideWatch}
 	k.suicideWatch = tracker
 
@@ -92,14 +93,14 @@ func TestSuicide_zeroTimeout(t *testing.T) {
 func TestSuicide_WithTasks(t *testing.T) {
 	defer glog.Flush()
 
-	k, _ := NewTestKubernetesExecutor()
+	k := NewTestKubernetesExecutor()
 	k.suicideTimeout = 50 * time.Millisecond
 
 	jumps := uint32(0)
 	tracker := &suicideTracker{suicideWatcher: k.suicideWatch, jumps: &jumps}
 	k.suicideWatch = tracker
 
-	k.tasks["foo"] = &kuberTask{} // prevent suicide attempts from succeeding
+	k.registry.bind("foo", &api.Pod{}) // prevent suicide attempts from succeeding
 
 	// call reset with a nil timer
 	glog.Infoln("Resetting suicide watch with 1 task")
@@ -119,7 +120,7 @@ func TestSuicide_WithTasks(t *testing.T) {
 		t.Fatalf("initial suicide watch setup failed")
 	}
 
-	delete(k.tasks, "foo") // zero remaining tasks
+	k.registry.Remove("foo") // zero remaining tasks
 	k.suicideTimeout = 1500 * time.Millisecond
 	suicideStart := time.Now()
 
@@ -142,7 +143,7 @@ func TestSuicide_WithTasks(t *testing.T) {
 	}
 
 	k.lock.Lock()
-	k.tasks["foo"] = &kuberTask{} // prevent suicide attempts from succeeding
+	k.registry.bind("foo", &api.Pod{}) // prevent suicide attempts from succeeding
 	k.lock.Unlock()
 
 	// reset the suicide watch, which should stop the existing timer
@@ -164,7 +165,7 @@ func TestSuicide_WithTasks(t *testing.T) {
 	}
 
 	k.lock.Lock()
-	delete(k.tasks, "foo") // allow suicide attempts to schedule
+	k.registry.Remove("foo") // allow suicide attempts to schedule
 	k.lock.Unlock()
 
 	// reset the suicide watch, which should reset a stopped timer
