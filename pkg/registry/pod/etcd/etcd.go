@@ -22,6 +22,7 @@ import (
 	"net/url"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/capability"
 	"k8s.io/kubernetes/pkg/api/errors"
 	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -67,7 +68,7 @@ func NewStorage(
 
 	newListFunc := func() runtime.Object { return &api.PodList{} }
 	storageInterface := storageDecorator(
-		s, 1000, &api.Pod{}, prefix, true, newListFunc)
+		s, capability.GetPodsSize(), &api.Pod{}, prefix, true, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },
