@@ -22,6 +22,7 @@ import (
 	"net/url"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/capability"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -57,7 +58,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator, con
 
 	newListFunc := func() runtime.Object { return &api.NodeList{} }
 	storageInterface := storageDecorator(
-		s, 1000, &api.Node{}, prefix, false, newListFunc)
+		s, capability.GetNodesSize(), &api.Node{}, prefix, false, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Node{} },

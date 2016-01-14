@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/capability"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -37,7 +38,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 
 	newListFunc := func() runtime.Object { return &api.PersistentVolumeList{} }
 	storageInterface := storageDecorator(
-		s, 100, &api.PersistentVolume{}, prefix, true, newListFunc)
+		s, capability.GetPersistentVolumesSize(), &api.PersistentVolume{}, prefix, true, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PersistentVolume{} },

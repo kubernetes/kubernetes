@@ -119,6 +119,24 @@ func generateStorageVersionMap(legacyVersion string, storageVersions string) map
 	return storageVersionMap
 }
 
+func setWatchCacheCapability(capabilities []string) {
+	for _ c:= range capabilities {
+		tokens := strings.Split(c, "#")	
+		if len(tokens) != 2 {
+			glog.Errorf("invalid value of watch cache capabilities: %s", c)
+			continue
+		}
+		
+		size, err := strconv.Atoi(tokens[1])
+		if err != nil {
+			glog.Errorf("invalid size of watch cache capabilities: %s", c)
+			continue
+		}
+		
+		capability.SetSizeByKey(strings.ToLower(tokens[0]), size)
+	}	
+}
+
 // parse the value of --etcd-servers-overrides and update given storageDestinations.
 func updateEtcdOverrides(overrides []string, storageVersions map[string]string, prefix string, storageDestinations *genericapiserver.StorageDestinations, newEtcdFn newEtcdFunc) {
 	if len(overrides) == 0 {
@@ -388,6 +406,11 @@ func Run(s *options.APIServer) error {
 
 		Tunneler: tunneler,
 	}
+	
+	if s.EnableWatchCache {
+		setWatchCacheCapability(s.WatchCacheSizes)
+	}
+	
 	m := master.New(config)
 	m.Run(s.ServerRunOptions)
 	return nil
