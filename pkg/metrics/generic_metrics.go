@@ -19,6 +19,7 @@ package metrics
 import (
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -57,6 +58,26 @@ var CommonMetrics = map[string][]string{
 }
 
 type Metrics map[string]model.Samples
+
+func (m *Metrics) Equal(o Metrics) bool {
+	leftKeySet := []string{}
+	rightKeySet := []string{}
+	for k := range *m {
+		leftKeySet = append(leftKeySet, k)
+	}
+	for k := range o {
+		rightKeySet = append(rightKeySet, k)
+	}
+	if !reflect.DeepEqual(leftKeySet, rightKeySet) {
+		return false
+	}
+	for _, k := range leftKeySet {
+		if !(*m)[k].Equal(o[k]) {
+			return false
+		}
+	}
+	return true
+}
 
 func PrintSample(sample *model.Sample) string {
 	buf := make([]string, 0)

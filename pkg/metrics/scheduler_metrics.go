@@ -41,6 +41,10 @@ var KnownSchedulerMetrics = map[string][]string{
 
 type SchedulerMetrics Metrics
 
+func (m *SchedulerMetrics) Equal(o SchedulerMetrics) bool {
+	return (*Metrics)(m).Equal(Metrics(o))
+}
+
 func NewSchedulerMetrics() SchedulerMetrics {
 	result := NewMetrics()
 	for metric := range KnownSchedulerMetrics {
