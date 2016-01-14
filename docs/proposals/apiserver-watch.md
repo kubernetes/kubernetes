@@ -34,9 +34,9 @@ Documentation for other releases can be found at
 
 ## Abstract
 
-In the current system, all watch requests send to apiserver are in general
-redirected to etcd. This means that for every watch request to apiserver,
-apiserver opens a watch on etcd.
+In the current system, most watch requests sent to apiserver are redirected to
+etcd. This means that for every watch request the apiserver opens a watch on
+etcd.
 
 The purpose of the proposal is to improve the overall performance of the system
 by solving the following problems:
@@ -99,7 +99,7 @@ to implement the proposal.
 1. Since we want the watch in apiserver to be optional for different resource
 types, this needs to be self-contained and hidden behind a well defined API.
 This should be a layer very close to etcd - in particular all registries:
-"pkg/registry/generic/etcd" should be build on top of it.
+"pkg/registry/generic/etcd" should be built on top of it.
 We will solve it by turning tools.EtcdHelper by extracting its interface
 and treating this interface as this API - the whole watch mechanisms in
 apiserver will be hidden behind that interface.
@@ -169,8 +169,8 @@ the same time, we can introduce an additional etcd event type:
   in places like
   [Reflector](../../pkg/client/cache/reflector.go)
 
-	However, this might turn out to be unnecessary optimization if apiserver
-	will always keep up (which is possible in the new design). We will work
+  However, this might turn out to be unnecessary optimization if apiserver
+  will always keep up (which is possible in the new design). We will work
   out all necessary details at that point.
 
 
