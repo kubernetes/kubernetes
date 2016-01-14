@@ -72,7 +72,7 @@ func (plugin *secretPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts vol
 			plugin,
 			plugin.host.GetMounter(),
 			plugin.host.GetWriter(),
-			volume.MetricsNil{},
+			volume.NewCachedMetrics(volume.NewMetricsDu(getPathFromHost(plugin.host, pod.UID, spec.Name()))),
 		},
 		secretName: spec.Volume.Secret.SecretName,
 		pod:        *pod,
@@ -88,7 +88,7 @@ func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID) (volume
 			plugin,
 			plugin.host.GetMounter(),
 			plugin.host.GetWriter(),
-			volume.MetricsNil{},
+			volume.NewCachedMetrics(volume.NewMetricsDu(getPathFromHost(plugin.host, podUID, volName))),
 		},
 	}, nil
 }
@@ -99,13 +99,17 @@ type secretVolume struct {
 	plugin  *secretPlugin
 	mounter mount.Interface
 	writer  ioutil.Writer
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 var _ volume.Volume = &secretVolume{}
 
 func (sv *secretVolume) GetPath() string {
-	return sv.plugin.host.GetPodVolumeDir(sv.podUID, strings.EscapeQualifiedNameForDisk(secretPluginName), sv.volName)
+	return getPathFromHost(sv.plugin.host, sv.podUID, sv.volName)
+}
+
+func getPathFromHost(host volume.VolumeHost, podUID types.UID, volName string) string {
+	return host.GetPodVolumeDir(podUID, strings.EscapeQualifiedNameForDisk(secretPluginName), volName)
 }
 
 // secretVolumeBuilder handles retrieving secrets from the API server
