@@ -19,6 +19,8 @@ package daemon
 import (
 	"reflect"
 	"sort"
+	"strconv"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -32,9 +34,10 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	podutil "k8s.io/kubernetes/pkg/util/pod"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
-	"sync"
 )
 
 const (
@@ -370,6 +373,47 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) 
 	return nodeToDaemonPods, nil
 }
 
+func (dsc *DaemonSetsController) needsRollingUpdate(ds *extensions.DaemonSet, daemonPods []*api.Pod, numUnavailable, numNodes int) (*api.Pod, bool) {
+	maxUnavailable, isPercent, err := util.GetIntOrPercentValue(&ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable)
+	if err != nil {
+		glog.Errorf("Invalid value for MaxUnavailable: %v", err)
+		return nil, false
+	}
+	if isPercent {
+		maxUnavailable = util.GetValueFromPercent(maxUnavailable, numNodes)
+	}
+	if numUnavailable >= maxUnavailable {
+		glog.V(4).Infof("Number of unavailable DaemonSet pods: %d, exceeds allowed maximum: %d", numUnavailable, maxUnavailable)
+		return nil, false
+	}
+
+	needsUpdate := true
+	var podToRetain *api.Pod
+	newPodTemplateSpecHash := podutil.GetPodTemplateSpecHash(*ds.Spec.Template)
+	newPodTemplateSpecHashStr := strconv.FormatUint(uint64(newPodTemplateSpecHash), 10)
+	for _, daemonPod := range daemonPods {
+		curPodTemplateSpecHash, hashExists := daemonPod.ObjectMeta.Labels[ds.Spec.UniqueLabelKey]
+		if hashExists && curPodTemplateSpecHash == newPodTemplateSpecHashStr {
+			podToRetain = daemonPod
+			needsUpdate = false
+			break
+		}
+	}
+	return podToRetain, needsUpdate
+}
+
+func (dsc *DaemonSetsController) needsUpdate(ds *extensions.DaemonSet, daemonPods []*api.Pod, numUnavailable, numNodes int) (*api.Pod, bool) {
+	if daemonPods == nil {
+		return nil, false
+	}
+
+	switch ds.Spec.UpdateStrategy.Type {
+	case extensions.RollingUpdateDaemonSetStrategyType:
+		return dsc.needsRollingUpdate(ds, daemonPods, numUnavailable, numNodes)
+	}
+	return nil, false
+}
+
 func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 	// Find out which nodes are running the daemon pods selected by ds.
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
@@ -383,26 +427,53 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 	if err != nil {
 		glog.Errorf("Couldn't get list of nodes when syncing daemon set %+v: %v", ds, err)
 	}
+
 	var nodesNeedingDaemonPods, podsToDelete []string
+	numUnavailable := 0
 	for _, node := range nodeList.Items {
 		shouldRun := nodeShouldRunDaemonPod(&node, ds)
 
 		daemonPods, isRunning := nodeToDaemonPods[node.Name]
 
-		if shouldRun && !isRunning {
-			// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
-			nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
-		} else if shouldRun && len(daemonPods) > 1 {
-			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
-			// Sort the daemon pods by creation time, so the the oldest is preserved.
-			sort.Sort(podByCreationTimestamp(daemonPods))
-			for i := 1; i < len(daemonPods); i++ {
-				podsToDelete = append(podsToDelete, daemonPods[i].Name)
+		if shouldRun {
+			if !isRunning {
+				// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
+				nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
+			} else {
+				// If daemon pod is supposed to be running on node, but more than 1 daemon
+				// pod is running, we need to delete the excess daemon pods.
+				// Sort the daemon pods by creation time, so the the oldest is preserved.
+				sort.Sort(podByCreationTimestamp(daemonPods))
+				podToRetain, needsUpdate := dsc.needsUpdate(ds, daemonPods, numUnavailable, len(nodeList.Items))
+
+				if needsUpdate {
+					// If the daemon pods on this node needs update, delete all the daemon pods
+					// running on this node and schedule a new daemon pod onto this node.
+					for i := range daemonPods {
+						podsToDelete = append(podsToDelete, daemonPods[i].Name)
+					}
+					numUnavailable++
+					nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
+				} else {
+					if len(daemonPods) > 1 {
+						if podToRetain == nil {
+							podToRetain = daemonPods[0]
+						}
+						for i := 0; i < len(daemonPods); i++ {
+							if daemonPods[i].Name == podToRetain.Name {
+								continue
+							}
+							podsToDelete = append(podsToDelete, daemonPods[i].Name)
+						}
+					}
+				}
 			}
-		} else if !shouldRun && isRunning {
-			// If daemon pod isn't supposed to run on node, but it is, delete all daemon pods on node.
-			for i := range daemonPods {
-				podsToDelete = append(podsToDelete, daemonPods[i].Name)
+		} else {
+			if isRunning {
+				// If daemon pod isn't supposed to run on node, but it is, delete all daemon pods on node.
+				for i := range daemonPods {
+					podsToDelete = append(podsToDelete, daemonPods[i].Name)
+				}
 			}
 		}
 	}
@@ -432,7 +503,16 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 	for i := 0; i < createDiff; i++ {
 		go func(ix int) {
 			defer createWait.Done()
-			if err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, ds.Spec.Template, ds); err != nil {
+
+			// Make a copy
+			template := *ds.Spec.Template
+			// Add podTemplateHash to pod template labels.
+			template.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
+				ds.Spec.Template.ObjectMeta.Labels,
+				ds.Spec.UniqueLabelKey,
+				podutil.GetPodTemplateSpecHash(template))
+
+			if err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &template, ds); err != nil {
 				glog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
 				dsc.expectations.CreationObserved(dsKey)
 				util.HandleError(err)
