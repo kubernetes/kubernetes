@@ -54,7 +54,7 @@ function join_regex_no_empty() {
 # Assumes globals:
 #   $JOB_NAME
 #   $KUBERNETES_PROVIDER
-#   $GKE_DEFAULT_SKIP_TESTS
+#   $GKE_REQUIRED_SKIP_TESTS
 #   $GCE_DEFAULT_SKIP_TESTS
 #   $GCE_FLAKY_TESTS
 #   $GCE_SLOW_TESTS
@@ -87,7 +87,7 @@ function configure_upgrade_step() {
         ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
         )"
   local -r gke_test_args="--ginkgo.skip=$(join_regex_allow_empty \
-        ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
+        ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
         ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
         ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
         ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
@@ -286,13 +286,6 @@ GKE_REQUIRED_SKIP_TESTS=(
     # Alpha features, remove from skip when these move to beta
     "Daemon\sset"
     "Deployment"
-    )
-
-# Specialized tests which should be skipped by default for GKE.
-GKE_DEFAULT_SKIP_TESTS=(
-    # Perf test, slow by design
-    "resource\susage\stracking"
-    "${GKE_REQUIRED_SKIP_TESTS[@]}"
     )
 
 # Tests which cannot be run on AWS.
@@ -633,9 +626,10 @@ case ${JOB_NAME} in
     : ${PROJECT:="k8s-jkns-e2e-gke-ci"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.skip=$(join_regex_allow_empty \
-          ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
+          ${GCE_SLOW_TESTS[@]:+${GCE_SLOW_TESTS[@]}} \
           )"}
     ;;
 
@@ -651,7 +645,7 @@ case ${JOB_NAME} in
           ) --ginkgo.skip=$(join_regex_no_empty \
           ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
           ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          ${GKE_DEFAULT_SKIP_TESTS[@]:+${GKE_DEFAULT_SKIP_TESTS[@]}} \
+          ${GKE_REQUIRED_SKIP_TESTS[@]:+${GKE_REQUIRED_SKIP_TESTS[@]}} \
           )"}
     ;;
 
