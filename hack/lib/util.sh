@@ -153,8 +153,11 @@ kube::util::host_platform() {
     s390x*)
       host_arch=s390x
       ;;
+    ppc64le*)
+      host_arch=ppc64le
+      ;;
     *)	
-      kube::log::error "Unsupported host arch. Must be x86_64, 386, arm or s390x."
+      kube::log::error "Unsupported host arch. Must be x86_64, 386, arm, s390x or ppc64le."
       exit 1
       ;;
   esac
@@ -171,17 +174,6 @@ kube::util::find-binary() {
   )
   local bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
   echo -n "${bin}"
-}
-
-# Wait for background jobs to finish. Return with
-# an error status if any of the jobs failed.
-kube::util::wait-for-jobs() {
-  local fail=0
-  local job
-  for job in $(jobs -p); do
-    wait "${job}" || fail=$((fail + 1))
-  done
-  return ${fail}
 }
 
 # Run all known doc generators (today gendocs, genman, and genbashcomp for kubectl)

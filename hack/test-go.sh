@@ -39,6 +39,7 @@ kube::test::find_dirs() {
           -o -path './test/e2e/*' \
           -o -path './test/e2e_node/*' \
           -o -path './test/integration/*' \
+          -o -path './test/component/scheduler/perf/*' \
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | sort -u
   )

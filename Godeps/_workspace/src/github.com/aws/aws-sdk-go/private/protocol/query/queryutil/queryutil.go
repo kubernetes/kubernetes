@@ -72,7 +72,7 @@ func (q *queryParser) parseStruct(v url.Values, value reflect.Value, prefix stri
 			continue // ignore unexported fields
 		}
 
-		value := elemOf(value.Field(i))
+		elemValue := elemOf(value.Field(i))
 		field := t.Field(i)
 		var name string
 
@@ -97,7 +97,7 @@ func (q *queryParser) parseStruct(v url.Values, value reflect.Value, prefix stri
 			name = prefix + "." + name
 		}
 
-		if err := q.parseValue(v, value, name, field.Tag); err != nil {
+		if err := q.parseValue(v, elemValue, name, field.Tag); err != nil {
 			return err
 		}
 	}

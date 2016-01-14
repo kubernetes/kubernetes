@@ -23,14 +23,15 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/docker/libcontainer/cgroups"
-	"github.com/fsouza/go-dockerclient"
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils"
+
+	"github.com/fsouza/go-dockerclient"
+	"github.com/golang/glog"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
 var ArgDockerEndpoint = flag.String("docker", "unix:///var/run/docker.sock", "docker endpoint")
@@ -46,6 +47,8 @@ var dockerRunDir = flag.String("docker_run", "/var/run/docker", "Absolute path t
 // --cgroup-parent have another prefix than 'docker'
 var dockerCgroupRegexp = regexp.MustCompile(`.+-([a-z0-9]{64})\.scope$`)
 
+var noSystemd = flag.Bool("nosystemd", false, "Explicitly disable systemd support for Docker containers")
+
 // TODO(vmarmol): Export run dir too for newer Dockers.
 // Directory holding Docker container state information.
 func DockerStateDir() string {
@@ -53,13 +56,14 @@ func DockerStateDir() string {
 }
 
 // Whether the system is using Systemd.
-var useSystemd bool
+var useSystemd = false
 var check = sync.Once{}
 
 func UseSystemd() bool {
 	check.Do(func() {
-		useSystemd = false
-
+		if *noSystemd {
+			return
+		}
 		// Check for system.slice in systemd and cpu cgroup.
 		for _, cgroupType := range []string{"name=systemd", "cpu"} {
 			mnt, err := cgroups.FindCgroupMountpoint(cgroupType)
@@ -84,8 +88,10 @@ func RootDir() string {
 type storageDriver string
 
 const (
+	// TODO: Add support for devicemapper storage usage.
 	devicemapperStorageDriver storageDriver = "devicemapper"
 	aufsStorageDriver         storageDriver = "aufs"
+	overlayStorageDriver      storageDriver = "overlay"
 )
 
 type dockerFactory struct {
@@ -169,9 +175,12 @@ func (self *dockerFactory) DebugInfo() map[string][]string {
 	return map[string][]string{}
 }
 
+var (
+	version_regexp_string = `(\d+)\.(\d+)\.(\d+)`
+	version_re            = regexp.MustCompile(version_regexp_string)
+)
+
 func parseDockerVersion(full_version_string string) ([]int, error) {
-	version_regexp_string := "(\\d+)\\.(\\d+)\\.(\\d+)"
-	version_re := regexp.MustCompile(version_regexp_string)
 	matches := version_re.FindAllStringSubmatch(full_version_string, -1)
 	if len(matches) != 1 {
 		return nil, fmt.Errorf("version string \"%v\" doesn't match expected regular expression: \"%v\"", full_version_string, version_regexp_string)

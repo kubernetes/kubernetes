@@ -53,7 +53,7 @@ result=""
 function depends {
   file=${generated_files[$1]//\.generated\.go/.go}
   deps=$(go list -f "{{.Deps}}" ${file} | tr "[" " " | tr "]" " ")
-  fullpath=$(readlink -f ${generated_files[$2]//\.generated\.go/.go})
+  fullpath=$(readlinkdashf "${generated_files[$2]//\.generated\.go/.go}")
   candidate=$(dirname "${fullpath}")
   result=false
   for dep in ${deps}; do
@@ -83,18 +83,8 @@ for (( i=0; i<number; i++ )); do
 done
 index=(${result})
 
-# Build codecgen from Godeps.
-# However, we need to install godep first.
-# We make some tricks with GOPATH variable to make it work with Travis.
-_gopath=${GOPATH}
-export GOPATH="${_tmpdir}"
-go get -u github.com/tools/godep 2>/dev/null
-go install github.com/tools/godep 2>/dev/null
-GODEP="${_tmpdir}/bin/godep"
-export GOPATH=${_gopath}
-
 CODECGEN="${_tmpdir}/codecgen_binary"
-${GODEP} go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
+godep go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
 
 # Generate files in the dependency order.
 for current in ${index[@]}; do

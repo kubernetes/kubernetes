@@ -33,16 +33,17 @@ var UnstructuredJSONScheme ObjectDecoder = unstructuredJSONScheme{}
 type unstructuredJSONScheme struct{}
 
 var _ Decoder = unstructuredJSONScheme{}
+var _ ObjectDecoder = unstructuredJSONScheme{}
 
 // Recognizes returns true for any version or kind that is specified (internal
 // versions are specifically excluded).
-func (unstructuredJSONScheme) Recognizes(version, kind string) bool {
-	return len(version) > 0 && len(kind) > 0
+func (unstructuredJSONScheme) Recognizes(gvk unversioned.GroupVersionKind) bool {
+	return !gvk.GroupVersion().IsEmpty() && len(gvk.Kind) > 0
 }
 
 func (s unstructuredJSONScheme) Decode(data []byte) (Object, error) {
 	unstruct := &Unstructured{}
-	if err := s.DecodeInto(data, unstruct); err != nil {
+	if err := DecodeInto(s, data, unstruct); err != nil {
 		return nil, err
 	}
 	return unstruct, nil
@@ -90,16 +91,22 @@ func (unstructuredJSONScheme) DecodeParametersInto(paramaters url.Values, obj Ob
 	return nil
 }
 
-func (unstructuredJSONScheme) DataVersionAndKind(data []byte) (version, kind string, err error) {
+func (unstructuredJSONScheme) DataKind(data []byte) (unversioned.GroupVersionKind, error) {
 	obj := TypeMeta{}
 	if err := json.Unmarshal(data, &obj); err != nil {
-		return "", "", err
+		return unversioned.GroupVersionKind{}, err
 	}
 	if len(obj.APIVersion) == 0 {
-		return "", "", conversion.NewMissingVersionErr(string(data))
+		return unversioned.GroupVersionKind{}, conversion.NewMissingVersionErr(string(data))
 	}
 	if len(obj.Kind) == 0 {
-		return "", "", conversion.NewMissingKindErr(string(data))
+		return unversioned.GroupVersionKind{}, conversion.NewMissingKindErr(string(data))
 	}
-	return obj.APIVersion, obj.Kind, nil
+
+	gv, err := unversioned.ParseGroupVersion(obj.APIVersion)
+	if err != nil {
+		return unversioned.GroupVersionKind{}, err
+	}
+
+	return gv.WithKind(obj.Kind), nil
 }

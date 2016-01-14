@@ -67,10 +67,6 @@ def get_all_files(rootdir):
             files.remove('known-flags.txt')
 
         for name in files:
-            if name.endswith(".svg"):
-                continue
-            if name.endswith(".gliffy"):
-                continue
             pathname = os.path.join(root, name)
             if is_binary(pathname):
                 continue
@@ -86,6 +82,10 @@ def normalize_files(rootdir, files):
         if f.endswith(".svg"):
             continue
         if f.endswith(".gliffy"):
+            continue
+        if f.endswith(".md"):
+            continue
+        if f.endswith(".yaml"):
             continue
         newfiles.append(f)
     for i, f in enumerate(newfiles):
@@ -105,9 +105,6 @@ def line_has_bad_flag(line, flagre):
         if "pillar[" + result + "]" in line:
             return False
         if "grains" + result in line:
-            return False
-        # These are usually yaml definitions
-        if result.endswith(":"):
             return False
          # something common in juju variables...
         if "template_data[" + result + "]" in line:

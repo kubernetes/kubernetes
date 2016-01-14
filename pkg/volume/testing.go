@@ -18,10 +18,14 @@ package volume
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
@@ -117,13 +121,17 @@ func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 type FakeVolumePlugin struct {
 	PluginName string
 	Host       VolumeHost
+	Config     VolumeConfig
 }
 
 var _ VolumePlugin = &FakeVolumePlugin{}
 var _ RecyclableVolumePlugin = &FakeVolumePlugin{}
+var _ DeletableVolumePlugin = &FakeVolumePlugin{}
+var _ ProvisionableVolumePlugin = &FakeVolumePlugin{}
 
-func (plugin *FakeVolumePlugin) Init(host VolumeHost) {
+func (plugin *FakeVolumePlugin) Init(host VolumeHost) error {
 	plugin.Host = host
+	return nil
 }
 
 func (plugin *FakeVolumePlugin) Name() string {
@@ -136,19 +144,23 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 }
 
 func (plugin *FakeVolumePlugin) NewBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions) (Builder, error) {
-	return &FakeVolume{pod.UID, spec.Name(), plugin}, nil
+	return &FakeVolume{pod.UID, spec.Name(), plugin, MetricsNil{}}, nil
 }
 
 func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID) (Cleaner, error) {
-	return &FakeVolume{podUID, volName, plugin}, nil
+	return &FakeVolume{podUID, volName, plugin, MetricsNil{}}, nil
 }
 
 func (plugin *FakeVolumePlugin) NewRecycler(spec *Spec) (Recycler, error) {
-	return &fakeRecycler{"/attributesTransferredFromSpec"}, nil
+	return &fakeRecycler{"/attributesTransferredFromSpec", MetricsNil{}}, nil
 }
 
 func (plugin *FakeVolumePlugin) NewDeleter(spec *Spec) (Deleter, error) {
-	return &FakeDeleter{"/attributesTransferredFromSpec"}, nil
+	return &FakeDeleter{"/attributesTransferredFromSpec", MetricsNil{}}, nil
+}
+
+func (plugin *FakeVolumePlugin) NewProvisioner(options VolumeOptions) (Provisioner, error) {
+	return &FakeProvisioner{options, plugin.Host}, nil
 }
 
 func (plugin *FakeVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -159,6 +171,7 @@ type FakeVolume struct {
 	PodUID  types.UID
 	VolName string
 	Plugin  *FakeVolumePlugin
+	MetricsNil
 }
 
 func (_ *FakeVolume) GetAttributes() Attributes {
@@ -192,6 +205,7 @@ func (fv *FakeVolume) TearDownAt(dir string) error {
 
 type fakeRecycler struct {
 	path string
+	MetricsNil
 }
 
 func (fr *fakeRecycler) Recycle() error {
@@ -214,6 +228,7 @@ func NewFakeRecycler(spec *Spec, host VolumeHost, config VolumeConfig) (Recycler
 
 type FakeDeleter struct {
 	path string
+	MetricsNil
 }
 
 func (fd *FakeDeleter) Delete() error {
@@ -223,4 +238,56 @@ func (fd *FakeDeleter) Delete() error {
 
 func (fd *FakeDeleter) GetPath() string {
 	return fd.path
+}
+
+type FakeProvisioner struct {
+	Options VolumeOptions
+	Host    VolumeHost
+}
+
+func (fc *FakeProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
+	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", util.NewUUID())
+	return &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "pv-fakeplugin-",
+			Annotations: map[string]string{
+				"kubernetes.io/createdby": "fakeplugin-provisioner",
+			},
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeReclaimPolicy: fc.Options.PersistentVolumeReclaimPolicy,
+			AccessModes:                   fc.Options.AccessModes,
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): fc.Options.Capacity,
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: fullpath,
+				},
+			},
+		},
+	}, nil
+}
+
+func (fc *FakeProvisioner) Provision(pv *api.PersistentVolume) error {
+	return nil
+}
+
+// FindEmptyDirectoryUsageOnTmpfs finds the expected usage of an empty directory existing on
+// a tmpfs filesystem on this system.
+func FindEmptyDirectoryUsageOnTmpfs() (*resource.Quantity, error) {
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "metrics_du_test")
+	if err != nil {
+		return nil, err
+	}
+	out, err := exec.Command("nice", "-n", "19", "du", "-s", "-B", "1", tmpDir).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed command 'du' on %s with error %v", tmpDir, err)
+	}
+	used, err := resource.ParseQuantity(strings.Fields(string(out))[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse 'du' output %s due to error %v", out, err)
+	}
+	used.Format = resource.BinarySI
+	return used, nil
 }

@@ -128,18 +128,22 @@ func GetTestScheme() *Scheme {
 
 type testMetaFactory struct{}
 
-func (testMetaFactory) Interpret(data []byte) (version, kind string, err error) {
+func (testMetaFactory) Interpret(data []byte) (unversioned.GroupVersionKind, error) {
 	findKind := struct {
 		APIVersion string `json:"myVersionKey,omitempty"`
 		ObjectKind string `json:"myKindKey,omitempty"`
 	}{}
 	// yaml is a superset of json, so we use it to decode here. That way,
 	// we understand both.
-	err = yaml.Unmarshal(data, &findKind)
+	err := yaml.Unmarshal(data, &findKind)
 	if err != nil {
-		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
+		return unversioned.GroupVersionKind{}, fmt.Errorf("couldn't get version/kind: %v", err)
 	}
-	return findKind.APIVersion, findKind.ObjectKind, nil
+	gv, err := unversioned.ParseGroupVersion(findKind.APIVersion)
+	if err != nil {
+		return unversioned.GroupVersionKind{}, err
+	}
+	return gv.WithKind(findKind.ObjectKind), nil
 }
 
 func (testMetaFactory) Update(version, kind string, obj interface{}) error {

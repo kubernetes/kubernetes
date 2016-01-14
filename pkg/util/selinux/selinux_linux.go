@@ -19,7 +19,7 @@ limitations under the License.
 package selinux
 
 import (
-	"github.com/docker/libcontainer/selinux"
+	"github.com/opencontainers/runc/libcontainer/selinux"
 )
 
 type realChconRunner struct{}

@@ -18,6 +18,7 @@ package prober
 
 import (
 	"reflect"
+	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -119,4 +120,22 @@ type fakeExecProber struct {
 
 func (p fakeExecProber) Probe(_ exec.Cmd) (probe.Result, string, error) {
 	return p.result, "", p.err
+}
+
+type syncExecProber struct {
+	sync.RWMutex
+	fakeExecProber
+}
+
+func (p *syncExecProber) set(result probe.Result, err error) {
+	p.Lock()
+	defer p.Unlock()
+	p.result = result
+	p.err = err
+}
+
+func (p *syncExecProber) Probe(cmd exec.Cmd) (probe.Result, string, error) {
+	p.RLock()
+	defer p.RUnlock()
+	return p.fakeExecProber.Probe(cmd)
 }

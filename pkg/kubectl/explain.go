@@ -25,25 +25,15 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 var allModels = make(map[string]*swagger.NamedModel)
 var recursive = false // this is global for convenience, can become int for multiple levels
 
-// GetSwaggerSchema returns the swagger spec from master
-func GetSwaggerSchema(apiVer string, kubeClient client.Interface) (*swagger.ApiDeclaration, error) {
-	swaggerSchema, err := kubeClient.SwaggerSchema(apiVer)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't read swagger schema from server: %v", err)
-	}
-	return swaggerSchema, nil
-}
-
 // SplitAndParseResourceRequest separates the users input into a model and fields
 func SplitAndParseResourceRequest(inResource string, mapper meta.RESTMapper) (string, []string, error) {
 	inResource, fieldsPath := splitDotNotation(inResource)
-	inResource, _ = mapper.ResourceSingularizer(expandResourceShortcut(inResource))
+	inResource, _ = mapper.ResourceSingularizer(inResource)
 	return inResource, fieldsPath, nil
 }
 
@@ -62,7 +52,7 @@ func PrintModelDescription(inModel string, fieldsPath []string, w io.Writer, swa
 		}
 	}
 	if pointedModel == nil {
-		return fmt.Errorf("Requested resource: %s doesn't exist", inModel)
+		return fmt.Errorf("requested resource %q is not defined", inModel)
 	}
 
 	if len(fieldsPath) == 0 {
@@ -79,7 +69,7 @@ func PrintModelDescription(inModel string, fieldsPath []string, w io.Writer, swa
 				return printPrimitive(w, prop)
 			}
 		} else {
-			return fmt.Errorf("field: %s doesn't exist", field)
+			return fmt.Errorf("field %q does not exist", field)
 		}
 	}
 	return printModelInfo(w, pointedModel, pointedModelAsProp)

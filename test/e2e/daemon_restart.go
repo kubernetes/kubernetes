@@ -22,11 +22,9 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -171,7 +169,8 @@ func replacePods(pods []*api.Pod, store cache.Store) {
 // getContainerRestarts returns the count of container restarts across all pods matching the given labelSelector,
 // and a list of nodenames across which these containers restarted.
 func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Selector) (int, []string) {
-	pods, err := c.Pods(ns).List(labelSelector, fields.Everything(), unversioned.ListOptions{})
+	options := api.ListOptions{LabelSelector: labelSelector}
+	pods, err := c.Pods(ns).List(options)
 	expectNoError(err)
 	failedContainers := 0
 	containerRestartNodes := sets.NewString()
@@ -184,7 +183,8 @@ func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Sele
 	return failedContainers, containerRestartNodes.List()
 }
 
-var _ = Describe("DaemonRestart", func() {
+// Flaky issues #17829, #19023
+var _ = Describe("DaemonRestart [Disruptive] [Flaky]", func() {
 
 	framework := NewFramework("daemonrestart")
 	rcName := "daemonrestart" + strconv.Itoa(numPods) + "-" + string(util.NewUUID())
@@ -220,11 +220,12 @@ var _ = Describe("DaemonRestart", func() {
 		tracker = newPodTracker()
 		newPods, controller = controllerframework.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func() (runtime.Object, error) {
-					return framework.Client.Pods(ns).List(labelSelector, fields.Everything(), unversioned.ListOptions{})
+				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+					options.LabelSelector = labelSelector
+					return framework.Client.Pods(ns).List(options)
 				},
-				WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-					options.LabelSelector.Selector = labelSelector
+				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+					options.LabelSelector = labelSelector
 					return framework.Client.Pods(ns).Watch(options)
 				},
 			},

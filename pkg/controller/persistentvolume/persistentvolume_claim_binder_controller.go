@@ -23,13 +23,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/conversion"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -57,10 +54,10 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 
 	_, volumeController := framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return kubeClient.PersistentVolumes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return kubeClient.PersistentVolumes().List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return kubeClient.PersistentVolumes().Watch(options)
 			},
 		},
@@ -75,10 +72,10 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 	)
 	_, claimController := framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return kubeClient.PersistentVolumeClaims(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return kubeClient.PersistentVolumeClaims(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return kubeClient.PersistentVolumeClaims(api.NamespaceAll).Watch(options)
 			},
 		},
@@ -88,8 +85,7 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    binder.addClaim,
 			UpdateFunc: binder.updateClaim,
-			// no DeleteFunc needed.  a claim requires no clean-up.
-			// syncVolume handles the missing claim
+			DeleteFunc: binder.deleteClaim,
 		},
 	)
 
@@ -98,24 +94,32 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 
 	return binder
 }
-
 func (binder *PersistentVolumeClaimBinder) addVolume(obj interface{}) {
 	binder.lock.Lock()
 	defer binder.lock.Unlock()
-	volume := obj.(*api.PersistentVolume)
-	err := syncVolume(binder.volumeIndex, binder.client, volume)
-	if err != nil {
-		glog.Errorf("PVClaimBinder could not add volume %s: %+v", volume.Name, err)
+	pv, ok := obj.(*api.PersistentVolume)
+	if !ok {
+		glog.Errorf("Expected PersistentVolume but handler received %+v", obj)
+		return
+	}
+	if err := syncVolume(binder.volumeIndex, binder.client, pv); err != nil {
+		glog.Errorf("PVClaimBinder could not add volume %s: %+v", pv.Name, err)
 	}
 }
 
 func (binder *PersistentVolumeClaimBinder) updateVolume(oldObj, newObj interface{}) {
 	binder.lock.Lock()
 	defer binder.lock.Unlock()
-	newVolume := newObj.(*api.PersistentVolume)
-	binder.volumeIndex.Update(newVolume)
-	err := syncVolume(binder.volumeIndex, binder.client, newVolume)
-	if err != nil {
+	newVolume, ok := newObj.(*api.PersistentVolume)
+	if !ok {
+		glog.Errorf("Expected PersistentVolume but handler received %+v", newObj)
+		return
+	}
+	if err := binder.volumeIndex.Update(newVolume); err != nil {
+		glog.Errorf("Error updating volume %s in index: %v", newVolume.Name, err)
+		return
+	}
+	if err := syncVolume(binder.volumeIndex, binder.client, newVolume); err != nil {
 		glog.Errorf("PVClaimBinder could not update volume %s: %+v", newVolume.Name, err)
 	}
 }
@@ -123,16 +127,25 @@ func (binder *PersistentVolumeClaimBinder) updateVolume(oldObj, newObj interface
 func (binder *PersistentVolumeClaimBinder) deleteVolume(obj interface{}) {
 	binder.lock.Lock()
 	defer binder.lock.Unlock()
-	volume := obj.(*api.PersistentVolume)
-	binder.volumeIndex.Delete(volume)
+	volume, ok := obj.(*api.PersistentVolume)
+	if !ok {
+		glog.Errorf("Expected PersistentVolume but handler received %+v", obj)
+		return
+	}
+	if err := binder.volumeIndex.Delete(volume); err != nil {
+		glog.Errorf("Error deleting volume %s from index: %v", volume.Name, err)
+	}
 }
 
 func (binder *PersistentVolumeClaimBinder) addClaim(obj interface{}) {
 	binder.lock.Lock()
 	defer binder.lock.Unlock()
-	claim := obj.(*api.PersistentVolumeClaim)
-	err := syncClaim(binder.volumeIndex, binder.client, claim)
-	if err != nil {
+	claim, ok := obj.(*api.PersistentVolumeClaim)
+	if !ok {
+		glog.Errorf("Expected PersistentVolumeClaim but handler received %+v", obj)
+		return
+	}
+	if err := syncClaim(binder.volumeIndex, binder.client, claim); err != nil {
 		glog.Errorf("PVClaimBinder could not add claim %s: %+v", claim.Name, err)
 	}
 }
@@ -140,10 +153,39 @@ func (binder *PersistentVolumeClaimBinder) addClaim(obj interface{}) {
 func (binder *PersistentVolumeClaimBinder) updateClaim(oldObj, newObj interface{}) {
 	binder.lock.Lock()
 	defer binder.lock.Unlock()
-	newClaim := newObj.(*api.PersistentVolumeClaim)
-	err := syncClaim(binder.volumeIndex, binder.client, newClaim)
-	if err != nil {
+	newClaim, ok := newObj.(*api.PersistentVolumeClaim)
+	if !ok {
+		glog.Errorf("Expected PersistentVolumeClaim but handler received %+v", newObj)
+	}
+	if err := syncClaim(binder.volumeIndex, binder.client, newClaim); err != nil {
 		glog.Errorf("PVClaimBinder could not update claim %s: %+v", newClaim.Name, err)
+	}
+}
+
+func (binder *PersistentVolumeClaimBinder) deleteClaim(obj interface{}) {
+	binder.lock.Lock()
+	defer binder.lock.Unlock()
+	var volume *api.PersistentVolume
+	if pvc, ok := obj.(*api.PersistentVolumeClaim); ok {
+		if pvObj, exists, _ := binder.volumeIndex.GetByKey(pvc.Spec.VolumeName); exists {
+			if pv, ok := pvObj.(*api.PersistentVolume); ok {
+				volume = pv
+			}
+		}
+	}
+	if unk, ok := obj.(cache.DeletedFinalStateUnknown); ok && unk.Obj != nil {
+		if pv, ok := unk.Obj.(*api.PersistentVolume); ok {
+			volume = pv
+		}
+	}
+
+	// sync the volume when its claim is deleted.  Explicitly sync'ing the volume here in response to
+	// claim deletion prevents the volume from waiting until the next sync period for its Release.
+	if volume != nil {
+		err := syncVolume(binder.volumeIndex, binder.client, volume)
+		if err != nil {
+			glog.Errorf("PVClaimBinder could not update volume %s from deleteClaim handler: %+v", volume.Name, err)
+		}
 	}
 }
 
@@ -166,6 +208,11 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 	}
 	if !exists {
 		volumeIndex.Add(volume)
+	}
+
+	if isBeingProvisioned(volume) {
+		glog.V(4).Infof("Skipping PersistentVolume[%s], waiting for provisioning to finish", volume.Name)
+		return nil
 	}
 
 	switch currentPhase {
@@ -277,38 +324,46 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 
 	switch claim.Status.Phase {
 	case api.ClaimPending:
+		// claims w/ a storage-class annotation for provisioning with *only* match volumes with a ClaimRef of the claim.
 		volume, err := volumeIndex.findBestMatchForClaim(claim)
 		if err != nil {
 			return err
 		}
+
 		if volume == nil {
 			glog.V(5).Infof("A volume match does not exist for persistent claim: %s", claim.Name)
 			return nil
 		}
 
-		// create a reference to the claim and assign it to the volume being bound.
-		// the volume is a pointer and assigning the reference fixes a race condition where another
-		// claim might match this volume but before the claimRef is persistent in the next case statement
+		if isBeingProvisioned(volume) {
+			glog.V(5).Infof("PersistentVolume[%s] for PersistentVolumeClaim[%s/%s] is still being provisioned.", volume.Name, claim.Namespace, claim.Name)
+			return nil
+		}
+
 		claimRef, err := api.GetReference(claim)
 		if err != nil {
 			return fmt.Errorf("Unexpected error getting claim reference: %v\n", err)
 		}
 
-		// make a binding reference to the claim and ensure to update the local index to prevent dupe bindings
-		clone, err := conversion.NewCloner().DeepCopy(volume)
-		if err != nil {
-			return fmt.Errorf("Error cloning pv: %v", err)
-		}
-		volumeClone, ok := clone.(*api.PersistentVolume)
-		if !ok {
-			return fmt.Errorf("Unexpected pv cast error : %v\n", volumeClone)
-		}
-		volumeClone.Spec.ClaimRef = claimRef
-		if updatedVolume, err := binderClient.UpdatePersistentVolume(volumeClone); err != nil {
-			return fmt.Errorf("Unexpected error saving PersistentVolume.Status: %+v", err)
-		} else {
-			volume = updatedVolume
-			volumeIndex.Update(updatedVolume)
+		// Make a binding reference to the claim by persisting claimRef on the volume.
+		// The local cache must be updated with the new bind to prevent subsequent
+		// claims from binding to the volume.
+		if volume.Spec.ClaimRef == nil {
+			clone, err := conversion.NewCloner().DeepCopy(volume)
+			if err != nil {
+				return fmt.Errorf("Error cloning pv: %v", err)
+			}
+			volumeClone, ok := clone.(*api.PersistentVolume)
+			if !ok {
+				return fmt.Errorf("Unexpected pv cast error : %v\n", volumeClone)
+			}
+			volumeClone.Spec.ClaimRef = claimRef
+			if updatedVolume, err := binderClient.UpdatePersistentVolume(volumeClone); err != nil {
+				return fmt.Errorf("Unexpected error saving PersistentVolume.Status: %+v", err)
+			} else {
+				volume = updatedVolume
+				volumeIndex.Update(updatedVolume)
+			}
 		}
 
 		// the bind is persisted on the volume above and will always match the claim in a search.
@@ -341,6 +396,14 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 
 	glog.V(5).Infof("PersistentVolumeClaim[%s] is bound\n", claim.Name)
 	return nil
+}
+
+func isBeingProvisioned(volume *api.PersistentVolume) bool {
+	value, found := volume.Annotations[pvProvisioningRequiredAnnotationKey]
+	if found && value != pvProvisioningCompletedAnnotationValue {
+		return true
+	}
+	return false
 }
 
 // Run starts all of this binder's control loops

@@ -18,11 +18,13 @@ package client
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/transport"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
@@ -96,6 +98,9 @@ func NewStaticKubeletClient(config *KubeletClientConfig) (KubeletClient, error) 
 
 // In default HTTPKubeletClient ctx is unused.
 func (c *HTTPKubeletClient) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
+	if ok, msg := validation.ValidateNodeName(nodeName, false); !ok {
+		return "", 0, nil, fmt.Errorf("invalid node name: %s", msg)
+	}
 	scheme := "http"
 	if c.Config.EnableHttps {
 		scheme = "https"

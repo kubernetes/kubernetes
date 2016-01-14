@@ -146,7 +146,8 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			stream := <-streamCh
 			io.Copy(stream, stream)
 		}))
-		defer server.Close()
+		// TODO: Uncomment when fix #19254
+		// defer server.Close()
 
 		req, err := http.NewRequest("GET", server.URL, nil)
 		if err != nil {

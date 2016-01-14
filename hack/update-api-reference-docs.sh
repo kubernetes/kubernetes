@@ -56,11 +56,11 @@ if [[ $(uname) == "Darwin" ]]; then
   user_flags=""
 fi 
 
-docker run ${user_flags} --rm -v $V1_TMP_IN_HOST:/output:z -v ${SWAGGER_PATH}:/swagger-source:z gcr.io/google_containers/gen-swagger-docs:v4.1 \
+docker run ${user_flags} --rm -v $V1_TMP_IN_HOST:/output:z -v ${SWAGGER_PATH}:/swagger-source:z gcr.io/google_containers/gen-swagger-docs:v4.2 \
     v1 \
     https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/api/v1/register.go
 
-docker run ${user_flags} --rm -v $V1BETA1_TMP_IN_HOST:/output:z -v ${SWAGGER_PATH}:/swagger-source:z gcr.io/google_containers/gen-swagger-docs:v4.1 \
+docker run ${user_flags} --rm -v $V1BETA1_TMP_IN_HOST:/output:z -v ${SWAGGER_PATH}:/swagger-source:z gcr.io/google_containers/gen-swagger-docs:v4.2 \
     v1beta1 \
     https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/apis/extensions/v1beta1/register.go
 

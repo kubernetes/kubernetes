@@ -17,11 +17,13 @@ limitations under the License.
 package rest
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // RESTUpdateStrategy defines the minimum validation, accepted input, and
@@ -42,7 +44,7 @@ type RESTUpdateStrategy interface {
 	// ValidateUpdate is invoked after default fields in the object have been
 	// filled in before the object is persisted.  This method should not mutate
 	// the object.
-	ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList
+	ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList
 	// Canonicalize is invoked after validation has succeeded but before the
 	// object has been persisted.  This method may mutate the object.
 	Canonicalize(obj runtime.Object)
@@ -53,19 +55,19 @@ type RESTUpdateStrategy interface {
 }
 
 // TODO: add other common fields that require global validation.
-func validateCommonFields(obj, old runtime.Object) utilvalidation.ErrorList {
-	allErrs := utilvalidation.ErrorList{}
+func validateCommonFields(obj, old runtime.Object) (field.ErrorList, error) {
+	allErrs := field.ErrorList{}
 	objectMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
-		return append(allErrs, utilvalidation.NewInternalError("metadata", err))
+		return nil, fmt.Errorf("failed to get new object metadata: %v", err)
 	}
 	oldObjectMeta, err := api.ObjectMetaFor(old)
 	if err != nil {
-		return append(allErrs, utilvalidation.NewInternalError("metadata", err))
+		return nil, fmt.Errorf("failed to get old object metadata: %v", err)
 	}
-	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(objectMeta, oldObjectMeta)...)
+	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(objectMeta, oldObjectMeta, field.NewPath("metadata"))...)
 
-	return allErrs
+	return allErrs, nil
 }
 
 // BeforeUpdate ensures that common operations for all resources are performed on update. It only returns
@@ -87,11 +89,14 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx api.Context, obj, old runtime
 	strategy.PrepareForUpdate(obj, old)
 
 	// Ensure some common fields, like UID, are validated for all resources.
-	errs := validateCommonFields(obj, old)
+	errs, err := validateCommonFields(obj, old)
+	if err != nil {
+		return errors.NewInternalError(err)
+	}
 
 	errs = append(errs, strategy.ValidateUpdate(ctx, obj, old)...)
 	if len(errs) > 0 {
-		return errors.NewInvalid(kind, objectMeta.Name, errs)
+		return errors.NewInvalid(kind.GroupKind(), objectMeta.Name, errs)
 	}
 
 	strategy.Canonicalize(obj)

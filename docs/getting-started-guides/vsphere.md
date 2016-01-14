@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/vsphere.md).
@@ -48,7 +49,7 @@ convenient).
 ### Prerequisites
 
 1. You need administrator credentials to an ESXi machine or vCenter instance.
-2. You must have Go (version 1.2 or later) installed: [www.golang.org](http://www.golang.org).
+2. You must have Go (see [here](../devel/development.md#go-versions) for supported versions) installed: [www.golang.org](http://www.golang.org).
 3. You must have your `GOPATH` set up and include `$GOPATH/bin` in your `PATH`.
 
    ```sh

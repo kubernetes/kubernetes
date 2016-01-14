@@ -24,10 +24,8 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -46,7 +44,7 @@ const (
 	// flag value affects all the e2e tests. So we are hard-coding this value for now.
 	lowDiskSpaceThreshold uint64 = 256 * mb
 
-	nodeOODTimeOut = 1 * time.Minute
+	nodeOODTimeOut = 5 * time.Minute
 
 	numNodeOODPods = 3
 )
@@ -65,7 +63,8 @@ const (
 //    choose that node to be node with index 1.
 // 7. Observe that the pod in pending status schedules on that node.
 //
-var _ = Describe("NodeOutOfDisk", func() {
+// Flaky issue #17687
+var _ = Describe("NodeOutOfDisk [Serial] [Flaky]", func() {
 	var c *client.Client
 	var unfilledNodeName, recoveredNodeName string
 	framework := Framework{BaseName: "node-outofdisk"}
@@ -74,8 +73,7 @@ var _ = Describe("NodeOutOfDisk", func() {
 		framework.beforeEach()
 		c = framework.Client
 
-		nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
-		expectNoError(err, "Error retrieving nodes")
+		nodelist := ListSchedulableNodesOrDie(c)
 		Expect(len(nodelist.Items)).To(BeNumerically(">", 1))
 
 		unfilledNodeName = nodelist.Items[0].Name
@@ -87,8 +85,7 @@ var _ = Describe("NodeOutOfDisk", func() {
 	AfterEach(func() {
 		defer framework.afterEach()
 
-		nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
-		expectNoError(err, "Error retrieving nodes")
+		nodelist := ListSchedulableNodesOrDie(c)
 		Expect(len(nodelist.Items)).ToNot(BeZero())
 		for _, node := range nodelist.Items {
 			if unfilledNodeName == node.Name || recoveredNodeName == node.Name {
@@ -133,16 +130,15 @@ var _ = Describe("NodeOutOfDisk", func() {
 
 		By(fmt.Sprintf("Finding a failed scheduler event for pod %s", pendingPodName))
 		wait.Poll(2*time.Second, 5*time.Minute, func() (bool, error) {
-			schedEvents, err := c.Events(ns).List(
-				labels.Everything(),
-				fields.Set{
-					"involvedObject.kind":      "Pod",
-					"involvedObject.name":      pendingPodName,
-					"involvedObject.namespace": ns,
-					"source":                   "scheduler",
-					"reason":                   "FailedScheduling",
-				}.AsSelector(),
-				unversioned.ListOptions{})
+			selector := fields.Set{
+				"involvedObject.kind":      "Pod",
+				"involvedObject.name":      pendingPodName,
+				"involvedObject.namespace": ns,
+				"source":                   api.DefaultSchedulerName,
+				"reason":                   "FailedScheduling",
+			}.AsSelector()
+			options := api.ListOptions{FieldSelector: selector}
+			schedEvents, err := c.Events(ns).List(options)
 			expectNoError(err)
 
 			if len(schedEvents.Items) > 0 {
@@ -152,8 +148,7 @@ var _ = Describe("NodeOutOfDisk", func() {
 			}
 		})
 
-		nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
-		expectNoError(err, "Error retrieving nodes")
+		nodelist := ListSchedulableNodesOrDie(c)
 		Expect(len(nodelist.Items)).To(BeNumerically(">", 1))
 
 		nodeToRecover := nodelist.Items[1]
@@ -203,7 +198,9 @@ func createOutOfDiskPod(c *client.Client, ns, name string, milliCPU int64) {
 func availCpu(c *client.Client, node *api.Node) (int64, error) {
 	podClient := c.Pods(api.NamespaceAll)
 
-	pods, err := podClient.List(labels.Everything(), fields.Set{"spec.nodeName": node.Name}.AsSelector(), unversioned.ListOptions{})
+	selector := fields.Set{"spec.nodeName": node.Name}.AsSelector()
+	options := api.ListOptions{FieldSelector: selector}
+	pods, err := podClient.List(options)
 	if err != nil {
 		return 0, fmt.Errorf("failed to retrieve all the pods on node %s: %v", node.Name, err)
 	}

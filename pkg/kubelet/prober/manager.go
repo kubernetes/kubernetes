@@ -25,7 +25,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -52,6 +52,9 @@ type Manager interface {
 	// UpdatePodStatus modifies the given PodStatus with the appropriate Ready state for each
 	// container based on container running status, cached probe results and worker states.
 	UpdatePodStatus(types.UID, *api.PodStatus)
+
+	// Start starts the Manager sync loops.
+	Start()
 }
 
 type manager struct {
@@ -79,20 +82,22 @@ func NewManager(
 	runner kubecontainer.ContainerCommandRunner,
 	refManager *kubecontainer.RefManager,
 	recorder record.EventRecorder) Manager {
+
 	prober := newProber(runner, refManager, recorder)
 	readinessManager := results.NewManager()
-	m := &manager{
+	return &manager{
 		statusManager:    statusManager,
 		prober:           prober,
 		readinessManager: readinessManager,
 		livenessManager:  livenessManager,
 		workers:          make(map[probeKey]*worker),
 	}
+}
 
+// Start syncing probe status. This should only be called once.
+func (m *manager) Start() {
 	// Start syncing readiness.
 	go util.Forever(m.updateReadiness, 0)
-
-	return m
 }
 
 // Key uniquely identifying container probes
@@ -134,7 +139,7 @@ func (m *manager) AddPod(pod *api.Pod) {
 			key.probeType = readiness
 			if _, ok := m.workers[key]; ok {
 				glog.Errorf("Readiness probe already exists! %v - %v",
-					kubeutil.FormatPodName(pod), c.Name)
+					format.Pod(pod), c.Name)
 				return
 			}
 			w := newWorker(m, readiness, pod, c)
@@ -146,7 +151,7 @@ func (m *manager) AddPod(pod *api.Pod) {
 			key.probeType = liveness
 			if _, ok := m.workers[key]; ok {
 				glog.Errorf("Liveness probe already exists! %v - %v",
-					kubeutil.FormatPodName(pod), c.Name)
+					format.Pod(pod), c.Name)
 				return
 			}
 			w := newWorker(m, liveness, pod, c)
@@ -216,6 +221,13 @@ func (m *manager) removeWorker(podUID types.UID, containerName string, probeType
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
 	delete(m.workers, probeKey{podUID, containerName, probeType})
+}
+
+// workerCount returns the total number of probe workers. For testing.
+func (m *manager) workerCount() int {
+	m.workerLock.Lock()
+	defer m.workerLock.Unlock()
+	return len(m.workers)
 }
 
 func (m *manager) updateReadiness() {

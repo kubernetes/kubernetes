@@ -46,8 +46,9 @@ const (
 	fcPluginName = "kubernetes.io/fc"
 )
 
-func (plugin *fcPlugin) Init(host volume.VolumeHost) {
+func (plugin *fcPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *fcPlugin) Name() string {
@@ -107,11 +108,11 @@ func (plugin *fcPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, 
 			wwns:    fc.TargetWWNs,
 			lun:     lun,
 			manager: manager,
-			mounter: &mount.SafeFormatAndMount{mounter, exec.New()},
 			io:      &osIOHandler{},
 			plugin:  plugin},
 		fsType:   fc.FSType,
 		readOnly: readOnly,
+		mounter:  &mount.SafeFormatAndMount{mounter, exec.New()},
 	}, nil
 }
 
@@ -121,14 +122,16 @@ func (plugin *fcPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cle
 }
 
 func (plugin *fcPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
-	return &fcDiskCleaner{&fcDisk{
-		podUID:  podUID,
-		volName: volName,
-		manager: manager,
+	return &fcDiskCleaner{
+		fcDisk: &fcDisk{
+			podUID:  podUID,
+			volName: volName,
+			manager: manager,
+			plugin:  plugin,
+			io:      &osIOHandler{},
+		},
 		mounter: mounter,
-		plugin:  plugin,
-		io:      &osIOHandler{},
-	}}, nil
+	}, nil
 }
 
 func (plugin *fcPlugin) execCommand(command string, args []string) ([]byte, error) {
@@ -143,11 +146,11 @@ type fcDisk struct {
 	wwns    []string
 	lun     string
 	plugin  *fcPlugin
-	mounter mount.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
 	// io handler interface
 	io ioHandler
+	volume.MetricsNil
 }
 
 func (fc *fcDisk) GetPath() string {
@@ -160,6 +163,7 @@ type fcDiskBuilder struct {
 	*fcDisk
 	readOnly bool
 	fsType   string
+	mounter  *mount.SafeFormatAndMount
 }
 
 var _ volume.Builder = &fcDiskBuilder{}
@@ -187,6 +191,7 @@ func (b *fcDiskBuilder) SetUpAt(dir string) error {
 
 type fcDiskCleaner struct {
 	*fcDisk
+	mounter mount.Interface
 }
 
 var _ volume.Cleaner = &fcDiskCleaner{}

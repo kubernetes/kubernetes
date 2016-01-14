@@ -225,12 +225,12 @@ func NewExecutorResourceProcurer(resources []*mesos.Resource, registry executori
 			wantedCpus := sumResources(filterResources(resources, isScalar, hasName("cpus")))
 			wantedMem := sumResources(filterResources(resources, isScalar, hasName("mem")))
 
-			procuredCpu, remaining := procureScalarResources("cpus", wantedCpus, t.allowedRoles, ps.offer.GetResources())
+			procuredCpu, remaining := procureScalarResources("cpus", wantedCpus, t.frameworkRoles, ps.offer.GetResources())
 			if procuredCpu == nil {
 				return fmt.Errorf("not enough cpu resources for executor: want=%v", wantedCpus)
 			}
 
-			procuredMem, remaining := procureScalarResources("mem", wantedMem, t.allowedRoles, remaining)
+			procuredMem, remaining := procureScalarResources("mem", wantedMem, t.frameworkRoles, remaining)
 			if procuredMem == nil {
 				return fmt.Errorf("not enough mem resources for executor: want=%v", wantedMem)
 			}

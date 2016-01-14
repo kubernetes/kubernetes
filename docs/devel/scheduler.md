@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/devel/scheduler.md).
@@ -47,7 +48,7 @@ will filter out nodes that don't have at least that much resources available (co
 as the capacity of the node minus the sum of the resource requests of the containers that
 are already running on the node). Second, it applies a set of "priority functions"
 that rank the nodes that weren't filtered out by the predicate check. For example,
-it tries to spread Pods across nodes while at the same time favoring the least-loaded
+it tries to spread Pods across nodes and zones while at the same time favoring the least-loaded
 nodes (where "load" here is sum of the resource requests of the containers running on the node,
 divided by the node's capacity).
 Finally, the node with the highest priority is chosen

@@ -38,14 +38,14 @@ func TestInMemoryRegistry_RegisterGetUnregister(t *testing.T) {
 	assert.Empty(tasks)
 
 	// add a task
-	a := fakePodTask("a")
+	a := fakePodTask("a", nil, nil)
 	a_clone, err := registry.Register(a)
 	assert.NoError(err)
 	assert.Equal(a_clone.ID, a.ID)
 	assert.Equal(a_clone.podKey, a.podKey)
 
 	// add another task
-	b := fakePodTask("b")
+	b := fakePodTask("b", nil, nil)
 	b_clone, err := registry.Register(b)
 	assert.NoError(err)
 	assert.Equal(b_clone.ID, b.ID)
@@ -106,7 +106,7 @@ func TestInMemoryRegistry_RegisterGetUnregister(t *testing.T) {
 	assertContains(t, a, tasks...)
 
 	// unregister a task not registered
-	unregistered_task := fakePodTask("unregistered-task")
+	unregistered_task := fakePodTask("unregistered-task", nil, nil)
 	registry.Unregister(unregistered_task)
 }
 
@@ -124,7 +124,7 @@ func TestInMemoryRegistry_State(t *testing.T) {
 	registry := NewInMemoryRegistry()
 
 	// add a task
-	a := fakePodTask("a")
+	a := fakePodTask("a", nil, nil)
 	a_clone, err := registry.Register(a)
 	assert.NoError(err)
 	assert.Equal(a.State, a_clone.State)
@@ -167,7 +167,7 @@ func TestInMemoryRegistry_Update(t *testing.T) {
 
 	// create registry
 	registry := NewInMemoryRegistry()
-	a := fakePodTask("a")
+	a := fakePodTask("a", nil, nil)
 	registry.Register(a.Clone()) // here clone a because we change it below
 
 	// state changes are ignored
@@ -225,7 +225,7 @@ func TestInMemoryRegistry_Update(t *testing.T) {
 	assert.Error(err)
 
 	// update unknown task
-	unknown_task := fakePodTask("unknown-task")
+	unknown_task := fakePodTask("unknown-task", nil, nil)
 	err = registry.Update(unknown_task)
 	assert.Error(err)
 
@@ -256,7 +256,7 @@ func testStateTrace(t *testing.T, transitions []transition) *Registry {
 	assert := assert.New(t)
 
 	registry := NewInMemoryRegistry()
-	a := fakePodTask("a")
+	a := fakePodTask("a", nil, nil)
 	a, _ = registry.Register(a)
 
 	// initial pending state

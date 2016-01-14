@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/logging-elasticsearch.md).
@@ -77,10 +78,10 @@ $ kubectl get pods --namespace=kube-system
 NAME                                           READY     REASON    RESTARTS   AGE
 elasticsearch-logging-v1-78nog                 1/1       Running   0          2h
 elasticsearch-logging-v1-nj2nb                 1/1       Running   0          2h
-fluentd-elasticsearch-kubernetes-minion-5oq0   1/1       Running   0          2h
-fluentd-elasticsearch-kubernetes-minion-6896   1/1       Running   0          2h
-fluentd-elasticsearch-kubernetes-minion-l1ds   1/1       Running   0          2h
-fluentd-elasticsearch-kubernetes-minion-lz9j   1/1       Running   0          2h
+fluentd-elasticsearch-kubernetes-node-5oq0     1/1       Running   0          2h
+fluentd-elasticsearch-kubernetes-node-6896     1/1       Running   0          2h
+fluentd-elasticsearch-kubernetes-node-l1ds     1/1       Running   0          2h
+fluentd-elasticsearch-kubernetes-node-lz9j     1/1       Running   0          2h
 kibana-logging-v1-bhpo8                        1/1       Running   0          2h
 kube-dns-v3-7r1l9                              3/3       Running   0          2h
 monitoring-heapster-v4-yl332                   1/1       Running   1          2h

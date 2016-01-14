@@ -44,7 +44,7 @@ func (f *fakePortForwarder) ForwardPorts(method string, url *url.URL, config *cl
 }
 
 func TestPortForward(t *testing.T) {
-	version := testapi.Default.Version()
+	version := testapi.Default.GroupVersion().Version
 
 	tests := []struct {
 		name, version, podPath, pfPath, container string
@@ -114,7 +114,7 @@ func TestPortForward(t *testing.T) {
 }
 
 func TestPortForwardWithPFlag(t *testing.T) {
-	version := testapi.Default.Version()
+	version := testapi.Default.GroupVersion().Version
 
 	tests := []struct {
 		name, version, podPath, pfPath, container string

@@ -18,10 +18,11 @@ package e2e
 
 import (
 	"fmt"
-	"google.golang.org/api/googleapi"
 	mathrand "math/rand"
 	"strings"
 	"time"
+
+	"google.golang.org/api/googleapi"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -32,8 +33,6 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -54,9 +53,7 @@ var _ = Describe("Pod Disks", func() {
 		SkipUnlessNodeCountIsAtLeast(2)
 
 		podClient = framework.Client.Pods(framework.Namespace.Name)
-
-		nodes, err := framework.Client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
-		expectNoError(err, "Failed to list nodes for e2e cluster.")
+		nodes := ListSchedulableNodesOrDie(framework.Client)
 
 		Expect(len(nodes.Items)).To(BeNumerically(">=", 2), "Requires at least 2 nodes")
 
@@ -166,7 +163,7 @@ var _ = Describe("Pod Disks", func() {
 		expectNoError(podClient.Delete(host1ROPod.Name, api.NewDeleteOptions(0)), "Failed to delete host1ROPod")
 	})
 
-	It("should schedule a pod w/ a RW PD shared between multiple containers, write to PD, delete pod, verify contents, and repeat in rapid succession", func() {
+	It("should schedule a pod w/ a RW PD shared between multiple containers, write to PD, delete pod, verify contents, and repeat in rapid succession [Slow]", func() {
 		SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD")
@@ -214,7 +211,7 @@ var _ = Describe("Pod Disks", func() {
 		}
 	})
 
-	It("should schedule a pod w/two RW PDs both mounted to one container, write to PD, verify contents, delete pod, recreate pod, verify contents, and repeat in rapid succession", func() {
+	It("should schedule a pod w/two RW PDs both mounted to one container, write to PD, verify contents, delete pod, recreate pod, verify contents, and repeat in rapid succession [Slow]", func() {
 		SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD1")
@@ -328,7 +325,7 @@ func createPD() (string, error) {
 			return "", fmt.Errorf("Provider does not support volumes")
 		}
 		volumeOptions := &awscloud.VolumeOptions{}
-		volumeOptions.CapacityMB = 10 * 1024
+		volumeOptions.CapacityGB = 10
 		return volumes.CreateVolume(volumeOptions)
 	}
 }
@@ -416,7 +413,7 @@ func testPDPod(diskNames []string, targetHost string, readOnly bool, numContaine
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.GroupOrDie("").GroupVersion.Version,
+			APIVersion: latest.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: "pd-test-" + string(util.NewUUID()),

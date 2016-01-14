@@ -31,6 +31,12 @@ func (prop *ModelProperty) setMaximum(field reflect.StructField) {
 	}
 }
 
+func (prop *ModelProperty) setType(field reflect.StructField) {
+	if tag := field.Tag.Get("type"); tag != "" {
+		prop.Type = &tag
+	}
+}
+
 func (prop *ModelProperty) setMinimum(field reflect.StructField) {
 	if tag := field.Tag.Get("minimum"); tag != "" {
 		prop.Minimum = tag
@@ -56,4 +62,5 @@ func (prop *ModelProperty) setPropertyMetadata(field reflect.StructField) {
 	prop.setMaximum(field)
 	prop.setUniqueItems(field)
 	prop.setDefaultValue(field)
+	prop.setType(field)
 }

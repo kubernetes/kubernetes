@@ -378,9 +378,12 @@ func (c *simpleHTTPClient) Do(ctx context.Context, act httpAction) (*http.Respon
 		return nil, nil, err
 	}
 
-	hctx, hcancel := context.WithCancel(ctx)
+	var hctx context.Context
+	var hcancel context.CancelFunc
 	if c.headerTimeout > 0 {
 		hctx, hcancel = context.WithTimeout(ctx, c.headerTimeout)
+	} else {
+		hctx, hcancel = context.WithCancel(ctx)
 	}
 	defer hcancel()
 

@@ -78,4 +78,7 @@ type ContainerHandler interface {
 
 	// Returns whether the container still exists.
 	Exists() bool
+
+	// Cleanup frees up any resources being held like fds or go routines, etc.
+	Cleanup()
 }

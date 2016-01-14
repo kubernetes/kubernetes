@@ -5,18 +5,20 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/jmespath/go-jmespath"
 )
 
 var indexRe = regexp.MustCompile(`(.+)\[(-?\d+)?\]$`)
 
 // rValuesAtPath returns a slice of values found in value v. The values
 // in v are explored recursively so all nested values are collected.
-func rValuesAtPath(v interface{}, path string, create bool, caseSensitive bool) []reflect.Value {
+func rValuesAtPath(v interface{}, path string, createPath, caseSensitive, nilTerm bool) []reflect.Value {
 	pathparts := strings.Split(path, "||")
 	if len(pathparts) > 1 {
 		for _, pathpart := range pathparts {
-			vals := rValuesAtPath(v, pathpart, create, caseSensitive)
-			if vals != nil && len(vals) > 0 {
+			vals := rValuesAtPath(v, pathpart, createPath, caseSensitive, nilTerm)
+			if len(vals) > 0 {
 				return vals
 			}
 		}
@@ -74,7 +76,16 @@ func rValuesAtPath(v interface{}, path string, create bool, caseSensitive bool) 
 				return false
 			})
 
-			if create && value.Kind() == reflect.Ptr && value.IsNil() {
+			if nilTerm && value.Kind() == reflect.Ptr && len(components[1:]) == 0 {
+				if !value.IsNil() {
+					value.Set(reflect.Zero(value.Type()))
+				}
+				return []reflect.Value{value}
+			}
+
+			if createPath && value.Kind() == reflect.Ptr && value.IsNil() {
+				// TODO if the value is the terminus it should not be created
+				// if the value to be set to its position is nil.
 				value.Set(reflect.New(value.Type().Elem()))
 				value = value.Elem()
 			} else {
@@ -82,7 +93,7 @@ func rValuesAtPath(v interface{}, path string, create bool, caseSensitive bool) 
 			}
 
 			if value.Kind() == reflect.Slice || value.Kind() == reflect.Map {
-				if !create && value.IsNil() {
+				if !createPath && value.IsNil() {
 					value = reflect.ValueOf(nil)
 				}
 			}
@@ -114,7 +125,7 @@ func rValuesAtPath(v interface{}, path string, create bool, caseSensitive bool) 
 				// pull out index
 				i := int(*index)
 				if i >= value.Len() { // check out of bounds
-					if create {
+					if createPath {
 						// TODO resize slice
 					} else {
 						continue
@@ -125,7 +136,7 @@ func rValuesAtPath(v interface{}, path string, create bool, caseSensitive bool) 
 				value = reflect.Indirect(value.Index(i))
 
 				if value.Kind() == reflect.Slice || value.Kind() == reflect.Map {
-					if !create && value.IsNil() {
+					if !createPath && value.IsNil() {
 						value = reflect.ValueOf(nil)
 					}
 				}
@@ -142,46 +153,70 @@ func rValuesAtPath(v interface{}, path string, create bool, caseSensitive bool) 
 	return values
 }
 
-// ValuesAtPath returns a list of objects at the lexical path inside of a structure
-func ValuesAtPath(i interface{}, path string) []interface{} {
-	if rvals := rValuesAtPath(i, path, false, true); rvals != nil {
-		vals := make([]interface{}, len(rvals))
-		for i, rval := range rvals {
-			vals[i] = rval.Interface()
-		}
-		return vals
+// ValuesAtPath returns a list of values at the case insensitive lexical
+// path inside of a structure.
+func ValuesAtPath(i interface{}, path string) ([]interface{}, error) {
+	result, err := jmespath.Search(path, i)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+
+	v := reflect.ValueOf(result)
+	if !v.IsValid() || (v.Kind() == reflect.Ptr && v.IsNil()) {
+		return nil, nil
+	}
+	if s, ok := result.([]interface{}); ok {
+		return s, err
+	}
+	if v.Kind() == reflect.Map && v.Len() == 0 {
+		return nil, nil
+	}
+	if v.Kind() == reflect.Slice {
+		out := make([]interface{}, v.Len())
+		for i := 0; i < v.Len(); i++ {
+			out[i] = v.Index(i).Interface()
+		}
+		return out, nil
+	}
+
+	return []interface{}{result}, nil
 }
 
-// ValuesAtAnyPath returns a list of objects at the case-insensitive lexical
-// path inside of a structure
-func ValuesAtAnyPath(i interface{}, path string) []interface{} {
-	if rvals := rValuesAtPath(i, path, false, false); rvals != nil {
-		vals := make([]interface{}, len(rvals))
-		for i, rval := range rvals {
-			vals[i] = rval.Interface()
-		}
-		return vals
-	}
-	return nil
-}
-
-// SetValueAtPath sets an object at the lexical path inside of a structure
+// SetValueAtPath sets a value at the case insensitive lexical path inside
+// of a structure.
 func SetValueAtPath(i interface{}, path string, v interface{}) {
-	if rvals := rValuesAtPath(i, path, true, true); rvals != nil {
+	if rvals := rValuesAtPath(i, path, true, false, v == nil); rvals != nil {
 		for _, rval := range rvals {
-			rval.Set(reflect.ValueOf(v))
+			if rval.Kind() == reflect.Ptr && rval.IsNil() {
+				continue
+			}
+			setValue(rval, v)
 		}
 	}
 }
 
-// SetValueAtAnyPath sets an object at the case insensitive lexical path inside
-// of a structure
-func SetValueAtAnyPath(i interface{}, path string, v interface{}) {
-	if rvals := rValuesAtPath(i, path, true, false); rvals != nil {
-		for _, rval := range rvals {
-			rval.Set(reflect.ValueOf(v))
-		}
+func setValue(dstVal reflect.Value, src interface{}) {
+	if dstVal.Kind() == reflect.Ptr {
+		dstVal = reflect.Indirect(dstVal)
 	}
+	srcVal := reflect.ValueOf(src)
+
+	if !srcVal.IsValid() { // src is literal nil
+		if dstVal.CanAddr() {
+			// Convert to pointer so that pointer's value can be nil'ed
+			//                     dstVal = dstVal.Addr()
+		}
+		dstVal.Set(reflect.Zero(dstVal.Type()))
+
+	} else if srcVal.Kind() == reflect.Ptr {
+		if srcVal.IsNil() {
+			srcVal = reflect.Zero(dstVal.Type())
+		} else {
+			srcVal = reflect.ValueOf(src).Elem()
+		}
+		dstVal.Set(srcVal)
+	} else {
+		dstVal.Set(srcVal)
+	}
+
 }

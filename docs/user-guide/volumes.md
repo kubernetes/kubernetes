@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md).
@@ -65,6 +66,7 @@ Familiarity with [pods](pods.md) is suggested.
     - [secret](#secret)
     - [persistentVolumeClaim](#persistentvolumeclaim)
     - [downwardAPI](#downwardapi)
+    - [FlexVolume](#flexvolume)
   - [Resources](#resources)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -138,7 +140,7 @@ volume is safe across container crashes.
 
 Some uses for an `emptyDir` are:
 
-* scratch space, such as for a disk-based mergesortcw
+* scratch space, such as for a disk-based merge sort
 * checkpointing a long computation for recovery from crashes
 * holding files that a content-manager container fetches while a webserver
   container serves the data
@@ -418,6 +420,14 @@ A `downwardAPI` volume is used to make downward API data available to applicatio
 It mounts a directory and writes the requested data in plain text files.
 
 See the [`downwardAPI` volume example](downward-api/volume/README.md)  for more details.
+
+### FlexVolume
+
+A `FlexVolume` enables users to mount vendor volumes into a pod. It expects vendor
+drivers are installed in the volume plugin path on each kubelet node. This is
+an alpha feature and may change in future.
+
+More details are in [here](../../examples/flexvolume/README.md)
 
 ## Resources
 

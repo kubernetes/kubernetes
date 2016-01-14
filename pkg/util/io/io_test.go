@@ -32,8 +32,8 @@ func TestSavePodToFile(t *testing.T) {
 	pod := volume.NewPersistentVolumeRecyclerPodTemplate()
 
 	// sets all default values on a pod for equality comparison after decoding from file
-	encoded, err := latest.GroupOrDie("").Codec.Encode(pod)
-	latest.GroupOrDie("").Codec.DecodeInto(encoded, pod)
+	encoded, err := latest.GroupOrDie(api.GroupName).Codec.Encode(pod)
+	latest.GroupOrDie(api.GroupName).Codec.DecodeInto(encoded, pod)
 
 	path := fmt.Sprintf("/tmp/kube-io-test-%s", uuid.New())
 	defer os.Remove(path)

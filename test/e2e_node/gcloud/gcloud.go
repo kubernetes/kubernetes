@@ -34,10 +34,12 @@ import (
 
 var freePortRegexp = regexp.MustCompile(".+:([0-9]+)")
 
-type TearDown func()
+type TearDown func() *RunResult
 
 type GCloudClient interface {
-	CopyAndWaitTillHealthy(sudo bool, remotePort string, timeout time.Duration, healthUrl string, bin string, args ...string) (*CmdHandle, error)
+	RunAndWaitTillHealthy(
+		sudo bool, copyBin bool, remotePort string,
+		timeout time.Duration, healthUrl string, bin string, args ...string) (*CmdHandle, error)
 }
 
 type gCloudClientImpl struct {
@@ -72,13 +74,14 @@ func (gc *gCloudClientImpl) Command(cmd string, moreargs ...string) ([]byte, err
 	return exec.Command("gcloud", args...).CombinedOutput()
 }
 
-func (gc *gCloudClientImpl) TunnelCommand(sudo bool, lPort string, rPort string, cmd string, moreargs ...string) ([]byte, error) {
+func (gc *gCloudClientImpl) TunnelCommand(sudo bool, lPort string, rPort string, dir string, cmd string, moreargs ...string) ([]byte, error) {
 	tunnelStr := fmt.Sprintf("-L %s:localhost:%s", lPort, rPort)
 	args := []string{"compute", "ssh"}
 	if gc.zone != "" {
 		args = append(args, "--zone", gc.zone)
 	}
 	args = append(args, "--ssh-flag", tunnelStr, gc.host, "--")
+	args = append(args, "cd", dir, ";")
 	if sudo {
 		args = append(args, "sudo")
 	}
@@ -99,7 +102,9 @@ func (gc *gCloudClientImpl) CopyToHost(from string, to string) ([]byte, error) {
 	return exec.Command("gcloud", args...).CombinedOutput()
 }
 
-func (gc *gCloudClientImpl) CopyAndRun(sudo bool, remotePort string, bin string, args ...string) *CmdHandle {
+func (gc *gCloudClientImpl) Run(
+	sudo bool, copyBin bool, remotePort string, bin string, args ...string) *CmdHandle {
+
 	h := &CmdHandle{}
 	h.Output = make(chan RunResult)
 
@@ -108,55 +113,73 @@ func (gc *gCloudClientImpl) CopyAndRun(sudo bool, remotePort string, bin string,
 	// Define where we will copy the temp binary
 	tDir := fmt.Sprintf("/tmp/gcloud-e2e-%d", rand.Int31())
 	_, f := filepath.Split(bin)
-	cmd := filepath.Join(tDir, f)
+	cmd := f
+	if copyBin {
+		cmd = filepath.Join(tDir, f)
+	}
 	h.LPort = getLocalPort()
 
-	h.TearDown = func() {
+	h.TearDown = func() *RunResult {
 		out, err := gc.Command("sudo", "pkill", f)
 		if err != nil {
-			h.Output <- RunResult{out, err, fmt.Sprintf("pkill %s", cmd)}
-			return
+			return &RunResult{out, err, fmt.Sprintf("pkill %s", f)}
 		}
 		out, err = gc.Command("rm", "-rf", tDir)
 		if err != nil {
-			h.Output <- RunResult{out, err, fmt.Sprintf("rm -rf %s", tDir)}
-			return
+			return &RunResult{out, err, fmt.Sprintf("rm -rf %s", tDir)}
 		}
+		return &RunResult{}
 	}
 
-	// Create the tmp directory
-	out, err := gc.Command("mkdir", "-p", tDir)
-	if err != nil {
-		glog.Errorf("mkdir failed %v", err)
-		h.Output <- RunResult{out, err, fmt.Sprintf("mkdir -p %s", tDir)}
-		return h
-	}
-
-	// Copy the binary
-	out, err = gc.CopyToHost(bin, tDir)
-	if err != nil {
-		glog.Errorf("copy-files failed %v", err)
-		h.Output <- RunResult{out, err, fmt.Sprintf("copy-files %s %s", bin, tDir)}
-		return h
-	}
-
-	// Do the setup
+	// Run the commands in a Go fn so that this method doesn't block when writing to a channel
+	// to report an error
 	go func() {
-		// Start the process
-		out, err = gc.TunnelCommand(sudo, h.LPort, remotePort, cmd, args...)
+		// Create the tmp directory
+		out, err := gc.Command("mkdir", "-p", tDir)
+
+		// Work around for gcloud flakiness - TODO: debug why gcloud sometimes cannot find credentials for some hosts
+		// If there was an error about credentials, retry making the directory 6 times to see if it can be resolved
+		// This is to help debug if the credential issues are persistent for a given host on a given run, or transient
+		// And if downstream gcloud commands are also impacted
+		for i := 0; i < 6 && err != nil && strings.Contains(string(out), "does not have any valid credentials"); i++ {
+			glog.Warningf("mkdir failed on host %s due to credential issues, retrying in 5 seconds %v %s", gc.host, err, out)
+			time.Sleep(5 * time.Second)
+			out, err = gc.Command("mkdir", "-p", tDir)
+		}
 		if err != nil {
-			glog.Errorf("command failed %v", err)
-			h.Output <- RunResult{out, err, fmt.Sprintf("%s %s", cmd, strings.Join(args, " "))}
+			glog.Errorf("mkdir failed %v %s", err, out)
+			h.Output <- RunResult{out, err, fmt.Sprintf("mkdir -p %s", tDir)}
 			return
 		}
+
+		// Copy the binary
+		if copyBin {
+			out, err = gc.CopyToHost(bin, tDir)
+			if err != nil {
+				glog.Errorf("copy-files failed %v %s", err, out)
+				h.Output <- RunResult{out, err, fmt.Sprintf("copy-files %s %s", bin, tDir)}
+				return
+			}
+		}
+
+		// Do the setup
+		go func() {
+			// Start the process
+			out, err = gc.TunnelCommand(sudo, h.LPort, remotePort, tDir, cmd, args...)
+			if err != nil {
+				glog.Errorf("command failed %v %s", err, out)
+				h.Output <- RunResult{out, err, fmt.Sprintf("%s %s", cmd, strings.Join(args, " "))}
+				return
+			}
+		}()
 	}()
 	return h
 }
 
-func (gc *gCloudClientImpl) CopyAndWaitTillHealthy(
-	sudo bool,
+func (gc *gCloudClientImpl) RunAndWaitTillHealthy(
+	sudo bool, copyBin bool,
 	remotePort string, timeout time.Duration, healthUrl string, bin string, args ...string) (*CmdHandle, error) {
-	h := gc.CopyAndRun(sudo, remotePort, bin, args...)
+	h := gc.Run(sudo, copyBin, remotePort, bin, args...)
 	eTime := time.Now().Add(timeout)
 	done := false
 	for eTime.After(time.Now()) && !done {

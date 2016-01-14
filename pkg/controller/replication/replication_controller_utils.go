@@ -57,12 +57,12 @@ func updateReplicaCount(rcClient client.ReplicationControllerInterface, controll
 }
 
 // OverlappingControllers sorts a list of controllers by creation timestamp, using their names as a tie breaker.
-type overlappingControllers []api.ReplicationController
+type OverlappingControllers []api.ReplicationController
 
-func (o overlappingControllers) Len() int      { return len(o) }
-func (o overlappingControllers) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o OverlappingControllers) Len() int      { return len(o) }
+func (o OverlappingControllers) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
-func (o overlappingControllers) Less(i, j int) bool {
+func (o OverlappingControllers) Less(i, j int) bool {
 	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}

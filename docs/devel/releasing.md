@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/devel/releasing.md).
@@ -46,6 +47,7 @@ release breaks down into four pieces:
 1. cutting/branching the release;
 1. building and pushing the binaries; and
 1. publishing binaries and release notes.
+1. updating the master branch.
 
 You should progress in this strict order.
 
@@ -92,22 +94,24 @@ release from HEAD of the branch, (because you have to do some version-rev
 commits,) so choose the latest build on the release branch.  (Remember, that
 branch should be frozen.)
 
-Once you find some greens, you can find the git hash for a build by looking at
-the Full Console Output and searching for `githash=`. You should see a line:
+Once you find some greens, you can find the build hash for a build by looking at
+the Full Console Output and searching for `build_version=`. You should see a line:
 
 ```console
-githash=v1.2.0-alpha.2.164+b44c7d79d6c9bb
+build_version=v1.2.0-alpha.2.164+b44c7d79d6c9bb
 ```
 
 Or, if you're cutting from a release branch (i.e. doing an official release),
 
 ```console
-githash=v1.1.0-beta.567+d79d6c9bbb44c7
+build_version=v1.1.0-beta.567+d79d6c9bbb44c7
 ```
+
+Please note that `build_version` was called `githash` versions prior to v1.2.
 
 Because Jenkins builds frequently, if you're looking between jobs
 (e.g. `kubernetes-e2e-gke-ci` and `kubernetes-e2e-gce`), there may be no single
-`githash` that's been run on both jobs. In that case, take the a green
+`build_version` that's been run on both jobs. In that case, take the a green
 `kubernetes-e2e-gce` build (but please check that it corresponds to a temporally
 similar build that's green on `kubernetes-e2e-gke-ci`). Lastly, if you're having
 trouble understanding why the GKE continuous integration clusters are failing
@@ -117,10 +121,10 @@ oncall.
 Before proceeding to the next step:
 
 ```sh
-export GITHASH=v1.2.0-alpha.2.164+b44c7d79d6c9bb
+export BUILD_VERSION=v1.2.0-alpha.2.164+b44c7d79d6c9bb
 ```
 
-Where `v1.2.0-alpha.2.164+b44c7d79d6c9bb` is the git hash you decided on. This
+Where `v1.2.0-alpha.2.164+b44c7d79d6c9bb` is the build hash you decided on. This
 will become your release point.
 
 ### Cutting/branching the release
@@ -132,19 +136,19 @@ git clone git@github.com:kubernetes/kubernetes.git
 cd kubernetes
 ```
 
-or `git checkout upstream/master` from an existing repo.
+or `git fetch upstream && git checkout upstream/master` from an existing repo.
 
 Decide what version you're cutting and export it:
 
-- alpha release: `export VER="vX.Y.0-alpha.W"`;
-- beta release: `export VER="vX.Y.Z-beta.W"`;
-- official release: `export VER="vX.Y.Z"`;
-- new release series: `export VER="vX.Y"`.
+- alpha release: `export RELEASE_VERSION="vX.Y.0-alpha.W"`;
+- beta release: `export RELEASE_VERSION="vX.Y.Z-beta.W"`;
+- official release: `export RELEASE_VERSION="vX.Y.Z"`;
+- new release series: `export RELEASE_VERSION="vX.Y"`.
 
 Then, run
 
 ```console
-./release/cut-official-release.sh "${VER}" "${GITHASH}"
+./release/cut-official-release.sh "${RELEASE_VERSION}" "${BUILD_VERSION}"
 ```
 
 This will do a dry run of the release.  It will give you instructions at the
@@ -152,7 +156,7 @@ end for `pushd`ing into the dry-run directory and having a look around.
 `pushd` into the directory and make sure everythig looks as you expect:
 
 ```console
-git log "${VER}"  # do you see the commit you expect?
+git log "${RELEASE_VERSION}"  # do you see the commit you expect?
 make release
 ./cluster/kubectl.sh version -c
 ```
@@ -161,46 +165,42 @@ If you're satisfied with the result of the script, go back to `upstream/master`
 run
 
 ```console
-./release/cut-official-release.sh "${VER}" "${GITHASH}" --no-dry-run
+./release/cut-official-release.sh "${RELEASE_VERSION}" "${BUILD_VERSION}" --no-dry-run
 ```
 
 and follow the instructions.
 
 ### Publishing binaries and release notes
 
+Only publish a beta release if it's a standalone pre-release (*not*
+vX.Y.Z-beta.0).  We create beta tags after we do official releases to
+maintain proper semantic versioning, but we don't publish these beta releases.
+
 The script you ran above will prompt you to take any remaining steps to push
 tars, and will also give you a template for the release notes.  Compose an
-email to the team with the template, and use `build/make-release-notes.sh`
-and/or `release-notes/release-notes.go` in
-[kubernetes/contrib](https://github.com/kubernetes/contrib) to make the release
-notes, (see #17444 for more info).
+email to the team with the template.  Figure out what the PR numbers for this
+release and last release are, and get an api-token from GitHub
+(https://github.com/settings/tokens).  From a clone of
+[kubernetes/contrib](https://github.com/kubernetes/contrib),
 
-- Alpha release:
-  - Figure out what the PR numbers for this release and last release are, and
-    get an api-token from GitHub (https://github.com/settings/tokens).  From a
-    clone of kubernetes/contrib at upstream/master,
-      go run release-notes/release-notes.go --last-release-pr=<number> --current-release-pr=<number> --api-token=<token>
-    Feel free to prune.
-- Beta release:
-  - Only publish a beta release if it's a standalone pre-release.  (We create
-    beta tags after we do official releases to maintain proper semantic
-    versioning, *we don't publish these beta releases*.)  Use
-    `./hack/cherry_pick_list.sh ${VER}` to get release notes for such a
-    release.
-- Official release:
-  - From your clone of upstream/master, run `./hack/cherry_pick_list.sh ${VER}`
-    to get the release notes for the patch release you just created. Feel free
-    to prune anything internal, but typically for patch releases we tend to
-    include everything in the release notes.
-  - If this is a first official release (vX.Y.0), look through the release
-    notes for all of the alpha releases since the last cycle, and include
-    anything important in release notes.
+```
+go run release-notes/release-notes.go --last-release-pr=<number> --current-release-pr=<number> --api-token=<token> --base=<release-branch>
+```
+
+where `<release-branch>` is `master` for alpha releases and `release-X.Y` for beta and official releases.
+
+**If this is a first official release (vX.Y.0)**, look through the release
+notes for all of the alpha releases since the last cycle, and include anything
+important in release notes.
+
+Feel free to edit the notes, (e.g. cherry picks should generally just have the
+same title as the original PR).
 
 Send the email out, letting people know these are the draft release notes.  If
 they want to change anything, they should update the appropriate PRs with the
 `release-note` label.
 
-When we're ready to announce the release, [create a GitHub
+When you're ready to announce the release, [create a GitHub
 release](https://github.com/kubernetes/kubernetes/releases/new):
 
 1. pick the appropriate tag;
@@ -208,10 +208,24 @@ release](https://github.com/kubernetes/kubernetes/releases/new):
 1. fill in the release title from the draft;
 1. re-run the appropriate release notes tool(s) to pick up any changes people
    have made;
-1. find the appropriate `kubernetes.tar.gz` in GCS, download it, double check
-   the hash (compare to what you had in the release notes draft), and attach it
-   to the release; and
+1. find the appropriate `kubernetes.tar.gz` in [GCS bucket](https://
+console.developers.google.com/storage/browser/kubernetes-release/release/),
+   download it, double check the hash (compare to what you had in the release
+   notes draft), and attach it to the release; and
 1. publish!
+
+Finally, from a clone of upstream/master, *make sure* you still have
+`RELEASE_VERSION` set correctly, and run `./build/mark-stable-release.sh
+${RELEASE_VERSION}`.
+
+### Updating the master branch
+
+If you are cutting a new release series, please also update the master branch:
+change the `latestReleaseBranch` in `cmd/mungedocs/mungedocs.go` to the new
+release branch (`release-X.Y`), run `hack/update-generated-docs.sh`. This will
+let the unversioned warning in docs point to the latest release series. Please
+send the changes as a PR titled "Update the latestReleaseBranch to release-X.Y
+in the munger".
 
 ## Injecting Version into Binaries
 

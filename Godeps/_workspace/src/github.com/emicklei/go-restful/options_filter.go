@@ -8,7 +8,8 @@ import "strings"
 
 // OPTIONSFilter is a filter function that inspects the Http Request for the OPTIONS method
 // and provides the response with a set of allowed methods for the request URL Path.
-// As for any filter, you can also install it for a particular WebService within a Container
+// As for any filter, you can also install it for a particular WebService within a Container.
+// Note: this filter is not needed when using CrossOriginResourceSharing (for CORS).
 func (c *Container) OPTIONSFilter(req *Request, resp *Response, chain *FilterChain) {
 	if "OPTIONS" != req.Request.Method {
 		chain.ProcessFilter(req, resp)
@@ -19,6 +20,7 @@ func (c *Container) OPTIONSFilter(req *Request, resp *Response, chain *FilterCha
 
 // OPTIONSFilter is a filter function that inspects the Http Request for the OPTIONS method
 // and provides the response with a set of allowed methods for the request URL Path.
+// Note: this filter is not needed when using CrossOriginResourceSharing (for CORS).
 func OPTIONSFilter() FilterFunction {
 	return DefaultContainer.OPTIONSFilter
 }

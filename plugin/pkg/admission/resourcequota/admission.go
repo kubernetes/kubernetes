@@ -29,8 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/watch"
@@ -51,10 +49,10 @@ type quota struct {
 // NewResourceQuota creates a new resource quota admission control handler
 func NewResourceQuota(client client.Interface) admission.Interface {
 	lw := &cache.ListWatch{
-		ListFunc: func() (runtime.Object, error) {
-			return client.ResourceQuotas(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			return client.ResourceQuotas(api.NamespaceAll).List(options)
 		},
-		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			return client.ResourceQuotas(api.NamespaceAll).Watch(options)
 		},
 	}
@@ -71,13 +69,13 @@ func createResourceQuota(client client.Interface, indexer cache.Indexer) admissi
 	}
 }
 
-var resourceToResourceName = map[string]api.ResourceName{
-	"pods":                   api.ResourcePods,
-	"services":               api.ResourceServices,
-	"replicationcontrollers": api.ResourceReplicationControllers,
-	"resourcequotas":         api.ResourceQuotas,
-	"secrets":                api.ResourceSecrets,
-	"persistentvolumeclaims": api.ResourcePersistentVolumeClaims,
+var resourceToResourceName = map[unversioned.GroupResource]api.ResourceName{
+	api.Resource("pods"):                   api.ResourcePods,
+	api.Resource("services"):               api.ResourceServices,
+	api.Resource("replicationcontrollers"): api.ResourceReplicationControllers,
+	api.Resource("resourcequotas"):         api.ResourceQuotas,
+	api.Resource("secrets"):                api.ResourceSecrets,
+	api.Resource("persistentvolumeclaims"): api.ResourcePersistentVolumeClaims,
 }
 
 func (q *quota) Admit(a admission.Attributes) (err error) {
@@ -171,7 +169,7 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, client client.Interface) (bool, error) {
 	// on update, the only resource that can modify the value of a quota is pods
 	// so if your not a pod, we exit quickly
-	if a.GetOperation() == admission.Update && a.GetResource() != "pods" {
+	if a.GetOperation() == admission.Update && a.GetResource() != api.Resource("pods") {
 		return false, nil
 	}
 
@@ -200,7 +198,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 		}
 	}
 
-	if a.GetResource() == "pods" {
+	if a.GetResource() == api.Resource("pods") {
 		for _, resourceName := range []api.ResourceName{api.ResourceMemory, api.ResourceCPU} {
 
 			// ignore tracking the resource if it's not in the quota document

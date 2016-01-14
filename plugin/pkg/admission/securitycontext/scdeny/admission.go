@@ -48,7 +48,7 @@ func NewSecurityContextDeny(client client.Interface) admission.Interface {
 
 // Admit will deny any pod that defines SELinuxOptions or RunAsUser.
 func (p *plugin) Admit(a admission.Attributes) (err error) {
-	if a.GetResource() != string(api.ResourcePods) {
+	if a.GetResource() != api.Resource("pods") {
 		return nil
 	}
 

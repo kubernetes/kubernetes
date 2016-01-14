@@ -146,7 +146,7 @@ func (t *Tester) TestWatch(valid runtime.Object, labelsPass, labelsFail []labels
 // =============================================================================
 // get codec based on runtime.Object
 func getCodec(obj runtime.Object) (runtime.Codec, error) {
-	_, kind, err := api.Scheme.ObjectVersionAndKind(obj)
+	fqKind, err := api.Scheme.ObjectKind(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected encoding error: %v", err)
 	}
@@ -155,12 +155,12 @@ func getCodec(obj runtime.Object) (runtime.Codec, error) {
 	// split the schemes for internal objects.
 	// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
 	var codec runtime.Codec
-	if api.Scheme.Recognizes(testapi.Default.GroupAndVersion(), kind) {
+	if api.Scheme.Recognizes(testapi.Default.GroupVersion().WithKind(fqKind.Kind)) {
 		codec = testapi.Default.Codec()
-	} else if api.Scheme.Recognizes(testapi.Extensions.GroupAndVersion(), kind) {
+	} else if api.Scheme.Recognizes(testapi.Extensions.GroupVersion().WithKind(fqKind.Kind)) {
 		codec = testapi.Extensions.Codec()
 	} else {
-		return nil, fmt.Errorf("unexpected kind: %v", kind)
+		return nil, fmt.Errorf("unexpected kind: %v", fqKind)
 	}
 	return codec, nil
 }

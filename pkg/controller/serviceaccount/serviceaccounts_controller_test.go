@@ -151,7 +151,10 @@ func TestServiceAccountCreation(t *testing.T) {
 	for k, tc := range testcases {
 		client := testclient.NewSimpleFake(defaultServiceAccount, managedServiceAccount)
 		options := DefaultServiceAccountsControllerOptions()
-		options.Names = sets.NewString(defaultName, managedName)
+		options.ServiceAccounts = []api.ServiceAccount{
+			{ObjectMeta: api.ObjectMeta{Name: defaultName}},
+			{ObjectMeta: api.ObjectMeta{Name: managedName}},
+		}
 		controller := NewServiceAccountsController(client, options)
 
 		if tc.ExistingNamespace != nil {

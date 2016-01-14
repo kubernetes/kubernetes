@@ -18,15 +18,12 @@ package e2e
 
 import (
 	"fmt"
-	//"k8s.io/kubernetes/pkg/api"
 	"strings"
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -43,7 +40,7 @@ func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSecond
 		go func(n int) {
 			defer wg.Done()
 			defer GinkgoRecover()
-			_, err = createTestingNS(fmt.Sprintf("nslifetest-%v", n), c)
+			_, err = createTestingNS(fmt.Sprintf("nslifetest-%v", n), c, nil)
 			Expect(err).NotTo(HaveOccurred())
 		}(n)
 	}
@@ -61,7 +58,7 @@ func extinguish(c *client.Client, totalNS int, maxAllowedAfterDel int, maxSecond
 	expectNoError(wait.Poll(2*time.Second, time.Duration(maxSeconds)*time.Second,
 		func() (bool, error) {
 			var cnt = 0
-			nsList, err := c.Namespaces().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			nsList, err := c.Namespaces().List(api.ListOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -94,7 +91,9 @@ var _ = Describe("Namespaces", func() {
 
 	//Confirms that namespace draining is functioning reasonably
 	//at minute intervals.
-	It("should delete fast enough (90 percent of 100 namespaces in 150 seconds)",
+	//
+	// Flaky issue #19026
+	It("should delete fast enough (90 percent of 100 namespaces in 150 seconds) [Flaky]",
 		func() { extinguish(c, 100, 10, 150) })
 
 	//comprehensive draining ; uncomment after #7372

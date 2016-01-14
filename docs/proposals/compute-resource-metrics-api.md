@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/proposals/compute-resource-metrics-api.md).
@@ -68,7 +69,7 @@ user via a periodically refreshing interface similar to `top` on Unix-like
 systems. This info could let users assign resource limits more efficiently.
 
 ```
-$ kubectl top kubernetes-minion-abcd
+$ kubectl top kubernetes-node-abcd
 POD                        CPU         MEM
 monitoring-heapster-abcde  0.12 cores  302 MB
 kube-ui-v1-nd7in           0.07 cores  130 MB

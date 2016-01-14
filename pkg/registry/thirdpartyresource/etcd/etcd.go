@@ -55,9 +55,9 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *RE
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return thirdpartyresource.Matcher(label, field)
 		},
-		EndpointName:   "thirdPartyResources",
-		CreateStrategy: thirdpartyresource.Strategy,
-		UpdateStrategy: thirdpartyresource.Strategy,
+		QualifiedResource: extensions.Resource("thirdpartyresources"),
+		CreateStrategy:    thirdpartyresource.Strategy,
+		UpdateStrategy:    thirdpartyresource.Strategy,
 
 		Storage: storageInterface,
 	}

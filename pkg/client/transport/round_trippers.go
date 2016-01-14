@@ -67,6 +67,10 @@ func DebugWrappers(rt http.RoundTripper) http.RoundTripper {
 	return rt
 }
 
+type requestCanceler interface {
+	CancelRequest(*http.Request)
+}
+
 type userAgentRoundTripper struct {
 	agent string
 	rt    http.RoundTripper
@@ -83,6 +87,14 @@ func (rt *userAgentRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	req = cloneRequest(req)
 	req.Header.Set("User-Agent", rt.agent)
 	return rt.rt.RoundTrip(req)
+}
+
+func (rt *userAgentRoundTripper) CancelRequest(req *http.Request) {
+	if canceler, ok := rt.rt.(requestCanceler); ok {
+		canceler.CancelRequest(req)
+	} else {
+		glog.Errorf("CancelRequest not implemented")
+	}
 }
 
 type basicAuthRoundTripper struct {
@@ -106,6 +118,14 @@ func (rt *basicAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	return rt.rt.RoundTrip(req)
 }
 
+func (rt *basicAuthRoundTripper) CancelRequest(req *http.Request) {
+	if canceler, ok := rt.rt.(requestCanceler); ok {
+		canceler.CancelRequest(req)
+	} else {
+		glog.Errorf("CancelRequest not implemented")
+	}
+}
+
 type bearerAuthRoundTripper struct {
 	bearer string
 	rt     http.RoundTripper
@@ -125,6 +145,14 @@ func (rt *bearerAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 	req = cloneRequest(req)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", rt.bearer))
 	return rt.rt.RoundTrip(req)
+}
+
+func (rt *bearerAuthRoundTripper) CancelRequest(req *http.Request) {
+	if canceler, ok := rt.rt.(requestCanceler); ok {
+		canceler.CancelRequest(req)
+	} else {
+		glog.Errorf("CancelRequest not implemented")
+	}
 }
 
 // cloneRequest returns a clone of the provided *http.Request.
@@ -213,6 +241,14 @@ func newDebuggingRoundTripper(rt http.RoundTripper, levels ...debugLevel) *debug
 		drt.levels[v] = true
 	}
 	return drt
+}
+
+func (rt *debuggingRoundTripper) CancelRequest(req *http.Request) {
+	if canceler, ok := rt.delegatedRoundTripper.(requestCanceler); ok {
+		canceler.CancelRequest(req)
+	} else {
+		glog.Errorf("CancelRequest not implemented")
+	}
 }
 
 func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {

@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/user-guide/connecting-applications.md).
@@ -88,8 +89,8 @@ This makes it accessible from any node in your cluster. Check the nodes the pod 
 ```console
 $ kubectl create -f ./nginxrc.yaml
 $ kubectl get pods -l app=nginx -o wide
-my-nginx-6isf4   1/1       Running   0          2h        e2e-test-beeps-minion-93ly
-my-nginx-t26zt   1/1       Running   0          2h        e2e-test-beeps-minion-93ly
+my-nginx-6isf4   1/1       Running   0          2h        e2e-test-beeps-node-93ly
+my-nginx-t26zt   1/1       Running   0          2h        e2e-test-beeps-node-93ly
 ```
 
 Check your pods' IPs:
@@ -332,7 +333,7 @@ Lets test this from a pod (the same secret is being reused for simplicity, the p
 
 ```console
 $ cat curlpod.yaml
-vapiVersion: v1
+apiVersion: v1
 kind: ReplicationController
 metadata:
   name: curlrc
@@ -410,7 +411,7 @@ $ curl https://104.197.63.17:30645 -k
 Lets now recreate the Service to use a cloud load balancer, just change the `Type` of Service in the nginx-app.yaml from `NodePort` to `LoadBalancer`:
 
 ```console
-$ kubectl delete rc, svc -l app=nginx
+$ kubectl delete rc,svc -l app=nginx
 $ kubectl create -f ./nginx-app.yaml
 $ kubectl get svc nginxsvc
 NAME      CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR     AGE

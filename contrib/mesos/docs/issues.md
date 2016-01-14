@@ -22,6 +22,16 @@ It is **strongly** recommended that all of the Kubernetes-Mesos executors are de
 Not following the above steps prior to upgrading the scheduler can result in a cluster wherein pods will never again be scheduled upon one or more nodes.
 This issue is being tracked here: https://github.com/mesosphere/kubernetes-mesos/issues/572.
 
+### Netfilter Connection Tracking
+
+The scheduler offers flags to tweak connection tracking for kube-proxy instances that are launched on slave nodes:
+
+- conntrack-max (do **NOT** set this to a non-zero value if the Mesos slave process is running in a non-root network namespace)
+- conntrack-tcp-timeout-established
+
+By default both of these are set to 0 when running Kubernetes-Mesos.
+Setting either of these flags to non-zero values may impact connection tracking for the entire slave.
+
 ### Port Specifications
 
 In order for pods (replicated, or otherwise) to be scheduled on the cluster, it is strongly recommended that:
@@ -197,6 +207,16 @@ The scheduler also offers `/debug` API endpoints that may be useful:
 
 All of the issues in the above section also apply to the Kubernetes-Mesos DCOS package builds.
 The issues listed in this section apply specifically to the Kubernetes-Mesos DCOS package available from https://github.com/mesosphere/multiverse.
+
+### Etcd
+
+The default configuration of the DCOS Kubernetes package launches an internal etcd process **which only persists the cluster state in the sandbox of the current container instance**. While this is simpler for the first steps with Kubernetes-Mesos, it means that any cluster state is lost when the Kubernetes-Mesos Docker container is restarted.
+
+Hence, for any kind of production-like deployment it is highly recommended to install the etcd DCOS package alongside Kubernetes-Mesos and
+configure the later to use the etcd cluster. Further instructions
+can be found at https://docs.mesosphere.com/services/kubernetes/#install.
+
+This situation will eventually go away as soon as DCOS supports package dependencies and/or interactive package configuration.
 
 ### Kubectl
 

@@ -17,12 +17,14 @@ limitations under the License.
 package gce_pd
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/types"
@@ -111,6 +113,17 @@ func (fake *fakePDManager) DetachDisk(c *gcePersistentDiskCleaner) error {
 	return nil
 }
 
+func (fake *fakePDManager) CreateVolume(c *gcePersistentDiskProvisioner) (volumeID string, volumeSizeGB int, err error) {
+	return "test-gce-volume-name", 100, nil
+}
+
+func (fake *fakePDManager) DeleteVolume(cd *gcePersistentDiskDeleter) error {
+	if cd.pdName != "test-gce-volume-name" {
+		return fmt.Errorf("Deleter got unexpected volume name: %s", cd.pdName)
+	}
+	return nil
+}
+
 func TestPlugin(t *testing.T) {
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "gcepdTest")
 	if err != nil {
@@ -189,6 +202,47 @@ func TestPlugin(t *testing.T) {
 	}
 	if !fakeManager.detachCalled {
 		t.Errorf("Detach watch not called")
+	}
+
+	// Test Provisioner
+	cap := resource.MustParse("100Mi")
+	options := volume.VolumeOptions{
+		Capacity: cap,
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+		},
+		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
+	}
+	provisioner, err := plug.(*gcePersistentDiskPlugin).newProvisionerInternal(options, &fakePDManager{})
+	persistentSpec, err := provisioner.NewPersistentVolumeTemplate()
+	if err != nil {
+		t.Errorf("NewPersistentVolumeTemplate() failed: %v", err)
+	}
+
+	// get 2nd Provisioner - persistent volume controller will do the same
+	provisioner, err = plug.(*gcePersistentDiskPlugin).newProvisionerInternal(options, &fakePDManager{})
+	err = provisioner.Provision(persistentSpec)
+	if err != nil {
+		t.Errorf("Provision() failed: %v", err)
+	}
+
+	if persistentSpec.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName != "test-gce-volume-name" {
+		t.Errorf("Provision() returned unexpected volume ID: %s", persistentSpec.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName)
+	}
+	cap = persistentSpec.Spec.Capacity[api.ResourceStorage]
+	size := cap.Value()
+	if size != 100*1024*1024*1024 {
+		t.Errorf("Provision() returned unexpected volume size: %v", size)
+	}
+
+	// Test Deleter
+	volSpec := &volume.Spec{
+		PersistentVolume: persistentSpec,
+	}
+	deleter, err := plug.(*gcePersistentDiskPlugin).newDeleterInternal(volSpec, &fakePDManager{})
+	err = deleter.Delete()
+	if err != nil {
+		t.Errorf("Deleter() failed: %v", err)
 	}
 }
 

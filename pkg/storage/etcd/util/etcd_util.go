@@ -22,56 +22,46 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	goetcd "github.com/coreos/go-etcd/etcd"
-)
-
-const (
-	etcdErrorCodeNotFound      = 100
-	etcdErrorCodeTestFailed    = 101
-	etcdErrorCodeNodeExist     = 105
-	etcdErrorCodeValueRequired = 200
-	etcdErrorCodeWatchExpired  = 401
-	etcdErrorCodeUnreachable   = 501
-)
-
-var (
-	etcdErrorNotFound      = &goetcd.EtcdError{ErrorCode: etcdErrorCodeNotFound}
-	etcdErrorTestFailed    = &goetcd.EtcdError{ErrorCode: etcdErrorCodeTestFailed}
-	etcdErrorNodeExist     = &goetcd.EtcdError{ErrorCode: etcdErrorCodeNodeExist}
-	etcdErrorValueRequired = &goetcd.EtcdError{ErrorCode: etcdErrorCodeValueRequired}
-	etcdErrorWatchExpired  = &goetcd.EtcdError{ErrorCode: etcdErrorCodeWatchExpired}
-	etcdErrorUnreachable   = &goetcd.EtcdError{ErrorCode: etcdErrorCodeUnreachable}
+	etcd "github.com/coreos/etcd/client"
 )
 
 // IsEtcdNotFound returns true if and only if err is an etcd not found error.
 func IsEtcdNotFound(err error) bool {
-	return isEtcdErrorNum(err, etcdErrorCodeNotFound)
+	return isEtcdErrorNum(err, etcd.ErrorCodeKeyNotFound)
 }
 
 // IsEtcdNodeExist returns true if and only if err is an etcd node already exist error.
 func IsEtcdNodeExist(err error) bool {
-	return isEtcdErrorNum(err, etcdErrorCodeNodeExist)
+	return isEtcdErrorNum(err, etcd.ErrorCodeNodeExist)
 }
 
 // IsEtcdTestFailed returns true if and only if err is an etcd write conflict.
 func IsEtcdTestFailed(err error) bool {
-	return isEtcdErrorNum(err, etcdErrorCodeTestFailed)
+	return isEtcdErrorNum(err, etcd.ErrorCodeTestFailed)
 }
 
 // IsEtcdWatchExpired returns true if and only if err indicates the watch has expired.
 func IsEtcdWatchExpired(err error) bool {
-	return isEtcdErrorNum(err, etcdErrorCodeWatchExpired)
+	// NOTE: This seems weird why it wouldn't be etcd.ErrorCodeWatcherCleared
+	//       I'm using the previous matching value
+	return isEtcdErrorNum(err, etcd.ErrorCodeEventIndexCleared)
 }
 
 // IsEtcdUnreachable returns true if and only if err indicates the server could not be reached.
 func IsEtcdUnreachable(err error) bool {
-	return isEtcdErrorNum(err, etcdErrorCodeUnreachable)
+	// NOTE: The logic has changed previous error code no longer applies
+	return err == etcd.ErrClusterUnavailable
 }
 
 // isEtcdErrorNum returns true if and only if err is an etcd error, whose errorCode matches errorCode
 func isEtcdErrorNum(err error, errorCode int) bool {
-	etcdError, ok := err.(*goetcd.EtcdError)
-	return ok && etcdError != nil && etcdError.ErrorCode == errorCode
+	if err != nil {
+		if etcdError, ok := err.(etcd.Error); ok {
+			return etcdError.Code == errorCode
+		}
+		// NOTE: There are other error types returned
+	}
+	return false
 }
 
 // GetEtcdVersion performs a version check against the provided Etcd server,

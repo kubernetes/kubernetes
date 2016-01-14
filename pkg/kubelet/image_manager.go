@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/container"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -41,6 +42,8 @@ type imageManager interface {
 
 	// Start async garbage collection of images.
 	Start() error
+
+	GetImageList() ([]kubecontainer.Image, error)
 
 	// TODO(vmarmol): Have this subsume pulls as well.
 }
@@ -101,6 +104,9 @@ func newImageManager(runtime container.Runtime, cadvisorInterface cadvisor.Inter
 	if policy.LowThresholdPercent < 0 || policy.LowThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid LowThresholdPercent %d, must be in range [0-100]", policy.LowThresholdPercent)
 	}
+	if policy.LowThresholdPercent > policy.HighThresholdPercent {
+		return nil, fmt.Errorf("LowThresholdPercent %d can not be higher than HighThresholdPercent %d", policy.LowThresholdPercent, policy.HighThresholdPercent)
+	}
 	im := &realImageManager{
 		runtime:      runtime,
 		policy:       policy,
@@ -130,6 +136,15 @@ func (im *realImageManager) Start() error {
 	}, 5*time.Minute, util.NeverStop)
 
 	return nil
+}
+
+// Get a list of images on this node
+func (im *realImageManager) GetImageList() ([]kubecontainer.Image, error) {
+	images, err := im.runtime.ListImages()
+	if err != nil {
+		return nil, err
+	}
+	return images, nil
 }
 
 func (im *realImageManager) detectImages(detected time.Time) error {
@@ -295,7 +310,7 @@ func isImageUsed(image container.Image, imagesInUse sets.String) bool {
 	if _, ok := imagesInUse[image.ID]; ok {
 		return true
 	}
-	for _, tag := range image.Tags {
+	for _, tag := range image.RepoTags {
 		if _, ok := imagesInUse[tag]; ok {
 			return true
 		}

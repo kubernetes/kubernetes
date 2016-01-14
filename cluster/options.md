@@ -10,6 +10,6 @@ This is a work-in-progress; not all options are documented yet!
 
 **NUM_NODES**
 
-The number of minion instances to create.  Most providers default this to 4.
+The number of node instances to create.  Most providers default this to 4.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/options.md?pixel)]()

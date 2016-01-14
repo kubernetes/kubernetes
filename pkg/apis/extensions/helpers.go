@@ -18,51 +18,49 @@ package extensions
 
 import (
 	"fmt"
-	"sort"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-// PodSelectorAsSelector converts the PodSelector api type into a struct that implements
+// LabelSelectorAsSelector converts the LabelSelector api type into a struct that implements
 // labels.Selector
-func PodSelectorAsSelector(ps *PodSelector) (labels.Selector, error) {
+func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 	if ps == nil {
 		return labels.Nothing(), nil
 	}
 	if len(ps.MatchLabels)+len(ps.MatchExpressions) == 0 {
 		return labels.Everything(), nil
 	}
-	selector := labels.LabelSelector{}
+	selector := labels.NewSelector()
 	for k, v := range ps.MatchLabels {
-		req, err := labels.NewRequirement(k, labels.InOperator, sets.NewString(v))
+		r, err := labels.NewRequirement(k, labels.InOperator, sets.NewString(v))
 		if err != nil {
 			return nil, err
 		}
-		selector = append(selector, *req)
+		selector = selector.Add(*r)
 	}
 	for _, expr := range ps.MatchExpressions {
 		var op labels.Operator
 		switch expr.Operator {
-		case PodSelectorOpIn:
+		case LabelSelectorOpIn:
 			op = labels.InOperator
-		case PodSelectorOpNotIn:
+		case LabelSelectorOpNotIn:
 			op = labels.NotInOperator
-		case PodSelectorOpExists:
+		case LabelSelectorOpExists:
 			op = labels.ExistsOperator
-		case PodSelectorOpDoesNotExist:
+		case LabelSelectorOpDoesNotExist:
 			op = labels.DoesNotExistOperator
 		default:
 			return nil, fmt.Errorf("%q is not a valid pod selector operator", expr.Operator)
 		}
-		req, err := labels.NewRequirement(expr.Key, op, sets.NewString(expr.Values...))
+		r, err := labels.NewRequirement(expr.Key, op, sets.NewString(expr.Values...))
 		if err != nil {
 			return nil, err
 		}
-		selector = append(selector, *req)
+		selector = selector.Add(*r)
 	}
-	sort.Sort(labels.ByKey(selector))
 	return selector, nil
 }
 

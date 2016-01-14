@@ -43,8 +43,9 @@ const (
 	cephfsPluginName = "kubernetes.io/cephfs"
 )
 
-func (plugin *cephfsPlugin) Init(host volume.VolumeHost) {
+func (plugin *cephfsPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *cephfsPlugin) Name() string {
@@ -143,6 +144,7 @@ type cephfs struct {
 	readonly    bool
 	mounter     mount.Interface
 	plugin      *cephfsPlugin
+	volume.MetricsNil
 }
 
 type cephfsBuilder struct {

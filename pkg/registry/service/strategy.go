@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // svcStrategy implements behavior for Services
@@ -58,7 +58,7 @@ func (svcStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new service.
-func (svcStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
+func (svcStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
 	service := obj.(*api.Service)
 	return validation.ValidateService(service)
 }
@@ -71,12 +71,34 @@ func (svcStrategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
-func (svcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
+func (svcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateServiceUpdate(obj.(*api.Service), old.(*api.Service))
 }
 
 func (svcStrategy) AllowUnconditionalUpdate() bool {
 	return true
+}
+
+func (svcStrategy) Export(obj runtime.Object, exact bool) error {
+	t, ok := obj.(*api.Service)
+	if !ok {
+		// unexpected programmer error
+		return fmt.Errorf("unexpected object: %v", obj)
+	}
+	// TODO: service does not yet have a prepare create strategy (see above)
+	t.Status = api.ServiceStatus{}
+	if exact {
+		return nil
+	}
+	if t.Spec.ClusterIP != api.ClusterIPNone {
+		t.Spec.ClusterIP = ""
+	}
+	if t.Spec.Type == api.ServiceTypeNodePort {
+		for i := range t.Spec.Ports {
+			t.Spec.Ports[i].NodePort = 0
+		}
+	}
+	return nil
 }
 
 func MatchServices(label labels.Selector, field fields.Selector) generic.Matcher {

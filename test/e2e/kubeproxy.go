@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -72,7 +71,8 @@ var _ = Describe("KubeProxy", func() {
 		f: f,
 	}
 
-	It("should test kube-proxy", func() {
+	// Slow issue #14204 (10 min)
+	It("should test kube-proxy [Slow]", func() {
 		By("cleaning up any pre-existing namespaces used by this test")
 		config.cleanup()
 
@@ -150,7 +150,7 @@ func createHTTPClient(transport *http.Transport) *http.Client {
 
 func (config *KubeProxyTestConfig) hitClusterIP(epCount int) {
 	clusterIP := config.nodePortService.Spec.ClusterIP
-	tries := epCount*epCount + 5 // if epCount == 0
+	tries := epCount*epCount + 15 // if epCount == 0
 	By("dialing(udp) node1 --> clusterIP:clusterUdpPort")
 	config.dialFromNode("udp", clusterIP, clusterUdpPort, tries, epCount)
 	By("dialing(http) node1 --> clusterIP:clusterHttpPort")
@@ -169,7 +169,7 @@ func (config *KubeProxyTestConfig) hitClusterIP(epCount int) {
 
 func (config *KubeProxyTestConfig) hitNodePort(epCount int) {
 	node1_IP := config.externalAddrs[0]
-	tries := epCount*epCount + 5 // + 10 if epCount == 0
+	tries := epCount*epCount + 15 //  if epCount == 0
 	By("dialing(udp) node1 --> node1:nodeUdpPort")
 	config.dialFromNode("udp", node1_IP, nodeUdpPort, tries, epCount)
 	By("dialing(http) node1  --> node1:nodeHttpPort")
@@ -256,7 +256,7 @@ func (config *KubeProxyTestConfig) createNetShellPodSpec(podName string, node st
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.GroupOrDie("").GroupVersion.Version,
+			APIVersion: latest.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      podName,
@@ -296,7 +296,7 @@ func (config *KubeProxyTestConfig) createTestPodSpec() *api.Pod {
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.GroupOrDie("").GroupVersion.Version,
+			APIVersion: latest.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      testPodName,
@@ -429,9 +429,8 @@ func (config *KubeProxyTestConfig) setup() {
 		selectorName: "true",
 	}
 
-	By("Getting two nodes")
-	nodeList, err := config.f.Client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get node list: %v", err))
+	By("Getting node addresses")
+	nodeList := ListSchedulableNodesOrDie(config.f.Client)
 	config.externalAddrs = NodeAddresses(nodeList, api.NodeExternalIP)
 	if len(config.externalAddrs) < 2 {
 		// fall back to legacy IPs
@@ -458,7 +457,7 @@ func (config *KubeProxyTestConfig) setup() {
 
 func (config *KubeProxyTestConfig) cleanup() {
 	nsClient := config.getNamespacesClient()
-	nsList, err := nsClient.List(nil, nil, unversioned.ListOptions{})
+	nsList, err := nsClient.List(api.ListOptions{})
 	if err == nil {
 		for _, ns := range nsList.Items {
 			if strings.Contains(ns.Name, config.f.BaseName) && ns.Name != config.f.Namespace.Name {
@@ -469,8 +468,7 @@ func (config *KubeProxyTestConfig) cleanup() {
 }
 
 func (config *KubeProxyTestConfig) createNetProxyPods(podName string, selector map[string]string) []*api.Pod {
-	nodes, err := config.f.Client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	nodes := ListSchedulableNodesOrDie(config.f.Client)
 
 	// create pods, one for each node
 	createdPods := make([]*api.Pod, 0, len(nodes.Items))

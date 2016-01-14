@@ -860,6 +860,7 @@ function start-master() {
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
     echo "readonly ZONE='${ZONE}'"
+    echo "readonly NUM_NODES='${NUM_NODES}'"
     echo "readonly KUBE_USER='${KUBE_USER}'"
     echo "readonly KUBE_PASSWORD='${KUBE_PASSWORD}'"
     echo "readonly SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
@@ -891,7 +892,13 @@ function start-master() {
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-master.sh"
-  ) > "${KUBE_TEMP}/master-start.sh"
+  ) > "${KUBE_TEMP}/master-user-data"
+
+  # We're running right up against the 16KB limit
+  # Remove all comment lines and then put back the bin/bash shebang
+  cat "${KUBE_TEMP}/master-user-data" | sed -e 's/^[[:blank:]]*#.*$//' | sed -e '/^[[:blank:]]*$/d' > "${KUBE_TEMP}/master-user-data.tmp"
+  echo '#! /bin/bash' | cat - "${KUBE_TEMP}/master-user-data.tmp" > "${KUBE_TEMP}/master-user-data"
+  rm "${KUBE_TEMP}/master-user-data.tmp"
 
   echo "Starting Master"
   master_id=$($AWS_CMD run-instances \
@@ -904,7 +911,7 @@ function start-master() {
     --security-group-ids ${MASTER_SG_ID} \
     --associate-public-ip-address \
     --block-device-mappings "${MASTER_BLOCK_DEVICE_MAPPINGS}" \
-    --user-data file://${KUBE_TEMP}/master-start.sh \
+    --user-data file://${KUBE_TEMP}/master-user-data \
     --query Instances[].InstanceId)
   add-tag $master_id Name $MASTER_NAME
   add-tag $master_id Role $MASTER_TAG
@@ -929,8 +936,13 @@ function start-master() {
       wait-for-instance-state ${master_id} "running"
 
       KUBE_MASTER=${MASTER_NAME}
-      KUBE_MASTER_IP=$(assign-elastic-ip $ip $master_id)
-      echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
+      echo -e " ${color_green}[master running @${ip}]${color_norm}"
+
+      local attach_message
+      attach_message=$(assign-elastic-ip $ip $master_id)
+      # Get master ip again after attachment.
+      KUBE_MASTER_IP=$(get_instance_public_ip $master_id)
+      echo ${attach_message}
 
       # This is a race between instance start and volume attachment.  There appears to be no way to start an AWS instance with a volume attached.
       # To work around this, we wait for volume to be ready in setup-master-pd.sh

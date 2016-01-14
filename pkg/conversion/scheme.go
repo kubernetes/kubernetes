@@ -163,18 +163,12 @@ func (s *Scheme) KnownTypes(gv unversioned.GroupVersion) map[string]reflect.Type
 
 // NewObject returns a new object of the given version and name,
 // or an error if it hasn't been registered.
-func (s *Scheme) NewObject(gvString, kind string) (interface{}, error) {
-	gv, err := unversioned.ParseGroupVersion(gvString)
-	if err != nil {
-		return nil, err
-	}
-	gvk := gv.WithKind(kind)
-
-	if t, exists := s.gvkToType[gvk]; exists {
+func (s *Scheme) NewObject(kind unversioned.GroupVersionKind) (interface{}, error) {
+	if t, exists := s.gvkToType[kind]; exists {
 		return reflect.New(t).Interface(), nil
 	}
 
-	return nil, &notRegisteredErr{gvk: gvk}
+	return nil, &notRegisteredErr{gvk: kind}
 }
 
 // AddConversionFuncs adds functions to the list of conversion functions. The given
@@ -281,15 +275,9 @@ func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
 	return nil
 }
 
-// Recognizes returns true if the scheme is able to handle the provided version and kind
+// Recognizes returns true if the scheme is able to handle the provided group,version,kind
 // of an object.
-func (s *Scheme) Recognizes(gvString, kind string) bool {
-	gv, err := unversioned.ParseGroupVersion(gvString)
-	if err != nil {
-		return false
-	}
-	gvk := gv.WithKind(kind)
-
+func (s *Scheme) Recognizes(gvk unversioned.GroupVersionKind) bool {
 	_, exists := s.gvkToType[gvk]
 	return exists
 }
@@ -314,13 +302,13 @@ func (s *Scheme) DeepCopy(in interface{}) (interface{}, error) {
 // that case, the conversion.Scope object passed to your conversion functions won't
 // have SrcVersion or DestVersion fields set correctly in Meta().
 func (s *Scheme) Convert(in, out interface{}) error {
-	inVersion := "unknown"
-	outVersion := "unknown"
-	if v, _, err := s.ObjectVersionAndKind(in); err == nil {
-		inVersion = v
+	inVersion := unversioned.GroupVersion{Group: "unknown", Version: "unknown"}
+	outVersion := unversioned.GroupVersion{Group: "unknown", Version: "unknown"}
+	if gvk, err := s.ObjectKind(in); err == nil {
+		inVersion = gvk.GroupVersion()
 	}
-	if v, _, err := s.ObjectVersionAndKind(out); err == nil {
-		outVersion = v
+	if gvk, err := s.ObjectKind(out); err == nil {
+		outVersion = gvk.GroupVersion()
 	}
 	flags, meta := s.generateConvertMeta(inVersion, outVersion, in)
 	if flags == 0 {
@@ -332,7 +320,7 @@ func (s *Scheme) Convert(in, out interface{}) error {
 // ConvertToVersion attempts to convert an input object to its matching Kind in another
 // version within this scheme. Will return an error if the provided version does not
 // contain the inKind (or a mapping by name defined with AddKnownTypeWithName).
-func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{}, error) {
+func (s *Scheme) ConvertToVersion(in interface{}, outGroupVersionString string) (interface{}, error) {
 	t := reflect.TypeOf(in)
 	if t.Kind() != reflect.Ptr {
 		return nil, fmt.Errorf("only pointer types may be converted: %v", t)
@@ -344,26 +332,30 @@ func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{
 
 	gvks, ok := s.typeToGVK[t]
 	if !ok {
-		return nil, fmt.Errorf("%v cannot be converted into version %q", t, outVersion)
+		return nil, fmt.Errorf("%v cannot be converted into version %q", t, outGroupVersionString)
 	}
-	outKind := gvks[0]
+	outVersion, err := unversioned.ParseGroupVersion(outGroupVersionString)
+	if err != nil {
+		return nil, err
+	}
+	outKind := outVersion.WithKind(gvks[0].Kind)
 
-	inVersion, _, err := s.ObjectVersionAndKind(in)
+	inKind, err := s.ObjectKind(in)
 	if err != nil {
 		return nil, err
 	}
 
-	out, err := s.NewObject(outVersion, outKind.Kind)
+	out, err := s.NewObject(outKind)
 	if err != nil {
 		return nil, err
 	}
 
-	flags, meta := s.generateConvertMeta(inVersion, outVersion, in)
+	flags, meta := s.generateConvertMeta(inKind.GroupVersion(), outVersion, in)
 	if err := s.converter.Convert(in, out, flags, meta); err != nil {
 		return nil, err
 	}
 
-	if err := s.SetVersionAndKind(outVersion, outKind.Kind, out); err != nil {
+	if err := s.SetVersionAndKind(outVersion.String(), outKind.Kind, out); err != nil {
 		return nil, err
 	}
 
@@ -376,37 +368,46 @@ func (s *Scheme) Converter() *Converter {
 }
 
 // generateConvertMeta constructs the meta value we pass to Convert.
-func (s *Scheme) generateConvertMeta(srcVersion, destVersion string, in interface{}) (FieldMatchingFlags, *Meta) {
+func (s *Scheme) generateConvertMeta(srcGroupVersion, destGroupVersion unversioned.GroupVersion, in interface{}) (FieldMatchingFlags, *Meta) {
 	t := reflect.TypeOf(in)
 	return s.converter.inputDefaultFlags[t], &Meta{
-		SrcVersion:     srcVersion,
-		DestVersion:    destVersion,
+		SrcVersion:     srcGroupVersion.String(),
+		DestVersion:    destGroupVersion.String(),
 		KeyNameMapping: s.converter.inputFieldMappingFuncs[t],
 	}
 }
 
-// DataVersionAndKind will return the APIVersion and Kind of the given wire-format
+// DataKind will return the group,version,kind of the given wire-format
 // encoding of an API Object, or an error.
-func (s *Scheme) DataVersionAndKind(data []byte) (version, kind string, err error) {
+func (s *Scheme) DataKind(data []byte) (unversioned.GroupVersionKind, error) {
 	return s.MetaFactory.Interpret(data)
 }
 
-// ObjectVersionAndKind returns the API version and kind of the go object,
+// ObjectKind returns the group,version,kind of the go object,
 // or an error if it's not a pointer or is unregistered.
-func (s *Scheme) ObjectVersionAndKind(obj interface{}) (apiVersion, kind string, err error) {
+func (s *Scheme) ObjectKind(obj interface{}) (unversioned.GroupVersionKind, error) {
+	gvks, err := s.ObjectKinds(obj)
+	if err != nil {
+		return unversioned.GroupVersionKind{}, err
+	}
+
+	return gvks[0], nil
+}
+
+// ObjectKinds returns all possible group,version,kind of the go object,
+// or an error if it's not a pointer or is unregistered.
+func (s *Scheme) ObjectKinds(obj interface{}) ([]unversioned.GroupVersionKind, error) {
 	v, err := EnforcePtr(obj)
 	if err != nil {
-		return "", "", err
+		return []unversioned.GroupVersionKind{}, err
 	}
 	t := v.Type()
 
 	gvks, ok := s.typeToGVK[t]
 	if !ok {
-		return "", "", &notRegisteredErr{t: t}
+		return []unversioned.GroupVersionKind{}, &notRegisteredErr{t: t}
 	}
-	apiVersion = gvks[0].GroupVersion().String()
-	kind = gvks[0].Kind
-	return
+	return gvks, nil
 }
 
 // SetVersionAndKind sets the version and kind fields (with help from

@@ -18,13 +18,14 @@ package kubelet
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/container"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 const (
@@ -41,6 +42,18 @@ type RunPodResult struct {
 
 // RunOnce polls from one configuration update and run the associated pods.
 func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, error) {
+	// Setup filesystem directories.
+	if err := kl.setupDataDirs(); err != nil {
+		return nil, err
+	}
+
+	// If the container logs directory does not exist, create it.
+	if _, err := os.Stat(containerLogsDir); err != nil {
+		if err := kl.os.Mkdir(containerLogsDir, 0755); err != nil {
+			glog.Errorf("Failed to create directory %q: %v", containerLogsDir, err)
+		}
+	}
+
 	select {
 	case u := <-updates:
 		glog.Infof("processing manifest with %d pods", len(u.Pods))
@@ -109,10 +122,9 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 		}
 		glog.Infof("pod %q containers not running: syncing", pod.Name)
 
-		podFullName := kubecontainer.GetPodFullName(pod)
-		glog.Infof("Creating a mirror pod for static pod %q", podFullName)
+		glog.Infof("Creating a mirror pod for static pod %q", format.Pod(pod))
 		if err := kl.podManager.CreateMirrorPod(pod); err != nil {
-			glog.Errorf("Failed creating a mirror pod %q: %v", podFullName, err)
+			glog.Errorf("Failed creating a mirror pod %q: %v", format.Pod(pod), err)
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 
@@ -132,9 +144,10 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 
 // isPodRunning returns true if all containers of a manifest are running.
 func (kl *Kubelet) isPodRunning(pod *api.Pod, runningPod container.Pod) (bool, error) {
-	status, err := kl.containerRuntime.GetPodStatus(pod)
+	// TODO(random-liu): Change this to new pod status
+	status, err := kl.containerRuntime.GetAPIPodStatus(pod)
 	if err != nil {
-		glog.Infof("Failed to get the status of pod %q: %v", kubecontainer.GetPodFullName(pod), err)
+		glog.Infof("Failed to get the status of pod %q: %v", format.Pod(pod), err)
 		return false, err
 	}
 	for _, st := range status.ContainerStatuses {

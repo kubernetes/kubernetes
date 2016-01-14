@@ -20,9 +20,6 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -33,11 +30,11 @@ type NodesInterface interface {
 type NodeInterface interface {
 	Get(name string) (result *api.Node, err error)
 	Create(node *api.Node) (*api.Node, error)
-	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.NodeList, error)
+	List(opts api.ListOptions) (*api.NodeList, error)
 	Delete(name string) error
 	Update(*api.Node) (*api.Node, error)
 	UpdateStatus(*api.Node) (*api.Node, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // nodes implements NodesInterface
@@ -63,9 +60,9 @@ func (c *nodes) Create(node *api.Node) (*api.Node, error) {
 }
 
 // List takes a selector, and returns the list of nodes that match that selector in the cluster.
-func (c *nodes) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.NodeList, error) {
+func (c *nodes) List(opts api.ListOptions) (*api.NodeList, error) {
 	result := &api.NodeList{}
-	err := c.r.Get().Resource(c.resourceName()).VersionedParams(&opts, api.Scheme).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err := c.r.Get().Resource(c.resourceName()).VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return result, err
 }
 
@@ -103,7 +100,7 @@ func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
 }
 
 // Watch returns a watch.Interface that watches the requested nodes.
-func (c *nodes) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *nodes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(api.NamespaceAll).

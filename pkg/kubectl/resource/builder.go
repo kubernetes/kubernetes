@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -67,6 +68,8 @@ type Builder struct {
 
 	singleResourceType bool
 	continueOnError    bool
+
+	export bool
 
 	schema validation.Schema
 }
@@ -234,6 +237,12 @@ func (b *Builder) Selector(selector labels.Selector) *Builder {
 	return b
 }
 
+// ExportParam accepts the export boolean for these resources
+func (b *Builder) ExportParam(export bool) *Builder {
+	b.export = export
+	return b
+}
+
 // NamespaceParam accepts the namespace that these resources should be
 // considered under from - used by DefaultNamespace() and RequireNamespace()
 func (b *Builder) NamespaceParam(namespace string) *Builder {
@@ -281,23 +290,7 @@ func (b *Builder) SelectAllParam(selectAll bool) *Builder {
 // When two or more arguments are received, they must be a single type and resource name(s).
 // The allowEmptySelector permits to select all the resources (via Everything func).
 func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string) *Builder {
-	// convert multiple resources to resource tuples, a,b,c d as a transform to a/d b/d c/d
-	if len(args) >= 2 {
-		resources := []string{}
-		resources = append(resources, SplitResourceArgument(args[0])...)
-		if len(resources) > 1 {
-			names := []string{}
-			names = append(names, args[1:]...)
-			newArgs := []string{}
-			for _, resource := range resources {
-				for _, name := range names {
-					newArgs = append(newArgs, strings.Join([]string{resource, name}, "/"))
-				}
-			}
-			args = newArgs
-		}
-	}
-
+	args = normalizeMultipleResourcesArgs(args)
 	if ok, err := hasCombinedTypeArgs(args); ok {
 		if err != nil {
 			b.errs = append(b.errs, err)
@@ -368,6 +361,27 @@ func hasCombinedTypeArgs(args []string) (bool, error) {
 	}
 }
 
+// Normalize args convert multiple resources to resource tuples, a,b,c d
+// as a transform to a/d b/d c/d
+func normalizeMultipleResourcesArgs(args []string) []string {
+	if len(args) >= 2 {
+		resources := []string{}
+		resources = append(resources, SplitResourceArgument(args[0])...)
+		if len(resources) > 1 {
+			names := []string{}
+			names = append(names, args[1:]...)
+			newArgs := []string{}
+			for _, resource := range resources {
+				for _, name := range names {
+					newArgs = append(newArgs, strings.Join([]string{resource, name}, "/"))
+				}
+			}
+			return newArgs
+		}
+	}
+	return args
+}
+
 // splitResourceTypeName handles type/name resource formats and returns a resource tuple
 // (empty or not), whether it successfully found one, and an error
 func splitResourceTypeName(s string) (resourceTuple, bool, error) {
@@ -426,7 +440,7 @@ func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 	}
 	mappings := []*meta.RESTMapping{}
 	for _, r := range b.resources {
-		gvk, err := b.mapper.KindFor(r)
+		gvk, err := b.mapper.KindFor(unversioned.GroupVersionResource{Resource: r})
 		if err != nil {
 			return nil, err
 		}
@@ -446,7 +460,7 @@ func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) 
 		if _, ok := mappings[r.Resource]; ok {
 			continue
 		}
-		gvk, err := b.mapper.KindFor(r.Resource)
+		gvk, err := b.mapper.KindFor(unversioned.GroupVersionResource{Resource: r.Resource})
 		if err != nil {
 			return nil, err
 		}
@@ -507,7 +521,7 @@ func (b *Builder) visitorResult() *Result {
 			if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 				selectorNamespace = ""
 			}
-			visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector))
+			visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector, b.export))
 		}
 		if b.continueOnError {
 			return &Result{visitor: EagerVisitorList(visitors), sources: visitors}
@@ -533,7 +547,7 @@ func (b *Builder) visitorResult() *Result {
 		}
 		clients := make(map[string]RESTClient)
 		for _, mapping := range mappings {
-			s := fmt.Sprintf("%s/%s", mapping.APIVersion, mapping.Resource)
+			s := fmt.Sprintf("%s/%s", mapping.GroupVersionKind.GroupVersion().String(), mapping.Resource)
 			if _, ok := clients[s]; ok {
 				continue
 			}
@@ -550,7 +564,7 @@ func (b *Builder) visitorResult() *Result {
 			if !ok {
 				return &Result{singular: isSingular, err: fmt.Errorf("resource %q is not recognized: %v", tuple.Resource, mappings)}
 			}
-			s := fmt.Sprintf("%s/%s", mapping.APIVersion, mapping.Resource)
+			s := fmt.Sprintf("%s/%s", mapping.GroupVersionKind.GroupVersion().String(), mapping.Resource)
 			client, ok := clients[s]
 			if !ok {
 				return &Result{singular: isSingular, err: fmt.Errorf("could not find a client for resource %q", tuple.Resource)}
@@ -565,7 +579,7 @@ func (b *Builder) visitorResult() *Result {
 				}
 			}
 
-			info := NewInfo(client, mapping, selectorNamespace, tuple.Name)
+			info := NewInfo(client, mapping, selectorNamespace, tuple.Name, b.export)
 			items = append(items, info)
 		}
 
@@ -614,7 +628,7 @@ func (b *Builder) visitorResult() *Result {
 
 		visitors := []Visitor{}
 		for _, name := range b.names {
-			info := NewInfo(client, mapping, selectorNamespace, name)
+			info := NewInfo(client, mapping, selectorNamespace, name, b.export)
 			visitors = append(visitors, info)
 		}
 		return &Result{singular: isSingular, visitor: VisitorList(visitors), sources: visitors}
@@ -695,4 +709,14 @@ func SplitResourceArgument(arg string) []string {
 		out = append(out, s)
 	}
 	return out
+}
+
+// HasNames returns true if the provided args contain resource names
+func HasNames(args []string) (bool, error) {
+	args = normalizeMultipleResourcesArgs(args)
+	hasCombinedTypes, err := hasCombinedTypeArgs(args)
+	if err != nil {
+		return false, err
+	}
+	return hasCombinedTypes || len(args) > 1, nil
 }

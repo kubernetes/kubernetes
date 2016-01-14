@@ -31,17 +31,16 @@
               "/hyperkube",
               "apiserver",
               "--service-cluster-ip-range=10.0.0.1/24",
-              "--address=127.0.0.1",
+              "--insecure-bind-address=127.0.0.1",
               "--etcd-servers=http://127.0.0.1:4001",
-              "--cluster-name=kubernetes",
-              "--admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ResourceQuota",
+              "--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,SecurityContextDeny,ResourceQuota",
               "--client-ca-file=/srv/kubernetes/ca.crt",
               "--basic-auth-file=/srv/kubernetes/basic_auth.csv",
               "--min-request-timeout=300",
               "--tls-cert-file=/srv/kubernetes/server.cert",
               "--tls-private-key-file=/srv/kubernetes/server.key",
               "--token-auth-file=/srv/kubernetes/known_tokens.csv",
-              "--allow-privileged=True",
+              "--allow-privileged=true",
               "--v=4"
         ],
       "volumeMounts": [
@@ -63,7 +62,7 @@
     },
     {
       "name": "setup",
-      "image": "gcr.io/google_containers/hyperkube:VERSION",
+      "image": "gcr.io/google_containers/hyperkube-ARCH:VERSION",
       "command": [
               "/setup-files.sh"
       ],

@@ -69,7 +69,7 @@ func (b *xmlBuilder) buildValue(value reflect.Value, current *XMLNode, tag refle
 
 	switch t {
 	case "structure":
-		if field, ok := value.Type().FieldByName("SDKShapeTraits"); ok {
+		if field, ok := value.Type().FieldByName("_"); ok {
 			tag = tag + reflect.StructTag(" ") + field.Tag
 		}
 		return b.buildStruct(value, current, tag)

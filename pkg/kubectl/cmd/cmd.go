@@ -110,23 +110,24 @@ __custom_func() {
 }
 `
 	valid_resources = `Valid resource types include:
-   * pods (aka 'po')
-   * replicationcontrollers (aka 'rc')
-   * daemonsets (aka 'ds')
-   * services (aka 'svc')
+   * componentstatuses (aka 'cs')
    * events (aka 'ev')
+   * endpoints (aka 'ep')
+   * horizontalpodautoscalers (aka 'hpa')
+   * ingress (aka 'ing')
+   * jobs
+   * limitranges (aka 'limits')
    * nodes (aka 'no')
    * namespaces (aka 'ns')
-   * secrets
+   * pods (aka 'po')
    * persistentvolumes (aka 'pv')
    * persistentvolumeclaims (aka 'pvc')
-   * limitranges (aka 'limits')
-   * resourcequotas (aka 'quota')
-   * componentstatuses (aka 'cs')
-   * endpoints (aka 'ep')
    * quota
-   * horizontalpodautoscalers (aka 'hpa')
+   * resourcequotas (aka 'quota')
+   * replicationcontrollers (aka 'rc')
+   * secrets
    * serviceaccounts
+   * services (aka 'svc')
 `
 )
 
@@ -161,6 +162,9 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	cmds.AddCommand(NewCmdLogs(f, out))
 	cmds.AddCommand(NewCmdRollingUpdate(f, out))
 	cmds.AddCommand(NewCmdScale(f, out))
+	cmds.AddCommand(NewCmdCordon(f, out))
+	cmds.AddCommand(NewCmdDrain(f, out))
+	cmds.AddCommand(NewCmdUncordon(f, out))
 
 	cmds.AddCommand(NewCmdAttach(f, in, out, err))
 	cmds.AddCommand(NewCmdExec(f, in, out, err))

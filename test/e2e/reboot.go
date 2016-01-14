@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -45,7 +44,7 @@ const (
 	rebootPodReadyAgainTimeout = 5 * time.Minute
 )
 
-var _ = Describe("Reboot", func() {
+var _ = Describe("Reboot [Disruptive]", func() {
 	var f *Framework
 
 	BeforeEach(func() {
@@ -62,12 +61,23 @@ var _ = Describe("Reboot", func() {
 			// events for the kube-system namespace on failures
 			namespaceName := api.NamespaceSystem
 			By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
-			events, err := f.Client.Events(namespaceName).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			events, err := f.Client.Events(namespaceName).List(api.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			for _, e := range events.Items {
 				Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
 			}
+		}
+		// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
+		// rebooted/deleted node) for up to 5 minutes before all tunnels are dropped and recreated.  Most tests
+		// make use of some proxy feature to verify functionality. So, if a reboot test runs right before a test
+		// that tries to get logs, for example, we may get unlucky and try to use a closed tunnel to a node that
+		// was recently rebooted. There's no good way to poll for proxies being closed, so we sleep.
+		//
+		// TODO(cjcullen) reduce this sleep (#19314)
+		if providerIs("gke") {
+			By("waiting 5 minutes for all dead tunnels to be dropped")
+			time.Sleep(5 * time.Minute)
 		}
 	})
 
@@ -116,10 +126,7 @@ var _ = Describe("Reboot", func() {
 
 func testReboot(c *client.Client, rebootCmd string) {
 	// Get all nodes, and kick off the test on each.
-	nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
-	if err != nil {
-		Failf("Error getting nodes: %v", err)
-	}
+	nodelist := ListSchedulableNodesOrDie(c)
 	result := make([]bool, len(nodelist.Items))
 	wg := sync.WaitGroup{}
 	wg.Add(len(nodelist.Items))

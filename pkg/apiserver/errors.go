@@ -21,7 +21,7 @@ import (
 	"net/http"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
+	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -52,7 +52,7 @@ func errToAPIStatus(err error) *unversioned.Status {
 		status := http.StatusInternalServerError
 		switch {
 		//TODO: replace me with NewConflictErr
-		case etcdutil.IsEtcdTestFailed(err):
+		case storage.IsTestFailed(err):
 			status = http.StatusConflict
 		}
 		// Log errors that were not converted to an error status

@@ -20,7 +20,8 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
-	"strings"
+
+	"github.com/appc/spec/schema/common"
 )
 
 type Port struct {
@@ -84,7 +85,12 @@ func PortFromString(pt string) (*Port, error) {
 	var port Port
 
 	pt = "name=" + pt
-	v, err := url.ParseQuery(strings.Replace(pt, ",", "&", -1))
+	ptQuery, err := common.MakeQueryString(pt)
+	if err != nil {
+		return nil, err
+	}
+
+	v, err := url.ParseQuery(ptQuery)
 	if err != nil {
 		return nil, err
 	}

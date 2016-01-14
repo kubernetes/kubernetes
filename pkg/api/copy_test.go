@@ -32,24 +32,24 @@ import (
 
 func TestDeepCopyApiObjects(t *testing.T) {
 	for i := 0; i < *fuzzIters; i++ {
-		for _, gv := range []unversioned.GroupVersion{testapi.Default.InternalGroupVersion(), *testapi.Default.GroupVersion()} {
-			f := apitesting.FuzzerFor(t, gv.String(), rand.NewSource(rand.Int63()))
-			for kind := range api.Scheme.KnownTypes(gv) {
-				doDeepCopyTest(t, gv.String(), kind, f)
+		for _, version := range []unversioned.GroupVersion{testapi.Default.InternalGroupVersion(), *testapi.Default.GroupVersion()} {
+			f := apitesting.FuzzerFor(t, version, rand.NewSource(rand.Int63()))
+			for kind := range api.Scheme.KnownTypes(version) {
+				doDeepCopyTest(t, version.WithKind(kind), f)
 			}
 		}
 	}
 }
 
-func doDeepCopyTest(t *testing.T, version, kind string, f *fuzz.Fuzzer) {
-	item, err := api.Scheme.New(version, kind)
+func doDeepCopyTest(t *testing.T, kind unversioned.GroupVersionKind, f *fuzz.Fuzzer) {
+	item, err := api.Scheme.New(kind)
 	if err != nil {
-		t.Fatalf("Could not create a %s: %s", kind, err)
+		t.Fatalf("Could not create a %v: %s", kind, err)
 	}
 	f.Fuzz(item)
 	itemCopy, err := api.Scheme.DeepCopy(item)
 	if err != nil {
-		t.Errorf("Could not deep copy a %s: %s", kind, err)
+		t.Errorf("Could not deep copy a %v: %s", kind, err)
 		return
 	}
 
@@ -60,9 +60,9 @@ func doDeepCopyTest(t *testing.T, version, kind string, f *fuzz.Fuzzer) {
 
 func TestDeepCopySingleType(t *testing.T) {
 	for i := 0; i < *fuzzIters; i++ {
-		for _, version := range []string{"", testapi.Default.Version()} {
+		for _, version := range []unversioned.GroupVersion{testapi.Default.InternalGroupVersion(), *testapi.Default.GroupVersion()} {
 			f := apitesting.FuzzerFor(t, version, rand.NewSource(rand.Int63()))
-			doDeepCopyTest(t, version, "Pod", f)
+			doDeepCopyTest(t, version.WithKind("Pod"), f)
 		}
 	}
 }

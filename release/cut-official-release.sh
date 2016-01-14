@@ -29,8 +29,7 @@ function main() {
     exit 1
   fi
   local -r new_version=${1-}
-  # TODO(ihmccreery) Stop calling it githash; it's not a githash.
-  local -r githash=${2-}
+  local -r build_version=${2-}
   DRY_RUN=true
   if [[ "${3-}" == "--no-dry-run" ]]; then
     echo "!!! This NOT is a dry run."
@@ -73,13 +72,13 @@ function main() {
     exit 1
   fi
 
-  # Get the git commit from the githash and verify it
+  # Get the git commit from the build_version and verify it
   local -r git_commit_regex="^[0-9a-f]{7}$"
-  local -r git_commit=$(echo "${githash}" | awk -F'+' '{print $2}' | head -c7)
+  local -r git_commit=$(echo "${build_version}" | awk -F'+' '{print $2}' | head -c7)
   if ! [[ "${git_commit}" =~ $git_commit_regex ]]; then
     usage
     echo
-    echo "!!! You specified an invalid githash '${githash}'."
+    echo "!!! You specified an invalid build_version '${build_version}'."
     echo "!!! Tried to extract commit, got ${git_commit}."
     exit 1
   fi
@@ -189,9 +188,11 @@ EOM
 }
 
 function usage() {
-  echo "Usage: ${0} <version> <githash> [--no-dry-run]"
+  echo "Usage: ${0} <release_version> <build_version> [--no-dry-run]"
   echo
-  echo "See docs/devel/releasing.md for more info."
+  echo "<release_version> is the version you want to release,"
+  echo "<build_version> is the version of the build you want to mark as <release-version>."
+  echo "Please see docs/devel/releasing.md for more info."
 }
 
 function check-prereqs() {

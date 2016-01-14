@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"math"
 	"testing"
 	"time"
 )
@@ -61,5 +62,28 @@ func TestThrottle(t *testing.T) {
 	}
 	if time.Now().Before(expectedFinish) {
 		t.Error("rate limit was not respected, finished too early")
+	}
+}
+
+func TestRateLimiterSaturation(t *testing.T) {
+	const e = 0.000001
+	tests := []struct {
+		capacity int
+		take     int
+
+		expectedSaturation float64
+	}{
+		{1, 1, 1},
+		{10, 3, 0.3},
+	}
+	for i, tt := range tests {
+		rl := NewTokenBucketRateLimiter(1, tt.capacity)
+		for i := 0; i < tt.take; i++ {
+			rl.Accept()
+		}
+		if math.Abs(rl.Saturation()-tt.expectedSaturation) > e {
+			t.Fatalf("#%d: Saturation rate difference isn't within tolerable range\n want=%f, get=%f",
+				i, tt.expectedSaturation, rl.Saturation())
+		}
 	}
 }

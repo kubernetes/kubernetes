@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package unversioned_test
+
+import . "k8s.io/kubernetes/pkg/client/unversioned"
 
 import (
 	"net/http"
@@ -24,25 +26,26 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
 func TestListEmptyPods(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{
-		Request:  testRequest{Method: "GET", Path: testapi.Default.ResourcePath("pods", ns, ""), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: http.StatusOK, Body: &api.PodList{}},
+	c := &simple.Client{
+		Request:  simple.Request{Method: "GET", Path: testapi.Default.ResourcePath("pods", ns, ""), Query: simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: http.StatusOK, Body: &api.PodList{}},
 	}
-	podList, err := c.Setup(t).Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	podList, err := c.Setup(t).Pods(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, podList, err)
 }
 
 func TestListPods(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{
-		Request: testRequest{Method: "GET", Path: testapi.Default.ResourcePath("pods", ns, ""), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: http.StatusOK,
+	c := &simple.Client{
+		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath("pods", ns, ""), Query: simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: http.StatusOK,
 			Body: &api.PodList{
 				Items: []api.Pod{
 					{
@@ -60,19 +63,20 @@ func TestListPods(t *testing.T) {
 			},
 		},
 	}
-	receivedPodList, err := c.Setup(t).Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	receivedPodList, err := c.Setup(t).Pods(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, receivedPodList, err)
 }
 
 func TestListPodsLabels(t *testing.T) {
 	ns := api.NamespaceDefault
-	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testapi.Default.Version())
-	c := &testClient{
-		Request: testRequest{
+	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath("pods", ns, ""),
-			Query:  buildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
-		Response: Response{
+			Query:  simple.BuildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
+		Response: simple.Response{
 			StatusCode: http.StatusOK,
 			Body: &api.PodList{
 				Items: []api.Pod{
@@ -92,17 +96,19 @@ func TestListPodsLabels(t *testing.T) {
 		},
 	}
 	c.Setup(t)
-	c.QueryValidator[labelSelectorQueryParamName] = validateLabels
+	defer c.Close()
+	c.QueryValidator[labelSelectorQueryParamName] = simple.ValidateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	receivedPodList, err := c.Pods(ns).List(selector, fields.Everything(), unversioned.ListOptions{})
+	options := api.ListOptions{LabelSelector: selector}
+	receivedPodList, err := c.Pods(ns).List(options)
 	c.Validate(t, receivedPodList, err)
 }
 
 func TestGetPod(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{
-		Request: testRequest{Method: "GET", Path: testapi.Default.ResourcePath("pods", ns, "foo"), Query: buildQueryValues(nil)},
-		Response: Response{
+	c := &simple.Client{
+		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath("pods", ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Response: simple.Response{
 			StatusCode: http.StatusOK,
 			Body: &api.Pod{
 				Status: api.PodStatus{
@@ -118,15 +124,17 @@ func TestGetPod(t *testing.T) {
 		},
 	}
 	receivedPod, err := c.Setup(t).Pods(ns).Get("foo")
+	defer c.Close()
 	c.Validate(t, receivedPod, err)
 }
 
 func TestGetPodWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{Error: true}
+	c := &simple.Client{Error: true}
 	receivedPod, err := c.Setup(t).Pods(ns).Get("")
-	if (err != nil) && (err.Error() != nameRequiredError) {
-		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
+	defer c.Close()
+	if (err != nil) && (err.Error() != simple.NameRequiredError) {
+		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
 	}
 
 	c.Validate(t, receivedPod, err)
@@ -134,11 +142,12 @@ func TestGetPodWithNoName(t *testing.T) {
 
 func TestDeletePod(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.Default.ResourcePath("pods", ns, "foo"), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: http.StatusOK},
+	c := &simple.Client{
+		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath("pods", ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: http.StatusOK},
 	}
 	err := c.Setup(t).Pods(ns).Delete("foo", nil)
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -155,14 +164,15 @@ func TestCreatePod(t *testing.T) {
 			},
 		},
 	}
-	c := &testClient{
-		Request: testRequest{Method: "POST", Path: testapi.Default.ResourcePath("pods", ns, ""), Query: buildQueryValues(nil), Body: requestPod},
-		Response: Response{
+	c := &simple.Client{
+		Request: simple.Request{Method: "POST", Path: testapi.Default.ResourcePath("pods", ns, ""), Query: simple.BuildQueryValues(nil), Body: requestPod},
+		Response: simple.Response{
 			StatusCode: http.StatusOK,
 			Body:       requestPod,
 		},
 	}
 	receivedPod, err := c.Setup(t).Pods(ns).Create(requestPod)
+	defer c.Close()
 	c.Validate(t, receivedPod, err)
 }
 
@@ -181,11 +191,12 @@ func TestUpdatePod(t *testing.T) {
 			Phase: api.PodRunning,
 		},
 	}
-	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.Default.ResourcePath("pods", ns, "foo"), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: http.StatusOK, Body: requestPod},
+	c := &simple.Client{
+		Request:  simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath("pods", ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: http.StatusOK, Body: requestPod},
 	}
 	receivedPod, err := c.Setup(t).Pods(ns).Update(requestPod)
+	defer c.Close()
 	c.Validate(t, receivedPod, err)
 }
 
@@ -195,8 +206,8 @@ func TestPodGetLogs(t *testing.T) {
 		Follow:     true,
 		Timestamps: true,
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath("pods", ns, "podName") + "/log",
 			Query: url.Values{
@@ -204,10 +215,11 @@ func TestPodGetLogs(t *testing.T) {
 				"timestamps": []string{"true"},
 			},
 		},
-		Response: Response{StatusCode: http.StatusOK},
+		Response: simple.Response{StatusCode: http.StatusOK},
 	}
 
 	body, err := c.Setup(t).Pods(ns).GetLogs("podName", opts).Stream()
+	defer c.Close()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

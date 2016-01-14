@@ -75,7 +75,7 @@ func TestFIFO_basic(t *testing.T) {
 	lastInt := _int(0)
 	lastUint := _uint(0)
 	for i := 0; i < amount*2; i++ {
-		switch obj := f.Pop().(type) {
+		switch obj := f.Pop(WithoutCancel()).(type) {
 		case _int:
 			if obj <= lastInt {
 				t.Errorf("got %v (int) out of order, last was %v", obj, lastInt)
@@ -100,7 +100,7 @@ func TestFIFO_addUpdate(t *testing.T) {
 	got := make(chan *testObj, 2)
 	go func() {
 		for {
-			got <- f.Pop().(*testObj)
+			got <- f.Pop(WithoutCancel()).(*testObj)
 		}
 	}()
 
@@ -126,7 +126,7 @@ func TestFIFO_addReplace(t *testing.T) {
 	got := make(chan *testObj, 2)
 	go func() {
 		for {
-			got <- f.Pop().(*testObj)
+			got <- f.Pop(WithoutCancel()).(*testObj)
 		}
 	}()
 
@@ -158,24 +158,24 @@ func TestFIFO_detectLineJumpers(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		if e, a := 13, f.Pop().(*testObj).value; a != e {
+		if e, a := 13, f.Pop(WithoutCancel()).(*testObj).value; a != e {
 			err = fmt.Errorf("expected %d, got %d", e, a)
 			return
 		}
 
 		f.Add(&testObj{"foo", 14}) // ensure foo doesn't jump back in line
 
-		if e, a := 1, f.Pop().(*testObj).value; a != e {
+		if e, a := 1, f.Pop(WithoutCancel()).(*testObj).value; a != e {
 			err = fmt.Errorf("expected %d, got %d", e, a)
 			return
 		}
 
-		if e, a := 30, f.Pop().(*testObj).value; a != e {
+		if e, a := 30, f.Pop(WithoutCancel()).(*testObj).value; a != e {
 			err = fmt.Errorf("expected %d, got %d", e, a)
 			return
 		}
 
-		if e, a := 14, f.Pop().(*testObj).value; a != e {
+		if e, a := 14, f.Pop(WithoutCancel()).(*testObj).value; a != e {
 			err = fmt.Errorf("expected %d, got %d", e, a)
 			return
 		}

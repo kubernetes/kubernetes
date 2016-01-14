@@ -53,8 +53,6 @@ var _ = Describe("Latency [Skipped]", func() {
 			c.Pods(ns).Delete(name, nil)
 		}
 
-		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
-
 		// Verify latency metrics
 		highLatencyRequests, err := HighLatencyRequests(c)
 		expectNoError(err)
@@ -67,10 +65,8 @@ var _ = Describe("Latency [Skipped]", func() {
 	BeforeEach(func() {
 		c = framework.Client
 		ns = framework.Namespace.Name
-		var err error
 
-		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
-		expectNoError(err)
+		nodes := ListSchedulableNodesOrDie(framework.Client)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 
@@ -83,7 +79,6 @@ var _ = Describe("Latency [Skipped]", func() {
 
 		expectNoError(resetMetrics(c))
 		expectNoError(os.Mkdir(fmt.Sprintf(testContext.OutputDir+"/%s", uuid), 0777))
-		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "before"))
 
 		Logf("Listing nodes for easy debugging:\n")
 		for _, node := range nodes.Items {
@@ -143,11 +138,12 @@ func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 	stopCh := make(chan struct{})
 	_, informer := framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return c.Pods(ns).List(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything(), unversioned.ListOptions{})
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				options.LabelSelector = labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
+				return c.Pods(ns).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				options.LabelSelector.Selector = labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				options.LabelSelector = labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
 				return c.Pods(ns).Watch(options)
 			},
 		},
@@ -190,14 +186,13 @@ func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 	close(stopCh)
 
 	// Read the schedule timestamp by checking the scheduler event for each pod
-	schedEvents, err := c.Events(ns).List(
-		labels.Everything(),
-		fields.Set{
-			"involvedObject.kind":      "Pod",
-			"involvedObject.namespace": ns,
-			"source":                   "scheduler",
-		}.AsSelector(),
-		unversioned.ListOptions{})
+	selector := fields.Set{
+		"involvedObject.kind":      "Pod",
+		"involvedObject.namespace": ns,
+		"source":                   api.DefaultSchedulerName,
+	}.AsSelector()
+	options := api.ListOptions{FieldSelector: selector}
+	schedEvents, err := c.Events(ns).List(options)
 	expectNoError(err)
 	for k := range createTimestamps {
 		for _, event := range schedEvents.Items {

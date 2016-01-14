@@ -22,13 +22,10 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	ioutil "k8s.io/kubernetes/pkg/util/io"
@@ -48,14 +45,16 @@ type PersistentVolumeRecycler struct {
 	client           recyclerClient
 	kubeClient       client.Interface
 	pluginMgr        volume.VolumePluginMgr
+	cloud            cloudprovider.Interface
 }
 
 // PersistentVolumeRecycler creates a new PersistentVolumeRecycler
-func NewPersistentVolumeRecycler(kubeClient client.Interface, syncPeriod time.Duration, plugins []volume.VolumePlugin) (*PersistentVolumeRecycler, error) {
+func NewPersistentVolumeRecycler(kubeClient client.Interface, syncPeriod time.Duration, plugins []volume.VolumePlugin, cloud cloudprovider.Interface) (*PersistentVolumeRecycler, error) {
 	recyclerClient := NewRecyclerClient(kubeClient)
 	recycler := &PersistentVolumeRecycler{
 		client:     recyclerClient,
 		kubeClient: kubeClient,
+		cloud:      cloud,
 	}
 
 	if err := recycler.pluginMgr.InitPlugins(plugins, recycler); err != nil {
@@ -64,23 +63,28 @@ func NewPersistentVolumeRecycler(kubeClient client.Interface, syncPeriod time.Du
 
 	_, volumeController := framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return kubeClient.PersistentVolumes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return kubeClient.PersistentVolumes().List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return kubeClient.PersistentVolumes().Watch(options)
 			},
 		},
 		&api.PersistentVolume{},
-		// TODO: Can we have much longer period here?
 		syncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				pv := obj.(*api.PersistentVolume)
+				pv, ok := obj.(*api.PersistentVolume)
+				if !ok {
+					glog.Errorf("Error casting object to PersistentVolume: %v", obj)
+				}
 				recycler.reclaimVolume(pv)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				pv := newObj.(*api.PersistentVolume)
+				pv, ok := newObj.(*api.PersistentVolume)
+				if !ok {
+					glog.Errorf("Error casting object to PersistentVolume: %v", newObj)
+				}
 				recycler.reclaimVolume(pv)
 			},
 		},
@@ -132,23 +136,26 @@ func (recycler *PersistentVolumeRecycler) handleRecycle(pv *api.PersistentVolume
 	spec := volume.NewSpecFromPersistentVolume(pv, false)
 	plugin, err := recycler.pluginMgr.FindRecyclablePluginBySpec(spec)
 	if err != nil {
-		return fmt.Errorf("Could not find recyclable volume plugin for spec: %+v", err)
-	}
-	volRecycler, err := plugin.NewRecycler(spec)
-	if err != nil {
-		return fmt.Errorf("Could not obtain Recycler for spec: %+v", err)
-	}
-	// blocks until completion
-	err = volRecycler.Recycle()
-	if err != nil {
-		glog.Errorf("PersistentVolume[%s] failed recycling: %+v", pv.Name, err)
-		pv.Status.Message = fmt.Sprintf("Recycling error: %s", err)
 		nextPhase = api.VolumeFailed
-	} else {
-		glog.V(5).Infof("PersistentVolume[%s] successfully recycled\n", pv.Name)
-		nextPhase = api.VolumePending
+		pv.Status.Message = fmt.Sprintf("%v", err)
+	}
+
+	// an error above means a suitable plugin for this volume was not found.
+	// we don't need to attempt recycling when plugin is nil, but we do need to persist the next/failed phase
+	// of the volume so that subsequent syncs won't attempt recycling through this handler func.
+	if plugin != nil {
+		volRecycler, err := plugin.NewRecycler(spec)
 		if err != nil {
-			glog.Errorf("Error updating pv.Status: %+v", err)
+			return fmt.Errorf("Could not obtain Recycler for spec: %#v  error: %v", spec, err)
+		}
+		// blocks until completion
+		if err := volRecycler.Recycle(); err != nil {
+			glog.Errorf("PersistentVolume[%s] failed recycling: %+v", pv.Name, err)
+			pv.Status.Message = fmt.Sprintf("Recycling error: %s", err)
+			nextPhase = api.VolumeFailed
+		} else {
+			glog.V(5).Infof("PersistentVolume[%s] successfully recycled\n", pv.Name)
+			nextPhase = api.VolumePending
 		}
 	}
 
@@ -174,24 +181,30 @@ func (recycler *PersistentVolumeRecycler) handleDelete(pv *api.PersistentVolume)
 	spec := volume.NewSpecFromPersistentVolume(pv, false)
 	plugin, err := recycler.pluginMgr.FindDeletablePluginBySpec(spec)
 	if err != nil {
-		return fmt.Errorf("Could not find deletable volume plugin for spec: %+v", err)
-	}
-	deleter, err := plugin.NewDeleter(spec)
-	if err != nil {
-		return fmt.Errorf("could not obtain Deleter for spec: %+v", err)
-	}
-	// blocks until completion
-	err = deleter.Delete()
-	if err != nil {
-		glog.Errorf("PersistentVolume[%s] failed deletion: %+v", pv.Name, err)
-		pv.Status.Message = fmt.Sprintf("Deletion error: %s", err)
 		nextPhase = api.VolumeFailed
-	} else {
-		glog.V(5).Infof("PersistentVolume[%s] successfully deleted through plugin\n", pv.Name)
-		// after successful deletion through the plugin, we can also remove the PV from the cluster
-		err = recycler.client.DeletePersistentVolume(pv)
+		pv.Status.Message = fmt.Sprintf("%v", err)
+	}
+
+	// an error above means a suitable plugin for this volume was not found.
+	// we don't need to attempt deleting when plugin is nil, but we do need to persist the next/failed phase
+	// of the volume so that subsequent syncs won't attempt deletion through this handler func.
+	if plugin != nil {
+		deleter, err := plugin.NewDeleter(spec)
 		if err != nil {
-			return fmt.Errorf("error deleting persistent volume: %+v", err)
+			return fmt.Errorf("Could not obtain Deleter for spec: %#v  error: %v", spec, err)
+		}
+		// blocks until completion
+		err = deleter.Delete()
+		if err != nil {
+			glog.Errorf("PersistentVolume[%s] failed deletion: %+v", pv.Name, err)
+			pv.Status.Message = fmt.Sprintf("Deletion error: %s", err)
+			nextPhase = api.VolumeFailed
+		} else {
+			glog.V(5).Infof("PersistentVolume[%s] successfully deleted through plugin\n", pv.Name)
+			// after successful deletion through the plugin, we can also remove the PV from the cluster
+			if err := recycler.client.DeletePersistentVolume(pv); err != nil {
+				return fmt.Errorf("error deleting persistent volume: %+v", err)
+			}
 		}
 	}
 
@@ -285,7 +298,7 @@ func (f *PersistentVolumeRecycler) NewWrapperCleaner(spec *volume.Spec, podUID t
 }
 
 func (f *PersistentVolumeRecycler) GetCloudProvider() cloudprovider.Interface {
-	return nil
+	return f.cloud
 }
 
 func (f *PersistentVolumeRecycler) GetMounter() mount.Interface {

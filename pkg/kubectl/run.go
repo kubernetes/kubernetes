@@ -109,7 +109,7 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 				},
 				Spec: *podSpec,
 			},
-			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
+			UniqueLabelKey: extensions.DefaultDeploymentUniqueLabelKey,
 		},
 	}
 	return &deployment, nil
@@ -266,7 +266,7 @@ func (JobV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object
 			Labels: labels,
 		},
 		Spec: extensions.JobSpec{
-			Selector: &extensions.PodSelector{
+			Selector: &extensions.LabelSelector{
 				MatchLabels: labels,
 			},
 			Template: api.PodTemplateSpec{

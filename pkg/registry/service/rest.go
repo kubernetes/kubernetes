@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -84,16 +84,19 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		// Allocate next available.
 		ip, err := rs.serviceIPs.AllocateNext()
 		if err != nil {
-			el := utilvalidation.ErrorList{utilvalidation.NewInvalidError("spec.clusterIP", service.Spec.ClusterIP, err.Error())}
-			return nil, errors.NewInvalid("Service", service.Name, el)
+			// TODO: what error should be returned here?  It's not a
+			// field-level validation failure (the field is valid), and it's
+			// not really an internal error.
+			return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a serviceIP: %v", err))
 		}
 		service.Spec.ClusterIP = ip.String()
 		releaseServiceIP = true
 	} else if api.IsServiceIPSet(service) {
 		// Try to respect the requested IP.
 		if err := rs.serviceIPs.Allocate(net.ParseIP(service.Spec.ClusterIP)); err != nil {
-			el := utilvalidation.ErrorList{utilvalidation.NewInvalidError("spec.clusterIP", service.Spec.ClusterIP, err.Error())}
-			return nil, errors.NewInvalid("Service", service.Name, el)
+			// TODO: when validation becomes versioned, this gets more complicated.
+			el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIP"), service.Spec.ClusterIP, err.Error())}
+			return nil, errors.NewInvalid(api.Kind("Service"), service.Name, el)
 		}
 		releaseServiceIP = true
 	}
@@ -104,14 +107,17 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		if servicePort.NodePort != 0 {
 			err := nodePortOp.Allocate(servicePort.NodePort)
 			if err != nil {
-				el := utilvalidation.ErrorList{utilvalidation.NewInvalidError("nodePort", servicePort.NodePort, err.Error())}.PrefixIndex(i).Prefix("spec.ports")
-				return nil, errors.NewInvalid("Service", service.Name, el)
+				// TODO: when validation becomes versioned, this gets more complicated.
+				el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), servicePort.NodePort, err.Error())}
+				return nil, errors.NewInvalid(api.Kind("Service"), service.Name, el)
 			}
 		} else if assignNodePorts {
 			nodePort, err := nodePortOp.AllocateNext()
 			if err != nil {
-				el := utilvalidation.ErrorList{utilvalidation.NewInvalidError("nodePort", servicePort.NodePort, err.Error())}.PrefixIndex(i).Prefix("spec.ports")
-				return nil, errors.NewInvalid("Service", service.Name, el)
+				// TODO: what error should be returned here?  It's not a
+				// field-level validation failure (the field is valid), and it's
+				// not really an internal error.
+				return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
 			}
 			servicePort.NodePort = nodePort
 		}
@@ -172,13 +178,13 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	return rs.registry.GetService(ctx, id)
 }
 
-func (rs *REST) List(ctx api.Context, options *unversioned.ListOptions) (runtime.Object, error) {
+func (rs *REST) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
 	return rs.registry.ListServices(ctx, options)
 }
 
 // Watch returns Services events via a watch.Interface.
 // It implements rest.Watcher.
-func (rs *REST) Watch(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
+func (rs *REST) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	return rs.registry.WatchServices(ctx, options)
 }
 
@@ -193,7 +199,7 @@ func (*REST) NewList() runtime.Object {
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	service := obj.(*api.Service)
 	if !api.ValidNamespace(ctx, &service.ObjectMeta) {
-		return nil, false, errors.NewConflict("service", service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
+		return nil, false, errors.NewConflict(api.Resource("services"), service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
 
 	oldService, err := rs.registry.GetService(ctx, service.Name)
@@ -204,7 +210,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 	// Copy over non-user fields
 	// TODO: make this a merge function
 	if errs := validation.ValidateServiceUpdate(service, oldService); len(errs) > 0 {
-		return nil, false, errors.NewInvalid("service", service.Name, errs)
+		return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
 
 	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts)
@@ -223,15 +229,17 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 				if !contains(oldNodePorts, nodePort) {
 					err := nodePortOp.Allocate(nodePort)
 					if err != nil {
-						el := utilvalidation.ErrorList{utilvalidation.NewInvalidError("nodePort", nodePort, err.Error())}.PrefixIndex(i).Prefix("spec.ports")
-						return nil, false, errors.NewInvalid("Service", service.Name, el)
+						el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), nodePort, err.Error())}
+						return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, el)
 					}
 				}
 			} else {
 				nodePort, err = nodePortOp.AllocateNext()
 				if err != nil {
-					el := utilvalidation.ErrorList{utilvalidation.NewInvalidError("nodePort", nodePort, err.Error())}.PrefixIndex(i).Prefix("spec.ports")
-					return nil, false, errors.NewInvalid("Service", service.Name, el)
+					// TODO: what error should be returned here?  It's not a
+					// field-level validation failure (the field is valid), and it's
+					// not really an internal error.
+					return nil, false, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
 				}
 				servicePort.NodePort = nodePort
 			}

@@ -34,17 +34,14 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/controller/serviceaccount"
-	"k8s.io/kubernetes/pkg/fields"
-	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/labels"
+	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	serviceaccountadmission "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
@@ -174,7 +171,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	tokensToCleanup := sets.NewString(token1Name, token2Name, token3Name)
 	err = wait.Poll(time.Second, 10*time.Second, func() (bool, error) {
 		// Get all secrets in the namespace
-		secrets, err := c.Secrets(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		secrets, err := c.Secrets(ns).List(api.ListOptions{})
 		// Retrieval errors should fail
 		if err != nil {
 			return false, err
@@ -341,25 +338,6 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 
 	deleteAllEtcdKeys()
 
-	// Etcd
-	etcdStorage, err := framework.NewEtcdStorage()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	expEtcdStorage, err := framework.NewExtensionsEtcdStorage(nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	storageDestinations := master.NewStorageDestinations()
-	storageDestinations.AddAPIGroup("", etcdStorage)
-	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
-
-	storageVersions := make(map[string]string)
-	storageVersions[""] = testapi.Default.Version()
-	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
-
 	// Listener
 	var m *master.Master
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -380,8 +358,8 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 		}
 		return nil, false, nil
 	})
-	serviceAccountKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	serviceAccountTokenGetter := serviceaccount.NewGetterFromClient(rootClient)
+	serviceAccountKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	serviceAccountTokenGetter := serviceaccountcontroller.NewGetterFromClient(rootClient)
 	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator([]*rsa.PublicKey{&serviceAccountKey.PublicKey}, true, serviceAccountTokenGetter)
 	authenticator := union.New(
 		bearertoken.New(rootTokenAuth),
@@ -423,24 +401,19 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	// Set up admission plugin to auto-assign serviceaccounts to pods
 	serviceAccountAdmission := serviceaccountadmission.NewServiceAccount(rootClient)
 
+	masterConfig := framework.NewMasterConfig()
+	masterConfig.EnableIndex = true
+	masterConfig.Authenticator = authenticator
+	masterConfig.Authorizer = authorizer
+	masterConfig.AdmissionControl = serviceAccountAdmission
+
 	// Create a master and install handlers into mux.
-	m = master.New(&master.Config{
-		StorageDestinations: storageDestinations,
-		KubeletClient:       kubeletclient.FakeKubeletClient{},
-		EnableLogsSupport:   false,
-		EnableUISupport:     false,
-		EnableIndex:         true,
-		APIPrefix:           "/api",
-		Authenticator:       authenticator,
-		Authorizer:          authorizer,
-		AdmissionControl:    serviceAccountAdmission,
-		StorageVersions:     storageVersions,
-	})
+	m = master.New(masterConfig)
 
 	// Start the service account and service account token controllers
-	tokenController := serviceaccount.NewTokensController(rootClient, serviceaccount.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
+	tokenController := serviceaccountcontroller.NewTokensController(rootClient, serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
 	tokenController.Run()
-	serviceAccountController := serviceaccount.NewServiceAccountsController(rootClient, serviceaccount.DefaultServiceAccountsControllerOptions())
+	serviceAccountController := serviceaccountcontroller.NewServiceAccountsController(rootClient, serviceaccountcontroller.DefaultServiceAccountsControllerOptions())
 	serviceAccountController.Run()
 	// Start the admission plugin reflectors
 	serviceAccountAdmission.Run()
@@ -449,7 +422,8 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 		tokenController.Stop()
 		serviceAccountController.Stop()
 		serviceAccountAdmission.Stop()
-		apiServer.Close()
+		// TODO: Uncomment when fix #19254
+		// apiServer.Close()
 	}
 
 	return rootClient, clientConfig, stop
@@ -539,11 +513,11 @@ func doServiceAccountAPIRequests(t *testing.T, c *client.Client, ns string, auth
 
 	readOps := []testOperation{
 		func() error {
-			_, err := c.Secrets(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			_, err := c.Secrets(ns).List(api.ListOptions{})
 			return err
 		},
 		func() error {
-			_, err := c.Pods(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			_, err := c.Pods(ns).List(api.ListOptions{})
 			return err
 		},
 	}

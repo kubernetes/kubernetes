@@ -56,37 +56,37 @@ func TestNegotiateVersion(t *testing.T) {
 			name:            "server supports client default",
 			version:         &uapi.GroupVersion{Version: "version1"},
 			config:          &unversioned.Config{},
-			serverVersions:  []string{"/version1", testapi.Default.Version()},
-			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, {Version: testapi.Default.Version()}},
+			serverVersions:  []string{"/version1", testapi.Default.GroupVersion().String()},
+			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, *testapi.Default.GroupVersion()},
 			expectedVersion: &uapi.GroupVersion{Version: "version1"},
 		},
 		{
 			name:            "server falls back to client supported",
-			version:         &uapi.GroupVersion{Version: testapi.Default.Version()},
+			version:         testapi.Default.GroupVersion(),
 			config:          &unversioned.Config{},
 			serverVersions:  []string{"/version1"},
-			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, {Version: testapi.Default.Version()}},
+			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, *testapi.Default.GroupVersion()},
 			expectedVersion: &uapi.GroupVersion{Version: "version1"},
 		},
 		{
 			name:            "explicit version supported",
 			config:          &unversioned.Config{GroupVersion: testapi.Default.GroupVersion()},
-			serverVersions:  []string{"/version1", testapi.Default.Version()},
-			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, {Version: testapi.Default.Version()}},
-			expectedVersion: &uapi.GroupVersion{Version: testapi.Default.Version()},
+			serverVersions:  []string{"/version1", testapi.Default.GroupVersion().String()},
+			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, *testapi.Default.GroupVersion()},
+			expectedVersion: testapi.Default.GroupVersion(),
 		},
 		{
 			name:           "explicit version not supported",
 			config:         &unversioned.Config{GroupVersion: testapi.Default.GroupVersion()},
 			serverVersions: []string{"/version1"},
-			clientVersions: []uapi.GroupVersion{{Version: "version1"}, {Version: testapi.Default.Version()}},
+			clientVersions: []uapi.GroupVersion{{Version: "version1"}, *testapi.Default.GroupVersion()},
 			expectErr:      func(err error) bool { return strings.Contains(err.Error(), `server does not support API version "v1"`) },
 		},
 		{
 			name:           "connection refused error",
 			config:         &unversioned.Config{GroupVersion: testapi.Default.GroupVersion()},
 			serverVersions: []string{"/version1"},
-			clientVersions: []uapi.GroupVersion{{Version: "version1"}, {Version: testapi.Default.Version()}},
+			clientVersions: []uapi.GroupVersion{{Version: "version1"}, *testapi.Default.GroupVersion()},
 			sendErr:        errors.New("connection refused"),
 			expectErr:      func(err error) bool { return strings.Contains(err.Error(), "connection refused") },
 		},
@@ -108,7 +108,7 @@ func TestNegotiateVersion(t *testing.T) {
 			}),
 		}
 		c := unversioned.NewOrDie(test.config)
-		c.Client = fakeClient.Client
+		c.DiscoveryClient.Client = fakeClient.Client
 		response, err := unversioned.NegotiateVersion(c, test.config, test.version, test.clientVersions)
 		if err == nil && test.expectErr != nil {
 			t.Errorf("expected error, got nil for [%s].", test.name)

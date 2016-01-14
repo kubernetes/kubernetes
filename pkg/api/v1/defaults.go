@@ -17,15 +17,14 @@ limitations under the License.
 package v1
 
 import (
-	"strings"
-
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
-func addDefaultingFuncs() {
-	api.Scheme.AddDefaultingFuncs(
+func addDefaultingFuncs(scheme *runtime.Scheme) {
+	scheme.AddDefaultingFuncs(
 		func(obj *PodExecOptions) {
 			obj.Stdout = true
 			obj.Stderr = true
@@ -67,10 +66,10 @@ func addDefaultingFuncs() {
 		},
 		func(obj *Container) {
 			if obj.ImagePullPolicy == "" {
-				// TODO(dchen1107): Move ParseImageName code to pkg/util
-				parts := strings.Split(obj.Image, ":")
+				_, tag := parsers.ParseImageName(obj.Image)
 				// Check image tag
-				if parts[len(parts)-1] == "latest" {
+
+				if tag == "latest" {
 					obj.ImagePullPolicy = PullAlways
 				} else {
 					obj.ImagePullPolicy = PullIfNotPresent
@@ -165,6 +164,11 @@ func addDefaultingFuncs() {
 				obj.Status.Phase = ClaimPending
 			}
 		},
+		func(obj *ISCSIVolumeSource) {
+			if obj.ISCSIInterface == "" {
+				obj.ISCSIInterface = "default"
+			}
+		},
 		func(obj *Endpoints) {
 			for i := range obj.Subsets {
 				ss := &obj.Subsets[i]
@@ -192,6 +196,15 @@ func addDefaultingFuncs() {
 		func(obj *Node) {
 			if obj.Spec.ExternalID == "" {
 				obj.Spec.ExternalID = obj.Name
+			}
+		},
+		func(obj *NodeStatus) {
+			if obj.Allocatable == nil && obj.Capacity != nil {
+				obj.Allocatable = make(ResourceList, len(obj.Capacity))
+				for key, value := range obj.Capacity {
+					obj.Allocatable[key] = *(value.Copy())
+				}
+				obj.Allocatable = obj.Capacity
 			}
 		},
 		func(obj *ObjectFieldSelector) {

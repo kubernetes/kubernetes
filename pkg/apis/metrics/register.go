@@ -17,31 +17,39 @@ limitations under the License.
 package metrics
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func init() {
-	// Register the API.
-	addKnownTypes()
+func AddToScheme(scheme *runtime.Scheme) {
+	// Add the API to Scheme.
+	addKnownTypes(scheme)
 }
 
+// GroupName is the group name use in this package
+const GroupName = "metrics"
+
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: "metrics", Version: ""}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: ""}
 
 // Kind takes an unqualified kind and returns back a Group qualified GroupKind
 func Kind(kind string) unversioned.GroupKind {
 	return SchemeGroupVersion.WithKind(kind).GroupKind()
 }
 
+// Resource takes an unqualified resource and returns back a Group qualified GroupResource
+func Resource(resource string) unversioned.GroupResource {
+	return SchemeGroupVersion.WithResource(resource).GroupResource()
+}
+
 // Adds the list of known types to api.Scheme.
-func addKnownTypes() {
+func addKnownTypes(scheme *runtime.Scheme) {
 	// TODO this will get cleaned up with the scheme types are fixed
-	api.Scheme.AddKnownTypes(SchemeGroupVersion,
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&RawNode{},
 		&RawPod{},
 	)
 }
 
-func (*RawNode) IsAnAPIObject() {}
-func (*RawPod) IsAnAPIObject()  {}
+func (obj *RawNode) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *RawPod) GetObjectKind() unversioned.ObjectKind  { return &obj.TypeMeta }

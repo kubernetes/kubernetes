@@ -22,6 +22,7 @@ import (
 	"sync"
 	"testing"
 
+	etcd "github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
@@ -34,10 +35,6 @@ import (
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
-
-	// TODO: once fakeClient has been purged move utils
-	// and eliminate these deps
-	"k8s.io/kubernetes/pkg/tools"
 )
 
 const validEtcdVersion = "etcd 2.0.9"
@@ -49,7 +46,7 @@ func init() {
 	scheme = runtime.NewScheme()
 	scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &storagetesting.TestResource{})
 	scheme.AddKnownTypes(*testapi.Default.GroupVersion(), &storagetesting.TestResource{})
-	codec = runtime.CodecFor(scheme, testapi.Default.Version())
+	codec = runtime.CodecFor(scheme, *testapi.Default.GroupVersion())
 	scheme.AddConversionFuncs(
 		func(in *storagetesting.TestResource, out *storagetesting.TestResource, s conversion.Scope) error {
 			*out = *in
@@ -58,7 +55,7 @@ func init() {
 	)
 }
 
-func newEtcdHelper(client tools.EtcdClient, codec runtime.Codec, prefix string) etcdHelper {
+func newEtcdHelper(client etcd.Client, codec runtime.Codec, prefix string) etcdHelper {
 	return *NewEtcdStorage(client, codec, prefix).(*etcdHelper)
 }
 
@@ -117,7 +114,7 @@ func TestList(t *testing.T) {
 	var got api.PodList
 	// TODO: a sorted filter function could be applied such implied
 	// ordering on the returned list doesn't matter.
-	err := helper.List(context.TODO(), key, 0, storage.Everything, &got)
+	err := helper.List(context.TODO(), key, "", storage.Everything, &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -156,7 +153,7 @@ func TestListFiltered(t *testing.T) {
 	}
 
 	var got api.PodList
-	err := helper.List(context.TODO(), key, 0, filter, &got)
+	err := helper.List(context.TODO(), key, "", filter, &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -206,7 +203,7 @@ func TestListAcrossDirectories(t *testing.T) {
 	list.Items[2] = *returnedObj
 
 	var got api.PodList
-	err := roothelper.List(context.TODO(), rootkey, 0, storage.Everything, &got)
+	err := roothelper.List(context.TODO(), rootkey, "", storage.Everything, &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -402,6 +399,9 @@ func TestGuaranteedUpdate(t *testing.T) {
 
 		return objUpdate, nil
 	}))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	objCheck := &storagetesting.TestResource{}
 	err = helper.Get(context.TODO(), key, objCheck, false)
@@ -409,7 +409,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 		t.Errorf("Unexpected error %#v", err)
 	}
 	if objCheck.Value != 2 {
-		t.Errorf("Value should have been 2 but got", objCheck.Value)
+		t.Errorf("Value should have been 2 but got %v", objCheck.Value)
 	}
 
 	if !callbackCalled {

@@ -33,13 +33,13 @@ import (
 	expvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/yaml"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	schedulerapilatest "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 )
 
-func validateObject(obj runtime.Object) (errors utilvalidation.ErrorList) {
+func validateObject(obj runtime.Object) (errors field.ErrorList) {
 	switch t := obj.(type) {
 	case *api.ReplicationController:
 		if t.Namespace == "" {
@@ -123,7 +123,7 @@ func validateObject(obj runtime.Object) (errors utilvalidation.ErrorList) {
 		}
 		errors = expvalidation.ValidateDaemonSet(t)
 	default:
-		return utilvalidation.ErrorList{utilvalidation.NewInternalError("", fmt.Errorf("no validation defined for %#v", obj))}
+		return field.ErrorList{field.InternalError(field.NewPath(""), fmt.Errorf("no validation defined for %#v", obj))}
 	}
 	return errors
 }
@@ -246,6 +246,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"rbd-with-secret": &api.Pod{},
 		},
 		"../examples/cassandra": {
+			"cassandra-daemonset":  &extensions.DaemonSet{},
 			"cassandra-controller": &api.ReplicationController{},
 			"cassandra-service":    &api.Service{},
 			"cassandra":            &api.Pod{},
@@ -391,6 +392,14 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"javaweb":   &api.Pod{},
 			"javaweb-2": &api.Pod{},
 		},
+		"../examples/job/work-queue-1": {
+			"job": &extensions.Job{},
+		},
+		"../examples/job/work-queue-2": {
+			"redis-pod":     &api.Pod{},
+			"redis-service": &api.Service{},
+			"job":           &extensions.Job{},
+		},
 	}
 
 	capabilities.SetForTests(capabilities.Capabilities{
@@ -421,7 +430,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 				if err != nil {
 					t.Errorf("Could not get codec for %s: %s", expectedType, err)
 				}
-				if err := codec.DecodeInto(data, expectedType); err != nil {
+				if err := runtime.DecodeInto(codec, data, expectedType); err != nil {
 					t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 					return
 				}

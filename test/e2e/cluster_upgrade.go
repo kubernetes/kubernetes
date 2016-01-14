@@ -29,10 +29,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -83,7 +80,8 @@ func masterUpgradeGKE(v string) error {
 		"upgrade",
 		testContext.CloudConfig.Cluster,
 		"--master",
-		fmt.Sprintf("--cluster-version=%s", v))
+		fmt.Sprintf("--cluster-version=%s", v),
+		"--quiet")
 	return err
 }
 
@@ -141,7 +139,8 @@ func nodeUpgradeGKE(v string) error {
 		"clusters",
 		"upgrade",
 		testContext.CloudConfig.Cluster,
-		fmt.Sprintf("--cluster-version=%s", v))
+		fmt.Sprintf("--cluster-version=%s", v),
+		"--quiet")
 	return err
 }
 
@@ -163,10 +162,10 @@ var _ = Describe("Cluster Upgrade [Skipped]", func() {
 	})
 
 	f := NewFramework("cluster-upgrade")
-	var w *WebserverTest
+	var w *ServerTest
 	BeforeEach(func() {
 		By("Setting up the service, RC, and pods")
-		w = NewWebserverTest(f.Client, f.Namespace.Name, svcName)
+		w = NewServerTest(f.Client, f.Namespace.Name, svcName)
 		rc := w.CreateWebserverRC(replicas)
 		rcName = rc.ObjectMeta.Name
 		svc := w.BuildServiceSpec()
@@ -353,10 +352,7 @@ func testNodeUpgrade(f *Framework, nUp func(f *Framework, n int, v string) error
 }
 
 func checkNodesVersions(c *client.Client, want string) error {
-	l, err := listNodes(c, labels.Everything(), fields.Everything())
-	if err != nil {
-		return fmt.Errorf("checkNodesVersions() failed to list nodes: %v", err)
-	}
+	l := ListSchedulableNodesOrDie(c)
 	for _, n := range l.Items {
 		// We do prefix trimming and then matching because:
 		// want   looks like:  0.19.3-815-g50e67d4
@@ -393,6 +389,9 @@ func retryCmd(command string, args ...string) (string, string, error) {
 
 // runCmd runs cmd using args and returns its stdout and stderr. It also outputs
 // cmd's stdout and stderr to their respective OS streams.
+//
+// TODO(ihmccreery) This function should either be moved into util.go or
+// removed; other e2e's use bare exe.Command.
 func runCmd(command string, args ...string) (string, string, error) {
 	Logf("Running %s %v", command, args)
 	var bout, berr bytes.Buffer
@@ -413,7 +412,7 @@ func runCmd(command string, args ...string) (string, string, error) {
 func validate(f *Framework, svcNameWant, rcNameWant string, ingress api.LoadBalancerIngress, podsWant int) error {
 	Logf("Beginning cluster validation")
 	// Verify RC.
-	rcs, err := f.Client.ReplicationControllers(f.Namespace.Name).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	rcs, err := f.Client.ReplicationControllers(f.Namespace.Name).List(api.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("error listing RCs: %v", err)
 	}

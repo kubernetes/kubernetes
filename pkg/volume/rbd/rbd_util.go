@@ -237,13 +237,13 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 				break
 			}
 		}
-	}
-	if err != nil {
-		return err
-	}
-	devicePath, found = waitForPath(b.Pool, b.Image, 10)
-	if !found {
-		return errors.New("Could not map image: Timeout after 10s")
+		if err != nil {
+			return err
+		}
+		devicePath, found = waitForPath(b.Pool, b.Image, 10)
+		if !found {
+			return errors.New("Could not map image: Timeout after 10s")
+		}
 	}
 	// mount it
 	globalPDPath := b.manager.MakeGlobalPDName(*b.rbd)
@@ -273,7 +273,7 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 	// the json file remains invisible during rbd mount and thus won't be removed accidentally.
 	util.persistRBD(b, globalPDPath)
 
-	if err = b.mounter.Mount(devicePath, globalPDPath, b.fsType, nil); err != nil {
+	if err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil); err != nil {
 		err = fmt.Errorf("rbd: failed to mount rbd volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
 	}
 	return err

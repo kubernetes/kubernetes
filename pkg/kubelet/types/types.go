@@ -21,20 +21,9 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // TODO: Reconcile custom types in kubelet/types and this subpackage
-
-// DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
-type DockerID string
-
-func (id DockerID) ContainerID() kubecontainer.ContainerID {
-	return kubecontainer.ContainerID{
-		Type: "docker",
-		ID:   string(id),
-	}
-}
 
 type HttpGetter interface {
 	Get(url string) (*http.Response, error)
@@ -77,4 +66,12 @@ func (s SortedContainerStatuses) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 func (s SortedContainerStatuses) Less(i, j int) bool {
 	return s[i].Name < s[j].Name
+}
+
+// Reservation represents reserved resources for non-pod components.
+type Reservation struct {
+	// System represents resources reserved for non-kubernetes components.
+	System api.ResourceList
+	// Kubernetes represents resources reserved for kubernetes system components.
+	Kubernetes api.ResourceList
 }

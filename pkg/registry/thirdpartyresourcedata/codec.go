@@ -41,13 +41,55 @@ type thirdPartyResourceDataMapper struct {
 
 var _ meta.RESTMapper = &thirdPartyResourceDataMapper{}
 
-func (t *thirdPartyResourceDataMapper) isThirdPartyResource(resource string) bool {
-	return resource == strings.ToLower(t.kind)+"s"
+func (t *thirdPartyResourceDataMapper) getResource() unversioned.GroupVersionResource {
+	plural, _ := meta.KindToResource(t.getKind(), false)
+
+	return plural
 }
 
-func (t *thirdPartyResourceDataMapper) KindFor(resource string) (unversioned.GroupVersionKind, error) {
+func (t *thirdPartyResourceDataMapper) getKind() unversioned.GroupVersionKind {
+	return unversioned.GroupVersionKind{Group: t.group, Version: t.version, Kind: t.kind}
+}
+
+func (t *thirdPartyResourceDataMapper) isThirdPartyResource(partialResource unversioned.GroupVersionResource) bool {
+	actualResource := t.getResource()
+	if strings.ToLower(partialResource.Resource) != strings.ToLower(actualResource.Resource) {
+		return false
+	}
+	if len(partialResource.Group) != 0 && partialResource.Group != actualResource.Group {
+		return false
+	}
+	if len(partialResource.Version) != 0 && partialResource.Version != actualResource.Version {
+		return false
+	}
+
+	return true
+}
+
+func (t *thirdPartyResourceDataMapper) ResourcesFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionResource, error) {
 	if t.isThirdPartyResource(resource) {
-		return unversioned.GroupVersionKind{Group: t.group, Version: t.version, Kind: t.kind}, nil
+		return []unversioned.GroupVersionResource{t.getResource()}, nil
+	}
+	return t.mapper.ResourcesFor(resource)
+}
+
+func (t *thirdPartyResourceDataMapper) KindsFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionKind, error) {
+	if t.isThirdPartyResource(resource) {
+		return []unversioned.GroupVersionKind{t.getKind()}, nil
+	}
+	return t.mapper.KindsFor(resource)
+}
+
+func (t *thirdPartyResourceDataMapper) ResourceFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionResource, error) {
+	if t.isThirdPartyResource(resource) {
+		return t.getResource(), nil
+	}
+	return t.mapper.ResourceFor(resource)
+}
+
+func (t *thirdPartyResourceDataMapper) KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error) {
+	if t.isThirdPartyResource(resource) {
+		return t.getKind(), nil
 	}
 	return t.mapper.KindFor(resource)
 }
@@ -67,9 +109,9 @@ func (t *thirdPartyResourceDataMapper) RESTMapping(gk unversioned.GroupKind, ver
 	}
 
 	// TODO figure out why we're doing this rewriting
-	extensionGK := unversioned.GroupKind{Group: "extensions", Kind: "ThirdPartyResourceData"}
+	extensionGK := unversioned.GroupKind{Group: extensions.GroupName, Kind: "ThirdPartyResourceData"}
 
-	mapping, err := t.mapper.RESTMapping(extensionGK, latest.GroupOrDie("extensions").GroupVersion.Version)
+	mapping, err := t.mapper.RESTMapping(extensionGK, latest.GroupOrDie(extensions.GroupName).GroupVersion.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -85,8 +127,7 @@ func (t *thirdPartyResourceDataMapper) ResourceSingularizer(resource string) (si
 	return t.mapper.ResourceSingularizer(resource)
 }
 
-// ResourceIsValid takes a string (kind) and checks if it's a valid resource
-func (t *thirdPartyResourceDataMapper) ResourceIsValid(resource string) bool {
+func (t *thirdPartyResourceDataMapper) ResourceIsValid(resource unversioned.GroupVersionResource) bool {
 	return t.isThirdPartyResource(resource) || t.mapper.ResourceIsValid(resource)
 }
 
@@ -158,7 +199,7 @@ func (t *thirdPartyResourceDataCodec) Decode(data []byte) (runtime.Object, error
 
 func (t *thirdPartyResourceDataCodec) DecodeToVersion(data []byte, gv unversioned.GroupVersion) (runtime.Object, error) {
 	// TODO: this is hacky, there must be a better way...
-	obj, err := t.Decode(data)
+	obj, err := runtime.Decode(t, data)
 	if err != nil {
 		return nil, err
 	}
@@ -289,19 +330,26 @@ type thirdPartyResourceDataCreator struct {
 	delegate runtime.ObjectCreater
 }
 
-func (t *thirdPartyResourceDataCreator) New(groupVersion, kind string) (out runtime.Object, err error) {
-	switch kind {
+func (t *thirdPartyResourceDataCreator) New(kind unversioned.GroupVersionKind) (out runtime.Object, err error) {
+	switch kind.Kind {
 	case "ThirdPartyResourceData":
-		if apiutil.GetGroupVersion(t.group, t.version) != groupVersion {
-			return nil, fmt.Errorf("unknown version %s for kind %s", groupVersion, kind)
+		if apiutil.GetGroupVersion(t.group, t.version) != kind.GroupVersion().String() {
+			return nil, fmt.Errorf("unknown kind %v", kind)
 		}
 		return &extensions.ThirdPartyResourceData{}, nil
 	case "ThirdPartyResourceDataList":
-		if apiutil.GetGroupVersion(t.group, t.version) != groupVersion {
-			return nil, fmt.Errorf("unknown version %s for kind %s", groupVersion, kind)
+		if apiutil.GetGroupVersion(t.group, t.version) != kind.GroupVersion().String() {
+			return nil, fmt.Errorf("unknown kind %v", kind)
 		}
 		return &extensions.ThirdPartyResourceDataList{}, nil
+	case "ListOptions":
+		if apiutil.GetGroupVersion(t.group, t.version) == kind.GroupVersion().String() {
+			// Translate third party group to external group.
+			gvk := latest.ExternalVersions[0].WithKind(kind.Kind)
+			return t.delegate.New(gvk)
+		}
+		return t.delegate.New(kind)
 	default:
-		return t.delegate.New(groupVersion, kind)
+		return t.delegate.New(kind)
 	}
 }

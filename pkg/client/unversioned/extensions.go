@@ -19,10 +19,9 @@ package unversioned
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -38,6 +37,8 @@ type ExtensionsInterface interface {
 	DeploymentsNamespacer
 	JobsNamespacer
 	IngressNamespacer
+	ThirdPartyResourceNamespacer
+	ConfigMapsNamespacer
 }
 
 // ExtensionsClient is used to interact with experimental Kubernetes features.
@@ -59,21 +60,6 @@ func (c *ExtensionsClient) ServerVersion() (*version.Info, error) {
 		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
 	return &info, nil
-}
-
-// ServerAPIVersions retrieves and parses the list of experimental API versions the
-// server supports.
-func (c *ExtensionsClient) ServerAPIVersions() (*unversioned.APIVersions, error) {
-	body, err := c.Get().AbsPath("/apis/extensions").Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var v unversioned.APIVersions
-	err = json.Unmarshal(body, &v)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &v, nil
 }
 
 func (c *ExtensionsClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
@@ -98,6 +84,14 @@ func (c *ExtensionsClient) Jobs(namespace string) JobInterface {
 
 func (c *ExtensionsClient) Ingress(namespace string) IngressInterface {
 	return newIngress(c, namespace)
+}
+
+func (c *ExtensionsClient) ConfigMaps(namespace string) ConfigMapsInterface {
+	return newConfigMaps(c, namespace)
+}
+
+func (c *ExtensionsClient) ThirdPartyResources(namespace string) ThirdPartyResourceInterface {
+	return newThirdPartyResources(c, namespace)
 }
 
 // NewExtensions creates a new ExtensionsClient for the given config. This client
@@ -130,7 +124,7 @@ func NewExtensionsOrDie(c *Config) *ExtensionsClient {
 
 func setExtensionsDefaults(config *Config) error {
 	// if experimental group is not registered, return an error
-	g, err := latest.Group("extensions")
+	g, err := latest.Group(extensions.GroupName)
 	if err != nil {
 		return err
 	}
@@ -144,10 +138,10 @@ func setExtensionsDefaults(config *Config) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	versionInterfaces, err := g.InterfacesFor(config.GroupVersion.String())
+	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
 	if err != nil {
-		return fmt.Errorf("Extensions API group/version '%v' is not recognized (valid values: %s)",
-			config.GroupVersion, strings.Join(latest.GroupOrDie("extensions").Versions, ", "))
+		return fmt.Errorf("Extensions API group/version '%v' is not recognized (valid values: %v)",
+			config.GroupVersion, latest.GroupOrDie(extensions.GroupName).GroupVersions)
 	}
 	config.Codec = versionInterfaces.Codec
 	if config.QPS == 0 {

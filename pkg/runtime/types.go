@@ -25,11 +25,12 @@ package runtime
 //      runtime.TypeMeta    `json:",inline"`
 //      ... // other fields
 // }
-// func (*MyAwesomeAPIObject) IsAnAPIObject() {}
+// func (obj *MyAwesomeAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) { unversioned.UpdateTypeMeta(obj,gvk) }; GroupVersionKind() *GroupVersionKind
 //
 // TypeMeta is provided here for convenience. You may use it directly from this package or define
 // your own with the same fields.
 //
+// +protobuf=true
 type TypeMeta struct {
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 	Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
@@ -98,6 +99,8 @@ type EmbeddedObject struct {
 // JSON stored in RawExtension, turning it into the correct object type, and storing it
 // in the EmbeddedObject. (TODO: In the case where the object is of an unknown type, a
 // runtime.Unknown object will be created and stored.)
+//
+// +protobuf=true
 type RawExtension struct {
 	RawJSON []byte
 }
@@ -107,6 +110,8 @@ type RawExtension struct {
 // TypeMeta features-- kind, version, etc.
 // TODO: Make this object have easy access to field based accessors and settors for
 // metadata and field mutatation.
+//
+// +protobuf=true
 type Unknown struct {
 	TypeMeta `json:",inline"`
 	// RawJSON will hold the complete JSON of the object which couldn't be matched
@@ -114,8 +119,6 @@ type Unknown struct {
 	// except for passing it through the system.
 	RawJSON []byte
 }
-
-func (*Unknown) IsAnAPIObject() {}
 
 // Unstructured allows objects that do not have Golang structs registered to be manipulated
 // generically. This can be used to deal with the API objects from a plug-in. Unstructured
@@ -128,5 +131,3 @@ type Unstructured struct {
 	// children.
 	Object map[string]interface{}
 }
-
-func (*Unstructured) IsAnAPIObject() {}

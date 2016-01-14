@@ -130,6 +130,9 @@ func (pm *basicManager) updatePodsInternal(pods ...*api.Pod) {
 		} else {
 			pm.podByUID[pod.UID] = pod
 			pm.podByFullName[podFullName] = pod
+			if mirror, ok := pm.mirrorPodByFullName[podFullName]; ok {
+				pm.translationByUID[mirror.UID] = pod.UID
+			}
 		}
 	}
 }
@@ -218,8 +221,8 @@ func (pm *basicManager) GetUIDTranslations() (podToMirror, mirrorToPod map[types
 	podToMirror = make(map[types.UID]types.UID, len(pm.translationByUID))
 	mirrorToPod = make(map[types.UID]types.UID, len(pm.translationByUID))
 	for k, v := range pm.translationByUID {
-		podToMirror[k] = v
-		mirrorToPod[v] = k
+		mirrorToPod[k] = v
+		podToMirror[v] = k
 	}
 	return podToMirror, mirrorToPod
 }

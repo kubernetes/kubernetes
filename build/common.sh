@@ -448,6 +448,7 @@ function kube::build::source_targets() {
     test
     third_party
     contrib/completions/bash/kubectl
+    contrib/mesos
     .generated_docs
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
@@ -653,6 +654,7 @@ function kube::release::package_tarballs() {
   kube::release::package_client_tarballs &
   kube::release::package_server_tarballs &
   kube::release::package_salt_tarball &
+  kube::release::package_kube_manifests_tarball &
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 
   kube::release::package_full_tarball & # _full depends on all the previous phases
@@ -702,6 +704,7 @@ function kube::release::package_server_tarballs() {
   local platform
   for platform in "${KUBE_SERVER_PLATFORMS[@]}" ; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
+    local arch=$(basename ${platform})
     kube::log::status "Building tarball: server $platform_tag"
 
     local release_stage="${RELEASE_STAGE}/server/${platform_tag}/kubernetes"
@@ -715,7 +718,7 @@ function kube::release::package_server_tarballs() {
     cp "${KUBE_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
 
-    kube::release::create_docker_images_for_server "${release_stage}/server/bin";
+    kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
     kube::release::write_addon_docker_images_for_server "${release_stage}/addons"
 
     # Include the client binaries here too as they are useful debugging tools.
@@ -753,12 +756,14 @@ function kube::release::sha1() {
 # that wrap the binary in them. (One docker image per binary)
 # Args:
 #  $1 - binary_dir, the directory to save the tared images to.
+#  $2 - arch, architecture for which we are building docker images.
 # Globals:
 #   KUBE_DOCKER_WRAPPED_BINARIES
 function kube::release::create_docker_images_for_server() {
   # Create a sub-shell so that we don't pollute the outer environment
   (
     local binary_dir="$1"
+    local arch="$2"
     local binary_name
     for wrappable in "${KUBE_DOCKER_WRAPPED_BINARIES[@]}"; do
 
@@ -786,11 +791,19 @@ function kube::release::create_docker_images_for_server() {
         printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
 
         local docker_image_tag=gcr.io/google_containers/$binary_name:$md5_sum
-        docker build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
-        docker save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
+        "${DOCKER[@]}" build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
+        "${DOCKER[@]}" save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
         echo $md5_sum > ${binary_dir}/${binary_name}.docker_tag
 
         rm -rf ${docker_build_path}
+
+        # If we are building an official/alpha/beta release we want to keep docker images
+        # and tag them appropriately.
+        if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
+          local release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
+          kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
+          "${DOCKER[@]}" tag -f "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
+        fi
 
         kube::log::status "Deleting docker image ${docker_image_tag}"
         "${DOCKER[@]}" rmi ${docker_image_tag} 2>/dev/null || true
@@ -819,6 +832,16 @@ function kube::release::write_addon_docker_images_for_server() {
       ) &
     done
 
+    if [[ ! -z "${BUILD_PYTHON_IMAGE:-}" ]]; then
+      (
+        kube::log::status "Building Docker python image"
+        
+        local img_name=python:2.7-slim-pyyaml
+        docker build -t "${img_name}" "${KUBE_ROOT}/cluster/addons/python-image"
+        docker save "${img_name}" > "${1}/${img_name}.tar"
+      ) &
+    fi
+
     kube::util::wait-for-jobs || { kube::log::error "unable to pull or write addon image"; return 1; }
     kube::log::status "Addon images done"
   )
@@ -846,6 +869,38 @@ function kube::release::package_salt_tarball() {
   kube::release::clean_cruft
 
   local package_name="${RELEASE_DIR}/kubernetes-salt.tar.gz"
+  kube::release::create_tarball "${package_name}" "${release_stage}/.."
+}
+
+# This will pack kube-system manifests files for distros without using salt
+# such as Ubuntu Trusty.
+#
+# There are two sources of manifests files: (1) some manifests in the directory
+# cluster/saltbase/salt can be used directly or after minor revision, so we copy
+# them from there; (2) otherwise, we will maintain separate copies in
+# cluster/gce/kube-manifests.
+function kube::release::package_kube_manifests_tarball() {
+  kube::log::status "Building tarball: manifests"
+
+  local release_stage="${RELEASE_STAGE}/manifests/kubernetes"
+  rm -rf "${release_stage}"
+  mkdir -p "${release_stage}"
+
+  # Source 1: manifests from cluster/saltbase/salt.
+  # TODO(andyzheng0831): Add more manifests when supporting master on trusty.
+  local salt_dir="${KUBE_ROOT}/cluster/saltbase/salt"
+  cp "${salt_dir}/fluentd-es/fluentd-es.yaml" "${release_stage}/"
+  cp "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${release_stage}/"
+  cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
+  cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
+
+  # Source 2: manifests from cluster/gce/kube-manifests.
+  # TODO(andyzheng0831): Enable the following line after finishing issue #16702.
+  # cp "${KUBE_ROOT}/cluster/gce/kube-manifests/"* "${release_stage}/"
+
+  kube::release::clean_cruft
+
+  local package_name="${RELEASE_DIR}/kubernetes-manifests.tar.gz"
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
 }
 
@@ -912,6 +967,7 @@ function kube::release::package_full_tarball() {
   mkdir -p "${release_stage}/server"
   cp "${RELEASE_DIR}/kubernetes-salt.tar.gz" "${release_stage}/server/"
   cp "${RELEASE_DIR}"/kubernetes-server-*.tar.gz "${release_stage}/server/"
+  cp "${RELEASE_DIR}/kubernetes-manifests.tar.gz" "${release_stage}/server/"
 
   mkdir -p "${release_stage}/third_party"
   cp -R "${KUBE_ROOT}/third_party/htpasswd" "${release_stage}/third_party/htpasswd"
@@ -1384,4 +1440,42 @@ function kube::release::gcs::publish() {
     kube::log::error "Expected contents of file to be ${KUBE_GCS_PUBLISH_VERSION}, but got ${contents}"
     return 1
   fi
+}
+
+# ---------------------------------------------------------------------------
+# Docker Release
+
+# Releases all docker images to a docker registry specified by KUBE_DOCKER_REGISTRY
+# using tag KUBE_DOCKER_IMAGE_TAG.
+#
+# Globals:
+#   KUBE_DOCKER_REGISTRY
+#   KUBE_DOCKER_IMAGE_TAG
+# Returns:
+#   If new pushing docker images was successful.
+function kube::release::docker::release() {
+  local binaries=(
+    "kube-apiserver"
+    "kube-controller-manager"
+    "kube-scheduler"
+    "kube-proxy"
+    "hyperkube"
+  )
+
+  local archs=(
+    "amd64"
+  )
+
+  local docker_push_cmd=("docker")
+  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
+    docker_push_cmd=("gcloud" "docker")
+  fi
+
+  for arch in "${archs[@]}"; do
+    for binary in "${binaries[@]}"; do
+      local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
+      kube::log::status "Pushing ${binary} to ${docker_target}"
+      "${docker_push_cmd[@]}" push "${docker_target}"
+    done
+  done
 }

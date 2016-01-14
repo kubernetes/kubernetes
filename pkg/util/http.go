@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -100,5 +101,13 @@ func TLSClientConfig(transport http.RoundTripper) (*tls.Config, error) {
 		return TLSClientConfig(transport.WrappedRoundTripper())
 	default:
 		return nil, fmt.Errorf("unknown transport type: %v", transport)
+	}
+}
+
+func FormatURL(scheme string, host string, port int, path string) *url.URL {
+	return &url.URL{
+		Scheme: scheme,
+		Host:   net.JoinHostPort(host, strconv.Itoa(port)),
+		Path:   path,
 	}
 }

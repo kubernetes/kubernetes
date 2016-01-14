@@ -171,7 +171,7 @@ fix-service-docker:
       - file: {{ environment_file }}
 {% if override_docker_ver != '' %}
     - require:
-      - pkg: {{ docker_pkg_name }}-{{ override_docker_ver }}
+      - pkg: docker-upgrade
 {% endif %}
 
 {% endif %}

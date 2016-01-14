@@ -23,24 +23,27 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
+	"sync"
 )
 
 const (
 	// Daemon sets will periodically check that their daemon pods are running as expected.
 	FullDaemonSetResyncPeriod = 30 * time.Second // TODO: Figure out if this time seems reasonable.
+
+	// Realistic value of the burstReplica field for the replication manager based off
+	// performance requirements for kubernetes 1.0.
+	BurstReplicas = 500
 
 	// We must avoid counting pods until the pod store has synced. If it hasn't synced, to
 	// avoid a hot loop, we'll wait this long between checks.
@@ -55,6 +58,10 @@ const (
 type DaemonSetsController struct {
 	kubeClient client.Interface
 	podControl controller.PodControlInterface
+
+	// An dsc is temporarily suspended after creating/deleting these many replicas.
+	// It resumes normal action after observing the watch events for them.
+	burstReplicas int
 
 	// To allow injection of syncDaemonSet for testing.
 	syncHandler func(dsKey string) error
@@ -91,16 +98,17 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 			KubeClient: kubeClient,
 			Recorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "daemon-set"}),
 		},
-		expectations: controller.NewControllerExpectations(),
-		queue:        workqueue.New(),
+		burstReplicas: BurstReplicas,
+		expectations:  controller.NewControllerExpectations(),
+		queue:         workqueue.New(),
 	}
 	// Manage addition/update of daemon sets.
 	dsc.dsStore.Store, dsc.dsController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).Watch(options)
 			},
 		},
@@ -129,10 +137,10 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 	// more pods until all the effects (expectations) of a daemon set's create/delete have been observed.
 	dsc.podStore.Store, dsc.podController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return dsc.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return dsc.kubeClient.Pods(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return dsc.kubeClient.Pods(api.NamespaceAll).Watch(options)
 			},
 		},
@@ -147,10 +155,10 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 	// Watch for new nodes or updates to nodes - daemon pods are launched on new nodes, and possibly when labels on nodes change,
 	dsc.nodeStore.Store, dsc.nodeController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return dsc.kubeClient.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return dsc.kubeClient.Nodes().List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return dsc.kubeClient.Nodes().Watch(options)
 			},
 		},
@@ -347,7 +355,7 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 // getNodesToDaemonSetPods returns a map from nodes to daemon pods (corresponding to ds) running on the nodes.
 func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) (map[string][]*api.Pod, error) {
 	nodeToDaemonPods := make(map[string][]*api.Pod)
-	selector, err := extensions.PodSelectorAsSelector(ds.Spec.Selector)
+	selector, err := extensions.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -405,25 +413,48 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 		glog.Errorf("Couldn't get key for object %+v: %v", ds, err)
 		return
 	}
-	dsc.expectations.SetExpectations(dsKey, len(nodesNeedingDaemonPods), len(podsToDelete))
 
-	glog.V(4).Infof("Nodes needing daemon pods for daemon set %s: %+v", ds.Name, nodesNeedingDaemonPods)
-	for i := range nodesNeedingDaemonPods {
-		if err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[i], ds.Namespace, ds.Spec.Template, ds); err != nil {
-			glog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
-			dsc.expectations.CreationObserved(dsKey)
-			util.HandleError(err)
-		}
+	createDiff := len(nodesNeedingDaemonPods)
+	deleteDiff := len(podsToDelete)
+
+	if createDiff > dsc.burstReplicas {
+		createDiff = dsc.burstReplicas
+	}
+	if deleteDiff > dsc.burstReplicas {
+		deleteDiff = dsc.burstReplicas
 	}
 
-	glog.V(4).Infof("Pods to delete for daemon set %s: %+v", ds.Name, podsToDelete)
-	for i := range podsToDelete {
-		if err := dsc.podControl.DeletePod(ds.Namespace, podsToDelete[i]); err != nil {
-			glog.V(2).Infof("Failed deletion, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
-			dsc.expectations.DeletionObserved(dsKey)
-			util.HandleError(err)
-		}
+	dsc.expectations.SetExpectations(dsKey, createDiff, deleteDiff)
+
+	glog.V(4).Infof("Nodes needing daemon pods for daemon set %s: %+v, creating %d", ds.Name, nodesNeedingDaemonPods, createDiff)
+	createWait := sync.WaitGroup{}
+	createWait.Add(createDiff)
+	for i := 0; i < createDiff; i++ {
+		go func(ix int) {
+			defer createWait.Done()
+			if err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, ds.Spec.Template, ds); err != nil {
+				glog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
+				dsc.expectations.CreationObserved(dsKey)
+				util.HandleError(err)
+			}
+		}(i)
 	}
+	createWait.Wait()
+
+	glog.V(4).Infof("Pods to delete for daemon set %s: %+v, deleting %d", ds.Name, podsToDelete, deleteDiff)
+	deleteWait := sync.WaitGroup{}
+	deleteWait.Add(deleteDiff)
+	for i := 0; i < deleteDiff; i++ {
+		go func(ix int) {
+			defer deleteWait.Done()
+			if err := dsc.podControl.DeletePod(ds.Namespace, podsToDelete[ix], ds); err != nil {
+				glog.V(2).Infof("Failed deletion, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
+				dsc.expectations.DeletionObserved(dsKey)
+				util.HandleError(err)
+			}
+		}(i)
+	}
+	deleteWait.Wait()
 }
 
 func storeDaemonSetStatus(dsClient client.DaemonSetInterface, ds *extensions.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled int) error {

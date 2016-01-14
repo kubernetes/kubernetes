@@ -36,6 +36,8 @@ func AddIsolatorName(n ACIdentifier, ns map[ACIdentifier]struct{}) {
 	ns[n] = struct{}{}
 }
 
+// Isolators encapsulates a list of individual Isolators for the ImageManifest
+// and PodManifest schemas.
 type Isolators []Isolator
 
 // GetByName returns the last isolator in the list by the given name.
@@ -63,21 +65,41 @@ func (is *Isolators) Unrecognized() Isolators {
 	return u
 }
 
+// IsolatorValue encapsulates the actual value of an Isolator which may be
+// serialized as any arbitrary JSON blob. Specific Isolator types should
+// implement this interface to facilitate unmarshalling and validation.
 type IsolatorValue interface {
 	UnmarshalJSON(b []byte) error
 	AssertValid() error
 }
+
+// Isolator is a model for unmarshalling isolator types from their JSON-encoded
+// representation.
 type Isolator struct {
-	Name     ACIdentifier     `json:"name"`
+	// Name is the name of the Isolator type as defined in the specification.
+	Name ACIdentifier `json:"name"`
+	// ValueRaw captures the raw JSON value of an Isolator that was
+	// unmarshalled. This field is used for unmarshalling only. It MUST NOT
+	// be referenced by external users of the Isolator struct. It is
+	// exported only to satisfy Go's unfortunate requirement that fields
+	// must be capitalized to be unmarshalled successfully.
 	ValueRaw *json.RawMessage `json:"value"`
-	value    IsolatorValue
+	// value captures the "true" value of the isolator.
+	value IsolatorValue
 }
+
+// isolator is a shadow type used for unmarshalling.
 type isolator Isolator
 
+// Value returns the raw Value of this Isolator. Users should perform a type
+// switch/assertion on this value to extract the underlying isolator type.
 func (i *Isolator) Value() IsolatorValue {
 	return i.value
 }
 
+// UnmarshalJSON populates this Isolator from a JSON-encoded representation. To
+// unmarshal the Value of the Isolator, it will use the appropriate constructor
+// as registered by AddIsolatorValueConstructor.
 func (i *Isolator) UnmarshalJSON(b []byte) error {
 	var ii isolator
 	err := json.Unmarshal(b, &ii)

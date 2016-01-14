@@ -21,10 +21,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
@@ -32,7 +30,8 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = Describe("ServiceAccounts", func() {
+// Flaky issue #19024
+var _ = Describe("ServiceAccounts [Flaky]", func() {
 	f := NewFramework("svcaccounts")
 
 	It("should mount an API token into pods [Conformance]", func() {
@@ -43,7 +42,8 @@ var _ = Describe("ServiceAccounts", func() {
 		expectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
 			By("getting the auto-created API token")
 			tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
-			secrets, err := f.Client.Secrets(f.Namespace.Name).List(labels.Everything(), tokenSelector, unversioned.ListOptions{})
+			options := api.ListOptions{FieldSelector: tokenSelector}
+			secrets, err := f.Client.Secrets(f.Namespace.Name).List(options)
 			if err != nil {
 				return false, err
 			}

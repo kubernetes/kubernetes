@@ -19,6 +19,7 @@ package generators
 import (
 	"io"
 	"path/filepath"
+	"strings"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
@@ -29,9 +30,12 @@ import (
 type genClientForType struct {
 	generator.DefaultGen
 	outputPackage string
+	group         string
 	typeToMatch   *types.Type
 	imports       *generator.ImportTracker
 }
+
+var _ generator.Generator = &genClientForType{}
 
 // Filter ignores all but one type because we're making a single file per type.
 func (g *genClientForType) Filter(c *generator.Context, t *types.Type) bool { return t == g.typeToMatch }
@@ -46,6 +50,18 @@ func (g *genClientForType) Imports(c *generator.Context) (imports []string) {
 	return g.imports.ImportLines()
 }
 
+// Ideally, we'd like hasStatus to return true if there is a subresource path
+// registered for "status" in the API server, but we do not have that
+// information, so hasStatus returns true if the type has a status field.
+func hasStatus(t *types.Type) bool {
+	for _, m := range t.Members {
+		if m.Name == "Status" && strings.Contains(m.Tags, `json:"status`) {
+			return true
+		}
+	}
+	return false
+}
+
 // GenerateType makes the body of a file implementing a set for type t.
 func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
@@ -54,19 +70,28 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"type":             t,
 		"package":          pkg,
 		"Package":          namer.IC(pkg),
-		"fieldSelector":    c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/fields", Name: "Selector"}),
-		"labelSelector":    c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/labels", Name: "Selector"}),
-		"watchInterface":   c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
-		"apiDeleteOptions": c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
-		"apiListOptions":   c.Universe.Get(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
+		"Group":            namer.IC(g.group),
+		"watchInterface":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
+		"apiDeleteOptions": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
+		"apiListOptions":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
 	}
 	sw.Do(namespacerTemplate, m)
-	sw.Do(interfaceTemplate, m)
+	sw.Do(interfaceTemplate1, m)
+	// Include the UpdateStatus method if the type has a status
+	if hasStatus(t) {
+		sw.Do(interfaceUpdateStatusTemplate, m)
+	}
+	sw.Do(interfaceTemplate2, m)
 	sw.Do(structTemplate, m)
 	sw.Do(newStructTemplate, m)
 	sw.Do(createTemplate, m)
 	sw.Do(updateTemplate, m)
+	// Generate the UpdateStatus method if the type has a status
+	if hasStatus(t) {
+		sw.Do(updateStatusTemplate, m)
+	}
 	sw.Do(deleteTemplate, m)
+	sw.Do(deleteCollectionTemplate, m)
 	sw.Do(getTemplate, m)
 	sw.Do(listTemplate, m)
 	sw.Do(watchTemplate, m)
@@ -78,49 +103,56 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 var namespacerTemplate = `
 // $.type|public$Namespacer has methods to work with $.type|public$ resources in a namespace
 type $.type|public$Namespacer interface {
-	$.type|public$s(namespace string) $.type|public$Interface
+	$.type|publicPlural$(namespace string) $.type|public$Interface
 }
 `
 
 // template for the Interface
-var interfaceTemplate = `
+var interfaceTemplate1 = `
 // $.type|public$Interface has methods to work with $.type|public$ resources.
 type $.type|public$Interface interface {
 	Create(*$.type|raw$) (*$.type|raw$, error)
-	Update(*$.type|raw$) (*$.type|raw$, error)
+	Update(*$.type|raw$) (*$.type|raw$, error)`
+
+var interfaceUpdateStatusTemplate = `
+	UpdateStatus(*$.type|raw$) (*$.type|raw$, error)`
+
+// template for the Interface
+var interfaceTemplate2 = `
 	Delete(name string, options *$.apiDeleteOptions|raw$) error
+	DeleteCollection(options *$.apiDeleteOptions|raw$, listOptions $.apiListOptions|raw$) error
 	Get(name string) (*$.type|raw$, error)
-	List(label $.labelSelector|raw$, field $.fieldSelector|raw$) (*$.type|raw$List, error)
-	Watch(label $.labelSelector|raw$, field $.fieldSelector|raw$, opts $.apiListOptions|raw$) ($.watchInterface|raw$, error)
+	List(opts $.apiListOptions|raw$) (*$.type|raw$List, error)
+	Watch(opts $.apiListOptions|raw$) ($.watchInterface|raw$, error)
+	$.type|public$Expansion
 }
 `
 
 // template for the struct that implements the interface
 var structTemplate = `
-// $.type|private$s implements $.type|public$Interface
-type $.type|private$s struct {
-	client *$.Package$Client
+// $.type|privatePlural$ implements $.type|public$Interface
+type $.type|privatePlural$ struct {
+	client *$.Group$Client
 	ns     string
 }
 `
 var newStructTemplate = `
-// new$.type|public$s returns a $.type|public$s
-func new$.type|public$s(c *ExtensionsClient, namespace string) *$.type|private$s {
-	return &$.type|private$s{
+// new$.type|publicPlural$ returns a $.type|publicPlural$
+func new$.type|publicPlural$(c *$.Group$Client, namespace string) *$.type|privatePlural$ {
+	return &$.type|privatePlural${
 		client: c,
 		ns:     namespace,
 	}
 }
 `
 var listTemplate = `
-// List takes label and field selectors, and returns the list of $.type|public$s that match those selectors.
-func (c *$.type|private$s) List(label $.labelSelector|raw$, field $.fieldSelector|raw$) (result *$.type|raw$List, err error) {
+// List takes label and field selectors, and returns the list of $.type|publicPlural$ that match those selectors.
+func (c *$.type|privatePlural$) List(opts $.apiListOptions|raw$) (result *$.type|raw$List, err error) {
 	result = &$.type|raw$List{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("$.type|private$s").
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
+		Resource("$.type|privatePlural$").
+		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
 	return
@@ -128,11 +160,11 @@ func (c *$.type|private$s) List(label $.labelSelector|raw$, field $.fieldSelecto
 `
 var getTemplate = `
 // Get takes name of the $.type|private$, and returns the corresponding $.type|private$ object, and an error if there is any.
-func (c *$.type|private$s) Get(name string) (result *$.type|raw$, err error) {
+func (c *$.type|privatePlural$) Get(name string) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("$.type|private$s").
+		Resource("$.type|privatePlural$").
 		Name(name).
 		Do().
 		Into(result)
@@ -142,19 +174,25 @@ func (c *$.type|private$s) Get(name string) (result *$.type|raw$, err error) {
 
 var deleteTemplate = `
 // Delete takes name of the $.type|private$ and deletes it. Returns an error if one occurs.
-func (c *$.type|private$s) Delete(name string, options *$.apiDeleteOptions|raw$) error {
-	if options == nil {
-		return c.client.Delete().Namespace(c.ns).Resource("$.type|private$s").Name(name).Do().Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.client.APIVersion())
-	if err != nil {
-		return err
-	}
+func (c *$.type|privatePlural$) Delete(name string, options *$.apiDeleteOptions|raw$) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("$.type|private$s").
+		Resource("$.type|privatePlural$").
 		Name(name).
-		Body(body).
+		Body(options).
+		Do().
+		Error()
+}
+`
+
+var deleteCollectionTemplate = `
+// DeleteCollection deletes a collection of objects.
+func (c *$.type|privatePlural$) DeleteCollection(options *$.apiDeleteOptions|raw$, listOptions $.apiListOptions|raw$) error {
+	return c.client.Delete().
+		Namespace(c.ns).
+		Resource("$.type|privatePlural$").
+		VersionedParams(&listOptions, api.Scheme).
+		Body(options).
 		Do().
 		Error()
 }
@@ -162,11 +200,11 @@ func (c *$.type|private$s) Delete(name string, options *$.apiDeleteOptions|raw$)
 
 var createTemplate = `
 // Create takes the representation of a $.type|private$ and creates it.  Returns the server's representation of the $.type|private$, and an error, if there is any.
-func (c *$.type|private$s) Create($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
+func (c *$.type|privatePlural$) Create($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("$.type|private$s").
+		Resource("$.type|privatePlural$").
 		Body($.type|private$).
 		Do().
 		Into(result)
@@ -176,11 +214,11 @@ func (c *$.type|private$s) Create($.type|private$ *$.type|raw$) (result *$.type|
 
 var updateTemplate = `
 // Update takes the representation of a $.type|private$ and updates it. Returns the server's representation of the $.type|private$, and an error, if there is any.
-func (c *$.type|private$s) Update($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
+func (c *$.type|privatePlural$) Update($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("$.type|private$s").
+		Resource("$.type|privatePlural$").
 		Name($.type|private$.Name).
 		Body($.type|private$).
 		Do().
@@ -189,17 +227,22 @@ func (c *$.type|private$s) Update($.type|private$ *$.type|raw$) (result *$.type|
 }
 `
 
+var updateStatusTemplate = `
+func (c *$.type|privatePlural$) UpdateStatus($.type|private$ *$.type|raw$) (*$.type|raw$, error) {
+	result := &$.type|raw${}
+	err := c.client.Put().Resource("$.type|privatePlural$").Name($.type|private$.Name).SubResource("status").Body($.type|private$).Do().Into(result)
+	return result, err
+}
+`
+
 var watchTemplate = `
-// Watch returns a $.watchInterface|raw$ that watches the requested $.type|private$s.
-func (c *$.type|private$s) Watch(label $.labelSelector|raw$, field $.fieldSelector|raw$, opts $.apiListOptions|raw$) ($.watchInterface|raw$, error) {
+// Watch returns a $.watchInterface|raw$ that watches the requested $.type|privatePlural$.
+func (c *$.type|privatePlural$) Watch(opts $.apiListOptions|raw$) ($.watchInterface|raw$, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("$.type|private$s").
-		Param("resourceVersion", opts.ResourceVersion).
-		TimeoutSeconds(TimeoutFromListOptions(opts)).
-		LabelsSelectorParam(label).
-		FieldsSelectorParam(field).
+		Resource("$.type|privatePlural$").
+		VersionedParams(&opts, api.Scheme).
 		Watch()
 }
 `

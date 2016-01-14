@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	info "github.com/google/cadvisor/info/v1"
+
 	"google.golang.org/cloud/compute/metadata"
 )
 

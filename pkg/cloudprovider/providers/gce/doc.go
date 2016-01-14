@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package gce is an implementation of Interface, TCPLoadBalancer
+// Package gce is an implementation of Interface, LoadBalancer
 // and Instances for Google Compute Engine.
 package gce

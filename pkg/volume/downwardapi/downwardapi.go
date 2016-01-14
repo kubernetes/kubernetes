@@ -51,8 +51,9 @@ type downwardAPIPlugin struct {
 
 var _ volume.VolumePlugin = &downwardAPIPlugin{}
 
-func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost) {
+func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *downwardAPIPlugin) Name() string {
@@ -90,6 +91,7 @@ type downwardAPIVolume struct {
 	pod                     *api.Pod
 	podUID                  types.UID // TODO: remove this redundancy as soon NewCleaner func will have *api.POD and not only types.UID
 	plugin                  *downwardAPIPlugin
+	volume.MetricsNil
 }
 
 // This is the spec for the volume that this plugin wraps.

@@ -56,8 +56,8 @@ type Config struct {
 	UpdatesBacklog                     int             `gcfg:"updates-backlog"`
 	FrameworkIdRefreshInterval         WrappedDuration `gcfg:"framework-id-refresh-interval"`
 	InitialImplicitReconciliationDelay WrappedDuration `gcfg:"initial-implicit-reconciliation-delay"`
-	ExplicitReconciliationMaxBackoff   WrappedDuration `gcfg:"explicit-reconciliantion-max-backoff"`
-	ExplicitReconciliationAbortTimeout WrappedDuration `gcfg:"explicit-reconciliantion-abort-timeout"`
+	ExplicitReconciliationMaxBackoff   WrappedDuration `gcfg:"explicit-reconciliation-max-backoff"`
+	ExplicitReconciliationAbortTimeout WrappedDuration `gcfg:"explicit-reconciliation-abort-timeout"`
 	InitialPodBackoff                  WrappedDuration `gcfg:"initial-pod-backoff"`
 	MaxPodBackoff                      WrappedDuration `gcfg:"max-pod-backoff"`
 	HttpHandlerTimeout                 WrappedDuration `gcfg:"http-handler-timeout"`

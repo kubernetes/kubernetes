@@ -102,10 +102,10 @@ func (c *MesosCloud) Instances() (cloudprovider.Instances, bool) {
 	return c, true
 }
 
-// TCPLoadBalancer always returns nil, false in this implementation.
+// LoadBalancer always returns nil, false in this implementation.
 // Mesos does not provide any type of native load balancing by default,
 // so this implementation always returns (nil, false).
-func (c *MesosCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
+func (c *MesosCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return nil, false
 }
 

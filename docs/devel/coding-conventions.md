@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/devel/coding-conventions.md).
@@ -68,11 +69,13 @@ Directory and file conventions
   - Avoid package sprawl. Find an appropriate subdirectory for new packages. (See [#4851](http://issues.k8s.io/4851) for discussion.)
     - Libraries with no more appropriate home belong in new package subdirectories of pkg/util
   - Avoid general utility packages. Packages called "util" are suspect. Instead, derive a name that describes your desired function. For example, the utility functions dealing with waiting for operations are in the "wait" package and include functionality like Poll. So the full name is wait.Poll
+  - All filenames should be lowercase
   - Go source files and directories use underscores, not dashes
     - Package directories should generally avoid using separators as much as possible (when packages are multiple words, they usually should be in nested subdirectories).
   - Document directories and filenames should use dashes rather than underscores
   - Contrived examples that illustrate system features belong in /docs/user-guide or /docs/admin, depending on whether it is a feature primarily intended for users that deploy applications or cluster administrators, respectively. Actual application examples belong in /examples.
-    - Examples should also illustrate [best practices for using the system](../user-guide/config-best-practices.md)
+    - Examples should also illustrate
+      [best practices for configuration and using the system](../user-guide/config-best-practices.md)
   - Third-party code
     - Third-party Go code is managed using Godeps
     - Other third-party code belongs in /third_party

@@ -27,8 +27,8 @@ import (
 
 // Interface is an abstract, pluggable interface for cloud providers.
 type Interface interface {
-	// TCPLoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
-	TCPLoadBalancer() (TCPLoadBalancer, bool)
+	// LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
+	LoadBalancer() (LoadBalancer, bool)
 	// Instances returns an instances interface. Also returns true if the interface is supported, false otherwise.
 	Instances() (Instances, bool)
 	// Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
@@ -76,23 +76,23 @@ func GetInstanceProviderID(cloud Interface, nodeName string) (string, error) {
 	return cloud.ProviderName() + "://" + instanceID, nil
 }
 
-// TCPLoadBalancer is an abstract, pluggable interface for TCP load balancers.
-type TCPLoadBalancer interface {
+// LoadBalancer is an abstract, pluggable interface for load balancers.
+type LoadBalancer interface {
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
-	// GetTCPLoadBalancer returns whether the specified load balancer exists, and
+	// GetLoadBalancer returns whether the specified load balancer exists, and
 	// if so, what its status is.
-	GetTCPLoadBalancer(name, region string) (status *api.LoadBalancerStatus, exists bool, err error)
-	// EnsureTCPLoadBalancer creates a new tcp load balancer, or updates an existing one. Returns the status of the balancer
-	EnsureTCPLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error)
-	// UpdateTCPLoadBalancer updates hosts under the specified load balancer.
-	UpdateTCPLoadBalancer(name, region string, hosts []string) error
-	// EnsureTCPLoadBalancerDeleted deletes the specified load balancer if it
+	GetLoadBalancer(name, region string) (status *api.LoadBalancerStatus, exists bool, err error)
+	// EnsureLoadBalancer creates a new load balancer, or updates an existing one. Returns the status of the balancer
+	EnsureLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error)
+	// UpdateLoadBalancer updates hosts under the specified load balancer.
+	UpdateLoadBalancer(name, region string, hosts []string) error
+	// EnsureLoadBalancerDeleted deletes the specified load balancer if it
 	// exists, returning nil if the load balancer specified either didn't exist or
 	// was successfully deleted.
 	// This construction is useful because many cloud providers' load balancers
 	// have multiple underlying components, meaning a Get could say that the LB
 	// doesn't exist even if some part of it is still laying around.
-	EnsureTCPLoadBalancerDeleted(name, region string) error
+	EnsureLoadBalancerDeleted(name, region string) error
 }
 
 // Instances is an abstract, pluggable interface for sets of instances.

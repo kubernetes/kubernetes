@@ -67,6 +67,7 @@ func TestDeleteOne_PendingPod(t *testing.T) {
 		pod.Pod,
 		&mesosproto.ExecutorInfo{},
 		nil,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("failed to create task: %v", err)
@@ -112,6 +113,7 @@ func TestDeleteOne_Running(t *testing.T) {
 		"bar",
 		pod.Pod,
 		&mesosproto.ExecutorInfo{},
+		nil,
 		nil,
 	)
 	if err != nil {

@@ -26,6 +26,32 @@ func (c Claims) StringClaim(name string) (string, bool, error) {
 	return v, true, nil
 }
 
+func (c Claims) StringsClaim(name string) ([]string, bool, error) {
+	cl, ok := c[name]
+	if !ok {
+		return nil, false, nil
+	}
+
+	if v, ok := cl.([]string); ok {
+		return v, true, nil
+	}
+
+	// When unmarshaled, []string will become []interface{}.
+	if v, ok := cl.([]interface{}); ok {
+		var ret []string
+		for _, vv := range v {
+			str, ok := vv.(string)
+			if !ok {
+				return nil, false, fmt.Errorf("unable to parse claim as string array: %v", name)
+			}
+			ret = append(ret, str)
+		}
+		return ret, true, nil
+	}
+
+	return nil, false, fmt.Errorf("unable to parse claim as string array: %v", name)
+}
+
 func (c Claims) Int64Claim(name string) (int64, bool, error) {
 	cl, ok := c[name]
 	if !ok {

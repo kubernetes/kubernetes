@@ -59,7 +59,7 @@ type ObjectScheme interface {
 func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 
 	return func(action Action) (bool, runtime.Object, error) {
-		gvk, err := mapper.KindFor(action.GetResource())
+		kind, err := mapper.KindFor(unversioned.GroupVersionResource{Resource: action.GetResource()})
 		if err != nil {
 			return false, nil, fmt.Errorf("unrecognized action %s: %v", action.GetResource(), err)
 		}
@@ -67,16 +67,16 @@ func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 		// TODO: have mapper return a Kind for a subresource?
 		switch castAction := action.(type) {
 		case ListAction:
-			gvk.Kind += "List"
-			resource, err := o.Kind(gvk, "")
+			kind.Kind += "List"
+			resource, err := o.Kind(kind, "")
 			return true, resource, err
 
 		case GetAction:
-			resource, err := o.Kind(gvk, castAction.GetName())
+			resource, err := o.Kind(kind, castAction.GetName())
 			return true, resource, err
 
 		case DeleteAction:
-			resource, err := o.Kind(gvk, castAction.GetName())
+			resource, err := o.Kind(kind, castAction.GetName())
 			return true, resource, err
 
 		case CreateAction:
@@ -84,7 +84,7 @@ func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 			if err != nil {
 				return true, nil, err
 			}
-			resource, err := o.Kind(gvk, meta.Name)
+			resource, err := o.Kind(kind, meta.Name)
 			return true, resource, err
 
 		case UpdateAction:
@@ -92,7 +92,7 @@ func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 			if err != nil {
 				return true, nil, err
 			}
-			resource, err := o.Kind(gvk, meta.Name)
+			resource, err := o.Kind(kind, meta.Name)
 			return true, resource, err
 
 		default:
@@ -114,7 +114,7 @@ func AddObjectsFromPath(path string, o ObjectRetriever, decoder runtime.Decoder)
 	if err != nil {
 		return err
 	}
-	obj, err := decoder.Decode(data)
+	obj, err := runtime.Decode(decoder, data)
 	if err != nil {
 		return err
 	}
@@ -152,24 +152,24 @@ func NewObjects(scheme ObjectScheme, decoder runtime.ObjectDecoder) ObjectRetrie
 	}
 }
 
-func (o objects) Kind(gvk unversioned.GroupVersionKind, name string) (runtime.Object, error) {
+func (o objects) Kind(kind unversioned.GroupVersionKind, name string) (runtime.Object, error) {
 	// TODO our test clients deal in internal versions.  We need to plumb that knowledge down here
 	// we might do this via an extra function to the scheme to allow getting internal group versions
 	// I'm punting for now
-	gvk.Version = ""
+	kind.Version = ""
 
-	empty, _ := o.scheme.New(gvk.GroupVersion().String(), gvk.Kind)
+	empty, _ := o.scheme.New(kind)
 	nilValue := reflect.Zero(reflect.TypeOf(empty)).Interface().(runtime.Object)
 
-	arr, ok := o.types[gvk.Kind]
+	arr, ok := o.types[kind.Kind]
 	if !ok {
-		if strings.HasSuffix(gvk.Kind, "List") {
-			itemKind := gvk.Kind[:len(gvk.Kind)-4]
+		if strings.HasSuffix(kind.Kind, "List") {
+			itemKind := kind.Kind[:len(kind.Kind)-4]
 			arr, ok := o.types[itemKind]
 			if !ok {
 				return empty, nil
 			}
-			out, err := o.scheme.New(gvk.GroupVersion().String(), gvk.Kind)
+			out, err := o.scheme.New(kind)
 			if err != nil {
 				return nilValue, err
 			}
@@ -181,25 +181,25 @@ func (o objects) Kind(gvk unversioned.GroupVersionKind, name string) (runtime.Ob
 			}
 			return out, nil
 		}
-		return nilValue, errors.NewNotFound(gvk.Kind, name)
+		return nilValue, errors.NewNotFound(unversioned.GroupResource{Group: kind.Group, Resource: kind.Kind}, name)
 	}
 
-	index := o.last[gvk.Kind]
+	index := o.last[kind.Kind]
 	if index >= len(arr) {
 		index = len(arr) - 1
 	}
 	if index < 0 {
-		return nilValue, errors.NewNotFound(gvk.Kind, name)
+		return nilValue, errors.NewNotFound(unversioned.GroupResource{Group: kind.Group, Resource: kind.Kind}, name)
 	}
 	out, err := o.scheme.Copy(arr[index])
 	if err != nil {
 		return nilValue, err
 	}
-	o.last[gvk.Kind] = index + 1
+	o.last[kind.Kind] = index + 1
 
 	if status, ok := out.(*unversioned.Status); ok {
 		if status.Details != nil {
-			status.Details.Kind = gvk.Kind
+			status.Details.Kind = kind.Kind
 		}
 		if status.Status != unversioned.StatusSuccess {
 			return nilValue, &errors.StatusError{ErrStatus: *status}
@@ -210,10 +210,11 @@ func (o objects) Kind(gvk unversioned.GroupVersionKind, name string) (runtime.Ob
 }
 
 func (o objects) Add(obj runtime.Object) error {
-	_, kind, err := o.scheme.ObjectVersionAndKind(obj)
+	gvk, err := o.scheme.ObjectKind(obj)
 	if err != nil {
 		return err
 	}
+	kind := gvk.Kind
 
 	switch {
 	case meta.IsListType(obj):

@@ -56,10 +56,10 @@ type ObjectTestExternal struct {
 	Items []runtime.RawExtension `json:"items,omitempty"`
 }
 
-func (*ObjectTest) IsAnAPIObject()           {}
-func (*ObjectTestExternal) IsAnAPIObject()   {}
-func (*EmbeddedTest) IsAnAPIObject()         {}
-func (*EmbeddedTestExternal) IsAnAPIObject() {}
+func (obj *ObjectTest) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
+func (obj *ObjectTestExternal) GetObjectKind() unversioned.ObjectKind   { return &obj.TypeMeta }
+func (obj *EmbeddedTest) GetObjectKind() unversioned.ObjectKind         { return &obj.TypeMeta }
+func (obj *EmbeddedTestExternal) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 
 func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
@@ -106,7 +106,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 			&EmbeddedTest{ID: "foo"},
 			&EmbeddedTest{ID: "bar"},
 			// TODO: until YAML is removed, this JSON must be in ascending key order to ensure consistent roundtrip serialization
-			&runtime.Unknown{RawJSON: []byte(`{"apiVersion":"unknown","foo":"bar","kind":"OtherTest"}`)},
+			&runtime.Unknown{RawJSON: []byte(`{"apiVersion":"unknown.group/unknown","foo":"bar","kind":"OtherTest"}`)},
 			&ObjectTest{
 				Items: []runtime.Object{
 					&EmbeddedTest{ID: "baz"},
@@ -126,7 +126,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 	}
 	t.Logf("exact wire is: %s", string(obj.Items[0].RawJSON))
 
-	decoded, err := s.Decode(wire)
+	decoded, err := runtime.Decode(s, wire)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 	}
 
 	internal.Items[2].(*runtime.Unknown).Kind = "OtherTest"
-	internal.Items[2].(*runtime.Unknown).APIVersion = "unknown"
+	internal.Items[2].(*runtime.Unknown).APIVersion = "unknown.group/unknown"
 	if e, a := internal.Items, list; !reflect.DeepEqual(e, a) {
 		t.Errorf("mismatched decoded: %s", util.ObjectDiff(e, a))
 	}
@@ -182,7 +182,7 @@ func TestEmbeddedObject(t *testing.T) {
 
 	t.Logf("Wire format is:\n%v\n", string(wire))
 
-	decoded, err := s.Decode(wire)
+	decoded, err := runtime.Decode(s, wire)
 	if err != nil {
 		t.Fatalf("Unexpected decode error %v", err)
 	}

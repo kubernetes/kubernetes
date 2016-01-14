@@ -61,8 +61,9 @@ type flocker struct {
 	plugin      *flockerPlugin
 }
 
-func (p *flockerPlugin) Init(host volume.VolumeHost) {
+func (p *flockerPlugin) Init(host volume.VolumeHost) error {
 	p.host = host
+	return nil
 }
 
 func (p flockerPlugin) Name() string {
@@ -111,6 +112,7 @@ type flockerBuilder struct {
 	exe      exec.Interface
 	opts     volume.VolumeOptions
 	readOnly bool
+	volume.MetricsNil
 }
 
 func (b flockerBuilder) GetAttributes() volume.Attributes {

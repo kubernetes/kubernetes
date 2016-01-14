@@ -122,5 +122,8 @@ func (m *MessageWithMap) GetByteMapping() map[bool][]byte {
 }
 
 func init() {
+	proto.RegisterType((*Message)(nil), "proto3_proto.Message")
+	proto.RegisterType((*Nested)(nil), "proto3_proto.Nested")
+	proto.RegisterType((*MessageWithMap)(nil), "proto3_proto.MessageWithMap")
 	proto.RegisterEnum("proto3_proto.Message_Humour", Message_Humour_name, Message_Humour_value)
 }

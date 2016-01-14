@@ -54,7 +54,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return persistentvolumeclaim.MatchPersistentVolumeClaim(label, field)
 		},
-		EndpointName: "persistentvolumeclaims",
+		QualifiedResource: api.Resource("persistentvolumeclaims"),
 
 		CreateStrategy:      persistentvolumeclaim.Strategy,
 		UpdateStrategy:      persistentvolumeclaim.Strategy,

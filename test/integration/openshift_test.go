@@ -19,6 +19,7 @@ package integration
 import (
 	"testing"
 
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/master"
 )
 
@@ -26,10 +27,15 @@ import (
 // are not referenced directly by a master.
 func TestMasterExportsSymbols(t *testing.T) {
 	_ = &master.Config{
+		Config: &genericapiserver.Config{
+			EnableUISupport:      false,
+			EnableSwaggerSupport: false,
+			RestfulContainer:     nil,
+		},
 		EnableCoreControllers: false,
-		EnableUISupport:       false,
-		EnableSwaggerSupport:  false,
-		RestfulContainer:      nil,
 	}
-	_ = (&master.Master{}).NewBootstrapController()
+	m := &master.Master{
+		GenericAPIServer: &genericapiserver.GenericAPIServer{},
+	}
+	_ = (m).NewBootstrapController()
 }

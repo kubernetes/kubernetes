@@ -42,7 +42,6 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/labels"
@@ -259,15 +258,34 @@ var _ = Describe("Kubectl client", func() {
 			if err != nil {
 				Failf("unable to create streaming upload. Error: %s", err)
 			}
-			resp, err := c.Post().
-				Namespace(ns).
-				Name("netexec").
-				Resource("pods").
-				SubResource("proxy").
-				Suffix("upload").
-				SetHeader("Content-Type", postConfigBodyWriter.FormDataContentType()).
-				Body(pipeConfigReader).
-				Do().Raw()
+
+			subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, c)
+			if err != nil {
+				Failf("Unable to determine server version.  Error: %s", err)
+			}
+
+			var resp []byte
+			if subResourceProxyAvailable {
+				resp, err = c.Post().
+					Namespace(ns).
+					Name("netexec").
+					Resource("pods").
+					SubResource("proxy").
+					Suffix("upload").
+					SetHeader("Content-Type", postConfigBodyWriter.FormDataContentType()).
+					Body(pipeConfigReader).
+					Do().Raw()
+			} else {
+				resp, err = c.Post().
+					Prefix("proxy").
+					Namespace(ns).
+					Name("netexec").
+					Resource("pods").
+					Suffix("upload").
+					SetHeader("Content-Type", postConfigBodyWriter.FormDataContentType()).
+					Body(pipeConfigReader).
+					Do().Raw()
+			}
 			if err != nil {
 				Failf("Unable to upload kubeconfig to the remote exec server due to error: %s", err)
 			}
@@ -286,15 +304,27 @@ var _ = Describe("Kubectl client", func() {
 			By("uploading kubectl to netexec")
 			var uploadOutput NetexecOutput
 			// Upload the kubectl binary
-			resp, err = c.Post().
-				Namespace(ns).
-				Name("netexec").
-				Resource("pods").
-				SubResource("proxy").
-				Suffix("upload").
-				SetHeader("Content-Type", postBodyWriter.FormDataContentType()).
-				Body(pipeReader).
-				Do().Raw()
+			if subResourceProxyAvailable {
+				resp, err = c.Post().
+					Namespace(ns).
+					Name("netexec").
+					Resource("pods").
+					SubResource("proxy").
+					Suffix("upload").
+					SetHeader("Content-Type", postBodyWriter.FormDataContentType()).
+					Body(pipeReader).
+					Do().Raw()
+			} else {
+				resp, err = c.Post().
+					Prefix("proxy").
+					Namespace(ns).
+					Name("netexec").
+					Resource("pods").
+					Suffix("upload").
+					SetHeader("Content-Type", postBodyWriter.FormDataContentType()).
+					Body(pipeReader).
+					Do().Raw()
+			}
 			if err != nil {
 				Failf("Unable to upload kubectl binary to the remote exec server due to error: %s", err)
 			}
@@ -324,14 +354,26 @@ var _ = Describe("Kubectl client", func() {
 
 				shellCommand := fmt.Sprintf("%s=%s .%s --kubeconfig=%s --server=%s --namespace=%s exec nginx echo running in container", proxyVar, proxyAddr, uploadBinaryName, kubecConfigRemotePath, apiServer, ns)
 				// Execute kubectl on remote exec server.
-				netexecShellOutput, err := c.Post().
-					Namespace(ns).
-					Name("netexec").
-					Resource("pods").
-					SubResource("proxy").
-					Suffix("shell").
-					Param("shellCommand", shellCommand).
-					Do().Raw()
+				var netexecShellOutput []byte
+				if subResourceProxyAvailable {
+					netexecShellOutput, err = c.Post().
+						Namespace(ns).
+						Name("netexec").
+						Resource("pods").
+						SubResource("proxy").
+						Suffix("shell").
+						Param("shellCommand", shellCommand).
+						Do().Raw()
+				} else {
+					netexecShellOutput, err = c.Post().
+						Prefix("proxy").
+						Namespace(ns).
+						Name("netexec").
+						Resource("pods").
+						Suffix("shell").
+						Param("shellCommand", shellCommand).
+						Do().Raw()
+				}
 				if err != nil {
 					Failf("Unable to execute kubectl binary on the remote exec server due to error: %s", err)
 				}
@@ -498,7 +540,7 @@ var _ = Describe("Kubectl client", func() {
 					{"Reason:"},
 					{"Message:"},
 					{"IP:"},
-					{"Replication Controllers:", "redis-master"}}
+					{"Controllers:", "ReplicationController/redis-master"}}
 				checkOutput(output, requiredStrings)
 			})
 
@@ -530,7 +572,8 @@ var _ = Describe("Kubectl client", func() {
 			checkOutput(output, requiredStrings)
 
 			// Node
-			nodes, err := c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+			// It should be OK to list unschedulable Nodes here.
+			nodes, err := c.Nodes().List(api.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			node := nodes.Items[0]
 			output = runKubectlOrDie("describe", "node", node.Name)
@@ -776,7 +819,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		AfterEach(func() {
-			runKubectlOrDie("stop", "rc", rcName, nsFlag)
+			runKubectlOrDie("delete", "rc", rcName, nsFlag)
 		})
 
 		It("should create an rc from an image [Conformance]", func() {
@@ -819,7 +862,7 @@ var _ = Describe("Kubectl client", func() {
 		})
 
 		AfterEach(func() {
-			runKubectlOrDie("stop", "jobs", jobName, nsFlag)
+			runKubectlOrDie("delete", "jobs", jobName, nsFlag)
 		})
 
 		It("should create a job from an image when restart is OnFailure [Conformance]", func() {
@@ -860,6 +903,25 @@ var _ = Describe("Kubectl client", func() {
 			}
 		})
 
+	})
+
+	Describe("Kubectl run --rm job", func() {
+		nsFlag := fmt.Sprintf("--namespace=%v", ns)
+		jobName := "e2e-test-rm-busybox-job"
+
+		It("should create a job from an image, then delete the job [Conformance]", func() {
+			By("executing a command with run --rm and attach with stdin")
+			runOutput := newKubectlCommand(nsFlag, "run", jobName, "--image=busybox", "--rm=true", "--restart=Never", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+				withStdinData("abcd1234").
+				execOrDie()
+			Expect(runOutput).To(ContainSubstring("abcd1234"))
+			Expect(runOutput).To(ContainSubstring("stdin closed"))
+
+			By("verifying the job " + jobName + " was deleted")
+			_, err := c.Extensions().Jobs(ns).Get(jobName)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+		})
 	})
 
 	Describe("Proxy server", func() {
@@ -1088,7 +1150,9 @@ func forEachReplicationController(c *client.Client, ns, selectorKey, selectorVal
 	var rcs *api.ReplicationControllerList
 	var err error
 	for t := time.Now(); time.Since(t) < podListTimeout; time.Sleep(poll) {
-		rcs, err = c.ReplicationControllers(ns).List(labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue})), fields.Everything(), unversioned.ListOptions{})
+		label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
+		options := api.ListOptions{LabelSelector: label}
+		rcs, err = c.ReplicationControllers(ns).List(options)
 		Expect(err).NotTo(HaveOccurred())
 		if len(rcs.Items) > 0 {
 			break
@@ -1124,14 +1188,30 @@ func getUDData(jpgExpected string, ns string) func(*client.Client, string) error
 	// getUDData validates data.json in the update-demo (returns nil if data is ok).
 	return func(c *client.Client, podID string) error {
 		Logf("validating pod %s", podID)
-		body, err := c.Get().
-			Namespace(ns).
-			Resource("pods").
-			SubResource("proxy").
-			Name(podID).
-			Suffix("data.json").
-			Do().
-			Raw()
+		subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, c)
+		if err != nil {
+			return err
+		}
+		var body []byte
+		if subResourceProxyAvailable {
+			body, err = c.Get().
+				Namespace(ns).
+				Resource("pods").
+				SubResource("proxy").
+				Name(podID).
+				Suffix("data.json").
+				Do().
+				Raw()
+		} else {
+			body, err = c.Get().
+				Prefix("proxy").
+				Namespace(ns).
+				Resource("pods").
+				Name(podID).
+				Suffix("data.json").
+				Do().
+				Raw()
+		}
 		if err != nil {
 			return err
 		}

@@ -37,21 +37,21 @@ type Selector interface {
 	// String returns a human readable string that represents this selector.
 	String() string
 
-	// Add add a specific requirement for the selector
-	Add(key string, operator Operator, values []string) Selector
+	// Add adds requirements to the Selector
+	Add(r ...Requirement) Selector
 }
 
 // Everything returns a selector that matches all labels.
 func Everything() Selector {
-	return LabelSelector{}
+	return internalSelector{}
 }
 
 type nothingSelector struct{}
 
-func (n nothingSelector) Matches(_ Labels) bool                         { return false }
-func (n nothingSelector) Empty() bool                                   { return false }
-func (n nothingSelector) String() string                                { return "<null>" }
-func (n nothingSelector) Add(_ string, _ Operator, _ []string) Selector { return n }
+func (n nothingSelector) Matches(_ Labels) bool         { return false }
+func (n nothingSelector) Empty() bool                   { return false }
+func (n nothingSelector) String() string                { return "<null>" }
+func (n nothingSelector) Add(_ ...Requirement) Selector { return n }
 
 // Nothing returns a selector that matches no labels
 func Nothing() Selector {
@@ -72,10 +72,13 @@ const (
 	ExistsOperator       Operator = "exists"
 )
 
-//LabelSelector is a list of Requirements.
-type LabelSelector []Requirement
+func NewSelector() Selector {
+	return internalSelector(nil)
+}
 
-// Sort by  obtain determisitic parser
+type internalSelector []Requirement
+
+// Sort by key to obtain determisitic parser
 type ByKey []Requirement
 
 func (a ByKey) Len() int { return len(a) }
@@ -178,8 +181,8 @@ func (r *Requirement) Values() sets.String {
 	return ret
 }
 
-// Return true if the LabelSelector doesn't restrict selection space
-func (lsel LabelSelector) Empty() bool {
+// Return true if the internalSelector doesn't restrict selection space
+func (lsel internalSelector) Empty() bool {
 	if lsel == nil {
 		return true
 	}
@@ -228,24 +231,25 @@ func (r *Requirement) String() string {
 	return buffer.String()
 }
 
-// Add adds a requirement to the selector. It copies the current selector returning a new one
-func (lsel LabelSelector) Add(key string, operator Operator, values []string) Selector {
-	var reqs []Requirement
-	for _, item := range lsel {
-		reqs = append(reqs, item)
+// Add adds requirements to the selector. It copies the current selector returning a new one
+func (lsel internalSelector) Add(reqs ...Requirement) Selector {
+	var sel internalSelector
+	for ix := range lsel {
+		sel = append(sel, lsel[ix])
 	}
-	if r, err := NewRequirement(key, operator, sets.NewString(values...)); err == nil {
-		reqs = append(reqs, *r)
+	for _, r := range reqs {
+		sel = append(sel, r)
 	}
-	return LabelSelector(reqs)
+	sort.Sort(ByKey(sel))
+	return sel
 }
 
-// Matches for a LabelSelector returns true if all
+// Matches for a internalSelector returns true if all
 // its Requirements match the input Labels. If any
 // Requirement does not match, false is returned.
-func (lsel LabelSelector) Matches(l Labels) bool {
-	for _, req := range lsel {
-		if matches := req.Matches(l); !matches {
+func (lsel internalSelector) Matches(l Labels) bool {
+	for ix := range lsel {
+		if matches := lsel[ix].Matches(l); !matches {
 			return false
 		}
 	}
@@ -253,11 +257,11 @@ func (lsel LabelSelector) Matches(l Labels) bool {
 }
 
 // String returns a comma-separated string of all
-// the LabelSelector Requirements' human-readable strings.
-func (lsel LabelSelector) String() string {
+// the internalSelector Requirements' human-readable strings.
+func (lsel internalSelector) String() string {
 	var reqs []string
-	for _, req := range lsel {
-		reqs = append(reqs, req.String())
+	for ix := range lsel {
+		reqs = append(reqs, lsel[ix].String())
 	}
 	return strings.Join(reqs, ",")
 }
@@ -473,10 +477,10 @@ func (p *Parser) scan() {
 
 // parse runs the left recursive descending algorithm
 // on input string. It returns a list of Requirement objects.
-func (p *Parser) parse() ([]Requirement, error) {
+func (p *Parser) parse() (internalSelector, error) {
 	p.scan() // init scannedItems
 
-	var requirements []Requirement
+	var requirements internalSelector
 	for {
 		tok, lit := p.lookahead(Values)
 		switch tok {
@@ -671,8 +675,8 @@ func (p *Parser) parseExactValue() (sets.String, error) {
 //           <value-set> ::= "(" <values> ")"
 //              <values> ::= VALUE | VALUE "," <values>
 // <exact-match-restriction> ::= ["="|"=="|"!="] VALUE
-// KEY is a sequence of one or more characters following [ DNS_SUBDOMAIN "/" ] DNS_LABEL
-// VALUE is a sequence of zero or more characters "([A-Za-z0-9_-\.])". Max length is 64 character.
+// KEY is a sequence of one or more characters following [ DNS_SUBDOMAIN "/" ] DNS_LABEL. Max length is 63 characters.
+// VALUE is a sequence of zero or more characters "([A-Za-z0-9_-\.])". Max length is 63 characters.
 // Delimiter is white space: (' ', '\t')
 // Example of valid syntax:
 //  "x in (foo,,baz),y,z notin ()"
@@ -692,23 +696,24 @@ func Parse(selector string) (Selector, error) {
 	items, error := p.parse()
 	if error == nil {
 		sort.Sort(ByKey(items)) // sort to grant determistic parsing
-		return LabelSelector(items), error
+		return internalSelector(items), error
 	}
 	return nil, error
 }
 
-const qualifiedNameErrorMsg string = "must match regex [" + validation.DNS1123SubdomainFmt + " / ] " + validation.DNS1123LabelFmt
+var qualifiedNameErrorMsg string = fmt.Sprintf(`must be a qualified name (at most %d characters, matching regex %s), with an optional DNS subdomain prefix (at most %d characters, matching regex %s) and slash (/): e.g. "MyName" or "example.com/MyName"`, validation.QualifiedNameMaxLength, validation.QualifiedNameFmt, validation.DNS1123SubdomainMaxLength, validation.DNS1123SubdomainFmt)
+var labelValueErrorMsg string = fmt.Sprintf(`must have at most %d characters, matching regex %s: e.g. "MyValue" or ""`, validation.LabelValueMaxLength, validation.LabelValueFmt)
 
 func validateLabelKey(k string) error {
 	if !validation.IsQualifiedName(k) {
-		return validation.NewInvalidError("label key", k, qualifiedNameErrorMsg)
+		return fmt.Errorf("invalid label key: %s", qualifiedNameErrorMsg)
 	}
 	return nil
 }
 
 func validateLabelValue(v string) error {
 	if !validation.IsValidLabelValue(v) {
-		return validation.NewInvalidError("label value", v, qualifiedNameErrorMsg)
+		return fmt.Errorf("invalid label value: %s", labelValueErrorMsg)
 	}
 	return nil
 }
@@ -717,18 +722,18 @@ func validateLabelValue(v string) error {
 // nil and empty Sets are considered equivalent to Everything().
 func SelectorFromSet(ls Set) Selector {
 	if ls == nil {
-		return LabelSelector{}
+		return internalSelector{}
 	}
-	var requirements []Requirement
+	var requirements internalSelector
 	for label, value := range ls {
 		if r, err := NewRequirement(label, EqualsOperator, sets.NewString(value)); err != nil {
 			//TODO: double check errors when input comes from serialization?
-			return LabelSelector{}
+			return internalSelector{}
 		} else {
 			requirements = append(requirements, *r)
 		}
 	}
 	// sort to have deterministic string representation
 	sort.Sort(ByKey(requirements))
-	return LabelSelector(requirements)
+	return internalSelector(requirements)
 }

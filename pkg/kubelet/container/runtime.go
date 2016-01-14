@@ -47,6 +47,10 @@ var (
 	// Required Image is absent on host and PullPolicy is NeverPullImage
 	ErrImageNeverPull = errors.New("ErrImageNeverPull")
 
+	// ErrContainerNotFound returned when a container in the given pod with the
+	// given container name was not found, amongst those managed by the kubelet.
+	ErrContainerNotFound = errors.New("no matching container")
+
 	// Get http error when pulling image from registry
 	RegistryUnavailable = errors.New("RegistryUnavailable")
 )
@@ -85,27 +89,26 @@ type Runtime interface {
 	// GarbageCollect removes dead containers using the specified container gc policy
 	GarbageCollect(gcPolicy ContainerGCPolicy) error
 	// Syncs the running pod into the desired pod.
-	SyncPod(pod *api.Pod, runningPod Pod, podStatus api.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error
+	SyncPod(pod *api.Pod, apiPodStatus api.PodStatus, podStatus *PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	KillPod(pod *api.Pod, runningPod Pod) error
-	// GetPodStatus retrieves the status of the pod, including the information of
+	// GetAPIPodStatus retrieves the api.PodStatus of the pod, including the information of
 	// all containers in the pod. Clients of this interface assume the
 	// containers' statuses in a pod always have a deterministic ordering
 	// (e.g., sorted by name).
-	// TODO: Rename this to GetAPIPodStatus, and eventually deprecate the
-	// function in favor of GetRawPodStatus.
-	GetPodStatus(*api.Pod) (*api.PodStatus, error)
-	// GetRawPodStatus retrieves the status of the pod, including the
+	GetAPIPodStatus(*api.Pod) (*api.PodStatus, error)
+	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visble in Runtime.
-	// TODO: Rename this to GetPodStatus to replace the original function.
-	GetRawPodStatus(uid types.UID, name, namespace string) (*RawPodStatus, error)
-	// ConvertRawToPodStatus converts the RawPodStatus object to api.PodStatus.
+	GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error)
+	// ConvertPodStatusToAPIPodStatus converts the PodStatus object to api.PodStatus.
 	// This function is needed because Docker generates some high-level and/or
 	// pod-level information for api.PodStatus (e.g., check whether the image
-	// exists to determine the reason).
-	// TODO: Deprecate this function once we generalize the logic for all
-	// container runtimes in kubelet.
-	ConvertRawToPodStatus(*api.Pod, *RawPodStatus) (*api.PodStatus, error)
+	// exists to determine the reason). We should try generalizing the logic
+	// for all container runtimes in kubelet and remove this funciton.
+	ConvertPodStatusToAPIPodStatus(*api.Pod, *PodStatus) (*api.PodStatus, error)
+	// Return both PodStatus and api.PodStatus, this is just a temporary function.
+	// TODO(random-liu): Remove this method later
+	GetPodStatusAndAPIPodStatus(*api.Pod) (*PodStatus, *api.PodStatus, error)
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary.
 	PullImage(image ImageSpec, pullSecrets []api.Secret) error
@@ -213,17 +216,27 @@ func (c *ContainerID) UnmarshalJSON(data []byte) error {
 	return c.ParseString(string(data))
 }
 
-type ContainerStatus string
+// DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
+type DockerID string
+
+func (id DockerID) ContainerID() ContainerID {
+	return ContainerID{
+		Type: "docker",
+		ID:   string(id),
+	}
+}
+
+type ContainerState string
 
 const (
-	ContainerStatusRunning ContainerStatus = "running"
-	ContainerStatusExited  ContainerStatus = "exited"
-	// This unknown encompasses all the statuses that we currently don't care.
-	ContainerStatusUnknown ContainerStatus = "unknown"
+	ContainerStateRunning ContainerState = "running"
+	ContainerStateExited  ContainerState = "exited"
+	// This unknown encompasses all the states that we currently don't care.
+	ContainerStateUnknown ContainerState = "unknown"
 )
 
 // Container provides the runtime information for a container, such as ID, hash,
-// status of the container.
+// state of the container.
 type Container struct {
 	// The ID of the container, used by the container runtime to identify
 	// a container.
@@ -239,13 +252,13 @@ type Container struct {
 	// The timestamp of the creation time of the container.
 	// TODO(yifan): Consider to move it to api.ContainerStatus.
 	Created int64
-	// Status is the status of the container.
-	Status ContainerStatus
+	// State is the state of the container.
+	State ContainerState
 }
 
-// RawPodStatus represents the status of the pod and its containers.
-// api.PodStatus can be derived from examining RawPodStatus and api.Pod.
-type RawPodStatus struct {
+// PodStatus represents the status of the pod and its containers.
+// api.PodStatus can be derived from examining PodStatus and api.Pod.
+type PodStatus struct {
 	// ID of the pod.
 	ID types.UID
 	// Name of the pod.
@@ -255,17 +268,17 @@ type RawPodStatus struct {
 	// IP of the pod.
 	IP string
 	// Status of containers in the pod.
-	ContainerStatuses []*RawContainerStatus
+	ContainerStatuses []*ContainerStatus
 }
 
-// RawPodContainer represents the status of a container.
-type RawContainerStatus struct {
+// ContainerStatus represents the status of a container.
+type ContainerStatus struct {
 	// ID of the container.
 	ID ContainerID
 	// Name of the container.
 	Name string
 	// Status of the container.
-	Status ContainerStatus
+	State ContainerState
 	// Creation time of the container.
 	CreatedAt time.Time
 	// Start time of the container.
@@ -279,7 +292,7 @@ type RawContainerStatus struct {
 	// ID of the image.
 	ImageID string
 	// Hash of the container, used for comparison.
-	Hash string
+	Hash uint64
 	// Number of times that the container has been restarted.
 	RestartCount int
 	// A string explains why container is in such a status.
@@ -289,12 +302,34 @@ type RawContainerStatus struct {
 	Message string
 }
 
+// FindContainerStatusByName returns container status in the pod status with the given name.
+// When there are multiple containers' statuses with the same name, the first match will be returned.
+func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *ContainerStatus {
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		if containerStatus.Name == containerName {
+			return containerStatus
+		}
+	}
+	return nil
+}
+
+// Get container status of all the running containers in a pod
+func (podStatus *PodStatus) GetRunningContainerStatuses() []*ContainerStatus {
+	runnningContainerStatues := []*ContainerStatus{}
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		if containerStatus.State == ContainerStateRunning {
+			runnningContainerStatues = append(runnningContainerStatues, containerStatus)
+		}
+	}
+	return runnningContainerStatues
+}
+
 // Basic information about a container image.
 type Image struct {
 	// ID of the image.
 	ID string
 	// Other names by which this image is known.
-	Tags []string
+	RepoTags []string
 	// The size of the image in bytes.
 	Size int64
 }

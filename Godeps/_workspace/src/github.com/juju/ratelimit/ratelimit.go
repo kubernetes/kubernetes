@@ -8,10 +8,10 @@
 package ratelimit
 
 import (
+	"math"
 	"strconv"
 	"sync"
 	"time"
-	"math"
 )
 
 // Bucket represents a token bucket that fills at a predetermined rate.
@@ -169,6 +169,30 @@ func (tb *Bucket) takeAvailable(now time.Time, count int64) int64 {
 	}
 	tb.avail -= count
 	return count
+}
+
+// Available returns the number of available tokens. It will be negative
+// when there are consumers waiting for tokens. Note that if this
+// returns greater than zero, it does not guarantee that calls that take
+// tokens from the buffer will succeed, as the number of available
+// tokens could have changed in the meantime. This method is intended
+// primarily for metrics reporting and debugging.
+func (tb *Bucket) Available() int64 {
+	return tb.available(time.Now())
+}
+
+// available is the internal version of available - it takes the current time as
+// an argument to enable easy testing.
+func (tb *Bucket) available(now time.Time) int64 {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
+	tb.adjust(now)
+	return tb.avail
+}
+
+// Capacity returns the capacity that the bucket was created with.
+func (tb *Bucket) Capacity() int64 {
+	return tb.capacity
 }
 
 // Rate returns the fill rate of the bucket, in tokens per second.

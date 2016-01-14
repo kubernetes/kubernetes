@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A single sciprt that runs a predefined set of update-* scripts, as they often go together.
+# A single script that runs a predefined set of update-* scripts, as they often go together.
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -42,11 +42,12 @@ fi
 
 BASH_TARGETS="codecgen
 	generated-conversions
-	generated-deep-copies 
-	generated-docs 
-	generated-swagger-docs 
+	generated-deep-copies
+	generated-docs
+	generated-swagger-docs
 	swagger-spec
-	api-reference-docs"
+	api-reference-docs
+	codegen"
 
 
 for t in $BASH_TARGETS

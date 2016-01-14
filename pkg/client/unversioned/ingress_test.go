@@ -14,17 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package unversioned_test
+
+import (
+	. "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
+)
 
 import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 func getIngressResourceName() string {
@@ -33,12 +35,12 @@ func getIngressResourceName() string {
 
 func TestListIngress(t *testing.T) {
 	ns := api.NamespaceAll
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, ""),
 		},
-		Response: Response{StatusCode: 200,
+		Response: simple.Response{StatusCode: 200,
 			Body: &extensions.IngressList{
 				Items: []extensions.Ingress{
 					{
@@ -57,19 +59,20 @@ func TestListIngress(t *testing.T) {
 			},
 		},
 	}
-	receivedIngressList, err := c.Setup(t).Extensions().Ingress(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	receivedIngressList, err := c.Setup(t).Extensions().Ingress(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, receivedIngressList, err)
 }
 
 func TestGetIngress(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo"),
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 		},
-		Response: Response{
+		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.Ingress{
 				ObjectMeta: api.ObjectMeta{
@@ -86,15 +89,17 @@ func TestGetIngress(t *testing.T) {
 		},
 	}
 	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).Get("foo")
+	defer c.Close()
 	c.Validate(t, receivedIngress, err)
 }
 
 func TestGetIngressWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{Error: true}
+	c := &simple.Client{Error: true}
 	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).Get("")
-	if (err != nil) && (err.Error() != nameRequiredError) {
-		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
+	defer c.Close()
+	if (err != nil) && (err.Error() != simple.NameRequiredError) {
+		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
 	}
 
 	c.Validate(t, receivedIngress, err)
@@ -109,13 +114,13 @@ func TestUpdateIngress(t *testing.T) {
 			ResourceVersion: "1",
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "PUT",
 			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo"),
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 		},
-		Response: Response{
+		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.Ingress{
 				ObjectMeta: api.ObjectMeta{
@@ -132,6 +137,7 @@ func TestUpdateIngress(t *testing.T) {
 		},
 	}
 	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).Update(requestIngress)
+	defer c.Close()
 	c.Validate(t, receivedIngress, err)
 }
 
@@ -152,13 +158,13 @@ func TestUpdateIngressStatus(t *testing.T) {
 			LoadBalancer: lbStatus,
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "PUT",
 			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo") + "/status",
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 		},
-		Response: Response{
+		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.Ingress{
 				ObjectMeta: api.ObjectMeta{
@@ -178,20 +184,22 @@ func TestUpdateIngressStatus(t *testing.T) {
 		},
 	}
 	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).UpdateStatus(requestIngress)
+	defer c.Close()
 	c.Validate(t, receivedIngress, err)
 }
 
 func TestDeleteIngress(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "DELETE",
 			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, "foo"),
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 		},
-		Response: Response{StatusCode: 200},
+		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Extensions().Ingress(ns).Delete("foo", nil)
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
@@ -203,14 +211,14 @@ func TestCreateIngress(t *testing.T) {
 			Namespace: ns,
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "POST",
 			Path:   testapi.Extensions.ResourcePath(getIngressResourceName(), ns, ""),
 			Body:   requestIngress,
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 		},
-		Response: Response{
+		Response: simple.Response{
 			StatusCode: 200,
 			Body: &extensions.Ingress{
 				ObjectMeta: api.ObjectMeta{
@@ -227,5 +235,6 @@ func TestCreateIngress(t *testing.T) {
 		},
 	}
 	receivedIngress, err := c.Setup(t).Extensions().Ingress(ns).Create(requestIngress)
+	defer c.Close()
 	c.Validate(t, receivedIngress, err)
 }

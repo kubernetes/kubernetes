@@ -17,6 +17,7 @@ limitations under the License.
 package service
 
 import (
+	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -26,18 +27,95 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
+func TestExportService(t *testing.T) {
+	tests := []struct {
+		objIn     runtime.Object
+		objOut    runtime.Object
+		exact     bool
+		expectErr bool
+	}{
+		{
+			objIn: &api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Status: api.ServiceStatus{
+					LoadBalancer: api.LoadBalancerStatus{
+						Ingress: []api.LoadBalancerIngress{
+							{IP: "1.2.3.4"},
+						},
+					},
+				},
+			},
+			objOut: &api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+			},
+			exact: true,
+		},
+		{
+			objIn: &api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: api.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+				},
+				Status: api.ServiceStatus{
+					LoadBalancer: api.LoadBalancerStatus{
+						Ingress: []api.LoadBalancerIngress{
+							{IP: "1.2.3.4"},
+						},
+					},
+				},
+			},
+			objOut: &api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+			},
+		},
+		{
+			objIn:     &api.Pod{},
+			expectErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		err := Strategy.Export(test.objIn, test.exact)
+		if err != nil {
+			if !test.expectErr {
+				t.Errorf("unexpected error: %v", err)
+			}
+			continue
+		}
+		if test.expectErr {
+			t.Error("unexpected non-error")
+			continue
+		}
+		if !reflect.DeepEqual(test.objIn, test.objOut) {
+			t.Errorf("expected:\n%v\nsaw:\n%v\n", test.objOut, test.objIn)
+		}
+	}
+}
+
 func TestCheckGeneratedNameError(t *testing.T) {
-	expect := errors.NewNotFound("foo", "bar")
+	expect := errors.NewNotFound(api.Resource("foos"), "bar")
 	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Pod{}); err != expect {
 		t.Errorf("NotFoundError should be ignored: %v", err)
 	}
 
-	expect = errors.NewAlreadyExists("foo", "bar")
+	expect = errors.NewAlreadyExists(api.Resource("foos"), "bar")
 	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Pod{}); err != expect {
 		t.Errorf("AlreadyExists should be returned when no GenerateName field: %v", err)
 	}
 
-	expect = errors.NewAlreadyExists("foo", "bar")
+	expect = errors.NewAlreadyExists(api.Resource("foos"), "bar")
 	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Pod{ObjectMeta: api.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsServerTimeout(err) {
 		t.Errorf("expected try again later error: %v", err)
 	}

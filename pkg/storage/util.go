@@ -22,9 +22,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 type SimpleUpdateFunc func(runtime.Object) (runtime.Object, error)
@@ -41,16 +42,29 @@ func SimpleUpdate(fn SimpleUpdateFunc) UpdateFunc {
 // the etcd version we should pass to helper.Watch(). Because resourceVersion is
 // an opaque value, the default watch behavior for non-zero watch is to watch
 // the next value (if you pass "1", you will see updates from "2" onwards).
-func ParseWatchResourceVersion(resourceVersion, kind string) (uint64, error) {
+func ParseWatchResourceVersion(resourceVersion string) (uint64, error) {
 	if resourceVersion == "" || resourceVersion == "0" {
 		return 0, nil
 	}
 	version, err := strconv.ParseUint(resourceVersion, 10, 64)
 	if err != nil {
-		// TODO: Does this need to be a ErrorList?  I can't convince myself it does.
-		return 0, errors.NewInvalid(kind, "", utilvalidation.ErrorList{utilvalidation.NewInvalidError("resourceVersion", resourceVersion, err.Error())})
+		return 0, errors.NewInvalid(unversioned.GroupKind{}, "", field.ErrorList{
+			// Validation errors are supposed to return version-specific field
+			// paths, but this is probably close enough.
+			field.Invalid(field.NewPath("resourceVersion"), resourceVersion, err.Error()),
+		})
 	}
-	return version + 1, nil
+	return version, nil
+}
+
+// ParseListResourceVersion takes a resource version argument and converts it to
+// the etcd version.
+func ParseListResourceVersion(resourceVersion string) (uint64, error) {
+	if resourceVersion == "" {
+		return 0, nil
+	}
+	version, err := strconv.ParseUint(resourceVersion, 10, 64)
+	return version, err
 }
 
 func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
@@ -58,11 +72,11 @@ func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	name := meta.Name()
+	name := meta.GetName()
 	if ok, msg := validation.IsValidPathSegmentName(name); !ok {
 		return "", fmt.Errorf("invalid name: %v", msg)
 	}
-	return prefix + "/" + meta.Namespace() + "/" + meta.Name(), nil
+	return prefix + "/" + meta.GetNamespace() + "/" + name, nil
 }
 
 func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
@@ -70,9 +84,9 @@ func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	name := meta.Name()
+	name := meta.GetName()
 	if ok, msg := validation.IsValidPathSegmentName(name); !ok {
 		return "", fmt.Errorf("invalid name: %v", msg)
 	}
-	return prefix + "/" + meta.Name(), nil
+	return prefix + "/" + name, nil
 }

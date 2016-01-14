@@ -39,7 +39,8 @@ func TestHTTPKubeletClient(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 
 	if _, err := url.Parse(testServer.URL); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -82,6 +83,7 @@ func TestNewKubeletClientTLSInvalid(t *testing.T) {
 
 func TestNewKubeletClientTLSValid(t *testing.T) {
 	config := &KubeletClientConfig{
+		Port:        1234,
 		EnableHttps: true,
 		TLSClientConfig: client.TLSClientConfig{
 			CertFile: "../../client/testdata/mycertvalid.cer",
@@ -98,5 +100,28 @@ func TestNewKubeletClientTLSValid(t *testing.T) {
 	}
 	if client == nil {
 		t.Error("client should not be nil")
+	}
+
+	{
+		scheme, port, transport, err := client.GetConnectionInfo(nil, "foo")
+		if err != nil {
+			t.Errorf("Error getting info: %v", err)
+		}
+		if scheme != "https" {
+			t.Errorf("Expected https, got %s", scheme)
+		}
+		if port != 1234 {
+			t.Errorf("Expected 1234, got %d", port)
+		}
+		if transport == nil {
+			t.Errorf("Expected transport, got nil")
+		}
+	}
+
+	{
+		_, _, _, err := client.GetConnectionInfo(nil, "foo bar")
+		if err == nil {
+			t.Errorf("Expected error getting connection info for invalid node name, got none")
+		}
 	}
 }

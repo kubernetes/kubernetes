@@ -43,7 +43,7 @@ func main() {
 	}
 	outFile := outDir + "kubectl"
 
-	//TODO os.Stdin should really be something like ioutil.Discard, but a Reader
+	// TODO os.Stdin should really be something like ioutil.Discard, but a Reader
 	kubectl := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, ioutil.Discard, ioutil.Discard)
 	kubectl.GenBashCompletionFile(outFile)
 }

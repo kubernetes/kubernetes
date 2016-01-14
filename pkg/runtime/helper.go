@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -56,10 +57,16 @@ func DecodeList(objects []Object, decoders ...ObjectDecoder) []error {
 		switch t := obj.(type) {
 		case *Unknown:
 			for _, decoder := range decoders {
-				if !decoder.Recognizes(t.APIVersion, t.Kind) {
+				gv, err := unversioned.ParseGroupVersion(t.APIVersion)
+				if err != nil {
+					errs = append(errs, err)
+					break
+				}
+
+				if !decoder.Recognizes(gv.WithKind(t.Kind)) {
 					continue
 				}
-				obj, err := decoder.Decode(t.RawJSON)
+				obj, err := Decode(decoder, t.RawJSON)
 				if err != nil {
 					errs = append(errs, err)
 					break
@@ -77,9 +84,9 @@ type MultiObjectTyper []ObjectTyper
 
 var _ ObjectTyper = MultiObjectTyper{}
 
-func (m MultiObjectTyper) DataVersionAndKind(data []byte) (version, kind string, err error) {
+func (m MultiObjectTyper) DataKind(data []byte) (gvk unversioned.GroupVersionKind, err error) {
 	for _, t := range m {
-		version, kind, err = t.DataVersionAndKind(data)
+		gvk, err = t.DataKind(data)
 		if err == nil {
 			return
 		}
@@ -87,9 +94,9 @@ func (m MultiObjectTyper) DataVersionAndKind(data []byte) (version, kind string,
 	return
 }
 
-func (m MultiObjectTyper) ObjectVersionAndKind(obj Object) (version, kind string, err error) {
+func (m MultiObjectTyper) ObjectKind(obj Object) (gvk unversioned.GroupVersionKind, err error) {
 	for _, t := range m {
-		version, kind, err = t.ObjectVersionAndKind(obj)
+		gvk, err = t.ObjectKind(obj)
 		if err == nil {
 			return
 		}
@@ -97,9 +104,19 @@ func (m MultiObjectTyper) ObjectVersionAndKind(obj Object) (version, kind string
 	return
 }
 
-func (m MultiObjectTyper) Recognizes(version, kind string) bool {
+func (m MultiObjectTyper) ObjectKinds(obj Object) (gvks []unversioned.GroupVersionKind, err error) {
 	for _, t := range m {
-		if t.Recognizes(version, kind) {
+		gvks, err = t.ObjectKinds(obj)
+		if err == nil {
+			return
+		}
+	}
+	return
+}
+
+func (m MultiObjectTyper) Recognizes(gvk unversioned.GroupVersionKind) bool {
+	for _, t := range m {
+		if t.Recognizes(gvk) {
 			return true
 		}
 	}

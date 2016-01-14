@@ -26,6 +26,7 @@ import (
 	etcderr "k8s.io/kubernetes/pkg/api/errors/etcd"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
@@ -35,7 +36,6 @@ import (
 	podrest "k8s.io/kubernetes/pkg/registry/pod/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 // PodStorage includes storage for pods and all sub resources
@@ -84,7 +84,7 @@ func NewStorage(
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return pod.MatchPod(label, field)
 		},
-		EndpointName: "pods",
+		QualifiedResource: api.Resource("pods"),
 
 		CreateStrategy:      pod.Strategy,
 		UpdateStrategy:      pod.Strategy,
@@ -93,8 +93,8 @@ func NewStorage(
 
 		Storage: storageInterface,
 	}
-	statusStore := *store
 
+	statusStore := *store
 	statusStore.UpdateStrategy = pod.StatusStrategy
 
 	return PodStorage{
@@ -132,13 +132,12 @@ var _ = rest.Creater(&BindingREST{})
 // Create ensures a pod is bound to a specific host.
 func (r *BindingREST) Create(ctx api.Context, obj runtime.Object) (out runtime.Object, err error) {
 	binding := obj.(*api.Binding)
+
 	// TODO: move me to a binding strategy
-	if len(binding.Target.Kind) != 0 && binding.Target.Kind != "Node" {
-		return nil, errors.NewInvalid("binding", binding.Name, validation.ErrorList{validation.NewInvalidError("to.kind", binding.Target.Kind, "must be empty or 'Node'")})
+	if errs := validation.ValidatePodBinding(binding); len(errs) != 0 {
+		return nil, errs.ToAggregate()
 	}
-	if len(binding.Target.Name) == 0 {
-		return nil, errors.NewInvalid("binding", binding.Name, validation.ErrorList{validation.NewRequiredError("to.name")})
-	}
+
 	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations)
 	out = &unversioned.Status{Status: unversioned.StatusSuccess}
 	return
@@ -179,10 +178,10 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx api.Context, podID, oldMachin
 // assignPod assigns the given pod to the given machine.
 func (r *BindingREST) assignPod(ctx api.Context, podID string, machine string, annotations map[string]string) (err error) {
 	if _, err = r.setPodHostAndAnnotations(ctx, podID, "", machine, annotations); err != nil {
-		err = etcderr.InterpretGetError(err, "pod", podID)
-		err = etcderr.InterpretUpdateError(err, "pod", podID)
+		err = etcderr.InterpretGetError(err, api.Resource("pods"), podID)
+		err = etcderr.InterpretUpdateError(err, api.Resource("pods"), podID)
 		if _, ok := err.(*errors.StatusError); !ok {
-			err = errors.NewConflict("binding", podID, err)
+			err = errors.NewConflict(api.Resource("pods/binding"), podID, err)
 		}
 	}
 	return

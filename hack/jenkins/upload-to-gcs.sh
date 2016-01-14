@@ -55,18 +55,18 @@ function upload_logs_to_gcs() {
   local -r gcs_job_path="${JENKINS_GCS_LOGS_PATH}/${JOB_NAME}"
   local -r gcs_build_path="${gcs_job_path}/${BUILD_NUMBER}"
   local -r gcs_acl="public-read"
+  local -r console_log="${JENKINS_HOME}/jobs/${JOB_NAME}/builds/${BUILD_NUMBER}/log"
+  local -r filtered_console_log="${WORKSPACE}/console-log.txt"
   for upload_attempt in $(seq 3); do
     echo "Uploading to ${gcs_build_path} (attempt ${upload_attempt})"
     if [[ -d "${artifacts_path}"  && -n $(ls -A "${artifacts_path}") ]]; then
       gsutil -m -q -o "GSUtil:use_magicfile=True" cp -a "${gcs_acl}" -r -c \
         -z log,txt,xml "${artifacts_path}" "${gcs_build_path}/artifacts" || continue
     fi
-    local -r console_log="${JENKINS_HOME}/jobs/${JOB_NAME}/builds/${BUILD_NUMBER}/log"
     # The console log only exists on the Jenkins master, so don't fail if it
     # doesn't exist.
     if [[ -f "${console_log}" ]]; then
       # Remove ANSI escape sequences from the console log before uploading.
-      local -r filtered_console_log="${WORKSPACE}/console-log.txt"
       sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g" \
         "${console_log}" > "${filtered_console_log}"
       gsutil -q cp -a "${gcs_acl}" -z txt "${filtered_console_log}" "${gcs_build_path}/" || continue

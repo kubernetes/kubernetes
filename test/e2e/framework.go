@@ -24,10 +24,9 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/metrics"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -53,6 +52,11 @@ type Framework struct {
 	logsSizeVerifier     *LogsSizeVerifier
 }
 
+type TestDataSummary interface {
+	PrintHumanReadable() string
+	PrintJSON() string
+}
+
 // NewFramework makes a new framework and sets up a BeforeEach/AfterEach for
 // you (you can write additional before/after each functions).
 func NewFramework(baseName string) *Framework {
@@ -76,7 +80,9 @@ func (f *Framework) beforeEach() {
 	f.Client = c
 
 	By("Building a namespace api object")
-	namespace, err := createTestingNS(f.BaseName, f.Client)
+	namespace, err := createTestingNS(f.BaseName, f.Client, map[string]string{
+		"e2e-framework": f.BaseName,
+	})
 	Expect(err).NotTo(HaveOccurred())
 
 	f.Namespace = namespace
@@ -90,7 +96,7 @@ func (f *Framework) beforeEach() {
 	}
 
 	if testContext.GatherKubeSystemResourceUsageData {
-		f.gatherer.startGatheringData(c, time.Minute)
+		f.gatherer.startGatheringData(c, resourceDataGatheringPeriodSeconds*time.Second)
 	}
 
 	if testContext.GatherLogsSizes {
@@ -110,7 +116,7 @@ func (f *Framework) afterEach() {
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed {
 		By(fmt.Sprintf("Collecting events from namespace %q.", f.Namespace.Name))
-		events, err := f.Client.Events(f.Namespace.Name).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		events, err := f.Client.Events(f.Namespace.Name).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, e := range events.Items {
@@ -130,6 +136,32 @@ func (f *Framework) afterEach() {
 		Failf("All nodes should be ready after test, %v", err)
 	}
 
+	summaries := make([]TestDataSummary, 0)
+	if testContext.GatherKubeSystemResourceUsageData {
+		summaries = append(summaries, f.gatherer.stopAndSummarize([]int{90, 99}, f.addonResourceConstraints))
+	}
+
+	if testContext.GatherLogsSizes {
+		close(f.logsSizeCloseChannel)
+		f.logsSizeWaitGroup.Wait()
+		summaries = append(summaries, f.logsSizeVerifier.GetSummary())
+	}
+
+	if testContext.GatherMetricsAfterTest {
+		// TODO: enable Scheduler and ControllerManager metrics grabbing when Master's Kubelet will be registered.
+		grabber, err := metrics.NewMetricsGrabber(f.Client, true, false, false, true)
+		if err != nil {
+			Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
+		} else {
+			received, err := grabber.Grab(nil)
+			if err != nil {
+				Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
+			} else {
+				summaries = append(summaries, (*MetricsForE2E)(&received))
+			}
+		}
+	}
+
 	if testContext.DeleteNamespace {
 		By(fmt.Sprintf("Destroying namespace %q for this suite.", f.Namespace.Name))
 
@@ -144,14 +176,22 @@ func (f *Framework) afterEach() {
 		Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 	}
 
-	if testContext.GatherKubeSystemResourceUsageData {
-		f.gatherer.stopAndPrintData([]int{50, 90, 99, 100}, f.addonResourceConstraints)
+	outputTypes := strings.Split(testContext.OutputPrintType, ",")
+	for _, printType := range outputTypes {
+		switch printType {
+		case "hr":
+			for i := range summaries {
+				Logf(summaries[i].PrintHumanReadable())
+			}
+		case "json":
+			for i := range summaries {
+				Logf(summaries[i].PrintJSON())
+			}
+		default:
+			Logf("Unknown ouptut type: %v. Skipping.", printType)
+		}
 	}
 
-	if testContext.GatherLogsSizes {
-		close(f.logsSizeCloseChannel)
-		f.logsSizeWaitGroup.Wait()
-	}
 	// Paranoia-- prevent reuse!
 	f.Namespace = nil
 	f.Client = nil
@@ -184,7 +224,7 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 	for {
 		// TODO: Endpoints client should take a field selector so we
 		// don't have to list everything.
-		list, err := f.Client.Endpoints(f.Namespace.Name).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+		list, err := f.Client.Endpoints(f.Namespace.Name).List(api.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -199,8 +239,8 @@ func (f *Framework) WaitForAnEndpoint(serviceName string) error {
 			}
 		}
 
-		options := unversioned.ListOptions{
-			FieldSelector:   unversioned.FieldSelector{fields.Set{"metadata.name": serviceName}.AsSelector()},
+		options := api.ListOptions{
+			FieldSelector:   fields.Set{"metadata.name": serviceName}.AsSelector(),
 			ResourceVersion: rv,
 		}
 		w, err := f.Client.Endpoints(f.Namespace.Name).Watch(options)

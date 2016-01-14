@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/user-guide/README.md).
@@ -125,7 +126,7 @@ If you don't have much familiarity with Kubernetes, we recommend you read the fo
   * [Downward API: accessing system configuration from a pod](downward-api.md)
   * [Images and registries](images.md)
   * [Migrating from docker-cli to kubectl](docker-cli-to-kubectl.md)
-  * [Tips and tricks when working with config](config-best-practices.md)
+  * [Configuration Best Practices and Tips](config-best-practices.md)
   * [Assign pods to selected nodes](node-selection/)
   * [Perform a rolling update on a running group of pods](update-demo/)
 

@@ -20,12 +20,13 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"golang.org/x/net/context"
+
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/storage"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 )
 
@@ -36,30 +37,37 @@ func init() {
 	RequireEtcd()
 }
 
-func NewEtcdClient() *etcd.Client {
-	return etcd.NewClient([]string{})
+func NewEtcdClient() etcd.Client {
+	cfg := etcd.Config{
+		Endpoints: []string{"http://127.0.0.1:4001"},
+	}
+	client, err := etcd.New(cfg)
+	if err != nil {
+		glog.Fatalf("unable to connect to etcd for testing: %v", err)
+	}
+	return client
 }
 
-func NewEtcdStorage() (storage.Interface, error) {
-	return master.NewEtcdStorage(NewEtcdClient(), latest.GroupOrDie("").InterfacesFor, testapi.Default.Version(), etcdtest.PathPrefix())
+func NewEtcdStorage() storage.Interface {
+	return etcdstorage.NewEtcdStorage(NewEtcdClient(), testapi.Default.Codec(), etcdtest.PathPrefix())
 }
 
-func NewExtensionsEtcdStorage(client *etcd.Client) (storage.Interface, error) {
+func NewExtensionsEtcdStorage(client etcd.Client) storage.Interface {
 	if client == nil {
 		client = NewEtcdClient()
 	}
-	return master.NewEtcdStorage(client, latest.GroupOrDie("extensions").InterfacesFor, testapi.Extensions.GroupAndVersion(), etcdtest.PathPrefix())
+	return etcdstorage.NewEtcdStorage(client, testapi.Extensions.Codec(), etcdtest.PathPrefix())
 }
 
 func RequireEtcd() {
-	if _, err := NewEtcdClient().Get("/", false, false); err != nil {
+	if _, err := etcd.NewKeysAPI(NewEtcdClient()).Get(context.TODO(), "/", nil); err != nil {
 		glog.Fatalf("unable to connect to etcd for testing: %v", err)
 	}
 }
 
 func WithEtcdKey(f func(string)) {
 	prefix := fmt.Sprintf("/test-%d", rand.Int63())
-	defer NewEtcdClient().Delete(prefix, true)
+	defer etcd.NewKeysAPI(NewEtcdClient()).Delete(context.TODO(), prefix, &etcd.DeleteOptions{Recursive: true})
 	f(prefix)
 }
 
@@ -69,13 +77,13 @@ func WithEtcdKey(f func(string)) {
 // of the test run.
 func DeleteAllEtcdKeys() {
 	glog.Infof("Deleting all etcd keys")
-	client := NewEtcdClient()
-	keys, err := client.Get("/", false, false)
+	keysAPI := etcd.NewKeysAPI(NewEtcdClient())
+	keys, err := keysAPI.Get(context.TODO(), "/", nil)
 	if err != nil {
 		glog.Fatalf("Unable to list root etcd keys: %v", err)
 	}
 	for _, node := range keys.Node.Nodes {
-		if _, err := client.Delete(node.Key, true); err != nil {
+		if _, err := keysAPI.Delete(context.TODO(), node.Key, &etcd.DeleteOptions{Recursive: true}); err != nil {
 			glog.Fatalf("Unable delete key: %v", err)
 		}
 	}

@@ -73,7 +73,7 @@ func newInitialResources(source dataSource, percentile int64, nsOnly bool) admis
 
 func (ir initialResources) Admit(a admission.Attributes) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
-	if a.GetSubresource() != "" || a.GetResource() != string(api.ResourcePods) {
+	if a.GetSubresource() != "" || a.GetResource() != api.Resource("pods") {
 		return nil
 	}
 	pod, ok := a.GetObject().(*api.Pod)

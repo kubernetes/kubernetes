@@ -14,14 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta1_test
 
 import (
 	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/v1"
+	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	. "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -87,7 +90,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 func TestSetDefaultDeployment(t *testing.T) {
 	defaultIntOrString := intstr.FromInt(1)
 	differentIntOrString := intstr.FromInt(5)
-	deploymentLabelKey := "deployment.kubernetes.io/podTemplateHash"
+	deploymentLabelKey := DefaultDeploymentUniqueLabelKey
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
@@ -205,7 +208,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 func TestSetDefaultJob(t *testing.T) {
 	expected := &Job{
 		Spec: JobSpec{
-			Selector: &PodSelector{
+			Selector: &LabelSelector{
 				MatchLabels: map[string]string{"job": "selector"},
 			},
 			Completions: newInt32(1),
@@ -216,7 +219,7 @@ func TestSetDefaultJob(t *testing.T) {
 		// selector set explicitly, completions and parallelism - default
 		{
 			Spec: JobSpec{
-				Selector: &PodSelector{
+				Selector: &LabelSelector{
 					MatchLabels: map[string]string{"job": "selector"},
 				},
 			},
@@ -275,7 +278,7 @@ func TestSetDefaultJob(t *testing.T) {
 }
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	data, err := Codec.Encode(obj)
+	data, err := runtime.Encode(Codec, obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)
 		return nil

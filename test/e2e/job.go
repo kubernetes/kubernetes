@@ -21,10 +21,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -184,6 +182,19 @@ var _ = Describe("Job", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(errors.IsNotFound(err)).To(BeTrue())
 	})
+
+	It("should fail a job", func() {
+		By("Creating a job")
+		job := newTestJob("notTerminate", "foo", api.RestartPolicyNever, parallelism, completions)
+		activeDeadlineSeconds := int64(10)
+		job.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+		job, err := createJob(f.Client, f.Namespace.Name, job)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring job was failed")
+		err = waitForJobFail(f.Client, f.Namespace.Name, job.Name)
+		Expect(err).NotTo(HaveOccurred())
+	})
 })
 
 // newTestJob returns a job which does one of several testing behaviors.
@@ -260,7 +271,8 @@ func deleteJob(c *client.Client, ns, name string) error {
 func waitForAllPodsRunning(c *client.Client, ns, jobName string, parallelism int) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{jobSelectorKey: jobName}))
 	return wait.Poll(poll, jobTimeout, func() (bool, error) {
-		pods, err := c.Pods(ns).List(label, fields.Everything(), unversioned.ListOptions{})
+		options := api.ListOptions{LabelSelector: label}
+		pods, err := c.Pods(ns).List(options)
 		if err != nil {
 			return false, err
 		}
@@ -282,5 +294,21 @@ func waitForJobFinish(c *client.Client, ns, jobName string, completions int) err
 			return false, err
 		}
 		return curr.Status.Succeeded == completions, nil
+	})
+}
+
+// Wait for job fail.
+func waitForJobFail(c *client.Client, ns, jobName string) error {
+	return wait.Poll(poll, jobTimeout, func() (bool, error) {
+		curr, err := c.Extensions().Jobs(ns).Get(jobName)
+		if err != nil {
+			return false, err
+		}
+		for _, c := range curr.Status.Conditions {
+			if c.Type == extensions.JobFailed && c.Status == api.ConditionTrue {
+				return true, nil
+			}
+		}
+		return false, nil
 	})
 }

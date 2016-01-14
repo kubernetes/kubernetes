@@ -18,6 +18,7 @@ package framework
 
 import (
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
@@ -27,19 +28,19 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
+	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 )
@@ -126,38 +127,48 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 	}))
 
 	if masterConfig == nil {
-		etcdClient := NewEtcdClient()
-		storageVersions := make(map[string]string)
-		etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, latest.GroupOrDie("").GroupVersion.String(), etcdtest.PathPrefix())
-		storageVersions[""] = latest.GroupOrDie("").GroupVersion.String()
-		if err != nil {
-			glog.Fatalf("Failed to create etcd storage for master %v", err)
-		}
-		expEtcdStorage, err := NewExtensionsEtcdStorage(etcdClient)
-		storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
-		if err != nil {
-			glog.Fatalf("Failed to create etcd storage for master %v", err)
-		}
-		storageDestinations := master.NewStorageDestinations()
-		storageDestinations.AddAPIGroup("", etcdStorage)
-		storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
-
-		masterConfig = &master.Config{
-			StorageDestinations:  storageDestinations,
-			StorageVersions:      storageVersions,
-			KubeletClient:        kubeletclient.FakeKubeletClient{},
-			EnableLogsSupport:    false,
-			EnableProfiling:      true,
-			EnableSwaggerSupport: true,
-			EnableUISupport:      false,
-			APIPrefix:            "/api",
-			APIGroupPrefix:       "/apis",
-			Authorizer:           apiserver.NewAlwaysAllowAuthorizer(),
-			AdmissionControl:     admit.NewAlwaysAdmit(),
-		}
+		masterConfig = NewMasterConfig()
+		masterConfig.EnableProfiling = true
+		masterConfig.EnableSwaggerSupport = true
 	}
 	m = master.New(masterConfig)
 	return m, s
+}
+
+// Returns a basic master config.
+func NewMasterConfig() *master.Config {
+	etcdClient := NewEtcdClient()
+	storageVersions := make(map[string]string)
+
+	etcdStorage := etcdstorage.NewEtcdStorage(etcdClient, testapi.Default.Codec(), etcdtest.PathPrefix())
+	storageVersions[api.GroupName] = testapi.Default.GroupVersion().String()
+	expEtcdStorage := NewExtensionsEtcdStorage(etcdClient)
+	storageVersions[extensions.GroupName] = testapi.Extensions.GroupVersion().String()
+
+	storageDestinations := genericapiserver.NewStorageDestinations()
+	storageDestinations.AddAPIGroup(api.GroupName, etcdStorage)
+	storageDestinations.AddAPIGroup(extensions.GroupName, expEtcdStorage)
+
+	return &master.Config{
+		Config: &genericapiserver.Config{
+			StorageDestinations: storageDestinations,
+			StorageVersions:     storageVersions,
+			APIPrefix:           "/api",
+			APIGroupPrefix:      "/apis",
+			Authorizer:          apiserver.NewAlwaysAllowAuthorizer(),
+			AdmissionControl:    admit.NewAlwaysAdmit(),
+		},
+		KubeletClient: kubeletclient.FakeKubeletClient{},
+	}
+}
+
+// Returns the master config appropriate for most integration tests.
+func NewIntegrationTestMasterConfig() *master.Config {
+	masterConfig := NewMasterConfig()
+	masterConfig.EnableCoreControllers = true
+	masterConfig.EnableIndex = true
+	masterConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	return masterConfig
 }
 
 func (m *MasterComponents) stopRCManager() {
@@ -172,7 +183,8 @@ func (m *MasterComponents) Stop(apiServer, rcManager bool) {
 		m.once.Do(m.stopRCManager)
 	}
 	if apiServer {
-		m.ApiServer.Close()
+		// TODO: Uncomment when fix #19254
+		// m.ApiServer.Close()
 	}
 }
 
@@ -243,7 +255,8 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 		glog.Infof("StartPods took %v with numPods %d", time.Since(start), numPods)
 	}()
 	hostField := fields.OneTermEqualSelector(client.PodHost, host)
-	pods, err := restClient.Pods(TestNS).List(labels.Everything(), hostField, unversioned.ListOptions{})
+	options := api.ListOptions{FieldSelector: hostField}
+	pods, err := restClient.Pods(TestNS).List(options)
 	if err != nil || len(pods.Items) == numPods {
 		return err
 	}
@@ -269,34 +282,9 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 
 // TODO: Merge this into startMasterOrDie.
 func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
-	etcdClient := NewEtcdClient()
-	storageVersions := make(map[string]string)
-	etcdStorage, err := master.NewEtcdStorage(etcdClient, latest.GroupOrDie("").InterfacesFor, testapi.Default.GroupAndVersion(), etcdtest.PathPrefix())
-	storageVersions[""] = testapi.Default.Version()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	expEtcdStorage, err := NewExtensionsEtcdStorage(etcdClient)
-	storageVersions["extensions"] = testapi.Extensions.GroupAndVersion()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	storageDestinations := master.NewStorageDestinations()
-	storageDestinations.AddAPIGroup("", etcdStorage)
-	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
-
-	m := master.New(&master.Config{
-		StorageDestinations: storageDestinations,
-		KubeletClient:       kubeletclient.FakeKubeletClient{},
-		EnableLogsSupport:   false,
-		EnableProfiling:     true,
-		EnableUISupport:     false,
-		APIPrefix:           "/api",
-		APIGroupPrefix:      "/apis",
-		Authorizer:          apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:    admit.NewAlwaysAdmit(),
-		StorageVersions:     storageVersions,
-	})
+	masterConfig := NewMasterConfig()
+	masterConfig.EnableProfiling = true
+	m := master.New(masterConfig)
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)

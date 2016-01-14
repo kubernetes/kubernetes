@@ -26,25 +26,26 @@ import (
 
 func TestSimpleMetaFactoryInterpret(t *testing.T) {
 	factory := SimpleMetaFactory{}
-	version, kind, err := factory.Interpret([]byte(`{"apiVersion":"1","kind":"object"}`))
+	fqKind, err := factory.Interpret([]byte(`{"apiVersion":"g/1","kind":"object"}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if version != "1" || kind != "object" {
-		t.Errorf("unexpected interpret: %s %s", version, kind)
+	expectedFQKind := unversioned.GroupVersionKind{Group: "g", Version: "1", Kind: "object"}
+	if expectedFQKind != fqKind {
+		t.Errorf("unexpected interpret: %s %s", expectedFQKind, fqKind)
 	}
 
 	// no kind or version
-	version, kind, err = factory.Interpret([]byte(`{}`))
+	fqKind, err = factory.Interpret([]byte(`{}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if version != "" || kind != "" {
-		t.Errorf("unexpected interpret: %s %s", version, kind)
+	if !fqKind.IsEmpty() {
+		t.Errorf("unexpected interpret: %s %s", fqKind)
 	}
 
 	// unparsable
-	version, kind, err = factory.Interpret([]byte(`{`))
+	fqKind, err = factory.Interpret([]byte(`{`))
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -237,10 +238,10 @@ func TestMetaValuesUnregisteredConvert(t *testing.T) {
 	// Register functions to verify that scope.Meta() gets set correctly.
 	err := s.AddConversionFuncs(
 		func(in *InternalSimple, out *ExternalSimple, scope Scope) error {
-			if e, a := "unknown", scope.Meta().SrcVersion; e != a {
+			if e, a := "unknown/unknown", scope.Meta().SrcVersion; e != a {
 				t.Fatalf("Expected '%v', got '%v'", e, a)
 			}
-			if e, a := "unknown", scope.Meta().DestVersion; e != a {
+			if e, a := "unknown/unknown", scope.Meta().DestVersion; e != a {
 				t.Fatalf("Expected '%v', got '%v'", e, a)
 			}
 			scope.Convert(&in.TestString, &out.TestString, 0)

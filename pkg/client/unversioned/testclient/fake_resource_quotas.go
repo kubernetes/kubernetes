@@ -18,9 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -40,8 +37,8 @@ func (c *FakeResourceQuotas) Get(name string) (*api.ResourceQuota, error) {
 	return obj.(*api.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.ResourceQuotaList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("resourcequotas", c.Namespace, label, field), &api.ResourceQuotaList{})
+func (c *FakeResourceQuotas) List(opts api.ListOptions) (*api.ResourceQuotaList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("resourcequotas", c.Namespace, opts), &api.ResourceQuotaList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -72,7 +69,7 @@ func (c *FakeResourceQuotas) Delete(name string) error {
 	return err
 }
 
-func (c *FakeResourceQuotas) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *FakeResourceQuotas) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.InvokesWatch(NewWatchAction("resourcequotas", c.Namespace, opts))
 }
 

@@ -29,8 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -75,7 +73,7 @@ func (m *FakeNodeHandler) Create(node *api.Node) (*api.Node, error) {
 	}()
 	for _, n := range m.Existing {
 		if n.Name == node.Name {
-			return nil, apierrors.NewAlreadyExists("Node", node.Name)
+			return nil, apierrors.NewAlreadyExists(api.Resource("nodes"), node.Name)
 		}
 	}
 	if m.CreateHook == nil || m.CreateHook(m, node) {
@@ -91,7 +89,7 @@ func (m *FakeNodeHandler) Get(name string) (*api.Node, error) {
 	return nil, nil
 }
 
-func (m *FakeNodeHandler) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*api.NodeList, error) {
+func (m *FakeNodeHandler) List(opts api.ListOptions) (*api.NodeList, error) {
 	defer func() { m.RequestCount++ }()
 	var nodes []*api.Node
 	for i := 0; i < len(m.UpdatedNodes); i++ {
@@ -136,7 +134,7 @@ func (m *FakeNodeHandler) UpdateStatus(node *api.Node) (*api.Node, error) {
 	return node, nil
 }
 
-func (m *FakeNodeHandler) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (m *FakeNodeHandler) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return nil, nil
 }
 
@@ -730,6 +728,20 @@ func TestCheckPod(t *testing.T) {
 		{
 			pod: api.Pod{
 				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
+				Spec:       api.PodSpec{NodeName: "older"},
+			},
+			prune: true,
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
+				Spec:       api.PodSpec{NodeName: "oldest"},
+			},
+			prune: true,
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
 				Spec:       api.PodSpec{NodeName: ""},
 			},
 			prune: true,
@@ -762,6 +774,26 @@ func TestCheckPod(t *testing.T) {
 		Status: api.NodeStatus{
 			NodeInfo: api.NodeSystemInfo{
 				KubeletVersion: "v1.0.0",
+			},
+		},
+	})
+	nc.nodeStore.Store.Add(&api.Node{
+		ObjectMeta: api.ObjectMeta{
+			Name: "older",
+		},
+		Status: api.NodeStatus{
+			NodeInfo: api.NodeSystemInfo{
+				KubeletVersion: "v0.21.4",
+			},
+		},
+	})
+	nc.nodeStore.Store.Add(&api.Node{
+		ObjectMeta: api.ObjectMeta{
+			Name: "oldest",
+		},
+		Status: api.NodeStatus{
+			NodeInfo: api.NodeSystemInfo{
+				KubeletVersion: "v0.19.3",
 			},
 		},
 	})

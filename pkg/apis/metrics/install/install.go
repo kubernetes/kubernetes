@@ -20,7 +20,6 @@ package install
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/golang/glog"
 
@@ -29,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	_ "k8s.io/kubernetes/pkg/apis/metrics"
+	"k8s.io/kubernetes/pkg/apis/metrics"
 	"k8s.io/kubernetes/pkg/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -39,54 +38,92 @@ const importPrefix = "k8s.io/kubernetes/pkg/apis/metrics"
 
 var accessor = meta.NewAccessor()
 
+// availableVersions lists all known external versions for this group from most preferred to least preferred
+var availableVersions = []unversioned.GroupVersion{v1alpha1.SchemeGroupVersion}
+
 func init() {
-	groupMeta, err := latest.RegisterGroup("metrics")
-	if err != nil {
+	registered.RegisterVersions(availableVersions...)
+
+	externalVersions := []unversioned.GroupVersion{}
+	for _, v := range availableVersions {
+		if registered.IsAllowedVersion(v) {
+			externalVersions = append(externalVersions, v)
+		}
+	}
+	if len(externalVersions) == 0 {
+		glog.V(4).Infof("No version is registered for group %v", metrics.GroupName)
+		return
+	}
+	if err := registered.EnableVersions(externalVersions...); err != nil {
 		glog.V(4).Infof("%v", err)
 		return
 	}
+	if err := enableVersions(externalVersions); err != nil {
+		glog.V(4).Infof("%v", err)
+		return
+	}
+}
 
-	registeredGroupVersions := registered.GroupVersionsForGroup("metrics")
-	groupVersion := registeredGroupVersions[0]
-	*groupMeta = latest.GroupMeta{
-		GroupVersion: groupVersion,
-		Codec:        runtime.CodecFor(api.Scheme, groupVersion.String()),
+// TODO: enableVersions should be centralized rather than spread in each API
+// group.
+func enableVersions(externalVersions []unversioned.GroupVersion) error {
+	addVersionsToScheme(externalVersions...)
+	preferredExternalVersion := externalVersions[0]
+
+	groupMeta := latest.GroupMeta{
+		GroupVersion:  preferredExternalVersion,
+		GroupVersions: externalVersions,
+		Codec:         runtime.CodecFor(api.Scheme, preferredExternalVersion),
+		RESTMapper:    newRESTMapper(externalVersions),
+		SelfLinker:    runtime.SelfLinker(accessor),
+		InterfacesFor: interfacesFor,
 	}
 
-	var versions []string
-	worstToBestGroupVersions := []unversioned.GroupVersion{}
-	for i := len(registeredGroupVersions) - 1; i >= 0; i-- {
-		versions = append(versions, registeredGroupVersions[i].Version)
-		worstToBestGroupVersions = append(worstToBestGroupVersions, registeredGroupVersions[i])
+	if err := latest.RegisterGroup(groupMeta); err != nil {
+		return err
 	}
-	groupMeta.Versions = versions
-	groupMeta.GroupVersions = registeredGroupVersions
+	api.RegisterRESTMapper(groupMeta.RESTMapper)
+	return nil
+}
 
-	groupMeta.SelfLinker = runtime.SelfLinker(accessor)
-
+func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper {
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
 	rootScoped := sets.NewString()
 
 	ignoredKinds := sets.NewString()
 
-	groupMeta.RESTMapper = api.NewDefaultRESTMapper(worstToBestGroupVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
-	api.RegisterRESTMapper(groupMeta.RESTMapper)
-	groupMeta.InterfacesFor = interfacesFor
+	return api.NewDefaultRESTMapper(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 }
 
-// InterfacesFor returns the default Codec and ResourceVersioner for a given version
+// interfacesFor returns the default Codec and ResourceVersioner for a given version
 // string, or an error if the version is not known.
-func interfacesFor(version string) (*meta.VersionInterfaces, error) {
+func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
 	switch version {
-	case "metrics/v1alpha1":
+	case v1alpha1.SchemeGroupVersion:
 		return &meta.VersionInterfaces{
 			Codec:            v1alpha1.Codec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
 	default:
-		g, _ := latest.Group("metrics")
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(g.Versions, ", "))
+		g, _ := latest.Group(metrics.GroupName)
+		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
+	}
+}
+
+func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
+	// add the internal version to Scheme
+	metrics.AddToScheme(api.Scheme)
+	// add the enabled external versions to Scheme
+	for _, v := range externalVersions {
+		if !registered.IsEnabledVersion(v) {
+			glog.Errorf("Version %s is not enabled, so it will not be added to the Scheme.", v)
+			continue
+		}
+		switch v {
+		case v1alpha1.SchemeGroupVersion:
+			v1alpha1.AddToScheme(api.Scheme)
+		}
 	}
 }

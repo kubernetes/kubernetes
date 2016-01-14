@@ -26,11 +26,11 @@ import (
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
-func autoconvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *componentconfig.KubeProxyConfiguration, out *KubeProxyConfiguration, s conversion.Scope) error {
+func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *componentconfig.KubeProxyConfiguration, out *KubeProxyConfiguration, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*componentconfig.KubeProxyConfiguration))(in)
 	}
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
 	out.BindAddress = in.BindAddress
@@ -57,15 +57,15 @@ func autoconvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 	return nil
 }
 
-func convert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *componentconfig.KubeProxyConfiguration, out *KubeProxyConfiguration, s conversion.Scope) error {
-	return autoconvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in, out, s)
+func Convert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *componentconfig.KubeProxyConfiguration, out *KubeProxyConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in, out, s)
 }
 
-func autoconvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration(in *KubeProxyConfiguration, out *componentconfig.KubeProxyConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration(in *KubeProxyConfiguration, out *componentconfig.KubeProxyConfiguration, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*KubeProxyConfiguration))(in)
 	}
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
 	out.BindAddress = in.BindAddress
@@ -92,14 +92,14 @@ func autoconvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyCon
 	return nil
 }
 
-func convert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration(in *KubeProxyConfiguration, out *componentconfig.KubeProxyConfiguration, s conversion.Scope) error {
-	return autoconvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration(in, out, s)
+func Convert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration(in *KubeProxyConfiguration, out *componentconfig.KubeProxyConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration(in, out, s)
 }
 
 func init() {
 	err := api.Scheme.AddGeneratedConversionFuncs(
-		autoconvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration,
-		autoconvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration,
+		autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration,
+		autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.

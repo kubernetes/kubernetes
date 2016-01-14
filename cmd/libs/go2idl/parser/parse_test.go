@@ -39,7 +39,7 @@ func construct(t *testing.T, files map[string]string, testNamer namer.Namer) (*p
 		t.Fatal(err)
 	}
 	orderer := namer.Orderer{testNamer}
-	o := orderer.Order(u)
+	o := orderer.OrderUniverse(u)
 	return b, u, o
 }
 
@@ -73,6 +73,11 @@ type Object struct {
 func AFunc(obj1 common.Object, obj2 Object) Frobber {
 }
 
+var AVar Frobber
+
+var (
+	AnotherVar = Frobber{}
+)
 `,
 		"base/common/proto/common.go": `
 package common
@@ -91,14 +96,19 @@ package o
 }
 
 {{end}}
-{{define "Func"}}{{$s := .Signature}}func {{Raw .}}( {{range $s.Parameters}}{{Raw .}} {{end}}) {{range $s.Results}}{{Raw .}} {{end}}{}
+{{define "Func"}}{{$s := .Underlying.Signature}}var {{Name .}} func({{range $index,$elem := $s.Parameters}}{{if $index}}, {{end}}{{Raw $elem}}{{end}}) {{if $s.Results|len |gt 1}}({{end}}{{range $index,$elem := $s.Results}}{{if $index}}, {{end}}{{Raw .}}{{end}}{{if $s.Results|len |gt 1}}){{end}} = {{Raw .}}
+
+{{end}}
+{{define "Var"}}{{$t := .Underlying}}var {{Name .}} {{Raw $t}} = {{Raw .}}
 
 {{end}}
 {{range $t := .}}{{if eq $t.Kind "Struct"}}{{template "Struct" $t}}{{end}}{{end}}
-{{range $t := .}}{{if eq $t.Kind "Func"}}{{template "Func" $t}}{{end}}{{end}}`
+{{range $t := .}}{{if eq $t.Kind "DeclarationOf"}}{{if eq $t.Underlying.Kind "Func"}}{{template "Func" $t}}{{end}}{{end}}{{end}}
+{{range $t := .}}{{if eq $t.Kind "DeclarationOf"}}{{if ne $t.Underlying.Kind "Func"}}{{template "Var" $t}}{{end}}{{end}}{{end}}`
 
 	var expect = `
 package o
+
 
 
 type CommonObject interface { 
@@ -128,7 +138,12 @@ type FooObject interface {
 }
 
 
-func proto.AFunc( proto.Object proto.Object ) proto.Frobber {}
+var FooAFunc func(proto.Object, proto.Object) proto.Frobber = proto.AFunc
+
+
+var FooAVar proto.Frobber = proto.AVar
+
+var FooAnotherVar proto.Frobber = proto.AnotherVar
 
 `
 	testNamer := namer.NewPublicNamer(1, "proto")
@@ -149,7 +164,6 @@ func proto.AFunc( proto.Object proto.Object ) proto.Frobber {}
 	if e, a := expect, buf.String(); e != a {
 		t.Errorf("Wanted, got:\n%v\n-----\n%v\n", e, a)
 	}
-
 	if p := u.Package("base/foo/proto"); !p.HasImport("base/common/proto") {
 		t.Errorf("Unexpected lack of import line: %#s", p.Imports)
 	}
@@ -175,7 +189,7 @@ type Blah struct {
 
 	_, u, o := construct(t, structTest, namer.NewPublicNamer(0))
 	t.Logf("%#v", o)
-	blahT := u.Get(types.Name{Package: "base/foo/proto", Name: "Blah"})
+	blahT := u.Type(types.Name{Package: "base/foo/proto", Name: "Blah"})
 	if blahT == nil {
 		t.Fatal("type not found")
 	}
@@ -194,6 +208,47 @@ type Blah struct {
 	}
 	if e, a := m, blahT.Members[1]; !reflect.DeepEqual(e, a) {
 		t.Errorf("wanted, got:\n%#v\n%#v", e, a)
+	}
+}
+
+func TestParseSecondClosestCommentLines(t *testing.T) {
+	const fileName = "base/foo/proto/foo.go"
+	testCases := []struct {
+		testFile map[string]string
+		expected string
+	}{
+		{
+			map[string]string{fileName: `package foo
+// Blah's SecondClosestCommentLines.
+// Another line.
+
+// Blah is a test.
+// A test, I tell you.
+type Blah struct {
+	a int
+}
+`},
+			"Blah's SecondClosestCommentLines.\nAnother line.\n",
+		},
+		{
+			map[string]string{fileName: `package foo
+// Blah's SecondClosestCommentLines.
+// Another line.
+
+type Blah struct {
+	a int
+}
+`},
+			"Blah's SecondClosestCommentLines.\nAnother line.\n",
+		},
+	}
+	for _, test := range testCases {
+		_, u, o := construct(t, test.testFile, namer.NewPublicNamer(0))
+		t.Logf("%#v", o)
+		blahT := u.Type(types.Name{Package: "base/foo/proto", Name: "Blah"})
+		if e, a := test.expected, blahT.SecondClosestCommentLines; e != a {
+			t.Errorf("struct second closest comment wrong, wanted %v, got %v", e, a)
+		}
 	}
 }
 
@@ -330,7 +385,7 @@ type Interface interface{Method(a, b string) (c, d string)}
 
 		for _, item := range assertions {
 			n := types.Name{Package: item.Package, Name: item.Name}
-			thisType := u.Get(n)
+			thisType := u.Type(n)
 			if thisType == nil {
 				t.Errorf("type %s not found", n)
 				continue
@@ -344,11 +399,11 @@ type Interface interface{Method(a, b string) (c, d string)}
 		}
 
 		// Also do some one-off checks
-		gtest := u.Get(types.Name{Package: "g", Name: "Test"})
+		gtest := u.Type(types.Name{Package: "g", Name: "Test"})
 		if e, a := 1, len(gtest.Methods); e != a {
 			t.Errorf("expected %v but found %v methods: %#v", e, a, gtest)
 		}
-		iface := u.Get(types.Name{Package: "g", Name: "Interface"})
+		iface := u.Type(types.Name{Package: "g", Name: "Interface"})
 		if e, a := 1, len(iface.Methods); e != a {
 			t.Errorf("expected %v but found %v methods: %#v", e, a, iface)
 		}

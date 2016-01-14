@@ -37,13 +37,15 @@ import (
 // Default returns a defaulted GeneratorArgs. You may change the defaults
 // before calling AddFlags.
 func Default() *GeneratorArgs {
-	return &GeneratorArgs{
+	generatorArgs := &GeneratorArgs{
 		OutputBase:       DefaultSourceTree(),
 		GoHeaderFilePath: filepath.Join(DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt"),
 	}
+	generatorArgs.AddFlags(pflag.CommandLine)
+	return generatorArgs
 }
 
-// GeneratorArgs has arguments common to most generators.
+// GeneratorArgs has arguments that are passed to generators.
 type GeneratorArgs struct {
 	// Which directories to parse.
 	InputDirs []string
@@ -56,6 +58,12 @@ type GeneratorArgs struct {
 
 	// Where to get copyright header text.
 	GoHeaderFilePath string
+
+	// If true, only verify, don't write anything.
+	VerifyOnly bool
+
+	// Any custom arguments go here
+	CustomArgs interface{}
 }
 
 func (g *GeneratorArgs) AddFlags(fs *pflag.FlagSet) {
@@ -63,6 +71,7 @@ func (g *GeneratorArgs) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&g.OutputBase, "output-base", "o", g.OutputBase, "Output base; defaults to $GOPATH/src/ or ./ if $GOPATH is not set.")
 	fs.StringVarP(&g.OutputPackagePath, "output-package", "p", g.OutputPackagePath, "Base package path.")
 	fs.StringVarP(&g.GoHeaderFilePath, "go-header-file", "h", g.GoHeaderFilePath, "File containing boilerplate header text. The string YEAR will be replaced with the current 4-digit year.")
+	fs.BoolVar(&g.VerifyOnly, "verify-only", g.VerifyOnly, "If true, only verify existing output, do not write anything.")
 }
 
 // LoadGoBoilerplate loads the boilerplate file passed to --go-header-file.
@@ -75,6 +84,8 @@ func (g *GeneratorArgs) LoadGoBoilerplate() ([]byte, error) {
 	return b, nil
 }
 
+// NewBuilder makes a new parser.Builder and populates it with the input
+// directories.
 func (g *GeneratorArgs) NewBuilder() (*parser.Builder, error) {
 	b := parser.New()
 	for _, d := range g.InputDirs {
@@ -99,7 +110,6 @@ func DefaultSourceTree() string {
 // If you don't need any non-default behavior, use as:
 // args.Default().Execute(...)
 func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem string, pkgs func(*generator.Context, *GeneratorArgs) generator.Packages) error {
-	g.AddFlags(pflag.CommandLine)
 	pflag.Parse()
 
 	b, err := g.NewBuilder()
@@ -112,6 +122,7 @@ func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem str
 		return fmt.Errorf("Failed making a context: %v", err)
 	}
 
+	c.Verify = g.VerifyOnly
 	packages := pkgs(c, g)
 	if err := c.ExecutePackages(g.OutputBase, packages); err != nil {
 		return fmt.Errorf("Failed executing generator: %v", err)

@@ -16,8 +16,13 @@ package statsd
 
 import (
 	info "github.com/google/cadvisor/info/v1"
+	"github.com/google/cadvisor/storage"
 	client "github.com/google/cadvisor/storage/statsd/client"
 )
+
+func init() {
+	storage.RegisterStorageDriver("statsd", new)
+}
 
 type statsdStorage struct {
 	client    *client.Client
@@ -45,6 +50,10 @@ const (
 	// Filesystem usage.
 	colFsUsage = "fs_usage"
 )
+
+func new() (storage.StorageDriver, error) {
+	return newStorage(*storage.ArgDbName, *storage.ArgDbHost)
+}
 
 func (self *statsdStorage) containerStatsToValues(
 	stats *info.ContainerStats,
@@ -114,7 +123,7 @@ func (self *statsdStorage) Close() error {
 	return nil
 }
 
-func New(namespace, hostPort string) (*statsdStorage, error) {
+func newStorage(namespace, hostPort string) (*statsdStorage, error) {
 	statsdClient, err := client.New(hostPort)
 	if err != nil {
 		return nil, err

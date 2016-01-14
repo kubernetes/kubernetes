@@ -102,7 +102,3 @@ func TestGC(t *testing.T) {
 		}
 	}
 }
-
-func TestTerminatedPodSelectorCompiles(t *testing.T) {
-	compileTerminatedPodSelector()
-}

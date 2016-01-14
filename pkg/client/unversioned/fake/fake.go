@@ -50,23 +50,23 @@ type RESTClient struct {
 }
 
 func (c *RESTClient) Get() *unversioned.Request {
-	return unversioned.NewRequest(c, "GET", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
+	return unversioned.NewRequest(c, "GET", &url.URL{Host: "localhost"}, *testapi.Default.GroupVersion(), c.Codec, nil)
 }
 
 func (c *RESTClient) Put() *unversioned.Request {
-	return unversioned.NewRequest(c, "PUT", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
+	return unversioned.NewRequest(c, "PUT", &url.URL{Host: "localhost"}, *testapi.Default.GroupVersion(), c.Codec, nil)
 }
 
 func (c *RESTClient) Patch(_ api.PatchType) *unversioned.Request {
-	return unversioned.NewRequest(c, "PATCH", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
+	return unversioned.NewRequest(c, "PATCH", &url.URL{Host: "localhost"}, *testapi.Default.GroupVersion(), c.Codec, nil)
 }
 
 func (c *RESTClient) Post() *unversioned.Request {
-	return unversioned.NewRequest(c, "POST", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
+	return unversioned.NewRequest(c, "POST", &url.URL{Host: "localhost"}, *testapi.Default.GroupVersion(), c.Codec, nil)
 }
 
 func (c *RESTClient) Delete() *unversioned.Request {
-	return unversioned.NewRequest(c, "DELETE", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
+	return unversioned.NewRequest(c, "DELETE", &url.URL{Host: "localhost"}, *testapi.Default.GroupVersion(), c.Codec, nil)
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {

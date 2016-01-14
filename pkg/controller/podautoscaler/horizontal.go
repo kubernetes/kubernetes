@@ -28,8 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -40,7 +38,9 @@ const (
 )
 
 type HorizontalController struct {
-	client        client.Interface
+	scaleNamespacer client.ScaleNamespacer
+	hpaNamespacer   client.HorizontalPodAutoscalersNamespacer
+
 	metricsClient metrics.MetricsClient
 	eventRecorder record.EventRecorder
 }
@@ -48,15 +48,16 @@ type HorizontalController struct {
 var downscaleForbiddenWindow = 5 * time.Minute
 var upscaleForbiddenWindow = 3 * time.Minute
 
-func NewHorizontalController(client client.Interface, metricsClient metrics.MetricsClient) *HorizontalController {
+func NewHorizontalController(evtNamespacer client.EventNamespacer, scaleNamespacer client.ScaleNamespacer, hpaNamespacer client.HorizontalPodAutoscalersNamespacer, metricsClient metrics.MetricsClient) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(client.Events(""))
+	broadcaster.StartRecordingToSink(evtNamespacer.Events(""))
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "horizontal-pod-autoscaler"})
 
 	return &HorizontalController{
-		client:        client,
-		metricsClient: metricsClient,
-		eventRecorder: recorder,
+		metricsClient:   metricsClient,
+		eventRecorder:   recorder,
+		scaleNamespacer: scaleNamespacer,
+		hpaNamespacer:   hpaNamespacer,
 	}
 }
 
@@ -68,41 +69,41 @@ func (a *HorizontalController) Run(syncPeriod time.Duration) {
 	}, syncPeriod, util.NeverStop)
 }
 
-func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.HorizontalPodAutoscaler, scale *extensions.Scale) (int, *int, error) {
+func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.HorizontalPodAutoscaler, scale *extensions.Scale) (int, *int, time.Time, error) {
 	if hpa.Spec.CPUUtilization == nil {
 		// If CPUTarget is not specified than we should return some default values.
 		// Since we always take maximum number of replicas from all policies it is safe
 		// to just return 0.
-		return 0, nil, nil
+		return 0, nil, time.Time{}, nil
 	}
 	currentReplicas := scale.Status.Replicas
-	currentUtilization, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, scale.Status.Selector)
+	currentUtilization, timestamp, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, scale.Status.Selector)
 
 	// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 	if err != nil {
 		a.eventRecorder.Event(&hpa, api.EventTypeWarning, "FailedGetMetrics", err.Error())
-		return 0, nil, fmt.Errorf("failed to get cpu utilization: %v", err)
+		return 0, nil, time.Time{}, fmt.Errorf("failed to get cpu utilization: %v", err)
 	}
 
 	usageRatio := float64(*currentUtilization) / float64(hpa.Spec.CPUUtilization.TargetPercentage)
 	if math.Abs(1.0-usageRatio) > tolerance {
-		return int(math.Ceil(usageRatio * float64(currentReplicas))), currentUtilization, nil
+		return int(math.Ceil(usageRatio * float64(currentReplicas))), currentUtilization, timestamp, nil
 	} else {
-		return currentReplicas, currentUtilization, nil
+		return currentReplicas, currentUtilization, timestamp, nil
 	}
 }
 
 func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodAutoscaler) error {
 	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleRef.Kind, hpa.Namespace, hpa.Spec.ScaleRef.Name)
 
-	scale, err := a.client.Extensions().Scales(hpa.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
+	scale, err := a.scaleNamespacer.Scales(hpa.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
 	if err != nil {
 		a.eventRecorder.Event(&hpa, api.EventTypeWarning, "FailedGetScale", err.Error())
 		return fmt.Errorf("failed to query scale subresource for %s: %v", reference, err)
 	}
 	currentReplicas := scale.Status.Replicas
 
-	desiredReplicas, currentUtilization, err := a.computeReplicasForCPUUtilization(hpa, scale)
+	desiredReplicas, currentUtilization, timestamp, err := a.computeReplicasForCPUUtilization(hpa, scale)
 	if err != nil {
 		a.eventRecorder.Event(&hpa, api.EventTypeWarning, "FailedComputeReplicas", err.Error())
 		return fmt.Errorf("failed to compute desired number of replicas based on CPU utilization for %s: %v", reference, err)
@@ -120,7 +121,6 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 	if desiredReplicas > hpa.Spec.MaxReplicas {
 		desiredReplicas = hpa.Spec.MaxReplicas
 	}
-	now := time.Now()
 	rescale := false
 
 	if desiredReplicas != currentReplicas {
@@ -128,7 +128,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		// and there was no rescaling in the last downscaleForbiddenWindow.
 		if desiredReplicas < currentReplicas &&
 			(hpa.Status.LastScaleTime == nil ||
-				hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(now)) {
+				hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(timestamp)) {
 			rescale = true
 		}
 
@@ -136,14 +136,14 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		// and there was no rescaling in the last upscaleForbiddenWindow.
 		if desiredReplicas > currentReplicas &&
 			(hpa.Status.LastScaleTime == nil ||
-				hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(now)) {
+				hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(timestamp)) {
 			rescale = true
 		}
 	}
 
 	if rescale {
 		scale.Spec.Replicas = desiredReplicas
-		_, err = a.client.Extensions().Scales(hpa.Namespace).Update(hpa.Spec.ScaleRef.Kind, scale)
+		_, err = a.scaleNamespacer.Scales(hpa.Namespace).Update(hpa.Spec.ScaleRef.Kind, scale)
 		if err != nil {
 			a.eventRecorder.Eventf(&hpa, api.EventTypeWarning, "FailedRescale", "New size: %d; error: %v", desiredReplicas, err.Error())
 			return fmt.Errorf("failed to rescale %s: %v", reference, err)
@@ -162,11 +162,11 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 		LastScaleTime:                   hpa.Status.LastScaleTime,
 	}
 	if rescale {
-		now := unversioned.NewTime(now)
+		now := unversioned.NewTime(time.Now())
 		hpa.Status.LastScaleTime = &now
 	}
 
-	_, err = a.client.Extensions().HorizontalPodAutoscalers(hpa.Namespace).UpdateStatus(&hpa)
+	_, err = a.hpaNamespacer.HorizontalPodAutoscalers(hpa.Namespace).UpdateStatus(&hpa)
 	if err != nil {
 		a.eventRecorder.Event(&hpa, api.EventTypeWarning, "FailedUpdateStatus", err.Error())
 		return fmt.Errorf("failed to update status for %s: %v", hpa.Name, err)
@@ -176,7 +176,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 
 func (a *HorizontalController) reconcileAutoscalers() error {
 	ns := api.NamespaceAll
-	list, err := a.client.Extensions().HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	list, err := a.hpaNamespacer.HorizontalPodAutoscalers(ns).List(api.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)
 	}

@@ -18,10 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,12 +29,12 @@ type IngressNamespacer interface {
 
 // IngressInterface exposes methods to work on Ingress resources.
 type IngressInterface interface {
-	List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (*extensions.IngressList, error)
+	List(opts api.ListOptions) (*extensions.IngressList, error)
 	Get(name string) (*extensions.Ingress, error)
 	Create(ingress *extensions.Ingress) (*extensions.Ingress, error)
 	Update(ingress *extensions.Ingress) (*extensions.Ingress, error)
 	Delete(name string, options *api.DeleteOptions) error
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 	UpdateStatus(ingress *extensions.Ingress) (*extensions.Ingress, error)
 }
 
@@ -53,9 +50,9 @@ func newIngress(c *ExtensionsClient, namespace string) *ingress {
 }
 
 // List returns a list of ingress that match the label and field selectors.
-func (c *ingress) List(label labels.Selector, field fields.Selector, opts unversioned.ListOptions) (result *extensions.IngressList, err error) {
+func (c *ingress) List(opts api.ListOptions) (result *extensions.IngressList, err error) {
 	result = &extensions.IngressList{}
-	err = c.r.Get().Namespace(c.ns).Resource("ingresses").VersionedParams(&opts, api.Scheme).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("ingresses").VersionedParams(&opts, api.Scheme).Do().Into(result)
 	return
 }
 
@@ -82,19 +79,11 @@ func (c *ingress) Update(ingress *extensions.Ingress) (result *extensions.Ingres
 
 // Delete deletes a ingress, returns error if one occurs.
 func (c *ingress) Delete(name string, options *api.DeleteOptions) (err error) {
-	if options == nil {
-		return c.r.Delete().Namespace(c.ns).Resource("ingresses").Name(name).Do().Error()
-	}
-
-	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion())
-	if err != nil {
-		return err
-	}
-	return c.r.Delete().Namespace(c.ns).Resource("ingresses").Name(name).Body(body).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource("ingresses").Name(name).Body(options).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested ingress.
-func (c *ingress) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *ingress) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).

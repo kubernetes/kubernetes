@@ -24,15 +24,14 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Cluster level logging using Elasticsearch", func() {
+// Flaky issue #17873
+var _ = Describe("Cluster level logging using Elasticsearch [Flaky]", func() {
 	f := NewFramework("es-logging")
 
 	BeforeEach(func() {
@@ -48,8 +47,9 @@ var _ = Describe("Cluster level logging using Elasticsearch", func() {
 })
 
 const (
-	esKey   = "k8s-app"
-	esValue = "elasticsearch-logging"
+	k8sAppKey    = "k8s-app"
+	esValue      = "elasticsearch-logging"
+	fluentdValue = "fluentd-logging"
 )
 
 func bodyToJSON(body []byte) (map[string]interface{}, error) {
@@ -61,13 +61,22 @@ func bodyToJSON(body []byte) (map[string]interface{}, error) {
 	return r, nil
 }
 
+func nodeInNodeList(nodeName string, nodeList *api.NodeList) bool {
+	for _, node := range nodeList.Items {
+		if nodeName == node.Name {
+			return true
+		}
+	}
+	return false
+}
+
 // ClusterLevelLoggingWithElasticsearch is an end to end test for cluster level logging.
 func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	// graceTime is how long to keep retrying requests for status information.
-	const graceTime = 2 * time.Minute
+	const graceTime = 5 * time.Minute
 	// ingestionTimeout is how long to keep retrying to wait for all the
 	// logs to be ingested.
-	const ingestionTimeout = 3 * time.Minute
+	const ingestionTimeout = 10 * time.Minute
 
 	// Check for the existence of the Elasticsearch service.
 	By("Checking the Elasticsearch service exists.")
@@ -85,8 +94,9 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 
 	// Wait for the Elasticsearch pods to enter the running state.
 	By("Checking to make sure the Elasticsearch pods are running")
-	label := labels.SelectorFromSet(labels.Set(map[string]string{esKey: esValue}))
-	pods, err := f.Client.Pods(api.NamespaceSystem).List(label, fields.Everything(), unversioned.ListOptions{})
+	label := labels.SelectorFromSet(labels.Set(map[string]string{k8sAppKey: esValue}))
+	options := api.ListOptions{LabelSelector: label}
+	pods, err := f.Client.Pods(api.NamespaceSystem).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
 		err = waitForPodRunningInNamespace(f.Client, pod.Name, api.NamespaceSystem)
@@ -99,7 +109,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	var esResponse map[string]interface{}
 	err = nil
 	var body []byte
-	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
+	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(10 * time.Second) {
 		// Query against the root URL for Elasticsearch.
 		body, err = f.Client.Get().
 			Namespace(api.NamespaceSystem).
@@ -127,6 +137,10 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 			Logf("After %v expected status to be a float64 but got %v of type %T", time.Since(start), statusIntf, statusIntf)
 			continue
 		}
+		if int(statusCode) != 200 {
+			Logf("After %v Elasticsearch cluster has a bad status: %v", time.Since(start), statusCode)
+			continue
+		}
 		break
 	}
 	Expect(err).NotTo(HaveOccurred())
@@ -145,6 +159,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	// Now assume we really are talking to an Elasticsearch instance.
 	// Check the cluster health.
 	By("Checking health of Elasticsearch service.")
+	healthy := false
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
 		body, err = f.Client.Get().
 			Namespace(api.NamespaceSystem).
@@ -152,30 +167,37 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 			Resource("services").
 			Name("elasticsearch-logging").
 			Suffix("_cluster/health").
-			Param("health", "pretty").
+			Param("level", "indices").
 			DoRaw()
-		if err == nil {
+		if err != nil {
+			continue
+		}
+		health, err := bodyToJSON(body)
+		if err != nil {
+			Logf("Bad json response from elasticsearch: %v", err)
+			continue
+		}
+		statusIntf, ok := health["status"]
+		if !ok {
+			Logf("No status field found in cluster health response: %v", health)
+			continue
+		}
+		status := statusIntf.(string)
+		if status != "green" && status != "yellow" {
+			Logf("Cluster health has bad status: %v", health)
+			continue
+		}
+		if err == nil && ok {
+			healthy = true
 			break
 		}
 	}
-	Expect(err).NotTo(HaveOccurred())
-
-	health, err := bodyToJSON(body)
-	Expect(err).NotTo(HaveOccurred())
-	statusIntf, ok := health["status"]
-	if !ok {
-		Failf("No status field found in cluster health response: %v", health)
-	}
-	status := statusIntf.(string)
-	if status != "green" && status != "yellow" {
-		Failf("Cluster health has bad status: %s", status)
+	if !healthy {
+		Failf("After %v elasticsearch cluster is not healthy", graceTime)
 	}
 
 	// Obtain a list of nodes so we can place one synthetic logger on each node.
-	nodes, err := f.Client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
-	if err != nil {
-		Failf("Failed to list nodes: %v", err)
-	}
+	nodes := ListSchedulableNodesOrDie(f.Client)
 	nodeCount := len(nodes.Items)
 	if nodeCount == 0 {
 		Failf("Failed to find any nodes")
@@ -193,6 +215,33 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	}
 	Logf("Found %d healthy nodes.", len(nodes.Items))
 
+	// Wait for the Fluentd pods to enter the running state.
+	By("Checking to make sure the Fluentd pod are running on each healthy node")
+	label = labels.SelectorFromSet(labels.Set(map[string]string{k8sAppKey: fluentdValue}))
+	options = api.ListOptions{LabelSelector: label}
+	fluentdPods, err := f.Client.Pods(api.NamespaceSystem).List(options)
+	Expect(err).NotTo(HaveOccurred())
+	for _, pod := range fluentdPods.Items {
+		if nodeInNodeList(pod.Spec.NodeName, nodes) {
+			err = waitForPodRunningInNamespace(f.Client, pod.Name, api.NamespaceSystem)
+			Expect(err).NotTo(HaveOccurred())
+		}
+	}
+
+	// Check if each healthy node has fluentd running on it
+	for _, node := range nodes.Items {
+		exists := false
+		for _, pod := range fluentdPods.Items {
+			if pod.Spec.NodeName == node.Name {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			Failf("Node %v does not have fluentd pod running on it.", node.Name)
+		}
+	}
+
 	// Create a unique root name for the resources in this test to permit
 	// parallel executions of this test.
 	// Use a unique namespace for the resources created in this test.
@@ -201,7 +250,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	// Form a unique name to taint log lines to be collected.
 	// Replace '-' characters with '_' to prevent the analyzer from breaking apart names.
 	taintName := strings.Replace(ns+name, "-", "_", -1)
-
+	Logf("Tainting log lines with %v", taintName)
 	// podNames records the names of the synthetic logging pods that are created in the
 	// loop below.
 	var podNames []string
@@ -253,12 +302,15 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 
 	// Make several attempts to observe the logs ingested into Elasticsearch.
 	By("Checking all the log lines were ingested into Elasticsearch")
-	missing := 0
+	totalMissing := 0
 	expected := nodeCount * countTo
-	for start := time.Now(); time.Since(start) < ingestionTimeout; time.Sleep(10 * time.Second) {
+	missingPerNode := []int{}
+	for start := time.Now(); time.Since(start) < ingestionTimeout; time.Sleep(25 * time.Second) {
 
 		// Debugging code to report the status of the elasticsearch logging endpoints.
-		esPods, err := f.Client.Pods(api.NamespaceSystem).List(labels.Set{esKey: esValue}.AsSelector(), fields.Everything(), unversioned.ListOptions{})
+		selector := labels.Set{k8sAppKey: esValue}.AsSelector()
+		options := api.ListOptions{LabelSelector: selector}
+		esPods, err := f.Client.Pods(api.NamespaceSystem).List(options)
 		if err != nil {
 			Logf("Attempt to list Elasticsearch nodes encountered a problem -- may retry: %v", err)
 			continue
@@ -294,7 +346,8 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 		}
 		hits, ok := response["hits"].(map[string]interface{})
 		if !ok {
-			Failf("response[hits] not of the expected type: %T", response["hits"])
+			Logf("response[hits] not of the expected type: %T", response["hits"])
+			continue
 		}
 		totalF, ok := hits["total"].(float64)
 		if !ok {
@@ -302,9 +355,8 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 			continue
 		}
 		total := int(totalF)
-		if total < expected {
-			Logf("After %v expecting to find %d log lines but saw only %d", time.Since(start), expected, total)
-			continue
+		if total != expected {
+			Logf("After %v expecting to find %d log lines but saw %d", time.Since(start), expected, total)
 		}
 		h, ok := hits["hits"].([]interface{})
 		if !ok {
@@ -320,55 +372,95 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 		for _, e := range h {
 			l, ok := e.(map[string]interface{})
 			if !ok {
-				Failf("element of hit not of expected type: %T", e)
+				Logf("element of hit not of expected type: %T", e)
+				continue
 			}
 			source, ok := l["_source"].(map[string]interface{})
 			if !ok {
-				Failf("_source not of the expected type: %T", l["_source"])
+				Logf("_source not of the expected type: %T", l["_source"])
+				continue
 			}
 			msg, ok := source["log"].(string)
 			if !ok {
-				Failf("log not of the expected type: %T", source["log"])
+				Logf("log not of the expected type: %T", source["log"])
+				continue
 			}
 			words := strings.Split(msg, " ")
-			if len(words) < 4 {
-				Failf("Malformed log line: %s", msg)
+			if len(words) != 4 {
+				Logf("Malformed log line: %s", msg)
+				continue
 			}
 			n, err := strconv.ParseUint(words[0], 10, 0)
 			if err != nil {
-				Failf("Expecting numer of node as first field of %s", msg)
+				Logf("Expecting numer of node as first field of %s", msg)
+				continue
 			}
 			if n < 0 || int(n) >= nodeCount {
-				Failf("Node count index out of range: %d", nodeCount)
+				Logf("Node count index out of range: %d", nodeCount)
+				continue
 			}
 			index, err := strconv.ParseUint(words[2], 10, 0)
 			if err != nil {
-				Failf("Expecting number as third field of %s", msg)
+				Logf("Expecting number as third field of %s", msg)
+				continue
 			}
 			if index < 0 || index >= countTo {
-				Failf("Index value out of range: %d", index)
+				Logf("Index value out of range: %d", index)
+				continue
 			}
 			// Record the observation of a log line from node n at the given index.
 			observed[n][index]++
 		}
 		// Make sure we correctly observed the expected log lines from each node.
-		missing = 0
+		totalMissing = 0
+		missingPerNode = make([]int, nodeCount)
+		incorrectCount := false
 		for n := range observed {
 			for i, c := range observed[n] {
 				if c == 0 {
-					missing++
+					totalMissing++
+					missingPerNode[n]++
 				}
 				if c < 0 || c > 1 {
-					Failf("Got incorrect count for node %d index %d: %d", n, i, c)
+					Logf("Got incorrect count for node %d index %d: %d", n, i, c)
+					incorrectCount = true
 				}
 			}
 		}
-		if missing != 0 {
-			Logf("After %v still missing %d log lines", time.Since(start), missing)
+		if incorrectCount {
+			Logf("After %v es still return duplicated log lines", time.Since(start))
+			continue
+		}
+		if totalMissing != 0 {
+			Logf("After %v still missing %d log lines", time.Since(start), totalMissing)
 			continue
 		}
 		Logf("After %s found all %d log lines", time.Since(start), expected)
 		return
+	}
+	for n := range missingPerNode {
+		if missingPerNode[n] > 0 {
+			Logf("Node %d %s is missing %d logs", n, nodes.Items[n].Name, missingPerNode[n])
+			opts := &api.PodLogOptions{}
+			body, err = f.Client.Pods(ns).GetLogs(podNames[n], opts).DoRaw()
+			if err != nil {
+				Logf("Cannot get logs from pod %v", podNames[n])
+				continue
+			}
+			Logf("Pod %s has the following logs: %s", podNames[n], body)
+
+			for _, pod := range fluentdPods.Items {
+				if pod.Spec.NodeName == nodes.Items[n].Name {
+					body, err = f.Client.Pods(api.NamespaceSystem).GetLogs(pod.Name, opts).DoRaw()
+					if err != nil {
+						Logf("Cannot get logs from pod %v", pod.Name)
+						break
+					}
+					Logf("Fluentd Pod %s on node %s has the following logs: %s", pod.Name, nodes.Items[n].Name, body)
+					break
+				}
+			}
+		}
 	}
 	Failf("Failed to find all %d log lines", expected)
 }

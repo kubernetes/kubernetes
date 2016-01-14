@@ -64,7 +64,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return ingress.MatchIngress(label, field)
 		},
-		EndpointName: "ingresses",
+		QualifiedResource: extensions.Resource("ingresses"),
 
 		// Used to validate controller creation
 		CreateStrategy: ingress.Strategy,

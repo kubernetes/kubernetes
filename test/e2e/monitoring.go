@@ -23,16 +23,14 @@ import (
 
 	influxdb "github.com/influxdb/influxdb/client"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
 )
 
 // TODO: quinton: debug issue #6541 and then remove Pending flag here.
-var _ = Describe("Monitoring", func() {
+var _ = Describe("[Flaky] Monitoring", func() {
 	var c *client.Client
 
 	BeforeEach(func() {
@@ -78,7 +76,9 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 	// situation when a heapster-monitoring-v1 and heapster-monitoring-v2 replication controller
 	// is running (which would be an error except during a rolling update).
 	for _, rcLabel := range rcLabels {
-		rcList, err := c.ReplicationControllers(api.NamespaceSystem).List(labels.Set{"k8s-app": rcLabel}.AsSelector(), fields.Everything(), unversioned.ListOptions{})
+		selector := labels.Set{"k8s-app": rcLabel}.AsSelector()
+		options := api.ListOptions{LabelSelector: selector}
+		rcList, err := c.ReplicationControllers(api.NamespaceSystem).List(options)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +87,9 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 				rcLabel, len(rcList.Items))
 		}
 		for _, rc := range rcList.Items {
-			podList, err := c.Pods(api.NamespaceSystem).List(labels.Set(rc.Spec.Selector).AsSelector(), fields.Everything(), unversioned.ListOptions{})
+			selector := labels.Set(rc.Spec.Selector).AsSelector()
+			options := api.ListOptions{LabelSelector: selector}
+			podList, err := c.Pods(api.NamespaceSystem).List(options)
 			if err != nil {
 				return nil, err
 			}
@@ -103,7 +105,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 }
 
 func expectedServicesExist(c *client.Client) error {
-	serviceList, err := c.Services(api.NamespaceSystem).List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	serviceList, err := c.Services(api.NamespaceSystem).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -121,7 +123,8 @@ func expectedServicesExist(c *client.Client) error {
 }
 
 func getAllNodesInCluster(c *client.Client) ([]string, error) {
-	nodeList, err := c.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
+	// It should be OK to list unschedulable Nodes here.
+	nodeList, err := c.Nodes().List(api.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -230,9 +233,24 @@ func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {
 			return
 		}
 		if time.Since(startTime) >= testTimeout {
+			// temporary workaround to help debug issue #12765
+			printDebugInfo(c)
 			break
 		}
 		time.Sleep(sleepBetweenAttempts)
 	}
 	Failf("monitoring using heapster and influxdb test failed")
+}
+
+func printDebugInfo(c *client.Client) {
+	set := labels.Set{"k8s-app": "heapster"}
+	options := api.ListOptions{LabelSelector: set.AsSelector()}
+	podList, err := c.Pods(api.NamespaceSystem).List(options)
+	if err != nil {
+		Logf("Error while listing pods %v", err)
+		return
+	}
+	for _, pod := range podList.Items {
+		Logf("Kubectl output:\n%v", runKubectlOrDie("log", pod.Name, "--namespace=kube-system"))
+	}
 }

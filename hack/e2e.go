@@ -60,7 +60,7 @@ const (
 	downloadDirName = "_output/downloads"
 	tarDirName      = "server"
 	tempDirName     = "upgrade-e2e-temp-dir"
-	minMinionCount  = 2
+	minNodeCount    = 2
 )
 
 var (
@@ -185,7 +185,7 @@ func Up() bool {
 
 // Ensure that the cluster is large engough to run the e2e tests.
 func ValidateClusterSize() {
-	// Check that there are at least minMinionCount minions running
+	// Check that there are at least minNodeCount nodes running
 	cmd := exec.Command(path.Join(*root, "hack/e2e-internal/e2e-cluster-size.sh"))
 	if *verbose {
 		cmd.Stderr = os.Stderr
@@ -200,8 +200,8 @@ func ValidateClusterSize() {
 		log.Fatalf("Could not count number of nodes to validate cluster size (%s)", err)
 	}
 
-	if numNodes < minMinionCount {
-		log.Fatalf("Cluster size (%d) is too small to run e2e tests.  %d Minions are required.", numNodes, minMinionCount)
+	if numNodes < minNodeCount {
+		log.Fatalf("Cluster size (%d) is too small to run e2e tests.  %d Nodes are required.", numNodes, minNodeCount)
 	}
 }
 

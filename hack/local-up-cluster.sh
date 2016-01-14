@@ -64,7 +64,13 @@ do
 done
 
 if [ "x$GO_OUT" == "x" ]; then
-    "${KUBE_ROOT}/hack/build-go.sh" cmd/kube-proxy cmd/kube-apiserver cmd/kube-controller-manager cmd/kubelet plugin/cmd/kube-scheduler
+    "${KUBE_ROOT}/hack/build-go.sh" \
+        cmd/kube-apiserver \
+        cmd/kube-controller-manager \
+        cmd/kube-proxy \
+        cmd/kubectl \
+        cmd/kubelet \
+        plugin/cmd/kube-scheduler
 else
     echo "skipped the build."
 fi
@@ -91,6 +97,7 @@ RKT_PATH=${RKT_PATH:-""}
 RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-false}
+ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
 
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
@@ -138,8 +145,11 @@ function detect_binary {
       s390x*)
         host_arch=s390x
         ;;
+      ppc64le*)
+        host_arch=ppc64le
+        ;;
       *)
-        echo "Unsupported host arch. Must be x86_64, 386, arm or s390x." >&2
+        echo "Unsupported host arch. Must be x86_64, 386, arm, s390x or ppc64le." >&2
         exit 1
         ;;
     esac
@@ -207,9 +217,9 @@ function set_service_accounts {
 function start_apiserver {
     # Admission Controllers to invoke prior to persisting objects in cluster
     if [[ -z "${ALLOW_SECURITY_CONTEXT}" ]]; then
-      ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+      ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
     else
-      ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,ServiceAccount,ResourceQuota
+      ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
     fi
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
@@ -250,6 +260,7 @@ function start_controller_manager {
       --v=${LOG_LEVEL} \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
+      --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
       --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
@@ -282,6 +293,7 @@ function start_kubelet {
         --address="127.0.0.1" \
         --api-servers="${API_HOST}:${API_PORT}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
+        --cluster-dns="127.0.0.1" \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
     else

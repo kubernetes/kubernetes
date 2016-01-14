@@ -31,11 +31,13 @@ type Codec interface {
 
 // Decoder defines methods for deserializing API objects into a given type
 type Decoder interface {
+	// TODO: change the signature of this method
 	Decode(data []byte) (Object, error)
-	// TODO: Remove this method?
+	// DEPRECATED: This method is being removed
 	DecodeToVersion(data []byte, groupVersion unversioned.GroupVersion) (Object, error)
+	// DEPRECATED: This method is being removed
 	DecodeInto(data []byte, obj Object) error
-	// TODO: Remove this method?
+	// DEPRECATED: This method is being removed
 	DecodeIntoWithSpecifiedVersionKind(data []byte, obj Object, groupVersionKind unversioned.GroupVersionKind) error
 
 	DecodeParametersInto(parameters url.Values, obj Object) error
@@ -43,6 +45,7 @@ type Decoder interface {
 
 // Encoder defines methods for serializing API objects into bytes
 type Encoder interface {
+	// DEPRECATED: This method is being removed
 	Encode(obj Object) (data []byte, err error)
 	EncodeToStream(obj Object, stream io.Writer) error
 
@@ -69,13 +72,13 @@ type ObjectCodec interface {
 // TODO: Consider removing this interface?
 type ObjectDecoder interface {
 	Decoder
-	// DataVersionAndKind returns the version and kind of the provided data, or an error
+	// DataVersionAndKind returns the group,version,kind of the provided data, or an error
 	// if another problem is detected. In many cases this method can be as expensive to
 	// invoke as the Decode method.
-	DataVersionAndKind([]byte) (version, kind string, err error)
-	// Recognizes returns true if the scheme is able to handle the provided version and kind
+	DataKind([]byte) (unversioned.GroupVersionKind, error)
+	// Recognizes returns true if the scheme is able to handle the provided group,version,kind
 	// of an object.
-	Recognizes(version, kind string) bool
+	Recognizes(unversioned.GroupVersionKind) bool
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -91,22 +94,25 @@ type ObjectConvertor interface {
 // ObjectTyper contains methods for extracting the APIVersion and Kind
 // of objects.
 type ObjectTyper interface {
-	// DataVersionAndKind returns the version and kind of the provided data, or an error
+	// DataKind returns the group,version,kind of the provided data, or an error
 	// if another problem is detected. In many cases this method can be as expensive to
 	// invoke as the Decode method.
-	DataVersionAndKind([]byte) (version, kind string, err error)
-	// ObjectVersionAndKind returns the version and kind of the provided object, or an
+	DataKind([]byte) (unversioned.GroupVersionKind, error)
+	// ObjectKind returns the default group,version,kind of the provided object, or an
 	// error if the object is not recognized (IsNotRegisteredError will return true).
-	ObjectVersionAndKind(Object) (version, kind string, err error)
+	ObjectKind(Object) (unversioned.GroupVersionKind, error)
+	// ObjectKinds returns the all possible group,version,kind of the provided object, or an
+	// error if the object is not recognized (IsNotRegisteredError will return true).
+	ObjectKinds(Object) ([]unversioned.GroupVersionKind, error)
 	// Recognizes returns true if the scheme is able to handle the provided version and kind,
 	// or more precisely that the provided version is a possible conversion or decoding
 	// target.
-	Recognizes(version, kind string) bool
+	Recognizes(gvk unversioned.GroupVersionKind) bool
 }
 
 // ObjectCreater contains methods for instantiating an object by kind and version.
 type ObjectCreater interface {
-	New(version, kind string) (out Object, err error)
+	New(kind unversioned.GroupVersionKind) (out Object, err error)
 }
 
 // ObjectCopier duplicates an object.
@@ -134,11 +140,10 @@ type SelfLinker interface {
 	Namespace(obj Object) (string, error)
 }
 
-// All api types must support the Object interface. It's deliberately tiny so that this is not an onerous
-// burden. Implement it with a pointer receiver; this will allow us to use the go compiler to check the
-// one thing about our objects that it's capable of checking for us.
+// All API types registered with Scheme must support the Object interface. Since objects in a scheme are
+// expected to be serialized to the wire, the interface an Object must provide to the Scheme allows
+// serializers to set the kind, version, and group the object is represented as. An Object may choose
+// to return a no-op ObjectKindAccessor in cases where it is not expected to be serialized.
 type Object interface {
-	// This function is used only to enforce membership. It's never called.
-	// TODO: Consider mass rename in the future to make it do something useful.
-	IsAnAPIObject()
+	GetObjectKind() unversioned.ObjectKind
 }

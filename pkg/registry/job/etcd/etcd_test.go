@@ -32,7 +32,7 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, "extensions")
+	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
 	jobStorage, statusStorage := NewREST(etcdStorage, generic.UndecoratedStorage)
 	return jobStorage, statusStorage, server
 }
@@ -48,7 +48,7 @@ func validNewJob() *extensions.Job {
 		Spec: extensions.JobSpec{
 			Completions: &completions,
 			Parallelism: &parallelism,
-			Selector: &extensions.PodSelector{
+			Selector: &extensions.LabelSelector{
 				MatchLabels: map[string]string{"a": "b"},
 			},
 			Template: api.PodTemplateSpec{
@@ -84,7 +84,7 @@ func TestCreate(t *testing.T) {
 		&extensions.Job{
 			Spec: extensions.JobSpec{
 				Completions: validJob.Spec.Completions,
-				Selector:    &extensions.PodSelector{},
+				Selector:    &extensions.LabelSelector{},
 				Template:    validJob.Spec.Template,
 			},
 		},
@@ -108,7 +108,7 @@ func TestUpdate(t *testing.T) {
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.Job)
-			object.Spec.Selector = &extensions.PodSelector{}
+			object.Spec.Selector = &extensions.LabelSelector{}
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {

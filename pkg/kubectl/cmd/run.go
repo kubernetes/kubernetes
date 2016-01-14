@@ -25,7 +25,6 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -93,6 +92,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().String("image", "", "The image for the container to run.")
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
+	cmd.Flags().Bool("rm", false, "If true, delete resources created in this command for attached containers.")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
 	cmd.Flags().StringSlice("env", []string{}, "Environment variables to set in the container")
@@ -136,7 +136,6 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	if err != nil {
 		return err
 	}
-
 	restartPolicy, err := getRestartPolicy(cmd, interactive)
 	if err != nil {
 		return err
@@ -154,9 +153,10 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 			generatorName = "job/v1beta1"
 		}
 	}
-	generator, found := f.Generator(generatorName)
+	generators := f.Generators("run")
+	generator, found := generators[generatorName]
 	if !found {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not found.", generatorName))
+		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generatorName))
 	}
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
@@ -181,11 +181,17 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	if err != nil {
 		return err
 	}
+
 	attachFlag := cmd.Flags().Lookup("attach")
 	attach := cmdutil.GetFlagBool(cmd, "attach")
 
 	if !attachFlag.Changed && interactive {
 		attach = true
+	}
+
+	remove := cmdutil.GetFlagBool(cmd, "rm")
+	if !attach && remove {
+		return cmdutil.UsageError(cmd, "--rm should only be used for attached containers")
 	}
 
 	if attach {
@@ -214,7 +220,31 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		if err != nil {
 			return err
 		}
-		return handleAttachPod(f, client, attachablePod, opts)
+		err = handleAttachPod(f, client, attachablePod, opts)
+		if err != nil {
+			return err
+		}
+
+		if remove {
+			namespace, err = mapping.MetadataAccessor.Namespace(obj)
+			if err != nil {
+				return err
+			}
+			var name string
+			name, err = mapping.MetadataAccessor.Name(obj)
+			if err != nil {
+				return err
+			}
+			_, typer := f.Object()
+			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+				ContinueOnError().
+				NamespaceParam(namespace).DefaultNamespace().
+				ResourceNames(mapping.Resource, name).
+				Flatten().
+				Do()
+			return ReapResult(r, f, cmdOut, true, true, 0, -1, false, mapper)
+		}
+		return nil
 	}
 
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
@@ -313,7 +343,8 @@ func getRestartPolicy(cmd *cobra.Command, interactive bool) (api.RestartPolicy, 
 }
 
 func generateService(f *cmdutil.Factory, cmd *cobra.Command, args []string, serviceGenerator string, paramsIn map[string]interface{}, namespace string, out io.Writer) error {
-	generator, found := f.Generator(serviceGenerator)
+	generators := f.Generators("expose")
+	generator, found := generators[serviceGenerator]
 	if !found {
 		return fmt.Errorf("missing service generator: %s", serviceGenerator)
 	}
@@ -365,30 +396,26 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 		return nil, "", nil, nil, err
 	}
 
+	// TODO: Validate flag usage against selected generator. More tricky since --expose was added.
 	obj, err := generator.Generate(params)
 	if err != nil {
 		return nil, "", nil, nil, err
 	}
 
 	mapper, typer := f.Object()
-	gvString, kind, err := typer.ObjectVersionAndKind(obj)
+	groupVersionKind, err := typer.ObjectKind(obj)
 	if err != nil {
 		return nil, "", nil, nil, err
 	}
-	gv, err := unversioned.ParseGroupVersion(gvString)
-	if err != nil {
-		return nil, "", nil, nil, err
-	}
-	gvk := gv.WithKind(kind)
 
 	if len(overrides) > 0 {
-		obj, err = cmdutil.Merge(obj, overrides, kind)
+		obj, err = cmdutil.Merge(obj, overrides, groupVersionKind.Kind)
 		if err != nil {
 			return nil, "", nil, nil, err
 		}
 	}
 
-	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	mapping, err := mapper.RESTMapping(groupVersionKind.GroupKind(), groupVersionKind.Version)
 	if err != nil {
 		return nil, "", nil, nil, err
 	}
@@ -414,5 +441,5 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 			return nil, "", nil, nil, err
 		}
 	}
-	return obj, kind, mapper, mapping, err
+	return obj, groupVersionKind.Kind, mapper, mapping, err
 }

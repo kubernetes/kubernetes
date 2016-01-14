@@ -23,7 +23,11 @@ spec:
         - image: gcr.io/google_containers/heapster_influxdb:v0.4
           name: influxdb
           resources:
+            # keep request = limit to keep this container in guaranteed class
             limits:
+              cpu: 100m
+              memory: 200Mi
+            requests:
               cpu: 100m
               memory: 200Mi
           ports: 
@@ -38,7 +42,11 @@ spec:
           name: grafana
           env:
           resources:
+            # keep request = limit to keep this container in guaranteed class
             limits:
+              cpu: 100m
+              memory: 100Mi
+            requests:
               cpu: 100m
               memory: 100Mi
           env:

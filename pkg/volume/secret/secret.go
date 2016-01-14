@@ -47,8 +47,9 @@ type secretPlugin struct {
 
 var _ volume.VolumePlugin = &secretPlugin{}
 
-func (plugin *secretPlugin) Init(host volume.VolumeHost) {
+func (plugin *secretPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *secretPlugin) Name() string {
@@ -61,14 +62,14 @@ func (plugin *secretPlugin) CanSupport(spec *volume.Spec) bool {
 
 func (plugin *secretPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
 	return &secretVolumeBuilder{
-		secretVolume: &secretVolume{spec.Name(), pod.UID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter()},
+		secretVolume: &secretVolume{spec.Name(), pod.UID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}},
 		secretName:   spec.Volume.Secret.SecretName,
 		pod:          *pod,
 		opts:         &opts}, nil
 }
 
 func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return &secretVolumeCleaner{&secretVolume{volName, podUID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter()}}, nil
+	return &secretVolumeCleaner{&secretVolume{volName, podUID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}}}, nil
 }
 
 type secretVolume struct {
@@ -77,6 +78,7 @@ type secretVolume struct {
 	plugin  *secretPlugin
 	mounter mount.Interface
 	writer  ioutil.Writer
+	volume.MetricsNil
 }
 
 var _ volume.Volume = &secretVolume{}

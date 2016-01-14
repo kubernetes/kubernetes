@@ -47,8 +47,9 @@ const (
 	glusterfsPluginName = "kubernetes.io/glusterfs"
 )
 
-func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) {
+func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *glusterfsPlugin) Name() string {
@@ -142,6 +143,7 @@ type glusterfs struct {
 	pod     *api.Pod
 	mounter mount.Interface
 	plugin  *glusterfsPlugin
+	volume.MetricsNil
 }
 
 type glusterfsBuilder struct {

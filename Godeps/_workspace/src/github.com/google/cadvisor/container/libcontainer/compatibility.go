@@ -19,9 +19,10 @@ import (
 	"io/ioutil"
 	"path"
 
-	"github.com/docker/libcontainer"
-	"github.com/docker/libcontainer/configs"
 	"github.com/google/cadvisor/utils"
+
+	"github.com/opencontainers/runc/libcontainer"
+	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
 // State represents a running container's state
@@ -143,6 +144,40 @@ type preAPINetwork struct {
 	TxQueueLen int `json:"txqueuelen,omitempty"`
 }
 
+type v1Cgroup struct {
+	configs.Cgroup
+
+	// Weight per cgroup per device, can override BlkioWeight.
+	BlkioWeightDevice string `json:"blkio_weight_device"`
+	// IO read rate limit per cgroup per device, bytes per second.
+	BlkioThrottleReadBpsDevice string `json:"blkio_throttle_read_bps_device"`
+
+	// IO write rate limit per cgroup per divice, bytes per second.
+	BlkioThrottleWriteBpsDevice string `json:"blkio_throttle_write_bps_device"`
+
+	// IO read rate limit per cgroup per device, IO per second.
+	BlkioThrottleReadIOPSDevice string `json:"blkio_throttle_read_iops_device"`
+
+	// IO write rate limit per cgroup per device, IO per second.
+	BlkioThrottleWriteIOPSDevice string `json:"blkio_throttle_write_iops_device"`
+}
+
+type v1Config struct {
+	configs.Config
+
+	// Cgroups specifies specific cgroup settings for the various subsystems that the container is
+	// placed into to limit the resources the container has available
+	Cgroup *v1Cgroup `json:"cgroups"`
+}
+
+// State represents a running container's state
+type v1State struct {
+	libcontainer.State
+
+	// Config is the container's configuration.
+	Config v1Config `json:"config"`
+}
+
 // Relative path to the libcontainer execdriver directory.
 const libcontainerExecDriverPath = "execdriver/native"
 
@@ -157,9 +192,20 @@ func ReadConfig(dockerRoot, dockerRun, containerID string) (*configs.Config, err
 		}
 
 		var state libcontainer.State
-		err = json.Unmarshal(out, &state)
-		if err != nil {
-			return nil, err
+		if err = json.Unmarshal(out, &state); err != nil {
+			if _, ok := err.(*json.UnmarshalTypeError); ok {
+				// Since some fields changes in Cgroup struct, it will be failed while unmarshalling to libcontainer.State struct.
+				// This failure is caused by a change of runc(https://github.com/opencontainers/runc/commit/c6e406af243fab0c9636539c1cb5f4d60fe0787f).
+				// If we encountered the UnmarshalTypeError, try to unmarshal it again to v1State struct and convert it.
+				var state v1State
+				err2 := json.Unmarshal(out, &state)
+				if err2 != nil {
+					return nil, err
+				}
+				return convertOldConfigToNew(state.Config), nil
+			} else {
+				return nil, err
+			}
 		}
 		return &state.Config, nil
 	}
@@ -231,6 +277,51 @@ func ReadConfig(dockerRoot, dockerRun, containerID string) (*configs.Config, err
 	}
 
 	return &result, nil
+}
+
+func convertOldConfigToNew(config v1Config) *configs.Config {
+	var (
+		result configs.Config
+		old    *v1Cgroup = config.Cgroup
+	)
+	result.Rootfs = config.Config.Rootfs
+	result.Hostname = config.Config.Hostname
+	result.Namespaces = config.Config.Namespaces
+	result.Capabilities = config.Config.Capabilities
+	result.Networks = config.Config.Networks
+	result.Routes = config.Config.Routes
+
+	var newCgroup = &configs.Cgroup{
+		Name:              old.Name,
+		Parent:            old.Parent,
+		AllowAllDevices:   old.AllowAllDevices,
+		AllowedDevices:    old.AllowedDevices,
+		DeniedDevices:     old.DeniedDevices,
+		Memory:            old.Memory,
+		MemoryReservation: old.MemoryReservation,
+		MemorySwap:        old.MemorySwap,
+		KernelMemory:      old.KernelMemory,
+		CpuShares:         old.CpuShares,
+		CpuQuota:          old.CpuQuota,
+		CpuPeriod:         old.CpuPeriod,
+		CpuRtRuntime:      old.CpuRtRuntime,
+		CpuRtPeriod:       old.CpuRtPeriod,
+		CpusetCpus:        old.CpusetCpus,
+		CpusetMems:        old.CpusetMems,
+		BlkioWeight:       old.BlkioWeight,
+		BlkioLeafWeight:   old.BlkioLeafWeight,
+		Freezer:           old.Freezer,
+		HugetlbLimit:      old.HugetlbLimit,
+		Slice:             old.Slice,
+		OomKillDisable:    old.OomKillDisable,
+		MemorySwappiness:  old.MemorySwappiness,
+		NetPrioIfpriomap:  old.NetPrioIfpriomap,
+		NetClsClassid:     old.NetClsClassid,
+	}
+
+	result.Cgroups = newCgroup
+
+	return &result
 }
 
 func readState(dockerRoot, containerID string) (preAPIState, error) {

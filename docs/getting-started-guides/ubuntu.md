@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/ubuntu.md).
@@ -60,7 +61,7 @@ work, which has been merge into this document.
 Internet to download the necessary files, while worker nodes do not.
 3. These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it can not work with
 Ubuntu 15 which uses systemd instead of upstart.
-4. Dependencies of this guide: etcd-2.2.1, flannel-0.5.3, k8s-1.1.2, may work with higher versions.
+4. Dependencies of this guide: etcd-2.2.1, flannel-0.5.5, k8s-1.1.2, may work with higher versions.
 5. All the remote servers can be ssh logged in without a password by using key authentication.
 
 
@@ -77,7 +78,7 @@ $ git clone https://github.com/kubernetes/kubernetes.git
 #### Configure and start the Kubernetes cluster
 
 The startup process will first download all the required binaries automatically.
-By default etcd version is 2.2.1, flannel version is 0.5.3 and k8s version is 1.1.2.
+By default etcd version is 2.2.1, flannel version is 0.5.5 and k8s version is 1.1.2.
 You can customize your etcd version, flannel version, k8s version by changing corresponding variables
 `ETCD_VERSION` , `FLANNEL_VERSION` and `KUBE_VERSION` like following.
 
@@ -156,7 +157,7 @@ bring up the whole cluster.
 
 `$ KUBERNETES_PROVIDER=ubuntu ./kube-up.sh`
 
-The scripts automatically `scp` binaries and config files to all the machines and start kubernetes
+The scripts automatically copy binaries and config files to all the machines via `scp` and start kubernetes
 service on them. The only thing you need to do is to type the sudo password when promoted.
 
 ```console
@@ -296,7 +297,7 @@ $ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh -h
 Here are some examples:
 
 * upgrade master to version 1.0.5: `$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh -m 1.0.5`
-* upgrade node 10.10.103.223 to version 1.0.5 : `$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh -n 10.10.103.223 1.0.5`
+* upgrade node `vcap@10.10.103.223` to version 1.0.5 : `$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh -n 10.10.103.223 1.0.5`
 * upgrade master and all nodes to version 1.0.5: `$ KUBERNETES_PROVIDER=ubuntu ./kube-push.sh 1.0.5`
 
 The script will not delete any resources of your cluster, it just replaces the binaries.
@@ -308,7 +309,7 @@ also [test-it-out](ubuntu.md#test-it-out)
 
 To make sure the version of the upgraded cluster is what you expect, you will find these commands helpful.
 * upgrade all components or master: `$ kubectl version`. Check the *Server Version*.
-* upgrade node 10.10.102.223: `$ ssh -t vcap@10.10.102.223 'cd /opt/bin && sudo ./kubelet --version'`
+* upgrade node `vcap@10.10.102.223`: `$ ssh -t vcap@10.10.102.223 'cd /opt/bin && sudo ./kubelet --version'`
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

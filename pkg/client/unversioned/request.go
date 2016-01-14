@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/metrics"
 	"k8s.io/kubernetes/pkg/conversion/queryparams"
@@ -99,7 +101,7 @@ type Request struct {
 	selector     labels.Selector
 	timeout      time.Duration
 
-	apiVersion string
+	groupVersion unversioned.GroupVersion
 
 	// output
 	err  error
@@ -108,18 +110,25 @@ type Request struct {
 	// The constructed request and the response
 	req  *http.Request
 	resp *http.Response
+
+	backoffMgr BackoffManager
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
-func NewRequest(client HTTPClient, verb string, baseURL *url.URL, apiVersion string,
-	codec runtime.Codec) *Request {
+func NewRequest(client HTTPClient, verb string, baseURL *url.URL, groupVersion unversioned.GroupVersion, codec runtime.Codec, backoff BackoffManager) *Request {
+	if backoff == nil {
+		glog.V(2).Infof("Not implementing request backoff strategy.")
+		backoff = &NoBackoff{}
+	}
+	metrics.Register()
 	return &Request{
-		client:     client,
-		verb:       verb,
-		baseURL:    baseURL,
-		path:       baseURL.Path,
-		apiVersion: apiVersion,
-		codec:      codec,
+		client:       client,
+		verb:         verb,
+		baseURL:      baseURL,
+		path:         baseURL.Path,
+		groupVersion: groupVersion,
+		codec:        codec,
+		backoffMgr:   backoff,
 	}
 }
 
@@ -278,6 +287,7 @@ const (
 
 	EventReason                  = "reason"
 	EventSource                  = "source"
+	EventType                    = "type"
 	EventInvolvedKind            = "involvedObject.kind"
 	EventInvolvedNamespace       = "involvedObject.namespace"
 	EventInvolvedName            = "involvedObject.name"
@@ -307,25 +317,25 @@ func (r resourceTypeToFieldMapping) filterField(resourceType, field, value strin
 	return fMapping.filterField(field, value)
 }
 
-type versionToResourceToFieldMapping map[string]resourceTypeToFieldMapping
+type versionToResourceToFieldMapping map[unversioned.GroupVersion]resourceTypeToFieldMapping
 
-func (v versionToResourceToFieldMapping) filterField(apiVersion, resourceType, field, value string) (newField, newValue string, err error) {
-	rMapping, ok := v[apiVersion]
+func (v versionToResourceToFieldMapping) filterField(groupVersion unversioned.GroupVersion, resourceType, field, value string) (newField, newValue string, err error) {
+	rMapping, ok := v[groupVersion]
 	if !ok {
-		glog.Warningf("Field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", apiVersion, resourceType, field, value)
+		glog.Warningf("Field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", groupVersion, resourceType, field, value)
 		return field, value, nil
 	}
 	newField, newValue, err = rMapping.filterField(resourceType, field, value)
 	if err != nil {
 		// This is only a warning until we find and fix all of the client's usages.
-		glog.Warningf("Field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", apiVersion, resourceType, field, value)
+		glog.Warningf("Field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", groupVersion, resourceType, field, value)
 		return field, value, nil
 	}
 	return newField, newValue, nil
 }
 
 var fieldMappings = versionToResourceToFieldMapping{
-	"v1": resourceTypeToFieldMapping{
+	v1.SchemeGroupVersion: resourceTypeToFieldMapping{
 		"nodes": clientFieldNameToAPIVersionFieldName{
 			ObjectNameField:   ObjectNameField,
 			NodeUnschedulable: NodeUnschedulable,
@@ -370,13 +380,13 @@ func (r *Request) FieldsSelectorParam(s fields.Selector) *Request {
 		return r
 	}
 	s2, err := s.Transform(func(field, value string) (newField, newValue string, err error) {
-		return fieldMappings.filterField(r.apiVersion, r.resource, field, value)
+		return fieldMappings.filterField(r.groupVersion, r.resource, field, value)
 	})
 	if err != nil {
 		r.err = err
 		return r
 	}
-	return r.setParam(unversioned.FieldSelectorQueryParam(r.apiVersion), s2.String())
+	return r.setParam(unversioned.FieldSelectorQueryParam(r.groupVersion.String()), s2.String())
 }
 
 // LabelsSelectorParam adds the given selector as a query parameter
@@ -390,7 +400,7 @@ func (r *Request) LabelsSelectorParam(s labels.Selector) *Request {
 	if s.Empty() {
 		return r
 	}
-	return r.setParam(unversioned.LabelSelectorQueryParam(r.apiVersion), s.String())
+	return r.setParam(unversioned.LabelSelectorQueryParam(r.groupVersion.String()), s.String())
 }
 
 // UintParam creates a query parameter with the given value.
@@ -416,7 +426,7 @@ func (r *Request) VersionedParams(obj runtime.Object, convertor runtime.ObjectCo
 	if r.err != nil {
 		return r
 	}
-	versioned, err := convertor.ConvertToVersion(obj, r.apiVersion)
+	versioned, err := convertor.ConvertToVersion(obj, r.groupVersion.String())
 	if err != nil {
 		r.err = err
 		return r
@@ -430,14 +440,14 @@ func (r *Request) VersionedParams(obj runtime.Object, convertor runtime.ObjectCo
 		for _, value := range v {
 			// TODO: Move it to setParam method, once we get rid of
 			// FieldSelectorParam & LabelSelectorParam methods.
-			if k == unversioned.LabelSelectorQueryParam(r.apiVersion) && value == "" {
+			if k == unversioned.LabelSelectorQueryParam(r.groupVersion.String()) && value == "" {
 				// Don't set an empty selector for backward compatibility.
 				// Since there is no way to get the difference between empty
 				// and unspecified string, we don't set it to avoid having
 				// labelSelector= param in every request.
 				continue
 			}
-			if k == unversioned.FieldSelectorQueryParam(r.apiVersion) {
+			if k == unversioned.FieldSelectorQueryParam(r.groupVersion.String()) {
 				if value == "" {
 					// Don't set an empty selector for backward compatibility.
 					// Since there is no way to get the difference between empty
@@ -453,7 +463,7 @@ func (r *Request) VersionedParams(obj runtime.Object, convertor runtime.ObjectCo
 				}
 				filteredSelector, err := selector.Transform(
 					func(field, value string) (newField, newValue string, err error) {
-						return fieldMappings.filterField(r.apiVersion, r.resource, field, value)
+						return fieldMappings.filterField(r.groupVersion, r.resource, field, value)
 					})
 				if err != nil {
 					r.err = fmt.Errorf("untransformable field selector: %v", err)
@@ -503,6 +513,7 @@ func (r *Request) Timeout(d time.Duration) *Request {
 // If obj is a []byte, send it directly.
 // If obj is an io.Reader, use it directly.
 // If obj is a runtime.Object, marshal it correctly, and set Content-Type header.
+// If obj is a runtime.Object and nil, do nothing.
 // Otherwise, set an error.
 func (r *Request) Body(obj interface{}) *Request {
 	if r.err != nil {
@@ -523,7 +534,11 @@ func (r *Request) Body(obj interface{}) *Request {
 	case io.Reader:
 		r.body = t
 	case runtime.Object:
-		data, err := r.codec.Encode(t)
+		// callers may pass typed interface pointers, therefore we must check nil with reflection
+		if reflect.ValueOf(t).IsNil() {
+			return r
+		}
+		data, err := runtime.Encode(r.codec, t)
 		if err != nil {
 			r.err = err
 			return r
@@ -609,8 +624,16 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
+	time.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
+	if r.baseURL != nil {
+		if err != nil {
+			r.backoffMgr.UpdateBackoff(r.baseURL, err, 0)
+		} else {
+			r.backoffMgr.UpdateBackoff(r.baseURL, err, resp.StatusCode)
+		}
+	}
 	if err != nil {
 		// The watch stream mechanism handles many common partial data errors, so closed
 		// connections can be retried in many cases.
@@ -662,8 +685,16 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
+	time.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
+	if r.baseURL != nil {
+		if err != nil {
+			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
+		} else {
+			r.backoffMgr.UpdateBackoff(r.URL(), err, resp.StatusCode)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -685,7 +716,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		if runtimeObject, err := r.codec.Decode(bodyBytes); err == nil {
 			statusError := errors.FromObject(runtimeObject)
 
-			if _, ok := statusError.(APIStatus); ok {
+			if _, ok := statusError.(errors.APIStatus); ok {
 				return nil, statusError
 			}
 		}
@@ -707,6 +738,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	}()
 
 	if r.err != nil {
+		glog.V(4).Infof("Error in request: %v", r.err)
 		return r.err
 	}
 
@@ -735,8 +767,14 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		}
 		req.Header = r.headers
 
+		time.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
 		resp, err := client.Do(req)
 		updateURLMetrics(r, resp, err)
+		if err != nil {
+			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
+		} else {
+			r.backoffMgr.UpdateBackoff(r.URL(), err, resp.StatusCode)
+		}
 		if err != nil {
 			return err
 		}
@@ -864,7 +902,7 @@ func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *h
 		message = strings.TrimSpace(string(body))
 	}
 	retryAfter, _ := retryAfterSeconds(resp)
-	return errors.NewGenericServerResponse(resp.StatusCode, req.Method, r.resource, r.resourceName, message, retryAfter, true)
+	return errors.NewGenericServerResponse(resp.StatusCode, req.Method, unversioned.GroupResource{Group: r.groupVersion.Group, Resource: r.resource}, r.resourceName, message, retryAfter, true)
 }
 
 // isTextResponse returns true if the response appears to be a textual media type.

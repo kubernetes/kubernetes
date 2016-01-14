@@ -23,9 +23,7 @@ import (
 	"path/filepath"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
@@ -112,8 +110,8 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 	// Find the pods of the rc we just created.
 	labelSelector := labels.SelectorFromSet(
 		labels.Set(map[string]string{"name": h.rcName}))
-	pods, err := h.client.Pods(h.rcNamespace).List(
-		labelSelector, fields.Everything(), unversioned.ListOptions{})
+	options := api.ListOptions{LabelSelector: labelSelector}
+	pods, err := h.client.Pods(h.rcNamespace).List(options)
 	if err != nil {
 		return err
 	}
@@ -205,7 +203,9 @@ func (s *ingManager) test(path string) error {
 	})
 }
 
-var _ = Describe("ServiceLoadBalancer", func() {
+// TODO(ihmccreery) Skipped originally in #14988, never sent follow-up PR, as
+// far as I can tell.
+var _ = Describe("ServiceLoadBalancer [Skipped]", func() {
 	// These variables are initialized after framework's beforeEach.
 	var ns string
 	var repoRoot string

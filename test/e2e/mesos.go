@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 
@@ -45,7 +44,8 @@ var _ = Describe("Mesos", func() {
 		nodeClient := framework.Client.Nodes()
 
 		rackA := labels.SelectorFromSet(map[string]string{"k8s.mesosphere.io/attribute-rack": "1"})
-		nodes, err := nodeClient.List(rackA, fields.Everything(), unversioned.ListOptions{})
+		options := api.ListOptions{LabelSelector: rackA}
+		nodes, err := nodeClient.List(options)
 		if err != nil {
 			Failf("Failed to query for node: %v", err)
 		}
@@ -64,8 +64,7 @@ var _ = Describe("Mesos", func() {
 		client := framework.Client
 		expectNoError(allNodesReady(client, util.ForeverTestTimeout), "all nodes ready")
 
-		nodelist, err := client.Nodes().List(labels.Everything(), fields.Everything(), unversioned.ListOptions{})
-		expectNoError(err, "nodes fetched from apiserver")
+		nodelist := ListSchedulableNodesOrDie(framework.Client)
 
 		const ns = "static-pods"
 		numpods := len(nodelist.Items)
@@ -73,7 +72,7 @@ var _ = Describe("Mesos", func() {
 			fmt.Sprintf("number of static pods in namespace %s is %d", ns, numpods))
 	})
 
-	It("schedules pods labelled with roles on correct slaves", func() {
+	It("schedules pods annotated with roles on correct slaves", func() {
 		// launch a pod to find a node which can launch a pod. We intentionally do
 		// not just take the node list and choose the first of them. Depending on the
 		// cluster and the scheduler it might be that a "normal" pod cannot be
@@ -86,8 +85,8 @@ var _ = Describe("Mesos", func() {
 			},
 			ObjectMeta: api.ObjectMeta{
 				Name: podName,
-				Labels: map[string]string{
-					"k8s.mesosphere.io/roles": "role1",
+				Annotations: map[string]string{
+					"k8s.mesosphere.io/roles": "public",
 				},
 			},
 			Spec: api.PodSpec{
@@ -106,10 +105,13 @@ var _ = Describe("Mesos", func() {
 		expectNoError(err)
 
 		nodeClient := framework.Client.Nodes()
-		role1 := labels.SelectorFromSet(map[string]string{
-			"k8s.mesosphere.io/attribute-role": "role1",
+
+		// schedule onto node with rack=2 being assigned to the "public" role
+		rack2 := labels.SelectorFromSet(map[string]string{
+			"k8s.mesosphere.io/attribute-rack": "2",
 		})
-		nodes, err := nodeClient.List(role1, fields.Everything(), unversioned.ListOptions{})
+		options := api.ListOptions{LabelSelector: rack2}
+		nodes, err := nodeClient.List(options)
 		expectNoError(err)
 
 		Expect(nodes.Items[0].Name).To(Equal(pod.Spec.NodeName))
