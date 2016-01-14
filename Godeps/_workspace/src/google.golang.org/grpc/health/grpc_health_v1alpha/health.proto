@@ -3,7 +3,7 @@ syntax = "proto3";
 package grpc.health.v1alpha;
 
 message HealthCheckRequest {
-  string service = 2;
+  string service = 1;
 }
 
 message HealthCheckResponse {
@@ -15,6 +15,6 @@ message HealthCheckResponse {
   ServingStatus status = 1;
 }
 
-service HealthCheck{
+service Health{
   rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
 } 

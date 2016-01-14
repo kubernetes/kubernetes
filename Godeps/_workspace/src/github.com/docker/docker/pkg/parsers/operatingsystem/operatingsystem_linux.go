@@ -1,3 +1,5 @@
+// Package operatingsystem provides helper function to get the operating system
+// name for different platforms.
 package operatingsystem
 
 import (
@@ -14,6 +16,7 @@ var (
 	etcOsRelease = "/etc/os-release"
 )
 
+// GetOperatingSystem gets the name of the current operating system.
 func GetOperatingSystem() (string, error) {
 	b, err := ioutil.ReadFile(etcOsRelease)
 	if err != nil {
@@ -26,6 +29,7 @@ func GetOperatingSystem() (string, error) {
 	return "", errors.New("PRETTY_NAME not found")
 }
 
+// IsContainerized returns true if we are running inside a container.
 func IsContainerized() (bool, error) {
 	b, err := ioutil.ReadFile(proc1Cgroup)
 	if err != nil {

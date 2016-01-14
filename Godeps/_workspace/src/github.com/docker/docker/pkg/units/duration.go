@@ -1,3 +1,5 @@
+// Package units provides helper function to parse and print size and time units
+// in human-readable format.
 package units
 
 import (
@@ -6,7 +8,7 @@ import (
 )
 
 // HumanDuration returns a human-readable approximation of a duration
-// (eg. "About a minute", "4 hours ago", etc.)
+// (eg. "About a minute", "4 hours ago", etc.).
 func HumanDuration(d time.Duration) string {
 	if seconds := int(d.Seconds()); seconds < 1 {
 		return "Less than a second"

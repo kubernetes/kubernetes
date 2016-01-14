@@ -119,7 +119,7 @@ type TransportAuthenticator interface {
 // TLSInfo contains the auth information for a TLS authenticated connection.
 // It implements the AuthInfo interface.
 type TLSInfo struct {
-	state tls.ConnectionState
+	State tls.ConnectionState
 }
 
 func (t TLSInfo) AuthType() string {
