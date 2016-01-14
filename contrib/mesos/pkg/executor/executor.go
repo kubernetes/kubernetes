@@ -173,12 +173,16 @@ func (k *Executor) Init(driver bindings.ExecutorDriver) {
 
 	// an active pod-task was deleted, alert mesos
 	k.podWatcher.filter(func(pod *RegisteredPod) bool {
-		if pod.event == RegistrationEventDeleted {
+		switch pod.event {
+		case RegistrationEventIncompatibleUpdate:
+			log.Warningf("killing task %v pod %v/%v because of an incompatible update", pod.taskID, pod.Namespace, pod.Name)
+			k.killPodTask(driver, pod.taskID)
+
+		case RegistrationEventDeleted:
 			k.resetSuicideWatch(driver)
 			// send back a TASK_FINISHED status here since we completed the
 			// pod-task lifecycle normally.
 			k.sendStatus(driver, newStatus(mutil.NewTaskID(pod.taskID), mesos.TaskState_TASK_FINISHED, "pod-deleted"))
-			return false
 		}
 		return true
 	})
@@ -471,36 +475,50 @@ func (k *Executor) launchTask(driver bindings.ExecutorDriver, task *mesos.TaskIn
 
 	// within the launch timeout window we should see a pod-task update via k.registry.
 	// if we see a Running update then we need to generate a TASK_RUNNING status update for mesos.
-	taskRunning := make(chan struct{})
+	handlerFinished := make(chan struct{})
 	expired := make(chan struct{})
 	go func() {
 		defer close(expired)
 		<-launchTimer.C
 	}()
 	handler := podWatchHandler{
-		predicate: podTaskRunning,
-		action: func(pod *RegisteredPod) error {
+		action: func(pod *RegisteredPod) (bool, error) {
 			if pod == nil {
 				// expired!!
 				select {
-				case <-taskRunning:
-					// noop, we already sent task-running
+				case <-handlerFinished:
+					// noop, someone else (maybe us) has already informed mesos
+					// about the status of the task
 				default:
 					// launch timeout expired
 					k.killPodTask(driver, task.TaskId.GetValue())
 				}
-				return nil
+				return true, nil
+			}
+
+			if pod.event == RegistrationEventDeleted {
+				defer launchTimer.Stop()
+				defer close(handlerFinished)
+
+				// we're done monitoring because pod has been deleted
+				return true, nil
+			}
+
+			if !podTaskRunning(pod) {
+				// still waiting for pod to transition to a running state, so
+				// we're not done monitoring yet; check back later..
+				return false, nil
 			}
 
 			log.V(2).Infof("Found status: '%v' for task %v pod %v/%v", pod.Status, pod.taskID, pod.Namespace, pod.Name)
 
 			data, podFullName, err := podStatusData(pod.Pod, pod.Status)
 			if err != nil {
-				return fmt.Errorf("failed to marshal pod status result: %v", err)
+				return false, fmt.Errorf("failed to marshal pod status result: %v", err)
 			}
 
 			defer launchTimer.Stop()
-			defer close(taskRunning)
+			defer close(handlerFinished)
 
 			k.sendStatus(driver, &mesos.TaskStatus{
 				TaskId:  task.TaskId,
@@ -509,7 +527,8 @@ func (k *Executor) launchTask(driver bindings.ExecutorDriver, task *mesos.TaskIn
 				Data:    data,
 			})
 
-			return nil
+			// we're done monitoring because TASK_RUNNING
+			return true, nil
 		},
 		expired: expired,
 	}

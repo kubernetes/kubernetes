@@ -23,13 +23,15 @@ import (
 )
 
 type (
-	podWatchFilter func(*RegisteredPod) bool
+	// handle registration events, return true to indicate the handler should be de-registered upon completion
+	podWatchAction func(*RegisteredPod) (done bool, err error)
+	// filter registration events, return false to abort further processing of the event
+	podWatchFilter func(*RegisteredPod) (accept bool)
 
 	podWatchHandler struct {
 		predicate podWatchFilter
-		action    func(*RegisteredPod) error
+		action    podWatchAction
 		expired   <-chan struct{}
-		forever   bool
 	}
 
 	podWatcher struct {
@@ -63,12 +65,13 @@ updateLoop:
 			h, ok = pw.handlers[u.taskID]
 			return
 		}()
-		if ok && h.predicate(u) {
+		if ok {
 			log.V(1).Infof("executing action for task %v pod %v/%v", u.taskID, u.Namespace, u.Name)
-			err := h.action(u)
+			done, err := h.action(u)
 			if err != nil {
 				log.Error(err)
-			} else if !h.forever {
+			}
+			if done {
 				// de-register handler upon successful completion of action
 				log.V(1).Infof("de-registering handler for task %v pod %v/%v", u.taskID, u.Namespace, u.Name)
 				func() {
@@ -103,6 +106,7 @@ func (pw *podWatcher) forTask(taskID string, h podWatchHandler) {
 			delete(pw.handlers, taskID)
 			pw.rw.Unlock()
 
+			// special case: invoke w/ nil pod to indicate expiration
 			h.action(&RegisteredPod{Pod: nil, taskID: taskID})
 		}()
 	}

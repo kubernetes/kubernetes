@@ -57,8 +57,14 @@ func newSourceMesos(
 		registry:      registry,
 		priorPodNames: make(map[podName]string),
 	}
-	// reflect changes from the watch into a chan, filtered to include only mirror pods (have an ConfigMirrorAnnotationKey attr)
-	cache.NewReflector(podWatch, &api.Pod{}, cache.NewUndeltaStore(source.send, cache.MetaNamespaceKeyFunc), 0).RunUntil(stop)
+	// reflect changes from the watch into a chan, filtered to include only mirror pods
+	// (have an ConfigMirrorAnnotationKey attr)
+	cache.NewReflector(
+		podWatch,
+		&api.Pod{},
+		cache.NewUndeltaStore(source.send, cache.MetaNamespaceKeyFunc),
+		0,
+	).RunUntil(stop)
 }
 
 // send is an update callback invoked by NewUndeltaStore
@@ -74,10 +80,11 @@ func (source *sourceMesos) send(objs []interface{}) {
 		if _, ok := p.Annotations[kubetypes.ConfigMirrorAnnotationKey]; ok {
 			// pass through all mirror pods
 			addPod = true
-		} else if taskID, err := source.registry.Update(p); err == nil {
-			// pod is bound to a task, so we'll allow it through
+		} else if rpod, err := source.registry.Update(p); err == nil {
+			// pod is bound to a task, and the update is compatible
+			// so we'll allow it through
 			addPod = true
-			podNames[podName{p.Namespace, p.Name}] = taskID
+			podNames[podName{p.Namespace, p.Name}] = rpod.Task()
 		} else {
 			log.V(1).Infof("skipping pod %v/%v", p.Namespace, p.Name)
 		}

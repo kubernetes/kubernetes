@@ -39,7 +39,7 @@ type (
 	}
 
 	Registry interface {
-		Update(pod *api.Pod) (string, error)
+		Update(pod *api.Pod) (*RegisteredPod, error)
 		Remove(taskID string) error
 
 		bind(taskID string, pod *api.Pod) error
@@ -63,13 +63,23 @@ var (
 	errCreateBindingFailed     = errors.New(messages.CreateBindingFailure)
 	errAnnotationUpdateFailure = errors.New(messages.AnnotationUpdateFailure)
 	errUnknownTask             = errors.New("unknown task ID")
+	errUnsupportedUpdate       = errors.New("pod update allowed by k8s is incompatible with this version of k8s-mesos")
 )
 
 const (
 	RegistrationEventBound RegistrationEvent = iota
 	RegistrationEventUpdated
 	RegistrationEventDeleted
+	RegistrationEventIncompatibleUpdate
 )
+
+func IsUnsupportedUpdate(err error) bool {
+	return err == errUnsupportedUpdate
+}
+
+func (rp *RegisteredPod) Task() string {
+	return rp.taskID
+}
 
 func NewRegistry(client *client.Client) Registry {
 	updates := make(chan *RegisteredPod)
@@ -139,7 +149,7 @@ func (r registryImpl) Remove(taskID string) error {
 	return nil
 }
 
-func (r registryImpl) Update(pod *api.Pod) (string, error) {
+func (r registryImpl) Update(pod *api.Pod) (*RegisteredPod, error) {
 	// Don't do anything for pods without task anotation which means:
 	// - "pre-scheduled" pods which have a NodeName set to this node without being scheduled already.
 	// - static/mirror pods: they'll never have a TaskID annotation, and we don't expect them to ever change.
@@ -152,26 +162,60 @@ func (r registryImpl) Update(pod *api.Pod) (string, error) {
 		// update on the floor because we'll get another update later that, in addition to the changes that
 		// we're dropping now, will also include the changes from the binding process.
 		log.V(5).Infof("ignoring pod update for %s/%s because %s annotation is missing", pod.Namespace, pod.Name, meta.TaskIdKey)
-		return "", err
+		return nil, err
 	}
 
 	r.m.Lock()
 	defer r.m.Unlock()
-	_, ok := r.boundTasks[taskID]
+	oldPod, ok := r.boundTasks[taskID]
 	if !ok {
-		return "", errUnknownTask
+		return nil, errUnknownTask
 	}
 
-	r.boundTasks[taskID] = pod
-
-	r.updates <- &RegisteredPod{
+	registeredPod := &RegisteredPod{
 		Pod:    pod,
 		taskID: taskID,
 		event:  RegistrationEventUpdated,
 	}
 
+	// TODO(jdef) would be nice to only execute this logic based on the presence of
+	// some particular annotation.
+	//   - preserve the original container port spec since the k8sm scheduler
+	//   has likely changed it.
+	containers := oldPod.Spec.Containers
+	ctPorts := make(map[string][]api.ContainerPort, len(containers))
+	for i := range containers {
+		ctPorts[containers[i].Name] = containers[i].Ports
+	}
+	containers = pod.Spec.Containers
+	for i := range containers {
+		name := containers[i].Name
+		if ports, found := ctPorts[name]; found {
+			containers[i].Ports = ports
+			delete(ctPorts, name)
+		} else {
+			// old pod spec is missing this container?!
+			goto incompatibleUpdate
+		}
+	}
+	if len(ctPorts) > 0 {
+		// new pod spec has containers that aren't in the old pod spec
+		goto incompatibleUpdate
+	}
+
+	// update our internal copy and broadcast the change
+	r.boundTasks[taskID] = pod
+	r.updates <- registeredPod
+
 	log.V(1).Infof("updated task %v pod %v/%v", taskID, pod.Namespace, pod.Name)
-	return taskID, nil
+	return registeredPod, nil
+
+incompatibleUpdate:
+	registeredPod.event = RegistrationEventIncompatibleUpdate
+	r.updates <- registeredPod
+
+	log.Warningf("pod containers changed in an incompatible way; aborting update")
+	return registeredPod, errUnsupportedUpdate
 }
 
 func (r registryImpl) bind(taskID string, pod *api.Pod) error {
