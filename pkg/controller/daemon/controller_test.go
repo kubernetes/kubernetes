@@ -27,7 +27,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 var (
@@ -36,6 +38,8 @@ var (
 	simpleNodeLabel       = map[string]string{"color": "blue", "speed": "fast"}
 	simpleNodeLabel2      = map[string]string{"color": "red", "speed": "fast"}
 	alwaysReady           = func() bool { return true }
+	securityCtx           = securitycontext.ValidSecurityContextWithContainerDefaults()
+	maxUnavailable        = 2
 )
 
 func getKey(ds *extensions.DaemonSet, t *testing.T) string {
@@ -66,12 +70,19 @@ func newDaemonSet(name string) *extensions.DaemonSet {
 							Image: "foo/bar",
 							TerminationMessagePath: api.TerminationMessagePathDefault,
 							ImagePullPolicy:        api.PullIfNotPresent,
-							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
+							SecurityContext:        securityCtx,
 						},
 					},
 					DNSPolicy: api.DNSDefault,
 				},
 			},
+			UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+				Type: extensions.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &extensions.RollingUpdateDaemonSet{
+					MaxUnavailable: intstr.FromInt(maxUnavailable),
+				},
+			},
+			UniqueLabelKey: extensions.DefaultDaemonSetUniqueLabelKey,
 		},
 	}
 }
@@ -113,7 +124,7 @@ func newPod(podName string, nodeName string, label map[string]string) *api.Pod {
 					Image: "foo/bar",
 					TerminationMessagePath: api.TerminationMessagePathDefault,
 					ImagePullPolicy:        api.PullIfNotPresent,
-					SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
+					SecurityContext:        securityCtx,
 				},
 			},
 			DNSPolicy: api.DNSDefault,
@@ -129,16 +140,65 @@ func addPods(podStore cache.Store, nodeName string, label map[string]string, num
 	}
 }
 
-func newTestController() (*DaemonSetsController, *controller.FakePodControl) {
+type fakePodControl struct {
+	*controller.FakePodControl
+	podStore *cache.StoreToPodLister
+	podIDMap map[string]*api.Pod
+}
+
+func (f *fakePodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
+	if err := f.FakePodControl.CreatePodsOnNode(nodeName, namespace, template, object); err != nil {
+		return fmt.Errorf("failed to create pod on node %q", nodeName)
+	}
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Labels:       template.Labels,
+			Namespace:    namespace,
+			GenerateName: fmt.Sprintf("%s-", nodeName),
+		},
+	}
+
+	if err := api.Scheme.Convert(&template.Spec, &pod.Spec); err != nil {
+		return fmt.Errorf("unable to convert pod template: %v", err)
+	}
+	if len(nodeName) != 0 {
+		pod.Spec.NodeName = nodeName
+	}
+	api.GenerateName(api.SimpleNameGenerator, &pod.ObjectMeta)
+
+	f.podStore.Add(pod)
+	f.podIDMap[pod.Name] = pod
+	return nil
+}
+
+func (f *fakePodControl) DeletePod(namespace string, podID string, object runtime.Object) error {
+	if err := f.FakePodControl.DeletePod(namespace, podID, object); err != nil {
+		return fmt.Errorf("failed to delete pod %q", podID)
+	}
+	pod, ok := f.podIDMap[podID]
+	if !ok {
+		return fmt.Errorf("pod %q does not exist", podID)
+	}
+	f.podStore.Delete(pod)
+	delete(f.podIDMap, podID)
+	return nil
+}
+
+func newTestController() (*DaemonSetsController, *fakePodControl) {
 	client := client.NewOrDie(&client.Config{Host: "", GroupVersion: testapi.Default.GroupVersion()})
 	manager := NewDaemonSetsController(client, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady
-	podControl := &controller.FakePodControl{}
+	podControl := &fakePodControl{
+		&controller.FakePodControl{},
+		&manager.podStore,
+		make(map[string]*api.Pod),
+	}
 	manager.podControl = podControl
 	return manager, podControl
 }
 
-func validateSyncDaemonSets(t *testing.T, fakePodControl *controller.FakePodControl, expectedCreates, expectedDeletes int) {
+func validateSyncDaemonSets(t *testing.T, fakePodControl *fakePodControl, expectedCreates, expectedDeletes int) {
 	if len(fakePodControl.Templates) != expectedCreates {
 		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", expectedCreates, len(fakePodControl.Templates))
 	}
@@ -147,13 +207,30 @@ func validateSyncDaemonSets(t *testing.T, fakePodControl *controller.FakePodCont
 	}
 }
 
-func syncAndValidateDaemonSets(t *testing.T, manager *DaemonSetsController, ds *extensions.DaemonSet, podControl *controller.FakePodControl, expectedCreates, expectedDeletes int) {
+func syncAndValidateDaemonSets(t *testing.T, manager *DaemonSetsController, ds *extensions.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
 		t.Errorf("Could not get key for daemon.")
 	}
 	manager.syncHandler(key)
 	validateSyncDaemonSets(t, podControl, expectedCreates, expectedDeletes)
+}
+
+// clearExpectations copies the FakePodControl to PodStore and clears the create and delete expectations.
+func clearExpectations(t *testing.T, manager *DaemonSetsController, ds *extensions.DaemonSet, fakePodControl *fakePodControl) {
+	nCreates := len(fakePodControl.Templates)
+	nDeletes := len(fakePodControl.DeletePodName)
+	fakePodControl.Clear()
+
+	key, err := controller.KeyFunc(ds)
+	if err != nil {
+		t.Errorf("Could not get key for daemon.")
+		return
+	}
+	// Reset expectations
+	if exp, exists, err := manager.expectations.GetExpectations(key); err == nil && exists {
+		exp.Seen(int64(nCreates), int64(nDeletes))
+	}
 }
 
 // DaemonSets without node selectors should launch pods on every node.
@@ -218,7 +295,7 @@ func TestDealsWithExistingPods(t *testing.T) {
 	addPods(manager.podStore.Store, "node-4", simpleDaemonSetLabel2, 2)
 	ds := newDaemonSet("foo")
 	manager.dsStore.Add(ds)
-	syncAndValidateDaemonSets(t, manager, ds, podControl, 2, 5)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 2+maxUnavailable, 5+maxUnavailable)
 }
 
 // Daemon with node selector should launch pods on nodes matching selector.
@@ -263,7 +340,7 @@ func TestSelectorDaemonDealsWithExistingPods(t *testing.T) {
 	ds := newDaemonSet("foo")
 	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
 	manager.dsStore.Add(ds)
-	syncAndValidateDaemonSets(t, manager, ds, podControl, 3, 20)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 3+maxUnavailable, 20+maxUnavailable)
 }
 
 // DaemonSet with node selector which does not match any node labels should not launch pods.
@@ -341,4 +418,43 @@ func TestDSManagerNotReady(t *testing.T) {
 
 	manager.podStoreSynced = alwaysReady
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
+// DaemonSet should launch pods and update them when the pod template changes.
+func TestDaemonSetUpdatesPods(t *testing.T) {
+	manager, podControl := newTestController()
+	addNodes(manager.nodeStore.Store, 0, 5, nil)
+	ds := newDaemonSet("foo")
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
+
+	ds.Spec.Template = &api.PodTemplateSpec{
+		ObjectMeta: api.ObjectMeta{
+			Labels: simpleDaemonSetLabel,
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Image: "foo2/bar2",
+					TerminationMessagePath: api.TerminationMessagePathDefault,
+					ImagePullPolicy:        api.PullIfNotPresent,
+					SecurityContext:        securityCtx,
+				},
+			},
+			DNSPolicy: api.DNSDefault,
+		},
+	}
+	manager.dsStore.Update(ds)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, maxUnavailable, maxUnavailable)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, maxUnavailable, maxUnavailable)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 1)
+
+	clearExpectations(t, manager, ds, podControl)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
