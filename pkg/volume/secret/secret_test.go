@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/testing/fake"
@@ -121,6 +122,11 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 	doTestSecretDataInVolume(volumePath, secret, t)
+
+	metrics, err := builder.GetMetrics()
+	assert.NotEmpty(t, metrics)
+	assert.NoError(t, err)
+
 	doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
 }
 

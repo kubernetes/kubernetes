@@ -18,16 +18,19 @@ package stats
 
 import (
 	"fmt"
+	"runtime"
 	"time"
 
-	"github.com/golang/glog"
-	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
+	"k8s.io/kubernetes/pkg/types"
+
+	"github.com/golang/glog"
+	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 )
 
 type SummaryProvider interface {
@@ -36,14 +39,17 @@ type SummaryProvider interface {
 }
 
 type summaryProviderImpl struct {
-	provider StatsProvider
+	provider         StatsProvider
+	resourceAnalyzer ResourceAnalyzer
 }
 
 var _ SummaryProvider = &summaryProviderImpl{}
 
 // NewSummaryProvider returns a new SummaryProvider
-func NewSummaryProvider(statsProvider StatsProvider) SummaryProvider {
-	return &summaryProviderImpl{statsProvider}
+func NewSummaryProvider(statsProvider StatsProvider, resourceAnalyzer ResourceAnalyzer) SummaryProvider {
+	stackBuff := []byte{}
+	runtime.Stack(stackBuff, false)
+	return &summaryProviderImpl{statsProvider, resourceAnalyzer}
 }
 
 // Get implements the SummaryProvider interface
@@ -74,17 +80,18 @@ func (sp *summaryProviderImpl) Get() (*Summary, error) {
 		return nil, err
 	}
 
-	sb := &summaryBuilder{node, nodeConfig, rootFsInfo, imageFsInfo, infos}
+	sb := &summaryBuilder{sp.resourceAnalyzer, node, nodeConfig, rootFsInfo, imageFsInfo, infos}
 	return sb.build()
 }
 
 // summaryBuilder aggregates the datastructures provided by cadvisor into a Summary result
 type summaryBuilder struct {
-	node        *api.Node
-	nodeConfig  cm.NodeConfig
-	rootFsInfo  cadvisorapiv2.FsInfo
-	imageFsInfo cadvisorapiv2.FsInfo
-	infos       map[string]cadvisorapiv2.ContainerInfo
+	resourceAnalyzer ResourceAnalyzer
+	node             *api.Node
+	nodeConfig       cm.NodeConfig
+	rootFsInfo       cadvisorapiv2.FsInfo
+	imageFsInfo      cadvisorapiv2.FsInfo
+	infos            map[string]cadvisorapiv2.ContainerInfo
 }
 
 // build returns a Summary from aggregating the input data
@@ -153,7 +160,8 @@ func (sb *summaryBuilder) containerInfoV2FsStats(
 	}
 	cfs := lcs.Filesystem
 	if cfs != nil && cfs.BaseUsageBytes != nil {
-		cs.Rootfs.UsedBytes = cfs.BaseUsageBytes
+		rootfsUsage := *cfs.BaseUsageBytes
+		cs.Rootfs.UsedBytes = &rootfsUsage
 		if cfs.TotalUsageBytes != nil {
 			logsUsage := *cfs.TotalUsageBytes - *cfs.BaseUsageBytes
 			cs.Logs.UsedBytes = &logsUsage
@@ -207,6 +215,11 @@ func (sb *summaryBuilder) buildSummaryPods() []PodStats {
 	// Add each PodStats to the result
 	result := make([]PodStats, 0, len(podToStats))
 	for _, stats := range podToStats {
+		// Lookup the volume stats for each pod
+		podUID := types.UID(stats.PodRef.UID)
+		if vstats, found := sb.resourceAnalyzer.GetPodVolumeStats(podUID); found {
+			stats.VolumeStats = vstats.Volumes
+		}
 		result = append(result, *stats)
 	}
 	return result

@@ -60,6 +60,7 @@ import (
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/rkt"
 	"k8s.io/kubernetes/pkg/kubelet/server"
+	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -203,6 +204,7 @@ func NewMainKubelet(
 	nodeIP net.IP,
 	reservation kubetypes.Reservation,
 	enableCustomMetrics bool,
+	volumeStatsAggPeriod time.Duration,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -329,6 +331,9 @@ func NewMainKubelet(
 		reservation:                  reservation,
 		enableCustomMetrics:          enableCustomMetrics,
 	}
+	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
+	klet.resourceAnalyzer = stats.NewResourceAnalyzer(klet, volumeStatsAggPeriod)
+
 	if klet.flannelExperimentalOverlay {
 		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
 	}
@@ -609,6 +614,9 @@ type Kubelet struct {
 
 	// Watcher of out of memory events.
 	oomWatcher OOMWatcher
+
+	// Monitor resource usage
+	resourceAnalyzer stats.ResourceAnalyzer
 
 	// If non-empty, pass this to the container runtime as the root cgroup.
 	cgroupRoot string
@@ -937,6 +945,9 @@ func (kl *Kubelet) initializeModules() error {
 	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
 	}
+
+	// Step 7: Start resource analyzer
+	kl.resourceAnalyzer.Start()
 	return nil
 }
 
@@ -3459,11 +3470,11 @@ func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) {
 }
 
 func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers bool) {
-	server.ListenAndServeKubeletServer(kl, address, port, tlsOptions, auth, enableDebuggingHandlers)
+	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableDebuggingHandlers)
 }
 
 func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
-	server.ListenAndServeKubeletReadOnlyServer(kl, address, port)
+	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port)
 }
 
 // GetRuntime returns the current Runtime implementation in use by the kubelet. This func

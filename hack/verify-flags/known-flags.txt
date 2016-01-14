@@ -365,6 +365,7 @@ use-kubernetes-cluster-service
 user-whitelist
 verify-only
 volume-plugin-dir
+volume-stats-agg-period
 watch-cache
 watch-only
 whitelist-override-label
