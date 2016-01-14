@@ -145,6 +145,8 @@ that conflicts with your own private network range.
 
 The `FLANNEL_NET` variable defines the IP range used for flannel overlay network,
 should not conflict with above `SERVICE_CLUSTER_IP_RANGE`.
+You can optionally provide additional Flannel network configuration
+through `FLANNEL_OTHER_NET_CONFIG`, as explained in `cluster/ubuntu/config-default.sh`.
 
 **Note:** When deploying, master needs to be connected to the Internet to download the necessary files.
 If your machines are located in a private network that need proxy setting to connect the Internet,
