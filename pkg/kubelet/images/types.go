@@ -18,29 +18,26 @@ package images
 
 import "k8s.io/kubernetes/pkg/api"
 
-// ImageSpec contains an image and all the metadata required for managing that image.
-type ImageSpec struct {
-	Name        string
-	PullPolicy  api.PullPolicy
-	PullSecrets []api.Secret
-}
-
 // ImageManager provides an interface to manage the lifecycle of images.
 // Implementations of this interface are expected to deal with pulling (downloading),
 // managing, and deleting container images.
 // Implementations are expected to abstract the underlying runtimes.
 // Implementations are expected to be thread safe.
 type ImageManager interface {
-	// EnsureImageExists will ensure that image specified in `imageSpec` exists.
+	// EnsureImageExists will ensure that image specified in `container` exists.
 	// TODO: Consider failing when conflicting PullPolicy is provided for the same image.
-	EnsureImageExists(imageSpec ImageSpec) error
-	// IncImageUsage increases the usage count of the image specified in `imageSpec`.
-	// This is useful for reference counting images.
-	IncImageUsage(imageSpec ImageSpec) error
+	EnsureImageExists(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) error
 	// DecImageUsage decreases the usage count of the image specified in `imageSpec`.
 	// This is useful for reference counting images.
-	DecImageUsage(imageSpec ImageSpec) error
-	// DeleteImages attempts to free up `bytesToBeFreed` by deleting images that are curretly unused.
+	// Returns an error if the image is not found.
+	DecImageUsage(container *api.Container) error
+	// DeleteImages attempts to free up disk space by deleting images that are currently unused.
 	// It will return the number of bytes freed on success, an appropriate error otherwise.
-	DeleteImages(bytesToBeFreed uint64) (uint64, error)
+	DeleteUnusedImages()
+}
+
+// ImageSpec is an internal representation of an image.
+type ImageSpec struct {
+	Image       string
+	pullSecrets []api.Secret
 }

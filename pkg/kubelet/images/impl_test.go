@@ -106,7 +106,7 @@ func TestPuller(t *testing.T) {
 
 		fakeRuntime := &ctest.FakeRuntime{}
 		fakeRecorder := &record.FakeRecorder{}
-		puller := NewImagePuller(fakeRecorder, fakeRuntime, backOff)
+		puller := NewImagemanager(fakeRecorder, fakeRuntime, backOff, false /*parallel*/)
 
 		fakeRuntime.ImageList = []Image{{"present_image", nil, 0}}
 		fakeRuntime.Err = c.pullerErr
