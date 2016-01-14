@@ -229,6 +229,8 @@ var _ = Describe("Density [Skipped]", func() {
 			}
 
 			// Create a listener for events.
+			// eLock is a lock protects the events
+			var eLock sync.Mutex
 			events := make([](*api.Event), 0)
 			_, controller := controllerframework.NewInformer(
 				&cache.ListWatch{
@@ -243,6 +245,8 @@ var _ = Describe("Density [Skipped]", func() {
 				0,
 				controllerframework.ResourceEventHandlerFuncs{
 					AddFunc: func(obj interface{}) {
+						eLock.Lock()
+						defer eLock.Unlock()
 						events = append(events, obj.(*api.Event))
 					},
 				},
@@ -251,6 +255,8 @@ var _ = Describe("Density [Skipped]", func() {
 			go controller.Run(stop)
 
 			// Create a listener for api updates
+			// uLock is a lock protects the updateCount
+			var uLock sync.Mutex
 			updateCount := 0
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": RCName}))
 			_, updateController := controllerframework.NewInformer(
@@ -268,6 +274,8 @@ var _ = Describe("Density [Skipped]", func() {
 				0,
 				controllerframework.ResourceEventHandlerFuncs{
 					UpdateFunc: func(_, _ interface{}) {
+						uLock.Lock()
+						defer uLock.Unlock()
 						updateCount++
 					},
 				},
@@ -287,10 +295,18 @@ var _ = Describe("Density [Skipped]", func() {
 			currentCount := updateCount
 			timeout := 10 * time.Minute
 			for start := time.Now(); (last < current || lastCount < currentCount) && time.Since(start) < timeout; time.Sleep(10 * time.Second) {
-				last = current
-				current = len(events)
-				lastCount = currentCount
-				currentCount = updateCount
+				func() {
+					eLock.Lock()
+					defer eLock.Unlock()
+					last = current
+					current = len(events)
+				}()
+				func() {
+					uLock.Lock()
+					defer uLock.Unlock()
+					lastCount = currentCount
+					currentCount = updateCount
+				}()
 			}
 			close(stop)
 
@@ -298,10 +314,10 @@ var _ = Describe("Density [Skipped]", func() {
 				Logf("Warning: Not all events were recorded after waiting %.2f minutes", timeout.Minutes())
 			}
 			Logf("Found %d events", current)
-			if updateCount != currentCount {
+			if currentCount != lastCount {
 				Logf("Warning: Not all updates were recorded after waiting %.2f minutes", timeout.Minutes())
 			}
-			Logf("Found %d updates", updateCount)
+			Logf("Found %d updates", currentCount)
 
 			// Tune the threshold for allowed failures.
 			badEvents := BadEvents(events)
