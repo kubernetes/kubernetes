@@ -79,6 +79,8 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&ComponentStatusList{},
 		&SerializedReference{},
 		&RangeAllocation{},
+		&ConfigMap{},
+		&ConfigMapList{},
 	)
 
 	// Add common types
@@ -127,3 +129,5 @@ func (obj *ComponentStatusList) GetObjectKind() unversioned.ObjectKind       { r
 func (obj *SerializedReference) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }
 func (obj *RangeAllocation) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
 func (obj *ExportOptions) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
+func (obj *ConfigMap) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
+func (obj *ConfigMapList) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }

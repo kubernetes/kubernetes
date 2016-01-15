@@ -1987,6 +1987,36 @@ func ValidateSecretUpdate(newSecret, oldSecret *api.Secret) field.ErrorList {
 	return allErrs
 }
 
+// ValidateConfigMapName can be used to check whether the given ConfigMap name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateConfigMapName(name string, prefix bool) (bool, string) {
+	return NameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateConfigMap tests whether required fields in the ConfigMap are set.
+func ValidateConfigMap(cfg *api.ConfigMap) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&cfg.ObjectMeta, true, ValidateConfigMapName, field.NewPath("metadata"))...)
+
+	for key := range cfg.Data {
+		if !IsSecretKey(key) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("data").Key(key), key, fmt.Sprintf("must have at most %d characters and match regex %s", validation.DNS1123SubdomainMaxLength, SecretKeyFmt)))
+		}
+	}
+
+	return allErrs
+}
+
+// ValidateConfigMapUpdate tests if required fields in the ConfigMap are set.
+func ValidateConfigMapUpdate(newCfg, oldCfg *api.ConfigMap) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newCfg.ObjectMeta, &oldCfg.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, ValidateConfigMap(newCfg)...)
+
+	return allErrs
+}
+
 func validateBasicResource(quantity resource.Quantity, fldPath *field.Path) field.ErrorList {
 	if quantity.Value() < 0 {
 		return field.ErrorList{field.Invalid(fldPath, quantity.Value(), "must be a valid resource quantity")}

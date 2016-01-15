@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
-	apiextensions "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -1364,7 +1363,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 	// 3.  Add remaining service environment vars
 	var (
 		tmpEnv      = make(map[string]string)
-		configMaps  = make(map[string]*apiextensions.ConfigMap)
+		configMaps  = make(map[string]*api.ConfigMap)
 		secrets     = make(map[string]*api.Secret)
 		mappingFunc = expansion.MappingFuncFor(tmpEnv, serviceEnv)
 	)
@@ -1393,7 +1392,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 				key := envVar.ValueFrom.ConfigMapKeyRef.Key
 				configMap, ok := configMaps[name]
 				if !ok {
-					configMap, err = kl.kubeClient.Extensions().ConfigMaps(pod.Namespace).Get(name)
+					configMap, err = kl.kubeClient.ConfigMaps(pod.Namespace).Get(name)
 					if err != nil {
 						return result, err
 					}
