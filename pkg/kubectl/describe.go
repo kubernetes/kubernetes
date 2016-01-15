@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
@@ -88,8 +89,8 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 
 		extensions.Kind("HorizontalPodAutoscaler"): &HorizontalPodAutoscalerDescriber{c},
 		extensions.Kind("DaemonSet"):               &DaemonSetDescriber{c},
+		extensions.Kind("Deployment"):              &DeploymentDescriber{clientset.FromUnversionedClient(c)},
 		extensions.Kind("Job"):                     &JobDescriber{c},
-		extensions.Kind("Deployment"):              &DeploymentDescriber{c},
 		extensions.Kind("Ingress"):                 &IngressDescriber{c},
 	}
 
@@ -1573,7 +1574,7 @@ func DescribeEvents(el *api.EventList, w io.Writer) {
 
 // DeploymentDescriber generates information about a deployment.
 type DeploymentDescriber struct {
-	client.Interface
+	clientset.Interface
 }
 
 func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) {
@@ -1605,7 +1606,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string) (string, error) 
 			}
 			fmt.Fprintf(out, "NewReplicationController:\t%s\n", printReplicationControllersByLabels(newRCs))
 		}
-		events, err := dd.Events(namespace).Search(d)
+		events, err := dd.Legacy().Events(namespace).Search(d)
 		if err == nil && events != nil {
 			DescribeEvents(events, out)
 		}

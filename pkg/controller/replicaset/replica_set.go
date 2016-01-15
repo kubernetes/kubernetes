@@ -28,8 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -59,7 +60,7 @@ const (
 // ReplicaSetController is responsible for synchronizing ReplicaSet objects stored
 // in the system with actual running pods.
 type ReplicaSetController struct {
-	kubeClient client.Interface
+	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
 
 	// A ReplicaSet is temporarily suspended after creating/deleting these many replicas.
@@ -88,10 +89,10 @@ type ReplicaSetController struct {
 }
 
 // NewReplicaSetController creates a new ReplicaSetController.
-func NewReplicaSetController(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int) *ReplicaSetController {
+func NewReplicaSetController(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int) *ReplicaSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	eventBroadcaster.StartRecordingToSink(&unversioned_legacy.EventSinkImpl{kubeClient.Legacy().Events("")})
 
 	rsc := &ReplicaSetController{
 		kubeClient: kubeClient,
@@ -148,10 +149,10 @@ func NewReplicaSetController(kubeClient client.Interface, resyncPeriod controlle
 	rsc.podStore.Store, rsc.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return rsc.kubeClient.Pods(api.NamespaceAll).List(options)
+				return rsc.kubeClient.Legacy().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return rsc.kubeClient.Pods(api.NamespaceAll).Watch(options)
+				return rsc.kubeClient.Legacy().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},

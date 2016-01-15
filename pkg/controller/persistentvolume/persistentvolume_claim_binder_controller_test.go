@@ -28,15 +28,16 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 )
 
 func TestRunStop(t *testing.T) {
-	client := &testclient.Fake{}
-	binder := NewPersistentVolumeClaimBinder(client, 1*time.Second)
+	clientset := fake.NewSimpleClientset()
+	binder := NewPersistentVolumeClaimBinder(clientset, 1*time.Second)
 
 	if len(binder.stopChannels) != 0 {
 		t.Errorf("Non-running binder should not have any stopChannels.  Got %v", len(binder.stopChannels))
@@ -290,18 +291,18 @@ func TestExampleObjects(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		codec := api.Codecs.UniversalDecoder()
-		o := testclient.NewObjects(api.Scheme, codec)
-		if err := testclient.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/"+name, o, codec); err != nil {
+		o := core.NewObjects(api.Scheme, codec)
+		if err := core.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/"+name, o, codec); err != nil {
 			t.Fatal(err)
 		}
 
-		client := &testclient.Fake{}
-		client.AddReactor("*", "*", testclient.ObjectReaction(o, api.RESTMapper))
+		clientset := &fake.Clientset{}
+		clientset.AddReactor("*", "*", core.ObjectReaction(o, api.RESTMapper))
 
 		if reflect.TypeOf(scenario.expected) == reflect.TypeOf(&api.PersistentVolumeClaim{}) {
-			pvc, err := client.PersistentVolumeClaims("ns").Get("doesntmatter")
+			pvc, err := clientset.Legacy().PersistentVolumeClaims("ns").Get("doesntmatter")
 			if err != nil {
-				t.Errorf("Error retrieving object: %v", err)
+				t.Fatalf("Error retrieving object: %v", err)
 			}
 
 			expected := scenario.expected.(*api.PersistentVolumeClaim)
@@ -320,9 +321,9 @@ func TestExampleObjects(t *testing.T) {
 		}
 
 		if reflect.TypeOf(scenario.expected) == reflect.TypeOf(&api.PersistentVolume{}) {
-			pv, err := client.PersistentVolumes().Get("doesntmatter")
+			pv, err := clientset.Legacy().PersistentVolumes().Get("doesntmatter")
 			if err != nil {
-				t.Errorf("Error retrieving object: %v", err)
+				t.Fatalf("Error retrieving object: %v", err)
 			}
 
 			expected := scenario.expected.(*api.PersistentVolume)
@@ -354,18 +355,21 @@ func TestBindingWithExamples(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	codec := api.Codecs.UniversalDecoder()
-	o := testclient.NewObjects(api.Scheme, codec)
-	if err := testclient.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/claims/claim-01.yaml", o, codec); err != nil {
+	o := core.NewObjects(api.Scheme, codec)
+	if err := core.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/claims/claim-01.yaml", o, codec); err != nil {
 		t.Fatal(err)
 	}
-	if err := testclient.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/volumes/local-01.yaml", o, codec); err != nil {
+	if err := core.AddObjectsFromPath("../../../docs/user-guide/persistent-volumes/volumes/local-01.yaml", o, codec); err != nil {
 		t.Fatal(err)
 	}
 
-	client := &testclient.Fake{}
-	client.AddReactor("*", "*", testclient.ObjectReaction(o, api.RESTMapper))
+	clientset := &fake.Clientset{}
+	clientset.AddReactor("*", "*", core.ObjectReaction(o, api.RESTMapper))
 
-	pv, err := client.PersistentVolumes().Get("any")
+	pv, err := clientset.Legacy().PersistentVolumes().Get("any")
+	if err != nil {
+		t.Errorf("Unexpected error getting PV from client: %v", err)
+	}
 	pv.Spec.PersistentVolumeReclaimPolicy = api.PersistentVolumeReclaimRecycle
 	if err != nil {
 		t.Errorf("Unexpected error getting PV from client: %v", err)
@@ -377,7 +381,7 @@ func TestBindingWithExamples(t *testing.T) {
 	// Test that !Pending gets correctly added
 	pv.Status.Phase = api.VolumeAvailable
 
-	claim, error := client.PersistentVolumeClaims("ns").Get("any")
+	claim, error := clientset.Legacy().PersistentVolumeClaims("ns").Get("any")
 	if error != nil {
 		t.Errorf("Unexpected error getting PVC from client: %v", err)
 	}
@@ -393,7 +397,7 @@ func TestBindingWithExamples(t *testing.T) {
 	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	recycler := &PersistentVolumeRecycler{
-		kubeClient: client,
+		kubeClient: clientset,
 		client:     mockClient,
 		pluginMgr:  plugMgr,
 	}
@@ -463,8 +467,8 @@ func TestBindingWithExamples(t *testing.T) {
 }
 
 func TestCasting(t *testing.T) {
-	client := &testclient.Fake{}
-	binder := NewPersistentVolumeClaimBinder(client, 1*time.Second)
+	clientset := fake.NewSimpleClientset()
+	binder := NewPersistentVolumeClaimBinder(clientset, 1*time.Second)
 
 	pv := &api.PersistentVolume{}
 	unk := cache.DeletedFinalStateUnknown{}

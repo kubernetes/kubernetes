@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
@@ -732,8 +733,11 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 	// used by kubelet. Since NewMainKubelet expects a client interface, we need to make sure we are not passing
 	// a nil pointer to it when what we really want is a nil interface.
 	var kubeClient client.Interface
+	var c clientset.Interface
 	if kc.KubeClient != nil {
 		kubeClient = kc.KubeClient
+		// TODO: remove this when we've refactored kubelet to only use clientset.
+		c = clientset.FromUnversionedClient(kc.KubeClient)
 	}
 
 	gcPolicy := kubecontainer.ContainerGCPolicy{
@@ -755,6 +759,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.NodeName,
 		kc.DockerClient,
 		kubeClient,
+		c,
 		kc.RootDirectory,
 		kc.PodInfraContainerImage,
 		kc.SyncFrequency,

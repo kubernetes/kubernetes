@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -56,7 +56,7 @@ func TestFailedRecycling(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 
 	recycler := &PersistentVolumeRecycler{
-		kubeClient: &testclient.Fake{},
+		kubeClient: fake.NewSimpleClientset(),
 		client:     mockClient,
 		pluginMgr:  plugMgr,
 	}

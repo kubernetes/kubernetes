@@ -57,7 +57,6 @@ type ObjectScheme interface {
 // ObjectRetriever interface to satisfy retrieval of lists or retrieval of single items.
 // TODO: add support for sub resources
 func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
-
 	return func(action Action) (bool, runtime.Object, error) {
 		kind, err := mapper.KindFor(unversioned.GroupVersionResource{Resource: action.GetResource()})
 		if err != nil {
