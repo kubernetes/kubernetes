@@ -62,3 +62,28 @@ const (
 	ProxyModeUserspace ProxyMode = "userspace"
 	ProxyModeIPTables  ProxyMode = "iptables"
 )
+
+// LeaderElectionConfiguration defines the configuration of leader election
+// clients for components that can run with leader election enabled.
+type LeaderElectionConfiguration struct {
+	// leaderElect enables a leader election client to gain leadership
+	// before executing the main loop. Enable this when running replicated
+	// components for high availability.
+	LeaderElect bool `json:"leaderElect"`
+	// leaseDuration is the duration that non-leader candidates will wait
+	// after observing a leadership renewal until attempting to acquire
+	// leadership of a led but unrenewed leader slot. This is effectively the
+	// maximum duration that a leader can be stopped before it is replaced
+	// by another candidate. This is only applicable if leader election is
+	// enabled.
+	LeaseDuration unversioned.Duration `json:"leaseDuration"`
+	// renewDeadline is the interval between attempts by the acting master to
+	// renew a leadership slot before it stops leading. This must be less
+	// than or equal to the lease duration. This is only applicable if leader
+	// election is enabled.
+	RenewDeadline unversioned.Duration `json:"renewDeadline"`
+	// retryPeriod is the duration the clients should wait between attempting
+	// acquisition and renewal of a leadership. This is only applicable if
+	// leader election is enabled.
+	RetryPeriod unversioned.Duration `json:"retryPeriod"`
+}
