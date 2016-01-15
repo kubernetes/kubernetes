@@ -148,6 +148,17 @@ func (DeploymentList) SwaggerDoc() map[string]string {
 	return map_DeploymentList
 }
 
+var map_DeploymentRollback = map[string]string{
+	"":                   "DeploymentRollback stores the information required to rollback a deployment.",
+	"name":               "Required: This must match the Name of a deployment.",
+	"updatedAnnotations": "The annotations to be updated to a deployment",
+	"rollbackTo":         "The config of this deployment rollback.",
+}
+
+func (DeploymentRollback) SwaggerDoc() map[string]string {
+	return map_DeploymentRollback
+}
+
 var map_DeploymentSpec = map[string]string{
 	"":                     "DeploymentSpec is the specification of the desired behavior of the Deployment.",
 	"replicas":             "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
@@ -157,6 +168,7 @@ var map_DeploymentSpec = map[string]string{
 	"revisionHistoryLimit": "The number of old ReplicationControllers to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified.",
 	"uniqueLabelKey":       "Key of the selector that is added to existing RCs (and label key that is added to its pods) to prevent the existing RCs to select new pods (and old pods being selected by new RC). Users can set this to an empty string to indicate that the system should not add any selector and label. If unspecified, system uses DefaultDeploymentUniqueLabelKey(\"deployment.kubernetes.io/podTemplateHash\"). Value of this key is hash of DeploymentSpec.PodTemplateSpec. No label is added if this is set to empty string.",
 	"paused":               "Indicates that the deployment is paused and will not be processed by the deployment controller.",
+	"rollbackTo":           "The config this deployment is rolling back to. Will be cleared after rollback is done.",
 }
 
 func (DeploymentSpec) SwaggerDoc() map[string]string {
@@ -480,6 +492,14 @@ var map_ReplicationControllerDummy = map[string]string{
 
 func (ReplicationControllerDummy) SwaggerDoc() map[string]string {
 	return map_ReplicationControllerDummy
+}
+
+var map_RollbackConfig = map[string]string{
+	"revision": "The revision to rollback to. If set to 0, rollbck to the last revision.",
+}
+
+func (RollbackConfig) SwaggerDoc() map[string]string {
+	return map_RollbackConfig
 }
 
 var map_RollingUpdateDaemonSet = map[string]string{

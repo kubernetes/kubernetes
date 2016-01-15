@@ -19,6 +19,7 @@ package deployment
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"sort"
 	"strconv"
 	"time"
@@ -417,6 +418,13 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		glog.V(4).Infof("Ignoring paused deployment %s/%s", d.Namespace, d.Name)
 		return nil
 	}
+	if d.Spec.RollbackTo != nil {
+		revision := d.Spec.RollbackTo.Revision
+		if _, err = dc.rollback(&d, &revision); err != nil {
+			return err
+		}
+	}
+
 	switch d.Spec.Strategy.Type {
 	case extensions.RecreateDeploymentStrategyType:
 		return dc.syncRecreateDeployment(d)
@@ -424,6 +432,59 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return dc.syncRollingUpdateDeployment(d)
 	}
 	return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
+}
+
+// Rolling back to a revision; no-op if the toRevision is deployment's current revision
+func (dc *DeploymentController) rollback(deployment *extensions.Deployment, toRevision *int64) (*extensions.Deployment, error) {
+	newRC, allOldRCs, err := dc.getNewRCAndAllOldRCs(*deployment)
+	if err != nil {
+		return nil, err
+	}
+	allRCs := append(allOldRCs, newRC)
+	// If rollback revision is 0, rollback to the last revision
+	if *toRevision == 0 {
+		if *toRevision = lastRevision(allRCs); *toRevision == 0 {
+			// If we still can't find the last revision, gives up rollback
+			dc.emitRollbackWarningEvent(deployment, "DeploymentRollbackRevisionNotFound", "Unable to find last revision.")
+			// Gives up rollback
+			return dc.updateDeploymentAndClearRollbackTo(deployment)
+		}
+	}
+	for _, rc := range allRCs {
+		v, err := revision(rc)
+		if err != nil {
+			glog.V(4).Infof("Unable to extract revision from deployment's rc %q: %v", rc.Name, err)
+			continue
+		}
+		if v == *toRevision {
+			glog.V(4).Infof("Found rc %q with desired revision %d", rc.Name, v)
+			// rollback by copying podTemplate.Spec from the rc, and increment revision number by 1
+			// no-op if the the spec matches current deployment's podTemplate.Spec
+			deployment, performedRollback, err := dc.rollbackToTemplate(deployment, rc)
+			if performedRollback && err == nil {
+				dc.emitRollbackNormalEvent(deployment, fmt.Sprintf("Rolled back deployment %q to revision %d", deployment.Name, *toRevision))
+			}
+			return deployment, err
+		}
+	}
+	dc.emitRollbackWarningEvent(deployment, "DeploymentRollbackRevisionNotFound", "Unable to find the revision to rollback to.")
+	// Gives up rollback
+	return dc.updateDeploymentAndClearRollbackTo(deployment)
+}
+
+func (dc *DeploymentController) emitRollbackWarningEvent(deployment *extensions.Deployment, reason, message string) {
+	dc.eventRecorder.Eventf(deployment, api.EventTypeWarning, reason, message)
+}
+
+func (dc *DeploymentController) emitRollbackNormalEvent(deployment *extensions.Deployment, message string) {
+	dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "DeploymentRollback", message)
+}
+
+// updateDeploymentAndClearRollbackTo sets .spec.rollbackTo to nil and update the input deployment
+func (dc *DeploymentController) updateDeploymentAndClearRollbackTo(deployment *extensions.Deployment) (*extensions.Deployment, error) {
+	glog.V(4).Infof("Cleans up rollbackTo of deployment %s", deployment.Name)
+	deployment.Spec.RollbackTo = nil
+	return dc.updateDeployment(deployment)
 }
 
 func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Deployment) error {
@@ -514,7 +575,9 @@ func (dc *DeploymentController) syncDeploymentStatus(allRCs []*api.ReplicationCo
 	return nil
 }
 
-func (dc *DeploymentController) getNewRCAndOldRCs(deployment extensions.Deployment) (*api.ReplicationController, []*api.ReplicationController, error) {
+// getNewRCAndMaybeFilteredOldRCs returns new RC and old RCs of the deployment. If ignoreNoPod is true,
+// the returned old RCs won't include the ones with no pods; otherwise, all old RCs will be returned.
+func (dc *DeploymentController) getNewRCAndMaybeFilteredOldRCs(deployment extensions.Deployment, ignoreNoPod bool) (*api.ReplicationController, []*api.ReplicationController, error) {
 	oldRCs, allOldRCs, err := dc.getOldRCs(deployment)
 	if err != nil {
 		return nil, nil, err
@@ -535,19 +598,35 @@ func (dc *DeploymentController) getNewRCAndOldRCs(deployment extensions.Deployme
 			glog.V(4).Infof("Error: %v. Unable to update deployment revision, will retry later.", err)
 		}
 	}
+
+	if !ignoreNoPod {
+		return newRC, allOldRCs, nil
+	}
 	return newRC, oldRCs, nil
 }
 
-func revision(rc *api.ReplicationController) (int, error) {
+// getNewRCAndOldRCs returns new RC and old RCs of the deployment.
+// Note that the returned old RCs don't include the ones with no pods.
+func (dc *DeploymentController) getNewRCAndOldRCs(deployment extensions.Deployment) (*api.ReplicationController, []*api.ReplicationController, error) {
+	return dc.getNewRCAndMaybeFilteredOldRCs(deployment, true)
+}
+
+// getNewRCAndAllOldRCs returns new RC and old RCs of the deployment.
+// Note that all old RCs are returned, include the ones with no pods.
+func (dc *DeploymentController) getNewRCAndAllOldRCs(deployment extensions.Deployment) (*api.ReplicationController, []*api.ReplicationController, error) {
+	return dc.getNewRCAndMaybeFilteredOldRCs(deployment, false)
+}
+
+func revision(rc *api.ReplicationController) (int64, error) {
 	v, ok := rc.Annotations[deploymentutil.RevisionAnnotation]
 	if !ok {
 		return 0, nil
 	}
-	return strconv.Atoi(v)
+	return strconv.ParseInt(v, 10, 64)
 }
 
-func maxRevision(allRCs []*api.ReplicationController) int {
-	max := 0
+func maxRevision(allRCs []*api.ReplicationController) int64 {
+	max := int64(0)
 	for _, rc := range allRCs {
 		if v, err := revision(rc); err != nil {
 			// Skip the RCs when it failed to parse their revision information
@@ -559,6 +638,25 @@ func maxRevision(allRCs []*api.ReplicationController) int {
 	return max
 }
 
+// lastRevision finds the second max revision number in all RCs (the last revision)
+func lastRevision(allRCs []*api.ReplicationController) int64 {
+	max, secMax := int64(0), int64(0)
+	for _, rc := range allRCs {
+		if v, err := revision(rc); err != nil {
+			// Skip the RCs when it failed to parse their revision information
+			glog.V(4).Infof("Error: %v. Couldn't parse revision for rc %#v, deployment controller will skip it when reconciling revisions.", err, rc)
+		} else if v >= max {
+			secMax = max
+			max = v
+		} else if v > secMax {
+			secMax = v
+		}
+	}
+	return secMax
+}
+
+// getOldRCs returns two sets of old RCs of the deployment. The first set of old RCs doesn't include
+// the ones with no pods, and the second set of old RCs include all old RCs.
 func (dc *DeploymentController) getOldRCs(deployment extensions.Deployment) ([]*api.ReplicationController, []*api.ReplicationController, error) {
 	return deploymentutil.GetOldRCsFromLists(deployment, dc.client,
 		func(namespace string, options api.ListOptions) (*api.PodList, error) {
@@ -573,9 +671,9 @@ func (dc *DeploymentController) getOldRCs(deployment extensions.Deployment) ([]*
 // Returns an RC that matches the intent of the given deployment.
 // It creates a new RC if required.
 // The revision of the new RC will be updated to maxOldRevision + 1
-func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOldRevision int) (*api.ReplicationController, error) {
+func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOldRevision int64) (*api.ReplicationController, error) {
 	// Calculate revision number for this new RC
-	newRevision := strconv.Itoa(maxOldRevision + 1)
+	newRevision := strconv.FormatInt(maxOldRevision+1, 10)
 
 	existingNewRC, err := deploymentutil.GetNewRCFromList(deployment, dc.client,
 		func(namespace string, options api.ListOptions) ([]api.ReplicationController, error) {
@@ -589,7 +687,7 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOl
 		}
 		if existingNewRC.Annotations[deploymentutil.RevisionAnnotation] != newRevision {
 			existingNewRC.Annotations[deploymentutil.RevisionAnnotation] = newRevision
-			glog.V(4).Infof("update existingNewRC's revision to %s - %+v\n", newRevision, existingNewRC)
+			glog.V(4).Infof("update existingNewRC %s revision to %s - %+v\n", existingNewRC.Name, newRevision)
 			return dc.client.ReplicationControllers(deployment.ObjectMeta.Namespace).Update(existingNewRC)
 		}
 		return existingNewRC, nil
@@ -636,11 +734,8 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOl
 		return nil, fmt.Errorf("error creating replication controller: %v", err)
 	}
 
-	if err = dc.updateDeploymentRevision(deployment, newRevision); err != nil {
-		return createdRC, err
-	}
-
-	return createdRC, nil
+	err = dc.updateDeploymentRevision(deployment, newRevision)
+	return createdRC, err
 }
 
 func (dc *DeploymentController) updateDeploymentRevision(deployment extensions.Deployment, revision string) error {
@@ -649,6 +744,15 @@ func (dc *DeploymentController) updateDeploymentRevision(deployment extensions.D
 	}
 	deployment.Annotations[deploymentutil.RevisionAnnotation] = revision
 	_, err := dc.updateDeployment(&deployment)
+	return err
+}
+
+func (dc *DeploymentController) updateRCRevision(rc api.ReplicationController, revision string) error {
+	if rc.Annotations == nil {
+		rc.Annotations = make(map[string]string)
+	}
+	rc.Annotations[deploymentutil.RevisionAnnotation] = revision
+	_, err := dc.client.ReplicationControllers(rc.ObjectMeta.Namespace).Update(&rc)
 	return err
 }
 
@@ -860,4 +964,17 @@ func (dc *DeploymentController) scaleRC(rc *api.ReplicationController, newScale 
 func (dc *DeploymentController) updateDeployment(deployment *extensions.Deployment) (*extensions.Deployment, error) {
 	// TODO: Using client for now, update to use store when it is ready.
 	return dc.expClient.Deployments(deployment.ObjectMeta.Namespace).Update(deployment)
+}
+
+func (dc *DeploymentController) rollbackToTemplate(deployment *extensions.Deployment, rc *api.ReplicationController) (d *extensions.Deployment, performedRollback bool, err error) {
+	if !reflect.DeepEqual(deploymentutil.GetNewRCTemplate(*deployment), *rc.Spec.Template) {
+		glog.Infof("Rolling back deployment %s to template spec %+v", deployment.Name, rc.Spec.Template.Spec)
+		deploymentutil.SetFromRCTemplate(deployment, *rc.Spec.Template)
+		performedRollback = true
+	} else {
+		glog.V(4).Infof("Rolling back to a revision that contains the same template as current deployment %s, skipping rollback...", deployment.Name)
+		dc.emitRollbackWarningEvent(deployment, "DeploymentRollbackTemplateUnchanged", fmt.Sprintf("The rollback revision contains the same template as current deployment %q", deployment.Name))
+	}
+	d, err = dc.updateDeploymentAndClearRollbackTo(deployment)
+	return
 }

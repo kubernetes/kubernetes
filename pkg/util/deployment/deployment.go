@@ -34,6 +34,7 @@ const (
 )
 
 // GetOldRCs returns the old RCs targeted by the given Deployment; get PodList and RCList from client interface.
+// Note that the first set of old RCs doesn't include the ones with no pods, and the second set of old RCs include all old RCs.
 func GetOldRCs(deployment extensions.Deployment, c client.Interface) ([]*api.ReplicationController, []*api.ReplicationController, error) {
 	return GetOldRCsFromLists(deployment, c,
 		func(namespace string, options api.ListOptions) (*api.PodList, error) {
@@ -45,7 +46,8 @@ func GetOldRCs(deployment extensions.Deployment, c client.Interface) ([]*api.Rep
 		})
 }
 
-// GetOldRCsFromLists returns the old RCs targeted by the given Deployment; get PodList and RCList with input functions.
+// GetOldRCsFromLists returns two sets of old RCs targeted by the given Deployment; get PodList and RCList with input functions.
+// Note that the first set of old RCs doesn't include the ones with no pods, and the second set of old RCs include all old RCs.
 func GetOldRCsFromLists(deployment extensions.Deployment, c client.Interface, getPodList func(string, api.ListOptions) (*api.PodList, error), getRcList func(string, api.ListOptions) ([]api.ReplicationController, error)) ([]*api.ReplicationController, []*api.ReplicationController, error) {
 	namespace := deployment.ObjectMeta.Namespace
 	// 1. Find all pods whose labels match deployment.Spec.Selector
@@ -133,6 +135,16 @@ func GetNewRCTemplate(deployment extensions.Deployment) api.PodTemplateSpec {
 		deployment.Spec.UniqueLabelKey,
 		podutil.GetPodTemplateSpecHash(newRCTemplate))
 	return newRCTemplate
+}
+
+// SetTemplate sets the desired PodTemplateSpec from an RC template to the given deployment.
+func SetFromRCTemplate(deployment *extensions.Deployment, template api.PodTemplateSpec) *extensions.Deployment {
+	deployment.Spec.Template.ObjectMeta = template.ObjectMeta
+	deployment.Spec.Template.Spec = template.Spec
+	deployment.Spec.Template.ObjectMeta.Labels = labelsutil.CloneAndRemoveLabel(
+		deployment.Spec.Template.ObjectMeta.Labels,
+		deployment.Spec.UniqueLabelKey)
+	return deployment
 }
 
 // Returns the sum of Replicas of the given replication controllers.

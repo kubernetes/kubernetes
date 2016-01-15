@@ -1126,6 +1126,25 @@ func deepCopy_v1beta1_DeploymentList(in DeploymentList, out *DeploymentList, c *
 	return nil
 }
 
+func deepCopy_v1beta1_DeploymentRollback(in DeploymentRollback, out *DeploymentRollback, c *conversion.Cloner) error {
+	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	out.Name = in.Name
+	if in.UpdatedAnnotations != nil {
+		out.UpdatedAnnotations = make(map[string]string)
+		for key, val := range in.UpdatedAnnotations {
+			out.UpdatedAnnotations[key] = val
+		}
+	} else {
+		out.UpdatedAnnotations = nil
+	}
+	if err := deepCopy_v1beta1_RollbackConfig(in.RollbackTo, &out.RollbackTo, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func deepCopy_v1beta1_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, c *conversion.Cloner) error {
 	if in.Replicas != nil {
 		out.Replicas = new(int32)
@@ -1160,6 +1179,14 @@ func deepCopy_v1beta1_DeploymentSpec(in DeploymentSpec, out *DeploymentSpec, c *
 		out.UniqueLabelKey = nil
 	}
 	out.Paused = in.Paused
+	if in.RollbackTo != nil {
+		out.RollbackTo = new(RollbackConfig)
+		if err := deepCopy_v1beta1_RollbackConfig(*in.RollbackTo, out.RollbackTo, c); err != nil {
+			return err
+		}
+	} else {
+		out.RollbackTo = nil
+	}
 	return nil
 }
 
@@ -1633,6 +1660,11 @@ func deepCopy_v1beta1_ReplicationControllerDummy(in ReplicationControllerDummy, 
 	return nil
 }
 
+func deepCopy_v1beta1_RollbackConfig(in RollbackConfig, out *RollbackConfig, c *conversion.Cloner) error {
+	out.Revision = in.Revision
+	return nil
+}
+
 func deepCopy_v1beta1_RollingUpdateDaemonSet(in RollingUpdateDaemonSet, out *RollingUpdateDaemonSet, c *conversion.Cloner) error {
 	if in.MaxUnavailable != nil {
 		out.MaxUnavailable = new(intstr.IntOrString)
@@ -1858,6 +1890,7 @@ func init() {
 		deepCopy_v1beta1_DaemonSetUpdateStrategy,
 		deepCopy_v1beta1_Deployment,
 		deepCopy_v1beta1_DeploymentList,
+		deepCopy_v1beta1_DeploymentRollback,
 		deepCopy_v1beta1_DeploymentSpec,
 		deepCopy_v1beta1_DeploymentStatus,
 		deepCopy_v1beta1_DeploymentStrategy,
@@ -1888,6 +1921,7 @@ func init() {
 		deepCopy_v1beta1_ReplicaSetSpec,
 		deepCopy_v1beta1_ReplicaSetStatus,
 		deepCopy_v1beta1_ReplicationControllerDummy,
+		deepCopy_v1beta1_RollbackConfig,
 		deepCopy_v1beta1_RollingUpdateDaemonSet,
 		deepCopy_v1beta1_RollingUpdateDeployment,
 		deepCopy_v1beta1_Scale,

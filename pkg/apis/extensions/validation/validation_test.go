@@ -872,6 +872,9 @@ func validDeployment() *extensions.Deployment {
 				},
 			},
 			UniqueLabelKey: "my-label",
+			RollbackTo: &extensions.RollbackConfig{
+				Revision: 1,
+			},
 		},
 	}
 }
@@ -948,8 +951,53 @@ func TestValidateDeployment(t *testing.T) {
 	}
 	errorCases["must not be greater than 100%"] = invalidMaxUnavailableDeployment
 
+	// Rollback.Revision must be non-negative
+	invalidRollbackRevisionDeployment := validDeployment()
+	invalidRollbackRevisionDeployment.Spec.RollbackTo.Revision = -3
+	errorCases["must be greater than or equal to 0"] = invalidRollbackRevisionDeployment
+
 	for k, v := range errorCases {
 		errs := ValidateDeployment(v)
+		if len(errs) == 0 {
+			t.Errorf("[%s] expected failure", k)
+		} else if !strings.Contains(errs[0].Error(), k) {
+			t.Errorf("unexpected error: %q, expected: %q", errs[0].Error(), k)
+		}
+	}
+}
+
+func validDeploymentRollback() *extensions.DeploymentRollback {
+	return &extensions.DeploymentRollback{
+		Name: "abc",
+		UpdatedAnnotations: map[string]string{
+			"created-by": "abc",
+		},
+		RollbackTo: extensions.RollbackConfig{
+			Revision: 1,
+		},
+	}
+}
+
+func TestValidateDeploymentRollback(t *testing.T) {
+	noAnnotation := validDeploymentRollback()
+	noAnnotation.UpdatedAnnotations = nil
+	successCases := []*extensions.DeploymentRollback{
+		validDeploymentRollback(),
+		noAnnotation,
+	}
+	for _, successCase := range successCases {
+		if errs := ValidateDeploymentRollback(successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]*extensions.DeploymentRollback{}
+	invalidNoName := validDeploymentRollback()
+	invalidNoName.Name = ""
+	errorCases["name: Required value"] = invalidNoName
+
+	for k, v := range errorCases {
+		errs := ValidateDeploymentRollback(v)
 		if len(errs) == 0 {
 			t.Errorf("[%s] expected failure", k)
 		} else if !strings.Contains(errs[0].Error(), k) {
