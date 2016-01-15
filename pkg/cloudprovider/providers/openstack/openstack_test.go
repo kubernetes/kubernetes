@@ -19,12 +19,14 @@ package openstack
 import (
 	"errors"
 	"log"
+	"net"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/rand"
@@ -287,6 +289,10 @@ func setup() error {
 		log.Printf("No config found in environment")
 		return errors.New("No config found in environment")
 	}
+	cfg.Route = RouteOpts{
+		HostnameOverride: true,
+	}
+
 	openstack, err := newOpenStack(cfg)
 	if err != nil {
 		log.Printf("Failed to construct/authenticate OpenStack: %s", err)
@@ -344,6 +350,7 @@ func setup() error {
 	}
 	log.Printf("Test router %s created", env.UUID)
 	env.Router = router
+	env.Openstack.routeOpts.RouterId = router.ID
 
 	interfaceOpts := routers.InterfaceOpts{
 		SubnetID: subnet.ID,
@@ -401,6 +408,43 @@ func teardown() {
 			log.Printf("Network %s not deleted: %s", env.Network.ID, err)
 		}
 	}
+}
+
+func TestRoutes(t *testing.T) {
+	os := env.Openstack
+
+	routes, ok := os.Routes()
+	if !ok {
+		t.Fatalf("Routes() returned false - perhaps your stack doesn't support Neutron?")
+	}
+
+	newroute := cloudprovider.Route{
+		DestinationCIDR: "10.164.2.0/24",
+		TargetInstance:  "192.168.199.10",
+	}
+	err := os.CreateRoute("test", "", &newroute)
+	if err != nil {
+		t.Fatalf("%s", err)
+	}
+
+	routelist, err := routes.ListRoutes("")
+	if err != nil {
+		t.Fatalf("ListRoutes() returned an err - %s", err)
+	}
+	for _, route := range routelist {
+		_, cidr, err := net.ParseCIDR(route.DestinationCIDR)
+		if err != nil {
+			t.Logf("Ignoring route %s, unparsable CIDR: %v", route.Name, err)
+		}
+		t.Logf("%s", cidr)
+		t.Logf("what %s %s", route.DestinationCIDR, route.TargetInstance)
+	}
+
+	err = os.DeleteRoute("test", &newroute)
+	if err != nil {
+		t.Fatalf("%s", err)
+	}
+
 }
 
 func TestVolumes(t *testing.T) {

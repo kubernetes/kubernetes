@@ -65,6 +65,11 @@ func (d *MyDuration) UnmarshalText(text []byte) error {
 	return nil
 }
 
+type RouteOpts struct {
+	RouterId         string `gcfg:"router-id"` // required
+	HostnameOverride bool   `gcfg:"hostname-override"`
+}
+
 type LoadBalancerOpts struct {
 	SubnetId          string     `gcfg:"subnet-id"` // required
 	FloatingNetworkId string     `gcfg:"floating-network-id"`
@@ -77,11 +82,12 @@ type LoadBalancerOpts struct {
 
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
 type OpenStack struct {
-	provider *gophercloud.ProviderClient
-	compute  *gophercloud.ServiceClient
-	network  *gophercloud.ServiceClient
-	region   string
-	lbOpts   LoadBalancerOpts
+	provider  *gophercloud.ProviderClient
+	compute   *gophercloud.ServiceClient
+	network   *gophercloud.ServiceClient
+	region    string
+	lbOpts    LoadBalancerOpts
+	routeOpts RouteOpts
 	// InstanceID of the server where this OpenStack object is instantiated.
 	localInstanceID string
 }
@@ -100,6 +106,7 @@ type Config struct {
 		Region     string
 	}
 	LoadBalancer LoadBalancerOpts
+	Route        RouteOpts
 }
 
 func init() {
@@ -238,6 +245,7 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 		network:         network,
 		region:          cfg.Global.Region,
 		lbOpts:          cfg.LoadBalancer,
+		routeOpts:       cfg.Route,
 		localInstanceID: id,
 	}
 
@@ -387,14 +395,11 @@ func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
 
 	return os, true
 }
+
 func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
 	glog.V(1).Infof("Current zone is %v", os.region)
 
 	return cloudprovider.Zone{Region: os.region}, nil
-}
-
-func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
-	return nil, false
 }
 
 func getServerByAddress(compute *gophercloud.ServiceClient, ip string) (*servers.Server, error) {
