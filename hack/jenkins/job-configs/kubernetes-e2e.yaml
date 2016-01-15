@@ -191,7 +191,7 @@
         - 'kubernetes-e2e-{suffix}'
 
 - project:
-    name: kubernetes-e2e-gce-features
+    name: kubernetes-e2e-features
     trigger-job: 'kubernetes-build'
     branch: 'master'
     suffix:
@@ -200,14 +200,6 @@
             timeout: 300
             emails: '$DEFAULT_RECIPIENTS, ihmccreery@google.com'
             test-owner: 'ihmccreery'
-    jobs:
-        - 'kubernetes-e2e-{suffix}'
-
-- project:
-    name: kubernetes-e2e-gke-features
-    trigger-job: 'kubernetes-build'
-    branch: 'master'
-    suffix:
         - 'gke-serial':
             description: 'Run [Serial], [Disruptive], and [Feature:Restart] tests on GKE using the latest successful build.'
             timeout: 300
