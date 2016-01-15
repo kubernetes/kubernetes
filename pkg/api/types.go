@@ -952,9 +952,9 @@ type ContainerStatus struct {
 	// Note that this is calculated from dead containers.  But those containers are subject to
 	// garbage collection.  This value will get capped at 5 by GC.
 	RestartCount      int              `json:"restartCount"`
+	ContainerID       string           `json:"containerID,omitempty"`
 	Image             string           `json:"image"`
 	ImageID           string           `json:"imageID"`
-	ContainerID       string           `json:"containerID,omitempty"`
 	ImageCreationTime unversioned.Time `json:"imageCreationTime,omitempty"`
 	ImageSize         int64            `json:"imageSize,omitempty"`
 	ImageVirtualSize  int64            `json:"imageVirtualSize,omitempty"`

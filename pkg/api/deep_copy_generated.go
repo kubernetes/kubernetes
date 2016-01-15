@@ -498,9 +498,9 @@ func deepCopy_api_ContainerStatus(in ContainerStatus, out *ContainerStatus, c *c
 	}
 	out.Ready = in.Ready
 	out.RestartCount = in.RestartCount
+	out.ContainerID = in.ContainerID
 	out.Image = in.Image
 	out.ImageID = in.ImageID
-	out.ContainerID = in.ContainerID
 	if newVal, err := c.DeepCopy(in.ImageCreationTime); err != nil {
 		return err
 	} else {
