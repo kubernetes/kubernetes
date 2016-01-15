@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/labels"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -110,24 +111,26 @@ func newDeployment(deploymentName string, replicas int, podLabels map[string]str
 func testNewDeployment(f *Framework) {
 	ns := f.Namespace.Name
 	c := f.Client
+	clientset := release_1_1.AdaptOldClient(f.Client)
+
 	deploymentName := "nginx-deployment"
 	podLabels := map[string]string{"name": "nginx"}
 	replicas := 1
 	Logf("Creating simple deployment %s", deploymentName)
-	_, err := c.Deployments(ns).Create(newDeployment(deploymentName, replicas, podLabels, "nginx", "nginx", extensions.RollingUpdateDeploymentStrategyType))
+	_, err := clientset.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, podLabels, "nginx", "nginx", extensions.RollingUpdateDeploymentStrategyType))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
-		deployment, err := c.Deployments(ns).Get(deploymentName)
+		deployment, err := clientset.Extensions().Deployments(ns).Get(deploymentName)
 		Expect(err).NotTo(HaveOccurred())
 		Logf("deleting deployment %s", deploymentName)
-		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
+		Expect(clientset.Extensions().Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
 		// TODO: remove this once we can delete rcs with deployment
-		newRC, err := deploymentutil.GetNewRC(*deployment, c)
+		newRC, err := deploymentutil.GetNewRC(*deployment, clientset)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(c.ReplicationControllers(ns).Delete(newRC.Name)).NotTo(HaveOccurred())
+		Expect(clientset.Legacy().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
 	}()
 	// Check that deployment is created fine.
-	deployment, err := c.Deployments(ns).Get(deploymentName)
+	deployment, err := clientset.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that the required pods have come up.
@@ -137,7 +140,7 @@ func testNewDeployment(f *Framework) {
 		Expect(err).NotTo(HaveOccurred())
 	}
 	// DeploymentStatus should be appropriately updated.
-	deployment, err = c.Deployments(ns).Get(deploymentName)
+	deployment, err = clientset.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(deployment.Status.Replicas).Should(Equal(replicas))
 	Expect(deployment.Status.UpdatedReplicas).Should(Equal(replicas))
@@ -146,6 +149,7 @@ func testNewDeployment(f *Framework) {
 func testRollingUpdateDeployment(f *Framework) {
 	ns := f.Namespace.Name
 	c := f.Client
+	clientset := release_1_1.AdaptOldClient(c)
 	// Create nginx pods.
 	deploymentPodLabels := map[string]string{"name": "sample-pod"}
 	rcPodLabels := map[string]string{
@@ -155,11 +159,11 @@ func testRollingUpdateDeployment(f *Framework) {
 
 	rcName := "nginx-controller"
 	replicas := 3
-	_, err := c.ReplicationControllers(ns).Create(newRC(rcName, replicas, rcPodLabels, "nginx", "nginx"))
+	_, err := clientset.Legacy().ReplicationControllers(ns).Create(newRC(rcName, replicas, rcPodLabels, "nginx", "nginx"))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		Logf("deleting replication controller %s", rcName)
-		Expect(c.ReplicationControllers(ns).Delete(rcName)).NotTo(HaveOccurred())
+		Expect(clientset.Legacy().ReplicationControllers(ns).Delete(rcName, nil)).NotTo(HaveOccurred())
 	}()
 	// Verify that the required pods have come up.
 	err = verifyPods(c, ns, "sample-pod", false, 3)
@@ -171,26 +175,27 @@ func testRollingUpdateDeployment(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "redis-deployment"
 	Logf("Creating deployment %s", deploymentName)
-	_, err = c.Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RollingUpdateDeploymentStrategyType))
+	_, err = clientset.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RollingUpdateDeploymentStrategyType))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
-		deployment, err := c.Deployments(ns).Get(deploymentName)
+		deployment, err := clientset.Extensions().Deployments(ns).Get(deploymentName)
 		Expect(err).NotTo(HaveOccurred())
 		Logf("deleting deployment %s", deploymentName)
-		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
+		Expect(clientset.Extensions().Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
 		// TODO: remove this once we can delete rcs with deployment
-		newRC, err := deploymentutil.GetNewRC(*deployment, c)
+		newRC, err := deploymentutil.GetNewRC(*deployment, clientset)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(c.ReplicationControllers(ns).Delete(newRC.Name)).NotTo(HaveOccurred())
+		Expect(clientset.Legacy().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
 	}()
 
-	err = waitForDeploymentStatus(c, ns, deploymentName, replicas, replicas-1, replicas+1, 0)
+	err = waitForDeploymentStatus(clientset, ns, deploymentName, replicas, replicas-1, replicas+1, 0)
 	Expect(err).NotTo(HaveOccurred())
 }
 
 func testRollingUpdateDeploymentEvents(f *Framework) {
 	ns := f.Namespace.Name
 	c := f.Client
+	clientset := release_1_1.AdaptOldClient(c)
 	// Create nginx pods.
 	deploymentPodLabels := map[string]string{"name": "sample-pod-2"}
 	rcPodLabels := map[string]string{
@@ -199,11 +204,11 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	}
 	rcName := "nginx-controller"
 	replicas := 1
-	_, err := c.ReplicationControllers(ns).Create(newRC(rcName, replicas, rcPodLabels, "nginx", "nginx"))
+	_, err := clientset.Legacy().ReplicationControllers(ns).Create(newRC(rcName, replicas, rcPodLabels, "nginx", "nginx"))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		Logf("deleting replication controller %s", rcName)
-		Expect(c.ReplicationControllers(ns).Delete(rcName)).NotTo(HaveOccurred())
+		Expect(clientset.Legacy().ReplicationControllers(ns).Delete(rcName, nil)).NotTo(HaveOccurred())
 	}()
 	// Verify that the required pods have come up.
 	err = verifyPods(c, ns, "sample-pod-2", false, 1)
@@ -215,33 +220,33 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "redis-deployment-2"
 	Logf("Creating deployment %s", deploymentName)
-	_, err = c.Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RollingUpdateDeploymentStrategyType))
+	_, err = clientset.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RollingUpdateDeploymentStrategyType))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
-		deployment, err := c.Deployments(ns).Get(deploymentName)
+		deployment, err := clientset.Extensions().Deployments(ns).Get(deploymentName)
 		Expect(err).NotTo(HaveOccurred())
 		Logf("deleting deployment %s", deploymentName)
-		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
+		Expect(clientset.Extensions().Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
 		// TODO: remove this once we can delete rcs with deployment
-		newRC, err := deploymentutil.GetNewRC(*deployment, c)
+		newRC, err := deploymentutil.GetNewRC(*deployment, clientset)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(c.ReplicationControllers(ns).Delete(newRC.Name)).NotTo(HaveOccurred())
+		Expect(clientset.Legacy().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
 	}()
 
-	err = waitForDeploymentStatus(c, ns, deploymentName, replicas, replicas-1, replicas+1, 0)
+	err = waitForDeploymentStatus(clientset, ns, deploymentName, replicas, replicas-1, replicas+1, 0)
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the pods were scaled up and down as expected. We use events to verify that.
-	deployment, err := c.Deployments(ns).Get(deploymentName)
+	deployment, err := clientset.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 	waitForEvents(c, ns, deployment, 2)
-	events, err := c.Events(ns).Search(deployment)
+	events, err := clientset.Legacy().Events(ns).Search(deployment)
 	if err != nil {
 		Logf("error in listing events: %s", err)
 		Expect(err).NotTo(HaveOccurred())
 	}
 	// There should be 2 events, one to scale up the new RC and then to scale down the old RC.
 	Expect(len(events.Items)).Should(Equal(2))
-	newRC, err := deploymentutil.GetNewRC(*deployment, c)
+	newRC, err := deploymentutil.GetNewRC(*deployment, clientset)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRC).NotTo(Equal(nil))
 	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled up rc %s to 1", newRC.Name)))
@@ -251,6 +256,7 @@ func testRollingUpdateDeploymentEvents(f *Framework) {
 func testRecreateDeployment(f *Framework) {
 	ns := f.Namespace.Name
 	c := f.Client
+	clientset := release_1_1.AdaptOldClient(c)
 	// Create nginx pods.
 	deploymentPodLabels := map[string]string{"name": "sample-pod-3"}
 	rcPodLabels := map[string]string{
@@ -260,11 +266,11 @@ func testRecreateDeployment(f *Framework) {
 
 	rcName := "nginx-controller"
 	replicas := 3
-	_, err := c.ReplicationControllers(ns).Create(newRC(rcName, replicas, rcPodLabels, "nginx", "nginx"))
+	_, err := clientset.Legacy().ReplicationControllers(ns).Create(newRC(rcName, replicas, rcPodLabels, "nginx", "nginx"))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		Logf("deleting replication controller %s", rcName)
-		Expect(c.ReplicationControllers(ns).Delete(rcName)).NotTo(HaveOccurred())
+		Expect(clientset.Legacy().ReplicationControllers(ns).Delete(rcName, nil)).NotTo(HaveOccurred())
 	}()
 	// Verify that the required pods have come up.
 	err = verifyPods(c, ns, "sample-pod-3", false, 3)
@@ -276,38 +282,38 @@ func testRecreateDeployment(f *Framework) {
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "redis-deployment-3"
 	Logf("Creating deployment %s", deploymentName)
-	_, err = c.Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RecreateDeploymentStrategyType))
+	_, err = clientset.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, "redis", "redis", extensions.RecreateDeploymentStrategyType))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
-		deployment, err := c.Deployments(ns).Get(deploymentName)
+		deployment, err := clientset.Extensions().Deployments(ns).Get(deploymentName)
 		Expect(err).NotTo(HaveOccurred())
 		Logf("deleting deployment %s", deploymentName)
-		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
+		Expect(clientset.Extensions().Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
 		// TODO: remove this once we can delete rcs with deployment
-		newRC, err := deploymentutil.GetNewRC(*deployment, c)
+		newRC, err := deploymentutil.GetNewRC(*deployment, clientset)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(c.ReplicationControllers(ns).Delete(newRC.Name)).NotTo(HaveOccurred())
+		Expect(clientset.Legacy().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
 	}()
 
-	err = waitForDeploymentStatus(c, ns, deploymentName, replicas, 0, replicas, 0)
+	err = waitForDeploymentStatus(clientset, ns, deploymentName, replicas, 0, replicas, 0)
 	if err != nil {
-		deployment, _ := c.Deployments(ns).Get(deploymentName)
+		deployment, _ := clientset.Extensions().Deployments(ns).Get(deploymentName)
 		Logf("deployment = %+v", deployment)
 	}
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that the pods were scaled up and down as expected. We use events to verify that.
-	deployment, err := c.Deployments(ns).Get(deploymentName)
+	deployment, err := clientset.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 	waitForEvents(c, ns, deployment, 2)
-	events, err := c.Events(ns).Search(deployment)
+	events, err := clientset.Legacy().Events(ns).Search(deployment)
 	if err != nil {
 		Logf("error in listing events: %s", err)
 		Expect(err).NotTo(HaveOccurred())
 	}
 	// There should be 2 events, one to scale up the new RC and then to scale down the old RC.
 	Expect(len(events.Items)).Should(Equal(2))
-	newRC, err := deploymentutil.GetNewRC(*deployment, c)
+	newRC, err := deploymentutil.GetNewRC(*deployment, clientset)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRC).NotTo(Equal(nil))
 	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled down rc %s to 0", rcName)))
@@ -319,6 +325,7 @@ func testRecreateDeployment(f *Framework) {
 func testRolloverDeployment(f *Framework) {
 	ns := f.Namespace.Name
 	c := f.Client
+	clientset := release_1_1.AdaptOldClient(c)
 	podName := "rollover-pod"
 	deploymentPodLabels := map[string]string{"name": podName}
 	rcPodLabels := map[string]string{
@@ -328,11 +335,11 @@ func testRolloverDeployment(f *Framework) {
 
 	rcName := "nginx-controller"
 	rcReplicas := 4
-	_, err := c.ReplicationControllers(ns).Create(newRC(rcName, rcReplicas, rcPodLabels, "nginx", "nginx"))
+	_, err := clientset.Legacy().ReplicationControllers(ns).Create(newRC(rcName, rcReplicas, rcPodLabels, "nginx", "nginx"))
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		Logf("deleting replication controller %s", rcName)
-		Expect(c.ReplicationControllers(ns).Delete(rcName)).NotTo(HaveOccurred())
+		Expect(clientset.Legacy().ReplicationControllers(ns).Delete(rcName, nil)).NotTo(HaveOccurred())
 	}()
 	// Verify that the required pods have come up.
 	err = verifyPods(c, ns, podName, false, rcReplicas)
@@ -354,23 +361,23 @@ func testRolloverDeployment(f *Framework) {
 		MaxSurge:        intstr.FromInt(1),
 		MinReadySeconds: deploymentMinReadySeconds,
 	}
-	_, err = c.Deployments(ns).Create(newDeployment)
+	_, err = clientset.Extensions().Deployments(ns).Create(newDeployment)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
-		deployment, err := c.Deployments(ns).Get(deploymentName)
+		deployment, err := clientset.Extensions().Deployments(ns).Get(deploymentName)
 		Expect(err).NotTo(HaveOccurred())
 		Logf("deleting deployment %s", deploymentName)
-		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
+		Expect(clientset.Extensions().Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
 		// TODO: remove this once we can delete rcs with deployment
-		newRC, err := deploymentutil.GetNewRC(*deployment, c)
+		newRC, err := deploymentutil.GetNewRC(*deployment, clientset)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(c.ReplicationControllers(ns).Delete(newRC.Name)).NotTo(HaveOccurred())
+		Expect(clientset.Legacy().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
 	}()
 	// Verify that the pods were scaled up and down as expected. We use events to verify that.
-	deployment, err := c.Deployments(ns).Get(deploymentName)
+	deployment, err := clientset.Extensions().Deployments(ns).Get(deploymentName)
 	// Make sure the deployment starts to scale up and down RCs
 	waitForPartialEvents(c, ns, deployment, 2)
-	newRC, err := deploymentutil.GetNewRC(*deployment, c)
+	newRC, err := deploymentutil.GetNewRC(*deployment, clientset)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRC).NotTo(Equal(nil))
 
@@ -381,43 +388,44 @@ func testRolloverDeployment(f *Framework) {
 	newDeployment.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImage
 	newDeployment.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage
 	Logf("updating deployment %s", deploymentName)
-	_, err = c.Deployments(ns).Update(newDeployment)
+	_, err = clientset.Extensions().Deployments(ns).Update(newDeployment)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = waitForDeploymentStatus(c, ns, deploymentName, deploymentReplicas, deploymentReplicas-1, deploymentReplicas+1, deploymentMinReadySeconds)
+	err = waitForDeploymentStatus(clientset, ns, deploymentName, deploymentReplicas, deploymentReplicas-1, deploymentReplicas+1, deploymentMinReadySeconds)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Make sure updated deployment contains "redis" image
-	deployment, err = c.Deployments(ns).Get(deploymentName)
+	deployment, err = clientset.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(deployment.Spec.Template.Spec.Containers[0].Image).Should(Equal(updatedDeploymentImage))
 	// Make sure new RC contains "redis" image
-	newRC, err = deploymentutil.GetNewRC(*deployment, c)
+	newRC, err = deploymentutil.GetNewRC(*deployment, clientset)
 	Expect(newRC.Spec.Template.Spec.Containers[0].Image).Should(Equal(updatedDeploymentImage))
 }
 
 func testPausedDeployment(f *Framework) {
 	ns := f.Namespace.Name
 	c := f.Client
+	clientset := release_1_1.AdaptOldClient(c)
 	deploymentName := "nginx"
 	podLabels := map[string]string{"name": "nginx"}
 	d := newDeployment(deploymentName, 1, podLabels, "nginx", "nginx", extensions.RollingUpdateDeploymentStrategyType)
 	d.Spec.Paused = true
 	Logf("Creating paused deployment %s", deploymentName)
-	_, err := c.Deployments(ns).Create(d)
+	_, err := clientset.Extensions().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
-		_, err := c.Deployments(ns).Get(deploymentName)
+		_, err := clientset.Extensions().Deployments(ns).Get(deploymentName)
 		Expect(err).NotTo(HaveOccurred())
 		Logf("deleting deployment %s", deploymentName)
-		Expect(c.Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
+		Expect(clientset.Extensions().Deployments(ns).Delete(deploymentName, nil)).NotTo(HaveOccurred())
 	}()
 	// Check that deployment is created fine.
-	deployment, err := c.Deployments(ns).Get(deploymentName)
+	deployment, err := clientset.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that there is no latest state realized for the new deployment.
-	rc, err := deploymentutil.GetNewRC(*deployment, c)
+	rc, err := deploymentutil.GetNewRC(*deployment, clientset)
 	Expect(err).NotTo(HaveOccurred())
 	if rc != nil {
 		err = fmt.Errorf("unexpected new rc/%s for deployment/%s", rc.Name, deployment.Name)
@@ -426,11 +434,11 @@ func testPausedDeployment(f *Framework) {
 
 	// Update the deployment to run
 	deployment.Spec.Paused = false
-	deployment, err = c.Deployments(ns).Update(deployment)
+	deployment, err = clientset.Extensions().Deployments(ns).Update(deployment)
 	Expect(err).NotTo(HaveOccurred())
 
 	opts := api.ListOptions{LabelSelector: labels.Set(deployment.Spec.Selector).AsSelector()}
-	w, err := c.ReplicationControllers(ns).Watch(opts)
+	w, err := clientset.Legacy().ReplicationControllers(ns).Watch(opts)
 	Expect(err).NotTo(HaveOccurred())
 
 	select {
@@ -445,21 +453,21 @@ func testPausedDeployment(f *Framework) {
 	// The paused deployment shouldn't recreate a new one.
 	deployment.Spec.Paused = true
 	deployment.ResourceVersion = ""
-	deployment, err = c.Deployments(ns).Update(deployment)
+	deployment, err = clientset.Extensions().Deployments(ns).Update(deployment)
 	Expect(err).NotTo(HaveOccurred())
 
-	newRC, err := deploymentutil.GetNewRC(*deployment, c)
+	newRC, err := deploymentutil.GetNewRC(*deployment, clientset)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(c.ReplicationControllers(ns).Delete(newRC.Name)).NotTo(HaveOccurred())
+	Expect(clientset.Legacy().ReplicationControllers(ns).Delete(newRC.Name, nil)).NotTo(HaveOccurred())
 
-	deployment, err = c.Deployments(ns).Get(deploymentName)
+	deployment, err = clientset.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 
 	if !deployment.Spec.Paused {
 		err = fmt.Errorf("deployment %q should be paused", deployment.Name)
 		Expect(err).NotTo(HaveOccurred())
 	}
-	shouldBeNil, err := deploymentutil.GetNewRC(*deployment, c)
+	shouldBeNil, err := deploymentutil.GetNewRC(*deployment, clientset)
 	Expect(err).NotTo(HaveOccurred())
 	if shouldBeNil != nil {
 		err = fmt.Errorf("deployment %q shouldn't have a rc but there is %q", deployment.Name, shouldBeNil.Name)
