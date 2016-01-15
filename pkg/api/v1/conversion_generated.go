@@ -446,6 +446,11 @@ func autoConvert_api_ContainerStatus_To_v1_ContainerStatus(in *api.ContainerStat
 	out.Image = in.Image
 	out.ImageID = in.ImageID
 	out.ContainerID = in.ContainerID
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.ImageCreationTime, &out.ImageCreationTime, s); err != nil {
+		return err
+	}
+	out.ImageSize = in.ImageSize
+	out.ImageVirtualSize = in.ImageVirtualSize
 	return nil
 }
 
@@ -3635,6 +3640,11 @@ func autoConvert_v1_ContainerStatus_To_api_ContainerStatus(in *ContainerStatus, 
 	out.Image = in.Image
 	out.ImageID = in.ImageID
 	out.ContainerID = in.ContainerID
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.ImageCreationTime, &out.ImageCreationTime, s); err != nil {
+		return err
+	}
+	out.ImageSize = in.ImageSize
+	out.ImageVirtualSize = in.ImageVirtualSize
 	return nil
 }
 

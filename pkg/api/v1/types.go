@@ -1168,6 +1168,12 @@ type ContainerStatus struct {
 	// Container's ID in the format 'docker://<container_id>'.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#container-information
 	ContainerID string `json:"containerID,omitempty"`
+	// The image creation time from docker image inspection
+	ImageCreationTime unversioned.Time `json:"imageCreationTime,omitempty"`
+	// The image size time from docker image inspection
+	ImageSize int64 `json:"imageSize,omitempty"`
+	// The image virtual size time from docker image inspection
+	ImageVirtualSize int64 `json:"imageVirtualSize,omitempty"`
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
