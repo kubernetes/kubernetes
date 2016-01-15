@@ -503,12 +503,7 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-reboot)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-reboot"}
     : ${E2E_NETWORK:="e2e-reboot"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_allow_empty \
-          ${DISRUPTIVE_TESTS[@]:+${DISRUPTIVE_TESTS[@]}} \
-          ) --ginkgo.skip=$(join_regex_no_empty \
-          ${GCE_DEFAULT_SKIP_TESTS[@]:+${GCE_DEFAULT_SKIP_TESTS[@]}} \
-          ${GCE_FLAKY_TESTS[@]:+${GCE_FLAKY_TESTS[@]}} \
-          )"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Reboot"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-reboot"}
     : ${PROJECT:="kubernetes-jenkins"}
     ;;
