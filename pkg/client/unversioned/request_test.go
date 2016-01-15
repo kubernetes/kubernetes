@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/watch"
 	watchjson "k8s.io/kubernetes/pkg/watch/json"
 )
@@ -698,7 +699,7 @@ func TestDoRequestNewWay(t *testing.T) {
 		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
@@ -867,7 +868,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
@@ -908,7 +909,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
@@ -964,7 +965,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
@@ -1010,7 +1011,7 @@ func TestWasCreated(t *testing.T) {
 		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := testapi.Default.Codec().Encode(expectedObj)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   201,
 		ResponseBody: string(expectedBody),
 		T:            t,

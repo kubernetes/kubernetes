@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 const NameRequiredError = "resource name may not be empty"
@@ -58,7 +58,7 @@ type Client struct {
 	Error    bool
 	Created  bool
 	server   *httptest.Server
-	handler  *util.FakeHandler
+	handler  *utiltesting.FakeHandler
 	// For query args, an optional function to validate the contents
 	// useful when the contents can change but still be correct.
 	// Maps from query arg key to validator.
@@ -67,7 +67,7 @@ type Client struct {
 }
 
 func (c *Client) Setup(t *testing.T) *Client {
-	c.handler = &util.FakeHandler{
+	c.handler = &utiltesting.FakeHandler{
 		StatusCode: c.Response.StatusCode,
 	}
 	if responseBody := body(t, c.Response.Body, c.Response.RawBody); responseBody != nil {
