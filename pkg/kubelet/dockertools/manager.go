@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 )
 
 const (
@@ -709,7 +710,7 @@ func (dm *DockerManager) runContainer(
 		return kubecontainer.ContainerID{}, err
 	}
 
-	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.CreatedContainer, "Created container with docker id %v", util.ShortenString(dockerContainer.ID, 12))
+	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.CreatedContainer, "Created container with docker id %v", utilstrings.ShortenString(dockerContainer.ID, 12))
 
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
 	binds := makeMountBindings(opts.Mounts, podHasSELinuxLabel)
@@ -766,10 +767,10 @@ func (dm *DockerManager) runContainer(
 
 	if err = dm.client.StartContainer(dockerContainer.ID, hc); err != nil {
 		dm.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.FailedToStartContainer,
-			"Failed to start container with docker id %v with error: %v", util.ShortenString(dockerContainer.ID, 12), err)
+			"Failed to start container with docker id %v with error: %v", utilstrings.ShortenString(dockerContainer.ID, 12), err)
 		return kubecontainer.ContainerID{}, err
 	}
-	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.StartedContainer, "Started container with docker id %v", util.ShortenString(dockerContainer.ID, 12))
+	dm.recorder.Eventf(ref, api.EventTypeNormal, kubecontainer.StartedContainer, "Started container with docker id %v", utilstrings.ShortenString(dockerContainer.ID, 12))
 
 	return kubecontainer.DockerID(dockerContainer.ID).ContainerID(), nil
 }
@@ -1384,7 +1385,7 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 	if !ok {
 		glog.Warningf("No ref for pod '%q'", name)
 	} else {
-		message := fmt.Sprintf("Killing container with docker id %v", util.ShortenString(ID, 12))
+		message := fmt.Sprintf("Killing container with docker id %v", utilstrings.ShortenString(ID, 12))
 		if reason != "" {
 			message = fmt.Sprint(message, ": ", reason)
 		}

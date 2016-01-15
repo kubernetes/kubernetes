@@ -23,8 +23,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -209,7 +209,7 @@ func (cephfsVolume *cephfsCleaner) TearDownAt(dir string) error {
 // GatePath creates global mount path
 func (cephfsVolume *cephfs) GetPath() string {
 	name := cephfsPluginName
-	return cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, util.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
+	return cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, strings.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
 }
 
 func (cephfsVolume *cephfs) cleanup(dir string) error {

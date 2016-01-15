@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -233,7 +234,7 @@ func (kl *Kubelet) getPodVolumesFromDisk() map[string]volume.Cleaner {
 }
 
 func (kl *Kubelet) newVolumeCleanerFromPlugins(kind string, name string, podUID types.UID) (volume.Cleaner, error) {
-	plugName := util.UnescapeQualifiedNameForDisk(kind)
+	plugName := strings.UnescapeQualifiedNameForDisk(kind)
 	plugin, err := kl.volumePluginMgr.FindPluginByName(plugName)
 	if err != nil {
 		// TODO: Maybe we should launch a cleanup of this dir?
