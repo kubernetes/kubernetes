@@ -51,6 +51,7 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&ClusterAutoscalerList{},
 		&Deployment{},
 		&DeploymentList{},
+		&DeploymentRollback{},
 		&HorizontalPodAutoscaler{},
 		&HorizontalPodAutoscalerList{},
 		&Job{},
@@ -76,6 +77,7 @@ func (obj *ClusterAutoscaler) GetObjectKind() unversioned.ObjectKind           {
 func (obj *ClusterAutoscalerList) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }
 func (obj *Deployment) GetObjectKind() unversioned.ObjectKind                  { return &obj.TypeMeta }
 func (obj *DeploymentList) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }
+func (obj *DeploymentRollback) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
 func (obj *HorizontalPodAutoscaler) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
 func (obj *HorizontalPodAutoscalerList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 func (obj *Job) GetObjectKind() unversioned.ObjectKind                         { return &obj.TypeMeta }

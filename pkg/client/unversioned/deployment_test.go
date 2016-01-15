@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-func getDeploymentsResoureName() string {
+func getDeploymentsResourceName() string {
 	return "deployments"
 }
 
@@ -48,7 +48,7 @@ func TestDeploymentCreate(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, ""),
 			Query:  simple.BuildQueryValues(nil),
 			Body:   &deployment,
 		},
@@ -74,7 +74,7 @@ func TestDeploymentGet(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, "abc"),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, "abc"),
 			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
@@ -101,7 +101,7 @@ func TestDeploymentList(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, ""),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, ""),
 			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
@@ -124,7 +124,7 @@ func TestDeploymentUpdate(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, "abc"),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, "abc"),
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{StatusCode: 200, Body: deployment},
@@ -146,7 +146,7 @@ func TestDeploymentUpdateStatus(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, "abc") + "/status",
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, "abc") + "/status",
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{StatusCode: 200, Body: deployment},
@@ -161,7 +161,7 @@ func TestDeploymentDelete(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "DELETE",
-			Path:   testapi.Extensions.ResourcePath(getDeploymentsResoureName(), ns, "foo"),
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, "foo"),
 			Query:  simple.BuildQueryValues(nil),
 		},
 		Response: simple.Response{StatusCode: 200},
@@ -175,7 +175,7 @@ func TestDeploymentWatch(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePathWithPrefix("watch", getDeploymentsResoureName(), "", ""),
+			Path:   testapi.Extensions.ResourcePathWithPrefix("watch", getDeploymentsResourceName(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}},
 		},
 		Response: simple.Response{StatusCode: 200},
@@ -216,4 +216,25 @@ func TestListDeploymentsLabels(t *testing.T) {
 	options := api.ListOptions{LabelSelector: selector}
 	receivedPodList, err := c.Deployments(ns).List(options)
 	c.Validate(t, receivedPodList, err)
+}
+
+func TestDeploymentRollback(t *testing.T) {
+	ns := api.NamespaceDefault
+	deploymentRollback := &extensions.DeploymentRollback{
+		Name:               "abc",
+		UpdatedAnnotations: map[string]string{},
+		RollbackTo:         extensions.RollbackConfig{Revision: 1},
+	}
+	c := &simple.Client{
+		Request: simple.Request{
+			Method: "POST",
+			Path:   testapi.Extensions.ResourcePath(getDeploymentsResourceName(), ns, "abc") + "/rollback",
+			Query:  simple.BuildQueryValues(nil),
+			Body:   deploymentRollback,
+		},
+		Response: simple.Response{StatusCode: http.StatusOK},
+	}
+	err := c.Setup(t).Deployments(ns).Rollback(deploymentRollback)
+	defer c.Close()
+	c.ValidateCommon(t, err)
 }
