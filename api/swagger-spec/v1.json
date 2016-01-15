@@ -15167,6 +15167,20 @@
      "containerID": {
       "type": "string",
       "description": "Container's ID in the format 'docker://\u003ccontainer_id\u003e'. More info: http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#container-information"
+     },
+     "imageCreationTime": {
+      "type": "string",
+      "description": "The image creation time from docker image inspection"
+     },
+     "imageSize": {
+      "type": "integer",
+      "format": "int64",
+      "description": "The image size time from docker image inspection"
+     },
+     "imageVirtualSize": {
+      "type": "integer",
+      "format": "int64",
+      "description": "The image virtual size time from docker image inspection"
      }
     }
    },
