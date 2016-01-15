@@ -77,6 +77,7 @@ func main() {
 		"k8s.io/kubernetes/pkg/watch",
 		"k8s.io/kubernetes/pkg/client/unversioned",
 		"k8s.io/kubernetes/pkg/api/latest",
+		"k8s.io/kubernetes/pkg/client/testing/fake",
 	}
 
 	if *test {
@@ -89,6 +90,7 @@ func main() {
 			[]unversioned.GroupVersion{{"testgroup", ""}},
 			"test_release_1_1",
 			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/",
+			false,
 			false,
 		}
 	} else {
@@ -110,6 +112,7 @@ func main() {
 			*clientsetName,
 			*clientsetPath,
 			*clientsetOnly,
+			true,
 		}
 	}
 
