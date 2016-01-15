@@ -498,13 +498,45 @@ case ${JOB_NAME} in
     NUM_NODES=${NUM_NODES_PARALLEL}
     ;;
 
-  # Run the DISRUPTIVE_TESTS on GCE. (#19681)
+  # Run the Reboot tests on GCE. (#19681)
   kubernetes-e2e-gce-reboot)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-reboot"}
     : ${E2E_NETWORK:="e2e-reboot"}
     : ${GINKGO_TEST_ARGS:="--ginkgo.focus=Reboot"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-reboot"}
     : ${PROJECT:="kubernetes-jenkins"}
+    ;;
+
+  # Run the [Serial], [Disruptive], and [Feature:Restart] tests on GCE.
+  kubernetes-e2e-gce-serial)
+    : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-serial"}
+    : ${E2E_NETWORK:="jenkins-gce-e2e-serial"}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
+          \[Serial\] \
+          \[Disruptive\] \
+          \[Feature:Restart\] \
+          ) --ginkgo.skip=$(join_regex_no_empty \
+	  \[Flaky\]
+          )"}
+    : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-serial"}
+    : ${PROJECT:="kubernetes-jkns-e2e-gce-serial"}
+    ;;
+
+  # Run the [Serial], [Disruptive], and [Feature:Restart] tests on GKE.
+  kubernetes-e2e-gke-serial)
+    : ${E2E_CLUSTER_NAME:="jenkins-gke-e2e-serial"}
+    : ${E2E_NETWORK:="jenkins-gke-e2e-serial"}
+    : ${E2E_SET_CLUSTER_API_VERSION:=y}
+    : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
+          \[Serial\] \
+          \[Disruptive\] \
+          \[Feature:Restart\] \
+          ) --ginkgo.skip=$(join_regex_no_empty \
+	  \[Flaky\]
+          )"}
+    : ${PROJECT:="kubernetes-jkns-e2e-gke-serial"}
     ;;
 
   # Runs the performance/scalability tests on GCE. A larger cluster is used.
