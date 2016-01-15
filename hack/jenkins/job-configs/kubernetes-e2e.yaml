@@ -189,3 +189,21 @@
             description: 'Run E2E tests on GCE from the release-1.0 branch.'
     jobs:
         - 'kubernetes-e2e-{suffix}'
+
+- project:
+    name: kubernetes-e2e-features
+    trigger-job: 'kubernetes-build'
+    branch: 'master'
+    suffix:
+        - 'gce-serial':
+            description: 'Run [Serial], [Disruptive], and [Feature:Restart] tests on GCE using the latest successful build.'
+            timeout: 300
+            emails: '$DEFAULT_RECIPIENTS, ihmccreery@google.com'
+            test-owner: 'ihmccreery'
+        - 'gke-serial':
+            description: 'Run [Serial], [Disruptive], and [Feature:Restart] tests on GKE using the latest successful build.'
+            timeout: 300
+            emails: '$DEFAULT_RECIPIENTS, ihmccreery@google.com'
+            test-owner: 'ihmccreery'
+    jobs:
+        - 'kubernetes-e2e-{suffix}'
