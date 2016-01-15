@@ -18,6 +18,7 @@ package mount
 
 import (
 	"fmt"
+	"runtime"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -46,6 +47,9 @@ type ExecArgs struct {
 }
 
 func TestSafeFormatAndMount(t *testing.T) {
+	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
+	}
 	tests := []struct {
 		description   string
 		fstype        string
