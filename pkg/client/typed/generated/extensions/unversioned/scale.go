@@ -16,16 +16,27 @@ limitations under the License.
 
 package unversioned
 
-type DaemonSetExpansion interface{}
+// ScalesGetter has a method to return a ScaleInterface.
+// A group's client should implement this interface.
+type ScalesGetter interface {
+	Scales(namespace string) ScaleInterface
+}
 
-type DeploymentExpansion interface{}
+// ScaleInterface has methods to work with Scale resources.
+type ScaleInterface interface {
+	ScaleExpansion
+}
 
-type HorizontalPodAutoscalerExpansion interface{}
+// scales implements ScaleInterface
+type scales struct {
+	client *ExtensionsClient
+	ns     string
+}
 
-type IngressExpansion interface{}
-
-type JobExpansion interface{}
-
-type ScaleExpansion interface{}
-
-type ThirdPartyResourceExpansion interface{}
+// newScales returns a Scales
+func newScales(c *ExtensionsClient, namespace string) *scales {
+	return &scales{
+		client: c,
+		ns:     namespace,
+	}
+}
