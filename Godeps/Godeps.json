@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
-	"GoVersion": "go1.5.1",
+	"GoVersion": "go1.5",
 	"Packages": [
 		"./..."
 	],
@@ -692,8 +692,8 @@
 		},
 		{
 			"ImportPath": "github.com/kr/pty",
-			"Comment": "release.r56-25-g05017fc",
-			"Rev": "05017fcccf23c823bfdea560dcc958a136e54fb7"
+			"Comment": "release.r56-29-gf7ee69f",
+			"Rev": "f7ee69f31298ecbe5d2b349c711e2547a617d398"
 		},
 		{
 			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/pbutil",
