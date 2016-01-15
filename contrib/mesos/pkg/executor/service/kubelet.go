@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // executorKubelet decorates the kubelet with a Run function that notifies the
@@ -38,7 +39,7 @@ func (kl *executorKubelet) Run(mergedUpdates <-chan kubetypes.PodUpdate) {
 		// When this Run function is called, we close it here.
 		// Otherwise, KubeletExecutorServer.runKubelet will.
 		close(kl.kubeletDone)
-		util.HandleCrash()
+		runtime.HandleCrash()
 		log.Infoln("kubelet run terminated") //TODO(jdef) turn down verbosity
 		// important: never return! this is in our contract
 		select {}

@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -184,7 +185,7 @@ func (rm *ReplicationManager) SetEventRecorder(recorder record.EventRecorder) {
 
 // Run begins watching and syncing.
 func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
-	defer util.HandleCrash()
+	defer utilruntime.HandleCrash()
 	glog.Infof("Starting RC Manager")
 	controller.SyncAllPodsWithStore(rm.kubeClient, rm.podStore.Store)
 	go rm.rcController.Run(stopCh)
@@ -364,7 +365,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 					// Decrement the expected number of creates because the informer won't observe this pod
 					glog.V(2).Infof("Failed creation, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
 					rm.expectations.CreationObserved(rcKey)
-					util.HandleError(err)
+					utilruntime.HandleError(err)
 				}
 			}()
 		}
@@ -392,7 +393,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 					// Decrement the expected number of deletes because the informer won't observe this deletion
 					glog.V(2).Infof("Failed deletion, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
 					rm.expectations.DeletionObserved(rcKey)
-					util.HandleError(err)
+					utilruntime.HandleError(err)
 				}
 			}(i)
 		}

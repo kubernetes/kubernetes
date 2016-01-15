@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // Controller is the controller manager for the core bootstrap Kubernetes controller
@@ -103,7 +104,7 @@ func (c *Controller) RunKubernetesService(ch chan struct{}) {
 		// run, ports and type will be corrected only during
 		// start.
 		if err := c.UpdateKubernetesService(false); err != nil {
-			util.HandleError(fmt.Errorf("unable to sync kubernetes service: %v", err))
+			runtime.HandleError(fmt.Errorf("unable to sync kubernetes service: %v", err))
 		}
 	}, c.EndpointInterval, ch)
 }

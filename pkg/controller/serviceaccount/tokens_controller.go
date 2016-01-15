@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/secret"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/util"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
@@ -255,7 +255,7 @@ func (e *TokensController) secretDeleted(obj interface{}) {
 	if err := client.RetryOnConflict(RemoveTokenBackoff, func() error {
 		return e.removeSecretReferenceIfNeeded(serviceAccount, secret.Name)
 	}); err != nil {
-		util.HandleError(err)
+		utilruntime.HandleError(err)
 	}
 }
 

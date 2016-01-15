@@ -19,7 +19,7 @@ package proc
 import (
 	"sync"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 const (
@@ -84,7 +84,7 @@ func stateRun(ps *processState, a *scheduledAction) stateFn {
 	close(a.errCh) // signal that action was scheduled
 	func() {
 		// we don't trust clients of this package
-		defer util.HandleCrash()
+		defer runtime.HandleCrash()
 		a.action()
 	}()
 	return stateRun

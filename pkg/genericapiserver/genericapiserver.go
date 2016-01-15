@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	systemd "github.com/coreos/go-systemd/daemon"
@@ -617,7 +618,7 @@ func (s *GenericAPIServer) Run(options *ServerRunOptions) {
 		}
 
 		go func() {
-			defer util.HandleCrash()
+			defer utilruntime.HandleCrash()
 			for {
 				// err == systemd.SdNotifyNoSocket when not running on a systemd system
 				if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
