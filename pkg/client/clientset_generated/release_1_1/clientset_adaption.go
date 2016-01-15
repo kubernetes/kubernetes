@@ -22,10 +22,10 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned"
 )
 
-// AdaptOldClient adapts a pkg/client/unversioned#Client to a Clientset.
+// FromUnversionedClient adapts a pkg/client/unversioned#Client to a Clientset.
 // This function is temporary. We will remove it when everyone has moved to using
 // Clientset. New code should NOT use this function.
-func AdaptOldClient(c *unversioned.Client) *Clientset {
+func FromUnversionedClient(c *unversioned.Client) *Clientset {
 	var clientset Clientset
 	if c != nil {
 		clientset.LegacyClient = legacy_unversioned.New(c.RESTClient)

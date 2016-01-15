@@ -111,3 +111,14 @@ func (c *FakeDeployments) Watch(opts api.ListOptions) (watch.Interface, error) {
 		InvokesWatch(core.NewWatchAction("deployments", c.ns, opts))
 
 }
+
+func (c *FakeDeployments) Rollback(deploymentRollback *extensions.DeploymentRollback) error {
+	action := core.CreateActionImpl{}
+	action.Verb = "create"
+	action.Resource = "deployments"
+	action.Subresource = "rollback"
+	action.Object = deploymentRollback
+
+	_, err := c.Fake.Invokes(action, deploymentRollback)
+	return err
+}

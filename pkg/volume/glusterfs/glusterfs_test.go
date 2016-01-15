@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -219,7 +219,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		}},
 	}
 
-	client := testclient.NewSimpleFake(pv, claim, ep)
+	client := fake.NewSimpleClientset(pv, claim, ep)
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(tmpDir, client, nil))

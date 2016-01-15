@@ -25,6 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	exp "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/testing/fake"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -89,9 +91,9 @@ func TestDeploymentController_reconcileNewRC(t *testing.T) {
 		oldRc := rc("foo-v2", test.oldReplicas, nil)
 		allRcs := []*api.ReplicationController{newRc, oldRc}
 		deployment := deployment("foo", test.deploymentReplicas, test.maxSurge, intstr.FromInt(0))
-		fake := &testclient.Fake{}
+		fake := fake.Clientset{}
 		controller := &DeploymentController{
-			client:        fake,
+			client:        &fake,
 			eventRecorder: &record.FakeRecorder{},
 		}
 		scaled, err := controller.reconcileNewRC(allRcs, newRc, deployment)
@@ -166,10 +168,10 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 		allRcs := []*api.ReplicationController{oldRc}
 		oldRcs := []*api.ReplicationController{oldRc}
 		deployment := deployment("foo", test.deploymentReplicas, intstr.FromInt(0), test.maxUnavailable)
-		fake := &testclient.Fake{}
-		fake.AddReactor("list", "pods", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+		fakeClientset := fake.Clientset{}
+		fakeClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			switch action.(type) {
-			case testclient.ListAction:
+			case core.ListAction:
 				podList := &api.PodList{}
 				for podIndex := 0; podIndex < test.readyPods; podIndex++ {
 					podList.Items = append(podList.Items, api.Pod{
@@ -191,7 +193,7 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 			return false, nil, nil
 		})
 		controller := &DeploymentController{
-			client:        fake,
+			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
 		scaled, err := controller.reconcileOldRCs(allRcs, oldRcs, nil, deployment, false)
@@ -201,18 +203,18 @@ func TestDeploymentController_reconcileOldRCs(t *testing.T) {
 		}
 		if !test.scaleExpected {
 			if scaled {
-				t.Errorf("unexpected scaling: %v", fake.Actions())
+				t.Errorf("unexpected scaling: %v", fakeClientset.Actions())
 			}
 			continue
 		}
 		if test.scaleExpected && !scaled {
-			t.Errorf("expected scaling to occur; actions: %v", fake.Actions())
+			t.Errorf("expected scaling to occur; actions: %v", fakeClientset.Actions())
 			continue
 		}
 		// There are both list and update actions logged, so extract the update
 		// action for verification.
 		var updateAction testclient.UpdateAction
-		for _, action := range fake.Actions() {
+		for _, action := range fakeClientset.Actions() {
 			switch a := action.(type) {
 			case testclient.UpdateAction:
 				if updateAction != nil {
@@ -269,7 +271,7 @@ func TestDeploymentController_cleanupOldRCs(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		fake := &testclient.Fake{}
+		fake := &fake.Clientset{}
 		controller := NewDeploymentController(fake, controller.NoResyncPeriodFunc)
 
 		controller.eventRecorder = &record.FakeRecorder{}
@@ -395,8 +397,7 @@ func newListOptions() api.ListOptions {
 type fixture struct {
 	t *testing.T
 
-	client *testclient.Fake
-
+	client *fake.Clientset
 	// Objects to put in the store.
 	dStore   []*exp.Deployment
 	rcStore  []*api.ReplicationController
@@ -404,22 +405,22 @@ type fixture struct {
 
 	// Actions expected to happen on the client. Objects from here are also
 	// preloaded into NewSimpleFake.
-	actions []testclient.Action
+	actions []core.Action
 	objects *api.List
 }
 
 func (f *fixture) expectUpdateDeploymentAction(d *exp.Deployment) {
-	f.actions = append(f.actions, testclient.NewUpdateAction("deployments", d.Namespace, d))
+	f.actions = append(f.actions, core.NewUpdateAction("deployments", d.Namespace, d))
 	f.objects.Items = append(f.objects.Items, d)
 }
 
 func (f *fixture) expectCreateRCAction(rc *api.ReplicationController) {
-	f.actions = append(f.actions, testclient.NewCreateAction("replicationcontrollers", rc.Namespace, rc))
+	f.actions = append(f.actions, core.NewCreateAction("replicationcontrollers", rc.Namespace, rc))
 	f.objects.Items = append(f.objects.Items, rc)
 }
 
 func (f *fixture) expectUpdateRCAction(rc *api.ReplicationController) {
-	f.actions = append(f.actions, testclient.NewUpdateAction("replicationcontrollers", rc.Namespace, rc))
+	f.actions = append(f.actions, core.NewUpdateAction("replicationcontrollers", rc.Namespace, rc))
 	f.objects.Items = append(f.objects.Items, rc)
 }
 
@@ -435,7 +436,7 @@ func newFixture(t *testing.T) *fixture {
 }
 
 func (f *fixture) run(deploymentName string) {
-	f.client = testclient.NewSimpleFake(f.objects)
+	f.client = fake.NewSimpleClientset(f.objects)
 	c := NewDeploymentController(f.client, controller.NoResyncPeriodFunc)
 	c.eventRecorder = &record.FakeRecorder{}
 	c.rcStoreSynced = alwaysReady

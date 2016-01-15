@@ -19,13 +19,15 @@ limitations under the License.
 package volume
 
 import (
-	"k8s.io/kubernetes/pkg/util/chmod"
-	"k8s.io/kubernetes/pkg/util/chown"
 	"path/filepath"
 	"syscall"
 
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/chmod"
+	"k8s.io/kubernetes/pkg/util/chown"
+
 	"os"
+
+	"github.com/golang/glog"
 )
 
 const (
