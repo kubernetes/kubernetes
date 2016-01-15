@@ -62,7 +62,7 @@ func hasStatus(t *types.Type) bool {
 	return false
 }
 
-// GenerateType makes the body of a file implementing a set for type t.
+// GenerateType makes the body of a file implementing the individual typed client for type t.
 func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	pkg := filepath.Base(t.Name.Package)
