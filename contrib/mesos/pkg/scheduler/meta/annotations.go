@@ -18,21 +18,24 @@ package meta
 
 // kubernetes api object annotations
 const (
+	// Namespace is the label and annotation namespace for mesos keys
+	Namespace = "k8s.mesosphere.io"
+
 	// the BindingHostKey pod annotation marks a pod as being assigned to a Mesos
 	// slave. It is already or will be launched on the slave as a task.
-	BindingHostKey = "k8s.mesosphere.io/bindingHost"
+	BindingHostKey = Namespace + "/bindingHost"
 
-	TaskIdKey                = "k8s.mesosphere.io/taskId"
-	SlaveIdKey               = "k8s.mesosphere.io/slaveId"
-	OfferIdKey               = "k8s.mesosphere.io/offerId"
-	ExecutorIdKey            = "k8s.mesosphere.io/executorId"
-	ExecutorResourcesKey     = "k8s.mesosphere.io/executorResources"
-	PortMappingKey           = "k8s.mesosphere.io/portMapping"
-	PortMappingKeyPrefix     = "k8s.mesosphere.io/port_"
+	TaskIdKey                = Namespace + "/taskId"
+	SlaveIdKey               = Namespace + "/slaveId"
+	OfferIdKey               = Namespace + "/offerId"
+	ExecutorIdKey            = Namespace + "/executorId"
+	ExecutorResourcesKey     = Namespace + "/executorResources"
+	PortMappingKey           = Namespace + "/portMapping"
+	PortMappingKeyPrefix     = Namespace + "/port_"
 	PortMappingKeyFormat     = PortMappingKeyPrefix + "%s_%d"
-	PortNameMappingKeyPrefix = "k8s.mesosphere.io/portName_"
+	PortNameMappingKeyPrefix = Namespace + "/portName_"
 	PortNameMappingKeyFormat = PortNameMappingKeyPrefix + "%s_%s"
-	ContainerPortKeyFormat   = "k8s.mesosphere.io/containerPort_%s_%s_%d"
-	StaticPodFilenameKey     = "k8s.mesosphere.io/staticPodFilename"
-	RolesKey                 = "k8s.mesosphere.io/roles"
+	ContainerPortKeyFormat   = Namespace + "/containerPort_%s_%s_%d"
+	StaticPodFilenameKey     = Namespace + "/staticPodFilename"
+	RolesKey                 = Namespace + "/roles"
 )
