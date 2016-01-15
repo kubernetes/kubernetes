@@ -30,14 +30,14 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 )
 
 func TestCreate(t *testing.T) {
-	handler := util.FakeHandler{
+	handler := utiltesting.FakeHandler{
 		StatusCode:   500,
 		ResponseBody: "",
 		T:            t,
@@ -56,7 +56,7 @@ func TestCreateFromConfig(t *testing.T) {
 	var configData []byte
 	var policy schedulerapi.Policy
 
-	handler := util.FakeHandler{
+	handler := utiltesting.FakeHandler{
 		StatusCode:   500,
 		ResponseBody: "",
 		T:            t,
@@ -99,7 +99,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	var configData []byte
 	var policy schedulerapi.Policy
 
-	handler := util.FakeHandler{
+	handler := utiltesting.FakeHandler{
 		StatusCode:   500,
 		ResponseBody: "",
 		T:            t,
@@ -140,7 +140,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
 		Spec:       apitesting.DeepEqualSafePodSpec(),
 	}
-	handler := util.FakeHandler{
+	handler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), testPod),
 		T:            t,
@@ -228,7 +228,7 @@ func TestBind(t *testing.T) {
 	}
 
 	for _, item := range table {
-		handler := util.FakeHandler{
+		handler := utiltesting.FakeHandler{
 			StatusCode:   200,
 			ResponseBody: "",
 			T:            t,
@@ -314,7 +314,7 @@ func TestBackoff(t *testing.T) {
 // is of name "foo-scheduler". A pod must be picked up by at most one of the two
 // schedulers.
 func TestResponsibleForPod(t *testing.T) {
-	handler := util.FakeHandler{
+	handler := utiltesting.FakeHandler{
 		StatusCode:   500,
 		ResponseBody: "",
 		T:            t,

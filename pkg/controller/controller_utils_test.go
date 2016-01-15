@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.
@@ -184,7 +185,7 @@ func TestControllerExpectations(t *testing.T) {
 func TestCreatePods(t *testing.T) {
 	ns := api.NamespaceDefault
 	body := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "empty_pod"}})
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
 	}

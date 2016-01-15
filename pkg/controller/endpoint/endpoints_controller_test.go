@@ -31,8 +31,8 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func addPods(store cache.Store, namespace string, nPods int, nPorts int, nNotReady int) {
@@ -73,8 +73,8 @@ type serverResponse struct {
 	obj        interface{}
 }
 
-func makeTestServer(t *testing.T, namespace string, endpointsResponse serverResponse) (*httptest.Server, *util.FakeHandler) {
-	fakeEndpointsHandler := util.FakeHandler{
+func makeTestServer(t *testing.T, namespace string, endpointsResponse serverResponse) (*httptest.Server, *utiltesting.FakeHandler) {
+	fakeEndpointsHandler := utiltesting.FakeHandler{
 		StatusCode:   endpointsResponse.statusCode,
 		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), endpointsResponse.obj.(runtime.Object)),
 	}
