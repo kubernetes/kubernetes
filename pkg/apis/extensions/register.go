@@ -66,8 +66,6 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&Ingress{},
 		&IngressList{},
 		&api.ListOptions{},
-		&ConfigMap{},
-		&ConfigMapList{},
 		&ReplicaSet{},
 		&ReplicaSetList{},
 		&api.ExportOptions{},
@@ -92,7 +90,5 @@ func (obj *ThirdPartyResourceData) GetObjectKind() unversioned.ObjectKind      {
 func (obj *ThirdPartyResourceDataList) GetObjectKind() unversioned.ObjectKind  { return &obj.TypeMeta }
 func (obj *Ingress) GetObjectKind() unversioned.ObjectKind                     { return &obj.TypeMeta }
 func (obj *IngressList) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
-func (obj *ConfigMap) GetObjectKind() unversioned.ObjectKind                   { return &obj.TypeMeta }
-func (obj *ConfigMapList) GetObjectKind() unversioned.ObjectKind               { return &obj.TypeMeta }
 func (obj *ReplicaSet) GetObjectKind() unversioned.ObjectKind                  { return &obj.TypeMeta }
 func (obj *ReplicaSetList) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }

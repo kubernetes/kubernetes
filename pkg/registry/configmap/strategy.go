@@ -21,8 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/validation"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -51,11 +50,11 @@ func (strategy) NamespaceScoped() bool {
 }
 
 func (strategy) PrepareForCreate(obj runtime.Object) {
-	_ = obj.(*extensions.ConfigMap)
+	_ = obj.(*api.ConfigMap)
 }
 
 func (strategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
-	cfg := obj.(*extensions.ConfigMap)
+	cfg := obj.(*api.ConfigMap)
 
 	return validation.ValidateConfigMap(cfg)
 }
@@ -69,8 +68,8 @@ func (strategy) AllowCreateOnUpdate() bool {
 }
 
 func (strategy) PrepareForUpdate(newObj, oldObj runtime.Object) {
-	_ = oldObj.(*extensions.ConfigMap)
-	_ = newObj.(*extensions.ConfigMap)
+	_ = oldObj.(*api.ConfigMap)
+	_ = newObj.(*api.ConfigMap)
 }
 
 func (strategy) AllowUnconditionalUpdate() bool {
@@ -78,13 +77,13 @@ func (strategy) AllowUnconditionalUpdate() bool {
 }
 
 func (strategy) ValidateUpdate(ctx api.Context, newObj, oldObj runtime.Object) field.ErrorList {
-	oldCfg, newCfg := oldObj.(*extensions.ConfigMap), newObj.(*extensions.ConfigMap)
+	oldCfg, newCfg := oldObj.(*api.ConfigMap), newObj.(*api.ConfigMap)
 
 	return validation.ValidateConfigMapUpdate(newCfg, oldCfg)
 }
 
 // ConfigMapToSelectableFields returns a field set that represents the object for matching purposes.
-func ConfigMapToSelectableFields(cfg *extensions.ConfigMap) fields.Set {
+func ConfigMapToSelectableFields(cfg *api.ConfigMap) fields.Set {
 	return generic.ObjectMetaFieldsSet(cfg.ObjectMeta, true)
 }
 
@@ -94,7 +93,7 @@ func MatchConfigMap(label labels.Selector, field fields.Selector) generic.Matche
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			cfg, ok := obj.(*extensions.ConfigMap)
+			cfg, ok := obj.(*api.ConfigMap)
 			if !ok {
 				return nil, nil, fmt.Errorf("given object is not of type ConfigMap")
 			}

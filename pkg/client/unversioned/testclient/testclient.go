@@ -282,6 +282,10 @@ func (c *Fake) ComponentStatuses() client.ComponentStatusInterface {
 	return &FakeComponentStatuses{Fake: c}
 }
 
+func (c *Fake) ConfigMaps(namespace string) client.ConfigMapsInterface {
+	return &FakeConfigMaps{Fake: c, Namespace: namespace}
+}
+
 // SwaggerSchema returns an empty swagger.ApiDeclaration for testing
 func (c *Fake) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
 	action := ActionImpl{}
@@ -327,10 +331,6 @@ func (c *FakeExperimental) Jobs(namespace string) client.JobInterface {
 
 func (c *FakeExperimental) Ingress(namespace string) client.IngressInterface {
 	return &FakeIngress{Fake: c, Namespace: namespace}
-}
-
-func (c *FakeExperimental) ConfigMaps(namespace string) client.ConfigMapsInterface {
-	return &FakeConfigMaps{Fake: c, Namespace: namespace}
 }
 
 func (c *FakeExperimental) ThirdPartyResources(namespace string) client.ThirdPartyResourceInterface {
