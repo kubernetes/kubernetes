@@ -145,7 +145,7 @@ func (im *imageManager) imageExists(spec ImageSpec) bool {
 }
 
 // PullImage pulls the image for the specified pod and runtime.
-func (im *imageManager) EnsureImageExists(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) error {
+func (im *imageManager) EnsureImageExists(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string) {
 	logPrefix := fmt.Sprintf("%s/%s", pod.Name, container.Image)
 	ref, err := runtime.GenerateContainerRef(pod, container)
 	if err != nil {
@@ -160,11 +160,11 @@ func (im *imageManager) EnsureImageExists(pod *api.Pod, container *api.Container
 			msg := fmt.Sprintf("Container image %q already present on machine", container.Image)
 			im.logIt(ref, api.EventTypeNormal, "Pulled", logPrefix, msg, glog.Info)
 			im.incrementImageUsage(spec.Image)
-			return nil
+			return nil, msg
 		} else {
 			msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", container.Image)
 			im.logIt(ref, api.EventTypeWarning, events.ErrImageNeverPullPolicy, logPrefix, msg, glog.Warning)
-			return ErrImageNeverPull
+			return ErrImageNeverPull, msg
 		}
 	}
 
@@ -172,7 +172,7 @@ func (im *imageManager) EnsureImageExists(pod *api.Pod, container *api.Container
 	if im.backOff.IsInBackOffSinceUpdate(backOffKey, im.backOff.Clock.Now()) {
 		msg := fmt.Sprintf("Back-off pulling image %q", container.Image)
 		im.logIt(ref, api.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, glog.Info)
-		return ErrImagePullBackOff
+		return ErrImagePullBackOff, msg
 	}
 	prePullChan := make(chan struct{})
 	errChan := make(chan error)
@@ -184,18 +184,19 @@ func (im *imageManager) EnsureImageExists(pod *api.Pod, container *api.Container
 	if err = <-errChan; err != nil {
 		im.logIt(ref, api.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, err), glog.Warning)
 		im.backOff.Next(backOffKey, im.backOff.Clock.Now())
+		msg := ""
 		if err == RegistryUnavailable {
-			msg := fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
-			im.logIt(ref, api.EventTypeNormal, events.FailedToPullImage, logPrefix, msg, glog.Info)
-			return ErrImagePull
+			msg = fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
 		} else {
-			return ErrImagePull
+			msg = fmt.Sprintf("image pull failed for %s: %v", container.Image, err)
 		}
+		im.logIt(ref, api.EventTypeNormal, events.FailedToPullImage, logPrefix, msg, glog.Info)
+		return ErrImagePull, msg
 	}
 	im.logIt(ref, api.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), glog.Info)
 	im.backOff.DeleteEntry(backOffKey)
 	im.incrementImageUsage(container.Image)
 	im.backOff.GC()
 
-	return nil
+	return nil, ""
 }

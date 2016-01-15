@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -869,7 +870,61 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 
 	runSyncPod(t, dm, fakeDocker, pod, nil, false)
 
-	verifyCalls(t, fakeDocker, []string{})
+	verifyCalls(t, fakeDocker, []string{
+		// Check the pod infra contianer.
+		"inspect_container",
+	})
+}
+
+func TestSyncPodWithPullPolicy(t *testing.T) {
+	dm, fakeDocker := newTestDockerManager()
+	puller := dm.dockerPuller.(*FakeDockerPuller)
+	puller.HasImages = []string{"existing_one", "want:latest"}
+	dm.podInfraContainerImage = "pod_infra_image"
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "bar", Image: "pull_always_image", ImagePullPolicy: api.PullAlways},
+				{Name: "bar2", Image: "pull_if_not_present_image", ImagePullPolicy: api.PullIfNotPresent},
+				{Name: "bar3", Image: "existing_one", ImagePullPolicy: api.PullIfNotPresent},
+				{Name: "bar4", Image: "want:latest", ImagePullPolicy: api.PullIfNotPresent},
+				{Name: "bar5", Image: "pull_never_image", ImagePullPolicy: api.PullNever},
+			},
+		},
+	}
+
+	expectedResults := []*kubecontainer.SyncResult{
+		//Sync result for infra container
+		{kubecontainer.StartContainer, PodInfraContainerName, nil, ""},
+		{kubecontainer.SetupNetwork, kubecontainer.GetPodFullName(pod), nil, ""},
+		//Sync result for user containers
+		{kubecontainer.StartContainer, "bar", nil, ""},
+		{kubecontainer.StartContainer, "bar2", nil, ""},
+		{kubecontainer.StartContainer, "bar3", nil, ""},
+		{kubecontainer.StartContainer, "bar4", nil, ""},
+		{kubecontainer.StartContainer, "bar5", images.ErrImageNeverPull,
+			"Container image \"pull_never_image\" is not present with pull policy of Never"},
+	}
+
+	result := runSyncPod(t, dm, fakeDocker, pod, nil, true)
+	verifySyncResults(t, expectedResults, result)
+
+	fakeDocker.Lock()
+	defer fakeDocker.Unlock()
+
+	pulledImageSorted := puller.ImagesPulled[:]
+	sort.Strings(pulledImageSorted)
+	assert.Equal(t, []string{"pod_infra_image", "pull_always_image", "pull_if_not_present_image"}, pulledImageSorted)
+
+	if len(fakeDocker.Created) != 5 {
+		t.Errorf("unexpected containers created %v", fakeDocker.Created)
+	}
 }
 
 func TestSyncPodWithRestartPolicy(t *testing.T) {
@@ -1348,7 +1403,7 @@ func TestSyncPodWithTerminationLog(t *testing.T) {
 	if len(fakeDocker.Created) != 2 ||
 		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
 		!matchString(t, "/k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
-		t.Errorf("unexpected containers created %v", fakeDocker.Created)
+		t.Fatalf("unexpected containers created %v", fakeDocker.Created)
 	}
 	fakeDocker.Unlock()
 	newContainer, err := fakeDocker.InspectContainer(fakeDocker.Created[1])
@@ -1395,7 +1450,7 @@ func TestSyncPodWithHostNetwork(t *testing.T) {
 	if len(fakeDocker.Created) != 2 ||
 		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
 		!matchString(t, "/k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
-		t.Errorf("unexpected containers created %v", fakeDocker.Created)
+		t.Fatalf("unexpected containers created %v", fakeDocker.Created)
 	}
 	fakeDocker.Unlock()
 
@@ -1571,57 +1626,6 @@ func TestGetIPCMode(t *testing.T) {
 	}
 }
 
-func TestSyncPodWithPullPolicy(t *testing.T) {
-	dm, fakeDocker := newTestDockerManager()
-	puller := dm.dockerPuller.(*FakeDockerPuller)
-	puller.HasImages = []string{"existing_one", "want:latest"}
-	dm.podInfraContainerImage = "pod_infra_image"
-
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       "12345678",
-			Name:      "foo",
-			Namespace: "new",
-		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{Name: "bar", Image: "pull_always_image", ImagePullPolicy: api.PullAlways},
-				{Name: "bar2", Image: "pull_if_not_present_image", ImagePullPolicy: api.PullIfNotPresent},
-				{Name: "bar3", Image: "existing_one", ImagePullPolicy: api.PullIfNotPresent},
-				{Name: "bar4", Image: "want:latest", ImagePullPolicy: api.PullIfNotPresent},
-				{Name: "bar5", Image: "pull_never_image", ImagePullPolicy: api.PullNever},
-			},
-		},
-	}
-
-	expectedResults := []*kubecontainer.SyncResult{
-		//Sync result for infra container
-		{kubecontainer.StartContainer, PodInfraContainerName, nil, ""},
-		{kubecontainer.SetupNetwork, kubecontainer.GetPodFullName(pod), nil, ""},
-		//Sync result for user containers
-		{kubecontainer.StartContainer, "bar", nil, ""},
-		{kubecontainer.StartContainer, "bar2", nil, ""},
-		{kubecontainer.StartContainer, "bar3", nil, ""},
-		{kubecontainer.StartContainer, "bar4", nil, ""},
-		{kubecontainer.StartContainer, "bar5", kubecontainer.ErrImageNeverPull,
-			"Container image \"pull_never_image\" is not present with pull policy of Never"},
-	}
-
-	result := runSyncPod(t, dm, fakeDocker, pod, nil, true)
-	verifySyncResults(t, expectedResults, result)
-
-	fakeDocker.Lock()
-	defer fakeDocker.Unlock()
-
-	pulledImageSorted := puller.ImagesPulled[:]
-	sort.Strings(pulledImageSorted)
-	assert.Equal(t, []string{"pod_infra_image", "pull_always_image", "pull_if_not_present_image"}, pulledImageSorted)
-
-	if len(fakeDocker.Created) != 5 {
-		t.Errorf("unexpected containers created %v", fakeDocker.Created)
-	}
-}
-
 // This test only covers SyncPod with PullImageFailure, CreateContainerFailure and StartContainerFailure.
 // There are still quite a few failure cases not covered.
 // TODO(random-liu): Better way to test the SyncPod failures.
@@ -1643,7 +1647,7 @@ func TestSyncPodWithFailure(t *testing.T) {
 			api.Container{Name: "bar", Image: "realImage", ImagePullPolicy: api.PullAlways},
 			map[string]error{},
 			[]error{fmt.Errorf("can't pull image")},
-			[]*kubecontainer.SyncResult{{kubecontainer.StartContainer, "bar", kubecontainer.ErrImagePull, "can't pull image"}},
+			[]*kubecontainer.SyncResult{{kubecontainer.StartContainer, "bar", images.ErrImagePull, "can't pull image"}},
 		},
 		"CreateContainerFailure": {
 			api.Container{Name: "bar", Image: "alreadyPresent"},
@@ -1741,7 +1745,7 @@ func TestSeccompIsDisabledWithDockerV110(t *testing.T) {
 	if len(fakeDocker.Created) != 2 ||
 		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
 		!matchString(t, "/k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
-		t.Errorf("unexpected containers created %v", fakeDocker.Created)
+		t.Fatalf("unexpected containers created %v", fakeDocker.Created)
 	}
 	fakeDocker.Unlock()
 
@@ -1780,7 +1784,7 @@ func TestSecurityOptsAreNilWithDockerV19(t *testing.T) {
 	if len(fakeDocker.Created) != 2 ||
 		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
 		!matchString(t, "/k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
-		t.Errorf("unexpected containers created %v", fakeDocker.Created)
+		t.Fatalf("unexpected containers created %v", fakeDocker.Created)
 	}
 	fakeDocker.Unlock()
 

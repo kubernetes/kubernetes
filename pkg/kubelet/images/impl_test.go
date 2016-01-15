@@ -123,7 +123,7 @@ func TestPuller(t *testing.T) {
 
 		for tick, expected := range c.expectedErr {
 			fakeClock.Step(time.Second)
-			err := manager.EnsureImageExists(pod, container, nil)
+			err, _ := manager.EnsureImageExists(pod, container, nil)
 			assert.Nil(t, fakeRuntime.AssertCalls(c.calledFunctions[tick]), "in test %d tick=%d", i, tick)
 			assert.Equal(t, expected, err, "in test %d tick=%d", i, tick)
 			if c.deleteUnusedImages {
