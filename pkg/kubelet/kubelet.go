@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	apiextensions "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -1365,9 +1366,11 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 	//     b.  If a source is defined for an environment variable, resolve the source
 	// 2.  Create the container's environment in the order variables are declared
 	// 3.  Add remaining service environment vars
-
-	tmpEnv := make(map[string]string)
-	mappingFunc := expansion.MappingFuncFor(tmpEnv, serviceEnv)
+	var (
+		tmpEnv      = make(map[string]string)
+		configMaps  = make(map[string]*apiextensions.ConfigMap)
+		mappingFunc = expansion.MappingFuncFor(tmpEnv, serviceEnv)
+	)
 	for _, envVar := range container.Env {
 		// Accesses apiserver+Pods.
 		// So, the master may set service env vars, or kubelet may.  In case both are doing
@@ -1380,11 +1383,28 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 		if runtimeVal != "" {
 			// Step 1a: expand variable references
 			runtimeVal = expansion.Expand(runtimeVal, mappingFunc)
-		} else if envVar.ValueFrom != nil && envVar.ValueFrom.FieldRef != nil {
+		} else if envVar.ValueFrom != nil {
 			// Step 1b: resolve alternate env var sources
-			runtimeVal, err = kl.podFieldSelectorRuntimeValue(envVar.ValueFrom.FieldRef, pod)
-			if err != nil {
-				return result, err
+			switch {
+			case envVar.ValueFrom.FieldRef != nil:
+				runtimeVal, err = kl.podFieldSelectorRuntimeValue(envVar.ValueFrom.FieldRef, pod)
+				if err != nil {
+					return result, err
+				}
+			case envVar.ValueFrom.ConfigMapKeyRef != nil:
+				name := envVar.ValueFrom.ConfigMapKeyRef.Name
+				key := envVar.ValueFrom.ConfigMapKeyRef.Key
+				configMap, ok := configMaps[name]
+				if !ok {
+					configMap, err = kl.kubeClient.Extensions().ConfigMaps(pod.Namespace).Get(name)
+					if err != nil {
+						return result, err
+					}
+				}
+				runtimeVal, ok = configMap.Data[key]
+				if !ok {
+					return result, fmt.Errorf("Couldn't find key %v in ConfigMap %v/%v", key, pod.Namespace, name)
+				}
 			}
 		}
 

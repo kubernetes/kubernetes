@@ -115,6 +115,15 @@ func (ComponentStatusList) SwaggerDoc() map[string]string {
 	return map_ComponentStatusList
 }
 
+var map_ConfigMapKeySelector = map[string]string{
+	"":    "Selects a key from a ConfigMap.",
+	"key": "The key to select.",
+}
+
+func (ConfigMapKeySelector) SwaggerDoc() map[string]string {
+	return map_ConfigMapKeySelector
+}
+
 var map_Container = map[string]string{
 	"":                       "A single application container that you want to run within a pod.",
 	"name":                   "Name of the container specified as a DNS_LABEL. Each container in a pod must have a unique name (DNS_LABEL). Cannot be updated.",
@@ -335,8 +344,9 @@ func (EnvVar) SwaggerDoc() map[string]string {
 }
 
 var map_EnvVarSource = map[string]string{
-	"":         "EnvVarSource represents a source for the value of an EnvVar.",
-	"fieldRef": "Selects a field of the pod. Only name and namespace are supported.",
+	"":                "EnvVarSource represents a source for the value of an EnvVar.",
+	"fieldRef":        "Selects a field of the pod; only name and namespace are supported.",
+	"configMapKeyRef": "Selects a key of a ConfigMap.",
 }
 
 func (EnvVarSource) SwaggerDoc() map[string]string {

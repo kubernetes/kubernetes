@@ -843,8 +843,10 @@ type EnvVar struct {
 
 // EnvVarSource represents a source for the value of an EnvVar.
 type EnvVarSource struct {
-	// Selects a field of the pod. Only name and namespace are supported.
-	FieldRef *ObjectFieldSelector `json:"fieldRef"`
+	// Selects a field of the pod; only name and namespace are supported.
+	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty"`
+	// Selects a key of a ConfigMap.
+	ConfigMapKeyRef *ConfigMapKeySelector `json:"configMapKeyRef,omitempty"`
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.
@@ -853,6 +855,14 @@ type ObjectFieldSelector struct {
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Path of the field to select in the specified API version.
 	FieldPath string `json:"fieldPath"`
+}
+
+// Selects a key from a ConfigMap.
+type ConfigMapKeySelector struct {
+	// The ConfigMap to select from.
+	LocalObjectReference `json:",inline"`
+	// The key to select.
+	Key string `json:"key"`
 }
 
 // HTTPGetAction describes an action based on HTTP Get requests.
