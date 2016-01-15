@@ -34,8 +34,7 @@ Documentation for other releases can be found at
 Pull Request Process
 ====================
 
-An overview of how we will manage old or out-of-date pull requests.
-
+An overview of how we will manage old or out-of-date pull requests.k
 Process
 -------
 
@@ -50,6 +49,10 @@ We want to limit the total number of PRs in flight to:
 
 Life of a Pull Request
 ----------------------
+
+### Visual overview
+
+![PR workflow](pr_workflow.png)
 
 Unless in the last few weeks of a milestone when we need to reduce churn and stabilize, we aim to be always accepting pull requests.
 
