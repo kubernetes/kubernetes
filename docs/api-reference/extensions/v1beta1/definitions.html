@@ -468,7 +468,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1_selinuxoptions">v1.SELinuxOptions</h3>
 <div class="paragraph">
-<p>SELinuxOptions are the labels to be applied to the container</p>
+<p>Represents the labels to be applied to the container</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -523,7 +523,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1_objectfieldselector">v1.ObjectFieldSelector</h3>
 <div class="paragraph">
-<p>ObjectFieldSelector selects an APIVersioned field of an object.</p>
+<p>Selects an APIVersioned field of an object.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -605,7 +605,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1_volumemount">v1.VolumeMount</h3>
 <div class="paragraph">
-<p>VolumeMount describes a mounting of a Volume within a container.</p>
+<p>Represents how a volume should be mounted into a container.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -783,7 +783,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1_cephfsvolumesource">v1.CephFSVolumeSource</h3>
 <div class="paragraph">
-<p>Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.</p>
+<p>Represents a Ceph Filesystem mount that lasts the lifetime of a pod. Cephfs volumes do not support ownership management or SELinux relabeling.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -996,7 +996,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1_downwardapivolumesource">v1.DownwardAPIVolumeSource</h3>
 <div class="paragraph">
-<p>DownwardAPIVolumeSource represents a volume containing downward API info. Downward API volumes support ownership management and SELinux relabeling.</p>
+<p>Represents a volume containing downward API info. Downward API volumes support ownership management and SELinux relabeling.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1140,7 +1140,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_tcpsocketaction">v1.TCPSocketAction</h3>
 <div class="paragraph">
-<p>TCPSocketAction describes an action based on opening a socket</p>
+<p>Describes an action based on opening a socket</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1419,7 +1419,7 @@ Both these may change in the future. Incoming requests are matched against the h
 <div class="sect2">
 <h3 id="_v1_httpgetaction">v1.HTTPGetAction</h3>
 <div class="paragraph">
-<p>HTTPGetAction describes an action based on HTTP Get requests.</p>
+<p>Describes an action based on HTTP Get requests.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1584,7 +1584,7 @@ Both these may change in the future. Incoming requests are matched against the h
 <div class="sect2">
 <h3 id="_v1_localobjectreference">v1.LocalObjectReference</h3>
 <div class="paragraph">
-<p>LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.</p>
+<p>Contains enough information to let you locate the referenced object inside the same namespace.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1649,7 +1649,7 @@ Both these may change in the future. Incoming requests are matched against the h
 <div class="sect2">
 <h3 id="_v1_loadbalancerstatus">v1.LoadBalancerStatus</h3>
 <div class="paragraph">
-<p>LoadBalancerStatus represents the status of a load-balancer.</p>
+<p>Represents the status of a load-balancer.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1683,7 +1683,7 @@ Both these may change in the future. Incoming requests are matched against the h
 <div class="sect2">
 <h3 id="_v1_container">v1.Container</h3>
 <div class="paragraph">
-<p>A single application container that you want to run within a pod.</p>
+<p>Represents a single container in a pod.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1836,7 +1836,7 @@ Both these may change in the future. Incoming requests are matched against the h
 <div class="sect2">
 <h3 id="_v1_podsecuritycontext">v1.PodSecurityContext</h3>
 <div class="paragraph">
-<p>PodSecurityContext holds pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.</p>
+<p>Represents pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1900,7 +1900,7 @@ Both these may change in the future. Incoming requests are matched against the h
 <div class="sect2">
 <h3 id="_v1_execaction">v1.ExecAction</h3>
 <div class="paragraph">
-<p>ExecAction describes a "run in container" action.</p>
+<p>Describes a "run in container" action.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1989,7 +1989,7 @@ Both these may change in the future. Incoming requests are matched against the h
 <div class="sect2">
 <h3 id="_v1_objectmeta">v1.ObjectMeta</h3>
 <div class="paragraph">
-<p>ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.</p>
+<p>Represents metadata that all persisted resources must have, which includes all objects users must create.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2473,7 +2473,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_securitycontext">v1.SecurityContext</h3>
 <div class="paragraph">
-<p>SecurityContext holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.</p>
+<p>Holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2627,7 +2627,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_persistentvolumeclaimvolumesource">v1.PersistentVolumeClaimVolumeSource</h3>
 <div class="paragraph">
-<p>PersistentVolumeClaimVolumeSource references the user&#8217;s PVC in the same namespace. This volume finds the bound PV and mounts that volume for the pod. A PersistentVolumeClaimVolumeSource is, essentially, a wrapper around another type of volume that is owned by someone else (the system).</p>
+<p>References the user&#8217;s PVC in the same namespace. This volume finds the bound PV and mounts that volume for the pod. A PersistentVolumeClaimVolumeSource is, essentially, a wrapper around another type of volume that is owned by someone else (the system).</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2929,7 +2929,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_envvar">v1.EnvVar</h3>
 <div class="paragraph">
-<p>EnvVar represents an environment variable present in a Container.</p>
+<p>Represents an environment variable in a Container.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3014,7 +3014,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_resourcerequirements">v1.ResourceRequirements</h3>
 <div class="paragraph">
-<p>ResourceRequirements describes the compute resource requirements.</p>
+<p>Describes the compute resource requirements.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3055,7 +3055,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_envvarsource">v1.EnvVarSource</h3>
 <div class="paragraph">
-<p>EnvVarSource represents a source for the value of an EnvVar.</p>
+<p>Represents a source for the value of an EnvVar.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3089,7 +3089,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_flexvolumesource">v1.FlexVolumeSource</h3>
 <div class="paragraph">
-<p>FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.</p>
+<p>Represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3220,7 +3220,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_loadbalanceringress">v1.LoadBalancerIngress</h3>
 <div class="paragraph">
-<p>LoadBalancerIngress represents the status of a load-balancer ingress point: traffic intended for the service should be sent to an ingress point.</p>
+<p>Represents the status of a load-balancer ingress point: traffic intended for the service should be sent to an ingress point.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3261,7 +3261,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_podtemplatespec">v1.PodTemplateSpec</h3>
 <div class="paragraph">
-<p>PodTemplateSpec describes the data a pod should have when created from a template</p>
+<p>Describes the data a pod should have when created from a template</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3302,7 +3302,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_deleteoptions">v1.DeleteOptions</h3>
 <div class="paragraph">
-<p>DeleteOptions may be provided when deleting an API object</p>
+<p>Describes options that may be provided when deleting an object.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3350,7 +3350,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_volume">v1.Volume</h3>
 <div class="paragraph">
-<p>Volume represents a named volume in a pod that may be accessed by any container in the pod.</p>
+<p>Represents a named volume in a pod that may be accessed by any containers in the pod.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3507,7 +3507,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_probe">v1.Probe</h3>
 <div class="paragraph">
-<p>Probe describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.</p>
+<p>Describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3739,7 +3739,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_downwardapivolumefile">v1.DownwardAPIVolumeFile</h3>
 <div class="paragraph">
-<p>DownwardAPIVolumeFile represents information to create the file containing the pod field</p>
+<p>Represents information to create the file containing the pod field</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3780,7 +3780,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_containerport">v1.ContainerPort</h3>
 <div class="paragraph">
-<p>ContainerPort represents a network port in a single container.</p>
+<p>Represents a network port in a single container.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3842,7 +3842,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_podspec">v1.PodSpec</h3>
 <div class="paragraph">
-<p>PodSpec is a description of a pod.</p>
+<p>Represents a description of a pod.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3955,7 +3955,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">securityContext</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SecurityContext holds pod-level security attributes and common container settings. Optional: Defaults to empty.  See type description for default values of each field.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Represents pod-level and common container security attributes. Optional: Defaults to empty.  See type description for default values of each field.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_podsecuritycontext">v1.PodSecurityContext</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4029,7 +4029,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_lifecycle">v1.Lifecycle</h3>
 <div class="paragraph">
-<p>Lifecycle describes actions that the management system should take in response to container lifecycle events. For the PostStart and PreStop lifecycle handlers, management of the container blocks until the action is complete, unless the container process fails, in which case the handler is aborted.</p>
+<p>Describes actions that the management system should take in response to container lifecycle events. For the PostStart and PreStop lifecycle handlers, management of the container blocks until the action is complete, unless the container process fails, in which case the handler is aborted.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4070,7 +4070,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_handler">v1.Handler</h3>
 <div class="paragraph">
-<p>Handler defines a specific action that should be taken</p>
+<p>Defines an action to take.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4477,7 +4477,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-01-06 14:06:54 UTC
+Last updated 2016-01-14 14:14:37 UTC
 </div>
 </div>
 </body>

@@ -475,7 +475,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1_node">v1.Node</h3>
 <div class="paragraph">
-<p>Node is a worker node in Kubernetes, formerly known as minion. Each node will have a unique identifier in the cache (i.e. in etcd).</p>
+<p>Represents a worker node in Kubernetes, formerly known as minion. Each node will have a unique identifier in the cache (i.e. in etcd).</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -537,7 +537,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1_persistentvolumeclaimlist">v1.PersistentVolumeClaimList</h3>
 <div class="paragraph">
-<p>PersistentVolumeClaimList is a list of PersistentVolumeClaim items.</p>
+<p>Represents a list of PersistentVolumeClaim items.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -592,7 +592,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1_objectfieldselector">v1.ObjectFieldSelector</h3>
 <div class="paragraph">
-<p>ObjectFieldSelector selects an APIVersioned field of an object.</p>
+<p>Selects an APIVersioned field of an object.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -633,7 +633,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1_selinuxoptions">v1.SELinuxOptions</h3>
 <div class="paragraph">
-<p>SELinuxOptions are the labels to be applied to the container</p>
+<p>Represents the labels to be applied to the container</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -688,7 +688,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1_containerstaterunning">v1.ContainerStateRunning</h3>
 <div class="paragraph">
-<p>ContainerStateRunning is a running state of a container.</p>
+<p>Represents a running state of a container.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -722,7 +722,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1_volumemount">v1.VolumeMount</h3>
 <div class="paragraph">
-<p>VolumeMount describes a mounting of a Volume within a container.</p>
+<p>Represents how a volume should be mounted into a container.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -770,7 +770,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1_persistentvolumeclaimspec">v1.PersistentVolumeClaimSpec</h3>
 <div class="paragraph">
-<p>PersistentVolumeClaimSpec describes the common attributes of storage devices and allows a Source for provider-specific attributes</p>
+<p>Represents the request attributes a user can make for a claim to match a persistent volume. and allows a Source for provider-specific attributes</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -818,7 +818,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1_cephfsvolumesource">v1.CephFSVolumeSource</h3>
 <div class="paragraph">
-<p>Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.</p>
+<p>Represents a Ceph Filesystem mount that lasts the lifetime of a pod. Cephfs volumes do not support ownership management or SELinux relabeling.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -880,7 +880,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1_downwardapivolumesource">v1.DownwardAPIVolumeSource</h3>
 <div class="paragraph">
-<p>DownwardAPIVolumeSource represents a volume containing downward API info. Downward API volumes support ownership management and SELinux relabeling.</p>
+<p>Represents a volume containing downward API info. Downward API volumes support ownership management and SELinux relabeling.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1024,7 +1024,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_resourcequotaspec">v1.ResourceQuotaSpec</h3>
 <div class="paragraph">
-<p>ResourceQuotaSpec defines the desired hard limits to enforce for Quota.</p>
+<p>Defines the desired hard limits to enforce for Quota.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1058,7 +1058,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_namespacestatus">v1.NamespaceStatus</h3>
 <div class="paragraph">
-<p>NamespaceStatus is information about the current status of a Namespace.</p>
+<p>Represents information about the current status of a Namespace.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1092,7 +1092,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_namespacespec">v1.NamespaceSpec</h3>
 <div class="paragraph">
-<p>NamespaceSpec describes the attributes on a Namespace.</p>
+<p>Describes the attributes on a Namespace.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1126,7 +1126,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_persistentvolume">v1.PersistentVolume</h3>
 <div class="paragraph">
-<p>PersistentVolume (PV) is a storage resource provisioned by an administrator. It is analogous to a node. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md">http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md</a></p>
+<p>Represents a storage resource provisioned by an administrator. It is analogous to a node. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md">http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md</a></p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1188,7 +1188,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_persistentvolumestatus">v1.PersistentVolumeStatus</h3>
 <div class="paragraph">
-<p>PersistentVolumeStatus is the current status of a persistent volume.</p>
+<p>Represents the current status of a persistent volume.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1236,7 +1236,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_endpointslist">v1.EndpointsList</h3>
 <div class="paragraph">
-<p>EndpointsList is a list of endpoints.</p>
+<p>Represents a list of endpoints.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1380,7 +1380,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_podtemplatelist">v1.PodTemplateList</h3>
 <div class="paragraph">
-<p>PodTemplateList is a list of PodTemplates.</p>
+<p>Represents a list of PodTemplates.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1435,7 +1435,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_nodecondition">v1.NodeCondition</h3>
 <div class="paragraph">
-<p>NodeCondition contains condition infromation for a node.</p>
+<p>Represents condition infromation for a node.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1504,7 +1504,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_localobjectreference">v1.LocalObjectReference</h3>
 <div class="paragraph">
-<p>LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.</p>
+<p>Contains enough information to let you locate the referenced object inside the same namespace.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1538,7 +1538,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_resourcequotastatus">v1.ResourceQuotaStatus</h3>
 <div class="paragraph">
-<p>ResourceQuotaStatus defines the enforced hard limits and observed use.</p>
+<p>Defines the enforced hard limits and observed use.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1579,7 +1579,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_execaction">v1.ExecAction</h3>
 <div class="paragraph">
-<p>ExecAction describes a "run in container" action.</p>
+<p>Describes a "run in container" action.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1613,7 +1613,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_objectmeta">v1.ObjectMeta</h3>
 <div class="paragraph">
-<p>ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.</p>
+<p>Represents metadata that all persisted resources must have, which includes all objects users must create.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1738,7 +1738,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_limitrangespec">v1.LimitRangeSpec</h3>
 <div class="paragraph">
-<p>LimitRangeSpec defines a min/max usage limit for resources that match on kind.</p>
+<p>Defines a min/max usage limit for resources that match on kind.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1875,7 +1875,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_nodelist">v1.NodeList</h3>
 <div class="paragraph">
-<p>NodeList is the whole list of all Nodes which have been registered with master.</p>
+<p>Represents the whole list of all Nodes which have been registered with master.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1936,7 +1936,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_persistentvolumeclaim">v1.PersistentVolumeClaim</h3>
 <div class="paragraph">
-<p>PersistentVolumeClaim is a user&#8217;s request for and claim to a persistent volume</p>
+<p>Represents a user&#8217;s request for and claim to a persistent volume.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1998,7 +1998,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_namespacelist">v1.NamespaceList</h3>
 <div class="paragraph">
-<p>NamespaceList is a list of Namespaces.</p>
+<p>Represents a list of Namespaces.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2053,7 +2053,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_serviceaccount">v1.ServiceAccount</h3>
 <div class="paragraph">
-<p>ServiceAccount binds together: * a name, understood by users, and perhaps by peripheral systems, for an identity * a principal that can be authenticated and authorized * a set of secrets</p>
+<p>A service account binds together: * a name, understood by users, and perhaps by peripheral systems, for an identity * a principal that can be authenticated and authorized * a set of secrets</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2115,7 +2115,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_nodeaddress">v1.NodeAddress</h3>
 <div class="paragraph">
-<p>NodeAddress contains information for the node&#8217;s address.</p>
+<p>Represents information for the node&#8217;s address.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2156,7 +2156,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_namespace">v1.Namespace</h3>
 <div class="paragraph">
-<p>Namespace provides a scope for Names. Use of multiple namespaces is optional.</p>
+<p>Provides a scope for Names. Use of multiple namespaces is optional.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2252,7 +2252,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_persistentvolumeclaimvolumesource">v1.PersistentVolumeClaimVolumeSource</h3>
 <div class="paragraph">
-<p>PersistentVolumeClaimVolumeSource references the user&#8217;s PVC in the same namespace. This volume finds the bound PV and mounts that volume for the pod. A PersistentVolumeClaimVolumeSource is, essentially, a wrapper around another type of volume that is owned by someone else (the system).</p>
+<p>References the user&#8217;s PVC in the same namespace. This volume finds the bound PV and mounts that volume for the pod. A PersistentVolumeClaimVolumeSource is, essentially, a wrapper around another type of volume that is owned by someone else (the system).</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2334,7 +2334,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_resourcequotalist">v1.ResourceQuotaList</h3>
 <div class="paragraph">
-<p>ResourceQuotaList is a list of ResourceQuota items.</p>
+<p>Represents a list of ResourceQuota items.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2389,7 +2389,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_persistentvolumeclaimstatus">v1.PersistentVolumeClaimStatus</h3>
 <div class="paragraph">
-<p>PersistentVolumeClaimStatus is the current status of a persistent volume claim.</p>
+<p>Represents the current status of a persistent volume claim.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2437,7 +2437,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_endpointsubset">v1.EndpointSubset</h3>
 <div class="paragraph">
-<p>EndpointSubset is a group of addresses with a common set of ports. The expanded set of endpoints is the Cartesian product of Addresses x Ports. For example, given:<br>
+<p>Represents a group of addresses with a common set of ports. The expanded set of endpoints is the Cartesian product of Addresses x Ports. For example, given:<br>
   {<br>
     Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],<br>
     Ports:     [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]<br>
@@ -2529,7 +2529,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_flexvolumesource">v1.FlexVolumeSource</h3>
 <div class="paragraph">
-<p>FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.</p>
+<p>Represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2591,7 +2591,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_envvarsource">v1.EnvVarSource</h3>
 <div class="paragraph">
-<p>EnvVarSource represents a source for the value of an EnvVar.</p>
+<p>Represents a source for the value of an EnvVar.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2625,7 +2625,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_loadbalanceringress">v1.LoadBalancerIngress</h3>
 <div class="paragraph">
-<p>LoadBalancerIngress represents the status of a load-balancer ingress point: traffic intended for the service should be sent to an ingress point.</p>
+<p>Represents the status of a load-balancer ingress point: traffic intended for the service should be sent to an ingress point.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2666,7 +2666,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_service">v1.Service</h3>
 <div class="paragraph">
-<p>Service is a named abstraction of software service (for example, mysql) consisting of local port (for example 3306) that the proxy listens on, and the selector that determines which pods will answer requests sent through the proxy.</p>
+<p>A named abstraction of software service (for example, mysql) consisting of local port (for example 3306) that the proxy listens on, and the selector that determines which pods will answer requests sent through the proxy.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2728,7 +2728,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_serviceaccountlist">v1.ServiceAccountList</h3>
 <div class="paragraph">
-<p>ServiceAccountList is a list of ServiceAccount objects</p>
+<p>Represents a list of ServiceAccount objects</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2783,7 +2783,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_limitrangelist">v1.LimitRangeList</h3>
 <div class="paragraph">
-<p>LimitRangeList is a list of LimitRange items.</p>
+<p>Represents a list of LimitRange items.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2838,7 +2838,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_endpoints">v1.Endpoints</h3>
 <div class="paragraph">
-<p>Endpoints is a collection of endpoints that implement the actual service. Example:<br>
+<p>Represents a collection of endpoints that implement the actual service. Example:<br>
   Name: "mysvc",<br>
   Subsets: [<br>
     {<br>
@@ -2904,7 +2904,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_deleteoptions">v1.DeleteOptions</h3>
 <div class="paragraph">
-<p>DeleteOptions may be provided when deleting an API object</p>
+<p>Describes options that may be provided when deleting an object.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2952,7 +2952,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_volume">v1.Volume</h3>
 <div class="paragraph">
-<p>Volume represents a named volume in a pod that may be accessed by any container in the pod.</p>
+<p>Represents a named volume in a pod that may be accessed by any containers in the pod.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3109,7 +3109,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_probe">v1.Probe</h3>
 <div class="paragraph">
-<p>Probe describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.</p>
+<p>Describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3192,7 +3192,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_replicationcontroller">v1.ReplicationController</h3>
 <div class="paragraph">
-<p>ReplicationController represents the configuration of a replication controller.</p>
+<p>Represents the configuration of a replication controller.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3258,7 +3258,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_limitrange">v1.LimitRange</h3>
 <div class="paragraph">
-<p>LimitRange sets resource usage limits for each kind of resource in a Namespace.</p>
+<p>Sets resource usage limits for each kind of resource in a Namespace.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3313,7 +3313,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_downwardapivolumefile">v1.DownwardAPIVolumeFile</h3>
 <div class="paragraph">
-<p>DownwardAPIVolumeFile represents information to create the file containing the pod field</p>
+<p>Represents information to create the file containing the pod field</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3354,7 +3354,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_podstatus">v1.PodStatus</h3>
 <div class="paragraph">
-<p>PodStatus represents information about the status of a pod. Status may trail the actual state of a system.</p>
+<p>Represents the status of a pod. Status may trail the actual state of a system.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3437,7 +3437,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_podspec">v1.PodSpec</h3>
 <div class="paragraph">
-<p>PodSpec is a description of a pod.</p>
+<p>Represents a description of a pod.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3550,7 +3550,7 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">securityContext</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SecurityContext holds pod-level security attributes and common container settings. Optional: Defaults to empty.  See type description for default values of each field.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Represents pod-level and common container security attributes. Optional: Defaults to empty.  See type description for default values of each field.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_podsecuritycontext">v1.PodSecurityContext</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3569,7 +3569,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_containerport">v1.ContainerPort</h3>
 <div class="paragraph">
-<p>ContainerPort represents a network port in a single container.</p>
+<p>Represents a network port in a single container.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3631,7 +3631,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_resourcequota">v1.ResourceQuota</h3>
 <div class="paragraph">
-<p>ResourceQuota sets aggregate quota restrictions enforced per namespace</p>
+<p>Sets aggregate quota restrictions enforced per namespace</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3693,7 +3693,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_eventlist">v1.EventList</h3>
 <div class="paragraph">
-<p>EventList is a list of events.</p>
+<p>Represents a list of events.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3748,7 +3748,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_lifecycle">v1.Lifecycle</h3>
 <div class="paragraph">
-<p>Lifecycle describes actions that the management system should take in response to container lifecycle events. For the PostStart and PreStop lifecycle handlers, management of the container blocks until the action is complete, unless the container process fails, in which case the handler is aborted.</p>
+<p>Describes actions that the management system should take in response to container lifecycle events. For the PostStart and PreStop lifecycle handlers, management of the container blocks until the action is complete, unless the container process fails, in which case the handler is aborted.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3789,7 +3789,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_replicationcontrollerspec">v1.ReplicationControllerSpec</h3>
 <div class="paragraph">
-<p>ReplicationControllerSpec is the specification of a replication controller.</p>
+<p>Represents the specification of a replication controller.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3837,7 +3837,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_nodestatus">v1.NodeStatus</h3>
 <div class="paragraph">
-<p>NodeStatus is information about the current status of a node.</p>
+<p>Represents information about the current status of a node.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3968,7 +3968,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_handler">v1.Handler</h3>
 <div class="paragraph">
-<p>Handler defines a specific action that should be taken</p>
+<p>Defines an action to take.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4016,7 +4016,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_eventsource">v1.EventSource</h3>
 <div class="paragraph">
-<p>EventSource contains information for an event.</p>
+<p>Contains information for an event.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4057,7 +4057,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_podcondition">v1.PodCondition</h3>
 <div class="paragraph">
-<p>PodCondition contains details for the current condition of this pod.</p>
+<p>Represents details for the current condition of this pod.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4209,7 +4209,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_podtemplate">v1.PodTemplate</h3>
 <div class="paragraph">
-<p>PodTemplate describes a template for creating copies of a predefined pod.</p>
+<p>Describes a template for creating copies of a predefined pod.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4264,7 +4264,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_servicestatus">v1.ServiceStatus</h3>
 <div class="paragraph">
-<p>ServiceStatus represents the current status of a service.</p>
+<p>Represents the current status of a service.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4401,7 +4401,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_endpointport">v1.EndpointPort</h3>
 <div class="paragraph">
-<p>EndpointPort is a tuple that describes a single port.</p>
+<p>Represents a tuple that describes a single port.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4449,7 +4449,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_tcpsocketaction">v1.TCPSocketAction</h3>
 <div class="paragraph">
-<p>TCPSocketAction describes an action based on opening a socket</p>
+<p>Describes an action based on opening a socket</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4545,7 +4545,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_httpgetaction">v1.HTTPGetAction</h3>
 <div class="paragraph">
-<p>HTTPGetAction describes an action based on HTTP Get requests.</p>
+<p>Describes an action based on HTTP Get requests.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4600,7 +4600,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_loadbalancerstatus">v1.LoadBalancerStatus</h3>
 <div class="paragraph">
-<p>LoadBalancerStatus represents the status of a load-balancer.</p>
+<p>Represents the status of a load-balancer.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4634,7 +4634,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_secretlist">v1.SecretList</h3>
 <div class="paragraph">
-<p>SecretList is a list of Secret.</p>
+<p>Represents a list of Secret.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4689,7 +4689,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_container">v1.Container</h3>
 <div class="paragraph">
-<p>A single application container that you want to run within a pod.</p>
+<p>Represents a single container in a pod.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4842,7 +4842,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_persistentvolumespec">v1.PersistentVolumeSpec</h3>
 <div class="paragraph">
-<p>PersistentVolumeSpec is the specification of a persistent volume.</p>
+<p>Represents the specification of a persistent volume.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4981,7 +4981,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_podsecuritycontext">v1.PodSecurityContext</h3>
 <div class="paragraph">
-<p>PodSecurityContext holds pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.</p>
+<p>Represents pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -5045,7 +5045,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_replicationcontrollerstatus">v1.ReplicationControllerStatus</h3>
 <div class="paragraph">
-<p>ReplicationControllerStatus represents the current status of a replication controller.</p>
+<p>Represents the current status of a replication controller.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -5090,7 +5090,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_serviceport">v1.ServicePort</h3>
 <div class="paragraph">
-<p>ServicePort conatins information on service&#8217;s port.</p>
+<p>Represents information on service&#8217;s port.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -5334,7 +5334,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_containerstateterminated">v1.ContainerStateTerminated</h3>
 <div class="paragraph">
-<p>ContainerStateTerminated is a terminated state of a container.</p>
+<p>Represents a terminated state of a container.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -5410,7 +5410,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_binding">v1.Binding</h3>
 <div class="paragraph">
-<p>Binding ties one object to another. For example, a pod is bound to a node by a scheduler.</p>
+<p>Ties one object to another. For example, a pod is bound to a node by a scheduler.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -5513,7 +5513,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_securitycontext">v1.SecurityContext</h3>
 <div class="paragraph">
-<p>SecurityContext holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.</p>
+<p>Holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -5575,7 +5575,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_containerstate">v1.ContainerState</h3>
 <div class="paragraph">
-<p>ContainerState holds a possible state of container. Only one of its members may be specified. If none of them is specified, the default one is ContainerStateWaiting.</p>
+<p>Represents a possible state of container. Only one of its members may be specified. If none of them is specified, the default one is ContainerStateWaiting.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -5681,7 +5681,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_containerstatus">v1.ContainerStatus</h3>
 <div class="paragraph">
-<p>ContainerStatus contains details for the current status of this container.</p>
+<p>Represents details for the current status of this container.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -5805,7 +5805,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_replicationcontrollerlist">v1.ReplicationControllerList</h3>
 <div class="paragraph">
-<p>ReplicationControllerList is a collection of replication controllers.</p>
+<p>Represents a collection of replication controllers.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -5860,7 +5860,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_nodedaemonendpoints">v1.NodeDaemonEndpoints</h3>
 <div class="paragraph">
-<p>NodeDaemonEndpoints lists ports opened by daemons running on the Node.</p>
+<p>Lists ports opened by daemons running on a Node.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -5894,7 +5894,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_secret">v1.Secret</h3>
 <div class="paragraph">
-<p>Secret holds secret data of a certain type. The total bytes of the values in the Data field must be less than MaxSecretSize bytes.</p>
+<p>Holds secret data of a certain type. The total bytes of the values in the Data field must be less than MaxSecretSize bytes.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -5956,7 +5956,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_event">v1.Event</h3>
 <div class="paragraph">
-<p>Event is a report of an event somewhere in the cluster.</p>
+<p>Represents a report of an event somewhere in the cluster.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6060,7 +6060,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_envvar">v1.EnvVar</h3>
 <div class="paragraph">
-<p>EnvVar represents an environment variable present in a Container.</p>
+<p>Represents an environment variable in a Container.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6108,7 +6108,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_resourcerequirements">v1.ResourceRequirements</h3>
 <div class="paragraph">
-<p>ResourceRequirements describes the compute resource requirements.</p>
+<p>Describes the compute resource requirements.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6153,7 +6153,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_componentstatus">v1.ComponentStatus</h3>
 <div class="paragraph">
-<p>ComponentStatus (and ComponentStatusList) holds the cluster validation info.</p>
+<p>Holds the cluster validation info.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6208,7 +6208,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_limitrangeitem">v1.LimitRangeItem</h3>
 <div class="paragraph">
-<p>LimitRangeItem defines a min/max usage limit for any resource that matches on kind.</p>
+<p>Defines a min/max usage limit for any resource that matches on kind.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6277,7 +6277,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_podtemplatespec">v1.PodTemplateSpec</h3>
 <div class="paragraph">
-<p>PodTemplateSpec describes the data a pod should have when created from a template</p>
+<p>Describes the data a pod should have when created from a template</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6318,7 +6318,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_podlist">v1.PodList</h3>
 <div class="paragraph">
-<p>PodList is a list of Pods.</p>
+<p>Represents a list of Pods.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6373,7 +6373,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_servicelist">v1.ServiceList</h3>
 <div class="paragraph">
-<p>ServiceList holds a list of services.</p>
+<p>Represents a list of services.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6428,7 +6428,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_persistentvolumelist">v1.PersistentVolumeList</h3>
 <div class="paragraph">
-<p>PersistentVolumeList is a list of PersistentVolume items.</p>
+<p>Represents a list of PersistentVolume items.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6483,7 +6483,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_objectreference">v1.ObjectReference</h3>
 <div class="paragraph">
-<p>ObjectReference contains enough information to let you inspect or modify the referred object.</p>
+<p>A reference to an object or piece of an object.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6642,7 +6642,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_containerstatewaiting">v1.ContainerStateWaiting</h3>
 <div class="paragraph">
-<p>ContainerStateWaiting is a waiting state of a container.</p>
+<p>Represents the state of a container.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6683,7 +6683,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_nodesysteminfo">v1.NodeSystemInfo</h3>
 <div class="paragraph">
-<p>NodeSystemInfo is a set of ids/uuids to uniquely identify the node.</p>
+<p>Represents a set of ids/uuids to uniquely identify a node.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6766,7 +6766,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_servicespec">v1.ServiceSpec</h3>
 <div class="paragraph">
-<p>ServiceSpec describes the attributes that a user creates on a service.</p>
+<p>Describes the attributes that a user creates on a service.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6849,7 +6849,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_pod">v1.Pod</h3>
 <div class="paragraph">
-<p>Pod is a collection of containers that can run on a host. This resource is created by clients and scheduled onto hosts.</p>
+<p>Represents a collection of containers that can run on a host. This resource is created by clients and scheduled onto hosts.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6911,7 +6911,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_nodespec">v1.NodeSpec</h3>
 <div class="paragraph">
-<p>NodeSpec describes the attributes that a node is created with.</p>
+<p>Describes the attributes that a node is created with.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6966,7 +6966,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_endpointaddress">v1.EndpointAddress</h3>
 <div class="paragraph">
-<p>EndpointAddress is a tuple that describes single IP address.</p>
+<p>Represents a tuple that describes a single IP address.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -7007,7 +7007,7 @@ The resulting set of endpoints can be viewed as:<br>
 <div class="sect2">
 <h3 id="_v1_daemonendpoint">v1.DaemonEndpoint</h3>
 <div class="paragraph">
-<p>DaemonEndpoint contains information about a single Daemon endpoint.</p>
+<p>Represents information about a single Daemon endpoint.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -7049,7 +7049,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-01-08 09:05:37 UTC
+Last updated 2016-01-14 14:14:25 UTC
 </div>
 </div>
 </body>

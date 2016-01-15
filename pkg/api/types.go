@@ -55,7 +55,7 @@ import (
 //      Hypens ('-') cannot be leading or trailing character of the string
 //      and cannot be adjacent to other hyphens.
 
-// ObjectMeta is metadata that all persisted resources must have, which includes all objects
+// Represents metadata that all persisted resources must have, which includes all objects
 // users must create.
 type ObjectMeta struct {
 	// Name is unique within a namespace.  Name is required when creating resources, although
@@ -153,7 +153,7 @@ const (
 	TerminationMessagePathDefault string = "/dev/termination-log"
 )
 
-// Volume represents a named volume in a pod that may be accessed by any containers in the pod.
+// Represents a named volume in a pod that may be accessed by any containers in the pod.
 type Volume struct {
 	// Required: This must be a DNS_LABEL.  Each volume in a pod must have
 	// a unique name.
@@ -164,7 +164,7 @@ type Volume struct {
 	VolumeSource `json:",inline,omitempty"`
 }
 
-// VolumeSource represents the source location of a volume to mount.
+// Represents the source of a volume to mount.
 // Only one of its members may be specified.
 type VolumeSource struct {
 	// HostPath represents file or directory on the host machine that is
@@ -217,7 +217,7 @@ type VolumeSource struct {
 	FC *FCVolumeSource `json:"fc,omitempty"`
 }
 
-// Similar to VolumeSource but meant for the administrator who creates PVs.
+// Represents the source of a persistent volume.
 // Exactly one of its members must be set.
 type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
@@ -253,6 +253,7 @@ type PersistentVolumeSource struct {
 	Flocker *FlockerVolumeSource `json:"flocker,omitempty"`
 }
 
+// References the user's PVC in the same namespace.
 type PersistentVolumeClaimVolumeSource struct {
 	// ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume
 	ClaimName string `json:"claimName"`
@@ -263,6 +264,7 @@ type PersistentVolumeClaimVolumeSource struct {
 
 // +genclient=true,nonNamespaced=true
 
+// Reperesents a storage resource provisioned by an administrator.
 type PersistentVolume struct {
 	unversioned.TypeMeta `json:",inline"`
 	ObjectMeta           `json:"metadata,omitempty"`
@@ -289,7 +291,7 @@ type PersistentVolumeSpec struct {
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty"`
 }
 
-// PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes
+// Describes a policy for end-of-life maintenance of persistent volumes.
 type PersistentVolumeReclaimPolicy string
 
 const (
@@ -304,6 +306,7 @@ const (
 	PersistentVolumeReclaimRetain PersistentVolumeReclaimPolicy = "Retain"
 )
 
+// Represents the current status of a persistent volume.
 type PersistentVolumeStatus struct {
 	// Phase indicates if a volume is available, bound to a claim, or released by a claim
 	Phase PersistentVolumePhase `json:"phase,omitempty"`
@@ -313,6 +316,7 @@ type PersistentVolumeStatus struct {
 	Reason string `json:"reason,omitempty"`
 }
 
+// Represents a list of PersistentVolume items.
 type PersistentVolumeList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
@@ -321,7 +325,7 @@ type PersistentVolumeList struct {
 
 // +genclient=true
 
-// PersistentVolumeClaim is a user's request for and claim to a persistent volume
+// Represents a user's request for and claim to a persistent volume.
 type PersistentVolumeClaim struct {
 	unversioned.TypeMeta `json:",inline"`
 	ObjectMeta           `json:"metadata,omitempty"`
@@ -333,13 +337,14 @@ type PersistentVolumeClaim struct {
 	Status PersistentVolumeClaimStatus `json:"status,omitempty"`
 }
 
+// Represents a list of PersistentVolumeClaim items.
 type PersistentVolumeClaimList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
 	Items                []PersistentVolumeClaim `json:"items"`
 }
 
-// PersistentVolumeClaimSpec describes the common attributes of storage devices
+// Represents the request attributes a user can make for a claim to match a persistent volume.
 // and allows a Source for provider-specific attributes
 type PersistentVolumeClaimSpec struct {
 	// Contains the types of access modes required
@@ -350,6 +355,7 @@ type PersistentVolumeClaimSpec struct {
 	VolumeName string `json:"volumeName,omitempty"`
 }
 
+// Represents the current status of a persistent volume claim.
 type PersistentVolumeClaimStatus struct {
 	// Phase represents the current phase of PersistentVolumeClaim
 	Phase PersistentVolumeClaimPhase `json:"phase,omitempty"`
@@ -415,7 +421,7 @@ type EmptyDirVolumeSource struct {
 	Medium StorageMedium `json:"medium,omitempty"`
 }
 
-// StorageMedium defines ways that storage can be allocated to a volume.
+// Represents ways that storage can be allocated to a volume.
 type StorageMedium string
 
 const (
@@ -423,7 +429,7 @@ const (
 	StorageMediumMemory  StorageMedium = "Memory" // use memory (tmpfs)
 )
 
-// Protocol defines network protocols supported for things like conatiner ports.
+// Defines network protocols supported for things like conatiner ports.
 type Protocol string
 
 const (
@@ -497,7 +503,7 @@ type FCVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// FlexVolume represents a generic volume resource that is
+// Represents a generic volume resource that is.
 // provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.
 type FlexVolumeSource struct {
 	// Driver is the name of the driver to use for this volume.
@@ -633,7 +639,7 @@ type CinderVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// Represents a Ceph Filesystem mount that lasts the lifetime of a pod
+// Represents a Ceph Filesystem mount that lasts the lifetime of a pod.
 // Cephfs volumes do not support ownership management or SELinux relabeling.
 type CephFSVolumeSource struct {
 	// Required: Monitors is a collection of Ceph monitors
@@ -671,7 +677,7 @@ type DownwardAPIVolumeFile struct {
 	FieldRef ObjectFieldSelector `json:"fieldRef"`
 }
 
-// ContainerPort represents a network port in a single container
+// Represents a network port in a single container
 type ContainerPort struct {
 	// Optional: If specified, this must be an IANA_SVC_NAME  Each named port
 	// in a pod must have a unique name.
@@ -687,7 +693,7 @@ type ContainerPort struct {
 	HostIP string `json:"hostIP,omitempty"`
 }
 
-// VolumeMount describes a mounting of a Volume within a container.
+// Represents how a volume should be mounted into a container.
 type VolumeMount struct {
 	// Required: This must match the Name of a Volume [above].
 	Name string `json:"name"`
@@ -697,7 +703,7 @@ type VolumeMount struct {
 	MountPath string `json:"mountPath"`
 }
 
-// EnvVar represents an environment variable present in a Container.
+// Represents an environment variable in a Container.
 type EnvVar struct {
 	// Required: This must be a C_IDENTIFIER.
 	Name string `json:"name"`
@@ -714,13 +720,13 @@ type EnvVar struct {
 	ValueFrom *EnvVarSource `json:"valueFrom,omitempty"`
 }
 
-// EnvVarSource represents a source for the value of an EnvVar.
+// Represents a source for the value of an EnvVar.
 type EnvVarSource struct {
 	// Required: Selects a field of the pod; only name and namespace are supported.
 	FieldRef *ObjectFieldSelector `json:"fieldRef"`
 }
 
-// ObjectFieldSelector selects an APIVersioned field of an object.
+// Selects an APIVersioned field of an object.
 type ObjectFieldSelector struct {
 	// Required: Version of the schema the FieldPath is written in terms of.
 	// If no value is specified, it will be defaulted to the APIVersion of the
@@ -730,7 +736,7 @@ type ObjectFieldSelector struct {
 	FieldPath string `json:"fieldPath"`
 }
 
-// HTTPGetAction describes an action based on HTTP Get requests.
+// Describes an action based on HTTP Get requests.
 type HTTPGetAction struct {
 	// Optional: Path to access on the HTTP server.
 	Path string `json:"path,omitempty"`
@@ -742,7 +748,7 @@ type HTTPGetAction struct {
 	Scheme URIScheme `json:"scheme,omitempty"`
 }
 
-// URIScheme identifies the scheme used for connection to a host for Get actions
+// Identifies the scheme used for connection to a host for Get actions
 type URIScheme string
 
 const (
@@ -752,13 +758,13 @@ const (
 	URISchemeHTTPS URIScheme = "HTTPS"
 )
 
-// TCPSocketAction describes an action based on opening a socket
+// Describes an action based on opening a socket
 type TCPSocketAction struct {
 	// Required: Port to connect to.
 	Port intstr.IntOrString `json:"port,omitempty"`
 }
 
-// ExecAction describes a "run in container" action.
+// Describes a "run in container" action.
 type ExecAction struct {
 	// Command is the command line to execute inside the container, the working directory for the
 	// command  is root ('/') in the container's filesystem.  The command is simply exec'd, it is
@@ -767,7 +773,7 @@ type ExecAction struct {
 	Command []string `json:"command,omitempty"`
 }
 
-// Probe describes a health check to be performed against a container to determine whether it is
+// Describes a health check to be performed against a container to determine whether it is
 // alive or ready to receive traffic.
 type Probe struct {
 	// The action taken to determine the health of a container
@@ -785,7 +791,7 @@ type Probe struct {
 	FailureThreshold int `json:"failureThreshold,omitempty"`
 }
 
-// PullPolicy describes a policy for if/when to pull a container image
+// Describes a policy for if/when to pull a container image.
 type PullPolicy string
 
 const (
@@ -797,10 +803,10 @@ const (
 	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
-// Capability represent POSIX capabilities type
+// Represents a POSIX capability type.
 type Capability string
 
-// Capabilities represent POSIX capabilities that can be added or removed to a running container.
+// Represents POSIX capabilities that can be added or removed to a running container.
 type Capabilities struct {
 	// Added capabilities
 	Add []Capability `json:"add,omitempty"`
@@ -808,7 +814,7 @@ type Capabilities struct {
 	Drop []Capability `json:"drop,omitempty"`
 }
 
-// ResourceRequirements describes the compute resource requirements.
+// Describes the compute resource requirements.
 type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources allowed.
 	Limits ResourceList `json:"limits,omitempty"`
@@ -818,7 +824,7 @@ type ResourceRequirements struct {
 	Requests ResourceList `json:"requests,omitempty"`
 }
 
-// Container represents a single container that is expected to be run on the host.
+// Represents a single container in a pod.
 type Container struct {
 	// Required: This must be a DNS_LABEL.  Each container in a pod must
 	// have a unique name.
@@ -862,7 +868,7 @@ type Container struct {
 	TTY       bool `json:"tty,omitempty"`
 }
 
-// Handler defines a specific action that should be taken
+// Defines an action to take.
 // TODO: pass structured data to these actions, and document that data here.
 type Handler struct {
 	// One and only one of the following should be specified.
@@ -875,7 +881,7 @@ type Handler struct {
 	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty"`
 }
 
-// Lifecycle describes actions that the management system should take in response to container lifecycle
+// Describes actions that the management system should take in response to container lifecycle
 // events.  For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
 type Lifecycle struct {
@@ -922,7 +928,7 @@ type ContainerStateTerminated struct {
 	ContainerID string           `json:"containerID,omitempty"`
 }
 
-// ContainerState holds a possible state of container.
+// Represents the state of a container.
 // Only one of its members may be specified.
 // If none of them is specified, the default one is ContainerStateWaiting.
 type ContainerState struct {
@@ -946,7 +952,7 @@ type ContainerStatus struct {
 	ContainerID  string `json:"containerID,omitempty"`
 }
 
-// PodPhase is a label for the condition of a pod at the current time.
+// Represents a label for the condition of a pod at the current time.
 type PodPhase string
 
 // These are the valid statuses of pods.
@@ -987,7 +993,7 @@ type PodCondition struct {
 	Message            string           `json:"message,omitempty"`
 }
 
-// RestartPolicy describes how the container should be restarted.
+// Describes how the container should be restarted.
 // Only one of the following restart policies may be specified.
 // If none of the following policies is specified, the default one
 // is RestartPolicyAlways.
@@ -999,7 +1005,7 @@ const (
 	RestartPolicyNever     RestartPolicy = "Never"
 )
 
-// PodList is a list of Pods.
+// Represents a list of Pods.
 type PodList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
@@ -1007,7 +1013,7 @@ type PodList struct {
 	Items []Pod `json:"items"`
 }
 
-// DNSPolicy defines how a pod's DNS will be configured.
+// Defines how a pod's DNS will be configured.
 type DNSPolicy string
 
 const (
@@ -1021,7 +1027,7 @@ const (
 	DNSDefault DNSPolicy = "Default"
 )
 
-// PodSpec is a description of a pod
+// Represents a description of a pod.
 type PodSpec struct {
 	Volumes []Volume `json:"volumes"`
 	// Required: there must be at least one container in a pod.
@@ -1059,7 +1065,7 @@ type PodSpec struct {
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
-// PodSecurityContext holds pod-level security attributes and common container settings.
+// Represents pod-level and common container security attributes.
 // Some fields are also present in container.securityContext.  Field values of
 // container.securityContext take precedence over field values of PodSecurityContext.
 type PodSecurityContext struct {
@@ -1108,7 +1114,7 @@ type PodSecurityContext struct {
 	FSGroup *int64 `json:"fsGroup,omitempty"`
 }
 
-// PodStatus represents information about the status of a pod. Status may trail the actual
+// Represents the status of a pod.
 // state of a system.
 type PodStatus struct {
 	Phase      PodPhase       `json:"phase,omitempty"`
@@ -1133,7 +1139,7 @@ type PodStatus struct {
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty"`
 }
 
-// PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
+// Represents a wrapper for PodStatus returned by kubelet that can be encode/decoded.
 type PodStatusResult struct {
 	unversioned.TypeMeta `json:",inline"`
 	ObjectMeta           `json:"metadata,omitempty"`
@@ -1144,7 +1150,7 @@ type PodStatusResult struct {
 
 // +genclient=true
 
-// Pod is a collection of containers, used as either input (create, update) or as output (list, get).
+// Represents a collection of containers, used as either input (create, update) or as output (list, get).
 type Pod struct {
 	unversioned.TypeMeta `json:",inline"`
 	ObjectMeta           `json:"metadata,omitempty"`
@@ -1157,7 +1163,7 @@ type Pod struct {
 	Status PodStatus `json:"status,omitempty"`
 }
 
-// PodTemplateSpec describes the data a pod should have when created from a template
+// Describes the data a pod should have when created from a template.
 type PodTemplateSpec struct {
 	// Metadata of the pods created from this template.
 	ObjectMeta `json:"metadata,omitempty"`
@@ -1168,7 +1174,7 @@ type PodTemplateSpec struct {
 
 // +genclient=true
 
-// PodTemplate describes a template for creating copies of a predefined pod.
+// Describes a template for creating copies of a predefined pod.
 type PodTemplate struct {
 	unversioned.TypeMeta `json:",inline"`
 	ObjectMeta           `json:"metadata,omitempty"`
@@ -1177,7 +1183,7 @@ type PodTemplate struct {
 	Template PodTemplateSpec `json:"template,omitempty"`
 }
 
-// PodTemplateList is a list of PodTemplates.
+// Represents a list of PodTemplates.
 type PodTemplateList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
@@ -1185,7 +1191,7 @@ type PodTemplateList struct {
 	Items []PodTemplate `json:"items"`
 }
 
-// ReplicationControllerSpec is the specification of a replication controller.
+// Represents the specification of a replication controller.
 // As the internal representation of a replication controller, it may have either
 // a TemplateRef or a Template set.
 type ReplicationControllerSpec struct {
@@ -1206,7 +1212,7 @@ type ReplicationControllerSpec struct {
 	Template *PodTemplateSpec `json:"template,omitempty"`
 }
 
-// ReplicationControllerStatus represents the current status of a replication
+// Represents the current status of a replication.
 // controller.
 type ReplicationControllerStatus struct {
 	// Replicas is the number of actual replicas.
@@ -1218,7 +1224,7 @@ type ReplicationControllerStatus struct {
 
 // +genclient=true
 
-// ReplicationController represents the configuration of a replication controller.
+// Represents the configuration of a replication controller.
 type ReplicationController struct {
 	unversioned.TypeMeta `json:",inline"`
 	ObjectMeta           `json:"metadata,omitempty"`
@@ -1231,7 +1237,7 @@ type ReplicationController struct {
 	Status ReplicationControllerStatus `json:"status,omitempty"`
 }
 
-// ReplicationControllerList is a collection of replication controllers.
+// Represents a collection of replication controllers.
 type ReplicationControllerList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
@@ -1240,12 +1246,12 @@ type ReplicationControllerList struct {
 }
 
 const (
-	// ClusterIPNone - do not assign a cluster IP
+	// ClusterIPNone - do not assign a cluster IP.
 	// no proxying required and no environment variables should be created for pods
 	ClusterIPNone = "None"
 )
 
-// ServiceList holds a list of services.
+// Holds a list of services.
 type ServiceList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
@@ -1253,7 +1259,7 @@ type ServiceList struct {
 	Items []Service `json:"items"`
 }
 
-// Session Affinity Type string
+// Session Affinity Type string.
 type ServiceAffinity string
 
 const (
@@ -1264,7 +1270,7 @@ const (
 	ServiceAffinityNone ServiceAffinity = "None"
 )
 
-// Service Type string describes ingress methods for a service
+// Service Type string describes ingress methods for a service.
 type ServiceType string
 
 const (
@@ -1282,21 +1288,21 @@ const (
 	ServiceTypeLoadBalancer ServiceType = "LoadBalancer"
 )
 
-// ServiceStatus represents the current status of a service
+// Represents the current status of a service.
 type ServiceStatus struct {
 	// LoadBalancer contains the current status of the load-balancer,
 	// if one is present.
 	LoadBalancer LoadBalancerStatus `json:"loadBalancer,omitempty"`
 }
 
-// LoadBalancerStatus represents the status of a load-balancer
+// Represents the status of a load-balancer
 type LoadBalancerStatus struct {
 	// Ingress is a list containing ingress points for the load-balancer;
 	// traffic intended for the service should be sent to these ingress points.
 	Ingress []LoadBalancerIngress `json:"ingress,omitempty"`
 }
 
-// LoadBalancerIngress represents the status of a load-balancer ingress point:
+// Represents the status of a load-balancer ingress point:
 // traffic intended for the service should be sent to an ingress point.
 type LoadBalancerIngress struct {
 	// IP is set for load-balancer ingress points that are IP based
@@ -1308,7 +1314,7 @@ type LoadBalancerIngress struct {
 	Hostname string `json:"hostname,omitempty"`
 }
 
-// ServiceSpec describes the attributes that a user creates on a service
+// Describes the attributes that a user creates on a service
 type ServiceSpec struct {
 	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer
 	Type ServiceType `json:"type,omitempty"`
@@ -1369,7 +1375,7 @@ type ServicePort struct {
 
 // +genclient=true
 
-// Service is a named abstraction of software service (for example, mysql) consisting of local port
+// A named abstraction of software service (for example, mysql) consisting of local port
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
 type Service struct {
@@ -1385,7 +1391,7 @@ type Service struct {
 
 // +genclient=true
 
-// ServiceAccount binds together:
+// A service account binds together:
 // * a name, understood by users, and perhaps by peripheral systems, for an identity
 // * a principal that can be authenticated and authorized
 // * a set of secrets
@@ -1412,7 +1418,7 @@ type ServiceAccountList struct {
 
 // +genclient=true
 
-// Endpoints is a collection of endpoints that implement the actual service.  Example:
+// Represents a collection of endpoints that implement the actual service.  Example:
 //   Name: "mysvc",
 //   Subsets: [
 //     {
@@ -1432,6 +1438,7 @@ type Endpoints struct {
 	Subsets []EndpointSubset
 }
 
+// Represents a collection of endpoints that implement the actual service.  Example:
 // EndpointSubset is a group of addresses with a common set of ports.  The
 // expanded set of endpoints is the Cartesian product of Addresses x Ports.
 // For example, given:
@@ -1448,7 +1455,7 @@ type EndpointSubset struct {
 	Ports             []EndpointPort
 }
 
-// EndpointAddress is a tuple that describes single IP address.
+// Represents a tuple that describes a single IP address.
 type EndpointAddress struct {
 	// The IP of this endpoint.
 	// TODO: This should allow hostname or IP, see #4447.
@@ -1458,7 +1465,7 @@ type EndpointAddress struct {
 	TargetRef *ObjectReference
 }
 
-// EndpointPort is a tuple that describes a single port.
+// Represents a tuple that describes a single port.
 type EndpointPort struct {
 	// The name of this port (corresponds to ServicePort.Name).  Optional
 	// if only one port is defined.  Must be a DNS_LABEL.
@@ -1471,7 +1478,7 @@ type EndpointPort struct {
 	Protocol Protocol
 }
 
-// EndpointsList is a list of endpoints.
+// Represents a list of endpoints.
 type EndpointsList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
@@ -1479,7 +1486,7 @@ type EndpointsList struct {
 	Items []Endpoints `json:"items"`
 }
 
-// NodeSpec describes the attributes that a node is created with.
+// Describes the attributes that a node is created with.
 type NodeSpec struct {
 	// PodCIDR represents the pod IP range assigned to the node
 	// Note: assigning IP ranges to nodes might need to be revisited when we support migratable IPs.
@@ -1496,19 +1503,19 @@ type NodeSpec struct {
 	Unschedulable bool `json:"unschedulable,omitempty"`
 }
 
-// DaemonEndpoint contains information about a single Daemon endpoint.
+// Represents information about a single Daemon endpoint.
 type DaemonEndpoint struct {
 	// Port number of the given endpoint.
 	Port int `json:port`
 }
 
-// NodeDaemonEndpoints lists ports opened by daemons running on the Node.
+// Lists ports opened by daemons running on a Node.
 type NodeDaemonEndpoints struct {
 	// Endpoint on which Kubelet is listening.
 	KubeletEndpoint DaemonEndpoint `json:"kubeletEndpoint,omitempty"`
 }
 
-// NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
+// Represents a set of ids/uuids to uniquely identify a node.
 type NodeSystemInfo struct {
 	// Machine ID reported by the node.
 	MachineID string `json:"machineID"`
@@ -1528,7 +1535,7 @@ type NodeSystemInfo struct {
 	KubeProxyVersion string `json:"kubeProxyVersion"`
 }
 
-// NodeStatus is information about the current status of a node.
+// Represents information about the current status of a node.
 type NodeStatus struct {
 	// Capacity represents the total resources of a node.
 	Capacity ResourceList `json:"capacity,omitempty"`
@@ -1548,7 +1555,7 @@ type NodeStatus struct {
 	Images []ContainerImage `json:"images",omitempty`
 }
 
-// Describe a container image
+// Describe a container image.
 type ContainerImage struct {
 	// Names by which this image is known.
 	RepoTags []string `json:"repoTags"`
@@ -1592,7 +1599,7 @@ type NodeCondition struct {
 
 type NodeAddressType string
 
-// These are valid address types of node. NodeLegacyHostIP is used to transit
+// These are valid address types of node. NodeLegacyHostIP is used to transit.
 // from out-dated HostIP field to NodeAddress.
 const (
 	NodeLegacyHostIP NodeAddressType = "LegacyHostIP"
@@ -1606,7 +1613,7 @@ type NodeAddress struct {
 	Address string          `json:"address"`
 }
 
-// NodeResources is an object for conveying resource information about a node.
+// Represents an object for conveying resource information about a node.
 // see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
 type NodeResources struct {
 	// Capacity represents the available resources of a node
@@ -1626,12 +1633,12 @@ const (
 	// Number of Pods that may be running on this Node: see ResourcePods
 )
 
-// ResourceList is a set of (resource name, quantity) pairs.
+// Represents a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
 // +genclient=true,nonNamespaced=true
 
-// Node is a worker node in Kubernetes
+// Represents a worker node in Kubernetes.
 // The name of the node according to etcd is in ObjectMeta.Name.
 type Node struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -1644,7 +1651,7 @@ type Node struct {
 	Status NodeStatus `json:"status,omitempty"`
 }
 
-// NodeList is a list of nodes.
+// Represents a list of nodes.
 type NodeList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
@@ -1652,7 +1659,7 @@ type NodeList struct {
 	Items []Node `json:"items"`
 }
 
-// NamespaceSpec describes the attributes on a Namespace
+// Describes the attributes on a Namespace.
 type NamespaceSpec struct {
 	// Finalizers is an opaque list of values that must be empty to permanently remove object from storage
 	Finalizers []FinalizerName
@@ -1660,12 +1667,12 @@ type NamespaceSpec struct {
 
 type FinalizerName string
 
-// These are internal finalizer values to Kubernetes, must be qualified name unless defined here
+// These are internal finalizer values to Kubernetes, must be qualified name unless defined here.
 const (
 	FinalizerKubernetes FinalizerName = "kubernetes"
 )
 
-// NamespaceStatus is information about the current status of a Namespace.
+// Represents information about the current status of a Namespace.
 type NamespaceStatus struct {
 	// Phase is the current lifecycle phase of the namespace.
 	Phase NamespacePhase `json:"phase,omitempty"`
@@ -1696,7 +1703,7 @@ type Namespace struct {
 	Status NamespaceStatus `json:"status,omitempty"`
 }
 
-// NamespaceList is a list of Namespaces.
+// Represents a list of namespaces.
 type NamespaceList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
@@ -1704,7 +1711,7 @@ type NamespaceList struct {
 	Items []Namespace `json:"items"`
 }
 
-// Binding ties one object to another - for example, a pod is bound to a node by a scheduler.
+// Ties one object to another - for example, a pod is bound to a node by a scheduler.
 type Binding struct {
 	unversioned.TypeMeta `json:",inline"`
 	// ObjectMeta describes the object that is being bound.
@@ -1714,7 +1721,7 @@ type Binding struct {
 	Target ObjectReference `json:"target"`
 }
 
-// DeleteOptions may be provided when deleting an API object
+// Describes options that may be provided when deleting an object.
 type DeleteOptions struct {
 	unversioned.TypeMeta `json:",inline"`
 
@@ -1724,7 +1731,7 @@ type DeleteOptions struct {
 	GracePeriodSeconds *int64 `json:"gracePeriodSeconds"`
 }
 
-// ExportOptions is the query options to the standard REST get call.
+// Represents the query options to the standard REST get call.
 type ExportOptions struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Should this value be exported.  Export strips fields that a user can not specify.
@@ -1733,7 +1740,7 @@ type ExportOptions struct {
 	Exact bool `json:"exact"`
 }
 
-// ListOptions is the query options to a standard REST list call, and has future support for
+// Represents the query options to a standard REST list call, and has future support for
 // watch calls.
 type ListOptions struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -1750,7 +1757,7 @@ type ListOptions struct {
 	TimeoutSeconds *int64
 }
 
-// PodLogOptions is the query options for a Pod's logs REST call
+// Represents the query options for a Pod's logs REST call.
 type PodLogOptions struct {
 	unversioned.TypeMeta
 
@@ -1782,7 +1789,7 @@ type PodLogOptions struct {
 	LimitBytes *int64
 }
 
-// PodAttachOptions is the query options to a Pod's remote attach call
+// Represents the query options to a Pod's remote attach call.
 // TODO: merge w/ PodExecOptions below for stdin, stdout, etc
 type PodAttachOptions struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -1803,7 +1810,7 @@ type PodAttachOptions struct {
 	Container string `json:"container,omitempty"`
 }
 
-// PodExecOptions is the query options to a Pod's remote exec call
+// Represents the query options to a Pod's remote exec call.
 type PodExecOptions struct {
 	unversioned.TypeMeta
 
@@ -1826,7 +1833,7 @@ type PodExecOptions struct {
 	Command []string
 }
 
-// PodProxyOptions is the query options to a Pod's proxy call
+// Represents the query options to a Pod's proxy call.
 type PodProxyOptions struct {
 	unversioned.TypeMeta
 
@@ -1834,7 +1841,7 @@ type PodProxyOptions struct {
 	Path string
 }
 
-// ObjectReference contains enough information to let you inspect or modify the referred object.
+// A reference to an object or piece of an object.
 type ObjectReference struct {
 	Kind            string    `json:"kind,omitempty"`
 	Namespace       string    `json:"namespace,omitempty"`
@@ -1854,7 +1861,7 @@ type ObjectReference struct {
 	FieldPath string `json:"fieldPath,omitempty"`
 }
 
-// LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.
+// Contains enough information to let you locate the referenced object inside the same namespace.
 type LocalObjectReference struct {
 	//TODO: Add other useful fields.  apiVersion, kind, uid?
 	Name string
@@ -1882,7 +1889,7 @@ const (
 
 // +genclient=true
 
-// Event is a report of an event somewhere in the cluster.
+// Represents a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
 type Event struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -1917,7 +1924,7 @@ type Event struct {
 	Type string `json:"type,omitempty"`
 }
 
-// EventList is a list of events.
+// Represents a list of events.
 type EventList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
@@ -1925,7 +1932,7 @@ type EventList struct {
 	Items []Event `json:"items"`
 }
 
-// List holds a list of objects, which may not be known by the server.
+// Holds a list of objects, which may not be known by the server.
 type List struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
@@ -1943,7 +1950,7 @@ const (
 	LimitTypeContainer LimitType = "Container"
 )
 
-// LimitRangeItem defines a min/max usage limit for any resource that matches on kind
+// Defines a min/max usage limit for any resource that matches on kind
 type LimitRangeItem struct {
 	// Type of resource that this limit applies to
 	Type LimitType `json:"type,omitempty"`
@@ -1959,7 +1966,7 @@ type LimitRangeItem struct {
 	MaxLimitRequestRatio ResourceList `json:"maxLimitRequestRatio,omitempty"`
 }
 
-// LimitRangeSpec defines a min/max usage limit for resources that match on kind
+// Defines a min/max usage limit for resources that match on kind
 type LimitRangeSpec struct {
 	// Limits is the list of LimitRangeItem objects that are enforced
 	Limits []LimitRangeItem `json:"limits"`
@@ -1967,7 +1974,7 @@ type LimitRangeSpec struct {
 
 // +genclient=true
 
-// LimitRange sets resource usage limits for each kind of resource in a Namespace
+// Sets resource usage limits for each kind of resource in a Namespace
 type LimitRange struct {
 	unversioned.TypeMeta `json:",inline"`
 	ObjectMeta           `json:"metadata,omitempty"`
@@ -1976,7 +1983,7 @@ type LimitRange struct {
 	Spec LimitRangeSpec `json:"spec,omitempty"`
 }
 
-// LimitRangeList is a list of LimitRange items.
+// Represents a list of LimitRange items.
 type LimitRangeList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
@@ -2001,13 +2008,13 @@ const (
 	ResourcePersistentVolumeClaims ResourceName = "persistentvolumeclaims"
 )
 
-// ResourceQuotaSpec defines the desired hard limits to enforce for Quota
+// Defines the desired hard limits to enforce for Quota
 type ResourceQuotaSpec struct {
 	// Hard is the set of desired hard limits for each named resource
 	Hard ResourceList `json:"hard,omitempty"`
 }
 
-// ResourceQuotaStatus defines the enforced hard limits and observed use
+// Defines the enforced hard limits and observed use
 type ResourceQuotaStatus struct {
 	// Hard is the set of enforced hard limits for each named resource
 	Hard ResourceList `json:"hard,omitempty"`
@@ -2017,7 +2024,7 @@ type ResourceQuotaStatus struct {
 
 // +genclient=true
 
-// ResourceQuota sets aggregate quota restrictions enforced per namespace
+// Sets aggregate quota restrictions enforced per namespace
 type ResourceQuota struct {
 	unversioned.TypeMeta `json:",inline"`
 	ObjectMeta           `json:"metadata,omitempty"`
@@ -2029,7 +2036,7 @@ type ResourceQuota struct {
 	Status ResourceQuotaStatus `json:"status,omitempty"`
 }
 
-// ResourceQuotaList is a list of ResourceQuota items
+// Represents a list of ResourceQuota items
 type ResourceQuotaList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
@@ -2040,7 +2047,7 @@ type ResourceQuotaList struct {
 
 // +genclient=true
 
-// Secret holds secret data of a certain type.  The total bytes of the values in
+// Holds secret data of a certain type.  The total bytes of the values in
 // the Data field must be less than MaxSecretSize bytes.
 type Secret struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -2176,7 +2183,7 @@ type ComponentCondition struct {
 
 // +genclient=true,nonNamespaced=true
 
-// ComponentStatus (and ComponentStatusList) holds the cluster validation info.
+// Holds the cluster validation info.
 type ComponentStatus struct {
 	unversioned.TypeMeta `json:",inline"`
 	ObjectMeta           `json:"metadata,omitempty"`
@@ -2191,7 +2198,7 @@ type ComponentStatusList struct {
 	Items []ComponentStatus `json:"items"`
 }
 
-// SecurityContext holds security configuration that will be applied to a container.
+// Holds security configuration that will be applied to a container.
 // Some fields are present in both SecurityContext and PodSecurityContext.  When both
 // are set, the values in SecurityContext take precedence.
 type SecurityContext struct {
@@ -2221,7 +2228,7 @@ type SecurityContext struct {
 	RunAsNonRoot *bool `json:"runAsNonRoot,omitempty"`
 }
 
-// SELinuxOptions are the labels to be applied to the container.
+// Represents the labels to be applied to the container.
 type SELinuxOptions struct {
 	// SELinux user label
 	User string `json:"user,omitempty"`
@@ -2233,7 +2240,7 @@ type SELinuxOptions struct {
 	Level string `json:"level,omitempty"`
 }
 
-// RangeAllocation is an opaque API object (not exposed to end users) that can be persisted to record
+// Represents an opaque API object (not exposed to end users) that can be persisted to record
 // the global allocation state of the cluster. The schema of Range and Data generic, in that Range
 // should be a string representation of the inputs to a range (for instance, for IP allocation it
 // might be a CIDR) and Data is an opaque blob understood by an allocator which is typically a
