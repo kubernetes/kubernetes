@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
@@ -331,41 +332,32 @@ func (l *LeaderElector) maybeReportTransition() {
 	}
 }
 
-func DefaultLeaderElectionCLIConfig() LeaderElectionCLIConfig {
-	return LeaderElectionCLIConfig{
+func DefaultLeaderElectionConfiguration() componentconfig.LeaderElectionConfiguration {
+	return componentconfig.LeaderElectionConfiguration{
 		LeaderElect:   false,
-		LeaseDuration: DefaultLeaseDuration,
-		RenewDeadline: DefaultRenewDeadline,
-		RetryPeriod:   DefaultRetryPeriod,
+		LeaseDuration: unversioned.Duration{DefaultLeaseDuration},
+		RenewDeadline: unversioned.Duration{DefaultRenewDeadline},
+		RetryPeriod:   unversioned.Duration{DefaultRetryPeriod},
 	}
 }
 
-// LeaderElectionCLIConfig is useful for embedding into component configuration objects
-// to maintain consistent command line flags.
-type LeaderElectionCLIConfig struct {
-	LeaderElect   bool
-	LeaseDuration time.Duration
-	RenewDeadline time.Duration
-	RetryPeriod   time.Duration
-}
-
 // BindFlags binds the common LeaderElectionCLIConfig flags to a flagset
-func (l *LeaderElectionCLIConfig) BindFlags(fs *pflag.FlagSet) {
+func BindFlags(l *componentconfig.LeaderElectionConfiguration, fs *pflag.FlagSet) {
 	fs.BoolVar(&l.LeaderElect, "leader-elect", l.LeaderElect, ""+
 		"Start a leader election client and gain leadership before "+
 		"executing scheduler loop. Enable this when running replicated "+
 		"schedulers.")
-	fs.DurationVar(&l.LeaseDuration, "leader-elect-lease-duration", l.LeaseDuration, ""+
+	fs.DurationVar(&l.LeaseDuration.Duration, "leader-elect-lease-duration", l.LeaseDuration.Duration, ""+
 		"The duration that non-leader candidates will wait after observing a leadership"+
 		"renewal until attempting to acquire leadership of a led but unrenewed leader "+
 		"slot. This is effectively the maximum duration that a leader can be stopped "+
 		"before it is replaced by another candidate. This is only applicable if leader "+
 		"election is enabled.")
-	fs.DurationVar(&l.RenewDeadline, "leader-elect-renew-deadline", l.RenewDeadline, ""+
+	fs.DurationVar(&l.RenewDeadline.Duration, "leader-elect-renew-deadline", l.RenewDeadline.Duration, ""+
 		"The interval between attempts by the acting master to renew a leadership slot "+
 		"before it stops leading. This must be less than or equal to the lease duration. "+
 		"This is only applicable if leader election is enabled.")
-	fs.DurationVar(&l.RetryPeriod, "leader-elect-retry-period", l.RetryPeriod, ""+
+	fs.DurationVar(&l.RetryPeriod.Duration, "leader-elect-retry-period", l.RetryPeriod.Duration, ""+
 		"The duration the clients should wait between attempting acquisition and renewal "+
 		"of a leadership. This is only applicable if leader election is enabled.")
 }
