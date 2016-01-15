@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned"
 )
 
-// AdaptOldClient adapt a pkg/client/unversioned#Client to a Clientset
+// AdaptOldClient adapts a pkg/client/unversioned#Client to a Clientset
 func AdaptOldClient(c *unversioned.Client) *Clientset {
 	var clientset Clientset
 	if c != nil {
