@@ -521,7 +521,7 @@ case ${JOB_NAME} in
         --gather-resource-usage=true \
         --gather-metrics-at-teardown=true \
         --gather-logs-sizes=true \
-        --output-print-type=json"}
+        --output-print-type=hr"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-scalability"}
     : ${PROJECT:="kubernetes-jenkins"}
     # Override GCE defaults.
