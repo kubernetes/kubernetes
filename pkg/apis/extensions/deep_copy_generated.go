@@ -87,6 +87,14 @@ func deepCopy_api_CinderVolumeSource(in api.CinderVolumeSource, out *api.CinderV
 	return nil
 }
 
+func deepCopy_api_ConfigMapKeySelector(in api.ConfigMapKeySelector, out *api.ConfigMapKeySelector, c *conversion.Cloner) error {
+	if err := deepCopy_api_LocalObjectReference(in.LocalObjectReference, &out.LocalObjectReference, c); err != nil {
+		return err
+	}
+	out.Key = in.Key
+	return nil
+}
+
 func deepCopy_api_Container(in api.Container, out *api.Container, c *conversion.Cloner) error {
 	out.Name = in.Name
 	out.Image = in.Image
@@ -238,6 +246,14 @@ func deepCopy_api_EnvVarSource(in api.EnvVarSource, out *api.EnvVarSource, c *co
 		}
 	} else {
 		out.FieldRef = nil
+	}
+	if in.ConfigMapKeyRef != nil {
+		out.ConfigMapKeyRef = new(api.ConfigMapKeySelector)
+		if err := deepCopy_api_ConfigMapKeySelector(*in.ConfigMapKeyRef, out.ConfigMapKeyRef, c); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMapKeyRef = nil
 	}
 	return nil
 }
@@ -1661,6 +1677,7 @@ func init() {
 		deepCopy_api_Capabilities,
 		deepCopy_api_CephFSVolumeSource,
 		deepCopy_api_CinderVolumeSource,
+		deepCopy_api_ConfigMapKeySelector,
 		deepCopy_api_Container,
 		deepCopy_api_ContainerPort,
 		deepCopy_api_DownwardAPIVolumeFile,

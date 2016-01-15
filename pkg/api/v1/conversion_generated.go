@@ -203,6 +203,21 @@ func Convert_api_ComponentStatusList_To_v1_ComponentStatusList(in *api.Component
 	return autoConvert_api_ComponentStatusList_To_v1_ComponentStatusList(in, out, s)
 }
 
+func autoConvert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in *api.ConfigMapKeySelector, out *ConfigMapKeySelector, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ConfigMapKeySelector))(in)
+	}
+	if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	out.Key = in.Key
+	return nil
+}
+
+func Convert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in *api.ConfigMapKeySelector, out *ConfigMapKeySelector, s conversion.Scope) error {
+	return autoConvert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in, out, s)
+}
+
 func autoConvert_api_Container_To_v1_Container(in *api.Container, out *Container, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Container))(in)
@@ -697,6 +712,15 @@ func autoConvert_api_EnvVarSource_To_v1_EnvVarSource(in *api.EnvVarSource, out *
 		}
 	} else {
 		out.FieldRef = nil
+	}
+	// unable to generate simple pointer conversion for api.ConfigMapKeySelector -> v1.ConfigMapKeySelector
+	if in.ConfigMapKeyRef != nil {
+		out.ConfigMapKeyRef = new(ConfigMapKeySelector)
+		if err := Convert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in.ConfigMapKeyRef, out.ConfigMapKeyRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMapKeyRef = nil
 	}
 	return nil
 }
@@ -3392,6 +3416,21 @@ func Convert_v1_ComponentStatusList_To_api_ComponentStatusList(in *ComponentStat
 	return autoConvert_v1_ComponentStatusList_To_api_ComponentStatusList(in, out, s)
 }
 
+func autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in *ConfigMapKeySelector, out *api.ConfigMapKeySelector, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ConfigMapKeySelector))(in)
+	}
+	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	out.Key = in.Key
+	return nil
+}
+
+func Convert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in *ConfigMapKeySelector, out *api.ConfigMapKeySelector, s conversion.Scope) error {
+	return autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in, out, s)
+}
+
 func autoConvert_v1_Container_To_api_Container(in *Container, out *api.Container, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Container))(in)
@@ -3886,6 +3925,15 @@ func autoConvert_v1_EnvVarSource_To_api_EnvVarSource(in *EnvVarSource, out *api.
 		}
 	} else {
 		out.FieldRef = nil
+	}
+	// unable to generate simple pointer conversion for v1.ConfigMapKeySelector -> api.ConfigMapKeySelector
+	if in.ConfigMapKeyRef != nil {
+		out.ConfigMapKeyRef = new(api.ConfigMapKeySelector)
+		if err := Convert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in.ConfigMapKeyRef, out.ConfigMapKeyRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.ConfigMapKeyRef = nil
 	}
 	return nil
 }
@@ -6292,6 +6340,7 @@ func init() {
 		autoConvert_api_ComponentCondition_To_v1_ComponentCondition,
 		autoConvert_api_ComponentStatusList_To_v1_ComponentStatusList,
 		autoConvert_api_ComponentStatus_To_v1_ComponentStatus,
+		autoConvert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector,
 		autoConvert_api_ContainerImage_To_v1_ContainerImage,
 		autoConvert_api_ContainerPort_To_v1_ContainerPort,
 		autoConvert_api_ContainerStateRunning_To_v1_ContainerStateRunning,
@@ -6413,6 +6462,7 @@ func init() {
 		autoConvert_v1_ComponentCondition_To_api_ComponentCondition,
 		autoConvert_v1_ComponentStatusList_To_api_ComponentStatusList,
 		autoConvert_v1_ComponentStatus_To_api_ComponentStatus,
+		autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector,
 		autoConvert_v1_ContainerImage_To_api_ContainerImage,
 		autoConvert_v1_ContainerPort_To_api_ContainerPort,
 		autoConvert_v1_ContainerStateRunning_To_api_ContainerStateRunning,
