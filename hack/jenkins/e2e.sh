@@ -290,7 +290,6 @@ GKE_REQUIRED_SKIP_TESTS=(
 
 # Specialized tests which should be skipped by default for GKE.
 GKE_DEFAULT_SKIP_TESTS=(
-    "Autoscaling\sSuite"
     # Perf test, slow by design
     "resource\susage\stracking"
     "${GKE_REQUIRED_SKIP_TESTS[@]}"
@@ -390,7 +389,7 @@ case ${JOB_NAME} in
   kubernetes-e2e-gce-autoscaling)
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-autoscaling"}
     : ${E2E_NETWORK:="e2e-autoscaling"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Autoscaling\]"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Feature:Autoscaling\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-autoscaling"}
     : ${PROJECT:="k8s-jnks-e2e-gce-autoscaling"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
