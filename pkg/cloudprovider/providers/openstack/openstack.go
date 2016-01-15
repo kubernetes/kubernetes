@@ -51,11 +51,6 @@ var ErrMultipleResults = errors.New("Multiple results where only one expected")
 var ErrNoAddressFound = errors.New("No address found for host")
 var ErrAttrNotFound = errors.New("Expected attribute not found")
 
-const (
-	MiB = 1024 * 1024
-	GB  = 1000 * 1000 * 1000
-)
-
 // encoding.TextUnmarshaler interface for time.Duration
 type MyDuration struct {
 	time.Duration
@@ -83,6 +78,8 @@ type LoadBalancerOpts struct {
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
 type OpenStack struct {
 	provider *gophercloud.ProviderClient
+	compute  *gophercloud.ServiceClient
+	network  *gophercloud.ServiceClient
 	region   string
 	lbOpts   LoadBalancerOpts
 	// InstanceID of the server where this OpenStack object is instantiated.
@@ -216,11 +213,29 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 
 	id, err := readInstanceID()
 	if err != nil {
+		glog.Info("Not running on an OpenStack Instance")
+	}
+
+	network, err := openstack.NewNetworkV2(provider, gophercloud.EndpointOpts{
+		Region: cfg.Global.Region,
+	})
+	if err != nil {
+		glog.Warningf("Failed to find neutron endpoint: %v", err)
+		return nil, err
+	}
+
+	compute, err := openstack.NewComputeV2(provider, gophercloud.EndpointOpts{
+		Region: cfg.Global.Region,
+	})
+	if err != nil {
+		glog.Warningf("Failed to find compute endpoint: %v", err)
 		return nil, err
 	}
 
 	os := OpenStack{
 		provider:        provider,
+		compute:         compute,
+		network:         network,
 		region:          cfg.Global.Region,
 		lbOpts:          cfg.LoadBalancer,
 		localInstanceID: id,
@@ -380,4 +395,41 @@ func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
 
 func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
+}
+
+func getServerByAddress(compute *gophercloud.ServiceClient, ip string) (*servers.Server, error) {
+	opts := servers.ListOpts{
+		Status: "ACTIVE",
+	}
+	pager := servers.List(compute, opts)
+
+	serverList := make([]servers.Server, 0, 1)
+
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		s, err := servers.ExtractServers(page)
+		if err != nil {
+			return false, err
+		}
+		for _, server := range s {
+			addr, err := getAddressByName(compute, server.Name)
+			if err != nil {
+				return false, err
+			}
+			if addr == ip {
+				serverList = append(serverList, server)
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(serverList) == 0 {
+		return nil, ErrNotFound
+	} else if len(serverList) > 1 {
+		return nil, ErrMultipleResults
+	}
+
+	return &serverList[0], nil
 }

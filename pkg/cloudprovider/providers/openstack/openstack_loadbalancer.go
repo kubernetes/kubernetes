@@ -18,9 +18,12 @@ package openstack
 
 import (
 	"fmt"
+	"io"
+	"net"
 
 	"github.com/rackspace/gophercloud"
-	"github.com/rackspace/gophercloud/openstack"
+	"github.com/rackspace/gophercloud/openstack/compute/v2/extensions/secgroups"
+	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/floatingips"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/members"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/monitors"
@@ -34,49 +37,30 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
-type LoadBalancer struct {
-	network *gophercloud.ServiceClient
-	compute *gophercloud.ServiceClient
-	opts    LoadBalancerOpts
-}
-
 func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	glog.V(4).Info("openstack.LoadBalancer() called")
 
-	// TODO: Search for and support Rackspace loadbalancer API, and others.
-	network, err := openstack.NewNetworkV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
-	if err != nil {
-		glog.Warningf("Failed to find neutron endpoint: %v", err)
-		return nil, false
-	}
-
-	compute, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
-	if err != nil {
-		glog.Warningf("Failed to find compute endpoint: %v", err)
-		return nil, false
-	}
-
 	glog.V(1).Info("Claiming to support LoadBalancer")
 
-	return &LoadBalancer{network, compute, os.lbOpts}, true
+	return os, true
 }
 
-func (lb *LoadBalancer) GetLoadBalancer(service *api.Service) (*api.LoadBalancerStatus, bool, error) {
+func (os *OpenStack) GetLoadBalancer(service *api.Service) (*api.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
-	vip, err := getVipByName(lb.network, loadBalancerName)
+	vip, err := getVipByName(os.network, loadBalancerName)
 	if err == ErrNotFound {
 		return nil, false, nil
 	}
 	if vip == nil {
 		return nil, false, err
 	}
+	fip, err := getFloatingIPByPortID(os.network, vip.PortID)
+	if err != nil {
+		return nil, false, err
+	}
 
 	status := &api.LoadBalancerStatus{}
-	status.Ingress = []api.LoadBalancerIngress{{IP: vip.Address}}
+	status.Ingress = []api.LoadBalancerIngress{{IP: fip.FloatingIP}}
 
 	return status, true, err
 }
@@ -86,20 +70,17 @@ func (lb *LoadBalancer) GetLoadBalancer(service *api.Service) (*api.LoadBalancer
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []string, annotations map[string]string) (*api.LoadBalancerStatus, error) {
-	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, hosts, annotations)
+func (os *OpenStack) EnsureLoadBalancer(apiService *api.Service, hosts []string, annotations map[string]string) (*api.LoadBalancerStatus, error) {
+	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, annotations)
+
+	name := cloudprovider.GetLoadBalancerName(apiService)
+	glog.V(2).Infof("Ensuring load balancer %s", name)
+	// Sucess variable to trigger deferred clean up functions on failure.
+	success := false
 
 	ports := apiService.Spec.Ports
 	if len(ports) > 1 {
 		return nil, fmt.Errorf("multiple ports are not yet supported in openstack load balancers")
-	} else if len(ports) == 0 {
-		return nil, fmt.Errorf("no ports provided to openstack load balancer")
-	}
-
-	// The service controller verified all the protocols match on the ports, just check and use the first one
-	// TODO: Convert all error messages to use an event recorder
-	if ports[0].Protocol != api.ProtocolTCP {
-		return nil, fmt.Errorf("Only TCP LoadBalancer is supported for openstack load balancers")
 	}
 
 	sourceRanges, err := service.GetLoadBalancerSourceRanges(annotations)
@@ -122,9 +103,8 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
 	}
 
-	glog.V(2).Info("Checking if openstack load balancer already exists: %s", cloudprovider.GetLoadBalancerName(apiService))
-
-	_, exists, err := lb.GetLoadBalancer(apiService)
+	glog.V(4).Infof("Checking if openstack load balancer already exists: %s", name)
+	_, exists, err := os.GetLoadBalancer(apiService)
 	if err != nil {
 		return nil, fmt.Errorf("error checking if openstack load balancer already exists: %v", err)
 	}
@@ -132,63 +112,145 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 	// TODO: Implement a more efficient update strategy for common changes than delete & create
 	// In particular, if we implement hosts update, we can get rid of UpdateHosts
 	if exists {
-		err := lb.EnsureLoadBalancerDeleted(apiService)
+		glog.V(4).Infof("Removing existing OpenStack load balancer: %s", name)
+		err := os.EnsureLoadBalancerDeleted(apiService)
 		if err != nil {
 			return nil, fmt.Errorf("error deleting existing openstack load balancer: %v", err)
 		}
 	}
 
-	lbmethod := lb.opts.LBMethod
+	secgroupOpts := secgroups.CreateOpts{
+		Name:        name,
+		Description: "Security group for Kubernetes Load Balancer"}
+	secgroup, err := secgroups.Create(os.compute, secgroupOpts).Extract()
+	if err != nil {
+		glog.Errorf("Security Group not created: %s", err)
+		return nil, err
+	}
+	defer func() {
+		if !success {
+			err = secgroups.Delete(os.compute, secgroup.ID).ExtractErr()
+			if err != nil {
+				glog.Errorf("Security Group %s has failed to delete: %s", name, err)
+			}
+		}
+	}()
+	glog.V(4).Infof("Creating Security Group: %s", name)
+
+	secgroupRuleOpts := secgroups.CreateRuleOpts{
+		ParentGroupID: secgroup.ID,
+		FromPort:      ports[0].NodePort,
+		ToPort:        ports[0].NodePort,
+		IPProtocol:    "TCP",
+		CIDR:          "0.0.0.0/0",
+	}
+	rule, err := secgroups.CreateRule(os.compute, secgroupRuleOpts).Extract()
+	if err != nil {
+		glog.Errorf("Security Group Rule not created: %s", err)
+		return nil, err
+	}
+	defer func() {
+		if !success {
+			secgroups.DeleteRule(os.compute, rule.ID)
+		}
+	}()
+	glog.V(4).Info("Creating Security Group rule for port: %s %s", ports[0].NodePort, name)
+
+	lbmethod := os.lbOpts.LBMethod
 	if lbmethod == "" {
 		lbmethod = pools.LBMethodRoundRobin
 	}
-	name := cloudprovider.GetLoadBalancerName(apiService)
-	pool, err := pools.Create(lb.network, pools.CreateOpts{
+	pool, err := pools.Create(os.network, pools.CreateOpts{
 		Name:     name,
 		Protocol: pools.ProtocolTCP,
-		SubnetID: lb.opts.SubnetId,
+		SubnetID: os.lbOpts.SubnetId,
 		LBMethod: lbmethod,
 	}).Extract()
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if !success {
+			pools.Delete(os.network, pool.ID)
+		}
+	}()
+	glog.V(4).Infof("OpenStack loadbalancer pool created: %s", name)
 
 	for _, host := range hosts {
-		addr, err := getAddressByName(lb.compute, host)
-		if err != nil {
-			return nil, err
+		// Handles the instance where hostname is overridden to be the IP of the node.
+		// Perhaps should move the route options HostnameOverride to Global options and
+		// use that here
+		var addr string
+		var server *servers.Server
+		ip := net.ParseIP(host)
+		if ip != nil {
+			glog.V(4).Infof("Searching for server with address: %s", host)
+			server, err = getServerByAddress(os.compute, host)
+			if err != nil {
+				glog.Errorf("Server %s not found by name: %s", host, err)
+				return nil, err
+			}
+			addr = ip.String()
+			glog.V(4).Infof("Found server with address: %s", host)
+		} else {
+			glog.V(4).Infof("Searching for server with name: %s", host)
+			server, err = getServerByName(os.compute, host)
+			if err != nil {
+				glog.Errorf("Server %s not found by name: %s", host, err)
+				return nil, err
+			}
+
+			addr, err = getAddressByName(os.compute, host)
+			glog.V(4).Infof("Found server with name %s and address %s", host, addr)
 		}
 
-		_, err = members.Create(lb.network, members.CreateOpts{
+		glog.V(4).Infof("Adding instance %s added to SecurityGroup %s", server.ID, name)
+		err = secgroups.AddServerToGroup(os.compute, server.ID, secgroup.Name).ExtractErr()
+		if err != nil && err != io.EOF {
+			glog.V(4).Infof("Failed to add instance %s added to SecurityGroup %s: %s", host, name, err)
+			return nil, err
+		}
+		defer func() {
+			if !success {
+				secgroups.RemoveServerFromGroup(os.compute, server.ID, secgroup.Name)
+			}
+		}()
+		glog.V(4).Infof("OpenStack instance %s added to SecurityGroup %s", host, name)
+
+		_, err = members.Create(os.network, members.CreateOpts{
 			PoolID:       pool.ID,
 			ProtocolPort: ports[0].NodePort, //TODO: need to handle multi-port
 			Address:      addr,
 		}).Extract()
 		if err != nil {
-			pools.Delete(lb.network, pool.ID)
 			return nil, err
 		}
+		glog.V(4).Infof("OpenStack instance %s added to OpenStack LB pool %s", name)
 	}
 
+	glog.V(4).Infof("CreateLoadBalancer monitor")
 	var mon *monitors.Monitor
-	if lb.opts.CreateMonitor {
-		mon, err = monitors.Create(lb.network, monitors.CreateOpts{
+	if os.lbOpts.CreateMonitor {
+		mon, err = monitors.Create(os.network, monitors.CreateOpts{
 			Type:       monitors.TypeTCP,
-			Delay:      int(lb.opts.MonitorDelay.Duration.Seconds()),
-			Timeout:    int(lb.opts.MonitorTimeout.Duration.Seconds()),
-			MaxRetries: int(lb.opts.MonitorMaxRetries),
+			Delay:      int(os.lbOpts.MonitorDelay.Duration.Seconds()),
+			Timeout:    int(os.lbOpts.MonitorTimeout.Duration.Seconds()),
+			MaxRetries: int(os.lbOpts.MonitorMaxRetries),
 		}).Extract()
 		if err != nil {
-			pools.Delete(lb.network, pool.ID)
 			return nil, err
 		}
+		defer func() {
+			if !success {
+				monitors.Delete(os.network, mon.ID)
+			}
+		}()
 
-		_, err = pools.AssociateMonitor(lb.network, pool.ID, mon.ID).Extract()
+		_, err = pools.AssociateMonitor(os.network, pool.ID, mon.ID).Extract()
 		if err != nil {
-			monitors.Delete(lb.network, mon.ID)
-			pools.Delete(lb.network, pool.ID)
 			return nil, err
 		}
+		glog.V(4).Infof("OpenStack lb monitor created: %s", name)
 	}
 
 	createOpts := vips.CreateOpts{
@@ -197,7 +259,7 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 		Protocol:     "TCP",
 		ProtocolPort: ports[0].Port, //TODO: need to handle multi-port
 		PoolID:       pool.ID,
-		SubnetID:     lb.opts.SubnetId,
+		SubnetID:     os.lbOpts.SubnetId,
 		Persistence:  persistence,
 	}
 
@@ -206,41 +268,44 @@ func (lb *LoadBalancer) EnsureLoadBalancer(apiService *api.Service, hosts []stri
 		createOpts.Address = loadBalancerIP
 	}
 
-	vip, err := vips.Create(lb.network, createOpts).Extract()
+	vip, err := vips.Create(os.network, createOpts).Extract()
 	if err != nil {
-		if mon != nil {
-			monitors.Delete(lb.network, mon.ID)
-		}
-		pools.Delete(lb.network, pool.ID)
+		glog.Errorf("VIP for %s not created: %s", name, err)
 		return nil, err
 	}
+	defer func() {
+		if !success {
+			vips.Delete(os.network, vip.ID)
+		}
+	}()
+	glog.V(4).Infof("OpenStack VIP created: %s", name)
+
+	fipCreateOpts := floatingips.CreateOpts{
+		FloatingNetworkID: os.lbOpts.FloatingNetworkId,
+		PortID:            vip.PortID,
+	}
+	fip, err := floatingips.Create(os.network, fipCreateOpts).Extract()
+	if err != nil {
+		return nil, err
+	}
+	glog.V(4).Infof("OpenStack FIP created: %s", name)
 
 	status := &api.LoadBalancerStatus{}
-
-	status.Ingress = []api.LoadBalancerIngress{{IP: vip.Address}}
-
-	if lb.opts.FloatingNetworkId != "" {
-		floatIPOpts := floatingips.CreateOpts{
-			FloatingNetworkID: lb.opts.FloatingNetworkId,
-			PortID:            vip.PortID,
-		}
-		floatIP, err := floatingips.Create(lb.network, floatIPOpts).Extract()
-		if err != nil {
-			return nil, err
-		}
-
-		status.Ingress = append(status.Ingress, api.LoadBalancerIngress{IP: floatIP.FloatingIP})
+	status.Ingress = []api.LoadBalancerIngress{
+		{IP: vip.Address},
+		{IP: fip.FloatingIP},
 	}
 
-	return status, nil
+	success = true
 
+	return status, nil
 }
 
-func (lb *LoadBalancer) UpdateLoadBalancer(service *api.Service, hosts []string) error {
+func (os *OpenStack) UpdateLoadBalancer(service *api.Service, hosts []string) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v)", loadBalancerName, hosts)
 
-	vip, err := getVipByName(lb.network, loadBalancerName)
+	vip, err := getVipByName(os.network, loadBalancerName)
 	if err != nil {
 		return err
 	}
@@ -248,16 +313,24 @@ func (lb *LoadBalancer) UpdateLoadBalancer(service *api.Service, hosts []string)
 	// Set of member (addresses) that _should_ exist
 	addrs := map[string]bool{}
 	for _, host := range hosts {
-		addr, err := getAddressByName(lb.compute, host)
-		if err != nil {
-			return err
+		var addr string
+		ip := net.ParseIP(host)
+		if ip != nil {
+			addr = ip.String()
+		} else {
+			addr, err = getAddressByName(os.compute, host)
+			if err != nil {
+				return err
+			}
 		}
 
 		addrs[addr] = true
 	}
 
+	// TODO Remove members from security group
 	// Iterate over members that _do_ exist
-	pager := members.List(lb.network, members.ListOpts{PoolID: vip.PoolID})
+	var port int
+	pager := members.List(os.network, members.ListOpts{PoolID: vip.PoolID})
 	err = pager.EachPage(func(page pagination.Page) (bool, error) {
 		memList, err := members.ExtractMembers(page)
 		if err != nil {
@@ -266,11 +339,20 @@ func (lb *LoadBalancer) UpdateLoadBalancer(service *api.Service, hosts []string)
 
 		for _, member := range memList {
 			if _, found := addrs[member.Address]; found {
+				port = member.ProtocolPort
 				// Member already exists
 				delete(addrs, member.Address)
 			} else {
 				// Member needs to be deleted
-				err = members.Delete(lb.network, member.ID).ExtractErr()
+				err = members.Delete(os.network, member.ID).ExtractErr()
+				if err != nil {
+					return false, err
+				}
+				server, err := getServerByAddress(os.compute, member.Address)
+				if err != nil {
+					return false, err
+				}
+				err = secgroups.RemoveServerFromGroup(os.compute, server.ID, service.Name).ExtractErr()
 				if err != nil {
 					return false, err
 				}
@@ -285,11 +367,19 @@ func (lb *LoadBalancer) UpdateLoadBalancer(service *api.Service, hosts []string)
 
 	// Anything left in addrs is a new member that needs to be added
 	for addr := range addrs {
-		_, err := members.Create(lb.network, members.CreateOpts{
+		_, err := members.Create(os.network, members.CreateOpts{
 			PoolID:       vip.PoolID,
 			Address:      addr,
-			ProtocolPort: vip.ProtocolPort,
+			ProtocolPort: port,
 		}).Extract()
+		if err != nil {
+			return err
+		}
+		server, err := getServerByAddress(os.compute, addr)
+		if err != nil {
+			return err
+		}
+		err = secgroups.AddServerToGroup(os.compute, server.ID, service.Name).ExtractErr()
 		if err != nil {
 			return err
 		}
@@ -298,32 +388,19 @@ func (lb *LoadBalancer) UpdateLoadBalancer(service *api.Service, hosts []string)
 	return nil
 }
 
-func (lb *LoadBalancer) EnsureLoadBalancerDeleted(service *api.Service) error {
+func (os *OpenStack) EnsureLoadBalancerDeleted(service *api.Service) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v)", loadBalancerName)
 
-	vip, err := getVipByName(lb.network, loadBalancerName)
+	vip, err := getVipByName(os.network, loadBalancerName)
 	if err != nil && err != ErrNotFound {
 		return err
-	}
-
-	if lb.opts.FloatingNetworkId != "" && vip != nil {
-		floatingIP, err := getFloatingIPByPortID(lb.network, vip.PortID)
-		if err != nil && !isNotFound(err) {
-			return err
-		}
-		if floatingIP != nil {
-			err = floatingips.Delete(lb.network, floatingIP.ID).ExtractErr()
-			if err != nil && !isNotFound(err) {
-				return err
-			}
-		}
 	}
 
 	// We have to delete the VIP before the pool can be deleted,
 	// so no point continuing if this fails.
 	if vip != nil {
-		err := vips.Delete(lb.network, vip.ID).ExtractErr()
+		err := vips.Delete(os.network, vip.ID).ExtractErr()
 		if err != nil && !isNotFound(err) {
 			return err
 		}
@@ -331,7 +408,7 @@ func (lb *LoadBalancer) EnsureLoadBalancerDeleted(service *api.Service) error {
 
 	var pool *pools.Pool
 	if vip != nil {
-		pool, err = pools.Get(lb.network, vip.PoolID).Extract()
+		pool, err = pools.Get(os.network, vip.PoolID).Extract()
 		if err != nil && !isNotFound(err) {
 			return err
 		}
@@ -340,7 +417,7 @@ func (lb *LoadBalancer) EnsureLoadBalancerDeleted(service *api.Service) error {
 		// still exists that we failed to delete on some
 		// previous occasion.  Make a best effort attempt to
 		// cleanup any pools with the same name as the VIP.
-		pool, err = getPoolByName(lb.network, service.Name)
+		pool, err = getPoolByName(os.network, service.Name)
 		if err != nil && err != ErrNotFound {
 			return err
 		}
@@ -348,23 +425,120 @@ func (lb *LoadBalancer) EnsureLoadBalancerDeleted(service *api.Service) error {
 
 	if pool != nil {
 		for _, monId := range pool.MonitorIDs {
-			_, err = pools.DisassociateMonitor(lb.network, pool.ID, monId).Extract()
+			_, err = pools.DisassociateMonitor(os.network, pool.ID, monId).Extract()
 			if err != nil {
 				return err
 			}
 
-			err = monitors.Delete(lb.network, monId).ExtractErr()
+			err = monitors.Delete(os.network, monId).ExtractErr()
 			if err != nil && !isNotFound(err) {
 				return err
 			}
 		}
-		err = pools.Delete(lb.network, pool.ID).ExtractErr()
+		err = pools.Delete(os.network, pool.ID).ExtractErr()
+		if err != nil && !isNotFound(err) {
+			return err
+		}
+	}
+
+	secgroup, err := getSecGroupByName(os.compute, service.Name)
+	if err != nil && err != ErrNotFound {
+		return err
+	}
+	if secgroup != nil {
+		os.removeServersFromSecgroup(secgroup.Name)
+		err := secgroups.Delete(os.compute, secgroup.ID).ExtractErr()
 		if err != nil && !isNotFound(err) {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (os *OpenStack) removeServerFromSecgroup(serverID string, groupName string) error {
+	pager := secgroups.ListByServer(os.compute, serverID)
+
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		v, err := secgroups.ExtractSecurityGroups(page)
+		if err != nil {
+			return false, err
+		}
+		for _, group := range v {
+			if group.Name == groupName {
+				err := secgroups.RemoveServerFromGroup(os.compute, serverID, groupName).ExtractErr()
+				if err != nil {
+					return false, err
+				}
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (os *OpenStack) removeServersFromSecgroup(groupName string) error {
+	pager := servers.List(os.compute, nil)
+
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		v, err := servers.ExtractServers(page)
+		if err != nil {
+			return false, err
+		}
+		for _, s := range v {
+			err := os.removeServerFromSecgroup(s.ID, groupName)
+			if err != nil {
+				return false, err
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func getSecGroupByName(client *gophercloud.ServiceClient, name string) (*secgroups.SecurityGroup, error) {
+	pager := secgroups.List(client)
+
+	secGroupList := make([]secgroups.SecurityGroup, 0, 1)
+
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		v, err := secgroups.ExtractSecurityGroups(page)
+		if err != nil {
+			return false, err
+		}
+		for _, sg := range v {
+			if sg.Name == name {
+				secGroupList = append(secGroupList, sg)
+				if len(secGroupList) > 1 {
+					return false, ErrMultipleResults
+				}
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		if isNotFound(err) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	if len(secGroupList) == 0 {
+		return nil, ErrNotFound
+	} else if len(secGroupList) > 1 {
+		return nil, ErrMultipleResults
+	}
+
+	return &secGroupList[0], nil
+
 }
 
 func getPoolByName(client *gophercloud.ServiceClient, name string) (*pools.Pool, error) {
