@@ -24,8 +24,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -275,7 +275,7 @@ func (ed *emptyDir) GetPath() string {
 
 func GetPath(uid types.UID, volName string, host volume.VolumeHost) string {
 	name := emptyDirPluginName
-	return host.GetPodVolumeDir(uid, util.EscapeQualifiedNameForDisk(name), volName)
+	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(name), volName)
 }
 
 // TearDown simply discards everything in the directory.
@@ -324,5 +324,5 @@ func (ed *emptyDir) teardownTmpfs(dir string) error {
 }
 
 func (ed *emptyDir) getMetaDir() string {
-	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, util.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
+	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, strings.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
 }
