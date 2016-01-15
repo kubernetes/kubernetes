@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -489,6 +490,9 @@ func (nc *NodeController) monitorNodeStatus() error {
 			// Report node event.
 			if readyCondition.Status != api.ConditionTrue && lastReadyCondition.Status == api.ConditionTrue {
 				nc.recordNodeStatusChange(node, "NodeNotReady")
+				if err = nc.markAllPodsNotReady(node.Name); err != nil {
+					util.HandleError(fmt.Errorf("Unable to mark all pods NotReady on node %v: %v", node.Name, err))
+				}
 			}
 
 			// Check with the cloud provider to see if the node still exists. If it
@@ -830,6 +834,42 @@ func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 		remaining = true
 	}
 	return remaining, nil
+}
+
+// update ready status of all pods running on given node from master
+// return true if success
+func (nc *NodeController) markAllPodsNotReady(nodeName string) error {
+	glog.V(2).Infof("Update ready status of pods on node [%v]", nodeName)
+	opts := api.ListOptions{FieldSelector: fields.OneTermEqualSelector(client.PodHost, nodeName)}
+	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(opts)
+	if err != nil {
+		return err
+	}
+
+	errMsg := []string{}
+	for _, pod := range pods.Items {
+		// Defensive check, also needed for tests.
+		if pod.Spec.NodeName != nodeName {
+			continue
+		}
+
+		for i, cond := range pod.Status.Conditions {
+			if cond.Type == api.PodReady {
+				pod.Status.Conditions[i].Status = api.ConditionFalse
+				glog.V(2).Infof("Updating ready status of pod %v to false", pod.Name)
+				pod, err := nc.kubeClient.Pods(pod.Namespace).UpdateStatus(&pod)
+				if err != nil {
+					glog.Warningf("Failed to updated status for pod %q: %v", format.Pod(pod), err)
+					errMsg = append(errMsg, fmt.Sprintf("%v", err))
+				}
+				break
+			}
+		}
+	}
+	if len(errMsg) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%v", strings.Join(errMsg, "; "))
 }
 
 // terminatePods will ensure all pods on the given node that are in terminating state are eventually
