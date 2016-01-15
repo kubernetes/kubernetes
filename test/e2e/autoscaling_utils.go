@@ -236,17 +236,18 @@ func (rc *ResourceConsumer) GetReplicas() int {
 	return 0
 }
 
-func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int) {
+func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int) bool {
 	timeout := 10 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		if desiredReplicas == rc.GetReplicas() {
 			Logf("%s: current replicas number is equal to desired replicas number: %d", rc.kind, desiredReplicas)
-			return
+			return true
 		} else {
 			Logf("%s: current replicas number %d waiting to be %d", rc.kind, rc.GetReplicas(), desiredReplicas)
 		}
 	}
-	Failf("timeout waiting %v for pods size to be %d", timeout, desiredReplicas)
+	Logf("Timeout expired.  The desiredReplica count was never reached.")
+	return false
 }
 
 func (rc *ResourceConsumer) EnsureDesiredReplicas(desiredReplicas int, timeout time.Duration) {
