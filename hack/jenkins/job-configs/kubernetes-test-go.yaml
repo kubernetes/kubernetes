@@ -38,9 +38,6 @@
             browser-url: https://github.com/kubernetes/kubernetes
             wipe-workspace: false
             skip-tag: true
-            clean:
-                after: true
-                before: false
     triggers:
         - pollscm:
             cron: 'H/2 * * * *'
@@ -52,6 +49,19 @@
             timeout: 30
             fail: true
         - timestamps
+        - raw:
+            xml: |
+                <hudson.plugins.ws__cleanup.PreBuildCleanup plugin="ws-cleanup@0.28">
+                    <patterns>
+                        <hudson.plugins.ws__cleanup.Pattern>
+                            <pattern>*</pattern>
+                            <type>INCLUDE</type>
+                        </hudson.plugins.ws__cleanup.Pattern>
+                    </patterns>
+                    <deleteDirs>true</deleteDirs>
+                    <cleanupParameter/>
+                    <externalDelete>sudo rm -rf %s</externalDelete>
+                </hudson.plugins.ws__cleanup.PreBuildCleanup>
 
 - project:
     name: kubernetes-test-go
