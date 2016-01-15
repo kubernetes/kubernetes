@@ -43,10 +43,10 @@ type cadvisorClient struct {
 
 var _ Interface = new(cadvisorClient)
 
-// TODO(vmarmol): Make configurable.
-// The amount of time for which to keep stats in memory.
-const statsCacheDuration = 2 * time.Minute
-const maxHousekeepingInterval = 15 * time.Second
+// TODO: This code will likely be removed once cadvisor is a daemonset pod.
+var statsCacheDuration = flag.Duration("cadvisor_storage_duration", 2*time.Minute, "How long to keep data stored (Default: 2min).")
+var maxHousekeepingInterval = flag.Duration("cadvisor_max_housekeeping_interval", 60*time.Second, "Max-interval between container housekeepings")
+
 const defaultHousekeepingInterval = 10 * time.Second
 const allowDynamicHousekeeping = true
 
@@ -66,7 +66,7 @@ func New(port uint) (Interface, error) {
 	}
 
 	// Create and start the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping)
+	m, err := manager.New(memory.New(*statsCacheDuration, nil), sysFs, *maxHousekeepingInterval, allowDynamicHousekeeping)
 	if err != nil {
 		return nil, err
 	}

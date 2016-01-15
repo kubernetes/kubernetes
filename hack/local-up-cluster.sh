@@ -291,6 +291,7 @@ function start_kubelet {
         --rkt-stage1-image="${RKT_STAGE1_IMAGE}" \
         --hostname-override="127.0.0.1" \
         --address="127.0.0.1" \
+        --max-pods="100" \
         --api-servers="${API_HOST}:${API_PORT}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
         --cluster-dns="127.0.0.1" \
