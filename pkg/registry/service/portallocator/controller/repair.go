@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // See ipallocator/controller/repair.go; this is a copy for ports.
@@ -52,7 +53,7 @@ func NewRepair(interval time.Duration, registry service.Registry, portRange net.
 func (c *Repair) RunUntil(ch chan struct{}) {
 	util.Until(func() {
 		if err := c.RunOnce(); err != nil {
-			util.HandleError(err)
+			runtime.HandleError(err)
 		}
 	}, c.interval, ch)
 }
@@ -107,11 +108,11 @@ func (c *Repair) runOnce() error {
 			case portallocator.ErrAllocated:
 				// TODO: send event
 				// port is broken, reallocate
-				util.HandleError(fmt.Errorf("the port %d for service %s/%s was assigned to multiple services; please recreate", port, svc.Name, svc.Namespace))
+				runtime.HandleError(fmt.Errorf("the port %d for service %s/%s was assigned to multiple services; please recreate", port, svc.Name, svc.Namespace))
 			case portallocator.ErrNotInRange:
 				// TODO: send event
 				// port is broken, reallocate
-				util.HandleError(fmt.Errorf("the port %d for service %s/%s is not within the port range %v; please recreate", port, svc.Name, svc.Namespace, c.portRange))
+				runtime.HandleError(fmt.Errorf("the port %d for service %s/%s is not within the port range %v; please recreate", port, svc.Name, svc.Namespace, c.portRange))
 			case portallocator.ErrFull:
 				// TODO: send event
 				return fmt.Errorf("the port range %v is full; you must widen the port range in order to create new services", c.portRange)

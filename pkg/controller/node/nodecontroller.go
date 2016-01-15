@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
@@ -241,7 +242,7 @@ func (nc *NodeController) Run(period time.Duration) {
 		nc.podEvictor.Try(func(value TimedValue) (bool, time.Duration) {
 			remaining, err := nc.deletePods(value.Value)
 			if err != nil {
-				util.HandleError(fmt.Errorf("unable to evict node %q: %v", value.Value, err))
+				utilruntime.HandleError(fmt.Errorf("unable to evict node %q: %v", value.Value, err))
 				return false, 0
 			}
 
@@ -260,7 +261,7 @@ func (nc *NodeController) Run(period time.Duration) {
 		nc.terminationEvictor.Try(func(value TimedValue) (bool, time.Duration) {
 			completed, remaining, err := nc.terminatePods(value.Value, value.AddedAt)
 			if err != nil {
-				util.HandleError(fmt.Errorf("unable to terminate pods on node %q: %v", value.Value, err))
+				utilruntime.HandleError(fmt.Errorf("unable to terminate pods on node %q: %v", value.Value, err))
 				return false, 0
 			}
 
@@ -333,7 +334,7 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 		// this can only happen if the Store.KeyFunc has a problem creating
 		// a key for the pod. If it happens once, it will happen again so
 		// don't bother requeuing the pod.
-		util.HandleError(err)
+		utilruntime.HandleError(err)
 		return
 	}
 
@@ -366,7 +367,7 @@ func forcefullyDeletePod(c client.Interface, pod *api.Pod) {
 	var zero int64
 	err := c.Pods(pod.Namespace).Delete(pod.Name, &api.DeleteOptions{GracePeriodSeconds: &zero})
 	if err != nil {
-		util.HandleError(err)
+		utilruntime.HandleError(err)
 	}
 }
 
@@ -456,7 +457,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			if readyCondition.Status != api.ConditionTrue && lastReadyCondition.Status == api.ConditionTrue {
 				nc.recordNodeStatusChange(node, "NodeNotReady")
 				if err = nc.markAllPodsNotReady(node.Name); err != nil {
-					util.HandleError(fmt.Errorf("Unable to mark all pods NotReady on node %v: %v", node.Name, err))
+					utilruntime.HandleError(fmt.Errorf("Unable to mark all pods NotReady on node %v: %v", node.Name, err))
 				}
 			}
 

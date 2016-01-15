@@ -27,7 +27,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -70,12 +70,12 @@ func NewNamespaceController(kubeClient client.Interface, versions *unversioned.A
 							glog.V(4).Infof("Content remaining in namespace %s, waiting %d seconds", namespace.Name, t)
 							time.Sleep(time.Duration(t) * time.Second)
 							if err := controller.Requeue(namespace); err != nil {
-								util.HandleError(err)
+								utilruntime.HandleError(err)
 							}
 						}()
 						return
 					}
-					util.HandleError(err)
+					utilruntime.HandleError(err)
 				}
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
@@ -87,12 +87,12 @@ func NewNamespaceController(kubeClient client.Interface, versions *unversioned.A
 							glog.V(4).Infof("Content remaining in namespace %s, waiting %d seconds", namespace.Name, t)
 							time.Sleep(time.Duration(t) * time.Second)
 							if err := controller.Requeue(namespace); err != nil {
-								util.HandleError(err)
+								utilruntime.HandleError(err)
 							}
 						}()
 						return
 					}
-					util.HandleError(err)
+					utilruntime.HandleError(err)
 				}
 			},
 		},

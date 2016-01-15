@@ -32,11 +32,12 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 func init() {
-	util.ReallyCrash = true
+	runtime.ReallyCrash = true
 }
 
 func TestDoProbe(t *testing.T) {
@@ -251,7 +252,7 @@ func TestCleanUp(t *testing.T) {
 }
 
 func TestHandleCrash(t *testing.T) {
-	util.ReallyCrash = false // Test that we *don't* really crash.
+	runtime.ReallyCrash = false // Test that we *don't* really crash.
 
 	m := newTestManager()
 	w := newTestWorker(m, readiness, api.Probe{})
