@@ -56,7 +56,7 @@ grep -q "^${ETCD_VERSION}\$" binaries/.etcd 2>/dev/null || {
 KUBE_VERSION=${KUBE_VERSION:-"1.1.2"}
 echo "Prepare kubernetes ${KUBE_VERSION} release ..."
 grep -q "^${KUBE_VERSION}\$" binaries/.kubernetes 2>/dev/null || {
-  curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v${KUBE_VERSION}/kubernetes.tar.gz -o kubernetes.tar.gz
+  curl -L https://github.com/kubernetes/kubernetes/releases/download/v${KUBE_VERSION}/kubernetes.tar.gz -o kubernetes.tar.gz
   tar xzf kubernetes.tar.gz
   pushd kubernetes/server
   tar xzf kubernetes-server-linux-amd64.tar.gz
@@ -72,5 +72,5 @@ grep -q "^${KUBE_VERSION}\$" binaries/.kubernetes 2>/dev/null || {
 
 rm -rf flannel* kubernetes* etcd*
 
-echo "Done! All your binaries locate in kubernetes/cluster/ubuntu/binaries directory"
+echo "Done! All binaries in kubernetes/cluster/ubuntu/binaries"
 popd
