@@ -241,7 +241,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		RootDirectory:                  s.RootDirectory,
 		Runonce:                        s.RunOnce,
 		SerializeImagePulls:            s.SerializeImagePulls,
-		StandaloneMode:                 (len(s.APIServerList) == 0),
+		StandaloneMode:                 (len(s.APIServer) == 0) && (len(s.APIServerList) == 0),
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
 		SyncFrequency:                  s.SyncFrequency,
 		SystemContainer:                s.SystemContainer,
@@ -278,7 +278,7 @@ func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
 			eventClientConfig.Burst = s.EventBurst
 			kcfg.EventClient, err = client.New(&eventClientConfig)
 		}
-		if err != nil && len(s.APIServerList) > 0 {
+		if err != nil && (len(s.APIServer) > 0 || len(s.APIServerList) > 0) {
 			glog.Warningf("No API client: %v", err)
 		}
 
@@ -381,14 +381,14 @@ func authPathClientConfig(s *options.KubeletServer, useDefaults bool) (*client.C
 	if err != nil {
 		return nil, err
 	}
-	authConfig.Host = s.APIServerList[0]
+	authConfig.Host = s.APIServer
 	return &authConfig, nil
 }
 
 func kubeconfigClientConfig(s *options.KubeletServer) (*client.Config, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServerList[0]}}).ClientConfig()
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServer}}).ClientConfig()
 }
 
 // createClientConfig creates a client configuration from the command line
@@ -417,16 +417,21 @@ func createClientConfig(s *options.KubeletServer) (*client.Config, error) {
 }
 
 // CreateAPIServerClientConfig generates a client.Config from command line flags,
-// including api-server-list, via createClientConfig and then injects chaos into
-// the configuration via addChaosToClientConfig. This func is exported to support
-// integration with third party kubelet extensions (e.g. kubernetes-mesos).
+// including api-server and api-server-list (in favor of the latter one if both
+// are explicitly set) via createClientConfig and then injects chaos into
+// the configuration via addChaosToClientConfig. This func is exported to
+// support integration with third party kubelet extensions (e.g. kubernetes-mesos).
 func CreateAPIServerClientConfig(s *options.KubeletServer) (*client.Config, error) {
-	if len(s.APIServerList) < 1 {
-		return nil, fmt.Errorf("no api servers specified")
+	if len(s.APIServerList) > 0 && len(s.APIServer) > 0 {
+		glog.Warningf("specify both --api-servers and --api-server, adopt --api-servers")
 	}
-	// TODO: adapt Kube client to support LB over several servers
-	if len(s.APIServerList) > 1 {
-		glog.Infof("Multiple api servers specified.  Picking first one")
+	if len(s.APIServerList) > 0 {
+		glog.Infof("picking first one of --api-servers")
+		s.APIServer = s.APIServerList[0]
+	}
+
+	if len(s.APIServer) == 0 {
+		return nil, fmt.Errorf("no api servers specified")
 	}
 
 	clientConfig, err := createClientConfig(s)

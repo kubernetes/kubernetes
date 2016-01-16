@@ -11,6 +11,7 @@ allow-privileged
 api-burst
 api-prefix
 api-rate
+api-server
 api-server-address
 api-server-port
 api-servers
