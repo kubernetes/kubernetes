@@ -262,6 +262,28 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
+	job := extensions.Job{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "job",
+			Namespace:         "default",
+			CreationTimestamp: unversioned.Time{time.Now()},
+			SelfLink:          "/apis/extensions/v1beta1/namespaces/default/jobs/job",
+		},
+		Spec: extensions.JobSpec{
+			Selector: &extensions.LabelSelector{MatchLabels: labels},
+		},
+	}
+
+	job_pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "bar",
+			Namespace:         "default",
+			CreationTimestamp: unversioned.Time{time.Now()},
+			Labels:            labels,
+			Annotations:       map[string]string{controller.CreatedByAnnotation: refJson(t, &job)},
+		},
+	}
+
 	naked_pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "bar",
@@ -299,6 +321,16 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []api.Pod{ds_pod},
+			rcs:          []api.ReplicationController{rc},
+			args:         []string{"node"},
+			expectFatal:  false,
+			expectDelete: true,
+		},
+		{
+			description:  "Job-managed pod",
+			node:         node,
+			expected:     cordoned_node,
+			pods:         []api.Pod{job_pod},
 			rcs:          []api.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  false,
@@ -352,6 +384,8 @@ func TestDrain(t *testing.T) {
 					return &http.Response{StatusCode: 200, Body: objBody(codec, &test.rcs[0])}, nil
 				case m.isFor("GET", "/namespaces/default/daemonsets/ds"):
 					return &http.Response{StatusCode: 200, Body: objBody(testapi.Extensions.Codec(), &ds)}, nil
+				case m.isFor("GET", "/namespaces/default/jobs/job"):
+					return &http.Response{StatusCode: 200, Body: objBody(testapi.Extensions.Codec(), &job)}, nil
 				case m.isFor("GET", "/pods"):
 					values, err := url.ParseQuery(req.URL.RawQuery)
 					if err != nil {
