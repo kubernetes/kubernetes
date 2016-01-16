@@ -45,6 +45,8 @@ type ContainerSpec struct {
 
 	// Metadata labels associated with this container.
 	Labels map[string]string `json:"labels,omitempty"`
+	// Metadata envs associated with this container. Only whitelisted envs are added.
+	Envs map[string]string `json:"envs,omitempty"`
 
 	HasCpu bool    `json:"has_cpu"`
 	Cpu    CpuSpec `json:"cpu,omitempty"`
@@ -306,6 +308,15 @@ type MemoryStats struct {
 	// Units: Bytes.
 	Usage uint64 `json:"usage"`
 
+	// Number of bytes of page cache memory.
+	// Units: Bytes.
+	Cache uint64 `json:"cache"`
+
+	// The amount of anonymous and swap cache memory (includes transparent
+	// hugepages).
+	// Units: Bytes.
+	RSS uint64 `json:"rss"`
+
 	// The amount of working set memory, this includes recently accessed memory,
 	// dirty memory, and kernel memory. Working set is <= "usage".
 	// Units: Bytes.
@@ -386,6 +397,10 @@ type FsStats struct {
 
 	// Number of bytes that is consumed by the container on this filesystem.
 	Usage uint64 `json:"usage"`
+
+	// Base Usage that is consumed by the container's writable layer.
+	// This field is only applicable for docker container's as of now.
+	BaseUsage uint64 `json:"base_usage"`
 
 	// Number of bytes available for non-root user.
 	Available uint64 `json:"available"`

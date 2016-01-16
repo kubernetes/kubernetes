@@ -103,7 +103,8 @@ func (self *elasticStorage) AddStats(ref info.ContainerReference, stats *info.Co
 			Do()
 		if err != nil {
 			// Handle error
-			panic(fmt.Errorf("failed to write stats to ElasticSearch- %s", err))
+			fmt.Printf("failed to write stats to ElasticSearch - %s", err)
+			return
 		}
 	}()
 	return nil
@@ -135,14 +136,15 @@ func newStorage(
 	)
 	if err != nil {
 		// Handle error
-		panic(err)
+		return nil, fmt.Errorf("failed to create the elasticsearch client - %s", err)
 	}
 
 	// Ping the Elasticsearch server to get e.g. the version number
 	info, code, err := client.Ping().URL(elasticHost).Do()
 	if err != nil {
 		// Handle error
-		panic(err)
+		return nil, fmt.Errorf("failed to ping the elasticsearch - %s", err)
+
 	}
 	fmt.Printf("Elasticsearch returned with code %d and version %s", code, info.Version.Number)
 

@@ -378,6 +378,11 @@
 			"Rev": "0f5c9d301b9b1cca66b3ea0f9dec3b5317d3686d"
 		},
 		{
+			"ImportPath": "github.com/docker/go-units",
+			"Comment": "v0.1.0-21-g0bbddae",
+			"Rev": "0bbddae09c5a5419a8c6dcdd7ff90da3d450393b"
+		},
+		{
 			"ImportPath": "github.com/docker/spdystream",
 			"Rev": "43bffc458d55aa784be658c9867fbefcfcb7fecf"
 		},
@@ -559,93 +564,93 @@
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/api",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/cache/memory",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/collector",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/container",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/events",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/fs",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/healthz",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/http",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/info/v1",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/info/v2",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/manager",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/metrics",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/pages",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/storage",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/summary",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/utils",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/validate",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/version",
-			"Comment": "v0.20.1",
-			"Rev": "634965abc45557ed03c268bb193a00cfcbedbd32"
+			"Comment": "v0.20.2",
+			"Rev": "5e3f23764e5760e179b527c854c32876dee4d4f7"
 		},
 		{
 			"ImportPath": "github.com/google/gofuzz",

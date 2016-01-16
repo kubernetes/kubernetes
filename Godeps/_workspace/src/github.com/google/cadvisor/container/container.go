@@ -81,4 +81,8 @@ type ContainerHandler interface {
 
 	// Cleanup frees up any resources being held like fds or go routines, etc.
 	Cleanup()
+
+	// Start starts any necessary background goroutines - must be cleaned up in Cleanup().
+	// It is expected that most implementations will be a no-op.
+	Start()
 }
