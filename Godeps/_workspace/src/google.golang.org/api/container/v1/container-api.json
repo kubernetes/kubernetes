@@ -1,11 +1,11 @@
 {
  "kind": "discovery#restDescription",
- "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/6g1NnM2JgMMXgWbO_PX25Eu0zKs\"",
+ "etag": "\"ye6orv2F-1npMW3u9suM3a7C5Bo/FD4oCwspiZqN6eCjsBmxDzsj5B8\"",
  "discoveryVersion": "v1",
  "id": "container:v1",
  "name": "container",
  "version": "v1",
- "revision": "20150605",
+ "revision": "20150603",
  "title": "Google Container Engine API",
  "description": "The Google Container Engine API is used for building and managing container based applications, powered by the open source Kubernetes technology.",
  "ownerDomain": "google.com",
@@ -17,7 +17,7 @@
  "documentationLink": "https://cloud.google.com/container-engine/",
  "protocol": "rest",
  "baseUrl": "https://container.googleapis.com/",
- "basePath": "",
+ "basePath": "/",
  "rootUrl": "https://container.googleapis.com/",
  "servicePath": "",
  "batchPath": "batch",
@@ -144,7 +144,7 @@
     },
     "nodeConfig": {
      "$ref": "NodeConfig",
-     "description": "Parameters used in creating the cluster's nodes. See the descriptions of the child properties of `nodeConfig`."
+     "description": "Parameters used in creating the cluster's nodes. See the descriptions of the child properties of `nodeConfig`. If unspecified, the defaults for all child properties are used."
     },
     "masterAuth": {
      "$ref": "MasterAuth",
@@ -164,39 +164,39 @@
     },
     "clusterIpv4Cidr": {
      "type": "string",
-     "description": "The IP address range of the container pods in this cluster, in [CIDR](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) notation (e.g. `10.96.0.0/14`). Leave blank to have one automatically chosen or specify a `/14` block in `10.0.0.0/8` or `172.16.0.0/12`."
+     "description": "The IP address range of the container pods in this cluster, in [CIDR](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) notation (e.g. `10.96.0.0/14`). Leave blank to have one automatically chosen or specify a `/14` block in `10.0.0.0/8`."
     },
     "selfLink": {
      "type": "string",
-     "description": "[Output only] Server-defined URL for the resource. @OutputOnly."
+     "description": "[Output only] Server-defined URL for the resource."
     },
     "zone": {
      "type": "string",
-     "description": "[Output only] The name of the Google Compute Engine [zone](/compute/docs/zones#available) in which the cluster resides. @OutputOnly."
+     "description": "[Output only] The name of the Google Compute Engine [zone](/compute/docs/zones#available) in which the cluster resides."
     },
     "endpoint": {
      "type": "string",
-     "description": "[Output only] The IP address of this cluster's Kubernetes master endpoint. The endpoint can be accessed from the internet at `https://username:password@endpoint/`. @OutputOnly. See the `masterAuth` property of this resource for username and password information."
+     "description": "[Output only] The IP address of this cluster's Kubernetes master endpoint. The endpoint can be accessed from the internet at `https://username:password@endpoint/`. See the `masterAuth` property of this resource for username and password information."
     },
     "initialClusterVersion": {
      "type": "string",
-     "description": "[Output only] The software version of Kubernetes master and kubelets used in the cluster when it was first created. The version can be upgraded over time. @OutputOnly."
+     "description": "[Output only] The software version of Kubernetes master and kubelets used in the cluster when it was first created. The version can be upgraded over time."
     },
     "currentMasterVersion": {
      "type": "string",
-     "description": "[Output only] The current software version of the master endpoint. @OutputOnly."
+     "description": "[Output only] The current software version of the master endpoint."
     },
     "currentNodeVersion": {
      "type": "string",
-     "description": "[Output only] The current version of the node software components. If they are currently at different versions because they're in the process of being upgraded, this reflects the minimum version of any of them. @OutputOnly."
+     "description": "[Output only] The current version of the node software components. If they are currently at different versions because they're in the process of being upgraded, this reflects the minimum version of any of them."
     },
     "createTime": {
      "type": "string",
-     "description": "[Output only] The time the cluster was created, in [RFC3339](href='https://www.ietf.org/rfc/rfc3339.txt) text format. @OutputOnly."
+     "description": "[Output only] The time the cluster was created, in [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) text format."
     },
     "status": {
      "type": "string",
-     "description": "[Output only] The current status of this cluster. @OutputOnly.",
+     "description": "[Output only] The current status of this cluster.",
      "enum": [
       "STATUS_UNSPECIFIED",
       "PROVISIONING",
@@ -208,20 +208,20 @@
     },
     "statusMessage": {
      "type": "string",
-     "description": "[Output only] Additional information about the current status of this cluster, if available. @OutputOnly."
+     "description": "[Output only] Additional information about the current status of this cluster, if available."
     },
     "nodeIpv4CidrSize": {
      "type": "integer",
-     "description": "[Output only] The size of the address space on each node for hosting containers. This is provisioned from within the container_ipv4_cidr range. @OutputOnly.",
+     "description": "[Output only] The size of the address space on each node for hosting containers. This is provisioned from within the container_ipv4_cidr range.",
      "format": "int32"
     },
     "servicesIpv4Cidr": {
      "type": "string",
-     "description": "[Output only] The IP address range of the Kubernetes services in this cluster, in [CIDR](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) notation (e.g. `1.2.3.4/29`). Service addresses are typically put in the last /16 from the container CIDR. @OutputOnly."
+     "description": "[Output only] The IP address range of the Kubernetes services in this cluster, in [CIDR](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) notation (e.g. `1.2.3.4/29`). Service addresses are typically put in the last /16 from the container CIDR."
     },
     "instanceGroupUrls": {
      "type": "array",
-     "description": "[Output only] The resource URLs of [instance groups](/compute/docs/instance-groups/) associated with this cluster. @OutputOnly.",
+     "description": "[Output only] The resource URLs of [instance groups](/compute/docs/instance-groups/) associated with this cluster.",
      "items": {
       "type": "string"
      }
@@ -239,12 +239,12 @@
     },
     "diskSizeGb": {
      "type": "integer",
-     "description": "Size of the disk attached to each node, specified in GB. The smallest allowed disk size is 10GB, and the default is 100GB.",
+     "description": "Size of the disk attached to each node, specified in GB. The smallest allowed disk size is 10GB. If unspecified, the default disk size is 100GB.",
      "format": "int32"
     },
     "oauthScopes": {
      "type": "array",
-     "description": "The set of Google API scopes to be made available on all of the node VMs under the \"default\" service account. Currently, the following scopes are necessary to ensure the correct functioning of the cluster: * \"https://www.googleapis.com/auth/compute\" * \"https://www.googleapis.com/auth/devstorage.read_only\"",
+     "description": "The set of Google API scopes to be made available on all of the node VMs under the \"default\" service account. The following scopes are recommended, but not required, and by default are not included: * `https://www.googleapis.com/auth/compute` is required for mounting persistent storage on your nodes. * `https://www.googleapis.com/auth/devstorage.read_only` is required for communicating with *gcr.io*. If unspecified, no scopes are added.",
      "items": {
       "type": "string"
      }
@@ -266,15 +266,15 @@
     },
     "clusterCaCertificate": {
      "type": "string",
-     "description": "[Output only] Base64 encoded public certificate that is the root of trust for the cluster. @OutputOnly."
+     "description": "[Output only] Base64 encoded public certificate that is the root of trust for the cluster."
     },
     "clientCertificate": {
      "type": "string",
-     "description": "[Output only] Base64 encoded public certificate used by clients to authenticate to the cluster endpoint. @OutputOnly."
+     "description": "[Output only] Base64 encoded public certificate used by clients to authenticate to the cluster endpoint."
     },
     "clientKey": {
      "type": "string",
-     "description": "[Output only] Base64 encoded private key used by clients to authenticate to the cluster endpoint. @OutputOnly."
+     "description": "[Output only] Base64 encoded private key used by clients to authenticate to the cluster endpoint."
     }
    }
   },
@@ -285,7 +285,7 @@
    "properties": {
     "cluster": {
      "$ref": "Cluster",
-     "description": "A [cluster resource](/container-engine/docs/v1/projects/zones/clusters)"
+     "description": "A [cluster resource](/container-engine/reference/rest/v1/projects.zones.clusters)"
     }
    }
   },
@@ -296,15 +296,15 @@
    "properties": {
     "name": {
      "type": "string",
-     "description": "The server-assigned ID for the operation. @OutputOnly."
+     "description": "The server-assigned ID for the operation."
     },
     "zone": {
      "type": "string",
-     "description": "The name of the Google Compute Engine [zone](/compute/docs/zones#available) in which the operation is taking place. @OutputOnly."
+     "description": "The name of the Google Compute Engine [zone](/compute/docs/zones#available) in which the operation is taking place."
     },
     "operationType": {
      "type": "string",
-     "description": "The operation type. @OutputOnly.",
+     "description": "The operation type.",
      "enum": [
       "TYPE_UNSPECIFIED",
       "CREATE_CLUSTER",
@@ -316,7 +316,7 @@
     },
     "status": {
      "type": "string",
-     "description": "The current status of the operation. @OutputOnly.",
+     "description": "The current status of the operation.",
      "enum": [
       "STATUS_UNSPECIFIED",
       "PENDING",
@@ -326,15 +326,15 @@
     },
     "statusMessage": {
      "type": "string",
-     "description": "If an error has occurred, a textual description of the error. @OutputOnly."
+     "description": "If an error has occurred, a textual description of the error."
     },
     "selfLink": {
      "type": "string",
-     "description": "Server-defined URL for the resource. @OutputOnly."
+     "description": "Server-defined URL for the resource."
     },
     "targetLink": {
      "type": "string",
-     "description": "Server-defined URL for the target of the operation. @OutputOnly."
+     "description": "Server-defined URL for the target of the operation."
     }
    }
   },
@@ -373,12 +373,62 @@
      }
     }
    }
+  },
+  "ServerConfig": {
+   "id": "ServerConfig",
+   "type": "object",
+   "description": "Container Engine Server configuration.",
+   "properties": {
+    "defaultClusterVersion": {
+     "type": "string",
+     "description": "What version this server deploys by default."
+    },
+    "validNodeVersions": {
+     "type": "array",
+     "description": "List of valid node upgrade target versions.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
   }
  },
  "resources": {
   "projects": {
    "resources": {
     "zones": {
+     "methods": {
+      "getServerconfig": {
+       "id": "container.projects.zones.getServerconfig",
+       "path": "v1/projects/{projectId}/zones/{zone}/serverconfig",
+       "httpMethod": "GET",
+       "description": "Returns configuration info about the Container Engine service.",
+       "parameters": {
+        "projectId": {
+         "type": "string",
+         "description": "The Google Developers Console [project ID or project number](https://developers.google.com/console/help/new/#projectnumber).",
+         "required": true,
+         "location": "path"
+        },
+        "zone": {
+         "type": "string",
+         "description": "The name of the Google Compute Engine [zone](/compute/docs/zones#available) to return operations for, or \"-\" for all zones.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "projectId",
+        "zone"
+       ],
+       "response": {
+        "$ref": "ServerConfig"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/cloud-platform"
+       ]
+      }
+     },
      "resources": {
       "clusters": {
        "methods": {
@@ -390,7 +440,7 @@
          "parameters": {
           "projectId": {
            "type": "string",
-           "description": "The Google Developers Console [project ID](https://console.developers.google.com/project) or [project number](https://developers.google.com/console/help/project-number)",
+           "description": "The Google Developers Console [project ID or project number](https://developers.google.com/console/help/new/#projectnumber).",
            "required": true,
            "location": "path"
           },
@@ -420,7 +470,7 @@
          "parameters": {
           "projectId": {
            "type": "string",
-           "description": "The Google Developers Console A [project ID](https://console.developers.google.com/project) or [project number](https://developers.google.com/console/help/project-number)",
+           "description": "The Google Developers Console [project ID or project number](https://developers.google.com/console/help/new/#projectnumber).",
            "required": true,
            "location": "path"
           },
@@ -453,11 +503,11 @@
          "id": "container.projects.zones.clusters.create",
          "path": "v1/projects/{projectId}/zones/{zone}/clusters",
          "httpMethod": "POST",
-         "description": "Creates a cluster, consisting of the specified number and type of Google Compute Engine instances, plus a Kubernetes master endpoint. By default, the cluster is created in the project's [default network]('/compute/docs/networking#networks_1'). One firewall is added for the cluster. After cluster creation, the cluster creates routes for each node to allow the containers on that node to communicate with all other instances in the cluster. Finally, an entry is added to the project's global metadata indicating which CIDR range is being used by the cluster.",
+         "description": "Creates a cluster, consisting of the specified number and type of Google Compute Engine instances, plus a Kubernetes master endpoint. By default, the cluster is created in the project's [default network](/compute/docs/networking#networks_1). One firewall is added for the cluster. After cluster creation, the cluster creates routes for each node to allow the containers on that node to communicate with all other instances in the cluster. Finally, an entry is added to the project's global metadata indicating which CIDR range is being used by the cluster.",
          "parameters": {
           "projectId": {
            "type": "string",
-           "description": "The Google Developers Console [project ID](https://console.developers.google.com/project) or [project number](https://developers.google.com/console/help/project-number)",
+           "description": "The Google Developers Console [project ID or project number](https://developers.google.com/console/help/new/#projectnumber).",
            "required": true,
            "location": "path"
           },
@@ -490,7 +540,7 @@
          "parameters": {
           "projectId": {
            "type": "string",
-           "description": "The Google Developers Console [project ID](https://console.developers.google.com/project) or [project number](https://developers.google.com/console/help/project-number)",
+           "description": "The Google Developers Console [project ID or project number](https://developers.google.com/console/help/new/#projectnumber).",
            "required": true,
            "location": "path"
           },
@@ -530,7 +580,7 @@
          "parameters": {
           "projectId": {
            "type": "string",
-           "description": "The Google Developers Console [project ID](https://console.developers.google.com/project) or [project number](https://developers.google.com/console/help/project-number)",
+           "description": "The Google Developers Console [project ID or project number](https://developers.google.com/console/help/new/#projectnumber).",
            "required": true,
            "location": "path"
           },
@@ -571,7 +621,7 @@
          "parameters": {
           "projectId": {
            "type": "string",
-           "description": "The Google Developers Console [project ID](https://console.developers.google.com/project) or [project number](https://developers.google.com/console/help/project-number)",
+           "description": "The Google Developers Console [project ID or project number](https://developers.google.com/console/help/new/#projectnumber).",
            "required": true,
            "location": "path"
           },
@@ -601,7 +651,7 @@
          "parameters": {
           "projectId": {
            "type": "string",
-           "description": "The Google Developers Console [project ID](https://console.developers.google.com/project) or [project number](https://developers.google.com/console/help/project-number)",
+           "description": "The Google Developers Console [project ID or project number](https://developers.google.com/console/help/new/#projectnumber).",
            "required": true,
            "location": "path"
           },

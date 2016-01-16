@@ -1046,7 +1046,7 @@ func (gce *GCECloud) CreateTargetHttpProxy(urlMap *compute.UrlMap, name string) 
 
 // SetUrlMapForTargetHttpProxy sets the given UrlMap for the given TargetHttpProxy.
 func (gce *GCECloud) SetUrlMapForTargetHttpProxy(proxy *compute.TargetHttpProxy, urlMap *compute.UrlMap) error {
-	op, err := gce.service.TargetHttpProxies.SetUrlMap(gce.projectID, proxy.Name, &compute.UrlMapReference{urlMap.SelfLink}).Do()
+	op, err := gce.service.TargetHttpProxies.SetUrlMap(gce.projectID, proxy.Name, &compute.UrlMapReference{UrlMap: urlMap.SelfLink}).Do()
 	if err != nil {
 		return err
 	}
@@ -1092,7 +1092,7 @@ func (gce *GCECloud) CreateGlobalForwardingRule(proxy *compute.TargetHttpProxy, 
 
 // SetProxyForGlobalForwardingRule links the given TargetHttpProxy with the given GlobalForwardingRule.
 func (gce *GCECloud) SetProxyForGlobalForwardingRule(fw *compute.ForwardingRule, proxy *compute.TargetHttpProxy) error {
-	op, err := gce.service.GlobalForwardingRules.SetTarget(gce.projectID, fw.Name, &compute.TargetReference{proxy.SelfLink}).Do()
+	op, err := gce.service.GlobalForwardingRules.SetTarget(gce.projectID, fw.Name, &compute.TargetReference{Target: proxy.SelfLink}).Do()
 	if err != nil {
 		return err
 	}
@@ -1167,7 +1167,7 @@ func (gce *GCECloud) ListBackendServices() (*compute.BackendServiceList, error) 
 // name, in the given instanceGroup. The instanceGroupLink is the fully
 // qualified self link of an instance group.
 func (gce *GCECloud) GetHealth(name string, instanceGroupLink string) (*compute.BackendServiceGroupHealth, error) {
-	groupRef := &compute.ResourceGroupReference{instanceGroupLink}
+	groupRef := &compute.ResourceGroupReference{Group: instanceGroupLink}
 	return gce.service.BackendServices.GetHealth(gce.projectID, name, groupRef).Do()
 }
 
@@ -1258,7 +1258,7 @@ func (gce *GCECloud) AddInstancesToInstanceGroup(name string, instanceNames []st
 	// Adding the same instance twice will result in a 4xx error
 	instances := []*compute.InstanceReference{}
 	for _, ins := range instanceNames {
-		instances = append(instances, &compute.InstanceReference{makeHostURL(gce.projectID, gce.zone, ins)})
+		instances = append(instances, &compute.InstanceReference{Instance: makeHostURL(gce.projectID, gce.zone, ins)})
 	}
 	op, err := gce.service.InstanceGroups.AddInstances(
 		gce.projectID, gce.zone, name,
@@ -1280,7 +1280,7 @@ func (gce *GCECloud) RemoveInstancesFromInstanceGroup(name string, instanceNames
 	instances := []*compute.InstanceReference{}
 	for _, ins := range instanceNames {
 		instanceLink := makeHostURL(gce.projectID, gce.zone, ins)
-		instances = append(instances, &compute.InstanceReference{instanceLink})
+		instances = append(instances, &compute.InstanceReference{Instance: instanceLink})
 	}
 	op, err := gce.service.InstanceGroups.RemoveInstances(
 		gce.projectID, gce.zone, name,
@@ -1306,7 +1306,7 @@ func (gce *GCECloud) AddPortToInstanceGroup(ig *compute.InstanceGroup, port int6
 		}
 	}
 	glog.Infof("Adding port %v to instance group %v with %d ports", port, ig.Name, len(ig.NamedPorts))
-	namedPort := compute.NamedPort{fmt.Sprintf("port%v", port), port}
+	namedPort := compute.NamedPort{Name: fmt.Sprintf("port%v", port), Port: port}
 	ig.NamedPorts = append(ig.NamedPorts, &namedPort)
 	op, err := gce.service.InstanceGroups.SetNamedPorts(
 		gce.projectID, gce.zone, ig.Name,
@@ -1367,12 +1367,13 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 		found := false
 		for _, item := range project.CommonInstanceMetadata.Items {
 			if item.Key == "sshKeys" {
-				if strings.Contains(item.Value, keyString) {
+				if strings.Contains(*item.Value, keyString) {
 					// We've already added the key
 					glog.Info("SSHKey already in project metadata")
 					return true, nil
 				}
-				item.Value = item.Value + "\n" + keyString
+				value := *item.Value + "\n" + keyString
+				item.Value = &value
 				found = true
 				break
 			}
@@ -1383,7 +1384,7 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 			project.CommonInstanceMetadata.Items = append(project.CommonInstanceMetadata.Items,
 				&compute.MetadataItems{
 					Key:   "sshKeys",
-					Value: keyString,
+					Value: &keyString,
 				})
 		}
 		op, err := gce.service.Projects.SetCommonInstanceMetadata(gce.projectID, project.CommonInstanceMetadata).Do()
@@ -1473,7 +1474,7 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 func getMetadataValue(metadata *compute.Metadata, key string) (string, bool) {
 	for _, item := range metadata.Items {
 		if item.Key == key {
-			return item.Value, true
+			return *item.Value, true
 		}
 	}
 	return "", false
