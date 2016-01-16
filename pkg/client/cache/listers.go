@@ -245,6 +245,62 @@ func (s *StoreToDeploymentLister) GetDeploymentsForRC(rc *api.ReplicationControl
 	return
 }
 
+// StoreToReplicaSetLister gives a store List and Exists methods. The store must contain only ReplicaSets.
+type StoreToReplicaSetLister struct {
+	Store
+}
+
+// Exists checks if the given ReplicaSet exists in the store.
+func (s *StoreToReplicaSetLister) Exists(rs *extensions.ReplicaSet) (bool, error) {
+	_, exists, err := s.Store.Get(rs)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// List lists all ReplicaSets in the store.
+// TODO: converge on the interface in pkg/client
+func (s *StoreToReplicaSetLister) List() (rss []extensions.ReplicaSet, err error) {
+	for _, rs := range s.Store.List() {
+		rss = append(rss, *(rs.(*extensions.ReplicaSet)))
+	}
+	return rss, nil
+}
+
+// GetPodReplicaSets returns a list of ReplicaSets managing a pod. Returns an error only if no matching ReplicaSets are found.
+func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []extensions.ReplicaSet, err error) {
+	var selector labels.Selector
+	var rs extensions.ReplicaSet
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no ReplicaSets found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		rs = *m.(*extensions.ReplicaSet)
+		if rs.Namespace != pod.Namespace {
+			continue
+		}
+		selector, err = extensions.LabelSelectorAsSelector(rs.Spec.Selector)
+		if err != nil {
+			err = fmt.Errorf("failed to convert pod selector to selector: %v", err)
+			return
+		}
+
+		// If a ReplicaSet with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		rss = append(rss, rs)
+	}
+	if len(rss) == 0 {
+		err = fmt.Errorf("could not find ReplicaSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
+
 // StoreToDaemonSetLister gives a store List and Exists methods. The store must contain only DaemonSets.
 type StoreToDaemonSetLister struct {
 	Store
