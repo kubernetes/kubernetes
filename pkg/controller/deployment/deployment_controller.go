@@ -196,7 +196,7 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 func (dc *DeploymentController) addRC(obj interface{}) {
 	rc := obj.(*api.ReplicationController)
 	glog.V(4).Infof("Replication controller %s added.", rc.Name)
-	if d := dc.getDeploymentForRC(rc); rc != nil {
+	if d := dc.getDeploymentForRC(rc); d != nil {
 		dKey, err := controller.KeyFunc(d)
 		if err != nil {
 			glog.Errorf("Couldn't get key for deployment controller %#v: %v", d, err)
