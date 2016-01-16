@@ -42,8 +42,8 @@ const (
 	listPodLatencyMediumThreshold time.Duration = 1 * time.Second
 	listPodLatencyLargeThreshold  time.Duration = 1 * time.Second
 	// TODO: Decrease the small threshold to 250ms once tests are fixed.
-	apiCallLatencySmallThreshold  time.Duration = 500 * time.Millisecond
-	apiCallLatencyMediumThreshold time.Duration = 500 * time.Millisecond
+	apiCallLatencySmallThreshold  time.Duration = 1 * time.Second
+	apiCallLatencyMediumThreshold time.Duration = 1 * time.Second
 	apiCallLatencyLargeThreshold  time.Duration = 1 * time.Second
 )
 
