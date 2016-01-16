@@ -222,7 +222,9 @@ func (r *Reflector) canForceResyncNow() bool {
 	return r.now().Add(forceResyncThreshold).After(r.nextResync)
 }
 
-// Returns error if ListAndWatch didn't even tried to initialize watch.
+// ListAndWatch first lists all items and get the resource version at the moment of call,
+// and then use the resource version to watch.
+// It returns error if ListAndWatch didn't even try to initialize watch.
 func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	var resourceVersion string
 	resyncCh, cleanup := r.resyncChan()
