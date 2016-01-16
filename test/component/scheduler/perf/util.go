@@ -39,7 +39,6 @@ import (
 // It returns scheduler config factory and destroyFunc which should be used to
 // remove resources after finished.
 // Notes on rate limiter:
-//   - The BindPodsRateLimiter is nil, meaning no rate limits.
 //   - client rate limit is set to 5000.
 func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destroyFunc func()) {
 	framework.DeleteAllEtcdKeys()
@@ -58,7 +57,7 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 		Burst:        5000,
 	})
 
-	schedulerConfigFactory = factory.NewConfigFactory(c, nil, api.DefaultSchedulerName)
+	schedulerConfigFactory = factory.NewConfigFactory(c, api.DefaultSchedulerName)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		panic("Couldn't create scheduler config")
