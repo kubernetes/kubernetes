@@ -18,6 +18,7 @@ package daemon
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -141,12 +142,15 @@ func addPods(podStore cache.Store, nodeName string, label map[string]string, num
 }
 
 type fakePodControl struct {
+	sync.Mutex
 	*controller.FakePodControl
 	podStore *cache.StoreToPodLister
 	podIDMap map[string]*api.Pod
 }
 
 func (f *fakePodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
+	f.Lock()
+	defer f.Unlock()
 	if err := f.FakePodControl.CreatePodsOnNode(nodeName, namespace, template, object); err != nil {
 		return fmt.Errorf("failed to create pod on node %q", nodeName)
 	}
@@ -173,6 +177,8 @@ func (f *fakePodControl) CreatePodsOnNode(nodeName, namespace string, template *
 }
 
 func (f *fakePodControl) DeletePod(namespace string, podID string, object runtime.Object) error {
+	f.Lock()
+	defer f.Unlock()
 	if err := f.FakePodControl.DeletePod(namespace, podID, object); err != nil {
 		return fmt.Errorf("failed to delete pod %q", podID)
 	}
@@ -190,9 +196,9 @@ func newTestController() (*DaemonSetsController, *fakePodControl) {
 	manager := NewDaemonSetsController(client, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady
 	podControl := &fakePodControl{
-		&controller.FakePodControl{},
-		&manager.podStore,
-		make(map[string]*api.Pod),
+		FakePodControl: &controller.FakePodControl{},
+		podStore:       &manager.podStore,
+		podIDMap:       make(map[string]*api.Pod),
 	}
 	manager.podControl = podControl
 	return manager, podControl

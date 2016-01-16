@@ -383,7 +383,7 @@ func (dsc *DaemonSetsController) needsRollingUpdate(ds *extensions.DaemonSet, da
 		maxUnavailable = util.GetValueFromPercent(maxUnavailable, numNodes)
 	}
 	if numUnavailable >= maxUnavailable {
-		glog.V(4).Infof("Number of unavailable DaemonSet pods: %d, exceeds allowed maximum: %d", numUnavailable, maxUnavailable)
+		glog.V(4).Infof("Number of unavailable DaemonSet pods: %d, is equal to or exceeds allowed maximum: %d", numUnavailable, maxUnavailable)
 		return nil, false
 	}
 
