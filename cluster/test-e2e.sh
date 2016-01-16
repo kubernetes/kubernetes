@@ -30,4 +30,4 @@ TEST_ARGS="$@"
 
 echo "Running e2e tests:" 1>&2
 echo "./hack/ginkgo-e2e.sh ${TEST_ARGS}" 1>&2
-exec "${KUBE_ROOT}/hack/ginkgo-e2e.sh" ${TEST_ARGS}
+exec "${KUBE_ROOT}/hack/ginkgo-e2e.sh" "$@"
