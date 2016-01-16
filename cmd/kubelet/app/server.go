@@ -178,13 +178,13 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 	}
 
 	return &KubeletConfig{
-		Address:                   s.Address,
+		Address:                   net.ParseIP(s.Address),
 		AllowPrivileged:           s.AllowPrivileged,
 		Auth:                      nil, // default does not enforce auth[nz]
 		CAdvisorInterface:         nil, // launches background processes, not set here
 		CgroupRoot:                s.CgroupRoot,
 		Cloud:                     nil, // cloud provider might start background processes
-		ClusterDNS:                s.ClusterDNS,
+		ClusterDNS:                net.ParseIP(s.ClusterDNS),
 		ClusterDomain:             s.ClusterDomain,
 		ConfigFile:                s.Config,
 		ConfigureCBR0:             s.ConfigureCBR0,
@@ -199,12 +199,12 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		EnableServer:              s.EnableServer,
 		EventBurst:                s.EventBurst,
 		EventRecordQPS:            s.EventRecordQPS,
-		FileCheckFrequency:        s.FileCheckFrequency,
+		FileCheckFrequency:        s.FileCheckFrequency.Duration,
 		HostnameOverride:          s.HostnameOverride,
 		HostNetworkSources:        hostNetworkSources,
 		HostPIDSources:            hostPIDSources,
 		HostIPCSources:            hostIPCSources,
-		HTTPCheckFrequency:        s.HTTPCheckFrequency,
+		HTTPCheckFrequency:        s.HTTPCheckFrequency.Duration,
 		ImageGCPolicy:             imageGCPolicy,
 		KubeClient:                nil,
 		ManifestURL:               s.ManifestURL,
@@ -214,14 +214,14 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		MaxOpenFiles:              s.MaxOpenFiles,
 		MaxPerPodContainerCount:   s.MaxPerPodContainerCount,
 		MaxPods:                   s.MaxPods,
-		MinimumGCAge:              s.MinimumGCAge,
+		MinimumGCAge:              s.MinimumGCAge.Duration,
 		Mounter:                   mounter,
 		ChownRunner:               chownRunner,
 		ChmodRunner:               chmodRunner,
 		NetworkPluginName:         s.NetworkPluginName,
 		NetworkPlugins:            ProbeNetworkPlugins(s.NetworkPluginDir),
 		NodeLabels:                s.NodeLabels,
-		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
+		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency.Duration,
 		OOMAdjuster:               oom.NewOOMAdjuster(),
 		OSInterface:               kubecontainer.RealOS{},
 		PodCIDR:                   s.PodCIDR,
@@ -242,16 +242,16 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		Runonce:                        s.RunOnce,
 		SerializeImagePulls:            s.SerializeImagePulls,
 		StandaloneMode:                 (len(s.APIServerList) == 0),
-		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
-		SyncFrequency:                  s.SyncFrequency,
+		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout.Duration,
+		SyncFrequency:                  s.SyncFrequency.Duration,
 		SystemContainer:                s.SystemContainer,
 		TLSOptions:                     tlsOptions,
 		Writer:                         writer,
 		VolumePlugins:                  ProbeVolumePlugins(s.VolumePluginDir),
-		OutOfDiskTransitionFrequency:   s.OutOfDiskTransitionFrequency,
+		OutOfDiskTransitionFrequency:   s.OutOfDiskTransitionFrequency.Duration,
 
 		ExperimentalFlannelOverlay: s.ExperimentalFlannelOverlay,
-		NodeIP: s.NodeIP,
+		NodeIP: net.ParseIP(s.NodeIP),
 	}, nil
 }
 
@@ -324,7 +324,7 @@ func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
 	if s.HealthzPort > 0 {
 		healthz.DefaultHealthz()
 		go util.Until(func() {
-			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress.String(), strconv.Itoa(s.HealthzPort)), nil)
+			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress, strconv.Itoa(s.HealthzPort)), nil)
 			if err != nil {
 				glog.Errorf("Starting health server failed: %v", err)
 			}
