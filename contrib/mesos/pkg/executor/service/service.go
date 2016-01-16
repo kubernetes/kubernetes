@@ -65,7 +65,7 @@ func NewKubeletExecutorServer() *KubeletExecutorServer {
 	} else {
 		k.RootDirectory = pwd // mesos sandbox dir
 	}
-	k.Address = net.ParseIP(defaultBindingAddress())
+	k.Address = defaultBindingAddress()
 
 	return k
 }
@@ -121,7 +121,7 @@ func (s *KubeletExecutorServer) runExecutor(
 	dconfig := bindings.DriverConfig{
 		Executor:         exec,
 		HostnameOverride: s.HostnameOverride,
-		BindingAddress:   s.Address,
+		BindingAddress:   net.ParseIP(s.Address),
 	}
 	driver, err := bindings.NewMesosExecutorDriver(dconfig)
 	if err != nil {
