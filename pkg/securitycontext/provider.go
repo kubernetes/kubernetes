@@ -83,7 +83,7 @@ func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container 
 	}
 
 	if effectiveSC.Capabilities != nil {
-		add, drop := makeCapabilites(effectiveSC.Capabilities.Add, effectiveSC.Capabilities.Drop)
+		add, drop := MakeCapabilities(effectiveSC.Capabilities.Add, effectiveSC.Capabilities.Drop)
 		hostConfig.CapAdd = add
 		hostConfig.CapDrop = drop
 	}
@@ -105,8 +105,8 @@ func modifySecurityOption(config []string, name, value string) []string {
 	return config
 }
 
-// makeCapabilites creates string slices from Capability slices
-func makeCapabilites(capAdd []api.Capability, capDrop []api.Capability) ([]string, []string) {
+// MakeCapabilities creates string slices from Capability slices
+func MakeCapabilities(capAdd []api.Capability, capDrop []api.Capability) ([]string, []string) {
 	var (
 		addCaps  []string
 		dropCaps []string
