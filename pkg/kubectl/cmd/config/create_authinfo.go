@@ -95,7 +95,8 @@ func NewCmdConfigSetAuthInfo(out io.Writer, configAccess ConfigAccess) *cobra.Co
 	cmd.Flags().Var(&options.token, clientcmd.FlagBearerToken, clientcmd.FlagBearerToken+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.username, clientcmd.FlagUsername, clientcmd.FlagUsername+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.password, clientcmd.FlagPassword, clientcmd.FlagPassword+" for the user entry in kubeconfig")
-	cmd.Flags().Var(&options.embedCertData, clientcmd.FlagEmbedCerts, "embed client cert/key for the user entry in kubeconfig")
+	f := cmd.Flags().VarPF(&options.embedCertData, clientcmd.FlagEmbedCerts, "", "embed client cert/key for the user entry in kubeconfig")
+	f.NoOptDefVal = "true"
 
 	return cmd
 }
