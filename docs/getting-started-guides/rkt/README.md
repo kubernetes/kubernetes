@@ -48,17 +48,22 @@ We still have [a bunch of work](http://issue.k8s.io/8262) to do to make the expe
 - Note that for rkt version later than v0.7.0, `metadata service` is not required for running pods in private networks. So now rkt pods will not register the metadata service be default.
 
 - Since release [v1.2.0-alpha.5](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.5),
-[rkt API service](https://github.com/coreos/rkt/blob/master/api/v1alpha/README.md) is required to be running on the machine.
+the [rkt API service](https://github.com/coreos/rkt/blob/master/api/v1alpha/README.md)
+must be running on the node.
 
 ### Network Setup
 
-rkt uses [CNI(Container Network Interface)](https://github.com/appc/cni) to manage the container networks.
-Currently, all launched pods will try to join a network called `rkt.kubernetes.io` by default, which is defined [here](https://github.com/kubernetes/kubernetes/blob/v1.2.0-alpha.6/pkg/kubelet/rkt/rkt.go#L91).
-So in order for the pod to get the correct IP address, we need to setup the CNI config file for this `rkt.kubernetes.io` network correctly:
+rkt uses the [Container Network Interface (CNI)](https://github.com/appc/cni)
+to manage container networking. By default, all pods attempt to join a network
+called `rkt.kubernetes.io`, which is currently defined [in `rkt.go`]
+(https://github.com/kubernetes/kubernetes/blob/v1.2.0-alpha.6/pkg/kubelet/rkt/rkt.go#L91).
+In order for pods to get correct IP addresses, the CNI config file must be
+edited to add this `rkt.kubernetes.io` network:
 
-- Using Flannel
+#### Using flannel
 
-If [flannel](https://github.com/coreos/flannel) is used, then we need to create a flannel CNI config, for example:
+[flannel](https://github.com/coreos/flannel) can be configured with a
+CNI config like:
 
 ```console
 $ cat <<EOF >/etc/rkt/net.d/k8s_cluster.conf
@@ -69,14 +74,18 @@ $ cat <<EOF >/etc/rkt/net.d/k8s_cluster.conf
 EOF
 ```
 
-Where `k8s_cluster.conf` is an arbitary name for the config file.
-`name` in the config file must be `rkt.kubernetes.io`, and `type` should be `flannel`.
-More details about flannel CNI plugin can be found [here](https://github.com/appc/cni/blob/master/Documentation/flannel.md)
+While `k8s_cluster.conf` is a rather arbitrary name for the config file itself,
+and can be adjusted to suit local conventions, the keys and values should be exactly
+as shown above. `name` must be `rkt.kubernetes.io` and `type` should be `flannel`.
+More details about the flannel CNI plugin can be found
+[in the CNI documentation](https://github.com/appc/cni/blob/master/Documentation/flannel.md).
 
-- On GCE
+#### On GCE
 
-As each VM on GCE can have extra 256 IP addresses that get routed to it, we don't have to use flannel for a Kubernetes cluster on GCE.
-But we still to create a CNI config, for example:
+Each VM on GCE can have up to 256 IP addresses routed to it, so flannel isn't called
+for in most smaller Kubernetes clusters on GCE. This makes the necessary CNI config
+file a bit more verbose:
+
 ```console
 $ cat <<EOF >/etc/rkt/net.d/k8s_cluster.conf
 {
@@ -92,12 +101,19 @@ $ cat <<EOF >/etc/rkt/net.d/k8s_cluster.conf
 }
 EOF
 ```
-Here we created a `bridge` plugin config for the network, which specifies the bridge name `cbr0`. It also specifies the CIDR in the `ipam` field.
 
-As you can imagine, creating those files for a multi-node cluster is impractical.
-Currently, we are working on Kuberenetes to use the CNI by default (see [#18795](https://github.com/kubernetes/kubernetes/pull/18795/files)).
-After those work is done, we won't need to manually created such config files for rkt.
-Besides, if you really want to try this out, [here](https://gist.github.com/yifan-gu/fbb911db83d785915543) is an example patch how you can create such files automatically.
+This example creates a `bridge` plugin configuration for the CNI network, specifying
+the bridge name `cbr0`. It also specifies the CIDR, in the `ipam` field.
+
+Creating these files for any moderately-sized cluster is at best inconvenient.
+Work is in progress to
+[enable Kubernetes to use the CNI by default]
+(https://github.com/kubernetes/kubernetes/pull/18795/files).
+As that work matures, such manual CNI config munging will become unneccessary for
+primary use cases. For early adopters, an initial example shows one way to
+[automatically generate these CNI configurations]
+(https://gist.github.com/yifan-gu/fbb911db83d785915543)
+for rkt.
 
 ### Local cluster
 
