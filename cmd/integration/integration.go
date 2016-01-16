@@ -75,9 +75,9 @@ var (
 	// Limit the number of concurrent tests.
 	maxConcurrency int
 
-	longTestTimeout = time.Second * 300
+	longTestTimeout = time.Second * 500
 
-	maxTestTimeout = time.Minute * 10
+	maxTestTimeout = time.Minute * 15
 )
 
 type delegateHandler struct {
