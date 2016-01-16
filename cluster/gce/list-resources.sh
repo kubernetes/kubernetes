@@ -45,10 +45,10 @@ function gcloud-compute-list() {
       echo "${result}"
       return
     fi
-    echo -e "${color_yellow}Attempt ${attempt} failed to list ${resource}. Retrying.${color_norm}" >&2
+    echo -e "Attempt ${attempt} failed to list ${resource}. Retrying." >&2
     attempt=$(($attempt+1))
     if [[ ${attempt} > 5 ]]; then
-      echo -e "${color_red}List ${resource} failed!${color_norm}" >&2
+      echo -e "List ${resource} failed!" >&2
       exit 2
     fi
     sleep $((5*${attempt}))
