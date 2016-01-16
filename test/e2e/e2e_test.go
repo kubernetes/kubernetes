@@ -25,5 +25,5 @@ func init() {
 }
 
 func TestE2E(t *testing.T) {
-	RunE2ETest(t)
+	RunE2ETests(t)
 }

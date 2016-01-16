@@ -49,7 +49,7 @@ const (
 var (
 	cloudConfig = &testContext.CloudConfig
 
-	reportDir = ""
+	reportDir string
 )
 
 func RegisterFlags() {
@@ -95,8 +95,8 @@ func RegisterFlags() {
 	flag.StringVar(&reportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 }
 
-// RunE2ETest is a test function which can be called externally.  This facilitates usage of the Kubernetes E2E tests in different environments.
-func RunE2ETest(t *testing.T) {
+// RunE2ETests checks configuration of the cluster and then runs the ginkgo tests.
+func RunE2ETests(t *testing.T) {
 	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()

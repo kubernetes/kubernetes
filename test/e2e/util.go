@@ -832,7 +832,7 @@ func waitForService(c *client.Client, namespace, name string, exist bool, interv
 	return nil
 }
 
-//waitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
+// waitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
 func waitForServiceEndpointsNum(c *client.Client, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
 	return wait.Poll(interval, timeout, func() (bool, error) {
 		Logf("Waiting for amount of service:%s endpoints to %d", serviceName, expectNum)
@@ -1178,11 +1178,11 @@ func kubectlCmd(args ...string) *exec.Cmd {
 	}
 	kubectlArgs := append(defaultArgs, args...)
 
-	//We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
-	//and so on.
+	// We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
+	// and so on.
 	cmd := exec.Command(testContext.KubectlPath, kubectlArgs...)
 
-	//caller will invoke this and wait on it.
+	// caller will invoke this and wait on it.
 	return cmd
 }
 
