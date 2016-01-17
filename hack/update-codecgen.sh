@@ -53,8 +53,7 @@ result=""
 function depends {
   file=${generated_files[$1]//\.generated\.go/.go}
   deps=$(go list -f "{{.Deps}}" ${file} | tr "[" " " | tr "]" " ")
-  fullpath=$(readlinkdashf "${generated_files[$2]//\.generated\.go/.go}")
-  candidate=$(dirname "${fullpath}")
+  candidate=$(readlinkdashf "${generated_files[$2]//\.generated\.go/.go}")
   result=false
   for dep in ${deps}; do
     if [[ ${candidate} = *${dep} ]]; then
