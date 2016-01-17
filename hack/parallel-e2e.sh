@@ -80,9 +80,9 @@ failed = False
 for testcase in parse(sys.stdin).getElementsByTagName("testcase"):
   if len(testcase.getElementsByTagName("failure")) != 0:
     failed = True
-    print "  FAIL: {test}".format(test = testcase.getAttribute("name"))
+    print("  FAIL: {test}".format(test = testcase.getAttribute("name")))
 if not failed:
-  print "  SUCCESS!"
+  print("  SUCCESS!")
 '
 }
 
