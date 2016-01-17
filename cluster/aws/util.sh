@@ -450,9 +450,12 @@ function ensure-master-pd {
 }
 
 # Gets master ELB, if exists
-# Sets MASTER_ELB_ID
+# Sets:
+#  MASTER_ELB_ID = id of the ELB
+#  MASTER_ELB_DNSNAME = hostname of the ELB
+#
 # Note that for ELB, the name == the ID, but we gloss over that:
-# to be consistent, we only set the ID if the load balacner exists.
+# to be consistent, we only set the ID if the load balancer exists.
 function find-master-elb {
   # Sadly ELBs don't support querying by tag
   # We can tag them, but we can't query on tags (easily)
@@ -479,7 +482,7 @@ function find-master-elb {
 }
 
 # Gets or creates master ELB
-# Sets MASTER_ELB_ID
+# Sets MASTER_ELB_ID and MASTER_ELB_DNSNAME (see find-master-elb)
 function ensure-master-elb {
   find-master-elb
 
@@ -1096,6 +1099,8 @@ function start-master() {
             --load-balancer-name ${MASTER_ELB_ID} \
             --instances ${master_id} > ${LOG}
     KUBE_SERVER=https://${MASTER_ELB_DNSNAME}
+    # API_SERVERS is passed to salt; it is the URL on which kubelets will contact the API
+    # (otherwise Salt derives a default URL from the IP of nodes with the master role)
     API_SERVERS=${MASTER_ELB_DNSNAME}
   fi
 }

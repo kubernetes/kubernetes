@@ -16,6 +16,19 @@
 
 # Common utilites for kube-up/kube-down
 
+# Some variables are well-known, and have specific meaning here and in the
+# provider-specific scripts. Note we document the generic definition here;
+# provider scripts may add additional requirements.
+#
+# KUBE_SERVER
+#  If set, KUBE_SERVER is the URL on which the kube API server can be reached
+#  from outside the cluster, used e.g. when building a kubectl configuration.
+#  Defaults to 'https://${KUBE_MASTER_IP}'
+#
+# KUBE_MASTER_IP
+#  If set, KUBE_MASTER_IP is the IP address on which the master can be reached
+#  from outside the cluster, used e.g. when building a kubectl configuration.
+
 set -o errexit
 set -o nounset
 set -o pipefail
