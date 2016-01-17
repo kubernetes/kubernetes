@@ -639,10 +639,33 @@ type IngressSpec struct {
 	// is optional to allow the loadbalancer controller or defaulting logic to
 	// specify a global default.
 	Backend *IngressBackend `json:"backend,omitempty"`
+
+	// TLS configuration. Currently the Ingress only supports a single TLS
+	// port, 443, and assumes TLS termination. If multiple members of this
+	// list specify different hosts, they will be multiplexed on the same
+	// port according to the hostname specified through the SNI TLS extension.
+	TLS []IngressTLS `json:"tls,omitempty"`
+
 	// A list of host rules used to configure the Ingress. If unspecified, or
 	// no rule matches, all traffic is sent to the default backend.
 	Rules []IngressRule `json:"rules,omitempty"`
 	// TODO: Add the ability to specify load-balancer IP through claims
+}
+
+// IngressTLS describes the transport layer security associated with an Ingress.
+type IngressTLS struct {
+	// Hosts are a list of hosts included in the TLS certificate. The values in
+	// this list must match the name/s used in the tlsSecret. Defaults to the
+	// wildcard host setting for the loadbalancer controller fulfilling this
+	// Ingress, if left unspecified.
+	Hosts []string `json:"hosts,omitempty"`
+	// SecretName is the name of the secret used to terminate SSL traffic on 443.
+	// Field is left optional to allow SSL routing based on SNI hostname alone.
+	// If the SNI host in a listener conflicts with the "Host" header field used
+	// by an IngressRule, the SNI host is used for termination and value of the
+	// Host header is used for routing.
+	SecretName string `json:"secretName,omitempty"`
+	// TODO: Consider specifying different modes of termination, protocols etc.
 }
 
 // IngressStatus describe the current state of the Ingress.

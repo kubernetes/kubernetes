@@ -3167,6 +3167,16 @@ func autoConvert_extensions_IngressSpec_To_v1beta1_IngressSpec(in *extensions.In
 	} else {
 		out.Backend = nil
 	}
+	if in.TLS != nil {
+		out.TLS = make([]IngressTLS, len(in.TLS))
+		for i := range in.TLS {
+			if err := Convert_extensions_IngressTLS_To_v1beta1_IngressTLS(&in.TLS[i], &out.TLS[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.TLS = nil
+	}
 	if in.Rules != nil {
 		out.Rules = make([]IngressRule, len(in.Rules))
 		for i := range in.Rules {
@@ -3196,6 +3206,26 @@ func autoConvert_extensions_IngressStatus_To_v1beta1_IngressStatus(in *extension
 
 func Convert_extensions_IngressStatus_To_v1beta1_IngressStatus(in *extensions.IngressStatus, out *IngressStatus, s conversion.Scope) error {
 	return autoConvert_extensions_IngressStatus_To_v1beta1_IngressStatus(in, out, s)
+}
+
+func autoConvert_extensions_IngressTLS_To_v1beta1_IngressTLS(in *extensions.IngressTLS, out *IngressTLS, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.IngressTLS))(in)
+	}
+	if in.Hosts != nil {
+		out.Hosts = make([]string, len(in.Hosts))
+		for i := range in.Hosts {
+			out.Hosts[i] = in.Hosts[i]
+		}
+	} else {
+		out.Hosts = nil
+	}
+	out.SecretName = in.SecretName
+	return nil
+}
+
+func Convert_extensions_IngressTLS_To_v1beta1_IngressTLS(in *extensions.IngressTLS, out *IngressTLS, s conversion.Scope) error {
+	return autoConvert_extensions_IngressTLS_To_v1beta1_IngressTLS(in, out, s)
 }
 
 func autoConvert_extensions_Job_To_v1beta1_Job(in *extensions.Job, out *Job, s conversion.Scope) error {
@@ -4438,6 +4468,16 @@ func autoConvert_v1beta1_IngressSpec_To_extensions_IngressSpec(in *IngressSpec, 
 	} else {
 		out.Backend = nil
 	}
+	if in.TLS != nil {
+		out.TLS = make([]extensions.IngressTLS, len(in.TLS))
+		for i := range in.TLS {
+			if err := Convert_v1beta1_IngressTLS_To_extensions_IngressTLS(&in.TLS[i], &out.TLS[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.TLS = nil
+	}
 	if in.Rules != nil {
 		out.Rules = make([]extensions.IngressRule, len(in.Rules))
 		for i := range in.Rules {
@@ -4467,6 +4507,26 @@ func autoConvert_v1beta1_IngressStatus_To_extensions_IngressStatus(in *IngressSt
 
 func Convert_v1beta1_IngressStatus_To_extensions_IngressStatus(in *IngressStatus, out *extensions.IngressStatus, s conversion.Scope) error {
 	return autoConvert_v1beta1_IngressStatus_To_extensions_IngressStatus(in, out, s)
+}
+
+func autoConvert_v1beta1_IngressTLS_To_extensions_IngressTLS(in *IngressTLS, out *extensions.IngressTLS, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*IngressTLS))(in)
+	}
+	if in.Hosts != nil {
+		out.Hosts = make([]string, len(in.Hosts))
+		for i := range in.Hosts {
+			out.Hosts[i] = in.Hosts[i]
+		}
+	} else {
+		out.Hosts = nil
+	}
+	out.SecretName = in.SecretName
+	return nil
+}
+
+func Convert_v1beta1_IngressTLS_To_extensions_IngressTLS(in *IngressTLS, out *extensions.IngressTLS, s conversion.Scope) error {
+	return autoConvert_v1beta1_IngressTLS_To_extensions_IngressTLS(in, out, s)
 }
 
 func autoConvert_v1beta1_Job_To_extensions_Job(in *Job, out *extensions.Job, s conversion.Scope) error {
@@ -5234,6 +5294,7 @@ func init() {
 		autoConvert_extensions_IngressRule_To_v1beta1_IngressRule,
 		autoConvert_extensions_IngressSpec_To_v1beta1_IngressSpec,
 		autoConvert_extensions_IngressStatus_To_v1beta1_IngressStatus,
+		autoConvert_extensions_IngressTLS_To_v1beta1_IngressTLS,
 		autoConvert_extensions_Ingress_To_v1beta1_Ingress,
 		autoConvert_extensions_JobCondition_To_v1beta1_JobCondition,
 		autoConvert_extensions_JobList_To_v1beta1_JobList,
@@ -5338,6 +5399,7 @@ func init() {
 		autoConvert_v1beta1_IngressRule_To_extensions_IngressRule,
 		autoConvert_v1beta1_IngressSpec_To_extensions_IngressSpec,
 		autoConvert_v1beta1_IngressStatus_To_extensions_IngressStatus,
+		autoConvert_v1beta1_IngressTLS_To_extensions_IngressTLS,
 		autoConvert_v1beta1_Ingress_To_extensions_Ingress,
 		autoConvert_v1beta1_JobCondition_To_extensions_JobCondition,
 		autoConvert_v1beta1_JobList_To_extensions_JobList,
