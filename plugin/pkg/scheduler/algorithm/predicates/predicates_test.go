@@ -80,6 +80,7 @@ func TestPodFitsResources(t *testing.T) {
 		existingPods []*api.Pod
 		fits         bool
 		test         string
+		wErr         error
 	}{
 		{
 			pod: &api.Pod{},
@@ -88,6 +89,7 @@ func TestPodFitsResources(t *testing.T) {
 			},
 			fits: true,
 			test: "no resources requested always fits",
+			wErr: nil,
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
@@ -96,6 +98,7 @@ func TestPodFitsResources(t *testing.T) {
 			},
 			fits: false,
 			test: "too many resources fails",
+			wErr: ErrInsufficientFreeCPU,
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
@@ -104,6 +107,7 @@ func TestPodFitsResources(t *testing.T) {
 			},
 			fits: true,
 			test: "both resources fit",
+			wErr: nil,
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 2}),
@@ -112,6 +116,7 @@ func TestPodFitsResources(t *testing.T) {
 			},
 			fits: false,
 			test: "one resources fits",
+			wErr: ErrInsufficientFreeMemory,
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
@@ -120,6 +125,7 @@ func TestPodFitsResources(t *testing.T) {
 			},
 			fits: true,
 			test: "equal edge case",
+			wErr: nil,
 		},
 	}
 
@@ -128,8 +134,8 @@ func TestPodFitsResources(t *testing.T) {
 
 		fit := ResourceFit{FakeNodeInfo(node)}
 		fits, err := fit.PodFitsResources(test.pod, test.existingPods, "machine")
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+		if !reflect.DeepEqual(err, test.wErr) {
+			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
 		if fits != test.fits {
 			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
@@ -141,6 +147,7 @@ func TestPodFitsResources(t *testing.T) {
 		existingPods []*api.Pod
 		fits         bool
 		test         string
+		wErr         error
 	}{
 		{
 			pod: &api.Pod{},
@@ -149,6 +156,7 @@ func TestPodFitsResources(t *testing.T) {
 			},
 			fits: false,
 			test: "even without specified resources predicate fails when there's no available ips",
+			wErr: ErrExceededMaxPodNumber,
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
@@ -157,6 +165,7 @@ func TestPodFitsResources(t *testing.T) {
 			},
 			fits: false,
 			test: "even if both resources fit predicate fails when there's no available ips",
+			wErr: ErrExceededMaxPodNumber,
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
@@ -165,6 +174,7 @@ func TestPodFitsResources(t *testing.T) {
 			},
 			fits: false,
 			test: "even for equal edge case predicate fails when there's no available ips",
+			wErr: ErrExceededMaxPodNumber,
 		},
 	}
 	for _, test := range notEnoughPodsTests {
@@ -172,8 +182,8 @@ func TestPodFitsResources(t *testing.T) {
 
 		fit := ResourceFit{FakeNodeInfo(node)}
 		fits, err := fit.PodFitsResources(test.pod, test.existingPods, "machine")
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+		if !reflect.DeepEqual(err, test.wErr) {
+			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
 		}
 		if fits != test.fits {
 			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
