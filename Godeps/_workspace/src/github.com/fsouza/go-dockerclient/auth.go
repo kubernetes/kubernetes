@@ -106,7 +106,7 @@ func authConfigs(confs map[string]dockerConfig) (*AuthConfigurations, error) {
 		if err != nil {
 			return nil, err
 		}
-		userpass := strings.Split(string(data), ":")
+		userpass := strings.SplitN(string(data), ":", 2)
 		if len(userpass) != 2 {
 			return nil, ErrCannotParseDockercfg
 		}
