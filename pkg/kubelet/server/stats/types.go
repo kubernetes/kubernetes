@@ -45,6 +45,9 @@ type NodeStats struct {
 	Memory *MemoryStats `json:"memory,omitempty"`
 	// Stats pertaining to network resources.
 	Network *NetworkStats `json:"network,omitempty"`
+	// Stats pertaining to total usage of filesystem resources on the rootfs used by node k8s components.
+	// NodeFs.Used is the total bytes used on the filesystem.
+	Fs *FsStats `json:"fs,omitempty"`
 }
 
 const (
@@ -64,6 +67,9 @@ type PodStats struct {
 	Containers []ContainerStats `json:"containers" patchStrategy:"merge" patchMergeKey:"name"`
 	// Stats pertaining to network resources.
 	Network *NetworkStats `json:"network,omitempty"`
+	// Stats pertaining to volume usage of filesystem resources.
+	// VolumeStats.UsedBytes is the number of bytes used by the Volume
+	VolumeStats []VolumeStats `json:"volume,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // ContainerStats holds container-level unprocessed sample stats.
@@ -74,6 +80,12 @@ type ContainerStats struct {
 	CPU *CPUStats `json:"cpu,omitempty"`
 	// Stats pertaining to memory (RAM) resources.
 	Memory *MemoryStats `json:"memory,omitempty"`
+	// Stats pertaining to container rootfs usage of filesystem resources.
+	// Rootfs.UsedBytes is the number of bytes used for the container write layer.
+	Rootfs *FsStats `json:"rootfs,omitempty"`
+	// Stats pertaining to container logs usage of filesystem resources.
+	// Logs.UsedBytes is the number of bytes used for the container logs.
+	Logs *FsStats `json:"logs,omitempty"`
 }
 
 // NonLocalObjectReference contains enough information to locate the referenced object.
@@ -114,4 +126,24 @@ type MemoryStats struct {
 	PageFaults *int64 `json:"pageFaults,omitempty"`
 	// Cumulative number of major page faults.
 	MajorPageFaults *int64 `json:"majorPageFaults,omitempty"`
+}
+
+// VolumeStats contains data about Volume filesystem usage.
+type VolumeStats struct {
+	// Embedded FsStats
+	FsStats
+	// Name is the name given to the Volume
+	Name string `json:"name,omitempty"`
+}
+
+// FsStats contains data about filesystem usage.
+type FsStats struct {
+	// AvailableBytes represents the storage space available (bytes) for the filesystem.
+	AvailableBytes *resource.Quantity `json:"availableBytes,omitempty"`
+	// CapacityBytes represents the total capacity (bytes) of the filesystems underlying storage.
+	CapacityBytes *resource.Quantity `json:"capacityBytes,omitempty"`
+	// UsedBytes represents the bytes used for a specific task on the filesystem.
+	// This may differ from the total bytes used on the filesystem and may not equal CapacityBytes - AvailableBytes.
+	// e.g. For ContainerStats.Rootfs this is the bytes used by the container rootfs on the filesystem.
+	UsedBytes *resource.Quantity `json:"usedBytes,omitempty"`
 }
