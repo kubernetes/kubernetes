@@ -56,40 +56,40 @@ func (c *thirdPartyResources) List(opts api.ListOptions) (result *extensions.Thi
 	return
 }
 
-// Get returns information about a particular daemon set.
+// Get returns information about a particular third party resource.
 func (c *thirdPartyResources) Get(name string) (result *extensions.ThirdPartyResource, err error) {
 	result = &extensions.ThirdPartyResource{}
 	err = c.r.Get().Namespace(c.ns).Resource("thirdpartyresources").Name(name).Do().Into(result)
 	return
 }
 
-// Create creates a new daemon set.
-func (c *thirdPartyResources) Create(daemon *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
+// Create creates a new third party resource.
+func (c *thirdPartyResources) Create(resource *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
 	result = &extensions.ThirdPartyResource{}
-	err = c.r.Post().Namespace(c.ns).Resource("thirdpartyresources").Body(daemon).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource("thirdpartyresources").Body(resource).Do().Into(result)
 	return
 }
 
-// Update updates an existing daemon set.
-func (c *thirdPartyResources) Update(daemon *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
+// Update updates an existing third party resource.
+func (c *thirdPartyResources) Update(resource *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
 	result = &extensions.ThirdPartyResource{}
-	err = c.r.Put().Namespace(c.ns).Resource("thirdpartyresources").Name(daemon.Name).Body(daemon).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource("thirdpartyresources").Name(resource.Name).Body(resource).Do().Into(result)
 	return
 }
 
-// UpdateStatus updates an existing daemon set status
-func (c *thirdPartyResources) UpdateStatus(daemon *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
+// UpdateStatus updates an existing third party resource status
+func (c *thirdPartyResources) UpdateStatus(resource *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
 	result = &extensions.ThirdPartyResource{}
-	err = c.r.Put().Namespace(c.ns).Resource("thirdpartyresources").Name(daemon.Name).SubResource("status").Body(daemon).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource("thirdpartyresources").Name(resource.Name).SubResource("status").Body(resource).Do().Into(result)
 	return
 }
 
-// Delete deletes an existing daemon set.
+// Delete deletes an existing third party resource.
 func (c *thirdPartyResources) Delete(name string) error {
 	return c.r.Delete().Namespace(c.ns).Resource("thirdpartyresources").Name(name).Do().Error()
 }
 
-// Watch returns a watch.Interface that watches the requested daemon sets.
+// Watch returns a watch.Interface that watches the requested third party resources.
 func (c *thirdPartyResources) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
