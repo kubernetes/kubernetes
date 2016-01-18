@@ -65,8 +65,8 @@ func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 }
 
 // ScaleFromDeployment returns a scale subresource for a deployment.
-func ScaleFromDeployment(deployment *Deployment) *Scale {
-	return &Scale{
+func ScaleFromDeployment(deployment *Deployment) *ScaleTwo {
+	return &ScaleTwo{
 		ObjectMeta: api.ObjectMeta{
 			Name:              deployment.Name,
 			Namespace:         deployment.Namespace,
@@ -75,9 +75,25 @@ func ScaleFromDeployment(deployment *Deployment) *Scale {
 		Spec: ScaleSpec{
 			Replicas: deployment.Spec.Replicas,
 		},
-		Status: ScaleStatus{
+		Status: ScaleTwoStatus{
 			Replicas: deployment.Status.Replicas,
-			Selector: deployment.Spec.Selector,
+			Selector: labels.SelectorFromSet(deployment.Spec.Selector).String(),
 		},
 	}
+}
+
+// SetAsLabelSelector converts the labels.Set object into a LabelSelector api object.
+func SetAsLabelSelector(ls labels.Set) *LabelSelector {
+	if ls == nil {
+		return nil
+	}
+
+	selector := &LabelSelector{
+		MatchLabels: make(map[string]string),
+	}
+	for label, value := range ls {
+		selector.MatchLabels[label] = value
+	}
+
+	return selector
 }

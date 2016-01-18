@@ -78,6 +78,21 @@ func validNewDeployment() *extensions.Deployment {
 
 var validDeployment = *validNewDeployment()
 
+func validNewScale() *extensions.ScaleTwo {
+	return &extensions.ScaleTwo{
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+		Spec: extensions.ScaleSpec{
+			Replicas: validDeployment.Spec.Replicas,
+		},
+		Status: extensions.ScaleTwoStatus{
+			Replicas: validDeployment.Status.Replicas,
+			Selector: labels.SelectorFromSet(validDeployment.Spec.Selector).String(),
+		},
+	}
+}
+
+var validScale = *validNewScale()
+
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
@@ -180,21 +195,6 @@ func TestWatch(t *testing.T) {
 	)
 }
 
-func validNewScale() *extensions.Scale {
-	return &extensions.Scale{
-		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
-		Spec: extensions.ScaleSpec{
-			Replicas: validDeployment.Spec.Replicas,
-		},
-		Status: extensions.ScaleStatus{
-			Replicas: validDeployment.Status.Replicas,
-			Selector: validDeployment.Spec.Template.Labels,
-		},
-	}
-}
-
-var validScale = *validNewScale()
-
 func TestScaleGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
@@ -210,7 +210,7 @@ func TestScaleGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	scale := obj.(*extensions.Scale)
+	scale := obj.(*extensions.ScaleTwo)
 	if e, a := expect, scale; !api.Semantic.DeepDerivative(e, a) {
 		t.Errorf("unexpected scale: %s", util.ObjectDiff(e, a))
 	}
@@ -226,7 +226,7 @@ func TestScaleUpdate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	replicas := 12
-	update := extensions.Scale{
+	update := extensions.ScaleTwo{
 		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: extensions.ScaleSpec{
 			Replicas: replicas,

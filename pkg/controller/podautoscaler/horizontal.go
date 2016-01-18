@@ -44,7 +44,7 @@ const (
 )
 
 type HorizontalController struct {
-	scaleNamespacer unversioned_extensions.ScalesGetter
+	scaleNamespacer unversioned_extensions.ScaleTwosGetter
 	hpaNamespacer   unversioned_extensions.HorizontalPodAutoscalersGetter
 
 	metricsClient metrics.MetricsClient
@@ -54,7 +54,7 @@ type HorizontalController struct {
 var downscaleForbiddenWindow = 5 * time.Minute
 var upscaleForbiddenWindow = 3 * time.Minute
 
-func NewHorizontalController(evtNamespacer unversioned_legacy.EventsGetter, scaleNamespacer unversioned_extensions.ScalesGetter, hpaNamespacer unversioned_extensions.HorizontalPodAutoscalersGetter, metricsClient metrics.MetricsClient) *HorizontalController {
+func NewHorizontalController(evtNamespacer unversioned_legacy.EventsGetter, scaleNamespacer unversioned_extensions.ScaleTwosGetter, hpaNamespacer unversioned_extensions.HorizontalPodAutoscalersGetter, metricsClient metrics.MetricsClient) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(evtNamespacer.Events(""))
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "horizontal-pod-autoscaler"})
@@ -75,7 +75,7 @@ func (a *HorizontalController) Run(syncPeriod time.Duration) {
 	}, syncPeriod, util.NeverStop)
 }
 
-func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.HorizontalPodAutoscaler, scale *extensions.Scale) (int, *int, time.Time, error) {
+func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.HorizontalPodAutoscaler, scale *extensions.ScaleTwo) (int, *int, time.Time, error) {
 	if hpa.Spec.CPUUtilization == nil {
 		// If CPUTarget is not specified than we should return some default values.
 		// Since we always take maximum number of replicas from all policies it is safe
@@ -167,7 +167,7 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa extensions.Ho
 func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodAutoscaler) error {
 	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleRef.Kind, hpa.Namespace, hpa.Spec.ScaleRef.Name)
 
-	scale, err := a.scaleNamespacer.Scales(hpa.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
+	scale, err := a.scaleNamespacer.ScalesTwo(hpa.Namespace).Get(hpa.Spec.ScaleRef.Kind, hpa.Spec.ScaleRef.Name)
 	if err != nil {
 		a.eventRecorder.Event(&hpa, api.EventTypeWarning, "FailedGetScale", err.Error())
 		return fmt.Errorf("failed to query scale subresource for %s: %v", reference, err)
@@ -244,7 +244,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa extensions.HorizontalPodA
 
 	if rescale {
 		scale.Spec.Replicas = desiredReplicas
-		_, err = a.scaleNamespacer.Scales(hpa.Namespace).Update(hpa.Spec.ScaleRef.Kind, scale)
+		_, err = a.scaleNamespacer.ScalesTwo(hpa.Namespace).Update(hpa.Spec.ScaleRef.Kind, scale)
 		if err != nil {
 			a.eventRecorder.Eventf(&hpa, api.EventTypeWarning, "FailedRescale", "New size: %d; error: %v", desiredReplicas, err.Error())
 			return fmt.Errorf("failed to rescale %s: %v", reference, err)

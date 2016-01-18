@@ -318,7 +318,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	})
 	m.serviceNodePortAllocator = serviceNodePortRegistry
 
-	controllerStorage, controllerStatusStorage := controlleretcd.NewREST(dbClient("replicationControllers"), storageDecorator)
+	controllerStorage := controlleretcd.NewStorage(dbClient("replicationControllers"), storageDecorator)
 
 	m.v1ResourcesStorage = map[string]rest.Storage{
 		"pods":             podStorage.Pod,
@@ -333,8 +333,9 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 
 		"podTemplates": podTemplateStorage,
 
-		"replicationControllers":        controllerStorage,
-		"replicationControllers/status": controllerStatusStorage,
+		"replicationControllers":        controllerStorage.Controller,
+		"replicationControllers/status": controllerStorage.Status,
+		"replicationControllers/scale":  controllerStorage.Scale,
 		"services":                      service.NewStorage(m.serviceRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator, m.ProxyTransport),
 		"services/status":               serviceStatusStorage,
 		"endpoints":                     endpointsStorage,
@@ -588,13 +589,16 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	}
 
 	storage := map[string]rest.Storage{}
+
+	// TODO(madhusudancs): Should this be guarded by something? Like the way we guard horizontalpodautoscalers, daemonset, etc.?
+	controllerStorage := expcontrolleretcd.NewStorage(c.StorageDestinations.Get("", "replicationControllers"), storageDecorator)
+	storage["replicationcontrollers"] = controllerStorage.ReplicationController
+	storage["replicationcontrollers/scale"] = controllerStorage.Scale
+
 	if isEnabled("horizontalpodautoscalers") {
 		autoscalerStorage, autoscalerStatusStorage := horizontalpodautoscaleretcd.NewREST(dbClient("horizontalpodautoscalers"), storageDecorator)
 		storage["horizontalpodautoscalers"] = autoscalerStorage
 		storage["horizontalpodautoscalers/status"] = autoscalerStatusStorage
-		controllerStorage := expcontrolleretcd.NewStorage(c.StorageDestinations.Get("", "replicationControllers"), storageDecorator)
-		storage["replicationcontrollers"] = controllerStorage.ReplicationController
-		storage["replicationcontrollers/scale"] = controllerStorage.Scale
 	}
 	if isEnabled("thirdpartyresources") {
 		thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(dbClient("thirdpartyresources"), storageDecorator)

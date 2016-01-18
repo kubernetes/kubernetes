@@ -17,7 +17,13 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/controller"
@@ -26,6 +32,24 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
+
+// ControllerStorage includes dummy storage for Replication Controllers and for Scale subresource.
+type ControllerStorage struct {
+	Controller *REST
+	Status     *StatusREST
+	Scale      *ScaleREST
+}
+
+func NewStorage(s storage.Interface, storageDecorator generic.StorageDecorator) ControllerStorage {
+	controllerREST, statusREST := NewREST(s, storageDecorator)
+	controllerRegistry := controller.NewRegistry(controllerREST)
+
+	return ControllerStorage{
+		Controller: controllerREST,
+		Status:     statusREST,
+		Scale:      &ScaleREST{registry: &controllerRegistry},
+	}
+}
 
 type REST struct {
 	*etcdgeneric.Etcd
@@ -90,4 +114,75 @@ func (r *StatusREST) New() runtime.Object {
 // Update alters the status subset of an object.
 func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	return r.store.Update(ctx, obj)
+}
+
+type ScaleREST struct {
+	registry *controller.Registry
+}
+
+// ScaleREST implements Patcher
+var _ = rest.Patcher(&ScaleREST{})
+
+// New creates a new Scale object
+func (r *ScaleREST) New() runtime.Object {
+	return &extensions.ScaleTwo{}
+}
+
+func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
+	rc, err := (*r.registry).GetController(ctx, name)
+	if err != nil {
+		return nil, errors.NewNotFound(extensions.Resource("replicationcontrollers/scale"), name)
+	}
+	return &extensions.ScaleTwo{
+		ObjectMeta: api.ObjectMeta{
+			Name:              name,
+			Namespace:         rc.Namespace,
+			CreationTimestamp: rc.CreationTimestamp,
+		},
+		Spec: extensions.ScaleSpec{
+			Replicas: rc.Spec.Replicas,
+		},
+		Status: extensions.ScaleTwoStatus{
+			Replicas: rc.Status.Replicas,
+			Selector: labels.SelectorFromSet(rc.Spec.Selector).String(),
+		},
+	}, nil
+}
+
+func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	if obj == nil {
+		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
+	}
+	scale, ok := obj.(*extensions.ScaleTwo)
+	if !ok {
+		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
+	}
+
+	if errs := extvalidation.ValidateScaleTwo(scale); len(errs) > 0 {
+		return nil, false, errors.NewInvalid(extensions.Kind("ScaleTwo"), scale.Name, errs)
+	}
+
+	rc, err := (*r.registry).GetController(ctx, scale.Name)
+	if err != nil {
+		return nil, false, errors.NewNotFound(extensions.Resource("replicationcontrollers/scale"), scale.Name)
+	}
+	rc.Spec.Replicas = scale.Spec.Replicas
+	rc, err = (*r.registry).UpdateController(ctx, rc)
+	if err != nil {
+		return nil, false, errors.NewConflict(extensions.Resource("replicationcontrollers/scale"), scale.Name, err)
+	}
+	return &extensions.ScaleTwo{
+		ObjectMeta: api.ObjectMeta{
+			Name:              rc.Name,
+			Namespace:         rc.Namespace,
+			CreationTimestamp: rc.CreationTimestamp,
+		},
+		Spec: extensions.ScaleSpec{
+			Replicas: rc.Spec.Replicas,
+		},
+		Status: extensions.ScaleTwoStatus{
+			Replicas: rc.Status.Replicas,
+			Selector: labels.SelectorFromSet(rc.Spec.Selector).String(),
+		},
+	}, false, nil
 }

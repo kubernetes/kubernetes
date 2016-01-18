@@ -46,7 +46,8 @@ type ScaleStatus struct {
 	// actual number of observed instances of the scaled object.
 	Replicas int `json:"replicas"`
 
-	// label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// label query over pods that should match the replicas count.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
@@ -63,6 +64,37 @@ type Scale struct {
 
 	// current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
 	Status ScaleStatus `json:"status,omitempty"`
+}
+
+// +genclient=true,noMethods=true
+
+// represents a scaling request for a resource.
+// TODO(madhusudancs): The name ScaleTwo is only a place holder to indicate that this Scale type is different
+// from the original Scale type. The name of this resource will still be Scale, but in a different APIVersion
+// group. Once the APIVersion group is decided, this type should be moved to that group and called Scale.
+type ScaleTwo struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+	api.ObjectMeta `json:"metadata,omitempty"`
+
+	// defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	Spec ScaleSpec `json:"spec,omitempty"`
+
+	// current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
+	Status ScaleTwoStatus `json:"status,omitempty"`
+}
+
+// represents the current status of a scale subresource.
+// TODO(madhusudancs): See the comment above for ScaleTwo type.
+type ScaleTwoStatus struct {
+	// actual number of observed instances of the scaled object.
+	Replicas int `json:"replicas"`
+
+	// label query over pods that should match the replicas count. This is same
+	// as the label selector but in the string format to avoid introspection
+	// by clients. The string will be in the same format as the query-param syntax.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	Selector string `json:"selector,omitempty"`
 }
 
 // Dummy definition

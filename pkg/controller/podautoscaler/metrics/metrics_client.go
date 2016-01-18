@@ -44,7 +44,7 @@ type MetricsClient interface {
 	// GetCPUUtilization returns the average utilization over all pods represented as a percent of requested CPU
 	// (e.g. 70 means that an average pod uses 70% of the requested CPU)
 	// and the time of generation of the oldest of utilization reports for pods.
-	GetCPUUtilization(namespace string, selector map[string]string) (*int, time.Time, error)
+	GetCPUUtilization(namespace string, selector string) (*int, time.Time, error)
 
 	// GetCustomMetric returns the average value of the given custom metrics from the
 	// pods picked using the namespace and selector passed as arguments.
@@ -100,7 +100,7 @@ func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, ser
 	}
 }
 
-func (h *HeapsterMetricsClient) GetCPUUtilization(namespace string, selector map[string]string) (*int, time.Time, error) {
+func (h *HeapsterMetricsClient) GetCPUUtilization(namespace string, selector string) (*int, time.Time, error) {
 	avgConsumption, avgRequest, timestamp, err := h.GetCpuConsumptionAndRequestInMillis(namespace, selector)
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to get CPU consumption and request: %v", err)
@@ -109,12 +109,16 @@ func (h *HeapsterMetricsClient) GetCPUUtilization(namespace string, selector map
 	return &utilization, timestamp, nil
 }
 
-func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace string, selector map[string]string) (avgConsumption int64,
+func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace string, selector string) (avgConsumption int64,
 	avgRequest int64, timestamp time.Time, err error) {
 
-	labelSelector := labels.SelectorFromSet(labels.Set(selector))
+	// TODO: Eliminate deserialization/reserialization of the selector.
+	selectorObj, err := labels.Parse(selector)
+	if err != nil {
+		return nil, nil, time.Time{}, fmt.Errorf("couldn't convert selector string to a corresponding selector object: %v", err)
+	}
 	podList, err := h.client.Legacy().Pods(namespace).
-		List(api.ListOptions{LabelSelector: labelSelector})
+		List(api.ListOptions{LabelSelector: selectorObj})
 
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("failed to get pod list: %v", err)

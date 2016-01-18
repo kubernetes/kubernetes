@@ -29,6 +29,7 @@ import (
 type ExtensionsInterface interface {
 	HorizontalPodAutoscalersNamespacer
 	ScaleNamespacer
+	ScaleTwoNamespacer
 	DaemonSetsNamespacer
 	DeploymentsNamespacer
 	JobsNamespacer
@@ -50,6 +51,10 @@ func (c *ExtensionsClient) HorizontalPodAutoscalers(namespace string) Horizontal
 
 func (c *ExtensionsClient) Scales(namespace string) ScaleInterface {
 	return newScales(c, namespace)
+}
+
+func (c *ExtensionsClient) ScalesTwo(namespace string) ScaleTwoInterface {
+	return newScalesTwo(c, namespace)
 }
 
 func (c *ExtensionsClient) DaemonSets(namespace string) DaemonSetInterface {

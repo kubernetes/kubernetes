@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/testing/fake"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 
 	heapster "k8s.io/heapster/api/v1/types"
@@ -153,7 +154,7 @@ func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
 	metricsClient := NewHeapsterMetricsClient(testClient, DefaultHeapsterNamespace, DefaultHeapsterScheme, DefaultHeapsterService, DefaultHeapsterPort)
 	if tc.targetResource == "cpu-usage" {
-		val, _, timestamp, err := metricsClient.GetCpuConsumptionAndRequestInMillis(tc.namespace, tc.selector)
+		val, _, timestamp, err := metricsClient.GetCpuConsumptionAndRequestInMillis(tc.namespace, labels.Set(tc.selector).AsSelector().String())
 		fval := float64(val)
 		tc.verifyResults(t, &fval, timestamp, err)
 	} else {

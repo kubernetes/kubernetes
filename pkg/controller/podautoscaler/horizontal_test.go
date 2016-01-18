@@ -32,6 +32,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 
 	heapster "k8s.io/heapster/api/v1/types"
@@ -116,7 +117,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	})
 
 	fakeClient.AddReactor("get", "replicationController", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		obj := &extensions.Scale{
+		obj := &extensions.ScaleTwo{
 			ObjectMeta: api.ObjectMeta{
 				Name:      rcName,
 				Namespace: namespace,
@@ -124,9 +125,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 			Spec: extensions.ScaleSpec{
 				Replicas: tc.initialReplicas,
 			},
-			Status: extensions.ScaleStatus{
+			Status: extensions.ScaleTwoStatus{
 				Replicas: tc.initialReplicas,
-				Selector: map[string]string{"name": podNamePrefix},
+				Selector: labels.SelectorFromSet(map[string]string{"name": podNamePrefix}).String(),
 			},
 		}
 		return true, obj, nil
@@ -179,8 +180,8 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	})
 
 	fakeClient.AddReactor("update", "replicationController", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		obj := action.(testclient.UpdateAction).GetObject().(*extensions.Scale)
-		replicas := action.(testclient.UpdateAction).GetObject().(*extensions.Scale).Spec.Replicas
+		obj := action.(testclient.UpdateAction).GetObject().(*extensions.ScaleTwo)
+		replicas := action.(testclient.UpdateAction).GetObject().(*extensions.ScaleTwo).Spec.Replicas
 		assert.Equal(t, tc.desiredReplicas, replicas)
 		tc.scaleUpdated = true
 		return true, obj, nil

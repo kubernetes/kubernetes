@@ -187,7 +187,7 @@ var _ = rest.Patcher(&ScaleREST{})
 
 // New creates a new Scale object
 func (r *ScaleREST) New() runtime.Object {
-	return &extensions.Scale{}
+	return &extensions.ScaleTwo{}
 }
 
 func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
@@ -202,13 +202,13 @@ func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object,
 	if obj == nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
 	}
-	scale, ok := obj.(*extensions.Scale)
+	scale, ok := obj.(*extensions.ScaleTwo)
 	if !ok {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
 	}
 
-	if errs := extvalidation.ValidateScale(scale); len(errs) > 0 {
-		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), scale.Name, errs)
+	if errs := extvalidation.ValidateScaleTwo(scale); len(errs) > 0 {
+		return nil, false, errors.NewInvalid(extensions.Kind("ScaleTwo"), scale.Name, errs)
 	}
 
 	deployment, err := (*r.registry).GetDeployment(ctx, scale.Name)
