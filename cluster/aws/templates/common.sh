@@ -14,9 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+echo "== Refreshing package database =="
+until apt-get update; do
+  echo "== apt-get update failed, retrying =="
+  sleep 5
+done
 
-apt-get update
-apt-get install --yes curl
+function apt-get-install {
+  # Forcibly install packages (options borrowed from Salt logs).
+  until apt-get -q -y -o DPkg::Options::=--force-confold -o DPkg::Options::=--force-confdef install $@; do
+    echo "== install of packages $@ failed, retrying =="
+    sleep 5
+  done
+}
+
+apt-get-install curl
 
 # Retry a download until we get it.
 #
@@ -43,12 +55,6 @@ install-salt() {
     echo "== SaltStack already installed, skipping install step =="
     return
   fi
-
-  echo "== Refreshing package database =="
-  until apt-get update; do
-    echo "== apt-get update failed, retrying =="
-    echo sleep 5
-  done
 
   mkdir -p /var/cache/salt-install
   cd /var/cache/salt-install
@@ -79,7 +85,7 @@ install-salt() {
   echo "== Installing unmet dependencies =="
   until apt-get install -f -y; do
     echo "== apt-get install failed, retrying =="
-    echo sleep 5
+    sleep 5
   done
 
   # Log a timestamp
