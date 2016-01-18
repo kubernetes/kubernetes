@@ -18,6 +18,9 @@ package fields
 
 import (
 	"testing"
+
+	"k8s.io/kubernetes/pkg/util/selectors"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestSelectorParse(t *testing.T) {
@@ -160,49 +163,87 @@ func TestSetIsEmpty(t *testing.T) {
 	if !(Set{}).AsSelector().Empty() {
 		t.Errorf("Empty set should be empty")
 	}
-	if !(andTerm(nil)).Empty() {
-		t.Errorf("Nil andTerm should be empty")
+
+	selector := NewSelector()
+	if !selector.Empty() {
+		t.Errorf("Empty set should be empty")
 	}
-	if (&hasTerm{}).Empty() {
-		t.Errorf("hasTerm should not be empty")
+
+	hasSelector := NewSelector()
+	hasRequirement, err := NewRequirement("metadata.name", selectors.ExistsOperator, sets.NewString())
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
 	}
-	if (&notHasTerm{}).Empty() {
-		t.Errorf("notHasTerm should not be empty")
+	hasSelector = hasSelector.Add(*hasRequirement)
+	if hasSelector.Empty() {
+		t.Errorf("hasSelector should not be empty")
 	}
-	if !(andTerm{andTerm{}}).Empty() {
-		t.Errorf("Nested andTerm should be empty")
+
+	notHasSelector := NewSelector()
+	notHasRequirement, err := NewRequirement("metadata.name", selectors.DoesNotExistOperator, sets.NewString())
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
 	}
-	if (andTerm{&hasTerm{"a", "b"}}).Empty() {
-		t.Errorf("Nested andTerm should not be empty")
+	notHasSelector = notHasSelector.Add(*notHasRequirement)
+	if notHasSelector.Empty() {
+		t.Errorf("notHasSelector should not be empty")
+	}
+
+	equalsSelector := NewSelector()
+	equalsRequirement, err := NewRequirement("metadata.name", selectors.EqualsOperator, sets.NewString("test-name"))
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	equalsSelector = equalsSelector.Add(*equalsRequirement)
+	if equalsSelector.Empty() {
+		t.Errorf("equalsSelector should not be empty")
 	}
 }
 
 func TestRequiresExactMatch(t *testing.T) {
-	testCases := map[string]struct {
-		S     Selector
-		Label string
-		Value string
-		Found bool
+	testCases := []struct {
+		fieldSelector string
+		label         string
+		value         string
+		found         bool
 	}{
-		"empty set":                 {Set{}.AsSelector(), "test", "", false},
-		"nil andTerm":               {andTerm(nil), "test", "", false},
-		"empty hasTerm":             {&hasTerm{}, "test", "", false},
-		"skipped hasTerm":           {&hasTerm{"a", "b"}, "test", "", false},
-		"valid hasTerm":             {&hasTerm{"test", "b"}, "test", "b", true},
-		"valid hasTerm no value":    {&hasTerm{"test", ""}, "test", "", true},
-		"valid notHasTerm":          {&notHasTerm{"test", "b"}, "test", "", false},
-		"valid notHasTerm no value": {&notHasTerm{"test", ""}, "test", "", false},
-		"nested andTerm":            {andTerm{andTerm{}}, "test", "", false},
-		"nested andTerm matches":    {andTerm{&hasTerm{"test", "b"}}, "test", "b", true},
-		"andTerm with non-match":    {andTerm{&hasTerm{}, &hasTerm{"test", "b"}}, "test", "b", true},
+		{
+			fieldSelector: "x=a",
+			label:         "x",
+			value:         "a",
+			found:         true,
+		},
+		{
+			fieldSelector: "y=a",
+			label:         "x",
+			value:         "",
+			found:         false,
+		},
+		{
+			fieldSelector: "x!=a",
+			label:         "x",
+			found:         false,
+		},
+		{
+			fieldSelector: "x==a,b!=y",
+			label:         "x",
+			value:         "a",
+			found:         true,
+		},
+		{
+			fieldSelector: "x=a,b!=y",
+			label:         "b",
+			found:         false,
+		},
 	}
-	for k, v := range testCases {
-		value, found := v.S.RequiresExactMatch(v.Label)
-		if value != v.Value {
-			t.Errorf("%s: expected value %s, got %s", k, v.Value, value)
+	for _, tc := range testCases {
+		selector := ParseSelectorOrDie(tc.fieldSelector)
+		value, found := selector.RequiresExactMatch(tc.label)
+		if value != tc.value {
+			t.Errorf("%s: expected value %s, got %s", tc.fieldSelector, tc.value, value)
 		}
-		if found != v.Found {
-			t.Errorf("%s: expected found %t, got %t", k, v.Found, found)
+		if found != tc.found {
+			t.Errorf("%s: expected found %t, got %t", tc.fieldSelector, tc.found, found)
 		}
 	}
 }
