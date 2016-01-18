@@ -99,6 +99,8 @@ net.ipv4.ip_forward:
 
 {% set storage_base='https://storage.googleapis.com/kubernetes-release/docker/' %}
 
+{% set override_deb_url='' %}
+
 {% if grains.get('cloud', '') == 'gce'
    and grains.get('os_family', '') == 'Debian'
    and grains.get('oscodename', '') == 'wheezy' -%}
@@ -106,11 +108,25 @@ net.ipv4.ip_forward:
 {% set override_deb='' %}
 {% set override_deb_sha1='' %}
 {% set override_docker_ver='' %}
+# Ubuntu presents as os_family=Debian, osfullname=Ubuntu
+{% elif grains.get('cloud', '') == 'aws'
+   and grains.get('os_family', '') == 'Debian'
+   and grains.get('oscodename', '') == 'vivid' -%}
+# TODO: Get from google storage?
+{% set docker_pkg_name='docker-engine-1.8.3' %}
+{% set override_docker_ver='1.8.3' %}
+{% set override_deb='docker-engine_1.8.3-0~vivid_amd64.deb' %}
+{% set override_deb_url='http://apt.dockerproject.org/repo/pool/main/d/docker-engine/docker-engine_1.8.3-0~vivid_amd64.deb' %}
+{% set override_deb_sha1='f0259b1f04635977325c0cfa7c0006e1e5de1341' %}
 {% else %}
 {% set docker_pkg_name='lxc-docker-1.7.1' %}
 {% set override_docker_ver='1.7.1' %}
 {% set override_deb='lxc-docker-1.7.1_1.7.1_amd64.deb' %}
 {% set override_deb_sha1='81abef31dd2c616883a61f85bfb294d743b1c889' %}
+{% endif %}
+
+{% if override_deb_url == '' %}
+{% set override_deb_url=storage_base + override_deb %}
 {% endif %}
 
 {% if override_docker_ver != '' %}
@@ -121,7 +137,7 @@ purge-old-docker-package:
 
 /var/cache/docker-install/{{ override_deb }}:
   file.managed:
-    - source: {{ storage_base }}{{ override_deb }}
+    - source: {{ override_deb_url }}
     - source_hash: sha1={{ override_deb_sha1 }}
     - user: root
     - group: root
