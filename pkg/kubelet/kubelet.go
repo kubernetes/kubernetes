@@ -1719,17 +1719,8 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		if podUsesHostNetwork(pod) {
 			kl.recorder.Event(pod, api.EventTypeWarning, kubecontainer.HostNetworkNotSupported, "Bandwidth shaping is not currently supported on the host network")
 		} else if kl.shaper != nil {
-			status, found := kl.statusManager.GetPodStatus(pod.UID)
-			if !found {
-				statusPtr, err := kl.containerRuntime.GetAPIPodStatus(pod)
-				if err != nil {
-					glog.Errorf("Error getting pod for bandwidth shaping")
-					return err
-				}
-				status = *statusPtr
-			}
-			if len(status.PodIP) > 0 {
-				err = kl.shaper.ReconcileCIDR(fmt.Sprintf("%s/32", status.PodIP), egress, ingress)
+			if len(apiPodStatus.PodIP) > 0 {
+				err = kl.shaper.ReconcileCIDR(fmt.Sprintf("%s/32", apiPodStatus.PodIP), egress, ingress)
 			}
 		} else {
 			kl.recorder.Event(pod, api.EventTypeWarning, kubecontainer.UndefinedShaper, "Pod requests bandwidth shaping, but the shaper is undefined")

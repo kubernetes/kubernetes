@@ -440,7 +440,6 @@ func (dm *DockerManager) ConvertPodStatusToAPIPodStatus(pod *api.Pod, podStatus 
 	}
 
 	containerDone := sets.NewString()
-	// NOTE(random-liu): The Pod IP is generated in kubelet.generatePodStatus(), we have no podStatus.IP now
 	apiPodStatus.PodIP = podStatus.IP
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		cName := containerStatus.Name
