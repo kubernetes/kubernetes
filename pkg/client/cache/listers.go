@@ -245,6 +245,19 @@ func (s *StoreToDeploymentLister) GetDeploymentsForRC(rc *api.ReplicationControl
 	return
 }
 
+// StoreToEventLister gives a store List method. The store must contain only Events.
+type StoreToEventLister struct {
+	Store
+}
+
+// StoreToEventLister lists all events in the store.
+func (s *StoreToEventLister) List() (events api.EventList, err error) {
+	for _, c := range s.Store.List() {
+		events.Items = append(events.Items, *(c.(*api.Event)))
+	}
+	return events, nil
+}
+
 // StoreToDaemonSetLister gives a store List and Exists methods. The store must contain only DaemonSets.
 type StoreToDaemonSetLister struct {
 	Store

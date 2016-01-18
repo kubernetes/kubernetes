@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
+	eventgc "k8s.io/kubernetes/pkg/controller/event"
 	"k8s.io/kubernetes/pkg/controller/gc"
 	"k8s.io/kubernetes/pkg/controller/job"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
@@ -146,6 +147,11 @@ func Run(s *options.CMServer) error {
 
 	if s.TerminatedPodGCThreshold > 0 {
 		go gc.New(clientForUserAgentOrDie(*kubeconfig, "garbage-collector"), ResyncPeriod(s), s.TerminatedPodGCThreshold).
+			Run(util.NeverStop)
+	}
+
+	if s.EventTTL > 0 {
+		go eventgc.New(clientForUserAgentOrDie(*kubeconfig, "event-garbage-collector"), ResyncPeriod(s), s.EventTTL).
 			Run(util.NeverStop)
 	}
 
