@@ -924,11 +924,7 @@ function start-master() {
   # Get or create master elastic IP
   ensure-master-ip
 
-  # Determine extra certificate names for master
-  octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
-  ((octets[3]+=1))
-  service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
-  MASTER_EXTRA_SANS="IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
+  create-certs "" # TODO: Should we pass ELB name / elastic IP ?
 
   write-master-env
 
