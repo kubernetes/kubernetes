@@ -62,7 +62,7 @@ These guides are maintained by community members, cover specific platforms and u
 
 [**Multi-node Cluster**](coreos/coreos_multinode_cluster.md)
 
-Set up a single master, multi-worker cluster on your choice of platform: AWS, GCE, or VMware Fusion.
+Set up a single master, multi-worker cluster on your choice of platform: AWS, GCE, or OpenStack.
 
 <hr/>
 
