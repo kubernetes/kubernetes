@@ -47,8 +47,57 @@ We still have [a bunch of work](http://issue.k8s.io/8262) to do to make the expe
 
 - Note that for rkt version later than v0.7.0, `metadata service` is not required for running pods in private networks. So now rkt pods will not register the metadata service be default.
 
-- Since release [v1.2.0-alpha.5](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.5), [rkt API service](https://github.com/coreos/rkt/blob/master/api/v1alpha/README.md)
-  is required to be running on the machine.
+- Since release [v1.2.0-alpha.5](https://github.com/kubernetes/kubernetes/releases/tag/v1.2.0-alpha.5),
+[rkt API service](https://github.com/coreos/rkt/blob/master/api/v1alpha/README.md) is required to be running on the machine.
+
+### Network Setup
+
+rkt uses [CNI(Container Network Interface)](https://github.com/appc/cni) to manage the container networks.
+Currently, all launched pods will try to join a network called `rkt.kubernetes.io` by default, which is defined [here](https://github.com/kubernetes/kubernetes/blob/v1.2.0-alpha.6/pkg/kubelet/rkt/rkt.go#L91).
+So in order for the pod to get the correct IP address, we need to setup the CNI config file for this `rkt.kubernetes.io` network correctly:
+
+- Using Flannel
+
+If [flannel](https://github.com/coreos/flannel) is used, then we need to create a flannel CNI config, for example:
+
+```console
+$ cat <<EOF >/etc/rkt/net.d/k8s_cluster.conf
+{
+    "name": "rkt.kubernetes.io",
+    "type": "flannel"
+}
+EOF
+```
+
+Where `k8s_cluster.conf` is an arbitary name for the config file.
+`name` in the config file must be `rkt.kubernetes.io`, and `type` should be `flannel`.
+More details about flannel CNI plugin can be found [here](https://github.com/appc/cni/blob/master/Documentation/flannel.md)
+
+- On GCE
+
+As each VM on GCE can have extra 256 IP addresses that get routed to it, we don't have to use flannel for a Kubernetes cluster on GCE.
+But we still to create a CNI config, for example:
+```console
+$ cat <<EOF >/etc/rkt/net.d/k8s_cluster.conf
+{
+    "name": "rkt.kubernetes.io",
+    "type": "bridge",
+    "bridge": "cbr0",
+    "isGateway": true,
+    "ipam": {
+        "type": "host-local",
+        "subnet": "10.255.228.1/24",
+        "gateway": "10.255.228.1"
+    }
+}
+EOF
+```
+Here we created a `bridge` plugin config for the network, which specifies the bridge name `cbr0`. It also specifies the CIDR in the `ipam` field.
+
+As you can imagine, creating those files for a multi-node cluster is impractical.
+Currently, we are working on Kuberenetes to use the CNI by default (see [#18795](https://github.com/kubernetes/kubernetes/pull/18795/files)).
+After those work is done, we won't need to manually created such config files for rkt.
+Besides, if you really want to try this out, [here](https://gist.github.com/yifan-gu/fbb911db83d785915543) is an example patch how you can create such files automatically.
 
 ### Local cluster
 
@@ -86,13 +135,13 @@ $ export KUBE_CONTAINER_RUNTIME=rkt
 You can optionally choose the version of rkt used by setting `KUBE_RKT_VERSION`:
 
 ```console
-$ export KUBE_RKT_VERSION=0.8.0
+$ export KUBE_RKT_VERSION=0.15.0
 ```
 
 Then you can launch the cluster by:
 
 ```console
-$ kube-up.sh
+$ cluster/kube-up.sh
 ```
 
 Note that we are still working on making all containerized the master components run smoothly in rkt. Before that we are not able to run the master node with rkt yet.
