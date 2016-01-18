@@ -722,6 +722,15 @@ func autoConvert_api_EnvVarSource_To_v1_EnvVarSource(in *api.EnvVarSource, out *
 	} else {
 		out.ConfigMapKeyRef = nil
 	}
+	// unable to generate simple pointer conversion for api.SecretKeySelector -> v1.SecretKeySelector
+	if in.SecretKeyRef != nil {
+		out.SecretKeyRef = new(SecretKeySelector)
+		if err := Convert_api_SecretKeySelector_To_v1_SecretKeySelector(in.SecretKeyRef, out.SecretKeyRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.SecretKeyRef = nil
+	}
 	return nil
 }
 
@@ -2731,6 +2740,21 @@ func Convert_api_Secret_To_v1_Secret(in *api.Secret, out *Secret, s conversion.S
 	return autoConvert_api_Secret_To_v1_Secret(in, out, s)
 }
 
+func autoConvert_api_SecretKeySelector_To_v1_SecretKeySelector(in *api.SecretKeySelector, out *SecretKeySelector, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.SecretKeySelector))(in)
+	}
+	if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	out.Key = in.Key
+	return nil
+}
+
+func Convert_api_SecretKeySelector_To_v1_SecretKeySelector(in *api.SecretKeySelector, out *SecretKeySelector, s conversion.Scope) error {
+	return autoConvert_api_SecretKeySelector_To_v1_SecretKeySelector(in, out, s)
+}
+
 func autoConvert_api_SecretList_To_v1_SecretList(in *api.SecretList, out *SecretList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.SecretList))(in)
@@ -3934,6 +3958,15 @@ func autoConvert_v1_EnvVarSource_To_api_EnvVarSource(in *EnvVarSource, out *api.
 		}
 	} else {
 		out.ConfigMapKeyRef = nil
+	}
+	// unable to generate simple pointer conversion for v1.SecretKeySelector -> api.SecretKeySelector
+	if in.SecretKeyRef != nil {
+		out.SecretKeyRef = new(api.SecretKeySelector)
+		if err := Convert_v1_SecretKeySelector_To_api_SecretKeySelector(in.SecretKeyRef, out.SecretKeyRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.SecretKeyRef = nil
 	}
 	return nil
 }
@@ -5836,6 +5869,21 @@ func Convert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversion.S
 	return autoConvert_v1_Secret_To_api_Secret(in, out, s)
 }
 
+func autoConvert_v1_SecretKeySelector_To_api_SecretKeySelector(in *SecretKeySelector, out *api.SecretKeySelector, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*SecretKeySelector))(in)
+	}
+	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	out.Key = in.Key
+	return nil
+}
+
+func Convert_v1_SecretKeySelector_To_api_SecretKeySelector(in *SecretKeySelector, out *api.SecretKeySelector, s conversion.Scope) error {
+	return autoConvert_v1_SecretKeySelector_To_api_SecretKeySelector(in, out, s)
+}
+
 func autoConvert_v1_SecretList_To_api_SecretList(in *SecretList, out *api.SecretList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*SecretList))(in)
@@ -6437,6 +6485,7 @@ func init() {
 		autoConvert_api_ResourceQuota_To_v1_ResourceQuota,
 		autoConvert_api_ResourceRequirements_To_v1_ResourceRequirements,
 		autoConvert_api_SELinuxOptions_To_v1_SELinuxOptions,
+		autoConvert_api_SecretKeySelector_To_v1_SecretKeySelector,
 		autoConvert_api_SecretList_To_v1_SecretList,
 		autoConvert_api_SecretVolumeSource_To_v1_SecretVolumeSource,
 		autoConvert_api_Secret_To_v1_Secret,
@@ -6560,6 +6609,7 @@ func init() {
 		autoConvert_v1_ResourceQuota_To_api_ResourceQuota,
 		autoConvert_v1_ResourceRequirements_To_api_ResourceRequirements,
 		autoConvert_v1_SELinuxOptions_To_api_SELinuxOptions,
+		autoConvert_v1_SecretKeySelector_To_api_SecretKeySelector,
 		autoConvert_v1_SecretList_To_api_SecretList,
 		autoConvert_v1_SecretVolumeSource_To_api_SecretVolumeSource,
 		autoConvert_v1_Secret_To_api_Secret,

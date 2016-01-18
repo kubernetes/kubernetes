@@ -141,6 +141,7 @@ func init() {
 		deepCopy_api_ResourceRequirements,
 		deepCopy_api_SELinuxOptions,
 		deepCopy_api_Secret,
+		deepCopy_api_SecretKeySelector,
 		deepCopy_api_SecretList,
 		deepCopy_api_SecretVolumeSource,
 		deepCopy_api_SecurityContext,
@@ -699,6 +700,15 @@ func deepCopy_api_EnvVarSource(in EnvVarSource, out *EnvVarSource, c *conversion
 		}
 	} else {
 		out.ConfigMapKeyRef = nil
+	}
+	if in.SecretKeyRef != nil {
+		in, out := in.SecretKeyRef, &out.SecretKeyRef
+		*out = new(SecretKeySelector)
+		if err := deepCopy_api_SecretKeySelector(*in, *out, c); err != nil {
+			return err
+		}
+	} else {
+		out.SecretKeyRef = nil
 	}
 	return nil
 }
@@ -2330,6 +2340,14 @@ func deepCopy_api_Secret(in Secret, out *Secret, c *conversion.Cloner) error {
 		out.Data = nil
 	}
 	out.Type = in.Type
+	return nil
+}
+
+func deepCopy_api_SecretKeySelector(in SecretKeySelector, out *SecretKeySelector, c *conversion.Cloner) error {
+	if err := deepCopy_api_LocalObjectReference(in.LocalObjectReference, &out.LocalObjectReference, c); err != nil {
+		return err
+	}
+	out.Key = in.Key
 	return nil
 }
 
