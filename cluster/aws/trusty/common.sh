@@ -24,17 +24,6 @@ function detect-minion-image() {
   fi
 }
 
-function generate-minion-user-data {
-  # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
-  echo "#! /bin/bash"
-  echo "SALT_MASTER='${MASTER_INTERNAL_IP}'"
-  echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
-  echo "readonly DOCKER_STORAGE='${DOCKER_STORAGE:-}'"
-  grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
-  grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
-  grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-minion.sh"
-}
-
 function check-minion() {
   local minion_ip=$1
 

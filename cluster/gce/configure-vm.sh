@@ -24,6 +24,7 @@ is_push=$@
 readonly KNOWN_TOKENS_FILE="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
 readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
 
+#+GCE
 function ensure-basic-networking() {
   # Deal with GCE networking bring-up race. (We rely on DNS for a lot,
   # and it's just not worth doing a whole lot of startup work if this
@@ -43,6 +44,7 @@ function ensure-basic-networking() {
 
   echo "Networking functional on $(hostname) ($(hostname -i))"
 }
+#-GCE
 
 function ensure-install-dir() {
   INSTALL_DIR="/var/cache/kubernetes-install"
@@ -57,13 +59,14 @@ EOF
 }
 
 function set-broken-motd() {
-  echo -e '\nBroken (or in progress) GCE Kubernetes node setup! Suggested first step:\n  tail /var/log/startupscript.log\n' > /etc/motd
+  echo -e '\nBroken (or in progress) Kubernetes node setup! Suggested first step:\n  tail /var/log/startupscript.log\n' > /etc/motd
 }
 
 function set-good-motd() {
-  echo -e '\n=== GCE Kubernetes node setup complete ===\n' > /etc/motd
+  echo -e '\n=== Kubernetes node setup complete ===\n' > /etc/motd
 }
 
+#+GCE
 function curl-metadata() {
   curl --fail --retry 5 --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/attributes/${1}"
 }
@@ -88,11 +91,7 @@ for k,v in yaml.load(sys.stdin).iteritems():
 
 function remove-docker-artifacts() {
   echo "== Deleting docker0 =="
-  # Forcibly install bridge-utils (options borrowed from Salt logs).
-  until apt-get -q -y -o DPkg::Options::=--force-confold -o DPkg::Options::=--force-confdef install bridge-utils; do
-    echo "== install of bridge-utils failed, retrying =="
-    sleep 5
-  done
+  apt-get-install bridge-utils
 
   # Remove docker artifacts on minion nodes, if present
   iptables -t nat -F || true
@@ -100,6 +99,7 @@ function remove-docker-artifacts() {
   brctl delbr docker0 || true
   echo "== Finished deleting docker0 =="
 }
+#-GCE
 
 # Retry a download until we get it.
 #
@@ -125,6 +125,23 @@ validate-hash() {
   fi
 }
 
+apt-get-install() {
+  # Forcibly install packages (options borrowed from Salt logs).
+  until apt-get -q -y -o DPkg::Options::=--force-confold -o DPkg::Options::=--force-confdef install $@; do
+    echo "== install of packages $@ failed, retrying =="
+    sleep 5
+  done
+}
+
+apt-get-update() {
+  echo "== Refreshing package database =="
+  until apt-get update; do
+    echo "== apt-get update failed, retrying =="
+    echo sleep 5
+  done
+}
+
+#
 # Install salt from GCS.  See README.md for instructions on how to update these
 # debs.
 install-salt() {
@@ -132,12 +149,6 @@ install-salt() {
     echo "== SaltStack already installed, skipping install step =="
     return
   fi
-
-  echo "== Refreshing package database =="
-  until apt-get update; do
-    echo "== apt-get update failed, retrying =="
-    echo sleep 5
-  done
 
   mkdir -p /var/cache/salt-install
   cd /var/cache/salt-install
@@ -205,6 +216,20 @@ stop-salt-minion() {
   done
 }
 
+#+GCE
+# Finds the master PD device; returns it in MASTER_PD_DEVICE
+find-master-pd() {
+  MASTER_PD_DEVICE=""
+  # TODO(zmerlynn): GKE is still lagging in master-pd creation
+  if [[ ! -e /dev/disk/by-id/google-master-pd ]]; then
+    return
+  fi
+  device_info=$(ls -l /dev/disk/by-id/google-master-pd)
+  relative_path=${device_info##* }
+  MASTER_PD_DEVICE="/dev/disk/by-id/${relative_path}"
+}
+#-GCE
+
 # Mounts a persistent disk (formatting if needed) to store the persistent data
 # on the master -- etcd's data, a few settings, and security certs/keys/tokens.
 #
@@ -213,19 +238,16 @@ stop-salt-minion() {
 # formats an unformatted disk, and mkdir -p will leave a directory be if it
 # already exists.
 mount-master-pd() {
-  # TODO(zmerlynn): GKE is still lagging in master-pd creation
-  if [[ ! -e /dev/disk/by-id/google-master-pd ]]; then
+  find-master-pd
+  if [[ -z "${MASTER_PD_DEVICE}" ]]; then
     return
   fi
-  device_info=$(ls -l /dev/disk/by-id/google-master-pd)
-  relative_path=${device_info##* }
-  device_path="/dev/disk/by-id/${relative_path}"
 
   # Format and mount the disk, create directories on it for all of the master's
   # persistent data, and link them to where they're used.
   echo "Mounting master-pd"
   mkdir -p /mnt/master-pd
-  /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${device_path}" /mnt/master-pd &>/var/log/master-pd-mount.log || \
+  /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${MASTER_PD_DEVICE}" /mnt/master-pd &>/var/log/master-pd-mount.log || \
     { echo "!!! master-pd mount failed, review /var/log/master-pd-mount.log !!!"; return 1; }
   # Contains all the data stored in etcd
   mkdir -m 700 -p /mnt/master-pd/var/etcd
@@ -558,10 +580,12 @@ function download-release() {
   kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"
 }
 
+#+GCE
 function fix-apt-sources() {
   sed -i -e "\|^deb.*http://http.debian.net/debian| s/^/#/" /etc/apt/sources.list
   sed -i -e "\|^deb.*http://ftp.debian.org/debian| s/^/#/" /etc/apt/sources.list.d/backports.list
 }
+#-GCE
 
 function salt-run-local() {
   cat <<EOF >/etc/salt/minion.d/local.conf
@@ -579,6 +603,7 @@ log_level_logfile: debug
 EOF
 }
 
+#+GCE
 function salt-master-role() {
   cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
@@ -633,6 +658,7 @@ grains:
   api_servers: '${KUBERNETES_MASTER_NAME}'
 EOF
 }
+#-GCE
 
 function salt-docker-opts() {
   DOCKER_OPTS=""
@@ -649,7 +675,6 @@ EOF
 }
 
 function configure-salt() {
-  fix-apt-sources
   mkdir -p /etc/salt/minion.d
   salt-run-local
   if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
@@ -676,6 +701,8 @@ if [[ -z "${is_push}" ]]; then
   echo "== kube-up node config starting =="
   set-broken-motd
   ensure-basic-networking
+  fix-apt-sources
+  apt-get-update
   ensure-install-dir
   set-kube-env
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
@@ -693,6 +720,7 @@ if [[ -z "${is_push}" ]]; then
   run-salt
   set-good-motd
 
+#+GCE
   if curl-metadata k8s-user-startup-script > "${INSTALL_DIR}/k8s-user-script.sh"; then
     user_script=$(cat "${INSTALL_DIR}/k8s-user-script.sh")
   fi
@@ -701,6 +729,7 @@ if [[ -z "${is_push}" ]]; then
     echo "== running user startup script =="
     "${INSTALL_DIR}/k8s-user-script.sh"
   fi
+#-GCE
   echo "== kube-up node config done =="
 else
   echo "== kube-push node config starting =="

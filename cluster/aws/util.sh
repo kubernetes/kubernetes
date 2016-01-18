@@ -861,21 +861,14 @@ function start-master() {
     echo "#! /bin/bash"
     echo "mkdir -p /var/cache/kubernetes-install"
     echo "cd /var/cache/kubernetes-install"
-    echo "cat > kube-env.yaml << __EOF_MASTER_KUBE_ENV_YAML"
+    echo "cat > kube_env.yaml << __EOF_KUBE_ENV_YAML"
     cat ${KUBE_TEMP}/master-kube-env.yaml
     # TODO: get rid of these exceptions / harmonize with common or GCE
-    echo "SALT_MASTER: $(yaml-quote ${MASTER_INTERNAL_IP:-})"
     echo "DOCKER_STORAGE: $(yaml-quote ${DOCKER_STORAGE:-})"
-    echo "MASTER_EXTRA_SANS: $(yaml-quote ${MASTER_EXTRA_SANS:-})"
-    echo "__EOF_MASTER_KUBE_ENV_YAML"
+    echo "__EOF_KUBE_ENV_YAML"
 
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/extract-kube-env.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/setup-master-pd.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-master.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/configure-vm-aws.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/gce/configure-vm.sh" | sed -e '/#+GCE/,/#-GCE/d'
   ) > "${KUBE_TEMP}/master-user-data"
 
   # We're running right up against the 16KB limit
@@ -999,7 +992,24 @@ function start-master() {
 # Creates an ASG for the minion nodes
 function start-minions() {
   echo "Creating minion configuration"
-  generate-minion-user-data > "${KUBE_TEMP}/minion-user-data"
+
+  write-node-env
+
+  (
+    # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
+    echo "#! /bin/bash"
+    echo "mkdir -p /var/cache/kubernetes-install"
+    echo "cd /var/cache/kubernetes-install"
+    echo "cat > kube_env.yaml << __EOF_KUBE_ENV_YAML"
+    cat ${KUBE_TEMP}/node-kube-env.yaml
+    # TODO: get rid of these exceptions / harmonize with common or GCE
+    echo "DOCKER_STORAGE: $(yaml-quote ${DOCKER_STORAGE:-})"
+    echo "__EOF_KUBE_ENV_YAML"
+
+    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/configure-vm-aws.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/gce/configure-vm.sh" | sed -e '/#+GCE/,/#-GCE/d'
+  ) > "${KUBE_TEMP}/node-user-data"
+
   local public_ip_option
   if [[ "${ENABLE_NODE_PUBLIC_IP}" == "true" ]]; then
     public_ip_option="--associate-public-ip-address"
@@ -1015,7 +1025,7 @@ function start-minions() {
       --security-groups ${NODE_SG_ID} \
       ${public_ip_option} \
       --block-device-mappings "${NODE_BLOCK_DEVICE_MAPPINGS}" \
-      --user-data "file://${KUBE_TEMP}/minion-user-data"
+      --user-data "file://${KUBE_TEMP}/node-user-data"
 
   echo "Creating autoscaling group"
   ${AWS_ASG_CMD} create-auto-scaling-group \
