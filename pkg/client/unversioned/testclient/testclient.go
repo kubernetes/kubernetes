@@ -23,7 +23,6 @@ import (
 	"github.com/emicklei/go-restful/swagger"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -279,29 +278,6 @@ func (c *Fake) Discovery() client.DiscoveryInterface {
 	return &FakeDiscovery{c}
 }
 
-func (c *Fake) ServerVersion() (*version.Info, error) {
-	action := ActionImpl{}
-	action.Verb = "get"
-	action.Resource = "version"
-
-	c.Invokes(action, nil)
-	versionInfo := version.Get()
-	return &versionInfo, nil
-}
-
-func (c *Fake) ServerAPIVersions() (*unversioned.APIVersions, error) {
-	action := ActionImpl{}
-	action.Verb = "get"
-	action.Resource = "apiversions"
-
-	c.Invokes(action, nil)
-	gvStrings := []string{}
-	for _, gv := range registered.EnabledVersions() {
-		gvStrings = append(gvStrings, gv.String())
-	}
-	return &unversioned.APIVersions{Versions: gvStrings}, nil
-}
-
 func (c *Fake) ComponentStatuses() client.ComponentStatusInterface {
 	return &FakeComponentStatuses{Fake: c}
 }
@@ -385,4 +361,14 @@ func (c *FakeDiscovery) ServerResources() (map[string]*unversioned.APIResourceLi
 
 func (c *FakeDiscovery) ServerGroups() (*unversioned.APIGroupList, error) {
 	return nil, nil
+}
+
+func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
+	action := ActionImpl{}
+	action.Verb = "get"
+	action.Resource = "version"
+
+	c.Invokes(action, nil)
+	versionInfo := version.Get()
+	return &versionInfo, nil
 }

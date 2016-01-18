@@ -31,6 +31,7 @@ type HorizontalPodAutoscalerNamespacer interface {
 type HorizontalPodAutoscalerInterface interface {
 	Create(*extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
 	Update(*extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
+	UpdateStatus(*extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*extensions.HorizontalPodAutoscaler, error)
@@ -78,6 +79,12 @@ func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *extensions.Ho
 	return
 }
 
+func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error) {
+	result := &extensions.HorizontalPodAutoscaler{}
+	err := c.client.Put().Resource("horizontalPodAutoscalers").Name(horizontalPodAutoscaler.Name).SubResource("status").Body(horizontalPodAutoscaler).Do().Into(result)
+	return result, err
+}
+
 // Delete takes name of the horizontalPodAutoscaler and deletes it. Returns an error if one occurs.
 func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
@@ -92,7 +99,7 @@ func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOption
 // DeleteCollection deletes a collection of objects.
 func (c *horizontalPodAutoscalers) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Namespace(c.ns).
 		Resource("horizontalPodAutoscalers").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).

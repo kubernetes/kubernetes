@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,57 +22,32 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
-// EventNamespacer can return an EventInterface for the given namespace.
-type EventNamespacer interface {
-	Events(namespace string) EventInterface
-}
-
-// EventInterface has methods to work with Event resources
-type EventInterface interface {
-	Create(event *api.Event) (*api.Event, error)
-	Update(event *api.Event) (*api.Event, error)
+type EventExpansion interface {
+	// CreateWithEventNamespace is the same as a Create, except that it sends the request to the event.Namespace.
+	CreateWithEventNamespace(event *api.Event) (*api.Event, error)
+	// UpdateWithEventNamespace is the same as a Update, except that it sends the request to the event.Namespace.
+	UpdateWithEventNamespace(event *api.Event) (*api.Event, error)
 	Patch(event *api.Event, data []byte) (*api.Event, error)
-	List(opts api.ListOptions) (*api.EventList, error)
-	Get(name string) (*api.Event, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
 	// Search finds events about the specified object
 	Search(objOrRef runtime.Object) (*api.EventList, error)
-	Delete(name string) error
-	// DeleteCollection deletes a collection of events.
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	// Returns the appropriate field selector based on the API version being used to communicate with the server.
 	// The returned field selector can be used with List and Watch to filter desired events.
 	GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector
 }
 
-// events implements Events interface
-type events struct {
-	client    *Client
-	namespace string
-}
-
-// newEvents returns a new events object.
-func newEvents(c *Client, ns string) *events {
-	return &events{
-		client:    c,
-		namespace: ns,
-	}
-}
-
-// Create makes a new event. Returns the copy of the event the server returns,
+// CreateWithEventNamespace makes a new event. Returns the copy of the event the server returns,
 // or an error. The namespace to create the event within is deduced from the
 // event; it must either match this event client's namespace, or this event
 // client must have been created with the "" namespace.
-func (e *events) Create(event *api.Event) (*api.Event, error) {
-	if e.namespace != "" && event.Namespace != e.namespace {
-		return nil, fmt.Errorf("can't create an event with namespace '%v' in namespace '%v'", event.Namespace, e.namespace)
+func (e *events) CreateWithEventNamespace(event *api.Event) (*api.Event, error) {
+	if e.ns != "" && event.Namespace != e.ns {
+		return nil, fmt.Errorf("can't create an event with namespace '%v' in namespace '%v'", event.Namespace, e.ns)
 	}
 	result := &api.Event{}
 	err := e.client.Post().
-		Namespace(event.Namespace).
+		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Body(event).
 		Do().
@@ -80,18 +55,15 @@ func (e *events) Create(event *api.Event) (*api.Event, error) {
 	return result, err
 }
 
-// Update modifies an existing event. It returns the copy of the event that the server returns,
+// UpdateWithEventNamespace modifies an existing event. It returns the copy of the event that the server returns,
 // or an error. The namespace and key to update the event within is deduced from the event. The
 // namespace must either match this event client's namespace, or this event client must have been
 // created with the "" namespace. Update also requires the ResourceVersion to be set in the event
 // object.
-func (e *events) Update(event *api.Event) (*api.Event, error) {
-	if len(event.ResourceVersion) == 0 {
-		return nil, fmt.Errorf("invalid event update object, missing resource version: %#v", event)
-	}
+func (e *events) UpdateWithEventNamespace(event *api.Event) (*api.Event, error) {
 	result := &api.Event{}
 	err := e.client.Put().
-		Namespace(event.Namespace).
+		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Name(event.Name).
 		Body(event).
@@ -107,47 +79,13 @@ func (e *events) Update(event *api.Event) (*api.Event, error) {
 func (e *events) Patch(incompleteEvent *api.Event, data []byte) (*api.Event, error) {
 	result := &api.Event{}
 	err := e.client.Patch(api.StrategicMergePatchType).
-		Namespace(incompleteEvent.Namespace).
+		NamespaceIfScoped(incompleteEvent.Namespace, len(incompleteEvent.Namespace) > 0).
 		Resource("events").
 		Name(incompleteEvent.Name).
 		Body(data).
 		Do().
 		Into(result)
 	return result, err
-}
-
-// List returns a list of events matching the selectors.
-func (e *events) List(opts api.ListOptions) (*api.EventList, error) {
-	result := &api.EventList{}
-	err := e.client.Get().
-		Namespace(e.namespace).
-		Resource("events").
-		VersionedParams(&opts, api.Scheme).
-		Do().
-		Into(result)
-	return result, err
-}
-
-// Get returns the given event, or an error.
-func (e *events) Get(name string) (*api.Event, error) {
-	result := &api.Event{}
-	err := e.client.Get().
-		Namespace(e.namespace).
-		Resource("events").
-		Name(name).
-		Do().
-		Into(result)
-	return result, err
-}
-
-// Watch starts watching for events matching the given selectors.
-func (e *events) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return e.client.Get().
-		Prefix("watch").
-		Namespace(e.namespace).
-		Resource("events").
-		VersionedParams(&opts, api.Scheme).
-		Watch()
 }
 
 // Search finds events about the specified object. The namespace of the
@@ -158,8 +96,8 @@ func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
 	if err != nil {
 		return nil, err
 	}
-	if e.namespace != "" && ref.Namespace != e.namespace {
-		return nil, fmt.Errorf("won't be able to find any events of namespace '%v' in namespace '%v'", ref.Namespace, e.namespace)
+	if e.ns != "" && ref.Namespace != e.ns {
+		return nil, fmt.Errorf("won't be able to find any events of namespace '%v' in namespace '%v'", ref.Namespace, e.ns)
 	}
 	stringRefKind := string(ref.Kind)
 	var refKind *string
@@ -173,27 +111,6 @@ func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
 	}
 	fieldSelector := e.GetFieldSelector(&ref.Name, &ref.Namespace, refKind, refUID)
 	return e.List(api.ListOptions{FieldSelector: fieldSelector})
-}
-
-// Delete deletes an existing event.
-func (e *events) Delete(name string) error {
-	return e.client.Delete().
-		Namespace(e.namespace).
-		Resource("events").
-		Name(name).
-		Do().
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (e *events) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	return e.client.Delete().
-		Namespace(e.namespace).
-		Resource("events").
-		VersionedParams(&listOptions, api.Scheme).
-		Body(options).
-		Do().
-		Error()
 }
 
 // Returns the appropriate field selector based on the API version being used to communicate with the server.

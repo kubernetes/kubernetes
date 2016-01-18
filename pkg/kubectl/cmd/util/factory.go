@@ -320,7 +320,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if err != nil {
 				return nil, err
 			}
-			return client.SwaggerSchema(version)
+			return client.Discovery().SwaggerSchema(version)
 		},
 		DefaultNamespace: func() (string, bool, error) {
 			return clientConfig.Namespace()

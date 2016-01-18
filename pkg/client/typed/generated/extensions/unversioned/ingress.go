@@ -31,6 +31,7 @@ type IngressNamespacer interface {
 type IngressInterface interface {
 	Create(*extensions.Ingress) (*extensions.Ingress, error)
 	Update(*extensions.Ingress) (*extensions.Ingress, error)
+	UpdateStatus(*extensions.Ingress) (*extensions.Ingress, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*extensions.Ingress, error)
@@ -78,6 +79,12 @@ func (c *ingresses) Update(ingress *extensions.Ingress) (result *extensions.Ingr
 	return
 }
 
+func (c *ingresses) UpdateStatus(ingress *extensions.Ingress) (*extensions.Ingress, error) {
+	result := &extensions.Ingress{}
+	err := c.client.Put().Resource("ingresses").Name(ingress.Name).SubResource("status").Body(ingress).Do().Into(result)
+	return result, err
+}
+
 // Delete takes name of the ingress and deletes it. Returns an error if one occurs.
 func (c *ingresses) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
@@ -92,7 +99,7 @@ func (c *ingresses) Delete(name string, options *api.DeleteOptions) error {
 // DeleteCollection deletes a collection of objects.
 func (c *ingresses) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Namespace(c.ns).
 		Resource("ingresses").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).

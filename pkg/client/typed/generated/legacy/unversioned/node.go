@@ -30,6 +30,7 @@ type NodeNamespacer interface {
 type NodeInterface interface {
 	Create(*api.Node) (*api.Node, error)
 	Update(*api.Node) (*api.Node, error)
+	UpdateStatus(*api.Node) (*api.Node, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.Node, error)
@@ -77,6 +78,12 @@ func (c *nodes) Update(node *api.Node) (result *api.Node, err error) {
 	return
 }
 
+func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
+	result := &api.Node{}
+	err := c.client.Put().Resource("nodes").Name(node.Name).SubResource("status").Body(node).Do().Into(result)
+	return result, err
+}
+
 // Delete takes name of the node and deletes it. Returns an error if one occurs.
 func (c *nodes) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
@@ -91,7 +98,7 @@ func (c *nodes) Delete(name string, options *api.DeleteOptions) error {
 // DeleteCollection deletes a collection of objects.
 func (c *nodes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Namespace(c.ns).
 		Resource("nodes").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).

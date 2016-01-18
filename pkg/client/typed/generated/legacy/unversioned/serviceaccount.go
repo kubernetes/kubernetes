@@ -91,7 +91,7 @@ func (c *serviceAccounts) Delete(name string, options *api.DeleteOptions) error 
 // DeleteCollection deletes a collection of objects.
 func (c *serviceAccounts) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Namespace(c.ns).
 		Resource("serviceAccounts").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).

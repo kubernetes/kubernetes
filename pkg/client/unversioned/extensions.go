@@ -17,12 +17,10 @@ limitations under the License.
 package unversioned
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 // Interface holds the experimental methods for clients of Kubernetes
@@ -30,7 +28,6 @@ import (
 // Features of Extensions group are not supported and may be changed or removed in
 // incompatible ways at any time.
 type ExtensionsInterface interface {
-	VersionInterface
 	HorizontalPodAutoscalersNamespacer
 	ScaleNamespacer
 	DaemonSetsNamespacer
@@ -46,20 +43,6 @@ type ExtensionsInterface interface {
 // incompatible ways at any time.
 type ExtensionsClient struct {
 	*RESTClient
-}
-
-// ServerVersion retrieves and parses the server's version.
-func (c *ExtensionsClient) ServerVersion() (*version.Info, error) {
-	body, err := c.Get().AbsPath("/version").Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var info version.Info
-	err = json.Unmarshal(body, &info)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &info, nil
 }
 
 func (c *ExtensionsClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {

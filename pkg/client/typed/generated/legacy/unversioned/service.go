@@ -30,6 +30,7 @@ type ServiceNamespacer interface {
 type ServiceInterface interface {
 	Create(*api.Service) (*api.Service, error)
 	Update(*api.Service) (*api.Service, error)
+	UpdateStatus(*api.Service) (*api.Service, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.Service, error)
@@ -77,6 +78,12 @@ func (c *services) Update(service *api.Service) (result *api.Service, err error)
 	return
 }
 
+func (c *services) UpdateStatus(service *api.Service) (*api.Service, error) {
+	result := &api.Service{}
+	err := c.client.Put().Resource("services").Name(service.Name).SubResource("status").Body(service).Do().Into(result)
+	return result, err
+}
+
 // Delete takes name of the service and deletes it. Returns an error if one occurs.
 func (c *services) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
@@ -91,7 +98,7 @@ func (c *services) Delete(name string, options *api.DeleteOptions) error {
 // DeleteCollection deletes a collection of objects.
 func (c *services) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Namespace(c.ns).
 		Resource("services").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).

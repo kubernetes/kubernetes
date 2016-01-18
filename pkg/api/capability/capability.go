@@ -19,6 +19,7 @@ package capability
 var watchCapability map[string]int
 
 func init() {
+	watchCapability = make(map[string]int)
 	watchCapability["pods"] = 1000
 	watchCapability["nodes"] = 1000
 	watchCapability["services"] = 100

@@ -1064,6 +1064,14 @@ __EOF__
   kubectl delete rc -l deployment.kubernetes.io/podTemplateHash "${kube_flags[@]}"
 
   ######################
+  # ConfigMap          #
+  ######################
+
+  kubectl create -f docs/user-guide/configmap/config-map.yaml
+  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}{{end}}" 'test-configmap'
+  kubectl delete configmap test-configmap "${kube_flags[@]}"
+
+  ######################
   # Multiple Resources #
   ######################
 

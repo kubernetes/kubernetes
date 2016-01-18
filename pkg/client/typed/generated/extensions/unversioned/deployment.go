@@ -31,6 +31,7 @@ type DeploymentNamespacer interface {
 type DeploymentInterface interface {
 	Create(*extensions.Deployment) (*extensions.Deployment, error)
 	Update(*extensions.Deployment) (*extensions.Deployment, error)
+	UpdateStatus(*extensions.Deployment) (*extensions.Deployment, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*extensions.Deployment, error)
@@ -78,6 +79,12 @@ func (c *deployments) Update(deployment *extensions.Deployment) (result *extensi
 	return
 }
 
+func (c *deployments) UpdateStatus(deployment *extensions.Deployment) (*extensions.Deployment, error) {
+	result := &extensions.Deployment{}
+	err := c.client.Put().Resource("deployments").Name(deployment.Name).SubResource("status").Body(deployment).Do().Into(result)
+	return result, err
+}
+
 // Delete takes name of the deployment and deletes it. Returns an error if one occurs.
 func (c *deployments) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
@@ -92,7 +99,7 @@ func (c *deployments) Delete(name string, options *api.DeleteOptions) error {
 // DeleteCollection deletes a collection of objects.
 func (c *deployments) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Namespace(c.ns).
 		Resource("deployments").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).

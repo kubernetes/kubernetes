@@ -30,6 +30,7 @@ type PersistentVolumeClaimNamespacer interface {
 type PersistentVolumeClaimInterface interface {
 	Create(*api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	Update(*api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
+	UpdateStatus(*api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Get(name string) (*api.PersistentVolumeClaim, error)
@@ -77,6 +78,12 @@ func (c *persistentVolumeClaims) Update(persistentVolumeClaim *api.PersistentVol
 	return
 }
 
+func (c *persistentVolumeClaims) UpdateStatus(persistentVolumeClaim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
+	result := &api.PersistentVolumeClaim{}
+	err := c.client.Put().Resource("persistentVolumeClaims").Name(persistentVolumeClaim.Name).SubResource("status").Body(persistentVolumeClaim).Do().Into(result)
+	return result, err
+}
+
 // Delete takes name of the persistentVolumeClaim and deletes it. Returns an error if one occurs.
 func (c *persistentVolumeClaims) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
@@ -91,7 +98,7 @@ func (c *persistentVolumeClaims) Delete(name string, options *api.DeleteOptions)
 // DeleteCollection deletes a collection of objects.
 func (c *persistentVolumeClaims) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		NamespaceIfScoped(c.ns, len(c.ns) > 0).
+		Namespace(c.ns).
 		Resource("persistentVolumeClaims").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
