@@ -566,9 +566,14 @@ function ensure-temp-dir {
 #   SALT_TAR_URL
 function upload-server-tars() {
   SERVER_BINARY_TAR_URL=
+  SERVER_BINARY_TAR_HASH=
   SALT_TAR_URL=
+  SALT_TAR_HASH=
 
   ensure-temp-dir
+
+  SERVER_BINARY_TAR_HASH=$(sha1sum-file "${SERVER_BINARY_TAR}")
+  SALT_TAR_HASH=$(sha1sum-file "${SALT_TAR}")
 
   if [[ -z ${AWS_S3_BUCKET-} ]]; then
       local project_hash=

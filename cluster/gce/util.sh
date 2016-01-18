@@ -115,14 +115,6 @@ function detect-project () {
   fi
 }
 
-function sha1sum-file() {
-  if which shasum >/dev/null 2>&1; then
-    shasum -a1 "$1" | awk '{ print $1 }'
-  else
-    sha1sum "$1" | awk '{ print $1 }'
-  fi
-}
-
 function already-staged() {
   local -r file=$1
   local -r newsum=$2
