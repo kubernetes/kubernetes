@@ -347,6 +347,7 @@ var map_EnvVarSource = map[string]string{
 	"":                "EnvVarSource represents a source for the value of an EnvVar.",
 	"fieldRef":        "Selects a field of the pod; only name and namespace are supported.",
 	"configMapKeyRef": "Selects a key of a ConfigMap.",
+	"secretKeyRef":    "Selects a key of a secret in the pod's namespace",
 }
 
 func (EnvVarSource) SwaggerDoc() map[string]string {
@@ -1271,6 +1272,15 @@ func (Secret) SwaggerDoc() map[string]string {
 	return map_Secret
 }
 
+var map_SecretKeySelector = map[string]string{
+	"":    "SecretKeySelector selects a key of a Secret.",
+	"key": "The key of the secret to select from.  Must be a valid secret key.",
+}
+
+func (SecretKeySelector) SwaggerDoc() map[string]string {
+	return map_SecretKeySelector
+}
+
 var map_SecretList = map[string]string{
 	"":         "SecretList is a list of Secret.",
 	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -1281,9 +1291,19 @@ func (SecretList) SwaggerDoc() map[string]string {
 	return map_SecretList
 }
 
+var map_SecretVolumeFile = map[string]string{
+	"":     "SecretVolumeFile represents a single secret key projected into a file.",
+	"path": "The path of the key within the volume.  Must be a relative path.  May not contain '..'.",
+}
+
+func (SecretVolumeFile) SwaggerDoc() map[string]string {
+	return map_SecretVolumeFile
+}
+
 var map_SecretVolumeSource = map[string]string{
 	"":           "Adapts a Secret into a volume.\n\nThe contents of the target Secret's Data field will be presented in a volume as files using the keys in the Data field as the file names. Secret volumes support ownership management and SELinux relabeling.",
-	"secretName": "SecretName is the name of a secret in the pod's namespace. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets",
+	"secretName": "Name of the secret in the pod's namespace to use.  May not be specified if items is specified.",
+	"items":      "A list of projections to make into the volume.  May not be specified if SecretName is specified.",
 }
 
 func (SecretVolumeSource) SwaggerDoc() map[string]string {

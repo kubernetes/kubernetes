@@ -255,6 +255,14 @@ func deepCopy_api_EnvVarSource(in api.EnvVarSource, out *api.EnvVarSource, c *co
 	} else {
 		out.ConfigMapKeyRef = nil
 	}
+	if in.SecretKeyRef != nil {
+		out.SecretKeyRef = new(api.SecretKeySelector)
+		if err := deepCopy_api_SecretKeySelector(*in.SecretKeyRef, out.SecretKeyRef, c); err != nil {
+			return err
+		}
+	} else {
+		out.SecretKeyRef = nil
+	}
 	return nil
 }
 
@@ -692,8 +700,34 @@ func deepCopy_api_SELinuxOptions(in api.SELinuxOptions, out *api.SELinuxOptions,
 	return nil
 }
 
+func deepCopy_api_SecretKeySelector(in api.SecretKeySelector, out *api.SecretKeySelector, c *conversion.Cloner) error {
+	if err := deepCopy_api_LocalObjectReference(in.LocalObjectReference, &out.LocalObjectReference, c); err != nil {
+		return err
+	}
+	out.Key = in.Key
+	return nil
+}
+
+func deepCopy_api_SecretVolumeFile(in api.SecretVolumeFile, out *api.SecretVolumeFile, c *conversion.Cloner) error {
+	if err := deepCopy_api_SecretKeySelector(in.SecretKeySelector, &out.SecretKeySelector, c); err != nil {
+		return err
+	}
+	out.Path = in.Path
+	return nil
+}
+
 func deepCopy_api_SecretVolumeSource(in api.SecretVolumeSource, out *api.SecretVolumeSource, c *conversion.Cloner) error {
 	out.SecretName = in.SecretName
+	if in.Items != nil {
+		out.Items = make([]api.SecretVolumeFile, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_api_SecretVolumeFile(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -1711,6 +1745,8 @@ func init() {
 		deepCopy_api_RBDVolumeSource,
 		deepCopy_api_ResourceRequirements,
 		deepCopy_api_SELinuxOptions,
+		deepCopy_api_SecretKeySelector,
+		deepCopy_api_SecretVolumeFile,
 		deepCopy_api_SecretVolumeSource,
 		deepCopy_api_SecurityContext,
 		deepCopy_api_TCPSocketAction,

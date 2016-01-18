@@ -291,6 +291,14 @@ func deepCopy_v1_EnvVarSource(in v1.EnvVarSource, out *v1.EnvVarSource, c *conve
 	} else {
 		out.ConfigMapKeyRef = nil
 	}
+	if in.SecretKeyRef != nil {
+		out.SecretKeyRef = new(v1.SecretKeySelector)
+		if err := deepCopy_v1_SecretKeySelector(*in.SecretKeyRef, out.SecretKeyRef, c); err != nil {
+			return err
+		}
+	} else {
+		out.SecretKeyRef = nil
+	}
 	return nil
 }
 
@@ -729,8 +737,34 @@ func deepCopy_v1_SELinuxOptions(in v1.SELinuxOptions, out *v1.SELinuxOptions, c 
 	return nil
 }
 
+func deepCopy_v1_SecretKeySelector(in v1.SecretKeySelector, out *v1.SecretKeySelector, c *conversion.Cloner) error {
+	if err := deepCopy_v1_LocalObjectReference(in.LocalObjectReference, &out.LocalObjectReference, c); err != nil {
+		return err
+	}
+	out.Key = in.Key
+	return nil
+}
+
+func deepCopy_v1_SecretVolumeFile(in v1.SecretVolumeFile, out *v1.SecretVolumeFile, c *conversion.Cloner) error {
+	if err := deepCopy_v1_SecretKeySelector(in.SecretKeySelector, &out.SecretKeySelector, c); err != nil {
+		return err
+	}
+	out.Path = in.Path
+	return nil
+}
+
 func deepCopy_v1_SecretVolumeSource(in v1.SecretVolumeSource, out *v1.SecretVolumeSource, c *conversion.Cloner) error {
 	out.SecretName = in.SecretName
+	if in.Items != nil {
+		out.Items = make([]v1.SecretVolumeFile, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1_SecretVolumeFile(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -1754,6 +1788,8 @@ func init() {
 		deepCopy_v1_RBDVolumeSource,
 		deepCopy_v1_ResourceRequirements,
 		deepCopy_v1_SELinuxOptions,
+		deepCopy_v1_SecretKeySelector,
+		deepCopy_v1_SecretVolumeFile,
 		deepCopy_v1_SecretVolumeSource,
 		deepCopy_v1_SecurityContext,
 		deepCopy_v1_TCPSocketAction,
