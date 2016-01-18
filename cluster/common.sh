@@ -419,3 +419,25 @@ function stage-images() {
 function yaml-quote {
   echo "'$(echo "${@}" | sed -e "s/'/''/g")'"
 }
+
+# Builds the RUNTIME_CONFIG var from other feature enable options
+function build-runtime-config() {
+  if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
+      if [[ -z "${RUNTIME_CONFIG}" ]]; then
+          RUNTIME_CONFIG="extensions/v1beta1/deployments=true"
+      else
+          if echo "${RUNTIME_CONFIG}" | grep -q -v "extensions/v1beta1/deployments=true"; then
+            RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/deployments=true"
+          fi
+      fi
+  fi
+  if [[ "${ENABLE_DAEMONSETS}" == "true" ]]; then
+      if [[ -z "${RUNTIME_CONFIG}" ]]; then
+          RUNTIME_CONFIG="extensions/v1beta1/daemonsets=true"
+      else
+          if echo "${RUNTIME_CONFIG}" | grep -q -v "extensions/v1beta1/daemonsets=true"; then
+            RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/daemonsets=true"
+          fi
+      fi
+  fi
+}
