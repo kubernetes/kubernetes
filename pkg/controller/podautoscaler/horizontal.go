@@ -77,7 +77,12 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa extensions.H
 		return 0, nil, time.Time{}, nil
 	}
 	currentReplicas := scale.Status.Replicas
-	currentUtilization, timestamp, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, scale.Status.Selector)
+
+	selector, err := extensions.LabelSelectorAsSelector(scale.Status.Selector)
+	if err != nil {
+		return 0, nil, time.Time{}, fmt.Errorf("failed to convert pod selector to label selector: %v", err)
+	}
+	currentUtilization, timestamp, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, selector)
 
 	// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 	if err != nil {

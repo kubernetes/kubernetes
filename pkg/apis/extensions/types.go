@@ -46,7 +46,7 @@ type ScaleStatus struct {
 	Replicas int `json:"replicas"`
 
 	// label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
-	Selector map[string]string `json:"selector,omitempty"`
+	Selector *LabelSelector `json:"selector,omitempty"`
 }
 
 // +genclient=true,noMethods=true

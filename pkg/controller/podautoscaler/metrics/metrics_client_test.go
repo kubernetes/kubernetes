@@ -28,6 +28,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 
 	heapster "k8s.io/heapster/api/v1/types"
@@ -153,7 +154,7 @@ func (tc *testCase) verifyResults(t *testing.T, val *ResourceConsumption, timest
 func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
 	metricsClient := NewHeapsterMetricsClient(testClient, DefaultHeapsterNamespace, DefaultHeapsterScheme, DefaultHeapsterService, DefaultHeapsterPort)
-	val, _, timestamp, err := metricsClient.GetResourceConsumptionAndRequest(tc.targetResource, tc.namespace, tc.selector)
+	val, _, timestamp, err := metricsClient.GetResourceConsumptionAndRequest(tc.targetResource, tc.namespace, labels.Set(tc.selector).AsSelector())
 	tc.verifyResults(t, val, timestamp, err)
 }
 

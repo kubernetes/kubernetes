@@ -79,7 +79,7 @@ func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 		},
 		Status: extensions.ScaleStatus{
 			Replicas: rc.Status.Replicas,
-			Selector: rc.Spec.Selector,
+			Selector: extensions.SetAsLabelSelector(rc.Spec.Selector),
 		},
 	}, nil
 }
@@ -117,7 +117,7 @@ func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object,
 		},
 		Status: extensions.ScaleStatus{
 			Replicas: rc.Status.Replicas,
-			Selector: rc.Spec.Selector,
+			Selector: extensions.SetAsLabelSelector(rc.Spec.Selector),
 		},
 	}, false, nil
 }

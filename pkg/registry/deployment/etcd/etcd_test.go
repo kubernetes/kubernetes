@@ -75,6 +75,23 @@ func validNewDeployment() *extensions.Deployment {
 
 var validDeployment = *validNewDeployment()
 
+func validNewScale() *extensions.Scale {
+	return &extensions.Scale{
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+		Spec: extensions.ScaleSpec{
+			Replicas: validDeployment.Spec.Replicas,
+		},
+		Status: extensions.ScaleStatus{
+			Replicas: validDeployment.Status.Replicas,
+			// TODO(madhusudancs): Remove LabelSelector wrapping and use deployment.Spec.Selector directly
+			// when deployment is moved to LabelSelector.
+			Selector: &extensions.LabelSelector{MatchLabels: validDeployment.Spec.Selector},
+		},
+	}
+}
+
+var validScale = *validNewScale()
+
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)

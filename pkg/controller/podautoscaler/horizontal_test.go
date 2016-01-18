@@ -115,7 +115,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 			},
 			Status: extensions.ScaleStatus{
 				Replicas: tc.initialReplicas,
-				Selector: map[string]string{"name": podNamePrefix},
+				Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"name": podNamePrefix}},
 			},
 		}
 		return true, obj, nil

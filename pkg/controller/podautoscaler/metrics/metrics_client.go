@@ -45,7 +45,7 @@ type MetricsClient interface {
 	// GetCPUUtilization returns the average utilization over all pods represented as a percent of requested CPU
 	// (e.g. 70 means that an average pod uses 70% of the requested CPU)
 	// and the time of generation of the oldest of utilization reports for pods.
-	GetCPUUtilization(namespace string, selector map[string]string) (*int, time.Time, error)
+	GetCPUUtilization(namespace string, selector labels.Selector) (*int, time.Time, error)
 }
 
 // ResourceConsumption specifies consumption of a particular resource.
@@ -106,7 +106,7 @@ func NewHeapsterMetricsClient(client client.Interface, namespace, scheme, servic
 	}
 }
 
-func (h *HeapsterMetricsClient) GetCPUUtilization(namespace string, selector map[string]string) (*int, time.Time, error) {
+func (h *HeapsterMetricsClient) GetCPUUtilization(namespace string, selector labels.Selector) (*int, time.Time, error) {
 	consumption, request, timestamp, err := h.GetResourceConsumptionAndRequest(api.ResourceCPU, namespace, selector)
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to get CPU consumption and request: %v", err)
@@ -116,10 +116,9 @@ func (h *HeapsterMetricsClient) GetCPUUtilization(namespace string, selector map
 	return utilization, timestamp, nil
 }
 
-func (h *HeapsterMetricsClient) GetResourceConsumptionAndRequest(resourceName api.ResourceName, namespace string, selector map[string]string) (consumption *ResourceConsumption, request *resource.Quantity, timestamp time.Time, err error) {
-	labelSelector := labels.SelectorFromSet(labels.Set(selector))
+func (h *HeapsterMetricsClient) GetResourceConsumptionAndRequest(resourceName api.ResourceName, namespace string, selector labels.Selector) (consumption *ResourceConsumption, request *resource.Quantity, timestamp time.Time, err error) {
 	podList, err := h.client.Pods(namespace).
-		List(api.ListOptions{LabelSelector: labelSelector})
+		List(api.ListOptions{LabelSelector: selector})
 
 	if err != nil {
 		return nil, nil, time.Time{}, fmt.Errorf("failed to get pod list: %v", err)
