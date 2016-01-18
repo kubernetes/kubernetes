@@ -21,10 +21,12 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"testing"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 func newEtcdClient() etcd.Client {
@@ -76,4 +78,10 @@ func MakeTempDirOrDie(prefix string, baseDir string) string {
 		glog.Fatalf("Can't mkdir(%q): %v", tempDir, err)
 	}
 	return tempDir
+}
+
+func deletePodOrErrorf(t *testing.T, c *client.Client, ns, name string) {
+	if err := c.Pods(ns).Delete(name, nil); err != nil {
+		t.Errorf("unable to delete pod %v: %v", name, err)
+	}
 }
