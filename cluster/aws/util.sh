@@ -864,6 +864,7 @@ function create-bootstrap-script() {
 
   (
     cat "${KUBE_ROOT}/cluster/aws/templates/configure-vm-aws.sh"
+    cat "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
     # tail -n +2 is to remove the shebang
     # GCE specific lines are surrounded by +GCE and -GCE; the sed removes them
     # TODO: Build the script on GCE, and remove the hacks here

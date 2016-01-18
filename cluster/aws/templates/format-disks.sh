@@ -16,6 +16,8 @@
 
 # Discover all the ephemeral disks
 
+function ensure-local-disks() {
+
 block_devices=()
 
 ephemeral_devices=$(curl --silent http://169.254.169.254/2014-11-05/meta-data/block-device-mapping/ | grep ephemeral)
@@ -119,7 +121,7 @@ else
       # 80% goes to the docker thin-pool; we want to leave some space for host-volumes
       lvcreate -l 80%VG --thinpool docker-thinpool vg-ephemeral
 
-      DOCKER_OPTS="${DOCKER_OPTS} --storage-opt dm.thinpooldev=/dev/mapper/vg--ephemeral-docker--thinpool"
+      DOCKER_OPTS="${DOCKER_OPTS:-} --storage-opt dm.thinpooldev=/dev/mapper/vg--ephemeral-docker--thinpool"
       # Note that we don't move docker; docker goes direct to the thinpool
 
       # Remaining space (20%) is for kubernetes data
@@ -159,7 +161,7 @@ fi
 
 
 if [[ ${docker_storage} == "btrfs" ]]; then
-  DOCKER_OPTS="${DOCKER_OPTS} -s btrfs"
+  DOCKER_OPTS="${DOCKER_OPTS:-} -s btrfs"
 elif [[ ${docker_storage} == "aufs-nolvm" || ${docker_storage} == "aufs" ]]; then
   # Install aufs kernel module
   # Fix issue #14162 with extra-virtual
@@ -168,9 +170,9 @@ elif [[ ${docker_storage} == "aufs-nolvm" || ${docker_storage} == "aufs" ]]; the
   # Install aufs tools
   apt-get-install aufs-tools
 
-  DOCKER_OPTS="${DOCKER_OPTS} -s aufs"
+  DOCKER_OPTS="${DOCKER_OPTS:-} -s aufs"
 elif [[ ${docker_storage} == "devicemapper" ]]; then
-  DOCKER_OPTS="${DOCKER_OPTS} -s devicemapper"
+  DOCKER_OPTS="${DOCKER_OPTS:-} -s devicemapper"
 else
   echo "Ignoring unknown DOCKER_STORAGE: ${docker_storage}"
 fi
@@ -183,7 +185,7 @@ if [[ -n "${move_docker}" ]]; then
   mkdir -p ${move_docker}/docker
   ln -s ${move_docker}/docker /var/lib/docker
   DOCKER_ROOT="${move_docker}/docker"
-  DOCKER_OPTS="${DOCKER_OPTS} -g ${DOCKER_ROOT}"
+  DOCKER_OPTS="${DOCKER_OPTS:-} -g ${DOCKER_ROOT}"
 fi
 
 if [[ -n "${move_kubelet}" ]]; then
@@ -197,3 +199,4 @@ if [[ -n "${move_kubelet}" ]]; then
   KUBELET_ROOT="${move_kubelet}/kubelet"
 fi
 
+}

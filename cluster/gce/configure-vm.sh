@@ -45,7 +45,13 @@ function ensure-basic-networking() {
   echo "Networking functional on $(hostname) ($(hostname -i))"
 }
 
+# A hookpoint for installing any needed packages
 ensure-packages() {
+  :
+}
+
+# A hookpoint for setting up local devices
+ensure-local-disks() {
   :
 }
 #-GCE
@@ -587,11 +593,8 @@ EOF
   cbr-cidr: ${MASTER_IP_RANGE}
 EOF
   fi
-  if [[ ! -z "${RUNTIME_CONFIG:-}" ]]; then
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
-EOF
-  fi
+
+  env-to-grains "runtime_config"
 }
 
 function salt-node-role() {
@@ -606,18 +609,28 @@ EOF
 }
 #-GCE
 
-function salt-docker-opts() {
-  DOCKER_OPTS=""
-
-  if [[ -n "${EXTRA_DOCKER_OPTS-}" ]]; then
-    DOCKER_OPTS="${EXTRA_DOCKER_OPTS}"
-  fi
-
-  if [[ -n "{DOCKER_OPTS}" ]]; then
+function env-to-grains {
+  local key=$1
+  local env_key=`echo $key | tr '[:lower:]' '[:upper:]'`
+  local value=${!env_key:-}
+  if [[ -n "${value}" ]]; then
+    # Note this is yaml, so indentation matters
     cat <<EOF >>/etc/salt/minion.d/grains.conf
-  docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
+  ${key}: '$(echo "${value}" | sed -e "s/'/''/g")'
 EOF
   fi
+}
+
+function node-docker-opts() {
+  if [[ -n "${EXTRA_DOCKER_OPTS-}" ]]; then
+    DOCKER_OPTS="${DOCKER_OPTS:-} ${EXTRA_DOCKER_OPTS}"
+  fi
+}
+
+function salt-grains() {
+  env-to-grains "docker_opts"
+  env-to-grains "docker_root"
+  env-to-grains "kubelet_root"
 }
 
 function configure-salt() {
@@ -630,8 +643,9 @@ function configure-salt() {
     fi
   else
     salt-node-role
-    salt-docker-opts
+    node-docker-opts
   fi
+  salt-grains
   install-salt
   stop-salt-minion
 }
@@ -652,6 +666,7 @@ if [[ -z "${is_push}" ]]; then
   ensure-install-dir
   ensure-packages
   set-kube-env
+  ensure-local-disks
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
   create-salt-pillar
   if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
