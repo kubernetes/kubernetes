@@ -465,15 +465,6 @@ function add-instance-metadata-from-file {
   done
 }
 
-# Quote something appropriate for a yaml string.
-#
-# TODO(zmerlynn): Note that this function doesn't so much "quote" as
-# "strip out quotes", and we really should be using a YAML library for
-# this, but PyYAML isn't shipped by default, and *rant rant rant ... SIGH*
-function yaml-quote {
-  echo "'$(echo "${@}" | sed -e "s/'/''/g")'"
-}
-
 function write-master-env {
   # If the user requested that the master be part of the cluster, set the
   # environment variable to program the master kubelet to register itself.
