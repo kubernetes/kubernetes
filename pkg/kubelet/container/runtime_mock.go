@@ -87,11 +87,6 @@ func (r *Mock) GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, 
 	return args.Get(0).(*PodStatus), args.Error(1)
 }
 
-func (r *Mock) GetPodStatusAndAPIPodStatus(pod *api.Pod) (*PodStatus, *api.PodStatus, error) {
-	args := r.Called(pod)
-	return args.Get(0).(*PodStatus), args.Get(0).(*api.PodStatus), args.Error(2)
-}
-
 func (r *Mock) ConvertPodStatusToAPIPodStatus(pod *api.Pod, podStatus *PodStatus) (*api.PodStatus, error) {
 	args := r.Called(pod, podStatus)
 	return args.Get(0).(*api.PodStatus), args.Error(1)
