@@ -410,3 +410,12 @@ function stage-images() {
   rm -rf "${temp_dir}"
   return 0
 }
+
+# Quote something appropriate for a yaml string.
+#
+# TODO(zmerlynn): Note that this function doesn't so much "quote" as
+# "strip out quotes", and we really should be using a YAML library for
+# this, but PyYAML isn't shipped by default, and *rant rant rant ... SIGH*
+function yaml-quote {
+  echo "'$(echo "${@}" | sed -e "s/'/''/g")'"
+}
