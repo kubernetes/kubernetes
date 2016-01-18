@@ -18,7 +18,7 @@ limitations under the License.
 
 package integration
 
-// This file tests use of the secrets API resource.
+// This file tests use of the configMap API resource.
 
 import (
 	"net/http"
@@ -32,14 +32,8 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func deleteSecretOrErrorf(t *testing.T, c *client.Client, ns, name string) {
-	if err := c.Secrets(ns).Delete(name); err != nil {
-		t.Errorf("unable to delete secret %v: %v", name, err)
-	}
-}
-
-// TestSecrets tests apiserver-side behavior of creation of secret objects and their use by pods.
-func TestSecrets(t *testing.T) {
+// TestConfigMap tests apiserver-side behavior of creation of ConfigMaps and pods that consume them.
+func TestConfigMap(t *testing.T) {
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
@@ -55,53 +49,70 @@ func TestSecrets(t *testing.T) {
 
 	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&client.Config{Host: s.URL, ContentConfig: client.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	DoTestSecrets(t, client)
+
+	DoTestConfigMap(t, client)
 }
 
-// DoTestSecrets test secrets for one api version.
-func DoTestSecrets(t *testing.T, client *client.Client) {
-	// Make a secret object.
+func DoTestConfigMap(t *testing.T, client *client.Client) {
 	ns := "ns"
-	s := api.Secret{
+	cfg := api.ConfigMap{
 		ObjectMeta: api.ObjectMeta{
-			Name:      "secret",
+			Name:      "configmap",
 			Namespace: ns,
 		},
-		Data: map[string][]byte{
-			"data": []byte("value1\n"),
+		Data: map[string]string{
+			"data-1": "value-1",
+			"data-2": "value-2",
+			"data-3": "value-3",
 		},
 	}
 
-	if _, err := client.Secrets(s.Namespace).Create(&s); err != nil {
-		t.Errorf("unable to create test secret: %v", err)
+	if _, err := client.ConfigMaps(cfg.Namespace).Create(&cfg); err != nil {
+		t.Errorf("unable to create test configMap: %v", err)
 	}
-	defer deleteSecretOrErrorf(t, client, s.Namespace, s.Name)
+	defer deleteConfigMapOrErrorf(t, client, cfg.Namespace, cfg.Name)
 
-	// Template for pods that use a secret.
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "XXX",
 		},
 		Spec: api.PodSpec{
-			Volumes: []api.Volume{
-				{
-					Name: "secvol",
-					VolumeSource: api.VolumeSource{
-						Secret: &api.SecretVolumeSource{
-							SecretName: "secret",
-						},
-					},
-				},
-			},
 			Containers: []api.Container{
 				{
 					Name:  "fake-name",
 					Image: "fakeimage",
-					VolumeMounts: []api.VolumeMount{
+					Env: []api.EnvVar{
 						{
-							Name:      "secvol",
-							MountPath: "/fake/path",
-							ReadOnly:  true,
+							Name: "CONFIG_DATA_1",
+							ValueFrom: &api.EnvVarSource{
+								ConfigMapKeyRef: &api.ConfigMapKeySelector{
+									LocalObjectReference: api.LocalObjectReference{
+										Name: "configmap",
+									},
+									Key: "data-1",
+								},
+							},
+						},
+						{
+							Name: "CONFIG_DATA_2",
+							ValueFrom: &api.EnvVarSource{
+								ConfigMapKeyRef: &api.ConfigMapKeySelector{
+									LocalObjectReference: api.LocalObjectReference{
+										Name: "configmap",
+									},
+									Key: "data-2",
+								},
+							},
+						}, {
+							Name: "CONFIG_DATA_3",
+							ValueFrom: &api.EnvVarSource{
+								ConfigMapKeyRef: &api.ConfigMapKeySelector{
+									LocalObjectReference: api.LocalObjectReference{
+										Name: "configmap",
+									},
+									Key: "data-3",
+								},
+							},
 						},
 					},
 				},
@@ -109,22 +120,15 @@ func DoTestSecrets(t *testing.T, client *client.Client) {
 		},
 	}
 
-	// Create a pod to consume secret.
-	pod.ObjectMeta.Name = "uses-secret"
+	pod.ObjectMeta.Name = "uses-configmap"
 	if _, err := client.Pods(ns).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 	defer deletePodOrErrorf(t, client, ns, pod.Name)
+}
 
-	// Create a pod that consumes non-existent secret.
-	pod.ObjectMeta.Name = "uses-non-existent-secret"
-	if _, err := client.Pods(ns).Create(pod); err != nil {
-		t.Errorf("Failed to create pod: %v", err)
+func deleteConfigMapOrErrorf(t *testing.T, c *client.Client, ns, name string) {
+	if err := c.ConfigMaps(ns).Delete(name); err != nil {
+		t.Errorf("unable to delete ConfigMap %v: %v", name, err)
 	}
-	defer deletePodOrErrorf(t, client, ns, pod.Name)
-	// This pod may fail to run, but we don't currently prevent this, and this
-	// test can't check whether the kubelet actually pulls the secret.
-
-	// Verifying contents of the volumes is out of scope for a
-	// apiserver<->kubelet integration test.  It is covered by an e2e test.
 }
