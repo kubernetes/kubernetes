@@ -42,6 +42,7 @@ const (
 	PersistentVolumeClaims   Resource = "persistentvolumeclaims"
 	Pods                     Resource = "pods"
 	PodTemplates             Resource = "podtemplates"
+	Replicasets              Resource = "replicasets"
 	ResourceQuotas           Resource = "resourcequotas"
 	Secrets                  Resource = "secrets"
 	ServiceAccounts          Resource = "serviceaccounts"
@@ -66,6 +67,7 @@ func init() {
 	watchCacheSizes[PersistentVolumeClaims] = 100
 	watchCacheSizes[Pods] = 1000
 	watchCacheSizes[PodTemplates] = 100
+	watchCacheSizes[Replicasets] = 100
 	watchCacheSizes[ResourceQuotas] = 100
 	watchCacheSizes[Secrets] = 100
 	watchCacheSizes[ServiceAccounts] = 100
