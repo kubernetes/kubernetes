@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/selectors"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -35,23 +36,23 @@ func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 	}
 	selector := labels.NewSelector()
 	for k, v := range ps.MatchLabels {
-		r, err := labels.NewRequirement(k, labels.InOperator, sets.NewString(v))
+		r, err := labels.NewRequirement(k, selectors.InOperator, sets.NewString(v))
 		if err != nil {
 			return nil, err
 		}
 		selector = selector.Add(*r)
 	}
 	for _, expr := range ps.MatchExpressions {
-		var op labels.Operator
+		var op selectors.Operator
 		switch expr.Operator {
 		case LabelSelectorOpIn:
-			op = labels.InOperator
+			op = selectors.InOperator
 		case LabelSelectorOpNotIn:
-			op = labels.NotInOperator
+			op = selectors.NotInOperator
 		case LabelSelectorOpExists:
-			op = labels.ExistsOperator
+			op = selectors.ExistsOperator
 		case LabelSelectorOpDoesNotExist:
-			op = labels.DoesNotExistOperator
+			op = selectors.DoesNotExistOperator
 		default:
 			return nil, fmt.Errorf("%q is not a valid pod selector operator", expr.Operator)
 		}
