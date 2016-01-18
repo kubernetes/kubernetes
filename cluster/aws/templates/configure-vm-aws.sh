@@ -14,10 +14,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-function ensure-basic-networking() {
+ensure-basic-networking() {
+  :
 }
 
-function set-kube-env() {
+ensure-packages() {
+  apt-get-install curl
+  # For reading kube-env.yaml
+  apt-get-install python-yaml
+
+  # TODO: Where to get safe_format_and_mount?
+  mkdir -p /usr/share/google
+  cd /usr/share/google
+  download-or-bust https://raw.githubusercontent.com/GoogleCloudPlatform/compute-image-packages/82b75f314528b90485d5239ab5d5495cc22d775f/google-startup-scripts/usr/share/google/safe_format_and_mount
+  chmod +x safe_format_and_mount
+}
+
+set-kube-env() {
   local kube_env_yaml="${INSTALL_DIR}/kube_env.yaml"
 
   # kube-env has all the environment variables we care about, in a flat yaml format
@@ -30,7 +43,8 @@ for k,v in yaml.load(sys.stdin).iteritems():
   ' < """${kube_env_yaml}""")"
 }
 
-function remove-docker-artifacts() {
+remove-docker-artifacts() {
+  :
 }
 
 # Finds the master PD device
@@ -49,11 +63,11 @@ find-master-pd() {
   done
 }
 
-function fix-apt-sources() {
+fix-apt-sources() {
+  :
 }
 
-#+GCE
-function salt-master-role() {
+salt-master-role() {
   cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
@@ -82,14 +96,14 @@ EOF
   fi
 }
 
-function salt-node-role() {
+salt-node-role() {
   cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-pool
   cbr-cidr: 10.123.45.0/30
   cloud: aws
-  api_servers: '${KUBERNETES_MASTER_NAME}'
+  api_servers: '${API_SERVERS}'
 EOF
 }
 

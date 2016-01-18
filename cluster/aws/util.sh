@@ -745,6 +745,7 @@ function kube-up {
   ensure-iam-profiles
 
   load-or-gen-kube-basicauth
+  load-or-gen-kube-bearertoken
 
   ssh-key-setup
 
@@ -848,7 +849,13 @@ function start-master() {
   # Get or create master persistent volume
   ensure-master-pd
 
-  create-certs "" # TODO: Should we pass ELB name / elastic IP ?
+  # We have to make sure that the cert is valid for API_SERVERS
+  # i.e. we likely have to pass ELB name / elastic IP in future
+  create-certs "${MASTER_INTERNAL_IP}"
+
+  # This key is no longer needed, and this enables us to get under the 16KB size limit
+  KUBECFG_CERT_BASE64=""
+  KUBECFG_KEY_BASE64=""
 
   write-master-env
 
@@ -861,10 +868,11 @@ function start-master() {
     cat ${KUBE_TEMP}/master-kube-env.yaml
     # TODO: get rid of these exceptions / harmonize with common or GCE
     echo "DOCKER_STORAGE: $(yaml-quote ${DOCKER_STORAGE:-})"
+    echo "API_SERVERS: $(yaml-quote ${MASTER_INTERNAL_IP:-})"
     echo "__EOF_KUBE_ENV_YAML"
 
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/configure-vm-aws.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/gce/configure-vm.sh" | sed -e '/#+GCE/,/#-GCE/d'
+    cat "${KUBE_ROOT}/cluster/aws/templates/configure-vm-aws.sh"
+    cat "${KUBE_ROOT}/cluster/gce/configure-vm.sh" | sed -e '/#+GCE/,/#-GCE/d'
   ) > "${KUBE_TEMP}/master-user-data"
 
   # We're running right up against the 16KB limit
@@ -872,6 +880,9 @@ function start-master() {
   cat "${KUBE_TEMP}/master-user-data" | sed -e 's/^[[:blank:]]*#.*$//' | sed -e '/^[[:blank:]]*$/d' > "${KUBE_TEMP}/master-user-data.tmp"
   echo '#! /bin/bash' | cat - "${KUBE_TEMP}/master-user-data.tmp" > "${KUBE_TEMP}/master-user-data"
   rm "${KUBE_TEMP}/master-user-data.tmp"
+
+  # And compress the data (cloud-init accepts compressed data)
+  gzip "${KUBE_TEMP}/master-user-data"
 
   echo "Starting Master"
   master_id=$($AWS_CMD run-instances \
@@ -884,7 +895,7 @@ function start-master() {
     --security-group-ids ${MASTER_SG_ID} \
     --associate-public-ip-address \
     --block-device-mappings "${MASTER_BLOCK_DEVICE_MAPPINGS}" \
-    --user-data file://${KUBE_TEMP}/master-user-data \
+    --user-data fileb://${KUBE_TEMP}/master-user-data.gz \
     --query Instances[].InstanceId)
   add-tag $master_id Name $MASTER_NAME
   add-tag $master_id Role $MASTER_TAG
@@ -933,56 +944,56 @@ function start-master() {
   done
 
   # Check for SSH connectivity
-  attempt=0
-  while true; do
-    echo -n Attempt "$(($attempt+1))" to check for SSH to master
-    local output
-    local ok=1
-    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} uptime 2> $LOG) || ok=0
-    if [[ ${ok} == 0 ]]; then
-      if (( attempt > 30 )); then
-        echo
-        echo "(Failed) output was: ${output}"
-        echo
-        echo -e "${color_red}Unable to ssh to master on ${KUBE_MASTER_IP}. Your cluster is unlikely" >&2
-        echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
-        echo -e "cluster. (sorry!)${color_norm}" >&2
-        exit 1
-      fi
-    else
-      echo -e " ${color_green}[ssh to master working]${color_norm}"
-      break
-    fi
-    echo -e " ${color_yellow}[ssh to master not working yet]${color_norm}"
-    attempt=$(($attempt+1))
-    sleep 10
-  done
+  #attempt=0
+  #while true; do
+  #  echo -n Attempt "$(($attempt+1))" to check for SSH to master
+  #  local output
+  #  local ok=1
+  #  output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} uptime 2> $LOG) || ok=0
+  #  if [[ ${ok} == 0 ]]; then
+  #    if (( attempt > 30 )); then
+  #      echo
+  #      echo "(Failed) output was: ${output}"
+  #      echo
+  #      echo -e "${color_red}Unable to ssh to master on ${KUBE_MASTER_IP}. Your cluster is unlikely" >&2
+  #      echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+  #      echo -e "cluster. (sorry!)${color_norm}" >&2
+  #      exit 1
+  #    fi
+  #  else
+  #    echo -e " ${color_green}[ssh to master working]${color_norm}"
+  #    break
+  #  fi
+  #  echo -e " ${color_yellow}[ssh to master not working yet]${color_norm}"
+  #  attempt=$(($attempt+1))
+  #  sleep 10
+  #done
 
   # We need the salt-master to be up for the minions to work
-  attempt=0
-  while true; do
-    echo -n Attempt "$(($attempt+1))" to check for salt-master
-    local output
-    local ok=1
-    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} pgrep salt-master 2> $LOG) || ok=0
-    if [[ ${ok} == 0 ]]; then
-      if (( attempt > 30 )); then
-        echo
-        echo "(Failed) output was: ${output}"
-        echo
-        echo -e "${color_red}salt-master failed to start on ${KUBE_MASTER_IP}. Your cluster is unlikely" >&2
-        echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
-        echo -e "cluster. (sorry!)${color_norm}" >&2
-        exit 1
-      fi
-    else
-      echo -e " ${color_green}[salt-master running]${color_norm}"
-      break
-    fi
-    echo -e " ${color_yellow}[salt-master not working yet]${color_norm}"
-    attempt=$(($attempt+1))
-    sleep 10
-  done
+  #attempt=0
+  #while true; do
+  #  echo -n Attempt "$(($attempt+1))" to check for salt-master
+  #  local output
+  #  local ok=1
+  #  output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} pgrep salt-master 2> $LOG) || ok=0
+  #  if [[ ${ok} == 0 ]]; then
+  #    if (( attempt > 30 )); then
+  #      echo
+  #      echo "(Failed) output was: ${output}"
+  #      echo
+  #      echo -e "${color_red}salt-master failed to start on ${KUBE_MASTER_IP}. Your cluster is unlikely" >&2
+  #      echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+  #      echo -e "cluster. (sorry!)${color_norm}" >&2
+  #      exit 1
+  #    fi
+  #  else
+  #    echo -e " ${color_green}[salt-master running]${color_norm}"
+  #    break
+  #  fi
+  #  echo -e " ${color_yellow}[salt-master not working yet]${color_norm}"
+  #  attempt=$(($attempt+1))
+  #  sleep 10
+  #done
 }
 
 # Creates an ASG for the minion nodes
@@ -1000,11 +1011,21 @@ function start-minions() {
     cat ${KUBE_TEMP}/node-kube-env.yaml
     # TODO: get rid of these exceptions / harmonize with common or GCE
     echo "DOCKER_STORAGE: $(yaml-quote ${DOCKER_STORAGE:-})"
+    echo "API_SERVERS: $(yaml-quote ${MASTER_INTERNAL_IP:-})"
     echo "__EOF_KUBE_ENV_YAML"
 
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/configure-vm-aws.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/gce/configure-vm.sh" | sed -e '/#+GCE/,/#-GCE/d'
+    cat "${KUBE_ROOT}/cluster/aws/templates/configure-vm-aws.sh"
+    cat "${KUBE_ROOT}/cluster/gce/configure-vm.sh" | sed -e '/#+GCE/,/#-GCE/d'
   ) > "${KUBE_TEMP}/node-user-data"
+
+  # We're running right up against the 16KB limit
+  # Remove all comment lines and then put back the bin/bash shebang
+  cat "${KUBE_TEMP}/node-user-data" | sed -e 's/^[[:blank:]]*#.*$//' | sed -e '/^[[:blank:]]*$/d' > "${KUBE_TEMP}/node-user-data.tmp"
+  echo '#! /bin/bash' | cat - "${KUBE_TEMP}/node-user-data.tmp" > "${KUBE_TEMP}/node-user-data"
+  rm "${KUBE_TEMP}/node-user-data.tmp"
+
+  # Compress the data (cloud-init accepts compressed data)
+  gzip "${KUBE_TEMP}/node-user-data"
 
   local public_ip_option
   if [[ "${ENABLE_NODE_PUBLIC_IP}" == "true" ]]; then
@@ -1021,7 +1042,7 @@ function start-minions() {
       --security-groups ${NODE_SG_ID} \
       ${public_ip_option} \
       --block-device-mappings "${NODE_BLOCK_DEVICE_MAPPINGS}" \
-      --user-data "file://${KUBE_TEMP}/node-user-data"
+      --user-data "fileb://${KUBE_TEMP}/node-user-data.gz"
 
   echo "Creating autoscaling group"
   ${AWS_ASG_CMD} create-auto-scaling-group \
@@ -1070,14 +1091,14 @@ function wait-master() {
   # Wait 3 minutes for cluster to come up.  We hit it with a "highstate" after that to
   # make sure that everything is well configured.
   # TODO: Can we poll here?
-  echo "Waiting 3 minutes for cluster to settle"
-  local i
-  for (( i=0; i < 6*3; i++)); do
-    printf "."
-    sleep 10
-  done
-  echo "Re-running salt highstate"
-  ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} sudo salt '*' state.highstate > $LOG
+  #echo "Waiting 3 minutes for cluster to settle"
+  #local i
+  #for (( i=0; i < 6*3; i++)); do
+  #  printf "."
+  #  sleep 10
+  #done
+  #echo "Re-running salt highstate"
+  #ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} sudo salt '*' state.highstate > $LOG
 
   echo "Waiting for cluster initialization."
   echo
