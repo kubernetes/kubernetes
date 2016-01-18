@@ -60,7 +60,6 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 		queue.NewBasicWorkQueue(),
 		time.Second,
 		time.Second,
-		nil,
 	)
 	return podWorkers, processed
 }
@@ -191,7 +190,7 @@ func TestFakePodWorkers(t *testing.T) {
 	kubeletForRealWorkers := &simpleFakeKubelet{}
 	kubeletForFakeWorkers := &simpleFakeKubelet{}
 
-	realPodWorkers := newPodWorkers(fakeRuntimeCache, kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(), time.Second, time.Second, nil)
+	realPodWorkers := newPodWorkers(fakeRuntimeCache, kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(), time.Second, time.Second)
 	fakePodWorkers := &fakePodWorkers{kubeletForFakeWorkers.syncPod, fakeRuntimeCache, t}
 
 	tests := []struct {
