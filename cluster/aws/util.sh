@@ -496,11 +496,14 @@ function upload-server-tars() {
   SERVER_BINARY_TAR_HASH=
   SALT_TAR_URL=
   SALT_TAR_HASH=
+  BOOTSTRAP_SCRIPT_URL=
+  BOOTSTRAP_SCRIPT_HASH=
 
   ensure-temp-dir
 
   SERVER_BINARY_TAR_HASH=$(sha1sum-file "${SERVER_BINARY_TAR}")
   SALT_TAR_HASH=$(sha1sum-file "${SALT_TAR}")
+  BOOTSTRAP_SCRIPT_HASH=$(sha1sum-file "${BOOTSTRAP_SCRIPT}")
 
   if [[ -z ${AWS_S3_BUCKET-} ]]; then
       local project_hash=
@@ -559,12 +562,13 @@ function upload-server-tars() {
   mkdir ${local_dir}
 
   echo "+++ Staging server tars to S3 Storage: ${AWS_S3_BUCKET}/${staging_path}"
-  local server_binary_path="${staging_path}/${SERVER_BINARY_TAR##*/}"
   cp -a "${SERVER_BINARY_TAR}" ${local_dir}
   cp -a "${SALT_TAR}" ${local_dir}
+  cp -a "${BOOTSTRAP_SCRIPT}" ${local_dir}
 
   aws s3 sync --region ${s3_bucket_location} --exact-timestamps ${local_dir} "s3://${AWS_S3_BUCKET}/${staging_path}/"
 
+  local server_binary_path="${staging_path}/${SERVER_BINARY_TAR##*/}"
   aws s3api put-object-acl --region ${s3_bucket_location} --bucket ${AWS_S3_BUCKET} --key "${server_binary_path}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
   SERVER_BINARY_TAR_URL="${s3_url_base}/${AWS_S3_BUCKET}/${server_binary_path}"
 
@@ -572,9 +576,14 @@ function upload-server-tars() {
   aws s3api put-object-acl --region ${s3_bucket_location} --bucket ${AWS_S3_BUCKET} --key "${salt_tar_path}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
   SALT_TAR_URL="${s3_url_base}/${AWS_S3_BUCKET}/${salt_tar_path}"
 
+  local bootstrap_script_path="${staging_path}/${BOOTSTRAP_SCRIPT##*/}"
+  aws s3api put-object-acl --region ${s3_bucket_location} --bucket ${AWS_S3_BUCKET} --key "${bootstrap_script_path}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
+  BOOTSTRAP_SCRIPT_URL="${s3_url_base}/${AWS_S3_BUCKET}/${bootstrap_script_path}"
+
   echo "Uploaded server tars:"
   echo "  SERVER_BINARY_TAR_URL: ${SERVER_BINARY_TAR_URL}"
   echo "  SALT_TAR_URL: ${SALT_TAR_URL}"
+  echo "  BOOTSTRAP_SCRIPT_URL: ${BOOTSTRAP_SCRIPT_URL}"
 }
 
 # Adds a tag to an AWS resource
@@ -740,6 +749,8 @@ function kube-up {
 
   ensure-temp-dir
 
+  create-bootstrap-script
+
   upload-server-tars
 
   ensure-iam-profiles
@@ -844,6 +855,22 @@ function kube-up {
   check-cluster
 }
 
+# Builds the bootstrap script and saves it to a local temp file
+# Sets BOOTSTRAP_SCRIPT to the path of the script
+function create-bootstrap-script() {
+  ensure-temp-dir
+
+  BOOTSTRAP_SCRIPT="${KUBE_TEMP}/bootstrap-script"
+
+  (
+    cat "${KUBE_ROOT}/cluster/aws/templates/configure-vm-aws.sh"
+    # tail -n +2 is to remove the shebang
+    # GCE specific lines are surrounded by +GCE and -GCE; the sed removes them
+    # TODO: Build the script on GCE, and remove the hacks here
+    cat "${KUBE_ROOT}/cluster/gce/configure-vm.sh" | tail -n +2 | sed -e '/#+GCE/,/#-GCE/d'
+  ) > "${BOOTSTRAP_SCRIPT}"
+}
+
 # Starts the master node
 function start-master() {
   # Get or create master persistent volume
@@ -870,18 +897,13 @@ function start-master() {
     echo "DOCKER_STORAGE: $(yaml-quote ${DOCKER_STORAGE:-})"
     echo "API_SERVERS: $(yaml-quote ${MASTER_INTERNAL_IP:-})"
     echo "__EOF_KUBE_ENV_YAML"
-
-    cat "${KUBE_ROOT}/cluster/aws/templates/configure-vm-aws.sh"
-    cat "${KUBE_ROOT}/cluster/gce/configure-vm.sh" | sed -e '/#+GCE/,/#-GCE/d'
+    echo ""
+    echo "wget -O bootstrap ${BOOTSTRAP_SCRIPT_URL}"
+    echo "chmod +x bootstrap"
+    echo "./bootstrap"
   ) > "${KUBE_TEMP}/master-user-data"
 
-  # We're running right up against the 16KB limit
-  # Remove all comment lines and then put back the bin/bash shebang
-  cat "${KUBE_TEMP}/master-user-data" | sed -e 's/^[[:blank:]]*#.*$//' | sed -e '/^[[:blank:]]*$/d' > "${KUBE_TEMP}/master-user-data.tmp"
-  echo '#! /bin/bash' | cat - "${KUBE_TEMP}/master-user-data.tmp" > "${KUBE_TEMP}/master-user-data"
-  rm "${KUBE_TEMP}/master-user-data.tmp"
-
-  # And compress the data (cloud-init accepts compressed data)
+  # Compress the data to fit under the 16KB limit (cloud-init accepts compressed data)
   gzip "${KUBE_TEMP}/master-user-data"
 
   echo "Starting Master"
@@ -1013,18 +1035,13 @@ function start-minions() {
     echo "DOCKER_STORAGE: $(yaml-quote ${DOCKER_STORAGE:-})"
     echo "API_SERVERS: $(yaml-quote ${MASTER_INTERNAL_IP:-})"
     echo "__EOF_KUBE_ENV_YAML"
-
-    cat "${KUBE_ROOT}/cluster/aws/templates/configure-vm-aws.sh"
-    cat "${KUBE_ROOT}/cluster/gce/configure-vm.sh" | sed -e '/#+GCE/,/#-GCE/d'
+    echo ""
+    echo "wget -O bootstrap ${BOOTSTRAP_SCRIPT_URL}"
+    echo "chmod +x bootstrap"
+    echo "./bootstrap"
   ) > "${KUBE_TEMP}/node-user-data"
 
-  # We're running right up against the 16KB limit
-  # Remove all comment lines and then put back the bin/bash shebang
-  cat "${KUBE_TEMP}/node-user-data" | sed -e 's/^[[:blank:]]*#.*$//' | sed -e '/^[[:blank:]]*$/d' > "${KUBE_TEMP}/node-user-data.tmp"
-  echo '#! /bin/bash' | cat - "${KUBE_TEMP}/node-user-data.tmp" > "${KUBE_TEMP}/node-user-data"
-  rm "${KUBE_TEMP}/node-user-data.tmp"
-
-  # Compress the data (cloud-init accepts compressed data)
+  # Compress the data to fit under the 16KB limit (cloud-init accepts compressed data)
   gzip "${KUBE_TEMP}/node-user-data"
 
   local public_ip_option
@@ -1322,6 +1339,7 @@ function kube-push {
 
   # Make sure we have the tar files staged on Google Storage
   find-release-tars
+  create-bootstrap-script
   upload-server-tars
 
   (
