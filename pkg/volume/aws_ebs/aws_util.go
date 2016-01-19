@@ -260,7 +260,7 @@ func detachDiskAndVerify(c *awsElasticBlockStoreCleaner) {
 				// Log error, if any, and continue checking periodically.
 				glog.Errorf("Error verifying EBS Disk (%q) is detached: %v", c.volumeID, err)
 			} else if allPathsRemoved {
-				// All paths to the PD have been succefully removed
+				// All paths to the PD have been successfully removed
 				unmountPDAndRemoveGlobalPath(c)
 				glog.Infof("Successfully detached EBS Disk %q.", c.volumeID)
 				return
