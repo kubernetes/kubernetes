@@ -56,8 +56,8 @@ $kube_provider_boxes = {
       # opscode_fedora-20", but by providing the URL and our own name, we
       # make it appear as yet another provider under the "kube-fedora20"
       # box
-      :box_name => 'kube-fedora20',
-      :box_url => 'https://atlas.hashicorp.com/rickard-von-essen/boxes/opscode_fedora-20/versions/0.4.0/providers/parallels.box'
+      :box_name => 'kube-fedora21',
+      :box_url => 'http://opscode-vm-bento.s3.amazonaws.com/vagrant/parallels/opscode_fedora-21_chef-provisionerless.box'
     }
   },
   :virtualbox => {
