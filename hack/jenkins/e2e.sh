@@ -512,13 +512,8 @@ case ${JOB_NAME} in
     : ${E2E_CLUSTER_NAME:="jenkins-gce-e2e-serial"}
     : ${E2E_NETWORK:="jenkins-gce-e2e-serial"}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
-          \[Serial\] \
-          \[Disruptive\] \
-          \[Feature:Restart\] \
-          ) --ginkgo.skip=$(join_regex_no_empty \
-	  \[Flaky\]
-          )"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Serial\]|\[Disruptive\]|\[Feature:Restart\] \
+                           --ginkgo.skip=\[Flaky\]"}
     : ${KUBE_GCE_INSTANCE_PREFIX:="e2e-serial"}
     : ${PROJECT:="kubernetes-jkns-e2e-gce-serial"}
     ;;
@@ -529,14 +524,9 @@ case ${JOB_NAME} in
     : ${E2E_NETWORK:="jenkins-gke-e2e-serial"}
     : ${E2E_SET_CLUSTER_API_VERSION:=y}
     : ${FAIL_ON_GCP_RESOURCE_LEAK:="true"}
-    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=$(join_regex_no_empty \
-          \[Serial\] \
-          \[Disruptive\] \
-          \[Feature:Restart\] \
-          ) --ginkgo.skip=$(join_regex_no_empty \
-	  \[Flaky\]
-          )"}
-    : ${PROJECT:="kubernetes-jkns-e2e-gke-serial"}
+    : ${GINKGO_TEST_ARGS:="--ginkgo.focus=\[Serial\]|\[Disruptive\]|\[Feature:Restart\] \
+                           --ginkgo.skip=\[Flaky\]"}
+    : ${PROJECT:="jenkins-gke-e2e-serial"}
     ;;
 
   # Runs the performance/scalability tests on GCE. A larger cluster is used.
