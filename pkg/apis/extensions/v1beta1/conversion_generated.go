@@ -3419,14 +3419,7 @@ func autoConvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.Sc
 		defaulting.(func(*extensions.ScaleStatus))(in)
 	}
 	out.Replicas = int32(in.Replicas)
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	return nil
 }
 
@@ -4540,14 +4533,7 @@ func autoConvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, 
 		defaulting.(func(*ScaleStatus))(in)
 	}
 	out.Replicas = int(in.Replicas)
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	return nil
 }
 

@@ -587,9 +587,9 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">selector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">label query over pods that should match the replicas count. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors">http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">label query over pods that should match the replicas count. This is same as the label selector but in the string format to avoid introspection by clients. The string will be in the same format as the query-param syntax. More info about label selectors: <a href="http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors">http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_any">any</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -4457,7 +4457,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-01-28 22:16:41 UTC
+Last updated 2016-01-29 07:06:51 UTC
 </div>
 </div>
 </body>
