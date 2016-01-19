@@ -50,7 +50,7 @@ kube::util::wait_for_url() {
 
 # returns a random port
 kube::util::get_random_port() {
-  awk -v min=1 -v max=65535 'BEGIN{srand(); print int(min+rand()*(max-min+1))}'
+  awk -v min=1024 -v max=65535 'BEGIN{srand(); print int(min+rand()*(max-min+1))}'
 }
 
 # use netcat to check if the host($1):port($2) is free (return 0 means free, 1 means used)
@@ -65,7 +65,7 @@ kube::util::test_host_port_free() {
     return ${success}
   }
 
-  if [ ! $(nc -vz "${host} ${port}") ]; then
+  if [ ! $(nc -vz "${host}" "${port}") ]; then
     kube::log::status "${host}:${port} is free, proceeding..."
     return ${success}
   else
