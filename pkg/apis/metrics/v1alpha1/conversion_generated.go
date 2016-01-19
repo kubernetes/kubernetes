@@ -22,9 +22,185 @@ import (
 	reflect "reflect"
 
 	api "k8s.io/kubernetes/pkg/api"
+	resource "k8s.io/kubernetes/pkg/api/resource"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	metrics "k8s.io/kubernetes/pkg/apis/metrics"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
+
+func autoConvert_api_ObjectMeta_To_v1_ObjectMeta(in *api.ObjectMeta, out *v1.ObjectMeta, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ObjectMeta))(in)
+	}
+	out.Name = in.Name
+	out.GenerateName = in.GenerateName
+	out.Namespace = in.Namespace
+	out.SelfLink = in.SelfLink
+	out.UID = in.UID
+	out.ResourceVersion = in.ResourceVersion
+	out.Generation = in.Generation
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.CreationTimestamp, &out.CreationTimestamp, s); err != nil {
+		return err
+	}
+	// unable to generate simple pointer conversion for unversioned.Time -> unversioned.Time
+	if in.DeletionTimestamp != nil {
+		out.DeletionTimestamp = new(unversioned.Time)
+		if err := api.Convert_unversioned_Time_To_unversioned_Time(in.DeletionTimestamp, out.DeletionTimestamp, s); err != nil {
+			return err
+		}
+	} else {
+		out.DeletionTimestamp = nil
+	}
+	if in.DeletionGracePeriodSeconds != nil {
+		out.DeletionGracePeriodSeconds = new(int64)
+		*out.DeletionGracePeriodSeconds = *in.DeletionGracePeriodSeconds
+	} else {
+		out.DeletionGracePeriodSeconds = nil
+	}
+	if in.Labels != nil {
+		out.Labels = make(map[string]string)
+		for key, val := range in.Labels {
+			out.Labels[key] = val
+		}
+	} else {
+		out.Labels = nil
+	}
+	if in.Annotations != nil {
+		out.Annotations = make(map[string]string)
+		for key, val := range in.Annotations {
+			out.Annotations[key] = val
+		}
+	} else {
+		out.Annotations = nil
+	}
+	return nil
+}
+
+func Convert_api_ObjectMeta_To_v1_ObjectMeta(in *api.ObjectMeta, out *v1.ObjectMeta, s conversion.Scope) error {
+	return autoConvert_api_ObjectMeta_To_v1_ObjectMeta(in, out, s)
+}
+
+func autoConvert_v1_ObjectMeta_To_api_ObjectMeta(in *v1.ObjectMeta, out *api.ObjectMeta, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*v1.ObjectMeta))(in)
+	}
+	out.Name = in.Name
+	out.GenerateName = in.GenerateName
+	out.Namespace = in.Namespace
+	out.SelfLink = in.SelfLink
+	out.UID = in.UID
+	out.ResourceVersion = in.ResourceVersion
+	out.Generation = in.Generation
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.CreationTimestamp, &out.CreationTimestamp, s); err != nil {
+		return err
+	}
+	// unable to generate simple pointer conversion for unversioned.Time -> unversioned.Time
+	if in.DeletionTimestamp != nil {
+		out.DeletionTimestamp = new(unversioned.Time)
+		if err := api.Convert_unversioned_Time_To_unversioned_Time(in.DeletionTimestamp, out.DeletionTimestamp, s); err != nil {
+			return err
+		}
+	} else {
+		out.DeletionTimestamp = nil
+	}
+	if in.DeletionGracePeriodSeconds != nil {
+		out.DeletionGracePeriodSeconds = new(int64)
+		*out.DeletionGracePeriodSeconds = *in.DeletionGracePeriodSeconds
+	} else {
+		out.DeletionGracePeriodSeconds = nil
+	}
+	if in.Labels != nil {
+		out.Labels = make(map[string]string)
+		for key, val := range in.Labels {
+			out.Labels[key] = val
+		}
+	} else {
+		out.Labels = nil
+	}
+	if in.Annotations != nil {
+		out.Annotations = make(map[string]string)
+		for key, val := range in.Annotations {
+			out.Annotations[key] = val
+		}
+	} else {
+		out.Annotations = nil
+	}
+	return nil
+}
+
+func Convert_v1_ObjectMeta_To_api_ObjectMeta(in *v1.ObjectMeta, out *api.ObjectMeta, s conversion.Scope) error {
+	return autoConvert_v1_ObjectMeta_To_api_ObjectMeta(in, out, s)
+}
+
+func autoConvert_metrics_Metrics_To_v1alpha1_Metrics(in *metrics.Metrics, out *Metrics, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*metrics.Metrics))(in)
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.StartTime, &out.StartTime, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.EndTime, &out.EndTime, s); err != nil {
+		return err
+	}
+	if in.Usage != nil {
+		out.Usage = make(v1.ResourceList)
+		for key, val := range in.Usage {
+			newVal := resource.Quantity{}
+			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, &newVal, s); err != nil {
+				return err
+			}
+			out.Usage[v1.ResourceName(key)] = newVal
+		}
+	} else {
+		out.Usage = nil
+	}
+	return nil
+}
+
+func Convert_metrics_Metrics_To_v1alpha1_Metrics(in *metrics.Metrics, out *Metrics, s conversion.Scope) error {
+	return autoConvert_metrics_Metrics_To_v1alpha1_Metrics(in, out, s)
+}
+
+func autoConvert_metrics_Node_To_v1alpha1_Node(in *metrics.Node, out *Node, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*metrics.Node))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_metrics_Metrics_To_v1alpha1_Metrics(&in.Metrics, &out.Metrics, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_metrics_Node_To_v1alpha1_Node(in *metrics.Node, out *Node, s conversion.Scope) error {
+	return autoConvert_metrics_Node_To_v1alpha1_Node(in, out, s)
+}
+
+func autoConvert_metrics_Pod_To_v1alpha1_Pod(in *metrics.Pod, out *Pod, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*metrics.Pod))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_metrics_Metrics_To_v1alpha1_Metrics(&in.Metrics, &out.Metrics, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_metrics_Pod_To_v1alpha1_Pod(in *metrics.Pod, out *Pod, s conversion.Scope) error {
+	return autoConvert_metrics_Pod_To_v1alpha1_Pod(in, out, s)
+}
 
 func autoConvert_metrics_RawNode_To_v1alpha1_RawNode(in *metrics.RawNode, out *RawNode, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
@@ -52,6 +228,75 @@ func autoConvert_metrics_RawPod_To_v1alpha1_RawPod(in *metrics.RawPod, out *RawP
 
 func Convert_metrics_RawPod_To_v1alpha1_RawPod(in *metrics.RawPod, out *RawPod, s conversion.Scope) error {
 	return autoConvert_metrics_RawPod_To_v1alpha1_RawPod(in, out, s)
+}
+
+func autoConvert_v1alpha1_Metrics_To_metrics_Metrics(in *Metrics, out *metrics.Metrics, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Metrics))(in)
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.StartTime, &out.StartTime, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.EndTime, &out.EndTime, s); err != nil {
+		return err
+	}
+	if in.Usage != nil {
+		out.Usage = make(api.ResourceList)
+		for key, val := range in.Usage {
+			newVal := resource.Quantity{}
+			if err := api.Convert_resource_Quantity_To_resource_Quantity(&val, &newVal, s); err != nil {
+				return err
+			}
+			out.Usage[api.ResourceName(key)] = newVal
+		}
+	} else {
+		out.Usage = nil
+	}
+	return nil
+}
+
+func Convert_v1alpha1_Metrics_To_metrics_Metrics(in *Metrics, out *metrics.Metrics, s conversion.Scope) error {
+	return autoConvert_v1alpha1_Metrics_To_metrics_Metrics(in, out, s)
+}
+
+func autoConvert_v1alpha1_Node_To_metrics_Node(in *Node, out *metrics.Node, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Node))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_Metrics_To_metrics_Metrics(&in.Metrics, &out.Metrics, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1alpha1_Node_To_metrics_Node(in *Node, out *metrics.Node, s conversion.Scope) error {
+	return autoConvert_v1alpha1_Node_To_metrics_Node(in, out, s)
+}
+
+func autoConvert_v1alpha1_Pod_To_metrics_Pod(in *Pod, out *metrics.Pod, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Pod))(in)
+	}
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_Metrics_To_metrics_Metrics(&in.Metrics, &out.Metrics, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1alpha1_Pod_To_metrics_Pod(in *Pod, out *metrics.Pod, s conversion.Scope) error {
+	return autoConvert_v1alpha1_Pod_To_metrics_Pod(in, out, s)
 }
 
 func autoConvert_v1alpha1_RawNode_To_metrics_RawNode(in *RawNode, out *metrics.RawNode, s conversion.Scope) error {
@@ -84,8 +329,16 @@ func Convert_v1alpha1_RawPod_To_metrics_RawPod(in *RawPod, out *metrics.RawPod, 
 
 func init() {
 	err := api.Scheme.AddGeneratedConversionFuncs(
+		autoConvert_api_ObjectMeta_To_v1_ObjectMeta,
+		autoConvert_metrics_Metrics_To_v1alpha1_Metrics,
+		autoConvert_metrics_Node_To_v1alpha1_Node,
+		autoConvert_metrics_Pod_To_v1alpha1_Pod,
 		autoConvert_metrics_RawNode_To_v1alpha1_RawNode,
 		autoConvert_metrics_RawPod_To_v1alpha1_RawPod,
+		autoConvert_v1_ObjectMeta_To_api_ObjectMeta,
+		autoConvert_v1alpha1_Metrics_To_metrics_Metrics,
+		autoConvert_v1alpha1_Node_To_metrics_Node,
+		autoConvert_v1alpha1_Pod_To_metrics_Pod,
 		autoConvert_v1alpha1_RawNode_To_metrics_RawNode,
 		autoConvert_v1alpha1_RawPod_To_metrics_RawPod,
 	)

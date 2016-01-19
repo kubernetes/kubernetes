@@ -41,9 +41,13 @@ func addKnownTypes(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&RawNode{},
 		&RawPod{},
+		&Node{},
+		&Pod{},
 		&v1.DeleteOptions{},
 	)
 }
 
 func (obj *RawNode) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 func (obj *RawPod) GetObjectKind() unversioned.ObjectKind  { return &obj.TypeMeta }
+func (obj *Node) GetObjectKind() unversioned.ObjectKind    { return &obj.TypeMeta }
+func (obj *Pod) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
