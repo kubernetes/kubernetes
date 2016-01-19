@@ -97,7 +97,7 @@ func (plugin *cinderPlugin) newBuilderInternal(spec *volume.Spec, podUID types.U
 		},
 		fsType:             fsType,
 		readOnly:           readOnly,
-		blockDeviceMounter: &cinderSafeFormatAndMount{mounter, exec.New()}}, nil
+		blockDeviceMounter: &mount.SafeFormatAndMount{mounter, exec.New()}}, nil
 }
 
 func (plugin *cinderPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
@@ -181,7 +181,7 @@ type cinderVolumeBuilder struct {
 	*cinderVolume
 	fsType             string
 	readOnly           bool
-	blockDeviceMounter mount.Interface
+	blockDeviceMounter *mount.SafeFormatAndMount
 }
 
 // cinderPersistentDisk volumes are disk resources provided by C3

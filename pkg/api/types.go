@@ -624,9 +624,8 @@ type RBDVolumeSource struct {
 type CinderVolumeSource struct {
 	// Unique id of the volume used to identify the cinder volume
 	VolumeID string `json:"volumeID"`
-	// Required: Filesystem type to mount.
+	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Only ext3 and ext4 are allowed
 	FSType string `json:"fsType,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
