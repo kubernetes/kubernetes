@@ -32,6 +32,11 @@ import (
 const (
 	// The revision annotation of a deployment's replication controllers which records its rollout sequence
 	RevisionAnnotation = "deployment.kubernetes.io/revision"
+
+	// Here are the possible rollback event reasons
+	RollbackRevisionNotFound  = "DeploymentRollbackRevisionNotFound"
+	RollbackTemplateUnchanged = "DeploymentRollbackTemplateUnchanged"
+	RollbackDone              = "DeploymentRollback"
 )
 
 // GetOldRCs returns the old RCs targeted by the given Deployment; get PodList and RCList from client interface.

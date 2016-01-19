@@ -770,7 +770,7 @@ func testRollbackDeploymentRCNoRevision(f *Framework) {
 	waitForEvents(unversionedClient, ns, deployment, 2)
 	events, err := c.Events(ns).Search(deployment)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(events.Items[1].Reason).Should(Equal("DeploymentRollbackRevisionNotFound"))
+	Expect(events.Items[1].Reason).Should(Equal(deploymentutil.RollbackRevisionNotFound))
 
 	// Check if it's still revision 1
 	checkDeploymentRevision(c, ns, deploymentName, "1", deploymentImageName, deploymentImage)
@@ -804,7 +804,7 @@ func testRollbackDeploymentRCNoRevision(f *Framework) {
 	waitForEvents(unversionedClient, ns, deployment, 5)
 	events, err = c.Events(ns).Search(deployment)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(events.Items[4].Reason).Should(Equal("DeploymentRollback"))
+	Expect(events.Items[4].Reason).Should(Equal(deploymentutil.RollbackDone))
 
 	// Check if it's updated to revision 3 correctly
 	checkDeploymentRevision(c, ns, deploymentName, "3", deploymentImageName, deploymentImage)
@@ -821,7 +821,7 @@ func testRollbackDeploymentRCNoRevision(f *Framework) {
 	waitForEvents(unversionedClient, ns, deployment, 7)
 	events, err = c.Events(ns).Search(deployment)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(events.Items[6].Reason).Should(Equal("DeploymentRollbackRevisionNotFound"))
+	Expect(events.Items[6].Reason).Should(Equal(deploymentutil.RollbackRevisionNotFound))
 
 	// Check if it's still revision 3
 	checkDeploymentRevision(c, ns, deploymentName, "3", deploymentImageName, deploymentImage)
@@ -838,7 +838,7 @@ func testRollbackDeploymentRCNoRevision(f *Framework) {
 	waitForEvents(unversionedClient, ns, deployment, 8)
 	events, err = c.Events(ns).Search(deployment)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(events.Items[7].Reason).Should(Equal("DeploymentRollbackTemplateUnchanged"))
+	Expect(events.Items[7].Reason).Should(Equal(deploymentutil.RollbackTemplateUnchanged))
 
 	// Check if it's still revision 3
 	checkDeploymentRevision(c, ns, deploymentName, "3", deploymentImageName, deploymentImage)
