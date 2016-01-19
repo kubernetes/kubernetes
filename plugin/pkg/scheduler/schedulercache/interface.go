@@ -67,10 +67,10 @@ type NodeInfoCache interface {
 	// For better concurrency control, we use a callback to serve the result.
 	// Depending on the implementation, it might acquire a lock. So don't do anything time consuming inside.
 	GetNodeInfo(nodeName string, callback func(*NodeInfo))
-	// AssumePod assumes a pod to be scheduled. The pod's information is aggregated into assigned node.
+	// AssumePodScheduled assumes a pod to be scheduled. The pod's information is aggregated into assigned node.
 	// The implementation might decide the policy to expire/remove the assumed pod before it is confirmed to be scheduled.
 	// After expiration, its information would be subtracted.
-	AssumePod(pod *api.Pod) error
+	AssumePodScheduled(pod *api.Pod) error
 	// AddPod will confirms a pod if it's assumed, or adds back if it's expired.
 	// If added back, the pod's information would be added again.
 	AddPod(pod *api.Pod) error

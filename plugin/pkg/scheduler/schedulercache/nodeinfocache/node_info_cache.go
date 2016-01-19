@@ -110,12 +110,12 @@ func (cache *nodeInfoCache) getNodeInfo(nodeName string) *schedulercache.NodeInf
 	return n
 }
 
-func (cache *nodeInfoCache) AssumePod(pod *api.Pod) error {
-	return cache.assumePod(pod, time.Now())
+func (cache *nodeInfoCache) AssumePodScheduled(pod *api.Pod) error {
+	return cache.assumePodScheduled(pod, time.Now())
 }
 
-// assumePod exists for making test deterministic by taking time as input argument.
-func (cache *nodeInfoCache) assumePod(pod *api.Pod, now time.Time) error {
+// assumePodScheduled exists for making test deterministic by taking time as input argument.
+func (cache *nodeInfoCache) assumePodScheduled(pod *api.Pod, now time.Time) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 

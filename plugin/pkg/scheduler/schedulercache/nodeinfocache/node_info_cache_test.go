@@ -26,9 +26,9 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-// TestAssumePod tests that after a pod is assumed, its information is aggregated
+// TestAssumePodScheduled tests that after a pod is assumed, its information is aggregated
 // on node level.
-func TestAssumePod(t *testing.T) {
+func TestAssumePodScheduled(t *testing.T) {
 	nodeName := "node"
 	tests := []struct {
 		pods []*api.Pod
@@ -59,9 +59,9 @@ func TestAssumePod(t *testing.T) {
 	for i, tt := range tests {
 		cache := newNodeInfoCache(time.Second, time.Second, nil)
 		for _, pod := range tt.pods {
-			err := cache.AssumePod(pod)
+			err := cache.AssumePodScheduled(pod)
 			if err != nil {
-				t.Fatalf("AssumePod failed: %v", err)
+				t.Fatalf("AssumePodScheduled failed: %v", err)
 			}
 		}
 		n := cache.getNodeInfo(nodeName)
@@ -107,7 +107,7 @@ func TestExpirePod(t *testing.T) {
 		cache := newNodeInfoCache(ttl, time.Second, nil)
 
 		for j, pod := range tt.pods {
-			err := cache.assumePod(pod, tt.assumedTime[j])
+			err := cache.assumePodScheduled(pod, tt.assumedTime[j])
 			if err != nil {
 				t.Fatalf("assumePod failed: %v", err)
 			}
@@ -147,7 +147,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 	now := time.Now()
 	for i, tt := range tests {
 		cache := newNodeInfoCache(ttl, time.Second, nil)
-		err := cache.assumePod(tt.podToAssume, now)
+		err := cache.assumePodScheduled(tt.podToAssume, now)
 		if err != nil {
 			t.Fatalf("assumePod failed: %v", err)
 		}
@@ -189,7 +189,7 @@ func TestAddPodAfterExpiration(t *testing.T) {
 	now := time.Now()
 	for i, tt := range tests {
 		cache := newNodeInfoCache(ttl, time.Second, nil)
-		err := cache.assumePod(tt.podToAssume, now)
+		err := cache.assumePodScheduled(tt.podToAssume, now)
 		if err != nil {
 			t.Fatalf("assumePod failed: %v", err)
 		}
@@ -238,7 +238,7 @@ func TestUpdatePod(t *testing.T) {
 	now := time.Now()
 	for i, tt := range tests {
 		cache := newNodeInfoCache(ttl, time.Second, nil)
-		err := cache.assumePod(tt.podToAssume, now)
+		err := cache.assumePodScheduled(tt.podToAssume, now)
 		if err != nil {
 			t.Fatalf("assumePod failed: %v", err)
 		}
@@ -279,7 +279,7 @@ func TestRemoveBindedPod(t *testing.T) {
 
 	for i, tt := range tests {
 		cache := newNodeInfoCache(time.Second, time.Second, nil)
-		err := cache.AssumePod(tt.pod)
+		err := cache.AssumePodScheduled(tt.pod)
 		if err != nil {
 			t.Fatalf("assumePod failed: %v", err)
 		}
@@ -321,7 +321,7 @@ func TestRemoveAddedPod(t *testing.T) {
 
 	for i, tt := range tests {
 		cache := newNodeInfoCache(time.Second, time.Second, nil)
-		err := cache.AssumePod(tt.pod)
+		err := cache.AssumePodScheduled(tt.pod)
 		if err != nil {
 			t.Fatalf("assumePod failed: %v", err)
 		}
@@ -368,7 +368,7 @@ func TestRemoveExpiredPod(t *testing.T) {
 	now := time.Now()
 	for i, tt := range tests {
 		cache := newNodeInfoCache(ttl, time.Second, nil)
-		err := cache.assumePod(tt.pod, now)
+		err := cache.assumePodScheduled(tt.pod, now)
 		if err != nil {
 			t.Fatalf("assumePod failed: %v", err)
 		}
