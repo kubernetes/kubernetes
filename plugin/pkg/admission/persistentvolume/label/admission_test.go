@@ -37,11 +37,11 @@ func (v *mockVolumes) AttachDisk(instanceName string, volumeName string, readOnl
 	return "", fmt.Errorf("not implemented")
 }
 
-func (v *mockVolumes) DetachDisk(instanceName string, volumeName string) error {
-	return fmt.Errorf("not implemented")
+func (v *mockVolumes) DetachDisk(instanceName string, volumeName string) (string, error) {
+	return "", fmt.Errorf("not implemented")
 }
 
-func (v *mockVolumes) CreateVolume(volumeOptions *aws.VolumeOptions) (volumeName string, err error) {
+func (v *mockVolumes) CreateDisk(volumeOptions *aws.VolumeOptions) (volumeName string, err error) {
 	return "", fmt.Errorf("not implemented")
 }
 

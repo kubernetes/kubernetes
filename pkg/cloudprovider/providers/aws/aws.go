@@ -158,11 +158,13 @@ type Volumes interface {
 	AttachDisk(instanceName string, volumeName string, readOnly bool) (string, error)
 	// Detach the disk from the specified instance
 	// instanceName can be empty to mean "the instance on which we are running"
-	DetachDisk(instanceName string, volumeName string) error
+	// Returns the device where the volume was attached
+	DetachDisk(instanceName string, volumeName string) (string, error)
 
 	// Create a volume with the specified options
-	CreateVolume(volumeOptions *VolumeOptions) (volumeName string, err error)
-	DeleteVolume(volumeName string) error
+	CreateDisk(volumeOptions *VolumeOptions) (volumeName string, err error)
+	// Delete the specified volume
+	DeleteDisk(volumeName string) error
 
 	// Get labels to apply to volume on creation
 	GetVolumeLabels(volumeName string) (map[string]string, error)
@@ -200,6 +202,8 @@ type AWSCloud struct {
 
 	mutex sync.Mutex
 }
+
+var _ Volumes = &AWSCloud{}
 
 type AWSCloudConfig struct {
 	Global struct {
@@ -901,7 +905,7 @@ func (self *awsInstance) getInfo() (*ec2.Instance, error) {
 // Gets the mountDevice already assigned to the volume, or assigns an unused mountDevice.
 // If the volume is already assigned, this will return the existing mountDevice with alreadyAttached=true.
 // Otherwise the mountDevice is assigned by finding the first available mountDevice, and it is returned with alreadyAttached=false.
-func (self *awsInstance) getMountDevice(volumeID string) (assigned mountDevice, alreadyAttached bool, err error) {
+func (self *awsInstance) getMountDevice(volumeID string, assign bool) (assigned mountDevice, alreadyAttached bool, err error) {
 	instanceType := self.getInstanceType()
 	if instanceType == nil {
 		return "", false, fmt.Errorf("could not get instance type for instance: %s", self.awsID)
@@ -939,9 +943,15 @@ func (self *awsInstance) getMountDevice(volumeID string) (assigned mountDevice, 
 	// Check to see if this volume is already assigned a device on this machine
 	for mountDevice, mappingVolumeID := range self.deviceMappings {
 		if volumeID == mappingVolumeID {
-			glog.Warningf("Got assignment call for already-assigned volume: %s@%s", mountDevice, mappingVolumeID)
+			if assign {
+				glog.Warningf("Got assignment call for already-assigned volume: %s@%s", mountDevice, mappingVolumeID)
+			}
 			return mountDevice, true, nil
 		}
+	}
+
+	if !assign {
+		return mountDevice(""), false, nil
 	}
 
 	// Check all the valid mountpoints to see if any of them are free
@@ -1172,7 +1182,7 @@ func (c *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly boo
 		return "", errors.New("AWS volumes cannot be mounted read-only")
 	}
 
-	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID)
+	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID, true)
 	if err != nil {
 		return "", err
 	}
@@ -1220,15 +1230,25 @@ func (c *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly boo
 }
 
 // Implements Volumes.DetachDisk
-func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
+func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) (string, error) {
 	disk, err := newAWSDisk(aws, diskName)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	awsInstance, err := aws.getAwsInstance(instanceName)
 	if err != nil {
-		return err
+		return "", err
+	}
+
+	mountDevice, alreadyAttached, err := awsInstance.getMountDevice(disk.awsID, false)
+	if err != nil {
+		return "", err
+	}
+
+	if !alreadyAttached {
+		glog.Warning("DetachDisk called on non-attached disk: ", diskName)
+		// TODO: Continue?  Tolerate non-attached error in DetachVolume?
 	}
 
 	request := ec2.DetachVolumeInput{
@@ -1238,11 +1258,15 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 
 	response, err := aws.ec2.DetachVolume(&request)
 	if err != nil {
-		return fmt.Errorf("error detaching EBS volume: %v", err)
+		return "", fmt.Errorf("error detaching EBS volume: %v", err)
 	}
 	if response == nil {
-		return errors.New("no response from DetachVolume")
+		return "", errors.New("no response from DetachVolume")
 	}
+
+	// TODO: Fix this - just remove the cache?
+	// If we don't have a cache; we don't have to wait any more (the driver does it for us)
+	// Also, maybe we could get the locally connected drivers from the AWS metadata service?
 
 	// At this point we are waiting for the volume being detached. This
 	// releases the volume and invalidates the cache even when there is a timeout.
@@ -1253,6 +1277,7 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 	// works though. An option would be to completely flush the cache upon timeouts.
 	//
 	defer func() {
+		// TODO: Not thread safe?
 		for mountDevice, existingVolumeID := range awsInstance.deviceMappings {
 			if existingVolumeID == disk.awsID {
 				awsInstance.releaseMountDevice(disk.awsID, mountDevice)
@@ -1263,14 +1288,15 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 
 	err = disk.waitForAttachmentStatus("detached")
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return err
+	hostDevicePath := "/dev/xvd" + string(mountDevice)
+	return hostDevicePath, err
 }
 
 // Implements Volumes.CreateVolume
-func (s *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) {
+func (s *AWSCloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 	// TODO: Should we tag this with the cluster id (so it gets deleted when the cluster does?)
 
 	request := &ec2.CreateVolumeInput{}
@@ -1302,7 +1328,7 @@ func (s *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) {
 		tagRequest.Tags = tags
 		if _, err := s.createTags(tagRequest); err != nil {
 			// delete the volume and hope it succeeds
-			delerr := s.DeleteVolume(volumeName)
+			delerr := s.DeleteDisk(volumeName)
 			if delerr != nil {
 				// delete did not succeed, we have a stray volume!
 				return "", fmt.Errorf("error tagging volume %s, could not delete the volume: %v", volumeName, delerr)
@@ -1313,8 +1339,8 @@ func (s *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) {
 	return volumeName, nil
 }
 
-// Implements Volumes.DeleteVolume
-func (aws *AWSCloud) DeleteVolume(volumeName string) error {
+// Implements Volumes.DeleteDisk
+func (aws *AWSCloud) DeleteDisk(volumeName string) error {
 	awsDisk, err := newAWSDisk(aws, volumeName)
 	if err != nil {
 		return err
