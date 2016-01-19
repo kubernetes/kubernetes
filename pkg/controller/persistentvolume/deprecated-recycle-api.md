@@ -1,4 +1,4 @@
-## Deprecation of persistentvolume recycler controller behavior
+## Deprecation of Persistent Volume Recycler Controller behavior
 The function of the persistent volume recycler will change in future kubernetes releases.  The current implementation will remain and function as is for the short term but expected to be removed or replaced in future releases.  
 
 ## Summary
@@ -17,6 +17,6 @@ As of Kubernetes 1.2 if a volume is marked for recycle when it is deleted a spec
 
 ## Timeline
 
-Kube 1.2 : Notice of deprecation
-Kube 1.3 : Community discussion and direction of Recycler future API
-Kube 1.2 + 1 year : Remove old recycler API
+* Kube 1.2 : Notice of deprecation
+* Kube 1.3 : Community discussion and direction of Recycler future API
+* Kube 1.2 + 1 year : Remove old recycler API
