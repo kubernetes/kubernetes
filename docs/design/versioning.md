@@ -34,19 +34,37 @@ Documentation for other releases can be found at
 
 # Kubernetes API and Release Versioning
 
+Reference: [Semantic Versioning](http://semver.org)
+
 Legend:
 
-* **Kube X.Y.Z** refers to the version of Kubernetes that is released. This versions all components: apiserver, kubelet, kubectl, etc.  (**X** is the major version, **Y** is the minor version, and **Z** is the patch version.)
+* **Kube X.Y.Z** refers to the version (git tag) of Kubernetes that is released. This versions all components: apiserver, kubelet, kubectl, etc.  (**X** is the major version, **Y** is the minor version, and **Z** is the patch version.)
 * **API vX[betaY]** refers to the version of the HTTP API.
 
 ## Release versioning
 
 ### Minor version scheme and timeline
 
-* Kube X.Y.0-alpha.W, W > 0: Alpha releases are released roughly every two weeks directly from the master branch. No cherrypick releases. If there is a critical bugfix, a new release from master can be created ahead of schedule.
-* Kube X.Y.Z-beta.W: When master is feature-complete for Kube X.Y, we will cut the release-X.Y branch 2 weeks prior to the desired X.Y.0 date and cherrypick only PRs essential to X.Y.  This cut will be marked as X.Y.0-beta.0, and master will be revved to X.Y+1.0-alpha.0.  If we're not satisfied with X.Y.0-beta.0, we'll release other beta releases, (X.Y.0-beta.W | W > 0) as necessary.
-* Kube X.Y.0: Final release, cut from the release-X.Y branch cut two weeks prior.  X.Y.1-beta.0 will be tagged at the same commit on the same branch.  X.Y.0 occur 3 to 4 months after X.Y-1.0.
-* Kube X.Y.Z, Z > 0: [Patch releases](#patch-releases) are released as we cherrypick commits into the release-X.Y branch, (which is at X.Y.Z-beta.W,) as needed.  X.Y.Z is cut straight from the release-X.Y branch, and X.Y.Z+1-beta.0 is tagged on the same commit.
+* Kube X.Y.0-alpha.W, W > 0 (Branch: master)
+  * Alpha releases are released roughly every two weeks directly from the master branch.
+  * No cherrypick releases. If there is a critical bugfix, a new release from master can be created ahead of schedule.
+* Kube X.Y.Z-beta.W (Branch: release-X.Y)
+  * When master is feature-complete for Kube X.Y, we will cut the release-X.Y branch 2 weeks prior to the desired X.Y.0 date and cherrypick only PRs essential to X.Y.
+  * This cut will be marked as X.Y.0-beta.0, and master will be revved to X.Y+1.0-alpha.0.
+  * If we're not satisfied with X.Y.0-beta.0, we'll release other beta releases, (X.Y.0-beta.W | W > 0) as necessary.
+* Kube X.Y.0 (Branch: release-X.Y)
+  * Final release, cut from the release-X.Y branch cut two weeks prior.
+  * X.Y.1-beta.0 will be tagged at the same commit on the same branch.
+  * X.Y.0 occur 3 to 4 months after X.(Y-1).0.
+* Kube X.Y.Z, Z > 0 (Branch: release-X.Y)
+  * [Patch releases](#patch-releases) are released as we cherrypick commits into the release-X.Y branch, (which is at X.Y.Z-beta.W,) as needed.
+  * X.Y.Z is cut straight from the release-X.Y branch, and X.Y.Z+1-beta.0 is tagged on the followup commit that updates pkg/version/base.go with the beta version.
+* Kube X.Y.Z, Z > 0 (Branch: release-X.Y.Z)
+  * These are special and different in that the X.Y.Z tag is branched to isolate the emergency/critical fix from all other changes that have landed on the release branch since the previous tag
+  * Cut release-X.Y.Z branch to hold the isolated patch release
+  * Tag release-X.Y.Z branch + fixes with X.Y.(Z+1)
+  * Branched [patch releases](#patch-releases) are rarely needed but used for emergency/critical fixes to the latest release
+  * See [#19849](https://issues.k8s.io/19849) tracking the work that is needed for this kind of release to be possible.
 
 ### Major version timeline
 
