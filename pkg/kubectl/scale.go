@@ -44,6 +44,8 @@ func ScalerFor(kind unversioned.GroupKind, c client.Interface) (Scaler, error) {
 	switch kind {
 	case api.Kind("ReplicationController"):
 		return &ReplicationControllerScaler{c}, nil
+	case extensions.Kind("ReplicaSet"):
+		return &ReplicaSetScaler{c.Extensions()}, nil
 	case extensions.Kind("Job"):
 		return &JobScaler{c.Extensions()}, nil
 	case extensions.Kind("Deployment"):
@@ -182,6 +184,68 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 		}
 		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
 			client.ControllerHasDesiredReplicas(scaler.c, rc))
+	}
+	return nil
+}
+
+// ValidateReplicaSet ensures that the preconditions match.  Returns nil if they are valid, an error otherwise
+func (precondition *ScalePrecondition) ValidateReplicaSet(replicaSet *extensions.ReplicaSet) error {
+	if precondition.Size != -1 && replicaSet.Spec.Replicas != precondition.Size {
+		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(replicaSet.Spec.Replicas)}
+	}
+	if len(precondition.ResourceVersion) != 0 && replicaSet.ResourceVersion != precondition.ResourceVersion {
+		return PreconditionError{"resource version", precondition.ResourceVersion, replicaSet.ResourceVersion}
+	}
+	return nil
+}
+
+type ReplicaSetScaler struct {
+	c client.ExtensionsInterface
+}
+
+func (scaler *ReplicaSetScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) error {
+	rs, err := scaler.c.ReplicaSets(namespace).Get(name)
+	if err != nil {
+		return ScaleError{ScaleGetFailure, "Unknown", err}
+	}
+	if preconditions != nil {
+		if err := preconditions.ValidateReplicaSet(rs); err != nil {
+			return err
+		}
+	}
+	rs.Spec.Replicas = int(newSize)
+	// TODO: do retry on 409 errors here?
+	if _, err := scaler.c.ReplicaSets(namespace).Update(rs); err != nil {
+		if errors.IsInvalid(err) {
+			return ScaleError{ScaleUpdateInvalidFailure, rs.ResourceVersion, err}
+		}
+		return ScaleError{ScaleUpdateFailure, rs.ResourceVersion, err}
+	}
+	return nil
+}
+
+// Scale updates a ReplicaSet to a new size, with optional precondition check (if preconditions is
+// not nil), optional retries (if retry is not nil), and then optionally waits for it's replica
+// count to reach the new value (if wait is not nil).
+func (scaler *ReplicaSetScaler) Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, waitForReplicas *RetryParams) error {
+	if preconditions == nil {
+		preconditions = &ScalePrecondition{-1, ""}
+	}
+	if retry == nil {
+		// Make it try only once, immediately
+		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
+	}
+	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize)
+	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
+		return err
+	}
+	if waitForReplicas != nil {
+		rs, err := scaler.c.ReplicaSets(namespace).Get(name)
+		if err != nil {
+			return err
+		}
+		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
+			client.ReplicaSetHasDesiredReplicas(scaler.c, rs))
 	}
 	return nil
 }

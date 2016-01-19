@@ -59,6 +59,7 @@ import (
 	podetcd "k8s.io/kubernetes/pkg/registry/pod/etcd"
 	pspetcd "k8s.io/kubernetes/pkg/registry/podsecuritypolicy/etcd"
 	podtemplateetcd "k8s.io/kubernetes/pkg/registry/podtemplate/etcd"
+	replicasetetcd "k8s.io/kubernetes/pkg/registry/replicaset/etcd"
 	resourcequotaetcd "k8s.io/kubernetes/pkg/registry/resourcequota/etcd"
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
 	"k8s.io/kubernetes/pkg/registry/service"
@@ -639,6 +640,11 @@ func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
 	if isEnabled("podsecuritypolicy") {
 		podSecurityPolicyStorage := pspetcd.NewREST(dbClient("podsecuritypolicy"), storageDecorator)
 		storage["podSecurityPolicies"] = podSecurityPolicyStorage
+	}
+	if isEnabled("replicasets") {
+		replicaSetStorage := replicasetetcd.NewStorage(dbClient("replicasets"), storageDecorator)
+		storage["replicasets"] = replicaSetStorage.ReplicaSet
+		storage["replicasets/status"] = replicaSetStorage.Status
 	}
 
 	return storage
