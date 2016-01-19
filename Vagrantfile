@@ -5,7 +5,7 @@
 VAGRANTFILE_API_VERSION = "2"
 
 # Require a recent version of vagrant otherwise some have reported errors setting host names on boxes
-Vagrant.require_version ">= 1.6.2"
+Vagrant.require_version ">= 1.7.4"
 
 if ARGV.first == "up" && ENV['USING_KUBE_SCRIPTS'] != 'true'
   raise Vagrant::Errors::VagrantError.new, <<END
