@@ -164,8 +164,8 @@ func CheckPodsExceedingFreeResources(pods []*api.Pod, capacity api.ResourceList)
 	memoryRequested := int64(0)
 	for _, pod := range pods {
 		podRequest := getResourceRequest(pod)
-		fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
-		fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory
+		fitsCPU := (totalMilliCPU - milliCPURequested) >= podRequest.milliCPU
+		fitsMemory := (totalMemory - memoryRequested) >= podRequest.memory
 		if !fitsCPU {
 			// the pod doesn't fit due to CPU request
 			notFittingCPU = append(notFittingCPU, pod)

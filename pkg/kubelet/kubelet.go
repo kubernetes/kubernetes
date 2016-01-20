@@ -2159,9 +2159,7 @@ func hasHostPortConflicts(pods []*api.Pod) bool {
 	return false
 }
 
-// hasInsufficientfFreeResources detects pods that exceeds node's resources.
-// TODO: Consider integrate disk space into this function, and returns a
-// suitable reason and message per resource type.
+// hasInsufficientfFreeResources detects pods that exceeds node's cpu and memory resource.
 func (kl *Kubelet) hasInsufficientfFreeResources(pods []*api.Pod) (bool, bool) {
 	info, err := kl.GetCachedMachineInfo()
 	if err != nil {
