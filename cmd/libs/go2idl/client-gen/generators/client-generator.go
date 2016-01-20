@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/args"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/fake"
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
@@ -47,6 +48,8 @@ type ClientGenArgs struct {
 	// types along with the clientset. It's populated from command-line
 	// arguments.
 	ClientsetOnly bool
+	// FakeClient determines if client-gen generates the fake clients.
+	FakeClient bool
 }
 
 // NameSystems returns the name system used by the generators in this package.
@@ -188,14 +191,21 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 
 	var packageList []generator.Package
+
+	packageList = append(packageList, packageForClientset(customArgs, arguments.OutputPackagePath, boilerplate))
+
 	// If --clientset-only=true, we don't regenerate the individual typed clients.
-	if !customArgs.ClientsetOnly {
-		orderer := namer.Orderer{namer.NewPrivateNamer(0)}
-		for group, types := range groupToTypes {
-			packageList = append(packageList, packageForGroup(group, "unversioned", orderer.OrderTypes(types), arguments.OutputPackagePath, arguments.OutputBase, boilerplate))
+	if customArgs.ClientsetOnly {
+		return generator.Packages(packageList)
+	}
+
+	orderer := namer.Orderer{namer.NewPrivateNamer(0)}
+	for group, types := range groupToTypes {
+		packageList = append(packageList, packageForGroup(group, "unversioned", orderer.OrderTypes(types), arguments.OutputPackagePath, arguments.OutputBase, boilerplate))
+		if customArgs.FakeClient {
+			packageList = append(packageList, fake.PackageForGroup(group, "unversioned", orderer.OrderTypes(types), arguments.OutputPackagePath, arguments.OutputBase, boilerplate))
 		}
 	}
 
-	packageList = append(packageList, packageForClientset(customArgs, arguments.OutputPackagePath, boilerplate))
 	return generator.Packages(packageList)
 }

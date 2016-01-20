@@ -22,7 +22,7 @@ import (
 )
 
 type Interface interface {
-	Testgroup() testgroup_unversioned.TestgroupClient
+	Testgroup() testgroup_unversioned.TestgroupInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -32,7 +32,7 @@ type Clientset struct {
 }
 
 // Testgroup retrieves the TestgroupClient
-func (c *Clientset) Testgroup() *testgroup_unversioned.TestgroupClient {
+func (c *Clientset) Testgroup() testgroup_unversioned.TestgroupInterface {
 	return c.TestgroupClient
 }
 

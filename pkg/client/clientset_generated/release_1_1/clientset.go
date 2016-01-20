@@ -23,8 +23,8 @@ import (
 )
 
 type Interface interface {
-	Legacy() legacy_unversioned.LegacyClient
-	Extensions() extensions_unversioned.ExtensionsClient
+	Legacy() legacy_unversioned.LegacyInterface
+	Extensions() extensions_unversioned.ExtensionsInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -35,12 +35,12 @@ type Clientset struct {
 }
 
 // Legacy retrieves the LegacyClient
-func (c *Clientset) Legacy() *legacy_unversioned.LegacyClient {
+func (c *Clientset) Legacy() legacy_unversioned.LegacyInterface {
 	return c.LegacyClient
 }
 
 // Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() *extensions_unversioned.ExtensionsClient {
+func (c *Clientset) Extensions() extensions_unversioned.ExtensionsInterface {
 	return c.ExtensionsClient
 }
 
