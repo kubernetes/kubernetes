@@ -79,10 +79,17 @@ func (c *persistentVolumeClaims) Update(persistentVolumeClaim *api.PersistentVol
 	return
 }
 
-func (c *persistentVolumeClaims) UpdateStatus(persistentVolumeClaim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
-	result := &api.PersistentVolumeClaim{}
-	err := c.client.Put().Resource("persistentVolumeClaims").Name(persistentVolumeClaim.Name).SubResource("status").Body(persistentVolumeClaim).Do().Into(result)
-	return result, err
+func (c *persistentVolumeClaims) UpdateStatus(persistentVolumeClaim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
+	result = &api.PersistentVolumeClaim{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("persistentVolumeClaims").
+		Name(persistentVolumeClaim.Name).
+		SubResource("status").
+		Body(persistentVolumeClaim).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the persistentVolumeClaim and deletes it. Returns an error if one occurs.

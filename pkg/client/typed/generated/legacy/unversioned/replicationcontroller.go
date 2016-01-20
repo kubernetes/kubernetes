@@ -79,10 +79,17 @@ func (c *replicationControllers) Update(replicationController *api.ReplicationCo
 	return
 }
 
-func (c *replicationControllers) UpdateStatus(replicationController *api.ReplicationController) (*api.ReplicationController, error) {
-	result := &api.ReplicationController{}
-	err := c.client.Put().Resource("replicationControllers").Name(replicationController.Name).SubResource("status").Body(replicationController).Do().Into(result)
-	return result, err
+func (c *replicationControllers) UpdateStatus(replicationController *api.ReplicationController) (result *api.ReplicationController, err error) {
+	result = &api.ReplicationController{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("replicationControllers").
+		Name(replicationController.Name).
+		SubResource("status").
+		Body(replicationController).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the replicationController and deletes it. Returns an error if one occurs.

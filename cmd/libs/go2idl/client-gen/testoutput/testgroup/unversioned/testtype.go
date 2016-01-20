@@ -80,10 +80,17 @@ func (c *testTypes) Update(testType *testgroup.TestType) (result *testgroup.Test
 	return
 }
 
-func (c *testTypes) UpdateStatus(testType *testgroup.TestType) (*testgroup.TestType, error) {
-	result := &testgroup.TestType{}
-	err := c.client.Put().Resource("testTypes").Name(testType.Name).SubResource("status").Body(testType).Do().Into(result)
-	return result, err
+func (c *testTypes) UpdateStatus(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
+	result = &testgroup.TestType{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("testTypes").
+		Name(testType.Name).
+		SubResource("status").
+		Body(testType).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.

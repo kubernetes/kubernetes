@@ -79,10 +79,17 @@ func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
 	return
 }
 
-func (c *pods) UpdateStatus(pod *api.Pod) (*api.Pod, error) {
-	result := &api.Pod{}
-	err := c.client.Put().Resource("pods").Name(pod.Name).SubResource("status").Body(pod).Do().Into(result)
-	return result, err
+func (c *pods) UpdateStatus(pod *api.Pod) (result *api.Pod, err error) {
+	result = &api.Pod{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("pods").
+		Name(pod.Name).
+		SubResource("status").
+		Body(pod).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the pod and deletes it. Returns an error if one occurs.

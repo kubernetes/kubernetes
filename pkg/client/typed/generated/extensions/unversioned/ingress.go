@@ -80,10 +80,17 @@ func (c *ingresses) Update(ingress *extensions.Ingress) (result *extensions.Ingr
 	return
 }
 
-func (c *ingresses) UpdateStatus(ingress *extensions.Ingress) (*extensions.Ingress, error) {
-	result := &extensions.Ingress{}
-	err := c.client.Put().Resource("ingresses").Name(ingress.Name).SubResource("status").Body(ingress).Do().Into(result)
-	return result, err
+func (c *ingresses) UpdateStatus(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
+	result = &extensions.Ingress{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("ingresses").
+		Name(ingress.Name).
+		SubResource("status").
+		Body(ingress).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the ingress and deletes it. Returns an error if one occurs.
