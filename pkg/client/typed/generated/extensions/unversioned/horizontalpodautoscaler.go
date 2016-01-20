@@ -80,10 +80,17 @@ func (c *horizontalPodAutoscalers) Update(horizontalPodAutoscaler *extensions.Ho
 	return
 }
 
-func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (*extensions.HorizontalPodAutoscaler, error) {
-	result := &extensions.HorizontalPodAutoscaler{}
-	err := c.client.Put().Resource("horizontalPodAutoscalers").Name(horizontalPodAutoscaler.Name).SubResource("status").Body(horizontalPodAutoscaler).Do().Into(result)
-	return result, err
+func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *extensions.HorizontalPodAutoscaler) (result *extensions.HorizontalPodAutoscaler, err error) {
+	result = &extensions.HorizontalPodAutoscaler{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("horizontalPodAutoscalers").
+		Name(horizontalPodAutoscaler.Name).
+		SubResource("status").
+		Body(horizontalPodAutoscaler).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the horizontalPodAutoscaler and deletes it. Returns an error if one occurs.

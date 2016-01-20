@@ -80,10 +80,17 @@ func (c *daemonSets) Update(daemonSet *extensions.DaemonSet) (result *extensions
 	return
 }
 
-func (c *daemonSets) UpdateStatus(daemonSet *extensions.DaemonSet) (*extensions.DaemonSet, error) {
-	result := &extensions.DaemonSet{}
-	err := c.client.Put().Resource("daemonSets").Name(daemonSet.Name).SubResource("status").Body(daemonSet).Do().Into(result)
-	return result, err
+func (c *daemonSets) UpdateStatus(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
+	result = &extensions.DaemonSet{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("daemonSets").
+		Name(daemonSet.Name).
+		SubResource("status").
+		Body(daemonSet).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the daemonSet and deletes it. Returns an error if one occurs.

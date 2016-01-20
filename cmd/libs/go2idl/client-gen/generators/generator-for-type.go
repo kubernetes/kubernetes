@@ -283,10 +283,17 @@ func (c *$.type|privatePlural$) Update($.type|private$ *$.type|raw$) (result *$.
 `
 
 var updateStatusTemplate = `
-func (c *$.type|privatePlural$) UpdateStatus($.type|private$ *$.type|raw$) (*$.type|raw$, error) {
-	result := &$.type|raw${}
-	err := c.client.Put().Resource("$.type|privatePlural$").Name($.type|private$.Name).SubResource("status").Body($.type|private$).Do().Into(result)
-	return result, err
+func (c *$.type|privatePlural$) UpdateStatus($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
+	result = &$.type|raw${}
+	err = c.client.Put().
+		$if .namespaced$Namespace(c.ns).$end$
+		Resource("$.type|privatePlural$").
+		Name($.type|private$.Name).
+		SubResource("status").
+		Body($.type|private$).
+		Do().
+		Into(result)
+	return
 }
 `
 

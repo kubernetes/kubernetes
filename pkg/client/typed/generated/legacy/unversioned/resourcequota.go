@@ -79,10 +79,17 @@ func (c *resourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.R
 	return
 }
 
-func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	result := &api.ResourceQuota{}
-	err := c.client.Put().Resource("resourceQuotas").Name(resourceQuota.Name).SubResource("status").Body(resourceQuota).Do().Into(result)
-	return result, err
+func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
+	result = &api.ResourceQuota{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("resourceQuotas").
+		Name(resourceQuota.Name).
+		SubResource("status").
+		Body(resourceQuota).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the resourceQuota and deletes it. Returns an error if one occurs.

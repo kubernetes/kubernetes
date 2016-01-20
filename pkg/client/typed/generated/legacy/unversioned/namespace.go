@@ -75,10 +75,16 @@ func (c *namespaces) Update(namespace *api.Namespace) (result *api.Namespace, er
 	return
 }
 
-func (c *namespaces) UpdateStatus(namespace *api.Namespace) (*api.Namespace, error) {
-	result := &api.Namespace{}
-	err := c.client.Put().Resource("namespaces").Name(namespace.Name).SubResource("status").Body(namespace).Do().Into(result)
-	return result, err
+func (c *namespaces) UpdateStatus(namespace *api.Namespace) (result *api.Namespace, err error) {
+	result = &api.Namespace{}
+	err = c.client.Put().
+		Resource("namespaces").
+		Name(namespace.Name).
+		SubResource("status").
+		Body(namespace).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the namespace and deletes it. Returns an error if one occurs.

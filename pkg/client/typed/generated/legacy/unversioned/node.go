@@ -75,10 +75,16 @@ func (c *nodes) Update(node *api.Node) (result *api.Node, err error) {
 	return
 }
 
-func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
-	result := &api.Node{}
-	err := c.client.Put().Resource("nodes").Name(node.Name).SubResource("status").Body(node).Do().Into(result)
-	return result, err
+func (c *nodes) UpdateStatus(node *api.Node) (result *api.Node, err error) {
+	result = &api.Node{}
+	err = c.client.Put().
+		Resource("nodes").
+		Name(node.Name).
+		SubResource("status").
+		Body(node).
+		Do().
+		Into(result)
+	return
 }
 
 // Delete takes name of the node and deletes it. Returns an error if one occurs.
