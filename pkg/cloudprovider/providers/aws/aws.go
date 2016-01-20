@@ -1682,7 +1682,7 @@ func (s *AWSCloud) listSubnetIDsinVPC(vpcId string) ([]string, error) {
 	return subnetIds, nil
 }
 
-// EnsureTCPLoadBalancer implements TCPLoadBalancer.EnsureTCPLoadBalancer
+// EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
 // TODO(justinsb) It is weird that these take a region.  I suspect it won't work cross-region anyway.
 func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
 	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v)", name, region, publicIP, ports, hosts)
