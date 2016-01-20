@@ -43,5 +43,7 @@ func NewCmdRollout(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 
+	cmd.AddCommand(NewCmdRolloutHistory(f, out))
+
 	return cmd
 }
