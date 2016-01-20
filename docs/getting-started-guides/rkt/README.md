@@ -109,8 +109,8 @@ Creating these files for any moderately-sized cluster is at best inconvenient.
 Work is in progress to
 [enable Kubernetes to use the CNI by default]
 (https://github.com/kubernetes/kubernetes/pull/18795/files).
-As that work matures, such manual CNI config munging will become unneccessary for
-primary use cases. For early adopters, an initial example shows one way to
+As that work matures, such manual CNI config munging will become unnecessary
+for primary use cases. For early adopters, an initial example shows one way to
 [automatically generate these CNI configurations]
 (https://gist.github.com/yifan-gu/fbb911db83d785915543)
 for rkt.
