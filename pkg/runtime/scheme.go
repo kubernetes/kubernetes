@@ -474,7 +474,7 @@ func (s *Scheme) ConvertToVersion(in Object, outVersion string) (Object, error) 
 		return nil, err
 	}
 	switch in.(type) {
-	case *Unknown, *Unstructured:
+	case *Unknown, *Unstructured, *UnstructuredList:
 		old := in.GetObjectKind().GroupVersionKind()
 		defer in.GetObjectKind().SetGroupVersionKind(old)
 		setTargetVersion(in, s, gv)
