@@ -18,9 +18,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Lock this to a release that is known to work.  We can bump this as needed.
-GODEP_RELEASE=v45
-
 #### HACK ####
 # Sometimes godep just can't handle things. This lets use manually put
 # some deps in place first, so godep won't fall over.
@@ -56,23 +53,14 @@ function cleanup {
 }
 trap cleanup EXIT
 
-export GOPATH="${_tmpdir}"
 # build the godep tool
+export GOPATH="${_tmpdir}"
 go get -u github.com/tools/godep 2>/dev/null
-pushd "${_tmpdir}/src/github.com/tools/godep" > /dev/null
-  git checkout "${GODEP_RELEASE}" 2>/dev/null
-  go install github.com/tools/godep 2>/dev/null
-popd > /dev/null
+go install github.com/tools/godep 2>/dev/null
 GODEP="${_tmpdir}/bin/godep"
 
 # fill out that nice clean place with the kube godeps
 echo "Starting to download all kubernetes godeps. This takes a while"
-
-# Remove once either godep works properly or we bump docker version
-preload-dep github.com/docker docker 0f5c9d301b9b1cca66b3ea0f9dec3b5317d3686d
-
-# Remove once either godep works properly or we bump camlistore deps
-preload-dep github.com/camlistore camlistore 9868aa0f8d8a93ff0b30ff0de46cc351b6b88b30
 
 "${GODEP}" restore
 echo "Download finished"
