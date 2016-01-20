@@ -71,6 +71,9 @@ type podWorkers struct {
 
 	// resyncInterval is the duration to wait until the next sync.
 	resyncInterval time.Duration
+
+	// podCache stores kubecontainer.PodStatus for all pods.
+	podCache kubecontainer.Cache
 }
 
 type workUpdate struct {
@@ -88,7 +91,7 @@ type workUpdate struct {
 }
 
 func newPodWorkers(runtimeCache kubecontainer.RuntimeCache, syncPodFn syncPodFnType,
-	recorder record.EventRecorder, workQueue queue.WorkQueue, resyncInterval, backOffPeriod time.Duration) *podWorkers {
+	recorder record.EventRecorder, workQueue queue.WorkQueue, resyncInterval, backOffPeriod time.Duration, podCache kubecontainer.Cache) *podWorkers {
 	return &podWorkers{
 		podUpdates:                map[types.UID]chan workUpdate{},
 		isWorking:                 map[types.UID]bool{},
@@ -99,13 +102,27 @@ func newPodWorkers(runtimeCache kubecontainer.RuntimeCache, syncPodFn syncPodFnT
 		workQueue:                 workQueue,
 		resyncInterval:            resyncInterval,
 		backOffPeriod:             backOffPeriod,
+		podCache:                  podCache,
 	}
 }
 
 func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 	var minRuntimeCacheTime time.Time
+
 	for newWork := range podUpdates {
 		err := func() (err error) {
+			podID := newWork.pod.UID
+			if p.podCache != nil {
+				// This is a blocking call that would return only if the cache
+				// has an entry for the pod that is newer than minRuntimeCache
+				// Time. This ensures the worker doesn't start syncing until
+				// after the cache is at least newer than the finished time of
+				// the previous sync.
+				// TODO: We don't consume the return PodStatus yet, but we
+				// should pass it to syncPod() eventually.
+				p.podCache.GetNewerThan(podID, minRuntimeCacheTime)
+			}
+			// TODO: Deprecate the runtime cache.
 			// We would like to have the state of the containers from at least
 			// the moment when we finished the previous processing of that pod.
 			if err := p.runtimeCache.ForceUpdateIfOlder(minRuntimeCacheTime); err != nil {
@@ -206,10 +223,13 @@ func (p *podWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty
 
 func (p *podWorkers) wrapUp(uid types.UID, syncErr error) {
 	// Requeue the last update if the last sync returned error.
-	if syncErr != nil {
-		p.workQueue.Enqueue(uid, p.backOffPeriod)
-	} else {
+	switch {
+	case syncErr == nil:
+		// No error; requeue at the regular resync interval.
 		p.workQueue.Enqueue(uid, p.resyncInterval)
+	default:
+		// Error occurred during the sync; back off and then retry.
+		p.workQueue.Enqueue(uid, p.backOffPeriod)
 	}
 	p.checkForUpdates(uid)
 }
