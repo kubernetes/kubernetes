@@ -964,17 +964,25 @@ func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList
 
 	numSources := 0
 
-	switch {
-	case ev.ValueFrom.FieldRef != nil:
+	if ev.ValueFrom.FieldRef != nil {
 		numSources++
 		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldRef, &validFieldPathExpressionsEnv, fldPath.Child("fieldRef"))...)
-	case ev.ValueFrom.ConfigMapKeyRef != nil:
+	}
+	if ev.ValueFrom.ConfigMapKeyRef != nil {
 		numSources++
 		allErrs = append(allErrs, validateConfigMapKeySelector(ev.ValueFrom.ConfigMapKeyRef, fldPath.Child("configMapKeyRef"))...)
 	}
+	if ev.ValueFrom.SecretKeyRef != nil {
+		numSources++
+		allErrs = append(allErrs, validateSecretKeySelector(ev.ValueFrom.SecretKeyRef, fldPath.Child("secretKeyRef"))...)
+	}
 
-	if len(ev.Value) != 0 && numSources != 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "may not be specified when `value` is not empty"))
+	if len(ev.Value) != 0 {
+		if numSources != 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath, "", "may not be specified when `value` is not empty"))
+		}
+	} else if numSources != 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "may not have more than one field specified at a time"))
 	}
 
 	return allErrs
@@ -1000,6 +1008,21 @@ func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.
 }
 
 func validateConfigMapKeySelector(s *api.ConfigMapKeySelector, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(s.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	}
+	if len(s.Key) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
+	} else if !IsSecretKey(s.Key) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), s.Key, fmt.Sprintf("must have at most %d characters and match regex %s", validation.DNS1123SubdomainMaxLength, SecretKeyFmt)))
+	}
+
+	return allErrs
+}
+
+func validateSecretKeySelector(s *api.SecretKeySelector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(s.Name) == 0 {

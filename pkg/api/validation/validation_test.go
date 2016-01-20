@@ -812,6 +812,17 @@ func TestValidateEnv(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name: "secret_value",
+			ValueFrom: &api.EnvVarSource{
+				SecretKeyRef: &api.SecretKeySelector{
+					LocalObjectReference: api.LocalObjectReference{
+						Name: "some-secret",
+					},
+					Key: "secret-key",
+				},
+			},
+		},
 	}
 	if errs := validateEnv(successCase, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -845,6 +856,25 @@ func TestValidateEnv(t *testing.T) {
 				},
 			}},
 			expectedError: "[0].valueFrom: Invalid value: \"\": may not be specified when `value` is not empty",
+		},
+		{
+			name: "FieldRef and SecretKeyRef specified",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						APIVersion: testapi.Default.GroupVersion().String(),
+						FieldPath:  "metadata.name",
+					},
+					SecretKeyRef: &api.SecretKeySelector{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "a-secret",
+						},
+						Key: "a-key",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom: Invalid value: \"\": may not have more than one field specified at a time",
 		},
 		{
 			name: "missing FieldPath on ObjectFieldSelector",
