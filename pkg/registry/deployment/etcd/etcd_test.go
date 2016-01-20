@@ -50,7 +50,7 @@ func validNewDeployment() *extensions.Deployment {
 			Namespace: namespace,
 		},
 		Spec: extensions.DeploymentSpec{
-			Selector: map[string]string{"a": "b"},
+			Selector: &extensions.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -89,7 +89,7 @@ func TestCreate(t *testing.T) {
 		// invalid (invalid selector)
 		&extensions.Deployment{
 			Spec: extensions.DeploymentSpec{
-				Selector: map[string]string{},
+				Selector: &extensions.LabelSelector{MatchLabels: map[string]string{}},
 				Template: validDeployment.Spec.Template,
 			},
 		},
@@ -127,7 +127,7 @@ func TestUpdate(t *testing.T) {
 		},
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.Deployment)
-			object.Spec.Selector = map[string]string{}
+			object.Spec.Selector = &extensions.LabelSelector{MatchLabels: map[string]string{}}
 			return object
 		},
 	)

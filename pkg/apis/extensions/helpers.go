@@ -18,10 +18,15 @@ package extensions
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // ScaleFromDeployment returns a scale subresource for a deployment.
-func ScaleFromDeployment(deployment *Deployment) *Scale {
+func ScaleFromDeployment(deployment *Deployment) (*Scale, error) {
+	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert label selector to selector: %v", err)
+	}
 	return &Scale{
 		ObjectMeta: api.ObjectMeta{
 			Name:              deployment.Name,
@@ -33,7 +38,7 @@ func ScaleFromDeployment(deployment *Deployment) *Scale {
 		},
 		Status: ScaleStatus{
 			Replicas: deployment.Status.Replicas,
-			Selector: deployment.Spec.Selector,
+			Selector: selector.String(),
 		},
-	}
+	}, nil
 }

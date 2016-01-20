@@ -196,7 +196,11 @@ func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 	if err != nil {
 		return nil, errors.NewNotFound(extensions.Resource("deployments/scale"), name)
 	}
-	return extensions.ScaleFromDeployment(deployment), nil
+	scale, err := extensions.ScaleFromDeployment(deployment)
+	if err != nil {
+		return nil, errors.NewBadRequest(fmt.Sprintf("%v", err))
+	}
+	return scale, nil
 }
 
 func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
@@ -221,5 +225,9 @@ func (r *ScaleREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object,
 	if err != nil {
 		return nil, false, errors.NewConflict(extensions.Resource("deployments/scale"), scale.Name, err)
 	}
-	return extensions.ScaleFromDeployment(deployment), false, nil
+	newScale, err := extensions.ScaleFromDeployment(deployment)
+	if err != nil {
+		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
+	}
+	return newScale, false, nil
 }

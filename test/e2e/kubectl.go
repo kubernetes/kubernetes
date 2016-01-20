@@ -457,7 +457,7 @@ var _ = Describe("Kubectl client", func() {
 				withStdinData("abcd1234\n").
 				execOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("stdin closed"))
-			runTestPod, err := util.GetFirstPod(c, ns, map[string]string{"run": "run-test-3"})
+			runTestPod, err := util.GetFirstPod(c, ns, labels.SelectorFromSet(map[string]string{"run": "run-test-3"}))
 			if err != nil {
 				os.Exit(1)
 			}
