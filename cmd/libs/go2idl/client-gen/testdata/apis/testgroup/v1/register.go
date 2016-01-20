@@ -40,7 +40,10 @@ func addKnownTypes(scheme *runtime.Scheme) {
 	)
 
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&v1.ListOptions{})
+		&v1.ListOptions{},
+		&v1.DeleteOptions{},
+		&unversioned.Status{},
+		&v1.ExportOptions{})
 }
 
 func (obj *TestType) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
