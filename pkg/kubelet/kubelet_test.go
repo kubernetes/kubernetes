@@ -150,10 +150,11 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.containerRuntime = fakeRuntime
 	kubelet.runtimeCache = kubecontainer.NewFakeRuntimeCache(kubelet.containerRuntime)
 	kubelet.reasonCache = NewReasonCache()
+	kubelet.podCache = kubecontainer.NewFakeCache(kubelet.containerRuntime)
 	kubelet.podWorkers = &fakePodWorkers{
-		syncPodFn:    kubelet.syncPod,
-		runtimeCache: kubelet.runtimeCache,
-		t:            t,
+		syncPodFn: kubelet.syncPod,
+		cache:     kubelet.podCache,
+		t:         t,
 	}
 
 	kubelet.probeManager = prober.FakeManager{}
@@ -3390,7 +3391,7 @@ func TestCreateMirrorPod(t *testing.T) {
 		}
 		pods := []*api.Pod{pod}
 		kl.podManager.SetPods(pods)
-		err := kl.syncPod(pod, nil, container.Pod{}, updateType)
+		err := kl.syncPod(pod, nil, &container.PodStatus{}, updateType)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -3448,7 +3449,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 	pods := []*api.Pod{pod, mirrorPod}
 	kl.podManager.SetPods(pods)
-	err := kl.syncPod(pod, mirrorPod, container.Pod{}, kubetypes.SyncPodUpdate)
+	err := kl.syncPod(pod, mirrorPod, &container.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3614,7 +3615,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 		},
 	}
 	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, container.Pod{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -3647,7 +3648,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.syncPod(pod, nil, container.Pod{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}
@@ -3674,7 +3675,7 @@ func TestPrivilegeContainerAllowed(t *testing.T) {
 		},
 	}
 	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, container.Pod{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -3700,7 +3701,7 @@ func TestPrivilegeContainerDisallowed(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.syncPod(pod, nil, container.Pod{}, kubetypes.SyncPodUpdate)
+	err := kubelet.syncPod(pod, nil, &container.PodStatus{}, kubetypes.SyncPodUpdate)
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}
