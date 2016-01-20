@@ -52,6 +52,7 @@ verify:
 	hack/verify-linkcheck.sh
 	hack/verify-flags-underscore.py
 	hack/verify-godeps.sh $(BRANCH)
+	hack/verify-godep-licenses.sh $(BRANCH)
 .PHONY: verify
 
 # Build and run tests.
