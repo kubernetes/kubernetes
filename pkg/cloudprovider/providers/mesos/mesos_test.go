@@ -24,6 +24,7 @@ import (
 	"time"
 
 	log "github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 func TestIPAddress(t *testing.T) {
@@ -120,15 +121,15 @@ func Test_Instances(t *testing.T) {
 	}
 }
 
-// test mesos.TCPLoadBalancer
+// test mesos.LoadBalancer
 func Test_TcpLoadBalancer(t *testing.T) {
 	defer log.Flush()
 	mesosCloud, _ := newMesosCloud(nil)
 
-	lb, supports_lb := mesosCloud.TCPLoadBalancer()
+	lb, supports_lb := mesosCloud.LoadBalancer()
 
 	if supports_lb || lb != nil {
-		t.Fatalf("MesosCloud does not provide an implementation of TCPLoadBalancer")
+		t.Fatalf("MesosCloud does not provide an implementation of LoadBalancer")
 	}
 }
 
@@ -250,5 +251,29 @@ func Test_List(t *testing.T) {
 
 	if len(clusters) != 0 {
 		t.Fatalf("List with a reject-all filter should return a list of size 0: (actual: %#v)", clusters)
+	}
+}
+
+func Test_ExternalID(t *testing.T) {
+	defer log.Flush()
+	md := FakeMasterDetector{}
+	httpServer, httpClient, httpTransport := makeHttpMocks()
+	defer httpServer.Close()
+	cacheTTL := 500 * time.Millisecond
+	mesosClient, err := createMesosClient(md, httpClient, httpTransport, cacheTTL)
+	mesosCloud := &MesosCloud{client: mesosClient, config: createDefaultConfig()}
+
+	_, err = mesosCloud.ExternalID("unknown")
+	if err != cloudprovider.InstanceNotFound {
+		t.Fatalf("ExternalID did not return InstanceNotFound on an unknown instance")
+	}
+
+	slaveName := "mesos3.internal.company.com"
+	id, err := mesosCloud.ExternalID(slaveName)
+	if id != "" {
+		t.Fatalf("ExternalID should not be able to resolve %q", slaveName)
+	}
+	if err == cloudprovider.InstanceNotFound {
+		t.Fatalf("ExternalID should find %q", slaveName)
 	}
 }

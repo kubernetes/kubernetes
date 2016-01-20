@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export SPARK_MASTER_PORT=${SPARK_MASTER_SERVICE_PORT:-7077}
-/opt/spark/sbin/start-master.sh
-tail -F /opt/spark/logs/*
+. /start-common.sh
+
+echo "$(hostname -i) spark-master" >> /etc/hosts
+
+# Run spark-class directly so that when it exits (or crashes), the pod restarts.
+/opt/spark/bin/spark-class org.apache.spark.deploy.master.Master --ip spark-master --port 7077 --webui-port 8080

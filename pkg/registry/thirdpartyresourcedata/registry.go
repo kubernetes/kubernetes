@@ -20,24 +20,16 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface implemented by things that know how to store ThirdPartyResourceData objects.
 type Registry interface {
-	// ListThirdPartyResourceData obtains a list of ThirdPartyResourceData having labels which match selector.
-	ListThirdPartyResourceData(ctx api.Context, selector labels.Selector) (*extensions.ThirdPartyResourceDataList, error)
-	// Watch for new/changed/deleted ThirdPartyResourceData
-	WatchThirdPartyResourceData(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
-	// Get a specific ThirdPartyResourceData
+	ListThirdPartyResourceData(ctx api.Context, options *api.ListOptions) (*extensions.ThirdPartyResourceDataList, error)
+	WatchThirdPartyResourceData(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 	GetThirdPartyResourceData(ctx api.Context, name string) (*extensions.ThirdPartyResourceData, error)
-	// Create a ThirdPartyResourceData based on a specification.
 	CreateThirdPartyResourceData(ctx api.Context, resource *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error)
-	// Update an existing ThirdPartyResourceData
 	UpdateThirdPartyResourceData(ctx api.Context, resource *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error)
-	// Delete an existing ThirdPartyResourceData
 	DeleteThirdPartyResourceData(ctx api.Context, name string) error
 }
 
@@ -52,16 +44,16 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListThirdPartyResourceData(ctx api.Context, label labels.Selector) (*extensions.ThirdPartyResourceDataList, error) {
-	obj, err := s.List(ctx, label, fields.Everything())
+func (s *storage) ListThirdPartyResourceData(ctx api.Context, options *api.ListOptions) (*extensions.ThirdPartyResourceDataList, error) {
+	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*extensions.ThirdPartyResourceDataList), nil
 }
 
-func (s *storage) WatchThirdPartyResourceData(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return s.Watch(ctx, label, field, resourceVersion)
+func (s *storage) WatchThirdPartyResourceData(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+	return s.Watch(ctx, options)
 }
 
 func (s *storage) GetThirdPartyResourceData(ctx api.Context, name string) (*extensions.ThirdPartyResourceData, error) {

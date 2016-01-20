@@ -21,10 +21,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/golang/glog"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
+
+	"github.com/golang/glog"
 )
 
 const (

@@ -106,6 +106,14 @@ func (f genHelperEncoder) EncExt(v interface{}) (r bool) {
 	}
 	return false 
 }
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) EncSendContainerState(c containerState) {
+	if f.e.cr != nil {
+		f.e.cr.sendContainerState(c)
+	}
+}
+
+// ---------------- DECODER FOLLOWS -----------------
 
 // FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
 func (f genHelperDecoder) DecBasicHandle() *BasicHandle {
@@ -150,11 +158,8 @@ func (f genHelperDecoder) DecTextUnmarshal(tm encoding.TextUnmarshaler) {
 // FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
 func (f genHelperDecoder) DecJSONUnmarshal(tm jsonUnmarshaler) {
 	// bs := f.dd.DecodeBytes(f.d.b[:], true, true)
-	f.d.r.track()
-	f.d.swallow()
-	bs := f.d.r.stopTrack()
-	// fmt.Printf(">>>>>> CODECGEN JSON: %s\n", bs)
-	fnerr := tm.UnmarshalJSON(bs)
+	// grab the bytes to be read, as UnmarshalJSON needs the full JSON so as to unmarshal it itself.
+	fnerr := tm.UnmarshalJSON(f.d.nextValueBytes())
 	if fnerr != nil {
 		panic(fnerr)
 	}
@@ -194,6 +199,12 @@ func (f genHelperDecoder) DecExt(v interface{}) (r bool) {
 // FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
 func (f genHelperDecoder) DecInferLen(clen, maxlen, unit int) (rvlen int, truncated bool) {
 	return decInferLen(clen, maxlen, unit)
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecSendContainerState(c containerState) {
+	if f.d.cr != nil {
+		f.d.cr.sendContainerState(c)
+	}
 }
 
 {{/*

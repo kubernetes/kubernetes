@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/api-reference/v1/definitions.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/api-reference/v1/definitions.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -31,7 +32,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 <!-- needed for gh-pages to render html files when imported -->
-{% include definitions.html %}
+{% include <REPLACE-WITH-RELEASE-VERSION>/v1-definitions.html %}
 
 
 

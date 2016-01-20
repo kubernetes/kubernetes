@@ -15,8 +15,8 @@
 # limitations under the License.
 
 ## Contains configuration values for interacting with the docker-compose cluster in test mode
-#Set NUM_MINIONS to minimum required for testing.
-NUM_MINIONS=2
+#Set NUM_NODES to minimum required for testing.
+NUM_NODES=2
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../..
 source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/config-default.sh"

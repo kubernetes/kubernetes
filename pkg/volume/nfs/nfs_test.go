@@ -92,6 +92,7 @@ func newMockRecycler(spec *volume.Spec, host volume.VolumeHost, config volume.Vo
 type mockRecycler struct {
 	path string
 	host volume.VolumeHost
+	volume.MetricsNil
 }
 
 func (r *mockRecycler) GetPath() string {
@@ -247,7 +248,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
 	builder, _ := plug.NewBuilder(spec, pod, volume.VolumeOptions{})
 
-	if !builder.IsReadOnly() {
+	if !builder.GetAttributes().ReadOnly {
 		t.Errorf("Expected true for builder.IsReadOnly")
 	}
 }

@@ -17,35 +17,38 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
+const (
+	probTestContainerName       = "test-webserber"
+	probTestInitialDelaySeconds = 30
+)
+
 var _ = Describe("Probing container", func() {
-	framework := Framework{BaseName: "container-probe"}
+	framework := NewFramework("container-probe")
 	var podClient client.PodInterface
 	probe := webserverProbeBuilder{}
 
 	BeforeEach(func() {
-		framework.beforeEach()
 		podClient = framework.Client.Pods(framework.Namespace.Name)
 	})
-
-	AfterEach(framework.afterEach)
 
 	It("with readiness probe should not be ready before initial delay and never restart [Conformance]", func() {
 		p, err := podClient.Create(makePodSpec(probe.withInitialDelay().build(), nil))
 		expectNoError(err)
-		startTime := time.Now()
 
-		Expect(wait.Poll(poll, 90*time.Second, func() (bool, error) {
+		Expect(wait.Poll(poll, 240*time.Second, func() (bool, error) {
 			p, err := podClient.Get(p.Name)
 			if err != nil {
 				return false, err
@@ -58,16 +61,24 @@ var _ = Describe("Probing container", func() {
 			return true, nil
 		})).NotTo(HaveOccurred(), "pod never became ready")
 
-		if time.Since(startTime) < 30*time.Second {
-			Failf("Pod became ready before it's initial delay")
-		}
-
 		p, err = podClient.Get(p.Name)
 		expectNoError(err)
-
 		isReady, err := podRunningReady(p)
 		expectNoError(err)
 		Expect(isReady).To(BeTrue(), "pod should be ready")
+
+		// We assume the pod became ready when the container became ready. This
+		// is true for a single container pod.
+		readyTime, err := getTransitionTimeForReadyCondition(p)
+		expectNoError(err)
+		startedTime, err := getContainerStartedTime(p, probTestContainerName)
+		expectNoError(err)
+
+		Logf("Container started at %v, pod became ready at %v", startedTime, readyTime)
+		initialDelay := probTestInitialDelaySeconds * time.Second
+		if readyTime.Sub(startedTime) < initialDelay {
+			Failf("Pod became ready before it's %v initial delay", initialDelay)
+		}
 
 		restartCount := getRestartCount(p)
 		Expect(restartCount == 0).To(BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
@@ -77,7 +88,7 @@ var _ = Describe("Probing container", func() {
 		p, err := podClient.Create(makePodSpec(probe.withFailing().build(), nil))
 		expectNoError(err)
 
-		err = wait.Poll(poll, 90*time.Second, func() (bool, error) {
+		err = wait.Poll(poll, 180*time.Second, func() (bool, error) {
 			p, err := podClient.Get(p.Name)
 			if err != nil {
 				return false, err
@@ -100,6 +111,28 @@ var _ = Describe("Probing container", func() {
 
 })
 
+func getContainerStartedTime(p *api.Pod, containerName string) (time.Time, error) {
+	for _, status := range p.Status.ContainerStatuses {
+		if status.Name != containerName {
+			continue
+		}
+		if status.State.Running == nil {
+			return time.Time{}, fmt.Errorf("Container is not running")
+		}
+		return status.State.Running.StartedAt.Time, nil
+	}
+	return time.Time{}, fmt.Errorf("cannot find container named %q", containerName)
+}
+
+func getTransitionTimeForReadyCondition(p *api.Pod) (time.Time, error) {
+	for _, cond := range p.Status.Conditions {
+		if cond.Type == api.PodReady {
+			return cond.LastTransitionTime.Time, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("No ready condition can be found for pod")
+}
+
 func getRestartCount(p *api.Pod) int {
 	count := 0
 	for _, containerStatus := range p.Status.ContainerStatuses {
@@ -114,13 +147,10 @@ func makePodSpec(readinessProbe, livenessProbe *api.Probe) *api.Pod {
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Name:           "test-webserver",
+					Name:           probTestContainerName,
 					Image:          "gcr.io/google_containers/test-webserver",
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,
-				}, {
-					Name:  "test-noprobe",
-					Image: "beta.gcr.io/google_containers/pause:2.0",
 				},
 			},
 		},
@@ -147,16 +177,16 @@ func (b webserverProbeBuilder) build() *api.Probe {
 	probe := &api.Probe{
 		Handler: api.Handler{
 			HTTPGet: &api.HTTPGetAction{
-				Port: util.NewIntOrStringFromInt(80),
+				Port: intstr.FromInt(80),
 				Path: "/",
 			},
 		},
 	}
 	if b.initialDelay {
-		probe.InitialDelaySeconds = 30
+		probe.InitialDelaySeconds = probTestInitialDelaySeconds
 	}
 	if b.failing {
-		probe.HTTPGet.Port = util.NewIntOrStringFromInt(81)
+		probe.HTTPGet.Port = intstr.FromInt(81)
 	}
 	return probe
 }

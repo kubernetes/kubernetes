@@ -17,7 +17,10 @@ limitations under the License.
 package config
 
 import (
+	"math/rand"
+	"reflect"
 	"sort"
+	"strconv"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -71,6 +74,9 @@ func CreateValidPod(name, namespace string) *api.Pod {
 				},
 			},
 		},
+		Status: api.PodStatus{
+			Phase: api.PodPending,
+		},
 	}
 }
 
@@ -105,7 +111,7 @@ func expectPodUpdate(t *testing.T, ch <-chan kubetypes.PodUpdate, expected ...ku
 		// Compare pods one by one. This is necessary beacuse we don't want to
 		// compare local annotations.
 		for j := range expected[i].Pods {
-			if podsDifferSemantically(expected[i].Pods[j], update.Pods[j]) {
+			if podsDifferSemantically(expected[i].Pods[j], update.Pods[j]) || !reflect.DeepEqual(expected[i].Pods[j].Status, update.Pods[j].Status) {
 				t.Fatalf("Expected %#v, Got %#v", expected[i].Pods[j], update.Pods[j])
 			}
 		}
@@ -267,6 +273,51 @@ func TestNewPodAddedUpdatedSet(t *testing.T) {
 		CreatePodUpdate(kubetypes.UPDATE, TestSource, pod))
 }
 
+func TestNewPodAddedSetReconciled(t *testing.T) {
+	// Create and touch new test pods, return the new pods and touched pod. We should create new pod list
+	// before touching to avoid data race.
+	newTestPods := func(touchStatus, touchSpec bool) ([]*api.Pod, *api.Pod) {
+		pods := []*api.Pod{
+			CreateValidPod("changable-pod-0", "new"),
+			CreateValidPod("constant-pod-1", "new"),
+			CreateValidPod("constant-pod-2", "new"),
+		}
+		if touchStatus {
+			pods[0].Status = api.PodStatus{Message: strconv.Itoa(rand.Int())}
+		}
+		if touchSpec {
+			pods[0].Spec.Containers[0].Name = strconv.Itoa(rand.Int())
+		}
+		return pods, pods[0]
+	}
+	for _, op := range []kubetypes.PodOperation{
+		kubetypes.ADD,
+		kubetypes.SET,
+	} {
+		var podWithStatusChange *api.Pod
+		pods, _ := newTestPods(false, false)
+		channel, ch, _ := createPodConfigTester(PodConfigNotificationIncremental)
+
+		// Use SET to initialize the config, especially initialize the source set
+		channel <- CreatePodUpdate(kubetypes.SET, TestSource, pods...)
+		expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.ADD, TestSource, pods...))
+
+		// If status is not changed, no reconcile should be triggered
+		channel <- CreatePodUpdate(op, TestSource, pods...)
+		expectNoPodUpdate(t, ch)
+
+		// If the pod status is changed and not updated, a reconcile should be triggered
+		pods, podWithStatusChange = newTestPods(true, false)
+		channel <- CreatePodUpdate(op, TestSource, pods...)
+		expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.RECONCILE, TestSource, podWithStatusChange))
+
+		// If the pod status is changed, but the pod is also updated, no reconcile should be triggered
+		pods, podWithStatusChange = newTestPods(true, true)
+		channel <- CreatePodUpdate(op, TestSource, pods...)
+		expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.UPDATE, TestSource, podWithStatusChange))
+	}
+}
+
 func TestInitialEmptySet(t *testing.T) {
 	for _, test := range []struct {
 		mode PodConfigNotificationMode
@@ -324,7 +375,7 @@ func TestPodUpdateAnnotations(t *testing.T) {
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.UPDATE, TestSource, pod))
 }
 
-func TestPodUpdateLables(t *testing.T) {
+func TestPodUpdateLabels(t *testing.T) {
 	channel, ch, _ := createPodConfigTester(PodConfigNotificationIncremental)
 
 	pod := CreateValidPod("foo2", "new")

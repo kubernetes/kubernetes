@@ -98,13 +98,13 @@ func TestDeltaFIFO_compressorWorks(t *testing.T) {
 	f.Add(mkFifoObj("foo", 10))
 	f.Update(mkFifoObj("foo", 12))
 	f.Replace([]interface{}{mkFifoObj("foo", 20)}, "0")
-	f.Delete(mkFifoObj("foo", 15))
-	f.Delete(mkFifoObj("foo", 18)) // flush the last one out
+	f.Delete(mkFifoObj("foo", 22))
+	f.Add(mkFifoObj("foo", 25)) // flush the last one out
 	expect := []DeltaType{Added, Updated, Sync, Deleted}
 	if e, a := expect, oldestTypes; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %#v, got %#v", e, a)
 	}
-	if e, a := (Deltas{{Deleted, mkFifoObj("foo", 18)}}), f.Pop().(Deltas); !reflect.DeepEqual(e, a) {
+	if e, a := (Deltas{{Added, mkFifoObj("foo", 25)}}), f.Pop().(Deltas); !reflect.DeepEqual(e, a) {
 		t.Fatalf("Expected %#v, got %#v", e, a)
 	}
 
@@ -126,7 +126,10 @@ func TestDeltaFIFO_addUpdate(t *testing.T) {
 	got := make(chan testFifoObject, 2)
 	go func() {
 		for {
-			got <- testPop(f)
+			obj := f.Pop().(Deltas).Newest().Object.(testFifoObject)
+			t.Logf("got a thing %#v", obj)
+			t.Logf("D len: %v", len(f.queue))
+			got <- obj
 		}
 	}()
 
@@ -145,10 +148,39 @@ func TestDeltaFIFO_addUpdate(t *testing.T) {
 	}
 }
 
-func TestDeltaFIFO_enqueueing(t *testing.T) {
+func TestDeltaFIFO_enqueueingNoLister(t *testing.T) {
 	f := NewDeltaFIFO(testFifoObjectKeyFunc, nil, nil)
 	f.Add(mkFifoObj("foo", 10))
 	f.Update(mkFifoObj("bar", 15))
+	f.Add(mkFifoObj("qux", 17))
+	f.Delete(mkFifoObj("qux", 18))
+
+	// This delete does not enqueue anything because baz doesn't exist.
+	f.Delete(mkFifoObj("baz", 20))
+
+	expectList := []int{10, 15, 18}
+	for _, expect := range expectList {
+		if e, a := expect, testPop(f).val; e != a {
+			t.Errorf("Didn't get updated value (%v), got %v", e, a)
+		}
+	}
+	if e, a := 0, len(f.items); e != a {
+		t.Errorf("queue unexpectedly not empty: %v != %v\n%#v", e, a, f.items)
+	}
+}
+
+func TestDeltaFIFO_enqueueingWithLister(t *testing.T) {
+	f := NewDeltaFIFO(
+		testFifoObjectKeyFunc,
+		nil,
+		keyLookupFunc(func() []string {
+			return []string{"foo", "bar", "baz"}
+		}),
+	)
+	f.Add(mkFifoObj("foo", 10))
+	f.Update(mkFifoObj("bar", 15))
+
+	// This delete does enqueue the deletion, because "baz" is in the key lister.
 	f.Delete(mkFifoObj("baz", 20))
 
 	expectList := []int{10, 15, 20}

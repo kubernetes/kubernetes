@@ -22,40 +22,44 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func TestErrorsToAPIStatus(t *testing.T) {
 	cases := map[error]unversioned.Status{
-		errors.NewNotFound("foo", "bar"): {
+		errors.NewNotFound(unversioned.GroupResource{Group: "legacy.kubernetes.io", Resource: "foos"}, "bar"): {
 			Status:  unversioned.StatusFailure,
 			Code:    http.StatusNotFound,
 			Reason:  unversioned.StatusReasonNotFound,
-			Message: "foo \"bar\" not found",
+			Message: "foos.legacy.kubernetes.io \"bar\" not found",
 			Details: &unversioned.StatusDetails{
-				Kind: "foo",
-				Name: "bar",
+				Group: "legacy.kubernetes.io",
+				Kind:  "foos",
+				Name:  "bar",
 			},
 		},
-		errors.NewAlreadyExists("foo", "bar"): {
+		errors.NewAlreadyExists(api.Resource("foos"), "bar"): {
 			Status:  unversioned.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "AlreadyExists",
-			Message: "foo \"bar\" already exists",
+			Message: "foos \"bar\" already exists",
 			Details: &unversioned.StatusDetails{
-				Kind: "foo",
-				Name: "bar",
+				Group: "",
+				Kind:  "foos",
+				Name:  "bar",
 			},
 		},
-		errors.NewConflict("foo", "bar", stderrs.New("failure")): {
+		errors.NewConflict(api.Resource("foos"), "bar", stderrs.New("failure")): {
 			Status:  unversioned.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "Conflict",
-			Message: "foo \"bar\" cannot be updated: failure",
+			Message: "foos \"bar\" cannot be updated: failure",
 			Details: &unversioned.StatusDetails{
-				Kind: "foo",
-				Name: "bar",
+				Group: "",
+				Kind:  "foos",
+				Name:  "bar",
 			},
 		},
 	}

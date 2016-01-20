@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/examples/simple-nginx.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/examples/simple-nginx.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -84,7 +85,7 @@ In order to access your nginx landing page, you also have to make sure that traf
 
 ### Next: Configuration files
 
-Most people will eventually want to use declarative configuration files for creating/modifying their applications.  A [simplified introduction](../docs/user-guide/simple-yaml.md)
+Most people will eventually want to use declarative configuration files for creating/modifying their applications.  A [simplified introduction](../docs/user-guide/deploying-applications.md)
 is given in a different document.
 
 

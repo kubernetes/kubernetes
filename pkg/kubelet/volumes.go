@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -93,6 +94,11 @@ func (vh *volumeHost) GetWriter() io.Writer {
 	return vh.kubelet.writer
 }
 
+// Returns the hostname of the host kubelet is running on
+func (vh *volumeHost) GetHostName() string {
+	return vh.kubelet.hostname
+}
+
 func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {
@@ -114,6 +120,12 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 	podVolumes := make(kubecontainer.VolumeMap)
 	for i := range pod.Spec.Volumes {
 		volSpec := &pod.Spec.Volumes[i]
+		hasFSGroup := false
+		var fsGroup int64 = 0
+		if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.FSGroup != nil {
+			hasFSGroup = true
+			fsGroup = *pod.Spec.SecurityContext.FSGroup
+		}
 
 		rootContext, err := kl.getRootDirContext()
 		if err != nil {
@@ -134,7 +146,18 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 		if err != nil {
 			return nil, err
 		}
-		podVolumes[volSpec.Name] = builder
+		if hasFSGroup &&
+			builder.GetAttributes().Managed &&
+			builder.GetAttributes().SupportsOwnershipManagement {
+			err := kl.manageVolumeOwnership(pod, internal, builder, fsGroup)
+			if err != nil {
+				glog.Errorf("Error managing ownership of volume %v for pod %v/%v: %v", internal.Name(), pod.Namespace, pod.Name, err)
+				return nil, err
+			} else {
+				glog.V(3).Infof("Managed ownership of volume %v for pod %v/%v", internal.Name(), pod.Namespace, pod.Name)
+			}
+		}
+		podVolumes[volSpec.Name] = kubecontainer.VolumeInfo{Builder: builder}
 	}
 	return podVolumes, nil
 }
@@ -211,7 +234,7 @@ func (kl *Kubelet) getPodVolumesFromDisk() map[string]volume.Cleaner {
 }
 
 func (kl *Kubelet) newVolumeCleanerFromPlugins(kind string, name string, podUID types.UID) (volume.Cleaner, error) {
-	plugName := util.UnescapeQualifiedNameForDisk(kind)
+	plugName := strings.UnescapeQualifiedNameForDisk(kind)
 	plugin, err := kl.volumePluginMgr.FindPluginByName(plugName)
 	if err != nil {
 		// TODO: Maybe we should launch a cleanup of this dir?

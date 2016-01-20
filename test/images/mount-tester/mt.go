@@ -29,24 +29,30 @@ var (
 	fsTypePath                = ""
 	fileModePath              = ""
 	filePermPath              = ""
+	fileOwnerPath             = ""
 	newFilePath0644           = ""
 	newFilePath0666           = ""
+	newFilePath0660           = ""
 	newFilePath0777           = ""
 	readFileContentPath       = ""
 	readFileContentInLoopPath = ""
 	retryDuration             = 180
+	breakOnExpectedContent    = true
 )
 
 func init() {
 	flag.StringVar(&fsTypePath, "fs_type", "", "Path to print the fs type for")
 	flag.StringVar(&fileModePath, "file_mode", "", "Path to print the mode bits of")
 	flag.StringVar(&filePermPath, "file_perm", "", "Path to print the perms of")
+	flag.StringVar(&fileOwnerPath, "file_owner", "", "Path to print the owning UID and GID of")
 	flag.StringVar(&newFilePath0644, "new_file_0644", "", "Path to write to and read from with perm 0644")
 	flag.StringVar(&newFilePath0666, "new_file_0666", "", "Path to write to and read from with perm 0666")
+	flag.StringVar(&newFilePath0660, "new_file_0660", "", "Path to write to and read from with perm 0660")
 	flag.StringVar(&newFilePath0777, "new_file_0777", "", "Path to write to and read from with perm 0777")
 	flag.StringVar(&readFileContentPath, "file_content", "", "Path to read the file content from")
 	flag.StringVar(&readFileContentInLoopPath, "file_content_in_loop", "", "Path to read the file content in loop from")
 	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")
+	flag.BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
 }
 
 // This program performs some tests on the filesystem as dictated by the
@@ -86,6 +92,11 @@ func main() {
 		errs = append(errs, err)
 	}
 
+	err = readWriteNewFile(newFilePath0660, 0660)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
 	err = readWriteNewFile(newFilePath0777, 0777)
 	if err != nil {
 		errs = append(errs, err)
@@ -101,12 +112,17 @@ func main() {
 		errs = append(errs, err)
 	}
 
+	err = fileOwner(fileOwnerPath)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
 	err = readFileContent(readFileContentPath)
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	err = readFileContentInLoop(readFileContentInLoopPath, retryDuration)
+	err = readFileContentInLoop(readFileContentInLoopPath, retryDuration, breakOnExpectedContent)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -171,6 +187,22 @@ func filePerm(path string) error {
 	return nil
 }
 
+func fileOwner(path string) error {
+	if path == "" {
+		return nil
+	}
+
+	buf := syscall.Stat_t{}
+	if err := syscall.Stat(path, &buf); err != nil {
+		fmt.Printf("error from stat(%q): %v\n", path, err)
+		return err
+	}
+
+	fmt.Printf("owner UID of %q: %v\n", path, buf.Uid)
+	fmt.Printf("owner GID of %q: %v\n", path, buf.Gid)
+	return nil
+}
+
 func readFileContent(path string) error {
 	if path == "" {
 		return nil
@@ -187,13 +219,14 @@ func readFileContent(path string) error {
 	return nil
 }
 
+const initialContent string = "mount-tester new file\n"
+
 func readWriteNewFile(path string, perm os.FileMode) error {
 	if path == "" {
 		return nil
 	}
 
-	content := "mount-tester new file\n"
-	err := ioutil.WriteFile(path, []byte(content), perm)
+	err := ioutil.WriteFile(path, []byte(initialContent), perm)
 	if err != nil {
 		fmt.Printf("error writing new file %q: %v\n", path, err)
 		return err
@@ -202,19 +235,14 @@ func readWriteNewFile(path string, perm os.FileMode) error {
 	return readFileContent(path)
 }
 
-func readFileContentInLoop(path string, retryDuration int) error {
+func readFileContentInLoop(path string, retryDuration int, breakOnExpectedContent bool) error {
 	if path == "" {
 		return nil
 	}
-	var content []byte
-	content = testFileContent(path, retryDuration)
-
-	fmt.Printf("content of file %q: %v\n", path, string(content))
-
-	return nil
+	return testFileContent(path, retryDuration, breakOnExpectedContent)
 }
 
-func testFileContent(filePath string, retryDuration int) []byte {
+func testFileContent(filePath string, retryDuration int, breakOnExpectedContent bool) error {
 	var (
 		contentBytes []byte
 		err          error
@@ -223,18 +251,18 @@ func testFileContent(filePath string, retryDuration int) []byte {
 	retryTime := time.Second * time.Duration(retryDuration)
 	for start := time.Now(); time.Since(start) < retryTime; time.Sleep(2 * time.Second) {
 		contentBytes, err = ioutil.ReadFile(filePath)
-		if err == nil {
-			//Expected content "mount-tester new file\n", length 22
-			if len(contentBytes) == 22 {
-				break
-			} else {
-				fmt.Printf("Unexpected length of file: found %d, expected %d.Retry", len(contentBytes), 22)
-			}
-		} else {
-			fmt.Printf("Error read file %s: %v, retry", filePath, err)
+		if err != nil {
+			fmt.Printf("Error reading file %s: %v, retrying\n", filePath, err)
+			continue
 		}
-
+		fmt.Printf("content of file %q: %v\n", filePath, string(contentBytes))
+		if breakOnExpectedContent {
+			if string(contentBytes) != initialContent {
+				fmt.Printf("Unexpected content. Expected: %s. Retrying", initialContent)
+				continue
+			}
+			break
+		}
 	}
-
-	return contentBytes
+	return err
 }

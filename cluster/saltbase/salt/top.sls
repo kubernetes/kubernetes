@@ -6,13 +6,20 @@ base:
 {% if grains.get('cloud') == 'aws' %}
     - ntp
 {% endif %}
+{% if pillar.get('e2e_storage_test_environment', '').lower() == 'true' %}
+    - e2e
+{% endif %}
 
   'roles:kubernetes-pool':
     - match: grain
     - docker
+{% if pillar.get('network_provider', '').lower() == 'flannel' %}
+    - flannel
+{% endif %}
     - helpers
     - cadvisor
     - kube-client-tools
+    - kube-node-unpacker
     - kubelet
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
     - opencontrail-networking-minion
@@ -30,24 +37,20 @@ base:
     - kube-registry-proxy
 {% endif %}
     - logrotate
-{% if grains['cloud'] is defined and grains.cloud == 'gce' %}
     - supervisor
-{% else %}
-    - monit
-{% endif %}
 
   'roles:kubernetes-master':
     - match: grain
     - generate-cert
     - etcd
+{% if pillar.get('network_provider', '').lower() == 'flannel' %}
+    - flannel-server
+    - flannel
+{% endif %}
     - kube-apiserver
     - kube-controller-manager
     - kube-scheduler
-{% if grains['cloud'] is defined and grains.cloud == 'gce' %}
     - supervisor
-{% else %}
-    - monit
-{% endif %}
 {% if grains['cloud'] is defined and not grains.cloud in [ 'aws', 'gce', 'vagrant' ] %}
     - nginx
 {% endif %}

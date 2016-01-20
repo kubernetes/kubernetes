@@ -26,10 +26,12 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/v1"
-	_ "k8s.io/kubernetes/pkg/apis/extensions"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
+	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
+	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
+	kruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -46,8 +48,8 @@ var (
 )
 
 // types inside the api package don't need to say "api.Scheme"; all others do.
-func destScheme(group, version string) string {
-	if group == "" && version == "" {
+func destScheme(gv unversioned.GroupVersion) string {
+	if gv == api.SchemeGroupVersion {
 		return "Scheme"
 	}
 	return "api.Scheme"
@@ -89,27 +91,30 @@ func main() {
 
 	data := new(bytes.Buffer)
 
-	group, version := path.Split(*groupVersion)
-	group = strings.TrimRight(group, "/")
-	registerTo := destScheme(group, version)
+	gv, err := unversioned.ParseGroupVersion(*groupVersion)
+	if err != nil {
+		glog.Fatalf("Error parsing groupversion %v: %v", *groupVersion, err)
+	}
+
+	registerTo := destScheme(gv)
 	var pkgname string
-	if group == "" {
+	if gv.Group == "" {
 		// the internal version of v1 is registered in package api
 		pkgname = "api"
 	} else {
-		pkgname = group
+		pkgname = gv.Group
 	}
-	if len(version) != 0 {
-		pkgname = version
+	if len(gv.Version) != 0 {
+		pkgname = gv.Version
 	}
 
-	_, err := data.WriteString(fmt.Sprintf("package %s\n", pkgname))
+	_, err = data.WriteString(fmt.Sprintf("package %s\n", pkgname))
 	if err != nil {
 		glog.Fatalf("Error while writing package line: %v", err)
 	}
 
-	versionPath := pkgPath(group, version)
-	generator := pkg_runtime.NewDeepCopyGenerator(api.Scheme.Raw(), versionPath, sets.NewString("k8s.io/kubernetes"))
+	versionPath := pkgPath(gv.Group, gv.Version)
+	generator := kruntime.NewDeepCopyGenerator(api.Scheme.Raw(), versionPath, sets.NewString("k8s.io/kubernetes"))
 	generator.AddImport(path.Join(pkgBase, "api"))
 
 	if len(*overwrites) > 0 {
@@ -121,14 +126,8 @@ func main() {
 			generator.OverwritePackage(vals[0], vals[1])
 		}
 	}
-	var schemeVersion string
-	if version == "" {
-		// This occurs when we generate deep-copy for internal version.
-		schemeVersion = ""
-	} else {
-		schemeVersion = *groupVersion
-	}
-	for _, knownType := range api.Scheme.KnownTypes(schemeVersion) {
+
+	for _, knownType := range api.Scheme.KnownTypes(gv) {
 		if knownType.PkgPath() != versionPath {
 			continue
 		}

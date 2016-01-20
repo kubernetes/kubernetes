@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/user-guide/volumes.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/user-guide/volumes.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -65,6 +66,7 @@ Familiarity with [pods](pods.md) is suggested.
     - [secret](#secret)
     - [persistentVolumeClaim](#persistentvolumeclaim)
     - [downwardAPI](#downwardapi)
+    - [FlexVolume](#flexvolume)
   - [Resources](#resources)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -121,6 +123,7 @@ Kubernetes supports several types of Volumes:
    * `gitRepo`
    * `secret`
    * `persistentVolumeClaim`
+   * `downwardAPI`
 
 We welcome additional contributions.
 
@@ -137,7 +140,7 @@ volume is safe across container crashes.
 
 Some uses for an `emptyDir` are:
 
-* scratch space, such as for a disk-based mergesortcw
+* scratch space, such as for a disk-based merge sort
 * checkpointing a long computation for recovery from crashes
 * holding files that a content-manager container fetches while a webserver
   container serves the data
@@ -271,11 +274,9 @@ spec:
   - name: test-volume
     # This AWS EBS volume must already exist.
     awsElasticBlockStore:
-      volumeID: aws://<availability-zone>/<volume-id>
+      volumeID: <volume-id>
       fsType: ext4
 ```
-
-(Note: the syntax of volumeID is currently awkward; #10181 fixes it)
 
 ### nfs
 
@@ -290,15 +291,6 @@ __Important: You must have your own NFS server running with the share exported
 before you can use it__
 
 See the [NFS example](../../examples/nfs/) for more details.
-
-For example, [this file](../../examples/nfs/nfs-web-pod.yaml) demonstrates how to
-specify the usage of an NFS volume within a pod.
-
-In this example one can see that a `volumeMount` called `nfs` is being mounted
-onto `/var/www/html` in the container `web`.  The volume "nfs" is defined as
-type `nfs`, with the NFS server serving from `nfs-server.default.kube.local`
-and exporting directory `/` as the share.  The mount being created in this
-example is writeable.
 
 ### iscsi
 
@@ -376,6 +368,27 @@ mounts an empty directory and clones a git repository into it for your pod to
 use.  In the future, such volumes may be moved to an even more decoupled model,
 rather than extending the Kubernetes API for every such use case.
 
+Here is a example for gitRepo volume:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: server
+spec:
+  containers:
+  - image: nginx
+    name: nginx
+    volumeMounts:
+    - mountPath: /mypath
+      name: git-volume
+  volumes:
+  - name: git-volume
+    gitRepo:
+      repository: "git@somewhere:me/my-git-repository.git"
+      revision: "22f1d8406d464b0c0874075539c1f2e96c253775"
+```
+
 ### secret
 
 A `secret` volume is used to pass sensitive information, such as passwords, to
@@ -405,6 +418,14 @@ A `downwardAPI` volume is used to make downward API data available to applicatio
 It mounts a directory and writes the requested data in plain text files.
 
 See the [`downwardAPI` volume example](downward-api/volume/README.md)  for more details.
+
+### FlexVolume
+
+A `FlexVolume` enables users to mount vendor volumes into a pod. It expects vendor
+drivers are installed in the volume plugin path on each kubelet node. This is
+an alpha feature and may change in future.
+
+More details are in [here](../../examples/flexvolume/README.md)
 
 ## Resources
 

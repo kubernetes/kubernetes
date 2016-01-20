@@ -46,7 +46,7 @@
 {% endif -%}
 
 {% set cloud_provider = "" -%}
-{% if grains.cloud is defined -%}
+{% if grains.cloud is defined and grains.cloud != 'vagrant' -%}
   {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
 {% endif -%}
 
@@ -85,6 +85,16 @@
   {% set configure_cbr0 = "--configure-cbr0=" + pillar['allocate_node_cidrs'] -%}
 {% endif -%}
 
+# The master kubelet cannot wait for the flannel daemon because it is responsible
+# for starting up the flannel server in a static pod. So even though the flannel
+# daemon runs on the master, it doesn't hold up cluster bootstrap. All the pods
+# on the master run with host networking, so the master flannel doesn't care
+# even if the network changes. We only need it for the master proxy.
+{% set experimental_flannel_overlay = "" -%}
+{% if pillar.get('network_provider', '').lower() == 'flannel' and grains['roles'][0] != 'kubernetes-master' %}
+  {% set experimental_flannel_overlay = "--experimental-flannel-overlay=true" %}
+{% endif -%}
+
 # Run containers under the root cgroup and create a system container.
 {% set system_container = "" -%}
 {% set cgroup_root = "" -%}
@@ -116,5 +126,15 @@
   {% set network_plugin = "--network-plugin=opencontrail" %}
 {% endif -%}
 
+{% set kubelet_port = "" -%}
+{% if pillar['kubelet_port'] is defined -%}
+  {% set kubelet_port="--port=" + pillar['kubelet_port'] %}
+{% endif -%}
+
+{% set log_level = pillar['log_level'] -%}
+{% if pillar['kubelet_test_log_level'] is defined -%}
+  {% set log_level = pillar['kubelet_test_log_level'] -%}
+{% endif -%}
+
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{experimental_flannel_overlay}} {{test_args}}"

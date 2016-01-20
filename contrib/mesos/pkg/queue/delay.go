@@ -302,12 +302,18 @@ func (f *DelayFIFO) Get(id string) (UniqueID, bool) {
 
 // Variant of DelayQueue.Pop() for UniqueDelayed items
 func (q *DelayFIFO) Await(timeout time.Duration) UniqueID {
-	cancel := make(chan struct{})
-	ch := make(chan interface{}, 1)
+	var (
+		cancel = make(chan struct{})
+		ch     = make(chan interface{}, 1)
+		t      = time.NewTimer(timeout)
+	)
+	defer t.Stop()
+
 	go func() { ch <- q.pop(cancel) }()
+
 	var x interface{}
 	select {
-	case <-time.After(timeout):
+	case <-t.C:
 		close(cancel)
 		x = <-ch
 	case x = <-ch:
@@ -319,13 +325,19 @@ func (q *DelayFIFO) Await(timeout time.Duration) UniqueID {
 	return nil
 }
 
-// Variant of DelayQueue.Pop() for UniqueDelayed items
-func (q *DelayFIFO) Pop() UniqueID {
-	return q.pop(nil).(UniqueID)
+// Pop blocks until either there is an item available to dequeue or else the specified
+// cancel chan is closed. Callers that have no interest in providing a cancel chan
+// should specify nil, or else WithoutCancel() (for readability).
+func (q *DelayFIFO) Pop(cancel <-chan struct{}) UniqueID {
+	x := q.pop(cancel)
+	if x == nil {
+		return nil
+	}
+	return x.(UniqueID)
 }
 
 // variant of DelayQueue.Pop that implements optional cancellation
-func (q *DelayFIFO) pop(cancel chan struct{}) interface{} {
+func (q *DelayFIFO) pop(cancel <-chan struct{}) interface{} {
 	next := func() *qitem {
 		q.lock()
 		defer q.unlock()

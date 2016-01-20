@@ -135,23 +135,15 @@ else
       move_kubelet="/mnt/ephemeral/kubernetes"
      else
       # aufs
-
       # We used to split docker & kubernetes, but we no longer do that, because
       # host volumes go into the kubernetes area, and it is otherwise very easy
       # to fill up small volumes.
+      #
+      # No need for thin pool since we are not over-provisioning or doing snapshots
+      # (probably shouldn't be doing snapshots on ephemeral disk? Should be stateless-ish.)
+      # Tried to do it, but it cause problems (#16188)
 
-      release=`lsb_release -c -s`
-      if [[ "${release}" != "wheezy" ]] ; then
-        lvcreate -l 100%FREE --thinpool pool-ephemeral vg-ephemeral
-
-        THINPOOL_SIZE=$(lvs vg-ephemeral/pool-ephemeral -o LV_SIZE --noheadings --units M --nosuffix)
-        lvcreate -V${THINPOOL_SIZE}M -T vg-ephemeral/pool-ephemeral -n ephemeral
-      else
-        # Thin provisioning not supported by Wheezy
-        echo "Detected wheezy; won't use LVM thin provisioning"
-        lvcreate -l 100%VG -n ephemeral vg-ephemeral
-      fi
-
+      lvcreate -l 100%VG -n ephemeral vg-ephemeral
       mkfs -t ext4 /dev/vg-ephemeral/ephemeral
       mkdir -p /mnt/ephemeral
       echo "/dev/vg-ephemeral/ephemeral  /mnt/ephemeral  ext4  noatime  0 0" >> /etc/fstab
@@ -172,7 +164,8 @@ if [[ ${docker_storage} == "btrfs" ]]; then
   DOCKER_OPTS="${DOCKER_OPTS} -s btrfs"
 elif [[ ${docker_storage} == "aufs-nolvm" || ${docker_storage} == "aufs" ]]; then
   # Install aufs kernel module
-  apt-get install --yes linux-image-extra-$(uname -r)
+  # Fix issue #14162 with extra-virtual
+  apt-get install --yes linux-image-extra-$(uname -r) linux-image-extra-virtual
 
   # Install aufs tools
   apt-get install --yes aufs-tools

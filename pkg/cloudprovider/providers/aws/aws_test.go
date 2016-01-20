@@ -111,6 +111,8 @@ type FakeAWSServices struct {
 	privateDnsName          string
 	networkInterfacesMacs   []string
 	networkInterfacesVpcIDs []string
+	internalIP              string
+	externalIP              string
 
 	ec2      *FakeEC2
 	elb      *FakeELB
@@ -323,6 +325,10 @@ func (self *FakeMetadata) GetMetadata(key string) (string, error) {
 		return self.aws.instanceId, nil
 	} else if key == "local-hostname" {
 		return self.aws.privateDnsName, nil
+	} else if key == "local-ipv4" {
+		return self.aws.internalIP, nil
+	} else if key == "public-ipv4" {
+		return self.aws.externalIP, nil
 	} else if strings.HasPrefix(key, networkInterfacesPrefix) {
 		if key == networkInterfacesPrefix {
 			return strings.Join(self.aws.networkInterfacesMacs, "/\n") + "/\n", nil
@@ -343,7 +349,7 @@ func (self *FakeMetadata) GetMetadata(key string) (string, error) {
 	}
 }
 
-func (ec2 *FakeEC2) AttachVolume(volumeID, instanceId, mountDevice string) (resp *ec2.VolumeAttachment, err error) {
+func (ec2 *FakeEC2) AttachVolume(request *ec2.AttachVolumeInput) (resp *ec2.VolumeAttachment, err error) {
 	panic("Not implemented")
 }
 
@@ -359,7 +365,7 @@ func (ec2 *FakeEC2) CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volu
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DeleteVolume(volumeID string) (resp *ec2.DeleteVolumeOutput, err error) {
+func (ec2 *FakeEC2) DeleteVolume(request *ec2.DeleteVolumeInput) (resp *ec2.DeleteVolumeOutput, err error) {
 	panic("Not implemented")
 }
 
@@ -467,12 +473,13 @@ func (a *FakeASG) DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGrou
 	panic("Not implemented")
 }
 
-func mockInstancesResp(instances []*ec2.Instance) *AWSCloud {
+func mockInstancesResp(instances []*ec2.Instance) (*AWSCloud, *FakeAWSServices) {
 	awsServices := NewFakeAWSServices().withInstances(instances)
 	return &AWSCloud{
 		ec2:              awsServices.ec2,
 		availabilityZone: awsServices.availabilityZone,
-	}
+		metadata:         &FakeMetadata{aws: awsServices},
+	}, awsServices
 }
 
 func mockAvailabilityZone(region string, availabilityZone string) *AWSCloud {
@@ -544,7 +551,7 @@ func TestList(t *testing.T) {
 	instance3.State = &state3
 
 	instances := []*ec2.Instance{&instance0, &instance1, &instance2, &instance3}
-	aws := mockInstancesResp(instances)
+	aws, _ := mockInstancesResp(instances)
 
 	table := []struct {
 		input  string
@@ -604,19 +611,19 @@ func TestNodeAddresses(t *testing.T) {
 
 	instances := []*ec2.Instance{&instance0, &instance1}
 
-	aws1 := mockInstancesResp([]*ec2.Instance{})
+	aws1, _ := mockInstancesResp([]*ec2.Instance{})
 	_, err1 := aws1.NodeAddresses("instance-mismatch.ec2.internal")
 	if err1 == nil {
 		t.Errorf("Should error when no instance found")
 	}
 
-	aws2 := mockInstancesResp(instances)
+	aws2, _ := mockInstancesResp(instances)
 	_, err2 := aws2.NodeAddresses("instance-same.ec2.internal")
 	if err2 == nil {
 		t.Errorf("Should error when multiple instances found")
 	}
 
-	aws3 := mockInstancesResp(instances[0:1])
+	aws3, _ := mockInstancesResp(instances[0:1])
 	addrs3, err3 := aws3.NodeAddresses("instance-same.ec2.internal")
 	if err3 != nil {
 		t.Errorf("Should not error when instance found")
@@ -627,6 +634,18 @@ func TestNodeAddresses(t *testing.T) {
 	testHasNodeAddress(t, addrs3, api.NodeInternalIP, "192.168.0.1")
 	testHasNodeAddress(t, addrs3, api.NodeLegacyHostIP, "192.168.0.1")
 	testHasNodeAddress(t, addrs3, api.NodeExternalIP, "1.2.3.4")
+
+	aws4, fakeServices := mockInstancesResp([]*ec2.Instance{})
+	fakeServices.externalIP = "2.3.4.5"
+	fakeServices.internalIP = "192.168.0.2"
+	aws4.selfAWSInstance = &awsInstance{nodeName: fakeServices.instanceId}
+
+	addrs4, err4 := aws4.NodeAddresses(fakeServices.instanceId)
+	if err4 != nil {
+		t.Errorf("unexpected error: %v", err4)
+	}
+	testHasNodeAddress(t, addrs4, api.NodeInternalIP, "192.168.0.2")
+	testHasNodeAddress(t, addrs4, api.NodeExternalIP, "2.3.4.5")
 }
 
 func TestGetRegion(t *testing.T) {
@@ -674,24 +693,24 @@ func TestLoadBalancerMatchesClusterRegion(t *testing.T) {
 	badELBRegion := "bad-elb-region"
 	errorMessage := fmt.Sprintf("requested load balancer region '%s' does not match cluster region '%s'", badELBRegion, c.region)
 
-	_, _, err = c.GetTCPLoadBalancer("elb-name", badELBRegion)
+	_, _, err = c.GetLoadBalancer("elb-name", badELBRegion)
 	if err == nil || err.Error() != errorMessage {
-		t.Errorf("Expected GetTCPLoadBalancer region mismatch error.")
+		t.Errorf("Expected GetLoadBalancer region mismatch error.")
 	}
 
-	_, err = c.EnsureTCPLoadBalancer("elb-name", badELBRegion, nil, nil, nil, api.ServiceAffinityNone)
+	_, err = c.EnsureLoadBalancer("elb-name", badELBRegion, nil, nil, nil, api.ServiceAffinityNone)
 	if err == nil || err.Error() != errorMessage {
-		t.Errorf("Expected EnsureTCPLoadBalancer region mismatch error.")
+		t.Errorf("Expected EnsureLoadBalancer region mismatch error.")
 	}
 
-	err = c.EnsureTCPLoadBalancerDeleted("elb-name", badELBRegion)
+	err = c.EnsureLoadBalancerDeleted("elb-name", badELBRegion)
 	if err == nil || err.Error() != errorMessage {
-		t.Errorf("Expected EnsureTCPLoadBalancerDeleted region mismatch error.")
+		t.Errorf("Expected EnsureLoadBalancerDeleted region mismatch error.")
 	}
 
-	err = c.UpdateTCPLoadBalancer("elb-name", badELBRegion, nil)
+	err = c.UpdateLoadBalancer("elb-name", badELBRegion, nil)
 	if err == nil || err.Error() != errorMessage {
-		t.Errorf("Expected UpdateTCPLoadBalancer region mismatch error.")
+		t.Errorf("Expected UpdateLoadBalancer region mismatch error.")
 	}
 }
 

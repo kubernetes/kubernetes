@@ -35,8 +35,8 @@ RUN rm -rf /var/lib/apt/lists/
 RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y rsync
 
 # Download and symlink etcd.  We need this for our integration tests.
-ENV ETCD_VERSION v2.0.12
-RUN mkdir -p /usr/local/src/etcd &&\
+RUN export ETCD_VERSION=v2.2.1; \
+    mkdir -p /usr/local/src/etcd &&\
     cd /usr/local/src/etcd &&\
     curl -fsSLO https://github.com/coreos/etcd/releases/download/$ETCD_VERSION/etcd-$ETCD_VERSION-linux-amd64.tar.gz &&\
     tar xzf etcd-$ETCD_VERSION-linux-amd64.tar.gz &&\

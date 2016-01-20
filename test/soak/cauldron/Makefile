@@ -15,7 +15,7 @@ rc:
 	kubectl create --validate -f cauldron-rc.yaml
 
 stop:
-	kubectl stop rc cauldron
+	kubectl delete rc cauldron
 
 get:
 	kubectl get rc,pods -l app=cauldron

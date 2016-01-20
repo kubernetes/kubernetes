@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/getting-started-guides/libvirt-coreos.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/libvirt-coreos.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -83,11 +84,12 @@ On the other hand, `libvirt-coreos` might be useful for people investigating low
 2. Install [ebtables](http://ebtables.netfilter.org/)
 3. Install [qemu](http://wiki.qemu.org/Main_Page)
 4. Install [libvirt](http://libvirt.org/)
-5. Enable and start the libvirt daemon, e.g:
+5. Install [openssl](http://openssl.org/)
+6. Enable and start the libvirt daemon, e.g:
    * ``systemctl enable libvirtd``
    * ``systemctl start libvirtd``
-6. [Grant libvirt access to your user¹](https://libvirt.org/aclpolkit.html)
-7. Check that your $HOME is accessible to the qemu user²
+7. [Grant libvirt access to your user¹](https://libvirt.org/aclpolkit.html)
+8. Check that your $HOME is accessible to the qemu user²
 
 #### ¹ Depending on your distribution, libvirt access may be denied by default or may require a password at each access.
 
@@ -144,6 +146,7 @@ In order to fix that issue, you have several possibilities:
   * writable by your user;
   * accessible by the qemu user.
 * Grant the qemu user access to the storage pool.
+* Edit `/etc/libvirt/qemu.conf` to run under that user, that have access to the storage pool (not recommended for production usage).
 
 On Arch:
 
@@ -166,7 +169,7 @@ cluster/kube-up.sh
 
 The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
 
-The `NUM_MINIONS` environment variable may be set to specify the number of nodes to start. If it is not set, the number of nodes defaults to 3.
+The `NUM_NODES` environment variable may be set to specify the number of nodes to start. If it is not set, the number of nodes defaults to 3.
 
 The `KUBE_PUSH` environment variable may be set to specify which Kubernetes binaries must be deployed on the cluster. Its possible values are:
 
@@ -180,9 +183,9 @@ $ virsh -c qemu:///system list
  Id    Name                           State
 ----------------------------------------------------
  15    kubernetes_master              running
- 16    kubernetes_minion-01           running
- 17    kubernetes_minion-02           running
- 18    kubernetes_minion-03           running
+ 16    kubernetes_node-01             running
+ 17    kubernetes_node-02             running
+ 18    kubernetes_node-03             running
  ```
 
 You can check that the Kubernetes cluster is working with:
@@ -207,7 +210,7 @@ Connect to `kubernetes_master`:
 ssh core@192.168.10.1
 ```
 
-Connect to `kubernetes_minion-01`:
+Connect to `kubernetes_node-01`:
 
 ```sh
 ssh core@192.168.10.2
@@ -224,7 +227,7 @@ export KUBERNETES_PROVIDER=libvirt-coreos
 Bring up a libvirt-CoreOS cluster of 5 nodes
 
 ```sh
-NUM_MINIONS=5 cluster/kube-up.sh
+NUM_NODES=5 cluster/kube-up.sh
 ```
 
 Destroy the libvirt-CoreOS cluster

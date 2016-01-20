@@ -19,7 +19,7 @@ COPY logback.xml /etc/cassandra/logback.xml
 COPY run.sh /run.sh
 COPY kubernetes-cassandra.jar /kubernetes-cassandra.jar
 
-RUN chmod a+x /run.sh && \
+RUN chmod a+rx /run.sh && \
     mkdir -p /cassandra_data/data && \
     chown -R cassandra.cassandra /etc/cassandra /cassandra_data && \
     chmod o+w -R /etc/cassandra /cassandra_data

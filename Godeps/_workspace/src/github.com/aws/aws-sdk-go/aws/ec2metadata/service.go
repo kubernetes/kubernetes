@@ -1,106 +1,87 @@
+// Package ec2metadata provides the client for making API calls to the
+// EC2 Metadata service.
 package ec2metadata
 
 import (
 	"io/ioutil"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/client"
+	"github.com/aws/aws-sdk-go/aws/client/metadata"
 	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/aws/service"
-	"github.com/aws/aws-sdk-go/aws/service/serviceinfo"
 )
 
-// DefaultRetries states the default number of times the service client will
-// attempt to retry a failed request before failing.
-const DefaultRetries = 3
+// ServiceName is the name of the service.
+const ServiceName = "ec2metadata"
 
-// A Config provides the configuration for the EC2 Metadata service.
-type Config struct {
-	// An optional endpoint URL (hostname only or fully qualified URI)
-	// that overrides the default service endpoint for a client. Set this
-	// to nil, or `""` to use the default service endpoint.
-	Endpoint *string
-
-	// The HTTP client to use when sending requests. Defaults to
-	// `http.DefaultClient`.
-	HTTPClient *http.Client
-
-	// An integer value representing the logging level. The default log level
-	// is zero (LogOff), which represents no logging. To enable logging set
-	// to a LogLevel Value.
-	Logger aws.Logger
-
-	// The logger writer interface to write logging messages to. Defaults to
-	// standard out.
-	LogLevel *aws.LogLevelType
-
-	// The maximum number of times that a request will be retried for failures.
-	// Defaults to DefaultRetries for the number of retries to be performed
-	// per request.
-	MaxRetries *int
+// A EC2Metadata is an EC2 Metadata service Client.
+type EC2Metadata struct {
+	*client.Client
 }
 
-// A Client is an EC2 Metadata service Client.
-type Client struct {
-	*service.Service
-}
-
-// New creates a new instance of the EC2 Metadata service client.
+// New creates a new instance of the EC2Metadata client with a session.
+// This client is safe to use across multiple goroutines.
 //
-// In the general use case the configuration for this service client should not
-// be needed and `nil` can be provided. Configuration is only needed if the
-// `ec2metadata.Config` defaults need to be overridden. Eg. Setting LogLevel.
+// Example:
+//     // Create a EC2Metadata client from just a session.
+//     svc := ec2metadata.New(mySession)
 //
-// @note This configuration will NOT be merged with the default AWS service
-// client configuration `defaults.DefaultConfig`. Due to circular dependencies
-// with the defaults package and credentials EC2 Role Provider.
-func New(config *Config) *Client {
-	service := &service.Service{
-		ServiceInfo: serviceinfo.ServiceInfo{
-			Config:      copyConfig(config),
-			ServiceName: "Client",
-			Endpoint:    "http://169.254.169.254/latest",
-			APIVersion:  "latest",
-		},
-	}
-	service.Initialize()
-	service.Handlers.Unmarshal.PushBack(unmarshalHandler)
-	service.Handlers.UnmarshalError.PushBack(unmarshalError)
-	service.Handlers.Validate.Clear()
-	service.Handlers.Validate.PushBack(validateEndpointHandler)
-
-	return &Client{service}
+//     // Create a EC2Metadata client with additional configuration
+//     svc := ec2metadata.New(mySession, aws.NewConfig().WithLogLevel(aws.LogDebugHTTPBody))
+func New(p client.ConfigProvider, cfgs ...*aws.Config) *EC2Metadata {
+	c := p.ClientConfig(ServiceName, cfgs...)
+	return NewClient(*c.Config, c.Handlers, c.Endpoint, c.SigningRegion)
 }
 
-func copyConfig(config *Config) *aws.Config {
-	if config == nil {
-		config = &Config{}
-	}
-	c := &aws.Config{
-		Credentials: credentials.AnonymousCredentials,
-		Endpoint:    config.Endpoint,
-		HTTPClient:  config.HTTPClient,
-		Logger:      config.Logger,
-		LogLevel:    config.LogLevel,
-		MaxRetries:  config.MaxRetries,
-	}
-
-	if c.HTTPClient == nil {
-		c.HTTPClient = http.DefaultClient
-	}
-	if c.Logger == nil {
-		c.Logger = aws.NewDefaultLogger()
-	}
-	if c.LogLevel == nil {
-		c.LogLevel = aws.LogLevel(aws.LogOff)
-	}
-	if c.MaxRetries == nil {
-		c.MaxRetries = aws.Int(DefaultRetries)
+// NewClient returns a new EC2Metadata client. Should be used to create
+// a client when not using a session. Generally using just New with a session
+// is preferred.
+func NewClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegion string, opts ...func(*client.Client)) *EC2Metadata {
+	// If the default http client is provided, replace it with a custom
+	// client using default timeouts.
+	if cfg.HTTPClient == http.DefaultClient {
+		cfg.HTTPClient = &http.Client{
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+				Dial: (&net.Dialer{
+					// use a shorter timeout than default because the metadata
+					// service is local if it is running, and to fail faster
+					// if not running on an ec2 instance.
+					Timeout:   5 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).Dial,
+				TLSHandshakeTimeout: 10 * time.Second,
+			},
+		}
 	}
 
-	return c
+	svc := &EC2Metadata{
+		Client: client.New(
+			cfg,
+			metadata.ClientInfo{
+				ServiceName: ServiceName,
+				Endpoint:    endpoint,
+				APIVersion:  "latest",
+			},
+			handlers,
+		),
+	}
+
+	svc.Handlers.Unmarshal.PushBack(unmarshalHandler)
+	svc.Handlers.UnmarshalError.PushBack(unmarshalError)
+	svc.Handlers.Validate.Clear()
+	svc.Handlers.Validate.PushBack(validateEndpointHandler)
+
+	// Add additional options to the service config
+	for _, option := range opts {
+		option(svc.Client)
+	}
+
+	return svc
 }
 
 type metadataOutput struct {
@@ -129,7 +110,7 @@ func unmarshalError(r *request.Request) {
 }
 
 func validateEndpointHandler(r *request.Request) {
-	if r.Service.Endpoint == "" {
+	if r.ClientInfo.Endpoint == "" {
 		r.Error = aws.ErrMissingEndpoint
 	}
 }

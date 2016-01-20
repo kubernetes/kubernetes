@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A scripts to install k8s worker node.
-# Author @wizard_cxy @reouser
+# A script to the k8s worker in docker containers.
+# Authors @wizard_cxy @resouer
 
 set -e
 
@@ -26,14 +26,9 @@ if ( ! ps -ef | grep "/usr/bin/docker" | grep -v 'grep' &> /dev/null  ); then
 fi
 
 # Make sure k8s version env is properly set
-if [ -z ${K8S_VERSION} ]; then
-    K8S_VERSION="1.0.3"
-    echo "K8S_VERSION is not set, using default: ${K8S_VERSION}"
-else
-    echo "k8s version is set to: ${K8S_VERSION}"
-fi
-
-
+K8S_VERSION=${K8S_VERSION:-"1.1.3"}
+FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.5"}
+FLANNEL_IFACE=${FLANNEL_IFACE:-"eth0"}
 
 # Run as root
 if [ "$(id -u)" != "0" ]; then
@@ -45,9 +40,12 @@ fi
 if [ -z ${MASTER_IP} ]; then
     echo "Please export MASTER_IP in your env"
     exit 1
-else
-    echo "k8s master is set to: ${MASTER_IP}"
 fi
+
+echo "K8S_VERSION is set to: ${K8S_VERSION}"
+echo "FLANNEL_VERSION is set to: ${FLANNEL_VERSION}"
+echo "FLANNEL_IFACE is set to: ${FLANNEL_IFACE}"
+echo "MASTER_IP is set to: ${MASTER_IP}"
 
 # Check if a command is valid
 command_exists() {
@@ -98,7 +96,15 @@ detect_lsb() {
 
 # Start the bootstrap daemon
 bootstrap_daemon() {
-    sudo -b docker -d -H unix:///var/run/docker-bootstrap.sock -p /var/run/docker-bootstrap.pid --iptables=false --ip-masq=false --bridge=none --graph=/var/lib/docker-bootstrap 2> /var/log/docker-bootstrap.log 1> /dev/null
+    docker -d \
+        -H unix:///var/run/docker-bootstrap.sock \
+        -p /var/run/docker-bootstrap.pid \
+        --iptables=false \
+        --ip-masq=false \
+        --bridge=none \
+        --graph=/var/lib/docker-bootstrap \
+            2> /var/log/docker-bootstrap.log \
+            1> /dev/null &
 
     sleep 5
 }
@@ -108,19 +114,30 @@ DOCKER_CONF=""
 # Start k8s components in containers
 start_k8s() {
     # Start flannel
-    flannelCID=$(sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --restart=always --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.3 /opt/bin/flanneld --etcd-endpoints=http://${MASTER_IP}:4001 -iface="eth0")
+    flannelCID=$(docker -H unix:///var/run/docker-bootstrap.sock run \
+        -d \
+        --restart=always \
+        --net=host \
+        --privileged \
+        -v /dev/net:/dev/net \
+        quay.io/coreos/flannel:${FLANNEL_VERSION} \
+        /opt/bin/flanneld \
+            --ip-masq \
+            --etcd-endpoints=http://${MASTER_IP}:4001 \
+            --iface="${FLANNEL_IFACE}")
 
     sleep 8
 
     # Copy flannel env out and source it on the host
-    sudo docker -H unix:///var/run/docker-bootstrap.sock cp ${flannelCID}:/run/flannel/subnet.env .
+    docker -H unix:///var/run/docker-bootstrap.sock \
+        cp ${flannelCID}:/run/flannel/subnet.env .
     source subnet.env
 
     # Configure docker net settings, then restart it
     case "${lsb_dist}" in
         centos)
             DOCKER_CONF="/etc/sysconfig/docker"
-            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | tee -a ${DOCKER_CONF}
             if ! command_exists ifconfig; then
                 yum -y -q install net-tools
             fi
@@ -129,15 +146,22 @@ start_k8s() {
             ;;
         amzn)
             DOCKER_CONF="/etc/sysconfig/docker"
-            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+            echo "OPTIONS=\"\$OPTIONS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | tee -a ${DOCKER_CONF}
             ifconfig docker0 down
             yum -y -q install bridge-utils && brctl delbr docker0 && service docker restart
             ;;
         ubuntu|debian)
             DOCKER_CONF="/etc/default/docker"
-            echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
+            echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | tee -a ${DOCKER_CONF}
             ifconfig docker0 down
-            apt-get install bridge-utils && brctl delbr docker0 && service docker restart
+            apt-get install bridge-utils
+            brctl delbr docker0
+            service docker stop
+            while [ `ps aux | grep /usr/bin/docker | grep -v grep | wc -l` -gt 0 ]; do
+                echo "Waiting for docker to terminate"
+                sleep 1
+            done
+            service docker start
             ;;
         *)
             echo "Unsupported operations system ${lsb_dist}"
@@ -149,22 +173,29 @@ start_k8s() {
     sleep 5
     
     # Start kubelet & proxy in container
+    # TODO: Use secure port for communication
     docker run \
         --net=host \
+        --pid=host \
         --privileged \
         --restart=always \
         -d \
         -v /sys:/sys:ro \
         -v /var/run:/var/run:rw  \
+        -v /:/rootfs:ro \
         -v /dev:/dev \
         -v /var/lib/docker/:/var/lib/docker:rw \
         -v /var/lib/kubelet/:/var/lib/kubelet:rw \
         gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
-        /hyperkube kubelet --api-servers=http://${MASTER_IP}:8080 \
-        --v=2 --address=0.0.0.0 --enable-server \
-        --hostname-override=$(hostname -i) \
-        --cluster-dns=10.0.0.10 \
-        --cluster-domain=cluster.local
+        /hyperkube kubelet \
+            --allow-privileged=true \
+            --api-servers=http://${MASTER_IP}:8080 \
+            --address=0.0.0.0 \
+            --enable-server \
+            --cluster-dns=10.0.0.10 \
+            --cluster-domain=cluster.local \
+            --containerized \
+            --v=2
     
     docker run \
         -d \
@@ -172,8 +203,9 @@ start_k8s() {
         --privileged \
         --restart=always \
         gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
-        /hyperkube proxy --master=http://${MASTER_IP}:8080 \
-        --v=2
+        /hyperkube proxy \
+            --master=http://${MASTER_IP}:8080 \
+            --v=2
 }
 
 echo "Detecting your OS distro ..."

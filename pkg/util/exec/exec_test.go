@@ -92,3 +92,12 @@ func TestLookPath(t *testing.T) {
 		t.Errorf("unexpected result for LookPath: got %s, expected %s", sh, shExpected)
 	}
 }
+
+func TestExecutableNotFound(t *testing.T) {
+	exec := New()
+	cmd := exec.Command("fake_executable_name")
+	_, err := cmd.CombinedOutput()
+	if err != ErrExecutableNotFound {
+		t.Errorf("Expected error ErrExecutableNotFound but got %v", err)
+	}
+}

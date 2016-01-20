@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/design/networking.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/design/networking.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -132,11 +133,11 @@ differentiate it from `docker0`) is set up outside of Docker proper.
 Example of GCE's advanced routing rules:
 
 ```sh
-gcloud compute routes add "${MINION_NAMES[$i]}" \
+gcloud compute routes add "${NODE_NAMES[$i]}" \
   --project "${PROJECT}" \
-  --destination-range "${MINION_IP_RANGES[$i]}" \
+  --destination-range "${NODE_IP_RANGES[$i]}" \
   --network "${NETWORK}" \
-  --next-hop-instance "${MINION_NAMES[$i]}" \
+  --next-hop-instance "${NODE_NAMES[$i]}" \
   --next-hop-instance-zone "${ZONE}" &
 ```
 

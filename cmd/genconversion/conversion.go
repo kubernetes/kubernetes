@@ -23,13 +23,14 @@ import (
 	"os"
 	"path"
 	"runtime"
-	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/v1"
-	_ "k8s.io/kubernetes/pkg/apis/extensions"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
+	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
+	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
+	kruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -80,25 +81,27 @@ func main() {
 
 	data := new(bytes.Buffer)
 
-	group, version := path.Split(*groupVersion)
-	group = strings.TrimRight(group, "/")
+	gv, err := unversioned.ParseGroupVersion(*groupVersion)
+	if err != nil {
+		glog.Fatalf("Error parsing groupversion %v: %v", *groupVersion, err)
+	}
 
-	_, err := data.WriteString(fmt.Sprintf("package %v\n", version))
+	_, err = data.WriteString(fmt.Sprintf("package %v\n", gv.Version))
 	if err != nil {
 		glog.Fatalf("Error while writing package line: %v", err)
 	}
 
-	versionPath := pkgPath(group, version)
-	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw(), versionPath)
+	versionPath := pkgPath(gv.Group, gv.Version)
+	generator := kruntime.NewConversionGenerator(api.Scheme.Raw(), versionPath)
 	apiShort := generator.AddImport(path.Join(pkgBase, "api"))
 	generator.AddImport(path.Join(pkgBase, "api/resource"))
 	// TODO(wojtek-t): Change the overwrites to a flag.
-	generator.OverwritePackage(version, "")
-	for _, knownType := range api.Scheme.KnownTypes(*groupVersion) {
+	generator.OverwritePackage(gv.Version, "")
+	for _, knownType := range api.Scheme.KnownTypes(gv) {
 		if knownType.PkgPath() != versionPath {
 			continue
 		}
-		if err := generator.GenerateConversionsForType(version, knownType); err != nil {
+		if err := generator.GenerateConversionsForType(gv, knownType); err != nil {
 			glog.Errorf("Error while generating conversion functions for %v: %v", knownType, err)
 		}
 	}
@@ -115,7 +118,10 @@ func main() {
 
 	b, err := imports.Process("", data.Bytes(), nil)
 	if err != nil {
-		glog.Fatalf("Error while update imports: %v", err)
+		for i, s := range bytes.Split(data.Bytes(), []byte("\n")) {
+			glog.Infof("%d:\t%s", i, s)
+		}
+		glog.Fatalf("Error while update imports: %v\n", err)
 	}
 	if _, err := funcOut.Write(b); err != nil {
 		glog.Fatalf("Error while writing out the resulting file: %v", err)

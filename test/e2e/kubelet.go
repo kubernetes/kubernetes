@@ -22,8 +22,6 @@ import (
 	"time"
 
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -95,8 +93,7 @@ var _ = Describe("kubelet", func() {
 	var resourceMonitor *resourceMonitor
 
 	BeforeEach(func() {
-		nodes, err := framework.Client.Nodes().List(labels.Everything(), fields.Everything())
-		expectNoError(err)
+		nodes := ListSchedulableNodesOrDie(framework.Client)
 		numNodes = len(nodes.Items)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
@@ -130,7 +127,7 @@ var _ = Describe("kubelet", func() {
 					Client:    framework.Client,
 					Name:      rcName,
 					Namespace: framework.Namespace.Name,
-					Image:     "beta.gcr.io/google_containers/pause:2.0",
+					Image:     "gcr.io/google_containers/pause:2.0",
 					Replicas:  totalPods,
 				})).NotTo(HaveOccurred())
 				// Perform a sanity check so that we know all desired pods are

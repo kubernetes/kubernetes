@@ -26,12 +26,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -169,9 +166,6 @@ func BenchmarkPodListEtcd(b *testing.B) {
 	glog.Infof("Starting benchmark: b.N %d, pods %d, workers %d, podsPerNode %d",
 		b.N, numPods, numTasks, podsPerNode)
 
-	ctx := api.WithNamespace(api.NewContext(), framework.TestNS)
-	key := etcdgeneric.NamespaceKeyRootFunc(ctx, fmt.Sprintf("%s/pods", etcdtest.PathPrefix()))
-
 	b.StartTimer()
 	for i := 0; i < iter; i++ {
 		framework.RunParallel(func(id int) error {
@@ -179,10 +173,12 @@ func BenchmarkPodListEtcd(b *testing.B) {
 			defer func() {
 				glog.V(3).Infof("Worker %d: listing pods took %v", id, time.Since(now))
 			}()
-			if response, err := m.EtcdStorage.Client.Get(key, true, true); err != nil {
+			pods, err := m.RestClient.Pods(framework.TestNS).List(labels.Everything(), fields.Everything())
+			if err != nil {
 				return err
-			} else if len(response.Node.Nodes) < podsPerNode {
-				glog.Fatalf("List retrieved %d pods, which is less than %d", len(response.Node.Nodes), podsPerNode)
+			}
+			if len(pods.Items) < numPods {
+				glog.Fatalf("List retrieved %d pods, which is less than %d", len(pods.Items), numPods)
 			}
 			return nil
 		}, numTasks, Workers)

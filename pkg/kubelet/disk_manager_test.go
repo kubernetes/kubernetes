@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	cadvisorApi "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -61,17 +61,15 @@ func TestSpaceAvailable(t *testing.T) {
 	dm, err := newDiskSpaceManager(mockCadvisor, policy)
 	assert.NoError(err)
 
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     400 * mb,
 		Capacity:  1000 * mb,
 		Available: 600 * mb,
 	}, nil)
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:    9 * mb,
 		Capacity: 10 * mb,
 	}, nil)
-
-	dm.Unfreeze()
 
 	ok, err := dm.IsDockerDiskSpaceAvailable()
 	assert.NoError(err)
@@ -90,13 +88,11 @@ func TestIsDockerDiskSpaceAvailableWithSpace(t *testing.T) {
 	require.NoError(t, err)
 
 	// 500MB available
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     9500 * mb,
 		Capacity:  10000 * mb,
 		Available: 500 * mb,
 	}, nil)
-
-	dm.Unfreeze()
 
 	ok, err := dm.IsDockerDiskSpaceAvailable()
 	assert.NoError(err)
@@ -108,7 +104,7 @@ func TestIsDockerDiskSpaceAvailableWithSpace(t *testing.T) {
 func TestIsDockerDiskSpaceAvailableWithoutSpace(t *testing.T) {
 	// 1MB available
 	assert, policy, mockCadvisor := setUp(t)
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     999 * mb,
 		Capacity:  1000 * mb,
 		Available: 1 * mb,
@@ -116,8 +112,6 @@ func TestIsDockerDiskSpaceAvailableWithoutSpace(t *testing.T) {
 
 	dm, err := newDiskSpaceManager(mockCadvisor, policy)
 	require.NoError(t, err)
-
-	dm.Unfreeze()
 
 	ok, err := dm.IsDockerDiskSpaceAvailable()
 	assert.NoError(err)
@@ -133,13 +127,11 @@ func TestIsRootDiskSpaceAvailableWithSpace(t *testing.T) {
 	assert.NoError(err)
 
 	// 999MB available
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     1 * mb,
 		Capacity:  1000 * mb,
 		Available: 999 * mb,
 	}, nil)
-
-	dm.Unfreeze()
 
 	ok, err := dm.IsRootDiskSpaceAvailable()
 	assert.NoError(err)
@@ -155,13 +147,11 @@ func TestIsRootDiskSpaceAvailableWithoutSpace(t *testing.T) {
 	assert.NoError(err)
 
 	// 9MB available
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     990 * mb,
 		Capacity:  1000 * mb,
 		Available: 9 * mb,
 	}, nil)
-
-	dm.Unfreeze()
 
 	ok, err := dm.IsRootDiskSpaceAvailable()
 	assert.NoError(err)
@@ -174,14 +164,12 @@ func TestCache(t *testing.T) {
 	dm, err := newDiskSpaceManager(mockCadvisor, policy)
 	assert.NoError(err)
 
-	dm.Unfreeze()
-
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     400 * mb,
 		Capacity:  1000 * mb,
 		Available: 300 * mb,
 	}, nil).Once()
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     500 * mb,
 		Capacity:  1000 * mb,
 		Available: 500 * mb,
@@ -220,9 +208,8 @@ func TestFsInfoError(t *testing.T) {
 	dm, err := newDiskSpaceManager(mockCadvisor, policy)
 	assert.NoError(err)
 
-	dm.Unfreeze()
-	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApi.FsInfo{}, fmt.Errorf("can't find fs"))
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{}, fmt.Errorf("EBUSY"))
+	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorapi.FsInfo{}, fmt.Errorf("can't find fs"))
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{}, fmt.Errorf("EBUSY"))
 	ok, err := dm.IsDockerDiskSpaceAvailable()
 	assert.Error(err)
 	assert.True(ok)
@@ -236,7 +223,7 @@ func Test_getFsInfo(t *testing.T) {
 	assert, policy, mockCadvisor := setUp(t)
 
 	// Sunny day case
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     10 * mb,
 		Capacity:  100 * mb,
 		Available: 90 * mb,
@@ -246,7 +233,6 @@ func Test_getFsInfo(t *testing.T) {
 		cadvisor:   mockCadvisor,
 		policy:     policy,
 		cachedInfo: map[string]fsInfo{},
-		frozen:     false,
 	}
 
 	available, err := dm.isSpaceAvailable("root", 10, dm.cadvisor.RootFsInfo)
@@ -255,7 +241,7 @@ func Test_getFsInfo(t *testing.T) {
 
 	// Threshold case
 	mockCadvisor = new(cadvisor.Mock)
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     9 * mb,
 		Capacity:  100 * mb,
 		Available: 9 * mb,
@@ -265,14 +251,13 @@ func Test_getFsInfo(t *testing.T) {
 		cadvisor:   mockCadvisor,
 		policy:     policy,
 		cachedInfo: map[string]fsInfo{},
-		frozen:     false,
 	}
 	available, err = dm.isSpaceAvailable("root", 10, dm.cadvisor.RootFsInfo)
 	assert.False(available)
 	assert.NoError(err)
 
 	// Frozen case
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     9 * mb,
 		Capacity:  10 * mb,
 		Available: 500 * mb,
@@ -282,7 +267,6 @@ func Test_getFsInfo(t *testing.T) {
 		cadvisor:   mockCadvisor,
 		policy:     policy,
 		cachedInfo: map[string]fsInfo{},
-		frozen:     true,
 	}
 	available, err = dm.isSpaceAvailable("root", 10, dm.cadvisor.RootFsInfo)
 	assert.True(available)
@@ -290,7 +274,7 @@ func Test_getFsInfo(t *testing.T) {
 
 	// Capacity error case
 	mockCadvisor = new(cadvisor.Mock)
-	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
 		Usage:     9 * mb,
 		Capacity:  0,
 		Available: 500 * mb,
@@ -300,7 +284,6 @@ func Test_getFsInfo(t *testing.T) {
 		cadvisor:   mockCadvisor,
 		policy:     policy,
 		cachedInfo: map[string]fsInfo{},
-		frozen:     false,
 	}
 	available, err = dm.isSpaceAvailable("root", 10, dm.cadvisor.RootFsInfo)
 	assert.True(available)
@@ -309,21 +292,4 @@ func Test_getFsInfo(t *testing.T) {
 
 	// Available error case skipped as v2.FSInfo uses uint64 and this
 	// can not be less than 0
-}
-
-// TestUnfreeze verifies that Unfreze does infact change the frozen
-// private field in master
-func TestUnfreeze(t *testing.T) {
-	dm := &realDiskSpaceManager{
-		cadvisor:   new(cadvisor.Mock),
-		policy:     testPolicy(),
-		cachedInfo: map[string]fsInfo{},
-		frozen:     true,
-	}
-
-	dm.Unfreeze()
-
-	if dm.frozen {
-		t.Errorf("DiskSpaceManager did not unfreeze: %+v", dm)
-	}
 }

@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/design/daemon.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/design/daemon.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -65,13 +66,13 @@ The DaemonSet supports standard API features:
   - Using the pod’s nodeSelector field, DaemonSets can be restricted to operate over nodes that have a certain label. For example, suppose that in a cluster some nodes are labeled ‘app=database’. You can use a DaemonSet to launch a datastore pod on exactly those nodes labeled ‘app=database’.
   - Using the pod's nodeName field, DaemonSets can be restricted to operate on a specified node.
   - The PodTemplateSpec used by the DaemonSet is the same as the PodTemplateSpec used by the Replication Controller.
-  - The initial implementation will not guarnatee that DaemonSet pods are created on nodes before other pods.
+  - The initial implementation will not guarantee that DaemonSet pods are created on nodes before other pods.
   - The initial implementation of DaemonSet does not guarantee that DaemonSet pods show up on nodes (for example because of resource limitations of the node), but makes a best effort to launch DaemonSet pods (like Replication Controllers do with pods). Subsequent revisions might ensure that DaemonSet pods show up on nodes, preempting other pods if necessary.
   - The DaemonSet controller adds an annotation "kubernetes.io/created-by: \<json API object reference\>"
   - YAML example:
 
 ```YAML
-  apiVersion: v1
+  apiVersion: extensions/v1beta1
   kind: DaemonSet
   metadata:
     labels:

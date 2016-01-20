@@ -32,20 +32,21 @@ import (
 
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
-	"k8s.io/kubernetes/pkg/kubelet"
+	kubeletserver "k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 )
 
 type fakeDialer struct {
-	dialed bool
-	conn   httpstream.Connection
-	err    error
+	dialed             bool
+	conn               httpstream.Connection
+	err                error
+	negotiatedProtocol string
 }
 
-func (d *fakeDialer) Dial() (httpstream.Connection, error) {
+func (d *fakeDialer) Dial(protocols ...string) (httpstream.Connection, string, error) {
 	d.dialed = true
-	return d.conn, d.err
+	return d.conn, d.negotiatedProtocol, d.err
 }
 
 func TestParsePortsAndNew(t *testing.T) {
@@ -203,47 +204,39 @@ func TestGetListener(t *testing.T) {
 }
 
 // fakePortForwarder simulates port forwarding for testing. It implements
-// kubelet.PortForwarder.
+// kubeletserver.PortForwarder.
 type fakePortForwarder struct {
 	lock sync.Mutex
+	// stores data expected from the stream per port
+	expected map[uint16]string
 	// stores data received from the stream per port
 	received map[uint16]string
 	// data to be sent to the stream per port
 	send map[uint16]string
 }
 
-var _ kubelet.PortForwarder = &fakePortForwarder{}
+var _ kubeletserver.PortForwarder = &fakePortForwarder{}
 
 func (pf *fakePortForwarder) PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
 	defer stream.Close()
 
-	var wg sync.WaitGroup
+	// read from the client
+	received := make([]byte, len(pf.expected[port]))
+	n, err := stream.Read(received)
+	if err != nil {
+		return fmt.Errorf("error reading from client for port %d: %v", port, err)
+	}
+	if n != len(pf.expected[port]) {
+		return fmt.Errorf("unexpected length read from client for port %d: got %d, expected %d. data=%q", port, n, len(pf.expected[port]), string(received))
+	}
 
-	// client -> server
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	// store the received content
+	pf.lock.Lock()
+	pf.received[port] = string(received)
+	pf.lock.Unlock()
 
-		// copy from stream into a buffer
-		received := new(bytes.Buffer)
-		io.Copy(received, stream)
-
-		// store the received content
-		pf.lock.Lock()
-		pf.received[port] = received.String()
-		pf.lock.Unlock()
-	}()
-
-	// server -> client
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		// send the hardcoded data to the stream
-		io.Copy(stream, strings.NewReader(pf.send[port]))
-	}()
-
-	wg.Wait()
+	// send the hardcoded data to the client
+	io.Copy(stream, strings.NewReader(pf.send[port]))
 
 	return nil
 }
@@ -253,10 +246,11 @@ func (pf *fakePortForwarder) PortForward(name string, uid types.UID, port uint16
 func fakePortForwardServer(t *testing.T, testName string, serverSends, expectedFromClient map[uint16]string) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		pf := &fakePortForwarder{
+			expected: expectedFromClient,
 			received: make(map[uint16]string),
 			send:     serverSends,
 		}
-		kubelet.ServePortForward(w, req, pf, "pod", "uid", 0, 10*time.Second)
+		kubeletserver.ServePortForward(w, req, pf, "pod", "uid", 0, 10*time.Second)
 
 		for port, expected := range expectedFromClient {
 			actual, ok := pf.received[port]
@@ -326,7 +320,8 @@ func TestForwardPorts(t *testing.T) {
 			clientConn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", port))
 			if err != nil {
 				t.Errorf("%s: error dialing %d: %s", testName, port, err)
-				server.Close()
+				// TODO: Uncomment when fix #19254
+				// server.Close()
 				continue
 			}
 			defer clientConn.Close()
@@ -334,24 +329,28 @@ func TestForwardPorts(t *testing.T) {
 			n, err := clientConn.Write([]byte(data))
 			if err != nil && err != io.EOF {
 				t.Errorf("%s: Error sending data '%s': %s", testName, data, err)
-				server.Close()
+				// TODO: Uncomment when fix #19254
+				// server.Close()
 				continue
 			}
 			if n == 0 {
 				t.Errorf("%s: unexpected write of 0 bytes", testName)
-				server.Close()
+				// TODO: Uncomment when fix #19254
+				// server.Close()
 				continue
 			}
 			b := make([]byte, 4)
 			n, err = clientConn.Read(b)
 			if err != nil && err != io.EOF {
 				t.Errorf("%s: Error reading data: %s", testName, err)
-				server.Close()
+				// TODO: Uncomment when fix #19254
+				// server.Close()
 				continue
 			}
 			if !bytes.Equal([]byte(test.serverSends[port]), b) {
 				t.Errorf("%s: expected to read '%s', got '%s'", testName, test.serverSends[port], b)
-				server.Close()
+				// TODO: Uncomment when fix #19254
+				// server.Close()
 				continue
 			}
 		}
@@ -363,14 +362,16 @@ func TestForwardPorts(t *testing.T) {
 		if err != nil {
 			t.Errorf("%s: unexpected error: %s", testName, err)
 		}
-		server.Close()
+		// TODO: Uncomment when fix #19254
+		// server.Close()
 	}
 
 }
 
 func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 	server := httptest.NewServer(fakePortForwardServer(t, "allBindsFailed", nil, nil))
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	url, _ := url.Parse(server.URL)
 	exec, err := remotecommand.NewExecutor(&client.Config{}, "POST", url)

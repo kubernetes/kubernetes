@@ -18,9 +18,9 @@
 # A library of common helper functions for Ubuntus & Debians.
 
 function detect-minion-image() {
-  if [[ -z "${KUBE_MINION_IMAGE=-}" ]]; then
+  if [[ -z "${KUBE_NODE_IMAGE=-}" ]]; then
     detect-image
-    KUBE_MINION_IMAGE=$AWS_IMAGE
+    KUBE_NODE_IMAGE=$AWS_IMAGE
   fi
 }
 

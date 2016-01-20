@@ -21,8 +21,8 @@ set -e
 script_root=`dirname "${BASH_SOURCE}"`
 source $script_root/env.sh
 
-echo "Stopping vtctld replicationcontroller..."
-$KUBECTL stop replicationcontroller vtctld
+echo "Deleting vtctld replicationcontroller..."
+$KUBECTL delete replicationcontroller vtctld
 
 echo "Deleting vtctld service..."
 $KUBECTL delete service vtctld

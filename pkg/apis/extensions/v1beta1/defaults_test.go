@@ -14,16 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta1_test
 
 import (
 	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/v1"
+	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	. "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestSetDefaultDaemonSet(t *testing.T) {
@@ -85,9 +88,18 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 }
 
 func TestSetDefaultDeployment(t *testing.T) {
-	defaultIntOrString := util.NewIntOrStringFromInt(1)
-	differentIntOrString := util.NewIntOrStringFromInt(5)
-	deploymentLabelKey := "deployment.kubernetes.io/podTemplateHash"
+	defaultIntOrString := intstr.FromInt(1)
+	differentIntOrString := intstr.FromInt(5)
+	deploymentLabelKey := DefaultDeploymentUniqueLabelKey
+	period := int64(v1.DefaultTerminationGracePeriodSeconds)
+	defaultTemplate := v1.PodTemplateSpec{
+		Spec: v1.PodSpec{
+			DNSPolicy:                     v1.DNSClusterFirst,
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			SecurityContext:               &v1.PodSecurityContext{},
+			TerminationGracePeriodSeconds: &period,
+		},
+	}
 	tests := []struct {
 		original *Deployment
 		expected *Deployment
@@ -96,7 +108,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			original: &Deployment{},
 			expected: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt(1),
+					Replicas: newInt32(1),
 					Strategy: DeploymentStrategy{
 						Type: RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &RollingUpdateDeployment{
@@ -104,6 +116,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
+					Template:       defaultTemplate,
 					UniqueLabelKey: newString(deploymentLabelKey),
 				},
 			},
@@ -111,7 +124,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt(5),
+					Replicas: newInt32(5),
 					Strategy: DeploymentStrategy{
 						RollingUpdate: &RollingUpdateDeployment{
 							MaxSurge: &differentIntOrString,
@@ -121,7 +134,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 			expected: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt(5),
+					Replicas: newInt32(5),
 					Strategy: DeploymentStrategy{
 						Type: RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &RollingUpdateDeployment{
@@ -129,6 +142,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
+					Template:       defaultTemplate,
 					UniqueLabelKey: newString(deploymentLabelKey),
 				},
 			},
@@ -136,7 +150,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt(5),
+					Replicas: newInt32(5),
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
@@ -144,10 +158,11 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 			expected: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt(5),
+					Replicas: newInt32(5),
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
+					Template:       defaultTemplate,
 					UniqueLabelKey: newString(deploymentLabelKey),
 				},
 			},
@@ -155,7 +170,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt(5),
+					Replicas: newInt32(5),
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
@@ -164,10 +179,11 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 			expected: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt(5),
+					Replicas: newInt32(5),
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
+					Template:       defaultTemplate,
 					UniqueLabelKey: newString("customDeploymentKey"),
 				},
 			},
@@ -184,7 +200,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			t.FailNow()
 		}
 		if !reflect.DeepEqual(got.Spec, expected.Spec) {
-			t.Errorf("got different than expected: %v, %v", got, expected)
+			t.Errorf("got different than expected:\n\t%+v\ngot:\n\t%+v", got.Spec, expected.Spec)
 		}
 	}
 }
@@ -192,18 +208,18 @@ func TestSetDefaultDeployment(t *testing.T) {
 func TestSetDefaultJob(t *testing.T) {
 	expected := &Job{
 		Spec: JobSpec{
-			Selector: &PodSelector{
+			Selector: &LabelSelector{
 				MatchLabels: map[string]string{"job": "selector"},
 			},
-			Completions: newInt(1),
-			Parallelism: newInt(1),
+			Completions: newInt32(1),
+			Parallelism: newInt32(1),
 		},
 	}
 	tests := []*Job{
 		// selector set explicitly, completions and parallelism - default
 		{
 			Spec: JobSpec{
-				Selector: &PodSelector{
+				Selector: &LabelSelector{
 					MatchLabels: map[string]string{"job": "selector"},
 				},
 			},
@@ -221,7 +237,7 @@ func TestSetDefaultJob(t *testing.T) {
 		// selector from template labels, completions set explicitly, parallelism - default
 		{
 			Spec: JobSpec{
-				Completions: newInt(1),
+				Completions: newInt32(1),
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: v1.ObjectMeta{
 						Labels: map[string]string{"job": "selector"},
@@ -232,7 +248,7 @@ func TestSetDefaultJob(t *testing.T) {
 		// selector from template labels, completions - default, parallelism set explicitly
 		{
 			Spec: JobSpec{
-				Parallelism: newInt(1),
+				Parallelism: newInt32(1),
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: v1.ObjectMeta{
 						Labels: map[string]string{"job": "selector"},
@@ -262,7 +278,7 @@ func TestSetDefaultJob(t *testing.T) {
 }
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	data, err := Codec.Encode(obj)
+	data, err := runtime.Encode(Codec, obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)
 		return nil
@@ -281,8 +297,8 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	return obj3
 }
 
-func newInt(val int) *int {
-	p := new(int)
+func newInt32(val int32) *int32 {
+	p := new(int32)
 	*p = val
 	return p
 }

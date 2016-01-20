@@ -1,5 +1,0 @@
-check process kube-addons with pidfile /var/run/kube-addons.pid
-group kube-addons
-start program = "/etc/init.d/kube-addons start"
-stop program = "/etc/init.d/kube-addons stop"
-if does not exist then restart

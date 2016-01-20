@@ -28,6 +28,8 @@
 #   * export KUBERNETES_PROVIDER=gke; wget -q -O - https://get.k8s.io | bash
 #  Amazon EC2
 #   * export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | bash
+#  Libvirt (with CoreOS as a guest operating system)
+#   * export KUBERNETES_PROVIDER=libvirt-coreos; wget -q -O - https://get.k8s.io | bash
 #  Vagrant (local virtual machines)
 #   * export KUBERNETES_PROVIDER=vagrant; wget -q -O - https://get.k8s.io | bash
 #  VMWare VSphere
@@ -94,9 +96,13 @@ elif [[ "${machine}" == "i686" ]]; then
   arch="386"
 elif [[ "${machine}" == "arm*" ]]; then
   arch="arm"
+elif [[ "${machine}" == "s390x*" ]]; then
+  arch="s390x"
+elif [[ "${machine}" == "ppc64le" ]]; then
+  arch="ppc64le"
 else
   echo "Unknown, unsupported architecture (${machine})."
-  echo "Supported architectures x86_64, i686, arm*"
+  echo "Supported architectures x86_64, i686, arm, s390x, ppc64le."
   echo "Bailing out."
   exit 3
 fi
@@ -114,9 +120,9 @@ if [[ -n "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
 fi
 
 if [[ $(which wget) ]]; then
-  wget -O ${file} ${release_url}
+  wget -N ${release_url}
 elif [[ $(which curl) ]]; then
-  curl -L -o ${file} ${release_url}
+  curl -L -z ${file} ${release_url} -o ${file}
 else
   echo "Couldn't find curl or wget.  Bailing out."
   exit 1
@@ -124,6 +130,5 @@ fi
 
 echo "Unpacking kubernetes release ${release}"
 tar -xzf ${file}
-rm ${file}
 
 create_cluster

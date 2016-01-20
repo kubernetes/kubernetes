@@ -18,8 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -39,8 +37,8 @@ func (c *FakePodTemplates) Get(name string) (*api.PodTemplate, error) {
 	return obj.(*api.PodTemplate), err
 }
 
-func (c *FakePodTemplates) List(label labels.Selector, field fields.Selector) (*api.PodTemplateList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("podtemplates", c.Namespace, label, field), &api.PodTemplateList{})
+func (c *FakePodTemplates) List(opts api.ListOptions) (*api.PodTemplateList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("podtemplates", c.Namespace, opts), &api.PodTemplateList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -71,6 +69,6 @@ func (c *FakePodTemplates) Delete(name string, options *api.DeleteOptions) error
 	return err
 }
 
-func (c *FakePodTemplates) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("podtemplates", c.Namespace, label, field, resourceVersion))
+func (c *FakePodTemplates) Watch(opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("podtemplates", c.Namespace, opts))
 }

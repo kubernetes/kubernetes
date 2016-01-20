@@ -17,17 +17,17 @@ package libcontainer
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/docker/libcontainer"
-	"github.com/docker/libcontainer/cgroups"
-	"github.com/golang/glog"
 	info "github.com/google/cadvisor/info/v1"
+
+	"github.com/golang/glog"
+	"github.com/opencontainers/runc/libcontainer"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
 type CgroupSubsystems struct {
@@ -98,7 +98,8 @@ func GetStats(cgroupManager cgroups.Manager, rootFs string, pid int) (*info.Cont
 			stats.Network.Interfaces = append(stats.Network.Interfaces, netStats...)
 		}
 
-		t, err := tcpStatsFromProc(rootFs, pid, "net/tcp")
+		// Commenting out to disable: too CPU intensive
+		/*t, err := tcpStatsFromProc(rootFs, pid, "net/tcp")
 		if err != nil {
 			glog.V(2).Infof("Unable to get tcp stats from pid %d: %v", pid, err)
 		} else {
@@ -110,7 +111,7 @@ func GetStats(cgroupManager cgroups.Manager, rootFs string, pid int) (*info.Cont
 			glog.V(2).Infof("Unable to get tcp6 stats from pid %d: %v", pid, err)
 		} else {
 			stats.Network.Tcp6 = t6
-		}
+		}*/
 	}
 
 	// For backwards compatibility.
@@ -134,7 +135,6 @@ func networkStatsFromProc(rootFs string, pid int) ([]info.InterfaceStats, error)
 
 var (
 	ignoredDevicePrefixes = []string{"lo", "veth", "docker"}
-	netStatLineRE         = regexp.MustCompile("[  ]*(.+):([  ]+[0-9]+){16}")
 )
 
 func isIgnoredDevice(ifName string) bool {
@@ -147,46 +147,71 @@ func isIgnoredDevice(ifName string) bool {
 }
 
 func scanInterfaceStats(netStatsFile string) ([]info.InterfaceStats, error) {
-	var (
-		bkt uint64
-	)
-
-	stats := []info.InterfaceStats{}
-
-	data, err := ioutil.ReadFile(netStatsFile)
+	file, err := os.Open(netStatsFile)
 	if err != nil {
-		return stats, fmt.Errorf("failure opening %s: %v", netStatsFile, err)
+		return nil, fmt.Errorf("failure opening %s: %v", netStatsFile, err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	// Discard header lines
+	for i := 0; i < 2; i++ {
+		if b := scanner.Scan(); !b {
+			return nil, scanner.Err()
+		}
 	}
 
-	reader := strings.NewReader(string(data))
-	scanner := bufio.NewScanner(reader)
-
-	scanner.Split(bufio.ScanLines)
-
+	stats := []info.InterfaceStats{}
 	for scanner.Scan() {
 		line := scanner.Text()
-		if netStatLineRE.MatchString(line) {
-			line = strings.Replace(line, ":", "", -1)
+		line = strings.Replace(line, ":", "", -1)
 
-			i := info.InterfaceStats{}
-
-			_, err := fmt.Sscanf(line, "%s %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
-				&i.Name, &i.RxBytes, &i.RxPackets, &i.RxErrors, &i.RxDropped, &bkt, &bkt, &bkt,
-				&bkt, &i.TxBytes, &i.TxPackets, &i.TxErrors, &i.TxDropped, &bkt, &bkt, &bkt, &bkt)
-
-			if err != nil {
-				return stats, fmt.Errorf("failure opening %s: %v", netStatsFile, err)
-			}
-
-			if !isIgnoredDevice(i.Name) {
-				stats = append(stats, i)
-			}
+		fields := strings.Fields(line)
+		// If the format of the  line is invalid then don't trust any of the stats
+		// in this file.
+		if len(fields) != 17 {
+			return nil, fmt.Errorf("invalid interface stats line: %v", line)
 		}
+
+		devName := fields[0]
+		if isIgnoredDevice(devName) {
+			continue
+		}
+
+		i := info.InterfaceStats{
+			Name: devName,
+		}
+
+		statFields := append(fields[1:5], fields[9:13]...)
+		statPointers := []*uint64{
+			&i.RxBytes, &i.RxPackets, &i.RxErrors, &i.RxDropped,
+			&i.TxBytes, &i.TxPackets, &i.TxErrors, &i.TxDropped,
+		}
+
+		err := setInterfaceStatValues(statFields, statPointers)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse interface stats (%v): %v", err, line)
+		}
+
+		stats = append(stats, i)
 	}
 
 	return stats, nil
 }
 
+func setInterfaceStatValues(fields []string, pointers []*uint64) error {
+	for i, v := range fields {
+		val, err := strconv.ParseUint(v, 10, 64)
+		if err != nil {
+			return err
+		}
+		*pointers[i] = val
+	}
+	return nil
+}
+
+/*
 func tcpStatsFromProc(rootFs string, pid int, file string) (info.TcpStat, error) {
 	tcpStatsFile := path.Join(rootFs, "proc", strconv.Itoa(pid), file)
 
@@ -207,8 +232,6 @@ func scanTcpStats(tcpStatsFile string) (info.TcpStat, error) {
 		return stats, fmt.Errorf("failure opening %s: %v", tcpStatsFile, err)
 	}
 
-	tcpStatLineRE, _ := regexp.Compile("[0-9:].*")
-
 	tcpStateMap := map[string]uint64{
 		"01": 0, //ESTABLISHED
 		"02": 0, //SYN_SENT
@@ -228,18 +251,23 @@ func scanTcpStats(tcpStatsFile string) (info.TcpStat, error) {
 
 	scanner.Split(bufio.ScanLines)
 
+	// Discard header line
+	if b := scanner.Scan(); !b {
+		return stats, scanner.Err()
+	}
+
 	for scanner.Scan() {
-
 		line := scanner.Text()
-		//skip header
-		matched := tcpStatLineRE.MatchString(line)
 
-		if matched {
-			state := strings.Fields(line)
-			//#file header tcp state is the 4 filed:
-			//sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt  uid timeout inode
-			tcpStateMap[state[3]]++
+		state := strings.Fields(line)
+		// TCP state is the 4th field.
+		// Format: sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt  uid timeout inode
+		tcpState := state[3]
+		_, ok := tcpStateMap[tcpState]
+		if !ok {
+			return stats, fmt.Errorf("invalid TCP stats line: %v", line)
 		}
+		tcpStateMap[tcpState]++
 	}
 
 	stats = info.TcpStat{
@@ -258,6 +286,7 @@ func scanTcpStats(tcpStatsFile string) (info.TcpStat, error) {
 
 	return stats, nil
 }
+*/
 
 func GetProcesses(cgroupManager cgroups.Manager) ([]int, error) {
 	pids, err := cgroupManager.GetPids()
@@ -347,8 +376,8 @@ func toContainerStats1(s *cgroups.Stats, ret *info.ContainerStats) {
 }
 
 func toContainerStats2(s *cgroups.Stats, ret *info.ContainerStats) {
-	ret.Memory.Usage = s.MemoryStats.Usage
-	ret.Memory.Failcnt = s.MemoryStats.Failcnt
+	ret.Memory.Usage = s.MemoryStats.Usage.Usage
+	ret.Memory.Failcnt = s.MemoryStats.Usage.Failcnt
 	if v, ok := s.MemoryStats.Stats["pgfault"]; ok {
 		ret.Memory.ContainerData.Pgfault = v
 		ret.Memory.HierarchicalData.Pgfault = v

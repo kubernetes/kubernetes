@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestRunExposeService(t *testing.T) {
@@ -63,7 +63,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolUDP,
 							Port:       14,
-							TargetPort: util.NewIntOrStringFromInt(14),
+							TargetPort: intstr.FromInt(14),
 						},
 					},
 					Selector: map[string]string{"app": "go"},
@@ -94,7 +94,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolUDP,
 							Port:       14,
-							TargetPort: util.NewIntOrStringFromInt(14),
+							TargetPort: intstr.FromInt(14),
 						},
 					},
 					Selector: map[string]string{"func": "stream"},
@@ -126,7 +126,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolTCP,
 							Port:       80,
-							TargetPort: util.NewIntOrStringFromInt(80),
+							TargetPort: intstr.FromInt(80),
 						},
 					},
 					Selector: map[string]string{"run": "this"},
@@ -157,7 +157,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolUDP,
 							Port:       14,
-							TargetPort: util.NewIntOrStringFromInt(14),
+							TargetPort: intstr.FromInt(14),
 						},
 					},
 					Selector: map[string]string{"func": "stream"},
@@ -188,42 +188,12 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolUDP,
 							Port:       14,
-							TargetPort: util.NewIntOrStringFromInt(14),
+							TargetPort: intstr.FromInt(14),
 						},
 					},
 					Selector:        map[string]string{"func": "stream"},
 					Type:            api.ServiceTypeLoadBalancer,
 					SessionAffinity: api.ServiceAffinityClientIP,
-				},
-			},
-			status: 200,
-		},
-		{
-			name: "expose-external-service",
-			args: []string{"service", "baz"},
-			ns:   "test",
-			calls: map[string]string{
-				"GET":  "/namespaces/test/services/baz",
-				"POST": "/namespaces/test/services",
-			},
-			input: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{},
-				},
-			},
-			// Even if we specify --selector, since service/test doesn't need one it will ignore it
-			flags: map[string]string{"selector": "svc=fromexternal", "port": "90", "labels": "svc=fromexternal", "name": "frombaz", "generator": "service/test", "dry-run": "true"},
-			output: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "frombaz", Namespace: "", Labels: map[string]string{"svc": "fromexternal"}},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
-						{
-							Protocol:   api.ProtocolTCP,
-							Port:       90,
-							TargetPort: util.NewIntOrStringFromInt(90),
-						},
-					},
 				},
 			},
 			status: 200,
@@ -250,7 +220,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolUDP,
 							Port:       14,
-							TargetPort: util.NewIntOrStringFromInt(14),
+							TargetPort: intstr.FromInt(14),
 						},
 					},
 					Selector: map[string]string{"func": "stream"},
@@ -277,7 +247,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   api.ProtocolTCP,
 							Port:       90,
-							TargetPort: util.NewIntOrStringFromInt(90),
+							TargetPort: intstr.FromInt(90),
 						},
 					},
 					Selector: map[string]string{"svc": "frompod"},
@@ -286,6 +256,54 @@ func TestRunExposeService(t *testing.T) {
 			expected: "service \"a-name-that-is-toooo-big\" exposed",
 			status:   200,
 		},
+		{
+			name: "expose-multiport-object",
+			args: []string{"service", "foo"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/foo",
+				"POST": "/namespaces/test/services",
+			},
+			input: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "multiport"}},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Protocol:   api.ProtocolTCP,
+							Port:       80,
+							TargetPort: intstr.FromInt(80),
+						},
+						{
+							Protocol:   api.ProtocolTCP,
+							Port:       443,
+							TargetPort: intstr.FromInt(443),
+						},
+					},
+				},
+			},
+			flags: map[string]string{"selector": "svc=fromfoo", "generator": "service/v2", "name": "fromfoo", "dry-run": "true"},
+			output: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "fromfoo", Namespace: "", Labels: map[string]string{"svc": "multiport"}},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Name:       "port-1",
+							Protocol:   api.ProtocolTCP,
+							Port:       80,
+							TargetPort: intstr.FromInt(80),
+						},
+						{
+							Name:       "port-2",
+							Protocol:   api.ProtocolTCP,
+							Port:       443,
+							TargetPort: intstr.FromInt(443),
+						},
+					},
+					Selector: map[string]string{"svc": "fromfoo"},
+				},
+			},
+			status: 200,
+		},
 	}
 
 	for _, test := range tests {
@@ -293,7 +311,7 @@ func TestRunExposeService(t *testing.T) {
 		tf.Printer = &kubectl.JSONPrinter{}
 		tf.Client = &fake.RESTClient{
 			Codec: codec,
-			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.calls[m] && m == "GET":
 					return &http.Response{StatusCode: test.status, Body: objBody(codec, test.input)}, nil

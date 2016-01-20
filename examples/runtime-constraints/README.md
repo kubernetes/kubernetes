@@ -18,10 +18,6 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
-<strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/examples/runtime-constraints/README.md).
-
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -43,7 +39,7 @@ of compute resources easier to follow by starting with an empty cluster.
 
 ```
 $ export KUBERNETES_PROVIDER=vagrant
-$ export NUM_MINIONS=1
+$ export NUM_NODES=1
 $ export KUBE_ENABLE_CLUSTER_MONITORING=none
 $ export KUBE_ENABLE_CLUSTER_DNS=false
 $ export KUBE_ENABLE_CLUSTER_UI=false

@@ -19,10 +19,10 @@ limitations under the License.
 package kubelet
 
 import (
-	"github.com/docker/libcontainer/selinux"
+	"github.com/opencontainers/runc/libcontainer/selinux"
 )
 
-// getRootContext gets the SELinux context of the kubelet rootDir
+// getRootDirContext gets the SELinux context of the kubelet rootDir
 // or returns an error.
 func (kl *Kubelet) getRootDirContext() (string, error) {
 	// If SELinux is not enabled, return an empty string

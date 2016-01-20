@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/getting-started-guides/docker-multinode/worker.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/docker-multinode/worker.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -34,10 +35,19 @@ Documentation for other releases can be found at
 ## Adding a Kubernetes worker node via Docker.
 
 
-
 These instructions are very similar to the master set-up above, but they are duplicated for clarity.
 You need to repeat these instructions for each node you want to join the cluster.
-We will assume that the IP address of this node is `${NODE_IP}` and you have the IP address of the master in `${MASTER_IP}` that you created in the [master instructions](master.md).
+We will assume that you have the IP address of the master in `${MASTER_IP}` that you created in the [master instructions](master.md).  We'll need to run several versioned Kubernetes components, so we'll assume that the version we want
+to run is `${K8S_VERSION}`, which should hold a value such as "1.1.3".
+
+Enviroinment variables used:
+
+```sh
+export MASTER_IP=<the_master_ip_here>
+export K8S_VERSION=<your_k8s_version (e.g. 1.1.3)>
+export FLANNEL_VERSION=<your_flannel_version (e.g. 0.5.5)>
+export FLANNEL_IFACE=<flannel_interface (defaults to eth0)>
+```
 
 For each worker node, there are three steps:
    * [Set up `flanneld` on the worker node](#set-up-flanneld-on-the-worker-node)
@@ -49,8 +59,7 @@ For each worker node, there are three steps:
 As before, the Flannel daemon is going to provide network connectivity.
 
 _Note_:
-There is a [bug](https://github.com/docker/docker/issues/14106) in Docker 1.7.0 that prevents this from working correctly.
-Please install Docker 1.6.2 or wait for Docker 1.7.1.
+This guide expects **Docker 1.7.1 or higher**.
 
 
 #### Set up a bootstrap docker
@@ -90,10 +99,18 @@ or it may be something else.
 Now run flanneld itself, this call is slightly different from the above, since we point it at the etcd instance on the master.
 
 ```sh
-sudo docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.5.3 /opt/bin/flanneld --etcd-endpoints=http://${MASTER_IP}:4001
+sudo docker -H unix:///var/run/docker-bootstrap.sock run -d \
+    --net=host \
+    --privileged \
+    -v /dev/net:/dev/net \
+    quay.io/coreos/flannel:${FLANNEL_VERSION} \
+    /opt/bin/flanneld \
+        --ip-masq \
+        --etcd-endpoints=http://${MASTER_IP}:4001 \
+        --iface=${FLANNEL_IFACE}
 ```
 
-The previous command should have printed a really long hash, copy this hash.
+The previous command should have printed a really long hash, the container id, copy this hash.
 
 Now get the subnet settings from flannel:
 
@@ -133,7 +150,7 @@ Again this is system dependent, it may be:
 sudo /etc/init.d/docker start
 ```
 
-it may be:
+or it may be:
 
 ```sh
 systemctl start docker
@@ -146,7 +163,27 @@ systemctl start docker
 Again this is similar to the above, but the `--api-servers` now points to the master we set up in the beginning.
 
 ```sh
-sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v1.0.1 /hyperkube kubelet --api-servers=http://${MASTER_IP}:8080 --v=2 --address=0.0.0.0 --enable-server --hostname-override=$(hostname -i) --cluster-dns=10.0.0.10 --cluster-domain=cluster.local
+sudo docker run \
+    --volume=/:/rootfs:ro \
+    --volume=/sys:/sys:ro \
+    --volume=/dev:/dev \
+    --volume=/var/lib/docker/:/var/lib/docker:rw \
+    --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
+    --volume=/var/run:/var/run:rw \
+    --net=host \
+    --privileged=true \
+    --pid=host \ 
+    -d \
+    gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+    /hyperkube kubelet \
+        --allow-privileged=true \
+        --api-servers=http://${MASTER_IP}:8080 \
+        --v=2 \
+        --address=0.0.0.0 \
+        --enable-server \
+        --containerized \
+        --cluster-dns=10.0.0.10 \
+        --cluster-domain=cluster.local
 ```
 
 #### Run the service proxy
@@ -154,7 +191,13 @@ sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.
 The service proxy provides load-balancing between groups of containers defined by Kubernetes `Services`
 
 ```sh
-sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v1.0.1 /hyperkube proxy --master=http://${MASTER_IP}:8080 --v=2
+sudo docker run -d \
+    --net=host \
+    --privileged \
+    gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+    /hyperkube proxy \
+        --master=http://${MASTER_IP}:8080 \
+        --v=2
 ```
 
 ### Next steps

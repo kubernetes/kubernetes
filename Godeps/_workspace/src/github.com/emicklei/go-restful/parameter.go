@@ -30,12 +30,12 @@ type Parameter struct {
 // ParameterData represents the state of a Parameter.
 // It is made public to make it accessible to e.g. the Swagger package.
 type ParameterData struct {
-	Name, Description, DataType string
-	Kind                        int
-	Required                    bool
-	AllowableValues             map[string]string
-	AllowMultiple               bool
-	DefaultValue                string
+	Name, Description, DataType, DataFormat string
+	Kind                                    int
+	Required                                bool
+	AllowableValues                         map[string]string
+	AllowMultiple                           bool
+	DefaultValue                            string
 }
 
 // Data returns the state of the Parameter
@@ -92,6 +92,12 @@ func (p *Parameter) AllowableValues(values map[string]string) *Parameter {
 // DataType sets the dataType field and returns the receiver
 func (p *Parameter) DataType(typeName string) *Parameter {
 	p.data.DataType = typeName
+	return p
+}
+
+// DataFormat sets the dataFormat field for Swagger UI
+func (p *Parameter) DataFormat(formatName string) *Parameter {
+	p.data.DataFormat = formatName
 	return p
 }
 

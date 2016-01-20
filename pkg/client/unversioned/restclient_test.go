@@ -19,177 +19,36 @@ package unversioned
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"os"
 	"reflect"
 	"testing"
+	"time"
 
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
-
-func TestSetsCodec(t *testing.T) {
-	testCases := map[string]struct {
-		Err    bool
-		Prefix string
-		Codec  runtime.Codec
-	}{
-		testapi.Default.Version(): {false, "/api/" + testapi.Default.Version() + "/", testapi.Default.Codec()},
-		"invalidVersion":          {true, "", nil},
-	}
-	for version, expected := range testCases {
-		client, err := New(&Config{Host: "127.0.0.1", Version: version})
-		switch {
-		case err == nil && expected.Err:
-			t.Errorf("expected error but was nil")
-			continue
-		case err != nil && !expected.Err:
-			t.Errorf("unexpected error %v", err)
-			continue
-		case err != nil:
-			continue
-		}
-		if e, a := expected.Prefix, client.RESTClient.baseURL.Path; e != a {
-			t.Errorf("expected %#v, got %#v", e, a)
-		}
-		if e, a := expected.Codec, client.RESTClient.Codec; e != a {
-			t.Errorf("expected %#v, got %#v", e, a)
-		}
-	}
-}
-
-func TestRESTClientRequires(t *testing.T) {
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: "", Codec: testapi.Default.Codec()}); err == nil {
-		t.Errorf("unexpected non-error")
-	}
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: testapi.Default.Version()}); err == nil {
-		t.Errorf("unexpected non-error")
-	}
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: testapi.Default.Version(), Codec: testapi.Default.Codec()}); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestValidatesHostParameter(t *testing.T) {
-	testCases := []struct {
-		Host   string
-		Prefix string
-
-		URL string
-		Err bool
-	}{
-		{"127.0.0.1", "", "http://127.0.0.1/" + testapi.Default.Version() + "/", false},
-		{"127.0.0.1:8080", "", "http://127.0.0.1:8080/" + testapi.Default.Version() + "/", false},
-		{"foo.bar.com", "", "http://foo.bar.com/" + testapi.Default.Version() + "/", false},
-		{"http://host/prefix", "", "http://host/prefix/" + testapi.Default.Version() + "/", false},
-		{"http://host", "", "http://host/" + testapi.Default.Version() + "/", false},
-		{"http://host", "/", "http://host/" + testapi.Default.Version() + "/", false},
-		{"http://host", "/other", "http://host/other/" + testapi.Default.Version() + "/", false},
-		{"host/server", "", "", true},
-	}
-	for i, testCase := range testCases {
-		c, err := RESTClientFor(&Config{Host: testCase.Host, Prefix: testCase.Prefix, Version: testapi.Default.Version(), Codec: testapi.Default.Codec()})
-		switch {
-		case err == nil && testCase.Err:
-			t.Errorf("expected error but was nil")
-			continue
-		case err != nil && !testCase.Err:
-			t.Errorf("unexpected error %v", err)
-			continue
-		case err != nil:
-			continue
-		}
-		if e, a := testCase.URL, c.baseURL.String(); e != a {
-			t.Errorf("%d: expected host %s, got %s", i, e, a)
-			continue
-		}
-	}
-}
-
-func TestDoRequestBearer(t *testing.T) {
-	status := &unversioned.Status{Status: unversioned.StatusFailure}
-	expectedBody, _ := testapi.Default.Codec().Encode(status)
-	fakeHandler := util.FakeHandler{
-		StatusCode:   400,
-		ResponseBody: string(expectedBody),
-		T:            t,
-	}
-	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
-	request, _ := http.NewRequest("GET", testServer.URL, nil)
-	c, err := RESTClientFor(&Config{
-		Host:        testServer.URL,
-		Version:     testapi.Default.Version(),
-		Codec:       testapi.Default.Codec(),
-		BearerToken: "test",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	err = c.Get().Do().Error()
-	if err == nil {
-		t.Fatalf("unexpected non-error: %v", err)
-	}
-	if fakeHandler.RequestReceived.Header.Get("Authorization") != "Bearer test" {
-		t.Errorf("Request is missing authorization header: %#v", *request)
-	}
-}
-
-func TestDoRequestWithoutPassword(t *testing.T) {
-	status := &unversioned.Status{Status: unversioned.StatusFailure}
-	expectedBody, _ := testapi.Default.Codec().Encode(status)
-	fakeHandler := util.FakeHandler{
-		StatusCode:   400,
-		ResponseBody: string(expectedBody),
-		T:            t,
-	}
-	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
-	c, err := RESTClientFor(&Config{
-		Host:     testServer.URL,
-		Version:  testapi.Default.Version(),
-		Codec:    testapi.Default.Codec(),
-		Username: "test",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	body, err := c.Get().Prefix("test").Do().Raw()
-	if err == nil {
-		t.Fatalf("Unexpected non-error")
-	}
-	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
-		t.Errorf("Request is missing authorization header: %#v", fakeHandler.RequestReceived)
-	}
-	se, ok := err.(APIStatus)
-	if !ok {
-		t.Fatalf("Unexpected kind of error: %#v", err)
-	}
-	if !reflect.DeepEqual(se.Status(), *status) {
-		t.Errorf("Unexpected status: %#v %#v", se.Status(), status)
-	}
-	if body != nil {
-		t.Errorf("Expected nil body, but saw: '%s'", string(body))
-	}
-	fakeHandler.ValidateRequest(t, "/"+testapi.Default.Version()+"/test", "GET", nil)
-}
 
 func TestDoRequestSuccess(t *testing.T) {
 	status := &unversioned.Status{Status: unversioned.StatusSuccess}
 	expectedBody, _ := testapi.Default.Codec().Encode(status)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	c, err := RESTClientFor(&Config{
-		Host:     testServer.URL,
-		Version:  testapi.Default.Version(),
-		Codec:    testapi.Default.Codec(),
-		Username: "user",
-		Password: "pass",
+		Host:         testServer.URL,
+		GroupVersion: testapi.Default.GroupVersion(),
+		Codec:        testapi.Default.Codec(),
+		Username:     "user",
+		Password:     "pass",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -208,7 +67,7 @@ func TestDoRequestSuccess(t *testing.T) {
 	if !reflect.DeepEqual(status, statusOut) {
 		t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", status, statusOut)
 	}
-	fakeHandler.ValidateRequest(t, "/"+testapi.Default.Version()+"/test", "GET", nil)
+	fakeHandler.ValidateRequest(t, "/"+testapi.Default.GroupVersion().String()+"/test", "GET", nil)
 }
 
 func TestDoRequestFailed(t *testing.T) {
@@ -220,17 +79,18 @@ func TestDoRequestFailed(t *testing.T) {
 		Details: &unversioned.StatusDetails{},
 	}
 	expectedBody, _ := testapi.Default.Codec().Encode(status)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   404,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	c, err := RESTClientFor(&Config{
-		Host:    testServer.URL,
-		Version: testapi.Default.Version(),
-		Codec:   testapi.Default.Codec(),
+		Host:         testServer.URL,
+		GroupVersion: testapi.Default.GroupVersion(),
+		Codec:        testapi.Default.Codec(),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -239,7 +99,7 @@ func TestDoRequestFailed(t *testing.T) {
 	if err == nil || body != nil {
 		t.Errorf("unexpected non-error: %#v", body)
 	}
-	ss, ok := err.(APIStatus)
+	ss, ok := err.(errors.APIStatus)
 	if !ok {
 		t.Errorf("unexpected error type %v", err)
 	}
@@ -252,19 +112,20 @@ func TestDoRequestFailed(t *testing.T) {
 func TestDoRequestCreated(t *testing.T) {
 	status := &unversioned.Status{Status: unversioned.StatusSuccess}
 	expectedBody, _ := testapi.Default.Codec().Encode(status)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   201,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	c, err := RESTClientFor(&Config{
-		Host:     testServer.URL,
-		Version:  testapi.Default.Version(),
-		Codec:    testapi.Default.Codec(),
-		Username: "user",
-		Password: "pass",
+		Host:         testServer.URL,
+		GroupVersion: testapi.Default.GroupVersion(),
+		Codec:        testapi.Default.Codec(),
+		Username:     "user",
+		Password:     "pass",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -284,5 +145,41 @@ func TestDoRequestCreated(t *testing.T) {
 	if !reflect.DeepEqual(status, statusOut) {
 		t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", status, statusOut)
 	}
-	fakeHandler.ValidateRequest(t, "/"+testapi.Default.Version()+"/test", "GET", nil)
+	fakeHandler.ValidateRequest(t, "/"+testapi.Default.GroupVersion().String()+"/test", "GET", nil)
+}
+
+func TestCreateBackoffManager(t *testing.T) {
+
+	theUrl, _ := url.Parse("http://localhost")
+
+	// 1 second base backoff + duration of 2 seconds -> exponential backoff for requests.
+	os.Setenv(envBackoffBase, "1")
+	os.Setenv(envBackoffDuration, "2")
+	backoff := readExpBackoffConfig()
+	backoff.UpdateBackoff(theUrl, nil, 500)
+	backoff.UpdateBackoff(theUrl, nil, 500)
+	if backoff.CalculateBackoff(theUrl)/time.Second != 2 {
+		t.Errorf("Backoff env not working.")
+	}
+
+	// 0 duration -> no backoff.
+	os.Setenv(envBackoffBase, "1")
+	os.Setenv(envBackoffDuration, "0")
+	backoff.UpdateBackoff(theUrl, nil, 500)
+	backoff.UpdateBackoff(theUrl, nil, 500)
+	backoff = readExpBackoffConfig()
+	if backoff.CalculateBackoff(theUrl)/time.Second != 0 {
+		t.Errorf("Zero backoff duration, but backoff still occuring.")
+	}
+
+	// No env -> No backoff.
+	os.Setenv(envBackoffBase, "")
+	os.Setenv(envBackoffDuration, "")
+	backoff = readExpBackoffConfig()
+	backoff.UpdateBackoff(theUrl, nil, 500)
+	backoff.UpdateBackoff(theUrl, nil, 500)
+	if backoff.CalculateBackoff(theUrl)/time.Second != 0 {
+		t.Errorf("Backoff should have been 0.")
+	}
+
 }

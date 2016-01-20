@@ -24,8 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	controllerFramework "k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
+	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -41,7 +40,7 @@ import (
 // This test primarily checks 2 things:
 // 1. Daemons restart automatically within some sane time (10m).
 // 2. They don't take abnormal actions when restarted in the steady state.
-//	- Controller manager sholdn't overshoot replicas
+//	- Controller manager shouldn't overshoot replicas
 //	- Kubelet shouldn't restart containers
 //	- Scheduler should continue assigning hosts to new pods
 
@@ -58,10 +57,10 @@ const (
 // nodeExec execs the given cmd on node via SSH. Note that the nodeName is an sshable name,
 // eg: the name returned by getMasterHost(). This is also not guaranteed to work across
 // cloud providers since it involves ssh.
-func nodeExec(nodeName, cmd string) (string, string, int, error) {
-	stdout, stderr, code, err := SSH(cmd, fmt.Sprintf("%v:%v", nodeName, sshPort), testContext.Provider)
+func nodeExec(nodeName, cmd string) (SSHResult, error) {
+	result, err := SSH(cmd, fmt.Sprintf("%v:%v", nodeName, sshPort), testContext.Provider)
 	Expect(err).NotTo(HaveOccurred())
-	return stdout, stderr, code, err
+	return result, err
 }
 
 // restartDaemonConfig is a config to restart a running daemon on a node, and wait till
@@ -99,10 +98,10 @@ func (r *restartDaemonConfig) waitUp() {
 		"curl -s -o /dev/null -I -w \"%%{http_code}\" http://localhost:%v/healthz", r.healthzPort)
 
 	err := wait.Poll(r.pollInterval, r.pollTimeout, func() (bool, error) {
-		stdout, stderr, code, err := nodeExec(r.nodeName, healthzCheck)
+		result, err := nodeExec(r.nodeName, healthzCheck)
 		expectNoError(err)
-		if code == 0 {
-			httpCode, err := strconv.Atoi(stdout)
+		if result.Code == 0 {
+			httpCode, err := strconv.Atoi(result.Stdout)
 			if err != nil {
 				Logf("Unable to parse healthz http return code: %v", err)
 			} else if httpCode == 200 {
@@ -110,7 +109,7 @@ func (r *restartDaemonConfig) waitUp() {
 			}
 		}
 		Logf("node %v exec command, '%v' failed with exitcode %v: \n\tstdout: %v\n\tstderr: %v",
-			r.nodeName, healthzCheck, code, stdout, stderr)
+			r.nodeName, healthzCheck, result.Code, result.Stdout, result.Stderr)
 		return false, nil
 	})
 	expectNoError(err, "%v did not respond with a 200 via %v within %v", r, healthzCheck, r.pollTimeout)
@@ -170,7 +169,8 @@ func replacePods(pods []*api.Pod, store cache.Store) {
 // getContainerRestarts returns the count of container restarts across all pods matching the given labelSelector,
 // and a list of nodenames across which these containers restarted.
 func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Selector) (int, []string) {
-	pods, err := c.Pods(ns).List(labelSelector, fields.Everything())
+	options := api.ListOptions{LabelSelector: labelSelector}
+	pods, err := c.Pods(ns).List(options)
 	expectNoError(err)
 	failedContainers := 0
 	containerRestartNodes := sets.NewString()
@@ -183,25 +183,24 @@ func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Sele
 	return failedContainers, containerRestartNodes.List()
 }
 
-var _ = Describe("DaemonRestart", func() {
+// Flaky issues #17829, #19023
+var _ = Describe("DaemonRestart [Disruptive] [Flaky]", func() {
 
-	framework := Framework{BaseName: "daemonrestart"}
+	framework := NewFramework("daemonrestart")
 	rcName := "daemonrestart" + strconv.Itoa(numPods) + "-" + string(util.NewUUID())
 	labelSelector := labels.Set(map[string]string{"name": rcName}).AsSelector()
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	var ns string
 	var config RCConfig
-	var controller *controllerFramework.Controller
+	var controller *controllerframework.Controller
 	var newPods cache.Store
 	var stopCh chan struct{}
 	var tracker *podTracker
 
 	BeforeEach(func() {
-
 		// These tests require SSH
 		// TODO(11834): Enable this test in GKE once experimental API there is switched on
-		SkipUnlessProviderIs("gce")
-		framework.beforeEach()
+		SkipUnlessProviderIs("gce", "aws")
 		ns = framework.Namespace.Name
 
 		// All the restart tests need an rc and a watch on pods of the rc.
@@ -210,7 +209,7 @@ var _ = Describe("DaemonRestart", func() {
 			Client:      framework.Client,
 			Name:        rcName,
 			Namespace:   ns,
-			Image:       "beta.gcr.io/google_containers/pause:2.0",
+			Image:       "gcr.io/google_containers/pause:2.0",
 			Replicas:    numPods,
 			CreatedPods: &[]*api.Pod{},
 		}
@@ -219,18 +218,20 @@ var _ = Describe("DaemonRestart", func() {
 
 		stopCh = make(chan struct{})
 		tracker = newPodTracker()
-		newPods, controller = controllerFramework.NewInformer(
+		newPods, controller = controllerframework.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func() (runtime.Object, error) {
-					return framework.Client.Pods(ns).List(labelSelector, fields.Everything())
+				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+					options.LabelSelector = labelSelector
+					return framework.Client.Pods(ns).List(options)
 				},
-				WatchFunc: func(rv string) (watch.Interface, error) {
-					return framework.Client.Pods(ns).Watch(labelSelector, fields.Everything(), rv)
+				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+					options.LabelSelector = labelSelector
+					return framework.Client.Pods(ns).Watch(options)
 				},
 			},
 			&api.Pod{},
 			0,
-			controllerFramework.ResourceEventHandlerFuncs{
+			controllerframework.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
 					tracker.remember(obj.(*api.Pod), ADD)
 				},
@@ -247,8 +248,6 @@ var _ = Describe("DaemonRestart", func() {
 
 	AfterEach(func() {
 		close(stopCh)
-		expectNoError(DeleteRC(framework.Client, ns, rcName))
-		framework.afterEach()
 	})
 
 	It("Controller Manager should not create/delete replicas across restart", func() {

@@ -19,7 +19,8 @@ Documentation of resources.
 Possible resource types include: pods (po), services (svc),
 replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
 limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
-resourcequotas (quota), namespaces (ns) or endpoints (ep).
+resourcequotas (quota), namespaces (ns), horizontalpodautoscalers (hpa)
+or endpoints (ep).
 
 
 .SH OPTIONS
@@ -43,7 +44,7 @@ resourcequotas (quota), namespaces (ns) or endpoints (ep).
 
 .PP
 \fB\-\-client\-certificate\fP=""
-    Path to a client key file for TLS.
+    Path to a client certificate file for TLS.
 
 .PP
 \fB\-\-client\-key\fP=""

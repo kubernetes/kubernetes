@@ -13,9 +13,9 @@ var inspect = require('util').inspect;
 var util = require('./util.js');
 
 var coreos_image_ids = {
-  'stable': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Stable-717.3.0',
-  'beta': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Beta-723.3.0', // untested
-  'alpha': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Alpha-745.1.0' // untested
+  'stable': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Stable-766.4.0',
+  'beta': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Beta-766.4.0', // untested
+  'alpha': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Alpha-815.0.0' // untested
 };
 
 var conf = {};
@@ -179,7 +179,7 @@ exports.queue_storage_if_needed = function() {
     ]);
     process.env['AZURE_STORAGE_ACCOUNT'] = conf.resources['storage_account'];
   } else {
-    // Preserve it for resizing, so we don't create a new one by accedent,
+    // Preserve it for resizing, so we don't create a new one by accident,
     // when the environment variable is unset
     conf.resources['storage_account'] = process.env['AZURE_STORAGE_ACCOUNT'];
   }

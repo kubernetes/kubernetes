@@ -24,12 +24,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestResolvePortInt(t *testing.T) {
 	expected := 80
-	port, err := resolvePort(util.IntOrString{Kind: util.IntstrInt, IntVal: expected}, &api.Container{})
+	port, err := resolvePort(intstr.FromInt(expected), &api.Container{})
 	if port != expected {
 		t.Errorf("expected: %d, saw: %d", expected, port)
 	}
@@ -46,7 +46,7 @@ func TestResolvePortString(t *testing.T) {
 			{Name: name, ContainerPort: expected},
 		},
 	}
-	port, err := resolvePort(util.IntOrString{Kind: util.IntstrString, StrVal: name}, container)
+	port, err := resolvePort(intstr.FromString(name), container)
 	if port != expected {
 		t.Errorf("expected: %d, saw: %d", expected, port)
 	}
@@ -63,7 +63,7 @@ func TestResolvePortStringUnknown(t *testing.T) {
 			{Name: "bar", ContainerPort: expected},
 		},
 	}
-	port, err := resolvePort(util.IntOrString{Kind: util.IntstrString, StrVal: name}, container)
+	port, err := resolvePort(intstr.FromString(name), container)
 	if port != -1 {
 		t.Errorf("expected: -1, saw: %d", port)
 	}
@@ -146,7 +146,7 @@ func TestRunHandlerHttp(t *testing.T) {
 			PostStart: &api.Handler{
 				HTTPGet: &api.HTTPGetAction{
 					Host: "foo",
-					Port: util.IntOrString{IntVal: 8080, Kind: util.IntstrInt},
+					Port: intstr.FromInt(8080),
 					Path: "bar",
 				},
 			},

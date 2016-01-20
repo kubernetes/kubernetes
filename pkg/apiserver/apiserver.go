@@ -80,20 +80,19 @@ type APIGroupVersion struct {
 	Storage map[string]rest.Storage
 
 	Root string
-	// TODO: caesarxuchao: Version actually contains "group/version", refactor it to avoid confusion.
-	Version string
 
-	// APIRequestInfoResolver is used to parse URLs for the legacy proxy handler.  Don't use this for anything else
+	// GroupVersion is the external group version
+	GroupVersion unversioned.GroupVersion
+
+	// RequestInfoResolver is used to parse URLs for the legacy proxy handler.  Don't use this for anything else
 	// TODO: refactor proxy handler to use sub resources
-	APIRequestInfoResolver *APIRequestInfoResolver
+	RequestInfoResolver *RequestInfoResolver
 
-	// ServerVersion controls the Kubernetes APIVersion used for common objects in the apiserver
+	// OptionsExternalVersion controls the Kubernetes APIVersion used for common objects in the apiserver
 	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
 	// define a version "v1beta1" but want to use the Kubernetes "v1" internal objects. If
-	// empty, defaults to Version.
-	// TODO: caesarxuchao: ServerVersion actually contains "group/version",
-	// refactor it to avoid confusion.
-	ServerVersion string
+	// empty, defaults to GroupVersion.
+	OptionsExternalVersion *unversioned.GroupVersion
 
 	Mapper meta.RESTMapper
 
@@ -126,8 +125,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	installer := g.newInstaller()
 	ws := installer.NewWebService()
 	apiResources, registrationErrors := installer.Install(ws)
-	// TODO: g.Version only contains "version" now, it will contain "group/version" in the near future.
-	AddSupportedResourcesWebService(ws, g.Version, apiResources)
+	AddSupportedResourcesWebService(ws, g.GroupVersion, apiResources)
 	container.Add(ws)
 	return utilerrors.NewAggregate(registrationErrors)
 }
@@ -151,17 +149,16 @@ func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 		return apierrors.NewInternalError(fmt.Errorf("unable to find an existing webservice for prefix %s", installer.prefix))
 	}
 	apiResources, registrationErrors := installer.Install(ws)
-	// TODO: g.Version only contains "version" now, it will contain "group/version" in the near future.
-	AddSupportedResourcesWebService(ws, g.Version, apiResources)
+	AddSupportedResourcesWebService(ws, g.GroupVersion, apiResources)
 	return utilerrors.NewAggregate(registrationErrors)
 }
 
 // newInstaller is a helper to create the installer.  Used by InstallREST and UpdateREST.
 func (g *APIGroupVersion) newInstaller() *APIInstaller {
-	prefix := path.Join(g.Root, g.Version)
+	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
 	installer := &APIInstaller{
 		group:             g,
-		info:              g.APIRequestInfoResolver,
+		info:              g.RequestInfoResolver,
 		prefix:            prefix,
 		minRequestTimeout: g.MinRequestTimeout,
 	}
@@ -214,30 +211,30 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 	glog.Errorln(buffer.String())
 
 	// TODO: make status unversioned or plumb enough of the request to deduce the requested API version
-	errorJSON(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", "", "", "", 0, false), latest.GroupOrDie("").Codec, httpWriter)
+	errorJSON(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", api.Resource(""), "", "", 0, false), latest.GroupOrDie(api.GroupName).Codec, httpWriter)
 }
 
-func InstallServiceErrorHandler(container *restful.Container, requestResolver *APIRequestInfoResolver, apiVersions []string) {
+func InstallServiceErrorHandler(container *restful.Container, requestResolver *RequestInfoResolver, apiVersions []string) {
 	container.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
 		serviceErrorHandler(requestResolver, apiVersions, serviceErr, request, response)
 	})
 }
 
-func serviceErrorHandler(requestResolver *APIRequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
-	requestInfo, err := requestResolver.GetAPIRequestInfo(request.Request)
-	codec := latest.GroupOrDie("").Codec
+func serviceErrorHandler(requestResolver *RequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
+	requestInfo, err := requestResolver.GetRequestInfo(request.Request)
+	codec := latest.GroupOrDie(api.GroupName).Codec
 	if err == nil && requestInfo.APIVersion != "" {
 		// check if the api version is valid.
 		for _, version := range apiVersions {
 			if requestInfo.APIVersion == version {
 				// valid api version.
-				codec = runtime.CodecFor(api.Scheme, requestInfo.APIVersion)
+				codec = runtime.CodecFor(api.Scheme, unversioned.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion})
 				break
 			}
 		}
 	}
 
-	errorJSON(apierrors.NewGenericServerResponse(serviceErr.Code, "", "", "", "", 0, false), codec, response.ResponseWriter)
+	errorJSON(apierrors.NewGenericServerResponse(serviceErr.Code, "", api.Resource(""), "", "", 0, false), codec, response.ResponseWriter)
 }
 
 // Adds a service to return the supported api versions at the legacy /api.
@@ -257,8 +254,8 @@ func AddApiWebService(container *restful.Container, apiPrefix string, versions [
 }
 
 // Adds a service to return the supported api versions at /apis.
-func AddApisWebService(container *restful.Container, apiPrefix string, groups []unversioned.APIGroup) {
-	rootAPIHandler := RootAPIHandler(groups)
+func AddApisWebService(container *restful.Container, apiPrefix string, f func() []unversioned.APIGroup) {
+	rootAPIHandler := RootAPIHandler(f)
 	ws := new(restful.WebService)
 	ws.Path(apiPrefix)
 	ws.Doc("get available API versions")
@@ -287,7 +284,7 @@ func AddGroupWebService(container *restful.Container, path string, group unversi
 
 // Adds a service to return the supported resources, E.g., a such web service
 // will be registered at /apis/extensions/v1.
-func AddSupportedResourcesWebService(ws *restful.WebService, groupVersion string, apiResources []unversioned.APIResource) {
+func AddSupportedResourcesWebService(ws *restful.WebService, groupVersion unversioned.GroupVersion, apiResources []unversioned.APIResource) {
 	resourceHandler := SupportedResourcesHandler(groupVersion, apiResources)
 	ws.Route(ws.GET("/").To(resourceHandler).
 		Doc("get available resources").
@@ -306,15 +303,15 @@ func handleVersion(req *restful.Request, resp *restful.Response) {
 func APIVersionHandler(versions ...string) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		// TODO: use restful's Response methods
-		writeRawJSON(http.StatusOK, unversioned.APIVersions{Versions: versions}, resp.ResponseWriter)
+		writeJSON(http.StatusOK, api.Codec, &unversioned.APIVersions{Versions: versions}, resp.ResponseWriter, true)
 	}
 }
 
 // RootAPIHandler returns a handler which will list the provided groups and versions as available.
-func RootAPIHandler(groups []unversioned.APIGroup) restful.RouteFunction {
+func RootAPIHandler(f func() []unversioned.APIGroup) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		// TODO: use restful's Response methods
-		writeRawJSON(http.StatusOK, unversioned.APIGroupList{Groups: groups}, resp.ResponseWriter)
+		writeJSON(http.StatusOK, api.Codec, &unversioned.APIGroupList{Groups: f()}, resp.ResponseWriter, true)
 	}
 }
 
@@ -323,15 +320,15 @@ func RootAPIHandler(groups []unversioned.APIGroup) restful.RouteFunction {
 func GroupHandler(group unversioned.APIGroup) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		// TODO: use restful's Response methods
-		writeRawJSON(http.StatusOK, group, resp.ResponseWriter)
+		writeJSON(http.StatusOK, api.Codec, &group, resp.ResponseWriter, true)
 	}
 }
 
 // SupportedResourcesHandler returns a handler which will list the provided resources as available.
-func SupportedResourcesHandler(groupVersion string, apiResources []unversioned.APIResource) restful.RouteFunction {
+func SupportedResourcesHandler(groupVersion unversioned.GroupVersion, apiResources []unversioned.APIResource) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		// TODO: use restful's Response methods
-		writeRawJSON(http.StatusOK, unversioned.APIResourceList{GroupVersion: groupVersion, APIResources: apiResources}, resp.ResponseWriter)
+		writeJSON(http.StatusOK, api.Codec, &unversioned.APIResourceList{GroupVersion: groupVersion.String(), APIResources: apiResources}, resp.ResponseWriter, true)
 	}
 }
 
@@ -340,9 +337,9 @@ func SupportedResourcesHandler(groupVersion string, apiResources []unversioned.A
 // response. The Accept header and current API version will be passed in, and the output will be copied
 // directly to the response body. If content type is returned it is used, otherwise the content type will
 // be "application/octet-stream". All other objects are sent to standard JSON serialization.
-func write(statusCode int, apiVersion string, codec runtime.Codec, object runtime.Object, w http.ResponseWriter, req *http.Request) {
+func write(statusCode int, groupVersion unversioned.GroupVersion, codec runtime.Codec, object runtime.Object, w http.ResponseWriter, req *http.Request) {
 	if stream, ok := object.(rest.ResourceStreamer); ok {
-		out, flush, contentType, err := stream.InputStream(apiVersion, req.Header.Get("Accept"))
+		out, flush, contentType, err := stream.InputStream(groupVersion.String(), req.Header.Get("Accept"))
 		if err != nil {
 			errorJSONFatal(err, codec, w)
 			return
@@ -410,7 +407,7 @@ func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w htt
 
 func prettyJSON(codec runtime.Codec, object runtime.Object, w http.ResponseWriter) {
 	formatted := &bytes.Buffer{}
-	output, err := codec.Encode(object)
+	output, err := runtime.Encode(codec, object)
 	if err != nil {
 		errorJSONFatal(err, codec, w)
 	}
@@ -424,8 +421,9 @@ func prettyJSON(codec runtime.Codec, object runtime.Object, w http.ResponseWrite
 // errorJSON renders an error to the response. Returns the HTTP status code of the error.
 func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) int {
 	status := errToAPIStatus(err)
-	writeJSON(status.Code, codec, status, w, true)
-	return status.Code
+	code := int(status.Code)
+	writeJSON(code, codec, status, w, true)
+	return code
 }
 
 // errorJSONFatal renders an error to the response, and if codec fails will render plaintext.
@@ -433,16 +431,17 @@ func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) int {
 func errorJSONFatal(err error, codec runtime.Codec, w http.ResponseWriter) int {
 	util.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
 	status := errToAPIStatus(err)
-	output, err := codec.Encode(status)
+	code := int(status.Code)
+	output, err := runtime.Encode(codec, status)
 	if err != nil {
-		w.WriteHeader(status.Code)
+		w.WriteHeader(code)
 		fmt.Fprintf(w, "%s: %s", status.Reason, status.Message)
-		return status.Code
+		return code
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status.Code)
+	w.WriteHeader(code)
 	w.Write(output)
-	return status.Code
+	return code
 }
 
 // writeRawJSON writes a non-API object in JSON.

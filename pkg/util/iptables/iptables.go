@@ -41,6 +41,8 @@ const (
 
 // An injectable interface for running iptables commands.  Implementations must be goroutine-safe.
 type Interface interface {
+	// GetVersion returns the "X.Y.Z" semver string for iptables.
+	GetVersion() (string, error)
 	// EnsureChain checks if the specified chain exists and, if not, creates it.  If the chain existed, return true.
 	EnsureChain(table Table, chain Chain) (bool, error)
 	// FlushChain clears the specified chain.  If the chain did not exist, return error.
@@ -135,7 +137,7 @@ type runner struct {
 
 // New returns a new Interface which will exec iptables.
 func New(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol) Interface {
-	vstring, err := GetIptablesVersionString(exec)
+	vstring, err := getIptablesVersionString(exec)
 	if err != nil {
 		glog.Warningf("Error checking iptables version, assuming version at least %s: %v", MinCheckVersion, err)
 		vstring = MinCheckVersion
@@ -184,6 +186,11 @@ func (runner *runner) connectToFirewallD() {
 	bus.Signal(runner.signal)
 
 	go runner.dbusSignalHandler(bus)
+}
+
+// GetVersion returns the version string.
+func (runner *runner) GetVersion() (string, error) {
+	return getIptablesVersionString(runner.exec)
 }
 
 // EnsureChain is part of Interface.
@@ -505,9 +512,9 @@ func getIptablesWaitFlag(vstring string) []string {
 	}
 }
 
-// GetIptablesVersionString runs "iptables --version" to get the version string
+// getIptablesVersionString runs "iptables --version" to get the version string
 // in the form "X.X.X"
-func GetIptablesVersionString(exec utilexec.Interface) (string, error) {
+func getIptablesVersionString(exec utilexec.Interface) (string, error) {
 	// this doesn't access mutable state so we don't need to use the interface / runner
 	bytes, err := exec.Command(cmdIptables, "--version").CombinedOutput()
 	if err != nil {

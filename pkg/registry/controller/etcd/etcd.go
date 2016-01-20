@@ -32,13 +32,18 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against replication controllers.
-func NewREST(s storage.Interface) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*REST, *StatusREST) {
 	prefix := "/controllers"
+
+	newListFunc := func() runtime.Object { return &api.ReplicationControllerList{} }
+	storageInterface := storageDecorator(
+		s, 100, &api.ReplicationController{}, prefix, true, newListFunc)
+
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &api.ReplicationController{} },
 
 		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: func() runtime.Object { return &api.ReplicationControllerList{} },
+		NewListFunc: newListFunc,
 		// Produces a path that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
 		KeyRootFunc: func(ctx api.Context) string {
@@ -57,7 +62,7 @@ func NewREST(s storage.Interface) (*REST, *StatusREST) {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return controller.MatchController(label, field)
 		},
-		EndpointName: "replicationControllers",
+		QualifiedResource: api.Resource("replicationcontrollers"),
 
 		// Used to validate controller creation
 		CreateStrategy: controller.Strategy,
@@ -65,7 +70,7 @@ func NewREST(s storage.Interface) (*REST, *StatusREST) {
 		// Used to validate controller updates
 		UpdateStrategy: controller.Strategy,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 	statusStore := *store
 	statusStore.UpdateStrategy = controller.StatusStrategy

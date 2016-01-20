@@ -193,7 +193,7 @@ func (util *RBDUtil) loadRBD(builder *rbdBuilder, mnt string) error {
 
 func (util *RBDUtil) fencing(b rbdBuilder) error {
 	// no need to fence readOnly
-	if b.IsReadOnly() {
+	if (&b).GetAttributes().ReadOnly {
 		return nil
 	}
 	return util.rbdLock(b, true)
@@ -210,6 +210,7 @@ func (util *RBDUtil) defencing(c rbdCleaner) error {
 
 func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 	var err error
+	var output []byte
 
 	devicePath, found := waitForPath(b.Pool, b.Image, 1)
 	if !found {
@@ -227,23 +228,24 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 			mon := b.Mon[i%l]
 			glog.V(1).Infof("rbd: map mon %s", mon)
 			if b.Secret != "" {
-				_, err = b.plugin.execCommand("rbd",
+				output, err = b.plugin.execCommand("rbd",
 					[]string{"map", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon, "--key=" + b.Secret})
 			} else {
-				_, err = b.plugin.execCommand("rbd",
+				output, err = b.plugin.execCommand("rbd",
 					[]string{"map", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon, "-k", b.Keyring})
 			}
 			if err == nil {
 				break
 			}
+			glog.V(1).Infof("rbd: map error %v %s", err, string(output))
 		}
-	}
-	if err != nil {
-		return err
-	}
-	devicePath, found = waitForPath(b.Pool, b.Image, 10)
-	if !found {
-		return errors.New("Could not map image: Timeout after 10s")
+		if err != nil {
+			return fmt.Errorf("rbd: map failed %v %s", err, string(output))
+		}
+		devicePath, found = waitForPath(b.Pool, b.Image, 10)
+		if !found {
+			return errors.New("Could not map image: Timeout after 10s")
+		}
 	}
 	// mount it
 	globalPDPath := b.manager.MakeGlobalPDName(*b.rbd)
@@ -273,7 +275,7 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 	// the json file remains invisible during rbd mount and thus won't be removed accidentally.
 	util.persistRBD(b, globalPDPath)
 
-	if err = b.mounter.Mount(devicePath, globalPDPath, b.fsType, nil); err != nil {
+	if err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil); err != nil {
 		err = fmt.Errorf("rbd: failed to mount rbd volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
 	}
 	return err

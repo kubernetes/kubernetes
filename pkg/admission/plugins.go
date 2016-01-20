@@ -19,6 +19,7 @@ package admission
 import (
 	"io"
 	"os"
+	"sort"
 	"sync"
 
 	"github.com/golang/glog"
@@ -45,6 +46,7 @@ func GetPlugins() []string {
 	for k := range plugins {
 		keys = append(keys, k)
 	}
+	sort.Strings(keys)
 	return keys
 }
 

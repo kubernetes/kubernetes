@@ -2,10 +2,12 @@
 #
 # `make porter` will build porter.
 # `make tag` will suggest a tag.
-# `make container` will build a container-- you must supply a tag.
-# `make push` will push the container-- you must supply a tag.
+# `make image` will build an image-- you must supply a tag.
+# `make push` will push the image-- you must supply a tag.
 
-REPO ?= gcr.io/google_containers
+# This image does not tag in the normal way
+# TAG =
+PREFIX = gcr.io/google_containers
 SUGGESTED_TAG = $(shell git rev-parse --verify HEAD)
 
 porter: porter.go
@@ -17,13 +19,15 @@ tag:
 	@echo "or"
 	@echo "$$ make push TAG=$(SUGGESTED_TAG)"
 
-container:
+container: image
+
+image:
 	$(if $(TAG),,$(error TAG is not defined. Use 'make tag' after committing changes to see a suggestion))
-	docker build -t $(REPO)/porter:$(TAG) .
+	docker build -t $(PREFIX)/porter:$(TAG) .
 
 push:
 	$(if $(TAG),,$(error TAG is not defined. Use 'make tag' after committing changes to see a suggestion))
-	gcloud docker push $(REPO)/porter:$(TAG)
+	gcloud docker push $(PREFIX)/porter:$(TAG)
 
 clean:
 	rm -f porter

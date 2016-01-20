@@ -21,7 +21,7 @@ import (
 	"net/http"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -52,7 +52,7 @@ func errToAPIStatus(err error) *unversioned.Status {
 		status := http.StatusInternalServerError
 		switch {
 		//TODO: replace me with NewConflictErr
-		case etcdstorage.IsEtcdTestFailed(err):
+		case storage.IsTestFailed(err):
 			status = http.StatusConflict
 		}
 		// Log errors that were not converted to an error status
@@ -62,7 +62,7 @@ func errToAPIStatus(err error) *unversioned.Status {
 		util.HandleError(fmt.Errorf("apiserver received an error that is not an unversioned.Status: %v", err))
 		return &unversioned.Status{
 			Status:  unversioned.StatusFailure,
-			Code:    status,
+			Code:    int32(status),
 			Reason:  unversioned.StatusReasonUnknown,
 			Message: err.Error(),
 		}
@@ -87,7 +87,7 @@ func forbidden(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(w, "Forbidden: %#v", req.RequestURI)
 }
 
-// errAPIPrefixNotFound indicates that a APIRequestInfo resolution failed because the request isn't under
+// errAPIPrefixNotFound indicates that a RequestInfo resolution failed because the request isn't under
 // any known API prefixes
 type errAPIPrefixNotFound struct {
 	SpecifiedPrefix string

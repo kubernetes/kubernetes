@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/admin/authentication.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/admin/authentication.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -46,7 +47,12 @@ to apiserver.  Currently, tokens last indefinitely, and the token list cannot
 be changed without restarting apiserver.
 
 The token file format is implemented in `plugin/pkg/auth/authenticator/token/tokenfile/...`
-and is a csv file with 3 columns: token, user name, user uid.
+and is a csv file with a minimum of 3 columns: token, user name, user uid, followed by
+optional group names. Note, if you have more than one group the column must be double quoted e.g.
+
+```
+token,user,uid,"group1,group2,group3"
+```
 
 When using token authentication from an http client the apiserver expects an `Authorization`
 header with a value of `Bearer SOMETOKEN`.

@@ -90,7 +90,6 @@ func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
 						ScaleRef: extensions.SubresourceReference{
 							Kind:        "replicationController",
 							Name:        rcName,
-							Namespace:   namespace,
 							Subresource: "scale",
 						},
 						MinReplicas: &tc.minReplicas,
@@ -206,7 +205,8 @@ func (tc *testCase) verifyResults(t *testing.T) {
 
 func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
-	hpaController := NewHorizontalController(testClient, metrics.NewHeapsterMetricsClient(testClient))
+	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
+	hpaController := NewHorizontalController(testClient, testClient.Extensions(), testClient.Extensions(), metricsClient)
 	err := hpaController.reconcileAutoscalers()
 	assert.Equal(t, nil, err)
 	if tc.verifyEvents {

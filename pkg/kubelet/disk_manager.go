@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	cadvisorApi "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
@@ -36,9 +36,6 @@ type diskSpaceManager interface {
 	// Checks the available disk space
 	IsRootDiskSpaceAvailable() (bool, error)
 	IsDockerDiskSpaceAvailable() (bool, error)
-	// Always returns sufficient space till Unfreeze() is called.
-	// This is a signal from caller that its internal initialization is done.
-	Unfreeze()
 }
 
 type DiskSpacePolicy struct {
@@ -58,12 +55,11 @@ type fsInfo struct {
 type realDiskSpaceManager struct {
 	cadvisor   cadvisor.Interface
 	cachedInfo map[string]fsInfo // cache of filesystem info.
-	lock       sync.Mutex        // protecting cachedInfo and frozen.
+	lock       sync.Mutex        // protecting cachedInfo.
 	policy     DiskSpacePolicy   // thresholds. Set at creation time.
-	frozen     bool              // space checks always return ok when frozen is set. True on creation.
 }
 
-func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorApi.FsInfo, error)) (fsInfo, error) {
+func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorapi.FsInfo, error)) (fsInfo, error) {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 	fsi := fsInfo{}
@@ -95,10 +91,7 @@ func (dm *realDiskSpaceManager) IsRootDiskSpaceAvailable() (bool, error) {
 	return dm.isSpaceAvailable("root", dm.policy.RootFreeDiskMB, dm.cadvisor.RootFsInfo)
 }
 
-func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f func() (cadvisorApi.FsInfo, error)) (bool, error) {
-	if dm.frozen {
-		return true, nil
-	}
+func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f func() (cadvisorapi.FsInfo, error)) (bool, error) {
 	fsInfo, err := dm.getFsInfo(fsType, f)
 	if err != nil {
 		return true, fmt.Errorf("failed to get fs info for %q: %v", fsType, err)
@@ -115,12 +108,6 @@ func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f
 		return false, nil
 	}
 	return true, nil
-}
-
-func (dm *realDiskSpaceManager) Unfreeze() {
-	dm.lock.Lock()
-	defer dm.lock.Unlock()
-	dm.frozen = false
 }
 
 func validatePolicy(policy DiskSpacePolicy) error {
@@ -144,7 +131,6 @@ func newDiskSpaceManager(cadvisorInterface cadvisor.Interface, policy DiskSpaceP
 		cadvisor:   cadvisorInterface,
 		policy:     policy,
 		cachedInfo: map[string]fsInfo{},
-		frozen:     true,
 	}
 
 	return dm, nil

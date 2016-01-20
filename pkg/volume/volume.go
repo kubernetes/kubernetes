@@ -19,6 +19,7 @@ package volume
 import (
 	"io/ioutil"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"os"
 	"path"
 )
@@ -28,6 +29,40 @@ import (
 type Volume interface {
 	// GetPath returns the directory path the volume is mounted to.
 	GetPath() string
+
+	// MetricsProvider embeds methods for exposing metrics (e.g. used,available space).
+	MetricsProvider
+}
+
+// MetricsProvider exposes metrics (e.g. used,available space) related to a Volume.
+type MetricsProvider interface {
+	// GetMetrics returns the Metrics for the Volume.  Maybe expensive for some implementations.
+	GetMetrics() (*Metrics, error)
+}
+
+// Metrics represents the used and available bytes of the Volume.
+type Metrics struct {
+	// Used represents the total bytes used by the Volume.
+	// Note: For block devices this maybe more than the total size of the files.
+	Used *resource.Quantity
+
+	// Capacity represents the total capacity (bytes) of the volume's underlying storage.
+	// For Volumes that share a filesystem with the host (e.g. emptydir, hostpath) this is the size
+	// of the underlying storage, and will not equal Used + Available as the fs is shared.
+	Capacity *resource.Quantity
+
+	// Available represents the storage space available (bytes) for the Volume.
+	// For Volumes that share a filesystem with the host (e.g. emptydir, hostpath), this is the available
+	// space on the underlying storage, and is shared with host processes and other Volumes.
+	Available *resource.Quantity
+}
+
+// Attributes represents the attributes of this builder.
+type Attributes struct {
+	ReadOnly                    bool
+	Managed                     bool
+	SupportsOwnershipManagement bool
+	SupportsSELinux             bool
 }
 
 // Builder interface provides methods to set up/mount the volume.
@@ -42,9 +77,8 @@ type Builder interface {
 	// directory path, which may or may not exist yet.  This may be called
 	// more than once, so implementations must be idempotent.
 	SetUpAt(dir string) error
-	// IsReadOnly is a flag that gives the builder's ReadOnly attribute.
-	// All persistent volumes have a private readOnly flag in their builders.
-	IsReadOnly() bool
+	// GetAttributes returns the attributes of the builder.
+	GetAttributes() Attributes
 }
 
 // Cleaner interface provides methods to cleanup/unmount the volumes.
@@ -66,10 +100,16 @@ type Recycler interface {
 	Recycle() error
 }
 
-// Create adds a new resource in the storage provider and creates a PersistentVolume for the new resource.
-// Calls to Create should block until complete.
-type Creater interface {
-	Create() (*api.PersistentVolume, error)
+// Provisioner is an interface that creates templates for PersistentVolumes and can create the volume
+// as a new resource in the infrastructure provider.
+type Provisioner interface {
+	// Provision creates the resource by allocating the underlying volume in a storage system.
+	// This method should block until completion.
+	Provision(*api.PersistentVolume) error
+	// NewPersistentVolumeTemplate creates a new PersistentVolume to be used as a template before saving.
+	// The provisioner will want to tweak its properties, assign correct annotations, etc.
+	// This func should *NOT* persist the PV in the API.  That is left to the caller.
+	NewPersistentVolumeTemplate() (*api.PersistentVolume, error)
 }
 
 // Delete removes the resource from the underlying storage provider.  Calls to this method should block until
@@ -77,6 +117,7 @@ type Creater interface {
 // A nil return indicates success.
 type Deleter interface {
 	Volume
+	// This method should block until completion.
 	Delete() error
 }
 

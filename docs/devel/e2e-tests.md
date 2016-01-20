@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/devel/e2e-tests.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/devel/e2e-tests.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -74,7 +75,7 @@ For the purposes of brevity, we will look at a subset of the options, which are 
 -repo-root="../../": Root directory of kubernetes repository, for finding test files.
 ```
 
-Prior to running the tests, it is recommended that you first create a simple auth file in your home directory, e.g. `$HOME/.kubernetes_auth` , with the following:
+Prior to running the tests, it is recommended that you first create a simple auth file in your home directory, e.g. `$HOME/.kube/config` , with the following:
 
 ```
 {
@@ -85,7 +86,7 @@ Prior to running the tests, it is recommended that you first create a simple aut
 
 Next, you will need a cluster that you can test against.  As mentioned earlier, you will want to execute `sudo ./hack/local-up-cluster.sh`.  To get a sense of what tests exist, you may want to run:
 
-`e2e.test --host="127.0.0.1:8080" --provider="local" --ginkgo.v=true -ginkgo.dryRun=true --kubeconfig="$HOME/.kubernetes_auth" --repo-root="$KUBERNETES_SRC_PATH"`
+`e2e.test --host="127.0.0.1:8080" --provider="local" --ginkgo.v=true -ginkgo.dryRun=true --kubeconfig="$HOME/.kube/config" --repo-root="$KUBERNETES_SRC_PATH"`
 
 If you wish to execute a specific set of tests you can use the `-ginkgo.focus=` regex, e.g.:
 
@@ -100,6 +101,20 @@ As mentioned earlier there are a host of other options that are available, but a
 **NOTE:** If you are running tests on a local cluster repeatedly, you may need to periodically perform some manual cleanup.
 - `rm -rf /var/run/kubernetes`, clear kube generated credentials, sometimes stale permissions can cause problems.
 - `sudo iptables -F`, clear ip tables rules left by the kube-proxy.
+
+## Kinds of tests
+
+We are working on implementing clearer partitioning of our e2e tests to make running a known set of tests easier (#10548).  Tests can be labeled with any of the following labels, in order of increasing precedence (that is, each label listed below supersedes the previous ones):
+
+- If a test has no labels, it is expected to run fast (under five minutes), be able to be run in parallel, and be consistent.
+- `[Slow]`: If a test takes more than five minutes to run (by itself or in parallel with many other tests), it is labeled `[Slow]`.  This partition allows us to run almost all of our tests quickly in parallel, without waiting for the stragglers to finish.
+- `[Serial]`: If a test cannot be run in parallel with other tests (e.g. it takes too many resources or restarts nodes), it is labeled `[Serial]`, and should be run in serial as part of a separate suite.
+- `[Disruptive]`: If a test restarts components that might cause other tests to fail or break the cluster completely, it is labeled `[Disruptive]`.  Any `[Disruptive]` test is also assumed to qualify for the `[Serial]` label, but need not be labeled as both.  These tests are not run against soak clusters to avoid restarting components.
+- `[Flaky]`: If a test is found to be flaky, it receives the `[Flaky]` label until it is fixed.  A `[Flaky]` label should be accompanied with a reference to the issue for de-flaking the test, because while a test remains labeled `[Flaky]`, it is not monitored closely in CI. `[Flaky]` tests are by default not run, unless a `focus` or `skip` argument is explicitly given.
+- `[Skipped]`: `[Skipped]` is a legacy label that we're phasing out.  If a test is marked `[Skipped]`, there should be an issue open to label it properly.  `[Skipped]` tests are by default not run, unless a `focus` or `skip` argument is explicitly given.
+- `[Feature:...]`: If a test has non-default requirements to run or targets some non-core functionality, and thus should not be run as part of the standard suite, it receives a `[Feature:...]` label, e.g. `[Feature:Performance]` or `[Feature:Ingress]`.  `[Feature:...]` tests are not run in our core suites, instead running in custom suites.
+
+Finally, `[Conformance]` tests are tests we expect to pass on **any** Kubernetes cluster.  The `[Conformance]` label does not supersede any other labels.  `[Conformance]` test policies are a work-in-progress; see #18162.
 
 ## Adding a New Test
 

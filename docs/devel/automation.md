@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/devel/automation.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/devel/automation.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -35,7 +36,7 @@ Documentation for other releases can be found at
 
 ## Overview
 
-Kubernetes uses a variety of automated tools in an attempt to relieve developers of repeptitive, low
+Kubernetes uses a variety of automated tools in an attempt to relieve developers of repetitive, low
 brain power work.  This document attempts to describe these processes.
 
 
@@ -46,8 +47,8 @@ In an effort to
    * maintain e2e stability
    * load test githubs label feature
 
-We have added an automated [submit-queue](https://github.com/kubernetes/contrib/tree/master/submit-queue)
-for kubernetes.
+We have added an automated [submit-queue](https://github.com/kubernetes/contrib/blob/master/mungegithub/mungers/submit-queue.go) to the
+[github "munger"](https://github.com/kubernetes/contrib/tree/master/mungegithub) for kubernetes.
 
 The submit-queue does the following:
 

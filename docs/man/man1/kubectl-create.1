@@ -29,6 +29,10 @@ JSON and YAML formats are accepted.
     Output mode. Use "\-o name" for shorter output (resource/name).
 
 .PP
+\fB\-\-save\-config\fP=false
+    If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.
+
+.PP
 \fB\-\-schema\-cache\-dir\fP="\~/.kube/schema"
     If non\-empty, load/store cached API schemas in this directory, default is '$HOME/.kube/schema'
 
@@ -52,7 +56,7 @@ JSON and YAML formats are accepted.
 
 .PP
 \fB\-\-client\-certificate\fP=""
-    Path to a client key file for TLS.
+    Path to a client certificate file for TLS.
 
 .PP
 \fB\-\-client\-key\fP=""
@@ -148,7 +152,7 @@ $ cat pod.json | kubectl create \-f \-
 
 .SH SEE ALSO
 .PP
-\fBkubectl(1)\fP,
+\fBkubectl(1)\fP, \fBkubectl\-create\-namespace(1)\fP, \fBkubectl\-create\-secret(1)\fP,
 
 
 .SH HISTORY

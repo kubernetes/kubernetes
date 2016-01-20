@@ -1,0 +1,10 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: spark-webui
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    component: spark-master

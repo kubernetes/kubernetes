@@ -17,12 +17,14 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/kubelet/client"
+	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
 	"k8s.io/kubernetes/pkg/registry/node"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -50,41 +52,31 @@ func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object
 }
 
 // NewREST returns a RESTStorage object that will work against nodes.
-func NewREST(s storage.Interface, useCacher bool, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper) (*REST, *StatusREST) {
+func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper) (*REST, *StatusREST) {
 	prefix := "/minions"
 
-	storageInterface := s
-	if useCacher {
-		config := storage.CacherConfig{
-			CacheCapacity:  1000,
-			Storage:        s,
-			Type:           &api.Node{},
-			ResourcePrefix: prefix,
-			KeyFunc: func(obj runtime.Object) (string, error) {
-				return storage.NoNamespaceKeyFunc(prefix, obj)
-			},
-			NewListFunc: func() runtime.Object { return &api.NodeList{} },
-		}
-		storageInterface = storage.NewCacher(config)
-	}
+	newListFunc := func() runtime.Object { return &api.NodeList{} }
+	storageInterface := storageDecorator(
+		s, 1000, &api.Node{}, prefix, false, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Node{} },
-		NewListFunc: func() runtime.Object { return &api.NodeList{} },
+		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
 			return prefix
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return prefix + "/" + name, nil
+			return etcdgeneric.NoNamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Node).Name, nil
 		},
-		PredicateFunc: node.MatchNode,
-		EndpointName:  "node",
+		PredicateFunc:     node.MatchNode,
+		QualifiedResource: api.Resource("nodes"),
 
 		CreateStrategy: node.Strategy,
 		UpdateStrategy: node.Strategy,
+		ExportStrategy: node.Strategy,
 
 		Storage: storageInterface,
 	}
@@ -100,5 +92,35 @@ var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a URL to which one can send traffic for the specified node.
 func (r *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
-	return node.ResourceLocation(r, r.connection, r.proxyTransport, ctx, id)
+	return node.ResourceLocation(r, r, r.proxyTransport, ctx, id)
+}
+
+var _ = client.ConnectionInfoGetter(&REST{})
+
+func (r *REST) getKubeletPort(ctx api.Context, nodeName string) (int, error) {
+	// We probably shouldn't care about context when looking for Node object.
+	obj, err := r.Get(ctx, nodeName)
+	if err != nil {
+		return 0, err
+	}
+	node, ok := obj.(*api.Node)
+	if !ok {
+		return 0, fmt.Errorf("Unexpected object type: %#v", node)
+	}
+	return node.Status.DaemonEndpoints.KubeletEndpoint.Port, nil
+}
+
+func (c *REST) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
+	scheme, port, transport, err := c.connection.GetConnectionInfo(ctx, nodeName)
+	if err != nil {
+		return "", 0, nil, err
+	}
+	daemonPort, err := c.getKubeletPort(ctx, nodeName)
+	if err != nil {
+		return "", 0, nil, err
+	}
+	if daemonPort > 0 {
+		return scheme, uint(daemonPort), transport, nil
+	}
+	return scheme, port, transport, nil
 }

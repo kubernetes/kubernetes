@@ -18,6 +18,7 @@ package http
 
 import (
 	"crypto/tls"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -72,5 +73,5 @@ func DoHTTPProbe(url *url.URL, client HTTPGetInterface) (probe.Result, string, e
 		return probe.Success, body, nil
 	}
 	glog.V(4).Infof("Probe failed for %s, Response: %v", url.String(), *res)
-	return probe.Failure, body, nil
+	return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode), nil
 }

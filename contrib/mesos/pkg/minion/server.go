@@ -23,9 +23,11 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"strconv"
 	"strings"
 	"syscall"
 
+	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	exservice "k8s.io/kubernetes/contrib/mesos/pkg/executor/service"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	"k8s.io/kubernetes/contrib/mesos/pkg/minion/config"
@@ -66,9 +68,12 @@ type MinionServer struct {
 	logMaxAgeInDays int
 	logVerbosity    int32 // see glog.Level
 
-	runProxy     bool
-	proxyLogV    int
-	proxyBindall bool
+	runProxy                       bool
+	proxyLogV                      int
+	proxyBindall                   bool
+	proxyMode                      string
+	conntrackMax                   int
+	conntrackTCPTimeoutEstablished int
 }
 
 // NewMinionServer creates the MinionServer struct with default values to be used by hyperkube
@@ -82,6 +87,7 @@ func NewMinionServer() *MinionServer {
 		logMaxBackups:         config.DefaultLogMaxBackups,
 		logMaxAgeInDays:       config.DefaultLogMaxAgeInDays,
 		runProxy:              true,
+		proxyMode:             "userspace", // upstream default is "iptables" post-v1.1
 	}
 
 	// cache this for later use
@@ -129,13 +135,16 @@ func findMesosCgroup(prefix string) string {
 func (ms *MinionServer) launchProxyServer() {
 	bindAddress := "0.0.0.0"
 	if !ms.proxyBindall {
-		bindAddress = ms.KubeletExecutorServer.Address.String()
+		bindAddress = ms.KubeletExecutorServer.Address
 	}
 	args := []string{
 		fmt.Sprintf("--bind-address=%s", bindAddress),
 		fmt.Sprintf("--v=%d", ms.proxyLogV),
 		"--logtostderr=true",
 		"--resource-container=" + path.Join("/", ms.mesosCgroup, "kube-proxy"),
+		"--proxy-mode=" + ms.proxyMode,
+		"--conntrack-max=" + strconv.Itoa(ms.conntrackMax),
+		"--conntrack-tcp-timeout-established=" + strconv.Itoa(ms.conntrackTCPTimeoutEstablished),
 	}
 
 	if ms.clientConfig.Host != "" {
@@ -206,17 +215,23 @@ func (ms *MinionServer) launchHyperkubeServer(server string, args []string, logF
 		}
 	}
 
-	// use given environment, but add /usr/sbin to the path for the iptables binary used in kube-proxy
+	// use given environment, but add /usr/sbin and $SANDBOX/bin to the path for the iptables binary used in kube-proxy
 	var kmEnv []string
-	if ms.pathOverride != "" {
-		env := os.Environ()
-		kmEnv = make([]string, 0, len(env))
-		for _, e := range env {
-			if !strings.HasPrefix(e, "PATH=") {
-				kmEnv = append(kmEnv, e)
+	env := os.Environ()
+	kmEnv = make([]string, 0, len(env))
+	for _, e := range env {
+		if !strings.HasPrefix(e, "PATH=") {
+			kmEnv = append(kmEnv, e)
+		} else {
+			if ms.pathOverride != "" {
+				e = "PATH=" + ms.pathOverride
 			}
+			pwd, err := os.Getwd()
+			if err != nil {
+				panic(fmt.Errorf("Cannot get current directory: %v", err))
+			}
+			kmEnv = append(kmEnv, fmt.Sprintf("%s:%s", e, path.Join(pwd, "bin")))
 		}
-		kmEnv = append(kmEnv, "PATH="+ms.pathOverride)
 	}
 
 	t := tasks.New(server, ms.kmBinary, kmArgs, kmEnv, writerFunc)
@@ -236,7 +251,7 @@ func (ms *MinionServer) Run(hks hyperkube.Interface, _ []string) error {
 	}
 
 	// create apiserver client
-	clientConfig, err := ms.KubeletExecutorServer.CreateAPIServerClientConfig()
+	clientConfig, err := kubeletapp.CreateAPIServerClientConfig(ms.KubeletExecutorServer.KubeletServer)
 	if err != nil {
 		// required for k8sm since we need to send api.Binding information
 		// back to the apiserver
@@ -336,4 +351,7 @@ func (ms *MinionServer) AddMinionFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&ms.runProxy, "run-proxy", ms.runProxy, "Maintain a running kube-proxy instance as a child proc of this kubelet-executor.")
 	fs.IntVar(&ms.proxyLogV, "proxy-logv", ms.proxyLogV, "Log verbosity of the child kube-proxy.")
 	fs.BoolVar(&ms.proxyBindall, "proxy-bindall", ms.proxyBindall, "When true will cause kube-proxy to bind to 0.0.0.0.")
+	fs.StringVar(&ms.proxyMode, "proxy-mode", ms.proxyMode, "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
+	fs.IntVar(&ms.conntrackMax, "conntrack-max", ms.conntrackMax, "Maximum number of NAT connections to track on agent nodes (0 to leave as-is)")
+	fs.IntVar(&ms.conntrackTCPTimeoutEstablished, "conntrack-tcp-timeout-established", ms.conntrackTCPTimeoutEstablished, "Idle timeout for established TCP connections on agent nodes (0 to leave as-is)")
 }

@@ -30,9 +30,12 @@ import (
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -73,6 +76,7 @@ func init() {
 	flag.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
 	flag.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
 	flag.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
+	flag.StringVar(&cloudConfig.ServiceAccount, "gce-service-account", "", "GCE service account to use for GCE API calls, if applicable")
 	flag.StringVar(&cloudConfig.Cluster, "gke-cluster", "", "GKE name of cluster being used, if applicable")
 	flag.StringVar(&cloudConfig.NodeInstanceGroup, "node-instance-group", "", "Name of the managed instance group for nodes. Valid only for gce, gke or aws")
 	flag.IntVar(&cloudConfig.NumNodes, "num-nodes", -1, "Number of nodes in the cluster")
@@ -82,6 +86,12 @@ func init() {
 	flag.StringVar(&testContext.UpgradeTarget, "upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
 	flag.StringVar(&testContext.PrometheusPushGateway, "prom-push-gateway", "", "The URL to prometheus gateway, so that metrics can be pushed during e2es and scraped by prometheus. Typically something like 127.0.0.1:9091.")
 	flag.BoolVar(&testContext.VerifyServiceAccount, "e2e-verify-service-account", true, "If true tests will verify the service account before running.")
+	flag.BoolVar(&testContext.DeleteNamespace, "delete-namespace", true, "If true tests will delete namespace after completion. It is only designed to make debugging easier, DO NOT turn it off by default.")
+	flag.BoolVar(&testContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
+	flag.BoolVar(&testContext.GatherKubeSystemResourceUsageData, "gather-resource-usage", false, "If set to true framework will be monitoring resource usage of system add-ons in (some) e2e tests.")
+	flag.BoolVar(&testContext.GatherLogsSizes, "gather-logs-sizes", false, "If set to true framework will be monitoring logs sizes on all machines running e2e tests.")
+	flag.BoolVar(&testContext.GatherMetricsAfterTest, "gather-metrics-at-teardown", false, "If set to true framwork will gather metrics from all components after each test.")
+	flag.StringVar(&testContext.OutputPrintType, "output-print-type", "hr", "Comma separated list: 'hr' for human readable summaries 'json' for JSON ones.")
 }
 
 func TestE2E(t *testing.T) {
@@ -97,6 +107,23 @@ func TestE2E(t *testing.T) {
 
 	if testContext.Provider == "" {
 		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
+	}
+
+	if testContext.Provider == "gce" || testContext.Provider == "gke" {
+		var err error
+		Logf("Fetching cloud provider for %q\r\n", testContext.Provider)
+		var tokenSource oauth2.TokenSource
+		tokenSource = nil
+		if cloudConfig.ServiceAccount != "" {
+			// Use specified service account for auth
+			Logf("Using service account %q as token source.", cloudConfig.ServiceAccount)
+			tokenSource = google.ComputeTokenSource(cloudConfig.ServiceAccount)
+		}
+		cloudConfig.Provider, err = gcecloud.CreateGCECloud(testContext.CloudConfig.ProjectID, testContext.CloudConfig.Zone, "" /* networkUrl */, tokenSource, false /* useMetadataServer */)
+		if err != nil {
+			glog.Fatal("Error building GCE provider: ", err)
+		}
+
 	}
 
 	if testContext.Provider == "aws" {
@@ -120,9 +147,28 @@ func TestE2E(t *testing.T) {
 
 	// Disable skipped tests unless they are explicitly requested.
 	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
-		config.GinkgoConfig.SkipString = "Skipped"
+		// TODO(ihmccreery) Remove [Skipped] once all [Skipped] labels have been reclassified.
+		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Skipped\]|\[Feature\]`
 	}
 	gomega.RegisterFailHandler(ginkgo.Fail)
+
+	c, err := loadClient()
+	if err != nil {
+		glog.Fatal("Error loading client: ", err)
+	}
+
+	// Delete any namespaces except default and kube-system. This ensures no
+	// lingering resources are left over from a previous test run.
+	if testContext.CleanStart {
+		deleted, err := deleteNamespaces(c, nil /* deleteFilter */, []string{api.NamespaceSystem, api.NamespaceDefault})
+		if err != nil {
+			t.Errorf("Error deleting orphaned namespaces: %v", err)
+		}
+		glog.Infof("Waiting for deletion of the following namespaces: %v", deleted)
+		if err := waitForNamespacesDeleted(c, deleted, namespaceCleanupTimeout); err != nil {
+			glog.Fatalf("Failed to delete orphaned namespaces %v: %v", deleted, err)
+		}
+	}
 
 	// Ensure all pods are running and ready before starting tests (otherwise,
 	// cluster infrastructure pods that are being pulled or started can block
@@ -137,5 +183,6 @@ func TestE2E(t *testing.T) {
 	if *reportDir != "" {
 		r = append(r, reporters.NewJUnitReporter(path.Join(*reportDir, fmt.Sprintf("junit_%02d.xml", config.GinkgoConfig.ParallelNode))))
 	}
+	glog.Infof("Starting e2e run; %q", runId)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }

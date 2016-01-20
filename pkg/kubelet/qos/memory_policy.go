@@ -44,7 +44,7 @@ func isMemoryGuaranteed(container *api.Container) bool {
 
 // GetContainerOOMAdjust returns the amount by which the OOM score of all processes in the
 // container should be adjusted. The OOM score of a process is the percentage of memory it consumes
-// multiplied by 100 (barring exceptional cases) + a configurable quantity which is between -1000
+// multiplied by 10 (barring exceptional cases) + a configurable quantity which is between -1000
 // and 1000. Containers with higher OOM scores are killed if the system runs out of memory.
 // See https://lwn.net/Articles/391222/ for more information.
 func GetContainerOOMScoreAdjust(container *api.Container, memoryCapacity int64) int {

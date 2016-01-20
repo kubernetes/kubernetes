@@ -17,13 +17,14 @@ limitations under the License.
 package main
 
 import (
-	kubelet "k8s.io/kubernetes/cmd/kubelet/app"
+	"k8s.io/kubernetes/cmd/kubelet/app"
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
 )
 
 // NewKubelet creates a new hyperkube Server object that includes the
 // description and flags.
 func NewKubelet() *Server {
-	s := kubelet.NewKubeletServer()
+	s := options.NewKubeletServer()
 	hks := Server{
 		SimpleUsage: "kubelet",
 		Long: `The kubelet binary is responsible for maintaining a set of containers on a
@@ -33,7 +34,7 @@ func NewKubelet() *Server {
 		configuration data, with the running set of containers by starting or stopping
 		Docker containers.`,
 		Run: func(_ *Server, _ []string) error {
-			return s.Run(nil)
+			return app.Run(s, nil)
 		},
 	}
 	s.AddFlags(hks.Flags())

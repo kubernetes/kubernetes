@@ -19,7 +19,6 @@ package testclient
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -40,10 +39,14 @@ func (c *FakeDeployments) Get(name string) (*extensions.Deployment, error) {
 	return obj.(*extensions.Deployment), err
 }
 
-func (c *FakeDeployments) List(label labels.Selector, field fields.Selector) (*extensions.DeploymentList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("deployments", c.Namespace, label, field), &extensions.DeploymentList{})
+func (c *FakeDeployments) List(opts api.ListOptions) (*extensions.DeploymentList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("deployments", c.Namespace, opts), &extensions.DeploymentList{})
 	if obj == nil {
 		return nil, err
+	}
+	label := opts.LabelSelector
+	if label == nil {
+		label = labels.Everything()
 	}
 	list := &extensions.DeploymentList{}
 	for _, deployment := range obj.(*extensions.DeploymentList).Items {
@@ -72,11 +75,20 @@ func (c *FakeDeployments) Update(deployment *extensions.Deployment) (*extensions
 	return obj.(*extensions.Deployment), err
 }
 
+func (c *FakeDeployments) UpdateStatus(deployment *extensions.Deployment) (*extensions.Deployment, error) {
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("deployments", "status", c.Namespace, deployment), deployment)
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*extensions.Deployment), err
+}
+
 func (c *FakeDeployments) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.Invokes(NewDeleteAction("deployments", c.Namespace, name), &extensions.Deployment{})
 	return err
 }
 
-func (c *FakeDeployments) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("deployments", c.Namespace, label, field, resourceVersion))
+func (c *FakeDeployments) Watch(opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("deployments", c.Namespace, opts))
 }

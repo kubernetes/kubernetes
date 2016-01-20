@@ -23,6 +23,18 @@ addon-dir-create:
   file.recurse:
     - source: salt://kube-addons/cluster-monitoring/influxdb
     - include_pat: E@(^.+\.yaml$|^.+\.json$)
+    - template: jinja
+    - user: root
+    - group: root
+    - dir_mode: 755
+    - file_mode: 644
+{% endif %}
+
+{% if pillar.get('enable_l7_loadbalancing', '').lower() == 'glbc' %}
+/etc/kubernetes/addons/cluster-loadbalancing/glbc:
+  file.recurse:
+    - source: salt://kube-addons/cluster-loadbalancing/glbc
+    - include_pat: E@(^.+\.yaml$|^.+\.json$)
     - user: root
     - group: root
     - dir_mode: 755
@@ -34,6 +46,7 @@ addon-dir-create:
   file.recurse:
     - source: salt://kube-addons/cluster-monitoring/google
     - include_pat: E@(^.+\.yaml$|^.+\.json$)
+    - template: jinja
     - user: root
     - group: root
     - dir_mode: 755
@@ -45,6 +58,7 @@ addon-dir-create:
   file.recurse:
     - source: salt://kube-addons/cluster-monitoring/standalone
     - include_pat: E@(^.+\.yaml$|^.+\.json$)
+    - template: jinja
     - user: root
     - group: root
     - dir_mode: 755
@@ -57,6 +71,7 @@ addon-dir-create:
     - source: salt://kube-addons/cluster-monitoring
     - include_pat: E@(^.+\.yaml$|^.+\.json$)
     - exclude_pat: E@(^.+heapster-controller\.yaml$|^.+heapster-controller\.json$)
+    - template: jinja
     - user: root
     - group: root
     - dir_mode: 755

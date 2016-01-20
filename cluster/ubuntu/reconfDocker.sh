@@ -16,16 +16,14 @@
 
 # reconfigure docker network setting
 
-if [ "$(id -u)" != "0" ]; then
+source "$HOME/kube/${KUBE_CONFIG_FILE##*/}"
+
+if [[ "$(id -u)" != "0" ]]; then
   echo >&2 "Please run as root"
   exit 1
 fi
 
-
 function config_etcd {
-
-  source ~/kube/config-default.sh
-
   attempt=0
   while true; do
     /opt/bin/etcdctl get /coreos.com/network/config
@@ -34,11 +32,11 @@ function config_etcd {
     else
     	# enough timeout??
       if (( attempt > 600 )); then
-        echo "timeout for waiting network config" > ~/kube/err.log
+        echo "timeout waiting for /coreos.com/network/config" >> ~/kube/err.log
         exit 2
       fi
 
-      /opt/bin/etcdctl mk /coreos.com/network/config "{\"Network\":\"${FLANNEL_NET}\"}"
+      /opt/bin/etcdctl mk /coreos.com/network/config "{\"Network\":\"${FLANNEL_NET}\", \"Backend\": {\"Type\": \"vxlan\"}}"
       attempt=$((attempt+1))
       sleep 3
     fi
@@ -46,8 +44,16 @@ function config_etcd {
 }
 
 function restart_docker {
-  #wait some secs for /run/flannel/subnet.env ready
-  sleep 15
+  attempt=0
+  while [[ ! -f /run/flannel/subnet.env ]]; do 
+    if (( attempt > 200 )); then
+      echo "timeout waiting for /run/flannel/subnet.env" >> ~/kube/err.log 
+      exit 2
+    fi
+    attempt=$((attempt+1))
+    sleep 3
+  done
+  
   sudo ip link set dev docker0 down
   sudo brctl delbr docker0
 
@@ -65,4 +71,7 @@ elif [[ $1 == "ai" ]]; then
   restart_docker
 elif [[ $1 == "a" ]]; then
   config_etcd
-fi
+else
+  echo "Another arguement is required."
+  exit 1
+fi 

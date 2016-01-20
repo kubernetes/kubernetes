@@ -20,16 +20,18 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-cd /build/
+cd /build
 
-wget "$2" -O input.json
-wget "$3" -O register.go
+wget "$2" -O register.go
+
+# gendocs takes "input.json" as the input swagger spec.
+cp /swagger-source/"$1".json input.json
 
 ./gradle-2.5/bin/gradle gendocs --info
 
 #insert a TOC for top level API objects
 buf="== Top Level API Objects\n\n"
-top_level_models=$(grep IsAnAPIObject ./register.go | sed 's/func (\*\(.*\)) IsAnAPIObject/\1/g' \
+top_level_models=$(grep GetObjectKind ./register.go | sed 's/func (obj \*\(.*\)) GetObjectKind(\(.*\)) .*/\1/g' \
     | tr -d '()' | tr -d '{}' | tr -d ' ')
 for m in $top_level_models
 do
@@ -50,6 +52,9 @@ sed -i -e 's|<<any>>|link:definitions.html#_any[any]|g' ./paths.adoc
 
 # change the title of paths.adoc from "paths" to "operations"
 sed -i 's|== Paths|== Operations|g' ./paths.adoc
+
+# $$ has special meaning in asciidoc, we need to escape it
+sed -i 's|\$\$|+++$$+++|g' ./definitions.adoc
 
 echo -e "=== any\nRepresents an untyped JSON map - see the description of the field for more info about the structure of this object." >> ./definitions.adoc
 

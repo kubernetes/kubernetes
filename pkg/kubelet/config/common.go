@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/hash"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 
 	"github.com/golang/glog"
@@ -47,7 +47,7 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName string) er
 		} else {
 			fmt.Fprintf(hasher, "url:%s", source)
 		}
-		util.DeepHashObject(hasher, pod)
+		hash.DeepHashObject(hasher, pod)
 		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
 		glog.V(5).Infof("Generated UID %q pod %q from %s", pod.UID, pod.Name, source)
 	}
@@ -64,6 +64,12 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName string) er
 	pod.Spec.NodeName = nodeName
 
 	pod.ObjectMeta.SelfLink = getSelfLink(pod.Name, pod.Namespace)
+
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	// The generated UID is the hash of the file.
+	pod.Annotations[kubetypes.ConfigHashAnnotationKey] = string(pod.UID)
 	return nil
 }
 
@@ -72,7 +78,7 @@ func getSelfLink(name, namespace string) string {
 	if len(namespace) == 0 {
 		namespace = api.NamespaceDefault
 	}
-	selfLink = fmt.Sprintf("/api/"+latest.GroupOrDie("").Version+"/pods/namespaces/%s/%s", name, namespace)
+	selfLink = fmt.Sprintf("/api/"+latest.GroupOrDie(api.GroupName).GroupVersion.Version+"/pods/namespaces/%s/%s", name, namespace)
 	return selfLink
 }
 

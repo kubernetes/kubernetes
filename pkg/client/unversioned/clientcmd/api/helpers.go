@@ -31,6 +31,14 @@ func init() {
 	redactedBytes = []byte(string(sDec))
 }
 
+// IsConfigEmpty returns true if the config is empty.
+func IsConfigEmpty(config *Config) bool {
+	return len(config.AuthInfos) == 0 && len(config.Clusters) == 0 && len(config.Contexts) == 0 &&
+		len(config.CurrentContext) == 0 &&
+		len(config.Preferences.Extensions) == 0 && !config.Preferences.Colors &&
+		len(config.Extensions) == 0
+}
+
 // MinifyConfig read the current context and uses that to keep only the relevant pieces of config
 // This is useful for making secrets based on kubeconfig files
 func MinifyConfig(config *Config) error {

@@ -23,14 +23,11 @@ import (
 	"testing"
 	"time"
 
-	docker "github.com/fsouza/go-dockerclient"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	"k8s.io/kubernetes/pkg/kubelet/network"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -43,18 +40,12 @@ func newPod(uid, name string) *api.Pod {
 	}
 }
 
-func createFakeRuntimeCache(fakeRecorder *record.FakeRecorder) kubecontainer.RuntimeCache {
-	fakeDocker := &dockertools.FakeDockerClient{}
-	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	dockerManager := dockertools.NewFakeDockerManager(fakeDocker, fakeRecorder, nil, nil, &cadvisorapi.MachineInfo{}, dockertools.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, nil)
-	return kubecontainer.NewFakeRuntimeCache(dockerManager)
-}
-
 func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 	lock := sync.Mutex{}
 	processed := make(map[types.UID][]string)
 	fakeRecorder := &record.FakeRecorder{}
-	fakeRuntimeCache := createFakeRuntimeCache(fakeRecorder)
+	fakeRuntime := &kubecontainer.FakeRuntime{}
+	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(fakeRuntime)
 	podWorkers := newPodWorkers(
 		fakeRuntimeCache,
 		func(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) error {
@@ -66,6 +57,9 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 			return nil
 		},
 		fakeRecorder,
+		queue.NewBasicWorkQueue(),
+		time.Second,
+		time.Second,
 	)
 	return podWorkers, processed
 }
@@ -159,8 +153,7 @@ type simpleFakeKubelet struct {
 	pod        *api.Pod
 	mirrorPod  *api.Pod
 	runningPod kubecontainer.Pod
-
-	wg sync.WaitGroup
+	wg         sync.WaitGroup
 }
 
 func (kl *simpleFakeKubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) error {
@@ -190,32 +183,28 @@ func (b byContainerName) Less(i, j int) bool {
 // TestFakePodWorkers verifies that the fakePodWorkers behaves the same way as the real podWorkers
 // for their invocation of the syncPodFn.
 func TestFakePodWorkers(t *testing.T) {
-	// Create components for pod workers.
-	fakeDocker := &dockertools.FakeDockerClient{}
 	fakeRecorder := &record.FakeRecorder{}
-	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	dockerManager := dockertools.NewFakeDockerManager(fakeDocker, fakeRecorder, nil, nil, &cadvisorapi.MachineInfo{}, dockertools.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, nil)
-	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(dockerManager)
+	fakeRuntime := &kubecontainer.FakeRuntime{}
+	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(fakeRuntime)
 
 	kubeletForRealWorkers := &simpleFakeKubelet{}
 	kubeletForFakeWorkers := &simpleFakeKubelet{}
 
-	realPodWorkers := newPodWorkers(fakeRuntimeCache, kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder)
+	realPodWorkers := newPodWorkers(fakeRuntimeCache, kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(), time.Second, time.Second)
 	fakePodWorkers := &fakePodWorkers{kubeletForFakeWorkers.syncPod, fakeRuntimeCache, t}
 
 	tests := []struct {
 		pod                    *api.Pod
 		mirrorPod              *api.Pod
-		containerList          []docker.APIContainers
+		podList                []*kubecontainer.Pod
 		containersInRunningPod int
 	}{
 		{
 			&api.Pod{},
 			&api.Pod{},
-			[]docker.APIContainers{},
+			[]*kubecontainer.Pod{},
 			0,
 		},
-
 		{
 			&api.Pod{
 				ObjectMeta: api.ObjectMeta{
@@ -223,13 +212,6 @@ func TestFakePodWorkers(t *testing.T) {
 					Name:      "foo",
 					Namespace: "new",
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name: "fooContainer",
-						},
-					},
-				},
 			},
 			&api.Pod{
 				ObjectMeta: api.ObjectMeta{
@@ -237,29 +219,31 @@ func TestFakePodWorkers(t *testing.T) {
 					Name:      "fooMirror",
 					Namespace: "new",
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			},
+			[]*kubecontainer.Pod{
+				{
+					ID:        "12345678",
+					Name:      "foo",
+					Namespace: "new",
+					Containers: []*kubecontainer.Container{
+						{
+							Name: "fooContainer",
+						},
+					},
+				},
+				{
+					ID:        "12345678",
+					Name:      "fooMirror",
+					Namespace: "new",
+					Containers: []*kubecontainer.Container{
 						{
 							Name: "fooContainerMirror",
 						},
 					},
 				},
 			},
-			[]docker.APIContainers{
-				{
-					// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>_<random>
-					Names: []string{"/k8s_bar.hash123_foo_new_12345678_0"},
-					ID:    "1234",
-				},
-				{
-					// pod infra container
-					Names: []string{"/k8s_POD.hash123_foo_new_12345678_0"},
-					ID:    "9876",
-				},
-			},
-			2,
+			1,
 		},
-
 		{
 			&api.Pod{
 				ObjectMeta: api.ObjectMeta{
@@ -267,93 +251,50 @@ func TestFakePodWorkers(t *testing.T) {
 					Name:      "bar",
 					Namespace: "new",
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name: "fooContainer",
-						},
-					},
-				},
 			},
 			&api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					UID:       "98765",
-					Name:      "fooMirror",
+					Name:      "barMirror",
 					Namespace: "new",
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			},
+			[]*kubecontainer.Pod{
+				{
+					ID:        "98765",
+					Name:      "bar",
+					Namespace: "new",
+					Containers: []*kubecontainer.Container{
 						{
-							Name: "fooContainerMirror",
+							Name: "barContainer0",
+						},
+						{
+							Name: "barContainer1",
+						},
+					},
+				},
+				{
+					ID:        "98765",
+					Name:      "barMirror",
+					Namespace: "new",
+					Containers: []*kubecontainer.Container{
+						{
+							Name: "barContainerMirror0",
+						},
+						{
+							Name: "barContainerMirror1",
 						},
 					},
 				},
 			},
-			[]docker.APIContainers{
-				{
-					// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>_<random>
-					Names: []string{"/k8s_bar.hash123_bar_new_98765_0"},
-					ID:    "1234",
-				},
-				{
-					// pod infra container
-					Names: []string{"/k8s_POD.hash123_foo_new_12345678_0"},
-					ID:    "9876",
-				},
-			},
-			1,
-		},
-
-		// Empty running pod.
-		{
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					UID:       "98765",
-					Name:      "baz",
-					Namespace: "new",
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name: "bazContainer",
-						},
-					},
-				},
-			},
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					UID:       "98765",
-					Name:      "bazMirror",
-					Namespace: "new",
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name: "bazContainerMirror",
-						},
-					},
-				},
-			},
-			[]docker.APIContainers{
-				{
-					// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>_<random>
-					Names: []string{"/k8s_bar.hash123_bar_new_12345678_0"},
-					ID:    "1234",
-				},
-				{
-					// pod infra container
-					Names: []string{"/k8s_POD.hash123_foo_new_12345678_0"},
-					ID:    "9876",
-				},
-			},
-			0,
+			2,
 		},
 	}
 
 	for i, tt := range tests {
 		kubeletForRealWorkers.wg.Add(1)
 
-		fakeDocker.ContainerList = tt.containerList
+		fakeRuntime.PodList = tt.podList
 		realPodWorkers.UpdatePod(tt.pod, tt.mirrorPod, kubetypes.SyncPodUpdate, func() {})
 		fakePodWorkers.UpdatePod(tt.pod, tt.mirrorPod, kubetypes.SyncPodUpdate, func() {})
 

@@ -31,7 +31,7 @@ source "$KUBE_ROOT/cluster/common.sh"
 
 KUBECTL_PATH=${KUBE_ROOT}/cluster/centos/binaries/kubectl
 
-# Directory to be used for master and minion provisioning.
+# Directory to be used for master and node provisioning.
 KUBE_TEMP="~/kube_temp"
 
 
@@ -43,13 +43,13 @@ function detect-master() {
   echo "KUBE_MASTER: ${MASTER}" 1>&2
 }
 
-# Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
-function detect-minions() {
-  KUBE_MINION_IP_ADDRESSES=()
-  for minion in ${MINIONS}; do
-    KUBE_MINION_IP_ADDRESSES+=("${minion#*@}")
+# Get node IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
+function detect-nodes() {
+  KUBE_NODE_IP_ADDRESSES=()
+  for node in ${NODES}; do
+    KUBE_NODE_IP_ADDRESSES+=("${node#*@}")
   done
-  echo "KUBE_MINION_IP_ADDRESSES: [${KUBE_MINION_IP_ADDRESSES[*]}]" 1>&2
+  echo "KUBE_NODE_IP_ADDRESSES: [${KUBE_NODE_IP_ADDRESSES[*]}]" 1>&2
 }
 
 # Verify prereqs on host machine
@@ -96,20 +96,24 @@ function trap-add {
 function validate-cluster() {
   # by default call the generic validate-cluster.sh script, customizable by
   # any cluster provider if this does not fit.
+  set +e
   "${KUBE_ROOT}/cluster/validate-cluster.sh"
+  if [[ "$?" -ne "0" ]]; then
+    troubleshoot-master
+    for node in ${NODES}; do
+      troubleshoot-node ${node}
+    done
+    exit 1
+  fi
+  set -e
 }
 
 # Instantiate a kubernetes cluster
 function kube-up() {
   provision-master
 
-  for minion in ${MINIONS}; do
-    provision-minion ${minion}
-  done
-
-  verify-master
-  for minion in ${MINIONS}; do
-    verify-minion ${minion}
+  for node in ${NODES}; do
+    provision-node ${node}
   done
 
   detect-master
@@ -127,63 +131,47 @@ function kube-up() {
 # Delete a kubernetes cluster
 function kube-down() {
   tear-down-master
-  for minion in ${MINIONS}; do
-    tear-down-minion ${minion}
+  for node in ${NODES}; do
+    tear-down-node ${node}
   done
 }
 
-
-function verify-master() {
-  # verify master has all required daemons
-  printf "[INFO] Validating master ${MASTER}"
+function troubleshoot-master() {
+  # Troubleshooting on master if all required daemons are active.
+  echo "[INFO] Troubleshooting on master ${MASTER}"
   local -a required_daemon=("kube-apiserver" "kube-controller-manager" "kube-scheduler")
-  local validated="1"
-  local try_count=0
-  until [[ "$validated" == "0" ]]; do
-    validated="0"
-    local daemon
-    for daemon in "${required_daemon[@]}"; do
-      local rc=0
-      kube-ssh "${MASTER}" "sudo pgrep -f ${daemon}" >/dev/null 2>&1 || rc="$?"
-      if [[ "${rc}" -ne "0" ]]; then
-        printf "."
-        validated="1"
-        ((try_count=try_count+2))
-        if [[ ${try_count} -gt ${PROCESS_CHECK_TIMEOUT} ]]; then
-          printf "\nWarning: Process \"${daemon}\" failed to run on ${MASTER}, please check.\n"
-          exit 1
-        fi
-        sleep 2
-      fi
-    done
+  local daemon
+  local daemon_status
+  printf "%-24s %-10s \n" "PROCESS" "STATUS"
+  for daemon in "${required_daemon[@]}"; do
+    local rc=0
+    kube-ssh "${MASTER}" "sudo systemctl is-active ${daemon}" >/dev/null 2>&1 || rc="$?"
+    if [[ "${rc}" -ne "0" ]]; then
+      daemon_status="inactive"
+    else
+      daemon_status="active"
+    fi
+    printf "%-24s %s\n" ${daemon} ${daemon_status}
   done
   printf "\n"
-
 }
 
-function verify-minion() {
-  # verify minion has all required daemons
-  printf "[INFO] Validating minion ${1}"
-  local -a required_daemon=("kube-proxy" "kubelet" "docker")
-  local validated="1"
-  local try_count=0
-  until [[ "$validated" == "0" ]]; do
-    validated="0"
-    local daemon
-    for daemon in "${required_daemon[@]}"; do
-      local rc=0
-      kube-ssh "${1}" "sudo pgrep -f ${daemon}" >/dev/null 2>&1 || rc="$?"
-      if [[ "${rc}" -ne "0" ]]; then
-        printf "."
-        validated="1"
-        ((try_count=try_count+2))
-        if [[ ${try_count} -gt ${PROCESS_CHECK_TIMEOUT} ]] ; then
-          printf "\nWarning: Process \"${daemon}\" failed to run on ${1}, please check.\n"
-          exit 1
-        fi
-        sleep 2
-      fi
-    done
+function troubleshoot-node() {
+  # Troubleshooting on node if all required daemons are active.
+  echo "[INFO] Troubleshooting on node ${1}"
+  local -a required_daemon=("kube-proxy" "kubelet" "docker" "flannel")
+  local daemon
+  local daemon_status
+  printf "%-24s %-10s \n" "PROCESS" "STATUS"
+  for daemon in "${required_daemon[@]}"; do
+    local rc=0
+    kube-ssh "${1}" "sudo systemctl is-active ${daemon}" >/dev/null 2>&1 || rc="$?"
+    if [[ "${rc}" -ne "0" ]]; then
+      daemon_status="inactive"
+    else
+      daemon_status="active"
+    fi
+    printf "%-24s %s\n" ${daemon} ${daemon_status}
   done
   printf "\n"
 }
@@ -205,9 +193,9 @@ echo "[INFO] tear-down-master on ${MASTER}"
   kube-ssh "${MASTER}" "sudo rm -rf /var/lib/etcd"
 }
 
-# Clean up on minion
-function tear-down-minion() {
-echo "[INFO] tear-down-minion on $1"
+# Clean up on node
+function tear-down-node() {
+echo "[INFO] tear-down-node on $1"
   for service_name in kube-proxy kubelet docker flannel ; do
       service_file="/usr/lib/systemd/system/${service_name}.service"
       kube-ssh "$1" " \
@@ -234,8 +222,8 @@ function provision-master() {
   local master_ip=${MASTER#*@}
   ensure-setup-dir ${MASTER}
 
-  # scp -r ${SSH_OPTS} master config-default.sh copy-files.sh util.sh "${MASTER}:${KUBE_TEMP}" 
-  kube-scp ${MASTER} "${ROOT}/../saltbase/salt/generate-cert/make-ca-cert.sh ${ROOT}/binaries/master ${ROOT}/master ${ROOT}/config-default.sh ${ROOT}/util.sh" "${KUBE_TEMP}" 
+  # scp -r ${SSH_OPTS} master config-default.sh copy-files.sh util.sh "${MASTER}:${KUBE_TEMP}"
+  kube-scp ${MASTER} "${ROOT}/../saltbase/salt/generate-cert/make-ca-cert.sh ${ROOT}/binaries/master ${ROOT}/master ${ROOT}/config-default.sh ${ROOT}/util.sh" "${KUBE_TEMP}"
   kube-ssh "${MASTER}" " \
     sudo cp -r ${KUBE_TEMP}/master/bin /opt/kubernetes; \
     sudo chmod -R +x /opt/kubernetes/bin; \
@@ -247,30 +235,29 @@ function provision-master() {
 }
 
 
-# Provision minion
+# Provision node
 #
 # Assumed vars:
-#   $1 (minion)
+#   $1 (node)
 #   MASTER
 #   KUBE_TEMP
 #   ETCD_SERVERS
 #   FLANNEL_NET
 #   DOCKER_OPTS
-function provision-minion() {
-  echo "[INFO] Provision minion on $1"
+function provision-node() {
+  echo "[INFO] Provision node on $1"
   local master_ip=${MASTER#*@}
-  local minion=$1
-  local minion_ip=${minion#*@}
-  ensure-setup-dir ${minion}
+  local node=$1
+  local node_ip=${node#*@}
+  ensure-setup-dir ${node}
 
-  # scp -r ${SSH_OPTS} minion config-default.sh copy-files.sh util.sh "${minion_ip}:${KUBE_TEMP}" 
-  kube-scp ${minion} "${ROOT}/binaries/node ${ROOT}/node ${ROOT}/config-default.sh ${ROOT}/util.sh" ${KUBE_TEMP}
-  kube-ssh "${minion}" " \
+  kube-scp ${node} "${ROOT}/binaries/node ${ROOT}/node ${ROOT}/config-default.sh ${ROOT}/util.sh" ${KUBE_TEMP}
+  kube-ssh "${node}" " \
     sudo cp -r ${KUBE_TEMP}/node/bin /opt/kubernetes; \
     sudo chmod -R +x /opt/kubernetes/bin; \
     sudo bash ${KUBE_TEMP}/node/scripts/flannel.sh ${ETCD_SERVERS} ${FLANNEL_NET}; \
     sudo bash ${KUBE_TEMP}/node/scripts/docker.sh \"${DOCKER_OPTS}\"; \
-    sudo bash ${KUBE_TEMP}/node/scripts/kubelet.sh ${master_ip} ${minion_ip}; \
+    sudo bash ${KUBE_TEMP}/node/scripts/kubelet.sh ${master_ip} ${node_ip}; \
     sudo bash ${KUBE_TEMP}/node/scripts/proxy.sh ${master_ip}"
 }
 
@@ -306,10 +293,10 @@ function kube-scp() {
 #   KUBE_USER
 #   KUBE_PASSWORD
 function get-password {
-  get-kubeconfig-basicauth
+  load-or-gen-kube-basicauth
   if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
     KUBE_USER=admin
     KUBE_PASSWORD=$(python -c 'import string,random; \
-      print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
+      print("".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16)))')
   fi
 }

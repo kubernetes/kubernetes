@@ -34,7 +34,7 @@ func ConsumeCPU(millicores int, durationSec int) {
 	arg1 := fmt.Sprintf("-millicores=%d", millicores)
 	arg2 := fmt.Sprintf("-duration-sec=%d", durationSec)
 	consumeCPU := exec.Command(consumeCPUBinary, arg1, arg2)
-	consumeCPU.Start()
+	consumeCPU.Run()
 }
 
 func ConsumeMem(megabytes int, durationSec int) {
@@ -43,7 +43,7 @@ func ConsumeMem(megabytes int, durationSec int) {
 	durationSecString := strconv.Itoa(durationSec)
 	// creating new consume memory process
 	consumeMem := exec.Command(consumeMemBinary, "-m", "1", "--vm-bytes", megabytesString, "--vm-hang", "0", "-t", durationSecString)
-	consumeMem.Start()
+	consumeMem.Run()
 }
 
 func GetCurrentStatus() {

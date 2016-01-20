@@ -16,7 +16,10 @@ limitations under the License.
 
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 const unversionedWarningTag = "UNVERSIONED_WARNING"
 
@@ -37,13 +40,14 @@ const unversionedWarningPre = `
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
 
 If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
+refer to the docs that go with that version.`
 
+const unversionedWarningLink = `
+
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-`
-
-const unversionedWarningFmt = `[here](http://releases.k8s.io/release-1.0/%s).`
+The latest release of this document can be found
+[here](http://releases.k8s.io/%s/%s).`
 
 const unversionedWarningPost = `
 
@@ -56,8 +60,13 @@ Documentation for other releases can be found at
 
 `
 
-func makeUnversionedWarning(fileName string) mungeLines {
-	insert := unversionedWarningPre + fmt.Sprintf(unversionedWarningFmt, fileName) + unversionedWarningPost
+func makeUnversionedWarning(fileName string, linkToReleaseDoc bool) mungeLines {
+	var insert string
+	if linkToReleaseDoc {
+		insert = unversionedWarningPre + fmt.Sprintf(unversionedWarningLink, latestReleaseBranch, fileName) + unversionedWarningPost
+	} else {
+		insert = unversionedWarningPre + unversionedWarningPost
+	}
 	return getMungeLines(insert)
 }
 
@@ -71,11 +80,20 @@ func updateUnversionedWarning(file string, mlines mungeLines) (mungeLines, error
 		// No warnings on release branches
 		return mlines, nil
 	}
+
+	var linkToReleaseDoc bool
+	checkDocExistence := inJenkins || (len(filesInLatestRelease) != 0)
+	if checkDocExistence {
+		linkToReleaseDoc = strings.Contains(filesInLatestRelease, file)
+	} else {
+		linkToReleaseDoc = hasLine(mlines, "<!-- TAG RELEASE_LINK, added by the munger automatically -->")
+	}
+
 	if !hasMacroBlock(mlines, unversionedWarningTag) {
 		mlines = prependMacroBlock(unversionedWarningTag, mlines)
 	}
 
-	mlines, err = updateMacroBlock(mlines, unversionedWarningTag, makeUnversionedWarning(file))
+	mlines, err = updateMacroBlock(mlines, unversionedWarningTag, makeUnversionedWarning(file, linkToReleaseDoc))
 	if err != nil {
 		return mlines, err
 	}

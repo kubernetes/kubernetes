@@ -22,15 +22,16 @@
 # replaced upstart with systemd as the init system. Consequently, the
 # configuration cannot work on these images.
 
-# By sourcing debian's helper.sh, we use the same build-kube-env and
-# create-master-instance functions as debian. But we overwrite the
-# create-node-instance-template function to use Ubuntu.
+# By sourcing debian's helper.sh, we use the same  create-master-instance
+# functions as debian. But we overwrite the create-node-instance-template
+# function to use Ubuntu.
 source "${KUBE_ROOT}/cluster/gce/debian/helper.sh"
 
 # $1: template name (required)
 function create-node-instance-template {
   local template_name="$1"
   create-node-template "$template_name" "${scope_flags[*]}" \
-		"kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
-    "user-data=${KUBE_ROOT}/cluster/gce/trusty/node.yaml"
+    "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
+    "user-data=${KUBE_ROOT}/cluster/gce/trusty/node.yaml" \
+    "configure-sh=${KUBE_ROOT}/cluster/gce/trusty/configure.sh"
 }

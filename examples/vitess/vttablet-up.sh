@@ -55,7 +55,7 @@ for shard in $(echo $SHARDS | tr "," " "); do
 
       # Expand template variables
       sed_script=""
-      for var in alias cell uid keyspace shard shard_label port grpc_port tablet_subdir tablet_type; do
+      for var in alias cell uid keyspace shard shard_label port grpc_port tablet_subdir tablet_type backup_flags; do
         sed_script+="s,{{$var}},${!var},g;"
       done
 

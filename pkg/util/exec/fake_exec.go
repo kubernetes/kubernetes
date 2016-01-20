@@ -31,7 +31,7 @@ type FakeCommandAction func(cmd string, args ...string) Cmd
 
 func (fake *FakeExec) Command(cmd string, args ...string) Cmd {
 	if fake.CommandCalls > len(fake.CommandScript)-1 {
-		panic("ran out of Command() actions")
+		panic(fmt.Sprintf("ran out of Command() actions. Could not handle command [%d]: %s args: %v", fake.CommandCalls, cmd, args))
 	}
 	i := fake.CommandCalls
 	fake.CommandCalls++
@@ -73,6 +73,10 @@ func (fake *FakeCmd) CombinedOutput() ([]byte, error) {
 	fake.CombinedOutputLog = append(fake.CombinedOutputLog, append([]string{}, fake.Argv...))
 	fake.CombinedOutputCalls++
 	return fake.CombinedOutputScript[i]()
+}
+
+func (fake *FakeCmd) Output() ([]byte, error) {
+	return nil, fmt.Errorf("unimplemented")
 }
 
 // A simple fake ExitError type.

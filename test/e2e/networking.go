@@ -24,9 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -117,7 +115,7 @@ var _ = Describe("Networking", func() {
 				Ports: []api.ServicePort{{
 					Protocol:   "TCP",
 					Port:       8080,
-					TargetPort: util.NewIntOrStringFromInt(8080),
+					TargetPort: intstr.FromInt(8080),
 				}},
 				Selector: map[string]string{
 					"name": svcname,
@@ -138,14 +136,11 @@ var _ = Describe("Networking", func() {
 
 		By("Creating a webserver (pending) pod on each node")
 
-		nodes, err := f.Client.Nodes().List(labels.Everything(), fields.Everything())
-		if err != nil {
-			Failf("Failed to list nodes: %v", err)
-		}
+		nodes := ListSchedulableNodesOrDie(f.Client)
 		// previous tests may have cause failures of some nodes. Let's skip
 		// 'Not Ready' nodes, just in case (there is no need to fail the test).
 		filterNodes(nodes, func(node api.Node) bool {
-			return isNodeReadySetAsExpected(&node, true)
+			return !node.Spec.Unschedulable && isNodeConditionSetAsExpected(&node, api.NodeReady, true)
 		})
 
 		if len(nodes.Items) == 0 {

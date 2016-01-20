@@ -74,7 +74,7 @@ fi
 export KUBECTL='kubectl'
 
 echo "Downloading and installing vtctlclient..."
-go get github.com/youtube/vitess/go/cmd/vtctlclient
+go get -u github.com/youtube/vitess/go/cmd/vtctlclient
 num_shards=`echo $SHARDS | tr "," " " | wc -w`
 total_tablet_count=$(($num_shards*$TABLETS_PER_SHARD*$num_cells))
 vtgate_count=$VTGATE_COUNT
@@ -105,7 +105,7 @@ wait_for_running_tasks vtctld 1
 wait_for_running_tasks vttablet $total_tablet_count
 wait_for_running_tasks vtgate $vtgate_count
 
-vtctld_port=30000
+vtctld_port=30001
 vtctld_ip=`kubectl get -o yaml nodes | grep 'type: ExternalIP' -B 1 | head -1 | awk '{print $NF}'`
 vtctl_server="$vtctld_ip:$vtctld_port"
 kvtctl="$GOPATH/bin/vtctlclient -server $vtctl_server"
@@ -160,5 +160,6 @@ echo "****************************"
 echo "* Complete!"
 echo "* Use the following line to make an alias to kvtctl:"
 echo "* alias kvtctl='\$GOPATH/bin/vtctlclient -server $vtctl_server'"
-echo "* See the vtctld UI at: http://${vtctl_server}"
+echo "* See the vtctld UI at: http://${vtctld_ip}:30000"
 echo "****************************"
+

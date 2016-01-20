@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/admin/garbage-collection.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/admin/garbage-collection.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -53,7 +54,7 @@ with the docker leaking issues would be appreciated.
 kubernetes manages lifecycle of all images through imageManager, with the cooperation
 of cadvisor.
 The policy for garbage collecting images we apply takes two factors into consideration,
-`HighThresholdPercent` and `LowThresholdPercent`. Disk usage above the the high threshold
+`HighThresholdPercent` and `LowThresholdPercent`. Disk usage above the high threshold
 will trigger garbage collection, which attempts to delete unused images until the low
 threshold is met. Least recently used images are deleted first.
 
@@ -66,7 +67,7 @@ pod (UID, container name) pair is allowed to have, less than zero for no limit.
 `MaxContainers` is the max number of total dead containers, less than zero for no limit as well.
 
 kubelet sorts out containers which are unidentified or stay out of bounds set by previous
-mentioned three flags. Gernerally the oldest containers are removed first. Since we take both
+mentioned three flags. Generally the oldest containers are removed first. Since we take both
 `MaxPerPodContainer` and `MaxContainers` into consideration, it could happen when they
 have conflict -- retaining the max number of containers per pod goes out of range set by max
 number of global dead containers. In this case, we would sacrifice the `MaxPerPodContainer`

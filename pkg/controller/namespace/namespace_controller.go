@@ -26,8 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -47,11 +45,11 @@ func NewNamespaceController(kubeClient client.Interface, versions *unversioned.A
 	var controller *framework.Controller
 	_, controller = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return kubeClient.Namespaces().List(labels.Everything(), fields.Everything())
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return kubeClient.Namespaces().List(options)
 			},
-			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-				return kubeClient.Namespaces().Watch(labels.Everything(), fields.Everything(), resourceVersion)
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return kubeClient.Namespaces().Watch(options)
 			},
 		},
 		&api.Namespace{},
@@ -141,7 +139,14 @@ func finalizeNamespaceFunc(kubeClient client.Interface, namespace *api.Namespace
 	for _, value := range finalizerSet.List() {
 		namespaceFinalize.Spec.Finalizers = append(namespaceFinalize.Spec.Finalizers, api.FinalizerName(value))
 	}
-	return kubeClient.Namespaces().Finalize(&namespaceFinalize)
+	namespace, err := kubeClient.Namespaces().Finalize(&namespaceFinalize)
+	if err != nil {
+		// it was removed already, so life is good
+		if errors.IsNotFound(err) {
+			return namespace, nil
+		}
+	}
+	return namespace, err
 }
 
 type contentRemainingError struct {
@@ -204,7 +209,7 @@ func deleteAllContent(kubeClient client.Interface, versions *unversioned.APIVers
 				return estimate, err
 			}
 		}
-		if containsResource(resources, "ingress") {
+		if containsResource(resources, "ingresses") {
 			err = deleteIngress(kubeClient.Extensions(), namespace)
 			if err != nil {
 				return estimate, err
@@ -268,10 +273,22 @@ func updateNamespaceStatusFunc(kubeClient client.Interface, namespace *api.Names
 }
 
 // syncNamespace orchestrates deletion of a Namespace and its associated content.
-func syncNamespace(kubeClient client.Interface, versions *unversioned.APIVersions, namespace *api.Namespace) (err error) {
+func syncNamespace(kubeClient client.Interface, versions *unversioned.APIVersions, namespace *api.Namespace) error {
 	if namespace.DeletionTimestamp == nil {
 		return nil
 	}
+
+	// multiple controllers may edit a namespace during termination
+	// first get the latest state of the namespace before proceeding
+	// if the namespace was deleted already, don't do anything
+	namespace, err := kubeClient.Namespaces().Get(namespace.Name)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
 	glog.V(4).Infof("Syncing namespace %s", namespace.Name)
 
 	// ensure that the status is up to date on the namespace
@@ -320,7 +337,7 @@ func syncNamespace(kubeClient client.Interface, versions *unversioned.APIVersion
 }
 
 func deleteLimitRanges(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.LimitRanges(ns).List(labels.Everything(), fields.Everything())
+	items, err := kubeClient.LimitRanges(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -334,7 +351,7 @@ func deleteLimitRanges(kubeClient client.Interface, ns string) error {
 }
 
 func deleteResourceQuotas(kubeClient client.Interface, ns string) error {
-	resourceQuotas, err := kubeClient.ResourceQuotas(ns).List(labels.Everything(), fields.Everything())
+	resourceQuotas, err := kubeClient.ResourceQuotas(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -348,7 +365,7 @@ func deleteResourceQuotas(kubeClient client.Interface, ns string) error {
 }
 
 func deleteServiceAccounts(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.ServiceAccounts(ns).List(labels.Everything(), fields.Everything())
+	items, err := kubeClient.ServiceAccounts(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -362,7 +379,7 @@ func deleteServiceAccounts(kubeClient client.Interface, ns string) error {
 }
 
 func deleteServices(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Services(ns).List(labels.Everything(), fields.Everything())
+	items, err := kubeClient.Services(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -376,7 +393,7 @@ func deleteServices(kubeClient client.Interface, ns string) error {
 }
 
 func deleteReplicationControllers(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.ReplicationControllers(ns).List(labels.Everything(), fields.Everything())
+	items, err := kubeClient.ReplicationControllers(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -390,7 +407,7 @@ func deleteReplicationControllers(kubeClient client.Interface, ns string) error 
 }
 
 func deletePods(kubeClient client.Interface, ns string, before unversioned.Time) (int64, error) {
-	items, err := kubeClient.Pods(ns).List(labels.Everything(), fields.Everything())
+	items, err := kubeClient.Pods(ns).List(api.ListOptions{})
 	if err != nil {
 		return 0, err
 	}
@@ -419,21 +436,11 @@ func deletePods(kubeClient client.Interface, ns string, before unversioned.Time)
 }
 
 func deleteEvents(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Events(ns).List(labels.Everything(), fields.Everything())
-	if err != nil {
-		return err
-	}
-	for i := range items.Items {
-		err := kubeClient.Events(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
+	return kubeClient.Events(ns).DeleteCollection(nil, api.ListOptions{})
 }
 
 func deleteSecrets(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Secrets(ns).List(labels.Everything(), fields.Everything())
+	items, err := kubeClient.Secrets(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -447,7 +454,7 @@ func deleteSecrets(kubeClient client.Interface, ns string) error {
 }
 
 func deletePersistentVolumeClaims(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.PersistentVolumeClaims(ns).List(labels.Everything(), fields.Everything())
+	items, err := kubeClient.PersistentVolumeClaims(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -461,7 +468,7 @@ func deletePersistentVolumeClaims(kubeClient client.Interface, ns string) error 
 }
 
 func deleteHorizontalPodAutoscalers(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.HorizontalPodAutoscalers(ns).List(labels.Everything(), fields.Everything())
+	items, err := expClient.HorizontalPodAutoscalers(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -475,7 +482,7 @@ func deleteHorizontalPodAutoscalers(expClient client.ExtensionsInterface, ns str
 }
 
 func deleteDaemonSets(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.DaemonSets(ns).List(labels.Everything(), fields.Everything())
+	items, err := expClient.DaemonSets(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -489,7 +496,7 @@ func deleteDaemonSets(expClient client.ExtensionsInterface, ns string) error {
 }
 
 func deleteJobs(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.Jobs(ns).List(labels.Everything(), fields.Everything())
+	items, err := expClient.Jobs(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -503,7 +510,7 @@ func deleteJobs(expClient client.ExtensionsInterface, ns string) error {
 }
 
 func deleteDeployments(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.Deployments(ns).List(labels.Everything(), fields.Everything())
+	items, err := expClient.Deployments(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -517,7 +524,7 @@ func deleteDeployments(expClient client.ExtensionsInterface, ns string) error {
 }
 
 func deleteIngress(expClient client.ExtensionsInterface, ns string) error {
-	items, err := expClient.Ingress(ns).List(labels.Everything(), fields.Everything())
+	items, err := expClient.Ingress(ns).List(api.ListOptions{})
 	if err != nil {
 		return err
 	}

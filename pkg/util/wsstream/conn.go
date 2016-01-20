@@ -97,9 +97,7 @@ func ignoreReceives(ws *websocket.Conn, timeout time.Duration) {
 	for {
 		resetTimeout(ws, timeout)
 		if err := websocket.Message.Receive(ws, &data); err != nil {
-			if err == io.EOF {
-				return
-			}
+			return
 		}
 	}
 }

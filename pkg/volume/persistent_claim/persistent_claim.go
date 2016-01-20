@@ -40,8 +40,9 @@ const (
 	persistentClaimPluginName = "kubernetes.io/persistent-claim"
 )
 
-func (plugin *persistentClaimPlugin) Init(host volume.VolumeHost) {
+func (plugin *persistentClaimPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *persistentClaimPlugin) Name() string {
@@ -86,10 +87,6 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod,
 	}
 
 	return builder, nil
-}
-
-func (plugin *persistentClaimPlugin) IsReadOnly() bool {
-	return plugin.readOnly
 }
 
 func (plugin *persistentClaimPlugin) NewCleaner(_ string, _ types.UID) (volume.Cleaner, error) {

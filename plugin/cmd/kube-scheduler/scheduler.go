@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/version/verflag"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
+	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 
 	"github.com/spf13/pflag"
 )
@@ -33,7 +34,7 @@ func init() {
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	s := app.NewSchedulerServer()
+	s := options.NewSchedulerServer()
 	s.AddFlags(pflag.CommandLine)
 
 	util.InitFlags()
@@ -42,5 +43,5 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	s.Run(pflag.CommandLine.Args())
+	app.Run(s)
 }

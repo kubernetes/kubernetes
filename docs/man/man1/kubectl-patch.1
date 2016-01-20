@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubectl patch \- Update field(s) of a resource by stdin.
+kubectl patch \- Update field(s) of a resource using strategic merge patch.
 
 
 .SH SYNOPSIS
@@ -20,7 +20,7 @@ JSON and YAML formats are accepted.
 
 .PP
 Please refer to the models in 
-\[la]https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/HEAD/docs/api-reference/definitions.html\[ra] to find if a field is mutable.
+\[la]https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html\[ra] to find if a field is mutable.
 
 
 .SH OPTIONS
@@ -52,7 +52,7 @@ Please refer to the models in
 
 .PP
 \fB\-\-client\-certificate\fP=""
-    Path to a client key file for TLS.
+    Path to a client certificate file for TLS.
 
 .PP
 \fB\-\-client\-key\fP=""

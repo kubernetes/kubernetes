@@ -17,21 +17,20 @@ limitations under the License.
 package etcd
 
 import (
-	"fmt"
+	"math/rand"
+	rt "runtime"
+	"sync"
 	"testing"
-	"time"
 
-	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/watch"
 
+	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 )
 
@@ -218,62 +217,43 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 	}
 }
 
+/* re-Disabling due to flakes seen upstream #18914
 func TestWatchEtcdError(t *testing.T) {
 	codec := testapi.Default.Codec()
-	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.ExpectNotFoundGet("/some/key")
-	fakeClient.WatchImmediateError = fmt.Errorf("immediate error")
-	h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
-
-	watching, err := h.Watch(context.TODO(), "/some/key", 4, storage.Everything)
+	server := etcdtesting.NewEtcdTestClientServer(t)
+	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
+	watching, err := h.Watch(context.TODO(), "/some/key", "4", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	defer watching.Stop()
+	server.Terminate(t)
 
-	got := <-watching.ResultChan()
-	if got.Type != watch.Error {
+	got, ok := <-watching.ResultChan()
+	if ok && got.Type != watch.Error {
 		t.Fatalf("Unexpected non-error")
 	}
-	status, ok := got.Object.(*unversioned.Status)
-	if !ok {
-		t.Fatalf("Unexpected non-error object type")
-	}
-	if status.Message != "immediate error" {
-		t.Errorf("Unexpected wrong error")
-	}
-	if status.Status != unversioned.StatusFailure {
-		t.Errorf("Unexpected wrong error status")
-	}
-}
+	watching.Stop()
+}*/
 
 func TestWatch(t *testing.T) {
 	codec := testapi.Default.Codec()
-	fakeClient := tools.NewFakeEtcdClient(t)
+	server := etcdtesting.NewEtcdTestClientServer(t)
+	defer server.Terminate(t)
 	key := "/some/key"
-	prefixedKey := etcdtest.AddPrefix(key)
-	fakeClient.ExpectNotFoundGet(prefixedKey)
-	h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
+	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
-	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
+	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-
-	fakeClient.WaitForWatchCompletion()
-	// when server returns not found, the watch index starts at the next value (1)
-	if fakeClient.WatchIndex != 1 {
-		t.Errorf("Expected client to be at index %d, got %#v", 1, fakeClient)
-	}
+	// watching is explicitly closed below.
 
 	// Test normal case
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	podBytes, _ := codec.Encode(pod)
-	fakeClient.WatchResponse <- &etcd.Response{
-		Action: "set",
-		Node: &etcd.Node{
-			Value: string(podBytes),
-		},
+	returnObj := &api.Pod{}
+	err = h.Set(context.TODO(), key, pod, returnObj, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	event := <-watching.ResultChan()
@@ -284,26 +264,17 @@ func TestWatch(t *testing.T) {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 
-	// Test error case
-	fakeClient.WatchInjectError <- fmt.Errorf("Injected error")
+	watching.Stop()
 
-	if errEvent, ok := <-watching.ResultChan(); !ok {
-		t.Errorf("no error result?")
-	} else {
-		if e, a := watch.Error, errEvent.Type; e != a {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-		if e, a := "Injected error", errEvent.Object.(*unversioned.Status).Message; e != a {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-	}
-
-	// Did everything shut down?
-	if _, open := <-fakeClient.WatchResponse; open {
-		t.Errorf("An injected error did not cause a graceful shutdown")
-	}
-	if _, open := <-watching.ResultChan(); open {
-		t.Errorf("An injected error did not cause a graceful shutdown")
+	// There is a race in etcdWatcher so that after calling Stop() one of
+	// two things can happen:
+	// - ResultChan() may be closed (triggered by closing userStop channel)
+	// - an Error "context cancelled" may be emitted (triggered by cancelling request
+	//   to etcd and putting that error to etcdError channel)
+	// We need to be prepared for both here.
+	event, open := <-watching.ResultChan()
+	if open && event.Type != watch.Error {
+		t.Errorf("Unexpected event from stopped watcher: %#v", event)
 	}
 }
 
@@ -320,139 +291,48 @@ func makeSubsets(ip string, port int) []api.EndpointSubset {
 
 func TestWatchEtcdState(t *testing.T) {
 	codec := testapi.Default.Codec()
-	baseKey := "/somekey/foo"
-	prefixedKey := etcdtest.AddPrefix(baseKey)
-	type T struct {
-		Type      watch.EventType
-		Endpoints []api.EndpointSubset
+	key := etcdtest.AddPrefix("/somekey/foo")
+	server := etcdtesting.NewEtcdTestClientServer(t)
+	defer server.Terminate(t)
+
+	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
+	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
 	}
-	testCases := map[string]struct {
-		Initial   map[string]tools.EtcdResponseWithError
-		Responses []*etcd.Response
-		From      uint64
-		Expected  []*T
-	}{
-		"from not found": {
-			Initial: map[string]tools.EtcdResponseWithError{},
-			Responses: []*etcd.Response{
-				{
-					Action: "create",
-					Node: &etcd.Node{
-						Value: string(runtime.EncodeOrDie(codec, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-							Subsets:    emptySubsets(),
-						})),
-					},
-				},
-			},
-			From: 1,
-			Expected: []*T{
-				{watch.Added, nil},
-			},
-		},
-		"from version 1": {
-			Responses: []*etcd.Response{
-				{
-					Action: "compareAndSwap",
-					Node: &etcd.Node{
-						Value: string(runtime.EncodeOrDie(codec, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-							Subsets:    makeSubsets("127.0.0.1", 9000),
-						})),
-						CreatedIndex:  1,
-						ModifiedIndex: 2,
-					},
-					PrevNode: &etcd.Node{
-						Value: string(runtime.EncodeOrDie(codec, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-							Subsets:    emptySubsets(),
-						})),
-						CreatedIndex:  1,
-						ModifiedIndex: 1,
-					},
-				},
-			},
-			From: 1,
-			Expected: []*T{
-				{watch.Modified, makeSubsets("127.0.0.1", 9000)},
-			},
-		},
-		"from initial state": {
-			Initial: map[string]tools.EtcdResponseWithError{
-				prefixedKey: {
-					R: &etcd.Response{
-						Action: "get",
-						Node: &etcd.Node{
-							Value: string(runtime.EncodeOrDie(codec, &api.Endpoints{
-								ObjectMeta: api.ObjectMeta{Name: "foo"},
-								Subsets:    emptySubsets(),
-							})),
-							CreatedIndex:  1,
-							ModifiedIndex: 1,
-						},
-						EtcdIndex: 1,
-					},
-				},
-			},
-			Responses: []*etcd.Response{
-				nil,
-				{
-					Action: "compareAndSwap",
-					Node: &etcd.Node{
-						Value: string(runtime.EncodeOrDie(codec, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-							Subsets:    makeSubsets("127.0.0.1", 9000),
-						})),
-						CreatedIndex:  1,
-						ModifiedIndex: 2,
-					},
-					PrevNode: &etcd.Node{
-						Value: string(runtime.EncodeOrDie(codec, &api.Endpoints{
-							ObjectMeta: api.ObjectMeta{Name: "foo"},
-							Subsets:    emptySubsets(),
-						})),
-						CreatedIndex:  1,
-						ModifiedIndex: 1,
-					},
-				},
-			},
-			Expected: []*T{
-				{watch.Added, nil},
-				{watch.Modified, makeSubsets("127.0.0.1", 9000)},
-			},
-		},
+	defer watching.Stop()
+
+	endpoint := &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Subsets:    emptySubsets(),
 	}
 
-	for k, testCase := range testCases {
-		fakeClient := tools.NewFakeEtcdClient(t)
-		for key, value := range testCase.Initial {
-			fakeClient.Data[key] = value
-		}
+	err = h.Set(context.TODO(), key, endpoint, endpoint, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
-		h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
-		watching, err := h.Watch(context.TODO(), baseKey, testCase.From, storage.Everything)
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
+	event := <-watching.ResultChan()
+	if event.Type != watch.Added {
+		t.Errorf("Unexpected event %#v", event)
+	}
 
-		fakeClient.WaitForWatchCompletion()
+	subset := makeSubsets("127.0.0.1", 9000)
+	endpoint.Subsets = subset
 
-		t.Logf("Testing %v", k)
-		for i := range testCase.Responses {
-			if testCase.Responses[i] != nil {
-				fakeClient.WatchResponse <- testCase.Responses[i]
-			}
-			event := <-watching.ResultChan()
-			if e, a := testCase.Expected[i].Type, event.Type; e != a {
-				t.Errorf("%s: expected type %v, got %v", k, e, a)
-				break
-			}
-			if e, a := testCase.Expected[i].Endpoints, event.Object.(*api.Endpoints).Subsets; !api.Semantic.DeepDerivative(e, a) {
-				t.Errorf("%s: expected type %v, got %v", k, e, a)
-				break
-			}
-		}
-		watching.Stop()
+	// CAS the previous value
+	err = h.Set(context.TODO(), key, endpoint, endpoint, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	event = <-watching.ResultChan()
+	if event.Type != watch.Modified {
+		t.Errorf("Unexpected event %#v", event)
+	}
+
+	if e, a := endpoint, event.Object; !api.Semantic.DeepDerivative(e, a) {
+		t.Errorf("%s: expected %v, got %v", e, a)
 	}
 }
 
@@ -460,280 +340,167 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	codec := testapi.Default.Codec()
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 
-	testCases := map[string]struct {
-		Response        tools.EtcdResponseWithError
-		ExpectedVersion string
-		ExpectedType    watch.EventType
-	}{
-		"get value created": {
-			tools.EtcdResponseWithError{
-				R: &etcd.Response{
-					Node: &etcd.Node{
-						Value:         runtime.EncodeOrDie(codec, pod),
-						CreatedIndex:  1,
-						ModifiedIndex: 1,
-					},
-					Action:    "get",
-					EtcdIndex: 2,
-				},
-			},
-			"1",
-			watch.Added,
-		},
-		"get value modified": {
-			tools.EtcdResponseWithError{
-				R: &etcd.Response{
-					Node: &etcd.Node{
-						Value:         runtime.EncodeOrDie(codec, pod),
-						CreatedIndex:  1,
-						ModifiedIndex: 2,
-					},
-					Action:    "get",
-					EtcdIndex: 3,
-				},
-			},
-			"2",
-			watch.Modified,
-		},
+	key := etcdtest.AddPrefix("/somekey/foo")
+	server := etcdtesting.NewEtcdTestClientServer(t)
+	defer server.Terminate(t)
+
+	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
+
+	// set before the watch and verify events
+	err := h.Set(context.TODO(), key, pod, pod, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	for k, testCase := range testCases {
-		fakeClient := tools.NewFakeEtcdClient(t)
-		key := "/some/key"
-		prefixedKey := etcdtest.AddPrefix(key)
-		fakeClient.Data[prefixedKey] = testCase.Response
-		h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
+	// check for concatenation on watch event with CAS
+	pod.Name = "bar"
+	err = h.Set(context.TODO(), key, pod, pod, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
-		watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
+	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer watching.Stop()
 
-		fakeClient.WaitForWatchCompletion()
-		if e, a := testCase.Response.R.EtcdIndex+1, fakeClient.WatchIndex; e != a {
-			t.Errorf("%s: expected watch index to be %d, got %d", k, e, a)
-		}
+	// marked as modified b/c of concatenation
+	event := <-watching.ResultChan()
+	if event.Type != watch.Modified {
+		t.Errorf("Unexpected event %#v", event)
+	}
 
-		// the existing node is detected and the index set
-		event := <-watching.ResultChan()
-		if e, a := testCase.ExpectedType, event.Type; e != a {
-			t.Errorf("%s: expected %v, got %v", k, e, a)
-		}
-		actualPod, ok := event.Object.(*api.Pod)
-		if !ok {
-			t.Fatalf("%s: expected a pod, got %#v", k, event.Object)
-		}
-		if actualPod.ResourceVersion != testCase.ExpectedVersion {
-			t.Errorf("%s: expected pod with resource version %v, Got %#v", k, testCase.ExpectedVersion, actualPod)
-		}
-		pod.ResourceVersion = testCase.ExpectedVersion
-		if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
-			t.Errorf("%s: expected %v, got %v", k, e, a)
-		}
-		watching.Stop()
+	err = h.Set(context.TODO(), key, pod, pod, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	event = <-watching.ResultChan()
+	if event.Type != watch.Modified {
+		t.Errorf("Unexpected event %#v", event)
+	}
+
+	if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
+		t.Errorf("%s: expected %v, got %v", e, a)
 	}
 }
 
 func TestWatchListFromZeroIndex(t *testing.T) {
 	codec := testapi.Default.Codec()
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	key := "/some/key"
-	prefixedKey := etcdtest.AddPrefix(key)
-	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Data[prefixedKey] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Dir: true,
-				Nodes: etcd.Nodes{
-					&etcd.Node{
-						Value:         runtime.EncodeOrDie(codec, pod),
-						CreatedIndex:  1,
-						ModifiedIndex: 1,
-						Nodes:         etcd.Nodes{},
-					},
-					&etcd.Node{
-						Value:         runtime.EncodeOrDie(codec, pod),
-						CreatedIndex:  2,
-						ModifiedIndex: 2,
-						Nodes:         etcd.Nodes{},
-					},
-				},
-			},
-			Action:    "get",
-			EtcdIndex: 3,
-		},
-	}
-	h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
+	key := etcdtest.AddPrefix("/some/key")
+	server := etcdtesting.NewEtcdTestClientServer(t)
+	defer server.Terminate(t)
+	h := newEtcdHelper(server.Client, codec, key)
 
-	watching, err := h.WatchList(context.TODO(), key, 0, storage.Everything)
+	watching, err := h.WatchList(context.TODO(), key, "0", storage.Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer watching.Stop()
+
+	// creates key/foo which should trigger the WatchList for "key"
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	err = h.Create(context.TODO(), pod.Name, pod, pod, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	// the existing node is detected and the index set
-	event, open := <-watching.ResultChan()
-	if !open {
-		t.Fatalf("unexpected channel close")
-	}
-	for i := 0; i < 2; i++ {
-		if e, a := watch.Added, event.Type; e != a {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-		actualPod, ok := event.Object.(*api.Pod)
-		if !ok {
-			t.Fatalf("expected a pod, got %#v", event.Object)
-		}
-		if actualPod.ResourceVersion != "1" {
-			t.Errorf("Expected pod with resource version %d, Got %#v", 1, actualPod)
-		}
-		pod.ResourceVersion = "1"
-		if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
+	event, _ := <-watching.ResultChan()
+	if event.Type != watch.Added {
+		t.Errorf("Unexpected event %#v", event)
 	}
 
-	fakeClient.WaitForWatchCompletion()
-	watching.Stop()
+	if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
+		t.Errorf("%s: expected %v, got %v", e, a)
+	}
 }
 
 func TestWatchListIgnoresRootKey(t *testing.T) {
 	codec := testapi.Default.Codec()
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	key := "/some/key"
-	prefixedKey := etcdtest.AddPrefix(key)
+	key := etcdtest.AddPrefix("/some/key")
+	server := etcdtesting.NewEtcdTestClientServer(t)
+	defer server.Terminate(t)
+	h := newEtcdHelper(server.Client, codec, key)
 
-	fakeClient := tools.NewFakeEtcdClient(t)
-	h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
-
-	watching, err := h.WatchList(context.TODO(), key, 1, storage.Everything)
+	watching, err := h.WatchList(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	fakeClient.WaitForWatchCompletion()
+	defer watching.Stop()
 
-	// This is the root directory of the watch, which happens to have a value encoded
-	fakeClient.WatchResponse <- &etcd.Response{
-		Action: "delete",
-		PrevNode: &etcd.Node{
-			Key:           prefixedKey,
-			Value:         runtime.EncodeOrDie(codec, pod),
-			CreatedIndex:  1,
-			ModifiedIndex: 1,
-		},
-	}
-	// Delete of the parent directory of a key is an event that a list watch would receive,
-	// but will have no value so the decode will fail.
-	fakeClient.WatchResponse <- &etcd.Response{
-		Action: "delete",
-		PrevNode: &etcd.Node{
-			Key:           prefixedKey,
-			Value:         "",
-			CreatedIndex:  1,
-			ModifiedIndex: 1,
-		},
-	}
-	close(fakeClient.WatchStop)
-
-	// the existing node is detected and the index set
-	_, open := <-watching.ResultChan()
-	if open {
-		t.Fatalf("unexpected channel open")
-	}
-
-	watching.Stop()
-}
-
-func TestWatchFromNotFound(t *testing.T) {
-	fakeClient := tools.NewFakeEtcdClient(t)
-	key := "/some/key"
-	prefixedKey := etcdtest.AddPrefix(key)
-	fakeClient.Data[prefixedKey] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
-		},
-		E: &etcd.EtcdError{
-			Index:     2,
-			ErrorCode: 100,
-		},
-	}
-	h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
-
-	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-	if fakeClient.WatchIndex != 3 {
-		t.Errorf("Expected client to wait for %d, got %#v", 3, fakeClient)
-	}
-
-	watching.Stop()
-}
-
-func TestWatchFromOtherError(t *testing.T) {
-	fakeClient := tools.NewFakeEtcdClient(t)
-	key := "/some/key"
-	prefixedKey := etcdtest.AddPrefix(key)
-	fakeClient.Data[prefixedKey] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
-		},
-		E: &etcd.EtcdError{
-			Index:     2,
-			ErrorCode: 101,
-		},
-	}
-	h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
-
-	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
+	// creates key/foo which should trigger the WatchList for "key"
+	err = h.Create(context.TODO(), key, pod, pod, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	errEvent := <-watching.ResultChan()
-	if e, a := watch.Error, errEvent.Type; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	if e, a := "101:  () [2]", errEvent.Object.(*unversioned.Status).Message; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
+	// force context switch to ensure watches would catch and notify.
+	rt.Gosched()
 
 	select {
-	case _, ok := <-watching.ResultChan():
-		if ok {
-			t.Fatalf("expected result channel to be closed")
-		}
-	case <-time.After(util.ForeverTestTimeout):
-		t.Fatalf("watch should have closed channel: %#v", watching)
-	}
-
-	if fakeClient.WatchResponse != nil || fakeClient.WatchIndex != 0 {
-		t.Fatalf("Watch should not have been invoked: %#v", fakeClient)
+	case event, _ := <-watching.ResultChan():
+		t.Fatalf("Unexpected event: %#v", event)
+	default:
+		// fall through, expected behavior
 	}
 }
 
 func TestWatchPurposefulShutdown(t *testing.T) {
-	fakeClient := tools.NewFakeEtcdClient(t)
-
-	h := newEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
+	server := etcdtesting.NewEtcdTestClientServer(t)
+	defer server.Terminate(t)
 	key := "/some/key"
-	prefixedKey := etcdtest.AddPrefix(key)
-	fakeClient.ExpectNotFoundGet(prefixedKey)
+	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
 	// Test purposeful shutdown
-	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
+	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	fakeClient.WaitForWatchCompletion()
 	watching.Stop()
+	rt.Gosched()
 
-	// Did everything shut down?
-	if _, open := <-fakeClient.WatchResponse; open {
-		t.Errorf("A stop did not cause a graceful shutdown")
+	// There is a race in etcdWatcher so that after calling Stop() one of
+	// two things can happen:
+	// - ResultChan() may be closed (triggered by closing userStop channel)
+	// - an Error "context cancelled" may be emitted (triggered by cancelling request
+	//   to etcd and putting that error to etcdError channel)
+	// We need to be prepared for both here.
+	event, open := <-watching.ResultChan()
+	if open && event.Type != watch.Error {
+		t.Errorf("Unexpected event from stopped watcher: %#v", event)
 	}
-	if _, open := <-watching.ResultChan(); open {
-		t.Errorf("An injected error did not cause a graceful shutdown")
+}
+
+func TestHighWaterMark(t *testing.T) {
+	var h HighWaterMark
+
+	for i := int64(10); i < 20; i++ {
+		if !h.Update(i) {
+			t.Errorf("unexpected false for %v", i)
+		}
+		if h.Update(i - 1) {
+			t.Errorf("unexpected true for %v", i-1)
+		}
+	}
+
+	m := int64(0)
+	wg := sync.WaitGroup{}
+	for i := 0; i < 300; i++ {
+		wg.Add(1)
+		v := rand.Int63()
+		go func(v int64) {
+			defer wg.Done()
+			h.Update(v)
+		}(v)
+		if v > m {
+			m = v
+		}
+	}
+	wg.Wait()
+	if m != int64(h) {
+		t.Errorf("unexpected value, wanted %v, got %v", m, int64(h))
 	}
 }

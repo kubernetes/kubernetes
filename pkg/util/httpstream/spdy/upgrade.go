@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 )
 
@@ -46,15 +46,15 @@ func (u responseUpgrader) UpgradeResponse(w http.ResponseWriter, req *http.Reque
 	connectionHeader := strings.ToLower(req.Header.Get(httpstream.HeaderConnection))
 	upgradeHeader := strings.ToLower(req.Header.Get(httpstream.HeaderUpgrade))
 	if !strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) || !strings.Contains(upgradeHeader, strings.ToLower(HeaderSpdy31)) {
-		w.Write([]byte(fmt.Sprintf("Unable to upgrade: missing upgrade headers in request: %#v", req.Header)))
 		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "unable to upgrade: missing upgrade headers in request: %#v", req.Header)
 		return nil
 	}
 
 	hijacker, ok := w.(http.Hijacker)
 	if !ok {
-		w.Write([]byte("Unable to upgrade: unable to hijack response"))
 		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "unable to upgrade: unable to hijack response")
 		return nil
 	}
 
@@ -64,13 +64,13 @@ func (u responseUpgrader) UpgradeResponse(w http.ResponseWriter, req *http.Reque
 
 	conn, _, err := hijacker.Hijack()
 	if err != nil {
-		glog.Errorf("Unable to upgrade: error hijacking response: %v", err)
+		util.HandleError(fmt.Errorf("unable to upgrade: error hijacking response: %v", err))
 		return nil
 	}
 
 	spdyConn, err := NewServerConnection(conn, newStreamHandler)
 	if err != nil {
-		glog.Errorf("Unable to upgrade: error creating SPDY server connection: %v", err)
+		util.HandleError(fmt.Errorf("unable to upgrade: error creating SPDY server connection: %v", err))
 		return nil
 	}
 

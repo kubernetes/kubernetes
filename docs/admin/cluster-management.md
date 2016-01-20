@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/admin/cluster-management.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/admin/cluster-management.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -46,31 +47,15 @@ To install Kubernetes on a set of machines, consult one of the existing [Getting
 
 The current state of cluster upgrades is provider dependent.
 
-### Master Upgrades
+### Upgrading Google Compute Engine clusters
 
-Both Google Container Engine (GKE) and
-Compute Engine Open Source (GCE-OSS) support node upgrades via a [Managed Instance Group](https://cloud.google.com/compute/docs/instance-groups/).
-Managed Instance Group upgrades sequentially delete and recreate each virtual machine, while maintaining the same
-Persistent Disk (PD) to ensure that data is retained across the upgrade.
+Google Compute Engine Open Source (GCE-OSS) support master upgrades by deleting and
+recreating the master, while maintaining the same Persistent Disk (PD) to ensure that data is retained across the
+upgrade.
 
-In contrast, the `kube-push.sh` process used on [other platforms](#other-platforms) attempts to upgrade the binaries in
-places, without recreating the virtual machines.
-
-### Node Upgrades
-
-Node upgrades for GKE and GCE-OSS again use a Managed Instance Group, each node is sequentially destroyed and then recreated with new software.  Any Pods that are running
-on that node need to be controlled by a Replication Controller, or manually re-created after the roll out.
-
-For other platforms, `kube-push.sh` is again used, performing an in-place binary upgrade on existing machines.
-
-### Upgrading Google Container Engine (GKE)
-
-Google Container Engine automatically updates master components (e.g. `kube-apiserver`, `kube-scheduler`) to the latest
-version. It also handles upgrading the operating system and other components that the master runs on.
-
-The node upgrade process is user-initiated and is described in the [GKE documentation.](https://cloud.google.com/container-engine/docs/clusters/upgrade)
-
-### Upgrading open source Google Compute Engine clusters
+Node upgrades for GCE use a [Managed Instance Group](https://cloud.google.com/compute/docs/instance-groups/), each node
+is sequentially destroyed and then recreated with new software.  Any Pods that are running on that node need to be
+controlled by a Replication Controller, or manually re-created after the roll out.
 
 Upgrades on open source Google Compute Engine (GCE) clusters are controlled by the `cluster/gce/upgrade.sh` script.
 
@@ -88,7 +73,14 @@ Alternatively, to upgrade your entire cluster to the latest stable release:
 cluster/gce/upgrade.sh release/stable
 ```
 
-### Other platforms
+### Upgrading Google Container Engine (GKE) clusters
+
+Google Container Engine automatically updates master components (e.g. `kube-apiserver`, `kube-scheduler`) to the latest
+version. It also handles upgrading the operating system and other components that the master runs on.
+
+The node upgrade process is user-initiated and is described in the [GKE documentation.](https://cloud.google.com/container-engine/docs/clusters/upgrade)
+
+### Upgrading clusters on other platforms
 
 The `cluster/kube-push.sh` script will do a rudimentary update.  This process is still quite experimental, we
 recommend testing the upgrade on an experimental cluster before performing the update on a production cluster.
@@ -99,7 +91,7 @@ If your cluster runs short on resources you can easily add more machines to it i
 If you're using GCE or GKE it's done by resizing Instance Group managing your Nodes. It can be accomplished by modifying number of instances on `Compute > Compute Engine > Instance groups > your group > Edit group` [Google Cloud Console page](https://console.developers.google.com) or using gcloud CLI:
 
 ```
-gcloud compute instance-groups managed --zone $ZONE resize my-cluster-minon-group --new-size 42
+gcloud compute instance-groups managed resize kubernetes-minion-group --size 42 --zone $ZONE
 ```
 
 Instance Group will take care of putting appropriate image on new machines and start them, while Kubelet will register its Node with API server to make it available for scheduling. If you scale the instance group down, system will randomly choose Nodes to kill.
@@ -212,13 +204,13 @@ for changes to this variable to take effect.
 
 ### Switching your config files to a new API version
 
-You can use the `kube-version-change` utility to convert config files between different API versions.
+You can use `kubectl convert` command to convert config files between different API versions.
 
 ```console
-$ hack/build-go.sh cmd/kube-version-change
-$ _output/local/go/bin/kube-version-change -i myPod.v1beta3.yaml -o myPod.v1.yaml
+$ kubectl convert -f pod.yaml --output-version v1
 ```
 
+For more options, please refer to the usage of [kubectl convert](../user-guide/kubectl/kubectl_convert.md) command.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/cluster-management.md?pixel)]()

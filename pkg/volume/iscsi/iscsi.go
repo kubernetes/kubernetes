@@ -23,9 +23,9 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -46,8 +46,9 @@ const (
 	iscsiPluginName = "kubernetes.io/iscsi"
 )
 
-func (plugin *iscsiPlugin) Init(host volume.VolumeHost) {
+func (plugin *iscsiPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *iscsiPlugin) Name() string {
@@ -97,6 +98,8 @@ func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 	lun := strconv.Itoa(iscsi.Lun)
 	portal := portalBuilder(iscsi.TargetPortal)
 
+	iface := iscsi.ISCSIInterface
+
 	return &iscsiDiskBuilder{
 		iscsiDisk: &iscsiDisk{
 			podUID:  podUID,
@@ -104,11 +107,12 @@ func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 			portal:  portal,
 			iqn:     iscsi.IQN,
 			lun:     lun,
+			iface:   iface,
 			manager: manager,
-			mounter: &mount.SafeFormatAndMount{mounter, exec.New()},
 			plugin:  plugin},
 		fsType:   iscsi.FSType,
 		readOnly: readOnly,
+		mounter:  &mount.SafeFormatAndMount{mounter, exec.New()},
 	}, nil
 }
 
@@ -118,13 +122,15 @@ func (plugin *iscsiPlugin) NewCleaner(volName string, podUID types.UID) (volume.
 }
 
 func (plugin *iscsiPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
-	return &iscsiDiskCleaner{&iscsiDisk{
-		podUID:  podUID,
-		volName: volName,
-		manager: manager,
+	return &iscsiDiskCleaner{
+		iscsiDisk: &iscsiDisk{
+			podUID:  podUID,
+			volName: volName,
+			manager: manager,
+			plugin:  plugin,
+		},
 		mounter: mounter,
-		plugin:  plugin,
-	}}, nil
+	}, nil
 }
 
 func (plugin *iscsiPlugin) execCommand(command string, args []string) ([]byte, error) {
@@ -138,25 +144,36 @@ type iscsiDisk struct {
 	portal  string
 	iqn     string
 	lun     string
+	iface   string
 	plugin  *iscsiPlugin
-	mounter mount.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
+	volume.MetricsNil
 }
 
 func (iscsi *iscsiDisk) GetPath() string {
 	name := iscsiPluginName
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
-	return iscsi.plugin.host.GetPodVolumeDir(iscsi.podUID, util.EscapeQualifiedNameForDisk(name), iscsi.volName)
+	return iscsi.plugin.host.GetPodVolumeDir(iscsi.podUID, utilstrings.EscapeQualifiedNameForDisk(name), iscsi.volName)
 }
 
 type iscsiDiskBuilder struct {
 	*iscsiDisk
 	readOnly bool
 	fsType   string
+	mounter  *mount.SafeFormatAndMount
 }
 
 var _ volume.Builder = &iscsiDiskBuilder{}
+
+func (b *iscsiDiskBuilder) GetAttributes() volume.Attributes {
+	return volume.Attributes{
+		ReadOnly:                    b.readOnly,
+		Managed:                     !b.readOnly,
+		SupportsOwnershipManagement: true,
+		SupportsSELinux:             true,
+	}
+}
 
 func (b *iscsiDiskBuilder) SetUp() error {
 	return b.SetUpAt(b.GetPath())
@@ -173,13 +190,10 @@ func (b *iscsiDiskBuilder) SetUpAt(dir string) error {
 
 type iscsiDiskCleaner struct {
 	*iscsiDisk
+	mounter mount.Interface
 }
 
 var _ volume.Cleaner = &iscsiDiskCleaner{}
-
-func (b *iscsiDiskBuilder) IsReadOnly() bool {
-	return b.readOnly
-}
 
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.

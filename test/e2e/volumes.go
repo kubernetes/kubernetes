@@ -15,8 +15,11 @@ limitations under the License.
 */
 
 /*
- * This test checks that various VolumeSources are working. For each volume
- * type it creates a server pod, exporting simple 'index.html' file.
+ * This test checks that various VolumeSources are working.
+ *
+ * There are two ways, how to test the volumes:
+ * 1) With containerized server (NFS, Ceph, Gluster, iSCSI, ...)
+ * The test creates a server pod, exporting simple 'index.html' file.
  * Then it uses appropriate VolumeSource to import this file into a client pod
  * and checks that the pod can see the file. It does so by importing the file
  * into web server root and loadind the index.html from it.
@@ -27,18 +30,26 @@ limitations under the License.
  *
  * Note that the server containers are for testing purposes only and should not
  * be used in production.
+ *
+ * 2) With server outside of Kubernetes (Cinder, ...)
+ * Appropriate server (e.g. OpenStack Cinder) must exist somewhere outside
+ * the tested Kubernetes cluster. The test itself creates a new volume,
+ * and checks, that Kubernetes can use it as a volume.
  */
 
 package e2e
 
 import (
 	"fmt"
+	"os/exec"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -149,9 +160,18 @@ func volumeTestCleanup(client *client.Client, config VolumeTestConfig) {
 
 	podClient := client.Pods(config.namespace)
 
-	// ignore all errors, the pods may not be even created
-	podClient.Delete(config.prefix+"-client", nil)
-	podClient.Delete(config.prefix+"-server", nil)
+	err := podClient.Delete(config.prefix+"-client", nil)
+	if err != nil {
+		// Log the error before failing test: if the test has already failed,
+		// expectNoError() won't print anything to logs!
+		glog.Warningf("Failed to delete client pod: %v", err)
+		expectNoError(err, "Failed to delete client pod: %v", err)
+	}
+	err = podClient.Delete(config.prefix+"-server", nil)
+	if err != nil {
+		glog.Warningf("Failed to delete server pod: %v", err)
+		expectNoError(err, "Failed to delete server pod: %v", err)
+	}
 }
 
 // Start a client pod using given VolumeSource (exported by startVolumeServer())
@@ -205,12 +225,26 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 	expectNoError(waitForPodRunningInNamespace(client, clientPod.Name, config.namespace))
 
 	By("reading a web page from the client")
-	body, err := client.Get().
-		Namespace(config.namespace).
-		Prefix("proxy").
-		Resource("pods").
-		Name(clientPod.Name).
-		DoRaw()
+	subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, client)
+	if err != nil {
+		Failf("Failed to get server version: %v", err)
+	}
+	var body []byte
+	if subResourceProxyAvailable {
+		body, err = client.Get().
+			Namespace(config.namespace).
+			Resource("pods").
+			SubResource("proxy").
+			Name(clientPod.Name).
+			DoRaw()
+	} else {
+		body, err = client.Get().
+			Prefix("proxy").
+			Namespace(config.namespace).
+			Resource("pods").
+			Name(clientPod.Name).
+			DoRaw()
+	}
 	expectNoError(err, "Cannot read web page: %v", err)
 	Logf("body: %v", string(body))
 
@@ -218,38 +252,103 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 	Expect(body).To(ContainSubstring(expectedContent))
 }
 
-var _ = Describe("Volumes", func() {
-	clean := true // If 'false', the test won't clear its namespace (and pods and services) upon completion. Useful for debugging.
+// Insert index.html with given content into given volume. It does so by
+// starting and auxiliary pod which writes the file there.
+// The volume must be writable.
+func injectHtml(client *client.Client, config VolumeTestConfig, volume api.VolumeSource, content string) {
+	By(fmt.Sprint("starting ", config.prefix, " injector"))
+	podClient := client.Pods(config.namespace)
 
+	injectPod := &api.Pod{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: config.prefix + "-injector",
+			Labels: map[string]string{
+				"role": config.prefix + "-injector",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:    config.prefix + "-injector",
+					Image:   "gcr.io/google_containers/busybox",
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", "echo '" + content + "' > /mnt/index.html && chmod o+rX /mnt /mnt/index.html"},
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      config.prefix + "-volume",
+							MountPath: "/mnt",
+						},
+					},
+				},
+			},
+			RestartPolicy: api.RestartPolicyNever,
+			Volumes: []api.Volume{
+				{
+					Name:         config.prefix + "-volume",
+					VolumeSource: volume,
+				},
+			},
+		},
+	}
+
+	defer func() {
+		podClient.Delete(config.prefix+"-injector", nil)
+	}()
+
+	injectPod, err := podClient.Create(injectPod)
+	expectNoError(err, "Failed to create injector pod: %v", err)
+	err = waitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Spec.Containers[0].Name, injectPod.Namespace)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func deleteCinderVolume(name string) error {
+	// Try to delete the volume for several seconds - it takes
+	// a while for the plugin to detach it.
+	var output []byte
+	var err error
+	timeout := time.Second * 120
+
+	Logf("Waiting up to %v for removal of cinder volume %s", timeout, name)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
+		output, err = exec.Command("cinder", "delete", name).CombinedOutput()
+		if err == nil {
+			Logf("Cinder volume %s deleted", name)
+			return nil
+		} else {
+			Logf("Failed to delete volume %s: %v", name, err)
+		}
+	}
+	Logf("Giving up deleting volume %s: %v\n%s", name, err, string(output[:]))
+	return err
+}
+
+// Marked with [Skipped] to skip the test by default (see driver.go),
+// these tests needs privileged containers, which are disabled by default.
+// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
+var _ = Describe("Volumes [Skipped]", func() {
+	framework := NewFramework("volume")
+
+	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
+	// note that namespace deletion is handled by delete-namespace flag
+	clean := true
 	// filled in BeforeEach
 	var c *client.Client
 	var namespace *api.Namespace
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-		By("Building a namespace api object")
-		namespace, err = createTestingNS("volume", c)
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	AfterEach(func() {
-		if clean {
-			if err := deleteNS(c, namespace.Name, 5*time.Minute /* namespace deletion timeout */); err != nil {
-				Failf("Couldn't delete ns %s", err)
-			}
-		}
+		c = framework.Client
+		namespace = framework.Namespace
 	})
 
 	////////////////////////////////////////////////////////////////////////
 	// NFS
 	////////////////////////////////////////////////////////////////////////
 
-	// Marked with [Skipped] to skip the test by default (see driver.go),
-	// the test needs privileged containers, which are disabled by default.
-	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
-	Describe("[Skipped] NFS", func() {
+	Describe("NFS", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
@@ -283,10 +382,7 @@ var _ = Describe("Volumes", func() {
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
 
-	// Marked with [Skipped] to skip the test by default (see driver.go),
-	// the test needs privileged containers, which are disabled by default.
-	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
-	Describe("[Skipped] GlusterFS", func() {
+	Describe("GlusterFS", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
@@ -360,13 +456,12 @@ var _ = Describe("Volumes", func() {
 	// iSCSI
 	////////////////////////////////////////////////////////////////////////
 
-	// Marked with [Skipped] to skip the test by default (see driver.go),
-	// the test needs privileged containers, which are disabled by default.
+	// The test needs privileged containers, which are disabled by default.
 	// Also, make sure that iscsiadm utility and iscsi target kernel modules
 	// are installed on all nodes!
 	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=iSCSI"
 
-	Describe("[Skipped] iSCSI", func() {
+	Describe("iSCSI", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
@@ -407,12 +502,7 @@ var _ = Describe("Volumes", func() {
 	// Ceph RBD
 	////////////////////////////////////////////////////////////////////////
 
-	// Marked with [Skipped] to skip the test by default (see driver.go),
-	// the test needs privileged containers, which are disabled by default.
-	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=RBD"
-
-	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
-	Describe("[Skipped] Ceph RBD", func() {
+	Describe("Ceph RBD", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
@@ -484,10 +574,7 @@ var _ = Describe("Volumes", func() {
 	// Ceph
 	////////////////////////////////////////////////////////////////////////
 
-	// Marked with [Skipped] to skip the test by default (see driver.go),
-	// the test needs privileged containers, which are disabled by default.
-	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
-	Describe("[Skipped] CephFS", func() {
+	Describe("CephFS", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
@@ -511,7 +598,7 @@ var _ = Describe("Volumes", func() {
 			secret := &api.Secret{
 				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Secret",
-					APIVersion: "v1beta3",
+					APIVersion: "v1",
 				},
 				ObjectMeta: api.ObjectMeta{
 					Name: config.prefix + "-secret",
@@ -549,4 +636,76 @@ var _ = Describe("Volumes", func() {
 		})
 	})
 
+	////////////////////////////////////////////////////////////////////////
+	// OpenStack Cinder
+	////////////////////////////////////////////////////////////////////////
+
+	// This test assumes that OpenStack client tools are installed
+	// (/usr/bin/nova, /usr/bin/cinder and /usr/bin/keystone)
+	// and that the usual OpenStack authentication env. variables are set
+	// (OS_USERNAME, OS_PASSWORD, OS_TENANT_NAME at least).
+
+	Describe("Cinder", func() {
+		It("should be mountable", func() {
+			config := VolumeTestConfig{
+				namespace: namespace.Name,
+				prefix:    "cinder",
+			}
+
+			// We assume that namespace.Name is a random string
+			volumeName := namespace.Name
+			By("creating a test Cinder volume")
+			output, err := exec.Command("cinder", "create", "--display-name="+volumeName, "1").CombinedOutput()
+			outputString := string(output[:])
+			Logf("cinder output:\n%s", outputString)
+			Expect(err).NotTo(HaveOccurred())
+
+			defer func() {
+				// Ignore any cleanup errors, there is not much we can do about
+				// them. They were already logged.
+				deleteCinderVolume(volumeName)
+			}()
+
+			// Parse 'id'' from stdout. Expected format:
+			// |     attachments     |                  []                  |
+			// |  availability_zone  |                 nova                 |
+			// ...
+			// |          id         | 1d6ff08f-5d1c-41a4-ad72-4ef872cae685 |
+			volumeID := ""
+			for _, line := range strings.Split(outputString, "\n") {
+				fields := strings.Fields(line)
+				if len(fields) != 5 {
+					continue
+				}
+				if fields[1] != "id" {
+					continue
+				}
+				volumeID = fields[3]
+				break
+			}
+			Logf("Volume ID: %s", volumeID)
+			Expect(volumeID).NotTo(Equal(""))
+
+			defer func() {
+				if clean {
+					Logf("Running volumeTestCleanup")
+					volumeTestCleanup(c, config)
+				}
+			}()
+			volume := api.VolumeSource{
+				Cinder: &api.CinderVolumeSource{
+					VolumeID: volumeID,
+					FSType:   "ext3",
+					ReadOnly: false,
+				},
+			}
+
+			// Insert index.html into the test volume with some random content
+			// to make sure we don't see the content from previous test runs.
+			content := "Hello from Cinder from namespace " + volumeName
+			injectHtml(c, config, volume, content)
+
+			testVolumeClient(c, config, volume, content)
+		})
+	})
 })

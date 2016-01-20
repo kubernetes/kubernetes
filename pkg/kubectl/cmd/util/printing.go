@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 
 	"github.com/spf13/cobra"
@@ -75,12 +76,18 @@ func ValidateOutputArgs(cmd *cobra.Command) error {
 }
 
 // OutputVersion returns the preferred output version for generic content (JSON, YAML, or templates)
-func OutputVersion(cmd *cobra.Command, defaultVersion string) string {
-	outputVersion := GetFlagString(cmd, "output-version")
-	if len(outputVersion) == 0 {
-		outputVersion = defaultVersion
+// defaultVersion is never mutated.  Nil simply allows clean passing in common usage from client.Config
+func OutputVersion(cmd *cobra.Command, defaultVersion *unversioned.GroupVersion) (unversioned.GroupVersion, error) {
+	outputVersionString := GetFlagString(cmd, "output-version")
+	if len(outputVersionString) == 0 {
+		if defaultVersion == nil {
+			return unversioned.GroupVersion{}, nil
+		}
+
+		return *defaultVersion, nil
 	}
-	return outputVersion
+
+	return unversioned.ParseGroupVersion(outputVersionString)
 }
 
 // PrinterForCommand returns the default printer for this command.
@@ -95,7 +102,9 @@ func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error
 		outputFormat = "template"
 	}
 
-	templateFormat := []string{"go-template=", "go-template-file=", "jsonpath=", "jsonpath-file="}
+	templateFormat := []string{
+		"go-template=", "go-template-file=", "jsonpath=", "jsonpath-file=", "custom-columns=", "custom-columns-file=",
+	}
 	for _, format := range templateFormat {
 		if strings.HasPrefix(outputFormat, format) {
 			templateFile = outputFormat[len(format):]

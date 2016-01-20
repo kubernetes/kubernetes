@@ -48,7 +48,7 @@ type Info struct {
 	TermsOfServiceUrl string `json:"termsOfServiceUrl,omitempty"`
 	Contact           string `json:"contact,omitempty"`
 	License           string `json:"license,omitempty"`
-	LicensUrl         string `json:"licensUrl,omitempty"`
+	LicenseUrl        string `json:"licenseUrl,omitempty"`
 }
 
 // 5.1.5
@@ -134,7 +134,7 @@ type Api struct {
 
 // 5.2.3 Operation Object
 type Operation struct {
-	Type             string            `json:"type"`
+	DataTypeFields
 	Method           string            `json:"method"`
 	Summary          string            `json:"summary,omitempty"`
 	Notes            string            `json:"notes,omitempty"`

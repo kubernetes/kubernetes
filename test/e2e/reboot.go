@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -43,50 +44,74 @@ const (
 	rebootPodReadyAgainTimeout = 5 * time.Minute
 )
 
-var _ = Describe("Reboot", func() {
-	var c *client.Client
+var _ = Describe("Reboot [Disruptive]", func() {
+	var f *Framework
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-
 		// These tests requires SSH to nodes, so the provider check should be identical to there
 		// (the limiting factor is the implementation of util.go's getSigner(...)).
 
 		// Cluster must support node reboot
-		SkipUnlessProviderIs("gce", "gke", "aws")
+		SkipUnlessProviderIs(providersWithSSH...)
 	})
+
+	AfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			// Most of the reboot tests just make sure that addon/system pods are running, so dump
+			// events for the kube-system namespace on failures
+			namespaceName := api.NamespaceSystem
+			By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
+			events, err := f.Client.Events(namespaceName).List(api.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			for _, e := range events.Items {
+				Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
+			}
+		}
+		// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
+		// rebooted/deleted node) for up to 5 minutes before all tunnels are dropped and recreated.  Most tests
+		// make use of some proxy feature to verify functionality. So, if a reboot test runs right before a test
+		// that tries to get logs, for example, we may get unlucky and try to use a closed tunnel to a node that
+		// was recently rebooted. There's no good way to poll for proxies being closed, so we sleep.
+		//
+		// TODO(cjcullen) reduce this sleep (#19314)
+		if providerIs("gke") {
+			By("waiting 5 minutes for all dead tunnels to be dropped")
+			time.Sleep(5 * time.Minute)
+		}
+	})
+
+	f = NewFramework("reboot")
 
 	It("each node by ordering clean reboot and ensure they function upon restart", func() {
 		// clean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is rebooted.
-		testReboot(c, "nohup sh -c 'sleep 10 && sudo reboot' >/dev/null 2>&1 &")
+		testReboot(f.Client, "nohup sh -c 'sleep 10 && sudo reboot' >/dev/null 2>&1 &")
 	})
 
 	It("each node by ordering unclean reboot and ensure they function upon restart", func() {
 		// unclean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is shutdown.
-		testReboot(c, "nohup sh -c 'sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
+		testReboot(f.Client, "nohup sh -c 'sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
 	})
 
 	It("each node by triggering kernel panic and ensure they function upon restart", func() {
 		// kernel panic
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before kernel panic is triggered.
-		testReboot(c, "nohup sh -c 'sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
+		testReboot(f.Client, "nohup sh -c 'sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
 	})
 
 	It("each node by switching off the network interface and ensure they function upon switch on", func() {
 		// switch the network interface off for a while to simulate a network outage
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before network is down.
-		testReboot(c, "nohup sh -c 'sleep 10 && sudo ifdown eth0 && sleep 120 && sudo ifup eth0' >/dev/null 2>&1 &")
+		testReboot(f.Client, "nohup sh -c 'sleep 10 && sudo ifdown eth0 && sleep 120 && sudo ifup eth0' >/dev/null 2>&1 &")
 	})
 
 	It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
 		// tell the firewall to drop all inbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping inbound packets.
 		// We still accept packages send from localhost to prevent monit from restarting kubelet.
-		testReboot(c, "nohup sh -c 'sleep 10 && sudo iptables -I INPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I INPUT 2 -j DROP && "+
+		testReboot(f.Client, "nohup sh -c 'sleep 10 && sudo iptables -I INPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I INPUT 2 -j DROP && "+
 			" sleep 120 && sudo iptables -D INPUT -j DROP && sudo iptables -D INPUT -s 127.0.0.1 -j ACCEPT' >/dev/null 2>&1 &")
 	})
 
@@ -94,54 +119,42 @@ var _ = Describe("Reboot", func() {
 		// tell the firewall to drop all outbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping outbound packets.
 		// We still accept packages send to localhost to prevent monit from restarting kubelet.
-		testReboot(c, "nohup sh -c 'sleep 10 &&  sudo iptables -I OUTPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I OUTPUT 2 -j DROP && "+
+		testReboot(f.Client, "nohup sh -c 'sleep 10 &&  sudo iptables -I OUTPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I OUTPUT 2 -j DROP && "+
 			" sleep 120 && sudo iptables -D OUTPUT -j DROP && sudo iptables -D OUTPUT -s 127.0.0.1 -j ACCEPT' >/dev/null 2>&1 &")
 	})
 })
 
 func testReboot(c *client.Client, rebootCmd string) {
 	// Get all nodes, and kick off the test on each.
-	nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
-	if err != nil {
-		Failf("Error getting nodes: %v", err)
-	}
-	result := make(chan bool, len(nodelist.Items))
-	for _, n := range nodelist.Items {
-		go rebootNode(c, testContext.Provider, n.ObjectMeta.Name, rebootCmd, result)
+	nodelist := ListSchedulableNodesOrDie(c)
+	result := make([]bool, len(nodelist.Items))
+	wg := sync.WaitGroup{}
+	wg.Add(len(nodelist.Items))
+
+	failed := false
+	for ix := range nodelist.Items {
+		go func(ix int) {
+			defer wg.Done()
+			n := nodelist.Items[ix]
+			result[ix] = rebootNode(c, testContext.Provider, n.ObjectMeta.Name, rebootCmd)
+			if !result[ix] {
+				failed = true
+			}
+		}(ix)
 	}
 
 	// Wait for all to finish and check the final result.
-	failed := false
-	// TODO(a-robinson): Change to `for range` syntax and remove logging once
-	// we support only Go >= 1.4.
-	for _, n := range nodelist.Items {
-		if !<-result {
-			Failf("Node %s failed reboot test.", n.ObjectMeta.Name)
-			failed = true
-		}
-	}
+	wg.Wait()
+
 	if failed {
+		for ix := range nodelist.Items {
+			n := nodelist.Items[ix]
+			if !result[ix] {
+				Logf("Node %s failed reboot test.", n.ObjectMeta.Name)
+			}
+		}
 		Failf("Test failed; at least one node failed to reboot in the time given.")
 	}
-}
-
-func issueSSHCommand(node *api.Node, provider, cmd string) error {
-	Logf("Getting external IP address for %s", node.Name)
-	host := ""
-	for _, a := range node.Status.Addresses {
-		if a.Type == api.NodeExternalIP {
-			host = a.Address + ":22"
-			break
-		}
-	}
-	if host == "" {
-		return fmt.Errorf("couldn't find external IP address for node %s", node.Name)
-	}
-	Logf("Calling %s on %s", cmd, node.Name)
-	if _, _, code, err := SSH(cmd, host, provider); code != 0 || err != nil {
-		return fmt.Errorf("when running %s on %s, got %d and %v", cmd, node.Name, code, err)
-	}
-	return nil
 }
 
 // rebootNode takes node name on provider through the following steps using c:
@@ -154,7 +167,7 @@ func issueSSHCommand(node *api.Node, provider, cmd string) error {
 //
 // It returns true through result only if all of the steps pass; at the first
 // failed step, it will return false through result and not run the rest.
-func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan bool) {
+func rebootNode(c *client.Client, provider, name, rebootCmd string) bool {
 	// Setup
 	ns := api.NamespaceSystem
 	ps := newPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(client.PodHost, name))
@@ -165,14 +178,12 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan 
 	node, err := c.Nodes().Get(name)
 	if err != nil {
 		Logf("Couldn't get node %s", name)
-		result <- false
-		return
+		return false
 	}
 
 	// Node sanity check: ensure it is "ready".
 	if !waitForNodeToBeReady(c, name, nodeReadyInitialTimeout) {
-		result <- false
-		return
+		return false
 	}
 
 	// Get all the pods on the node that don't have liveness probe set.
@@ -196,36 +207,31 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan 
 	// For each pod, we do a sanity check to ensure it's running / healthy
 	// now, as that's what we'll be checking later.
 	if !checkPodsRunningReady(c, ns, podNames, podReadyBeforeTimeout) {
-		result <- false
-		return
+		return false
 	}
 
 	// Reboot the node.
-	if err = issueSSHCommand(node, provider, rebootCmd); err != nil {
+	if err = issueSSHCommand(rebootCmd, provider, node); err != nil {
 		Logf("Error while issuing ssh command: %v", err)
-		result <- false
-		return
+		return false
 	}
 
 	// Wait for some kind of "not ready" status.
 	if !waitForNodeToBeNotReady(c, name, rebootNodeNotReadyTimeout) {
-		result <- false
-		return
+		return false
 	}
 
 	// Wait for some kind of "ready" status.
 	if !waitForNodeToBeReady(c, name, rebootNodeReadyAgainTimeout) {
-		result <- false
-		return
+		return false
 	}
 
 	// Ensure all of the pods that we found on this node before the reboot are
 	// running / healthy.
 	if !checkPodsRunningReady(c, ns, podNames, rebootPodReadyAgainTimeout) {
-		result <- false
-		return
+		return false
 	}
 
 	Logf("Reboot successful on node %s", name)
-	result <- true
+	return true
 }

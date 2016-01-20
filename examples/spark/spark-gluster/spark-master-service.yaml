@@ -1,0 +1,12 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: spark-master
+  labels:
+    component: spark-master-service
+spec:
+  ports:
+    - port: 7077
+      targetPort: 7077
+  selector:
+    component: spark-master

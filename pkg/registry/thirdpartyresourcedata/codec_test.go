@@ -92,7 +92,7 @@ func TestCodec(t *testing.T) {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 			continue
 		}
-		obj, err := codec.Decode(data)
+		obj, err := runtime.Decode(&codec, data)
 		if err != nil && !test.expectErr {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 			continue
@@ -120,7 +120,7 @@ func TestCodec(t *testing.T) {
 			t.Errorf("[%s]\nexpected\n%v\nsaw\n%v\n", test.name, test.obj, &output)
 		}
 
-		data, err = codec.Encode(rsrcObj)
+		data, err = runtime.Encode(&codec, rsrcObj)
 		if err != nil {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 		}
@@ -140,35 +140,31 @@ func TestCreater(t *testing.T) {
 	creater := NewObjectCreator("creater group", "creater version", api.Scheme)
 	tests := []struct {
 		name        string
-		version     string
-		kind        string
+		kind        unversioned.GroupVersionKind
 		expectedObj runtime.Object
 		expectErr   bool
 	}{
 		{
 			name:        "valid ThirdPartyResourceData creation",
-			version:     "creater group/creater version",
-			kind:        "ThirdPartyResourceData",
+			kind:        unversioned.GroupVersionKind{Group: "creater group", Version: "creater version", Kind: "ThirdPartyResourceData"},
 			expectedObj: &extensions.ThirdPartyResourceData{},
 			expectErr:   false,
 		},
 		{
 			name:        "invalid ThirdPartyResourceData creation",
-			version:     "invalid version",
-			kind:        "ThirdPartyResourceData",
+			kind:        unversioned.GroupVersionKind{Version: "invalid version", Kind: "ThirdPartyResourceData"},
 			expectedObj: nil,
 			expectErr:   true,
 		},
 		{
 			name:        "valid ListOptions creation",
-			version:     "v1",
-			kind:        "ListOptions",
+			kind:        unversioned.GroupVersionKind{Version: "v1", Kind: "ListOptions"},
 			expectedObj: &v1.ListOptions{},
 			expectErr:   false,
 		},
 	}
 	for _, test := range tests {
-		out, err := creater.New(test.version, test.kind)
+		out, err := creater.New(test.kind)
 		if err != nil && !test.expectErr {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 		}
@@ -179,5 +175,46 @@ func TestCreater(t *testing.T) {
 			t.Errorf("[%s] unexpected error: expect: %v, got: %v", test.expectedObj, out)
 		}
 
+	}
+}
+
+func TestResourceIsValid(t *testing.T) {
+	tests := []struct {
+		kind     string
+		resource string
+		valid    bool
+		name     string
+	}{
+		{
+			kind:     "Foo",
+			resource: "foos",
+			valid:    true,
+			name:     "basic",
+		},
+		{
+			kind:     "Party",
+			resource: "parties",
+			valid:    true,
+			name:     "fun",
+		},
+		{
+			kind:     "bus",
+			resource: "buses",
+			valid:    true,
+			name:     "transport",
+		},
+		{
+			kind:     "Foo",
+			resource: "fooies",
+			name:     "bad",
+		},
+	}
+	for _, test := range tests {
+		mapper := &thirdPartyResourceDataMapper{kind: test.kind}
+		mapper.mapper = api.RESTMapper
+		valid := mapper.ResourceIsValid(unversioned.GroupVersionResource{Resource: test.resource})
+		if valid != test.valid {
+			t.Errorf("%s: expected: %v, actual: %v", test.name, test.valid, valid)
+		}
 	}
 }

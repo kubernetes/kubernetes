@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
@@ -69,7 +68,7 @@ type LBCTester interface {
 	getName() string
 }
 
-// haproxyControllerTester implementes LBCTester for bare metal haproxy LBs.
+// haproxyControllerTester implements LBCTester for bare metal haproxy LBs.
 type haproxyControllerTester struct {
 	client      *client.Client
 	cfg         string
@@ -88,7 +87,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 	// Create a replication controller with the given configuration.
 	rc := rcFromManifest(h.cfg)
 	rc.Namespace = namespace
-	rc.Spec.Template.Labels["rcName"] = rc.Name
+	rc.Spec.Template.Labels["name"] = rc.Name
 
 	// Add the --namespace arg.
 	// TODO: Remove this when we have proper namespace support.
@@ -102,7 +101,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 	if err != nil {
 		return
 	}
-	if err = waitForRCPodsRunning(h.client, namespace, h.rcName); err != nil {
+	if err = waitForRCPodsRunning(h.client, namespace, rc.Name); err != nil {
 		return
 	}
 	h.rcName = rc.Name
@@ -110,9 +109,9 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 
 	// Find the pods of the rc we just created.
 	labelSelector := labels.SelectorFromSet(
-		labels.Set(map[string]string{"rcName": h.rcName}))
-	pods, err := h.client.Pods(h.rcNamespace).List(
-		labelSelector, fields.Everything())
+		labels.Set(map[string]string{"name": h.rcName}))
+	options := api.ListOptions{LabelSelector: labelSelector}
+	pods, err := h.client.Pods(h.rcNamespace).List(options)
 	if err != nil {
 		return err
 	}
@@ -164,7 +163,7 @@ func (s *ingManager) start(namespace string) (err error) {
 	for _, rcPath := range s.rcCfgPaths {
 		rc := rcFromManifest(rcPath)
 		rc.Namespace = namespace
-		rc.Spec.Template.Labels["rcName"] = rc.Name
+		rc.Spec.Template.Labels["name"] = rc.Name
 		rc, err = s.client.ReplicationControllers(rc.Namespace).Create(rc)
 		if err != nil {
 			return
@@ -174,7 +173,7 @@ func (s *ingManager) start(namespace string) (err error) {
 		}
 	}
 	// Create services.
-	// Note that it's upto the caller to make sure the service actually matches
+	// Note that it's up to the caller to make sure the service actually matches
 	// the pods of the rc.
 	for _, svcPath := range s.svcCfgPaths {
 		svc := svcFromManifest(svcPath)
@@ -195,7 +194,7 @@ func (s *ingManager) test(path string) error {
 	url := fmt.Sprintf("%v/hostName", path)
 	httpClient := &http.Client{}
 	return wait.Poll(pollInterval, serviceRespondingTimeout, func() (bool, error) {
-		body, err := simpleGET(httpClient, url)
+		body, err := simpleGET(httpClient, url, "")
 		if err != nil {
 			Logf("%v\n%v\n%v", url, body, err)
 			return false, nil
@@ -204,23 +203,20 @@ func (s *ingManager) test(path string) error {
 	})
 }
 
-var _ = Describe("ServiceLoadBalancer", func() {
+// TODO(ihmccreery) Skipped originally in #14988, never sent follow-up PR, as
+// far as I can tell.
+var _ = Describe("ServiceLoadBalancer [Skipped]", func() {
 	// These variables are initialized after framework's beforeEach.
 	var ns string
 	var repoRoot string
 	var client *client.Client
 
-	framework := Framework{BaseName: "servicelb"}
+	framework := NewFramework("servicelb")
 
 	BeforeEach(func() {
-		framework.beforeEach()
 		client = framework.Client
 		ns = framework.Namespace.Name
 		repoRoot = testContext.RepoRoot
-	})
-
-	AfterEach(func() {
-		framework.afterEach()
 	})
 
 	It("should support simple GET on Ingress ips", func() {
@@ -245,8 +241,13 @@ var _ = Describe("ServiceLoadBalancer", func() {
 })
 
 // simpleGET executes a get on the given url, returns error if non-200 returned.
-func simpleGET(c *http.Client, url string) (string, error) {
-	res, err := c.Get(url)
+func simpleGET(c *http.Client, url, host string) (string, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Host = host
+	res, err := c.Do(req)
 	if err != nil {
 		return "", err
 	}

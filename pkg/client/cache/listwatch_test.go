@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/util"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func parseSelectorOrDie(s string) fields.Selector {
@@ -55,7 +55,7 @@ func buildLocation(resourcePath string, query url.Values) string {
 }
 
 func TestListWatchesCanList(t *testing.T) {
-	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.Version())
+	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String())
 	table := []struct {
 		location      string
 		resource      string
@@ -89,23 +89,24 @@ func TestListWatchesCanList(t *testing.T) {
 		},
 	}
 	for _, item := range table {
-		handler := util.FakeHandler{
+		handler := utiltesting.FakeHandler{
 			StatusCode:   500,
 			ResponseBody: "",
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+		// TODO: Uncomment when fix #19254
+		// defer server.Close()
+		client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
 		lw := NewListWatchFromClient(client, item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
-		lw.List()
+		lw.List(api.ListOptions{})
 		handler.ValidateRequest(t, item.location, "GET", nil)
 	}
 }
 
 func TestListWatchesCanWatch(t *testing.T) {
-	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.Version())
+	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String())
 	table := []struct {
 		rv            string
 		location      string
@@ -117,7 +118,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		{
 			location: buildLocation(
 				testapi.Default.ResourcePathWithPrefix("watch", "nodes", api.NamespaceAll, ""),
-				buildQueryValues(url.Values{"resourceVersion": []string{""}})),
+				buildQueryValues(url.Values{})),
 			rv:            "",
 			resource:      "nodes",
 			namespace:     api.NamespaceAll,
@@ -155,17 +156,18 @@ func TestListWatchesCanWatch(t *testing.T) {
 	}
 
 	for _, item := range table {
-		handler := util.FakeHandler{
+		handler := utiltesting.FakeHandler{
 			StatusCode:   500,
 			ResponseBody: "",
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Default.Version()})
+		// TODO: Uncomment when fix #19254
+		// defer server.Close()
+		client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
 		lw := NewListWatchFromClient(client, item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
-		lw.Watch(item.rv)
+		lw.Watch(api.ListOptions{ResourceVersion: item.rv})
 		handler.ValidateRequest(t, item.location, "GET", nil)
 	}
 }

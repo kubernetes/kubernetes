@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/admin/cluster-components.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/admin/cluster-components.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -32,6 +33,31 @@ Documentation for other releases can be found at
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
 # Kubernetes Cluster Admin Guide: Cluster Components
+
+**Table of Contents**
+
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+- [Kubernetes Cluster Admin Guide: Cluster Components](#kubernetes-cluster-admin-guide-cluster-components)
+  - [Master Components](#master-components)
+    - [kube-apiserver](#kube-apiserver)
+    - [etcd](#etcd)
+    - [kube-controller-manager](#kube-controller-manager)
+    - [kube-scheduler](#kube-scheduler)
+    - [addons](#addons)
+      - [DNS](#dns)
+      - [User interface](#user-interface)
+      - [Container Resource Monitoring](#container-resource-monitoring)
+      - [Cluster-level Logging](#cluster-level-logging)
+  - [Node components](#node-components)
+    - [kubelet](#kubelet)
+    - [kube-proxy](#kube-proxy)
+    - [docker](#docker)
+    - [rkt](#rkt)
+    - [supervisord](#supervisord)
+    - [fluentd](#fluentd)
+
+<!-- END MUNGE: GENERATED_TOC -->
 
 This document outlines the various binary components that need to run to
 deliver a functioning Kubernetes cluster.
@@ -101,14 +127,38 @@ to create these pods and services does run on the master VM. See:
 
 Addon objects are created in the "kube-system" namespace.
 
-Example addons are:
-* [DNS](http://releases.k8s.io/HEAD/cluster/addons/dns/) provides cluster local DNS.
-* [kube-ui](http://releases.k8s.io/HEAD/cluster/addons/kube-ui/) provides a graphical UI for the
-  cluster.
-* [fluentd-elasticsearch](http://releases.k8s.io/HEAD/cluster/addons/fluentd-elasticsearch/) provides
-  log storage. Also see the [gcp version](http://releases.k8s.io/HEAD/cluster/addons/fluentd-gcp/).
-* [cluster-monitoring](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/) provides
-  monitoring for the cluster.
+#### DNS
+
+While the other addons are not strictly required, all Kubernetes
+clusters should have [cluster DNS](dns.md), as many examples rely on it.
+
+Cluster DNS is a DNS server, in addition to the other DNS server(s) in your
+environment, which serves DNS records for Kubernetes services.
+
+Containers started by Kubernetes automatically include this DNS server
+in their DNS searches.
+
+#### User interface
+
+The kube-ui provides a read-only overview of the cluster state.  Access
+[the UI using kubectl proxy](../user-guide/connecting-to-applications-proxy.md#connecting-to-the-kube-ui-service-from-your-local-workstation)
+
+#### Container Resource Monitoring
+
+[Container Resource Monitoring](../user-guide/monitoring.md) records generic time-series metrics
+about containers in a central database, and provides a UI for browsing that data.
+
+#### Cluster-level Logging
+
+[Container Logging](../user-guide/monitoring.md) saves container logs
+to a central log store with search/browsing interface.  There are two
+implementations:
+
+* [Cluster-level logging to Google Cloud Logging](
+docs/user-guide/logging.md#cluster-level-logging-to-google-cloud-logging)
+
+* [Cluster-level Logging with Elasticsearch and Kibana](
+docs/user-guide/logging.md#cluster-level-logging-with-elasticsearch-and-kibana)
 
 ## Node components
 
@@ -141,11 +191,14 @@ network rules on the host and performing connection forwarding.
 
 `rkt` is supported experimentally as an alternative to docker.
 
-### monit
+### supervisord
 
-`monit` is a lightweight process babysitting system for keeping kubelet and docker
+`supervisord` is a lightweight process babysitting system for keeping kubelet and docker
 running.
 
+### fluentd
+
+`fluentd` is a daemon which helps provide [cluster-level logging](#cluster-level-logging).
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/admin/cluster-components.md?pixel)]()

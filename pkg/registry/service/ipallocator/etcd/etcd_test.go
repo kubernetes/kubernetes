@@ -22,18 +22,19 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/registry/service/allocator"
-	allocator_etcd "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
+	allocatoretcd "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
+	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+
+	"golang.org/x/net/context"
 )
 
-func newStorage(t *testing.T) (*tools.FakeEtcdClient, ipallocator.Interface, allocator.Interface) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t, "")
+func newStorage(t *testing.T) (*etcdtesting.EtcdTestServer, ipallocator.Interface, allocator.Interface, storage.Interface) {
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
 	if err != nil {
 		t.Fatal(err)
@@ -43,11 +44,11 @@ func newStorage(t *testing.T) (*tools.FakeEtcdClient, ipallocator.Interface, all
 	storage := ipallocator.NewAllocatorCIDRRange(cidr, func(max int, rangeSpec string) allocator.Interface {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
 		backing = mem
-		etcd := allocator_etcd.NewEtcd(mem, "/ranges/serviceips", "serviceipallocation", etcdStorage)
+		etcd := allocatoretcd.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), etcdStorage)
 		return etcd
 	})
 
-	return fakeClient, storage, backing
+	return server, storage, backing, etcdStorage
 }
 
 func validNewRangeAllocation() *api.RangeAllocation {
@@ -63,23 +64,25 @@ func key() string {
 }
 
 func TestEmpty(t *testing.T) {
-	fakeClient, storage, _ := newStorage(t)
-	fakeClient.ExpectNotFoundGet(key())
-	if err := storage.Allocate(net.ParseIP("192.168.1.2")); !strings.Contains(err.Error(), "cannot allocate resources of type serviceipallocation at this time") {
+	server, storage, _, _ := newStorage(t)
+	defer server.Terminate(t)
+	if err := storage.Allocate(net.ParseIP("192.168.1.2")); !strings.Contains(err.Error(), "cannot allocate resources of type serviceipallocations at this time") {
 		t.Fatal(err)
 	}
 }
 
 func TestErrors(t *testing.T) {
-	_, storage, _ := newStorage(t)
+	server, storage, _, _ := newStorage(t)
+	defer server.Terminate(t)
 	if err := storage.Allocate(net.ParseIP("192.168.0.0")); err != ipallocator.ErrNotInRange {
 		t.Fatal(err)
 	}
 }
 
 func TestStore(t *testing.T) {
-	fakeClient, storage, backing := newStorage(t)
-	if _, err := fakeClient.Set(key(), runtime.EncodeOrDie(testapi.Default.Codec(), validNewRangeAllocation()), 0); err != nil {
+	server, storage, backing, si := newStorage(t)
+	defer server.Terminate(t)
+	if err := si.Set(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -96,10 +99,4 @@ func TestStore(t *testing.T) {
 	if err := storage.Allocate(net.ParseIP("192.168.1.2")); err != ipallocator.ErrAllocated {
 		t.Fatal(err)
 	}
-
-	obj := fakeClient.Data[key()]
-	if obj.R == nil || obj.R.Node == nil {
-		t.Fatalf("%s is empty: %#v", key(), obj)
-	}
-	t.Logf("data: %#v", obj.R.Node)
 }

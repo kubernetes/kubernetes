@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/devel/flaky-tests.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/devel/flaky-tests.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -80,17 +81,17 @@ You can use this script to automate checking for failures, assuming your cluster
 ```sh
 echo "" > output.txt
 for i in {1..4}; do
-  echo "Checking kubernetes-minion-${i}"
-  echo "kubernetes-minion-${i}:" >> output.txt
-  gcloud compute ssh "kubernetes-minion-${i}" --command="sudo docker ps -a" >> output.txt
+  echo "Checking kubernetes-node-${i}"
+  echo "kubernetes-node-${i}:" >> output.txt
+  gcloud compute ssh "kubernetes-node-${i}" --command="sudo docker ps -a" >> output.txt
 done
 grep "Exited ([^0])" output.txt
 ```
 
-Eventually you will have sufficient runs for your purposes. At that point you can stop and delete the replication controller by running:
+Eventually you will have sufficient runs for your purposes. At that point you can delete the replication controller by running:
 
 ```sh
-kubectl stop replicationcontroller flakecontroller
+kubectl delete replicationcontroller flakecontroller
 ```
 
 If you do a final check for flakes with `docker ps -a`, ignore tasks that exited -1, since that's what happens when you stop the replication controller.

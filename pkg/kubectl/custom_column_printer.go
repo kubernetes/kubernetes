@@ -27,6 +27,7 @@ import (
 	"text/tabwriter"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
 )
@@ -168,8 +169,8 @@ func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error
 		}
 	}
 
-	if runtime.IsListType(obj) {
-		objs, err := runtime.ExtractList(obj)
+	if meta.IsListType(obj) {
+		objs, err := meta.ExtractList(obj)
 		if err != nil {
 			return err
 		}

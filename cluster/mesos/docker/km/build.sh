@@ -41,11 +41,20 @@ find-binary() {
 
 km_path=$(find-binary km linux/amd64)
 if [ -z "$km_path" ]; then
-  echo "Failed to find km binary" 1>&2
-  exit 1
+  km_path=$(find-binary km darwin/amd64)
+  if [ -z "$km_path" ]; then
+    echo "Failed to find km binary" 1>&2
+    exit 1
+  fi
 fi
 kube_bin_path=$(dirname ${km_path})
 common_bin_path=$(cd ${script_dir}/../common/bin && pwd -P)
+
+# download nsenter and socat
+overlay_dir=${MESOS_DOCKER_OVERLAY_DIR:-${script_dir}/overlay}
+mkdir -p "${overlay_dir}"
+docker run --rm -v "${overlay_dir}:/target" jpetazzo/nsenter
+docker run --rm -v "${overlay_dir}:/target" mesosphere/kubernetes-socat
 
 cd "${KUBE_ROOT}"
 
@@ -56,6 +65,7 @@ echo "Workspace created: ${workspace}"
 
 cleanup() {
   rm -rf "${workspace}"
+  rm -f "${overlay_dir}/*"
   echo "Workspace deleted: ${workspace}"
 }
 trap 'cleanup' EXIT
@@ -65,6 +75,7 @@ echo "Copying files to workspace"
 
 # binaries & scripts
 mkdir -p "${workspace}/bin"
+
 #cp "${script_dir}/bin/"* "${workspace}/bin/"
 cp "${common_bin_path}/"* "${workspace}/bin/"
 cp "${kube_bin_path}/km" "${workspace}/bin/"
@@ -72,6 +83,13 @@ cp "${kube_bin_path}/km" "${workspace}/bin/"
 # config
 mkdir -p "${workspace}/opt"
 cp "${script_dir}/opt/"* "${workspace}/opt/"
+
+# package up the sandbox overay
+mkdir -p "${workspace}/overlay/bin"
+cp -a "${overlay_dir}/nsenter" "${workspace}/overlay/bin"
+cp -a "${overlay_dir}/socat" "${workspace}/overlay/bin"
+chmod +x "${workspace}/overlay/bin/"*
+cd "${workspace}/overlay" && tar -czvf "${workspace}/opt/sandbox-overlay.tar.gz" . && cd -
 
 # docker
 cp "${script_dir}/Dockerfile" "${workspace}/"

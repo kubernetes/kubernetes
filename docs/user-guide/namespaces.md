@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/user-guide/namespaces.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/user-guide/namespaces.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -99,7 +100,9 @@ $ export CONTEXT=$(kubectl config view | grep current-context | awk '{print $2}'
 Then update the default namespace:
 
 ```console
-$ kubectl config set-context $(CONTEXT) --namespace=<insert-namespace-name-here>
+$ kubectl config set-context $CONTEXT --namespace=<insert-namespace-name-here>
+# Validate it
+$ kubectl config view | grep namespace:
 ```
 
 ## Namespaces and DNS

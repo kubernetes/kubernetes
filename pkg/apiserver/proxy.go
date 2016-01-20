@@ -42,11 +42,11 @@ import (
 // ProxyHandler provides a http.Handler which will proxy traffic to locations
 // specified by items implementing Redirector.
 type ProxyHandler struct {
-	prefix                 string
-	storage                map[string]rest.Storage
-	codec                  runtime.Codec
-	context                api.RequestContextMapper
-	apiRequestInfoResolver *APIRequestInfoResolver
+	prefix              string
+	storage             map[string]rest.Storage
+	codec               runtime.Codec
+	context             api.RequestContextMapper
+	requestInfoResolver *RequestInfoResolver
 }
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -58,8 +58,8 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	reqStart := time.Now()
 	defer metrics.Monitor(&verb, &apiResource, util.GetClient(req), &httpCode, reqStart)
 
-	requestInfo, err := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
-	if err != nil {
+	requestInfo, err := r.requestInfoResolver.GetRequestInfo(req)
+	if err != nil || !requestInfo.IsResourceRequest {
 		notFound(w, req)
 		httpCode = http.StatusNotFound
 		return
@@ -101,7 +101,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	redirector, ok := storage.(rest.Redirector)
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resource)
-		httpCode = errorJSON(errors.NewMethodNotSupported(resource, "proxy"), r.codec, w)
+		httpCode = errorJSON(errors.NewMethodNotSupported(api.Resource(resource), "proxy"), r.codec, w)
 		return
 	}
 
@@ -109,8 +109,9 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		httplog.LogOf(req, w).Addf("Error getting ResourceLocation: %v", err)
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
-		httpCode = status.Code
+		code := int(status.Code)
+		writeJSON(code, r.codec, status, w, true)
+		httpCode = code
 		return
 	}
 	if location == nil {
@@ -144,13 +145,18 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	newReq, err := http.NewRequest(req.Method, location.String(), req.Body)
 	if err != nil {
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
+		code := int(status.Code)
+		writeJSON(code, r.codec, status, w, true)
 		notFound(w, req)
-		httpCode = status.Code
+		httpCode = code
 		return
 	}
 	httpCode = http.StatusOK
 	newReq.Header = req.Header
+	newReq.ContentLength = req.ContentLength
+	// Copy the TransferEncoding is for future-proofing. Currently Go only supports "chunked" and
+	// it can determine the TransferEncoding based on ContentLength and the Body.
+	newReq.TransferEncoding = req.TransferEncoding
 
 	// TODO convert this entire proxy to an UpgradeAwareProxy similar to
 	// https://github.com/openshift/origin/blob/master/pkg/util/httpproxy/upgradeawareproxy.go.
@@ -211,7 +217,8 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 	backendConn, err := proxyutil.DialURL(location, transport)
 	if err != nil {
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
+		code := int(status.Code)
+		writeJSON(code, r.codec, status, w, true)
 		return true
 	}
 	defer backendConn.Close()
@@ -222,14 +229,16 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 	requestHijackedConn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
+		code := int(status.Code)
+		writeJSON(code, r.codec, status, w, true)
 		return true
 	}
 	defer requestHijackedConn.Close()
 
 	if err = newReq.Write(backendConn); err != nil {
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
+		code := int(status.Code)
+		writeJSON(code, r.codec, status, w, true)
 		return true
 	}
 

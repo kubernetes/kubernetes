@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -51,8 +51,9 @@ type downwardAPIPlugin struct {
 
 var _ volume.VolumePlugin = &downwardAPIPlugin{}
 
-func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost) {
+func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *downwardAPIPlugin) Name() string {
@@ -90,6 +91,7 @@ type downwardAPIVolume struct {
 	pod                     *api.Pod
 	podUID                  types.UID // TODO: remove this redundancy as soon NewCleaner func will have *api.POD and not only types.UID
 	plugin                  *downwardAPIPlugin
+	volume.MetricsNil
 }
 
 // This is the spec for the volume that this plugin wraps.
@@ -106,6 +108,16 @@ type downwardAPIVolumeBuilder struct {
 
 // downwardAPIVolumeBuilder implements volume.Builder interface
 var _ volume.Builder = &downwardAPIVolumeBuilder{}
+
+// downward API volumes are always ReadOnlyManaged
+func (d *downwardAPIVolume) GetAttributes() volume.Attributes {
+	return volume.Attributes{
+		ReadOnly:                    true,
+		Managed:                     true,
+		SupportsOwnershipManagement: true,
+		SupportsSELinux:             true,
+	}
+}
 
 // SetUp puts in place the volume plugin.
 // This function is not idempotent by design. We want the data to be refreshed periodically.
@@ -146,11 +158,6 @@ func (b *downwardAPIVolumeBuilder) SetUpAt(dir string) error {
 
 	glog.V(3).Infof("Data dumped for downwardAPI volume %v for pod %v/%v", b.volName, b.pod.Namespace, b.pod.Name)
 	return nil
-}
-
-// IsReadOnly func to fulfill volume.Builder interface
-func (d *downwardAPIVolume) IsReadOnly() bool {
-	return true
 }
 
 // collectData collects requested downwardAPI in data map.
@@ -338,7 +345,7 @@ func sortLines(values string) string {
 }
 
 func (d *downwardAPIVolume) GetPath() string {
-	return d.plugin.host.GetPodVolumeDir(d.podUID, util.EscapeQualifiedNameForDisk(downwardAPIPluginName), d.volName)
+	return d.plugin.host.GetPodVolumeDir(d.podUID, utilstrings.EscapeQualifiedNameForDisk(downwardAPIPluginName), d.volName)
 }
 
 // downwardAPIVolumeCleander handles cleaning up downwardAPI volumes
@@ -365,5 +372,5 @@ func (c *downwardAPIVolumeCleaner) TearDownAt(dir string) error {
 }
 
 func (b *downwardAPIVolumeBuilder) getMetaDir() string {
-	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, util.EscapeQualifiedNameForDisk(downwardAPIPluginName)), b.volName)
+	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedNameForDisk(downwardAPIPluginName)), b.volName)
 }

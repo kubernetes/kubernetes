@@ -60,11 +60,11 @@ const (
 // -------------------
 
 type cborEncDriver struct {
+	noBuiltInTypes
+	encNoSeparator
 	e *Encoder
 	w encWriter
 	h *CborHandle
-	noBuiltInTypes
-	encNoSeparator
 	x [8]byte
 }
 
@@ -175,11 +175,10 @@ type cborDecDriver struct {
 	d      *Decoder
 	h      *CborHandle
 	r      decReader
+	b      [scratchByteArrayLen]byte
 	br     bool // bytes reader
 	bdRead bool
-	bdType valueType
 	bd     byte
-	b      [scratchByteArrayLen]byte
 	noBuiltInTypes
 	decNoSeparator
 }
@@ -187,24 +186,23 @@ type cborDecDriver struct {
 func (d *cborDecDriver) readNextBd() {
 	d.bd = d.r.readn1()
 	d.bdRead = true
-	d.bdType = valueTypeUnset
 }
 
-func (d *cborDecDriver) IsContainerType(vt valueType) (bv bool) {
-	switch vt {
-	case valueTypeNil:
-		return d.bd == cborBdNil
-	case valueTypeBytes:
-		return d.bd == cborBdIndefiniteBytes || (d.bd >= cborBaseBytes && d.bd < cborBaseString)
-	case valueTypeString:
-		return d.bd == cborBdIndefiniteString || (d.bd >= cborBaseString && d.bd < cborBaseArray)
-	case valueTypeArray:
-		return d.bd == cborBdIndefiniteArray || (d.bd >= cborBaseArray && d.bd < cborBaseMap)
-	case valueTypeMap:
-		return d.bd == cborBdIndefiniteMap || (d.bd >= cborBaseMap && d.bd < cborBaseTag)
+func (d *cborDecDriver) ContainerType() (vt valueType) {
+	if d.bd == cborBdNil {
+		return valueTypeNil
+	} else if d.bd == cborBdIndefiniteBytes || (d.bd >= cborBaseBytes && d.bd < cborBaseString) {
+		return valueTypeBytes
+	} else if d.bd == cborBdIndefiniteString || (d.bd >= cborBaseString && d.bd < cborBaseArray) {
+		return valueTypeString
+	} else if d.bd == cborBdIndefiniteArray || (d.bd >= cborBaseArray && d.bd < cborBaseMap) {
+		return valueTypeArray
+	} else if d.bd == cborBdIndefiniteMap || (d.bd >= cborBaseMap && d.bd < cborBaseTag) {
+		return valueTypeMap
+	} else {
+		// d.d.errorf("isContainerType: unsupported parameter: %v", vt)
 	}
-	d.d.errorf("isContainerType: unsupported parameter: %v", vt)
-	return // "unreachable"
+	return valueTypeUnset
 }
 
 func (d *cborDecDriver) TryDecodeAsNil() bool {
@@ -446,71 +444,72 @@ func (d *cborDecDriver) DecodeExt(rv interface{}, xtag uint64, ext Ext) (realxta
 	return
 }
 
-func (d *cborDecDriver) DecodeNaked() (v interface{}, vt valueType, decodeFurther bool) {
+func (d *cborDecDriver) DecodeNaked() {
 	if !d.bdRead {
 		d.readNextBd()
 	}
 
+	n := &d.d.n
+	var decodeFurther bool
+
 	switch d.bd {
 	case cborBdNil:
-		vt = valueTypeNil
+		n.v = valueTypeNil
 	case cborBdFalse:
-		vt = valueTypeBool
-		v = false
+		n.v = valueTypeBool
+		n.b = false
 	case cborBdTrue:
-		vt = valueTypeBool
-		v = true
+		n.v = valueTypeBool
+		n.b = true
 	case cborBdFloat16, cborBdFloat32:
-		vt = valueTypeFloat
-		v = d.DecodeFloat(true)
+		n.v = valueTypeFloat
+		n.f = d.DecodeFloat(true)
 	case cborBdFloat64:
-		vt = valueTypeFloat
-		v = d.DecodeFloat(false)
+		n.v = valueTypeFloat
+		n.f = d.DecodeFloat(false)
 	case cborBdIndefiniteBytes:
-		vt = valueTypeBytes
-		v = d.DecodeBytes(nil, false, false)
+		n.v = valueTypeBytes
+		n.l = d.DecodeBytes(nil, false, false)
 	case cborBdIndefiniteString:
-		vt = valueTypeString
-		v = d.DecodeString()
+		n.v = valueTypeString
+		n.s = d.DecodeString()
 	case cborBdIndefiniteArray:
-		vt = valueTypeArray
+		n.v = valueTypeArray
 		decodeFurther = true
 	case cborBdIndefiniteMap:
-		vt = valueTypeMap
+		n.v = valueTypeMap
 		decodeFurther = true
 	default:
 		switch {
 		case d.bd >= cborBaseUint && d.bd < cborBaseNegInt:
 			if d.h.SignedInteger {
-				vt = valueTypeInt
-				v = d.DecodeInt(64)
+				n.v = valueTypeInt
+				n.i = d.DecodeInt(64)
 			} else {
-				vt = valueTypeUint
-				v = d.DecodeUint(64)
+				n.v = valueTypeUint
+				n.u = d.DecodeUint(64)
 			}
 		case d.bd >= cborBaseNegInt && d.bd < cborBaseBytes:
-			vt = valueTypeInt
-			v = d.DecodeInt(64)
+			n.v = valueTypeInt
+			n.i = d.DecodeInt(64)
 		case d.bd >= cborBaseBytes && d.bd < cborBaseString:
-			vt = valueTypeBytes
-			v = d.DecodeBytes(nil, false, false)
+			n.v = valueTypeBytes
+			n.l = d.DecodeBytes(nil, false, false)
 		case d.bd >= cborBaseString && d.bd < cborBaseArray:
-			vt = valueTypeString
-			v = d.DecodeString()
+			n.v = valueTypeString
+			n.s = d.DecodeString()
 		case d.bd >= cborBaseArray && d.bd < cborBaseMap:
-			vt = valueTypeArray
+			n.v = valueTypeArray
 			decodeFurther = true
 		case d.bd >= cborBaseMap && d.bd < cborBaseTag:
-			vt = valueTypeMap
+			n.v = valueTypeMap
 			decodeFurther = true
 		case d.bd >= cborBaseTag && d.bd < cborBaseSimple:
-			vt = valueTypeExt
-			var re RawExt
-			ui := d.decUint()
+			n.v = valueTypeExt
+			n.u = d.decUint()
+			n.l = nil
 			d.bdRead = false
-			re.Tag = ui
-			d.d.decode(&re.Value)
-			v = &re
+			// d.d.decode(&re.Value) // handled by decode itself.
 			// decodeFurther = true
 		default:
 			d.d.errorf("decodeNaked: Unrecognized d.bd: 0x%x", d.bd)
@@ -557,8 +556,12 @@ func (d *cborDecDriver) DecodeNaked() (v interface{}, vt valueType, decodeFurthe
 //     // Now, vv contains the same string "one-byte"
 //
 type CborHandle struct {
-	BasicHandle
 	binaryEncodingType
+	BasicHandle
+}
+
+func (h *CborHandle) SetInterfaceExt(rt reflect.Type, tag uint64, ext InterfaceExt) (err error) {
+	return h.SetExt(rt, tag, &setExtWrapper{i: ext})
 }
 
 func (h *CborHandle) newEncDriver(e *Encoder) encDriver {
@@ -569,8 +572,12 @@ func (h *CborHandle) newDecDriver(d *Decoder) decDriver {
 	return &cborDecDriver{d: d, r: d.r, h: h, br: d.bytes}
 }
 
-func (h *CborHandle) SetInterfaceExt(rt reflect.Type, tag uint64, ext InterfaceExt) (err error) {
-	return h.SetExt(rt, tag, &setExtWrapper{i: ext})
+func (e *cborEncDriver) reset() {
+	e.w = e.e.w
+}
+
+func (d *cborDecDriver) reset() {
+	d.r = d.d.r
 }
 
 var _ decDriver = (*cborDecDriver)(nil)

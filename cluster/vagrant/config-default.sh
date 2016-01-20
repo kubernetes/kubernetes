@@ -16,9 +16,9 @@
 
 ## Contains configuration values for interacting with the Vagrant cluster
 
-# Number of minions in the cluster
-NUM_MINIONS=${NUM_MINIONS-"1"}
-export NUM_MINIONS
+# Number of nodes in the cluster
+NUM_NODES=${NUM_NODES-"1"}
+export NUM_NODES
 
 # The IP of the master
 export MASTER_IP=${MASTER_IP-"10.245.1.2"}
@@ -30,20 +30,20 @@ export MASTER_NAME="${INSTANCE_PREFIX}-master"
 # Should the master serve as a node
 REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-false}
 
-# Map out the IPs, names and container subnets of each minion
-export MINION_IP_BASE=${MINION_IP_BASE-"10.245.1."}
-MINION_CONTAINER_SUBNET_BASE="10.246"
+# Map out the IPs, names and container subnets of each node
+export NODE_IP_BASE=${NODE_IP_BASE-"10.245.1."}
+NODE_CONTAINER_SUBNET_BASE="10.246"
 MASTER_CONTAINER_NETMASK="255.255.255.0"
-MASTER_CONTAINER_ADDR="${MINION_CONTAINER_SUBNET_BASE}.0.1"
-MASTER_CONTAINER_SUBNET="${MINION_CONTAINER_SUBNET_BASE}.0.1/24"
-CONTAINER_SUBNET="${MINION_CONTAINER_SUBNET_BASE}.0.0/16"
-for ((i=0; i < NUM_MINIONS; i++)) do
-  MINION_IPS[$i]="${MINION_IP_BASE}$((i+3))"
-  MINION_NAMES[$i]="${INSTANCE_PREFIX}-minion-$((i+1))"
-  MINION_CONTAINER_SUBNETS[$i]="${MINION_CONTAINER_SUBNET_BASE}.$((i+1)).1/24"
-  MINION_CONTAINER_ADDRS[$i]="${MINION_CONTAINER_SUBNET_BASE}.$((i+1)).1"
-  MINION_CONTAINER_NETMASKS[$i]="255.255.255.0"
-  VAGRANT_MINION_NAMES[$i]="minion-$((i+1))"
+MASTER_CONTAINER_ADDR="${NODE_CONTAINER_SUBNET_BASE}.0.1"
+MASTER_CONTAINER_SUBNET="${NODE_CONTAINER_SUBNET_BASE}.0.1/24"
+CONTAINER_SUBNET="${NODE_CONTAINER_SUBNET_BASE}.0.0/16"
+for ((i=0; i < NUM_NODES; i++)) do
+  NODE_IPS[$i]="${NODE_IP_BASE}$((i+3))"
+  NODE_NAMES[$i]="${INSTANCE_PREFIX}-node-$((i+1))"
+  NODE_CONTAINER_SUBNETS[$i]="${NODE_CONTAINER_SUBNET_BASE}.$((i+1)).1/24"
+  NODE_CONTAINER_ADDRS[$i]="${NODE_CONTAINER_SUBNET_BASE}.$((i+1)).1"
+  NODE_CONTAINER_NETMASKS[$i]="255.255.255.0"
+  VAGRANT_NODE_NAMES[$i]="node-$((i+1))"
 done
 
 SERVICE_CLUSTER_IP_RANGE=10.247.0.0/16  # formerly PORTAL_NET
@@ -54,16 +54,6 @@ MASTER_PASSWD=vagrant
 
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
-
-# Optional: Enable experimental API features
-ENABLE_EXPERIMENTAL_API="${KUBE_ENABLE_EXPERIMENTAL_API:-true}"
-
-# Optional: Enable feature for autoscaling number of pods
-# Experimental feature, not ready for production use.
-ENABLE_HORIZONTAL_POD_AUTOSCALER="${KUBE_ENABLE_HORIZONTAL_POD_AUTOSCALER:-true}"
-if [[ "${ENABLE_HORIZONTAL_POD_AUTOSCALER}" == "true" ]]; then
-  ENABLE_EXPERIMENTAL_API=true
-fi
 
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=false
@@ -112,3 +102,5 @@ NETWORK_PROVIDER="${NETWORK_PROVIDER:-none}" # opencontrail
 OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
 OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"
 OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
+# Optional: if set to true, kube-up will configure the cluster to run e2e tests.
+E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}

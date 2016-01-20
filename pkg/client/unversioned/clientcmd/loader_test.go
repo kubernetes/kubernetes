@@ -174,6 +174,32 @@ func TestConflictingCurrentContext(t *testing.T) {
 	}
 }
 
+func TestLoadingEmptyMaps(t *testing.T) {
+	configFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(configFile.Name())
+
+	mockConfig := clientcmdapi.Config{
+		CurrentContext: "any-context-value",
+	}
+
+	WriteToFile(mockConfig, configFile.Name())
+
+	config, err := LoadFromFile(configFile.Name())
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if config.Clusters == nil {
+		t.Error("expected config.Clusters to be non-nil")
+	}
+	if config.AuthInfos == nil {
+		t.Error("expected config.AuthInfos to be non-nil")
+	}
+	if config.Contexts == nil {
+		t.Error("expected config.Contexts to be non-nil")
+	}
+}
+
 func TestResolveRelativePaths(t *testing.T) {
 	pathResolutionConfig1 := clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{

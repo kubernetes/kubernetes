@@ -23,13 +23,13 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 )
 
 // This test requires that --terminated-pod-gc-threshold=100 be set on the controller manager
-var _ = Describe("Garbage collector", func() {
+//
+// Slow by design (7 min)
+var _ = Describe("Garbage collector [Slow]", func() {
 	f := NewFramework("garbage-collector")
 	It("should handle the creation of 1000 pods", func() {
 		SkipUnlessProviderIs("gce")
@@ -56,7 +56,7 @@ var _ = Describe("Garbage collector", func() {
 		// 20 seconds.
 		time.Sleep(30 * time.Second)
 
-		pods, err := f.Client.Pods(f.Namespace.Name).List(labels.Everything(), fields.Everything())
+		pods, err := f.Client.Pods(f.Namespace.Name).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(pods.Items)).To(BeNumerically("==", 100))
 	})
@@ -73,7 +73,7 @@ func createTerminatingPod(f *Framework) (*api.Pod, error) {
 			Containers: []api.Container{
 				{
 					Name:  string(uuid),
-					Image: "beta.gcr.io/google_containers/busybox",
+					Image: "gcr.io/google_containers/busybox",
 				},
 			},
 		},

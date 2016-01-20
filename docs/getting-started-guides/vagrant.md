@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/getting-started-guides/vagrant.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/vagrant.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -56,7 +57,7 @@ Running Kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
 
 ### Prerequisites
 
-1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
+1. Install latest version >= 1.7.4 of vagrant from http://www.vagrantup.com/downloads.html
 2. Install one of:
    1. The latest version of Virtual Box from https://www.virtualbox.org/wiki/Downloads
    2. [VMWare Fusion](https://www.vmware.com/products/fusion/) version 5 or greater as well as the appropriate [Vagrant VMWare Fusion provider](https://www.vagrantup.com/vmware)
@@ -284,7 +285,10 @@ my-nginx-xql4j   1/1       Running   0          1m
 
 $ ./cluster/kubectl.sh get services
 NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR               AGE
-my-nginx          10.0.0.1         <none>            80/TCP        run=my-nginx           1h
+
+$ ./cluster/kubectl.sh get replicationcontrollers
+CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR       REPLICAS   AGE
+my-nginx     my-nginx       nginx      run=my-nginx   3          1m
 ```
 
 We did not start any services, hence there are none listed. But we see three replicas displayed properly.
@@ -319,9 +323,9 @@ export KUBERNETES_PROVIDER=vagrant
 During provision of the cluster, you may see the following message:
 
 ```sh
-Validating minion-1
+Validating node-1
 .............
-Waiting for each minion to be registered with cloud provider
+Waiting for each node to be registered with cloud provider
 error: couldn't read version from server: Get https://10.245.1.2/api: dial tcp 10.245.1.2:443: i/o timeout
 ```
 
@@ -331,9 +335,9 @@ To debug, first verify that the master is binding to the proper IP address:
 
 ```
 $ vagrant ssh master
-$ ifconfig | grep eth1 -C 2 
-eth1: flags=4163<UP,BROADCAST,RUNNING,MULTICAST> mtu 1500 inet 10.245.1.2 netmask 
-   255.255.255.0 broadcast 10.245.1.255 
+$ ifconfig | grep eth1 -C 2
+eth1: flags=4163<UP,BROADCAST,RUNNING,MULTICAST> mtu 1500 inet 10.245.1.2 netmask
+   255.255.255.0 broadcast 10.245.1.255
 ```
 
 Then verify that your host machine has a network connection to a bridge that can serve that address:
@@ -386,10 +390,10 @@ Log on to one of the nodes (`vagrant ssh node-1`) and inspect the salt minion lo
 
 #### I want to change the number of nodes!
 
-You can control the number of nodes that are instantiated via the environment variable `NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough nodes to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single node. You do this, by setting `NUM_MINIONS` to 1 like so:
+You can control the number of nodes that are instantiated via the environment variable `NUM_NODES` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough nodes to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single node. You do this, by setting `NUM_NODES` to 1 like so:
 
 ```sh
-export NUM_MINIONS=1
+export NUM_NODES=1
 ```
 
 #### I want my VMs to have more memory!
@@ -405,7 +409,7 @@ If you need more granular control, you can set the amount of memory for the mast
 
 ```sh
 export KUBERNETES_MASTER_MEMORY=1536
-export KUBERNETES_MINION_MEMORY=2048
+export KUBERNETES_NODE_MEMORY=2048
 ```
 
 #### I ran vagrant suspend and nothing works!

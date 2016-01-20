@@ -19,7 +19,6 @@ package testclient
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -40,10 +39,14 @@ func (c *FakeHorizontalPodAutoscalers) Get(name string) (*extensions.HorizontalP
 	return obj.(*extensions.HorizontalPodAutoscaler), err
 }
 
-func (c *FakeHorizontalPodAutoscalers) List(label labels.Selector, field fields.Selector) (*extensions.HorizontalPodAutoscalerList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("horizontalpodautoscalers", c.Namespace, label, field), &extensions.HorizontalPodAutoscalerList{})
+func (c *FakeHorizontalPodAutoscalers) List(opts api.ListOptions) (*extensions.HorizontalPodAutoscalerList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("horizontalpodautoscalers", c.Namespace, opts), &extensions.HorizontalPodAutoscalerList{})
 	if obj == nil {
 		return nil, err
+	}
+	label := opts.LabelSelector
+	if label == nil {
+		label = labels.Everything()
 	}
 	list := &extensions.HorizontalPodAutoscalerList{}
 	for _, a := range obj.(*extensions.HorizontalPodAutoscalerList).Items {
@@ -85,6 +88,6 @@ func (c *FakeHorizontalPodAutoscalers) Delete(name string, options *api.DeleteOp
 	return err
 }
 
-func (c *FakeHorizontalPodAutoscalers) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewWatchAction("horizontalpodautoscalers", c.Namespace, label, field, resourceVersion))
+func (c *FakeHorizontalPodAutoscalers) Watch(opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("horizontalpodautoscalers", c.Namespace, opts))
 }

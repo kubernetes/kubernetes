@@ -31,10 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -219,7 +219,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "test",
-						Image: "beta.gcr.io/google_containers/pause:2.0",
+						Image: "gcr.io/google_containers/pause:2.0",
 					},
 				},
 			},
@@ -244,7 +244,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "beta.gcr.io/google_containers/pause:2.0",
+						Image: "gcr.io/google_containers/pause:2.0",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
@@ -287,7 +287,7 @@ var _ = Describe("Pods", func() {
 							Handler: api.Handler{
 								HTTPGet: &api.HTTPGetAction{
 									Path: "/index.html",
-									Port: util.NewIntOrStringFromInt(8080),
+									Port: intstr.FromInt(8080),
 								},
 							},
 							InitialDelaySeconds: 30,
@@ -298,13 +298,18 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("setting up watch")
-		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
+		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+		options := api.ListOptions{LabelSelector: selector}
+		pods, err := podClient.List(options)
 		if err != nil {
 			Failf("Failed to query for pods: %v", err)
 		}
 		Expect(len(pods.Items)).To(Equal(0))
-		w, err := podClient.Watch(
-			labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything(), pods.ListMeta.ResourceVersion)
+		options = api.ListOptions{
+			LabelSelector:   selector,
+			ResourceVersion: pods.ListMeta.ResourceVersion,
+		}
+		w, err := podClient.Watch(options)
 		if err != nil {
 			Failf("Failed to set up watch: %v", err)
 		}
@@ -320,7 +325,9 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("verifying the pod is in kubernetes")
-		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
+		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+		options = api.ListOptions{LabelSelector: selector}
+		pods, err = podClient.List(options)
 		if err != nil {
 			Failf("Failed to query for pods: %v", err)
 		}
@@ -364,7 +371,9 @@ var _ = Describe("Pods", func() {
 		Expect(lastPod.DeletionTimestamp).ToNot(BeNil())
 		Expect(lastPod.Spec.TerminationGracePeriodSeconds).ToNot(BeZero())
 
-		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
+		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+		options = api.ListOptions{LabelSelector: selector}
+		pods, err = podClient.List(options)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to list pods to verify deletion: %v", err))
 		}
@@ -395,7 +404,7 @@ var _ = Describe("Pods", func() {
 							Handler: api.Handler{
 								HTTPGet: &api.HTTPGetAction{
 									Path: "/index.html",
-									Port: util.NewIntOrStringFromInt(8080),
+									Port: intstr.FromInt(8080),
 								},
 							},
 							InitialDelaySeconds: 30,
@@ -418,7 +427,9 @@ var _ = Describe("Pods", func() {
 		expectNoError(framework.WaitForPodRunning(pod.Name))
 
 		By("verifying the pod is in kubernetes")
-		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
+		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+		options := api.ListOptions{LabelSelector: selector}
+		pods, err := podClient.List(options)
 		Expect(len(pods.Items)).To(Equal(1))
 
 		// Standard get, update retry loop
@@ -448,7 +459,9 @@ var _ = Describe("Pods", func() {
 		expectNoError(framework.WaitForPodRunning(pod.Name))
 
 		By("verifying the updated pod is in kubernetes")
-		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
+		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+		options = api.ListOptions{LabelSelector: selector}
+		pods, err = podClient.List(options)
 		Expect(len(pods.Items)).To(Equal(1))
 		Logf("Pod update OK")
 	})
@@ -497,7 +510,7 @@ var _ = Describe("Pods", func() {
 			Spec: api.ServiceSpec{
 				Ports: []api.ServicePort{{
 					Port:       8765,
-					TargetPort: util.NewIntOrStringFromInt(8080),
+					TargetPort: intstr.FromInt(8080),
 				}},
 				Selector: map[string]string{
 					"name": serverName,
@@ -559,6 +572,7 @@ var _ = Describe("Pods", func() {
 								},
 							},
 							InitialDelaySeconds: 15,
+							FailureThreshold:    1,
 						},
 					},
 				},
@@ -585,6 +599,7 @@ var _ = Describe("Pods", func() {
 								},
 							},
 							InitialDelaySeconds: 15,
+							FailureThreshold:    1,
 						},
 					},
 				},
@@ -608,10 +623,11 @@ var _ = Describe("Pods", func() {
 							Handler: api.Handler{
 								HTTPGet: &api.HTTPGetAction{
 									Path: "/healthz",
-									Port: util.NewIntOrStringFromInt(8080),
+									Port: intstr.FromInt(8080),
 								},
 							},
 							InitialDelaySeconds: 15,
+							FailureThreshold:    1,
 						},
 					},
 				},
@@ -619,7 +635,8 @@ var _ = Describe("Pods", func() {
 		}, 1, defaultObservationTimeout)
 	})
 
-	It("should have monotonically increasing restart count [Conformance]", func() {
+	// Slow by design (5 min)
+	It("should have monotonically increasing restart count [Conformance] [Slow]", func() {
 		runLivenessTest(framework.Client, framework.Namespace.Name, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "liveness-http",
@@ -635,10 +652,11 @@ var _ = Describe("Pods", func() {
 							Handler: api.Handler{
 								HTTPGet: &api.HTTPGetAction{
 									Path: "/healthz",
-									Port: util.NewIntOrStringFromInt(8080),
+									Port: intstr.FromInt(8080),
 								},
 							},
 							InitialDelaySeconds: 5,
+							FailureThreshold:    1,
 						},
 					},
 				},
@@ -668,10 +686,11 @@ var _ = Describe("Pods", func() {
 							Handler: api.Handler{
 								HTTPGet: &api.HTTPGetAction{
 									Path: "/read",
-									Port: util.NewIntOrStringFromInt(8080),
+									Port: intstr.FromInt(8080),
 								},
 							},
 							InitialDelaySeconds: 15,
+							FailureThreshold:    1,
 						},
 					},
 				},
@@ -827,39 +846,6 @@ var _ = Describe("Pods", func() {
 		}
 	})
 
-	It("should have their container restart back-off timer increase exponentially", func() {
-		podName := "pod-back-off-exponentially"
-		containerName := "back-off"
-		podClient := framework.Client.Pods(framework.Namespace.Name)
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:   podName,
-				Labels: map[string]string{"test": "back-off-image"},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox",
-						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
-					},
-				},
-			},
-		}
-
-		defer func() {
-			By("deleting the pod")
-			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
-		}()
-
-		delay1, delay2 := startPodAndGetBackOffs(framework, pod, podName, containerName, buildBackOffDuration)
-		delay1 += 1 // divide by zero
-		ratio := float64(delay2) / float64(delay1)
-		if math.Floor(ratio) != 2 && math.Ceil(ratio) != 2 {
-			Failf("back-off gap is not increasing exponentially pod=%s/%s delay1=%s delay2=%s", podName, containerName, delay1, delay2)
-		}
-	})
-
 	It("should have their auto-restart back-off timer reset on image update", func() {
 		podName := "pod-back-off-image"
 		containerName := "back-off"
@@ -906,12 +892,13 @@ var _ = Describe("Pods", func() {
 			Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 		}
 
-		if delayAfterUpdate > delay2 || delayAfterUpdate > delay1 {
+		if delayAfterUpdate > 2*delay2 || delayAfterUpdate > 2*delay1 {
 			Failf("updating image did not reset the back-off value in pod=%s/%s d3=%s d2=%s d1=%s", podName, containerName, delayAfterUpdate, delay1, delay2)
 		}
 	})
 
-	It("should not back-off restarting a container on LivenessProbe failure", func() {
+	// Flaky issue #18293
+	It("should not back-off restarting a container on LivenessProbe failure [Flaky]", func() {
 		podClient := framework.Client.Pods(framework.Namespace.Name)
 		podName := "pod-back-off-liveness"
 		containerName := "back-off-liveness"
@@ -951,7 +938,8 @@ var _ = Describe("Pods", func() {
 		}
 	})
 
-	It("should cap back-off at MaxContainerBackOff", func() {
+	// Slow issue #19027 (20 mins)
+	It("should cap back-off at MaxContainerBackOff [Slow]", func() {
 		podClient := framework.Client.Pods(framework.Namespace.Name)
 		podName := "back-off-cap"
 		containerName := "back-off-cap"
@@ -1062,7 +1050,9 @@ var _ = Describe("Pods", func() {
 			expectNoError(framework.WaitForPodRunning(pod.Name))
 
 			By("verifying the pod is in kubernetes")
-			pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+			selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+			options := api.ListOptions{LabelSelector: selector}
+			pods, err := podClient.List(options)
 			if err != nil {
 				Failf("Failed to query for pods: %v", err)
 			}
@@ -1135,7 +1125,9 @@ var _ = Describe("Pods", func() {
 			expectNoError(framework.WaitForPodRunning(pod.Name))
 
 			By("verifying the pod is in kubernetes")
-			pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+			selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+			options := api.ListOptions{LabelSelector: selector}
+			pods, err := podClient.List(options)
 			if err != nil {
 				Failf("Failed to query for pods: %v", err)
 			}

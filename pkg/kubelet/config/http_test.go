@@ -29,8 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func TestURLErrorNotExistNoUpdate(t *testing.T) {
@@ -68,7 +67,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Invalid volume name",
 			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{{Name: "_INVALID_"}},
 				},
@@ -77,7 +76,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Duplicate volume names",
 			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{{Name: "repeated"}, {Name: "repeated"}},
 				},
@@ -86,7 +85,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Unspecified container name",
 			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: ""}},
 				},
@@ -95,7 +94,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Invalid container name",
 			pod: &api.Pod{
-				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
+				TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: "_INVALID_"}},
 				},
@@ -107,12 +106,13 @@ func TestExtractInvalidPods(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: Some weird json problem: %v", testCase.desc, err)
 		}
-		fakeHandler := util.FakeHandler{
+		fakeHandler := utiltesting.FakeHandler{
 			StatusCode:   200,
 			ResponseBody: string(data),
 		}
 		testServer := httptest.NewServer(&fakeHandler)
-		defer testServer.Close()
+		// TODO: Uncomment when fix #19254
+		// defer testServer.Close()
 		ch := make(chan interface{}, 1)
 		c := sourceURL{testServer.URL, http.Header{}, "localhost", ch, nil, 0}
 		if err := c.extractFromURL(); err == nil {
@@ -152,11 +152,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				kubetypes.HTTPSource,
 				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
-						UID:       "111",
-						Name:      "foo" + "-" + hostname,
-						Namespace: "mynamespace",
-
-						SelfLink: getSelfLink("foo-"+hostname, "mynamespace"),
+						UID:         "111",
+						Name:        "foo" + "-" + hostname,
+						Namespace:   "mynamespace",
+						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "111"},
+						SelfLink:    getSelfLink("foo-"+hostname, "mynamespace"),
 					},
 					Spec: api.PodSpec{
 						NodeName:                      hostname,
@@ -200,7 +200,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						},
 						Spec: api.PodSpec{
 							NodeName:        hostname,
-							Containers:      []api.Container{{Name: "2", Image: "bar", ImagePullPolicy: ""}},
+							Containers:      []api.Container{{Name: "2", Image: "bar:bartag", ImagePullPolicy: ""}},
 							SecurityContext: &api.PodSecurityContext{},
 						},
 					},
@@ -210,11 +210,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				kubetypes.HTTPSource,
 				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
-						UID:       "111",
-						Name:      "foo" + "-" + hostname,
-						Namespace: "default",
-
-						SelfLink: getSelfLink("foo-"+hostname, kubetypes.NamespaceDefault),
+						UID:         "111",
+						Name:        "foo" + "-" + hostname,
+						Namespace:   "default",
+						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "111"},
+						SelfLink:    getSelfLink("foo-"+hostname, kubetypes.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
 						NodeName:                      hostname,
@@ -233,11 +233,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				},
 				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
-						UID:       "222",
-						Name:      "bar" + "-" + hostname,
-						Namespace: "default",
-
-						SelfLink: getSelfLink("bar-"+hostname, kubetypes.NamespaceDefault),
+						UID:         "222",
+						Name:        "bar" + "-" + hostname,
+						Namespace:   "default",
+						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "222"},
+						SelfLink:    getSelfLink("bar-"+hostname, kubetypes.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
 						NodeName:                      hostname,
@@ -248,7 +248,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 
 						Containers: []api.Container{{
 							Name:  "2",
-							Image: "bar",
+							Image: "bar:bartag",
 							TerminationMessagePath: "/dev/termination-log",
 							ImagePullPolicy:        "IfNotPresent",
 						}},
@@ -267,12 +267,13 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
 		}
-		fakeHandler := util.FakeHandler{
+		fakeHandler := utiltesting.FakeHandler{
 			StatusCode:   200,
 			ResponseBody: string(data),
 		}
 		testServer := httptest.NewServer(&fakeHandler)
-		defer testServer.Close()
+		// TODO: Uncomment when fix #19254
+		// defer testServer.Close()
 		ch := make(chan interface{}, 1)
 		c := sourceURL{testServer.URL, http.Header{}, hostname, ch, nil, 0}
 		if err := c.extractFromURL(); err != nil {
@@ -286,7 +287,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		}
 		for _, pod := range update.Pods {
 			if errs := validation.ValidatePod(pod); len(errs) != 0 {
-				t.Errorf("%s: Expected no validation errors on %#v, Got %v", testCase.desc, pod, utilerrors.NewAggregate(errs))
+				t.Errorf("%s: Expected no validation errors on %#v, Got %v", testCase.desc, pod, errs.ToAggregate())
 			}
 		}
 	}
@@ -295,7 +296,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 func TestURLWithHeader(t *testing.T) {
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
-			APIVersion: testapi.Default.Version(),
+			APIVersion: testapi.Default.GroupVersion().String(),
 			Kind:       "Pod",
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -312,12 +313,13 @@ func TestURLWithHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected json marshalling error: %v", err)
 	}
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(data),
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	ch := make(chan interface{}, 1)
 	header := make(http.Header)
 	header.Set("Metadata-Flavor", "Google")

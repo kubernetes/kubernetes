@@ -3,10 +3,14 @@ kind: Service
 metadata:
   name: redis-slave
   labels:
-    name: redis-slave
+    app: redis
+    role: slave
+    tier: backend
 spec:
   ports:
     # the port that this service should serve on
   - port: 6379
   selector:
-    name: redis-slave
+    app: redis
+    role: slave
+    tier: backend

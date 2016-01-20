@@ -27,9 +27,14 @@ const (
 	sysctlBase         = "/proc/sys"
 	VmOvercommitMemory = "vm/overcommit_memory"
 	VmPanicOnOOM       = "vm/panic_on_oom"
+	KernelPanic        = "kernel/panic"
+	KernelPanicOnOops  = "kernel/panic_on_oops"
 
 	VmOvercommitMemoryAlways    = 1 // kernel performs no memory over-commit handling
 	VmPanicOnOOMInvokeOOMKiller = 0 // kernel calls the oom_killer function when OOM occurs
+
+	KernelPanicOnOopsAlways  = 1  // kernel panics on kernel oops
+	KernelPanicRebootTimeout = 10 // seconds after a panic for the kernel to reboot
 )
 
 // GetSysctl returns the value for the specified sysctl setting

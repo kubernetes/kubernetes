@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -40,7 +41,8 @@ const (
 Possible resource types include (case insensitive): pods (po), services (svc),
 replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
 limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
-resourcequotas (quota), namespaces (ns), endpoints (ep), serviceaccounts or secrets.
+resourcequotas (quota), namespaces (ns), endpoints (ep),
+horizontalpodautoscalers (hpa), serviceaccounts or secrets.
 
 By specifying the output as 'template' and providing a Go template as the value
 of the --template flag, you can filter the attributes of the fetched resource(s).`
@@ -49,9 +51,6 @@ $ kubectl get pods
 
 # List all pods in ps output format with more information (such as node name).
 $ kubectl get pods -o wide
-
-# List all pods in resource/name format (such as pod/nginx).
-$ kubectl get pods -o name
 
 # List a single replication controller with specified NAME in ps output format.
 $ kubectl get replicationcontroller web
@@ -79,7 +78,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs := []string{}
-	p, err := f.Printer(nil, false, false, false, false, []string{})
+	p, err := f.Printer(nil, false, false, false, false, false, []string{})
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
@@ -102,6 +101,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requested object(s), without listing/getting first.")
 	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().StringSliceP("label-columns", "L", []string{}, "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag statements like -L label1 -L label2...")
+	cmd.Flags().Bool("export", false, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
 	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	return cmd
@@ -120,11 +120,19 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	}
 
 	if len(args) == 0 && len(options.Filenames) == 0 {
-		fmt.Fprint(out, "You must specify the type of resource to get. ", valid_resources, `   * componentstatuses (aka 'cs')
-   * endpoints (aka 'ep')
-`)
+		fmt.Fprint(out, "You must specify the type of resource to get. ", valid_resources)
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
+
+	// always show resources when getting by name or filename
+	argsHasNames, err := resource.HasNames(args)
+	if err != nil {
+		return err
+	}
+	if len(options.Filenames) > 0 || argsHasNames {
+		cmd.Flag("show-all").Value.Set("true")
+	}
+	export := cmdutil.GetFlagBool(cmd, "export")
 
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := cmdutil.GetFlagBool(cmd, "watch"), cmdutil.GetFlagBool(cmd, "watch-only")
@@ -133,6 +141,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 			FilenameParam(enforceNamespace, options.Filenames...).
 			SelectorParam(selector).
+			ExportParam(export).
 			ResourceTypeOrNameArgs(true, args...).
 			SingleResourceType().
 			Latest().
@@ -187,6 +196,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 		FilenameParam(enforceNamespace, options.Filenames...).
 		SelectorParam(selector).
+		ExportParam(export).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Latest()
@@ -200,7 +210,6 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		if err != nil {
 			return err
 		}
-		defaultVersion := clientConfig.Version
 
 		singular := false
 		r := b.Flatten().Do()
@@ -211,8 +220,11 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 		// the outermost object will be converted to the output-version, but inner
 		// objects can use their mappings
-		version := cmdutil.OutputVersion(cmd, defaultVersion)
-		obj, err := resource.AsVersionedObject(infos, !singular, version)
+		version, err := cmdutil.OutputVersion(cmd, clientConfig.GroupVersion)
+		if err != nil {
+			return err
+		}
+		obj, err := resource.AsVersionedObject(infos, !singular, version.String())
 		if err != nil {
 			return err
 		}
@@ -220,25 +232,52 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		return printer.PrintObj(obj, out)
 	}
 
+	infos, err := b.Flatten().Do().Infos()
+	if err != nil {
+		return err
+	}
+	objs := make([]runtime.Object, len(infos))
+	for ix := range infos {
+		objs[ix] = infos[ix].Object
+	}
+
+	sorting, err := cmd.Flags().GetString("sort-by")
+	var sorter *kubectl.RuntimeSort
+	if err == nil && len(sorting) > 0 {
+		if sorter, err = kubectl.SortObjects(objs, sorting); err != nil {
+			return err
+		}
+	}
+
 	// use the default printer for each object
 	printer = nil
 	var lastMapping *meta.RESTMapping
 	w := kubectl.GetNewTabWriter(out)
 	defer w.Flush()
-	return b.Flatten().Do().Visit(func(r *resource.Info, err error) error {
-		if err != nil {
-			return err
+
+	for ix := range objs {
+		var mapping *meta.RESTMapping
+		if sorter != nil {
+			mapping = infos[sorter.OriginalPosition(ix)].Mapping
+		} else {
+			mapping = infos[ix].Mapping
 		}
-		if printer == nil || lastMapping == nil || r.Mapping == nil || r.Mapping.Resource != lastMapping.Resource {
-			printer, err = f.PrinterForMapping(cmd, r.Mapping, allNamespaces)
+		if printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource {
+			printer, err = f.PrinterForMapping(cmd, mapping, allNamespaces)
 			if err != nil {
 				return err
 			}
-			lastMapping = r.Mapping
+			lastMapping = mapping
 		}
 		if _, found := printer.(*kubectl.HumanReadablePrinter); found {
-			return printer.PrintObj(r.Object, w)
+			if err := printer.PrintObj(objs[ix], w); err != nil {
+				return err
+			}
+			continue
 		}
-		return printer.PrintObj(r.Object, out)
-	})
+		if err := printer.PrintObj(objs[ix], out); err != nil {
+			return err
+		}
+	}
+	return nil
 }

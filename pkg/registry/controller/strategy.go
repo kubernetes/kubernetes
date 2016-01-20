@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // rcStrategy implements verification logic for Replication Controllers.
@@ -76,9 +76,13 @@ func (rcStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new replication controller.
-func (rcStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
+func (rcStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
 	controller := obj.(*api.ReplicationController)
 	return validation.ValidateReplicationController(controller)
+}
+
+// Canonicalize normalizes the object after validation.
+func (rcStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for replication controllers; this means a POST is
@@ -88,9 +92,9 @@ func (rcStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (rcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (rcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateReplicationController(obj.(*api.ReplicationController))
-	updateErrorList := validation.ValidateReplicationControllerUpdate(old.(*api.ReplicationController), obj.(*api.ReplicationController))
+	updateErrorList := validation.ValidateReplicationControllerUpdate(obj.(*api.ReplicationController), old.(*api.ReplicationController))
 	return append(validationErrorList, updateErrorList...)
 }
 
@@ -98,12 +102,13 @@ func (rcStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-// ControllerToSelectableFields returns a label set that represents the object.
+// ControllerToSelectableFields returns a field set that represents the object.
 func ControllerToSelectableFields(controller *api.ReplicationController) fields.Set {
-	return fields.Set{
-		"metadata.name":   controller.Name,
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(controller.ObjectMeta, true)
+	controllerSpecificFieldsSet := fields.Set{
 		"status.replicas": strconv.Itoa(controller.Status.Replicas),
 	}
+	return generic.MergeFieldsSets(objectMetaFieldsSet, controllerSpecificFieldsSet)
 }
 
 // MatchController is the filter used by the generic etcd backend to route
@@ -136,6 +141,6 @@ func (rcStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newRc.Spec = oldRc.Spec
 }
 
-func (rcStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateReplicationControllerStatusUpdate(old.(*api.ReplicationController), obj.(*api.ReplicationController))
+func (rcStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+	return validation.ValidateReplicationControllerStatusUpdate(obj.(*api.ReplicationController), old.(*api.ReplicationController))
 }

@@ -28,7 +28,7 @@ import (
 )
 
 func readPod(filename string) (string, error) {
-	data, err := ioutil.ReadFile("testdata/" + testapi.Default.Version() + "/" + filename)
+	data, err := ioutil.ReadFile("testdata/" + testapi.Default.GroupVersion().Version + "/" + filename)
 	if err != nil {
 		return "", err
 	}
@@ -36,7 +36,8 @@ func readPod(filename string) (string, error) {
 }
 
 func loadSchemaForTest() (Schema, error) {
-	pathToSwaggerSpec := "../../../api/swagger-spec/" + testapi.Default.Version() + ".json"
+	// TODO this path is broken
+	pathToSwaggerSpec := "../../../api/swagger-spec/" + testapi.Default.GroupVersion().Version + ".json"
 	data, err := ioutil.ReadFile(pathToSwaggerSpec)
 	if err != nil {
 		return nil, err
@@ -66,7 +67,7 @@ func TestValidateOk(t *testing.T) {
 	}
 
 	seed := rand.Int63()
-	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(seed))
+	apiObjectFuzzer := apitesting.FuzzerFor(nil, testapi.Default.InternalGroupVersion(), rand.NewSource(seed))
 	for i := 0; i < 5; i++ {
 		for _, test := range tests {
 			testObj := test.obj

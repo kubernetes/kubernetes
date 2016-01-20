@@ -24,7 +24,7 @@ function provision-network-master {
   # Install etcd for flannel data
   if ! which etcd >/dev/null 2>&1; then
 
-    yum install -y etcd
+    dnf install -y etcd
 
     # Modify etcd configuration for flannel data
     cat <<EOF >/etc/etcd/etcd.conf
@@ -45,7 +45,7 @@ EOF
   # Install flannel for overlay
   if ! which flanneld >/dev/null 2>&1; then
 
-    yum install -y flannel
+    dnf install -y flannel
 
     cat <<EOF >/etc/flannel-config.json
 {
@@ -68,7 +68,7 @@ EOF
     cat <<EOF >/etc/sysconfig/flanneld
 FLANNEL_ETCD="${FLANNEL_ETCD_URL}"
 FLANNEL_ETCD_KEY="/coreos.com/network"
-FLANNEL_OPTIONS="-iface=${NETWORK_IF_NAME}"
+FLANNEL_OPTIONS="-iface=${NETWORK_IF_NAME} --ip-masq"
 EOF
 
     # Start flannel

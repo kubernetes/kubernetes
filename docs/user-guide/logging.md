@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/user-guide/logging.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/user-guide/logging.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -32,6 +33,20 @@ Documentation for other releases can be found at
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
 # Logging
+
+**Table of Contents**
+
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+- [Logging](#logging)
+  - [Logging by Kubernetes Components](#logging-by-kubernetes-components)
+  - [Examining the logs of running containers](#examining-the-logs-of-running-containers)
+  - [Cluster level logging to Google Cloud Logging](#cluster-level-logging-to-google-cloud-logging)
+  - [Cluster level logging with Elasticsearch and Kibana](#cluster-level-logging-with-elasticsearch-and-kibana)
+  - [Ingesting Application Log Files](#ingesting-application-log-files)
+  - [Known issues](#known-issues)
+
+<!-- END MUNGE: GENERATED_TOC -->
 
 ## Logging by Kubernetes Components
 
@@ -116,7 +131,7 @@ describes how to ingest cluster level logs into Elasticsearch and view them usin
 ## Ingesting Application Log Files
 
 Cluster level logging only collects the standard output and standard error output of the applications
-running in containers. The guide [Collecting log files within containers with Fluentd](http://releases.k8s.io/release-1.0/contrib/logging/fluentd-sidecar-gcp/README.md) explains how the log files of applications can also be ingested into Google Cloud logging.
+running in containers. The guide [Collecting log files within containers with Fluentd](http://releases.k8s.io/release-1.1/contrib/logging/fluentd-sidecar-gcp/README.md) explains how the log files of applications can also be ingested into Google Cloud logging.
 
 ## Known issues
 

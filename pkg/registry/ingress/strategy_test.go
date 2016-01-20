@@ -21,13 +21,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func newIngress() extensions.Ingress {
 	defaultBackend := extensions.IngressBackend{
 		ServiceName: "default-backend",
-		ServicePort: util.IntOrString{Kind: util.IntstrInt, IntVal: 80},
+		ServicePort: intstr.FromInt(80),
 	}
 	return extensions.Ingress{
 		ObjectMeta: api.ObjectMeta{
@@ -37,7 +37,7 @@ func newIngress() extensions.Ingress {
 		Spec: extensions.IngressSpec{
 			Backend: &extensions.IngressBackend{
 				ServiceName: "default-backend",
-				ServicePort: util.IntOrString{Kind: util.IntstrInt, IntVal: 80},
+				ServicePort: intstr.FromInt(80),
 			},
 			Rules: []extensions.IngressRule{
 				{

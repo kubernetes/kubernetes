@@ -83,6 +83,11 @@ import (
 // This format is intended to make it difficult to use these numbers without
 // writing some sort of special handling code in the hopes that that will
 // cause implementors to also use a fixed point implementation.
+//
+// +protobuf=true
+// +protobuf.embed=QuantityProto
+// +protobuf.options.marshal=false
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type Quantity struct {
 	// Amount is public, so you can manipulate it if the accessor
 	// functions are not sufficient.
@@ -112,10 +117,27 @@ func MustParse(str string) Quantity {
 	return *q
 }
 
+// Scale is used for getting and setting the base-10 scaled value.
+// Base-2 scales are omitted for mathematical simplicity.
+// See Quantity.ScaledValue for more details.
+type Scale int
+
+const (
+	Nano  Scale = -9
+	Micro Scale = -6
+	Milli Scale = -3
+	Kilo  Scale = 3
+	Mega  Scale = 6
+	Giga  Scale = 9
+	Tera  Scale = 12
+	Peta  Scale = 15
+	Exa   Scale = 18
+)
+
 const (
 	// splitREString is used to separate a number from its suffix; as such,
 	// this is overly permissive, but that's OK-- it will be checked later.
-	splitREString = "^([+-]?[0-9.]+)([eEimkKMGTP]*[-+]?[0-9]*)$"
+	splitREString = "^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$"
 )
 
 var (
@@ -171,7 +193,7 @@ func ParseQuantity(str string) (*Quantity, error) {
 
 	// So that no one but us has to think about suffixes, remove it.
 	if base == 10 {
-		amount.SetScale(amount.Scale() + inf.Scale(-exponent))
+		amount.SetScale(amount.Scale() + Scale(exponent).infScale())
 	} else if base == 2 {
 		// numericSuffix = 2 ** exponent
 		numericSuffix := big.NewInt(1).Lsh(bigOne, uint(exponent))
@@ -184,14 +206,13 @@ func ParseQuantity(str string) (*Quantity, error) {
 	if sign == -1 {
 		amount.Neg(amount)
 	}
-	// This rounds non-zero values up to the minimum representable
-	// value, under the theory that if you want some resources, you
-	// should get some resources, even if you asked for way too small
-	// of an amount.
-	// Arguably, this should be inf.RoundHalfUp (normal rounding), but
-	// that would have the side effect of rounding values < .5m to zero.
+
+	// This rounds non-zero values up to the minimum representable value, under the theory that
+	// if you want some resources, you should get some resources, even if you asked for way too small
+	// of an amount.  Arguably, this should be inf.RoundHalfUp (normal rounding), but that would have
+	// the side effect of rounding values < .5n to zero.
 	if v, ok := amount.Unscaled(); v != int64(0) || !ok {
-		amount.Round(amount, 3, inf.RoundUp)
+		amount.Round(amount, Nano.infScale(), inf.RoundUp)
 	}
 
 	// The max is just a simple cap.
@@ -308,30 +329,41 @@ func (q *Quantity) String() string {
 //   +1 if q >  y
 //
 func (q *Quantity) Cmp(y Quantity) int {
-	num1 := q.Value()
-	num2 := y.Value()
-	if num1 < MaxMilliValue && num2 < MaxMilliValue {
-		num1 = q.MilliValue()
-		num2 = y.MilliValue()
+	if q.Amount == nil {
+		if y.Amount == nil {
+			return 0
+		}
+		return -y.Amount.Sign()
 	}
-	if num1 < num2 {
-		return -1
-	} else if num1 > num2 {
-		return 1
+	if y.Amount == nil {
+		return q.Amount.Sign()
 	}
-	return 0
+	return q.Amount.Cmp(y.Amount)
 }
 
 func (q *Quantity) Add(y Quantity) error {
-	q.Amount.Add(q.Amount, y.Amount)
+	switch {
+	case y.Amount == nil:
+		// Adding 0: do nothing.
+	case q.Amount == nil:
+		q.Amount = &inf.Dec{}
+		return q.Add(y)
+	default:
+		q.Amount.Add(q.Amount, y.Amount)
+	}
 	return nil
 }
 
 func (q *Quantity) Sub(y Quantity) error {
-	if q.Format != y.Format {
-		return fmt.Errorf("format mismatch: %v vs. %v", q.Format, y.Format)
+	switch {
+	case y.Amount == nil:
+		// Subtracting 0: do nothing.
+	case q.Amount == nil:
+		q.Amount = &inf.Dec{}
+		return q.Sub(y)
+	default:
+		q.Amount.Sub(q.Amount, y.Amount)
 	}
-	q.Amount.Sub(q.Amount, y.Amount)
 	return nil
 }
 
@@ -372,41 +404,52 @@ func NewMilliQuantity(value int64, format Format) *Quantity {
 	}
 }
 
-// Value returns the value of q; any fractional part will be lost.
-func (q *Quantity) Value() int64 {
-	if q.Amount == nil {
-		return 0
+// NewScaledQuantity returns a new Quantity representing the given
+// value * 10^scale in DecimalSI format.
+func NewScaledQuantity(value int64, scale Scale) *Quantity {
+	return &Quantity{
+		Amount: inf.NewDec(value, scale.infScale()),
+		Format: DecimalSI,
 	}
-	tmp := &inf.Dec{}
-	return tmp.Round(q.Amount, 0, inf.RoundUp).UnscaledBig().Int64()
 }
 
-// MilliValue returns the value of q * 1000; this could overflow an int64;
+// Value returns the value of q; any fractional part will be lost.
+func (q *Quantity) Value() int64 {
+	return q.ScaledValue(0)
+}
+
+// MilliValue returns the value of ceil(q * 1000); this could overflow an int64;
 // if that's a concern, call Value() first to verify the number is small enough.
 func (q *Quantity) MilliValue() int64 {
+	return q.ScaledValue(Milli)
+}
+
+// ScaledValue returns the value of ceil(q * 10^scale); this could overflow an int64.
+// To detect overflow, call Value() first and verify the expected magnitude.
+func (q *Quantity) ScaledValue(scale Scale) int64 {
 	if q.Amount == nil {
 		return 0
 	}
-	tmp := &inf.Dec{}
-	return tmp.Round(tmp.Mul(q.Amount, decThousand), 0, inf.RoundUp).UnscaledBig().Int64()
+	return scaledValue(q.Amount.UnscaledBig(), int(q.Amount.Scale()), int(scale.infScale()))
 }
 
 // Set sets q's value to be value.
 func (q *Quantity) Set(value int64) {
-	if q.Amount == nil {
-		q.Amount = &inf.Dec{}
-	}
-	q.Amount.SetUnscaled(value)
-	q.Amount.SetScale(0)
+	q.SetScaled(value, 0)
 }
 
 // SetMilli sets q's value to be value * 1/1000.
 func (q *Quantity) SetMilli(value int64) {
+	q.SetScaled(value, Milli)
+}
+
+// SetScaled sets q's value to be value * 10^scale
+func (q *Quantity) SetScaled(value int64, scale Scale) {
 	if q.Amount == nil {
 		q.Amount = &inf.Dec{}
 	}
 	q.Amount.SetUnscaled(value)
-	q.Amount.SetScale(3)
+	q.Amount.SetScale(scale.infScale())
 }
 
 // Copy is a convenience function that makes a deep copy for you. Non-deep
@@ -460,4 +503,9 @@ func QuantityFlag(flagName, defaultValue, description string) *Quantity {
 // pointing at the given Quantity variable.
 func NewQuantityFlagValue(q *Quantity) flag.Value {
 	return qFlag{q}
+}
+
+// infScale adapts a Scale value to an inf.Scale value.
+func (s Scale) infScale() inf.Scale {
+	return inf.Scale(-s) // inf.Scale is upside-down
 }

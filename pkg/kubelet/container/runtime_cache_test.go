@@ -86,27 +86,3 @@ func TestForceUpdateIfOlder(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", newpods, actual)
 	}
 }
-
-func TestUpdatePodsOnlyIfNewer(t *testing.T) {
-	runtime := &FakeRuntime{}
-	cache := newTestRuntimeCache(runtime)
-
-	// Cache new pods with a future timestamp.
-	newpods := []*Pod{{ID: "1111"}, {ID: "2222"}, {ID: "3333"}}
-	cache.Lock()
-	cache.pods = newpods
-	cache.cacheTime = time.Now().Add(20 * time.Minute)
-	cache.Unlock()
-
-	// Instruct runime to return a list of old pods.
-	oldpods := []*Pod{{ID: "1111"}}
-	runtime.PodList = oldpods
-
-	// Try to update the cache; the attempt should not succeed because the
-	// cache timestamp is newer than the current time.
-	cache.updateCacheWithLock()
-	actual := cache.getCachedPods()
-	if !reflect.DeepEqual(newpods, actual) {
-		t.Errorf("expected %#v, got %#v", newpods, actual)
-	}
-}

@@ -16,18 +16,16 @@
 package manager
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/docker/libcontainer/cgroups"
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
@@ -40,6 +38,9 @@ import (
 	"github.com/google/cadvisor/utils/cpuload"
 	"github.com/google/cadvisor/utils/oomparser"
 	"github.com/google/cadvisor/utils/sysfs"
+
+	"github.com/golang/glog"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
 var globalHousekeepingInterval = flag.Duration("global_housekeeping_interval", 1*time.Minute, "Interval between global housekeepings")
@@ -126,7 +127,11 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 	}
 	glog.Infof("cAdvisor running in container: %q", selfContainer)
 
-	context := fs.Context{DockerRoot: docker.RootDir()}
+	dockerInfo, err := docker.DockerInfo()
+	if err != nil {
+		glog.Warningf("Unable to connect to Docker: %v", err)
+	}
+	context := fs.Context{DockerRoot: docker.RootDir(), DockerInfo: dockerInfo}
 	fsInfo, err := fs.NewFsInfo(context)
 	if err != nil {
 		return nil, err
@@ -150,7 +155,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 		allowDynamicHousekeeping: allowDynamicHousekeeping,
 	}
 
-	machineInfo, err := getMachineInfo(sysfs, fsInfo)
+	machineInfo, err := getMachineInfo(sysfs, fsInfo, inHostNamespace)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +190,6 @@ type manager struct {
 	quitChannels             []chan error
 	cadvisorContainer        string
 	inHostNamespace          bool
-	dockerContainersRegexp   *regexp.Regexp
 	loadReader               cpuload.CpuLoadReader
 	eventHandler             events.EventManager
 	startupTime              time.Time
@@ -1188,19 +1192,16 @@ func (m *manager) DockerInfo() (DockerStatus, error) {
 			out.NumContainers = n
 		}
 	}
-	// cut, trim, cut - Example format:
-	// DriverStatus=[["Root Dir","/var/lib/docker/aufs"],["Backing Filesystem","extfs"],["Dirperm1 Supported","false"]]
 	if val, ok := info["DriverStatus"]; ok {
+		var driverStatus [][]string
+		err := json.Unmarshal([]byte(val), &driverStatus)
+		if err != nil {
+			return DockerStatus{}, err
+		}
 		out.DriverStatus = make(map[string]string)
-		val = strings.TrimPrefix(val, "[[")
-		val = strings.TrimSuffix(val, "]]")
-		vals := strings.Split(val, "],[")
-		for _, v := range vals {
-			kv := strings.Split(v, "\",\"")
-			if len(kv) != 2 {
-				continue
-			} else {
-				out.DriverStatus[strings.Trim(kv[0], "\"")] = strings.Trim(kv[1], "\"")
+		for _, v := range driverStatus {
+			if len(v) == 2 {
+				out.DriverStatus[v[0]] = v[1]
 			}
 		}
 	}

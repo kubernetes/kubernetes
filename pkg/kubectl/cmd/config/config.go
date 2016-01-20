@@ -89,6 +89,7 @@ The loading order follows these rules:
 	cmd.AddCommand(NewCmdConfigSetContext(out, pathOptions))
 	cmd.AddCommand(NewCmdConfigSet(out, pathOptions))
 	cmd.AddCommand(NewCmdConfigUnset(out, pathOptions))
+	cmd.AddCommand(NewCmdConfigCurrentContext(out, pathOptions))
 	cmd.AddCommand(NewCmdConfigUseContext(out, pathOptions))
 
 	return cmd
@@ -225,6 +226,7 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 
 			configToWrite := getConfigFromFileOrDie(destinationFile)
 			t := *cluster
+
 			configToWrite.Clusters[key] = &t
 			configToWrite.Clusters[key].LocationOfOrigin = destinationFile
 			if relativizePaths {

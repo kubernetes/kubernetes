@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/user-guide/jsonpath.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/user-guide/jsonpath.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -85,7 +86,6 @@ Given the input:
 Function | Description        | Example            | Result
 ---------|--------------------|--------------------|------------------
 text     | the plain text     | kind is {.kind}    | kind is List
-""       | quote              | {"{"}              | {
 @        | the current object | {@}                | the same as input
 . or []  | child operator     | {.kind} or {['kind']}| List
 ..       | recursive descent  | {..name}           | 127.0.0.1 127.0.0.2 myself e2e
@@ -94,7 +94,7 @@ text     | the plain text     | kind is {.kind}    | kind is List
 [,]      | union operator     | {.items[*]['metadata.name', 'status.capacity']} | 127.0.0.1 127.0.0.2 map[cpu:4] map[cpu:8]
 ?()      | filter             | {.users[?(@.name=="e2e")].user.password} | secret
 range, end | iterate list | {range .items[*]}[{.metadata.name}, {.status.capacity}] {end} | [127.0.0.1, map[cpu:4]] [127.0.0.2, map[cpu:8]]
-
+""       | quote interpreted string | {range .items[*]}{.metadata.name}{"\t"}{end} | 127.0.0.1    127.0.0.2
 
 
 

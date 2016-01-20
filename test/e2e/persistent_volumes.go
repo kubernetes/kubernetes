@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -32,27 +31,17 @@ import (
 // Marked with [Skipped] to skip the test by default (see driver.go),
 // the test needs privileged containers, which are disabled by default.
 // Run the test with "go run hack/e2e.go ... --ginkgo.focus=PersistentVolume"
-var _ = Describe("[Skipped] persistentVolumes", func() {
+var _ = Describe("PersistentVolumes [Skipped]", func() {
+	framework := NewFramework("pv")
 	var c *client.Client
 	var ns string
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-		ns_, err := createTestingNS("pv", c)
-		ns = ns_.Name
-		Expect(err).NotTo(HaveOccurred())
+		c = framework.Client
+		ns = framework.Namespace.Name
 	})
 
-	AfterEach(func() {
-		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
-	})
-
-	It("PersistentVolume", func() {
+	It("NFS volume can be created, bound, retrieved, unbound, and used by a pod", func() {
 		config := VolumeTestConfig{
 			namespace:   ns,
 			prefix:      "nfs",
@@ -164,7 +153,7 @@ func makeCheckPod(ns string, nfsserver string) *api.Pod {
 	return &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: testapi.Default.Version(),
+			APIVersion: testapi.Default.GroupVersion().String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "checker-",

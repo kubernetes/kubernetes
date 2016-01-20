@@ -64,7 +64,13 @@ do
 done
 
 if [ "x$GO_OUT" == "x" ]; then
-    "${KUBE_ROOT}/hack/build-go.sh" cmd/kube-proxy cmd/kube-apiserver cmd/kube-controller-manager cmd/kubelet plugin/cmd/kube-scheduler
+    "${KUBE_ROOT}/hack/build-go.sh" \
+        cmd/kube-apiserver \
+        cmd/kube-controller-manager \
+        cmd/kube-proxy \
+        cmd/kubectl \
+        cmd/kubelet \
+        plugin/cmd/kube-scheduler
 else
     echo "skipped the build."
 fi
@@ -91,6 +97,7 @@ RKT_PATH=${RKT_PATH:-""}
 RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-false}
+ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
 
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
@@ -135,8 +142,14 @@ function detect_binary {
       i?86*)
         host_arch=x86
         ;;
+      s390x*)
+        host_arch=s390x
+        ;;
+      ppc64le*)
+        host_arch=ppc64le
+        ;;
       *)
-        echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
+        echo "Unsupported host arch. Must be x86_64, 386, arm, s390x or ppc64le." >&2
         exit 1
         ;;
     esac
@@ -204,9 +217,9 @@ function set_service_accounts {
 function start_apiserver {
     # Admission Controllers to invoke prior to persisting objects in cluster
     if [[ -z "${ALLOW_SECURITY_CONTEXT}" ]]; then
-      ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+      ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
     else
-      ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,ServiceAccount,ResourceQuota
+      ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
     fi
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
@@ -247,13 +260,29 @@ function start_controller_manager {
       --v=${LOG_LEVEL} \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
+      --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
       --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
 
 function start_kubelet {
     KUBELET_LOG=/tmp/kubelet.log
+
+    mkdir -p /var/lib/kubelet
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
+      # On selinux enabled systems, it might
+      # require to relabel /var/lib/kubelet
+      if which selinuxenabled &> /dev/null && \
+         selinuxenabled && \
+         which chcon > /dev/null ; then
+         if [[ ! $(ls -Zd /var/lib/kubelet) =~ system_u:object_r:svirt_sandbox_file_t:s0 ]] ; then
+            echo "Applying SELinux label to /var/lib/kubelet directory."
+            if ! chcon -R system_u:object_r:svirt_sandbox_file_t:s0 /var/lib/kubelet; then
+               echo "Failed to apply selinux label to /var/lib/kubelet."
+            fi
+	 fi
+      fi
+
       sudo -E "${GO_OUT}/kubelet" ${priv_arg}\
         --v=${LOG_LEVEL} \
         --chaos-chance="${CHAOS_CHANCE}" \
@@ -264,6 +293,7 @@ function start_kubelet {
         --address="127.0.0.1" \
         --api-servers="${API_HOST}:${API_PORT}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
+        --cluster-dns="127.0.0.1" \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
     else
@@ -277,7 +307,7 @@ function start_kubelet {
         --volume=/var/run:/var/run:rw \
         --volume=/sys:/sys:ro \
         --volume=/var/lib/docker/:/var/lib/docker:ro \
-        --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
+        --volume=/var/lib/kubelet/:/var/lib/kubelet:rw,z \
         --net=host \
         --privileged=true \
         -i \
@@ -291,6 +321,7 @@ function start_kubeproxy {
     PROXY_LOG=/tmp/kube-proxy.log
     sudo -E "${GO_OUT}/kube-proxy" \
       --v=${LOG_LEVEL} \
+      --hostname-override="127.0.0.1" \
       --master="http://${API_HOST}:${API_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
 

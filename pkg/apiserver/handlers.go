@@ -40,11 +40,10 @@ import (
 // CRUDdy GET/POST/PUT/DELETE actions on REST objects.
 // TODO: find a way to keep this up to date automatically.  Maybe dynamically populate list as handlers added to
 // master's Mux.
-var specialVerbs = map[string]bool{
-	"proxy":    true,
-	"redirect": true,
-	"watch":    true,
-}
+var specialVerbs = sets.NewString("proxy", "redirect", "watch")
+
+// specialVerbsNoSubresources contains root verbs which do not allow subresources
+var specialVerbsNoSubresources = sets.NewString("proxy", "redirect")
 
 // Constant for the retry-after interval on rate limiting.
 // TODO: maybe make this dynamic? or user-adjustable?
@@ -246,7 +245,7 @@ func (tw *baseTimeoutWriter) timeout(msg string) {
 			tw.w.Write([]byte(msg))
 		} else {
 			enc := json.NewEncoder(tw.w)
-			enc.Encode(errors.NewServerTimeout("", "", 0))
+			enc.Encode(errors.NewServerTimeout(api.Resource(""), "", 0))
 		}
 	}
 	tw.timedOut = true
@@ -343,13 +342,13 @@ type RequestAttributeGetter interface {
 }
 
 type requestAttributeGetter struct {
-	requestContextMapper   api.RequestContextMapper
-	apiRequestInfoResolver *APIRequestInfoResolver
+	requestContextMapper api.RequestContextMapper
+	requestInfoResolver  *RequestInfoResolver
 }
 
 // NewAttributeGetter returns an object which implements the RequestAttributeGetter interface.
-func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper, apiRequestInfoResolver *APIRequestInfoResolver) RequestAttributeGetter {
-	return &requestAttributeGetter{requestContextMapper, apiRequestInfoResolver}
+func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper, requestInfoResolver *RequestInfoResolver) RequestAttributeGetter {
+	return &requestAttributeGetter{requestContextMapper, requestInfoResolver}
 }
 
 func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attributes {
@@ -363,19 +362,24 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 		}
 	}
 
-	apiRequestInfo, _ := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
+	requestInfo, _ := r.requestInfoResolver.GetRequestInfo(req)
 
-	attribs.APIGroup = apiRequestInfo.APIGroup
-	attribs.Verb = apiRequestInfo.Verb
+	// Start with common attributes that apply to resource and non-resource requests
+	attribs.ResourceRequest = requestInfo.IsResourceRequest
+	attribs.Path = requestInfo.Path
+	attribs.Verb = requestInfo.Verb
+
+	// If the request was for a resource in an API group, include that info
+	attribs.APIGroup = requestInfo.APIGroup
 
 	// If a path follows the conventions of the REST object store, then
 	// we can extract the resource.  Otherwise, not.
-	attribs.Resource = apiRequestInfo.Resource
+	attribs.Resource = requestInfo.Resource
 
 	// If the request specifies a namespace, then the namespace is filled in.
 	// Assumes there is no empty string namespace.  Unspecified results
 	// in empty (does not understand defaulting rules.)
-	attribs.Namespace = apiRequestInfo.Namespace
+	attribs.Namespace = requestInfo.Namespace
 
 	return &attribs
 }
@@ -392,10 +396,16 @@ func WithAuthorizationCheck(handler http.Handler, getAttribs RequestAttributeGet
 	})
 }
 
-// APIRequestInfo holds information parsed from the http.Request
-type APIRequestInfo struct {
-	// Verb is the kube verb associated with the request, not the http verb.  This includes things like list and watch.
-	Verb       string
+// RequestInfo holds information parsed from the http.Request
+type RequestInfo struct {
+	// IsResourceRequest indicates whether or not the request is for an API resource or subresource
+	IsResourceRequest bool
+	// Path is the URL path of the request
+	Path string
+	// Verb is the kube verb associated with the request for API requests, not the http verb.  This includes things like list and watch.
+	// for non-resource requests, this is the lowercase http verb
+	Verb string
+
 	APIPrefix  string
 	APIGroup   string
 	APIVersion string
@@ -410,20 +420,18 @@ type APIRequestInfo struct {
 	Name string
 	// Parts are the path parts for the request, always starting with /{resource}/{name}
 	Parts []string
-	// Raw is the unparsed form of everything other than parts.
-	// Raw + Parts = complete URL path
-	Raw []string
 }
 
-type APIRequestInfoResolver struct {
+type RequestInfoResolver struct {
 	APIPrefixes          sets.String
 	GrouplessAPIPrefixes sets.String
 }
 
-// TODO write an integration test against the swagger doc to test the APIRequestInfo and match up behavior to responses
-// GetAPIRequestInfo returns the information from the http request.  If error is not nil, APIRequestInfo holds the information as best it is known before the failure
+// TODO write an integration test against the swagger doc to test the RequestInfo and match up behavior to responses
+// GetRequestInfo returns the information from the http request.  If error is not nil, RequestInfo holds the information as best it is known before the failure
+// It handles both resource and non-resource requests and fills in all the pertinent information for each.
 // Valid Inputs:
-// Storage paths
+// Resource paths
 // /apis/{api-group}/{version}/namespaces
 // /api/{version}/namespaces
 // /api/{version}/namespaces/{namespace}
@@ -432,26 +440,41 @@ type APIRequestInfoResolver struct {
 // /api/{version}/{resource}
 // /api/{version}/{resource}/{resourceName}
 //
-// Special verbs:
+// Special verbs without subresources:
 // /api/{version}/proxy/{resource}/{resourceName}
 // /api/{version}/proxy/namespaces/{namespace}/{resource}/{resourceName}
 // /api/{version}/redirect/namespaces/{namespace}/{resource}/{resourceName}
 // /api/{version}/redirect/{resource}/{resourceName}
+//
+// Special verbs with subresources:
 // /api/{version}/watch/{resource}
 // /api/{version}/watch/namespaces/{namespace}/{resource}
-func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIRequestInfo, error) {
-	requestInfo := APIRequestInfo{
-		Raw:  splitPath(req.URL.Path),
-		Verb: strings.ToLower(req.Method),
+//
+// NonResource paths
+// /apis/{api-group}/{version}
+// /apis/{api-group}
+// /apis
+// /api/{version}
+// /api
+// /healthz
+// /
+func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (RequestInfo, error) {
+	// start with a non-resource request until proven otherwise
+	requestInfo := RequestInfo{
+		IsResourceRequest: false,
+		Path:              req.URL.Path,
+		Verb:              strings.ToLower(req.Method),
 	}
 
-	currentParts := requestInfo.Raw
+	currentParts := splitPath(req.URL.Path)
 	if len(currentParts) < 3 {
-		return requestInfo, fmt.Errorf("a resource request must have a url with at least three parts, not %v", req.URL)
+		// return a non-resource request
+		return requestInfo, nil
 	}
 
 	if !r.APIPrefixes.Has(currentParts[0]) {
-		return requestInfo, &errAPIPrefixNotFound{currentParts[0]}
+		// return a non-resource request
+		return requestInfo, nil
 	}
 	requestInfo.APIPrefix = currentParts[0]
 	currentParts = currentParts[1:]
@@ -459,18 +482,20 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 	if !r.GrouplessAPIPrefixes.Has(requestInfo.APIPrefix) {
 		// one part (APIPrefix) has already been consumed, so this is actually "do we have four parts?"
 		if len(currentParts) < 3 {
-			return requestInfo, fmt.Errorf("a resource request with an API group must have a url with at least four parts, not %v", req.URL)
+			// return a non-resource request
+			return requestInfo, nil
 		}
 
 		requestInfo.APIGroup = currentParts[0]
 		currentParts = currentParts[1:]
 	}
 
+	requestInfo.IsResourceRequest = true
 	requestInfo.APIVersion = currentParts[0]
 	currentParts = currentParts[1:]
 
 	// handle input of form /{specialVerb}/*
-	if _, ok := specialVerbs[currentParts[0]]; ok {
+	if specialVerbs.Has(currentParts[0]) {
 		if len(currentParts) < 2 {
 			return requestInfo, fmt.Errorf("unable to determine kind and namespace from url, %v", req.URL)
 		}
@@ -482,7 +507,7 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 		switch req.Method {
 		case "POST":
 			requestInfo.Verb = "create"
-		case "GET":
+		case "GET", "HEAD":
 			requestInfo.Verb = "get"
 		case "PUT":
 			requestInfo.Verb = "update"
@@ -512,18 +537,16 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 
 	// parsing successful, so we now know the proper value for .Parts
 	requestInfo.Parts = currentParts
-	// Raw should have everything not in Parts
-	requestInfo.Raw = requestInfo.Raw[:len(requestInfo.Raw)-len(currentParts)]
 
 	// parts look like: resource/resourceName/subresource/other/stuff/we/don't/interpret
 	switch {
-	case len(requestInfo.Parts) >= 3:
+	case len(requestInfo.Parts) >= 3 && !specialVerbsNoSubresources.Has(requestInfo.Verb):
 		requestInfo.Subresource = requestInfo.Parts[2]
 		fallthrough
-	case len(requestInfo.Parts) == 2:
+	case len(requestInfo.Parts) >= 2:
 		requestInfo.Name = requestInfo.Parts[1]
 		fallthrough
-	case len(requestInfo.Parts) == 1:
+	case len(requestInfo.Parts) >= 1:
 		requestInfo.Resource = requestInfo.Parts[0]
 	}
 

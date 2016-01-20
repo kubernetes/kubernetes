@@ -112,8 +112,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
-	"unicode/utf8"
 )
 
 const (
@@ -194,14 +192,6 @@ const (
 
 type seqType uint8
 
-// mirror json.Marshaler and json.Unmarshaler here, so we don't import the encoding/json package
-type jsonMarshaler interface {
-	MarshalJSON() ([]byte, error)
-}
-type jsonUnmarshaler interface {
-	UnmarshalJSON([]byte) error
-}
-
 const (
 	_ seqType = iota
 	seqTypeArray
@@ -209,13 +199,43 @@ const (
 	seqTypeChan
 )
 
+// note that containerMapStart and containerArraySend are not sent.
+// This is because the ReadXXXStart and EncodeXXXStart already does these.
+type containerState uint8
+
+const (
+	_ containerState = iota
+
+	containerMapStart // slot left open, since Driver method already covers it
+	containerMapKey
+	containerMapValue
+	containerMapEnd
+	containerArrayStart // slot left open, since Driver methods already cover it
+	containerArrayElem
+	containerArrayEnd
+)
+
+type containerStateRecv interface {
+	sendContainerState(containerState)
+}
+
+// mirror json.Marshaler and json.Unmarshaler here,
+// so we don't import the encoding/json package
+type jsonMarshaler interface {
+	MarshalJSON() ([]byte, error)
+}
+type jsonUnmarshaler interface {
+	UnmarshalJSON([]byte) error
+}
+
 var (
 	bigen               = binary.BigEndian
 	structInfoFieldName = "_struct"
 
-	// mapStrIntfTyp = reflect.TypeOf(map[string]interface{}(nil))
-	intfSliceTyp = reflect.TypeOf([]interface{}(nil))
-	intfTyp      = intfSliceTyp.Elem()
+	mapStrIntfTyp  = reflect.TypeOf(map[string]interface{}(nil))
+	mapIntfIntfTyp = reflect.TypeOf(map[interface{}]interface{}(nil))
+	intfSliceTyp   = reflect.TypeOf([]interface{}(nil))
+	intfTyp        = intfSliceTyp.Elem()
 
 	stringTyp     = reflect.TypeOf("")
 	timeTyp       = reflect.TypeOf(time.Time{})
@@ -241,6 +261,9 @@ var (
 	timeTypId       = reflect.ValueOf(timeTyp).Pointer()
 	stringTypId     = reflect.ValueOf(stringTyp).Pointer()
 
+	mapStrIntfTypId  = reflect.ValueOf(mapStrIntfTyp).Pointer()
+	mapIntfIntfTypId = reflect.ValueOf(mapIntfIntfTyp).Pointer()
+	intfSliceTypId   = reflect.ValueOf(intfSliceTyp).Pointer()
 	// mapBySliceTypId  = reflect.ValueOf(mapBySliceTyp).Pointer()
 
 	intBitsize  uint8 = uint8(reflect.TypeOf(int(0)).Bits())
@@ -283,7 +306,7 @@ type MapBySlice interface {
 type BasicHandle struct {
 	// TypeInfos is used to get the type info for any type.
 	//
-	// If not configure, the default TypeInfos is used, which uses struct tag keys: codec, json
+	// If not configured, the default TypeInfos is used, which uses struct tag keys: codec, json
 	TypeInfos *TypeInfos
 
 	extHandle
@@ -332,6 +355,8 @@ type RawExt struct {
 // It is used by codecs (e.g. binc, msgpack, simple) which do custom serialization of the types.
 type BytesExt interface {
 	// WriteExt converts a value to a []byte.
+	//
+	// Note: v *may* be a pointer to the extension type, if the extension type was a struct or array.
 	WriteExt(v interface{}) []byte
 
 	// ReadExt updates a value from a []byte.
@@ -344,6 +369,8 @@ type BytesExt interface {
 // It is used by codecs (e.g. cbor, json) which use the format to do custom serialization of the types.
 type InterfaceExt interface {
 	// ConvertExt converts a value into a simpler interface for easy encoding e.g. convert time.Time to int64.
+	//
+	// Note: v *may* be a pointer to the extension type, if the extension type was a struct or array.
 	ConvertExt(v interface{}) interface{}
 
 	// UpdateExt updates a value from a simpler interface for easy decoding e.g. convert int64 to time.Time.
@@ -363,7 +390,6 @@ type addExtWrapper struct {
 }
 
 func (x addExtWrapper) WriteExt(v interface{}) []byte {
-	// fmt.Printf(">>>>>>>>>> WriteExt: %T, %v\n", v, v)
 	bs, err := x.encFn(reflect.ValueOf(v))
 	if err != nil {
 		panic(err)
@@ -372,7 +398,6 @@ func (x addExtWrapper) WriteExt(v interface{}) []byte {
 }
 
 func (x addExtWrapper) ReadExt(v interface{}, bs []byte) {
-	// fmt.Printf(">>>>>>>>>> ReadExt: %T, %v\n", v, v)
 	if err := x.decFn(reflect.ValueOf(v), bs); err != nil {
 		panic(err)
 	}
@@ -474,7 +499,7 @@ type extTypeTagFn struct {
 	ext  Ext
 }
 
-type extHandle []*extTypeTagFn
+type extHandle []extTypeTagFn
 
 // DEPRECATED: Use SetBytesExt or SetInterfaceExt on the Handle instead.
 //
@@ -513,12 +538,17 @@ func (o *extHandle) SetExt(rt reflect.Type, tag uint64, ext Ext) (err error) {
 		}
 	}
 
-	*o = append(*o, &extTypeTagFn{rtid, rt, tag, ext})
+	if *o == nil {
+		*o = make([]extTypeTagFn, 0, 4)
+	}
+	*o = append(*o, extTypeTagFn{rtid, rt, tag, ext})
 	return
 }
 
 func (o extHandle) getExt(rtid uintptr) *extTypeTagFn {
-	for _, v := range o {
+	var v *extTypeTagFn
+	for i := range o {
+		v = &o[i]
 		if v.rtid == rtid {
 			return v
 		}
@@ -527,7 +557,9 @@ func (o extHandle) getExt(rtid uintptr) *extTypeTagFn {
 }
 
 func (o extHandle) getExtForTag(tag uint64) *extTypeTagFn {
-	for _, v := range o {
+	var v *extTypeTagFn
+	for i := range o {
+		v = &o[i]
 		if v.tag == tag {
 			return v
 		}
@@ -650,6 +682,8 @@ type typeInfo struct {
 	rt   reflect.Type
 	rtid uintptr
 
+	numMeth uint16 // number of methods
+
 	// baseId gives pointer to the base reflect.Type, after deferencing
 	// the pointers. E.g. base type of ***time.Time is time.Time.
 	base      reflect.Type
@@ -746,14 +780,10 @@ func (x *TypeInfos) get(rtid uintptr, rt reflect.Type) (pti *typeInfo) {
 		return
 	}
 
-	x.mu.Lock()
-	defer x.mu.Unlock()
-	if pti, ok = x.infos[rtid]; ok {
-		return
-	}
-
+	// do not hold lock while computing this.
+	// it may lead to duplication, but that's ok.
 	ti := typeInfo{rt: rt, rtid: rtid}
-	pti = &ti
+	ti.numMeth = uint16(rt.NumMethod())
 
 	var indir int8
 	if ok, indir = implementsIntf(rt, binaryMarshalerTyp); ok {
@@ -813,7 +843,13 @@ func (x *TypeInfos) get(rtid uintptr, rt reflect.Type) (pti *typeInfo) {
 		copy(ti.sfi, sfip)
 	}
 	// sfi = sfip
-	x.infos[rtid] = pti
+
+	x.mu.Lock()
+	if pti, ok = x.infos[rtid]; !ok {
+		pti = &ti
+		x.infos[rtid] = pti
+	}
+	x.mu.Unlock()
 	return
 }
 
@@ -822,45 +858,49 @@ func (x *TypeInfos) rget(rt reflect.Type, indexstack []int, fnameToHastag map[st
 ) {
 	for j := 0; j < rt.NumField(); j++ {
 		f := rt.Field(j)
-		// func types are skipped.
-		if tk := f.Type.Kind(); tk == reflect.Func {
+		fkind := f.Type.Kind()
+		// skip if a func type, or is unexported, or structTag value == "-"
+		if fkind == reflect.Func {
+			continue
+		}
+		// if r1, _ := utf8.DecodeRuneInString(f.Name); r1 == utf8.RuneError || !unicode.IsUpper(r1) {
+		if f.PkgPath != "" && !f.Anonymous { // unexported, not embedded
 			continue
 		}
 		stag := x.structTag(f.Tag)
 		if stag == "-" {
 			continue
 		}
-		if r1, _ := utf8.DecodeRuneInString(f.Name); r1 == utf8.RuneError || !unicode.IsUpper(r1) {
-			continue
-		}
 		var si *structFieldInfo
-		// if anonymous and there is no struct tag (or it's blank)
-		// and its a struct (or pointer to struct), inline it.
-		var doInline bool
-		if f.Anonymous && f.Type.Kind() != reflect.Interface {
-			doInline = stag == ""
+		// if anonymous and no struct tag (or it's blank), and a struct (or pointer to struct), inline it.
+		if f.Anonymous && fkind != reflect.Interface {
+			doInline := stag == ""
 			if !doInline {
 				si = parseStructFieldInfo("", stag)
 				doInline = si.encName == ""
 				// doInline = si.isZero()
-				// fmt.Printf(">>>> doInline for si.isZero: %s: %v\n", f.Name, doInline)
+			}
+			if doInline {
+				ft := f.Type
+				for ft.Kind() == reflect.Ptr {
+					ft = ft.Elem()
+				}
+				if ft.Kind() == reflect.Struct {
+					indexstack2 := make([]int, len(indexstack)+1, len(indexstack)+4)
+					copy(indexstack2, indexstack)
+					indexstack2[len(indexstack)] = j
+					// indexstack2 := append(append(make([]int, 0, len(indexstack)+4), indexstack...), j)
+					x.rget(ft, indexstack2, fnameToHastag, sfi, siInfo)
+					continue
+				}
 			}
 		}
 
-		if doInline {
-			ft := f.Type
-			for ft.Kind() == reflect.Ptr {
-				ft = ft.Elem()
-			}
-			if ft.Kind() == reflect.Struct {
-				indexstack2 := make([]int, len(indexstack)+1, len(indexstack)+4)
-				copy(indexstack2, indexstack)
-				indexstack2[len(indexstack)] = j
-				// indexstack2 := append(append(make([]int, 0, len(indexstack)+4), indexstack...), j)
-				x.rget(ft, indexstack2, fnameToHastag, sfi, siInfo)
-				continue
-			}
+		// after the anonymous dance: if an unexported field, skip
+		if f.PkgPath != "" { // unexported
+			continue
 		}
+
 		// do not let fields with same name in embedded structs override field at higher level.
 		// this must be done after anonymous check, to allow anonymous field
 		// still include their child fields

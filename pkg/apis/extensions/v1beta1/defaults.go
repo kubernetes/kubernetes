@@ -17,15 +17,15 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
-func addDefaultingFuncs() {
-	api.Scheme.AddDefaultingFuncs(
+func addDefaultingFuncs(scheme *runtime.Scheme) {
+	scheme.AddDefaultingFuncs(
 		func(obj *APIVersion) {
 			if len(obj.APIGroup) == 0 {
-				obj.APIGroup = "extensions"
+				obj.APIGroup = GroupName
 			}
 		},
 		func(obj *DaemonSet) {
@@ -35,8 +35,10 @@ func addDefaultingFuncs() {
 			}
 			// TODO: support templates defined elsewhere when we support them in the API
 			if labels != nil {
-				if len(obj.Spec.Selector) == 0 {
-					obj.Spec.Selector = labels
+				if obj.Spec.Selector == nil {
+					obj.Spec.Selector = &LabelSelector{
+						MatchLabels: labels,
+					}
 				}
 				if len(obj.Labels) == 0 {
 					obj.Labels = labels
@@ -45,10 +47,8 @@ func addDefaultingFuncs() {
 		},
 		func(obj *Deployment) {
 			// Default labels and selector to labels from pod template spec.
-			var labels map[string]string
-			if obj.Spec.Template != nil {
-				labels = obj.Spec.Template.Labels
-			}
+			labels := obj.Spec.Template.Labels
+
 			if labels != nil {
 				if len(obj.Spec.Selector) == 0 {
 					obj.Spec.Selector = labels
@@ -59,7 +59,7 @@ func addDefaultingFuncs() {
 			}
 			// Set DeploymentSpec.Replicas to 1 if it is not set.
 			if obj.Spec.Replicas == nil {
-				obj.Spec.Replicas = new(int)
+				obj.Spec.Replicas = new(int32)
 				*obj.Spec.Replicas = 1
 			}
 			strategy := &obj.Spec.Strategy
@@ -74,18 +74,18 @@ func addDefaultingFuncs() {
 				}
 				if strategy.RollingUpdate.MaxUnavailable == nil {
 					// Set default MaxUnavailable as 1 by default.
-					maxUnavailable := util.NewIntOrStringFromInt(1)
+					maxUnavailable := intstr.FromInt(1)
 					strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 				}
 				if strategy.RollingUpdate.MaxSurge == nil {
 					// Set default MaxSurge as 1 by default.
-					maxSurge := util.NewIntOrStringFromInt(1)
+					maxSurge := intstr.FromInt(1)
 					strategy.RollingUpdate.MaxSurge = &maxSurge
 				}
 			}
 			if obj.Spec.UniqueLabelKey == nil {
 				obj.Spec.UniqueLabelKey = new(string)
-				*obj.Spec.UniqueLabelKey = "deployment.kubernetes.io/podTemplateHash"
+				*obj.Spec.UniqueLabelKey = DefaultDeploymentUniqueLabelKey
 			}
 		},
 		func(obj *Job) {
@@ -93,7 +93,7 @@ func addDefaultingFuncs() {
 			// TODO: support templates defined elsewhere when we support them in the API
 			if labels != nil {
 				if obj.Spec.Selector == nil {
-					obj.Spec.Selector = &PodSelector{
+					obj.Spec.Selector = &LabelSelector{
 						MatchLabels: labels,
 					}
 				}
@@ -102,7 +102,7 @@ func addDefaultingFuncs() {
 				}
 			}
 			if obj.Spec.Completions == nil {
-				completions := 1
+				completions := int32(1)
 				obj.Spec.Completions = &completions
 			}
 			if obj.Spec.Parallelism == nil {
@@ -111,11 +111,16 @@ func addDefaultingFuncs() {
 		},
 		func(obj *HorizontalPodAutoscaler) {
 			if obj.Spec.MinReplicas == nil {
-				minReplicas := 1
+				minReplicas := int32(1)
 				obj.Spec.MinReplicas = &minReplicas
 			}
 			if obj.Spec.CPUUtilization == nil {
 				obj.Spec.CPUUtilization = &CPUTargetUtilization{TargetPercentage: 80}
+			}
+		},
+		func(obj *ConfigMap) {
+			if obj.Data == nil {
+				obj.Data = make(map[string]string)
 			}
 		},
 	)

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -33,13 +34,16 @@ type FakeRuntime struct {
 	sync.Mutex
 	CalledFunctions   []string
 	PodList           []*Pod
+	AllPodList        []*Pod
 	ImageList         []Image
-	PodStatus         api.PodStatus
+	APIPodStatus      api.PodStatus
+	PodStatus         PodStatus
 	StartedPods       []string
 	KilledPods        []string
 	StartedContainers []string
 	KilledContainers  []string
 	VersionInfo       string
+	RuntimeType       string
 	Err               error
 	InspectErr        error
 }
@@ -88,12 +92,14 @@ func (f *FakeRuntime) ClearCalls() {
 
 	f.CalledFunctions = []string{}
 	f.PodList = []*Pod{}
-	f.PodStatus = api.PodStatus{}
+	f.AllPodList = []*Pod{}
+	f.APIPodStatus = api.PodStatus{}
 	f.StartedPods = []string{}
 	f.KilledPods = []string{}
 	f.StartedContainers = []string{}
 	f.KilledContainers = []string{}
 	f.VersionInfo = ""
+	f.RuntimeType = ""
 	f.Err = nil
 	f.InspectErr = nil
 }
@@ -136,6 +142,10 @@ func (f *FakeRuntime) AssertKilledContainers(containers []string) error {
 	return f.assertList(containers, f.KilledContainers)
 }
 
+func (f *FakeRuntime) Type() string {
+	return f.RuntimeType
+}
+
 func (f *FakeRuntime) Version() (Version, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -149,10 +159,13 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetPods")
+	if all {
+		return f.AllPodList, f.Err
+	}
 	return f.PodList, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(pod *api.Pod, _ Pod, _ api.PodStatus, _ []api.Secret, backOff *util.Backoff) error {
+func (f *FakeRuntime) SyncPod(pod *api.Pod, _ api.PodStatus, _ *PodStatus, _ []api.Secret, backOff *util.Backoff) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -210,13 +223,42 @@ func (f *FakeRuntime) KillContainerInPod(container api.Container, pod *api.Pod) 
 	return f.Err
 }
 
-func (f *FakeRuntime) GetPodStatus(*api.Pod) (*api.PodStatus, error) {
+func (f *FakeRuntime) GetAPIPodStatus(*api.Pod) (*api.PodStatus, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "GetAPIPodStatus")
+	status := f.APIPodStatus
+	return &status, f.Err
+}
+
+func (f *FakeRuntime) GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error) {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetPodStatus")
 	status := f.PodStatus
 	return &status, f.Err
+}
+
+func (f *FakeRuntime) ConvertPodStatusToAPIPodStatus(_ *api.Pod, _ *PodStatus) (*api.PodStatus, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "ConvertPodStatusToAPIPodStatus")
+	status := f.APIPodStatus
+	return &status, f.Err
+}
+
+func (f *FakeRuntime) GetPodStatusAndAPIPodStatus(_ *api.Pod) (*PodStatus, *api.PodStatus, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	// This is only a temporary function, it should be logged as GetAPIPodStatus
+	f.CalledFunctions = append(f.CalledFunctions, "GetAPIPodStatus")
+	apiPodStatus := f.APIPodStatus
+	podStatus := f.PodStatus
+	return &podStatus, &apiPodStatus, f.Err
 }
 
 func (f *FakeRuntime) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {

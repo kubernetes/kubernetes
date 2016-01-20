@@ -70,8 +70,14 @@ case "$(uname -m)" in
   i?86*)
     host_arch=386
     ;;
+  s390x*)
+    host_arch=s390x
+    ;;
+  ppc64le*)
+    host_arch=ppc64le
+    ;;
   *)
-    echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
+    echo "Unsupported host arch. Must be x86_64, 386, arm, s390x or ppc64le." >&2
     exit 1
     ;;
 esac

@@ -18,93 +18,111 @@ package rkt
 
 import (
 	"fmt"
-	"os/exec"
-	"strconv"
-	"strings"
 
-	appctypes "github.com/appc/spec/schema/types"
+	"github.com/coreos/go-semver/semver"
+	rktapi "github.com/coreos/rkt/api/v1alpha"
+	"github.com/golang/glog"
+	"golang.org/x/net/context"
 )
 
-type rktVersion []int
+// rktVersion implementes kubecontainer.Version interface by implementing
+// Compare() and String() (which is implemented by the underlying semver.Version)
+type rktVersion struct {
+	*semver.Version
+}
 
-func parseVersion(input string) (rktVersion, error) {
-	nsv, err := appctypes.NewSemVer(input)
+func newRktVersion(version string) (rktVersion, error) {
+	sem, err := semver.NewVersion(version)
 	if err != nil {
-		return nil, err
+		return rktVersion{}, err
 	}
-	return rktVersion{int(nsv.Major), int(nsv.Minor), int(nsv.Patch)}, nil
+	return rktVersion{sem}, nil
 }
 
 func (r rktVersion) Compare(other string) (int, error) {
-	v, err := parseVersion(other)
+	v, err := semver.NewVersion(other)
 	if err != nil {
 		return -1, err
 	}
 
-	for i := range r {
-		if i > len(v)-1 {
-			return 1, nil
-		}
-		if r[i] < v[i] {
-			return -1, nil
-		}
-		if r[i] > v[i] {
-			return 1, nil
-		}
-	}
-
-	// When loop ends, len(r) is <= len(v).
-	if len(r) < len(v) {
+	if r.LessThan(*v) {
 		return -1, nil
 	}
-	return 0, nil
-}
-
-func (r rktVersion) String() string {
-	var version []string
-	for _, v := range r {
-		version = append(version, fmt.Sprintf("%d", v))
-	}
-	return strings.Join(version, ".")
-}
-
-type systemdVersion int
-
-func (s systemdVersion) String() string {
-	return fmt.Sprintf("%d", s)
-}
-
-func (s systemdVersion) Compare(other string) (int, error) {
-	v, err := strconv.Atoi(other)
-	if err != nil {
-		return -1, err
-	}
-	if int(s) < v {
-		return -1, nil
-	} else if int(s) > v {
+	if v.LessThan(*r.Version) {
 		return 1, nil
 	}
 	return 0, nil
 }
 
-func getSystemdVersion() (systemdVersion, error) {
-	output, err := exec.Command("systemctl", "--version").Output()
+// checkVersion tests whether the rkt/systemd/rkt-api-service that meet the version requirement.
+// If all version requirements are met, it returns nil.
+func (r *Runtime) checkVersion(minimumRktBinVersion, recommendedRktBinVersion, minimumAppcVersion, minimumRktApiVersion, minimumSystemdVersion string) error {
+	// Check systemd version.
+	var err error
+	r.systemdVersion, err = r.systemd.Version()
 	if err != nil {
-		return -1, err
+		return err
 	}
-	// Example output of 'systemctl --version':
-	//
-	// systemd 215
-	// +PAM +AUDIT +SELINUX +IMA +SYSVINIT +LIBCRYPTSETUP +GCRYPT +ACL +XZ -SECCOMP -APPARMOR
-	//
-	lines := strings.Split(string(output), "\n")
-	tuples := strings.Split(lines[0], " ")
-	if len(tuples) != 2 {
-		return -1, fmt.Errorf("rkt: Failed to parse version %v", lines)
-	}
-	result, err := strconv.Atoi(string(tuples[1]))
+	result, err := r.systemdVersion.Compare(minimumSystemdVersion)
 	if err != nil {
-		return -1, err
+		return err
 	}
-	return systemdVersion(result), nil
+	if result < 0 {
+		return fmt.Errorf("rkt: systemd version(%v) is too old, requires at least %v", r.systemdVersion, minimumSystemdVersion)
+	}
+
+	// Example for the version strings returned by GetInfo():
+	// RktVersion:"0.10.0+gitb7349b1" AppcVersion:"0.7.1" ApiVersion:"1.0.0-alpha"
+	resp, err := r.apisvc.GetInfo(context.Background(), &rktapi.GetInfoRequest{})
+	if err != nil {
+		return err
+	}
+
+	// Check rkt binary version.
+	r.binVersion, err = newRktVersion(resp.Info.RktVersion)
+	if err != nil {
+		return err
+	}
+	result, err = r.binVersion.Compare(minimumRktBinVersion)
+	if err != nil {
+		return err
+	}
+	if result < 0 {
+		return fmt.Errorf("rkt: binary version is too old(%v), requires at least %v", resp.Info.RktVersion, minimumRktBinVersion)
+	}
+	result, err = r.binVersion.Compare(recommendedRktBinVersion)
+	if err != nil {
+		return err
+	}
+	if result != 0 {
+		// TODO(yifan): Record an event to expose the information.
+		glog.Warningf("rkt: current binary version %q is not recommended (recommended version %q)", resp.Info.RktVersion, recommendedRktBinVersion)
+	}
+
+	// Check Appc version.
+	r.appcVersion, err = newRktVersion(resp.Info.AppcVersion)
+	if err != nil {
+		return err
+	}
+	result, err = r.appcVersion.Compare(minimumAppcVersion)
+	if err != nil {
+		return err
+	}
+	if result < 0 {
+		return fmt.Errorf("rkt: appc version is too old(%v), requires at least %v", resp.Info.AppcVersion, minimumAppcVersion)
+	}
+
+	// Check rkt API version.
+	r.apiVersion, err = newRktVersion(resp.Info.ApiVersion)
+	if err != nil {
+		return err
+	}
+	result, err = r.apiVersion.Compare(minimumRktApiVersion)
+	if err != nil {
+		return err
+	}
+	if result < 0 {
+		return fmt.Errorf("rkt: API version is too old(%v), requires at least %v", resp.Info.ApiVersion, minimumRktApiVersion)
+	}
+	return nil
 }

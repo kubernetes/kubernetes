@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-// ReadSeekCloser wraps a io.Reader returning a ReaderSeakerCloser
+// ReadSeekCloser wraps a io.Reader returning a ReaderSeekerCloser
 func ReadSeekCloser(r io.Reader) ReaderSeekerCloser {
 	return ReaderSeekerCloser{r}
 }

@@ -17,15 +17,9 @@
 // Provides Filesystem Stats
 package fs
 
-/*
- extern int getBytesFree(const char *path, unsigned long long *bytes);
- extern int getBytesTotal(const char *path, unsigned long long *bytes);
- extern int getBytesAvail(const char *path, unsigned long long *bytes);
-*/
-import "C"
-
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -35,13 +29,10 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"unsafe"
 
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
 )
-
-var partitionRegex = regexp.MustCompile("^(:?(:?s|xv)d[a-z]+\\d*|dm-\\d+)$")
 
 const (
 	LabelSystemRoot   = "root"
@@ -52,6 +43,8 @@ type partition struct {
 	mountpoint string
 	major      uint
 	minor      uint
+	fsType     string
+	blockSize  uint
 }
 
 type RealFsInfo struct {
@@ -65,6 +58,7 @@ type RealFsInfo struct {
 type Context struct {
 	// docker root directory.
 	DockerRoot string
+	DockerInfo map[string]string
 }
 
 func NewFsInfo(context Context) (FsInfo, error) {
@@ -88,7 +82,25 @@ func NewFsInfo(context Context) (FsInfo, error) {
 		if _, ok := partitions[mount.Source]; ok {
 			continue
 		}
-		partitions[mount.Source] = partition{mount.Mountpoint, uint(mount.Major), uint(mount.Minor)}
+		partitions[mount.Source] = partition{
+			mountpoint: mount.Mountpoint,
+			major:      uint(mount.Major),
+			minor:      uint(mount.Minor),
+		}
+	}
+	if storageDriver, ok := context.DockerInfo["Driver"]; ok && storageDriver == "devicemapper" {
+		dev, major, minor, blockSize, err := dockerDMDevice(context.DockerInfo["DriverStatus"])
+		if err != nil {
+			glog.Warningf("Could not get Docker devicemapper device: %v", err)
+		} else {
+			partitions[dev] = partition{
+				fsType:    "devicemapper",
+				major:     major,
+				minor:     minor,
+				blockSize: blockSize,
+			}
+			fsInfo.labels[LabelDockerImages] = dev
+		}
 	}
 	glog.Infof("Filesystem partitions: %+v", partitions)
 	fsInfo.partitions = partitions
@@ -116,7 +128,7 @@ func getDockerImagePaths(context Context) []string {
 	// TODO(rjnagal): Detect docker root and graphdriver directories from docker info.
 	dockerRoot := context.DockerRoot
 	dockerImagePaths := []string{}
-	for _, dir := range []string{"devicemapper", "btrfs", "aufs"} {
+	for _, dir := range []string{"devicemapper", "btrfs", "aufs", "overlay"} {
 		dockerImagePaths = append(dockerImagePaths, path.Join(dockerRoot, dir))
 	}
 	for dockerRoot != "/" && dockerRoot != "." {
@@ -182,9 +194,18 @@ func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, er
 		_, hasMount := mountSet[partition.mountpoint]
 		_, hasDevice := deviceSet[device]
 		if mountSet == nil || (hasMount && !hasDevice) {
-			total, free, avail, err := getVfsStats(partition.mountpoint)
+			var (
+				total, free, avail uint64
+				err                error
+			)
+			switch partition.fsType {
+			case "devicemapper":
+				total, free, avail, err = getDMStats(device, partition.blockSize)
+			default:
+				total, free, avail, err = getVfsStats(partition.mountpoint)
+			}
 			if err != nil {
-				glog.Errorf("Statvfs failed. Error: %v", err)
+				glog.Errorf("Stat fs failed. Error: %v", err)
 			} else {
 				deviceSet[device] = struct{}{}
 				deviceInfo := DeviceInfo{
@@ -199,6 +220,8 @@ func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, er
 	}
 	return filesystems, nil
 }
+
+var partitionRegex = regexp.MustCompile(`^(?:(?:s|xv)d[a-z]+\d*|dm-\d+)$`)
 
 func getDiskStatsMap(diskStatsFile string) (map[string]DiskStats, error) {
 	diskStatsMap := make(map[string]DiskStats)
@@ -266,8 +289,8 @@ func minor(devNumber uint64) uint {
 }
 
 func (self *RealFsInfo) GetDirFsDevice(dir string) (*DeviceInfo, error) {
-	var buf syscall.Stat_t
-	err := syscall.Stat(dir, &buf)
+	buf := new(syscall.Stat_t)
+	err := syscall.Stat(dir, buf)
 	if err != nil {
 		return nil, fmt.Errorf("stat failed on %s with error: %s", dir, err)
 	}
@@ -293,22 +316,110 @@ func (self *RealFsInfo) GetDirUsage(dir string) (uint64, error) {
 	return usageInKb * 1024, nil
 }
 
-func getVfsStats(path string) (total uint64, free uint64, avail uint64, err error) {
-	_p0, err := syscall.BytePtrFromString(path)
+func getVfsStats(path string) (uint64, uint64, uint64, error) {
+	var s syscall.Statfs_t
+	if err := syscall.Statfs(path, &s); err != nil {
+		return 0, 0, 0, err
+	}
+	total := uint64(s.Frsize) * s.Blocks
+	free := uint64(s.Frsize) * s.Bfree
+	avail := uint64(s.Frsize) * s.Bavail
+	return total, free, avail, nil
+}
+
+func dockerStatusValue(status [][]string, target string) string {
+	for _, v := range status {
+		if len(v) == 2 && strings.ToLower(v[0]) == strings.ToLower(target) {
+			return v[1]
+		}
+	}
+	return ""
+}
+
+// Devicemapper thin provisioning is detailed at
+// https://www.kernel.org/doc/Documentation/device-mapper/thin-provisioning.txt
+func dockerDMDevice(driverStatus string) (string, uint, uint, uint, error) {
+	var config [][]string
+	err := json.Unmarshal([]byte(driverStatus), &config)
+	if err != nil {
+		return "", 0, 0, 0, err
+	}
+	poolName := dockerStatusValue(config, "Pool Name")
+	if len(poolName) == 0 {
+		return "", 0, 0, 0, fmt.Errorf("Could not get dm pool name")
+	}
+
+	out, err := exec.Command("dmsetup", "table", poolName).Output()
+	if err != nil {
+		return "", 0, 0, 0, err
+	}
+
+	major, minor, dataBlkSize, err := parseDMTable(string(out))
+	if err != nil {
+		return "", 0, 0, 0, err
+	}
+
+	return poolName, major, minor, dataBlkSize, nil
+}
+
+func parseDMTable(dmTable string) (uint, uint, uint, error) {
+	dmTable = strings.Replace(dmTable, ":", " ", -1)
+	dmFields := strings.Fields(dmTable)
+
+	if len(dmFields) < 8 {
+		return 0, 0, 0, fmt.Errorf("Invalid dmsetup status output: %s", dmTable)
+	}
+
+	major, err := strconv.ParseUint(dmFields[5], 10, 32)
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	res, err := C.getBytesFree((*C.char)(unsafe.Pointer(_p0)), (*_Ctype_ulonglong)(unsafe.Pointer(&free)))
-	if res != 0 {
+	minor, err := strconv.ParseUint(dmFields[6], 10, 32)
+	if err != nil {
 		return 0, 0, 0, err
 	}
-	res, err = C.getBytesTotal((*C.char)(unsafe.Pointer(_p0)), (*_Ctype_ulonglong)(unsafe.Pointer(&total)))
-	if res != 0 {
+	dataBlkSize, err := strconv.ParseUint(dmFields[7], 10, 32)
+	if err != nil {
 		return 0, 0, 0, err
 	}
-	res, err = C.getBytesAvail((*C.char)(unsafe.Pointer(_p0)), (*_Ctype_ulonglong)(unsafe.Pointer(&avail)))
-	if res != 0 {
+
+	return uint(major), uint(minor), uint(dataBlkSize), nil
+}
+
+func getDMStats(poolName string, dataBlkSize uint) (uint64, uint64, uint64, error) {
+	out, err := exec.Command("dmsetup", "status", poolName).Output()
+	if err != nil {
 		return 0, 0, 0, err
 	}
-	return total, free, avail, nil
+
+	used, total, err := parseDMStatus(string(out))
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	used *= 512 * uint64(dataBlkSize)
+	total *= 512 * uint64(dataBlkSize)
+	free := total - used
+
+	return total, free, free, nil
+}
+
+func parseDMStatus(dmStatus string) (uint64, uint64, error) {
+	dmStatus = strings.Replace(dmStatus, "/", " ", -1)
+	dmFields := strings.Fields(dmStatus)
+
+	if len(dmFields) < 8 {
+		return 0, 0, fmt.Errorf("Invalid dmsetup status output: %s", dmStatus)
+	}
+
+	used, err := strconv.ParseUint(dmFields[6], 10, 64)
+	if err != nil {
+		return 0, 0, err
+	}
+	total, err := strconv.ParseUint(dmFields[7], 10, 64)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return used, total, nil
 }

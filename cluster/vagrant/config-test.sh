@@ -15,11 +15,14 @@
 # limitations under the License.
 
 ## Contains configuration values for interacting with the Vagrant cluster in test mode
-#Set NUM_MINIONS to minimum required for testing.
-NUM_MINIONS=2
+#Set NUM_NODES to minimum required for testing.
+NUM_NODES=2
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/vagrant/config-default.sh"
 
 # Do not register the master kubelet during testing
 REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-false}
+
+# Optional: if set to true, kube-up will configure the cluster to run e2e tests.
+E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}

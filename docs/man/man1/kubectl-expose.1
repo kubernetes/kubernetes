@@ -13,12 +13,13 @@ kubectl expose \- Take a replication controller, service or pod and expose it as
 
 .SH DESCRIPTION
 .PP
-Take a replication controller, service or pod and expose it as a new Kubernetes Service.
+Take a replication controller, service, or pod and expose it as a new Kubernetes service.
 
 .PP
-Looks up a replication controller, service or pod by name and uses the selector for that resource as the
-selector for a new Service on the specified port. If no labels are specified, the new service will
-re\-use the labels from the resource it exposes.
+Looks up a replication controller, service, or pod by name and uses the selector for that resource as the
+selector for a new service on the specified port. Note that if no port is specified via \-\-port and the
+exposed resource has multiple ports, all will be re\-used by the new service. Also if no labels are specified,
+the new service will re\-use the labels from the resource it exposes.
 
 
 .SH OPTIONS
@@ -36,7 +37,7 @@ re\-use the labels from the resource it exposes.
 
 .PP
 \fB\-\-external\-ip\fP=""
-    External IP address to set for the service. The service can be accessed by this IP in addition to its generated service IP.
+    Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP.
 
 .PP
 \fB\-f\fP, \fB\-\-filename\fP=[]
@@ -52,7 +53,7 @@ re\-use the labels from the resource it exposes.
 
 .PP
 \fB\-\-load\-balancer\-ip\fP=""
-    IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used(cloud\-provider specific).
+    IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud\-provider specific).
 
 .PP
 \fB\-\-name\fP=""
@@ -85,6 +86,10 @@ re\-use the labels from the resource it exposes.
     The network protocol for the service to be created. Default is 'tcp'.
 
 .PP
+\fB\-\-save\-config\fP=false
+    If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.
+
+.PP
 \fB\-\-selector\fP=""
     A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
 
@@ -105,7 +110,7 @@ re\-use the labels from the resource it exposes.
     Name or number for the port on the container that the service should direct traffic to. Optional.
 
 .PP
-\fB\-t\fP, \fB\-\-template\fP=""
+\fB\-\-template\fP=""
     Template string or path to template file to use when \-o=go\-template, \-o=go\-template\-file. The template format is golang templates [
 \[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]].
 
@@ -129,7 +134,7 @@ re\-use the labels from the resource it exposes.
 
 .PP
 \fB\-\-client\-certificate\fP=""
-    Path to a client key file for TLS.
+    Path to a client certificate file for TLS.
 
 .PP
 \fB\-\-client\-key\fP=""

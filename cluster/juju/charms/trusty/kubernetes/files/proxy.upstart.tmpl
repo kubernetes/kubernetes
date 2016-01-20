@@ -9,4 +9,5 @@ kill timeout 60 # wait 60s between SIGTERM and SIGKILL.
 
 exec /usr/local/bin/proxy \
      --master=%(kubeapi_server)s \
-     --logtostderr=true
+     --logtostderr=true \
+     --hostname-override=%(kubelet_bind_addr)s

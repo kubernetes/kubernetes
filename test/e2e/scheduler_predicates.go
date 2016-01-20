@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
@@ -47,7 +46,7 @@ func getPodsScheduled(pods *api.PodList) (scheduledPods, notScheduledPods []api.
 // Simplified version of RunRC, that does not create RC, but creates plain Pods and
 // requires passing whole Pod definition, which is needed to test various Scheduler predicates.
 func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, pod api.Pod) {
-	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+	allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
 	expectNoError(err)
 	podsScheduledBefore, _ := getPodsScheduled(allPods)
 
@@ -68,7 +67,7 @@ func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, 
 	startTime := time.Now()
 	currentlyScheduledPods := 0
 	for len(podsScheduledBefore)+replicas != currentlyScheduledPods {
-		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+		allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
 		expectNoError(err)
 		scheduledPods := 0
 		for _, pod := range allPods.Items {
@@ -90,26 +89,42 @@ func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, 
 func getRequestedCPU(pod api.Pod) int64 {
 	var result int64
 	for _, container := range pod.Spec.Containers {
-		result += container.Resources.Limits.Cpu().MilliValue()
+		result += container.Resources.Requests.Cpu().MilliValue()
 	}
 	return result
 }
 
 func verifyResult(c *client.Client, podName string, ns string) {
-	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+	allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
 	expectNoError(err)
 	scheduledPods, notScheduledPods := getPodsScheduled(allPods)
 
-	schedEvents, err := c.Events(ns).List(
-		labels.Everything(),
-		fields.Set{
+	selector := fields.Set{
+		"involvedObject.kind":      "Pod",
+		"involvedObject.name":      podName,
+		"involvedObject.namespace": ns,
+		"source":                   api.DefaultSchedulerName,
+		"reason":                   "FailedScheduling",
+	}.AsSelector()
+	options := api.ListOptions{FieldSelector: selector}
+	schedEvents, err := c.Events(ns).List(options)
+	expectNoError(err)
+	// If we failed to find event with a capitalized first letter of reason
+	// try looking for one starting with a small one for backward compatibility.
+	// If we don't do it we end up in #15806.
+	// TODO: remove this block when we don't care about supporting v1.0 too much.
+	if len(schedEvents.Items) == 0 {
+		selector := fields.Set{
 			"involvedObject.kind":      "Pod",
 			"involvedObject.name":      podName,
 			"involvedObject.namespace": ns,
 			"source":                   "scheduler",
-			"reason":                   "FailedScheduling",
-		}.AsSelector())
-	expectNoError(err)
+			"reason":                   "failedScheduling",
+		}.AsSelector()
+		options := api.ListOptions{FieldSelector: selector}
+		schedEvents, err = c.Events(ns).List(options)
+		expectNoError(err)
+	}
 
 	printed := false
 	printOnce := func(msg string) string {
@@ -127,7 +142,7 @@ func verifyResult(c *client.Client, podName string, ns string) {
 
 func cleanupPods(c *client.Client, ns string) {
 	By("Removing all pods in namespace " + ns)
-	pods, err := c.Pods(ns).List(labels.Everything(), fields.Everything())
+	pods, err := c.Pods(ns).List(api.ListOptions{})
 	expectNoError(err)
 	opt := api.NewDeleteOptions(0)
 	for _, p := range pods.Items {
@@ -140,13 +155,13 @@ func waitForStableCluster(c *client.Client) int {
 	timeout := 10 * time.Minute
 	startTime := time.Now()
 
-	allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+	allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
 	expectNoError(err)
 	scheduledPods, currentlyNotScheduledPods := getPodsScheduled(allPods)
 	for len(currentlyNotScheduledPods) != 0 {
 		time.Sleep(2 * time.Second)
 
-		allPods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+		allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
 		expectNoError(err)
 		scheduledPods, currentlyNotScheduledPods = getPodsScheduled(allPods)
 
@@ -158,22 +173,12 @@ func waitForStableCluster(c *client.Client) int {
 	return len(scheduledPods)
 }
 
-var _ = Describe("SchedulerPredicates", func() {
-	framework := Framework{BaseName: "sched-pred"}
+var _ = Describe("SchedulerPredicates [Serial]", func() {
 	var c *client.Client
 	var nodeList *api.NodeList
 	var totalPodCapacity int64
 	var RCName string
 	var ns string
-
-	BeforeEach(func() {
-		framework.beforeEach()
-		c = framework.Client
-		ns = framework.Namespace.Name
-		var err error
-		nodeList, err = c.Nodes().List(labels.Everything(), fields.Everything())
-		expectNoError(err)
-	})
 
 	AfterEach(func() {
 		rc, err := c.ReplicationControllers(ns).Get(RCName)
@@ -182,13 +187,22 @@ var _ = Describe("SchedulerPredicates", func() {
 			err := DeleteRC(c, ns, RCName)
 			expectNoError(err)
 		}
-		framework.afterEach()
+	})
+
+	framework := NewFramework("sched-pred")
+
+	BeforeEach(func() {
+		c = framework.Client
+		ns = framework.Namespace.Name
+		nodeList = ListSchedulableNodesOrDie(c)
 	})
 
 	// This test verifies that max-pods flag works as advertised. It assumes that cluster add-on pods stay stable
 	// and cannot be run in parallel with any other test that touches Nodes or Pods. It is so because to check
 	// if max-pods is working we need to fully saturate the cluster and keep it in this state for few seconds.
-	It("validates MaxPods limit number of pods that are allowed to run", func() {
+	//
+	// Slow PR #13315 (8 min)
+	It("validates MaxPods limit number of pods that are allowed to run [Slow]", func() {
 		totalPodCapacity = 0
 
 		for _, node := range nodeList.Items {
@@ -215,7 +229,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  "",
-						Image: "beta.gcr.io/google_containers/pause:2.0",
+						Image: "gcr.io/google_containers/pause:2.0",
 					},
 				},
 			},
@@ -234,7 +248,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "beta.gcr.io/google_containers/pause:2.0",
+						Image: "gcr.io/google_containers/pause:2.0",
 					},
 				},
 			},
@@ -261,7 +275,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		}
 		waitForStableCluster(c)
 
-		pods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+		pods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
 		expectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToCapacityMap[pod.Spec.NodeName]
@@ -293,9 +307,12 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  "",
-						Image: "beta.gcr.io/google_containers/pause:2.0",
+						Image: "gcr.io/google_containers/pause:2.0",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
+								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+							},
+							Requests: api.ResourceList{
 								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 							},
 						},
@@ -317,7 +334,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "beta.gcr.io/google_containers/pause:2.0",
+						Image: "gcr.io/google_containers/pause:2.0",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
@@ -357,7 +374,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "beta.gcr.io/google_containers/pause:2.0",
+						Image: "gcr.io/google_containers/pause:2.0",
 					},
 				},
 				NodeSelector: map[string]string{
@@ -393,7 +410,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "beta.gcr.io/google_containers/pause:2.0",
+						Image: "gcr.io/google_containers/pause:2.0",
 					},
 				},
 			},
@@ -431,7 +448,7 @@ var _ = Describe("SchedulerPredicates", func() {
 				Containers: []api.Container{
 					{
 						Name:  labelPodName,
-						Image: "beta.gcr.io/google_containers/pause:2.0",
+						Image: "gcr.io/google_containers/pause:2.0",
 					},
 				},
 				NodeSelector: map[string]string{

@@ -28,9 +28,9 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/secret"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
@@ -41,7 +41,7 @@ const NumServiceAccountRemoveReferenceRetries = 10
 // TokensControllerOptions contains options for the TokensController
 type TokensControllerOptions struct {
 	// TokenGenerator is the generator to use to create new tokens
-	TokenGenerator TokenGenerator
+	TokenGenerator serviceaccount.TokenGenerator
 	// ServiceAccountResync is the time.Duration at which to fully re-list service accounts.
 	// If zero, re-list will be delayed as long as possible
 	ServiceAccountResync time.Duration
@@ -62,11 +62,11 @@ func NewTokensController(cl client.Interface, options TokensControllerOptions) *
 
 	e.serviceAccounts, e.serviceAccountController = framework.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return e.client.ServiceAccounts(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return e.client.ServiceAccounts(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(rv string) (watch.Interface, error) {
-				return e.client.ServiceAccounts(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return e.client.ServiceAccounts(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.ServiceAccount{},
@@ -82,11 +82,13 @@ func NewTokensController(cl client.Interface, options TokensControllerOptions) *
 	tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
 	e.secrets, e.secretController = framework.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return e.client.Secrets(api.NamespaceAll).List(labels.Everything(), tokenSelector)
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				options.FieldSelector = tokenSelector
+				return e.client.Secrets(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(rv string) (watch.Interface, error) {
-				return e.client.Secrets(api.NamespaceAll).Watch(labels.Everything(), tokenSelector, rv)
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				options.FieldSelector = tokenSelector
+				return e.client.Secrets(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Secret{},
@@ -110,7 +112,7 @@ type TokensController struct {
 	stopChan chan struct{}
 
 	client client.Interface
-	token  TokenGenerator
+	token  serviceaccount.TokenGenerator
 
 	rootCA []byte
 
@@ -450,7 +452,7 @@ func (e *TokensController) getServiceAccount(secret *api.Secret, fetchOnCacheMis
 	for _, obj := range namespaceAccounts {
 		serviceAccount := obj.(*api.ServiceAccount)
 
-		if IsServiceAccountToken(secret, serviceAccount) {
+		if serviceaccount.IsServiceAccountToken(secret, serviceAccount) {
 			return serviceAccount, nil
 		}
 	}
@@ -464,7 +466,7 @@ func (e *TokensController) getServiceAccount(secret *api.Secret, fetchOnCacheMis
 			return nil, err
 		}
 
-		if IsServiceAccountToken(secret, serviceAccount) {
+		if serviceaccount.IsServiceAccountToken(secret, serviceAccount) {
 			return serviceAccount, nil
 		}
 	}
@@ -485,7 +487,7 @@ func (e *TokensController) listTokenSecrets(serviceAccount *api.ServiceAccount) 
 	for _, obj := range namespaceSecrets {
 		secret := obj.(*api.Secret)
 
-		if IsServiceAccountToken(secret, serviceAccount) {
+		if serviceaccount.IsServiceAccountToken(secret, serviceAccount) {
 			items = append(items, secret)
 		}
 	}

@@ -2,6 +2,5 @@
 
 package opts
 
-import "fmt"
-
-var DefaultHost = fmt.Sprintf("tcp://%s:%d", DefaultHTTPHost, DefaultHTTPPort)
+// DefaultHost constant defines the default host string used by docker on Windows
+var DefaultHost = DefaultTCPHost

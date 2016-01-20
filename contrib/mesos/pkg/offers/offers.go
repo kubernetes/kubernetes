@@ -242,7 +242,7 @@ func (s *offerStorage) Add(offers []*mesos.Offer) {
 			offerId := offer.Id.GetValue()
 			log.V(3).Infof("Declining incompatible offer %v", offerId)
 			s.declineOffer(offerId, offer.GetHostname(), metrics.OfferCompat)
-			return
+			continue
 		}
 		timed := &liveOffer{
 			Offer:      offer,
@@ -441,7 +441,7 @@ func (s *offerStorage) ageOffers() {
 }
 
 func (s *offerStorage) nextListener() *offerListener {
-	obj := s.listeners.Pop()
+	obj := s.listeners.Pop(queue.WithoutCancel())
 	if listen, ok := obj.(*offerListener); !ok {
 		//programming error
 		panic(fmt.Sprintf("unexpected listener object %v", obj))

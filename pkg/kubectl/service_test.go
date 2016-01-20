@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestGenerateService(t *testing.T) {
@@ -52,7 +52,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "TCP",
-							TargetPort: util.NewIntOrStringFromInt(1234),
+							TargetPort: intstr.FromInt(1234),
 						},
 					},
 				},
@@ -81,7 +81,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "UDP",
-							TargetPort: util.NewIntOrStringFromString("foobar"),
+							TargetPort: intstr.FromString("foobar"),
 						},
 					},
 				},
@@ -114,7 +114,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "TCP",
-							TargetPort: util.NewIntOrStringFromInt(1234),
+							TargetPort: intstr.FromInt(1234),
 						},
 					},
 				},
@@ -143,7 +143,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "UDP",
-							TargetPort: util.NewIntOrStringFromString("foobar"),
+							TargetPort: intstr.FromString("foobar"),
 						},
 					},
 					ExternalIPs: []string{"1.2.3.4"},
@@ -174,7 +174,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "UDP",
-							TargetPort: util.NewIntOrStringFromString("foobar"),
+							TargetPort: intstr.FromString("foobar"),
 						},
 					},
 					Type:        api.ServiceTypeLoadBalancer,
@@ -205,7 +205,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "UDP",
-							TargetPort: util.NewIntOrStringFromString("foobar"),
+							TargetPort: intstr.FromString("foobar"),
 						},
 					},
 					Type: api.ServiceTypeNodePort,
@@ -236,7 +236,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "UDP",
-							TargetPort: util.NewIntOrStringFromString("foobar"),
+							TargetPort: intstr.FromString("foobar"),
 						},
 					},
 					Type: api.ServiceTypeNodePort,
@@ -266,7 +266,7 @@ func TestGenerateService(t *testing.T) {
 							Name:       "default",
 							Port:       80,
 							Protocol:   "TCP",
-							TargetPort: util.NewIntOrStringFromInt(1234),
+							TargetPort: intstr.FromInt(1234),
 						},
 					},
 				},
@@ -296,10 +296,111 @@ func TestGenerateService(t *testing.T) {
 							Name:       "default",
 							Port:       80,
 							Protocol:   "TCP",
-							TargetPort: util.NewIntOrStringFromInt(1234),
+							TargetPort: intstr.FromInt(1234),
 						},
 					},
 					SessionAffinity: api.ServiceAffinityClientIP,
+				},
+			},
+		},
+		{
+			generator: ServiceGeneratorV1{},
+			params: map[string]interface{}{
+				"selector":       "foo=bar",
+				"name":           "test",
+				"ports":          "80,443",
+				"protocol":       "TCP",
+				"container-port": "foobar",
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+					},
+					Ports: []api.ServicePort{
+						{
+							Name:       "port-1",
+							Port:       80,
+							Protocol:   api.ProtocolTCP,
+							TargetPort: intstr.FromString("foobar"),
+						},
+						{
+							Name:       "port-2",
+							Port:       443,
+							Protocol:   api.ProtocolTCP,
+							TargetPort: intstr.FromString("foobar"),
+						},
+					},
+				},
+			},
+		},
+		{
+			generator: ServiceGeneratorV2{},
+			params: map[string]interface{}{
+				"selector":    "foo=bar",
+				"name":        "test",
+				"ports":       "80,443",
+				"protocol":    "UDP",
+				"target-port": "1234",
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+					},
+					Ports: []api.ServicePort{
+						{
+							Name:       "port-1",
+							Port:       80,
+							Protocol:   api.ProtocolUDP,
+							TargetPort: intstr.FromInt(1234),
+						},
+						{
+							Name:       "port-2",
+							Port:       443,
+							Protocol:   api.ProtocolUDP,
+							TargetPort: intstr.FromInt(1234),
+						},
+					},
+				},
+			},
+		},
+		{
+			generator: ServiceGeneratorV2{},
+			params: map[string]interface{}{
+				"selector": "foo=bar",
+				"name":     "test",
+				"ports":    "80,443",
+				"protocol": "TCP",
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+					},
+					Ports: []api.ServicePort{
+						{
+							Name:       "port-1",
+							Port:       80,
+							Protocol:   api.ProtocolTCP,
+							TargetPort: intstr.FromInt(80),
+						},
+						{
+							Name:       "port-2",
+							Port:       443,
+							Protocol:   api.ProtocolTCP,
+							TargetPort: intstr.FromInt(443),
+						},
+					},
 				},
 			},
 		},

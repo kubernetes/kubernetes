@@ -22,8 +22,9 @@ import (
 )
 
 // BoolFlag is a boolean flag compatible with flags and pflags that keeps track of whether it had a value supplied or not.
-// Beware!  If you use this type, you must actually specify --flag-name=true, you cannot leave it as --flag-name and still have
-// the value set
+// Getting this flag to act like a normal bool, where true/false are not required needs a little bit of extra code, example:
+//    f := cmd.Flags().VarPF(&BoolFlagVar, "flagname", "", "help about the flag")
+//    f.NoOptDefVal = "true"
 type BoolFlag struct {
 	// If Set has been invoked this value is true
 	provided bool

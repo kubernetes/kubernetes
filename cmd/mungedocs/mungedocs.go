@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -28,7 +29,11 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
+// This needs to be updated when we cut a new release series.
+const latestReleaseBranch = "release-1.1"
+
 var (
+	verbose = flag.Bool("verbose", false, "On verification failure, emit pre-munge and post-munge versions.")
 	verify  = flag.Bool("verify", false, "Exit with status 1 if files would have needed changes but do not change.")
 	rootDir = flag.String("root-dir", "", "Root directory containing documents to be processed.")
 	// "repo-root" seems like a dumb name, this is the relative path (from rootDir) to get to the repoRoot
@@ -42,6 +47,11 @@ Examples:
 	repoRoot   string
 
 	ErrChangesNeeded = errors.New("mungedocs: changes required")
+
+	// This records the files in the rootDir in upstream/latest-release
+	filesInLatestRelease string
+	// This indicates if the munger is running inside Jenkins
+	inJenkins bool
 
 	// All of the munge operations to perform.
 	// TODO: allow selection from command line. (e.g., just check links in the examples directory.)
@@ -108,6 +118,14 @@ func (f fileProcessor) visit(path string) error {
 				filePrinted = true
 			}
 			fmt.Printf("%s:\n", munge.name)
+			if *verbose {
+				if len(mungeLines) <= 20 {
+					fmt.Printf("INPUT: <<<%v>>>\n", mungeLines)
+					fmt.Printf("MUNGED: <<<%v>>>\n", after)
+				} else {
+					fmt.Printf("not printing failed chunk: too many lines\n")
+				}
+			}
 			if err != nil {
 				fmt.Println(err)
 				errFound = true
@@ -185,6 +203,26 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 		os.Exit(2)
+	}
+
+	absRootDir, err := filepath.Abs(*rootDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+		os.Exit(2)
+	}
+	inJenkins = len(os.Getenv("JENKINS_HOME")) != 0
+	out, err := exec.Command("git", "ls-tree", "-r", "--name-only", fmt.Sprintf("%s/%s", "upstream", latestReleaseBranch), absRootDir).CombinedOutput()
+	if err != nil {
+		if inJenkins {
+			fmt.Fprintf(os.Stderr, "output: %s,\nERROR: %v\n", out, err)
+			os.Exit(2)
+		} else {
+			fmt.Fprintf(os.Stdout, "output: %s,\nERROR: %v\n", out, err)
+			fmt.Fprintf(os.Stdout, "`git ls-tree -r --name-only upstream/%s failed. We'll ignore this error locally, but Jenkins may pick an error. Munger uses the output of this command to determine in unversioned warning, if it should add a link to the doc in release branch.\n", latestReleaseBranch)
+			filesInLatestRelease = ""
+		}
+	} else {
+		filesInLatestRelease = string(out)
 	}
 
 	fp := fileProcessor{

@@ -28,6 +28,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -88,7 +89,7 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 func testComponentStatusData() *api.ComponentStatusList {
 	good := api.ComponentStatus{
 		Conditions: []api.ComponentCondition{
-			{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok", Error: "nil"},
+			{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok"},
 		},
 		ObjectMeta: api.ObjectMeta{Name: "servergood"},
 	}
@@ -121,7 +122,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &internalType{Name: "foo"})},
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &client.Config{Version: testapi.Default.Version()}
+	tf.ClientConfig = &client.Config{GroupVersion: testapi.Default.GroupVersion()}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdGet(f, buf)
@@ -146,9 +147,9 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 //
 // The expected behavior of the `kubectl get` command is:
 // 1. objects using unrecognized schemes will always be returned using that scheme/version, "unlikelyversion" in this test;
-// 2. if the specified output-version is a recognized, valid Scheme, then the list should use that scheme, and otherwise it will default to the client version, testapi.Default.Version() in this test;
+// 2. if the specified output-version is a recognized, valid Scheme, then the list should use that scheme, and otherwise it will default to the client version, testapi.Default.GroupVersion().String() in this test;
 // 3a. if the specified output-version is a recognized, valid Scheme, in which the requested object (replicationcontroller) can be represented, then the object should be returned using that version;
-// 3b. otherwise if the specified output-version is unrecognized, but the requested object (replicationcontroller) is recognized by the client's codec, then it will be converted to the client version, testapi.Default.Version() in this test.
+// 3b. otherwise if the specified output-version is unrecognized, but the requested object (replicationcontroller) is recognized by the client's codec, then it will be converted to the client version, testapi.Default.GroupVersion().String() in this test.
 func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 	testCases := map[string]struct {
 		outputVersion   string
@@ -157,29 +158,29 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		rcVersion       string
 	}{
 		"handles specific version": {
-			outputVersion:   testapi.Default.Version(),
-			listVersion:     testapi.Default.Version(),
-			testtypeVersion: "unlikelyversion",
-			rcVersion:       testapi.Default.Version(),
+			outputVersion:   testapi.Default.GroupVersion().String(),
+			listVersion:     testapi.Default.GroupVersion().String(),
+			testtypeVersion: unlikelyGV.String(),
+			rcVersion:       testapi.Default.GroupVersion().String(),
 		},
 		"handles second specific version": {
-			outputVersion:   "unlikelyversion",
-			listVersion:     testapi.Default.Version(),
-			testtypeVersion: "unlikelyversion",
-			rcVersion:       testapi.Default.Version(), // see expected behavior 3b
+			outputVersion:   "unlikely.group/unlikelyversion",
+			listVersion:     testapi.Default.GroupVersion().String(),
+			testtypeVersion: unlikelyGV.String(),
+			rcVersion:       testapi.Default.GroupVersion().String(), // see expected behavior 3b
 		},
 		"handles common version": {
-			outputVersion:   testapi.Default.Version(),
-			listVersion:     testapi.Default.Version(),
-			testtypeVersion: "unlikelyversion",
-			rcVersion:       testapi.Default.Version(),
+			outputVersion:   testapi.Default.GroupVersion().String(),
+			listVersion:     testapi.Default.GroupVersion().String(),
+			testtypeVersion: unlikelyGV.String(),
+			rcVersion:       testapi.Default.GroupVersion().String(),
 		},
 	}
 	for k, test := range testCases {
-		apiCodec := runtime.CodecFor(api.Scheme, testapi.Default.Version())
+		apiCodec := runtime.CodecFor(api.Scheme, *testapi.Default.GroupVersion())
 		regularClient := &fake.RESTClient{
 			Codec: apiCodec,
-			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				return &http.Response{StatusCode: 200, Body: objBody(apiCodec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}})}, nil
 			}),
 		}
@@ -188,16 +189,17 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
 			Codec: codec,
-			Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &internalType{Name: "foo"})}, nil
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &client.Config{Version: testapi.Default.Version()}
+		tf.ClientConfig = &client.Config{GroupVersion: testapi.Default.GroupVersion()}
 		buf := bytes.NewBuffer([]byte{})
 		cmd := NewCmdGet(f, buf)
 		cmd.SetOutput(buf)
 		cmd.Flags().Set("output", "json")
+
 		cmd.Flags().Set("output-version", test.outputVersion)
 		err := RunGet(f, buf, cmd, []string{"type/foo", "replicationcontrollers/foo"}, &GetOptions{})
 		if err != nil {
@@ -234,7 +236,7 @@ func TestGetSchemaObject(t *testing.T) {
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}})},
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &client.Config{Version: "v1"}
+	tf.ClientConfig = &client.Config{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdGet(f, buf)
@@ -330,7 +332,7 @@ func TestGetListObjects(t *testing.T) {
 func extractResourceList(objs []runtime.Object) ([]runtime.Object, error) {
 	finalObjs := []runtime.Object{}
 	for _, obj := range objs {
-		items, err := runtime.ExtractList(obj)
+		items, err := meta.ExtractList(obj)
 		if err != nil {
 			return nil, err
 		}
@@ -407,7 +409,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, pods)}, nil
@@ -446,7 +448,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, pods)}, nil
@@ -459,7 +461,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &client.Config{Version: testapi.Default.Version()}
+	tf.ClientConfig = &client.Config{GroupVersion: testapi.Default.GroupVersion()}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdGet(f, buf)
@@ -472,18 +474,18 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 		t.Errorf("unexpected print to default printer")
 	}
 
-	out, err := codec.Decode(buf.Bytes())
+	out, err := runtime.Decode(codec, buf.Bytes())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	list, err := runtime.ExtractList(out)
+	list, err := meta.ExtractList(out)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if errs := runtime.DecodeList(list, api.Scheme); len(errs) > 0 {
 		t.Fatalf("unexpected error: %v", errs)
 	}
-	if err := runtime.SetList(out, list); err != nil {
+	if err := meta.SetList(out, list); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -506,8 +508,8 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.Version())) != "a=b" {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -558,7 +560,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/nodes/foo":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, node)}, nil
@@ -587,6 +589,29 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 		t.Errorf("unexpected empty output")
 	}
 }
+
+func TestGetByNameForcesFlag(t *testing.T) {
+	pods, _, _ := testData()
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &fake.RESTClient{
+		Codec: codec,
+		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])},
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdGet(f, buf)
+	cmd.SetOutput(buf)
+	cmd.Run(cmd, []string{"pods", "foo"})
+
+	showAllFlag, _ := cmd.Flags().GetBool("show-all")
+	if !showAllFlag {
+		t.Errorf("expected showAll to be true when getting resource by name")
+	}
+}
+
 func watchTestData() ([]api.Pod, []watch.Event) {
 	pods := []api.Pod{
 		{
@@ -632,8 +657,8 @@ func TestWatchSelector(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.Version())) != "a=b" {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -674,7 +699,7 @@ func TestWatchResource(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods/foo":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods[0])}, nil
@@ -712,7 +737,7 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods/cassandra":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods[0])}, nil
@@ -751,7 +776,7 @@ func TestWatchOnlyResource(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		Codec: codec,
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods/foo":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods[0])}, nil

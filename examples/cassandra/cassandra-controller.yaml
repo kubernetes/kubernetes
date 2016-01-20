@@ -2,16 +2,14 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
-    name: cassandra
+    app: cassandra
   name: cassandra
 spec:
   replicas: 1
-  selector:
-    name: cassandra
   template:
     metadata:
       labels:
-        name: cassandra
+        app: cassandra
     spec:
       containers:
         - command:
@@ -28,7 +26,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: gcr.io/google_containers/cassandra:v6
+          image: gcr.io/google_containers/cassandra:v7
           name: cassandra
           ports:
             - containerPort: 9042

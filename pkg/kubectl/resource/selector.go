@@ -31,21 +31,23 @@ type Selector struct {
 	Mapping   *meta.RESTMapping
 	Namespace string
 	Selector  labels.Selector
+	Export    bool
 }
 
 // NewSelector creates a resource selector which hides details of getting items by their label selector.
-func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace string, selector labels.Selector) *Selector {
+func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace string, selector labels.Selector, export bool) *Selector {
 	return &Selector{
 		Client:    client,
 		Mapping:   mapping,
 		Namespace: namespace,
 		Selector:  selector,
+		Export:    export,
 	}
 }
 
 // Visit implements Visitor
 func (r *Selector) Visit(fn VisitorFunc) error {
-	list, err := NewHelper(r.Client, r.Mapping).List(r.Namespace, r.ResourceMapping().APIVersion, r.Selector)
+	list, err := NewHelper(r.Client, r.Mapping).List(r.Namespace, r.ResourceMapping().GroupVersionKind.GroupVersion().String(), r.Selector, r.Export)
 	if err != nil {
 		if errors.IsBadRequest(err) || errors.IsNotFound(err) {
 			if r.Selector.Empty() {
@@ -70,7 +72,7 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 }
 
 func (r *Selector) Watch(resourceVersion string) (watch.Interface, error) {
-	return NewHelper(r.Client, r.Mapping).Watch(r.Namespace, resourceVersion, r.ResourceMapping().APIVersion, r.Selector)
+	return NewHelper(r.Client, r.Mapping).Watch(r.Namespace, resourceVersion, r.ResourceMapping().GroupVersionKind.GroupVersion().String(), r.Selector)
 }
 
 // ResourceMapping returns the mapping for this resource and implements ResourceMapping

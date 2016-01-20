@@ -22,7 +22,7 @@ import (
 	"os"
 	"runtime"
 
-	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
+	kruntime "k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
@@ -54,10 +54,10 @@ func main() {
 		funcOut = file
 	}
 
-	docsForTypes := pkg_runtime.ParseDocumentationFrom(*typeSrc)
+	docsForTypes := kruntime.ParseDocumentationFrom(*typeSrc)
 
 	if *verify == true {
-		rc, err := pkg_runtime.VerifySwaggerDocsExist(docsForTypes, funcOut)
+		rc, err := kruntime.VerifySwaggerDocsExist(docsForTypes, funcOut)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error in verification process: %s\n", err)
 		}
@@ -65,7 +65,7 @@ func main() {
 	}
 
 	if docsForTypes != nil && len(docsForTypes) > 0 {
-		if err := pkg_runtime.WriteSwaggerDocFunc(docsForTypes, funcOut); err != nil {
+		if err := kruntime.WriteSwaggerDocFunc(docsForTypes, funcOut); err != nil {
 			fmt.Fprintf(os.Stderr, "Error when writing swagger documentation functions: %s\n", err)
 			os.Exit(-1)
 		}

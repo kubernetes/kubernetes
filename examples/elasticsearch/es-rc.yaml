@@ -6,8 +6,6 @@ metadata:
     component: elasticsearch
 spec:
   replicas: 1
-  selector:
-    component: elasticsearch
   template:
     metadata:
       labels:

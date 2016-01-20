@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/user-guide/quick-start.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/user-guide/quick-start.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -76,8 +77,7 @@ Through integration with some cloud providers (for example Google Compute Engine
 
 ```console
 $ kubectl expose rc my-nginx --port=80 --type=LoadBalancer
-NAME         CLUSTER_IP       EXTERNAL_IP       PORT(S)                SELECTOR     AGE
-my-nginx     10.179.240.1     <none>            80/TCP                 run=nginx    8d
+service "my-nginx" exposed
 ```
 
 To find the public IP address assigned to your application, execute:

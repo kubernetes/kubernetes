@@ -163,7 +163,7 @@ func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 	val, ok := q.queue.Head()
 	for ok {
 		// rate limit the queue checking
-		if !q.limiter.CanAccept() {
+		if !q.limiter.TryAccept() {
 			glog.V(10).Info("Try rate limitted...")
 			// Try again later
 			break

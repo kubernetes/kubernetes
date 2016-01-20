@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/admin/daemons.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/admin/daemons.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -77,8 +78,8 @@ but with different flags and/or different memory and cpu requests for different 
 ### Required Fields
 
 As with all other Kubernetes config, a DaemonSet needs `apiVersion`, `kind`, and `metadata` fields.  For
-general information about working with config files, see [here](../user-guide/simple-yaml.md),
-[here](../user-guide/configuring-containers.md), and [here](../user-guide/working-with-resources.md).
+general information about working with config files, see [deploying applications](../user-guide/deploying-applications.md),
+[configuring containers](../user-guide/configuring-containers.md), and [working with resources](../user-guide/working-with-resources.md) documents.
 
 A DaemonSet also needs a [`.spec`](../devel/api-conventions.md#spec-and-status) section.
 
@@ -151,11 +152,11 @@ If node labels are changed, the DaemonSet will promptly add pods to newly matchi
 pods from newly not-matching nodes.
 
 You can modify the pods that a DaemonSet creates.  However, pods do not allow all
-fields to be updated.  Also, the DeamonSet controller will use the original template the next
+fields to be updated.  Also, the DaemonSet controller will use the original template the next
 time a node (even with the same name) is created.
 
 
-You can delete a DeamonSet.  If you specify `--cascade=false` with `kubectl`, then the pods
+You can delete a DaemonSet.  If you specify `--cascade=false` with `kubectl`, then the pods
 will be left on the nodes.  You can then create a new DaemonSet with a different template.
 the new DaemonSet with the different template will recognize all the existing pods as having
 matching labels.  It will not modify or delete them despite a mismatch in the pod template.
@@ -209,12 +210,15 @@ all or certain hosts, and when it needs to start before other pods.
 
 ## Caveats
 
-DaemonSet objects are in the [`extensions` API Group](../api.md#api-groups).  This API group may or
-may not be enabled on your cluster.
+DaemonSet objects are in the [`extensions` API Group](../api.md#api-groups).
+DaemonSet is not enabled by default. Enable it by setting
+`--runtime-config=extensions/v1beta1/daemonsets=true` on the api server. This can be
+achieved by exporting KUBE_ENABLE_DAEMONSETS=true before running kube-up.sh script
+on GCE.
 
 DaemonSet objects effectively have [API version `v1alpha1`](../api.md#api-versioning).
  Alpha objects may change or even be discontinued in future software releases.
-However, due to to a known issue, they may appear as API version `v1beta1` if enabled.
+However, due to to a known issue, they will appear as API version `v1beta1` if enabled.
 
 
 

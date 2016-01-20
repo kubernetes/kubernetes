@@ -26,13 +26,13 @@ import (
 )
 
 func TestDecodeUnstructured(t *testing.T) {
-	version := testapi.Default.Version()
-	rawJson := fmt.Sprintf(`{"kind":"Pod","apiVersion":"%s","metadata":{"name":"test"}}`, version)
+	groupVersionString := testapi.Default.GroupVersion().String()
+	rawJson := fmt.Sprintf(`{"kind":"Pod","apiVersion":"%s","metadata":{"name":"test"}}`, groupVersionString)
 	pl := &api.List{
 		Items: []runtime.Object{
 			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}},
-			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "Pod", APIVersion: version}, RawJSON: []byte(rawJson)},
-			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "", APIVersion: version}, RawJSON: []byte(rawJson)},
+			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "Pod", APIVersion: groupVersionString}, RawJSON: []byte(rawJson)},
+			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "", APIVersion: groupVersionString}, RawJSON: []byte(rawJson)},
 			&runtime.Unstructured{TypeMeta: runtime.TypeMeta{Kind: "Foo", APIVersion: "Bar"}, Object: map[string]interface{}{"test": "value"}},
 		},
 	}

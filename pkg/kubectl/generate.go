@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
@@ -40,6 +41,12 @@ type Generator interface {
 	Generate(params map[string]interface{}) (runtime.Object, error)
 	// ParamNames returns the list of parameters that this generator uses
 	ParamNames() []GeneratorParam
+}
+
+// StructuredGenerator is an interface for things that can generate API objects not using parameter injection
+type StructuredGenerator interface {
+	// StructuredGenerator creates an API object using pre-configured parameters
+	StructuredGenerate() (runtime.Object, error)
 }
 
 func IsZero(i interface{}) bool {
@@ -60,6 +67,58 @@ func ValidateParams(paramSpec []GeneratorParam, params map[string]interface{}) e
 			}
 		}
 	}
+	return utilerrors.NewAggregate(allErrs)
+}
+
+// AnnotateFlags annotates all flags that are used by generators.
+func AnnotateFlags(cmd *cobra.Command, generators map[string]Generator) {
+	// Iterate over all generators and mark any flags used by them.
+	for name, generator := range generators {
+		generatorParams := map[string]struct{}{}
+		for _, param := range generator.ParamNames() {
+			generatorParams[param.Name] = struct{}{}
+		}
+
+		cmd.Flags().VisitAll(func(flag *pflag.Flag) {
+			if _, found := generatorParams[flag.Name]; !found {
+				// This flag is not used by the current generator
+				// so skip it.
+				return
+			}
+			if flag.Annotations == nil {
+				flag.Annotations = map[string][]string{}
+			}
+			if annotations := flag.Annotations["generator"]; annotations == nil {
+				flag.Annotations["generator"] = []string{}
+			}
+			flag.Annotations["generator"] = append(flag.Annotations["generator"], name)
+		})
+	}
+}
+
+//  EnsureFlagsValid ensures that no invalid flags are being used against a generator.
+func EnsureFlagsValid(cmd *cobra.Command, generators map[string]Generator, generatorInUse string) error {
+	AnnotateFlags(cmd, generators)
+
+	allErrs := []error{}
+	cmd.Flags().VisitAll(func(flag *pflag.Flag) {
+		// If the flag hasn't changed, don't validate it.
+		if !flag.Changed {
+			return
+		}
+		// Look into the flag annotations for the generators that can use it.
+		if annotations := flag.Annotations["generator"]; len(annotations) > 0 {
+			annotationMap := map[string]struct{}{}
+			for _, ann := range annotations {
+				annotationMap[ann] = struct{}{}
+			}
+			// If the current generator is not annotated, then this flag shouldn't
+			// be used with it.
+			if _, found := annotationMap[generatorInUse]; !found {
+				allErrs = append(allErrs, fmt.Errorf("cannot use --%s with --generator=%s", flag.Name, generatorInUse))
+			}
+		}
+	})
 	return utilerrors.NewAggregate(allErrs)
 }
 

@@ -19,24 +19,16 @@ package namespace
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface implemented by things that know how to store Namespace objects.
 type Registry interface {
-	// ListNamespaces obtains a list of namespaces having labels which match selector.
-	ListNamespaces(ctx api.Context, selector labels.Selector) (*api.NamespaceList, error)
-	// Watch for new/changed/deleted namespaces
-	WatchNamespaces(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
-	// Get a specific namespace
+	ListNamespaces(ctx api.Context, options *api.ListOptions) (*api.NamespaceList, error)
+	WatchNamespaces(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 	GetNamespace(ctx api.Context, namespaceID string) (*api.Namespace, error)
-	// Create a namespace based on a specification.
 	CreateNamespace(ctx api.Context, namespace *api.Namespace) error
-	// Update an existing namespace
 	UpdateNamespace(ctx api.Context, namespace *api.Namespace) error
-	// Delete an existing namespace
 	DeleteNamespace(ctx api.Context, namespaceID string) error
 }
 
@@ -51,16 +43,16 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListNamespaces(ctx api.Context, label labels.Selector) (*api.NamespaceList, error) {
-	obj, err := s.List(ctx, label, fields.Everything())
+func (s *storage) ListNamespaces(ctx api.Context, options *api.ListOptions) (*api.NamespaceList, error) {
+	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*api.NamespaceList), nil
 }
 
-func (s *storage) WatchNamespaces(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return s.Watch(ctx, label, field, resourceVersion)
+func (s *storage) WatchNamespaces(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+	return s.Watch(ctx, options)
 }
 
 func (s *storage) GetNamespace(ctx api.Context, namespaceName string) (*api.Namespace, error) {

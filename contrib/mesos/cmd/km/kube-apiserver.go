@@ -18,20 +18,21 @@ limitations under the License.
 package main
 
 import (
-	kubeapiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 )
 
 // NewKubeAPIServer creates a new hyperkube Server object that includes the
 // description and flags.
 func NewKubeAPIServer() *Server {
-	s := kubeapiserver.NewAPIServer()
+	s := options.NewAPIServer()
 
 	hks := Server{
 		SimpleUsage: hyperkube.CommandApiserver,
 		Long:        "The main API entrypoint and interface to the storage system.  The API server is also the focal point for all authorization decisions.",
-		Run: func(_ *Server, args []string) error {
-			return s.Run(args)
+		Run: func(_ *Server, _ []string) error {
+			return app.Run(s)
 		},
 	}
 	s.AddFlags(hks.Flags())

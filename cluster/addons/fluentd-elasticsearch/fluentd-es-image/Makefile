@@ -4,7 +4,7 @@ IMAGE = fluentd-elasticsearch
 TAG = 1.12
 
 build:	
-	docker build -t beta.gcr.io/google_containers/$(IMAGE):$(TAG) .
+	docker build -t gcr.io/google_containers/$(IMAGE):$(TAG) .
 
 push:	
-	gcloud docker --server=beta.gcr.io push beta.gcr.io/google_containers/$(IMAGE):$(TAG)
+	gcloud docker --server=gcr.io push gcr.io/google_containers/$(IMAGE):$(TAG)

@@ -24,6 +24,7 @@ import (
 // Top level config objects and all values required for proper functioning are not "omitempty".  Any truly optional piece of config is allowed to be omitted.
 
 // Config holds the information needed to build connect to remote kubernetes clusters as a given user
+// IMPORTANT if you add fields to this struct, please update IsConfigEmpty()
 type Config struct {
 	// Legacy field from pkg/api/types.go TypeMeta.
 	// TODO(jlowdermilk): remove this after eliminating downstream dependencies.
@@ -44,6 +45,7 @@ type Config struct {
 	Extensions map[string]*runtime.EmbeddedObject `json:"extensions,omitempty"`
 }
 
+// IMPORTANT if you add fields to this struct, please update IsConfigEmpty()
 type Preferences struct {
 	Colors bool `json:"colors,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields

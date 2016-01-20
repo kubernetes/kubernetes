@@ -14,9 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-echo "$SPARK_MASTER_SERVICE_HOST spark-master" >> /etc/hosts
-echo "SPARK_LOCAL_HOSTNAME=$(hostname -i)" >> /opt/spark/conf/spark-env.sh
-echo "MASTER=spark://spark-master:$SPARK_MASTER_SERVICE_PORT" >> /opt/spark/conf/spark-env.sh
+. /start-common.sh
+
 echo "Use kubectl exec spark-driver -it bash to invoke commands"
 while true; do
   sleep 100

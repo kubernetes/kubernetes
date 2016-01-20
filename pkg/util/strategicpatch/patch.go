@@ -23,6 +23,9 @@ import (
 	"sort"
 
 	forkedjson "k8s.io/kubernetes/third_party/forked/json"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/ghodss/yaml"
 )
 
 // An alternate implementation of JSON Merge Patch
@@ -66,8 +69,8 @@ type errConflict struct {
 	message string
 }
 
-func newErrConflict(patch, current []byte) errConflict {
-	s := fmt.Sprintf("patch:\n%s\nconflicts with current:\n%s\n", patch, current)
+func newErrConflict(patch, current string) errConflict {
+	s := fmt.Sprintf("patch:\n%s\nconflicts with changes made from original to current:\n%s\n", patch, current)
 	return errConflict{s}
 }
 
@@ -113,7 +116,7 @@ func CreateStrategicMergePatch(original, modified []byte, dataStruct interface{}
 }
 
 // CreateTwoWayMergePatch creates a patch that can be passed to StrategicMergePatch from an original
-// document and a modified documernt, which are passed to the method as json encoded content. It will
+// document and a modified document, which are passed to the method as json encoded content. It will
 // return a patch that yields the modified document when applied to the original document, or an error
 // if either of the two documents is invalid.
 func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, fns ...PreconditionFunc) ([]byte, error) {
@@ -331,7 +334,7 @@ loopB:
 }
 
 var errNoMergeKeyFmt = "map: %v does not contain declared merge key: %s"
-var errBadArgTypeFmt = "expected a %s, but received a %t"
+var errBadArgTypeFmt = "expected a %s, but received a %s"
 
 // Returns a (recursive) strategic merge patch that yields modified when applied to original,
 // for a pair of lists of maps with merge semantics.
@@ -354,7 +357,8 @@ loopB:
 	for ; modifiedIndex < len(modifiedSorted); modifiedIndex++ {
 		modifiedMap, ok := modifiedSorted[modifiedIndex].(map[string]interface{})
 		if !ok {
-			return nil, fmt.Errorf(errBadArgTypeFmt, "map[string]interface{}", modifiedSorted[modifiedIndex])
+			t := reflect.TypeOf(modifiedSorted[modifiedIndex])
+			return nil, fmt.Errorf(errBadArgTypeFmt, "map[string]interface{}", t.Kind().String())
 		}
 
 		modifiedValue, ok := modifiedMap[mergeKey]
@@ -365,7 +369,8 @@ loopB:
 		for ; originalIndex < len(originalSorted); originalIndex++ {
 			originalMap, ok := originalSorted[originalIndex].(map[string]interface{})
 			if !ok {
-				return nil, fmt.Errorf(errBadArgTypeFmt, "map[string]interface{}", originalSorted[originalIndex])
+				t := reflect.TypeOf(originalSorted[originalIndex])
+				return nil, fmt.Errorf(errBadArgTypeFmt, "map[string]interface{}", t.Kind().String())
 			}
 
 			originalValue, ok := originalMap[mergeKey]
@@ -411,7 +416,8 @@ loopB:
 		for ; originalIndex < len(originalSorted); originalIndex++ {
 			originalMap, ok := originalSorted[originalIndex].(map[string]interface{})
 			if !ok {
-				return nil, fmt.Errorf(errBadArgTypeFmt, "map[string]interface{}", originalSorted[originalIndex])
+				t := reflect.TypeOf(originalSorted[originalIndex])
+				return nil, fmt.Errorf(errBadArgTypeFmt, "map[string]interface{}", t.Kind().String())
 			}
 
 			originalValue, ok := originalMap[mergeKey]
@@ -444,11 +450,11 @@ func StrategicMergePatchData(original, patch []byte, dataStruct interface{}) ([]
 // by calling CreateStrategicMergePatch.
 func StrategicMergePatch(original, patch []byte, dataStruct interface{}) ([]byte, error) {
 	if original == nil {
-		original = []byte{}
+		original = []byte("{}")
 	}
 
 	if patch == nil {
-		patch = []byte{}
+		patch = []byte("{}")
 	}
 
 	originalMap := map[string]interface{}{}
@@ -926,7 +932,8 @@ func sliceElementType(slices ...[]interface{}) (reflect.Type, error) {
 
 // HasConflicts returns true if the left and right JSON interface objects overlap with
 // different values in any key. All keys are required to be strings. Since patches of the
-// same Type have congruent keys, this is valid for multiple patch types.
+// same Type have congruent keys, this is valid for multiple patch types. This method
+// supports JSON merge patch semantics.
 func HasConflicts(left, right interface{}) (bool, error) {
 	switch typedLeft := left.(type) {
 	case map[string]interface{}:
@@ -939,6 +946,7 @@ func HasConflicts(left, right interface{}) (bool, error) {
 				}
 				return HasConflicts(leftValue, rightValue)
 			}
+
 			return false, nil
 		default:
 			return true, nil
@@ -949,9 +957,11 @@ func HasConflicts(left, right interface{}) (bool, error) {
 			if len(typedLeft) != len(typedRight) {
 				return true, nil
 			}
+
 			for i := range typedLeft {
 				return HasConflicts(typedLeft[i], typedRight[i])
 			}
+
 			return false, nil
 		default:
 			return true, nil
@@ -963,14 +973,184 @@ func HasConflicts(left, right interface{}) (bool, error) {
 	}
 }
 
+// MergingMapsHaveConflicts returns true if the left and right JSON interface
+// objects overlap with different values in any key. All keys are required to be
+// strings. Since patches of the same Type have congruent keys, this is valid
+// for multiple patch types. This method supports strategic merge patch semantics.
+func MergingMapsHaveConflicts(left, right map[string]interface{}, dataStruct interface{}) (bool, error) {
+	t, err := getTagStructType(dataStruct)
+	if err != nil {
+		return true, err
+	}
+
+	return mergingMapFieldsHaveConflicts(left, right, t, "", "")
+}
+
+func mergingMapFieldsHaveConflicts(
+	left, right interface{},
+	fieldType reflect.Type,
+	fieldPatchStrategy, fieldPatchMergeKey string,
+) (bool, error) {
+	switch leftType := left.(type) {
+	case map[string]interface{}:
+		switch rightType := right.(type) {
+		case map[string]interface{}:
+			leftMarker, okLeft := leftType[directiveMarker]
+			rightMarker, okRight := rightType[directiveMarker]
+			// if one or the other has a directive marker,
+			// then we need to consider that before looking at the individual keys,
+			// since a directive operates on the whole map.
+			if okLeft || okRight {
+				// if one has a directive marker and the other doesn't,
+				// then we have a conflict, since one is deleting or replacing the whole map,
+				// and the other is doing things to individual keys.
+				if okLeft != okRight {
+					return true, nil
+				}
+
+				// if they both have markers, but they are not the same directive,
+				// then we have a conflict because they're doing different things to the map.
+				if leftMarker != rightMarker {
+					return true, nil
+				}
+			}
+
+			// Check the individual keys.
+			return mapsHaveConflicts(leftType, rightType, fieldType)
+		default:
+			return true, nil
+		}
+	case []interface{}:
+		switch rightType := right.(type) {
+		case []interface{}:
+			return slicesHaveConflicts(leftType, rightType, fieldType, fieldPatchStrategy, fieldPatchMergeKey)
+		default:
+			return true, nil
+		}
+	case string, float64, bool, int, int64, nil:
+		return !reflect.DeepEqual(left, right), nil
+	default:
+		return true, fmt.Errorf("unknown type: %v", reflect.TypeOf(left))
+	}
+}
+
+func mapsHaveConflicts(typedLeft, typedRight map[string]interface{}, structType reflect.Type) (bool, error) {
+	for key, leftValue := range typedLeft {
+		if key != directiveMarker {
+			if rightValue, ok := typedRight[key]; ok {
+				fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(structType, key)
+				if err != nil {
+					return true, err
+				}
+
+				if hasConflicts, err := mergingMapFieldsHaveConflicts(leftValue, rightValue,
+					fieldType, fieldPatchStrategy, fieldPatchMergeKey); hasConflicts {
+					return true, err
+				}
+			}
+		}
+	}
+
+	return false, nil
+}
+
+func slicesHaveConflicts(
+	typedLeft, typedRight []interface{},
+	fieldType reflect.Type,
+	fieldPatchStrategy, fieldPatchMergeKey string,
+) (bool, error) {
+	elementType, err := sliceElementType(typedLeft, typedRight)
+	if err != nil {
+		return true, err
+	}
+
+	valueType := fieldType.Elem()
+	if fieldPatchStrategy == mergeDirective {
+		// Merging lists of scalars have no conflicts by definition
+		// So we only need to check further if the elements are maps
+		if elementType.Kind() != reflect.Map {
+			return false, nil
+		}
+
+		// Build a map for each slice and then compare the two maps
+		leftMap, err := sliceOfMapsToMapOfMaps(typedLeft, fieldPatchMergeKey)
+		if err != nil {
+			return true, err
+		}
+
+		rightMap, err := sliceOfMapsToMapOfMaps(typedRight, fieldPatchMergeKey)
+		if err != nil {
+			return true, err
+		}
+
+		return mapsOfMapsHaveConflicts(leftMap, rightMap, valueType)
+	}
+
+	// Either we don't have type information, or these are non-merging lists
+	if len(typedLeft) != len(typedRight) {
+		return true, nil
+	}
+
+	// Sort scalar slices to prevent ordering issues
+	// We have no way to sort non-merging lists of maps
+	if elementType.Kind() != reflect.Map {
+		typedLeft = uniqifyAndSortScalars(typedLeft)
+		typedRight = uniqifyAndSortScalars(typedRight)
+	}
+
+	// Compare the slices element by element in order
+	// This test will fail if the slices are not sorted
+	for i := range typedLeft {
+		if hasConflicts, err := mergingMapFieldsHaveConflicts(typedLeft[i], typedRight[i], valueType, "", ""); hasConflicts {
+			return true, err
+		}
+	}
+
+	return false, nil
+}
+
+func sliceOfMapsToMapOfMaps(slice []interface{}, mergeKey string) (map[string]interface{}, error) {
+	result := make(map[string]interface{}, len(slice))
+	for _, value := range slice {
+		typedValue, ok := value.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("invalid element type in merging list:%v", slice)
+		}
+
+		mergeValue, ok := typedValue[mergeKey]
+		if !ok {
+			return nil, fmt.Errorf("cannot find merge key `%s` in merging list element:%v", mergeKey, typedValue)
+		}
+
+		result[fmt.Sprintf("%s", mergeValue)] = typedValue
+	}
+
+	return result, nil
+}
+
+func mapsOfMapsHaveConflicts(typedLeft, typedRight map[string]interface{}, structType reflect.Type) (bool, error) {
+	for key, leftValue := range typedLeft {
+		if rightValue, ok := typedRight[key]; ok {
+			if hasConflicts, err := mergingMapFieldsHaveConflicts(leftValue, rightValue, structType, "", ""); hasConflicts {
+				return true, err
+			}
+		}
+	}
+
+	return false, nil
+}
+
 // CreateThreeWayMergePatch reconciles a modified configuration with an original configuration,
 // while preserving any changes or deletions made to the original configuration in the interim,
 // and not overridden by the current configuration. All three documents must be passed to the
 // method as json encoded content. It will return a strategic merge patch, or an error if any
 // of the documents is invalid, or if there are any preconditions that fail against the modified
-// configuration, or, if force is false and there are conflicts between the modified and current
-// configurations.
-func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct interface{}, force bool, fns ...PreconditionFunc) ([]byte, error) {
+// configuration, or, if overwrite is false and there are conflicts between the modified and current
+// configurations. Conflicts are defined as keys changed differently from original to modified
+// than from original to current. In other words, a conflict occurs if modified changes any key
+// in a way that is different from how it is changed in current (e.g., deleting it, changing its
+// value).
+func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct interface{}, overwrite bool, fns ...PreconditionFunc) ([]byte, error) {
 	originalMap := map[string]interface{}{}
 	if len(original) > 0 {
 		if err := json.Unmarshal(original, &originalMap); err != nil {
@@ -1023,8 +1203,41 @@ func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct int
 		}
 	}
 
-	// TODO(jackgr): If force is false, and the patch contains any keys that are also in current,
+	// If overwrite is false, and the patch contains any keys that were changed differently,
 	// then return a conflict error.
+	if !overwrite {
+		changedMap, err := diffMaps(originalMap, currentMap, t, false, false)
+		if err != nil {
+			return nil, err
+		}
+
+		hasConflicts, err := MergingMapsHaveConflicts(patchMap, changedMap, dataStruct)
+		if err != nil {
+			return nil, err
+		}
+
+		if hasConflicts {
+			return nil, newErrConflict(toYAMLOrError(patchMap), toYAMLOrError(changedMap))
+		}
+	}
 
 	return json.Marshal(patchMap)
+}
+
+func toYAMLOrError(v interface{}) string {
+	y, err := toYAML(v)
+	if err != nil {
+		return err.Error()
+	}
+
+	return y
+}
+
+func toYAML(v interface{}) (string, error) {
+	y, err := yaml.Marshal(v)
+	if err != nil {
+		return "", fmt.Errorf("yaml marshal failed:%v\n%v\n", err, spew.Sdump(v))
+	}
+
+	return string(y), nil
 }

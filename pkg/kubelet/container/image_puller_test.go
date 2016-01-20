@@ -115,5 +115,6 @@ func TestPuller(t *testing.T) {
 			fakeRuntime.AssertCalls(c.calledFunctions)
 			assert.Equal(t, expected, err, "in test %d tick=%d", i, tick)
 		}
+
 	}
 }

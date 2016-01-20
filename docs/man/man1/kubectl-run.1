@@ -14,7 +14,7 @@ kubectl run \- Run a particular image on the cluster.
 .SH DESCRIPTION
 .PP
 Create and run a particular image, possibly replicated.
-Creates a replication controller to manage the created container(s).
+Creates a replication controller or job to manage the created container(s).
 
 
 .SH OPTIONS
@@ -35,8 +35,12 @@ Creates a replication controller to manage the created container(s).
     Environment variables to set in the container
 
 .PP
+\fB\-\-expose\fP=false
+    If true, a public, external service is created for the container(s) which are run
+
+.PP
 \fB\-\-generator\fP=""
-    The name of the API generator to use.  Default is 'run/v1' if \-\-restart=Always, otherwise the default is 'run\-pod/v1'.
+    The name of the API generator to use.  Default is 'run/v1' if \-\-restart=Always, otherwise the default is 'job/v1beta1'.
 
 .PP
 \fB\-\-hostport\fP=\-1
@@ -78,7 +82,7 @@ Creates a replication controller to manage the created container(s).
 
 .PP
 \fB\-\-port\fP=\-1
-    The port that this container exposes.
+    The port that this container exposes.  If \-\-expose is true, this is also the port used by the service that is created.
 
 .PP
 \fB\-r\fP, \fB\-\-replicas\fP=1
@@ -90,7 +94,23 @@ Creates a replication controller to manage the created container(s).
 
 .PP
 \fB\-\-restart\fP="Always"
-    The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a replication controller is created for this pod, if set to OnFailure or Never, only the Pod is created and \-\-replicas must be 1.  Default 'Always'
+    The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a replication controller is created for this pod, if set to OnFailure or Never, a job is created for this pod and \-\-replicas must be 1.  Default 'Always'
+
+.PP
+\fB\-\-rm\fP=false
+    If true, delete resources created in this command for attached containers.
+
+.PP
+\fB\-\-save\-config\fP=false
+    If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.
+
+.PP
+\fB\-\-service\-generator\fP="service/v2"
+    The name of the generator to use for creating a service.  Only used if \-\-expose is true
+
+.PP
+\fB\-\-service\-overrides\fP=""
+    An inline JSON override for the generated service object. If this is non\-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if \-\-expose is true.
 
 .PP
 \fB\-a\fP, \fB\-\-show\-all\fP=false
@@ -105,7 +125,7 @@ Creates a replication controller to manage the created container(s).
     Keep stdin open on the container(s) in the pod, even if nothing is attached.
 
 .PP
-\fB\-t\fP, \fB\-\-template\fP=""
+\fB\-\-template\fP=""
     Template string or path to template file to use when \-o=go\-template, \-o=go\-template\-file. The template format is golang templates [
 \[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]].
 
@@ -129,7 +149,7 @@ Creates a replication controller to manage the created container(s).
 
 .PP
 \fB\-\-client\-certificate\fP=""
-    Path to a client key file for TLS.
+    Path to a client certificate file for TLS.
 
 .PP
 \fB\-\-client\-key\fP=""
@@ -231,14 +251,17 @@ $ kubectl run nginx \-\-image=nginx \-\-dry\-run
 # Start a single instance of nginx, but overload the spec of the replication controller with a partial set of values parsed from JSON.
 $ kubectl run nginx \-\-image=nginx \-\-overrides='{ "apiVersion": "v1", "spec": { ... } }'
 
-# Start a single instance of nginx and keep it in the foreground, don't restart it if it exits.
-$ kubectl run \-i \-tty nginx \-\-image=nginx \-\-restart=Never
+# Start a single instance of busybox and keep it in the foreground, don't restart it if it exits.
+$ kubectl run \-i \-\-tty busybox \-\-image=busybox \-\-restart=Never
 
 # Start the nginx container using the default command, but use custom arguments (arg1 .. argN) for that command.
 $ kubectl run nginx \-\-image=nginx \-\- <arg1> <arg2> ... <argN>
 
-# Start the nginx container using a different command and custom arguments
+# Start the nginx container using a different command and custom arguments.
 $ kubectl run nginx \-\-image=nginx \-\-command \-\- <cmd> <arg1> ... <argN>
+
+# Start the perl container to compute π to 2000 places and print it out.
+$ kubectl run pi \-\-image=perl \-\-restart=OnFailure \-\- perl \-Mbignum=bpi \-wle 'print bpi(2000)'
 
 .fi
 .RE

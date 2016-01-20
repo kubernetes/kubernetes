@@ -65,16 +65,16 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
-set_binary_version ${1}
+set_binary_version "${1}"
 
 if [[ "${print_version}" == "true" ]]; then
   echo "${KUBE_VERSION}"
 else
   echo "Using version at ${1}: ${KUBE_VERSION}" >&2
-  if [[ ${KUBE_VERSION} =~ ${KUBE_VERSION_REGEX} ]]; then
-    curl --fail -o kubernetes-${KUBE_VERSION}.tar.gz "https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes.tar.gz"
+  if [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
+    curl --fail -o "kubernetes-${KUBE_VERSION}.tar.gz" "${KUBE_RELEASE_BUCKET_URL}/release/${KUBE_VERSION}/${KUBE_TAR_NAME}"
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
-    curl --fail -o kubernetes-${KUBE_VERSION}.tar.gz "https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes.tar.gz"
+    curl --fail -o "kubernetes-${KUBE_VERSION}.tar.gz" "${KUBE_RELEASE_BUCKET_URL}/ci/${KUBE_VERSION}/${KUBE_TAR_NAME}"
   else
     echo "Version doesn't match regexp" >&2
     exit 1

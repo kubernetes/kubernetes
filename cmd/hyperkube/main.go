@@ -31,6 +31,7 @@ func main() {
 		Long: "This is an all-in-one binary that can run any of the various Kubernetes servers.",
 	}
 
+	hk.AddServer(NewKubectlServer())
 	hk.AddServer(NewKubeAPIServer())
 	hk.AddServer(NewKubeControllerManager())
 	hk.AddServer(NewScheduler())

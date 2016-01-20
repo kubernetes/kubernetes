@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/api.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/api.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -81,7 +82,7 @@ in more detail in the [API Changes documentation](devel/api_changes.md#alpha-bet
   - Support for the overall feature will not be dropped, though details may change.
   - The schema and/or semantics of objects may change in incompatible ways in a subsequent beta or stable release.  When this happens,
     we will provide instructions for migrating to the next version.  This may require deleting, editing, and re-creating
-    API objects.  The editing process may require some thought.   This may require downtime for appplications that rely on the feature.
+    API objects.  The editing process may require some thought.   This may require downtime for applications that rely on the feature.
   - Recommended for only non-business-critical uses because of potential for incompatible changes in subsequent releases.  If you have
     multiple clusters which can be upgraded independently, you may be able to relax this restriction.
   - **Please do try our beta features and give feedback on them!  Once they exit beta, it may not be practical for us to make more changes.**
@@ -92,7 +93,7 @@ in more detail in the [API Changes documentation](devel/api_changes.md#alpha-bet
 ## API groups
 
 To make it easier to extend the Kubernetes API, we are in the process of implementing [*API
-groups*](proposals/api-groups.md).  These are simply different interfaces to read and/or modify the
+groups*](proposals/api-group.md).  These are simply different interfaces to read and/or modify the
 same underlying resources.  The API group is specified in a REST path and in the `apiVersion` field
 of a serialized object.
 
@@ -104,14 +105,15 @@ Currently there are two API groups in use:
   `apiVersion: extensions/$VERSION` (e.g. currently `apiVersion: extensions/v1beta1`).
 
 In the future we expect that there will be more API groups, all at REST path `/apis/$API_GROUP` and
-using `apiVersion: $API_GROUP/$VERSION`.  We expect that there will be a way for (third parties to
+using `apiVersion: $API_GROUP/$VERSION`.  We expect that there will be a way for [third parties to
 create their own API groups](design/extending-api.md), and to avoid naming collisions.
 
-## Enabling the extensions group
+## Enabling resources in the extensions group
 
-Enable `extensions/v1beta1` objects by adding the following flags to your API server:
-
-  - `--runtime-config=extensions/v1beta1=true`
+Jobs, Ingress and HorizontalPodAutoscalers are enabled by default.
+Other extensions resources can be enabled by setting runtime-config on
+apiserver. runtime-config accepts comma separated values. For ex: to enable deployments and disable jobs, set
+`--runtime-config=extensions/v1beta1/deployments=true,extensions/v1beta1/jobs=false`
 
 ## v1beta1, v1beta2, and v1beta3 are deprecated; please move to v1 ASAP
 
@@ -119,7 +121,7 @@ As of June 4, 2015, the Kubernetes v1 API has been enabled by default. The v1bet
 
 ### v1 conversion tips (from v1beta3)
 
-We're working to convert all documentation and examples to v1. A simple [API conversion tool](admin/cluster-management.md#switching-your-config-files-to-a-new-api-version) has been written to simplify the translation process. Use `kubectl create --validate` in order to validate your json or yaml against our Swagger spec.
+We're working to convert all documentation and examples to v1. Use `kubectl create --validate` in order to validate your json or yaml against our Swagger spec.
 
 Changes to services are the most significant difference between v1beta3 and v1.
 

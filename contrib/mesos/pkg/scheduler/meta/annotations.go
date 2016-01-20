@@ -26,9 +26,13 @@ const (
 	SlaveIdKey               = "k8s.mesosphere.io/slaveId"
 	OfferIdKey               = "k8s.mesosphere.io/offerId"
 	ExecutorIdKey            = "k8s.mesosphere.io/executorId"
+	ExecutorResourcesKey     = "k8s.mesosphere.io/executorResources"
+	PortMappingKey           = "k8s.mesosphere.io/portMapping"
 	PortMappingKeyPrefix     = "k8s.mesosphere.io/port_"
 	PortMappingKeyFormat     = PortMappingKeyPrefix + "%s_%d"
 	PortNameMappingKeyPrefix = "k8s.mesosphere.io/portName_"
 	PortNameMappingKeyFormat = PortNameMappingKeyPrefix + "%s_%s"
 	ContainerPortKeyFormat   = "k8s.mesosphere.io/containerPort_%s_%s_%d"
+	StaticPodFilenameKey     = "k8s.mesosphere.io/staticPodFilename"
+	RolesKey                 = "k8s.mesosphere.io/roles"
 )

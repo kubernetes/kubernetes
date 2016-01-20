@@ -18,8 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -38,8 +36,8 @@ func (c *FakeNodes) Get(name string) (*api.Node, error) {
 	return obj.(*api.Node), err
 }
 
-func (c *FakeNodes) List(label labels.Selector, field fields.Selector) (*api.NodeList, error) {
-	obj, err := c.Fake.Invokes(NewRootListAction("nodes", label, field), &api.NodeList{})
+func (c *FakeNodes) List(opts api.ListOptions) (*api.NodeList, error) {
+	obj, err := c.Fake.Invokes(NewRootListAction("nodes", opts), &api.NodeList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -70,8 +68,8 @@ func (c *FakeNodes) Delete(name string) error {
 	return err
 }
 
-func (c *FakeNodes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return c.Fake.InvokesWatch(NewRootWatchAction("nodes", label, field, resourceVersion))
+func (c *FakeNodes) Watch(opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewRootWatchAction("nodes", opts))
 }
 
 func (c *FakeNodes) UpdateStatus(node *api.Node) (*api.Node, error) {

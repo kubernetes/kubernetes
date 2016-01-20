@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   labels:
-    name: cassandra
+    app: cassandra
   name: cassandra
 spec:
   containers:
@@ -11,7 +11,7 @@ spec:
     resources:
       limits:
         cpu: "0.1"
-    image: gcr.io/google_containers/cassandra:v6
+    image: gcr.io/google_containers/cassandra:v7
     name: cassandra
     ports:
     - name: cql

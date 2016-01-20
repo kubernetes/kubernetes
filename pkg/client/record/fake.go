@@ -28,13 +28,13 @@ type FakeRecorder struct {
 	Events []string
 }
 
-func (f *FakeRecorder) Event(object runtime.Object, reason, message string) {
-	f.Events = append(f.Events, fmt.Sprintf("%s %s", reason, message))
+func (f *FakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
+	f.Events = append(f.Events, fmt.Sprintf("%s %s %s", eventtype, reason, message))
 }
 
-func (f *FakeRecorder) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
-	f.Events = append(f.Events, fmt.Sprintf(reason+" "+messageFmt, args...))
+func (f *FakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	f.Events = append(f.Events, fmt.Sprintf(eventtype+" "+reason+" "+messageFmt, args...))
 }
 
-func (f *FakeRecorder) PastEventf(object runtime.Object, timestamp unversioned.Time, reason, messageFmt string, args ...interface{}) {
+func (f *FakeRecorder) PastEventf(object runtime.Object, timestamp unversioned.Time, eventtype, reason, messageFmt string, args ...interface{}) {
 }

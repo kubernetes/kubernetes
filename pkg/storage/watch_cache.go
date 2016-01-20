@@ -50,10 +50,14 @@ type watchCacheElement struct {
 // watchCache implements a Store interface.
 // However, it depends on the elements implementing runtime.Object interface.
 //
-// watchCache is a "sliding window" (with a limitted capacity) of objects
+// watchCache is a "sliding window" (with a limited capacity) of objects
 // observed from a watch.
 type watchCache struct {
 	sync.RWMutex
+
+	// Condition on which lists are waiting for the fresh enough
+	// resource version.
+	cond *sync.Cond
 
 	// Maximum size of history window.
 	capacity int
@@ -84,7 +88,7 @@ type watchCache struct {
 }
 
 func newWatchCache(capacity int) *watchCache {
-	return &watchCache{
+	wc := &watchCache{
 		capacity:        capacity,
 		cache:           make([]watchCacheElement, capacity),
 		startIndex:      0,
@@ -92,6 +96,8 @@ func newWatchCache(capacity int) *watchCache {
 		store:           cache.NewStore(cache.MetaNamespaceKeyFunc),
 		resourceVersion: 0,
 	}
+	wc.cond = sync.NewCond(wc.RLocker())
+	return wc
 }
 
 func (w *watchCache) Add(obj interface{}) error {
@@ -136,7 +142,7 @@ func objectToVersionedRuntimeObject(obj interface{}) (runtime.Object, uint64, er
 	if err != nil {
 		return nil, 0, err
 	}
-	resourceVersion, err := parseResourceVersion(meta.ResourceVersion())
+	resourceVersion, err := parseResourceVersion(meta.GetResourceVersion())
 	if err != nil {
 		return nil, 0, err
 	}
@@ -160,8 +166,6 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	var prevObject runtime.Object
 	if exists {
 		prevObject = previous.(runtime.Object)
-	} else {
-		prevObject = nil
 	}
 	watchCacheEvent := watchCacheEvent{event.Type, event.Object, prevObject}
 	if w.onEvent != nil {
@@ -169,6 +173,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	}
 	w.updateCache(resourceVersion, watchCacheEvent)
 	w.resourceVersion = resourceVersion
+	w.cond.Broadcast()
 	return updateFunc(event.Object)
 }
 
@@ -188,8 +193,11 @@ func (w *watchCache) List() []interface{} {
 	return w.store.List()
 }
 
-func (w *watchCache) ListWithVersion() ([]interface{}, uint64) {
+func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64) ([]interface{}, uint64) {
 	w.RLock()
+	for w.resourceVersion < resourceVersion {
+		w.cond.Wait()
+	}
 	defer w.RUnlock()
 	return w.store.List(), w.resourceVersion
 }
@@ -230,6 +238,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	if w.onReplace != nil {
 		w.onReplace()
 	}
+	w.cond.Broadcast()
 	return nil
 }
 
@@ -266,10 +275,10 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]wa
 		return result, nil
 	}
 	if resourceVersion < oldest {
-		return nil, errors.NewInternalError(fmt.Errorf("too old resource version: %d (%d)", resourceVersion, oldest))
+		return nil, errors.NewGone(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest))
 	}
 
-	// Binary seatch the smallest index at which resourceVersion is not smaller than
+	// Binary search the smallest index at which resourceVersion is not smaller than
 	// the given one.
 	f := func(i int) bool {
 		return w.cache[(w.startIndex+i)%w.capacity].resourceVersion >= resourceVersion

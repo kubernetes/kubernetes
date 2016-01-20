@@ -12,7 +12,7 @@ spec:
     spec:
       containers:
         - name: vtgate
-          image: vitess/lite:v2.0.0-alpha3
+          image: vitess/lite:v2.0.0-alpha5
           volumeMounts:
             - name: syslog
               mountPath: /dev/log

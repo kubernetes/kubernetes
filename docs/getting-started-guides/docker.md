@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/getting-started-guides/docker.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/docker.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -35,15 +36,16 @@ Running Kubernetes locally via Docker
 
 **Table of Contents**
 
-- [Overview](#setting-up-a-cluster)
+- [Overview](#overview)
 - [Prerequisites](#prerequisites)
-- [Step One: Run etcd](#step-one-run-etcd)
-- [Step Two: Run the master](#step-two-run-the-master)
-- [Step Three: Run the service proxy](#step-three-run-the-service-proxy)
+- [Run it](#run-it)
+- [Download kubectl](#download-kubectl)
 - [Test it out](#test-it-out)
 - [Run an application](#run-an-application)
 - [Expose it as a service](#expose-it-as-a-service)
+- [Deploy a DNS](#deploy-a-dns)
 - [A note on turning down your cluster](#a-note-on-turning-down-your-cluster)
+- [Troubleshooting](#troubleshooting)
 
 ### Overview
 
@@ -55,7 +57,143 @@ Here's a diagram of what the final result will look like:
 ### Prerequisites
 
 1. You need to have docker installed on one machine.
-2. Your kernel should support memory and swap accounting. Ensure that the
+2. Decide what Kubernetes version to use.  Set the `${K8S_VERSION}` variable to
+   a value such as "1.1.1".
+
+### Run it
+
+```sh
+docker run \
+    --volume=/:/rootfs:ro \
+    --volume=/sys:/sys:ro \
+    --volume=/dev:/dev \
+    --volume=/var/lib/docker/:/var/lib/docker:rw \
+    --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
+    --volume=/var/run:/var/run:rw \
+    --net=host \
+    --pid=host \
+    --privileged=true \
+    -d \
+    gcr.io/google_containers/hyperkube:v${K8S_VERSION} \
+    /hyperkube kubelet \
+        --containerized \
+        --hostname-override="127.0.0.1" \
+        --address="0.0.0.0" \
+        --api-servers=http://localhost:8080 \
+        --config=/etc/kubernetes/manifests \
+        --cluster-dns=10.0.0.10 \
+        --cluster-domain=cluster.local \
+        --allow-privileged=true --v=10
+```
+
+> Note that `--cluster-dns` and `--cluster-domain` is used to deploy dns, feel free to discard them if dns is not needed.
+
+This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.md) that contains the other master components.
+
+### Download `kubectl`
+
+At this point you should have a running Kubernetes cluster.  You can test this
+by downloading the kubectl binary for `${K8S_VERSION}` (look at the URL in the
+following links) and make it available by editing your PATH environment
+variable.
+([OS X](http://storage.googleapis.com/kubernetes-release/release/v1.1.1/bin/darwin/amd64/kubectl))
+([linux](http://storage.googleapis.com/kubernetes-release/release/v1.1.1/bin/linux/amd64/kubectl))
+
+For example, OS X:
+
+```console
+$ wget http://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/darwin/amd64/kubectl
+$ chmod 755 kubectl
+$ PATH=$PATH:`pwd`
+```
+
+Linux:
+
+```console
+$ wget http://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/linux/amd64/kubectl
+$ chmod 755 kubectl
+$ PATH=$PATH:`pwd`
+```
+
+Create configuration:
+
+```
+$ kubectl config set-cluster test-doc --server=http://localhost:8080
+$ kubectl config set-context test-doc --cluster=test-doc
+$ kubectl config use-context test-doc
+```
+
+For Max OS X users instead of `localhost` you will have to use IP address of your docker machine,
+which you can find by running `docker-machine env <machinename>` (see [documentation](https://docs.docker.com/machine/reference/env/)
+for details).
+
+### Test it out
+
+List the nodes in your cluster by running:
+
+```sh
+kubectl get nodes
+```
+
+This should print:
+
+```console
+NAME        LABELS                             STATUS
+127.0.0.1   kubernetes.io/hostname=127.0.0.1   Ready
+```
+
+### Run an application
+
+```sh
+kubectl run nginx --image=nginx --port=80
+```
+
+Now run `docker ps` you should see nginx running.  You may need to wait a few minutes for the image to get pulled.
+
+### Expose it as a service
+
+```sh
+kubectl expose rc nginx --port=80
+```
+
+Run the following command to obtain the IP of this service we just created. There are two IPs, the first one is internal (CLUSTER_IP), and the second one is the external load-balanced IP.
+
+```sh
+kubectl get svc nginx
+```
+
+Alternatively, you can obtain only the first IP (CLUSTER_IP) by running:
+
+```sh
+kubectl get svc nginx --template={{.spec.clusterIP}}
+```
+
+Hit the webserver with the first IP (CLUSTER_IP):
+
+```sh
+curl <insert-cluster-ip-here>
+```
+
+Note that you will need run this curl command on your boot2docker VM if you are running on OS X.
+
+## Deploy a DNS
+
+See [here](docker-multinode/deployDNS.md) for instructions.
+
+### A note on turning down your cluster
+
+Many of these containers run under the management of the `kubelet` binary, which attempts to keep containers running, even if they fail.  So, in order to turn down
+the cluster, you need to first kill the kubelet container, and then any other containers.
+
+You may use `docker kill $(docker ps -aq)`, note this removes _all_ containers running under Docker, so use with caution.
+
+### Troubleshooting
+
+#### Node is in `NotReady` state
+
+If you see your node as `NotReady` it's possible that your OS does not have memcg and swap enabled.
+
+1. Your kernel should support memory and swap accounting. Ensure that the
 following configs are turned on in your linux kernel:
 
     ```console
@@ -66,7 +204,7 @@ following configs are turned on in your linux kernel:
     CONFIG_MEMCG_KMEM=y
     ```
 
-3. Enable the memory and swap accounting in the kernel, at boot, as command line
+2. Enable the memory and swap accounting in the kernel, at boot, as command line
 parameters as follows:
 
     ```console
@@ -82,108 +220,6 @@ parameters as follows:
     BOOT_IMAGE=/boot/vmlinuz-3.18.4-aufs root=/dev/sda5 ro cgroup_enable=memory
     swapaccount=1
     ```
-
-### Step One: Run etcd
-
-```sh
-docker run --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
-```
-
-### Step Two: Run the master
-
-```sh
-docker run \
-    --volume=/:/rootfs:ro \
-    --volume=/sys:/sys:ro \
-    --volume=/dev:/dev \
-    --volume=/var/lib/docker/:/var/lib/docker:rw \
-    --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
-    --volume=/var/run:/var/run:rw \
-    --net=host \
-    --privileged=true \
-    -d \
-    gcr.io/google_containers/hyperkube:v1.0.6 \
-    /hyperkube kubelet --containerized --hostname-override="127.0.0.1" --address="0.0.0.0" --api-servers=http://localhost:8080 --config=/etc/kubernetes/manifests
-```
-
-This actually runs the kubelet, which in turn runs a [pod](../user-guide/pods.md) that contains the other master components.
-
-### Step Three: Run the service proxy
-
-```sh
-docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v1.0.6 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
-```
-
-### Test it out
-
-At this point you should have a running Kubernetes cluster.  You can test this by downloading the kubectl
-binary
-([OS X](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/darwin/amd64/kubectl))
-([linux](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl))
-
-*Note:*
-On OS/X you will need to set up port forwarding via ssh:
-
-```sh
-boot2docker ssh -L8080:localhost:8080
-```
-
-List the nodes in your cluster by running:
-
-```sh
-kubectl get nodes
-```
-
-This should print:
-
-```console
-NAME        LABELS                             STATUS
-127.0.0.1   kubernetes.io/hostname=127.0.0.1   Ready
-```
-
-If you are running different Kubernetes clusters, you may need to specify `-s http://localhost:8080` to select the local cluster.
-
-### Run an application
-
-```sh
-kubectl -s http://localhost:8080 run nginx --image=nginx --port=80
-```
-
-Now run `docker ps` you should see nginx running.  You may need to wait a few minutes for the image to get pulled.
-
-### Expose it as a service
-
-```sh
-kubectl expose rc nginx --port=80
-```
-
-This should print:
-
-```console
-NAME      LABELS      SELECTOR    IP(S)     PORT(S)
-nginx     run=nginx   run=nginx             80/TCP
-```
-
-If `IP(S)` is blank run the following command to obtain it. Know issue [#10836](https://github.com/kubernetes/kubernetes/issues/10836)
-
-```sh
-kubectl get svc nginx
-```
-
-Hit the webserver:
-
-```sh
-curl <insert-ip-from-above-here>
-```
-
-Note that you will need run this curl command on your boot2docker VM if you are running on OS X.
-
-### A note on turning down your cluster
-
-Many of these containers run under the management of the `kubelet` binary, which attempts to keep containers running, even if they fail.  So, in order to turn down
-the cluster, you need to first kill the kubelet container, and then any other containers.
-
-You may use `docker kill $(docker ps -aq)`, note this removes _all_ containers running under Docker, so use with caution.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker.md?pixel)]()

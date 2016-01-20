@@ -33,6 +33,8 @@ enable_cluster_dns: $ENABLE_CLUSTER_DNS
 dns_replicas: $DNS_REPLICAS
 dns_server: $DNS_SERVER_IP
 dns_domain: $DNS_DOMAIN
+e2e_storage_test_environment: $E2E_STORAGE_TEST_ENVIRONMENT
+
 EOF
 
 mkdir -p /srv/salt-overlay/salt/nginx

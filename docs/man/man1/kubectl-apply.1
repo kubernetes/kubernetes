@@ -14,6 +14,7 @@ kubectl apply \- Apply a configuration to a resource by filename or stdin
 .SH DESCRIPTION
 .PP
 Apply a configuration to a resource by filename or stdin.
+The resource will be created if it doesn't exist yet.
 
 .PP
 JSON and YAML formats are accepted.
@@ -52,7 +53,7 @@ JSON and YAML formats are accepted.
 
 .PP
 \fB\-\-client\-certificate\fP=""
-    Path to a client key file for TLS.
+    Path to a client certificate file for TLS.
 
 .PP
 \fB\-\-client\-key\fP=""

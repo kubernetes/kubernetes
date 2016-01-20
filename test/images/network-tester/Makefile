@@ -1,16 +1,18 @@
-all: push
-
-# Set this to the *next* version to prevent accidentally overwriting the existing image.
 TAG = 1.6
+PREFIX = gcr.io/google_containers
+
+all: push
 
 webserver: webserver.go
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./webserver.go
 
-container: webserver
-	docker build -t gcr.io/google_containers/nettest:$(TAG) .
+container: image
 
-push: container
-	gcloud docker push gcr.io/google_containers/nettest:$(TAG)
+image: webserver
+	docker build -t $(PREFIX)/nettest:$(TAG) .
+
+push: image
+	gcloud docker push $(PREFIX)/nettest:$(TAG)
 
 clean:
 	rm -f webserver

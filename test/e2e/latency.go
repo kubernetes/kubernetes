@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -39,22 +39,34 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("[Performance Suite] Latency", func() {
+var _ = Describe("Latency [Skipped]", func() {
 	var c *client.Client
 	var nodeCount int
 	var additionalPodsPrefix string
 	var ns string
 	var uuid string
-	framework := Framework{BaseName: "latency", NamespaceDeletionTimeout: time.Hour}
+
+	AfterEach(func() {
+		By("Removing additional pods if any")
+		for i := 1; i <= nodeCount; i++ {
+			name := additionalPodsPrefix + "-" + strconv.Itoa(i)
+			c.Pods(ns).Delete(name, nil)
+		}
+
+		// Verify latency metrics
+		highLatencyRequests, err := HighLatencyRequests(c)
+		expectNoError(err)
+		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+	})
+
+	framework := NewFramework("latency")
+	framework.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
-		framework.beforeEach()
 		c = framework.Client
 		ns = framework.Namespace.Name
-		var err error
 
-		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
-		expectNoError(err)
+		nodes := ListSchedulableNodesOrDie(framework.Client)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 
@@ -67,7 +79,6 @@ var _ = Describe("[Performance Suite] Latency", func() {
 
 		expectNoError(resetMetrics(c))
 		expectNoError(os.Mkdir(fmt.Sprintf(testContext.OutputDir+"/%s", uuid), 0777))
-		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "before"))
 
 		Logf("Listing nodes for easy debugging:\n")
 		for _, node := range nodes.Items {
@@ -79,28 +90,7 @@ var _ = Describe("[Performance Suite] Latency", func() {
 		}
 	})
 
-	AfterEach(func() {
-		By("Removing additional pods if any")
-		for i := 1; i <= nodeCount; i++ {
-			name := additionalPodsPrefix + "-" + strconv.Itoa(i)
-			c.Pods(ns).Delete(name, nil)
-		}
-
-		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
-		if err := c.Namespaces().Delete(ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
-
-		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
-
-		// Verify latency metrics
-		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second)
-		expectNoError(err)
-		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
-	})
-
-	// Skipped to avoid running in e2e
-	It("[Skipped] pod start latency should be acceptable", func() {
+	It("pod start latency should be acceptable", func() {
 		runLatencyTest(nodeCount, c, ns)
 	})
 })
@@ -148,11 +138,13 @@ func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 	stopCh := make(chan struct{})
 	_, informer := framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return c.Pods(ns).List(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything())
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				options.LabelSelector = labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
+				return c.Pods(ns).List(options)
 			},
-			WatchFunc: func(rv string) (watch.Interface, error) {
-				return c.Pods(ns).Watch(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything(), rv)
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				options.LabelSelector = labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
+				return c.Pods(ns).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -194,13 +186,13 @@ func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 	close(stopCh)
 
 	// Read the schedule timestamp by checking the scheduler event for each pod
-	schedEvents, err := c.Events(ns).List(
-		labels.Everything(),
-		fields.Set{
-			"involvedObject.kind":      "Pod",
-			"involvedObject.namespace": ns,
-			"source":                   "scheduler",
-		}.AsSelector())
+	selector := fields.Set{
+		"involvedObject.kind":      "Pod",
+		"involvedObject.namespace": ns,
+		"source":                   api.DefaultSchedulerName,
+	}.AsSelector()
+	options := api.ListOptions{FieldSelector: selector}
+	schedEvents, err := c.Events(ns).List(options)
 	expectNoError(err)
 	for k := range createTimestamps {
 		for _, event := range schedEvents.Items {
@@ -266,9 +258,7 @@ func runLatencyTest(nodeCount int, c *client.Client, ns string) {
 
 	// Test whether e2e pod startup time is acceptable.
 	podStartupLatency := PodStartupLatency{Latency: extractLatencyMetrics(e2eLatencies)}
-	// TODO: Switch it to 5 seconds once we are sure our tests are passing.
-	podStartupThreshold := 8 * time.Second
-	expectNoError(VerifyPodStartupLatency(podStartupLatency, podStartupThreshold))
+	expectNoError(VerifyPodStartupLatency(podStartupLatency))
 
 	// Log suspicious latency metrics/docker errors from all nodes that had slow startup times
 	logSuspiciousLatency(startLatencies, nil, nodeCount, c)

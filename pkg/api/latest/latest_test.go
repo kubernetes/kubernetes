@@ -16,7 +16,11 @@ limitations under the License.
 
 package latest
 
-import "testing"
+import (
+	"testing"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
+)
 
 func TestAllPreferredGroupVersions(t *testing.T) {
 	testCases := []struct {
@@ -26,13 +30,13 @@ func TestAllPreferredGroupVersions(t *testing.T) {
 		{
 			groupMetaMap: GroupMetaMap{
 				"group1": &GroupMeta{
-					GroupVersion: "group1/v1",
+					GroupVersion: unversioned.GroupVersion{"group1", "v1"},
 				},
 				"group2": &GroupMeta{
-					GroupVersion: "group2/v2",
+					GroupVersion: unversioned.GroupVersion{"group2", "v2"},
 				},
 				"": &GroupMeta{
-					GroupVersion: "v1",
+					GroupVersion: unversioned.GroupVersion{"", "v1"},
 				},
 			},
 			expect: "group1/v1,group2/v2,v1",
@@ -40,7 +44,7 @@ func TestAllPreferredGroupVersions(t *testing.T) {
 		{
 			groupMetaMap: GroupMetaMap{
 				"": &GroupMeta{
-					GroupVersion: "v1",
+					GroupVersion: unversioned.GroupVersion{"", "v1"},
 				},
 			},
 			expect: "v1",

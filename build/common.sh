@@ -23,6 +23,8 @@ DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER_NATIVE=${DOCKER_NATIVE:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKER_HOST=${DOCKER_HOST:-""}
+readonly DOCKER_MACHINE_NAME=${DOCKER_MACHINE_NAME:-"kube-dev"}
+readonly DOCKER_MACHINE_DRIVER=${DOCKER_MACHINE_DRIVER:-"virtualbox"}
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd "${KUBE_ROOT}"
@@ -93,15 +95,18 @@ readonly RELEASE_DIR="${LOCAL_OUTPUT_ROOT}/release-tars"
 readonly GCS_STAGE="${LOCAL_OUTPUT_ROOT}/gcs-stage"
 
 # The set of master binaries that run in Docker (on Linux)
+# Entry format is "<name-of-binary>,<base-image>".
+# Binaries are placed in /usr/local/bin inside the image.
 readonly KUBE_DOCKER_WRAPPED_BINARIES=(
-  kube-apiserver
-  kube-controller-manager
-  kube-scheduler
+  kube-apiserver,busybox
+  kube-controller-manager,busybox
+  kube-scheduler,busybox
+  kube-proxy,gcr.io/google_containers/debian-iptables:v1
 )
 
 # The set of addons images that should be prepopulated
 readonly KUBE_ADDON_PATHS=(
-  beta.gcr.io/google_containers/pause:2.0
+  gcr.io/google_containers/pause:2.0
   gcr.io/google_containers/kube-registry-proxy:0.3
 )
 
@@ -160,18 +165,22 @@ function kube::build::docker_available_on_osx() {
 
 function kube::build::prepare_docker_machine() {
   kube::log::status "docker-machine was found."
-  docker-machine inspect kube-dev >/dev/null || {
+  docker-machine inspect "${DOCKER_MACHINE_NAME}" >/dev/null || {
     kube::log::status "Creating a machine to build Kubernetes"
-    docker-machine create -d virtualbox kube-dev > /dev/null || {
+    docker-machine create --driver "${DOCKER_MACHINE_DRIVER}" "${DOCKER_MACHINE_NAME}" > /dev/null || {
       kube::log::error "Something went wrong creating a machine."
       kube::log::error "Try the following: "
-      kube::log::error "docker-machine create -d <provider> kube-dev"
+      kube::log::error "docker-machine create -d ${DOCKER_MACHINE_DRIVER} ${DOCKER_MACHINE_NAME}"
       return 1
     }
   }
-  docker-machine start kube-dev > /dev/null
-  eval $(docker-machine env kube-dev)
-  kube::log::status "A Docker host using docker-machine named kube-dev is ready to go!"
+  docker-machine start "${DOCKER_MACHINE_NAME}" > /dev/null
+  # it takes `docker-machine env` a few seconds to work if the machine was just started
+  while ! docker-machine env ${DOCKER_MACHINE_NAME} &> /dev/null; do
+    sleep 1
+  done
+  eval $(docker-machine env "${DOCKER_MACHINE_NAME}")
+  kube::log::status "A Docker host using docker-machine named '${DOCKER_MACHINE_NAME}' is ready to go!"
   return 0
 }
 
@@ -218,10 +227,10 @@ function kube::build::ensure_docker_daemon_connectivity {
       echo "Possible causes:"
       echo "  - On Mac OS X, DOCKER_HOST hasn't been set. You may need to: "
       echo "    - Create and start your VM using docker-machine or boot2docker: "
-      echo "      - docker-machine create -d <driver> kube-dev"
+      echo "      - docker-machine create -d ${DOCKER_MACHINE_DRIVER} ${DOCKER_MACHINE_NAME}"
       echo "      - boot2docker init && boot2docker start"
       echo "    - Set your environment variables using: "
-      echo "      - eval \$(docker-machine env kube-dev)"
+      echo "      - eval \$(docker-machine env ${DOCKER_MACHINE_NAME})"
       echo "      - \$(boot2docker shellinit)"
       echo "  - On Linux, user isn't in 'docker' group.  Add and relogin."
       echo "    - Something like 'sudo usermod -a -G docker ${USER-user}'"
@@ -346,18 +355,26 @@ function kube::build::destroy_container() {
 #   version
 # Returns:
 #   If version is a valid release version
-# Sets:
-#  BASH_REMATCH, so you can do something like:
-#    local -r version_major="${BASH_REMATCH[1]}"
-#    local -r version_minor="${BASH_REMATCH[2]}"
-#    local -r version_patch="${BASH_REMATCH[3]}"
+# Sets:                    (e.g. for '1.2.3-alpha.4')
+#   VERSION_MAJOR          (e.g. '1')
+#   VERSION_MINOR          (e.g. '2')
+#   VERSION_PATCH          (e.g. '3')
+#   VERSION_EXTRA          (e.g. '-alpha.4')
+#   VERSION_PRERELEASE     (e.g. 'alpha')
+#   VERSION_PRERELEASE_REV (e.g. '4')
 function kube::release::parse_and_validate_release_version() {
-  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(beta|alpha)\\.(0|[1-9][0-9]*))?$"
   local -r version="${1-}"
   [[ "${version}" =~ ${version_regex} ]] || {
-    kube::log::error "Invalid release version: '${version}'"
+    kube::log::error "Invalid release version: '${version}', must match regex ${version_regex}"
     return 1
   }
+  VERSION_MAJOR="${BASH_REMATCH[1]}"
+  VERSION_MINOR="${BASH_REMATCH[2]}"
+  VERSION_PATCH="${BASH_REMATCH[3]}"
+  VERSION_EXTRA="${BASH_REMATCH[4]}"
+  VERSION_PRERELEASE="${BASH_REMATCH[5]}"
+  VERSION_PRERELEASE_REV="${BASH_REMATCH[6]}"
 }
 
 # Validate a ci version
@@ -368,23 +385,29 @@ function kube::release::parse_and_validate_release_version() {
 #   version
 # Returns:
 #   If version is a valid ci version
-# Sets:
-#  BASH_REMATCH, so you can do something like:
-#    local -r version_major="${BASH_REMATCH[1]}"
-#    local -r version_minor="${BASH_REMATCH[2]}"
-#    local -r version_patch="${BASH_REMATCH[3]}"
-#    local -r version_prerelease="${BASH_REMATCH[4]}"
-#    local -r version_alpha_rev="${BASH_REMATCH[5]}"
-#    local -r version_build_info="${BASH_REMATCH[6]}"
-#    local -r version_commits="${BASH_REMATCH[7]}"
+# Sets:                    (e.g. for '1.2.3-alpha.4.56+abcd789-dirty')
+#   VERSION_MAJOR          (e.g. '1')
+#   VERSION_MINOR          (e.g. '2')
+#   VERSION_PATCH          (e.g. '3')
+#   VERSION_PRERELEASE     (e.g. 'alpha')
+#   VERSION_PRERELEASE_REV (e.g. '4')
+#   VERSION_BUILD_INFO     (e.g. '.56+abcd789-dirty')
+#   VERSION_COMMITS        (e.g. '56')
 function kube::release::parse_and_validate_ci_version() {
-  # Accept things like "v1.2.3-alpha.0.456+abcd789-dirty" or "v1.2.3-beta.456"
-  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha\\.(0|[1-9][0-9]*))(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
+  # Accept things like "v1.2.3-alpha.4.56+abcd789-dirty" or "v1.2.3-beta.4.56"
+  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
   local -r version="${1-}"
   [[ "${version}" =~ ${version_regex} ]] || {
-    kube::log::error "Invalid ci version: '${version}'"
+    kube::log::error "Invalid ci version: '${version}', must match regex ${version_regex}"
     return 1
   }
+  VERSION_MAJOR="${BASH_REMATCH[1]}"
+  VERSION_MINOR="${BASH_REMATCH[2]}"
+  VERSION_PATCH="${BASH_REMATCH[3]}"
+  VERSION_PRERELEASE="${BASH_REMATCH[4]}"
+  VERSION_PRERELEASE_REV="${BASH_REMATCH[5]}"
+  VERSION_BUILD_INFO="${BASH_REMATCH[6]}"
+  VERSION_COMMITS="${BASH_REMATCH[7]}"
 }
 
 # ---------------------------------------------------------------------------
@@ -416,6 +439,7 @@ function kube::build::source_targets() {
   local targets=(
     api
     build
+    cluster
     cmd
     docs
     examples
@@ -425,9 +449,13 @@ function kube::build::source_targets() {
     LICENSE
     pkg
     plugin
+    DESIGN.md
     README.md
     test
     third_party
+    contrib/completions/bash/kubectl
+    contrib/mesos
+    .generated_docs
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
     for contrib in "${KUBERNETES_CONTRIB}"; do
@@ -632,6 +660,7 @@ function kube::release::package_tarballs() {
   kube::release::package_client_tarballs &
   kube::release::package_server_tarballs &
   kube::release::package_salt_tarball &
+  kube::release::package_kube_manifests_tarball &
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 
   kube::release::package_full_tarball & # _full depends on all the previous phases
@@ -681,6 +710,7 @@ function kube::release::package_server_tarballs() {
   local platform
   for platform in "${KUBE_SERVER_PLATFORMS[@]}" ; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
+    local arch=$(basename ${platform})
     kube::log::status "Building tarball: server $platform_tag"
 
     local release_stage="${RELEASE_STAGE}/server/${platform_tag}/kubernetes"
@@ -694,7 +724,7 @@ function kube::release::package_server_tarballs() {
     cp "${KUBE_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
 
-    kube::release::create_docker_images_for_server "${release_stage}/server/bin";
+    kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
     kube::release::write_addon_docker_images_for_server "${release_stage}/addons"
 
     # Include the client binaries here too as they are useful debugging tools.
@@ -730,32 +760,56 @@ function kube::release::sha1() {
 
 # This will take binaries that run on master and creates Docker images
 # that wrap the binary in them. (One docker image per binary)
+# Args:
+#  $1 - binary_dir, the directory to save the tared images to.
+#  $2 - arch, architecture for which we are building docker images.
+# Globals:
+#   KUBE_DOCKER_WRAPPED_BINARIES
 function kube::release::create_docker_images_for_server() {
   # Create a sub-shell so that we don't pollute the outer environment
   (
+    local binary_dir="$1"
+    local arch="$2"
     local binary_name
-    for binary_name in "${KUBE_DOCKER_WRAPPED_BINARIES[@]}"; do
+    for wrappable in "${KUBE_DOCKER_WRAPPED_BINARIES[@]}"; do
+
+      local oldifs=$IFS
+      IFS=","
+      set $wrappable
+      IFS=$oldifs
+
+      local binary_name="$1"
+      local base_image="$2"
+
       kube::log::status "Starting Docker build for image: ${binary_name}"
 
       (
         local md5_sum
-        md5_sum=$(kube::release::md5 "$1/${binary_name}")
+        md5_sum=$(kube::release::md5 "${binary_dir}/${binary_name}")
 
-        local docker_build_path="$1/${binary_name}.dockerbuild"
+        local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
         local docker_file_path="${docker_build_path}/Dockerfile"
-        local binary_file_path="$1/${binary_name}"
+        local binary_file_path="${binary_dir}/${binary_name}"
 
         rm -rf ${docker_build_path}
         mkdir -p ${docker_build_path}
-        ln $1/${binary_name} ${docker_build_path}/${binary_name}
-        printf " FROM busybox \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
+        ln ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name}
+        printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
 
         local docker_image_tag=gcr.io/google_containers/$binary_name:$md5_sum
-        docker build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
-        docker save ${docker_image_tag} > ${1}/${binary_name}.tar
-        echo $md5_sum > ${1}/${binary_name}.docker_tag
+        "${DOCKER[@]}" build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
+        "${DOCKER[@]}" save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
+        echo $md5_sum > ${binary_dir}/${binary_name}.docker_tag
 
         rm -rf ${docker_build_path}
+
+        # If we are building an official/alpha/beta release we want to keep docker images
+        # and tag them appropriately.
+        if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
+          local release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
+          kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
+          "${DOCKER[@]}" tag -f "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
+        fi
 
         kube::log::status "Deleting docker image ${docker_image_tag}"
         "${DOCKER[@]}" rmi ${docker_image_tag} 2>/dev/null || true
@@ -765,6 +819,7 @@ function kube::release::create_docker_images_for_server() {
     kube::util::wait-for-jobs || { kube::log::error "previous Docker build failed"; return 1; }
     kube::log::status "Docker builds done"
   )
+
 }
 
 # This will pull and save docker images for addons which need to placed
@@ -782,6 +837,16 @@ function kube::release::write_addon_docker_images_for_server() {
         docker save "${addon_path}" > "${1}/${dest_name}.tar"
       ) &
     done
+
+    if [[ ! -z "${BUILD_PYTHON_IMAGE:-}" ]]; then
+      (
+        kube::log::status "Building Docker python image"
+        
+        local img_name=python:2.7-slim-pyyaml
+        docker build -t "${img_name}" "${KUBE_ROOT}/cluster/addons/python-image"
+        docker save "${img_name}" > "${1}/${img_name}.tar"
+      ) &
+    fi
 
     kube::util::wait-for-jobs || { kube::log::error "unable to pull or write addon image"; return 1; }
     kube::log::status "Addon images done"
@@ -810,6 +875,38 @@ function kube::release::package_salt_tarball() {
   kube::release::clean_cruft
 
   local package_name="${RELEASE_DIR}/kubernetes-salt.tar.gz"
+  kube::release::create_tarball "${package_name}" "${release_stage}/.."
+}
+
+# This will pack kube-system manifests files for distros without using salt
+# such as Ubuntu Trusty.
+#
+# There are two sources of manifests files: (1) some manifests in the directory
+# cluster/saltbase/salt can be used directly or after minor revision, so we copy
+# them from there; (2) otherwise, we will maintain separate copies in
+# cluster/gce/kube-manifests.
+function kube::release::package_kube_manifests_tarball() {
+  kube::log::status "Building tarball: manifests"
+
+  local release_stage="${RELEASE_STAGE}/manifests/kubernetes"
+  rm -rf "${release_stage}"
+  mkdir -p "${release_stage}"
+
+  # Source 1: manifests from cluster/saltbase/salt.
+  # TODO(andyzheng0831): Add more manifests when supporting master on trusty.
+  local salt_dir="${KUBE_ROOT}/cluster/saltbase/salt"
+  cp "${salt_dir}/fluentd-es/fluentd-es.yaml" "${release_stage}/"
+  cp "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${release_stage}/"
+  cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
+  cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
+
+  # Source 2: manifests from cluster/gce/kube-manifests.
+  # TODO(andyzheng0831): Enable the following line after finishing issue #16702.
+  # cp "${KUBE_ROOT}/cluster/gce/kube-manifests/"* "${release_stage}/"
+
+  kube::release::clean_cruft
+
+  local package_name="${RELEASE_DIR}/kubernetes-manifests.tar.gz"
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
 }
 
@@ -876,6 +973,7 @@ function kube::release::package_full_tarball() {
   mkdir -p "${release_stage}/server"
   cp "${RELEASE_DIR}/kubernetes-salt.tar.gz" "${release_stage}/server/"
   cp "${RELEASE_DIR}"/kubernetes-server-*.tar.gz "${release_stage}/server/"
+  cp "${RELEASE_DIR}/kubernetes-manifests.tar.gz" "${release_stage}/server/"
 
   mkdir -p "${release_stage}/third_party"
   cp -R "${KUBE_ROOT}/third_party/htpasswd" "${release_stage}/third_party/htpasswd"
@@ -887,6 +985,8 @@ function kube::release::package_full_tarball() {
   cp "${KUBE_ROOT}/Vagrantfile" "${release_stage}/"
   mkdir -p "${release_stage}/contrib/completions/bash"
   cp "${KUBE_ROOT}/contrib/completions/bash/kubectl" "${release_stage}/contrib/completions/bash"
+
+  echo "${KUBE_GIT_VERSION}" > "${release_stage}/version"
 
   kube::release::clean_cruft
 
@@ -996,7 +1096,7 @@ function kube::release::gcs::copy_release_artifacts() {
   # deploy hosted with the release is useful for GKE.
   kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/configure-vm.sh" extra/gce || return 1
   kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/trusty/node.yaml" extra/gce || return 1
-
+  kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/trusty/configure.sh" extra/gce || return 1
 
   # Upload the "naked" binaries to GCS.  This is useful for install scripts that
   # download the binaries directly and don't need tars.
@@ -1070,8 +1170,8 @@ function kube::release::gcs::publish_ci() {
   kube::release::gcs::verify_release_files || return 1
 
   kube::release::parse_and_validate_ci_version "${KUBE_GCS_PUBLISH_VERSION}" || return 1
-  local -r version_major="${BASH_REMATCH[1]}"
-  local -r version_minor="${BASH_REMATCH[2]}"
+  local -r version_major="${VERSION_MAJOR}"
+  local -r version_minor="${VERSION_MINOR}"
 
   local -r publish_files=(ci/latest.txt ci/latest-${version_major}.txt ci/latest-${version_major}.${version_minor}.txt)
 
@@ -1100,8 +1200,8 @@ function kube::release::gcs::publish_official() {
   kube::release::gcs::verify_release_files || return 1
 
   kube::release::parse_and_validate_release_version "${KUBE_GCS_PUBLISH_VERSION}" || return 1
-  local -r version_major="${BASH_REMATCH[1]}"
-  local -r version_minor="${BASH_REMATCH[2]}"
+  local -r version_major="${VERSION_MAJOR}"
+  local -r version_minor="${VERSION_MINOR}"
 
   local publish_files
   if [[ "${release_kind}" == 'latest' ]]; then
@@ -1148,6 +1248,10 @@ function kube::release::gcs::verify_release_files() {
 #   publish_file: the GCS location to look in
 # Returns:
 #   If new version is greater than the GCS version
+#
+# TODO(16529): This should all be outside of build an in release, and should be
+# refactored to reduce code duplication.  Also consider using strictly nested
+# if and explicit handling of equals case.
 function kube::release::gcs::verify_release_gt() {
   local -r publish_file="${1-}"
   local -r new_version=${KUBE_GCS_PUBLISH_VERSION}
@@ -1155,9 +1259,11 @@ function kube::release::gcs::verify_release_gt() {
 
   kube::release::parse_and_validate_release_version "${new_version}" || return 1
 
-  local -r version_major="${BASH_REMATCH[1]}"
-  local -r version_minor="${BASH_REMATCH[2]}"
-  local -r version_patch="${BASH_REMATCH[3]}"
+  local -r version_major="${VERSION_MAJOR}"
+  local -r version_minor="${VERSION_MINOR}"
+  local -r version_patch="${VERSION_PATCH}"
+  local -r version_prerelease="${VERSION_PRERELEASE}"
+  local -r version_prerelease_rev="${VERSION_PRERELEASE_REV}"
 
   local gcs_version
   if gcs_version="$(gsutil cat "${publish_file_dst}")"; then
@@ -1166,9 +1272,11 @@ function kube::release::gcs::verify_release_gt() {
       return 1
     }
 
-    local -r gcs_version_major="${BASH_REMATCH[1]}"
-    local -r gcs_version_minor="${BASH_REMATCH[2]}"
-    local -r gcs_version_patch="${BASH_REMATCH[3]}"
+    local -r gcs_version_major="${VERSION_MAJOR}"
+    local -r gcs_version_minor="${VERSION_MINOR}"
+    local -r gcs_version_patch="${VERSION_PATCH}"
+    local -r gcs_version_prerelease="${VERSION_PRERELEASE}"
+    local -r gcs_version_prerelease_rev="${VERSION_PRERELEASE_REV}"
 
     local greater=true
     if [[ "${version_major}" -lt "${gcs_version_major}" ]]; then
@@ -1179,7 +1287,26 @@ function kube::release::gcs::verify_release_gt() {
       greater=false
     elif [[ "${version_minor}" -gt "${gcs_version_minor}" ]]; then
       : # fall out
-    elif [[ "${version_patch}" -le "${gcs_version_patch}" ]]; then
+    elif [[ "${version_patch}" -lt "${gcs_version_patch}" ]]; then
+      greater=false
+    elif [[ "${version_patch}" -gt "${gcs_version_patch}" ]]; then
+      : # fall out
+    # Use lexicographic (instead of integer) comparison because
+    # version_prerelease is a string, ("alpha" or "beta",) but first check if
+    # either is an official release (i.e. empty prerelease string).
+    #
+    # We have to do this because lexicographically "beta" > "alpha" > "", but
+    # we want official > beta > alpha.
+    elif [[ -n "${version_prerelease}" && -z "${gcs_version_prerelease}" ]]; then
+      greater=false
+    elif [[ -z "${version_prerelease}" && -n "${gcs_version_prerelease}" ]]; then
+      : # fall out
+    elif [[ "${version_prerelease}" < "${gcs_version_prerelease}" ]]; then
+      greater=false
+    elif [[ "${version_prerelease}" > "${gcs_version_prerelease}" ]]; then
+      : # fall out
+    # Finally resort to -le here, since we want strictly-greater-than.
+    elif [[ "${version_prerelease_rev}" -le "${gcs_version_prerelease_rev}" ]]; then
       greater=false
     fi
 
@@ -1205,6 +1332,10 @@ function kube::release::gcs::verify_release_gt() {
 #   publish_file: the GCS location to look in
 # Returns:
 #   If new version is greater than the GCS version
+#
+# TODO(16529): This should all be outside of build an in release, and should be
+# refactored to reduce code duplication.  Also consider using strictly nested
+# if and explicit handling of equals case.
 function kube::release::gcs::verify_ci_ge() {
   local -r publish_file="${1-}"
   local -r new_version=${KUBE_GCS_PUBLISH_VERSION}
@@ -1212,12 +1343,12 @@ function kube::release::gcs::verify_ci_ge() {
 
   kube::release::parse_and_validate_ci_version "${new_version}" || return 1
 
-  local -r version_major="${BASH_REMATCH[1]}"
-  local -r version_minor="${BASH_REMATCH[2]}"
-  local -r version_patch="${BASH_REMATCH[3]}"
-  local -r version_prerelease="${BASH_REMATCH[4]}"
-  local -r version_alpha_rev="${BASH_REMATCH[5]}"
-  local -r version_commits="${BASH_REMATCH[7]}"
+  local -r version_major="${VERSION_MAJOR}"
+  local -r version_minor="${VERSION_MINOR}"
+  local -r version_patch="${VERSION_PATCH}"
+  local -r version_prerelease="${VERSION_PRERELEASE}"
+  local -r version_prerelease_rev="${VERSION_PRERELEASE_REV}"
+  local -r version_commits="${VERSION_COMMITS}"
 
   local gcs_version
   if gcs_version="$(gsutil cat "${publish_file_dst}")"; then
@@ -1226,12 +1357,12 @@ function kube::release::gcs::verify_ci_ge() {
       return 1
     }
 
-    local -r gcs_version_major="${BASH_REMATCH[1]}"
-    local -r gcs_version_minor="${BASH_REMATCH[2]}"
-    local -r gcs_version_patch="${BASH_REMATCH[3]}"
-    local -r gcs_version_prerelease="${BASH_REMATCH[4]}"
-    local -r gcs_version_alpha_rev="${BASH_REMATCH[5]}"
-    local -r gcs_version_commits="${BASH_REMATCH[7]}"
+    local -r gcs_version_major="${VERSION_MAJOR}"
+    local -r gcs_version_minor="${VERSION_MINOR}"
+    local -r gcs_version_patch="${VERSION_PATCH}"
+    local -r gcs_version_prerelease="${VERSION_PRERELEASE}"
+    local -r gcs_version_prerelease_rev="${VERSION_PRERELEASE_REV}"
+    local -r gcs_version_commits="${VERSION_COMMITS}"
 
     local greater=true
     if [[ "${version_major}" -lt "${gcs_version_major}" ]]; then
@@ -1246,18 +1377,15 @@ function kube::release::gcs::verify_ci_ge() {
       greater=false
     elif [[ "${version_patch}" -gt "${gcs_version_patch}" ]]; then
       : # fall out
-    elif [[ "${version_prerelease}" =~ alpha.* && "${gcs_version_prerelease}" == "beta" ]]; then
+    # Use lexicographic (instead of integer) comparison because
+    # version_prerelease is a string, ("alpha" or "beta")
+    elif [[ "${version_prerelease}" < "${gcs_version_prerelease}" ]]; then
       greater=false
-    elif [[ "${version_prerelease}" == "beta" && "${gcs_version_prerelease}" =~ alpha.* ]]; then
+    elif [[ "${version_prerelease}" > "${gcs_version_prerelease}" ]]; then
       : # fall out
-    # Check the alpha revision; if they are both beta, this is just comparing empty strings.
-    elif [[ "${version_alpha_rev}" -lt "${gcs_version_alpha_rev}" ]]; then
+    elif [[ "${version_prerelease_rev}" -lt "${gcs_version_prerelease_rev}" ]]; then
       greater=false
-    elif [[ "${version_alpha_rev}" -gt "${gcs_version_alpha_rev}" ]]; then
-      : # fall out
-    elif [[ "${version_patch}" -lt "${gcs_version_patch}" ]]; then
-      greater=false
-    elif [[ "${version_patch}" -gt "${gcs_version_patch}" ]]; then
+    elif [[ "${version_prerelease_rev}" -gt "${gcs_version_prerelease_rev}" ]]; then
       : # fall out
     # If either version_commits is empty, it will be considered less-than, as
     # expected, (e.g. 1.2.3-beta < 1.2.3-beta.1).
@@ -1318,4 +1446,42 @@ function kube::release::gcs::publish() {
     kube::log::error "Expected contents of file to be ${KUBE_GCS_PUBLISH_VERSION}, but got ${contents}"
     return 1
   fi
+}
+
+# ---------------------------------------------------------------------------
+# Docker Release
+
+# Releases all docker images to a docker registry specified by KUBE_DOCKER_REGISTRY
+# using tag KUBE_DOCKER_IMAGE_TAG.
+#
+# Globals:
+#   KUBE_DOCKER_REGISTRY
+#   KUBE_DOCKER_IMAGE_TAG
+# Returns:
+#   If new pushing docker images was successful.
+function kube::release::docker::release() {
+  local binaries=(
+    "kube-apiserver"
+    "kube-controller-manager"
+    "kube-scheduler"
+    "kube-proxy"
+    "hyperkube"
+  )
+
+  local archs=(
+    "amd64"
+  )
+
+  local docker_push_cmd=("docker")
+  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
+    docker_push_cmd=("gcloud" "docker")
+  fi
+
+  for arch in "${archs[@]}"; do
+    for binary in "${binaries[@]}"; do
+      local docker_target="${KUBE_DOCKER_REGISTRY}/${binary}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
+      kube::log::status "Pushing ${binary} to ${docker_target}"
+      "${docker_push_cmd[@]}" push "${docker_target}"
+    done
+  done
 }

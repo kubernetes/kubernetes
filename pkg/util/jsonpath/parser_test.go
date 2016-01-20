@@ -21,44 +21,46 @@ import (
 )
 
 type parserTest struct {
-	name  string
-	text  string
-	nodes []Node
+	name        string
+	text        string
+	nodes       []Node
+	shouldError bool
 }
 
 var parserTests = []parserTest{
-	{"plain", `hello jsonpath`, []Node{newText("hello jsonpath")}},
+	{"plain", `hello jsonpath`, []Node{newText("hello jsonpath")}, false},
 	{"variable", `hello {.jsonpath}`,
-		[]Node{newText("hello "), newList(), newField("jsonpath")}},
+		[]Node{newText("hello "), newList(), newField("jsonpath")}, false},
 	{"arrayfiled", `hello {['jsonpath']}`,
-		[]Node{newText("hello "), newList(), newField("jsonpath")}},
-	{"quote", `{"{"}`, []Node{newList(), newText("{")}},
+		[]Node{newText("hello "), newList(), newField("jsonpath")}, false},
+	{"quote", `{"{"}`, []Node{newList(), newText("{")}, false},
 	{"array", `{[1:3]}`, []Node{newList(),
-		newArray([3]ParamsEntry{{1, true}, {3, true}, {0, false}})}},
+		newArray([3]ParamsEntry{{1, true}, {3, true}, {0, false}})}, false},
 	{"allarray", `{.book[*].author}`,
 		[]Node{newList(), newField("book"),
-			newArray([3]ParamsEntry{{0, false}, {0, false}, {0, false}}), newField("author")}},
+			newArray([3]ParamsEntry{{0, false}, {0, false}, {0, false}}), newField("author")}, false},
 	{"wildcard", `{.bicycle.*}`,
-		[]Node{newList(), newField("bicycle"), newWildcard()}},
+		[]Node{newList(), newField("bicycle"), newWildcard()}, false},
 	{"filter", `{[?(@.price<3)]}`,
 		[]Node{newList(), newFilter(newList(), newList(), "<"),
-			newList(), newField("price"), newList(), newInt(3)}},
-	{"recursive", `{..}`, []Node{newList(), newRecursive()}},
+			newList(), newField("price"), newList(), newInt(3)}, false},
+	{"recursive", `{..}`, []Node{newList(), newRecursive()}, false},
 	{"recurField", `{..price}`,
-		[]Node{newList(), newRecursive(), newField("price")}},
+		[]Node{newList(), newRecursive(), newField("price")}, false},
 	{"arraydict", `{['book.price']}`, []Node{newList(),
 		newField("book"), newField("price"),
-	}},
+	}, false},
 	{"union", `{['bicycle.price', 3, 'book.price']}`, []Node{newList(), newUnion([]*ListNode{}),
 		newList(), newField("bicycle"), newField("price"),
 		newList(), newArray([3]ParamsEntry{{3, true}, {4, true}, {0, false}}),
 		newList(), newField("book"), newField("price"),
-	}},
+	}, false},
 	{"range", `{range .items}{.name},{end}`, []Node{
 		newList(), newIdentifier("range"), newField("items"),
 		newList(), newField("name"), newText(","),
 		newList(), newIdentifier("end"),
-	}},
+	}, false},
+	{"malformat input", `{\\\}`, []Node{}, true},
 }
 
 func collectNode(nodes []Node, cur Node) []Node {
@@ -82,6 +84,12 @@ func collectNode(nodes []Node, cur Node) []Node {
 func TestParser(t *testing.T) {
 	for _, test := range parserTests {
 		parser, err := Parse(test.name, test.text)
+		if test.shouldError {
+			if err == nil {
+				t.Errorf("unexpected non-error when parsing %s", test.name)
+			}
+			continue
+		}
 		if err != nil {
 			t.Errorf("parse %s error %v", test.name, err)
 		}

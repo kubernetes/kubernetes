@@ -27,13 +27,12 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -42,71 +41,40 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
-// SchedulerServer has all the context and params needed to run a Scheduler
-type SchedulerServer struct {
-	Port              int
-	Address           net.IP
-	AlgorithmProvider string
-	PolicyConfigFile  string
-	EnableProfiling   bool
-	Master            string
-	Kubeconfig        string
-	BindPodsQPS       float32
-	BindPodsBurst     int
-	KubeApiQps        float32
-	KubeApiBurst      int
-}
-
-// NewSchedulerServer creates a new SchedulerServer with default parameters
-func NewSchedulerServer() *SchedulerServer {
-	s := SchedulerServer{
-		Port:              ports.SchedulerPort,
-		Address:           net.ParseIP("127.0.0.1"),
-		AlgorithmProvider: factory.DefaultProvider,
-		BindPodsQPS:       50.0,
-		BindPodsBurst:     100,
-		KubeApiQps:        50.0,
-		KubeApiBurst:      100,
+// NewSchedulerCommand creates a *cobra.Command object with default parameters
+func NewSchedulerCommand() *cobra.Command {
+	s := options.NewSchedulerServer()
+	s.AddFlags(pflag.CommandLine)
+	cmd := &cobra.Command{
+		Use: "kube-scheduler",
+		Long: `The Kubernetes scheduler is a policy-rich, topology-aware,
+workload-specific function that significantly impacts availability, performance,
+and capacity. The scheduler needs to take into account individual and collective
+resource requirements, quality of service requirements, hardware/software/policy
+constraints, affinity and anti-affinity specifications, data locality, inter-workload
+interference, deadlines, and so on. Workload-specific requirements will be exposed
+through the API as necessary.`,
+		Run: func(cmd *cobra.Command, args []string) {
+		},
 	}
-	return &s
-}
 
-// AddFlags adds flags for a specific SchedulerServer to the specified FlagSet
-func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
-	fs.IntVar(&s.Port, "port", s.Port, "The port that the scheduler's http service runs on")
-	fs.IPVar(&s.Address, "address", s.Address, "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.StringVar(&s.AlgorithmProvider, "algorithm-provider", s.AlgorithmProvider, "The scheduling algorithm provider to use, one of: "+factory.ListAlgorithmProviders())
-	fs.StringVar(&s.PolicyConfigFile, "policy-config-file", s.PolicyConfigFile, "File with scheduler policy configuration")
-	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
-	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
-	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
-	fs.Float32Var(&s.BindPodsQPS, "bind-pods-qps", s.BindPodsQPS, "Number of bindings per second scheduler is allowed to continuously make")
-	fs.IntVar(&s.BindPodsBurst, "bind-pods-burst", s.BindPodsBurst, "Number of bindings per second scheduler is allowed to make during bursts")
-	fs.Float32Var(&s.KubeApiQps, "kube-api-qps", s.KubeApiQps, "QPS to use while talking with kubernetes apiserver")
-	fs.IntVar(&s.KubeApiBurst, "kube-api-burst", s.KubeApiBurst, "Burst to use while talking with kubernetes apiserver")
+	return cmd
 }
 
 // Run runs the specified SchedulerServer.  This should never exit.
-func (s *SchedulerServer) Run(_ []string) error {
-	if s.Kubeconfig == "" && s.Master == "" {
-		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
-	}
-
-	// This creates a client, first loading any specified kubeconfig
-	// file, and then overriding the Master flag, if non-empty.
-	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig()
+func Run(s *options.SchedulerServer) error {
+	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
 	if err != nil {
 		return err
 	}
 
 	// Override kubeconfig qps/burst settings from flags
-	kubeconfig.QPS = s.KubeApiQps
-	kubeconfig.Burst = s.KubeApiBurst
+	kubeconfig.QPS = s.KubeAPIQPS
+	kubeconfig.Burst = s.KubeAPIBurst
 
 	kubeClient, err := client.New(kubeconfig)
 	if err != nil {
@@ -130,24 +98,60 @@ func (s *SchedulerServer) Run(_ []string) error {
 		glog.Fatal(server.ListenAndServe())
 	}()
 
-	configFactory := factory.NewConfigFactory(kubeClient, util.NewTokenBucketRateLimiter(s.BindPodsQPS, s.BindPodsBurst))
-	config, err := s.createConfig(configFactory)
+	configFactory := factory.NewConfigFactory(kubeClient, s.SchedulerName)
+	config, err := createConfig(s, configFactory)
+
 	if err != nil {
 		glog.Fatalf("Failed to create scheduler configuration: %v", err)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	config.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
+	config.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: s.SchedulerName})
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
 
 	sched := scheduler.New(config)
-	sched.Run()
 
-	select {}
+	run := func(_ <-chan struct{}) {
+		sched.Run()
+		select {}
+	}
+
+	if !s.LeaderElection.LeaderElect {
+		run(nil)
+		glog.Fatal("this statement is unreachable")
+		panic("unreachable")
+	}
+
+	id, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+
+	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+		EndpointsMeta: api.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "kube-scheduler",
+		},
+		Client:        kubeClient,
+		Identity:      id,
+		EventRecorder: config.Recorder,
+		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: run,
+			OnStoppedLeading: func() {
+				glog.Fatalf("lost master")
+			},
+		},
+	})
+
+	glog.Fatal("this statement is unreachable")
+	panic("unreachable")
 }
 
-func (s *SchedulerServer) createConfig(configFactory *factory.ConfigFactory) (*scheduler.Config, error) {
+func createConfig(s *options.SchedulerServer, configFactory *factory.ConfigFactory) (*scheduler.Config, error) {
 	var policy schedulerapi.Policy
 	var configData []byte
 

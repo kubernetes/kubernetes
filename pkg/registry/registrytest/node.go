@@ -21,8 +21,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -59,7 +57,7 @@ func (r *NodeRegistry) SetError(err error) {
 	r.Err = err
 }
 
-func (r *NodeRegistry) ListNodes(ctx api.Context, label labels.Selector, field fields.Selector) (*api.NodeList, error) {
+func (r *NodeRegistry) ListNodes(ctx api.Context, options *api.ListOptions) (*api.NodeList, error) {
 	r.Lock()
 	defer r.Unlock()
 	return &r.Nodes, r.Err
@@ -96,7 +94,7 @@ func (r *NodeRegistry) GetNode(ctx api.Context, nodeID string) (*api.Node, error
 			return &node, nil
 		}
 	}
-	return nil, errors.NewNotFound("node", nodeID)
+	return nil, errors.NewNotFound(api.Resource("nodes"), nodeID)
 }
 
 func (r *NodeRegistry) DeleteNode(ctx api.Context, nodeID string) error {
@@ -112,6 +110,6 @@ func (r *NodeRegistry) DeleteNode(ctx api.Context, nodeID string) error {
 	return r.Err
 }
 
-func (r *NodeRegistry) WatchNodes(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (r *NodeRegistry) WatchNodes(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	return nil, r.Err
 }

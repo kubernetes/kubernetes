@@ -18,8 +18,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	info "github.com/google/cadvisor/info/v1"
+
+	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )
 

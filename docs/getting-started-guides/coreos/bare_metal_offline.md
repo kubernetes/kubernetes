@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/getting-started-guides/coreos/bare_metal_offline.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/coreos/bare_metal_offline.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -699,7 +700,7 @@ List Kubernetes
 
 Kill all pods:
 
-    for i in `kubectl get pods | awk '{print $1}'`; do kubectl stop pod $i; done
+    for i in `kubectl get pods | awk '{print $1}'`; do kubectl delete pod $i; done
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

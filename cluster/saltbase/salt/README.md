@@ -10,7 +10,6 @@ Key: M = Config applies to master, n = config applies to nodes
 
 Config                                              | GCE   | Vagrant | AWS |
 ----------------------------------------------------|-------|---------|-----|
-[cadvisor](cadvisor/)                               | M n   | M n     | M n |
 [debian-auto-upgrades](debian-auto-upgrades/)       | M n   | M n     | M n |
 [docker](docker/)                                   | M n   | M n     | M n |
 [etcd](etcd/)                                       | M     | M       | M   |
@@ -24,8 +23,7 @@ Config                                              | GCE   | Vagrant | AWS |
 [kube-scheduler](kube-scheduler/)                   | M     | M       | M   |
 [kubelet](kubelet/)                                 | M n   | M n     | M n |
 [logrotate](logrotate/)                             | M n   |   n     | M n |
-[monit](monit/)                                     | M n   | M n     | M n |
-[nginx](nginx/)                                     | M     | M       | M   |
+[supervisord](supervisor/)                          | M n   | M n     | M n |
 [static-routes](static-routes/) (vsphere only)      |       |         |     |
 [base](base.sls)                                    | M n   | M n     | M n |
 [kube-client-tools](kube-client-tools.sls)          | M     | M       | M   |

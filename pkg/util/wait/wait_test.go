@@ -18,6 +18,7 @@ package wait
 
 import (
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -48,10 +49,17 @@ DRAIN:
 	}
 }
 
-func fakeTicker(max int, used *int32) WaitFunc {
+type fakePoller struct {
+	max  int
+	used int32 // accessed with atomics
+	wg   sync.WaitGroup
+}
+
+func fakeTicker(max int, used *int32, doneFunc func()) WaitFunc {
 	return func(done <-chan struct{}) <-chan struct{} {
 		ch := make(chan struct{})
 		go func() {
+			defer doneFunc()
 			defer close(ch)
 			for i := 0; i < max; i++ {
 				select {
@@ -68,13 +76,9 @@ func fakeTicker(max int, used *int32) WaitFunc {
 	}
 }
 
-type fakePoller struct {
-	max  int
-	used int32 // accessed with atomics
-}
-
-func (fp *fakePoller) GetWaitFunc(interval, timeout time.Duration) WaitFunc {
-	return fakeTicker(fp.max, &fp.used)
+func (fp *fakePoller) GetWaitFunc() WaitFunc {
+	fp.wg.Add(1)
+	return fakeTicker(fp.max, &fp.used, fp.wg.Done)
 }
 
 func TestPoll(t *testing.T) {
@@ -84,9 +88,10 @@ func TestPoll(t *testing.T) {
 		return true, nil
 	})
 	fp := fakePoller{max: 1}
-	if err := pollInternal(fp.GetWaitFunc(time.Microsecond, time.Microsecond), f); err != nil {
+	if err := pollInternal(fp.GetWaitFunc(), f); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
+	fp.wg.Wait()
 	if invocations != 1 {
 		t.Errorf("Expected exactly one invocation, got %d", invocations)
 	}
@@ -94,19 +99,19 @@ func TestPoll(t *testing.T) {
 	if used != 1 {
 		t.Errorf("Expected exactly one tick, got %d", used)
 	}
+}
 
+func TestPollError(t *testing.T) {
 	expectedError := errors.New("Expected error")
-	f = ConditionFunc(func() (bool, error) {
+	f := ConditionFunc(func() (bool, error) {
 		return false, expectedError
 	})
-	fp = fakePoller{max: 1}
-	if err := pollInternal(fp.GetWaitFunc(time.Microsecond, time.Microsecond), f); err == nil || err != expectedError {
+	fp := fakePoller{max: 1}
+	if err := pollInternal(fp.GetWaitFunc(), f); err == nil || err != expectedError {
 		t.Fatalf("Expected error %v, got none %v", expectedError, err)
 	}
-	if invocations != 1 {
-		t.Errorf("Expected exactly one invocation, got %d", invocations)
-	}
-	used = atomic.LoadInt32(&fp.used)
+	fp.wg.Wait()
+	used := atomic.LoadInt32(&fp.used)
 	if used != 1 {
 		t.Errorf("Expected exactly one tick, got %d", used)
 	}
@@ -119,9 +124,10 @@ func TestPollImmediate(t *testing.T) {
 		return true, nil
 	})
 	fp := fakePoller{max: 0}
-	if err := pollImmediateInternal(fp.GetWaitFunc(time.Microsecond, time.Microsecond), f); err != nil {
+	if err := pollImmediateInternal(fp.GetWaitFunc(), f); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
+	// We don't need to wait for fp.wg, as pollImmediate shouldn't call WaitFunc at all.
 	if invocations != 1 {
 		t.Errorf("Expected exactly one invocation, got %d", invocations)
 	}
@@ -129,19 +135,19 @@ func TestPollImmediate(t *testing.T) {
 	if used != 0 {
 		t.Errorf("Expected exactly zero ticks, got %d", used)
 	}
+}
 
+func TestPollImmediateError(t *testing.T) {
 	expectedError := errors.New("Expected error")
-	f = ConditionFunc(func() (bool, error) {
+	f := ConditionFunc(func() (bool, error) {
 		return false, expectedError
 	})
-	fp = fakePoller{max: 0}
-	if err := pollImmediateInternal(fp.GetWaitFunc(time.Microsecond, time.Microsecond), f); err == nil || err != expectedError {
+	fp := fakePoller{max: 0}
+	if err := pollImmediateInternal(fp.GetWaitFunc(), f); err == nil || err != expectedError {
 		t.Fatalf("Expected error %v, got none %v", expectedError, err)
 	}
-	if invocations != 1 {
-		t.Errorf("Expected exactly one invocation, got %d", invocations)
-	}
-	used = atomic.LoadInt32(&fp.used)
+	// We don't need to wait for fp.wg, as pollImmediate shouldn't call WaitFunc at all.
+	used := atomic.LoadInt32(&fp.used)
 	if used != 0 {
 		t.Errorf("Expected exactly zero ticks, got %d", used)
 	}
@@ -185,13 +191,12 @@ func TestPollForever(t *testing.T) {
 		}
 	}
 
-	// at most two poll notifications should be sent once we return from the condition
+	// at most one poll notification should be sent once we return from the condition
 	done <- struct{}{}
 	go func() {
 		for i := 0; i < 2; i++ {
 			_, open := <-ch
-			if open {
-				<-complete
+			if !open {
 				return
 			}
 		}
@@ -238,7 +243,7 @@ func TestWaitFor(t *testing.T) {
 	}
 	for k, c := range testCases {
 		invocations = 0
-		ticker := fakeTicker(c.Ticks, nil)
+		ticker := fakeTicker(c.Ticks, nil, func() {})
 		err := func() error {
 			done := make(chan struct{})
 			defer close(done)
@@ -255,5 +260,20 @@ func TestWaitFor(t *testing.T) {
 		if invocations != c.Invoked {
 			t.Errorf("%s: Expected %d invocations, got %d", k, c.Invoked, invocations)
 		}
+	}
+}
+
+func TestWaitForWithDelay(t *testing.T) {
+	done := make(chan struct{})
+	defer close(done)
+	WaitFor(poller(time.Millisecond, util.ForeverTestTimeout), func() (bool, error) {
+		time.Sleep(10 * time.Millisecond)
+		return true, nil
+	}, done)
+	// If polling goroutine doesn't see the done signal it will leak timers.
+	select {
+	case done <- struct{}{}:
+	case <-time.After(util.ForeverTestTimeout):
+		t.Errorf("expected an ack of the done signal.")
 	}
 }

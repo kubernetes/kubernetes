@@ -45,7 +45,7 @@ type testPatchSubType struct {
 	StringField string `json:"theField"`
 }
 
-func (*testPatchType) IsAnAPIObject() {}
+func (obj *testPatchType) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 
 func TestPatchAnonymousField(t *testing.T) {
 	originalJS := `{"kind":"testPatchType","theField":"my-value"}`
@@ -78,7 +78,7 @@ func (p *testPatcher) New() runtime.Object {
 func (p *testPatcher) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	inPod := obj.(*api.Pod)
 	if inPod.ResourceVersion != p.updatePod.ResourceVersion {
-		return nil, false, apierrors.NewConflict("Pod", inPod.Name, fmt.Errorf("existing %v, new %v", p.updatePod.ResourceVersion, inPod.ResourceVersion))
+		return nil, false, apierrors.NewConflict(api.Resource("pods"), inPod.Name, fmt.Errorf("existing %v, new %v", p.updatePod.ResourceVersion, inPod.ResourceVersion))
 	}
 
 	return inPod, false, nil
@@ -152,7 +152,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	namespace := tc.startingPod.Namespace
 	name := tc.startingPod.Name
 
-	codec := latest.GroupOrDie("").Codec
+	codec := latest.GroupOrDie(api.GroupName).Codec
 
 	testPatcher := &testPatcher{}
 	testPatcher.startingPod = tc.startingPod
@@ -176,12 +176,12 @@ func (tc *patchTestCase) Run(t *testing.T) {
 		}
 		t.Logf("Working with patchType %v", patchType)
 
-		originalObjJS, err := codec.Encode(tc.startingPod)
+		originalObjJS, err := runtime.Encode(codec, tc.startingPod)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 			return
 		}
-		changedJS, err := codec.Encode(tc.changedPod)
+		changedJS, err := runtime.Encode(codec, tc.changedPod)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 			return
@@ -231,12 +231,12 @@ func (tc *patchTestCase) Run(t *testing.T) {
 		resultPod := resultObj.(*api.Pod)
 
 		// roundtrip to get defaulting
-		expectedJS, err := codec.Encode(tc.expectedPod)
+		expectedJS, err := runtime.Encode(codec, tc.expectedPod)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 			return
 		}
-		expectedObj, err := codec.Decode(expectedJS)
+		expectedObj, err := runtime.Decode(codec, expectedJS)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 			return
@@ -306,7 +306,7 @@ func TestPatchResourceWithConflict(t *testing.T) {
 		changedPod:  &api.Pod{},
 		updatePod:   &api.Pod{},
 
-		expectedError: `Pod "foo" cannot be updated: existing 2, new 1`,
+		expectedError: `pods "foo" cannot be updated: existing 2, new 1`,
 	}
 
 	tc.startingPod.Name = name

@@ -130,7 +130,7 @@ func (j *JSONPath) walk(value []reflect.Value, node Node) ([]reflect.Value, erro
 	case *ListNode:
 		return j.evalList(value, node)
 	case *TextNode:
-		return []reflect.Value{reflect.ValueOf(string(node.Text))}, nil
+		return []reflect.Value{reflect.ValueOf(node.Text)}, nil
 	case *FieldNode:
 		return j.evalField(value, node)
 	case *ArrayNode:
@@ -232,6 +232,16 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 
 		if params[1].Value < 0 {
 			params[1].Value += value.Len()
+		}
+
+		sliceLength := value.Len()
+		if params[1].Value != params[0].Value { // if you're requesting zero elements, allow it through.
+			if params[0].Value >= sliceLength {
+				return input, fmt.Errorf("array index out of bounds: index %d, length %d", params[0].Value, sliceLength)
+			}
+			if params[1].Value > sliceLength {
+				return input, fmt.Errorf("array index out of bounds: index %d, length %d", params[1].Value-1, sliceLength)
+			}
 		}
 
 		if !params[2].Known {

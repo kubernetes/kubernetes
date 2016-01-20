@@ -1,0 +1,180 @@
+- job-template:
+    name: 'kubernetes-upgrade-{provider}-{version-old}-{version-new}'
+    disabled: false
+    description: 'Upgrade multijob from {version-old} to {version-new}. Test owner: ihmccreery.'
+    project-type: multijob
+    triggers:
+        - timed: '@hourly'
+    builders:
+        # TODO(ihmccreery) In theory, we could get ourselves into trouble by
+        # editing these things in the middle of a run.  Jenkins Job Builder
+        # would delete jobs, and they'd leave resources lying around.  We
+        # should either (1) make this not a multi-job, or (2) add a script here
+        # to update these jobs only at the beginning of a multijob run.
+        #
+        # This pain would also pretty much disappear with #18119, too.
+        - multijob:
+            name: Deploy
+            condition: SUCCESSFUL
+            projects:
+                - name: 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-step1-deploy'
+        - multijob:
+            name: Kubectl Test New
+            condition: COMPLETED
+            projects:
+                - name: 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-step2-kubectl-e2e-new'
+        - multijob:
+            name: Upgrade Master
+            condition: COMPLETED
+            projects:
+                - name: 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-step3-upgrade-master'
+        - multijob:
+            name: Test Old
+            condition: COMPLETED
+            projects:
+                - name: 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-step4-e2e-old'
+        - multijob:
+            name: Upgrade Cluster
+            condition: COMPLETED
+            projects:
+                - name: 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-step5-upgrade-cluster'
+        - multijob:
+            name: Test Old
+            condition: COMPLETED
+            projects:
+                - name: 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-step6-e2e-old'
+        - multijob:
+            name: Test New
+            condition: COMPLETED
+            projects:
+                - name: 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-step7-e2e-new'
+
+- job-template:
+    name: 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-step1-deploy'
+    description: 'Deploy a cluster at {version-old} to be tested and upgraded to {version-new}. Test owner: ihmccreery.'
+    logrotate:
+        daysToKeep: 7
+    builders:
+        - shell: |
+            curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
+    properties:
+        - mail-watcher
+    publishers:
+        - claim-build
+        # No junit-publisher, since we're not running any tests
+        - gcs-uploader
+        - log-parser
+        - email-ext:
+            recipients: 'ihmccreery@google.com'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: 60
+            fail: true
+        - timestamps
+        - workspace-cleanup
+
+- job-template:
+    name: 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}'
+    description: '{description} Test owner: ihmccreery.'
+    # Use the same workspace as step1
+    workspace: /var/lib/jenkins/jobs/kubernetes-upgrade-{provider}-{version-old}-{version-new}-step1-deploy/workspace/
+    logrotate:
+        daysToKeep: 7
+    builders:
+        - shell: |
+            curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/{branch}/hack/jenkins/e2e.sh" | bash -
+    properties:
+        - mail-watcher
+    publishers:
+        - claim-build
+        - junit-publisher
+        - gcs-uploader
+        - log-parser
+        - email-ext:
+            recipients: 'ihmccreery@google.com'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: 300
+            abort: true
+            fail: true
+        - timestamps
+        # Don't clean the workspace; we want to keep configs intact across steps in the multijob
+
+- job-group:
+    name: '{provider}-{version-old}-{version-new}-upgrades'
+    jobs:
+        - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}'
+        - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-step1-deploy':
+            branch: '{branch-old}'
+        - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
+            step: 'step2-kubectl-e2e-new'
+            branch: '{branch-new}'
+            description: 'Run {version-new} kubectl tests against the cluster running {version-old}.'
+        - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
+            step: 'step3-upgrade-master'
+            branch: '{branch-new}'
+            description: 'Upgrade the master from {version-old} to {version-new}.'
+        - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
+            step: 'step4-e2e-old'
+            branch: '{branch-old}'
+            description: 'Run {version-old} e2e tests against the cluster with master at {version-new} and nodes still at {version-old}.'
+        - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
+            step: 'step5-upgrade-cluster'
+            branch: '{branch-new}'
+            description: 'Upgrade the nodes from {version-old} to {version-new}.'
+        - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
+            step: 'step6-e2e-old'
+            branch: '{branch-old}'
+            description: 'Run {version-old} e2e tests against the cluster with master and nodes at {version-new}.'
+        - 'kubernetes-upgrade-{provider}-{version-old}-{version-new}-{step}':
+            step: 'step7-e2e-new'
+            branch: '{branch-new}'
+            description: 'Run {version-new} e2e tests against the cluster with master and nodes at {version-new}.'
+
+- project:
+    name: 'upgrade-gke'
+    jobs:
+        - '{provider}-{version-old}-{version-new}-upgrades':
+            provider: 'gke'
+            version-old: '1.1'
+            version-new: 'master'
+            branch-old: 'release-1.1'
+            branch-new: 'master'
+        - '{provider}-{version-old}-{version-new}-upgrades':
+            provider: 'gke'
+            version-old: '1.0'
+            version-new: 'master'
+            branch-old: 'release-1.0'
+            branch-new: 'master'
+        - '{provider}-{version-old}-{version-new}-upgrades':
+            provider: 'gke'
+            version-old: '1.0'
+            version-new: 'current-release'
+            branch-old: 'release-1.0'
+            branch-new: 'release-1.1'
+        - '{provider}-{version-old}-{version-new}-upgrades':
+            provider: 'gke'
+            version-old: 'stable'
+            version-new: 'current-release'
+            branch-old: 'release-1.1'
+            branch-new: 'release-1.1'
+
+- project:
+    name: 'upgrade-gce'
+    jobs:
+        - '{provider}-{version-old}-{version-new}-upgrades':
+            provider: 'gce'
+            version-old: '1.1'
+            version-new: 'master'
+            branch-old: 'release-1.1'
+            branch-new: 'master'
+        - '{provider}-{version-old}-{version-new}-upgrades':
+            provider: 'gce'
+            version-old: 'stable'
+            version-new: 'current-release'
+            branch-old: 'release-1.1'
+            branch-new: 'release-1.1'

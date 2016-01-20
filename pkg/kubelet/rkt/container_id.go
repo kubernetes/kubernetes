@@ -31,8 +31,6 @@ type containerID struct {
 	appName string // Name of the app in that pod.
 }
 
-const RktType = "rkt"
-
 // buildContainerID constructs the containers's ID using containerID,
 // which consists of the pod uuid and the container name.
 // The result can be used to uniquely identify a container.

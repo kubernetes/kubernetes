@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/examples/aws_ebs/README.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/examples/aws_ebs/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -33,11 +34,20 @@ Documentation for other releases can be found at
 This is a simple web server pod which serves HTML from an AWS EBS
 volume.
 
-Create a volume in the same region as your node add your volume
-information in the pod description file aws-ebs-web.yaml then create
-the pod:
+If you did not use kube-up script, make sure that your minions have the following IAM permissions ([Amazon IAM Roles](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html#create-iam-role-console)):
 
-```sh
+```shell
+  ec2:AttachVolume
+  ec2:DetachVolume
+  ec2:DescribeInstances
+  ec2:DescribeVolumes
+```
+
+Create a volume in the same region as your node.
+
+Add your volume information in the pod description file aws-ebs-web.yaml then create the pod:
+
+```shell
   $ kubectl create -f examples/aws_ebs/aws-ebs-web.yaml
 ```
 

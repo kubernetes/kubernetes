@@ -8,11 +8,6 @@ import (
 	"unsafe"
 )
 
-const (
-	EVENT_ALL_ACCESS    = 0x1F0003
-	EVENT_MODIFY_STATUS = 0x0002
-)
-
 var (
 	procCreateEvent = modkernel32.NewProc("CreateEventW")
 	procOpenEvent   = modkernel32.NewProc("OpenEventW")
@@ -21,13 +16,14 @@ var (
 	procPulseEvent  = modkernel32.NewProc("PulseEvent")
 )
 
+// CreateEvent implements win32 CreateEventW func in golang. It will create an event object.
 func CreateEvent(eventAttributes *syscall.SecurityAttributes, manualReset bool, initialState bool, name string) (handle syscall.Handle, err error) {
 	namep, _ := syscall.UTF16PtrFromString(name)
-	var _p1 uint32 = 0
+	var _p1 uint32
 	if manualReset {
 		_p1 = 1
 	}
-	var _p2 uint32 = 0
+	var _p2 uint32
 	if initialState {
 		_p2 = 1
 	}
@@ -40,9 +36,10 @@ func CreateEvent(eventAttributes *syscall.SecurityAttributes, manualReset bool, 
 	return
 }
 
+// OpenEvent implements win32 OpenEventW func in golang. It opens an event object.
 func OpenEvent(desiredAccess uint32, inheritHandle bool, name string) (handle syscall.Handle, err error) {
 	namep, _ := syscall.UTF16PtrFromString(name)
-	var _p1 uint32 = 0
+	var _p1 uint32
 	if inheritHandle {
 		_p1 = 1
 	}
@@ -55,14 +52,17 @@ func OpenEvent(desiredAccess uint32, inheritHandle bool, name string) (handle sy
 	return
 }
 
+// SetEvent implements win32 SetEvent func in golang.
 func SetEvent(handle syscall.Handle) (err error) {
 	return setResetPulse(handle, procSetEvent)
 }
 
+// ResetEvent implements win32 ResetEvent func in golang.
 func ResetEvent(handle syscall.Handle) (err error) {
 	return setResetPulse(handle, procResetEvent)
 }
 
+// PulseEvent implements win32 PulseEvent func in golang.
 func PulseEvent(handle syscall.Handle) (err error) {
 	return setResetPulse(handle, procPulseEvent)
 }

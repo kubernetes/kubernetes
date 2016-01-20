@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // persistentvolumeStrategy implements behavior for PersistentVolume objects
@@ -48,9 +48,13 @@ func (persistentvolumeStrategy) PrepareForCreate(obj runtime.Object) {
 	pv.Status = api.PersistentVolumeStatus{}
 }
 
-func (persistentvolumeStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
+func (persistentvolumeStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
 	persistentvolume := obj.(*api.PersistentVolume)
 	return validation.ValidatePersistentVolume(persistentvolume)
+}
+
+// Canonicalize normalizes the object after validation.
+func (persistentvolumeStrategy) Canonicalize(obj runtime.Object) {
 }
 
 func (persistentvolumeStrategy) AllowCreateOnUpdate() bool {
@@ -64,7 +68,7 @@ func (persistentvolumeStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newPv.Status = oldPv.Status
 }
 
-func (persistentvolumeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (persistentvolumeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidatePersistentVolume(obj.(*api.PersistentVolume))
 	return append(errorList, validation.ValidatePersistentVolumeUpdate(obj.(*api.PersistentVolume), old.(*api.PersistentVolume))...)
 }
@@ -86,7 +90,7 @@ func (persistentvolumeStatusStrategy) PrepareForUpdate(obj, old runtime.Object) 
 	newPv.Spec = oldPv.Spec
 }
 
-func (persistentvolumeStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (persistentvolumeStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePersistentVolumeStatusUpdate(obj.(*api.PersistentVolume), old.(*api.PersistentVolume))
 }
 
@@ -104,9 +108,10 @@ func MatchPersistentVolumes(label labels.Selector, field fields.Selector) generi
 
 // PersistentVolumeToSelectableFields returns a label set that represents the object
 func PersistentVolumeToSelectableFields(persistentvolume *api.PersistentVolume) labels.Set {
-	return labels.Set{
-		"metadata.name": persistentvolume.Name,
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(persistentvolume.ObjectMeta, false)
+	specificFieldsSet := fields.Set{
 		// This is a bug, but we need to support it for backward compatibility.
 		"name": persistentvolume.Name,
 	}
+	return labels.Set(generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet))
 }

@@ -45,10 +45,10 @@ func ControllerHasDesiredReplicas(c Interface, controller *api.ReplicationContro
 
 // JobHasDesiredParallelism returns a condition that will be true if the desired parallelism count
 // for a job equals the current active counts or is less by an appropriate successful/unsuccessful count.
-func JobHasDesiredParallelism(c Interface, job *extensions.Job) wait.ConditionFunc {
+func JobHasDesiredParallelism(c ExtensionsInterface, job *extensions.Job) wait.ConditionFunc {
 
 	return func() (bool, error) {
-		job, err := c.Extensions().Jobs(job.Namespace).Get(job.Name)
+		job, err := c.Jobs(job.Namespace).Get(job.Name)
 		if err != nil {
 			return false, err
 		}
@@ -60,5 +60,19 @@ func JobHasDesiredParallelism(c Interface, job *extensions.Job) wait.ConditionFu
 		// otherwise count successful
 		progress := *job.Spec.Completions - job.Status.Active - job.Status.Succeeded
 		return progress == 0, nil
+	}
+}
+
+// DeploymentHasDesiredReplicas returns a condition that will be true if and only if
+// the desired replica count for a deployment equals its updated replicas count.
+// (non-terminated pods that have the desired template spec).
+func DeploymentHasDesiredReplicas(c ExtensionsInterface, deployment *extensions.Deployment) wait.ConditionFunc {
+
+	return func() (bool, error) {
+		deployment, err := c.Deployments(deployment.Namespace).Get(deployment.Name)
+		if err != nil {
+			return false, err
+		}
+		return deployment.Status.UpdatedReplicas == deployment.Spec.Replicas, nil
 	}
 }

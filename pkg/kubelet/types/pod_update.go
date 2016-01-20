@@ -25,6 +25,7 @@ import (
 const ConfigSourceAnnotationKey = "kubernetes.io/config.source"
 const ConfigMirrorAnnotationKey = "kubernetes.io/config.mirror"
 const ConfigFirstSeenAnnotationKey = "kubernetes.io/config.seen"
+const ConfigHashAnnotationKey = "kubernetes.io/config.hash"
 
 // PodOperation defines what changes will be made on a pod configuration.
 type PodOperation int
@@ -38,6 +39,9 @@ const (
 	REMOVE
 	// Pods with the given ids have been updated in this source
 	UPDATE
+	// Pods with the given ids have unexpected status in this source,
+	// kubelet should reconcile status with this source
+	RECONCILE
 
 	// These constants identify the sources of pods
 	// Updates from a file
@@ -48,9 +52,6 @@ const (
 	ApiserverSource = "api"
 	// Updates from all sources
 	AllSource = "*"
-
-	// Used for ConfigMirrorAnnotationKey.
-	MirrorType = "mirror"
 
 	NamespaceDefault = api.NamespaceDefault
 )

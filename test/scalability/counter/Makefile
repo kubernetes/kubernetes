@@ -24,4 +24,4 @@ counter5000:
 	kubectl scale rc counter --replicas=5000
 
 stop:
-	kubectl stop rc counter
+	kubectl delete rc counter

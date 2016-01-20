@@ -50,11 +50,16 @@ func CoreDump(dir string) {
 		return
 	}
 
-	cmds := []command{
-		{"cat /var/log/kubelet.log", "kubelet"},
-		{"cat /var/log/kube-proxy.log", "kube-proxy"},
-		{"cat /var/log/supervisor/supervisord.log", "supervisord"},
+	cmds := []command{{"cat /var/log/kube-proxy.log", "kube-proxy"}}
+	if isUsingSystemdKubelet(provider, hosts...) {
+		cmds = append(cmds, command{"sudo journalctl --output=cat -u kubelet.service", "kubelet"})
+	} else {
+		cmds = append(cmds, []command{
+			{"cat /var/log/kubelet.log", "kubelet"},
+			{"cat /var/log/supervisor/supervisord.log", "supervisord"},
+		}...)
 	}
+
 	logCore(cmds, hosts, dir, provider)
 
 	// I wish there was a better way to get the master IP...
@@ -64,13 +69,21 @@ func CoreDump(dir string) {
 	}
 	ix := strings.LastIndex(config.Host, "/")
 	master := net.JoinHostPort(config.Host[ix+1:], "22")
+
 	cmds = []command{
-		{"cat /var/log/kubelet.log", "kubelet"},
 		{"cat /var/log/kube-apiserver.log", "kube-apiserver"},
 		{"cat /var/log/kube-scheduler.log", "kube-scheduler"},
 		{"cat /var/log/kube-controller-manager.log", "kube-controller-manager"},
-		{"cat /var/log/supervisor/supervisord.log", "supervisord"},
 	}
+	if isUsingSystemdKubelet(provider, master) {
+		cmds = append(cmds, command{"sudo journalctl --output=cat -u kubelet.service", "kubelet"})
+	} else {
+		cmds = append(cmds, []command{
+			{"cat /var/log/kubelet.log", "kubelet"},
+			{"cat /var/log/supervisor/supervisord.log", "supervisord"},
+		}...)
+	}
+
 	logCore(cmds, []string{master}, dir, provider)
 }
 
@@ -85,15 +98,44 @@ func logCore(cmds []command, hosts []string, dir, provider string) {
 				defer wg.Done()
 				logfile := fmt.Sprintf("%s/%s-%s.log", dir, host, cmd.component)
 				fmt.Printf("Writing to %s.\n", logfile)
-				stdout, stderr, _, err := SSH(cmd.cmd, host, provider)
+				result, err := SSH(cmd.cmd, host, provider)
 				if err != nil {
 					fmt.Printf("Error running command: %v\n", err)
 				}
-				if err := ioutil.WriteFile(logfile, []byte(stdout+stderr), 0777); err != nil {
+				if err := ioutil.WriteFile(logfile, []byte(result.Stdout+result.Stderr), 0777); err != nil {
 					fmt.Printf("Error writing logfile: %v\n", err)
 				}
 			}(cmd, host)
 		}
 	}
 	wg.Wait()
+}
+
+func isUsingSystemdKubelet(provider string, hosts ...string) bool {
+	wg := &sync.WaitGroup{}
+	results := make([]bool, len(hosts))
+	cmd := "sudo systemctl status kubelet.service"
+
+	wg.Add(len(hosts))
+	for i := range hosts {
+		go func(i int) {
+			defer wg.Done()
+			result, err := SSH(cmd, hosts[i], provider)
+			if err != nil {
+				fmt.Printf("Error running command: %v\n", err)
+				return
+			}
+			if result.Code == 0 {
+				results[i] = true
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	for _, r := range results {
+		if r {
+			return true
+		}
+	}
+	return false
 }

@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // jobStrategy implements verification logic for Replication Controllers.
@@ -58,9 +58,13 @@ func (jobStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new job.
-func (jobStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
+func (jobStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
 	job := obj.(*extensions.Job)
 	return validation.ValidateJob(job)
+}
+
+// Canonicalize normalizes the object after validation.
+func (jobStrategy) Canonicalize(obj runtime.Object) {
 }
 
 func (jobStrategy) AllowUnconditionalUpdate() bool {
@@ -73,9 +77,9 @@ func (jobStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (jobStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (jobStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateJob(obj.(*extensions.Job))
-	updateErrorList := validation.ValidateJobUpdate(old.(*extensions.Job), obj.(*extensions.Job))
+	updateErrorList := validation.ValidateJobUpdate(obj.(*extensions.Job), old.(*extensions.Job))
 	return append(validationErrorList, updateErrorList...)
 }
 
@@ -91,16 +95,17 @@ func (jobStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newJob.Spec = oldJob.Spec
 }
 
-func (jobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (jobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateJobUpdateStatus(obj.(*extensions.Job), old.(*extensions.Job))
 }
 
 // JobSelectableFields returns a field set that represents the object for matching purposes.
 func JobToSelectableFields(job *extensions.Job) fields.Set {
-	return fields.Set{
-		"metadata.name":     job.Name,
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(job.ObjectMeta, true)
+	specificFieldsSet := fields.Set{
 		"status.successful": strconv.Itoa(job.Status.Succeeded),
 	}
+	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }
 
 // MatchJob is the filter used by the generic etcd backend to route

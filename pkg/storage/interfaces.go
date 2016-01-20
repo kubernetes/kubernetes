@@ -95,15 +95,17 @@ type Interface interface {
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items passing 'filter' are sent down to returned watch.Interface.
-	// resourceVersion may be used to specify what version to begin watching
+	// resourceVersion may be used to specify what version to begin watching,
+	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
-	Watch(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error)
+	Watch(ctx context.Context, key string, resourceVersion string, filter FilterFunc) (watch.Interface, error)
 
 	// WatchList begins watching the specified key's items. Items are decoded into API
 	// objects and any item passing 'filter' are sent down to returned watch.Interface.
-	// resourceVersion may be used to specify what version to begin watching
+	// resourceVersion may be used to specify what version to begin watching,
+	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
-	WatchList(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error)
+	WatchList(ctx context.Context, key string, resourceVersion string, filter FilterFunc) (watch.Interface, error)
 
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
 	// return a zero object of the requested type, or an error, depending on ignoreNotFound.
@@ -116,7 +118,9 @@ type Interface interface {
 
 	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
-	List(ctx context.Context, key string, filter FilterFunc, listObj runtime.Object) error
+	// The returned contents may be delayed, but it is guaranteed that they will
+	// be have at least 'resourceVersion'.
+	List(ctx context.Context, key string, resourceVersion string, filter FilterFunc, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.
@@ -146,4 +150,14 @@ type Interface interface {
 
 	// Codec provides access to the underlying codec being used by the implementation.
 	Codec() runtime.Codec
+}
+
+// Config interface allows storage tiers to generate the proper storage.interface
+// and reduce the dependencies to encapsulate storage.
+type Config interface {
+	// Creates the Interface base on ConfigObject
+	NewStorage() (Interface, error)
+
+	// This function is used to enforce membership, and return the underlying type
+	GetType() string
 }

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
@@ -28,35 +27,21 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 //TODO : Consolidate this code with the code for emptyDir.
 //This will require some smart.
 var _ = Describe("hostPath", func() {
-	var (
-		c         *client.Client
-		namespace *api.Namespace
-	)
+	framework := NewFramework("hostpath")
+	var c *client.Client
+	var namespace *api.Namespace
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Building a namespace api object")
-		namespace, err = createTestingNS("hostpath", c)
-		Expect(err).NotTo(HaveOccurred())
+		c = framework.Client
+		namespace = framework.Namespace
 
 		//cleanup before running the test.
 		_ = os.Remove("/tmp/test-file")
-	})
-
-	AfterEach(func() {
-		By(fmt.Sprintf("Destroying namespace for this suite %v", namespace.Name))
-		if err := deleteNS(c, namespace.Name, 5*time.Minute /* namespace deletion timeout */); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
 	})
 
 	It("should give a volume the correct mode [Conformance]", func() {
@@ -95,7 +80,7 @@ var _ = Describe("hostPath", func() {
 			fmt.Sprintf("--retry_time=%d", retryDuration),
 		}
 		//Read the content of the file with the second container to
-		//verify volumes  being shared properly among continers within the pod.
+		//verify volumes  being shared properly among containers within the pod.
 		testContainerOutput("hostPath r/w", c, pod, 1, []string{
 			"content of file \"/test-volume/test-file\": mount-tester new file",
 		}, namespace.Name,
@@ -126,7 +111,7 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 	return &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.GroupOrDie("").Version,
+			APIVersion: latest.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: podName,
@@ -135,7 +120,7 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 			Containers: []api.Container{
 				{
 					Name:  containerName1,
-					Image: "gcr.io/google_containers/mounttest:0.4",
+					Image: "gcr.io/google_containers/mounttest:0.6",
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      volumeName,
@@ -145,7 +130,7 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 				},
 				{
 					Name:  containerName2,
-					Image: "gcr.io/google_containers/mounttest:0.4",
+					Image: "gcr.io/google_containers/mounttest:0.6",
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      volumeName,

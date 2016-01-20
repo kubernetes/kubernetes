@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/getting-started-guides/scratch.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/scratch.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -77,9 +78,7 @@ steps that existing cluster setup scripts are making.
       - [Scheduler pod template](#scheduler-pod-template)
       - [Controller Manager Template](#controller-manager-template)
       - [Starting and Verifying Apiserver, Scheduler, and Controller Manager](#starting-and-verifying-apiserver-scheduler-and-controller-manager)
-    - [Logging](#logging)
-    - [Monitoring](#monitoring)
-    - [DNS](#dns)
+    - [Starting Cluster Services](#starting-cluster-services)
   - [Troubleshooting](#troubleshooting)
     - [Running validate-cluster](#running-validate-cluster)
     - [Inspect pods and services](#inspect-pods-and-services)
@@ -239,8 +238,8 @@ You have several choices for Kubernetes images:
     command like `docker images`
 
 For etcd, you can:
-- Use images hosted on Google Container Registry (GCR), such as `gcr.io/google_containers/etcd:2.0.12`
-- Use images hosted on [Docker Hub](https://hub.docker.com/search/?q=etcd) or [Quay.io](https://quay.io/repository/coreos/etcd), such as `quay.io/coreos/etcd:v2.2.0`
+- Use images hosted on Google Container Registry (GCR), such as `gcr.io/google_containers/etcd:2.2.1`
+- Use images hosted on [Docker Hub](https://hub.docker.com/search/?q=etcd) or [Quay.io](https://quay.io/repository/coreos/etcd), such as `quay.io/coreos/etcd:v2.2.1`
 - Use etcd binary included in your OS distro.
 - Build your own image
   - You can do: `cd kubernetes/cluster/images/etcd; make`
@@ -378,7 +377,7 @@ options, you may have a Docker-created bridge and iptables rules.  You may want 
 as follows before proceeding to configure Docker for Kubernetes.
 
 ```sh
-iptables -t nat -F 
+iptables -t nat -F
 ifconfig docker0 down
 brctl delbr docker0
 ```
@@ -433,7 +432,7 @@ Arguments to consider:
   - Otherwise, if taking the firewall-based security approach
     - `--api-servers=http://$MASTER_IP`
   - `--config=/etc/kubernetes/manifests`
-  - `--cluster-dns=` to the address of the DNS server you will setup (see [Starting Addons](#starting-addons).)
+  - `--cluster-dns=` to the address of the DNS server you will setup (see [Starting Cluster Services](#starting-cluster-services).)
   - `--cluster-domain=` to the dns domain prefix to use for cluster DNS addresses.
   - `--docker-root=`
   - `--root-dir=`
@@ -472,13 +471,13 @@ because of how this is used later.
 - Alternate, manual approach:
   1. Set `--configure-cbr0=false` on kubelet and restart.
   1. Create a bridge
-  - e.g. `brctl addbr cbr0`.
-  1. Set appropriate MTU
-  - `ip link set dev cbr0 mtu 1460` (NOTE: the actual value of MTU will depend on your network environment)
-  1. Add the clusters network to the bridge (docker will go on other side of bridge).
-  - e.g. `ip addr add $NODE_X_BRIDGE_ADDR dev cbr0`
+     - `brctl addbr cbr0`.
+  1. Set appropriate MTU. NOTE: the actual value of MTU will depend on your network environment
+     - `ip link set dev cbr0 mtu 1460`
+  1. Add the node's network to the bridge (docker will go on other side of bridge).
+     - `ip addr add $NODE_X_BRIDGE_ADDR dev cbr0`
   1. Turn it on
-  - e.g. `ip link set dev cbr0 up`
+     - `ip link set dev cbr0 up`
 
 If you have turned off Docker's IP masquerading to allow pods to talk to each
 other, then you may need to do masquerading just for destination IPs outside
@@ -502,7 +501,7 @@ traffic to the internet, but have no problem with them inside your GCE Project.
 
 - Enable auto-upgrades for your OS package manager, if desired.
 - Configure log rotation for all node components (e.g. using [logrotate](http://linux.die.net/man/8/logrotate)).
-- Setup liveness-monitoring (e.g. using [monit](http://linux.die.net/man/1/monit)).
+- Setup liveness-monitoring (e.g. using [supervisord](http://supervisord.org/)).
 - Setup volume plugin support (optional)
   - Install any client binaries for optional volume types, such as `glusterfs-client` for GlusterFS
     volumes.
@@ -836,17 +835,30 @@ If you have selected the `--register-node=true` option for kubelets, they will n
 You should soon be able to see all your nodes by running the `kubectl get nodes` command.
 Otherwise, you will need to manually create node objects.
 
-### Logging
+### Starting Cluster Services
 
-**TODO** talk about starting Logging.
+You will want to complete your Kubernetes clusters by adding cluster-wide
+services.  These are sometimes called *addons*, and [an overview
+of their purpose is in the admin guide](
+../../docs/admin/cluster-components.md#addons).
 
-### Monitoring
+Notes for setting up each cluster service are given below:
 
-**TODO** talk about starting Monitoring.
-
-### DNS
-
-**TODO** talk about starting DNS.
+* Cluster DNS:
+  * required for many kubernetes examples
+  * [Setup instructions](http://releases.k8s.io/HEAD/cluster/addons/dns/)
+  * [Admin Guide](../admin/dns.md)
+* Cluster-level Logging
+  * Multiple implementations with different storage backends and UIs.
+  * [Elasticsearch Backend Setup Instructions](http://releases.k8s.io/HEAD/cluster/addons/fluentd-elasticsearch/)
+  * [Google Cloud Logging Backend Setup Instructions](http://releases.k8s.io/HEAD/cluster/addons/fluentd-gcp/).
+  * Both require running fluentd on each node.
+  * [User Guide](../user-guide/logging.md)
+* Container Resource Monitoring
+  * [Setup instructions](http://releases.k8s.io/HEAD/cluster/addons/cluster-monitoring/)
+* GUI
+  * [Setup instructions](http://releases.k8s.io/HEAD/cluster/addons/kube-ui/)
+  cluster.
 
 ## Troubleshooting
 

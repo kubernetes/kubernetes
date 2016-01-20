@@ -20,11 +20,12 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type InternalComplex struct {
-	TypeMeta
+	runtime.TypeMeta
 	String    string
 	Integer   int
 	Integer64 int64
@@ -33,22 +34,26 @@ type InternalComplex struct {
 }
 
 type ExternalComplex struct {
-	TypeMeta  `json:",inline"`
-	String    string `json:"string" description:"testing"`
-	Integer   int    `json:"int"`
-	Integer64 int64  `json:",omitempty"`
-	Int64     int64
-	Bool      bool `json:"bool"`
+	runtime.TypeMeta `json:",inline"`
+	String           string `json:"string" description:"testing"`
+	Integer          int    `json:"int"`
+	Integer64        int64  `json:",omitempty"`
+	Int64            int64
+	Bool             bool `json:"bool"`
 }
 
-func (*InternalComplex) IsAnAPIObject() {}
-func (*ExternalComplex) IsAnAPIObject() {}
+func (obj *InternalComplex) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *ExternalComplex) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 
 func TestStringMapConversion(t *testing.T) {
+	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}
+	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "external"}
+
 	scheme := runtime.NewScheme()
 	scheme.Log(t)
-	scheme.AddKnownTypeWithName("", "Complex", &InternalComplex{})
-	scheme.AddKnownTypeWithName("external", "Complex", &ExternalComplex{})
+	scheme.AddInternalGroupVersion(internalGV)
+	scheme.AddKnownTypeWithName(internalGV.WithKind("Complex"), &InternalComplex{})
+	scheme.AddKnownTypeWithName(externalGV.WithKind("Complex"), &ExternalComplex{})
 
 	testCases := map[string]struct {
 		input    map[string][]string

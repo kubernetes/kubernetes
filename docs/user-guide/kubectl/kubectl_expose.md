@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/user-guide/kubectl/kubectl_expose.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/user-guide/kubectl/kubectl_expose.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -38,14 +39,15 @@ Take a replication controller, service or pod and expose it as a new Kubernetes 
 ### Synopsis
 
 
-Take a replication controller, service or pod and expose it as a new Kubernetes Service.
+Take a replication controller, service, or pod and expose it as a new Kubernetes service.
 
-Looks up a replication controller, service or pod by name and uses the selector for that resource as the
-selector for a new Service on the specified port. If no labels are specified, the new service will
-re-use the labels from the resource it exposes.
+Looks up a replication controller, service, or pod by name and uses the selector for that resource as the
+selector for a new service on the specified port. Note that if no port is specified via --port and the
+exposed resource has multiple ports, all will be re-used by the new service. Also if no labels are specified,
+the new service will re-use the labels from the resource it exposes.
 
 ```
-kubectl expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [----external-ip=external-ip-of-service] [--type=type]
+kubectl expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--external-ip=external-ip-of-service] [--type=type]
 ```
 
 ### Examples
@@ -72,11 +74,11 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
 ```
       --container-port="": Synonym for --target-port
       --dry-run[=false]: If true, only print the object that would be sent, without creating it.
-      --external-ip="": External IP address to set for the service. The service can be accessed by this IP in addition to its generated service IP.
+      --external-ip="": Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP.
   -f, --filename=[]: Filename, directory, or URL to a file identifying the resource to expose a service
       --generator="service/v2": The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'.
   -l, --labels="": Labels to apply to the service created by this call.
-      --load-balancer-ip="": IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used(cloud-provider specific).
+      --load-balancer-ip="": IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).
       --name="": The name for the newly created object.
       --no-headers[=false]: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md].
@@ -84,6 +86,7 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
       --overrides="": An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
       --port="": The port that the service should serve on. Copied from the resource being exposed, if unspecified
       --protocol="TCP": The network protocol for the service to be created. Default is 'tcp'.
+      --save-config[=false]: If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.
       --selector="": A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
       --session-affinity="": If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'
   -a, --show-all[=false]: When printing, show all resources (default hide terminated pods.)
@@ -99,7 +102,7 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
       --alsologtostderr[=false]: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
       --certificate-authority="": Path to a cert. file for the certificate authority.
-      --client-certificate="": Path to a client key file for TLS.
+      --client-certificate="": Path to a client certificate file for TLS.
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
@@ -125,7 +128,7 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
 
 * [kubectl](kubectl.md)	 - kubectl controls the Kubernetes cluster manager
 
-###### Auto generated by spf13/cobra at 2015-10-10 14:16:24.22183637 +0000 UTC
+###### Auto generated by spf13/cobra on 10-Jan-2016
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/kubectl/kubectl_expose.md?pixel)]()

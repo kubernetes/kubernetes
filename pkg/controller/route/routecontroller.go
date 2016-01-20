@@ -25,8 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -61,7 +59,7 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 	}
 	// TODO (cjcullen): use pkg/controller/framework.NewInformer to watch this
 	// and reduce the number of lists needed.
-	nodeList, err := rc.kubeClient.Nodes().List(labels.Everything(), fields.Everything())
+	nodeList, err := rc.kubeClient.Nodes().List(api.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)
 	}

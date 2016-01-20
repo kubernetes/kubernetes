@@ -311,7 +311,49 @@ func TestUpdate(t *testing.T) {
 		pair{FROM, FROM}: true,
 	}
 
+	pod := func(name, check string, final bool) *api.Pod {
+		p := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   name,
+				Labels: map[string]string{"check": check},
+			},
+		}
+		if final {
+			p.Labels["final"] = "true"
+		}
+		return p
+	}
+	deletePod := func(p *api.Pod) bool {
+		return p.Labels["final"] == "true"
+	}
+
+	tests := []func(string){
+		func(name string) {
+			name = "a-" + name
+			source.Add(pod(name, FROM, false))
+			source.Modify(pod(name, TO, true))
+		},
+		func(name string) {
+			name = "b-" + name
+			source.Add(pod(name, FROM, false))
+			source.ModifyDropWatch(pod(name, TO, true))
+		},
+		func(name string) {
+			name = "c-" + name
+			source.AddDropWatch(pod(name, FROM, false))
+			source.Modify(pod(name, ADD_MISSED, false))
+			source.Modify(pod(name, TO, true))
+		},
+		func(name string) {
+			name = "d-" + name
+			source.Add(pod(name, FROM, true))
+		},
+	}
+
+	const threads = 3
+
 	var testDoneWG sync.WaitGroup
+	testDoneWG.Add(threads * len(tests))
 
 	// Make a controller that deletes things once it observes an update.
 	// It calls Done() on the wait group on deletions so we can tell when
@@ -327,48 +369,15 @@ func TestUpdate(t *testing.T) {
 				if !allowedTransitions[pair{from, to}] {
 					t.Errorf("observed transition %q -> %q for %v", from, to, n.Name)
 				}
-				source.Delete(n)
+				if deletePod(n) {
+					source.Delete(n)
+				}
 			},
 			DeleteFunc: func(obj interface{}) {
 				testDoneWG.Done()
 			},
 		},
 	)
-
-	pod := func(name, check string) *api.Pod {
-		return &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:   name,
-				Labels: map[string]string{"check": check},
-			},
-		}
-	}
-
-	tests := []func(string){
-		func(name string) {
-			name = "a-" + name
-			source.Add(pod(name, FROM))
-			source.Modify(pod(name, TO))
-		},
-		func(name string) {
-			name = "b-" + name
-			source.Add(pod(name, FROM))
-			source.ModifyDropWatch(pod(name, TO))
-		},
-		func(name string) {
-			name = "c-" + name
-			source.AddDropWatch(pod(name, FROM))
-			source.Modify(pod(name, ADD_MISSED))
-			source.Modify(pod(name, TO))
-		},
-		func(name string) {
-			name = "d-" + name
-			source.Add(pod(name, FROM))
-		},
-	}
-
-	const threads = 3
-	testDoneWG.Add(threads * len(tests))
 
 	// Run the controller and run it until we close stop.
 	// Once Run() is called, calls to testDoneWG.Done() might start, so

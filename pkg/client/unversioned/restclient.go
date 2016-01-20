@@ -17,13 +17,24 @@ limitations under the License.
 package unversioned
 
 import (
+	"net/http"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+)
+
+const (
+	// Environment variables: Note that the duration should be long enough that the backoff
+	// persists for some reasonable time (i.e. 120 seconds).  The typical base might be "1".
+	envBackoffBase     = "KUBE_CLIENT_BACKOFF_BASE"
+	envBackoffDuration = "KUBE_CLIENT_BACKOFF_DURATION"
 )
 
 // RESTClient imposes common Kubernetes API conventions on a set of resource paths.
@@ -36,7 +47,7 @@ import (
 type RESTClient struct {
 	baseURL *url.URL
 	// A string identifying the version of the API this client is expected to use.
-	apiVersion string
+	groupVersion unversioned.GroupVersion
 
 	// Codec is the encoding and decoding scheme that applies to a particular set of
 	// REST resources.
@@ -44,9 +55,7 @@ type RESTClient struct {
 
 	// Set specific behavior of the client.  If not set http.DefaultClient will be
 	// used.
-	Client HTTPClient
-
-	Timeout time.Duration
+	Client *http.Client
 
 	// TODO extract this into a wrapper interface via the RESTClient interface in kubectl.
 	Throttle util.RateLimiter
@@ -55,7 +64,7 @@ type RESTClient struct {
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
 // decoding of responses from the server.
-func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, maxQPS float32, maxBurst int) *RESTClient {
+func NewRESTClient(baseURL *url.URL, groupVersion unversioned.GroupVersion, c runtime.Codec, maxQPS float32, maxBurst int) *RESTClient {
 	base := *baseURL
 	if !strings.HasSuffix(base.Path, "/") {
 		base.Path += "/"
@@ -68,10 +77,29 @@ func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, maxQPS 
 		throttle = util.NewTokenBucketRateLimiter(maxQPS, maxBurst)
 	}
 	return &RESTClient{
-		baseURL:    &base,
-		apiVersion: apiVersion,
-		Codec:      c,
-		Throttle:   throttle,
+		baseURL:      &base,
+		groupVersion: groupVersion,
+		Codec:        c,
+		Throttle:     throttle,
+	}
+}
+
+// readExpBackoffConfig handles the internal logic of determining what the
+// backoff policy is.  By default if no information is available, NoBackoff.
+// TODO Generalize this see #17727 .
+func readExpBackoffConfig() BackoffManager {
+	backoffBase := os.Getenv(envBackoffBase)
+	backoffDuration := os.Getenv(envBackoffDuration)
+
+	backoffBaseInt, errBase := strconv.ParseInt(backoffBase, 10, 64)
+	backoffDurationInt, errDuration := strconv.ParseInt(backoffDuration, 10, 64)
+	if errBase != nil || errDuration != nil {
+		return &NoBackoff{}
+	} else {
+		return &URLBackoff{
+			Backoff: util.NewBackOff(
+				time.Duration(backoffBaseInt)*time.Second,
+				time.Duration(backoffDurationInt)*time.Second)}
 	}
 }
 
@@ -91,7 +119,13 @@ func (c *RESTClient) Verb(verb string) *Request {
 	if c.Throttle != nil {
 		c.Throttle.Accept()
 	}
-	return NewRequest(c.Client, verb, c.baseURL, c.apiVersion, c.Codec).Timeout(c.Timeout)
+
+	backoff := readExpBackoffConfig()
+
+	if c.Client == nil {
+		return NewRequest(nil, verb, c.baseURL, c.groupVersion, c.Codec, backoff)
+	}
+	return NewRequest(c.Client, verb, c.baseURL, c.groupVersion, c.Codec, backoff)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
@@ -120,6 +154,6 @@ func (c *RESTClient) Delete() *Request {
 }
 
 // APIVersion returns the APIVersion this RESTClient is expected to use.
-func (c *RESTClient) APIVersion() string {
-	return c.apiVersion
+func (c *RESTClient) APIVersion() unversioned.GroupVersion {
+	return c.groupVersion
 }

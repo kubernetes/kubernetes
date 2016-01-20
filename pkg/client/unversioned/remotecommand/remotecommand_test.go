@@ -28,6 +28,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
@@ -42,6 +43,13 @@ func fakeExecServer(t *testing.T, i int, stdinData, stdoutData, stderrData, erro
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		protocol, err := httpstream.Handshake(req, w, []string{StreamProtocolV2Name}, StreamProtocolV1Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if protocol != StreamProtocolV2Name {
+			t.Fatalf("unexpected protocol: %s", protocol)
+		}
 		streamCh := make(chan httpstream.Stream)
 
 		upgrader := spdy.NewResponseUpgrader()
@@ -182,8 +190,9 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 		server := httptest.NewServer(fakeExecServer(t, i, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, testCase.MessageCount))
 
 		url, _ := url.ParseRequestURI(server.URL)
-		c := client.NewRESTClient(url, "x", nil, -1, -1)
+		c := client.NewRESTClient(url, unversioned.GroupVersion{Group: "x"}, nil, -1, -1)
 		req := c.Post().Resource("testing")
+		req.SetHeader(httpstream.HeaderProtocolVersion, StreamProtocolV2Name)
 		req.Param("command", "ls")
 		req.Param("command", "/")
 		conf := &client.Config{
@@ -206,13 +215,15 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 				}
 			}
 
-			server.Close()
+			// TODO: Uncomment when fix #19254
+			// server.Close()
 			continue
 		}
 
 		if hasErr {
 			t.Errorf("%d: unexpected error: %v", i, err)
-			server.Close()
+			// TODO: Uncomment when fix #19254
+			// server.Close()
 			continue
 		}
 
@@ -228,7 +239,8 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 			}
 		}
 
-		server.Close()
+		// TODO: Uncomment when fix #19254
+		// server.Close()
 	}
 }
 
@@ -263,7 +275,7 @@ func TestRequestAttachRemoteCommand(t *testing.T) {
 		server := httptest.NewServer(fakeExecServer(t, i, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, 1))
 
 		url, _ := url.ParseRequestURI(server.URL)
-		c := client.NewRESTClient(url, "x", nil, -1, -1)
+		c := client.NewRESTClient(url, unversioned.GroupVersion{Group: "x"}, nil, -1, -1)
 		req := c.Post().Resource("testing")
 
 		conf := &client.Config{
@@ -286,13 +298,15 @@ func TestRequestAttachRemoteCommand(t *testing.T) {
 				}
 			}
 
-			server.Close()
+			// TODO: Uncomment when fix #19254
+			// server.Close()
 			continue
 		}
 
 		if hasErr {
 			t.Errorf("%d: unexpected error: %v", i, err)
-			server.Close()
+			// TODO: Uncomment when fix #19254
+			// server.Close()
 			continue
 		}
 
@@ -308,7 +322,8 @@ func TestRequestAttachRemoteCommand(t *testing.T) {
 			}
 		}
 
-		server.Close()
+		// TODO: Uncomment when fix #19254
+		// server.Close()
 	}
 }
 
@@ -347,7 +362,7 @@ func TestDial(t *testing.T) {
 		checkResponse: true,
 		conn:          &fakeConnection{},
 		resp: &http.Response{
-			StatusCode: http.StatusOK,
+			StatusCode: http.StatusSwitchingProtocols,
 			Body:       ioutil.NopCloser(&bytes.Buffer{}),
 		},
 	}
@@ -363,7 +378,7 @@ func TestDial(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	conn, err := exec.Dial()
+	conn, protocol, err := exec.Dial("protocol1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -373,4 +388,5 @@ func TestDial(t *testing.T) {
 	if !called {
 		t.Errorf("wrapper not called")
 	}
+	_ = protocol
 }

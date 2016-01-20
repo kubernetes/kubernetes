@@ -23,7 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -40,7 +39,6 @@ const (
 	jobSelectorKey = "job"
 )
 
-// TODO: Activate these tests for GKE when we support experimental APIs there.
 var _ = Describe("Job", func() {
 	f := NewFramework("job")
 	parallelism := 2
@@ -49,7 +47,6 @@ var _ = Describe("Job", func() {
 
 	// Simplest case: all pods succeed promptly
 	It("should run a job to completion when tasks succeed", func() {
-		SkipIfProviderIs("gke")
 		By("Creating a job")
 		job := newTestJob("succeed", "all-succeed", api.RestartPolicyNever, parallelism, completions)
 		job, err := createJob(f.Client, f.Namespace.Name, job)
@@ -62,10 +59,15 @@ var _ = Describe("Job", func() {
 
 	// Pods sometimes fail, but eventually succeed.
 	It("should run a job to completion when tasks sometimes fail and are locally restarted", func() {
-		SkipIfProviderIs("gke")
 		By("Creating a job")
-		// 50% chance of container success, local restarts.
-		job := newTestJob("randomlySucceedOrFail", "rand-local", api.RestartPolicyOnFailure, parallelism, completions)
+		// One failure, then a success, local restarts.
+		// We can't use the random failure approach used by the
+		// non-local test below, because kubelet will throttle
+		// frequently failing containers in a given pod, ramping
+		// up to 5 minutes between restarts, making test timeouts
+		// due to successive failures too likely with a reasonable
+		// test timeout.
+		job := newTestJob("failOnce", "fail-once-local", api.RestartPolicyOnFailure, parallelism, completions)
 		job, err := createJob(f.Client, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -76,9 +78,13 @@ var _ = Describe("Job", func() {
 
 	// Pods sometimes fail, but eventually succeed, after pod restarts
 	It("should run a job to completion when tasks sometimes fail and are not locally restarted", func() {
-		SkipIfProviderIs("gke")
 		By("Creating a job")
 		// 50% chance of container success, local restarts.
+		// Can't use the failOnce approach because that relies
+		// on an emptyDir, which is not preserved across new pods.
+		// Worst case analysis: 15 failures, each taking 1 minute to
+		// run due to some slowness, 1 in 2^15 chance of happening,
+		// causing test flake.  Should be very rare.
 		job := newTestJob("randomlySucceedOrFail", "rand-non-local", api.RestartPolicyNever, parallelism, completions)
 		job, err := createJob(f.Client, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred())
@@ -89,7 +95,6 @@ var _ = Describe("Job", func() {
 	})
 
 	It("should keep restarting failed pods", func() {
-		SkipIfProviderIs("gke")
 		By("Creating a job")
 		job := newTestJob("fail", "all-fail", api.RestartPolicyNever, parallelism, completions)
 		job, err := createJob(f.Client, f.Namespace.Name, job)
@@ -106,7 +111,6 @@ var _ = Describe("Job", func() {
 	})
 
 	It("should scale a job up", func() {
-		SkipIfProviderIs("gke")
 		startParallelism := 1
 		endParallelism := 2
 		By("Creating a job")
@@ -119,7 +123,7 @@ var _ = Describe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("scale job up")
-		scaler, err := kubectl.ScalerFor("Job", f.Client)
+		scaler, err := kubectl.ScalerFor(extensions.Kind("Job"), f.Client)
 		Expect(err).NotTo(HaveOccurred())
 		waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 		waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
@@ -132,7 +136,6 @@ var _ = Describe("Job", func() {
 	})
 
 	It("should scale a job down", func() {
-		SkipIfProviderIs("gke")
 		startParallelism := 2
 		endParallelism := 1
 		By("Creating a job")
@@ -145,7 +148,7 @@ var _ = Describe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("scale job down")
-		scaler, err := kubectl.ScalerFor("Job", f.Client)
+		scaler, err := kubectl.ScalerFor(extensions.Kind("Job"), f.Client)
 		Expect(err).NotTo(HaveOccurred())
 		waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 		waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
@@ -158,7 +161,6 @@ var _ = Describe("Job", func() {
 	})
 
 	It("should stop a job", func() {
-		SkipIfProviderIs("gke")
 		By("Creating a job")
 		job := newTestJob("notTerminate", "foo", api.RestartPolicyNever, parallelism, completions)
 		job, err := createJob(f.Client, f.Namespace.Name, job)
@@ -169,16 +171,29 @@ var _ = Describe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("scale job down")
-		reaper, err := kubectl.ReaperFor("Job", f.Client)
+		reaper, err := kubectl.ReaperFor(extensions.Kind("Job"), f.Client)
 		Expect(err).NotTo(HaveOccurred())
 		timeout := 1 * time.Minute
-		_, err = reaper.Stop(f.Namespace.Name, job.Name, timeout, api.NewDeleteOptions(0))
+		err = reaper.Stop(f.Namespace.Name, job.Name, timeout, api.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job was deleted")
 		_, err = f.Client.Extensions().Jobs(f.Namespace.Name).Get(job.Name)
 		Expect(err).To(HaveOccurred())
 		Expect(errors.IsNotFound(err)).To(BeTrue())
+	})
+
+	It("should fail a job", func() {
+		By("Creating a job")
+		job := newTestJob("notTerminate", "foo", api.RestartPolicyNever, parallelism, completions)
+		activeDeadlineSeconds := int64(10)
+		job.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+		job, err := createJob(f.Client, f.Namespace.Name, job)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring job was failed")
+		err = waitForJobFail(f.Client, f.Namespace.Name, job.Name)
+		Expect(err).NotTo(HaveOccurred())
 	})
 })
 
@@ -197,11 +212,25 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 				},
 				Spec: api.PodSpec{
 					RestartPolicy: rPol,
+					Volumes: []api.Volume{
+						{
+							Name: "data",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{},
+							},
+						},
+					},
 					Containers: []api.Container{
 						{
 							Name:    "c",
 							Image:   "gcr.io/google_containers/busybox",
 							Command: []string{},
+							VolumeMounts: []api.VolumeMount{
+								{
+									MountPath: "/data",
+									Name:      "data",
+								},
+							},
 						},
 					},
 				},
@@ -217,8 +246,15 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "exit 0"}
 	case "randomlySucceedOrFail":
 		// Bash's $RANDOM generates pseudorandom int in range 0 - 32767.
-		// Dividing by 16384 gives roughly 50/50 chance of succeess.
+		// Dividing by 16384 gives roughly 50/50 chance of success.
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "exit $(( $RANDOM / 16384 ))"}
+	case "failOnce":
+		// Fail the first the container of the pod is run, and
+		// succeed the second time. Checks for file on emptydir.
+		// If present, succeed.  If not, create but fail.
+		// Note that this cannot be used with RestartNever because
+		// it always fails the first time for a pod.
+		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "if [[ -r /data/foo ]] ; then exit 0 ; else touch /data/foo ; exit 1 ; fi"}
 	}
 	return job
 }
@@ -235,7 +271,8 @@ func deleteJob(c *client.Client, ns, name string) error {
 func waitForAllPodsRunning(c *client.Client, ns, jobName string, parallelism int) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{jobSelectorKey: jobName}))
 	return wait.Poll(poll, jobTimeout, func() (bool, error) {
-		pods, err := c.Pods(ns).List(label, fields.Everything())
+		options := api.ListOptions{LabelSelector: label}
+		pods, err := c.Pods(ns).List(options)
 		if err != nil {
 			return false, err
 		}
@@ -257,5 +294,21 @@ func waitForJobFinish(c *client.Client, ns, jobName string, completions int) err
 			return false, err
 		}
 		return curr.Status.Succeeded == completions, nil
+	})
+}
+
+// Wait for job fail.
+func waitForJobFail(c *client.Client, ns, jobName string) error {
+	return wait.Poll(poll, jobTimeout, func() (bool, error) {
+		curr, err := c.Extensions().Jobs(ns).Get(jobName)
+		if err != nil {
+			return false, err
+		}
+		for _, c := range curr.Status.Conditions {
+			if c.Type == extensions.JobFailed && c.Status == api.ConditionTrue {
+				return true, nil
+			}
+		}
+		return false, nil
 	})
 }

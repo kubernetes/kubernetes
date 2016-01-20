@@ -19,24 +19,16 @@ package serviceaccount
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface implemented by things that know how to store ServiceAccount objects.
 type Registry interface {
-	// ListServiceAccounts obtains a list of ServiceAccounts having labels which match selector.
-	ListServiceAccounts(ctx api.Context, selector labels.Selector) (*api.ServiceAccountList, error)
-	// Watch for new/changed/deleted service accounts
-	WatchServiceAccounts(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
-	// Get a specific ServiceAccount
+	ListServiceAccounts(ctx api.Context, options *api.ListOptions) (*api.ServiceAccountList, error)
+	WatchServiceAccounts(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 	GetServiceAccount(ctx api.Context, name string) (*api.ServiceAccount, error)
-	// Create a ServiceAccount based on a specification.
 	CreateServiceAccount(ctx api.Context, ServiceAccount *api.ServiceAccount) error
-	// Update an existing ServiceAccount
 	UpdateServiceAccount(ctx api.Context, ServiceAccount *api.ServiceAccount) error
-	// Delete an existing ServiceAccount
 	DeleteServiceAccount(ctx api.Context, name string) error
 }
 
@@ -51,16 +43,16 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListServiceAccounts(ctx api.Context, label labels.Selector) (*api.ServiceAccountList, error) {
-	obj, err := s.List(ctx, label, fields.Everything())
+func (s *storage) ListServiceAccounts(ctx api.Context, options *api.ListOptions) (*api.ServiceAccountList, error) {
+	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*api.ServiceAccountList), nil
 }
 
-func (s *storage) WatchServiceAccounts(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return s.Watch(ctx, label, field, resourceVersion)
+func (s *storage) WatchServiceAccounts(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+	return s.Watch(ctx, options)
 }
 
 func (s *storage) GetServiceAccount(ctx api.Context, name string) (*api.ServiceAccount, error) {

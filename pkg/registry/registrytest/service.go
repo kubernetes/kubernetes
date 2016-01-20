@@ -20,8 +20,6 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -33,6 +31,7 @@ type ServiceRegistry struct {
 	mu      sync.Mutex
 	List    api.ServiceList
 	Service *api.Service
+	Updates []api.Service
 	Err     error
 
 	DeletedID string
@@ -46,7 +45,7 @@ func (r *ServiceRegistry) SetError(err error) {
 	r.Err = err
 }
 
-func (r *ServiceRegistry) ListServices(ctx api.Context, label labels.Selector, field fields.Selector) (*api.ServiceList, error) {
+func (r *ServiceRegistry) ListServices(ctx api.Context, options *api.ListOptions) (*api.ServiceList, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -103,10 +102,11 @@ func (r *ServiceRegistry) UpdateService(ctx api.Context, svc *api.Service) (*api
 
 	r.UpdatedID = svc.Name
 	*r.Service = *svc
+	r.Updates = append(r.Updates, *svc)
 	return svc, r.Err
 }
 
-func (r *ServiceRegistry) WatchServices(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+func (r *ServiceRegistry) WatchServices(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

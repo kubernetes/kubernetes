@@ -18,11 +18,10 @@ import (
 	"bytes"
 	"flag"
 	"io/ioutil"
+	"path/filepath"
 	"strings"
 	"syscall"
 
-	dclient "github.com/fsouza/go-dockerclient"
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/container/docker"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
@@ -31,6 +30,8 @@ import (
 	"github.com/google/cadvisor/utils/sysfs"
 	"github.com/google/cadvisor/utils/sysinfo"
 	version "github.com/google/cadvisor/version"
+
+	"github.com/golang/glog"
 )
 
 var machineIdFilePath = flag.String("machine_id_file", "/etc/machine-id,/var/lib/dbus/machine-id", "Comma-separated list of files to check for machine-id. Use the first one that exists.")
@@ -50,8 +51,13 @@ func getInfoFromFiles(filePaths string) string {
 	return ""
 }
 
-func getMachineInfo(sysFs sysfs.SysFs, fsInfo fs.FsInfo) (*info.MachineInfo, error) {
-	cpuinfo, err := ioutil.ReadFile("/proc/cpuinfo")
+func getMachineInfo(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.MachineInfo, error) {
+	rootFs := "/"
+	if !inHostNamespace {
+		rootFs = "/rootfs"
+	}
+
+	cpuinfo, err := ioutil.ReadFile(filepath.Join(rootFs, "/proc/cpuinfo"))
 	clockSpeed, err := machine.GetClockSpeed(cpuinfo)
 	if err != nil {
 		return nil, err
@@ -98,9 +104,9 @@ func getMachineInfo(sysFs sysfs.SysFs, fsInfo fs.FsInfo) (*info.MachineInfo, err
 		DiskMap:        diskMap,
 		NetworkDevices: netDevices,
 		Topology:       topology,
-		MachineID:      getInfoFromFiles(*machineIdFilePath),
+		MachineID:      getInfoFromFiles(filepath.Join(rootFs, *machineIdFilePath)),
 		SystemUUID:     systemUUID,
-		BootID:         getInfoFromFiles(*bootIdFilePath),
+		BootID:         getInfoFromFiles(filepath.Join(rootFs, *bootIdFilePath)),
 		CloudProvider:  cloudProvider,
 		InstanceType:   instanceType,
 	}
@@ -146,7 +152,7 @@ func getContainerOsVersion() string {
 
 func getDockerVersion() string {
 	docker_version := "Unknown"
-	client, err := dclient.NewClient(*docker.ArgDockerEndpoint)
+	client, err := docker.Client()
 	if err == nil {
 		version, err := client.Version()
 		if err == nil {

@@ -25,8 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -119,7 +117,7 @@ var _ = Describe("Service endpoints latency", func() {
 func runServiceLatencies(f *Framework, inParallel, total int) (output []time.Duration, err error) {
 	cfg := RCConfig{
 		Client:       f.Client,
-		Image:        "beta.gcr.io/google_containers/pause:2.0",
+		Image:        "gcr.io/google_containers/pause:2.0",
 		Name:         "svc-latency-rc",
 		Namespace:    f.Namespace.Name,
 		Replicas:     1,
@@ -278,11 +276,11 @@ func (eq *endpointQueries) added(e *api.Endpoints) {
 func startEndpointWatcher(f *Framework, q *endpointQueries) {
 	_, controller := framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return f.Client.Endpoints(f.Namespace.Name).List(labels.Everything())
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return f.Client.Endpoints(f.Namespace.Name).List(options)
 			},
-			WatchFunc: func(rv string) (watch.Interface, error) {
-				return f.Client.Endpoints(f.Namespace.Name).Watch(labels.Everything(), fields.Everything(), rv)
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return f.Client.Endpoints(f.Namespace.Name).Watch(options)
 			},
 		},
 		&api.Endpoints{},

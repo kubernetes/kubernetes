@@ -17,7 +17,6 @@ limitations under the License.
 package basicauth
 
 import (
-	"encoding/base64"
 	"errors"
 	"net/http"
 	"testing"
@@ -56,40 +55,18 @@ func TestBasicAuth(t *testing.T) {
 		ExpectedOK   bool
 		ExpectedErr  bool
 	}{
-		"no header": {
-			Header: "",
-		},
-		"non-basic header": {
-			Header: "Bearer foo",
-		},
-		"empty value basic header": {
-			Header: "Basic",
-		},
-		"whitespace value basic header": {
-			Header: "Basic  ",
-		},
-		"non base-64 basic header": {
-			Header:      "Basic !@#$",
-			ExpectedErr: true,
-		},
-		"malformed basic header": {
-			Header:      "Basic " + base64.StdEncoding.EncodeToString([]byte("user_without_password")),
-			ExpectedErr: true,
-		},
+		"no auth": {},
 		"empty password basic header": {
-			Header:           "Basic " + base64.StdEncoding.EncodeToString([]byte("user_with_empty_password:")),
 			ExpectedCalled:   true,
 			ExpectedUsername: "user_with_empty_password",
 			ExpectedPassword: "",
 		},
 		"valid basic header": {
-			Header:           "Basic " + base64.StdEncoding.EncodeToString([]byte("myuser:mypassword:withcolon")),
 			ExpectedCalled:   true,
 			ExpectedUsername: "myuser",
 			ExpectedPassword: "mypassword:withcolon",
 		},
 		"password auth returned user": {
-			Header:           "Basic " + base64.StdEncoding.EncodeToString([]byte("myuser:mypw")),
 			Password:         testPassword{User: &user.DefaultInfo{Name: "returneduser"}, OK: true},
 			ExpectedCalled:   true,
 			ExpectedUsername: "myuser",
@@ -98,7 +75,6 @@ func TestBasicAuth(t *testing.T) {
 			ExpectedOK:       true,
 		},
 		"password auth returned error": {
-			Header:           "Basic " + base64.StdEncoding.EncodeToString([]byte("myuser:mypw")),
 			Password:         testPassword{Err: errors.New("auth error")},
 			ExpectedCalled:   true,
 			ExpectedUsername: "myuser",
@@ -112,35 +88,35 @@ func TestBasicAuth(t *testing.T) {
 		auth := authenticator.Request(New(&password))
 
 		req, _ := http.NewRequest("GET", "/", nil)
-		if testCase.Header != "" {
-			req.Header.Set("Authorization", testCase.Header)
+		if testCase.ExpectedUsername != "" || testCase.ExpectedPassword != "" {
+			req.SetBasicAuth(testCase.ExpectedUsername, testCase.ExpectedPassword)
 		}
 
 		user, ok, err := auth.AuthenticateRequest(req)
 
 		if testCase.ExpectedCalled != password.Called {
-			t.Fatalf("%s: Expected called=%v, got %v", k, testCase.ExpectedCalled, password.Called)
+			t.Errorf("%s: Expected called=%v, got %v", k, testCase.ExpectedCalled, password.Called)
 			continue
 		}
 		if testCase.ExpectedUsername != password.Username {
-			t.Fatalf("%s: Expected called with username=%v, got %v", k, testCase.ExpectedUsername, password.Username)
+			t.Errorf("%s: Expected called with username=%v, got %v", k, testCase.ExpectedUsername, password.Username)
 			continue
 		}
 		if testCase.ExpectedPassword != password.Password {
-			t.Fatalf("%s: Expected called with password=%v, got %v", k, testCase.ExpectedPassword, password.Password)
+			t.Errorf("%s: Expected called with password=%v, got %v", k, testCase.ExpectedPassword, password.Password)
 			continue
 		}
 
 		if testCase.ExpectedErr != (err != nil) {
-			t.Fatalf("%s: Expected err=%v, got err=%v", k, testCase.ExpectedErr, err)
+			t.Errorf("%s: Expected err=%v, got err=%v", k, testCase.ExpectedErr, err)
 			continue
 		}
 		if testCase.ExpectedOK != ok {
-			t.Fatalf("%s: Expected ok=%v, got ok=%v", k, testCase.ExpectedOK, ok)
+			t.Errorf("%s: Expected ok=%v, got ok=%v", k, testCase.ExpectedOK, ok)
 			continue
 		}
 		if testCase.ExpectedUser != "" && testCase.ExpectedUser != user.GetName() {
-			t.Fatalf("%s: Expected user.GetName()=%v, got %v", k, testCase.ExpectedUser, user.GetName())
+			t.Errorf("%s: Expected user.GetName()=%v, got %v", k, testCase.ExpectedUser, user.GetName())
 			continue
 		}
 	}

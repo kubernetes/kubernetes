@@ -19,11 +19,30 @@ package runtime
 import (
 	"io"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/yaml"
 )
 
+// Encode is a convenience wrapper for encoding to a []byte from an Encoder
+// TODO: these are transitional interfaces to reduce refactor cost as Codec is altered.
+func Encode(e Encoder, obj Object) ([]byte, error) {
+	return e.Encode(obj)
+}
+
+// Decode is a convenience wrapper for decoding data into an Object.
+// TODO: these are transitional interfaces to reduce refactor cost as Codec is altered.
+func Decode(d Decoder, data []byte) (Object, error) {
+	return d.Decode(data)
+}
+
+// DecodeInto performs a Decode into the provided object.
+// TODO: these are transitional interfaces to reduce refactor cost as Codec is altered.
+func DecodeInto(d Decoder, data []byte, into Object) error {
+	return d.DecodeInto(data, into)
+}
+
 // CodecFor returns a Codec that invokes Encode with the provided version.
-func CodecFor(codec ObjectCodec, version string) Codec {
+func CodecFor(codec ObjectCodec, version unversioned.GroupVersion) Codec {
 	return &codecWrapper{codec, version}
 }
 
@@ -35,6 +54,7 @@ type yamlCodec struct {
 
 // yamlCodec implements Codec
 var _ Codec = yamlCodec{}
+var _ Decoder = yamlCodec{}
 
 // YAMLDecoder adds YAML decoding support to a codec that supports JSON.
 func YAMLDecoder(codec Codec) Codec {
@@ -61,7 +81,7 @@ func (c yamlCodec) DecodeInto(data []byte, obj Object) error {
 
 // EncodeOrDie is a version of Encode which will panic instead of returning an error. For tests.
 func EncodeOrDie(codec Codec, obj Object) string {
-	bytes, err := codec.Encode(obj)
+	bytes, err := Encode(codec, obj)
 	if err != nil {
 		panic(err)
 	}
@@ -72,16 +92,19 @@ func EncodeOrDie(codec Codec, obj Object) string {
 // default version for a scheme.
 type codecWrapper struct {
 	ObjectCodec
-	version string
+	version unversioned.GroupVersion
 }
+
+// codecWrapper implements Decoder
+var _ Decoder = &codecWrapper{}
 
 // Encode implements Codec
 func (c *codecWrapper) Encode(obj Object) ([]byte, error) {
-	return c.EncodeToVersion(obj, c.version)
+	return c.EncodeToVersion(obj, c.version.String())
 }
 
 func (c *codecWrapper) EncodeToStream(obj Object, stream io.Writer) error {
-	return c.EncodeToVersionStream(obj, c.version, stream)
+	return c.EncodeToVersionStream(obj, c.version.String(), stream)
 }
 
 // TODO: Make this behaviour default when we move everyone away from

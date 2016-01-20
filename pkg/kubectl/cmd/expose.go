@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -35,11 +36,12 @@ type ExposeOptions struct {
 }
 
 const (
-	expose_long = `Take a replication controller, service or pod and expose it as a new Kubernetes Service.
+	expose_long = `Take a replication controller, service, or pod and expose it as a new Kubernetes service.
 
-Looks up a replication controller, service or pod by name and uses the selector for that resource as the
-selector for a new Service on the specified port. If no labels are specified, the new service will
-re-use the labels from the resource it exposes.`
+Looks up a replication controller, service, or pod by name and uses the selector for that resource as the
+selector for a new service on the specified port. Note that if no port is specified via --port and the 
+exposed resource has multiple ports, all will be re-used by the new service. Also if no labels are specified,
+the new service will re-use the labels from the resource it exposes.`
 
 	expose_example = `# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
 $ kubectl expose rc nginx --port=80 --target-port=8000
@@ -61,7 +63,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &ExposeOptions{}
 
 	cmd := &cobra.Command{
-		Use:     "expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [----external-ip=external-ip-of-service] [--type=type]",
+		Use:     "expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--external-ip=external-ip-of-service] [--type=type]",
 		Short:   "Take a replication controller, service or pod and expose it as a new Kubernetes Service",
 		Long:    expose_long,
 		Example: expose_example,
@@ -78,19 +80,20 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	// TODO: remove create-external-load-balancer in code on or after Aug 25, 2016.
 	cmd.Flags().Bool("create-external-load-balancer", false, "If true, create an external load balancer for this service (trumped by --type). Implementation is cloud provider dependent. Default is 'false'.")
 	cmd.Flags().MarkDeprecated("create-external-load-balancer", "use --type=\"LoadBalancer\" instead")
-	cmd.Flags().String("load-balancer-ip", "", "IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used(cloud-provider specific).")
+	cmd.Flags().String("load-balancer-ip", "", "IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).")
 	cmd.Flags().String("selector", "", "A label selector to use for this service. If empty (the default) infer the selector from the replication controller.")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the service created by this call.")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without creating it.")
 	cmd.Flags().String("container-port", "", "Synonym for --target-port")
 	cmd.Flags().String("target-port", "", "Name or number for the port on the container that the service should direct traffic to. Optional.")
-	cmd.Flags().String("external-ip", "", "External IP address to set for the service. The service can be accessed by this IP in addition to its generated service IP.")
+	cmd.Flags().String("external-ip", "", "Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP.")
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
 	cmd.Flags().String("name", "", "The name for the newly created object.")
 	cmd.Flags().String("session-affinity", "", "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'")
 
 	usage := "Filename, directory, or URL to a file identifying the resource to expose a service"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	cmdutil.AddApplyAnnotationFlags(cmd)
 	return cmd
 }
 
@@ -117,7 +120,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	if err := f.CanBeExposed(mapping.Kind); err != nil {
+	if err := f.CanBeExposed(mapping.GroupVersionKind.GroupKind()); err != nil {
 		return err
 	}
 	// Get the input object
@@ -128,7 +131,8 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 	// Get the generator, setup and validate all required parameters
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
-	generator, found := f.Generator(generatorName)
+	generators := f.Generators("expose")
+	generator, found := generators[generatorName]
 	if !found {
 		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generatorName))
 	}
@@ -163,7 +167,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		case 1:
 			params["port"] = ports[0]
 		default:
-			return cmdutil.UsageError(cmd, fmt.Sprintf("multiple ports to choose from: %v, please explicitly specify a port using the --port flag.", ports))
+			params["ports"] = strings.Join(ports, ",")
 		}
 	}
 	if kubectl.IsZero(params["labels"]) {
@@ -176,6 +180,10 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	if err = kubectl.ValidateParams(names, params); err != nil {
 		return err
 	}
+	// Check for invalid flags used against the present generator.
+	if err := kubectl.EnsureFlagsValid(cmd, generators, generatorName); err != nil {
+		return err
+	}
 
 	// Generate new object
 	object, err := generator.Generate(params)
@@ -184,7 +192,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 
 	if inline := cmdutil.GetFlagString(cmd, "overrides"); len(inline) > 0 {
-		object, err = cmdutil.Merge(object, inline, mapping.Kind)
+		object, err = cmdutil.Merge(object, inline, mapping.GroupVersionKind.Kind)
 		if err != nil {
 			return err
 		}
@@ -199,17 +207,12 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	if cmdutil.GetFlagBool(cmd, "dry-run") {
 		return f.PrintObject(cmd, object, out)
 	}
-	// Serialize the configuration into an annotation.
-	if err := kubectl.UpdateApplyAnnotation(info); err != nil {
+	if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info); err != nil {
 		return err
 	}
 
 	// Serialize the object with the annotation applied.
-	data, err := info.Mapping.Codec.Encode(object)
-	if err != nil {
-		return err
-	}
-	object, err = resource.NewHelper(info.Client, info.Mapping).Create(namespace, false, data)
+	object, err = resource.NewHelper(info.Client, info.Mapping).Create(namespace, false, object)
 	if err != nil {
 		return err
 	}

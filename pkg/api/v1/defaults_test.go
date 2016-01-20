@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	versioned "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
@@ -156,8 +156,8 @@ func TestSetDefaultReplicationController(t *testing.T) {
 	}
 }
 
-func newInt(val int) *int {
-	p := new(int)
+func newInt(val int32) *int32 {
+	p := new(int32)
 	*p = val
 	return p
 }
@@ -165,7 +165,7 @@ func newInt(val int) *int {
 func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 	tests := []struct {
 		rc             versioned.ReplicationController
-		expectReplicas int
+		expectReplicas int32
 	}{
 		{
 			rc: versioned.ReplicationController{
@@ -300,14 +300,14 @@ func TestSetDefaulServiceTargetPort(t *testing.T) {
 	in := &versioned.Service{Spec: versioned.ServiceSpec{Ports: []versioned.ServicePort{{Port: 1234}}}}
 	obj := roundTrip(t, runtime.Object(in))
 	out := obj.(*versioned.Service)
-	if out.Spec.Ports[0].TargetPort != util.NewIntOrStringFromInt(1234) {
+	if out.Spec.Ports[0].TargetPort != intstr.FromInt(1234) {
 		t.Errorf("Expected TargetPort to be defaulted, got %v", out.Spec.Ports[0].TargetPort)
 	}
 
-	in = &versioned.Service{Spec: versioned.ServiceSpec{Ports: []versioned.ServicePort{{Port: 1234, TargetPort: util.NewIntOrStringFromInt(5678)}}}}
+	in = &versioned.Service{Spec: versioned.ServiceSpec{Ports: []versioned.ServicePort{{Port: 1234, TargetPort: intstr.FromInt(5678)}}}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*versioned.Service)
-	if out.Spec.Ports[0].TargetPort != util.NewIntOrStringFromInt(5678) {
+	if out.Spec.Ports[0].TargetPort != intstr.FromInt(5678) {
 		t.Errorf("Expected TargetPort to be unchanged, got %v", out.Spec.Ports[0].TargetPort)
 	}
 }
@@ -316,42 +316,42 @@ func TestSetDefaultServicePort(t *testing.T) {
 	// Unchanged if set.
 	in := &versioned.Service{Spec: versioned.ServiceSpec{
 		Ports: []versioned.ServicePort{
-			{Protocol: "UDP", Port: 9376, TargetPort: util.NewIntOrStringFromString("p")},
-			{Protocol: "UDP", Port: 8675, TargetPort: util.NewIntOrStringFromInt(309)},
+			{Protocol: "UDP", Port: 9376, TargetPort: intstr.FromString("p")},
+			{Protocol: "UDP", Port: 8675, TargetPort: intstr.FromInt(309)},
 		},
 	}}
 	out := roundTrip(t, runtime.Object(in)).(*versioned.Service)
 	if out.Spec.Ports[0].Protocol != versioned.ProtocolUDP {
 		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolUDP, out.Spec.Ports[0].Protocol)
 	}
-	if out.Spec.Ports[0].TargetPort != util.NewIntOrStringFromString("p") {
+	if out.Spec.Ports[0].TargetPort != intstr.FromString("p") {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[0].Port, out.Spec.Ports[0].TargetPort)
 	}
 	if out.Spec.Ports[1].Protocol != versioned.ProtocolUDP {
 		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolUDP, out.Spec.Ports[1].Protocol)
 	}
-	if out.Spec.Ports[1].TargetPort != util.NewIntOrStringFromInt(309) {
+	if out.Spec.Ports[1].TargetPort != intstr.FromInt(309) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[1].Port, out.Spec.Ports[1].TargetPort)
 	}
 
 	// Defaulted.
 	in = &versioned.Service{Spec: versioned.ServiceSpec{
 		Ports: []versioned.ServicePort{
-			{Protocol: "", Port: 9376, TargetPort: util.NewIntOrStringFromString("")},
-			{Protocol: "", Port: 8675, TargetPort: util.NewIntOrStringFromInt(0)},
+			{Protocol: "", Port: 9376, TargetPort: intstr.FromString("")},
+			{Protocol: "", Port: 8675, TargetPort: intstr.FromInt(0)},
 		},
 	}}
 	out = roundTrip(t, runtime.Object(in)).(*versioned.Service)
 	if out.Spec.Ports[0].Protocol != versioned.ProtocolTCP {
 		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolTCP, out.Spec.Ports[0].Protocol)
 	}
-	if out.Spec.Ports[0].TargetPort != util.NewIntOrStringFromInt(in.Spec.Ports[0].Port) {
+	if out.Spec.Ports[0].TargetPort != intstr.FromInt(int(in.Spec.Ports[0].Port)) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[0].Port, out.Spec.Ports[0].TargetPort)
 	}
 	if out.Spec.Ports[1].Protocol != versioned.ProtocolTCP {
 		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolTCP, out.Spec.Ports[1].Protocol)
 	}
-	if out.Spec.Ports[1].TargetPort != util.NewIntOrStringFromInt(in.Spec.Ports[1].Port) {
+	if out.Spec.Ports[1].TargetPort != intstr.FromInt(int(in.Spec.Ports[1].Port)) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[1].Port, out.Spec.Ports[1].TargetPort)
 	}
 }
@@ -367,7 +367,7 @@ func TestSetDefaultNamespace(t *testing.T) {
 }
 
 func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
-	portNum := 8080
+	portNum := int32(8080)
 	s := versioned.PodSpec{}
 	s.HostNetwork = true
 	s.Containers = []versioned.Container{
@@ -403,6 +403,80 @@ func TestSetDefaultNodeExternalID(t *testing.T) {
 	}
 	if n2.Spec.ProviderID != "" {
 		t.Errorf("Expected empty default Cloud Provider ID, got: %s", n2.Spec.ProviderID)
+	}
+}
+
+func TestSetDefaultNodeStatusAllocatable(t *testing.T) {
+	capacity := versioned.ResourceList{
+		versioned.ResourceCPU:    resource.MustParse("1000m"),
+		versioned.ResourceMemory: resource.MustParse("10G"),
+	}
+	allocatable := versioned.ResourceList{
+		versioned.ResourceCPU:    resource.MustParse("500m"),
+		versioned.ResourceMemory: resource.MustParse("5G"),
+	}
+	tests := []struct {
+		capacity            versioned.ResourceList
+		allocatable         versioned.ResourceList
+		expectedAllocatable versioned.ResourceList
+	}{{ // Everything set, no defaulting.
+		capacity:            capacity,
+		allocatable:         allocatable,
+		expectedAllocatable: allocatable,
+	}, { // Allocatable set, no defaulting.
+		capacity:            nil,
+		allocatable:         allocatable,
+		expectedAllocatable: allocatable,
+	}, { // Capacity set, allocatable defaults to capacity.
+		capacity:            capacity,
+		allocatable:         nil,
+		expectedAllocatable: capacity,
+	}, { // Nothing set, allocatable "defaults" to capacity.
+		capacity:            nil,
+		allocatable:         nil,
+		expectedAllocatable: nil,
+	}}
+
+	copyResourceList := func(rl versioned.ResourceList) versioned.ResourceList {
+		if rl == nil {
+			return nil
+		}
+		copy := make(versioned.ResourceList, len(rl))
+		for k, v := range rl {
+			copy[k] = *v.Copy()
+		}
+		return copy
+	}
+
+	resourceListsEqual := func(a versioned.ResourceList, b versioned.ResourceList) bool {
+		if len(a) != len(b) {
+			return false
+		}
+		for k, v := range a {
+			vb, found := b[k]
+			if !found {
+				return false
+			}
+			if v.Cmp(vb) != 0 {
+				return false
+			}
+		}
+		return true
+	}
+
+	for i, testcase := range tests {
+		node := versioned.Node{
+			Status: versioned.NodeStatus{
+				Capacity:    copyResourceList(testcase.capacity),
+				Allocatable: copyResourceList(testcase.allocatable),
+			},
+		}
+		node2 := roundTrip(t, runtime.Object(&node)).(*versioned.Node)
+		actual := node2.Status.Allocatable
+		expected := testcase.expectedAllocatable
+		if !resourceListsEqual(expected, actual) {
+			t.Errorf("[%d] Expected NodeStatus.Allocatable: %+v; Got: %+v", i, expected, actual)
+		}
 	}
 }
 
@@ -543,5 +617,28 @@ func TestSetDefaultLimitRangeItem(t *testing.T) {
 	requestMinValue := defaultRequest[versioned.ResourceMemory]
 	if requestMinValue.String() != "100Mi" {
 		t.Errorf("Expected request memory: %s, got: %s", "100Mi", requestMinValue.String())
+	}
+}
+
+func TestSetDefaultProbe(t *testing.T) {
+	originalProbe := versioned.Probe{}
+	expectedProbe := versioned.Probe{
+		InitialDelaySeconds: 0,
+		TimeoutSeconds:      1,
+		PeriodSeconds:       10,
+		SuccessThreshold:    1,
+		FailureThreshold:    3,
+	}
+
+	pod := &versioned.Pod{
+		Spec: versioned.PodSpec{
+			Containers: []versioned.Container{{LivenessProbe: &originalProbe}},
+		},
+	}
+
+	output := roundTrip(t, runtime.Object(pod)).(*versioned.Pod)
+	actualProbe := *output.Spec.Containers[0].LivenessProbe
+	if actualProbe != expectedProbe {
+		t.Errorf("Expected probe: %+v\ngot: %+v\n", expectedProbe, actualProbe)
 	}
 }

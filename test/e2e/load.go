@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
@@ -47,43 +47,42 @@ const (
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
 // -t/--test flag or ginkgo.focus flag.
-var _ = Describe("Load capacity", func() {
+var _ = Describe("Load capacity [Skipped]", func() {
 	var c *client.Client
 	var nodeCount int
 	var ns string
 	var configs []*RCConfig
-	framework := Framework{BaseName: "load", NamespaceDeletionTimeout: time.Hour}
+
+	// Gathers metrics before teardown
+	// TODO add flag that allows to skip cleanup on failure
+	AfterEach(func() {
+		deleteAllRC(configs)
+
+		// Verify latency metrics
+		highLatencyRequests, err := HighLatencyRequests(c)
+		expectNoError(err, "Too many instances metrics above the threshold")
+		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
+	})
+
+	// Explicitly put here, to delete namespace at the end of the test
+	// (after measuring latency metrics, etc.).
+	framework := NewFramework("load")
+	framework.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
-		framework.beforeEach()
 		c = framework.Client
 		ns = framework.Namespace.Name
-		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
-		expectNoError(err)
+		nodes := ListSchedulableNodesOrDie(c)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
 		// terminating namespace to be finally deleted before starting this test.
-		err = checkTestingNSDeletedExcept(c, ns)
+		err := checkTestingNSDeletedExcept(c, ns)
 		expectNoError(err)
 
 		expectNoError(resetMetrics(c))
-	})
-
-	// TODO add flag that allows to skip cleanup on failure
-	AfterEach(func() {
-		// We can't call it explicitly at the end, because it will not be called
-		// if Expect() fails.
-		defer framework.afterEach()
-
-		deleteAllRC(configs)
-
-		// Verify latency metrics
-		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second)
-		expectNoError(err, "Too many instances metrics above the threshold")
-		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
 
 	type Load struct {
@@ -99,7 +98,10 @@ var _ = Describe("Load capacity", func() {
 	}
 
 	for _, testArg := range loadTests {
-		name := fmt.Sprintf("[Skipped] [Performance suite] should be able to handle %v pods per node", testArg.podsPerNode)
+		name := fmt.Sprintf("should be able to handle %v pods per node", testArg.podsPerNode)
+		if testArg.podsPerNode == 30 {
+			name = "[Performance] " + name
+		}
 		itArg := testArg
 
 		It(name, func() {
@@ -211,7 +213,11 @@ func scaleRC(wg *sync.WaitGroup, config *RCConfig) {
 	expectNoError(ScaleRC(config.Client, config.Namespace, config.Name, newSize, true),
 		fmt.Sprintf("scaling rc %s for the first time", config.Name))
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
-	_, err := config.Client.Pods(config.Namespace).List(selector, fields.Everything())
+	options := api.ListOptions{
+		LabelSelector:   selector,
+		ResourceVersion: "0",
+	}
+	_, err := config.Client.Pods(config.Namespace).List(options)
 	expectNoError(err, fmt.Sprintf("listing pods from rc %v", config.Name))
 }
 

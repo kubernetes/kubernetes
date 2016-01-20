@@ -19,11 +19,11 @@
 SSH_USER=core
 
 function detect-minion-image (){
-  if [[ -z "${KUBE_MINION_IMAGE-}" ]]; then
-    KUBE_MINION_IMAGE=$(curl -s -L http://${COREOS_CHANNEL}.release.core-os.net/amd64-usr/current/coreos_production_ami_all.json | python -c "import json,sys;obj=json.load(sys.stdin);print filter(lambda t: t['name']=='${AWS_REGION}', obj['amis'])[0]['hvm']")
+  if [[ -z "${KUBE_NODE_IMAGE-}" ]]; then
+    KUBE_NODE_IMAGE=$(curl -s -L http://${COREOS_CHANNEL}.release.core-os.net/amd64-usr/current/coreos_production_ami_all.json | python -c "import json,sys;obj=json.load(sys.stdin);print filter(lambda t: t['name']=='${AWS_REGION}', obj['amis'])[0]['hvm']")
   fi
-  if [[ -z "${KUBE_MINION_IMAGE-}" ]]; then
-    echo "unable to determine KUBE_MINION_IMAGE"
+  if [[ -z "${KUBE_NODE_IMAGE-}" ]]; then
+    echo "unable to determine KUBE_NODE_IMAGE"
     exit 2
   fi
 }

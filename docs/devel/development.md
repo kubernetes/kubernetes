@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/devel/development.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.1/docs/devel/development.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -33,15 +34,29 @@ Documentation for other releases can be found at
 
 # Development Guide
 
-# Releases and Official Builds
+This document is intended to be the canonical source of truth for things like
+supported toolchain versions for building Kubernetes.  If you find a
+requirement that this doc does not capture, please file a bug.  If you find
+other docs with references to requirements that are not simply links to this
+doc, please file a bug.
+
+This document is intended to be relative to the branch in which it is found.
+It is guaranteed that requirements will change over time for the development
+branch, but release branches of Kubernetes should not change.
+
+## Releases and Official Builds
 
 Official releases are built in Docker containers.  Details are [here](http://releases.k8s.io/HEAD/build/README.md).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
 
 ## Go development environment
 
-Kubernetes is written in [Go](http://golang.org) programming language. If you haven't set up Go development environment, please follow [this instruction](http://golang.org/doc/code.html) to install go tool and set up GOPATH. Ensure your version of Go is at least 1.3.
+Kubernetes is written in the [Go](http://golang.org) programming language. If you haven't set up a Go development environment, please follow [these instructions](http://golang.org/doc/code.html) to install the go tools and set up a GOPATH.
 
-## Git Setup
+### Go versions
+
+Requires Go version 1.4.x or 1.5.x
+
+## Git setup
 
 Below, we outline one of the more common git workflows that core developers use. Other git workflows are also valid.
 
@@ -204,7 +219,7 @@ _If `go get -u path/to/dependency` fails with compilation errors, instead try `g
 to fetch the dependencies without compiling them.  This can happen when updating the cadvisor dependency._
 
 
-5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by running hack/verify-godeps.sh
+5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by running `hack/verify-godeps.sh`
 
 _If hack/verify-godeps.sh fails after a `godep update`, it is possible that a transitive dependency was added or removed but not
 updated by godeps.  It then may be necessary to perform a `godep save ./...` to pick up the transitive dependency changes._
@@ -212,6 +227,10 @@ updated by godeps.  It then may be necessary to perform a `godep save ./...` to 
 It is sometimes expedient to manually fix the /Godeps/godeps.json file to minimize the changes.
 
 Please send dependency updates in separate commits within your PR, for easier reviewing.
+
+6) If you updated the Godeps, please also update `Godeps/LICENSES.md` by running `hack/update-godep-licenses.sh`.
+
+_If Godep does not automatically vendor the proper license file for a new dependency, be sure to add an exception entry to `hack/update-godep-licenses.sh`._
 
 ## Unit tests
 

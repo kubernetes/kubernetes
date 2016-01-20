@@ -87,12 +87,12 @@ func NewConverter() *Converter {
 		inputFieldMappingFuncs: map[reflect.Type]FieldMappingFunc{},
 		inputDefaultFlags:      map[reflect.Type]FieldMatchingFlags{},
 	}
-	c.RegisterConversionFunc(byteSliceCopy)
+	c.RegisterConversionFunc(ByteSliceCopy)
 	return c
 }
 
-// Prevent recursing into every byte...
-func byteSliceCopy(in *[]byte, out *[]byte, s Scope) error {
+// ByteSliceCopy prevents recursing into every byte
+func ByteSliceCopy(in *[]byte, out *[]byte, s Scope) error {
 	*out = make([]byte, len(*in))
 	copy(*out, *in)
 	return nil
@@ -291,7 +291,7 @@ func verifyConversionFunctionSignature(ft reflect.Type) error {
 //
 // Example:
 // c.RegisterConversionFunc(
-//         func(in *Pod, out *v1beta1.Pod, s Scope) error {
+//         func(in *Pod, out *v1.Pod, s Scope) error {
 //                 // conversion logic...
 //                 return nil
 //          })
@@ -322,6 +322,11 @@ func (c *Converter) HasConversionFunc(inType, outType reflect.Type) bool {
 	return found
 }
 
+func (c *Converter) ConversionFuncValue(inType, outType reflect.Type) (reflect.Value, bool) {
+	value, found := c.conversionFuncs[typePair{inType, outType}]
+	return value, found
+}
+
 // SetStructFieldCopy registers a correspondence. Whenever a struct field is encountered
 // which has a type and name matching srcFieldType and srcFieldName, it wil be copied
 // into the field in the destination struct matching destFieldType & Name, if such a
@@ -343,7 +348,7 @@ func (c *Converter) SetStructFieldCopy(srcFieldType interface{}, srcFieldName st
 //
 // Example:
 // c.RegisteDefaultingFunc(
-//         func(in *v1beta1.Pod) {
+//         func(in *v1.Pod) {
 //                 // defaulting logic...
 //          })
 func (c *Converter) RegisterDefaultingFunc(defaultingFunc interface{}) error {

@@ -24,8 +24,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -54,8 +54,10 @@ const (
 	emptyDirPluginName = "kubernetes.io/empty-dir"
 )
 
-func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) {
+func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+
+	return nil
 }
 
 func (plugin *emptyDirPlugin) Name() string {
@@ -70,23 +72,23 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
-	return plugin.newBuilderInternal(spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()}, opts, newChconRunner())
+	return plugin.newBuilderInternal(spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()}, opts)
 }
 
-func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions, chconRunner chconRunner) (volume.Builder, error) {
+func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions) (volume.Builder, error) {
 	medium := api.StorageMediumDefault
 	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.Volume.EmptyDir.Medium
 	}
 	return &emptyDir{
-		pod:           pod,
-		volName:       spec.Name(),
-		medium:        medium,
-		mounter:       mounter,
-		mountDetector: mountDetector,
-		plugin:        plugin,
-		rootContext:   opts.RootContext,
-		chconRunner:   chconRunner,
+		pod:             pod,
+		volName:         spec.Name(),
+		medium:          medium,
+		mounter:         mounter,
+		mountDetector:   mountDetector,
+		plugin:          plugin,
+		rootContext:     opts.RootContext,
+		MetricsProvider: volume.NewMetricsDu(GetPath(pod.UID, spec.Name(), plugin.host)),
 	}, nil
 }
 
@@ -97,12 +99,13 @@ func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID) (volu
 
 func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface, mountDetector mountDetector) (volume.Cleaner, error) {
 	ed := &emptyDir{
-		pod:           &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
-		volName:       volName,
-		medium:        api.StorageMediumDefault, // might be changed later
-		mounter:       mounter,
-		mountDetector: mountDetector,
-		plugin:        plugin,
+		pod:             &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
+		volName:         volName,
+		medium:          api.StorageMediumDefault, // might be changed later
+		mounter:         mounter,
+		mountDetector:   mountDetector,
+		plugin:          plugin,
+		MetricsProvider: volume.NewMetricsDu(GetPath(podUID, volName, plugin.host)),
 	}
 	return ed, nil
 }
@@ -134,7 +137,16 @@ type emptyDir struct {
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
 	rootContext   string
-	chconRunner   chconRunner
+	volume.MetricsProvider
+}
+
+func (ed *emptyDir) GetAttributes() volume.Attributes {
+	return volume.Attributes{
+		ReadOnly:                    false,
+		Managed:                     true,
+		SupportsOwnershipManagement: true,
+		SupportsSELinux:             true,
+	}
 }
 
 // SetUp creates new directory.
@@ -171,7 +183,7 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 
 	switch ed.medium {
 	case api.StorageMediumDefault:
-		err = ed.setupDir(dir, securityContext)
+		err = ed.setupDir(dir)
 	case api.StorageMediumMemory:
 		err = ed.setupTmpfs(dir, securityContext)
 	default:
@@ -185,17 +197,13 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 	return err
 }
 
-func (ed *emptyDir) IsReadOnly() bool {
-	return false
-}
-
 // setupTmpfs creates a tmpfs mount at the specified directory with the
 // specified SELinux context.
 func (ed *emptyDir) setupTmpfs(dir string, selinuxContext string) error {
 	if ed.mounter == nil {
 		return fmt.Errorf("memory storage requested, but mounter is nil")
 	}
-	if err := ed.setupDir(dir, selinuxContext); err != nil {
+	if err := ed.setupDir(dir); err != nil {
 		return err
 	}
 	// Make SetUp idempotent.
@@ -224,7 +232,7 @@ func (ed *emptyDir) setupTmpfs(dir string, selinuxContext string) error {
 
 // setupDir creates the directory with the specified SELinux context and
 // the default permissions specified by the perm constant.
-func (ed *emptyDir) setupDir(dir, selinuxContext string) error {
+func (ed *emptyDir) setupDir(dir string) error {
 	// Create the directory if it doesn't already exist.
 	if err := os.MkdirAll(dir, perm); err != nil {
 		return err
@@ -258,18 +266,16 @@ func (ed *emptyDir) setupDir(dir, selinuxContext string) error {
 		}
 	}
 
-	// Set the context on the directory, if appropriate
-	if selinuxContext != "" {
-		glog.V(3).Infof("Setting SELinux context for %v to %v", dir, selinuxContext)
-		return ed.chconRunner.SetContext(dir, selinuxContext)
-	}
-
 	return nil
 }
 
 func (ed *emptyDir) GetPath() string {
+	return GetPath(ed.pod.UID, ed.volName, ed.plugin.host)
+}
+
+func GetPath(uid types.UID, volName string, host volume.VolumeHost) string {
 	name := emptyDirPluginName
-	return ed.plugin.host.GetPodVolumeDir(ed.pod.UID, util.EscapeQualifiedNameForDisk(name), ed.volName)
+	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(name), volName)
 }
 
 // TearDown simply discards everything in the directory.
@@ -318,5 +324,5 @@ func (ed *emptyDir) teardownTmpfs(dir string) error {
 }
 
 func (ed *emptyDir) getMetaDir() string {
-	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, util.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
+	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, strings.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
 }

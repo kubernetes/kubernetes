@@ -52,8 +52,9 @@ function deploy_ui {
   "${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/kube-ui/kube-ui-svc.yaml"
 }
 
-# create the kube-system namespace
+# create the kube-system and static-pods namespaces
 "${kubectl}" create -f "${KUBE_ROOT}/cluster/mesos/docker/kube-system-ns.yaml"
+"${kubectl}" create -f "${KUBE_ROOT}/cluster/mesos/docker/static-pods-ns.yaml"
 
 if [ "${ENABLE_CLUSTER_DNS}" == true ]; then
   cluster::mesos::docker::run_in_temp_dir 'k8sm-dns' 'deploy_dns'

@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // persistentvolumeclaimStrategy implements behavior for PersistentVolumeClaim objects
@@ -48,9 +48,13 @@ func (persistentvolumeclaimStrategy) PrepareForCreate(obj runtime.Object) {
 	pv.Status = api.PersistentVolumeClaimStatus{}
 }
 
-func (persistentvolumeclaimStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
+func (persistentvolumeclaimStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
 	pvc := obj.(*api.PersistentVolumeClaim)
 	return validation.ValidatePersistentVolumeClaim(pvc)
+}
+
+// Canonicalize normalizes the object after validation.
+func (persistentvolumeclaimStrategy) Canonicalize(obj runtime.Object) {
 }
 
 func (persistentvolumeclaimStrategy) AllowCreateOnUpdate() bool {
@@ -64,7 +68,7 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newPvc.Status = oldPvc.Status
 }
 
-func (persistentvolumeclaimStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (persistentvolumeclaimStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidatePersistentVolumeClaim(obj.(*api.PersistentVolumeClaim))
 	return append(errorList, validation.ValidatePersistentVolumeClaimUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))...)
 }
@@ -86,7 +90,7 @@ func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(obj, old runtime.Obj
 	newPv.Spec = oldPv.Spec
 }
 
-func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePersistentVolumeClaimStatusUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))
 }
 
@@ -104,9 +108,10 @@ func MatchPersistentVolumeClaim(label labels.Selector, field fields.Selector) ge
 
 // PersistentVolumeClaimToSelectableFields returns a label set that represents the object
 func PersistentVolumeClaimToSelectableFields(persistentvolumeclaim *api.PersistentVolumeClaim) labels.Set {
-	return labels.Set{
-		"metadata.name": persistentvolumeclaim.Name,
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(persistentvolumeclaim.ObjectMeta, true)
+	specificFieldsSet := fields.Set{
 		// This is a bug, but we need to support it for backward compatibility.
 		"name": persistentvolumeclaim.Name,
 	}
+	return labels.Set(generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet))
 }

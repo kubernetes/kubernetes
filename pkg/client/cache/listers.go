@@ -95,6 +95,10 @@ func (s *StoreToPodLister) Exists(pod *api.Pod) (bool, error) {
 	return exists, nil
 }
 
+// NodeConditionPredicate is a function that indicates whether the given node's conditions meet
+// some set of criteria defined by the function.
+type NodeConditionPredicate func(node api.Node) bool
+
 // StoreToNodeLister makes a Store have the List method of the client.NodeInterface
 // The Store must contain (only) Nodes.
 type StoreToNodeLister struct {
@@ -109,68 +113,29 @@ func (s *StoreToNodeLister) List() (machines api.NodeList, err error) {
 }
 
 // NodeCondition returns a storeToNodeConditionLister
-func (s *StoreToNodeLister) NodeCondition(conditionType api.NodeConditionType, conditionStatus api.ConditionStatus) storeToNodeConditionLister {
+func (s *StoreToNodeLister) NodeCondition(predicate NodeConditionPredicate) storeToNodeConditionLister {
 	// TODO: Move this filtering server side. Currently our selectors don't facilitate searching through a list so we
 	// have the reflector filter out the Unschedulable field and sift through node conditions in the lister.
-	return storeToNodeConditionLister{s.Store, conditionType, conditionStatus}
+	return storeToNodeConditionLister{s.Store, predicate}
 }
 
 // storeToNodeConditionLister filters and returns nodes matching the given type and status from the store.
 type storeToNodeConditionLister struct {
-	store           Store
-	conditionType   api.NodeConditionType
-	conditionStatus api.ConditionStatus
+	store     Store
+	predicate NodeConditionPredicate
 }
 
-// List returns a list of nodes that match the condition type/status in the storeToNodeConditionLister.
+// List returns a list of nodes that match the conditions defined by the predicate functions in the storeToNodeConditionLister.
 func (s storeToNodeConditionLister) List() (nodes api.NodeList, err error) {
 	for _, m := range s.store.List() {
 		node := *m.(*api.Node)
-
-		// We currently only use a conditionType of "Ready". If the kubelet doesn't
-		// periodically report the status of a node, the nodecontroller sets its
-		// ConditionStatus to "Unknown". If the kubelet thinks a node is unhealthy
-		// it can (in theory) set its ConditionStatus to "False".
-		var nodeCondition *api.NodeCondition
-
-		// Get the last condition of the required type
-		for _, cond := range node.Status.Conditions {
-			if cond.Type == s.conditionType {
-				nodeCondition = &cond
-			} else {
-				glog.V(4).Infof("Ignoring condition type %v for node %v", cond.Type, node.Name)
-			}
-		}
-
-		// Check that the condition has the required status
-		if nodeCondition != nil {
-			if nodeCondition.Status == s.conditionStatus {
-				nodes.Items = append(nodes.Items, node)
-			} else {
-				glog.V(4).Infof("Ignoring node %v with condition status %v", node.Name, nodeCondition.Status)
-			}
+		if s.predicate(node) {
+			nodes.Items = append(nodes.Items, node)
 		} else {
-			glog.V(2).Infof("Node %s doesn't have conditions of type %v", node.Name, s.conditionType)
+			glog.V(5).Infof("Node %s matches none of the conditions", node.Name)
 		}
 	}
 	return
-}
-
-// TODO Move this back to scheduler as a helper function that takes a Store,
-// rather than a method of StoreToNodeLister.
-// GetNodeInfo returns cached data for the node 'id'.
-func (s *StoreToNodeLister) GetNodeInfo(id string) (*api.Node, error) {
-	node, exists, err := s.Get(&api.Node{ObjectMeta: api.ObjectMeta{Name: id}})
-
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving node '%v' from cache: %v", id, err)
-	}
-
-	if !exists {
-		return nil, fmt.Errorf("node '%v' is not in cache", id)
-	}
-
-	return node.(*api.Node), nil
 }
 
 // StoreToReplicationControllerLister gives a store List and Exists methods. The store must contain only ReplicationControllers.
@@ -202,7 +167,7 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 	var rc api.ReplicationController
 
 	if len(pod.Labels) == 0 {
-		err = fmt.Errorf("No controllers found for pod %v because it has no labels", pod.Name)
+		err = fmt.Errorf("no controllers found for pod %v because it has no labels", pod.Name)
 		return
 	}
 
@@ -221,7 +186,61 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 		controllers = append(controllers, rc)
 	}
 	if len(controllers) == 0 {
-		err = fmt.Errorf("Could not find daemon set for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("could not find controller for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
+
+// StoreToDeploymentLister gives a store List and Exists methods. The store must contain only Deployments.
+type StoreToDeploymentLister struct {
+	Store
+}
+
+// Exists checks if the given deployment exists in the store.
+func (s *StoreToDeploymentLister) Exists(deployment *extensions.Deployment) (bool, error) {
+	_, exists, err := s.Store.Get(deployment)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// StoreToDeploymentLister lists all deployments in the store.
+// TODO: converge on the interface in pkg/client
+func (s *StoreToDeploymentLister) List() (deployments []extensions.Deployment, err error) {
+	for _, c := range s.Store.List() {
+		deployments = append(deployments, *(c.(*extensions.Deployment)))
+	}
+	return deployments, nil
+}
+
+// GetDeploymentsForRC returns a list of deployments managing a replication controller. Returns an error only if no matching deployments are found.
+func (s *StoreToDeploymentLister) GetDeploymentsForRC(rc *api.ReplicationController) (deployments []extensions.Deployment, err error) {
+	var selector labels.Selector
+	var d extensions.Deployment
+
+	if len(rc.Labels) == 0 {
+		err = fmt.Errorf("no deployments found for replication controller %v because it has no labels", rc.Name)
+		return
+	}
+
+	// TODO: MODIFY THIS METHOD so that it checks for the podTemplateSpecHash label
+	for _, m := range s.Store.List() {
+		d = *m.(*extensions.Deployment)
+		if d.Namespace != rc.Namespace {
+			continue
+		}
+		labelSet := labels.Set(d.Spec.Selector)
+		selector = labels.Set(d.Spec.Selector).AsSelector()
+
+		// If a deployment with a nil or empty selector creeps in, it should match nothing, not everything.
+		if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(rc.Labels)) {
+			continue
+		}
+		deployments = append(deployments, d)
+	}
+	if len(deployments) == 0 {
+		err = fmt.Errorf("could not find deployments set for replication controller %s in namespace %s with labels: %v", rc.Name, rc.Namespace, rc.Labels)
 	}
 	return
 }
@@ -242,9 +261,9 @@ func (s *StoreToDaemonSetLister) Exists(ds *extensions.DaemonSet) (bool, error) 
 
 // List lists all daemon sets in the store.
 // TODO: converge on the interface in pkg/client
-func (s *StoreToDaemonSetLister) List() (dss []extensions.DaemonSet, err error) {
+func (s *StoreToDaemonSetLister) List() (dss extensions.DaemonSetList, err error) {
 	for _, c := range s.Store.List() {
-		dss = append(dss, *(c.(*extensions.DaemonSet)))
+		dss.Items = append(dss.Items, *(c.(*extensions.DaemonSet)))
 	}
 	return dss, nil
 }
@@ -256,7 +275,7 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 	var daemonSet extensions.DaemonSet
 
 	if len(pod.Labels) == 0 {
-		err = fmt.Errorf("No daemon sets found for pod %v because it has no labels", pod.Name)
+		err = fmt.Errorf("no daemon sets found for pod %v because it has no labels", pod.Name)
 		return
 	}
 
@@ -265,7 +284,11 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 		if daemonSet.Namespace != pod.Namespace {
 			continue
 		}
-		selector = labels.Set(daemonSet.Spec.Selector).AsSelector()
+		selector, err = extensions.LabelSelectorAsSelector(daemonSet.Spec.Selector)
+		if err != nil {
+			// this should not happen if the DaemonSet passed validation
+			return nil, err
+		}
 
 		// If a daemonSet with a nil or empty selector creeps in, it should match nothing, not everything.
 		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
@@ -274,7 +297,7 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 		daemonSets = append(daemonSets, daemonSet)
 	}
 	if len(daemonSets) == 0 {
-		err = fmt.Errorf("Could not find daemon set for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("could not find daemon set for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
 }
@@ -314,7 +337,7 @@ func (s *StoreToServiceLister) GetPodServices(pod *api.Pod) (services []api.Serv
 		}
 	}
 	if len(services) == 0 {
-		err = fmt.Errorf("Could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 
 	return
@@ -341,7 +364,7 @@ func (s *StoreToEndpointsLister) GetServiceEndpoints(svc *api.Service) (ep api.E
 			return ep, nil
 		}
 	}
-	err = fmt.Errorf("Could not find endpoints for service: %v", svc.Name)
+	err = fmt.Errorf("could not find endpoints for service: %v", svc.Name)
 	return
 }
 
@@ -367,13 +390,13 @@ func (s *StoreToJobLister) List() (jobs extensions.JobList, err error) {
 	return jobs, nil
 }
 
-// GetPodControllers returns a list of jobs managing a pod. Returns an error only if no matching jobs are found.
+// GetPodJobs returns a list of jobs managing a pod. Returns an error only if no matching jobs are found.
 func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err error) {
 	var selector labels.Selector
 	var job extensions.Job
 
 	if len(pod.Labels) == 0 {
-		err = fmt.Errorf("No jobs found for pod %v because it has no labels", pod.Name)
+		err = fmt.Errorf("no jobs found for pod %v because it has no labels", pod.Name)
 		return
 	}
 
@@ -383,14 +406,53 @@ func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []extensions.Job, err 
 			continue
 		}
 
-		selector, _ = extensions.PodSelectorAsSelector(job.Spec.Selector)
+		selector, _ = extensions.LabelSelectorAsSelector(job.Spec.Selector)
 		if !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
 		jobs = append(jobs, job)
 	}
 	if len(jobs) == 0 {
-		err = fmt.Errorf("Could not find jobs for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("could not find jobs for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
+}
+
+// Typed wrapper around a store of PersistentVolumes
+type StoreToPVFetcher struct {
+	Store
+}
+
+// GetPersistentVolumeInfo returns cached data for the PersistentVolume 'id'.
+func (s *StoreToPVFetcher) GetPersistentVolumeInfo(id string) (*api.PersistentVolume, error) {
+	o, exists, err := s.Get(&api.PersistentVolume{ObjectMeta: api.ObjectMeta{Name: id}})
+
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving PersistentVolume '%v' from cache: %v", id, err)
+	}
+
+	if !exists {
+		return nil, fmt.Errorf("PersistentVolume '%v' is not in cache", id)
+	}
+
+	return o.(*api.PersistentVolume), nil
+}
+
+// Typed wrapper around a store of PersistentVolumeClaims
+type StoreToPVCFetcher struct {
+	Store
+}
+
+// GetPersistentVolumeClaimInfo returns cached data for the PersistentVolumeClaim 'id'.
+func (s *StoreToPVCFetcher) GetPersistentVolumeClaimInfo(namespace string, id string) (*api.PersistentVolumeClaim, error) {
+	o, exists, err := s.Get(&api.PersistentVolumeClaim{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: id}})
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving PersistentVolumeClaim '%s/%s' from cache: %v", namespace, id, err)
+	}
+
+	if !exists {
+		return nil, fmt.Errorf("PersistentVolumeClaim '%s/%s' is not in cache", namespace, id)
+	}
+
+	return o.(*api.PersistentVolumeClaim), nil
 }

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"net/http"
 	"sort"
 	"strconv"
@@ -31,10 +32,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -54,13 +55,17 @@ var _ = Describe("Services", func() {
 	})
 
 	AfterEach(func() {
-		for _, ns := range extraNamespaces {
-			By(fmt.Sprintf("Destroying namespace %v", ns))
-			if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
-				Failf("Couldn't delete namespace %s: %s", ns, err)
+		if testContext.DeleteNamespace {
+			for _, ns := range extraNamespaces {
+				By(fmt.Sprintf("Destroying namespace %v", ns))
+				if err := deleteNS(c, ns, 5*time.Minute /* namespace deletion timeout */); err != nil {
+					Failf("Couldn't delete namespace %s: %s", ns, err)
+				}
 			}
+			extraNamespaces = nil
+		} else {
+			Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 		}
-		extraNamespaces = nil
 	})
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
@@ -92,7 +97,7 @@ var _ = Describe("Services", func() {
 				Selector: labels,
 				Ports: []api.ServicePort{{
 					Port:       80,
-					TargetPort: util.NewIntOrStringFromInt(80),
+					TargetPort: intstr.FromInt(80),
 				}},
 			},
 		}
@@ -155,12 +160,12 @@ var _ = Describe("Services", func() {
 					{
 						Name:       "portname1",
 						Port:       80,
-						TargetPort: util.NewIntOrStringFromString(svc1port),
+						TargetPort: intstr.FromString(svc1port),
 					},
 					{
 						Name:       "portname2",
 						Port:       81,
-						TargetPort: util.NewIntOrStringFromString(svc2port),
+						TargetPort: intstr.FromString(svc2port),
 					},
 				},
 			},
@@ -230,14 +235,14 @@ var _ = Describe("Services", func() {
 		}
 		host := hosts[0]
 
-		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
-		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
 
 		// Stop service 1 and make sure it is gone.
 		expectNoError(stopServeHostnameService(c, ns, "service1"))
 
 		expectNoError(verifyServeHostnameServiceDown(c, host, svc1IP, servicePort))
-		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
 
 		// Start another service and verify both are up.
 		podNames3, svc3IP, err := startServeHostnameService(c, ns, "service3", servicePort, numPods)
@@ -247,14 +252,14 @@ var _ = Describe("Services", func() {
 			Failf("VIPs conflict: %v", svc2IP)
 		}
 
-		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
-		expectNoError(verifyServeHostnameServiceUp(c, host, podNames3, svc3IP, servicePort))
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames3, svc3IP, servicePort))
 
 		expectNoError(stopServeHostnameService(c, ns, "service2"))
 		expectNoError(stopServeHostnameService(c, ns, "service3"))
 	})
 
-	It("should work after restarting kube-proxy", func() {
+	It("should work after restarting kube-proxy [Disruptive]", func() {
 		SkipUnlessProviderIs("gce", "gke")
 
 		ns := f.Namespace.Name
@@ -282,29 +287,30 @@ var _ = Describe("Services", func() {
 		}
 		host := hosts[0]
 
-		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
-		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
 
 		By("Restarting kube-proxy")
 		if err := restartKubeProxy(host); err != nil {
 			Failf("error restarting kube-proxy: %v", err)
 		}
-		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
-		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
 
 		By("Removing iptable rules")
-		_, _, code, err := SSH(`
+		result, err := SSH(`
 					sudo iptables -t nat -F KUBE-SERVICES || true;
 					sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
 					sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, testContext.Provider)
-		if err != nil || code != 0 {
-			Failf("couldn't remove iptable rules: %v (code %v)", err, code)
+		if err != nil || result.Code != 0 {
+			LogSSHResult(result)
+			Failf("couldn't remove iptable rules: %v", err)
 		}
-		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
-		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
 	})
 
-	It("should work after restarting apiserver", func() {
+	It("should work after restarting apiserver [Disruptive]", func() {
 		// TODO: restartApiserver doesn't work in GKE - fix it and reenable this test.
 		SkipUnlessProviderIs("gce")
 
@@ -313,6 +319,7 @@ var _ = Describe("Services", func() {
 
 		defer func() { expectNoError(stopServeHostnameService(c, ns, "service1")) }()
 		podNames1, svc1IP, err := startServeHostnameService(c, ns, "service1", servicePort, numPods)
+		Expect(err).NotTo(HaveOccurred())
 
 		hosts, err := NodeSSHHosts(c)
 		Expect(err).NotTo(HaveOccurred())
@@ -321,7 +328,7 @@ var _ = Describe("Services", func() {
 		}
 		host := hosts[0]
 
-		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
 
 		// Restart apiserver
 		if err := restartApiserver(); err != nil {
@@ -330,24 +337,25 @@ var _ = Describe("Services", func() {
 		if err := waitForApiserverUp(c); err != nil {
 			Failf("error while waiting for apiserver up: %v", err)
 		}
-		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
 
 		// Create a new service and check if it's not reusing IP.
 		defer func() { expectNoError(stopServeHostnameService(c, ns, "service2")) }()
 		podNames2, svc2IP, err := startServeHostnameService(c, ns, "service2", servicePort, numPods)
+		Expect(err).NotTo(HaveOccurred())
 
 		if svc1IP == svc2IP {
 			Failf("VIPs conflict: %v", svc1IP)
 		}
-		expectNoError(verifyServeHostnameServiceUp(c, host, podNames1, svc1IP, servicePort))
-		expectNoError(verifyServeHostnameServiceUp(c, host, podNames2, svc2IP, servicePort))
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
+		expectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
 	})
 
 	It("should be able to create a functioning NodePort service", func() {
 		serviceName := "nodeportservice-test"
 		ns := f.Namespace.Name
 
-		t := NewWebserverTest(c, ns, serviceName)
+		t := NewServerTest(c, ns, serviceName)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -387,17 +395,13 @@ var _ = Describe("Services", func() {
 		ip := pickNodeIP(c)
 		testReachable(ip, nodePort)
 
-		// this test uses NodeSSHHosts that does not work if a Node only reports LegacyHostIP
-		if providerIs(providersWithSSH...) {
-			hosts, err := NodeSSHHosts(c)
-			if err != nil {
-				Expect(err).NotTo(HaveOccurred())
-			}
-			cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
-			_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
-			if code != 0 {
-				Failf("expected node port (%d) to be in use", nodePort)
-			}
+		By("verifying the node port is locked")
+		hostExec := LaunchHostExecPod(f.Client, f.Namespace.Name, "hostexec")
+		// Loop a bit because we see transient flakes.
+		cmd := fmt.Sprintf(`for i in $(seq 1 10); do if ss -ant46 'sport = :%d' | grep ^LISTEN; then exit 0; fi; sleep 0.1; done; exit 1`, nodePort)
+		stdout, err := RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+		if err != nil {
+			Failf("expected node port (%d) to be in use, stdout: %v", nodePort, stdout)
 		}
 	})
 
@@ -407,7 +411,7 @@ var _ = Describe("Services", func() {
 
 		serviceName := "mutability-service-test"
 
-		t := NewWebserverTest(f.Client, f.Namespace.Name, serviceName)
+		t := NewServerTest(f.Client, f.Namespace.Name, serviceName)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -501,29 +505,36 @@ var _ = Describe("Services", func() {
 		By("hitting the pod through the service's LoadBalancer")
 		testLoadBalancerReachable(ingress1, 80)
 
-		By("changing service " + serviceName + " update NodePort")
-		nodePort2 := nodePort1 - 1
-		if !ServiceNodePortRange.Contains(nodePort2) {
-			//Check for (unlikely) assignment at bottom of range
-			nodePort2 = nodePort1 + 1
+		By("changing service " + serviceName + ": update NodePort")
+		nodePort2 := 0
+		for i := 1; i < ServiceNodePortRange.Size; i++ {
+			offs1 := nodePort1 - ServiceNodePortRange.Base
+			offs2 := (offs1 + i) % ServiceNodePortRange.Size
+			nodePort2 = ServiceNodePortRange.Base + offs2
+			service, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
+				s.Spec.Ports[0].NodePort = nodePort2
+			})
+			if err != nil && strings.Contains(err.Error(), "provided port is already allocated") {
+				Logf("nodePort %d is busy, will retry", nodePort2)
+				continue
+			}
+			// Otherwise err was nil or err was a real error
+			break
 		}
-		service, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
-			s.Spec.Ports[0].NodePort = nodePort2
-		})
 		Expect(err).NotTo(HaveOccurred())
 
 		if service.Spec.Type != api.ServiceTypeLoadBalancer {
-			Failf("got unexpected Spec.Type for updated-NodePort service: %v", service)
+			Failf("got unexpected Spec.Type for updated-LoadBalancer service: %v", service)
 		}
 		if len(service.Spec.Ports) != 1 {
-			Failf("got unexpected len(Spec.Ports) for updated-NodePort service: %v", service)
+			Failf("got unexpected len(Spec.Ports) for updated-LoadBalancer service: %v", service)
 		}
 		port = service.Spec.Ports[0]
 		if port.NodePort != nodePort2 {
-			Failf("got unexpected Spec.Ports[0].nodePort for NodePort service: %v", service)
+			Failf("got unexpected Spec.Ports[0].nodePort for LoadBalancer service: %v", service)
 		}
 		if len(service.Status.LoadBalancer.Ingress) != 1 {
-			Failf("got unexpected len(Status.LoadBalancer.Ingress) for NodePort service: %v", service)
+			Failf("got unexpected len(Status.LoadBalancer.Ingress) for LoadBalancer service: %v", service)
 		}
 
 		By("hitting the pod through the service's updated NodePort")
@@ -538,7 +549,7 @@ var _ = Describe("Services", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			ingress2 := service.Status.LoadBalancer.Ingress[0]
-			if testLoadBalancerReachableInTime(ingress2, 80, 5*time.Second) {
+			if testLoadBalancerReachable(ingress2, 80) {
 				break
 			}
 
@@ -599,7 +610,7 @@ var _ = Describe("Services", func() {
 		serviceName2 := baseName + "2"
 		ns := f.Namespace.Name
 
-		t := NewWebserverTest(c, ns, serviceName1)
+		t := NewServerTest(c, ns, serviceName1)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -634,7 +645,7 @@ var _ = Describe("Services", func() {
 		if err == nil {
 			Failf("Created service with conflicting NodePort: %v", result2)
 		}
-		expectedErr := fmt.Sprintf("Service \"%s\" is invalid: spec.ports[0].nodePort: invalid value '%d', Details: provided port is already allocated",
+		expectedErr := fmt.Sprintf("Service \"%s\" is invalid: spec.ports[0].nodePort: Invalid value: %d: provided port is already allocated",
 			serviceName2, port.NodePort)
 		Expect(fmt.Sprintf("%v", err)).To(Equal(expectedErr))
 
@@ -651,7 +662,7 @@ var _ = Describe("Services", func() {
 		serviceName := "nodeport-range-test"
 		ns := f.Namespace.Name
 
-		t := NewWebserverTest(c, ns, serviceName)
+		t := NewServerTest(c, ns, serviceName)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -695,7 +706,7 @@ var _ = Describe("Services", func() {
 		if err == nil {
 			Failf("failed to prevent update of service with out-of-range NodePort: %v", result)
 		}
-		expectedErr := fmt.Sprintf("Service \"%s\" is invalid: spec.ports[0].nodePort: invalid value '%d', Details: provided port is not in the valid range", serviceName, outOfRangeNodePort)
+		expectedErr := fmt.Sprintf("Service \"%s\" is invalid: spec.ports[0].nodePort: Invalid value: %d: provided port is not in the valid range", serviceName, outOfRangeNodePort)
 		Expect(fmt.Sprintf("%v", err)).To(Equal(expectedErr))
 
 		By("deleting original service " + serviceName)
@@ -717,7 +728,7 @@ var _ = Describe("Services", func() {
 		serviceName := "nodeport-reuse"
 		ns := f.Namespace.Name
 
-		t := NewWebserverTest(c, ns, serviceName)
+		t := NewServerTest(c, ns, serviceName)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -752,17 +763,11 @@ var _ = Describe("Services", func() {
 		err = t.DeleteService(serviceName)
 		Expect(err).NotTo(HaveOccurred())
 
-		// this test uses NodeSSHHosts that does not work if a Node only reports LegacyHostIP
-		if providerIs(providersWithSSH...) {
-			hosts, err := NodeSSHHosts(c)
-			if err != nil {
-				Expect(err).NotTo(HaveOccurred())
-			}
-			cmd := fmt.Sprintf(`test -n "$(ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN)"`, nodePort)
-			_, _, code, err := SSH(cmd, hosts[0], testContext.Provider)
-			if code == 0 {
-				Failf("expected node port (%d) to not be in use", nodePort)
-			}
+		hostExec := LaunchHostExecPod(f.Client, f.Namespace.Name, "hostexec")
+		cmd := fmt.Sprintf(`! ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
+		stdout, err := RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+		if err != nil {
+			Failf("expected node port (%d) to not be in use, stdout: %v", nodePort, stdout)
 		}
 
 		By(fmt.Sprintf("creating service "+serviceName+" with same NodePort %d", nodePort))
@@ -774,14 +779,15 @@ var _ = Describe("Services", func() {
 	})
 
 	// This test hits several load-balancer cases because LB turnup is slow.
-	It("should serve identically named services in different namespaces on different load-balancers", func() {
+	// Flaky issue #18952
+	It("should serve identically named services in different namespaces on different load-balancers [Flaky]", func() {
 		// requires ExternalLoadBalancer
 		SkipUnlessProviderIs("gce", "gke", "aws")
 
 		ns1 := f.Namespace.Name
 
 		By("Building a second namespace api object")
-		namespacePtr, err := createTestingNS("services", c)
+		namespacePtr, err := createTestingNS("services", c, nil)
 		Expect(err).NotTo(HaveOccurred())
 		ns2 := namespacePtr.Name
 		extraNamespaces = append(extraNamespaces, ns2)
@@ -790,11 +796,11 @@ var _ = Describe("Services", func() {
 		servicePort := 9376
 
 		By("creating service " + serviceName + " with load balancer in namespace " + ns1)
-		t1 := NewWebserverTest(c, ns1, serviceName)
+		t1 := NewServerTest(c, ns1, serviceName)
 		svc1 := t1.BuildServiceSpec()
 		svc1.Spec.Type = api.ServiceTypeLoadBalancer
 		svc1.Spec.Ports[0].Port = servicePort
-		svc1.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(80)
+		svc1.Spec.Ports[0].TargetPort = intstr.FromInt(80)
 		_, err = t1.CreateService(svc1)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -814,18 +820,20 @@ var _ = Describe("Services", func() {
 			}()
 		}
 
-		By("creating service " + serviceName + " with load balancer in namespace " + ns2)
-		t2 := NewWebserverTest(c, ns2, serviceName)
+		By("creating service " + serviceName + " with UDP load balancer in namespace " + ns2)
+		t2 := NewNetcatTest(c, ns2, serviceName)
 		svc2 := t2.BuildServiceSpec()
 		svc2.Spec.Type = api.ServiceTypeLoadBalancer
 		svc2.Spec.Ports[0].Port = servicePort
-		svc2.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(80)
+		// UDP loadbalancing is tested via test NetcatTest
+		svc2.Spec.Ports[0].Protocol = api.ProtocolUDP
+		svc2.Spec.Ports[0].TargetPort = intstr.FromInt(80)
 		svc2.Spec.LoadBalancerIP = loadBalancerIP
 		_, err = t2.CreateService(svc2)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("creating pod to be part of service " + serviceName + " in namespace " + ns2)
-		t2.CreateWebserverRC(2)
+		t2.CreateNetcatRC(2)
 
 		ingressPoints := []string{}
 		svcs := []*api.Service{svc1, svc2}
@@ -860,11 +868,19 @@ var _ = Describe("Services", func() {
 			}
 			ingressPoints = append(ingressPoints, ing) // Save 'em to check uniqueness
 
-			By("hitting the pod through the service's NodePort")
-			testReachable(pickNodeIP(c), port.NodePort)
+			if svc1.Spec.Ports[0].Protocol == api.ProtocolTCP {
+				By("hitting the pod through the service's NodePort")
+				testReachable(pickNodeIP(c), port.NodePort)
 
-			By("hitting the pod through the service's external load balancer")
-			testLoadBalancerReachable(ingress, servicePort)
+				By("hitting the pod through the service's external load balancer")
+				testLoadBalancerReachable(ingress, servicePort)
+			} else {
+				By("hitting the pod through the service's NodePort")
+				testNetcatReachable(pickNodeIP(c), port.NodePort)
+
+				By("hitting the pod through the service's external load balancer")
+				testNetcatLoadBalancerReachable(ingress, servicePort)
+			}
 		}
 		validateUniqueOrFail(ingressPoints)
 	})
@@ -1047,7 +1063,7 @@ func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, ex
 		i++
 	}
 
-	if pods, err := c.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything()); err == nil {
+	if pods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{}); err == nil {
 		for _, pod := range pods.Items {
 			Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
 		}
@@ -1055,6 +1071,39 @@ func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, ex
 		Logf("Can't list pod debug info: %v", err)
 	}
 	Failf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, serviceStartTimeout)
+}
+
+// createExecPodOrFail creates a simple busybox pod in a sleep loop used as a
+// vessel for kubectl exec commands.
+func createExecPodOrFail(c *client.Client, ns, name string) {
+	Logf("Creating new exec pod")
+	immediate := int64(0)
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+		Spec: api.PodSpec{
+			TerminationGracePeriodSeconds: &immediate,
+			Containers: []api.Container{
+				{
+					Name:    "exec",
+					Image:   "gcr.io/google_containers/busybox",
+					Command: []string{"sh", "-c", "while true; do sleep 5; done"},
+				},
+			},
+		},
+	}
+	_, err := c.Pods(ns).Create(pod)
+	Expect(err).NotTo(HaveOccurred())
+	err = wait.PollImmediate(poll, 5*time.Minute, func() (bool, error) {
+		retrievedPod, err := c.Pods(pod.Namespace).Get(pod.Name)
+		if err != nil {
+			return false, nil
+		}
+		return retrievedPod.Status.Phase == api.PodRunning, nil
+	})
+	Expect(err).NotTo(HaveOccurred())
 }
 
 func createPodOrFail(c *client.Client, ns, name string, labels map[string]string, containerPorts []api.ContainerPort) {
@@ -1068,7 +1117,7 @@ func createPodOrFail(c *client.Client, ns, name string, labels map[string]string
 			Containers: []api.Container{
 				{
 					Name:  "test",
-					Image: "beta.gcr.io/google_containers/pause:2.0",
+					Image: "gcr.io/google_containers/pause:2.0",
 					Ports: containerPorts,
 				},
 			},
@@ -1099,10 +1148,7 @@ func collectAddresses(nodes *api.NodeList, addressType api.NodeAddressType) []st
 }
 
 func getNodePublicIps(c *client.Client) ([]string, error) {
-	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
-	if err != nil {
-		return nil, err
-	}
+	nodes := ListSchedulableNodesOrDie(c)
 
 	ips := collectAddresses(nodes, api.NodeExternalIP)
 	if len(ips) == 0 {
@@ -1125,13 +1171,33 @@ func testLoadBalancerReachable(ingress api.LoadBalancerIngress, port int) bool {
 	return testLoadBalancerReachableInTime(ingress, port, podStartTimeout)
 }
 
+func testNetcatLoadBalancerReachable(ingress api.LoadBalancerIngress, port int) bool {
+	return testNetcatLoadBalancerReachableInTime(ingress, port, podStartTimeout)
+}
+
+func conditionFuncDecorator(ip string, port int, fn func(string, int) (bool, error)) wait.ConditionFunc {
+	return func() (bool, error) {
+		return fn(ip, port)
+	}
+}
+
 func testLoadBalancerReachableInTime(ingress api.LoadBalancerIngress, port int, timeout time.Duration) bool {
 	ip := ingress.IP
 	if ip == "" {
 		ip = ingress.Hostname
 	}
 
-	return testReachableInTime(ip, port, timeout)
+	return testReachableInTime(conditionFuncDecorator(ip, port, testReachable), timeout)
+
+}
+
+func testNetcatLoadBalancerReachableInTime(ingress api.LoadBalancerIngress, port int, timeout time.Duration) bool {
+	ip := ingress.IP
+	if ip == "" {
+		ip = ingress.Hostname
+	}
+
+	return testReachableInTime(conditionFuncDecorator(ip, port, testNetcatReachable), timeout)
 }
 
 func testLoadBalancerNotReachable(ingress api.LoadBalancerIngress, port int) {
@@ -1143,47 +1209,83 @@ func testLoadBalancerNotReachable(ingress api.LoadBalancerIngress, port int) {
 	testNotReachable(ip, port)
 }
 
-func testReachable(ip string, port int) bool {
-	return testReachableInTime(ip, port, podStartTimeout)
-}
-
-func testReachableInTime(ip string, port int, timeout time.Duration) bool {
+func testReachable(ip string, port int) (bool, error) {
 	url := fmt.Sprintf("http://%s:%d", ip, port)
 	if ip == "" {
 		Failf("Got empty IP for reachability check (%s)", url)
-		return false
+		return false, nil
 	}
 	if port == 0 {
 		Failf("Got port==0 for reachability check (%s)", url)
-		return false
+		return false, nil
 	}
 
-	desc := fmt.Sprintf("the url %s to be reachable", url)
-	By(fmt.Sprintf("Waiting up to %v for %s", timeout, desc))
-	start := time.Now()
-	err := wait.PollImmediate(poll, timeout, func() (bool, error) {
-		resp, err := httpGetNoConnectionPool(url)
-		if err != nil {
-			Logf("Got error waiting for reachability of %s: %v (%v)", url, err, time.Since(start))
-			return false, nil
-		}
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			Logf("Got error reading response from %s: %v", url, err)
-			return false, nil
-		}
-		if resp.StatusCode != 200 {
-			return false, fmt.Errorf("received non-success return status %q trying to access %s; got body: %s", resp.Status, url, string(body))
-		}
-		if !strings.Contains(string(body), "test-webserver") {
-			return false, fmt.Errorf("received response body without expected substring 'test-webserver': %s", string(body))
-		}
-		Logf("Successfully reached %v", url)
-		return true, nil
-	})
+	Logf("Testing reachability of %v", url)
+
+	resp, err := httpGetNoConnectionPool(url)
 	if err != nil {
-		Expect(err).NotTo(HaveOccurred(), "Error waiting for %s", desc)
+		Logf("Got error waiting for reachability of %s: %v", url, err)
+		return false, nil
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		Logf("Got error reading response from %s: %v", url, err)
+		return false, nil
+	}
+	if resp.StatusCode != 200 {
+		return false, fmt.Errorf("received non-success return status %q trying to access %s; got body: %s", resp.Status, url, string(body))
+	}
+	if !strings.Contains(string(body), "test-webserver") {
+		return false, fmt.Errorf("received response body without expected substring 'test-webserver': %s", string(body))
+	}
+	Logf("Successfully reached %v", url)
+	return true, nil
+}
+
+func testNetcatReachable(ip string, port int) (bool, error) {
+	uri := fmt.Sprintf("udp://%s:%d", ip, port)
+	if ip == "" {
+		Failf("Got empty IP for reachability check (%s)", uri)
+		return false, nil
+	}
+	if port == 0 {
+		Failf("Got port==0 for reachability check (%s)", uri)
+		return false, nil
+	}
+
+	Logf("Testing reachability of %v", uri)
+
+	con, err := net.Dial("udp", ip+":"+string(port))
+	if err != nil {
+		return false, fmt.Errorf("Failed to connect to: %s:%d (%s)", ip, port, err.Error())
+	}
+
+	_, err = con.Write([]byte("\n"))
+	if err != nil {
+		return false, fmt.Errorf("Failed to send newline: %s", err.Error())
+	}
+
+	var buf []byte = make([]byte, len("SUCCESS")+1)
+
+	_, err = con.Read(buf)
+	if err != nil {
+		return false, fmt.Errorf("Failed to read result: %s", err.Error())
+	}
+
+	if !strings.HasPrefix(string(buf), "SUCCESS") {
+		return false, fmt.Errorf("Failed to retrieve: \"SUCCESS\"")
+	}
+
+	Logf("Successfully retrieved \"SUCCESS\"")
+	return true, nil
+}
+
+func testReachableInTime(testFunc wait.ConditionFunc, timeout time.Duration) bool {
+	By(fmt.Sprintf("Waiting up to %v", timeout))
+	err := wait.PollImmediate(poll, timeout, testFunc)
+	if err != nil {
+		Expect(err).NotTo(HaveOccurred(), "Error waiting")
 		return false
 	}
 	return true
@@ -1230,7 +1332,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 		Spec: api.ServiceSpec{
 			Ports: []api.ServicePort{{
 				Port:       port,
-				TargetPort: util.NewIntOrStringFromInt(9376),
+				TargetPort: intstr.FromInt(9376),
 				Protocol:   "TCP",
 			}},
 			Selector: map[string]string{
@@ -1290,39 +1392,69 @@ func stopServeHostnameService(c *client.Client, ns, name string) error {
 	return nil
 }
 
-func verifyServeHostnameServiceUp(c *client.Client, host string, expectedPods []string, serviceIP string, servicePort int) error {
+// verifyServeHostnameServiceUp wgets the given serviceIP:servicePort from the
+// given host and from within a pod. The host is expected to be an SSH-able node
+// in the cluster. Each pod in the service is expected to echo its name. These
+// names are compared with the given expectedPods list after a sort | uniq.
+func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPods []string, serviceIP string, servicePort int) error {
+	execPodName := "execpod"
+	createExecPodOrFail(c, ns, execPodName)
+	defer func() {
+		deletePodOrFail(c, ns, execPodName)
+	}()
+	// Loop a bunch of times - the proxy is randomized, so we want a good
+	// chance of hitting each backend at least once.
 	command := fmt.Sprintf(
 		"for i in $(seq 1 %d); do wget -q -T 1 -O - http://%s:%d || true; echo; done",
-		3*len(expectedPods), serviceIP, servicePort)
+		50*len(expectedPods), serviceIP, servicePort)
 
-	commands := []string{
+	commands := []func() string{
 		// verify service from node
-		fmt.Sprintf(`set -e; %s | sort -n | uniq`, command),
-		// verify service from container
-		fmt.Sprintf(`set -e;
-			sudo docker pull gcr.io/google_containers/busybox > /dev/null;
-			sudo docker run gcr.io/google_containers/busybox sh -c '%v' | sort -n | uniq`,
-			command),
-	}
-
-	By(fmt.Sprintf("verifying service has %d reachable backends", len(expectedPods)))
-	for _, cmd := range commands {
-		passed := false
-		for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5) {
-			stdout, _, code, err := SSH(cmd, host, testContext.Provider)
-			if err != nil || code != 0 {
-				Logf("error while SSH-ing to node: %v (code %v)", err, code)
+		func() string {
+			cmd := fmt.Sprintf(`set -e; %s`, command)
+			Logf("Executing cmd %v on host %v", cmd, host)
+			result, err := SSH(cmd, host, testContext.Provider)
+			if err != nil || result.Code != 0 {
+				LogSSHResult(result)
+				Logf("error while SSH-ing to node: %v", err)
 			}
-			pods := strings.Split(strings.TrimSpace(stdout), "\n")
-			sort.StringSlice(pods).Sort()
-			if api.Semantic.DeepEqual(pods, expectedPods) {
+			return result.Stdout
+		},
+		// verify service from pod
+		func() string {
+			Logf("Executing cmd %v in pod %v/%v", command, ns, execPodName)
+			// TODO: Use exec-over-http via the netexec pod instead of kubectl exec.
+			output, err := RunHostCmd(ns, execPodName, command)
+			if err != nil {
+				Logf("error while kubectl execing %v in pod %v/%v: %v\nOutput: %v", command, ns, execPodName, err, output)
+			}
+			return output
+		},
+	}
+	sort.StringSlice(expectedPods).Sort()
+	By(fmt.Sprintf("verifying service has %d reachable backends", len(expectedPods)))
+	for _, cmdFunc := range commands {
+		passed := false
+		pods := []string{}
+		// Retry cmdFunc for a while
+		for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
+			pods = strings.Split(strings.TrimSpace(cmdFunc()), "\n")
+			// Uniq pods before the sort because inserting them into a set
+			// (which is implemented using dicts) can re-order them.
+			uniquePods := sets.String{}
+			for _, name := range pods {
+				uniquePods.Insert(name)
+			}
+			sortedPods := uniquePods.List()
+			sort.StringSlice(sortedPods).Sort()
+			if api.Semantic.DeepEqual(sortedPods, expectedPods) {
 				passed = true
 				break
 			}
-			Logf("Waiting for expected pods for %s: %v, got: %v", serviceIP, expectedPods, pods)
+			Logf("Waiting for expected pods for %s: %v, got: %v", serviceIP, expectedPods, sortedPods)
 		}
 		if !passed {
-			return fmt.Errorf("service verification failed for:\n %s", cmd)
+			return fmt.Errorf("service verification failed for:\n %s, expected to retrieve pods %v, only retrieved %v", serviceIP, expectedPods, pods)
 		}
 	}
 	return nil
@@ -1333,11 +1465,12 @@ func verifyServeHostnameServiceDown(c *client.Client, host string, serviceIP str
 		"curl -s --connect-timeout 2 http://%s:%d && exit 99", serviceIP, servicePort)
 
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		_, _, code, err := SSH(command, host, testContext.Provider)
+		result, err := SSH(command, host, testContext.Provider)
 		if err != nil {
+			LogSSHResult(result)
 			Logf("error while SSH-ing to node: %v", err)
 		}
-		if code != 99 {
+		if result.Code != 99 {
 			return nil
 		}
 		Logf("service still alive - still waiting")
@@ -1361,7 +1494,7 @@ func httpGetNoConnectionPool(url string) (*http.Response, error) {
 }
 
 // Simple helper class to avoid too much boilerplate in tests
-type WebserverTest struct {
+type ServerTest struct {
 	ServiceName string
 	Namespace   string
 	Client      *client.Client
@@ -1375,8 +1508,8 @@ type WebserverTest struct {
 	image    string
 }
 
-func NewWebserverTest(client *client.Client, namespace string, serviceName string) *WebserverTest {
-	t := &WebserverTest{}
+func NewServerTest(client *client.Client, namespace string, serviceName string) *ServerTest {
+	t := &ServerTest{}
 	t.Client = client
 	t.Namespace = namespace
 	t.ServiceName = serviceName
@@ -1394,8 +1527,27 @@ func NewWebserverTest(client *client.Client, namespace string, serviceName strin
 	return t
 }
 
+func NewNetcatTest(client *client.Client, namespace string, serviceName string) *ServerTest {
+	t := &ServerTest{}
+	t.Client = client
+	t.Namespace = namespace
+	t.ServiceName = serviceName
+	t.TestId = t.ServiceName + "-" + string(util.NewUUID())
+	t.Labels = map[string]string{
+		"testid": t.TestId,
+	}
+
+	t.rcs = make(map[string]bool)
+	t.services = make(map[string]bool)
+
+	t.name = "netcat"
+	t.image = "ubuntu"
+
+	return t
+}
+
 // Build default config for a service (which can then be changed)
-func (t *WebserverTest) BuildServiceSpec() *api.Service {
+func (t *ServerTest) BuildServiceSpec() *api.Service {
 	service := &api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:      t.ServiceName,
@@ -1405,7 +1557,7 @@ func (t *WebserverTest) BuildServiceSpec() *api.Service {
 			Selector: t.Labels,
 			Ports: []api.ServicePort{{
 				Port:       80,
-				TargetPort: util.NewIntOrStringFromInt(80),
+				TargetPort: intstr.FromInt(80),
 			}},
 		},
 	}
@@ -1414,8 +1566,24 @@ func (t *WebserverTest) BuildServiceSpec() *api.Service {
 
 // CreateWebserverRC creates rc-backed pods with the well-known webserver
 // configuration and records it for cleanup.
-func (t *WebserverTest) CreateWebserverRC(replicas int) *api.ReplicationController {
-	rcSpec := rcByNamePort(t.name, replicas, t.image, 80, t.Labels)
+func (t *ServerTest) CreateWebserverRC(replicas int) *api.ReplicationController {
+	rcSpec := rcByNamePort(t.name, replicas, t.image, 80, api.ProtocolTCP, t.Labels)
+	rcAct, err := t.createRC(rcSpec)
+	if err != nil {
+		Failf("Failed to create rc %s: %v", rcSpec.Name, err)
+	}
+	if err := verifyPods(t.Client, t.Namespace, t.name, false, replicas); err != nil {
+		Failf("Failed to create %d pods with name %s: %v", replicas, t.name, err)
+	}
+	return rcAct
+}
+
+// CreateNetcatRC creates rc-backed pods with a netcat listener
+// configuration and records it for cleanup.
+func (t *ServerTest) CreateNetcatRC(replicas int) *api.ReplicationController {
+	rcSpec := rcByNamePort(t.name, replicas, t.image, 80, api.ProtocolUDP, t.Labels)
+	rcSpec.Spec.Template.Spec.Containers[0].Command = []string{"/bin/bash"}
+	rcSpec.Spec.Template.Spec.Containers[0].Args = []string{"-c", "echo SUCCESS | nc -q 0 -u -l 0.0.0.0 80"}
 	rcAct, err := t.createRC(rcSpec)
 	if err != nil {
 		Failf("Failed to create rc %s: %v", rcSpec.Name, err)
@@ -1427,7 +1595,7 @@ func (t *WebserverTest) CreateWebserverRC(replicas int) *api.ReplicationControll
 }
 
 // createRC creates a replication controller and records it for cleanup.
-func (t *WebserverTest) createRC(rc *api.ReplicationController) (*api.ReplicationController, error) {
+func (t *ServerTest) createRC(rc *api.ReplicationController) (*api.ReplicationController, error) {
 	rc, err := t.Client.ReplicationControllers(t.Namespace).Create(rc)
 	if err == nil {
 		t.rcs[rc.Name] = true
@@ -1436,7 +1604,7 @@ func (t *WebserverTest) createRC(rc *api.ReplicationController) (*api.Replicatio
 }
 
 // Create a service, and record it for cleanup
-func (t *WebserverTest) CreateService(service *api.Service) (*api.Service, error) {
+func (t *ServerTest) CreateService(service *api.Service) (*api.Service, error) {
 	result, err := t.Client.Services(t.Namespace).Create(service)
 	if err == nil {
 		t.services[service.Name] = true
@@ -1445,7 +1613,7 @@ func (t *WebserverTest) CreateService(service *api.Service) (*api.Service, error
 }
 
 // Delete a service, and remove it from the cleanup list
-func (t *WebserverTest) DeleteService(serviceName string) error {
+func (t *ServerTest) DeleteService(serviceName string) error {
 	err := t.Client.Services(t.Namespace).Delete(serviceName)
 	if err == nil {
 		delete(t.services, serviceName)
@@ -1453,7 +1621,7 @@ func (t *WebserverTest) DeleteService(serviceName string) error {
 	return err
 }
 
-func (t *WebserverTest) Cleanup() []error {
+func (t *ServerTest) Cleanup() []error {
 	var errs []error
 	for rcName := range t.rcs {
 		By("stopping RC " + rcName + " in namespace " + t.Namespace)

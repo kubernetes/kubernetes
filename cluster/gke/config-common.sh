@@ -19,7 +19,7 @@
 # - CLUSTER_NAME  (the name of the cluster)
 
 ZONE="${ZONE:-us-central1-f}"
-NUM_MINIONS="${NUM_MINIONS:-2}"
+NUM_NODES="${NUM_NODES:-3}"
 CLUSTER_API_VERSION="${CLUSTER_API_VERSION:-}"
 NETWORK="${NETWORK:-default}"
 NETWORK_RANGE="${NETWORK_RANGE:-10.240.0.0/16}"
@@ -27,8 +27,8 @@ FIREWALL_SSH="${FIREWALL_SSH:-${NETWORK}-allow-ssh}"
 GCLOUD="${GCLOUD:-gcloud}"
 CMD_GROUP="${CMD_GROUP:-}"
 GCLOUD_CONFIG_DIR="${GCLOUD_CONFIG_DIR:-${HOME}/.config/gcloud/kubernetes}"
-MINION_SCOPES="${MINION_SCOPES:-"compute-rw,storage-ro"}"
-MACHINE_TYPE="${MACHINE_TYPE:-n1-standard-1}"
+NODE_SCOPES="${NODE_SCOPES:-"compute-rw,storage-ro"}"
+MACHINE_TYPE="${MACHINE_TYPE:-n1-standard-2}"
 
 # WARNING: any new vars added here must correspond to options that can be
 # passed to `gcloud {CMD_GROUP} container clusters create`, or they will

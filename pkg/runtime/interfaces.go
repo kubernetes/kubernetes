@@ -18,39 +18,10 @@ package runtime
 
 import (
 	"io"
+	"net/url"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
-
-// ObjectScheme represents common conversions between formal external API versions
-// and the internal Go structs. ObjectScheme is typically used with ObjectCodec to
-// transform internal Go structs into serialized versions. There may be many valid
-// ObjectCodecs for each ObjectScheme.
-type ObjectScheme interface {
-	ObjectConvertor
-	ObjectTyper
-	ObjectCreater
-	ObjectCopier
-}
-
-// ObjectCodec represents the common mechanisms for converting to and from a particular
-// binary representation of an object.
-type ObjectCodec interface {
-	ObjectEncoder
-	Decoder
-}
-
-// Decoder defines methods for deserializing API objects into a given type
-type Decoder interface {
-	Decode(data []byte) (Object, error)
-	DecodeToVersion(data []byte, version string) (Object, error)
-	DecodeInto(data []byte, obj Object) error
-	DecodeIntoWithSpecifiedVersionKind(data []byte, obj Object, kind, version string) error
-}
-
-// Encoder defines methods for serializing API objects into bytes
-type Encoder interface {
-	Encode(obj Object) (data []byte, err error)
-	EncodeToStream(obj Object, stream io.Writer) error
-}
 
 // Codec defines methods for serializing and deserializing API objects.
 type Codec interface {
@@ -58,22 +29,60 @@ type Codec interface {
 	Encoder
 }
 
-// ObjectCopier duplicates an object.
-type ObjectCopier interface {
-	// Copy returns an exact copy of the provided Object, or an error if the
-	// copy could not be completed.
-	Copy(Object) (Object, error)
+// Decoder defines methods for deserializing API objects into a given type
+type Decoder interface {
+	// TODO: change the signature of this method
+	Decode(data []byte) (Object, error)
+	// DEPRECATED: This method is being removed
+	DecodeToVersion(data []byte, groupVersion unversioned.GroupVersion) (Object, error)
+	// DEPRECATED: This method is being removed
+	DecodeInto(data []byte, obj Object) error
+	// DEPRECATED: This method is being removed
+	DecodeIntoWithSpecifiedVersionKind(data []byte, obj Object, groupVersionKind unversioned.GroupVersionKind) error
+
+	DecodeParametersInto(parameters url.Values, obj Object) error
 }
 
-// ObjectEncoder turns an object into a byte array. This interface is a
-// general form of the Encoder interface
-type ObjectEncoder interface {
+// Encoder defines methods for serializing API objects into bytes
+type Encoder interface {
+	// DEPRECATED: This method is being removed
+	Encode(obj Object) (data []byte, err error)
+	EncodeToStream(obj Object, stream io.Writer) error
+
+	// TODO: Add method for processing url parameters.
+	// EncodeParameters(obj Object) (url.Values, error)
+}
+
+// ObjectCodec represents the common mechanisms for converting to and from a particular
+// binary representation of an object.
+// TODO: Remove this interface - it is used only in CodecFor() method.
+type ObjectCodec interface {
+	Decoder
+
 	// EncodeToVersion convert and serializes an object in the internal format
 	// to a specified output version. An error is returned if the object
 	// cannot be converted for any reason.
 	EncodeToVersion(obj Object, outVersion string) ([]byte, error)
 	EncodeToVersionStream(obj Object, outVersion string, stream io.Writer) error
 }
+
+// ObjectDecoder is a convenience interface for identifying serialized versions of objects
+// and transforming them into Objects. It intentionally overlaps with ObjectTyper and
+// Decoder for use in decode only paths.
+// TODO: Consider removing this interface?
+type ObjectDecoder interface {
+	Decoder
+	// DataVersionAndKind returns the group,version,kind of the provided data, or an error
+	// if another problem is detected. In many cases this method can be as expensive to
+	// invoke as the Decode method.
+	DataKind([]byte) (unversioned.GroupVersionKind, error)
+	// Recognizes returns true if the scheme is able to handle the provided group,version,kind
+	// of an object.
+	Recognizes(unversioned.GroupVersionKind) bool
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Non-codec interfaces
 
 // ObjectConvertor converts an object to a different version.
 type ObjectConvertor interface {
@@ -85,36 +94,32 @@ type ObjectConvertor interface {
 // ObjectTyper contains methods for extracting the APIVersion and Kind
 // of objects.
 type ObjectTyper interface {
-	// DataVersionAndKind returns the version and kind of the provided data, or an error
+	// DataKind returns the group,version,kind of the provided data, or an error
 	// if another problem is detected. In many cases this method can be as expensive to
 	// invoke as the Decode method.
-	DataVersionAndKind([]byte) (version, kind string, err error)
-	// ObjectVersionAndKind returns the version and kind of the provided object, or an
+	DataKind([]byte) (unversioned.GroupVersionKind, error)
+	// ObjectKind returns the default group,version,kind of the provided object, or an
 	// error if the object is not recognized (IsNotRegisteredError will return true).
-	ObjectVersionAndKind(Object) (version, kind string, err error)
+	ObjectKind(Object) (unversioned.GroupVersionKind, error)
+	// ObjectKinds returns the all possible group,version,kind of the provided object, or an
+	// error if the object is not recognized (IsNotRegisteredError will return true).
+	ObjectKinds(Object) ([]unversioned.GroupVersionKind, error)
 	// Recognizes returns true if the scheme is able to handle the provided version and kind,
 	// or more precisely that the provided version is a possible conversion or decoding
 	// target.
-	Recognizes(version, kind string) bool
+	Recognizes(gvk unversioned.GroupVersionKind) bool
 }
 
 // ObjectCreater contains methods for instantiating an object by kind and version.
 type ObjectCreater interface {
-	New(version, kind string) (out Object, err error)
+	New(kind unversioned.GroupVersionKind) (out Object, err error)
 }
 
-// ObjectDecoder is a convenience interface for identifying serialized versions of objects
-// and transforming them into Objects. It intentionally overlaps with ObjectTyper and
-// Decoder for use in decode only paths.
-type ObjectDecoder interface {
-	Decoder
-	// DataVersionAndKind returns the version and kind of the provided data, or an error
-	// if another problem is detected. In many cases this method can be as expensive to
-	// invoke as the Decode method.
-	DataVersionAndKind([]byte) (version, kind string, err error)
-	// Recognizes returns true if the scheme is able to handle the provided version and kind
-	// of an object.
-	Recognizes(version, kind string) bool
+// ObjectCopier duplicates an object.
+type ObjectCopier interface {
+	// Copy returns an exact copy of the provided Object, or an error if the
+	// copy could not be completed.
+	Copy(Object) (Object, error)
 }
 
 // ResourceVersioner provides methods for setting and retrieving
@@ -135,11 +140,10 @@ type SelfLinker interface {
 	Namespace(obj Object) (string, error)
 }
 
-// All api types must support the Object interface. It's deliberately tiny so that this is not an onerous
-// burden. Implement it with a pointer receiver; this will allow us to use the go compiler to check the
-// one thing about our objects that it's capable of checking for us.
+// All API types registered with Scheme must support the Object interface. Since objects in a scheme are
+// expected to be serialized to the wire, the interface an Object must provide to the Scheme allows
+// serializers to set the kind, version, and group the object is represented as. An Object may choose
+// to return a no-op ObjectKindAccessor in cases where it is not expected to be serialized.
 type Object interface {
-	// This function is used only to enforce membership. It's never called.
-	// TODO: Consider mass rename in the future to make it do something useful.
-	IsAnAPIObject()
+	GetObjectKind() unversioned.ObjectKind
 }

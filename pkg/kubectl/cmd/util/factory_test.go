@@ -170,15 +170,15 @@ func TestLabelsForObject(t *testing.T) {
 func TestCanBeExposed(t *testing.T) {
 	factory := NewFactory(nil)
 	tests := []struct {
-		kind      string
+		kind      unversioned.GroupKind
 		expectErr bool
 	}{
 		{
-			kind:      "ReplicationController",
+			kind:      api.Kind("ReplicationController"),
 			expectErr: false,
 		},
 		{
-			kind:      "Node",
+			kind:      api.Kind("Node"),
 			expectErr: true,
 		},
 	}
@@ -207,7 +207,7 @@ func TestFlagUnderscoreRenaming(t *testing.T) {
 }
 
 func loadSchemaForTest() (validation.Schema, error) {
-	pathToSwaggerSpec := "../../../../api/swagger-spec/" + testapi.Default.Version() + ".json"
+	pathToSwaggerSpec := "../../../../api/swagger-spec/" + testapi.Default.GroupVersion().Version + ".json"
 	data, err := ioutil.ReadFile(pathToSwaggerSpec)
 	if err != nil {
 		return nil, err
@@ -230,7 +230,7 @@ func TestValidateCachesSchema(t *testing.T) {
 
 	c := &fake.RESTClient{
 		Codec: testapi.Default.Codec(),
-		Client: fake.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
 				requests[p] = requests[p] + 1

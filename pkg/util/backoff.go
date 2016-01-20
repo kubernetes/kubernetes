@@ -70,6 +70,13 @@ func (p *Backoff) Next(id string, eventTime time.Time) {
 	entry.lastUpdate = p.Clock.Now()
 }
 
+// Reset forces clearing of all backoff data for a given key.
+func (p *Backoff) Reset(id string) {
+	p.Lock()
+	defer p.Unlock()
+	delete(p.perItemBackoff, id)
+}
+
 // Returns True if the elapsed time since eventTime is smaller than the current backoff window
 func (p *Backoff) IsInBackOffSince(id string, eventTime time.Time) bool {
 	p.Lock()

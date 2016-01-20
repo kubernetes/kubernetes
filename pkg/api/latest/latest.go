@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -41,20 +41,24 @@ var (
 	IsRegistered = allGroups.IsRegistered
 )
 
+// ExternalVersions is a list of all external versions for this API group in order of
+// most preferred to least preferred
+var ExternalVersions = []unversioned.GroupVersion{
+	{Group: "", Version: "v1"},
+}
+
 // GroupMetaMap is a map between group names and their metadata.
 type GroupMetaMap map[string]*GroupMeta
 
 // RegisterGroup registers a group to GroupMetaMap.
-func (g GroupMetaMap) RegisterGroup(group string) (*GroupMeta, error) {
-	_, found := g[group]
-	if found {
-		return nil, fmt.Errorf("group %v is already registered", g)
+func (g GroupMetaMap) RegisterGroup(groupMeta GroupMeta) error {
+	groupName := groupMeta.GroupVersion.Group
+	if _, found := g[groupName]; found {
+		return fmt.Errorf("group %v is already registered", g)
 	}
-	if len(registered.GroupVersionsForGroup(group)) == 0 {
-		return nil, fmt.Errorf("No version is registered for group %v", group)
-	}
-	g[group] = &GroupMeta{}
-	return g[group], nil
+
+	g[groupName] = &groupMeta
+	return nil
 }
 
 // Group returns the metadata of a group if the gruop is registered, otherwise
@@ -64,7 +68,8 @@ func (g GroupMetaMap) Group(group string) (*GroupMeta, error) {
 	if !found {
 		return nil, fmt.Errorf("no version is registered for group %v", group)
 	}
-	return groupMeta, nil
+	groupMetaCopy := *groupMeta
+	return &groupMetaCopy, nil
 }
 
 // IsRegistered takes a string and determines if it's one of the registered groups
@@ -86,7 +91,8 @@ func (g GroupMetaMap) GroupOrDie(group string) *GroupMeta {
 			panic(fmt.Sprintf("No version is registered for group %s. ", group) + msg)
 		}
 	}
-	return groupMeta
+	groupMetaCopy := *groupMeta
+	return &groupMetaCopy
 }
 
 // AllPreferredGroupVersions returns the preferred versions of all registered
@@ -97,7 +103,7 @@ func (g GroupMetaMap) AllPreferredGroupVersions() string {
 	}
 	var defaults []string
 	for _, groupMeta := range g {
-		defaults = append(defaults, groupMeta.GroupVersion)
+		defaults = append(defaults, groupMeta.GroupVersion.String())
 	}
 	sort.Strings(defaults)
 	return strings.Join(defaults, ",")
@@ -105,27 +111,12 @@ func (g GroupMetaMap) AllPreferredGroupVersions() string {
 
 // GroupMeta stores the metadata of a group, such as the latest supported version.
 type GroupMeta struct {
-	// GroupVersion represents the current external default version of the group. It
-	// is in the form of "group/version".
-	GroupVersion string
-
-	// Version represents the current external default version of the group.
-	// It equals to the "version" part of GroupVersion.
-	Version string
-
-	// Group represents the name of the group
-	Group string
-
-	// Versions is the list of versions that are recognized in code. The order
-	// provided is assumed to be from the oldest to the newest, e.g.,
-	// Versions[0] == oldest and Versions[N-1] == newest.
-	// Clients may choose to prefer the latter items in the list over the former
-	// items when presented with a set of versions to choose.
-	Versions []string
+	// GroupVersion represents the current external default version of the group.
+	GroupVersion unversioned.GroupVersion
 
 	// GroupVersions is Group + Versions. This is to avoid string concatenation
 	// in many places.
-	GroupVersions []string
+	GroupVersions []unversioned.GroupVersion
 
 	// Codec is the default codec for serializing output that should use
 	// the latest supported version.  Use this Codec when writing to
@@ -144,6 +135,6 @@ type GroupMeta struct {
 	RESTMapper meta.RESTMapper
 
 	// InterfacesFor returns the default Codec and ResourceVersioner for a given version
-	// string, or an error if the version is not known.
-	InterfacesFor func(version string) (*meta.VersionInterfaces, error)
+	// or an error if the version is not known.
+	InterfacesFor func(version unversioned.GroupVersion) (*meta.VersionInterfaces, error)
 }

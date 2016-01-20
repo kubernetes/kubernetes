@@ -55,12 +55,16 @@ The command line parameters that affect the hash calculation are listed below.
 - `--allow-privileged`
 - `--api-servers`
 - `--auth-path`
-- `--cluster_*`
-- `--executor_*`
-- `--kubelet_*`
+- `--cluster-*`
+- `--executor-*`
+- `--kubelet-*`
 - `--km-path`
+- `--mesos-cgroup-prefix`
+- `--mesos-launch-grace-period`
+- `--minion-*`
 - `--profiling`
-- `--proxy_path`
+- `--proxy-*`
+- `--static-pods-config`
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/mesos/docs/ha.md?pixel)]()

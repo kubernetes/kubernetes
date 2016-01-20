@@ -31,35 +31,35 @@ function detect-vivid-image () {
   if [[ -z "${AWS_IMAGE-}" ]]; then
     case "${AWS_REGION}" in
       ap-northeast-1)
-        AWS_IMAGE=ami-907fa690
+        AWS_IMAGE=ami-ee023e80
         ;;
 
       ap-southeast-1)
-        AWS_IMAGE=ami-b4a79de6
+        AWS_IMAGE=ami-7ad91519
         ;;
 
       eu-central-1)
-        AWS_IMAGE=ami-e8635bf5
+        AWS_IMAGE=ami-9c7960f0
         ;;
 
       eu-west-1)
-        AWS_IMAGE=ami-0fd0ae78
+        AWS_IMAGE=ami-6a379c19
         ;;
 
       sa-east-1)
-        AWS_IMAGE=ami-f9f675e4
+        AWS_IMAGE=ami-7d49c811
         ;;
 
       us-east-1)
-        AWS_IMAGE=ami-f57b8f9e
+        AWS_IMAGE=ami-b5bd98df
         ;;
 
       us-west-1)
-        AWS_IMAGE=ami-87b643c3
+        AWS_IMAGE=ami-b30571d3
         ;;
 
       cn-north-1)
-        AWS_IMAGE=ami-3abf2203
+        AWS_IMAGE=ami-4c7ab321
         ;;
 
       #us-gov-west-1)
@@ -67,15 +67,15 @@ function detect-vivid-image () {
       #  ;;
 
       ap-southeast-2)
-        AWS_IMAGE=ami-1bb9c221
+        AWS_IMAGE=ami-d11431b2
         ;;
 
       us-west-2)
-        AWS_IMAGE=ami-33566d03
+        AWS_IMAGE=ami-58a2b839
         ;;
 
       *)
-        echo "Please specify AWS_IMAGE directly (region not recognized)"
+        echo "Please specify AWS_IMAGE directly (region ${AWS_REGION} not recognized)"
         exit 1
     esac
   fi
