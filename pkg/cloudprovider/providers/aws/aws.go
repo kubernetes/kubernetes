@@ -2146,20 +2146,53 @@ func (a *AWSCloud) getInstancesByIDs(instanceIDs []*string) (map[string]*ec2.Ins
 	return instancesByID, nil
 }
 
-// TODO: Make efficient
+// Fetches instances by node names; returns an error if any cannot be found.
+// This is currently implemented by fetching all the instances, because this is currently called for all nodes (i.e. the majority)
+// In practice, the breakeven vs looping through and calling getInstanceByNodeName is probably around N=2.
 func (a *AWSCloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance, error) {
-	instances := []*ec2.Instance{}
-	for _, nodeName := range nodeNames {
-		instance, err := a.getInstanceByNodeName(nodeName)
-		if err != nil {
-			return nil, err
-		}
-		if instance == nil {
-			return nil, fmt.Errorf("unable to find instance " + nodeName)
-		}
-		instances = append(instances, instance)
+	allInstances, err := a.getAllInstances()
+	if err != nil {
+		return nil, err
 	}
+
+	nodeNamesMap := make(map[string]int, len(nodeNames))
+	for i, nodeName := range nodeNames {
+		nodeNamesMap[nodeName] = i
+	}
+
+	instances := make([]*ec2.Instance, len(nodeNames))
+	for _, instance := range allInstances {
+		nodeName := aws.StringValue(instance.PrivateDnsName)
+		if nodeName == "" {
+			glog.V(2).Infof("ignoring ec2 instance with no PrivateDnsName: %q", aws.StringValue(instance.InstanceId))
+			continue
+		}
+		i, found := nodeNamesMap[nodeName]
+		if !found {
+			continue
+		}
+		instances[i] = instance
+	}
+
+	for i, instance := range instances {
+		if instance == nil {
+			nodeName := nodeNames[i]
+			return nil, fmt.Errorf("unable to find instance %q", nodeName)
+		}
+	}
+
 	return instances, nil
+}
+
+// Returns all instances that are tagged as being in this cluster.
+func (a *AWSCloud) getAllInstances() ([]*ec2.Instance, error) {
+	filters := []*ec2.Filter{}
+	filters = a.addFilters(filters)
+	request := &ec2.DescribeInstancesInput{
+		Filters: filters,
+	}
+
+	return a.ec2.DescribeInstances(request)
 }
 
 // Returns the instance with the specified node name
