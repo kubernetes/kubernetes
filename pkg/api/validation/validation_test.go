@@ -476,6 +476,17 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "gitrepodot", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "my-repo", Directory: "."}}},
 		{Name: "iscsidisk", VolumeSource: api.VolumeSource{ISCSI: &api.ISCSIVolumeSource{TargetPortal: "127.0.0.1", IQN: "iqn.2015-02.example.com:test", Lun: 1, FSType: "ext4", ReadOnly: false}}},
 		{Name: "secret", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "my-secret"}}},
+		{Name: "secret-files", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{Items: []api.SecretVolumeFile{
+			{
+				SecretKeySelector: api.SecretKeySelector{
+					LocalObjectReference: api.LocalObjectReference{
+						Name: "my-secret",
+					},
+					Key: "some-key",
+				},
+			},
+		}}},
+		},
 		{Name: "glusterfs", VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "host1", Path: "path", ReadOnly: false}}},
 		{Name: "flocker", VolumeSource: api.VolumeSource{Flocker: &api.FlockerVolumeSource{DatasetName: "datasetName"}}},
 		{Name: "rbd", VolumeSource: api.VolumeSource{RBD: &api.RBDVolumeSource{CephMonitors: []string{"foo"}, RBDImage: "bar", FSType: "ext4"}}},
@@ -697,6 +708,11 @@ func TestValidateVolumes(t *testing.T) {
 			}
 		}
 	}
+
+	// TODO: validation failures where multiple errors are returned
+	// multiErrorCases := map[string]struct{
+
+	// }
 }
 
 func TestValidatePorts(t *testing.T) {
