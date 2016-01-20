@@ -1,4 +1,11 @@
-sudo: false
+sudo: required
+
+# trusty required for docker
+# https://github.com/travis-ci/travis-ci/issues/5448
+dist: trusty
+
+services:
+  - docker
 
 language: go
 
