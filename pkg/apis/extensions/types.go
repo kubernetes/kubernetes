@@ -233,9 +233,9 @@ type DeploymentSpec struct {
 	// zero and not specified. Defaults to 1.
 	Replicas int `json:"replicas,omitempty"`
 
-	// Label selector for pods. Existing ReplicationControllers whose pods are
+	// Label selector for pods. Existing ReplicaSets whose pods are
 	// selected by this will be the ones affected by this deployment.
-	Selector map[string]string `json:"selector,omitempty"`
+	Selector *LabelSelector `json:"selector,omitempty"`
 
 	// Template describes the pods that will be created.
 	Template api.PodTemplateSpec `json:"template"`

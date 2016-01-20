@@ -220,7 +220,7 @@ type DeploymentSpec struct {
 
 	// Label selector for pods. Existing ReplicationControllers whose pods are
 	// selected by this will be the ones affected by this deployment.
-	Selector map[string]string `json:"selector,omitempty"`
+	Selector *LabelSelector `json:"selector,omitempty"`
 
 	// Template describes the pods that will be created.
 	Template v1.PodTemplateSpec `json:"template"`

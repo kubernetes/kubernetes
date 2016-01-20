@@ -447,11 +447,20 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			switch t := object.(type) {
 			case *api.ReplicationController:
-				return GetFirstPod(client, t.Namespace, t.Spec.Selector)
+				selector := labels.SelectorFromSet(t.Spec.Selector)
+				return GetFirstPod(client, t.Namespace, selector)
 			case *extensions.Deployment:
-				return GetFirstPod(client, t.Namespace, t.Spec.Selector)
+				selector, err := extensions.LabelSelectorAsSelector(t.Spec.Selector)
+				if err != nil {
+					return nil, fmt.Errorf("failed to convert label selector to selector: %v", err)
+				}
+				return GetFirstPod(client, t.Namespace, selector)
 			case *extensions.Job:
-				return GetFirstPod(client, t.Namespace, t.Spec.Selector.MatchLabels)
+				selector, err := extensions.LabelSelectorAsSelector(t.Spec.Selector)
+				if err != nil {
+					return nil, fmt.Errorf("failed to convert label selector to selector: %v", err)
+				}
+				return GetFirstPod(client, t.Namespace, selector)
 			case *api.Pod:
 				return t, nil
 			default:
@@ -469,12 +478,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 }
 
 // GetFirstPod returns the first pod of an object from its namespace and selector
-func GetFirstPod(client *client.Client, namespace string, selector map[string]string) (*api.Pod, error) {
+func GetFirstPod(client *client.Client, namespace string, selector labels.Selector) (*api.Pod, error) {
 	var pods *api.PodList
 	for pods == nil || len(pods.Items) == 0 {
 		var err error
-		labelSelector := labels.SelectorFromSet(selector)
-		options := api.ListOptions{LabelSelector: labelSelector}
+		options := api.ListOptions{LabelSelector: selector}
 		if pods, err = client.Pods(namespace).List(options); err != nil {
 			return nil, err
 		}

@@ -104,9 +104,9 @@ func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.
 	out.Replicas = new(int32)
 	*out.Replicas = int32(in.Replicas)
 	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
+		out.Selector = new(LabelSelector)
+		if err := Convert_extensions_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
+			return err
 		}
 	} else {
 		out.Selector = nil
@@ -139,10 +139,11 @@ func Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 	if in.Replicas != nil {
 		out.Replicas = int(*in.Replicas)
 	}
+
 	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
+		out.Selector = new(extensions.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_extensions_LabelSelector(in.Selector, out.Selector, s); err != nil {
+			return err
 		}
 	} else {
 		out.Selector = nil

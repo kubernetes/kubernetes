@@ -342,7 +342,10 @@ func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, precondition
 			return err
 		}
 	}
-	scale := extensions.ScaleFromDeployment(deployment)
+	scale, err := extensions.ScaleFromDeployment(deployment)
+	if err != nil {
+		return ScaleError{ScaleUpdateFailure, deployment.ResourceVersion, err}
+	}
 	scale.Spec.Replicas = int(newSize)
 	if _, err := scaler.c.Scales(namespace).Update("Deployment", scale); err != nil {
 		if errors.IsInvalid(err) {
