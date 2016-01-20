@@ -75,7 +75,7 @@ This example requires a running Kubernetes cluster. See the [Getting Started gui
 
 ### Quick Start
 
-This section shows a simplest way to get the example work. If you want to know the details, you should skip this and read [the rest of the example](#step-one-start-up-the-redis-master).
+This section shows the simplest way to get the example work. If you want to know the details, you should skip this and read [the rest of the example](#step-one-start-up-the-redis-master).
 
 Start the guestbook with one command:
 
@@ -105,7 +105,7 @@ redis-master      10.0.136.3       <none>            6379/TCP      app=redis,rol
 redis-slave       10.0.21.92       <none>            6379/TCP      app=redis,role=slave,tier=backend   1h
 ```
 
-Now you can access the guestbook on each node with frontend service's `<ClusterIP>:Port`, e.g. `10.0.93.211:80` in this guide. `<ClusterIP>` is a cluster-internal IP. If you want to access the guestbook from outside of the cluster, add `type: NodePort` to frontend service `spec` field. Then you can access the guestbook with `<NodeIP>:NodePort` from outside of the cluster. On cloud providers which support external load balancers, setting the type field to "LoadBalancer" will provision a load balancer for your Service. There are several ways for you to access the guestbook. You may learn from [Accessing services running on the cluster](../../docs/user-guide/accessing-the-cluster.md#accessing-services-running-on-the-cluster).
+Now you can access the guestbook on each node with frontend service's `<ClusterIP>:Port`, e.g. `10.0.93.211:80` in this guide. `<ClusterIP>` is a cluster-internal IP. If you want to access the guestbook from outside of the cluster, add `type: NodePort` to the frontend service `spec` field. Then you can access the guestbook with `<NodeIP>:NodePort` from outside of the cluster. On cloud providers which support external load balancers, setting the type field to `type: LoadBalancer` will provision a load balancer for your service. There are several ways for you to access the guestbook. You may learn from [Accessing services running on the cluster](../../docs/user-guide/accessing-the-cluster.md#accessing-services-running-on-the-cluster).
 
 Clean up the guestbook:
 
@@ -228,7 +228,7 @@ NAME              CLUSTER_IP       EXTERNAL_IP       PORT(S)       SELECTOR     
 redis-master      10.0.136.3       <none>            6379/TCP      app=redis,role=master,tier=backend  1h
 ```
 
-This will cause all pods to see the redis master apparently running on <ip>:6379.  A service can map an incoming port to any `targetPort` in the backend pod.  Once created, the service proxy on each node is configured to set up a proxy on the specified port (in this case port 6379).
+This will cause all pods to see the redis master apparently running on `<ip>:6379`.  A service can map an incoming port to any `targetPort` in the backend pod.  Once created, the service proxy on each node is configured to set up a proxy on the specified port (in this case port `6379`).
 
 `targetPort` will default to `port` if it is omitted in the configuration. For simplicity's sake, we omit it in the following configurations.
 
@@ -253,13 +253,13 @@ If your cluster does not have the DNS service enabled, then you can use environm
 `GET_HOSTS_FROM` env value in both
 `examples/guestbook/redis-slave-controller.yaml` and `examples/guestbook/frontend-controller.yaml`
 from `dns` to `env` before you start up the app.
-(However, this is unlikely to be necessary. You can check for the DNS service in the list of the clusters' services by
+(However, this is unlikely to be necessary. You can check for the DNS service in the list of the cluster's services by
 running `kubectl --namespace=kube-system get rc`, and looking for a controller prefixed `kube-dns`.)
 Note that switching to env causes creation-order dependencies, since services need to be created before their clients that require env vars.
 
 #### Create a replication controller
 
-Second create the redis master pod in your Kubernetes cluster by running:
+Second, create the redis master pod in your Kubernetes cluster by running:
 
 ```console
 $ kubectl create -f examples/guestbook/redis-master-controller.yaml
@@ -325,7 +325,7 @@ Conditions:
 No events.
 ```
 
-The 'Node' is the name of the machine, e.g. `kubernetes-minion-krxw` in the example above.
+The `Node` is the name of the machine, e.g. `kubernetes-minion-krxw` in the example above.
 
 If you want to view the container logs for a given pod, you can run:
 
@@ -341,7 +341,7 @@ However, if you should want to SSH to the listed host machine, you can inspect v
 me@workstation$ gcloud compute ssh kubernetes-minion-krxw
 ```
 
-Then, you can look at the docker containers on the remote machine.  You should see something like this (the specifics of the IDs will be different):
+Then, you can look at the Docker containers on the remote machine.  You should see something like this (the specifics of the IDs will be different):
 
 ```console
 me@kubernetes-minion-krxw:~$ sudo docker ps
@@ -361,8 +361,8 @@ $ docker logs <container_id>
 Now that the redis master is running, we can start up its 'read slaves'.
 
 We'll define these as replicated pods as well, though this time— unlike for the redis master— we'll define the number of replicas to be 2.
-In Kubernetes, a replication controller is responsible for managing multiple instances of a replicated pod. The replication controller will automatically launch new pods if the number of replicas falls below the specified number.
-(This particular replicated pod is a great one to test this with -- you can try killing the docker processes for your pods directly, then watch them come back online on a new node shortly thereafter.)
+In Kubernetes, a replication controller (RC) is responsible for managing multiple instances of a replicated pod. The replication controller will automatically launch new pods if the number of replicas falls below the specified number.
+(This particular replicated pod is a great one to test this with -- you can try killing the Docker processes for your pods directly, then watch them come back online on a new node shortly thereafter.)
 
 Just like the master, we want to have a service to proxy connections to the redis slaves. In this case, in addition to discovery, the slave service will provide transparent load balancing to web app clients.
 
@@ -438,9 +438,9 @@ spec:
 [Download example](all-in-one/redis-slave.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE all-in-one/redis-slave.yaml -->
 
-This time the selector for the service is `app=redis,role=slave,tier=backend`, because that identifies the pods running redis slaves. It is generally helpful to set labels on your service itself as we've done here to make it easy to locate them with the `kubectl get services -l "app=redis,role=slave,tier=backend"` command. More lables usage, see [using-labels-effectively](../../docs/user-guide/managing-deployments.md#using-labels-effectively).
+This time the selector for the service is `app=redis,role=slave,tier=backend`, because that identifies the pods running redis slaves. It is generally helpful to set labels on your service itself as we've done here to make it easy to locate them with the `kubectl get services -l "app=redis,role=slave,tier=backend"` command. For more information on the usage of labels, see [using-labels-effectively](../../docs/user-guide/managing-deployments.md#using-labels-effectively).
 
-Now that you have created the specification, create it in your cluster by running:
+Now that you have created the specification, create the service in your cluster by running:
 
 ```console
 $ kubectl create -f examples/guestbook/all-in-one/redis-slave.yaml
@@ -582,7 +582,7 @@ redis-master                master                  redis                       
 redis-slave                 slave                   gcr.io/google_samples/gb-redisslave:v1     app=redis,role=slave,tier=backend      2
 ```
 
-Once it's up (again, it may take up to thirty seconds to create the pods) you can list the pods with specified labels the cluster, to verify that the master, slaves and frontends are all running. You should see a list contains pods with label tier like the following:
+Once it's up (again, it may take up to thirty seconds to create the pods), you can list the pods with specified labels in the cluster, to verify that the master, slaves and frontends are all running. You should see a list containing pods with label 'tier' like the following:
 
 ```console
 $ kubectl get pods -L tier
@@ -649,7 +649,7 @@ Note the use of the `redis-master` and `redis-slave` host names-- we're finding 
 
 ### Step Four: Cleanup
 
-If you are in a live kubernetes cluster, you can just kill the pods by deleteing the replication controllers and services. Using labels to select the resources to delete is an easy way to do this in one command.
+If you are in a live Kubernetes cluster, you can just kill the pods by deleting the replication controllers and services. Using labels to select the resources to delete is an easy way to do this in one command.
 
 ```console
 $ kubectl delete rc -l "app in (redis, guestbook)"
@@ -676,7 +676,7 @@ You'll want to set up your guestbook service so that it can be accessed from out
 
 More generally, Kubernetes supports two ways of exposing a service onto an external IP address: `NodePort`s and `LoadBalancer`s , as described [here](../../docs/user-guide/services.md#publishing-services---service-types).
 
-If the `LoadBalancer` specification is used, it can take a short period for an external IP to show up in `kubectl get services` output, but you should shortly see it listed as well, e.g. like this:
+If the `LoadBalancer` specification is used, it can take a short period for an external IP to show up in `kubectl get services` output, but you should then see it listed as well, e.g. like this:
 
 ```console
 $ kubectl get services
@@ -696,9 +696,9 @@ If you are more advanced in the ops arena, you can also manually get the service
 
 #### Google Compute Engine External Load Balancer Specifics
 
-In Google Compute Engine, Kubernetes automatically creates forwarding rule for services with `LoadBalancer`.
+In Google Compute Engine, Kubernetes automatically creates forwarding rules for services with `LoadBalancer`.
 
-You can list the forwarding rules like this.  The forwarding rule also indicates the external IP.
+You can list the forwarding rules like this (the forwarding rule also indicates the external IP):
 
 ```console
 $ gcloud compute forwarding-rules list
@@ -712,7 +712,7 @@ In Google Compute Engine, you also may need to open the firewall for port 80 usi
 $ gcloud compute firewall-rules create --allow=tcp:80 --target-tags=kubernetes-minion kubernetes-minion-80
 ```
 
-For GCE kubernetes startup details, see the [Getting started on Google Compute Engine](../../docs/getting-started-guides/gce.md)
+For GCE Kubernetes startup details, see the [Getting started on Google Compute Engine](../../docs/getting-started-guides/gce.md)
 
 For Google Compute Engine details about limiting traffic to specific sources, see the [Google Compute Engine firewall documentation][gce-firewall-docs].
 
