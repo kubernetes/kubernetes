@@ -82,7 +82,7 @@ func main() {
 
 	if *test {
 		arguments.InputDirs = append(dependencies, []string{
-			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup",
+			"k8s.io/kubernetes/examples/apis/testgroup",
 		}...)
 		// We may change the output path later.
 		arguments.OutputPackagePath = "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput"

@@ -23,8 +23,8 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup"
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup/v1"
+	"k8s.io/kubernetes/examples/apis/testgroup"
+	"k8s.io/kubernetes/examples/apis/testgroup/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -33,14 +33,12 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-const importPrefix = "k8s.io/kubernetes/pkg/apis/testgroup"
+const importPrefix = "k8s.io/kubernetes/examples/apis/testgroup"
 
 var accessor = meta.NewAccessor()
 
-const groupName = "testgroup"
-
 // availableVersions lists all known external versions for this group from most preferred to least preferred
-var availableVersions = []unversioned.GroupVersion{{Group: groupName, Version: "v1"}}
+var availableVersions = []unversioned.GroupVersion{v1.SchemeGroupVersion}
 
 func init() {
 	externalVersions := availableVersions
@@ -85,7 +83,7 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 			MetadataAccessor: accessor,
 		}, nil
 	default:
-		g, _ := latest.Group(groupName)
+		g, _ := latest.Group(v1.SchemeGroupVersion.Group)
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
 	}
 }
