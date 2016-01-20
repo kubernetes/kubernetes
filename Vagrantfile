@@ -5,7 +5,7 @@
 VAGRANTFILE_API_VERSION = "2"
 
 # Require a recent version of vagrant otherwise some have reported errors setting host names on boxes
-Vagrant.require_version ">= 1.6.2"
+Vagrant.require_version ">= 1.7.4"
 
 if ARGV.first == "up" && ENV['USING_KUBE_SCRIPTS'] != 'true'
   raise Vagrant::Errors::VagrantError.new, <<END
@@ -54,28 +54,28 @@ $kube_provider_boxes = {
       # your own value so long as you provide :box_url; for example, the
       # "official" name of this box is "rickard-von-essen/
       # opscode_fedora-20", but by providing the URL and our own name, we
-      # make it appear as yet another provider under the "kube-fedora20"
+      # make it appear as yet another provider under the "kube-fedora22"
       # box
-      :box_name => 'kube-fedora20',
-      :box_url => 'https://atlas.hashicorp.com/rickard-von-essen/boxes/opscode_fedora-20/versions/0.4.0/providers/parallels.box'
+      :box_name => 'kube-fedora23',
+      :box_url => 'https://opscode-vm-bento.s3.amazonaws.com/vagrant/parallels/opscode_fedora-23_chef-provisionerless.box'
     }
   },
   :virtualbox => {
     'fedora' => {
-      :box_name => 'kube-fedora21',
-      :box_url => 'http://opscode-vm-bento.s3.amazonaws.com/vagrant/virtualbox/opscode_fedora-21_chef-provisionerless.box'
+      :box_name => 'kube-fedora23',
+      :box_url => 'https://opscode-vm-bento.s3.amazonaws.com/vagrant/virtualbox/opscode_fedora-23_chef-provisionerless.box'
     }
   },
   :libvirt => {
     'fedora' => {
-      :box_name => 'kube-fedora21',
-      :box_url => 'https://amadeus.box.com/shared/static/93mj2fajrii6afeh8b5v5ihuk2ows2yn.box'
+      :box_name => 'kube-fedora23',
+      :box_url => 'https://dl.fedoraproject.org/pub/fedora/linux/releases/23/Cloud/x86_64/Images/Fedora-Cloud-Base-Vagrant-23-20151030.x86_64.vagrant-libvirt.box'
     }
   },
   :vmware_desktop => {
     'fedora' => {
-      :box_name => 'kube-fedora21',
-      :box_url => 'http://opscode-vm-bento.s3.amazonaws.com/vagrant/vmware/opscode_fedora-21_chef-provisionerless.box'
+      :box_name => 'kube-fedora23',
+      :box_url => 'https://opscode-vm-bento.s3.amazonaws.com/vagrant/vmware/opscode_fedora-23_chef-provisionerless.box'
     }
   }
 }

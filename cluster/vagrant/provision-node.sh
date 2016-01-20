@@ -22,11 +22,7 @@ set -o pipefail
 # See: https://github.com/mitchellh/vagrant/issues/2430
 hostnamectl set-hostname ${NODE_NAME}
 
-if [[ "$(grep 'VERSION_ID' /etc/os-release)" =~ ^VERSION_ID=21 ]]; then
-  # Workaround to vagrant inability to guess interface naming sequence
-  # Tell system to abandon the new naming scheme and use eth* instead
-  rm -f /etc/sysconfig/network-scripts/ifcfg-enp0s3
-
+if [[ "$(grep 'VERSION_ID' /etc/os-release)" =~ ^VERSION_ID=23 ]]; then
   # Disable network interface being managed by Network Manager (needed for Fedora 21+)
   NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
   if_to_edit=$( find ${NETWORK_CONF_PATH}ifcfg-* | xargs grep -l VAGRANT-BEGIN )
