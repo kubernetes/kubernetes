@@ -354,8 +354,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"rc":             &api.ReplicationController{},
 		},
 		"../docs/user-guide/secrets": {
-			"secret-pod": &api.Pod{},
-			"secret":     &api.Secret{},
+			"secret-pod":     &api.Pod{},
+			"secret":         &api.Secret{},
+			"secret-env-pod": &api.Pod{},
 		},
 		"../examples/spark": {
 			"spark-master-controller": &api.ReplicationController{},

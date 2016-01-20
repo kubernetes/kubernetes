@@ -291,6 +291,14 @@ func deepCopy_v1_EnvVarSource(in v1.EnvVarSource, out *v1.EnvVarSource, c *conve
 	} else {
 		out.ConfigMapKeyRef = nil
 	}
+	if in.SecretKeyRef != nil {
+		out.SecretKeyRef = new(v1.SecretKeySelector)
+		if err := deepCopy_v1_SecretKeySelector(*in.SecretKeyRef, out.SecretKeyRef, c); err != nil {
+			return err
+		}
+	} else {
+		out.SecretKeyRef = nil
+	}
 	return nil
 }
 
@@ -726,6 +734,14 @@ func deepCopy_v1_SELinuxOptions(in v1.SELinuxOptions, out *v1.SELinuxOptions, c 
 	out.Role = in.Role
 	out.Type = in.Type
 	out.Level = in.Level
+	return nil
+}
+
+func deepCopy_v1_SecretKeySelector(in v1.SecretKeySelector, out *v1.SecretKeySelector, c *conversion.Cloner) error {
+	if err := deepCopy_v1_LocalObjectReference(in.LocalObjectReference, &out.LocalObjectReference, c); err != nil {
+		return err
+	}
+	out.Key = in.Key
 	return nil
 }
 
@@ -1754,6 +1770,7 @@ func init() {
 		deepCopy_v1_RBDVolumeSource,
 		deepCopy_v1_ResourceRequirements,
 		deepCopy_v1_SELinuxOptions,
+		deepCopy_v1_SecretKeySelector,
 		deepCopy_v1_SecretVolumeSource,
 		deepCopy_v1_SecurityContext,
 		deepCopy_v1_TCPSocketAction,
