@@ -70,6 +70,9 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName string) er
 	}
 	// The generated UID is the hash of the file.
 	pod.Annotations[kubetypes.ConfigHashAnnotationKey] = string(pod.UID)
+
+	// Set the default status to pending.
+	pod.Status.Phase = api.PodPending
 	return nil
 }
 
