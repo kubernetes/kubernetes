@@ -69,12 +69,29 @@ func TestPreformattedImbalance(t *testing.T) {
 	}
 	for i, c := range cases {
 		in := getMungeLines(c.in)
-		_, err := checkPreformatBalance("filename.md", in)
+		out, err := checkPreformatBalance("filename.md", in)
 		if err != nil && c.ok {
 			t.Errorf("case[%d]: expected success", i)
 		}
 		if err == nil && !c.ok {
 			t.Errorf("case[%d]: expected failure", i)
 		}
+		// Even in case of misformat, return all the text,
+		// so that the user's work is not lost.
+		if !equalMungeLines(out, in) {
+			t.Errorf("case[%d]: expected munged text to be identical to input text", i)
+		}
 	}
+}
+
+func equalMungeLines(a, b mungeLines) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
