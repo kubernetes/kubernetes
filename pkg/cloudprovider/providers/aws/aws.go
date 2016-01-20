@@ -1306,14 +1306,6 @@ func (c *AWSCloud) GetVolumeLabels(volumeName string) (map[string]string, error)
 	return labels, nil
 }
 
-func (v *AWSCloud) Configure(name string, spec *api.NodeSpec) error {
-	return nil
-}
-
-func (v *AWSCloud) Release(name string) error {
-	return nil
-}
-
 // Gets the current load balancer state
 func (s *AWSCloud) describeLoadBalancer(name string) (*elb.LoadBalancerDescription, error) {
 	request := &elb.DescribeLoadBalancersInput{}
