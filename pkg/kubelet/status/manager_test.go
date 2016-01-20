@@ -84,14 +84,14 @@ func getRandomPodStatus() api.PodStatus {
 func verifyActions(t *testing.T, kubeClient client.Interface, expectedActions []testclient.Action) {
 	actions := kubeClient.(*testclient.Fake).Actions()
 	if len(actions) != len(expectedActions) {
-		t.Fatalf("unexpected actions, got: %s expected: %s", actions, expectedActions)
+		t.Fatalf("unexpected actions, got: %+v expected: %+v", actions, expectedActions)
 		return
 	}
 	for i := 0; i < len(actions); i++ {
 		e := expectedActions[i]
 		a := actions[i]
 		if !a.Matches(e.GetVerb(), e.GetResource()) || a.GetSubresource() != e.GetSubresource() {
-			t.Errorf("unexpected actions, got: %s expected: %s", actions, expectedActions)
+			t.Errorf("unexpected actions, got: %+v expected: %+v", actions, expectedActions)
 		}
 	}
 }
@@ -713,4 +713,59 @@ func expectPodStatus(t *testing.T, m *manager, pod *api.Pod) api.PodStatus {
 		t.Fatalf("Expected PodStatus for %q not found", pod.UID)
 	}
 	return status
+}
+
+func TestDeletePods(t *testing.T) {
+	pod := getTestPod()
+	// Set the deletion timestamp.
+	pod.DeletionTimestamp = new(unversioned.Time)
+	client := testclient.NewSimpleFake(pod)
+	m := newTestManager(client)
+	m.podManager.AddPod(pod)
+
+	status := getRandomPodStatus()
+	now := unversioned.Now()
+	status.StartTime = &now
+	m.SetPodStatus(pod, status)
+
+	m.testSyncBatch()
+	// Expect to see an delete action.
+	verifyActions(t, m.kubeClient, []testclient.Action{
+		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
+		testclient.UpdateActionImpl{ActionImpl: testclient.ActionImpl{Verb: "update", Resource: "pods", Subresource: "status"}},
+		testclient.DeleteActionImpl{ActionImpl: testclient.ActionImpl{Verb: "delete", Resource: "pods"}},
+	})
+}
+
+func TestDoNotDeleteMirrorPods(t *testing.T) {
+	staticPod := getTestPod()
+	staticPod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"}
+	mirrorPod := getTestPod()
+	mirrorPod.UID = "mirror-12345678"
+	mirrorPod.Annotations = map[string]string{
+		kubetypes.ConfigSourceAnnotationKey: "api",
+		kubetypes.ConfigMirrorAnnotationKey: "mirror",
+	}
+	// Set the deletion timestamp.
+	mirrorPod.DeletionTimestamp = new(unversioned.Time)
+	client := testclient.NewSimpleFake(mirrorPod)
+	m := newTestManager(client)
+	m.podManager.AddPod(staticPod)
+	m.podManager.AddPod(mirrorPod)
+	// Verify setup.
+	assert.True(t, kubepod.IsStaticPod(staticPod), "SetUp error: staticPod")
+	assert.True(t, kubepod.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
+	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), staticPod.UID)
+
+	status := getRandomPodStatus()
+	now := unversioned.Now()
+	status.StartTime = &now
+	m.SetPodStatus(staticPod, status)
+
+	m.testSyncBatch()
+	// Expect not to see an delete action.
+	verifyActions(t, m.kubeClient, []testclient.Action{
+		testclient.GetActionImpl{ActionImpl: testclient.ActionImpl{Verb: "get", Resource: "pods"}},
+		testclient.UpdateActionImpl{ActionImpl: testclient.ActionImpl{Verb: "update", Resource: "pods", Subresource: "status"}},
+	})
 }
