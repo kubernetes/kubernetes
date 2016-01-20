@@ -1700,9 +1700,10 @@ func (s *AWSCloud) EnsureLoadBalancer(name, region string, publicIP net.IP, port
 		return nil, fmt.Errorf("requested load balancer with no ports")
 	}
 
-	// The service controller verified all the protocols match on the ports, just check and use the first one
-	if ports[0].Protocol != api.ProtocolTCP {
-		return nil, fmt.Errorf("Only TCP LoadBalancer is supported for AWS ELB")
+	for _, port := range ports {
+		if port.Protocol != api.ProtocolTCP {
+			return nil, fmt.Errorf("Only TCP LoadBalancer is supported for AWS ELB")
+		}
 	}
 
 	if publicIP != nil {
