@@ -480,7 +480,9 @@ function kube::build::build_image() {
   kube::version::save_version_vars "${build_context_dir}/kube-version-defs"
 
   cp build/build-image/Dockerfile ${build_context_dir}/Dockerfile
-  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${build_context_dir}"
+  # We don't want to force-pull this image because it's based on a local image
+  # (see kube::build::build_image_cross), not upstream.
+  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${build_context_dir}" 'false'
 }
 
 # Build the kubernetes golang cross base image.
@@ -496,10 +498,12 @@ function kube::build::build_image_cross() {
 # Build a docker image from a Dockerfile.
 # $1 is the name of the image to build
 # $2 is the location of the "context" directory, with the Dockerfile at the root.
+# $3 is the value to set the --pull flag for docker build; true by default
 function kube::build::docker_build() {
   local -r image=$1
   local -r context_dir=$2
-  local -ra build_cmd=("${DOCKER[@]}" build -t "${image}" "${context_dir}")
+  local -r pull="${3:-true}"
+  local -ra build_cmd=("${DOCKER[@]}" build -t "${image}" "--pull=${pull}" "${context_dir}")
 
   kube::log::status "Building Docker image ${image}."
   local docker_output
