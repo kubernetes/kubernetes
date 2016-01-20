@@ -109,9 +109,23 @@ type Unknown struct {
 // metadata and field mutatation.
 type Unstructured struct {
 	TypeMeta `json:",inline"`
+
+	// Name is populated from metadata (if present) upon deserialization
+	Name string
+
 	// Object is a JSON compatible map with string, float, int, []interface{}, or map[string]interface{}
 	// children.
 	Object map[string]interface{}
+}
+
+// UnstructuredList allows lists that do not have Golang structs
+// registered to be manipulated generically. This can be used to deal
+// with the API lists from a plug-in.
+type UnstructuredList struct {
+	TypeMeta `json:",inline"`
+
+	// Items is a list of unstructured objects.
+	Items []*Unstructured `json:"items"`
 }
 
 // VersionedObjects is used by Decoders to give callers a way to access all versions
