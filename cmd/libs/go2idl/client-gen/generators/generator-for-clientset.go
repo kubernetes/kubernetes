@@ -116,7 +116,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 
 var clientsetInterfaceTemplate = `
 type Interface interface {
-    $range .allGroups$$.Group$() $.PackageName$.$.Group$Client
+    $range .allGroups$$.Group$() $.PackageName$.$.Group$Interface
     $end$
 }
 `
@@ -132,7 +132,7 @@ type Clientset struct {
 
 var clientsetInterfaceImplTemplate = `
 // $.Group$ retrieves the $.Group$Client
-func (c *Clientset) $.Group$() *$.PackageName$.$.Group$Client {
+func (c *Clientset) $.Group$() $.PackageName$.$.Group$Interface {
 	return c.$.Group$Client
 }
 `
