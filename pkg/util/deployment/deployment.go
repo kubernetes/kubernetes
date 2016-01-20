@@ -18,6 +18,7 @@ package deployment
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -201,4 +202,13 @@ func getPodsForRCs(c clientset.Interface, replicationControllers []*api.Replicat
 		allPods = append(allPods, podList.Items...)
 	}
 	return allPods, nil
+}
+
+// Revision returns the revision number of the input RC
+func Revision(rc *api.ReplicationController) (int64, error) {
+	v, ok := rc.Annotations[RevisionAnnotation]
+	if !ok {
+		return 0, nil
+	}
+	return strconv.ParseInt(v, 10, 64)
 }
