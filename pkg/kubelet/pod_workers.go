@@ -37,7 +37,7 @@ type PodWorkers interface {
 	ForgetWorker(uid types.UID)
 }
 
-type syncPodFnType func(*api.Pod, *api.Pod, kubecontainer.Pod, kubetypes.SyncPodType) error
+type syncPodFnType func(*api.Pod, *api.Pod, *kubecontainer.PodStatus, kubetypes.SyncPodType) error
 
 type podWorkers struct {
 	// Protects all per worker fields.
@@ -53,8 +53,6 @@ type podWorkers struct {
 	// Tracks the last undelivered work item for this pod - a work item is
 	// undelivered if it comes in while the worker is working.
 	lastUndeliveredWorkUpdate map[types.UID]workUpdate
-	// runtimeCache is used for listing running containers.
-	runtimeCache kubecontainer.RuntimeCache
 
 	workQueue queue.WorkQueue
 
@@ -90,13 +88,12 @@ type workUpdate struct {
 	updateType kubetypes.SyncPodType
 }
 
-func newPodWorkers(runtimeCache kubecontainer.RuntimeCache, syncPodFn syncPodFnType,
-	recorder record.EventRecorder, workQueue queue.WorkQueue, resyncInterval, backOffPeriod time.Duration, podCache kubecontainer.Cache) *podWorkers {
+func newPodWorkers(syncPodFn syncPodFnType, recorder record.EventRecorder, workQueue queue.WorkQueue,
+	resyncInterval, backOffPeriod time.Duration, podCache kubecontainer.Cache) *podWorkers {
 	return &podWorkers{
 		podUpdates:                map[types.UID]chan workUpdate{},
 		isWorking:                 map[types.UID]bool{},
 		lastUndeliveredWorkUpdate: map[types.UID]workUpdate{},
-		runtimeCache:              runtimeCache,
 		syncPodFn:                 syncPodFn,
 		recorder:                  recorder,
 		workQueue:                 workQueue,
@@ -107,45 +104,31 @@ func newPodWorkers(runtimeCache kubecontainer.RuntimeCache, syncPodFn syncPodFnT
 }
 
 func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
-	var minRuntimeCacheTime time.Time
-
+	var lastSyncTime time.Time
 	for newWork := range podUpdates {
-		err := func() (err error) {
+		err := func() error {
 			podID := newWork.pod.UID
-			if p.podCache != nil {
-				// This is a blocking call that would return only if the cache
-				// has an entry for the pod that is newer than minRuntimeCache
-				// Time. This ensures the worker doesn't start syncing until
-				// after the cache is at least newer than the finished time of
-				// the previous sync.
-				// TODO: We don't consume the return PodStatus yet, but we
-				// should pass it to syncPod() eventually.
-				p.podCache.GetNewerThan(podID, minRuntimeCacheTime)
-			}
-			// TODO: Deprecate the runtime cache.
-			// We would like to have the state of the containers from at least
-			// the moment when we finished the previous processing of that pod.
-			if err := p.runtimeCache.ForceUpdateIfOlder(minRuntimeCacheTime); err != nil {
-				glog.Errorf("Error updating the container runtime cache: %v", err)
+			// This is a blocking call that would return only if the cache
+			// has an entry for the pod that is newer than minRuntimeCache
+			// Time. This ensures the worker doesn't start syncing until
+			// after the cache is at least newer than the finished time of
+			// the previous sync.
+			status, err := p.podCache.GetNewerThan(podID, lastSyncTime)
+			if err != nil {
 				return err
 			}
-			pods, err := p.runtimeCache.GetPods()
+			err = p.syncPodFn(newWork.pod, newWork.mirrorPod, status, newWork.updateType)
+			lastSyncTime = time.Now()
 			if err != nil {
-				glog.Errorf("Error getting pods while syncing pod: %v", err)
-				return err
-			}
-
-			err = p.syncPodFn(newWork.pod, newWork.mirrorPod,
-				kubecontainer.Pods(pods).FindPodByID(newWork.pod.UID), newWork.updateType)
-			minRuntimeCacheTime = time.Now()
-			if err != nil {
-				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
-				p.recorder.Eventf(newWork.pod, api.EventTypeWarning, kubecontainer.FailedSync, "Error syncing pod, skipping: %v", err)
 				return err
 			}
 			newWork.updateCompleteFn()
 			return nil
 		}()
+		if err != nil {
+			glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
+			p.recorder.Eventf(newWork.pod, api.EventTypeWarning, kubecontainer.FailedSync, "Error syncing pod, skipping: %v", err)
+		}
 		p.wrapUp(newWork.pod.UID, err)
 	}
 }
