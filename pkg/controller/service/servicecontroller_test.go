@@ -17,13 +17,13 @@ limitations under the License.
 package service
 
 import (
-	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/types"
+	"reflect"
 )
 
 const region = "us-central"
@@ -91,7 +91,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 		cloud := &fakecloud.FakeCloud{}
 		cloud.Region = region
 		client := &testclient.Fake{}
-		controller := New(cloud, client, "test-cluster")
+		controller := New(cloud, client, "test-cluster", 0, 0)
 		controller.init()
 		cloud.Calls = nil     // ignore any cloud calls made in init()
 		client.ClearActions() // ignore any client calls made in init()
@@ -211,7 +211,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 
 		cloud.Region = region
 		client := &testclient.Fake{}
-		controller := New(cloud, client, "test-cluster2")
+		controller := New(cloud, client, "test-cluster2", 0, 0)
 		controller.init()
 		cloud.Calls = nil // ignore any cloud calls made in init()
 
