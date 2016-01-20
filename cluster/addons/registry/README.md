@@ -245,11 +245,14 @@ Now you can build and push images on your local computer as
 `localhost:5000/yourname/container` and those images will be available inside
 your kubernetes cluster with the same name.
 
+# More Extensions
+
+- [Use GCS as storage backend](gcs/README.md)
+- [Enable TLS/SSL](tls/README.md)
+- [Enable Authentication](auth/README.md)
+
 ## Future improvements
 
-* Use a NodePort Service instead of a per-node proxy process
-* Enable SSL with a cert signed by your cluster CA or provided by the user
-* Enable authentication
 * Allow port-forwarding to a Service rather than a pod (#15180)
 
 
