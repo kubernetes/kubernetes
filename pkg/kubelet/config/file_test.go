@@ -93,6 +93,9 @@ func TestReadPodsFromFile(t *testing.T) {
 					Containers:      []api.Container{{Name: "image", Image: "test/image", SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults()}},
 					SecurityContext: &api.PodSecurityContext{},
 				},
+				Status: api.PodStatus{
+					Phase: api.PodPending,
+				},
 			},
 			expected: CreatePodUpdate(kubetypes.SET, kubetypes.FileSource, &api.Pod{
 				ObjectMeta: api.ObjectMeta{
@@ -114,6 +117,9 @@ func TestReadPodsFromFile(t *testing.T) {
 						ImagePullPolicy:        "Always",
 						SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
 					SecurityContext: &api.PodSecurityContext{},
+				},
+				Status: api.PodStatus{
+					Phase: api.PodPending,
 				},
 			}),
 		},
