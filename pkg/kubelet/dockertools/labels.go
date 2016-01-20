@@ -49,6 +49,8 @@ const (
 	kubernetesPodLabel = "io.kubernetes.pod.data"
 )
 
+type LabelFactory func(_ *api.Container, _ *api.Pod, restartCount int) map[string]string
+
 // Container information which has been labelled on each docker container
 // TODO(random-liu): The type of Hash should be compliance with kubelet container status.
 type labelledContainerInfo struct {
@@ -62,6 +64,10 @@ type labelledContainerInfo struct {
 	RestartCount              int
 	TerminationMessagePath    string
 	PreStopHandler            *api.Handler
+}
+
+func DefaultLabelFactory() LabelFactory {
+	return newLabels
 }
 
 func newLabels(container *api.Container, pod *api.Pod, restartCount int) map[string]string {
