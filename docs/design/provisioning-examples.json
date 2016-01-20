@@ -1,0 +1,71 @@
+[
+  // fast disk in east zone
+  {
+    "kind": "ConfigMap",
+    "apiVersion": "v1",
+    "metadata": {
+      "name": "gold-east",
+      "namespace": "kubernetes.io/provisioners",
+      "labels": {
+        "storage-class": "gold",
+        "zone": "us-east"
+      }
+    },
+    "data": {
+      "plugin-name": "kubernetes.io/gce-pd",
+      // OPAQUE JSON MAP OF PARAMS AS DEFINED BY THE PLUGIN
+      "parameters": "{'volumeType':'ssd', 'zone':'us-east'}"
+    }
+  },
+  // fast disk in west zone
+  {
+    "kind": "ConfigMap",
+    "apiVersion": "v1",
+    "metadata": {
+      "name": "gold-west",
+      "namespace": "kubernetes.io/provisioners",
+      "labels": {
+        "storage-class": "gold",
+        "zone": "us-west"
+      }
+    },
+    "data": {
+      "plugin-name": "kubernetes.io/gce-pd",
+      "parameters": "{'volumeType':'ssd', 'zone':'us-west'}"
+    }
+  },
+  // standard disk in east zone
+  {
+    "kind": "ConfigMap",
+    "apiVersion": "v1",
+    "metadata": {
+      "name": "silver-east",
+      "namespace": "kubernetes.io/provisioners",
+      "labels": {
+        "storage-class": "silver",
+        "zone": "us-east"
+      }
+    },
+    "data": {
+      "plugin-name": "kubernetes.io/gce-pd",
+      "parameters": "{'volumeType':'hdd', 'zone':'us-east'}"
+    }
+  },
+  // standard disk in west zone
+  {
+    "kind": "ConfigMap",
+    "apiVersion": "v1",
+    "metadata": {
+      "name": "silver-west",
+      "namespace": "kubernetes.io/provisioners",
+      "labels": {
+        "storage-class": "silver",
+        "zone": "us-west"
+      }
+    },
+    "data": {
+      "plugin-name": "kubernetes.io/gce-pd",
+      "parameters": "{'volumeType':'hdd', 'zone':'us-west'}"
+    }
+  }
+]
