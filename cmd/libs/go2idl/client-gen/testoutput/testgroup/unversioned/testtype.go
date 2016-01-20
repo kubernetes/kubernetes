@@ -17,7 +17,7 @@ limitations under the License.
 package unversioned
 
 import (
-	testgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup"
+	testgroup "k8s.io/kubernetes/examples/apis/testgroup"
 	api "k8s.io/kubernetes/pkg/api"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
