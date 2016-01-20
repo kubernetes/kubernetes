@@ -99,25 +99,16 @@ net.ipv4.ip_forward:
 
 {% set storage_base='https://storage.googleapis.com/kubernetes-release/docker/' %}
 
-{% if grains.get('cloud', '') == 'gce'
-   and grains.get('os_family', '') == 'Debian'
-   and grains.get('oscodename', '') == 'wheezy' -%}
-{% set docker_pkg_name='' %}
-{% set override_deb='' %}
-{% set override_deb_sha1='' %}
-{% set override_docker_ver='' %}
-{% else %}
-{% set docker_pkg_name='lxc-docker-1.7.1' %}
-{% set override_docker_ver='1.7.1' %}
-{% set override_deb='lxc-docker-1.7.1_1.7.1_amd64.deb' %}
-{% set override_deb_sha1='81abef31dd2c616883a61f85bfb294d743b1c889' %}
-{% endif %}
+{% set docker_pkg_name='docker-engine_1.9.1' %}
+{% set override_docker_ver='1.9.1' %}
+{% set override_deb='docker-engine_1.9.1-0~wheezy_amd64.deb' %}
+{% set override_deb_sha1='d682e2f0545e21f2d7309c2d87826aa566cc4af0' %}
 
 {% if override_docker_ver != '' %}
 purge-old-docker-package:
   pkg.removed:
     - pkgs:
-      - lxc-docker-1.6.2
+      - lxc-docker-1.7.1
 
 /var/cache/docker-install/{{ override_deb }}:
   file.managed:
