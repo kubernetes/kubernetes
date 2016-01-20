@@ -82,9 +82,9 @@ More details about the flannel CNI plugin can be found
 
 #### On GCE
 
-Each VM on GCE can have up to 256 IP addresses routed to it, so flannel isn't called
-for in most smaller Kubernetes clusters on GCE. This makes the necessary CNI config
-file a bit more verbose:
+Each VM on GCE has an additional 256 IP addresses routed to it, so
+it is possible to forego flannel in smaller clusters. This makes the
+necessary CNI config file a bit more verbose:
 
 ```console
 $ cat <<EOF >/etc/rkt/net.d/k8s_cluster.conf
