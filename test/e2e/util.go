@@ -2001,6 +2001,55 @@ func waitForRCPodsGone(c *client.Client, rc *api.ReplicationController) error {
 	})
 }
 
+// Delete a ReplicaSet and all pods it spawned
+func DeleteReplicaSet(c *client.Client, ns, name string) error {
+	By(fmt.Sprintf("deleting ReplicaSet %s in namespace %s", name, ns))
+	rc, err := c.Extensions().ReplicaSets(ns).Get(name)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			Logf("ReplicaSet %s was already deleted: %v", name, err)
+			return nil
+		}
+		return err
+	}
+	reaper, err := kubectl.ReaperFor(extensions.Kind("ReplicaSet"), c)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			Logf("ReplicaSet %s was already deleted: %v", name, err)
+			return nil
+		}
+		return err
+	}
+	startTime := time.Now()
+	err = reaper.Stop(ns, name, 0, api.NewDeleteOptions(0))
+	if apierrs.IsNotFound(err) {
+		Logf("ReplicaSet %s was already deleted: %v", name, err)
+		return nil
+	}
+	deleteRSTime := time.Now().Sub(startTime)
+	Logf("Deleting RS %s took: %v", name, deleteRSTime)
+	if err == nil {
+		err = waitForReplicaSetPodsGone(c, rc)
+	}
+	terminatePodTime := time.Now().Sub(startTime) - deleteRSTime
+	Logf("Terminating ReplicaSet %s pods took: %v", name, terminatePodTime)
+	return err
+}
+
+// waitForReplicaSetPodsGone waits until there are no pods reported under a
+// ReplicaSet selector (because the pods have completed termination).
+func waitForReplicaSetPodsGone(c *client.Client, rs *extensions.ReplicaSet) error {
+	return wait.PollImmediate(poll, 2*time.Minute, func() (bool, error) {
+		selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+		expectNoError(err)
+		options := api.ListOptions{LabelSelector: selector}
+		if pods, err := c.Pods(rs.Namespace).List(options); err == nil && len(pods.Items) == 0 {
+			return true, nil
+		}
+		return false, nil
+	})
+}
+
 // Waits for the deployment to reach desired state.
 // Returns an error if minAvailable or maxCreated is broken at any times.
 func waitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, desiredUpdatedReplicas, minAvailable, maxCreated, minReadySeconds int) error {
