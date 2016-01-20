@@ -302,7 +302,7 @@ function create-salt-pillar() {
 	enable_l7_loadbalancing enable_node_logging logging_destination enable_cluster_dns \
 	enable_cluster_registry dns_replicas dns_domain admission_control network_provider opencontrail_tag \
 	opencontrail_kubernetes_tag opencontrail_public_subnet enable_manifest_url manifest_url \
-	manifest_url_header num_nodes e2e_storage_test_environment \
+	manifest_url_header e2e_storage_test_environment \
 	kubelet_port apiserver_test_args api_server_test_log_level kubelet_test_args kubelet_test_log_level \
 	controller_manager_test_args controller_manager_test_log_level scheduler_test_args scheduler_test_log_level \
 	kubeproxy_test_args kubeproxy_test_log_level \
@@ -323,6 +323,12 @@ cluster_cidr: '$(echo "$CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
 elasticsearch_replicas: '$(echo "$ELASTICSEARCH_LOGGING_REPLICAS" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 EOF
+
+  # Special case: things that aren't strings (hopefully we can just copy kube-env instead)
+  cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+num_nodes: $(echo "$NUM_NODES" | sed -e "s/'/''/g")
+EOF
+
 
   # TODO: Replace this  with a persistent volume (and create it).
   if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
