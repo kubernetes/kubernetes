@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -279,19 +280,27 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 			if err != nil {
 				return nil, nil, err
 			}
+		} else {
+			// Check if the object's resource version matches the latest resource version.
+			newVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
+			if err != nil {
+				return nil, nil, err
+			}
+			if newVersion == 0 {
+				// TODO: The Invalid error should has a field for Resource.
+				// After that field is added, we should fill the Resource and
+				// leave the Kind field empty. See the discussion in #18526.
+				qualifiedKind := unversioned.GroupKind{e.QualifiedResource.Group, e.QualifiedResource.Resource}
+				fieldErrList := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("resourceVersion"), newVersion, "must be specified for an update")}
+				return nil, nil, kubeerr.NewInvalid(qualifiedKind, name, fieldErrList)
+			}
+			if newVersion != version {
+				return nil, nil, kubeerr.NewConflict(e.QualifiedResource, name, fmt.Errorf("the object has been modified; please apply your changes to the latest version and try again"))
+			}
 		}
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
 			return nil, nil, err
 		}
-		// Check if the object's resource version matches the latest resource version.
-		newVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
-		if err != nil {
-			return nil, nil, err
-		}
-		if newVersion != version {
-			return nil, nil, kubeerr.NewConflict(e.QualifiedResource, name, fmt.Errorf("the object has been modified; please apply your changes to the latest version and try again"))
-		}
-
 		ttl, err := e.calculateTTL(obj, res.TTL, true)
 		if err != nil {
 			return nil, nil, err
