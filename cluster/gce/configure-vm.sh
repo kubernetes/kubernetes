@@ -326,7 +326,7 @@ EOF
 
   # Special case: things that aren't strings (hopefully we can just copy kube-env instead)
   cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-num_nodes: $(echo "$NUM_NODES" | sed -e "s/'/''/g")
+num_nodes: $(echo "${NUM_NODES:-}" | sed -e "s/'/''/g")
 EOF
 
 
