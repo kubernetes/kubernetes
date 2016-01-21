@@ -24,3 +24,17 @@ ENV KUBE_CROSSPLATFORMS \
   windows/amd64 windows/386
 
 RUN cd /usr/src/go/src && for platform in ${KUBE_CROSSPLATFORMS}; do GOOS=${platform%/*} GOARCH=${platform##*/} ./make.bash --no-clean; done
+
+# Install g++, then download and install protoc for generating protobuf output
+RUN apt-get install -y g++ && apt-get clean && rm -rf /var/lib/apt/lists/* &&\
+    mkdir -p /usr/local/src/protobuf && cd /usr/local/src/protobuf &&\
+    wget -q https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protobuf-cpp-3.0.0-beta-2.tar.gz &&\
+    tar xzvf protobuf-cpp-3.0.0-beta-2.tar.gz &&\
+    cd protobuf-3.0.0-beta-2 &&\
+    ./configure &&\
+    make install &&\
+    ldconfig &&\
+    cd .. &&\
+    rm -rf protobuf-3.0.0-beta-2 &&\
+    protoc --version
+
