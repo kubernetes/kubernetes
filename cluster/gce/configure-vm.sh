@@ -24,6 +24,7 @@ is_push=$@
 readonly KNOWN_TOKENS_FILE="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
 readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
 
+#+GCE
 function ensure-basic-networking() {
   # Deal with GCE networking bring-up race. (We rely on DNS for a lot,
   # and it's just not worth doing a whole lot of startup work if this
@@ -44,6 +45,17 @@ function ensure-basic-networking() {
   echo "Networking functional on $(hostname) ($(hostname -i))"
 }
 
+# A hookpoint for installing any needed packages
+ensure-packages() {
+  :
+}
+
+# A hookpoint for setting up local devices
+ensure-local-disks() {
+  :
+}
+#-GCE
+
 function ensure-install-dir() {
   INSTALL_DIR="/var/cache/kubernetes-install"
   mkdir -p ${INSTALL_DIR}
@@ -57,13 +69,14 @@ EOF
 }
 
 function set-broken-motd() {
-  echo -e '\nBroken (or in progress) GCE Kubernetes node setup! Suggested first step:\n  tail /var/log/startupscript.log\n' > /etc/motd
+  echo -e '\nBroken (or in progress) Kubernetes node setup! Suggested first step:\n  tail /var/log/startupscript.log\n' > /etc/motd
 }
 
 function set-good-motd() {
-  echo -e '\n=== GCE Kubernetes node setup complete ===\n' > /etc/motd
+  echo -e '\n=== Kubernetes node setup complete ===\n' > /etc/motd
 }
 
+#+GCE
 function curl-metadata() {
   curl --fail --retry 5 --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/attributes/${1}"
 }
@@ -88,11 +101,7 @@ for k,v in yaml.load(sys.stdin).iteritems():
 
 function remove-docker-artifacts() {
   echo "== Deleting docker0 =="
-  # Forcibly install bridge-utils (options borrowed from Salt logs).
-  until apt-get -q -y -o DPkg::Options::=--force-confold -o DPkg::Options::=--force-confdef install bridge-utils; do
-    echo "== install of bridge-utils failed, retrying =="
-    sleep 5
-  done
+  apt-get-install bridge-utils
 
   # Remove docker artifacts on minion nodes, if present
   iptables -t nat -F || true
@@ -100,6 +109,7 @@ function remove-docker-artifacts() {
   brctl delbr docker0 || true
   echo "== Finished deleting docker0 =="
 }
+#-GCE
 
 # Retry a download until we get it.
 #
@@ -125,6 +135,23 @@ validate-hash() {
   fi
 }
 
+apt-get-install() {
+  # Forcibly install packages (options borrowed from Salt logs).
+  until apt-get -q -y -o DPkg::Options::=--force-confold -o DPkg::Options::=--force-confdef install $@; do
+    echo "== install of packages $@ failed, retrying =="
+    sleep 5
+  done
+}
+
+apt-get-update() {
+  echo "== Refreshing package database =="
+  until apt-get update; do
+    echo "== apt-get update failed, retrying =="
+    echo sleep 5
+  done
+}
+
+#
 # Install salt from GCS.  See README.md for instructions on how to update these
 # debs.
 install-salt() {
@@ -132,12 +159,6 @@ install-salt() {
     echo "== SaltStack already installed, skipping install step =="
     return
   fi
-
-  echo "== Refreshing package database =="
-  until apt-get update; do
-    echo "== apt-get update failed, retrying =="
-    echo sleep 5
-  done
 
   mkdir -p /var/cache/salt-install
   cd /var/cache/salt-install
@@ -205,6 +226,20 @@ stop-salt-minion() {
   done
 }
 
+#+GCE
+# Finds the master PD device; returns it in MASTER_PD_DEVICE
+find-master-pd() {
+  MASTER_PD_DEVICE=""
+  # TODO(zmerlynn): GKE is still lagging in master-pd creation
+  if [[ ! -e /dev/disk/by-id/google-master-pd ]]; then
+    return
+  fi
+  device_info=$(ls -l /dev/disk/by-id/google-master-pd)
+  relative_path=${device_info##* }
+  MASTER_PD_DEVICE="/dev/disk/by-id/${relative_path}"
+}
+#-GCE
+
 # Mounts a persistent disk (formatting if needed) to store the persistent data
 # on the master -- etcd's data, a few settings, and security certs/keys/tokens.
 #
@@ -213,19 +248,16 @@ stop-salt-minion() {
 # formats an unformatted disk, and mkdir -p will leave a directory be if it
 # already exists.
 mount-master-pd() {
-  # TODO(zmerlynn): GKE is still lagging in master-pd creation
-  if [[ ! -e /dev/disk/by-id/google-master-pd ]]; then
+  find-master-pd
+  if [[ -z "${MASTER_PD_DEVICE}" ]]; then
     return
   fi
-  device_info=$(ls -l /dev/disk/by-id/google-master-pd)
-  relative_path=${device_info##* }
-  device_path="/dev/disk/by-id/${relative_path}"
 
   # Format and mount the disk, create directories on it for all of the master's
   # persistent data, and link them to where they're used.
   echo "Mounting master-pd"
   mkdir -p /mnt/master-pd
-  /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${device_path}" /mnt/master-pd &>/var/log/master-pd-mount.log || \
+  /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${MASTER_PD_DEVICE}" /mnt/master-pd &>/var/log/master-pd-mount.log || \
     { echo "!!! master-pd mount failed, review /var/log/master-pd-mount.log !!!"; return 1; }
   # Contains all the data stored in etcd
   mkdir -m 700 -p /mnt/master-pd/var/etcd
@@ -260,104 +292,52 @@ function create-salt-pillar() {
   # Always overwrite the cluster-params.sls (even on a push, we have
   # these variables)
   mkdir -p /srv/salt-overlay/pillar
-  cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
-instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
-node_instance_prefix: '$(echo "$NODE_INSTANCE_PREFIX" | sed -e "s/'/''/g")'
+
+  rm -f /srv/salt-overlay/pillar/cluster-params.sls
+
+  # TODO: Just dump everything into the pillar ?  Harmless, and it is really confusing when we switch names anyway.
+  # (this can be as simple as copying the kube-env file, I think)
+  for key in instance_prefix node_instance_prefix allocate_node_cidrs \
+	service_cluster_ip_range enable_cluster_monitoring enable_cluster_logging enable_cluster_ui \
+	enable_l7_loadbalancing enable_node_logging logging_destination enable_cluster_dns \
+	enable_cluster_registry dns_replicas dns_domain admission_control network_provider opencontrail_tag \
+	opencontrail_kubernetes_tag opencontrail_public_subnet enable_manifest_url manifest_url \
+	manifest_url_header e2e_storage_test_environment \
+	kubelet_port apiserver_test_args api_server_test_log_level kubelet_test_args kubelet_test_log_level \
+	controller_manager_test_args controller_manager_test_log_level scheduler_test_args scheduler_test_log_level \
+	kubeproxy_test_args kubeproxy_test_log_level \
+	terminated_pod_gc_threshold \
+	; do
+    local env_key=`echo $key | tr '[:lower:]' '[:upper:]'`
+    local value=${!env_key:-}
+    if [[ -n "${value}" ]]; then
+      # Note this is yaml, so indentation matters
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+${key}: '$(echo "${value}" | sed -e "s/'/''/g")'
+EOF
+    fi
+  done
+
+  cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 cluster_cidr: '$(echo "$CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
-allocate_node_cidrs: '$(echo "$ALLOCATE_NODE_CIDRS" | sed -e "s/'/''/g")'
-service_cluster_ip_range: '$(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
-enable_cluster_monitoring: '$(echo "$ENABLE_CLUSTER_MONITORING" | sed -e "s/'/''/g")'
-enable_cluster_logging: '$(echo "$ENABLE_CLUSTER_LOGGING" | sed -e "s/'/''/g")'
-enable_cluster_ui: '$(echo "$ENABLE_CLUSTER_UI" | sed -e "s/'/''/g")'
-enable_l7_loadbalancing: '$(echo "$ENABLE_L7_LOADBALANCING" | sed -e "s/'/''/g")'
-enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
-logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
 elasticsearch_replicas: '$(echo "$ELASTICSEARCH_LOGGING_REPLICAS" | sed -e "s/'/''/g")'
-enable_cluster_dns: '$(echo "$ENABLE_CLUSTER_DNS" | sed -e "s/'/''/g")'
-enable_cluster_registry: '$(echo "$ENABLE_CLUSTER_REGISTRY" | sed -e "s/'/''/g")'
-dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
-dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
-admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
-network_provider: '$(echo "$NETWORK_PROVIDER" | sed -e "s/'/''/g")'
-opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG" | sed -e "s/'/''/g")'
-opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG")'
-opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
-enable_manifest_url: '$(echo "$ENABLE_MANIFEST_URL" | sed -e "s/'/''/g")'
-manifest_url: '$(echo "$MANIFEST_URL" | sed -e "s/'/''/g")'
-manifest_url_header: '$(echo "$MANIFEST_URL_HEADER" | sed -e "s/'/''/g")'
-num_nodes: $(echo "${NUM_NODES}" | sed -e "s/'/''/g")
-e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
 EOF
-    if [ -n "${KUBELET_PORT:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-kubelet_port: '$(echo "$KUBELET_PORT" | sed -e "s/'/''/g")'
+
+  # Special case: things that aren't strings (hopefully we can just copy kube-env instead)
+  cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+num_nodes: $(echo "${NUM_NODES:-}" | sed -e "s/'/''/g")
 EOF
-    fi
-    # Configuration changes for test clusters
-    if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-apiserver_test_args: '$(echo "$APISERVER_TEST_ARGS" | sed -e "s/'/''/g")'
-EOF
-    fi
-    if [ -n "${API_SERVER_TEST_LOG_LEVEL:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-api_server_test_log_level: '$(echo "$API_SERVER_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
-EOF
-    fi
-    if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-kubelet_test_args: '$(echo "$KUBELET_TEST_ARGS" | sed -e "s/'/''/g")'
-EOF
-    fi
-    if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-kubelet_test_log_level: '$(echo "$KUBELET_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
-EOF
-    fi
-    if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-controller_manager_test_args: '$(echo "$CONTROLLER_MANAGER_TEST_ARGS" | sed -e "s/'/''/g")'
-EOF
-    fi
-    if [ -n "${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-controller_manager_test_log_level: '$(echo "$CONTROLLER_MANAGER_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
-EOF
-    fi
-    if [ -n "${SCHEDULER_TEST_ARGS:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-scheduler_test_args: '$(echo "$SCHEDULER_TEST_ARGS" | sed -e "s/'/''/g")'
-EOF
-    fi
-    if [ -n "${SCHEDULER_TEST_LOG_LEVEL:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-scheduler_test_log_level: '$(echo "$SCHEDULER_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
-EOF
-    fi
-    if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-kubeproxy_test_args: '$(echo "$KUBEPROXY_TEST_ARGS" | sed -e "s/'/''/g")'
-EOF
-    fi
-    if [ -n "${KUBEPROXY_TEST_LOG_LEVEL:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-kubeproxy_test_log_level: '$(echo "$KUBEPROXY_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
-EOF
-    fi
-    # TODO: Replace this  with a persistent volume (and create it).
-    if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+
+
+  # TODO: Replace this  with a persistent volume (and create it).
+  if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
+    cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 cluster_registry_disk_type: gce
 cluster_registry_disk_size: $(echo $(convert-bytes-gce-kube ${CLUSTER_REGISTRY_DISK_SIZE}) | sed -e "s/'/''/g")
 cluster_registry_disk_name: $(echo ${CLUSTER_REGISTRY_DISK} | sed -e "s/'/''/g")
 EOF
-    fi
-    if [ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-terminated_pod_gc_threshold: '$(echo "${TERMINATED_POD_GC_THRESHOLD}" | sed -e "s/'/''/g")'
-EOF
-    fi
+  fi
 }
 
 # The job of this function is simple, but the basic regular expression syntax makes
@@ -558,10 +538,12 @@ function download-release() {
   kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"
 }
 
+#+GCE
 function fix-apt-sources() {
   sed -i -e "\|^deb.*http://http.debian.net/debian| s/^/#/" /etc/apt/sources.list
   sed -i -e "\|^deb.*http://ftp.debian.org/debian| s/^/#/" /etc/apt/sources.list.d/backports.list
 }
+#-GCE
 
 function salt-run-local() {
   cat <<EOF >/etc/salt/minion.d/local.conf
@@ -579,6 +561,7 @@ log_level_logfile: debug
 EOF
 }
 
+#+GCE
 function salt-master-role() {
   cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
@@ -616,11 +599,8 @@ EOF
   cbr-cidr: ${MASTER_IP_RANGE}
 EOF
   fi
-  if [[ ! -z "${RUNTIME_CONFIG:-}" ]]; then
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
-EOF
-  fi
+
+  env-to-grains "runtime_config"
 }
 
 function salt-node-role() {
@@ -633,23 +613,33 @@ grains:
   api_servers: '${KUBERNETES_MASTER_NAME}'
 EOF
 }
+#-GCE
 
-function salt-docker-opts() {
-  DOCKER_OPTS=""
-
-  if [[ -n "${EXTRA_DOCKER_OPTS-}" ]]; then
-    DOCKER_OPTS="${EXTRA_DOCKER_OPTS}"
-  fi
-
-  if [[ -n "{DOCKER_OPTS}" ]]; then
+function env-to-grains {
+  local key=$1
+  local env_key=`echo $key | tr '[:lower:]' '[:upper:]'`
+  local value=${!env_key:-}
+  if [[ -n "${value}" ]]; then
+    # Note this is yaml, so indentation matters
     cat <<EOF >>/etc/salt/minion.d/grains.conf
-  docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
+  ${key}: '$(echo "${value}" | sed -e "s/'/''/g")'
 EOF
   fi
 }
 
+function node-docker-opts() {
+  if [[ -n "${EXTRA_DOCKER_OPTS-}" ]]; then
+    DOCKER_OPTS="${DOCKER_OPTS:-} ${EXTRA_DOCKER_OPTS}"
+  fi
+}
+
+function salt-grains() {
+  env-to-grains "docker_opts"
+  env-to-grains "docker_root"
+  env-to-grains "kubelet_root"
+}
+
 function configure-salt() {
-  fix-apt-sources
   mkdir -p /etc/salt/minion.d
   salt-run-local
   if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
@@ -659,8 +649,9 @@ function configure-salt() {
     fi
   else
     salt-node-role
-    salt-docker-opts
+    node-docker-opts
   fi
+  salt-grains
   install-salt
   stop-salt-minion
 }
@@ -676,8 +667,12 @@ if [[ -z "${is_push}" ]]; then
   echo "== kube-up node config starting =="
   set-broken-motd
   ensure-basic-networking
+  fix-apt-sources
+  apt-get-update
   ensure-install-dir
+  ensure-packages
   set-kube-env
+  ensure-local-disks
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
   create-salt-pillar
   if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
@@ -693,6 +688,7 @@ if [[ -z "${is_push}" ]]; then
   run-salt
   set-good-motd
 
+#+GCE
   if curl-metadata k8s-user-startup-script > "${INSTALL_DIR}/k8s-user-script.sh"; then
     user_script=$(cat "${INSTALL_DIR}/k8s-user-script.sh")
   fi
@@ -701,6 +697,7 @@ if [[ -z "${is_push}" ]]; then
     echo "== running user startup script =="
     "${INSTALL_DIR}/k8s-user-script.sh"
   fi
+#-GCE
   echo "== kube-up node config done =="
 else
   echo "== kube-push node config starting =="
