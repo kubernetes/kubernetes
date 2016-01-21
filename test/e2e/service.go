@@ -35,12 +35,13 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // This should match whatever the default/configured range is
-var ServiceNodePortRange = util.PortRange{Base: 30000, Size: 2768}
+var ServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
 var _ = Describe("Services", func() {
 	f := NewFramework("services")
