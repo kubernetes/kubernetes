@@ -147,6 +147,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					Containers:      []api.Container{{Name: "1", Image: "foo", ImagePullPolicy: api.PullAlways}},
 					SecurityContext: &api.PodSecurityContext{},
 				},
+				Status: api.PodStatus{
+					Phase: api.PodPending,
+				},
 			},
 			expected: CreatePodUpdate(kubetypes.SET,
 				kubetypes.HTTPSource,
@@ -172,6 +175,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							ImagePullPolicy:        "Always",
 						}},
 					},
+					Status: api.PodStatus{
+						Phase: api.PodPending,
+					},
 				}),
 		},
 		{
@@ -192,6 +198,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							Containers:      []api.Container{{Name: "1", Image: "foo", ImagePullPolicy: api.PullAlways}},
 							SecurityContext: &api.PodSecurityContext{},
 						},
+						Status: api.PodStatus{
+							Phase: api.PodPending,
+						},
 					},
 					{
 						ObjectMeta: api.ObjectMeta{
@@ -202,6 +211,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							NodeName:        hostname,
 							Containers:      []api.Container{{Name: "2", Image: "bar:bartag", ImagePullPolicy: ""}},
 							SecurityContext: &api.PodSecurityContext{},
+						},
+						Status: api.PodStatus{
+							Phase: api.PodPending,
 						},
 					},
 				},
@@ -230,6 +242,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							ImagePullPolicy:        "Always",
 						}},
 					},
+					Status: api.PodStatus{
+						Phase: api.PodPending,
+					},
 				},
 				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
@@ -252,6 +267,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							TerminationMessagePath: "/dev/termination-log",
 							ImagePullPolicy:        "IfNotPresent",
 						}},
+					},
+					Status: api.PodStatus{
+						Phase: api.PodPending,
 					},
 				}),
 		},
