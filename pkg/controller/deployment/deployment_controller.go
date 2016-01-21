@@ -452,7 +452,10 @@ func (dc *DeploymentController) syncRecreateDeployment(deployment extensions.Dep
 		return dc.updateDeploymentStatus(allRCs, newRC, deployment)
 	}
 
-	return nil
+	// Sync deployment status
+	return dc.syncDeploymentStatus(allRCs, newRC, deployment)
+
+	// TODO: raise an event, neither scaled up nor down.
 }
 
 func (dc *DeploymentController) syncRollingUpdateDeployment(deployment extensions.Deployment) error {
@@ -489,13 +492,18 @@ func (dc *DeploymentController) syncRollingUpdateDeployment(deployment extension
 	}
 
 	// Sync deployment status
+	return dc.syncDeploymentStatus(allRCs, newRC, deployment)
+
+	// TODO: raise an event, neither scaled up nor down.
+}
+
+// syncDeploymentStatus checks if the status is up-to-date and sync it if necessary
+func (dc *DeploymentController) syncDeploymentStatus(allRCs []*api.ReplicationController, newRC *api.ReplicationController, deployment extensions.Deployment) error {
 	totalReplicas := deploymentutil.GetReplicaCountForRCs(allRCs)
 	updatedReplicas := deploymentutil.GetReplicaCountForRCs([]*api.ReplicationController{newRC})
 	if deployment.Status.Replicas != totalReplicas || deployment.Status.UpdatedReplicas != updatedReplicas {
 		return dc.updateDeploymentStatus(allRCs, newRC, deployment)
 	}
-
-	// TODO: raise an event, neither scaled up nor down.
 	return nil
 }
 
