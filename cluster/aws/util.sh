@@ -80,6 +80,10 @@ fi
 
 MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
 NODE_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
+if [[ -n "${KUBE_MASTER_ELB:-}" ]]; then
+  MASTER_ELB_NAME="k8s-${CLUSTER_ID}"
+  MASTER_ELB_SG_NAME="kubernetes-elb-master-${CLUSTER_ID}"
+fi
 
 # Be sure to map all the ephemeral drives.  We can specify more than we actually have.
 # TODO: Actually mount the correct number (especially if we have more), though this is non-trivial, and
@@ -237,6 +241,16 @@ function detect-security-groups {
       echo "Using minion security group: ${NODE_SG_NAME} ${NODE_SG_ID}"
     fi
   fi
+
+  if [[ -n "${MASTER_ELB_SG_NAME:-}" ]]; then
+    MASTER_ELB_SG_ID=$(get_security_group_id "${MASTER_ELB_SG_NAME}")
+    if [[ -z "${MASTER_ELB_SG_ID:-}" ]]; then
+      echo "Could not detect Kubernetes master ELB security group.  Make sure you've launched a cluster with 'kube-up.sh'"
+      exit 1
+    else
+      echo "Using master ELB security group: ${MASTER_ELB_SG_NAME} ${MASTER_ELB_SG_ID}"
+    fi
+  fi
 }
 
 # Detects the AMI to use (considering the region)
@@ -381,7 +395,7 @@ function create-security-group {
 
   local sgid=$(get_security_group_id "${name}")
   if [[ -z "$sgid" ]]; then
-	  echo "Creating security group ${name}."
+	  echo "Creating security group ${name} (${description})."
 	  sgid=$($AWS_CMD create-security-group --group-name "${name}" --description "${description}" --vpc-id "${VPC_ID}" --query GroupId)
 	  add-tag $sgid KubernetesCluster ${CLUSTER_ID}
   fi
@@ -432,6 +446,60 @@ function ensure-master-pd {
     MASTER_DISK_ID=`$AWS_CMD create-volume --availability-zone ${ZONE} --volume-type ${MASTER_DISK_TYPE} --size ${MASTER_DISK_SIZE} --query VolumeId`
     add-tag ${MASTER_DISK_ID} Name ${name}
     add-tag ${MASTER_DISK_ID} KubernetesCluster ${CLUSTER_ID}
+  fi
+}
+
+# Gets master ELB, if exists
+# Sets:
+#  MASTER_ELB_ID = id of the ELB
+#  MASTER_ELB_DNSNAME = hostname of the ELB
+#
+# Note that for ELB, the name == the ID, but we gloss over that:
+# to be consistent, we only set the ID if the load balancer exists.
+function find-master-elb {
+  # Sadly ELBs don't support querying by tag
+  # We can tag them, but we can't query on tags (easily)
+  # It's also tricky to tolerate the LoadBalancerNotFound error
+  # For now, we list them all and match on name
+  if [[ -z "${MASTER_ELB_ID:-}" ]]; then
+    local elb_ids=$(get_elbs_in_vpc ${VPC_ID})
+    if [[ -n "${elb_ids}" ]]; then
+      for elb_id in ${elb_ids}; do
+        if [[ "${elb_id}" == "${MASTER_ELB_NAME}" ]]; then
+          MASTER_ELB_ID=${elb_id}
+        fi
+      done
+    fi
+  fi
+
+  if [[ -n "${MASTER_ELB_ID:-}" ]]; then
+    if [[ -z "${MASTER_ELB_DNSNAME:-}" ]]; then
+      MASTER_ELB_DNSNAME=`aws elb describe-load-balancers \
+                                  --load-balancer-names ${MASTER_ELB_ID} \
+                                  --query LoadBalancerDescriptions[].DNSName`
+    fi
+  fi
+}
+
+# Gets or creates master ELB
+# Sets MASTER_ELB_ID and MASTER_ELB_DNSNAME (see find-master-elb)
+function ensure-master-elb {
+  find-master-elb
+
+  if [[ -z "${MASTER_ELB_ID:-}" ]]; then
+    echo "Creating master ELB"
+    aws elb create-load-balancer \
+	    --load-balancer-name ${MASTER_ELB_NAME} \
+	    --listeners Protocol=TCP,LoadBalancerPort=443,InstanceProtocol=TCP,InstancePort=443 \
+	    --subnets ${SUBNET_ID} \
+	    --security-groups ${MASTER_ELB_SG_ID} \
+	    --tags Key=KubernetesCluster,Value=${CLUSTER_ID} \
+	           Key=kubernetes.io/role,Value=master-elb > ${LOG}
+    find-master-elb
+    if [[ -z "${MASTER_ELB_ID:-}" ]]; then
+      echo "Created master ELB, but was then unable to find it"
+      exit 1
+    fi
   fi
 }
 
@@ -776,15 +844,10 @@ function kube-up {
   echo "Using Route Table $ROUTE_TABLE_ID"
 
   # Create security groups
-  MASTER_SG_ID=$(get_security_group_id "${MASTER_SG_NAME}")
-  if [[ -z "${MASTER_SG_ID}" ]]; then
-    echo "Creating master security group."
-    create-security-group "${MASTER_SG_NAME}" "Kubernetes security group applied to master nodes"
-  fi
-  NODE_SG_ID=$(get_security_group_id "${NODE_SG_NAME}")
-  if [[ -z "${NODE_SG_ID}" ]]; then
-    echo "Creating minion security group."
-    create-security-group "${NODE_SG_NAME}" "Kubernetes security group applied to minion nodes"
+  create-security-group "${MASTER_SG_NAME}" "Kubernetes security group applied to masters"
+  create-security-group "${NODE_SG_NAME}" "Kubernetes security group applied to nodes"
+  if [[ -n "${MASTER_ELB_SG_NAME:-}" ]]; then
+    create-security-group "${MASTER_ELB_SG_NAME}" "Kubernetes security group applied to ELB for masters"
   fi
 
   detect-security-groups
@@ -806,7 +869,12 @@ function kube-up {
   authorize-security-group-ingress "${NODE_SG_ID}" "--protocol tcp --port 22 --cidr 0.0.0.0/0"
 
   # HTTPS to the master is allowed (for API access)
-  authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
+  if [[ -z "${KUBE_MASTER_ELB:-}" ]]; then
+    authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
+  else
+    authorize-security-group-ingress "${MASTER_SG_ID}" "--source-group ${MASTER_ELB_SG_ID} --protocol all"
+    authorize-security-group-ingress "${MASTER_ELB_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
+  fi
 
   # KUBE_USE_EXISTING_MASTER is used to add minions to an existing master
   if [[ "${KUBE_USE_EXISTING_MASTER:-}" == "true" ]]; then
@@ -840,12 +908,21 @@ function start-master() {
   # Get or create master persistent volume
   ensure-master-pd
 
+  # Create master ELB if needed
+  if [[ -n "${KUBE_MASTER_ELB:-}" ]]; then
+    ensure-master-elb
+  fi
+
   # Determine extra certificate names for master
   octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
   ((octets[3]+=1))
   service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
+  # TODO: Probably can get rid of MASTER_NAME here - it only works on GCE (?)
   MASTER_EXTRA_SANS="IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
 
+  if [[ -n "${MASTER_ELB_DNSNAME:-}" ]]; then
+    MASTER_EXTRA_SANS="${MASTER_EXTRA_SANS},DNS:${MASTER_ELB_DNSNAME}"
+  fi
 
   (
     # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
@@ -1010,6 +1087,22 @@ function start-master() {
     attempt=$(($attempt+1))
     sleep 10
   done
+
+  # We wait as long as possible before registering the instance with the ELB,
+  # because the ELB health check will mark the instance offline if the API server
+  # isn't available, and it takes a while to come back online.
+  # TODO: This is probably still too early
+  if [[ -n "${KUBE_MASTER_ELB:-}" ]]; then
+    echo "Registering master with load balancer"
+
+    aws elb register-instances-with-load-balancer \
+            --load-balancer-name ${MASTER_ELB_ID} \
+            --instances ${master_id} > ${LOG}
+    KUBE_SERVER=https://${MASTER_ELB_DNSNAME}
+    # API_SERVERS is passed to salt; it is the URL on which kubelets will contact the API
+    # (otherwise Salt derives a default URL from the IP of nodes with the master role)
+    API_SERVERS=${MASTER_ELB_DNSNAME}
+  fi
 }
 
 # Creates an ASG for the minion nodes
@@ -1096,8 +1189,13 @@ function wait-master() {
   echo "  up."
   echo
 
+  local url="https://${KUBE_MASTER_IP}/healthz"
+  if [[ -n "${KUBE_SERVER:-}" ]]; then
+    url="${KUBE_SERVER}/healthz"
+  fi
+
   until $(curl --insecure --user ${KUBE_USER}:${KUBE_PASSWORD} --max-time 5 \
-    --fail --output $LOG --silent https://${KUBE_MASTER_IP}/healthz); do
+    --fail --output $LOG --silent ${url}); do
     printf "."
     sleep 2
   done
@@ -1106,7 +1204,7 @@ function wait-master() {
 }
 
 # Creates the ~/.kube/config file, getting the information from the master
-# The master much be running and set in KUBE_MASTER_IP
+# The master must be running and set in KUBE_MASTER_IP
 function build-config() {
   # TODO use token instead of kube_auth
   export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
