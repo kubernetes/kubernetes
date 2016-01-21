@@ -160,7 +160,16 @@ func TestVersion(t *testing.T) {
 	if err != nil {
 		t.Errorf("got error while getting docker server version - %s", err)
 	}
-	expectedVersion, _ := docker.NewAPIVersion("1.15")
+	expectedVersion, _ := docker.NewAPIVersion("1.1.3")
+	if e, a := expectedVersion.String(), version.String(); e != a {
+		t.Errorf("invalid docker server version. expected: %v, got: %v", e, a)
+	}
+
+	version, err = manager.APIVersion()
+	if err != nil {
+		t.Errorf("got error while getting docker server version - %s", err)
+	}
+	expectedVersion, _ = docker.NewAPIVersion("1.15")
 	if e, a := expectedVersion.String(), version.String(); e != a {
 		t.Errorf("invalid docker server version. expected: %v, got: %v", e, a)
 	}

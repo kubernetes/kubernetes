@@ -971,6 +971,10 @@ func (r *Runtime) Version() (kubecontainer.Version, error) {
 	return r.binVersion, nil
 }
 
+func (r *Runtime) APIVersion() (kubecontainer.Version, error) {
+	return r.binVersion, nil
+}
+
 // SyncPod syncs the running pod to match the specified desired pod.
 func (r *Runtime) SyncPod(pod *api.Pod, podStatus api.PodStatus, internalPodStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) error {
 	// TODO: (random-liu) Stop using running pod in SyncPod()
