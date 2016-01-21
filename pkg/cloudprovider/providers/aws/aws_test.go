@@ -266,11 +266,11 @@ func contains(haystack []*string, needle string) bool {
 
 func instanceMatchesFilter(instance *ec2.Instance, filter *ec2.Filter) bool {
 	name := *filter.Name
-	if name == "private-dns-name" {
-		if instance.PrivateDnsName == nil {
+	if name == "private-ip-address" {
+		if instance.PrivateIpAddress == nil {
 			return false
 		}
-		return contains(filter.Values, *instance.PrivateDnsName)
+		return contains(filter.Values, *instance.PrivateIpAddress)
 	}
 	panic("Unknown filter name: " + name)
 }
@@ -602,7 +602,7 @@ func TestNodeAddresses(t *testing.T) {
 	//1
 	instance1.InstanceId = aws.String("instance-same")
 	instance1.PrivateDnsName = aws.String("instance-same.ec2.internal")
-	instance1.PrivateIpAddress = aws.String("192.168.0.2")
+	instance1.PrivateIpAddress = aws.String("192.168.0.1")
 	instance1.InstanceType = aws.String("c3.large")
 	state1 := ec2.InstanceState{
 		Name: aws.String("running"),
@@ -612,19 +612,19 @@ func TestNodeAddresses(t *testing.T) {
 	instances := []*ec2.Instance{&instance0, &instance1}
 
 	aws1, _ := mockInstancesResp([]*ec2.Instance{})
-	_, err1 := aws1.NodeAddresses("instance-mismatch.ec2.internal")
+	_, err1 := aws1.NodeAddresses("192.168.0.12")
 	if err1 == nil {
 		t.Errorf("Should error when no instance found")
 	}
 
 	aws2, _ := mockInstancesResp(instances)
-	_, err2 := aws2.NodeAddresses("instance-same.ec2.internal")
+	_, err2 := aws2.NodeAddresses("192.168.0.1")
 	if err2 == nil {
 		t.Errorf("Should error when multiple instances found")
 	}
 
 	aws3, _ := mockInstancesResp(instances[0:1])
-	addrs3, err3 := aws3.NodeAddresses("instance-same.ec2.internal")
+	addrs3, err3 := aws3.NodeAddresses("192.168.0.1")
 	if err3 != nil {
 		t.Errorf("Should not error when instance found")
 	}
