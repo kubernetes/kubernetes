@@ -228,6 +228,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					return "", fmt.Errorf("the service has no pod selector set")
 				}
 				return kubectl.MakeLabels(t.Spec.Selector), nil
+			case *extensions.Deployment:
+				return kubectl.MakeLabels(t.Spec.Selector), nil
 			default:
 				gvk, err := api.Scheme.ObjectKind(object)
 				if err != nil {
@@ -245,6 +247,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return getPorts(t.Spec), nil
 			case *api.Service:
 				return getServicePorts(t.Spec), nil
+			case *extensions.Deployment:
+				return getPorts(t.Spec.Template.Spec), nil
 			default:
 				gvk, err := api.Scheme.ObjectKind(object)
 				if err != nil {
@@ -330,7 +334,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		},
 		CanBeExposed: func(kind unversioned.GroupKind) error {
 			switch kind {
-			case api.Kind("ReplicationController"), api.Kind("Service"), api.Kind("Pod"):
+			case api.Kind("ReplicationController"), api.Kind("Service"), api.Kind("Pod"), extensions.Kind("Deployment"):
 				// nothing to do here
 			default:
 				return fmt.Errorf("cannot expose a %s", kind)

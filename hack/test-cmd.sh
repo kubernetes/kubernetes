@@ -946,6 +946,19 @@ __EOF__
   # TODO: Remove once deployment reaping is implemented
   kubectl delete rc --all "${kube_flags[@]}"
 
+  ### Expose a deployment as a service
+  kubectl create -f examples/extensions/deployment.yaml "${kube_flags[@]}"
+  # Pre-condition: 3 replicas
+  kube::test::get_object_assert 'deployment nginx-deployment' "{{$deployment_replicas}}" '3'
+  # Command
+  kubectl expose deployment/nginx-deployment
+  # Post-condition: service exists and exposes deployment port (80)
+  kube::test::get_object_assert 'service nginx-deployment' "{{$port_field}}" '80'
+  # Clean-up
+  kubectl delete deployment/nginx-deployment service/nginx-deployment "${kube_flags[@]}"
+  # TODO: Remove once deployment reaping is implemented
+  kubectl delete rc --all "${kube_flags[@]}"
+
   ### Expose replication controller as service
   kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
   # Pre-condition: 3 replicas
