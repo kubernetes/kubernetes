@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package downwardapi
+package downwardapi_test
 
 import (
 	"fmt"
@@ -29,6 +29,10 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
+)
+
+const (
+	downwardAPIPluginName = "kubernetes.io/downward-api"
 )
 
 func formatMap(m map[string]string) (fmtstr string) {

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package rbd
+package rbd_test
 
 import (
 	"os"

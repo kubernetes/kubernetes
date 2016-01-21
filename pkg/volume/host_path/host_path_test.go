@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package host_path
+package host_path_test
 
 import (
 	"fmt"
