@@ -84,6 +84,7 @@ dry-run
 duration-sec
 e2e-output-dir
 e2e-verify-service-account
+enable-custom-metrics
 enable-debugging-handlers
 enable-hostpath-provisioner
 enable-server

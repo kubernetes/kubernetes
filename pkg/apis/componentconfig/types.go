@@ -288,6 +288,8 @@ type KubeletConfiguration struct {
 	NodeLabels map[string]string `json:"nodeLabels"`
 	// nonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
 	NonMasqueradeCIDR string `json:"nonMasqueradeCIDR"`
+	// enable gathering custom metrics.
+	EnableCustomMetrics bool `json:"enableCustomMetrics"`
 }
 
 type KubeSchedulerConfiguration struct {
