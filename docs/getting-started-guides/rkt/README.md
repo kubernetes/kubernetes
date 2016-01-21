@@ -62,8 +62,12 @@ edited to add this `rkt.kubernetes.io` network:
 
 #### Using flannel
 
-[flannel](https://github.com/coreos/flannel) can be configured with a
-CNI config like:
+In addition to the basic prerequisites above, each node must be running
+a [flannel](https://github.com/coreos/flannel) daemon. This implies
+that a flannel-supporting etcd service must be available to the cluster
+as well, apart from the Kubernetes etcd, which will not yet be
+available at flannel configuration time. Once it's running, flannel can
+be set up with a CNI config like:
 
 ```console
 $ cat <<EOF >/etc/rkt/net.d/k8s_cluster.conf
