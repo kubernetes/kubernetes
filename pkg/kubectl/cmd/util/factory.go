@@ -103,6 +103,8 @@ type Factory struct {
 	HistoryViewer func(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error)
 	// Returns a Rollbacker for changing the rollback version of the specified RESTMapping type or an error
 	Rollbacker func(mapping *meta.RESTMapping) (kubectl.Rollbacker, error)
+	// Returns a StatusViewer for printing rollout status.
+	StatusViewer func(mapping *meta.RESTMapping) (kubectl.StatusViewer, error)
 	// MapBasedSelectorForObject returns the map-based selector associated with the provided object. If a
 	// new set-based selector is provided, an error is returned if the selector cannot be converted to a
 	// map-based selector
@@ -561,6 +563,14 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return nil, err
 			}
 			return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), client)
+		},
+		StatusViewer: func(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
+			mappingVersion := mapping.GroupVersionKind.GroupVersion()
+			client, err := clients.ClientForVersion(&mappingVersion)
+			if err != nil {
+				return nil, err
+			}
+			return kubectl.StatusViewerFor(mapping.GroupVersionKind.GroupKind(), client)
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
 			if validate {
