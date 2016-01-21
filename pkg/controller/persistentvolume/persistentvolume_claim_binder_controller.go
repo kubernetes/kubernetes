@@ -226,7 +226,7 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 		nextPhase = api.VolumeAvailable
 
 		if volume.Spec.ClaimRef != nil {
-			_, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
+			claim, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
 			if errors.IsNotFound(err) {
 				// Pending volumes that have a ClaimRef where the claim is missing were recently recycled.
 				// The Recycler set the phase to VolumePending to start the volume at the beginning of this lifecycle.
@@ -249,6 +249,14 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 				}
 			} else if err != nil {
 				return fmt.Errorf("Error getting PersistentVolumeClaim[%s/%s]: %v", volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name, err)
+			}
+
+			// Dynamically provisioned claims remain Pending until its volume is completely provisioned.
+			// The provisioner updates the PV and triggers this update for the volume.  Explicitly sync'ing
+			// the claim here prevents the need to wait until the next sync period when the claim would normally
+			// advance to Bound phase. Otherwise, the maximum wait time for the claim to be Bound is the default sync period.
+			if claim != nil && claim.Status.Phase == api.ClaimPending && keyExists(qosProvisioningKey, claim.Annotations) && isProvisioningComplete(volume) {
+				syncClaim(volumeIndex, binderClient, claim)
 			}
 		}
 		glog.V(5).Infof("PersistentVolume[%s] is available\n", volume.Name)
