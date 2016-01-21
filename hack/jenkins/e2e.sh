@@ -972,6 +972,7 @@ export KUBE_GCE_NODE_PROJECT=${KUBE_GCE_NODE_PROJECT:-}
 export KUBE_GCE_NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-}
 export KUBE_OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-}
 export GCE_SERVICE_ACCOUNT=$(gcloud auth list 2> /dev/null | grep active | cut -f3 -d' ')
+export FAIL_ON_GCP_RESOURCE_LEAK="${FAIL_ON_GCP_RESOURCE_LEAK:-false}"
 
 # GKE variables
 export CLUSTER_NAME=${E2E_CLUSTER_NAME}
@@ -980,6 +981,7 @@ export KUBE_GKE_NETWORK=${E2E_NETWORK}
 export E2E_SET_CLUSTER_API_VERSION=${E2E_SET_CLUSTER_API_VERSION:-}
 export CMD_GROUP=${CMD_GROUP:-}
 export MACHINE_TYPE=${NODE_SIZE:-}  # GKE scripts use MACHINE_TYPE for the node vm size
+export CLOUDSDK_BUCKET="${CLOUDSDK_BUCKET:-}"
 
 if [[ ! -z "${GKE_API_ENDPOINT:-}" ]]; then
   export CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER=${GKE_API_ENDPOINT}
@@ -1010,12 +1012,18 @@ export PATH=${PATH}:/usr/local/go/bin
 export KUBE_SKIP_UPDATE=y
 export KUBE_SKIP_CONFIRMATIONS=y
 
+# Kubemark
+export USE_KUBEMARK="${USE_KUBEMARK:-false}"
+export KUBEMARK_MASTER_SIZE="${KUBEMARK_MASTER_SIZE:-$MASTER_SIZE}"
+export KUBEMARK_NUM_NODES="${KUBEMARK_NUM_NODES:-$NUM_NODES}"
+
 # E2E Control Variables
 export E2E_OPT="${E2E_OPT:-}"
 export E2E_UP="${E2E_UP:-true}"
 export E2E_TEST="${E2E_TEST:-true}"
 export E2E_DOWN="${E2E_DOWN:-true}"
 export E2E_CLEAN_START="${E2E_CLEAN_START:-}"
+export E2E_PUBLISH_GREEN_VERSION="${E2E_PUBLISH_GREEN_VERSION:-false}"
 # Used by hack/ginkgo-e2e.sh to enable ginkgo's parallel test runner.
 export GINKGO_PARALLEL=${GINKGO_PARALLEL:-}
 export GINKGO_PARALLEL_NODES=${GINKGO_PARALLEL_NODES:-}
