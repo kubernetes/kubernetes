@@ -71,7 +71,7 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 }
 
 func TestRequestPreservesBaseTrailingSlash(t *testing.T) {
-	r := &Request{baseURL: &url.URL{}, path: "/path/"}
+	r := &Request{baseURL: &url.URL{}, pathPrefix: "/path/"}
 	if s := r.URL().String(); s != "/path/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
@@ -113,8 +113,8 @@ func TestRequestSetsNamespace(t *testing.T) {
 
 func TestRequestOrdersNamespaceInPath(t *testing.T) {
 	r := (&Request{
-		baseURL: &url.URL{},
-		path:    "/test/",
+		baseURL:    &url.URL{},
+		pathPrefix: "/test/",
 	}).Name("bar").Resource("baz").Namespace("foo")
 	if s := r.URL().String(); s != "/test/namespaces/foo/baz/bar" {
 		t.Errorf("namespace should be in order in path: %s", s)
@@ -123,8 +123,8 @@ func TestRequestOrdersNamespaceInPath(t *testing.T) {
 
 func TestRequestOrdersSubResource(t *testing.T) {
 	r := (&Request{
-		baseURL: &url.URL{},
-		path:    "/test/",
+		baseURL:    &url.URL{},
+		pathPrefix: "/test/",
 	}).Name("bar").Resource("baz").Namespace("foo").Suffix("test").SubResource("a", "b")
 	if s := r.URL().String(); s != "/test/namespaces/foo/baz/bar/a/b/test" {
 		t.Errorf("namespace should be in order in path: %s", s)
@@ -217,7 +217,7 @@ func TestRequestURI(t *testing.T) {
 	r := (&Request{}).Param("foo", "a")
 	r.Prefix("other")
 	r.RequestURI("/test?foo=b&a=b&c=1&c=2")
-	if r.path != "/test" {
+	if r.pathPrefix != "/test" {
 		t.Errorf("path is wrong: %#v", r)
 	}
 	if !reflect.DeepEqual(r.params, url.Values{"a": []string{"b"}, "foo": []string{"b"}, "c": []string{"1", "2"}}) {
@@ -265,7 +265,7 @@ func TestResultIntoWithErrReturnsErr(t *testing.T) {
 
 func TestURLTemplate(t *testing.T) {
 	uri, _ := url.Parse("http://localhost")
-	r := NewRequest(nil, "POST", uri, unversioned.GroupVersion{Group: "test"}, nil, nil)
+	r := NewRequest(nil, "POST", uri, "", unversioned.GroupVersion{Group: "test"}, nil, nil)
 	r.Prefix("pre1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0")
 	full := r.URL()
 	if full.String() != "http://localhost/pre1/namespaces/ns/r1/nm?p0=v0" {
@@ -326,7 +326,7 @@ func TestTransformResponse(t *testing.T) {
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 	}
 	for i, test := range testCases {
-		r := NewRequest(nil, "", uri, *testapi.Default.GroupVersion(), testapi.Default.Codec(), nil)
+		r := NewRequest(nil, "", uri, "", *testapi.Default.GroupVersion(), testapi.Default.Codec(), nil)
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
@@ -450,7 +450,7 @@ func TestRequestWatch(t *testing.T) {
 			Err:     true,
 		},
 		{
-			Request: &Request{baseURL: &url.URL{}, path: "%"},
+			Request: &Request{baseURL: &url.URL{}, pathPrefix: "%"},
 			Err:     true,
 		},
 		{
@@ -579,7 +579,7 @@ func TestRequestStream(t *testing.T) {
 			Err:     true,
 		},
 		{
-			Request: &Request{baseURL: &url.URL{}, path: "%"},
+			Request: &Request{baseURL: &url.URL{}, pathPrefix: "%"},
 			Err:     true,
 		},
 		{
@@ -665,7 +665,7 @@ func TestRequestDo(t *testing.T) {
 			Err:     true,
 		},
 		{
-			Request: &Request{baseURL: &url.URL{}, path: "%"},
+			Request: &Request{baseURL: &url.URL{}, pathPrefix: "%"},
 			Err:     true,
 		},
 		{
@@ -1062,11 +1062,37 @@ func TestVerbs(t *testing.T) {
 }
 
 func TestAbsPath(t *testing.T) {
-	expectedPath := "/bar/foo"
-	c := testRESTClient(t, nil)
-	r := c.Post().Prefix("/foo").AbsPath(expectedPath)
-	if r.path != expectedPath {
-		t.Errorf("unexpected path: %s, expected %s", r.path, expectedPath)
+	for i, tc := range []struct {
+		configPrefix   string
+		resourcePrefix string
+		absPath        string
+		wantsAbsPath   string
+	}{
+		{"", "", "", "/"},
+		{"", "", "/", "/"},
+		{"", "", "/api", "/api"},
+		{"", "", "/api/", "/api/"},
+		{"", "", "/apis", "/apis"},
+		{"", "/foo", "/bar/foo", "/bar/foo"},
+		{"", "/api/foo/123", "/bar/foo", "/bar/foo"},
+		{"/p1", "", "", "/p1"},
+		{"/p1", "", "/", "/p1/"},
+		{"/p1", "", "/api", "/p1/api"},
+		{"/p1", "", "/apis", "/p1/apis"},
+		{"/p1", "/r1", "/apis", "/p1/apis"},
+		{"/p1", "/api/r1", "/apis", "/p1/apis"},
+		{"/p1/api/p2", "", "", "/p1/api/p2"},
+		{"/p1/api/p2", "", "/", "/p1/api/p2/"},
+		{"/p1/api/p2", "", "/api", "/p1/api/p2/api"},
+		{"/p1/api/p2", "", "/api/", "/p1/api/p2/api/"},
+		{"/p1/api/p2", "/r1", "/api/", "/p1/api/p2/api/"},
+		{"/p1/api/p2", "/api/r1", "/api/", "/p1/api/p2/api/"},
+	} {
+		c := NewOrDie(&Config{Host: "http://localhost:123" + tc.configPrefix})
+		r := c.Post().Prefix(tc.resourcePrefix).AbsPath(tc.absPath)
+		if r.pathPrefix != tc.wantsAbsPath {
+			t.Errorf("test case %d failed, unexpected path: %q, expected %q", i, r.pathPrefix, tc.wantsAbsPath)
+		}
 	}
 }
 
@@ -1083,7 +1109,7 @@ func TestUintParam(t *testing.T) {
 
 	for _, item := range table {
 		u, _ := url.Parse("http://localhost")
-		r := NewRequest(nil, "GET", u, unversioned.GroupVersion{Group: "test"}, nil, nil).AbsPath("").UintParam(item.name, item.testVal)
+		r := NewRequest(nil, "GET", u, "", unversioned.GroupVersion{Group: "test"}, nil, nil).AbsPath("").UintParam(item.name, item.testVal)
 		if e, a := item.expectStr, r.URL().String(); e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
@@ -1255,6 +1281,6 @@ func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
 			t.Fatalf("failed to parse test URL: %v", err)
 		}
 	}
-	baseURL.Path = testapi.Default.ResourcePath("", "", "")
-	return NewRESTClient(baseURL, *testapi.Default.GroupVersion(), testapi.Default.Codec(), 0, 0)
+	versionedAPIPath := testapi.Default.ResourcePath("", "", "")
+	return NewRESTClient(baseURL, versionedAPIPath, *testapi.Default.GroupVersion(), testapi.Default.Codec(), 0, 0)
 }

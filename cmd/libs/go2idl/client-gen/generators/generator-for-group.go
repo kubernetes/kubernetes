@@ -55,7 +55,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	const pkgUnversioned = "k8s.io/kubernetes/pkg/client/unversioned"
 	const pkgLatest = "k8s.io/kubernetes/pkg/api/latest"
-	prefix := func(group string) string {
+	apiPath := func(group string) string {
 		if group == "legacy" {
 			return `"/api"`
 		}
@@ -80,7 +80,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"RESTClientFor":              c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "RESTClientFor"}),
 		"latestGroup":                c.Universe.Variable(types.Name{Package: pkgLatest, Name: "Group"}),
 		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgLatest, Name: "GroupOrDie"}),
-		"prefix":                     prefix(g.group),
+		"apiPath":                    apiPath(g.group),
 	}
 	sw.Do(groupInterfaceTemplate, m)
 	sw.Do(groupClientTemplate, m)
@@ -171,7 +171,7 @@ func setConfigDefaults(config *$.Config|raw$) error {
 	if err != nil {
 		return err
 	}
-	config.Prefix = $.prefix$
+	config.APIPath = $.apiPath$
 	if config.UserAgent == "" {
 		config.UserAgent = $.DefaultKubernetesUserAgent|raw$()
 	}

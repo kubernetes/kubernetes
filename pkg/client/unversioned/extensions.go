@@ -111,7 +111,7 @@ func setExtensionsDefaults(config *Config) error {
 	if err != nil {
 		return err
 	}
-	config.Prefix = "apis/"
+	config.APIPath = defaultAPIPath
 	if config.UserAgent == "" {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}

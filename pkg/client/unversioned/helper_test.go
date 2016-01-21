@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"reflect"
 	"strings"
 	"testing"
@@ -91,7 +92,7 @@ func TestSetKubernetesDefaults(t *testing.T) {
 		{
 			Config{},
 			Config{
-				Prefix:       "/api",
+				APIPath:      "/api",
 				GroupVersion: testapi.Default.GroupVersion(),
 				Codec:        testapi.Default.Codec(),
 				QPS:          5,
@@ -202,7 +203,7 @@ func TestSetsCodec(t *testing.T) {
 		Prefix string
 		Codec  runtime.Codec
 	}{
-		testapi.Default.GroupVersion().Version: {false, "/api/" + testapi.Default.GroupVersion().Version + "/", testapi.Default.Codec()},
+		testapi.Default.GroupVersion().Version: {false, "/api/" + testapi.Default.GroupVersion().Version, testapi.Default.Codec()},
 		// Add this test back when we fixed config and SetKubernetesDefaults
 		// "invalidVersion":                       {true, "", nil},
 	}
@@ -218,7 +219,7 @@ func TestSetsCodec(t *testing.T) {
 		case err != nil:
 			continue
 		}
-		if e, a := expected.Prefix, client.RESTClient.baseURL.Path; e != a {
+		if e, a := expected.Prefix, client.RESTClient.versionedAPIPath; e != a {
 			t.Errorf("expected %#v, got %#v", e, a)
 		}
 		if e, a := expected.Codec, client.RESTClient.Codec; e != a {
@@ -241,8 +242,8 @@ func TestRESTClientRequires(t *testing.T) {
 
 func TestValidatesHostParameter(t *testing.T) {
 	testCases := []struct {
-		Host   string
-		Prefix string
+		Host    string
+		APIPath string
 
 		URL string
 		Err bool
@@ -257,7 +258,7 @@ func TestValidatesHostParameter(t *testing.T) {
 		{"host/server", "", "", true},
 	}
 	for i, testCase := range testCases {
-		u, err := DefaultServerURL(testCase.Host, testCase.Prefix, *testapi.Default.GroupVersion(), false)
+		u, versionedAPIPath, err := DefaultServerURL(testCase.Host, testCase.APIPath, *testapi.Default.GroupVersion(), false)
 		switch {
 		case err == nil && testCase.Err:
 			t.Errorf("expected error but was nil")
@@ -268,6 +269,7 @@ func TestValidatesHostParameter(t *testing.T) {
 		case err != nil:
 			continue
 		}
+		u.Path = path.Join(u.Path, versionedAPIPath)
 		if e, a := testCase.URL, u.String(); e != a {
 			t.Errorf("%d: expected host %s, got %s", i, e, a)
 			continue

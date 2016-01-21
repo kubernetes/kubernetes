@@ -207,7 +207,7 @@ func (d *DiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) (*swag
 }
 
 func setDiscoveryDefaults(config *Config) error {
-	config.Prefix = ""
+	config.APIPath = ""
 	config.GroupVersion = nil
 	// Discovery client deals with unversioned objects, so we use api.Codec.
 	config.Codec = api.Codec

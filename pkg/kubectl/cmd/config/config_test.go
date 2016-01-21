@@ -145,13 +145,9 @@ func TestSetWithPathPrefixIntoExistingStruct(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expectedHost := "http://cow.org:8080"
+	expectedHost := "http://cow.org:8080/foo/baz"
 	if expectedHost != dcc.Host {
 		t.Fatalf("expected client.Config.Host = %q instead of %q", expectedHost, dcc.Host)
-	}
-	expectedPrefix := "/foo/baz"
-	if expectedPrefix != dcc.Prefix {
-		t.Fatalf("expected client.Config.Prefix = %q instead of %q", expectedPrefix, dcc.Prefix)
 	}
 }
 
