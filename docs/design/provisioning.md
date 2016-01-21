@@ -42,7 +42,7 @@ Use cases include:
 
 Summary implementation:
 
-Administrators use ConfigMap in a namespace they control to configure many provisioners.  Each provisioner creates 1 distinct kind and class of volume.  Using ConfigMap allows configuration to be stored in the API, which allows for easy update.
+Administrators use ConfigMap in a namespace they control to configure many provisioners.  Each provisioner creates 1 distinct kind and class of volume.  Using ConfigMap allows configuration to be stored in the API, which allows for easy update, watches, etc.
 
 A PersistentVolumeSelector added to PersistentVolumeClaim would first attempt to match labels on available PVs before looking for a provisioner with a matching label set, allowing "storage classes" to be defined for both manually created and dynamically provisioned volumes.
 
@@ -53,12 +53,22 @@ A PersistentVolumeSelector added to PersistentVolumeClaim would first attempt to
 
 Provisioners will be configured using `ConfigMap`.  `ConfigMap` allows configuration to be stored in the API server, which allows dynamic updates, querying, watches, etc.  The alternative is file config, which requires the same machinery as the API server (versioning, watches, querying, etc), or a new 1st class API object.  `ConfigMap` perfectly suits the requirements of this proposal without requiring a new API type.
 
-`ConfigMap` objects live in a namespace, so the administrator will create a namespace specifically to hold provisioner configuration.  The  namespace is required by kube-controller-manager so that the provisioner controller can query the correct namespace for configuration data.
+`ConfigMap` objects live in a namespace, so the administrator will create a namespace specifically to hold provisioner configuration.  This "system namespace" may contain many types of ConfigMaps, not all of which are provisioners, so a specific label must be applied to provisioners to identify them.
 
-Admins will pass the namespace to the controller via CLI flag:
+The  namespace and label are required by kube-controller-manager so that the provisioner controller can query the correct namespace and find the provisioner configs.
+
+Admins will pass the namespace and label to the controller via CLI flag:
 
 ```
+CLI flags:
+
 --pv-provisioner-namespace=foobar
+--pv-provisioner-label="type=provisioner-config
+
+example usage:
+
+kubectl --namespace=system-namespace get configmap -l type=provisioner-config
+
 ```
 
 
@@ -78,6 +88,7 @@ One configuration is shown below.  The remainder can be found [here](provisionin
       "name": "gold-east",
       "namespace": "kubernetes.io/provisioners",
       "labels": {
+        "type": "provisioner-config",
         "storage-class": "gold",
         "zone": "us-east"
       }
@@ -107,7 +118,9 @@ End users request specific storage by using a PersistentVolumeSelector on their 
     "persistentVolumeSelector":{
     	"matchLabels":{
     		"storage-class":"gold",
-    		"zone":"us-east",    	}    }
+    		"zone":"us-east",
+    	}
+    }
     "resources": {
       "requests": {
         "storage": "3Gi"
