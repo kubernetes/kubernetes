@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -96,4 +98,13 @@ func TestExportSecret(t *testing.T) {
 			t.Errorf("expected:\n%v\nsaw:\n%v\n", test.objOut, test.objIn)
 		}
 	}
+}
+
+func TestSelectableFieldLabelConversions(t *testing.T) {
+	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
+		testapi.Default.GroupVersion().String(),
+		"Secret",
+		SelectableFields(&api.Secret{}),
+		nil,
+	)
 }

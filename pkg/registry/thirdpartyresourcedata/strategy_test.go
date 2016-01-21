@@ -14,44 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package thirdpartyresourcedata
 
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	_ "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
-
-func TestMatchNode(t *testing.T) {
-	testFieldMap := map[bool][]fields.Set{
-		true: {
-			{"metadata.name": "foo"},
-		},
-		false: {
-			{"foo": "bar"},
-		},
-	}
-
-	for expectedResult, fieldSet := range testFieldMap {
-		for _, field := range fieldSet {
-			m := MatchNode(labels.Everything(), field.AsSelector())
-			_, matchesSingle := m.MatchesSingle()
-			if e, a := expectedResult, matchesSingle; e != a {
-				t.Errorf("%+v: expected %v, got %v", fieldSet, e, a)
-			}
-		}
-	}
-}
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		testapi.Default.GroupVersion().String(),
-		"Node",
-		labels.Set(NodeToSelectableFields(&api.Node{})),
+		testapi.Extensions.GroupVersion().String(),
+		"ThirdPartyResourceData",
+		SelectableFields(&extensions.ThirdPartyResourceData{}),
 		nil,
 	)
 }
