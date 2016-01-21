@@ -204,7 +204,6 @@ var _ = Describe("Kubectl client", func() {
 				Failf("Unable to parse URL %s. Error=%s", apiServer, err)
 			}
 			apiServerUrl.Scheme = "https"
-			apiServerUrl.Path = "/api"
 			if !strings.Contains(apiServer, ":443") {
 				apiServerUrl.Host = apiServerUrl.Host + ":443"
 			}

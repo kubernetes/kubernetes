@@ -99,7 +99,7 @@ func setConfigDefaults(config *unversioned.Config) error {
 	if err != nil {
 		return err
 	}
-	config.Prefix = "/apis"
+	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = unversioned.DefaultKubernetesUserAgent()
 	}

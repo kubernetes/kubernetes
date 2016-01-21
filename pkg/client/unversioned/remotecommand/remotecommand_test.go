@@ -190,7 +190,7 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 		server := httptest.NewServer(fakeExecServer(t, i, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, testCase.MessageCount))
 
 		url, _ := url.ParseRequestURI(server.URL)
-		c := client.NewRESTClient(url, unversioned.GroupVersion{Group: "x"}, nil, -1, -1)
+		c := client.NewRESTClient(url, "", unversioned.GroupVersion{Group: "x"}, nil, -1, -1)
 		req := c.Post().Resource("testing")
 		req.SetHeader(httpstream.HeaderProtocolVersion, StreamProtocolV2Name)
 		req.Param("command", "ls")
@@ -275,7 +275,7 @@ func TestRequestAttachRemoteCommand(t *testing.T) {
 		server := httptest.NewServer(fakeExecServer(t, i, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, 1))
 
 		url, _ := url.ParseRequestURI(server.URL)
-		c := client.NewRESTClient(url, unversioned.GroupVersion{Group: "x"}, nil, -1, -1)
+		c := client.NewRESTClient(url, "", unversioned.GroupVersion{Group: "x"}, nil, -1, -1)
 		req := c.Post().Resource("testing")
 
 		conf := &client.Config{
