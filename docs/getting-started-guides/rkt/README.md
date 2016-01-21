@@ -97,7 +97,10 @@ $ cat <<EOF >/etc/rkt/net.d/k8s_cluster.conf
         "type": "host-local",
         "subnet": "10.255.228.1/24",
         "gateway": "10.255.228.1"
-    }
+    },
+    "routes": [
+      { "dst": "0.0.0.0/0" }
+    ]
 }
 EOF
 ```
