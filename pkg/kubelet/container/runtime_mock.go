@@ -47,6 +47,11 @@ func (r *Mock) Version() (Version, error) {
 	return args.Get(0).(Version), args.Error(1)
 }
 
+func (r *Mock) APIVersion() (Version, error) {
+	args := r.Called()
+	return args.Get(0).(Version), args.Error(1)
+}
+
 func (r *Mock) GetPods(all bool) ([]*Pod, error) {
 	args := r.Called(all)
 	return args.Get(0).([]*Pod), args.Error(1)
