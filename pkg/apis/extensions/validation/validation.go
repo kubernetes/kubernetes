@@ -179,17 +179,46 @@ func ValidateDaemonSetTemplateUpdate(podTemplate, oldPodTemplate *api.PodTemplat
 	return allErrs
 }
 
+func ValidateRollingUpdateDaemonSet(rollingUpdate *extensions.RollingUpdateDaemonSet, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	if getIntOrPercentValue(rollingUpdate.MaxUnavailable) == 0 {
+		// MaxUnavailable cannot be 0.
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxUnavailable"), rollingUpdate.MaxUnavailable, "cannot be 0"))
+	}
+	// Validate that MaxUnavailable is not more than 100%.
+	allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rollingUpdate.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
+	return allErrs
+}
+
+func ValidateDaemonSetUpdateStrategy(strategy *extensions.DaemonSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// Only rolling update is supported at this time.
+	if strategy.Type != extensions.RollingUpdateDaemonSetStrategyType {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), strategy.Type, "RollingUpdate is the only supported type"))
+	}
+	// Make sure RollingUpdate field isn't nil.
+	if strategy.RollingUpdate == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("rollingUpdate"), ""))
+		return allErrs
+	}
+	allErrs = append(allErrs, ValidateRollingUpdateDaemonSet(strategy.RollingUpdate, fldPath.Child("rollingUpdate"))...)
+	return allErrs
+}
+
 // ValidateDaemonSetSpec tests if required fields in the DaemonSetSpec are set.
 func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
-
+	// The order of these checks is important because spec.Template is tested for nil value here
+	// before accessing its labels in the following check.
 	if spec.Template == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("template"), ""))
 		return allErrs
 	}
 
+	allErrs = append(allErrs, ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
 	selector, err := extensions.LabelSelectorAsSelector(spec.Selector)
 	if err == nil && !selector.Matches(labels.Set(spec.Template.Labels)) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "metadata", "labels"), spec.Template.Labels, "`selector` does not match template `labels`"))
@@ -202,6 +231,8 @@ func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec, fldPath *field.Path) 
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"), spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
 	}
+
+	allErrs = append(allErrs, ValidateDaemonSetUpdateStrategy(&spec.UpdateStrategy, fldPath.Child("updateStrategy"))...)
 
 	return allErrs
 }

@@ -1101,6 +1101,15 @@ func deepCopy_v1beta1_DaemonSetSpec(in DaemonSetSpec, out *DaemonSetSpec, c *con
 	} else {
 		out.Template = nil
 	}
+	if err := deepCopy_v1beta1_DaemonSetUpdateStrategy(in.UpdateStrategy, &out.UpdateStrategy, c); err != nil {
+		return err
+	}
+	if in.UniqueLabelKey != nil {
+		out.UniqueLabelKey = new(string)
+		*out.UniqueLabelKey = *in.UniqueLabelKey
+	} else {
+		out.UniqueLabelKey = nil
+	}
 	return nil
 }
 
@@ -1108,6 +1117,19 @@ func deepCopy_v1beta1_DaemonSetStatus(in DaemonSetStatus, out *DaemonSetStatus, 
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
+	return nil
+}
+
+func deepCopy_v1beta1_DaemonSetUpdateStrategy(in DaemonSetUpdateStrategy, out *DaemonSetUpdateStrategy, c *conversion.Cloner) error {
+	out.Type = in.Type
+	if in.RollingUpdate != nil {
+		out.RollingUpdate = new(RollingUpdateDaemonSet)
+		if err := deepCopy_v1beta1_RollingUpdateDaemonSet(*in.RollingUpdate, out.RollingUpdate, c); err != nil {
+			return err
+		}
+	} else {
+		out.RollingUpdate = nil
+	}
 	return nil
 }
 
@@ -1577,6 +1599,19 @@ func deepCopy_v1beta1_ReplicationControllerDummy(in ReplicationControllerDummy, 
 	return nil
 }
 
+func deepCopy_v1beta1_RollingUpdateDaemonSet(in RollingUpdateDaemonSet, out *RollingUpdateDaemonSet, c *conversion.Cloner) error {
+	if in.MaxUnavailable != nil {
+		out.MaxUnavailable = new(intstr.IntOrString)
+		if err := deepCopy_intstr_IntOrString(*in.MaxUnavailable, out.MaxUnavailable, c); err != nil {
+			return err
+		}
+	} else {
+		out.MaxUnavailable = nil
+	}
+	out.MinReadySeconds = in.MinReadySeconds
+	return nil
+}
+
 func deepCopy_v1beta1_RollingUpdateDeployment(in RollingUpdateDeployment, out *RollingUpdateDeployment, c *conversion.Cloner) error {
 	if in.MaxUnavailable != nil {
 		out.MaxUnavailable = new(intstr.IntOrString)
@@ -1788,6 +1823,7 @@ func init() {
 		deepCopy_v1beta1_DaemonSetList,
 		deepCopy_v1beta1_DaemonSetSpec,
 		deepCopy_v1beta1_DaemonSetStatus,
+		deepCopy_v1beta1_DaemonSetUpdateStrategy,
 		deepCopy_v1beta1_Deployment,
 		deepCopy_v1beta1_DeploymentList,
 		deepCopy_v1beta1_DeploymentSpec,
@@ -1816,6 +1852,7 @@ func init() {
 		deepCopy_v1beta1_ListOptions,
 		deepCopy_v1beta1_NodeUtilization,
 		deepCopy_v1beta1_ReplicationControllerDummy,
+		deepCopy_v1beta1_RollingUpdateDaemonSet,
 		deepCopy_v1beta1_RollingUpdateDeployment,
 		deepCopy_v1beta1_Scale,
 		deepCopy_v1beta1_ScaleSpec,
