@@ -627,11 +627,7 @@ func getNodeConditionPredicate() cache.NodeConditionPredicate {
 func (s *ServiceController) nodeSyncLoop(period time.Duration) {
 	var prevHosts []string
 	var servicesToUpdate []*cachedService
-	// TODO: Eliminate the unneeded now variable once we stop compiling in go1.3.
-	// It's needed at the moment because go1.3 requires ranges to be assigned to
-	// something to compile, and gofmt1.4 complains about using `_ = range`.
-	for now := range time.Tick(period) {
-		_ = now
+	for range time.Tick(period) {
 		nodes, err := s.nodeLister.NodeCondition(getNodeConditionPredicate()).List()
 		if err != nil {
 			glog.Errorf("Failed to retrieve current set of nodes from node lister: %v", err)
