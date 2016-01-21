@@ -593,11 +593,16 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 func parseEnvs(envArray []string) ([]api.EnvVar, error) {
 	envs := []api.EnvVar{}
 	for _, env := range envArray {
-		parts := strings.Split(env, "=")
-		if len(parts) != 2 || !validation.IsCIdentifier(parts[0]) || len(parts[1]) == 0 {
+		pos := strings.Index(env, "=")
+		if pos == -1 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
-		envVar := api.EnvVar{Name: parts[0], Value: parts[1]}
+		name := env[:pos]
+		value := env[pos+1:]
+		if len(name) == 0 || !validation.IsCIdentifier(name) || len(value) == 0 {
+			return nil, fmt.Errorf("invalid env: %v", env)
+		}
+		envVar := api.EnvVar{Name: name, Value: value}
 		envs = append(envs, envVar)
 	}
 	return envs, nil
