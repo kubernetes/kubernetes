@@ -24,19 +24,20 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/net"
 )
 
 // See ipallocator/controller/repair.go; this is a copy for ports.
 type Repair struct {
 	interval  time.Duration
 	registry  service.Registry
-	portRange util.PortRange
+	portRange net.PortRange
 	alloc     service.RangeRegistry
 }
 
 // NewRepair creates a controller that periodically ensures that all ports are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
-func NewRepair(interval time.Duration, registry service.Registry, portRange util.PortRange, alloc service.RangeRegistry) *Repair {
+func NewRepair(interval time.Duration, registry service.Registry, portRange net.PortRange, alloc service.RangeRegistry) *Repair {
 	return &Repair{
 		interval:  interval,
 		registry:  registry,

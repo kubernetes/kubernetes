@@ -27,7 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
-	"k8s.io/kubernetes/pkg/util"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
+
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -42,7 +43,7 @@ func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registryte
 	}
 	r := ipallocator.NewCIDRRange(makeIPNet(t))
 
-	portRange := util.PortRange{Base: 30000, Size: 1000}
+	portRange := utilnet.PortRange{Base: 30000, Size: 1000}
 	portAllocator := portallocator.NewPortAllocator(portRange)
 
 	storage := NewStorage(registry, endpointRegistry, r, portAllocator, nil)

@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/transport"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 type KubeletClientConfig struct {
@@ -71,7 +71,7 @@ func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
 
 	rt := http.DefaultTransport
 	if config.Dial != nil || tlsConfig != nil {
-		rt = util.SetTransportDefaults(&http.Transport{
+		rt = utilnet.SetTransportDefaults(&http.Transport{
 			Dial:            config.Dial,
 			TLSClientConfig: tlsConfig,
 		})

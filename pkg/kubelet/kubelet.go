@@ -74,6 +74,7 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
@@ -2713,7 +2714,7 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 				}
 
 				if len(node.Status.Addresses) == 0 {
-					ip, err := util.ChooseHostInterface()
+					ip, err := utilnet.ChooseHostInterface()
 					if err != nil {
 						return err
 					}

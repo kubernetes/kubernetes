@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/net"
 )
 
 var (
@@ -52,7 +53,7 @@ func (r *randomAllocator) Release(_ int) {
 // newPortAllocator builds PortAllocator for a given PortRange. If the PortRange is empty
 // then a random port allocator is returned; otherwise, a new range-based allocator
 // is returned.
-func newPortAllocator(r util.PortRange) PortAllocator {
+func newPortAllocator(r net.PortRange) PortAllocator {
 	if r.Base == 0 {
 		return &randomAllocator{}
 	}
@@ -66,14 +67,14 @@ const (
 )
 
 type rangeAllocator struct {
-	util.PortRange
+	net.PortRange
 	ports chan int
 	used  big.Int
 	lock  sync.Mutex
 	rand  *rand.Rand
 }
 
-func newPortRangeAllocator(r util.PortRange) PortAllocator {
+func newPortRangeAllocator(r net.PortRange) PortAllocator {
 	if r.Base == 0 || r.Size == 0 {
 		panic("illegal argument: may not specify an empty port range")
 	}

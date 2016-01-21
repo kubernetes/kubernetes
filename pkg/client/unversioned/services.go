@@ -18,7 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -103,7 +103,7 @@ func (c *services) ProxyGet(scheme, name, port, path string, params map[string]s
 		Prefix("proxy").
 		Namespace(c.ns).
 		Resource("services").
-		Name(util.JoinSchemeNamePort(scheme, name, port)).
+		Name(net.JoinSchemeNamePort(scheme, name, port)).
 		Suffix(path)
 	for k, v := range params {
 		request = request.Param(k, v)

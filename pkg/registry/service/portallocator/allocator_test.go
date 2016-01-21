@@ -22,12 +22,12 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestAllocate(t *testing.T) {
-	pr, err := util.ParsePortRange("10000-10200")
+	pr, err := net.ParsePortRange("10000-10200")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestAllocate(t *testing.T) {
 }
 
 func TestSnapshot(t *testing.T) {
-	pr, err := util.ParsePortRange("10000-10200")
+	pr, err := net.ParsePortRange("10000-10200")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pr2, err := util.ParsePortRange(dst.Range)
+	pr2, err := net.ParsePortRange(dst.Range)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestSnapshot(t *testing.T) {
 		t.Fatalf("mismatched networks: %s : %s", pr, pr2)
 	}
 
-	otherPr, err := util.ParsePortRange("200-300")
+	otherPr, err := net.ParsePortRange("200-300")
 	if err != nil {
 		t.Fatal(err)
 	}

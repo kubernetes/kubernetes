@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/net"
 )
 
 // Decoder allows StreamWatcher to watch any stream for which a Decoder can be written.
@@ -102,7 +103,7 @@ func (sw *StreamWatcher) receive() {
 				glog.V(1).Infof("Unexpected EOF during watch stream event decoding: %v", err)
 			default:
 				msg := "Unable to decode an event from the watch stream: %v"
-				if util.IsProbableEOF(err) {
+				if net.IsProbableEOF(err) {
 					glog.V(5).Infof(msg, err)
 				} else {
 					glog.Errorf(msg, err)

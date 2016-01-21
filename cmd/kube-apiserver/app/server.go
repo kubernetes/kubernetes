@@ -51,7 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/util"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -164,9 +164,9 @@ func Run(s *options.APIServer) error {
 
 	// If advertise-address is not specified, use bind-address. If bind-address
 	// is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
-	// interface as valid public addr for master (see: util#ValidPublicAddrForMaster)
+	// interface as valid public addr for master (see: util/net#ValidPublicAddrForMaster)
 	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
-		hostIP, err := util.ValidPublicAddrForMaster(s.BindAddress)
+		hostIP, err := utilnet.ChooseBindAddress(s.BindAddress)
 		if err != nil {
 			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
 				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)

@@ -30,6 +30,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/net"
 )
 
 var (
@@ -72,7 +73,7 @@ func New(issuerURL, clientID, caFile, usernameClaim string) (*OIDCAuthenticator,
 	}
 
 	// Copied from http.DefaultTransport.
-	tr := util.SetTransportDefaults(&http.Transport{
+	tr := net.SetTransportDefaults(&http.Transport{
 		// According to golang's doc, if RootCAs is nil,
 		// TLS uses the host's root CA set.
 		TLSClientConfig: &tls.Config{RootCAs: roots},

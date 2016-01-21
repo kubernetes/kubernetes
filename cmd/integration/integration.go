@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/util"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
@@ -153,7 +154,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	}
 
 	// The caller of master.New should guarantee pulicAddress is properly set
-	hostIP, err := util.ValidPublicAddrForMaster(publicAddress)
+	hostIP, err := utilnet.ChooseBindAddress(publicAddress)
 	if err != nil {
 		glog.Fatalf("Unable to find suitable network address.error='%v' . "+
 			"Fail to get a valid public address for master.", err)
