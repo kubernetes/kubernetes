@@ -59,7 +59,7 @@ func (c *resourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *api.R
 	result = &api.ResourceQuota{}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("resourceQuotas").
+		Resource("resourcequotas").
 		Body(resourceQuota).
 		Do().
 		Into(result)
@@ -71,7 +71,7 @@ func (c *resourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.R
 	result = &api.ResourceQuota{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("resourceQuotas").
+		Resource("resourcequotas").
 		Name(resourceQuota.Name).
 		Body(resourceQuota).
 		Do().
@@ -83,7 +83,7 @@ func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (result 
 	result = &api.ResourceQuota{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("resourceQuotas").
+		Resource("resourcequotas").
 		Name(resourceQuota.Name).
 		SubResource("status").
 		Body(resourceQuota).
@@ -96,7 +96,7 @@ func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (result 
 func (c *resourceQuotas) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("resourceQuotas").
+		Resource("resourcequotas").
 		Name(name).
 		Body(options).
 		Do().
@@ -107,7 +107,7 @@ func (c *resourceQuotas) Delete(name string, options *api.DeleteOptions) error {
 func (c *resourceQuotas) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("resourceQuotas").
+		Resource("resourcequotas").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
 		Do().
@@ -119,7 +119,7 @@ func (c *resourceQuotas) Get(name string) (result *api.ResourceQuota, err error)
 	result = &api.ResourceQuota{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("resourceQuotas").
+		Resource("resourcequotas").
 		Name(name).
 		Do().
 		Into(result)
@@ -131,7 +131,7 @@ func (c *resourceQuotas) List(opts api.ListOptions) (result *api.ResourceQuotaLi
 	result = &api.ResourceQuotaList{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("resourceQuotas").
+		Resource("resourcequotas").
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -143,7 +143,7 @@ func (c *resourceQuotas) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("resourceQuotas").
+		Resource("resourcequotas").
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

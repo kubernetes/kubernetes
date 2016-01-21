@@ -59,7 +59,7 @@ func (c *persistentVolumeClaims) Create(persistentVolumeClaim *api.PersistentVol
 	result = &api.PersistentVolumeClaim{}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("persistentVolumeClaims").
+		Resource("persistentvolumeclaims").
 		Body(persistentVolumeClaim).
 		Do().
 		Into(result)
@@ -71,7 +71,7 @@ func (c *persistentVolumeClaims) Update(persistentVolumeClaim *api.PersistentVol
 	result = &api.PersistentVolumeClaim{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("persistentVolumeClaims").
+		Resource("persistentvolumeclaims").
 		Name(persistentVolumeClaim.Name).
 		Body(persistentVolumeClaim).
 		Do().
@@ -83,7 +83,7 @@ func (c *persistentVolumeClaims) UpdateStatus(persistentVolumeClaim *api.Persist
 	result = &api.PersistentVolumeClaim{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("persistentVolumeClaims").
+		Resource("persistentvolumeclaims").
 		Name(persistentVolumeClaim.Name).
 		SubResource("status").
 		Body(persistentVolumeClaim).
@@ -96,7 +96,7 @@ func (c *persistentVolumeClaims) UpdateStatus(persistentVolumeClaim *api.Persist
 func (c *persistentVolumeClaims) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("persistentVolumeClaims").
+		Resource("persistentvolumeclaims").
 		Name(name).
 		Body(options).
 		Do().
@@ -107,7 +107,7 @@ func (c *persistentVolumeClaims) Delete(name string, options *api.DeleteOptions)
 func (c *persistentVolumeClaims) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("persistentVolumeClaims").
+		Resource("persistentvolumeclaims").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
 		Do().
@@ -119,7 +119,7 @@ func (c *persistentVolumeClaims) Get(name string) (result *api.PersistentVolumeC
 	result = &api.PersistentVolumeClaim{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("persistentVolumeClaims").
+		Resource("persistentvolumeclaims").
 		Name(name).
 		Do().
 		Into(result)
@@ -131,7 +131,7 @@ func (c *persistentVolumeClaims) List(opts api.ListOptions) (result *api.Persist
 	result = &api.PersistentVolumeClaimList{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("persistentVolumeClaims").
+		Resource("persistentvolumeclaims").
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -143,7 +143,7 @@ func (c *persistentVolumeClaims) Watch(opts api.ListOptions) (watch.Interface, e
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("persistentVolumeClaims").
+		Resource("persistentvolumeclaims").
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

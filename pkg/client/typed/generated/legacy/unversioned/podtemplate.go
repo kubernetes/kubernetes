@@ -58,7 +58,7 @@ func (c *podTemplates) Create(podTemplate *api.PodTemplate) (result *api.PodTemp
 	result = &api.PodTemplate{}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("podTemplates").
+		Resource("podtemplates").
 		Body(podTemplate).
 		Do().
 		Into(result)
@@ -70,7 +70,7 @@ func (c *podTemplates) Update(podTemplate *api.PodTemplate) (result *api.PodTemp
 	result = &api.PodTemplate{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("podTemplates").
+		Resource("podtemplates").
 		Name(podTemplate.Name).
 		Body(podTemplate).
 		Do().
@@ -82,7 +82,7 @@ func (c *podTemplates) Update(podTemplate *api.PodTemplate) (result *api.PodTemp
 func (c *podTemplates) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("podTemplates").
+		Resource("podtemplates").
 		Name(name).
 		Body(options).
 		Do().
@@ -93,7 +93,7 @@ func (c *podTemplates) Delete(name string, options *api.DeleteOptions) error {
 func (c *podTemplates) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("podTemplates").
+		Resource("podtemplates").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
 		Do().
@@ -105,7 +105,7 @@ func (c *podTemplates) Get(name string) (result *api.PodTemplate, err error) {
 	result = &api.PodTemplate{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("podTemplates").
+		Resource("podtemplates").
 		Name(name).
 		Do().
 		Into(result)
@@ -117,7 +117,7 @@ func (c *podTemplates) List(opts api.ListOptions) (result *api.PodTemplateList, 
 	result = &api.PodTemplateList{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("podTemplates").
+		Resource("podtemplates").
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -129,7 +129,7 @@ func (c *podTemplates) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("podTemplates").
+		Resource("podtemplates").
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

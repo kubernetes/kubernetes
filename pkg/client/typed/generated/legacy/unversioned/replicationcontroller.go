@@ -59,7 +59,7 @@ func (c *replicationControllers) Create(replicationController *api.ReplicationCo
 	result = &api.ReplicationController{}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("replicationControllers").
+		Resource("replicationcontrollers").
 		Body(replicationController).
 		Do().
 		Into(result)
@@ -71,7 +71,7 @@ func (c *replicationControllers) Update(replicationController *api.ReplicationCo
 	result = &api.ReplicationController{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("replicationControllers").
+		Resource("replicationcontrollers").
 		Name(replicationController.Name).
 		Body(replicationController).
 		Do().
@@ -83,7 +83,7 @@ func (c *replicationControllers) UpdateStatus(replicationController *api.Replica
 	result = &api.ReplicationController{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("replicationControllers").
+		Resource("replicationcontrollers").
 		Name(replicationController.Name).
 		SubResource("status").
 		Body(replicationController).
@@ -96,7 +96,7 @@ func (c *replicationControllers) UpdateStatus(replicationController *api.Replica
 func (c *replicationControllers) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("replicationControllers").
+		Resource("replicationcontrollers").
 		Name(name).
 		Body(options).
 		Do().
@@ -107,7 +107,7 @@ func (c *replicationControllers) Delete(name string, options *api.DeleteOptions)
 func (c *replicationControllers) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("replicationControllers").
+		Resource("replicationcontrollers").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
 		Do().
@@ -119,7 +119,7 @@ func (c *replicationControllers) Get(name string) (result *api.ReplicationContro
 	result = &api.ReplicationController{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("replicationControllers").
+		Resource("replicationcontrollers").
 		Name(name).
 		Do().
 		Into(result)
@@ -131,7 +131,7 @@ func (c *replicationControllers) List(opts api.ListOptions) (result *api.Replica
 	result = &api.ReplicationControllerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("replicationControllers").
+		Resource("replicationcontrollers").
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -143,7 +143,7 @@ func (c *replicationControllers) Watch(opts api.ListOptions) (watch.Interface, e
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("replicationControllers").
+		Resource("replicationcontrollers").
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

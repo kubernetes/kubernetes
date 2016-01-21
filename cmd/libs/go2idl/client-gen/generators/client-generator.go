@@ -60,11 +60,12 @@ func NameSystems() namer.NameSystems {
 		"Ingress":         "Ingress",
 	}
 	return namer.NameSystems{
-		"public":        namer.NewPublicNamer(0),
-		"private":       namer.NewPrivateNamer(0),
-		"raw":           namer.NewRawNamer("", nil),
-		"publicPlural":  namer.NewPublicPluralNamer(pluralExceptions),
-		"privatePlural": namer.NewPrivatePluralNamer(pluralExceptions),
+		"public":             namer.NewPublicNamer(0),
+		"private":            namer.NewPrivateNamer(0),
+		"raw":                namer.NewRawNamer("", nil),
+		"publicPlural":       namer.NewPublicPluralNamer(pluralExceptions),
+		"privatePlural":      namer.NewPrivatePluralNamer(pluralExceptions),
+		"allLowercasePlural": namer.NewAllLowercasePluralNamer(pluralExceptions),
 	}
 }
 

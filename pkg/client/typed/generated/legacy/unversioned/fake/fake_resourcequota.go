@@ -31,7 +31,7 @@ type FakeResourceQuotas struct {
 
 func (c *FakeResourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("resourceQuotas", c.ns, resourceQuota), &api.ResourceQuota{})
+		Invokes(core.NewCreateAction("resourcequotas", c.ns, resourceQuota), &api.ResourceQuota{})
 
 	if obj == nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (c *FakeResourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *a
 
 func (c *FakeResourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("resourceQuotas", c.ns, resourceQuota), &api.ResourceQuota{})
+		Invokes(core.NewUpdateAction("resourcequotas", c.ns, resourceQuota), &api.ResourceQuota{})
 
 	if obj == nil {
 		return nil, err
@@ -51,7 +51,7 @@ func (c *FakeResourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *a
 
 func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction("resourceQuotas", "status", c.ns, resourceQuota), &api.ResourceQuota{})
+		Invokes(core.NewUpdateSubresourceAction("resourcequotas", "status", c.ns, resourceQuota), &api.ResourceQuota{})
 
 	if obj == nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*ap
 
 func (c *FakeResourceQuotas) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("resourceQuotas", c.ns, name), &api.ResourceQuota{})
+		Invokes(core.NewDeleteAction("resourcequotas", c.ns, name), &api.ResourceQuota{})
 
 	return err
 }
@@ -75,7 +75,7 @@ func (c *FakeResourceQuotas) DeleteCollection(options *api.DeleteOptions, listOp
 
 func (c *FakeResourceQuotas) Get(name string) (result *api.ResourceQuota, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("resourceQuotas", c.ns, name), &api.ResourceQuota{})
+		Invokes(core.NewGetAction("resourcequotas", c.ns, name), &api.ResourceQuota{})
 
 	if obj == nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (c *FakeResourceQuotas) Get(name string) (result *api.ResourceQuota, err er
 
 func (c *FakeResourceQuotas) List(opts api.ListOptions) (result *api.ResourceQuotaList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("resourceQuotas", c.ns, opts), &api.ResourceQuotaList{})
+		Invokes(core.NewListAction("resourcequotas", c.ns, opts), &api.ResourceQuotaList{})
 
 	if obj == nil {
 		return nil, err
@@ -107,6 +107,6 @@ func (c *FakeResourceQuotas) List(opts api.ListOptions) (result *api.ResourceQuo
 // Watch returns a watch.Interface that watches the requested resourceQuotas.
 func (c *FakeResourceQuotas) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("resourceQuotas", c.ns, opts))
+		InvokesWatch(core.NewWatchAction("resourcequotas", c.ns, opts))
 
 }

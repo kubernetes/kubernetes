@@ -55,7 +55,7 @@ func newComponentStatus(c *LegacyClient) *componentStatus {
 func (c *componentStatus) Create(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
 	result = &api.ComponentStatus{}
 	err = c.client.Post().
-		Resource("componentStatus").
+		Resource("componentstatus").
 		Body(componentStatus).
 		Do().
 		Into(result)
@@ -66,7 +66,7 @@ func (c *componentStatus) Create(componentStatus *api.ComponentStatus) (result *
 func (c *componentStatus) Update(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
 	result = &api.ComponentStatus{}
 	err = c.client.Put().
-		Resource("componentStatus").
+		Resource("componentstatus").
 		Name(componentStatus.Name).
 		Body(componentStatus).
 		Do().
@@ -77,7 +77,7 @@ func (c *componentStatus) Update(componentStatus *api.ComponentStatus) (result *
 // Delete takes name of the componentStatus and deletes it. Returns an error if one occurs.
 func (c *componentStatus) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
-		Resource("componentStatus").
+		Resource("componentstatus").
 		Name(name).
 		Body(options).
 		Do().
@@ -87,7 +87,7 @@ func (c *componentStatus) Delete(name string, options *api.DeleteOptions) error 
 // DeleteCollection deletes a collection of objects.
 func (c *componentStatus) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
-		Resource("componentStatus").
+		Resource("componentstatus").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
 		Do().
@@ -98,7 +98,7 @@ func (c *componentStatus) DeleteCollection(options *api.DeleteOptions, listOptio
 func (c *componentStatus) Get(name string) (result *api.ComponentStatus, err error) {
 	result = &api.ComponentStatus{}
 	err = c.client.Get().
-		Resource("componentStatus").
+		Resource("componentstatus").
 		Name(name).
 		Do().
 		Into(result)
@@ -109,7 +109,7 @@ func (c *componentStatus) Get(name string) (result *api.ComponentStatus, err err
 func (c *componentStatus) List(opts api.ListOptions) (result *api.ComponentStatusList, err error) {
 	result = &api.ComponentStatusList{}
 	err = c.client.Get().
-		Resource("componentStatus").
+		Resource("componentstatus").
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -120,7 +120,7 @@ func (c *componentStatus) List(opts api.ListOptions) (result *api.ComponentStatu
 func (c *componentStatus) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
-		Resource("componentStatus").
+		Resource("componentstatus").
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

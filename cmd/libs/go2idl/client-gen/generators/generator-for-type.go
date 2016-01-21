@@ -206,7 +206,7 @@ func (c *$.type|privatePlural$) List(opts $.apiListOptions|raw$) (result *$.type
 	result = &$.type|raw$List{}
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|privatePlural$").
+		Resource("$.type|allLowercasePlural$").
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -219,7 +219,7 @@ func (c *$.type|privatePlural$) Get(name string) (result *$.type|raw$, err error
 	result = &$.type|raw${}
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|privatePlural$").
+		Resource("$.type|allLowercasePlural$").
 		Name(name).
 		Do().
 		Into(result)
@@ -232,7 +232,7 @@ var deleteTemplate = `
 func (c *$.type|privatePlural$) Delete(name string, options *$.apiDeleteOptions|raw$) error {
 	return c.client.Delete().
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|privatePlural$").
+		Resource("$.type|allLowercasePlural$").
 		Name(name).
 		Body(options).
 		Do().
@@ -245,7 +245,7 @@ var deleteCollectionTemplate = `
 func (c *$.type|privatePlural$) DeleteCollection(options *$.apiDeleteOptions|raw$, listOptions $.apiListOptions|raw$) error {
 	return c.client.Delete().
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|privatePlural$").
+		Resource("$.type|allLowercasePlural$").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
 		Do().
@@ -259,7 +259,7 @@ func (c *$.type|privatePlural$) Create($.type|private$ *$.type|raw$) (result *$.
 	result = &$.type|raw${}
 	err = c.client.Post().
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|privatePlural$").
+		Resource("$.type|allLowercasePlural$").
 		Body($.type|private$).
 		Do().
 		Into(result)
@@ -273,7 +273,7 @@ func (c *$.type|privatePlural$) Update($.type|private$ *$.type|raw$) (result *$.
 	result = &$.type|raw${}
 	err = c.client.Put().
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|privatePlural$").
+		Resource("$.type|allLowercasePlural$").
 		Name($.type|private$.Name).
 		Body($.type|private$).
 		Do().
@@ -287,7 +287,7 @@ func (c *$.type|privatePlural$) UpdateStatus($.type|private$ *$.type|raw$) (resu
 	result = &$.type|raw${}
 	err = c.client.Put().
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|privatePlural$").
+		Resource("$.type|allLowercasePlural$").
 		Name($.type|private$.Name).
 		SubResource("status").
 		Body($.type|private$).
@@ -303,7 +303,7 @@ func (c *$.type|privatePlural$) Watch(opts $.apiListOptions|raw$) ($.watchInterf
 	return c.client.Get().
 		Prefix("watch").
 		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|privatePlural$").
+		Resource("$.type|allLowercasePlural$").
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }
