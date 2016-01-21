@@ -228,6 +228,10 @@ type DeploymentSpec struct {
 	// Value of this key is hash of DeploymentSpec.PodTemplateSpec.
 	// No label is added if this is set to empty string.
 	UniqueLabelKey string `json:"uniqueLabelKey,omitempty"`
+
+	// Indicates that the deployment is paused and will not be processed by the
+	// deployment controller.
+	Paused bool `json:"paused,omitempty"`
 }
 
 const (

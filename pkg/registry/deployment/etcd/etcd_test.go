@@ -75,21 +75,6 @@ func validNewDeployment() *extensions.Deployment {
 
 var validDeployment = *validNewDeployment()
 
-func validNewScale() *extensions.Scale {
-	return &extensions.Scale{
-		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
-		Spec: extensions.ScaleSpec{
-			Replicas: validDeployment.Spec.Replicas,
-		},
-		Status: extensions.ScaleStatus{
-			Replicas: validDeployment.Status.Replicas,
-			Selector: validDeployment.Spec.Template.Labels,
-		},
-	}
-}
-
-var validScale = *validNewScale()
-
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
@@ -192,6 +177,21 @@ func TestWatch(t *testing.T) {
 	)
 }
 
+func validNewScale() *extensions.Scale {
+	return &extensions.Scale{
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+		Spec: extensions.ScaleSpec{
+			Replicas: validDeployment.Spec.Replicas,
+		},
+		Status: extensions.ScaleStatus{
+			Replicas: validDeployment.Status.Replicas,
+			Selector: validDeployment.Spec.Template.Labels,
+		},
+	}
+}
+
+var validScale = *validNewScale()
+
 func TestScaleGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
@@ -204,10 +204,10 @@ func TestScaleGet(t *testing.T) {
 
 	expect := &validScale
 	obj, err := storage.Scale.Get(ctx, name)
-	scale := obj.(*extensions.Scale)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	scale := obj.(*extensions.Scale)
 	if e, a := expect, scale; !api.Semantic.DeepDerivative(e, a) {
 		t.Errorf("unexpected scale: %s", util.ObjectDiff(e, a))
 	}
@@ -216,6 +216,7 @@ func TestScaleGet(t *testing.T) {
 func TestScaleUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
 	if err := storage.Deployment.Storage.Set(ctx, key, &validDeployment, nil, 0); err != nil {
@@ -232,12 +233,11 @@ func TestScaleUpdate(t *testing.T) {
 	if _, _, err := storage.Scale.Update(ctx, &update); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	obj, err := storage.Scale.Get(ctx, name)
+	obj, err := storage.Deployment.Get(ctx, name)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	deployment := obj.(*extensions.Scale)
+	deployment := obj.(*extensions.Deployment)
 	if deployment.Spec.Replicas != replicas {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, deployment.Spec.Replicas)
 	}
