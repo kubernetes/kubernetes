@@ -2646,11 +2646,13 @@ func autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extension
 	} else {
 		out.Template = nil
 	}
+	if err := Convert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.UniqueLabelKey, &out.UniqueLabelKey, 0); err != nil {
+		return err
+	}
 	return nil
-}
-
-func Convert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extensions.DaemonSetSpec, out *DaemonSetSpec, s conversion.Scope) error {
-	return autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in, out, s)
 }
 
 func autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *extensions.DaemonSetStatus, out *DaemonSetStatus, s conversion.Scope) error {
@@ -2665,6 +2667,23 @@ func autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *exten
 
 func Convert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *extensions.DaemonSetStatus, out *DaemonSetStatus, s conversion.Scope) error {
 	return autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in, out, s)
+}
+
+func autoConvert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(in *extensions.DaemonSetUpdateStrategy, out *DaemonSetUpdateStrategy, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.DaemonSetUpdateStrategy))(in)
+	}
+	out.Type = DaemonSetUpdateStrategyType(in.Type)
+	// unable to generate simple pointer conversion for extensions.RollingUpdateDaemonSet -> v1beta1.RollingUpdateDaemonSet
+	if in.RollingUpdate != nil {
+		out.RollingUpdate = new(RollingUpdateDaemonSet)
+		if err := Convert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+			return err
+		}
+	} else {
+		out.RollingUpdate = nil
+	}
+	return nil
 }
 
 func autoConvert_extensions_Deployment_To_v1beta1_Deployment(in *extensions.Deployment, out *Deployment, s conversion.Scope) error {
@@ -3299,6 +3318,17 @@ func Convert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControl
 	return autoConvert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy(in, out, s)
 }
 
+func autoConvert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in *extensions.RollingUpdateDaemonSet, out *RollingUpdateDaemonSet, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*extensions.RollingUpdateDaemonSet))(in)
+	}
+	if err := s.Convert(&in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
+		return err
+	}
+	out.MinReadySeconds = int32(in.MinReadySeconds)
+	return nil
+}
+
 func autoConvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *extensions.RollingUpdateDeployment, out *RollingUpdateDeployment, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*extensions.RollingUpdateDeployment))(in)
@@ -3704,11 +3734,11 @@ func autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSet
 	} else {
 		out.Template = nil
 	}
+	if err := Convert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
+		return err
+	}
+	// in.UniqueLabelKey has no peer in out
 	return nil
-}
-
-func Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
-	return autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in, out, s)
 }
 
 func autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *DaemonSetStatus, out *extensions.DaemonSetStatus, s conversion.Scope) error {
@@ -3723,6 +3753,23 @@ func autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *Daemo
 
 func Convert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *DaemonSetStatus, out *extensions.DaemonSetStatus, s conversion.Scope) error {
 	return autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in, out, s)
+}
+
+func autoConvert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(in *DaemonSetUpdateStrategy, out *extensions.DaemonSetUpdateStrategy, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*DaemonSetUpdateStrategy))(in)
+	}
+	out.Type = extensions.DaemonSetUpdateStrategyType(in.Type)
+	// unable to generate simple pointer conversion for v1beta1.RollingUpdateDaemonSet -> extensions.RollingUpdateDaemonSet
+	if in.RollingUpdate != nil {
+		out.RollingUpdate = new(extensions.RollingUpdateDaemonSet)
+		if err := Convert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+			return err
+		}
+	} else {
+		out.RollingUpdate = nil
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_Deployment_To_extensions_Deployment(in *Deployment, out *extensions.Deployment, s conversion.Scope) error {
@@ -4364,6 +4411,15 @@ func Convert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControl
 	return autoConvert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy(in, out, s)
 }
 
+func autoConvert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in *RollingUpdateDaemonSet, out *extensions.RollingUpdateDaemonSet, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*RollingUpdateDaemonSet))(in)
+	}
+	// in.MaxUnavailable has no peer in out
+	out.MinReadySeconds = int(in.MinReadySeconds)
+	return nil
+}
+
 func autoConvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in *RollingUpdateDeployment, out *extensions.RollingUpdateDeployment, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*RollingUpdateDeployment))(in)
@@ -4603,6 +4659,7 @@ func init() {
 		autoConvert_extensions_DaemonSetList_To_v1beta1_DaemonSetList,
 		autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec,
 		autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus,
+		autoConvert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy,
 		autoConvert_extensions_DaemonSet_To_v1beta1_DaemonSet,
 		autoConvert_extensions_DeploymentList_To_v1beta1_DeploymentList,
 		autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec,
@@ -4631,6 +4688,7 @@ func init() {
 		autoConvert_extensions_LabelSelector_To_v1beta1_LabelSelector,
 		autoConvert_extensions_NodeUtilization_To_v1beta1_NodeUtilization,
 		autoConvert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy,
+		autoConvert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet,
 		autoConvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment,
 		autoConvert_extensions_ScaleSpec_To_v1beta1_ScaleSpec,
 		autoConvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus,
@@ -4694,6 +4752,7 @@ func init() {
 		autoConvert_v1beta1_DaemonSetList_To_extensions_DaemonSetList,
 		autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec,
 		autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus,
+		autoConvert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy,
 		autoConvert_v1beta1_DaemonSet_To_extensions_DaemonSet,
 		autoConvert_v1beta1_DeploymentList_To_extensions_DeploymentList,
 		autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec,
@@ -4722,6 +4781,7 @@ func init() {
 		autoConvert_v1beta1_ListOptions_To_api_ListOptions,
 		autoConvert_v1beta1_NodeUtilization_To_extensions_NodeUtilization,
 		autoConvert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy,
+		autoConvert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet,
 		autoConvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
 		autoConvert_v1beta1_ScaleSpec_To_extensions_ScaleSpec,
 		autoConvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus,
