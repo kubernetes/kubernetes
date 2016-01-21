@@ -83,6 +83,7 @@ if [[ -n "${CONFORMANCE_TEST_SKIP_REGEX:-}" ]]; then
 fi
 if [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
   ginkgo_args+=("-p")
+  ginkgo_args+=("-stream")
 fi
 
 
