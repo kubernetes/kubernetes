@@ -650,19 +650,23 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 		return nil, err
 	}
 	if self.nodeName == name || len(name) == 0 {
+		addresses := []api.NodeAddress{}
+
 		internalIP, err := aws.metadata.GetMetadata("local-ipv4")
 		if err != nil {
 			return nil, err
 		}
+		addresses = append(addresses, api.NodeAddress{Type: api.NodeInternalIP, Address: internalIP})
+		addresses = append(addresses, api.NodeAddress{Type: api.NodeLegacyHostIP, Address: internalIP})
+
 		externalIP, err := aws.metadata.GetMetadata("public-ipv4")
 		if err != nil {
-			return nil, err
+			//Perhaps only log this as a warning the first time this method is called?
+		} else {
+			addresses = append(addresses, api.NodeAddress{Type: api.NodeExternalIP, Address: externalIP})
 		}
-		return []api.NodeAddress{
-			{Type: api.NodeInternalIP, Address: internalIP},
-			{Type: api.NodeLegacyHostIP, Address: internalIP},
-			{Type: api.NodeExternalIP, Address: externalIP},
-		}, nil
+
+		return addresses, nil
 	}
 	instance, err := aws.getInstanceByNodeName(name)
 	if err != nil {
