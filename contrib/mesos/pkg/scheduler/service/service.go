@@ -785,7 +785,8 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 
 	// create event recorder sending events to the "" namespace of the apiserver
 	broadcaster := record.NewBroadcaster()
-	recorder := broadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
+	recorder := broadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
+	broadcaster.StartLogging(log.Infof)
 	broadcaster.StartRecordingToSink(client.Events(""))
 
 	// create scheduler core with all components arranged around it
