@@ -624,8 +624,8 @@ function kube::build::copy_output() {
     # Wait until binaries have finished coppying
     count=0
     while true;do
-      if docker "${DOCKER_OPTS}" cp "${KUBE_BUILD_CONTAINER_NAME}:/tmp/finished" "${LOCAL_OUTPUT_BINPATH}" > /dev/null 2>&1;then
-        docker "${DOCKER_OPTS}" cp "${KUBE_BUILD_CONTAINER_NAME}:/tmp/bin" "${LOCAL_OUTPUT_SUBPATH}"
+      if "${DOCKER[@]}" cp "${KUBE_BUILD_CONTAINER_NAME}:/tmp/finished" "${LOCAL_OUTPUT_BINPATH}" > /dev/null 2>&1;then
+        "${DOCKER[@]}" cp "${KUBE_BUILD_CONTAINER_NAME}:/tmp/bin" "${LOCAL_OUTPUT_SUBPATH}"
         break;
       fi
 
@@ -833,8 +833,8 @@ function kube::release::write_addon_docker_images_for_server() {
         kube::log::status "Pulling and writing Docker image for addon: ${addon_path}"
 
         local dest_name="${addon_path//\//\~}"
-        docker pull "${addon_path}"
-        docker save "${addon_path}" > "${1}/${dest_name}.tar"
+        "${DOCKER[@]}" pull "${addon_path}"
+        "${DOCKER[@]}" save "${addon_path}" > "${1}/${dest_name}.tar"
       ) &
     done
 
@@ -843,8 +843,8 @@ function kube::release::write_addon_docker_images_for_server() {
         kube::log::status "Building Docker python image"
         
         local img_name=python:2.7-slim-pyyaml
-        docker build -t "${img_name}" "${KUBE_ROOT}/cluster/addons/python-image"
-        docker save "${img_name}" > "${1}/${img_name}.tar"
+        "${DOCKER[@]}" build -t "${img_name}" "${KUBE_ROOT}/cluster/addons/python-image"
+        "${DOCKER[@]}" save "${img_name}" > "${1}/${img_name}.tar"
       ) &
     fi
 
@@ -1472,7 +1472,7 @@ function kube::release::docker::release() {
     "amd64"
   )
 
-  local docker_push_cmd=("docker")
+  local docker_push_cmd=("${DOCKER[@]}")
   if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
     docker_push_cmd=("gcloud" "docker")
   fi
