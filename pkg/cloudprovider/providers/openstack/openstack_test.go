@@ -210,7 +210,10 @@ func TestVolumes(t *testing.T) {
 		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
 	}
 
-	vol, err := os.CreateVolume(1)
+	tags := map[string]string{
+		"test": "value",
+	}
+	vol, err := os.CreateVolume(1, &tags)
 	if err != nil {
 		t.Fatalf("Cannot create a new Cinder volume: %v", err)
 	}

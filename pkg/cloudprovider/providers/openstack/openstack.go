@@ -1033,7 +1033,7 @@ func (os *OpenStack) getVolume(diskName string) (volumes.Volume, error) {
 }
 
 // Create a volume of given size (in GiB)
-func (os *OpenStack) CreateVolume(size int) (volumeName string, err error) {
+func (os *OpenStack) CreateVolume(size int, tags *map[string]string) (volumeName string, err error) {
 
 	sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
@@ -1045,6 +1045,9 @@ func (os *OpenStack) CreateVolume(size int) (volumeName string, err error) {
 	}
 
 	opts := volumes.CreateOpts{Size: size}
+	if tags != nil {
+		opts.Metadata = *tags
+	}
 	vol, err := volumes.Create(sClient, opts).Extract()
 	if err != nil {
 		glog.Errorf("Failed to create a %d GB volume: %v", size, err)
