@@ -58,7 +58,7 @@ func (c *serviceAccounts) Create(serviceAccount *api.ServiceAccount) (result *ap
 	result = &api.ServiceAccount{}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("serviceAccounts").
+		Resource("serviceaccounts").
 		Body(serviceAccount).
 		Do().
 		Into(result)
@@ -70,7 +70,7 @@ func (c *serviceAccounts) Update(serviceAccount *api.ServiceAccount) (result *ap
 	result = &api.ServiceAccount{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("serviceAccounts").
+		Resource("serviceaccounts").
 		Name(serviceAccount.Name).
 		Body(serviceAccount).
 		Do().
@@ -82,7 +82,7 @@ func (c *serviceAccounts) Update(serviceAccount *api.ServiceAccount) (result *ap
 func (c *serviceAccounts) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("serviceAccounts").
+		Resource("serviceaccounts").
 		Name(name).
 		Body(options).
 		Do().
@@ -93,7 +93,7 @@ func (c *serviceAccounts) Delete(name string, options *api.DeleteOptions) error 
 func (c *serviceAccounts) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("serviceAccounts").
+		Resource("serviceaccounts").
 		VersionedParams(&listOptions, api.Scheme).
 		Body(options).
 		Do().
@@ -105,7 +105,7 @@ func (c *serviceAccounts) Get(name string) (result *api.ServiceAccount, err erro
 	result = &api.ServiceAccount{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("serviceAccounts").
+		Resource("serviceaccounts").
 		Name(name).
 		Do().
 		Into(result)
@@ -117,7 +117,7 @@ func (c *serviceAccounts) List(opts api.ListOptions) (result *api.ServiceAccount
 	result = &api.ServiceAccountList{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("serviceAccounts").
+		Resource("serviceaccounts").
 		VersionedParams(&opts, api.Scheme).
 		Do().
 		Into(result)
@@ -129,7 +129,7 @@ func (c *serviceAccounts) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("serviceAccounts").
+		Resource("serviceaccounts").
 		VersionedParams(&opts, api.Scheme).
 		Watch()
 }

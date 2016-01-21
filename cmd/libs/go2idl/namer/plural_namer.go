@@ -16,7 +16,11 @@ limitations under the License.
 
 package namer
 
-import "k8s.io/kubernetes/cmd/libs/go2idl/types"
+import (
+	"strings"
+
+	"k8s.io/kubernetes/cmd/libs/go2idl/types"
+)
 
 type pluralNamer struct {
 	// key is the case-sensitive type name, value is the case-insensitive
@@ -35,6 +39,12 @@ func NewPublicPluralNamer(exceptions map[string]string) *pluralNamer {
 // type's name, starting with a lowercase letter.
 func NewPrivatePluralNamer(exceptions map[string]string) *pluralNamer {
 	return &pluralNamer{exceptions, IL}
+}
+
+// NewAllLowercasePluralNamer returns a namer that returns the plural form of the input
+// type's name, with all letters in lowercase.
+func NewAllLowercasePluralNamer(exceptions map[string]string) *pluralNamer {
+	return &pluralNamer{exceptions, strings.ToLower}
 }
 
 // Name returns the plural form of the type's name. If the type's name is found

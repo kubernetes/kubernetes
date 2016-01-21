@@ -31,7 +31,7 @@ type FakeReplicationControllers struct {
 
 func (c *FakeReplicationControllers) Create(replicationController *api.ReplicationController) (result *api.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction("replicationControllers", c.ns, replicationController), &api.ReplicationController{})
+		Invokes(core.NewCreateAction("replicationcontrollers", c.ns, replicationController), &api.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (c *FakeReplicationControllers) Create(replicationController *api.Replicati
 
 func (c *FakeReplicationControllers) Update(replicationController *api.ReplicationController) (result *api.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction("replicationControllers", c.ns, replicationController), &api.ReplicationController{})
+		Invokes(core.NewUpdateAction("replicationcontrollers", c.ns, replicationController), &api.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -51,7 +51,7 @@ func (c *FakeReplicationControllers) Update(replicationController *api.Replicati
 
 func (c *FakeReplicationControllers) UpdateStatus(replicationController *api.ReplicationController) (*api.ReplicationController, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction("replicationControllers", "status", c.ns, replicationController), &api.ReplicationController{})
+		Invokes(core.NewUpdateSubresourceAction("replicationcontrollers", "status", c.ns, replicationController), &api.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (c *FakeReplicationControllers) UpdateStatus(replicationController *api.Rep
 
 func (c *FakeReplicationControllers) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction("replicationControllers", c.ns, name), &api.ReplicationController{})
+		Invokes(core.NewDeleteAction("replicationcontrollers", c.ns, name), &api.ReplicationController{})
 
 	return err
 }
@@ -75,7 +75,7 @@ func (c *FakeReplicationControllers) DeleteCollection(options *api.DeleteOptions
 
 func (c *FakeReplicationControllers) Get(name string) (result *api.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction("replicationControllers", c.ns, name), &api.ReplicationController{})
+		Invokes(core.NewGetAction("replicationcontrollers", c.ns, name), &api.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (c *FakeReplicationControllers) Get(name string) (result *api.ReplicationCo
 
 func (c *FakeReplicationControllers) List(opts api.ListOptions) (result *api.ReplicationControllerList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction("replicationControllers", c.ns, opts), &api.ReplicationControllerList{})
+		Invokes(core.NewListAction("replicationcontrollers", c.ns, opts), &api.ReplicationControllerList{})
 
 	if obj == nil {
 		return nil, err
@@ -107,6 +107,6 @@ func (c *FakeReplicationControllers) List(opts api.ListOptions) (result *api.Rep
 // Watch returns a watch.Interface that watches the requested replicationControllers.
 func (c *FakeReplicationControllers) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction("replicationControllers", c.ns, opts))
+		InvokesWatch(core.NewWatchAction("replicationcontrollers", c.ns, opts))
 
 }
