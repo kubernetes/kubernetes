@@ -142,5 +142,26 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 				obj.Data = make(map[string]string)
 			}
 		},
+		func(obj *ReplicaSet) {
+			var labels map[string]string
+			if obj.Spec.Template != nil {
+				labels = obj.Spec.Template.Labels
+			}
+			// TODO: support templates defined elsewhere when we support them in the API
+			if labels != nil {
+				if obj.Spec.Selector == nil {
+					obj.Spec.Selector = &LabelSelector{
+						MatchLabels: labels,
+					}
+				}
+				if len(obj.Labels) == 0 {
+					obj.Labels = labels
+				}
+			}
+			if obj.Spec.Replicas == nil {
+				obj.Spec.Replicas = new(int32)
+				*obj.Spec.Replicas = 1
+			}
+		},
 	)
 }
