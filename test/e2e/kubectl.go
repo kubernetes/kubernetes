@@ -352,7 +352,9 @@ var _ = Describe("Kubectl client", func() {
 				}
 				proxyAddr := fmt.Sprintf("http://%s:8080", goproxyPod.Status.PodIP)
 
-				shellCommand := fmt.Sprintf("%s=%s .%s --kubeconfig=%s --server=%s --namespace=%s exec nginx echo running in container", proxyVar, proxyAddr, uploadBinaryName, kubecConfigRemotePath, apiServer, ns)
+				shellCommand := fmt.Sprintf("%s=%s .%s --kubeconfig=%s --server=%s --namespace=%s exec nginx echo running in container",
+					proxyVar, proxyAddr, uploadBinaryName, kubecConfigRemotePath, apiServer, ns)
+				Logf("About to remote exec: %v", shellCommand)
 				// Execute kubectl on remote exec server.
 				var netexecShellOutput []byte
 				if subResourceProxyAvailable {
@@ -383,6 +385,12 @@ var _ = Describe("Kubectl client", func() {
 					Failf("Unable to read the result from the netexec server. Error: %s", err)
 				}
 
+				// Get (and print!) the proxy logs here, so
+				// they'll be present in case the below check
+				// fails the test, to help diagnose #19500 if
+				// it recurs.
+				proxyLog := runKubectlOrDie("log", "goproxy", fmt.Sprintf("--namespace=%v", ns))
+
 				// Verify we got the normal output captured by the exec server
 				expectedExecOutput := "running in container\n"
 				if netexecOuput.Output != expectedExecOutput {
@@ -391,7 +399,6 @@ var _ = Describe("Kubectl client", func() {
 
 				// Verify the proxy server logs saw the connection
 				expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimRight(strings.TrimLeft(testContext.Host, "https://"), "/api"))
-				proxyLog := runKubectlOrDie("log", "goproxy", fmt.Sprintf("--namespace=%v", ns))
 
 				if !strings.Contains(proxyLog, expectedProxyLog) {
 					Failf("Missing expected log result on proxy server for %s. Expected: %q, got %q", proxyVar, expectedProxyLog, proxyLog)
