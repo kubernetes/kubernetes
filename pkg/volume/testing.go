@@ -120,9 +120,10 @@ func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 // Use as:
 //   volume.RegisterPlugin(&FakePlugin{"fake-name"})
 type FakeVolumePlugin struct {
-	PluginName string
-	Host       VolumeHost
-	Config     VolumeConfig
+	PluginName             string
+	Host                   VolumeHost
+	Config                 VolumeConfig
+	LastProvisionerOptions VolumeOptions
 }
 
 var _ VolumePlugin = &FakeVolumePlugin{}
@@ -161,6 +162,7 @@ func (plugin *FakeVolumePlugin) NewDeleter(spec *Spec) (Deleter, error) {
 }
 
 func (plugin *FakeVolumePlugin) NewProvisioner(options VolumeOptions) (Provisioner, error) {
+	plugin.LastProvisionerOptions = options
 	return &FakeProvisioner{options, plugin.Host}, nil
 }
 
