@@ -689,7 +689,7 @@ func validateCinderVolumeSource(cd *api.CinderVolumeSource, fldPath *field.Path)
 	if len(cd.VolumeID) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
 	}
-	if len(cd.FSType) == 0 || (cd.FSType != "ext3" && cd.FSType != "ext4") {
+	if len(cd.FSType) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("fsType"), ""))
 	}
 	return allErrs
