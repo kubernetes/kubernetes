@@ -32,10 +32,13 @@ const (
 	qosProvisioningKey = "volume.alpha.kubernetes.io/storage-class"
 	// Name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
 	// with namespace of a persistent volume claim used to create this volume.
-	cloudVolumeCreatedForNamespaceTag = "kubernetes.io/created-for/pvc/namespace"
+	cloudVolumeCreatedForClaimNamespaceTag = "kubernetes.io/created-for/pvc/namespace"
 	// Name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
 	// with name of a persistent volume claim used to create this volume.
-	cloudVolumeCreatedForNameTag = "kubernetes.io/created-for/pvc/name"
+	cloudVolumeCreatedForClaimNameTag = "kubernetes.io/created-for/pvc/name"
+	// Name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
+	// with name of appropriate Kubernetes persistent volume .
+	cloudVolumeCreatedForVolumeNameTag = "kubernetes.io/created-for/pv/name"
 )
 
 // persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes indexed by AccessModes and ordered by storage capacity.
