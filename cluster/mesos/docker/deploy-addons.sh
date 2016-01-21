@@ -27,39 +27,19 @@ set -o errtrace
 
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/${KUBE_CONFIG_FILE-"config-default.sh"}"
-source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/common/bin/util-temp-dir.sh"
 kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-
-
-function deploy_dns {
-  echo "Deploying DNS Addon" 1>&2
-  local workspace=$(pwd)
-
-  # Process salt pillar templates manually
-  sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" > "${workspace}/skydns-rc.yaml"
-  sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" > "${workspace}/skydns-svc.yaml"
-
-  # Use kubectl to create skydns rc and service
-  "${kubectl}" create -f "${workspace}/skydns-rc.yaml"
-  "${kubectl}" create -f "${workspace}/skydns-svc.yaml"
-}
-
-function deploy_ui {
-  echo "Deploying UI Addon" 1>&2
-
-  # Use kubectl to create ui rc and service
-  "${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/kube-ui/kube-ui-rc.yaml"
-  "${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/kube-ui/kube-ui-svc.yaml"
-}
+bin="$(cd "$(dirname "${BASH_SOURCE}")" && pwd -P)"
 
 # create the kube-system and static-pods namespaces
 "${kubectl}" create -f "${KUBE_ROOT}/cluster/mesos/docker/kube-system-ns.yaml"
 "${kubectl}" create -f "${KUBE_ROOT}/cluster/mesos/docker/static-pods-ns.yaml"
 
-if [ "${ENABLE_CLUSTER_DNS}" == true ]; then
-  cluster::mesos::docker::run_in_temp_dir 'k8sm-dns' 'deploy_dns'
+if [ "${ENABLE_CLUSTER_DNS}" == "true" ]; then
+  echo "Deploying DNS Addon" 1>&2
+  "${KUBE_ROOT}/third_party/intemp/intemp.sh" -t 'kube-dns' "${bin}/deploy-dns.sh"
 fi
 
-if [ "${ENABLE_CLUSTER_UI}" == true ]; then
-  deploy_ui
+if [ "${ENABLE_CLUSTER_UI}" == "true" ]; then
+  echo "Deploying UI Addon" 1>&2
+  "${bin}/deploy-ui.sh"
 fi

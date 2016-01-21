@@ -56,7 +56,7 @@ echo "${DOCKER_BIN_PATH}"
 
 # Clean (k8s output & images), Build, Kube-Up, Test, Kube-Down
 cd "${KUBE_ROOT}"
-exec docker run \
+docker run \
   --rm \
   -v "${KUBE_ROOT}:/go/src/github.com/GoogleCloudPlatform/kubernetes" \
   -v "/var/run/docker.sock:/var/run/docker.sock" \

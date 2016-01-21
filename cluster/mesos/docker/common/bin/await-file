@@ -16,7 +16,7 @@
 
 # Wait for a file to exist in the filesystem.
 # Block up to the timeout duration in seconds (default: 10).
-# Usage: await-health-check [-t=<duration>] <address>
+# Usage: await-file [-t=<duration>] <address>
 # Requires: timeout, file
 
 set -o errexit
