@@ -1939,6 +1939,17 @@ func ValidateSecret(secret *api.Secret) field.ErrorList {
 		if err := json.Unmarshal(dockercfgBytes, &map[string]interface{}{}); err != nil {
 			allErrs = append(allErrs, field.Invalid(dataPath.Key(api.DockerConfigKey), "<secret contents redacted>", err.Error()))
 		}
+	case api.SecretTypeDockerConfigJson:
+		dockerConfigJsonBytes, exists := secret.Data[api.DockerConfigJsonKey]
+		if !exists {
+			allErrs = append(allErrs, field.Required(dataPath.Key(api.DockerConfigJsonKey), ""))
+			break
+		}
+
+		// make sure that the content is well-formed json.
+		if err := json.Unmarshal(dockerConfigJsonBytes, &map[string]interface{}{}); err != nil {
+			allErrs = append(allErrs, field.Invalid(dataPath.Key(api.DockerConfigJsonKey), "<secret contents redacted>", err.Error()))
+		}
 
 	default:
 		// no-op
