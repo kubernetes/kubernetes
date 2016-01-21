@@ -1,0 +1,48 @@
+- job-template:
+    name: 'kubernetes-kubemark-{suffix}'
+    description: '{description} Test owner: gmarek'
+    logrotate:
+        daysToKeep: 7
+    builders:
+        - shell: |
+            curl -fsS --retry 3  "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e.sh" | bash -
+    properties:
+        - mail-watcher
+    publishers:
+        - claim-build
+        - junit-publisher
+        - gcs-uploader
+        - log-parser
+        - email-ext:
+            recipients: "gmarek@google.com"
+    triggers:
+        - reverse:
+            jobs: 'kubernetes-build'
+            result: success
+        - timed: '{cron-string}'
+    wrappers:
+        - ansicolor:
+            colormap: xterm
+        - timeout:
+            timeout: '{timeout}'
+            fail: true
+        - timestamps
+        - workspace-cleanup
+
+- project:
+    name: kubernetes-kubemark
+    suffix:
+        - 'gce':
+            description: 'Continuously run Density test on Kubemark.'
+            timeout: 90
+            cron-string: '@hourly'
+        - '500-gce':
+            description: 'Run Density test on Kubemark in a large cluster that we should be able to handle.'
+            timeout: 180
+            cron-string: '@hourly'
+        - 'gce-scale':
+            description: 'Run Density test on Kubemark in very large cluster. Currently only scheduled to run every 6 hours so as not to waste too many resources.'
+            timeout: 180
+            cron-string: 'H H/6 * * *'
+    jobs:
+        - 'kubernetes-kubemark-{suffix}'
