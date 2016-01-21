@@ -359,7 +359,31 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	if actual != nil {
 		t.Error("Unexpected job modification")
 	}
+}
 
+func TestSyncJobComplete(t *testing.T) {
+	client := client.NewOrDie(&client.Config{Host: "", GroupVersion: testapi.Default.GroupVersion()})
+	manager := NewJobController(client, controller.NoResyncPeriodFunc)
+	fakePodControl := controller.FakePodControl{}
+	manager.podControl = &fakePodControl
+	manager.podStoreSynced = alwaysReady
+
+	job := newJob(1, 1)
+	job.Status.Conditions = append(job.Status.Conditions, newCondition(extensions.JobComplete, "", ""))
+	manager.jobStore.Store.Add(job)
+	err := manager.syncJob(getKey(job, t))
+	if err != nil {
+		t.Fatalf("Unexpected error when syncing jobs %v", err)
+	}
+	uncastJob, _, err := manager.jobStore.Store.Get(job)
+	if err != nil {
+		t.Fatalf("Unexpected error when trying to get job from the store: %v", err)
+	}
+	actual := uncastJob.(*extensions.Job)
+	// Verify that after syncing a complete job, the conditions are the same.
+	if got, expected := len(actual.Status.Conditions), 1; got != expected {
+		t.Fatalf("Unexpected job status conditions amount; expected %d, got %d", expected, got)
+	}
 }
 
 func TestSyncJobDeleted(t *testing.T) {

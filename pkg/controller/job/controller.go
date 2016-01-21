@@ -330,11 +330,11 @@ func (jm *JobController) syncJob(key string) error {
 		now := unversioned.Now()
 		job.Status.StartTime = &now
 	}
+	// if job was finished previously, we don't want to redo the termination
+	if isJobFinished(&job) {
+		return nil
+	}
 	if pastActiveDeadline(&job) {
-		// if job was finished previously, we don't want to redo the termination
-		if isJobFinished(&job) {
-			return nil
-		}
 		// TODO: below code should be replaced with pod termination resulting in
 		// pod failures, rather than killing pods. Unfortunately none such solution
 		// exists ATM. There's an open discussion in the topic in
