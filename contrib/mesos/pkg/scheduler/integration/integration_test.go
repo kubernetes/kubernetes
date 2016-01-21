@@ -198,13 +198,23 @@ func (lw *MockPodsListWatch) Pod(name string) *api.Pod {
 
 	for _, p := range lw.list.Items {
 		if p.Name == name {
-			return &p
+			clone, err := api.Scheme.DeepCopy(&p)
+			if err != nil {
+				panic(err.Error())
+			}
+			return clone.(*api.Pod)
 		}
 	}
 
 	return nil
 }
 func (lw *MockPodsListWatch) Add(pod *api.Pod, notify bool) {
+	clone, err := api.Scheme.DeepCopy(pod)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	pod = clone.(*api.Pod)
 	func() {
 		lw.lock.Lock()
 		defer lw.lock.Unlock()
@@ -216,6 +226,12 @@ func (lw *MockPodsListWatch) Add(pod *api.Pod, notify bool) {
 	}
 }
 func (lw *MockPodsListWatch) Modify(pod *api.Pod, notify bool) {
+	clone, err := api.Scheme.DeepCopy(pod)
+	if err != nil {
+		panic("failed to clone pod object")
+	}
+
+	pod = clone.(*api.Pod)
 	found := false
 	func() {
 		lw.lock.Lock()
