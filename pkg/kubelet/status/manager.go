@@ -370,7 +370,10 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		if err == nil {
 			glog.V(3).Infof("Status for pod %q updated successfully: %+v", format.Pod(pod), status)
 			m.apiStatusVersions[pod.UID] = status.version
-
+			if kubepod.IsMirrorPod(pod) {
+				// We don't handle graceful deletion of mirror pods.
+				return
+			}
 			if pod.DeletionTimestamp == nil {
 				return
 			}
