@@ -161,11 +161,17 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 		if len(deletes.Pods) > 0 {
 			s.updates <- *deletes
 		}
-		if len(adds.Pods) > 0 || firstSet {
+		if len(adds.Pods) > 0 {
 			s.updates <- *adds
 		}
 		if len(updates.Pods) > 0 {
 			s.updates <- *updates
+		}
+		if firstSet && len(adds.Pods) == 0 && len(updates.Pods) == 0 {
+			// Send an empty update when first seeing the source and there are
+			// no ADD or UPDATE pods from the source. This signals kubelet that
+			// the source is ready.
+			s.updates <- *adds
 		}
 		// Only add reconcile support here, because kubelet doesn't support Snapshot update now.
 		if len(reconciles.Pods) > 0 {
