@@ -4480,6 +4480,7 @@ func TestValidateConfigMap(t *testing.T) {
 		dotKey           = newConfigMap("validname", "validns", map[string]string{".": "value"})
 		doubleDotKey     = newConfigMap("validname", "validns", map[string]string{"..": "value"})
 		overMaxKeyLength = newConfigMap("validname", "validns", map[string]string{strings.Repeat("a", 254): "value"})
+		overMaxSize      = newConfigMap("validname", "validns", map[string]string{"key": strings.Repeat("a", api.MaxSecretSize+1)})
 	)
 
 	tests := map[string]struct {
@@ -4497,6 +4498,7 @@ func TestValidateConfigMap(t *testing.T) {
 		"dot key":             {dotKey, false},
 		"double dot key":      {doubleDotKey, false},
 		"over max key length": {overMaxKeyLength, false},
+		"over max size":       {overMaxSize, false},
 	}
 
 	for name, tc := range tests {
