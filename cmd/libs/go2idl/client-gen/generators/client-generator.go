@@ -57,6 +57,7 @@ func NameSystems() namer.NameSystems {
 	pluralExceptions := map[string]string{
 		"Endpoints":       "Endpoints",
 		"ComponentStatus": "ComponentStatus",
+		"Ingress":         "Ingress",
 	}
 	return namer.NameSystems{
 		"public":        namer.NewPublicNamer(0),
