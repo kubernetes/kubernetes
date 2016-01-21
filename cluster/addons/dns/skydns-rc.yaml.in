@@ -55,7 +55,7 @@ spec:
             memory: 50Mi
         args:
         # command = "/kube2sky"
-        - -domain={{ pillar['dns_domain'] }}
+        - --domain={{ pillar['dns_domain'] }}
       - name: skydns
         image: gcr.io/google_containers/skydns:2015-10-13-8c72f8c
         resources:
