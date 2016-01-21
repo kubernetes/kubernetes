@@ -130,7 +130,7 @@ func (s *CMServer) Run(_ []string) error {
 	endpoints := s.createEndpointController(clientForUserAgentOrDie(*kubeconfig, "endpoint-controller"))
 	go endpoints.Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
-	go replicationcontroller.NewReplicationManager(clientForUserAgentOrDie(*kubeconfig, "replication-controller"), s.resyncPeriod, replicationcontroller.BurstReplicas).
+	go replicationcontroller.NewReplicationManager(clientsetForUserAgentOrDie(*kubeconfig, "replication-controller"), s.resyncPeriod, replicationcontroller.BurstReplicas).
 		Run(s.ConcurrentRCSyncs, util.NeverStop)
 
 	if s.TerminatedPodGCThreshold > 0 {
@@ -219,13 +219,13 @@ func (s *CMServer) Run(_ []string) error {
 
 		if containsResource(resources, "daemonsets") {
 			glog.Infof("Starting daemon set controller")
-			go daemon.NewDaemonSetsController(clientForUserAgentOrDie(*kubeconfig, "daemon-set-controller"), s.resyncPeriod).
+			go daemon.NewDaemonSetsController(clientsetForUserAgentOrDie(*kubeconfig, "daemon-set-controller"), s.resyncPeriod).
 				Run(s.ConcurrentDSCSyncs, util.NeverStop)
 		}
 
 		if containsResource(resources, "jobs") {
 			glog.Infof("Starting job controller")
-			go job.NewJobController(clientForUserAgentOrDie(*kubeconfig, "job-controller"), s.resyncPeriod).
+			go job.NewJobController(clientsetForUserAgentOrDie(*kubeconfig, "job-controller"), s.resyncPeriod).
 				Run(s.ConcurrentJobSyncs, util.NeverStop)
 		}
 

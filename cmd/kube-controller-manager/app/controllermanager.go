@@ -198,7 +198,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
 	go replicationcontroller.NewReplicationManager(
-		clientForUserAgentOrDie(*kubeconfig, "replication-controller"),
+		clientsetForUserAgentOrDie(*kubeconfig, "replication-controller"),
 		ResyncPeriod(s),
 		replicationcontroller.BurstReplicas,
 	).Run(s.ConcurrentRCSyncs, util.NeverStop)
@@ -284,13 +284,13 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 
 		if containsResource(resources, "daemonsets") {
 			glog.Infof("Starting daemon set controller")
-			go daemon.NewDaemonSetsController(clientForUserAgentOrDie(*kubeconfig, "daemon-set-controller"), ResyncPeriod(s)).
+			go daemon.NewDaemonSetsController(clientsetForUserAgentOrDie(*kubeconfig, "daemon-set-controller"), ResyncPeriod(s)).
 				Run(s.ConcurrentDSCSyncs, util.NeverStop)
 		}
 
 		if containsResource(resources, "jobs") {
 			glog.Infof("Starting job controller")
-			go job.NewJobController(clientForUserAgentOrDie(*kubeconfig, "job-controller"), ResyncPeriod(s)).
+			go job.NewJobController(clientsetForUserAgentOrDie(*kubeconfig, "job-controller"), ResyncPeriod(s)).
 				Run(s.ConcurrentJobSyncs, util.NeverStop)
 		}
 

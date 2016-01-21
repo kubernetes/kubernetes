@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -192,10 +193,10 @@ func TestCreatePods(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	// TODO: Uncomment when fix #19254
 	// defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	clientset := release_1_1.NewForConfigOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
 
 	podControl := RealPodControl{
-		KubeClient: client,
+		KubeClient: clientset,
 		Recorder:   &record.FakeRecorder{},
 	}
 
@@ -212,7 +213,7 @@ func TestCreatePods(t *testing.T) {
 		Spec: controllerSpec.Spec.Template.Spec,
 	}
 	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath("pods", api.NamespaceDefault, ""), "POST", nil)
-	actualPod, err := runtime.Decode(client.Codec, []byte(fakeHandler.RequestBody))
+	actualPod, err := runtime.Decode(clientset.LegacyClient.Codec, []byte(fakeHandler.RequestBody))
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}

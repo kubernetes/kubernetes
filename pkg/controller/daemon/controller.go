@@ -21,12 +21,15 @@ import (
 	"sort"
 	"time"
 
+	"sync"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	unversioned_extensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
@@ -34,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
-	"sync"
 )
 
 const (
@@ -56,7 +58,7 @@ const (
 // DaemonSetsController is responsible for synchronizing DaemonSet objects stored
 // in the system with actual running pods.
 type DaemonSetsController struct {
-	kubeClient client.Interface
+	kubeClient release_1_1.Interface
 	podControl controller.PodControlInterface
 
 	// An dsc is temporarily suspended after creating/deleting these many replicas.
@@ -87,10 +89,10 @@ type DaemonSetsController struct {
 	queue *workqueue.Type
 }
 
-func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc) *DaemonSetsController {
+func NewDaemonSetsController(kubeClient release_1_1.Interface, resyncPeriod controller.ResyncPeriodFunc) *DaemonSetsController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	eventBroadcaster.StartRecordingToSink(kubeClient.Legacy().Events(""))
 
 	dsc := &DaemonSetsController{
 		kubeClient: kubeClient,
@@ -138,10 +140,10 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 	dsc.podStore.Store, dsc.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return dsc.kubeClient.Pods(api.NamespaceAll).List(options)
+				return dsc.kubeClient.Legacy().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dsc.kubeClient.Pods(api.NamespaceAll).Watch(options)
+				return dsc.kubeClient.Legacy().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
@@ -156,10 +158,10 @@ func NewDaemonSetsController(kubeClient client.Interface, resyncPeriod controlle
 	dsc.nodeStore.Store, dsc.nodeController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return dsc.kubeClient.Nodes().List(options)
+				return dsc.kubeClient.Legacy().Nodes().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dsc.kubeClient.Nodes().Watch(options)
+				return dsc.kubeClient.Legacy().Nodes().Watch(options)
 			},
 		},
 		&api.Node{},
@@ -459,7 +461,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) {
 	deleteWait.Wait()
 }
 
-func storeDaemonSetStatus(dsClient client.DaemonSetInterface, ds *extensions.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled int) error {
+func storeDaemonSetStatus(dsClient unversioned_extensions.DaemonSetInterface, ds *extensions.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled int) error {
 	if ds.Status.DesiredNumberScheduled == desiredNumberScheduled && ds.Status.CurrentNumberScheduled == currentNumberScheduled && ds.Status.NumberMisscheduled == numberMisscheduled {
 		return nil
 	}

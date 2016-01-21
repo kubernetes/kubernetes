@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_1"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
@@ -39,7 +39,7 @@ import (
 )
 
 type JobController struct {
-	kubeClient client.Interface
+	kubeClient release_1_1.Interface
 	podControl controller.PodControlInterface
 
 	// To allow injection of updateJobStatus for testing.
@@ -68,10 +68,10 @@ type JobController struct {
 	recorder record.EventRecorder
 }
 
-func NewJobController(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc) *JobController {
+func NewJobController(kubeClient release_1_1.Interface, resyncPeriod controller.ResyncPeriodFunc) *JobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	eventBroadcaster.StartRecordingToSink(kubeClient.Legacy().Events(""))
 
 	jm := &JobController{
 		kubeClient: kubeClient,
@@ -110,10 +110,10 @@ func NewJobController(kubeClient client.Interface, resyncPeriod controller.Resyn
 	jm.podStore.Store, jm.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return jm.kubeClient.Pods(api.NamespaceAll).List(options)
+				return jm.kubeClient.Legacy().Pods(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return jm.kubeClient.Pods(api.NamespaceAll).Watch(options)
+				return jm.kubeClient.Legacy().Pods(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Pod{},
