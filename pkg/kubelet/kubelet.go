@@ -3102,12 +3102,8 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod, podStatus *kubecontainer.PodS
 			Message: fmt.Sprintf("Query container info failed with error (%v)", statusErr),
 		}, nil
 	}
-	// Ask the runtime to convert the internal PodStatus to api.PodStatus.
-	s, err := kl.containerRuntime.ConvertPodStatusToAPIPodStatus(pod, podStatus)
-	if err != nil {
-		glog.Infof("Failed to convert PodStatus to api.PodStatus for %q: %v", format.Pod(pod), err)
-		return api.PodStatus{}, err
-	}
+	// Convert the internal PodStatus to api.PodStatus.
+	s := kl.convertStatusToAPIStatus(pod, podStatus)
 
 	// Assume info is ready to process
 	spec := &pod.Spec
