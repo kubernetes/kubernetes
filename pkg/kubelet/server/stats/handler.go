@@ -56,6 +56,7 @@ func CreateHandlers(provider StatsProvider) *restful.WebService {
 		handler restful.RouteFunction
 	}{
 		{"", h.handleStats},
+		{"/summary", h.handleSummary},
 		{"/container", h.handleSystemContainer},
 		{"/{podName}/{containerName}", h.handlePodContainer},
 		{"/{namespace}/{podName}/{uid}/{containerName}", h.handlePodContainer},
@@ -132,6 +133,15 @@ func (h *handler) handleStats(request *restful.Request, response *restful.Respon
 		return
 	}
 	writeResponse(response, statsMap["/"])
+}
+
+// Handles stats summary requests to /stats/summary
+func (h *handler) handleSummary(request *restful.Request, response *restful.Response) {
+	summary := Summary{}
+
+	// TODO(timstclair): Fill in summary from cAdvisor v2 endpoint.
+
+	writeResponse(response, summary)
 }
 
 // Handles non-kubernetes container stats requests to /stats/container/
