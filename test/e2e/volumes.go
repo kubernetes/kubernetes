@@ -326,10 +326,9 @@ func deleteCinderVolume(name string) error {
 	return err
 }
 
-// Marked with [Skipped] to skip the test by default (see driver.go),
-// these tests needs privileged containers, which are disabled by default.
-// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
-var _ = Describe("Volumes [Skipped]", func() {
+// These tests need privileged containers, which are disabled by default.  Run
+// the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
+var _ = Describe("Volumes [Feature:Volumes]", func() {
 	framework := NewFramework("volume")
 
 	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,

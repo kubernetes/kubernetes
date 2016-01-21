@@ -28,10 +28,9 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
-// Marked with [Skipped] to skip the test by default (see driver.go),
-// the test needs privileged containers, which are disabled by default.
-// Run the test with "go run hack/e2e.go ... --ginkgo.focus=PersistentVolume"
-var _ = Describe("PersistentVolumes [Skipped]", func() {
+// This test needs privileged containers, which are disabled by default.  Run
+// the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
+var _ = Describe("PersistentVolumes [Feature:Volumes]", func() {
 	framework := NewFramework("pv")
 	var c *client.Client
 	var ns string
