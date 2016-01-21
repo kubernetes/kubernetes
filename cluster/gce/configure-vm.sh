@@ -136,7 +136,7 @@ install-salt() {
   echo "== Refreshing package database =="
   until apt-get update; do
     echo "== apt-get update failed, retrying =="
-    echo sleep 5
+    sleep 5
   done
 
   mkdir -p /var/cache/salt-install
@@ -178,7 +178,7 @@ EOF
   echo "== Installing unmet dependencies =="
   until apt-get install -f -y; do
     echo "== apt-get install failed, retrying =="
-    echo sleep 5
+    sleep 5
   done
 
   rm /usr/sbin/policy-rc.d
