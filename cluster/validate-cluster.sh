@@ -57,7 +57,7 @@ while true; do
   else
     # Set the timeout to ~25minutes (100 x 15 second) to avoid timeouts for 1000-node clusters.
     if (( attempt > 100 )); then
-      echo -e "${color_red}Detected ${ready} ready nodes, found ${found} nodes out of expected ${EXPECTED_NUM_NODES}. Your cluster may not be working.${color_norm}"
+      echo -e "${color_red}Detected ${ready} ready nodes, found ${found} nodes out of expected ${EXPECTED_NUM_NODES}. Your cluster may not be fully functional.${color_norm}"
       "${KUBE_ROOT}/cluster/kubectl.sh" get nodes
       exit 2
 		else
