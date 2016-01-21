@@ -82,46 +82,35 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*api.Node, error) {
 }
 
 func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
-	if volume.GCEPersistentDisk != nil {
-		disk := volume.GCEPersistentDisk
+	// fast path if there is no conflict checking targets.
+	if volume.GCEPersistentDisk == nil && volume.AWSElasticBlockStore == nil && volume.RBD == nil {
+		return false
+	}
 
-		existingPod := &(pod.Spec)
-		for ix := range existingPod.Volumes {
-			if existingPod.Volumes[ix].GCEPersistentDisk != nil &&
-				existingPod.Volumes[ix].GCEPersistentDisk.PDName == disk.PDName &&
-				!(existingPod.Volumes[ix].GCEPersistentDisk.ReadOnly && disk.ReadOnly) {
+	for _, existingVolume := range pod.Spec.Volumes {
+		// Same GCE disk mounted by multiple pods conflicts unless all pods mount it read-only.
+		if volume.GCEPersistentDisk != nil && existingVolume.GCEPersistentDisk != nil {
+			disk, existingDisk := volume.GCEPersistentDisk, existingVolume.GCEPersistentDisk
+			if disk.PDName == existingDisk.PDName && !(disk.ReadOnly && existingDisk.ReadOnly) {
+				return true
+			}
+		}
+
+		if volume.AWSElasticBlockStore != nil && existingVolume.AWSElasticBlockStore != nil {
+			if volume.AWSElasticBlockStore.VolumeID == existingVolume.AWSElasticBlockStore.VolumeID {
+				return true
+			}
+		}
+
+		if volume.RBD != nil && existingVolume.RBD != nil {
+			mon, pool, image := volume.RBD.CephMonitors, volume.RBD.RBDPool, volume.RBD.RBDImage
+			emon, epool, eimage := existingVolume.RBD.CephMonitors, existingVolume.RBD.RBDPool, existingVolume.RBD.RBDImage
+			if haveSame(mon, emon) && pool == epool && image == eimage {
 				return true
 			}
 		}
 	}
-	if volume.AWSElasticBlockStore != nil {
-		volumeID := volume.AWSElasticBlockStore.VolumeID
 
-		existingPod := &(pod.Spec)
-		for ix := range existingPod.Volumes {
-			if existingPod.Volumes[ix].AWSElasticBlockStore != nil &&
-				existingPod.Volumes[ix].AWSElasticBlockStore.VolumeID == volumeID {
-				return true
-			}
-		}
-	}
-	if volume.RBD != nil {
-		mon := volume.RBD.CephMonitors
-		pool := volume.RBD.RBDPool
-		image := volume.RBD.RBDImage
-
-		existingPod := &(pod.Spec)
-		for ix := range existingPod.Volumes {
-			if existingPod.Volumes[ix].RBD != nil {
-				mon_m := existingPod.Volumes[ix].RBD.CephMonitors
-				pool_m := existingPod.Volumes[ix].RBD.RBDPool
-				image_m := existingPod.Volumes[ix].RBD.RBDImage
-				if haveSame(mon, mon_m) && pool_m == pool && image_m == image {
-					return true
-				}
-			}
-		}
-	}
 	return false
 }
 
@@ -134,10 +123,9 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 // - Ceph RBD forbids if any two pods share at least same monitor, and match pool and image.
 // TODO: migrate this into some per-volume specific code?
 func NoDiskConflict(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
-	podSpec := &(pod.Spec)
-	for ix := range podSpec.Volumes {
-		for podIx := range existingPods {
-			if isVolumeConflict(podSpec.Volumes[ix], existingPods[podIx]) {
+	for _, v := range pod.Spec.Volumes {
+		for _, ev := range existingPods {
+			if isVolumeConflict(v, ev) {
 				return false, nil
 			}
 		}
