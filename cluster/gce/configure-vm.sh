@@ -586,20 +586,40 @@ grains:
     - kubernetes-master
   cloud: gce
 EOF
-  if ! [[ -z "${PROJECT_ID:-}" ]] && ! [[ -z "${TOKEN_URL:-}" ]] && ! [[ -z "${TOKEN_BODY:-}" ]] && ! [[ -z "${NODE_NETWORK:-}" ]] ; then
-    cat <<EOF >/etc/gce.conf
+
+  cat <<EOF >/etc/gce.conf
 [global]
+EOF
+  CLOUD_CONFIG='' # Set to non-empty path if we are using the gce.conf file
+
+  if ! [[ -z "${PROJECT_ID:-}" ]] && ! [[ -z "${TOKEN_URL:-}" ]] && ! [[ -z "${TOKEN_BODY:-}" ]] && ! [[ -z "${NODE_NETWORK:-}" ]] ; then
+    cat <<EOF >>/etc/gce.conf
 token-url = ${TOKEN_URL}
 token-body = ${TOKEN_BODY}
 project-id = ${PROJECT_ID}
 network-name = ${NODE_NETWORK}
 EOF
+    CLOUD_CONFIG=/etc/gce.conf
     EXTERNAL_IP=$(curl --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
     cat <<EOF >>/etc/salt/minion.d/grains.conf
-  cloud_config: /etc/gce.conf
   advertise_address: '${EXTERNAL_IP}'
   proxy_ssh_user: '${PROXY_SSH_USER}'
 EOF
+  fi
+
+  if [[ -n "${MULTIZONE:-}" ]]; then
+    cat <<EOF >>/etc/gce.conf
+multizone = ${MULTIZONE}
+EOF
+    CLOUD_CONFIG=/etc/gce.conf
+  fi
+
+  if [[ -n ${CLOUD_CONFIG:-} ]]; then
+  cat <<EOF >>/etc/salt/minion.d/grains.conf
+  cloud_config: ${CLOUD_CONFIG}
+EOF
+  else
+    rm -f /etc/gce.conf
   fi
 
   # If the kubelet on the master is enabled, give it the same CIDR range

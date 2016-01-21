@@ -20,7 +20,7 @@
 # The intent is to allow experimentation/advanced functionality before we
 # are ready to commit to supporting it.
 # Experimental functionality:
-#   KUBE_SHARE_MASTER=true
+#   KUBE_USE_EXISTING_MASTER=true
 #     Detect and reuse an existing master; useful if you want to
 #     create more nodes, perhaps with a different instance type or in
 #     a different subnet/AZ
@@ -808,8 +808,8 @@ function kube-up {
   # HTTPS to the master is allowed (for API access)
   authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
 
-  # KUBE_SHARE_MASTER is used to add minions to an existing master
-  if [[ "${KUBE_SHARE_MASTER:-}" == "true" ]]; then
+  # KUBE_USE_EXISTING_MASTER is used to add minions to an existing master
+  if [[ "${KUBE_USE_EXISTING_MASTER:-}" == "true" ]]; then
     # Detect existing master
     detect-master
 

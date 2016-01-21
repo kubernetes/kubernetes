@@ -71,7 +71,7 @@ make multiple zones better supported.
 For the initial implemenation, kube-up must be run multiple times, once for
 each zone.  The first kube-up will take place as normal, but then for each
 additional zone the user must run kube-up again, specifying
-`KUBE_SHARE_MASTER=true` and `KUBE_SUBNET_CIDR=172.20.x.0/24`.  This will then
+`KUBE_USE_EXISTING_MASTER=true` and `KUBE_SUBNET_CIDR=172.20.x.0/24`.  This will then
 create additional nodes in a different zone, but will register them with the
 existing master.
 
