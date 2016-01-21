@@ -230,7 +230,7 @@ var _ = Describe("Addon update", func() {
 		// providers that provide those capabilities.
 		SkipUnlessProviderIs("gce")
 
-		//these tests are long, so I squeezed several cases in one scenario
+		// these tests are long, so I squeezed several cases in one scenario
 		Expect(sshClient).NotTo(BeNil())
 		dir = f.Namespace.Name // we use it only to give a unique string for each test execution
 

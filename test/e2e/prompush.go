@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//This is a utility for prometheus pushing functionality.
+// This is a utility for prometheus pushing functionality.
 package e2e
 
 import (
@@ -57,7 +57,7 @@ func promPushRunningPending(running, pending int) error {
 		if err := prometheus.Push(
 			"e2e",
 			"none",
-			testContext.PrometheusPushGateway, //i.e. "127.0.0.1:9091"
+			testContext.PrometheusPushGateway, // i.e. "127.0.0.1:9091"
 		); err != nil {
 			fmt.Println("failed at pushing to pushgateway ", err)
 			return err
