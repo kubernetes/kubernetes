@@ -32,6 +32,7 @@ Before=docker.service
 
 [Service]
 EnvironmentFile=-/opt/kubernetes/cfg/flannel
+ExecStartPre=/opt/kubernetes/bin/remove-docker0.sh
 ExecStart=/opt/kubernetes/bin/flanneld --ip-masq \${FLANNEL_ETCD} \${FLANNEL_ETCD_KEY}
 ExecStartPost=/opt/kubernetes/bin/mk-docker-opts.sh -d /run/flannel/docker
 
