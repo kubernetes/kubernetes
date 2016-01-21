@@ -46,17 +46,17 @@ type lifecycle struct {
 	immortalNamespaces sets.String
 }
 
-func (l *lifecycle) Admit(a admission.Attributes) (err error) {
+func (l *lifecycle) Admit(a admission.Attributes) (warn admission.Warning, err error) {
 	// prevent deletion of immortal namespaces
 	if a.GetOperation() == admission.Delete && a.GetKind() == api.Kind("Namespace") && l.immortalNamespaces.Has(a.GetName()) {
-		return errors.NewForbidden(a.GetResource(), a.GetName(), fmt.Errorf("this namespace may not be deleted"))
+		return nil, errors.NewForbidden(a.GetResource(), a.GetName(), fmt.Errorf("this namespace may not be deleted"))
 	}
 
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
 	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
 	// its a namespaced resource.
 	if len(a.GetNamespace()) == 0 || a.GetKind() == api.Kind("Namespace") {
-		return nil
+		return nil, nil
 	}
 
 	namespaceObj, exists, err := l.store.Get(&api.Namespace{
@@ -66,7 +66,7 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 		},
 	})
 	if err != nil {
-		return errors.NewInternalError(err)
+		return nil, errors.NewInternalError(err)
 	}
 
 	// refuse to operate on non-existent namespaces
@@ -75,9 +75,9 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 		namespaceObj, err = l.client.Namespaces().Get(a.GetNamespace())
 		if err != nil {
 			if errors.IsNotFound(err) {
-				return err
+				return nil, err
 			}
-			return errors.NewInternalError(err)
+			return nil, errors.NewInternalError(err)
 		}
 	}
 
@@ -85,14 +85,14 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 	if a.GetOperation() == admission.Create {
 		namespace := namespaceObj.(*api.Namespace)
 		if namespace.Status.Phase != api.NamespaceTerminating {
-			return nil
+			return nil, nil
 		}
 
 		// TODO: This should probably not be a 403
-		return admission.NewForbidden(a, fmt.Errorf("Unable to create new content in namespace %s because it is being terminated.", a.GetNamespace()))
+		return nil, admission.NewForbidden(a, fmt.Errorf("Unable to create new content in namespace %s because it is being terminated.", a.GetNamespace()))
 	}
 
-	return nil
+	return nil, nil
 }
 
 // NewLifecycle creates a new namespace lifecycle admission control handler

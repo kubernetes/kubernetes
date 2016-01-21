@@ -147,17 +147,17 @@ func (s *serviceAccount) Stop() {
 	}
 }
 
-func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
+func (s *serviceAccount) Admit(a admission.Attributes) (warn admission.Warning, err error) {
 	if a.GetResource() != api.Resource("pods") {
-		return nil
+		return nil, nil
 	}
 	obj := a.GetObject()
 	if obj == nil {
-		return nil
+		return nil, nil
 	}
 	pod, ok := obj.(*api.Pod)
 	if !ok {
-		return nil
+		return nil, nil
 	}
 
 	// Don't modify the spec of mirror pods.
@@ -165,14 +165,14 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
 	if _, isMirrorPod := pod.Annotations[kubelet.ConfigMirrorAnnotationKey]; isMirrorPod {
 		if len(pod.Spec.ServiceAccountName) != 0 {
-			return admission.NewForbidden(a, fmt.Errorf("A mirror pod may not reference service accounts"))
+			return nil, admission.NewForbidden(a, fmt.Errorf("A mirror pod may not reference service accounts"))
 		}
 		for _, volume := range pod.Spec.Volumes {
 			if volume.VolumeSource.Secret != nil {
-				return admission.NewForbidden(a, fmt.Errorf("A mirror pod may not reference secrets"))
+				return nil, admission.NewForbidden(a, fmt.Errorf("A mirror pod may not reference secrets"))
 			}
 		}
-		return nil
+		return nil, nil
 	}
 
 	// Set the default service account if needed
@@ -183,22 +183,22 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	// Ensure the referenced service account exists
 	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), pod.Spec.ServiceAccountName)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
+		return nil, admission.NewForbidden(a, fmt.Errorf("Error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
 	}
 	if serviceAccount == nil {
 		// TODO: convert to a ServerTimeout error (or other error that sends a Retry-After header)
-		return admission.NewForbidden(a, fmt.Errorf("service account %s/%s was not found, retry after the service account is created", a.GetNamespace(), pod.Spec.ServiceAccountName))
+		return nil, admission.NewForbidden(a, fmt.Errorf("service account %s/%s was not found, retry after the service account is created", a.GetNamespace(), pod.Spec.ServiceAccountName))
 	}
 
 	if s.enforceMountableSecrets(serviceAccount) {
 		if err := s.limitSecretReferences(serviceAccount, pod); err != nil {
-			return admission.NewForbidden(a, err)
+			return nil, admission.NewForbidden(a, err)
 		}
 	}
 
 	if s.MountServiceAccountToken {
 		if err := s.mountServiceAccountToken(serviceAccount, pod); err != nil {
-			return admission.NewForbidden(a, err)
+			return nil, admission.NewForbidden(a, err)
 		}
 	}
 
@@ -207,7 +207,7 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		copy(pod.Spec.ImagePullSecrets, serviceAccount.ImagePullSecrets)
 	}
 
-	return nil
+	return nil, nil
 }
 
 // enforceMountableSecrets indicates whether mountable secrets should be enforced for a particular service account

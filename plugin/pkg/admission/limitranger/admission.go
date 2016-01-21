@@ -52,11 +52,11 @@ type limitRanger struct {
 }
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
-func (l *limitRanger) Admit(a admission.Attributes) (err error) {
+func (l *limitRanger) Admit(a admission.Attributes) (warn admission.Warning, err error) {
 
 	// Ignore all calls to subresources
 	if a.GetSubresource() != "" {
-		return nil
+		return nil, nil
 	}
 
 	obj := a.GetObject()
@@ -76,10 +76,10 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 	}
 	items, err := l.indexer.Index("namespace", key)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Unable to %s %v at this time because there was an error enforcing limit ranges", a.GetOperation(), a.GetResource()))
+		return nil, admission.NewForbidden(a, fmt.Errorf("Unable to %s %v at this time because there was an error enforcing limit ranges", a.GetOperation(), a.GetResource()))
 	}
 	if len(items) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// ensure it meets each prescribed min/max
@@ -87,10 +87,10 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 		limitRange := items[i].(*api.LimitRange)
 		err = l.limitFunc(limitRange, a.GetResource().Resource, a.GetObject())
 		if err != nil {
-			return admission.NewForbidden(a, err)
+			return nil, admission.NewForbidden(a, err)
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // NewLimitRanger returns an object that enforces limits based on the supplied limit function

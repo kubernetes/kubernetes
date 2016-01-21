@@ -78,13 +78,13 @@ var resourceToResourceName = map[unversioned.GroupResource]api.ResourceName{
 	api.Resource("persistentvolumeclaims"): api.ResourcePersistentVolumeClaims,
 }
 
-func (q *quota) Admit(a admission.Attributes) (err error) {
+func (q *quota) Admit(a admission.Attributes) (warn admission.Warning, err error) {
 	if a.GetSubresource() != "" {
-		return nil
+		return nil, nil
 	}
 
 	if a.GetOperation() == "DELETE" {
-		return nil
+		return nil, nil
 	}
 
 	key := &api.ResourceQuota{
@@ -102,18 +102,16 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 
 	items, err := q.indexer.Index("namespace", key)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("unable to %s %s at this time because there was an error enforcing quota", a.GetOperation(), a.GetResource()))
+		return nil, admission.NewForbidden(a, fmt.Errorf("unable to %s %s at this time because there was an error enforcing quota", a.GetOperation(), a.GetResource()))
 	}
 	if len(items) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	for i := range items {
-
 		quota := items[i].(*api.ResourceQuota)
 
 		for retry := 1; retry <= numRetries; retry++ {
-
 			// we cannot modify the value directly in the cache, so we copy
 			status := &api.ResourceQuotaStatus{
 				Hard: api.ResourceList{},
@@ -128,7 +126,7 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 
 			dirty, err := IncrementUsage(a, status, q.client)
 			if err != nil {
-				return admission.NewForbidden(a, err)
+				return nil, admission.NewForbidden(a, err)
 			}
 
 			if dirty {
@@ -149,18 +147,18 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 
 				// we have concurrent requests to update quota, so look to retry if needed
 				if retry == numRetries {
-					return admission.NewForbidden(a, fmt.Errorf("unable to %s %s at this time because there are too many concurrent requests to increment quota", a.GetOperation(), a.GetResource()))
+					return nil, admission.NewForbidden(a, fmt.Errorf("unable to %s %s at this time because there are too many concurrent requests to increment quota", a.GetOperation(), a.GetResource()))
 				}
 				time.Sleep(interval)
 				// manually get the latest quota
 				quota, err = q.client.ResourceQuotas(usage.Namespace).Get(quota.Name)
 				if err != nil {
-					return admission.NewForbidden(a, err)
+					return nil, admission.NewForbidden(a, err)
 				}
 			}
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // IncrementUsage updates the supplied ResourceQuotaStatus object based on the incoming operation
