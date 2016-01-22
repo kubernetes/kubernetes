@@ -1764,14 +1764,20 @@ func (gce *GCECloud) getDiskByNameUnknownZone(diskName string) (*gceDisk, error)
 	// "us-central1-a/mydisk".  We could do this for them as part of
 	// admission control, but that might be a little weird (values changing
 	// on create)
+
+	var found *gceDisk
 	for _, zone := range gce.managedZones {
 		disk, err := gce.findDiskByName(diskName, zone)
 		if err != nil {
 			return nil, err
 		}
-		if disk != nil {
-			return disk, nil
+		if found != nil {
+			return nil, fmt.Errorf("GCE persistent disk name was found in multiple zones: %q", diskName)
 		}
+		found = disk
+	}
+	if found != nil {
+		return found, nil
 	}
 	return nil, fmt.Errorf("GCE persistent disk not found: %q", diskName)
 }
