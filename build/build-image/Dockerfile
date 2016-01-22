@@ -14,7 +14,10 @@
 
 # This file creates a standard build environment for building Kubernetes
 
-FROM kube-build:cross
+# We replace KUBE_BUILD_IMAGE_CROSS in build/common.sh with the actual
+# cross-build image tag.
+FROM KUBE_BUILD_IMAGE_CROSS
+
 MAINTAINER  Joe Beda <jbeda@google.com>
 
 # (set an explicit GOARM of 5 for maximum compatibility)
