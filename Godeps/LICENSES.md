@@ -61,6 +61,7 @@ github.com/matttproud/golang_protobuf_extensions | Apache-2
 github.com/mesos/mesos-go | Apache-2
 github.com/miekg/dns | spdxBSD3
 github.com/mitchellh/mapstructure | MITname
+github.com/mvdan/xurls | spdxBSD3
 github.com/mxk/go-flowrate | spdxBSD3
 github.com/onsi/ginkgo | spdxMIT
 github.com/onsi/gomega | spdxMIT
