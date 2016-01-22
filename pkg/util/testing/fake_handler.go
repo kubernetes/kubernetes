@@ -79,7 +79,7 @@ func (f *FakeHandler) ValidateRequestCount(t TestInterface, count int) bool {
 	defer f.lock.Unlock()
 	if f.requestCount != count {
 		ok = false
-		t.Logf("Expected %d call, but got %d. Only the last call is recorded and checked.", count, f.requestCount)
+		t.Errorf("Expected %d call, but got %d. Only the last call is recorded and checked.", count, f.requestCount)
 	}
 	f.hasBeenChecked = true
 	return ok
