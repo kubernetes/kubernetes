@@ -171,7 +171,11 @@ The nodes do not need a lot of access to the AWS APIs.  They need to download
 a distribution file, and then are responsible for attaching and detaching EBS
 volumes from itself.
 
-The node policy is relatively minimal.  The master policy is probably overly
+The node policy is relatively minimal.  In 1.2 and later, nodes can retrieve ECR
+authorization tokens, refresh them every 12 hours if needed, and fetch Docker
+images from it, as long as the appropriate permissions are enabled.  Those in
+[AmazonEC2ContainerRegistryReadOnly](http://docs.aws.amazon.com/AmazonECR/latest/userguide/ecr_managed_policies.html#AmazonEC2ContainerRegistryReadOnly),
+without write access, should suffice.  The master policy is probably overly
 permissive.  The security conscious may want to lock-down the IAM policies
 further ([#11936](http://issues.k8s.io/11936)).
 
@@ -180,7 +184,7 @@ are correctly configured ([#14226](http://issues.k8s.io/14226)).
 
 ### Tagging
 
-All AWS resources are tagged with a tag named "KuberentesCluster", with a value
+All AWS resources are tagged with a tag named "KubernetesCluster", with a value
 that is the unique cluster-id.  This tag is used to identify a particular
 'instance' of Kubernetes, even if two clusters are deployed into the same VPC.
 Resources are considered to belong to the same cluster if and only if they have
