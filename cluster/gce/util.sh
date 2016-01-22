@@ -696,7 +696,7 @@ function create-nodes-firewall() {
 
   # Wait for last batch of jobs
   kube::util::wait-for-jobs || {
-    echo -e "${color_red}${fail} commands failed.${color_norm}" >&2
+    echo -e "${color_red}Some commands failed.${color_norm}" >&2
   }
 }
 
@@ -1214,7 +1214,7 @@ function kube-push {
   done
 
   kube::util::wait-for-jobs || {
-    echo -e "${color_red}${fail} commands failed.${color_norm}" >&2
+    echo -e "${color_red}Some commands failed.${color_norm}" >&2
   }
 
   # TODO(zmerlynn): Re-create instance-template with the new
