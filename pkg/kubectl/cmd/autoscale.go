@@ -64,6 +64,7 @@ func NewCmdAutoscale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "Filename, directory, or URL to a file identifying the resource to autoscale."
 	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
 	cmdutil.AddApplyAnnotationFlags(cmd)
+	cmdutil.AddRecordFlag(cmd)
 	return cmd
 }
 
@@ -138,6 +139,12 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	hpa, err := resourceMapper.InfoForObject(object)
 	if err != nil {
 		return err
+	}
+	if cmdutil.ShouldRecord(cmd, hpa) {
+		if err := cmdutil.RecordChangeCause(hpa.Object, f.Command()); err != nil {
+			return err
+		}
+		object = hpa.Object
 	}
 	// TODO: extract this flag to a central location, when such a location exists.
 	if cmdutil.GetFlagBool(cmd, "dry-run") {

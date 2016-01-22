@@ -56,6 +56,10 @@ horizontalpodautoscalers (hpa), resourcequotas (quota) or secrets.
     If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.
 
 .PP
+\fB\-\-record\fP=false
+    Record current kubectl command in the resource annotation.
+
+.PP
 \fB\-\-resource\-version\fP=""
     If non\-empty, the annotation update will only succeed if this is the current resource\-version for the object. Only valid when specifying a single resource.
 

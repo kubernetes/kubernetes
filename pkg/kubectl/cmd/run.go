@@ -83,6 +83,7 @@ func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 	cmdutil.AddPrinterFlags(cmd)
 	addRunFlags(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
+	cmdutil.AddRecordFlag(cmd)
 	return cmd
 }
 
@@ -425,6 +426,15 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 		return nil, "", nil, nil, err
 	}
 
+	annotations, err := mapping.MetadataAccessor.Annotations(obj)
+	if err != nil {
+		return nil, "", nil, nil, err
+	}
+	if cmdutil.GetRecordFlag(cmd) || len(annotations[kubectl.ChangeCauseAnnotation]) > 0 {
+		if err := cmdutil.RecordChangeCause(obj, f.Command()); err != nil {
+			return nil, "", nil, nil, err
+		}
+	}
 	// TODO: extract this flag to a central location, when such a location exists.
 	if !cmdutil.GetFlagBool(cmd, "dry-run") {
 		resourceMapper := &resource.Mapper{

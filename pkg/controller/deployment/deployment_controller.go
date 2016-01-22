@@ -34,6 +34,7 @@ import (
 	unversioned_legacy "k8s.io/kubernetes/pkg/client/typed/generated/legacy/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
@@ -720,6 +721,12 @@ func (dc *DeploymentController) getNewRC(deployment extensions.Deployment, maxOl
 			Selector: newRCSelector,
 			Template: &newRCTemplate,
 		},
+	}
+	if _, ok := deployment.Annotations[kubectl.ChangeCauseAnnotation]; ok {
+		if newRC.Annotations == nil {
+			newRC.Annotations = make(map[string]string)
+		}
+		newRC.Annotations[kubectl.ChangeCauseAnnotation] = deployment.Annotations[kubectl.ChangeCauseAnnotation]
 	}
 	createdRC, err := dc.client.Legacy().ReplicationControllers(namespace).Create(&newRC)
 	if err != nil {
