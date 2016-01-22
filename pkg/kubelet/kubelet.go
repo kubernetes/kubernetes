@@ -2897,25 +2897,28 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *api.Node) {
 }
 
 // Set versioninfo for the node.
-func (kl *Kubelet) setNodeStatusVersionInfo(node *api.Node) {
+func (kl *Kubelet) setNodeStatusVersionInfo(node *api.Node) error {
 	verinfo, err := kl.cadvisor.VersionInfo()
 	if err != nil {
 		glog.Errorf("Error getting version info: %v", err)
-	} else {
-		node.Status.NodeInfo.KernelVersion = verinfo.KernelVersion
-		node.Status.NodeInfo.OSImage = verinfo.ContainerOsVersion
-
-		runtimeVersion := "Unknown"
-		if runtimeVer, err := kl.containerRuntime.Version(); err == nil {
-			runtimeVersion = runtimeVer.String()
-		}
-		node.Status.NodeInfo.ContainerRuntimeVersion = fmt.Sprintf("%s://%s", kl.containerRuntime.Type(), runtimeVersion)
-
-		node.Status.NodeInfo.KubeletVersion = version.Get().String()
-		// TODO: kube-proxy might be different version from kubelet in the future
-		node.Status.NodeInfo.KubeProxyVersion = version.Get().String()
+		return err
 	}
+	node.Status.NodeInfo.KernelVersion = verinfo.KernelVersion
+	node.Status.NodeInfo.OSImage = verinfo.ContainerOsVersion
 
+	runtimeVer, err := kl.containerRuntime.Version()
+	if err != nil {
+		return err
+	}
+	runtimeVersion := runtimeVer.String()
+
+	node.Status.NodeInfo.ContainerRuntimeVersion = fmt.Sprintf("%s://%s", kl.containerRuntime.Type(), runtimeVersion)
+
+	node.Status.NodeInfo.KubeletVersion = version.Get().String()
+	// TODO: kube-proxy might be different version from kubelet in the future
+	node.Status.NodeInfo.KubeProxyVersion = version.Get().String()
+
+	return nil
 }
 
 // Set daemonEndpoints for the node.
@@ -2942,11 +2945,14 @@ func (kl *Kubelet) setNodeStatusImages(node *api.Node) {
 }
 
 // Set status for the node.
-func (kl *Kubelet) setNodeStatusInfo(node *api.Node) {
+func (kl *Kubelet) setNodeStatusInfo(node *api.Node) error {
 	kl.setNodeStatusMachineInfo(node)
-	kl.setNodeStatusVersionInfo(node)
+	if err := kl.setNodeStatusVersionInfo(node); err != nil {
+		return err
+	}
 	kl.setNodeStatusDaemonEndpoints(node)
 	kl.setNodeStatusImages(node)
+	return nil
 }
 
 // Set Readycondition for the node.
@@ -3111,7 +3117,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*api.Node) error {
 	}
 	return []func(*api.Node) error{
 		kl.setNodeAddress,
-		withoutError(kl.setNodeStatusInfo),
+		kl.setNodeStatusInfo,
 		withoutError(kl.setNodeOODCondition),
 		withoutError(kl.setNodeReadyCondition),
 		withoutError(kl.recordNodeSchdulableEvent),
