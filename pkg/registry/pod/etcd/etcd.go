@@ -67,7 +67,7 @@ func NewStorage(
 
 	newListFunc := func() runtime.Object { return &api.PodList{} }
 	storageInterface := storageDecorator(
-		s, 1000, &api.Pod{}, prefix, true, newListFunc)
+		s, 1000, &api.Pod{}, prefix, pod.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },

@@ -37,7 +37,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *RE
 
 	newListFunc := func() runtime.Object { return &api.ConfigMapList{} }
 	storageInterface := storageDecorator(
-		s, 100, &api.ConfigMap{}, prefix, false, newListFunc)
+		s, 100, &api.ConfigMap{}, prefix, configmap.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object {

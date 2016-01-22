@@ -35,8 +35,10 @@ type REST struct {
 func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *REST {
 	prefix := "/testtype"
 	newListFunc := func() runtime.Object { return &testgroup.TestTypeList{} }
+	// Usually you should reuse your RESTCreateStrategy.
+	strategy := &NotNamespaceScoped{}
 	storageInterface := storageDecorator(
-		s, 100, &testgroup.TestType{}, prefix, false, newListFunc)
+		s, 100, &testgroup.TestType{}, prefix, strategy, newListFunc)
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &testgroup.TestType{} },
 		// NewListFunc returns an object capable of storing results of an etcd list.
@@ -62,4 +64,11 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *RE
 		Storage: storageInterface,
 	}
 	return &REST{store}
+}
+
+type NotNamespaceScoped struct {
+}
+
+func (*NotNamespaceScoped) NamespaceScoped() bool {
+	return false
 }

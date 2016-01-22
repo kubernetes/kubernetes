@@ -38,7 +38,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 
 	newListFunc := func() runtime.Object { return &extensions.HorizontalPodAutoscalerList{} }
 	storageInterface := storageDecorator(
-		s, 100, &extensions.HorizontalPodAutoscaler{}, prefix, false, newListFunc)
+		s, 100, &extensions.HorizontalPodAutoscaler{}, prefix, horizontalpodautoscaler.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc: func() runtime.Object { return &extensions.HorizontalPodAutoscaler{} },
