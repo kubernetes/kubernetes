@@ -39,7 +39,7 @@ func construct(t *testing.T, files map[string]string, testNamer namer.Namer) (*p
 		t.Fatal(err)
 	}
 	orderer := namer.Orderer{testNamer}
-	o := orderer.Order(u)
+	o := orderer.OrderUniverse(u)
 	return b, u, o
 }
 
@@ -208,6 +208,47 @@ type Blah struct {
 	}
 	if e, a := m, blahT.Members[1]; !reflect.DeepEqual(e, a) {
 		t.Errorf("wanted, got:\n%#v\n%#v", e, a)
+	}
+}
+
+func TestParseSecondClosestCommentLines(t *testing.T) {
+	const fileName = "base/foo/proto/foo.go"
+	testCases := []struct {
+		testFile map[string]string
+		expected string
+	}{
+		{
+			map[string]string{fileName: `package foo
+// Blah's SecondClosestCommentLines.
+// Another line.
+
+// Blah is a test.
+// A test, I tell you.
+type Blah struct {
+	a int
+}
+`},
+			"Blah's SecondClosestCommentLines.\nAnother line.\n",
+		},
+		{
+			map[string]string{fileName: `package foo
+// Blah's SecondClosestCommentLines.
+// Another line.
+
+type Blah struct {
+	a int
+}
+`},
+			"Blah's SecondClosestCommentLines.\nAnother line.\n",
+		},
+	}
+	for _, test := range testCases {
+		_, u, o := construct(t, test.testFile, namer.NewPublicNamer(0))
+		t.Logf("%#v", o)
+		blahT := u.Type(types.Name{Package: "base/foo/proto", Name: "Blah"})
+		if e, a := test.expected, blahT.SecondClosestCommentLines; e != a {
+			t.Errorf("struct second closest comment wrong, wanted %v, got %v", e, a)
+		}
 	}
 }
 

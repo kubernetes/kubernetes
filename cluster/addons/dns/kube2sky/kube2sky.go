@@ -86,8 +86,10 @@ type kube2sky struct {
 	etcdMutationTimeout time.Duration
 	// A cache that contains all the endpoints in the system.
 	endpointsStore kcache.Store
-	// A cache that contains all the servicess in the system.
+	// A cache that contains all the services in the system.
 	servicesStore kcache.Store
+	// A cache that contains all the pods in the system.
+	podsStore kcache.Store
 	// Lock for controlling access to headless services.
 	mlock sync.Mutex
 }
@@ -583,7 +585,7 @@ func main() {
 
 	ks.endpointsStore = watchEndpoints(kubeClient, &ks)
 	ks.servicesStore = watchForServices(kubeClient, &ks)
-	ks.servicesStore = watchPods(kubeClient, &ks)
+	ks.podsStore = watchPods(kubeClient, &ks)
 
 	select {}
 }

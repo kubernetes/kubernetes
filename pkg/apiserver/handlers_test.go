@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -40,15 +42,15 @@ func (fakeRL) Stop()             {}
 func (f fakeRL) TryAccept() bool { return bool(f) }
 func (f fakeRL) Accept()         {}
 
-func expectHTTP(url string, code int, t *testing.T) {
+func expectHTTP(url string, code int) error {
 	r, err := http.Get(url)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		return
+		return fmt.Errorf("unexpected error: %v", err)
 	}
 	if r.StatusCode != code {
-		t.Errorf("unexpected response: %v", r.StatusCode)
+		return fmt.Errorf("unexpected response: %v", r.StatusCode)
 	}
+	return nil
 }
 
 func getPath(resource, namespace, name string) string {
@@ -81,6 +83,13 @@ func TestMaxInFlight(t *testing.T) {
 	// 'short' accounted ones.
 	calls := &sync.WaitGroup{}
 	calls.Add(AllowedInflightRequestsNo * 2)
+
+	// Responses is used to wait until all responses are
+	// received. This prevents some async requests getting EOF
+	// errors from prematurely closing the server
+	responses := sync.WaitGroup{}
+	responses.Add(AllowedInflightRequestsNo * 2)
+
 	// Block is used to keep requests in flight for as long as we need to. All requests will
 	// be unblocked at the same time.
 	block := sync.WaitGroup{}
@@ -102,27 +111,32 @@ func TestMaxInFlight(t *testing.T) {
 			}),
 		),
 	)
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 
 	// These should hang, but not affect accounting.
 	for i := 0; i < AllowedInflightRequestsNo; i++ {
 		// These should hang waiting on block...
 		go func() {
-			expectHTTP(server.URL+"/foo/bar/watch", http.StatusOK, t)
+			if err := expectHTTP(server.URL+"/foo/bar/watch", http.StatusOK); err != nil {
+				t.Error(err)
+			}
+			responses.Done()
 		}()
 	}
 	// Check that sever is not saturated by not-accounted calls
-	expectHTTP(server.URL+"/dontwait", http.StatusOK, t)
-	oneAccountedFinished := sync.WaitGroup{}
-	oneAccountedFinished.Add(1)
-	var once sync.Once
+	if err := expectHTTP(server.URL+"/dontwait", http.StatusOK); err != nil {
+		t.Error(err)
+	}
 
 	// These should hang and be accounted, i.e. saturate the server
 	for i := 0; i < AllowedInflightRequestsNo; i++ {
 		// These should hang waiting on block...
 		go func() {
-			expectHTTP(server.URL, http.StatusOK, t)
-			once.Do(oneAccountedFinished.Done)
+			if err := expectHTTP(server.URL, http.StatusOK); err != nil {
+				t.Error(err)
+			}
+			responses.Done()
 		}()
 	}
 	// We wait for all calls to be received by the server
@@ -132,18 +146,24 @@ func TestMaxInFlight(t *testing.T) {
 
 	// Do this multiple times to show that it rate limit rejected requests don't block.
 	for i := 0; i < 2; i++ {
-		expectHTTP(server.URL, errors.StatusTooManyRequests, t)
+		if err := expectHTTP(server.URL, errors.StatusTooManyRequests); err != nil {
+			t.Error(err)
+		}
 	}
 	// Validate that non-accounted URLs still work
-	expectHTTP(server.URL+"/dontwait/watch", http.StatusOK, t)
+	if err := expectHTTP(server.URL+"/dontwait/watch", http.StatusOK); err != nil {
+		t.Error(err)
+	}
 
 	// Let all hanging requests finish
 	block.Done()
 
 	// Show that we recover from being blocked up.
 	// Too avoid flakyness we need to wait until at least one of the requests really finishes.
-	oneAccountedFinished.Wait()
-	expectHTTP(server.URL, http.StatusOK, t)
+	responses.Wait()
+	if err := expectHTTP(server.URL, http.StatusOK); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestReadOnly(t *testing.T) {
@@ -154,7 +174,8 @@ func TestReadOnly(t *testing.T) {
 			}
 		},
 	)))
-	defer server.Close()
+	// TODO: Uncomment when fix #19254
+	// defer server.Close()
 	for _, verb := range []string{"GET", "POST", "PUT", "DELETE", "CREATE"} {
 		req, err := http.NewRequest(verb, server.URL, nil)
 		if err != nil {
@@ -180,7 +201,8 @@ func TestTimeout(t *testing.T) {
 		func(*http.Request) (<-chan time.Time, string) {
 			return timeout, timeoutResp
 		}))
-	defer ts.Close()
+	// TODO: Uncomment when fix #19254
+	// defer ts.Close()
 
 	// No timeouts
 	sendResponse <- struct{}{}
@@ -281,7 +303,7 @@ func TestGetAttribs(t *testing.T) {
 				Verb:            "list",
 				Path:            "/apis/extensions/v1beta1/namespaces/myns/jobs",
 				ResourceRequest: true,
-				APIGroup:        "extensions",
+				APIGroup:        extensions.GroupName,
 				Namespace:       "myns",
 				Resource:        "jobs",
 			},

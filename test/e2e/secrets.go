@@ -28,7 +28,7 @@ import (
 var _ = Describe("Secrets", func() {
 	f := NewFramework("secrets")
 
-	It("should be consumable from pods [Conformance]", func() {
+	It("should be consumable from pods in volume [Conformance]", func() {
 		name := "secret-test-" + string(util.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
@@ -74,7 +74,7 @@ var _ = Describe("Secrets", func() {
 				},
 				Containers: []api.Container{
 					{
-						Name:  "secret-test",
+						Name:  "secret-volume-test",
 						Image: "gcr.io/google_containers/mounttest:0.2",
 						Args: []string{
 							"--file_content=/etc/secret-volume/data-1",
@@ -95,6 +95,65 @@ var _ = Describe("Secrets", func() {
 		testContainerOutput("consume secrets", f.Client, pod, 0, []string{
 			"content of file \"/etc/secret-volume/data-1\": value-1",
 			"mode of file \"/etc/secret-volume/data-1\": -r--r--r--",
+		}, f.Namespace.Name)
+	})
+
+	It("should be consumable from pods in env vars [Conformance]", func() {
+		name := "secret-test-" + string(util.NewUUID())
+
+		secret := &api.Secret{
+			ObjectMeta: api.ObjectMeta{
+				Namespace: f.Namespace.Name,
+				Name:      name,
+			},
+			Data: map[string][]byte{
+				"data-1": []byte("value-1"),
+			},
+		}
+
+		By(fmt.Sprintf("Creating secret with name %s", secret.Name))
+		defer func() {
+			By("Cleaning up the secret")
+			if err := f.Client.Secrets(f.Namespace.Name).Delete(secret.Name); err != nil {
+				Failf("unable to delete secret %v: %v", secret.Name, err)
+			}
+		}()
+		var err error
+		if secret, err = f.Client.Secrets(f.Namespace.Name).Create(secret); err != nil {
+			Failf("unable to create test secret %s: %v", secret.Name, err)
+		}
+
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: "pod-secrets-" + string(util.NewUUID()),
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    "secret-env-test",
+						Image:   "gcr.io/google_containers/busybox",
+						Command: []string{"sh", "-c", "env"},
+						Env: []api.EnvVar{
+							{
+								Name: "SECRET_DATA",
+								ValueFrom: &api.EnvVarSource{
+									SecretKeyRef: &api.SecretKeySelector{
+										LocalObjectReference: api.LocalObjectReference{
+											Name: name,
+										},
+										Key: "data-1",
+									},
+								},
+							},
+						},
+					},
+				},
+				RestartPolicy: api.RestartPolicyNever,
+			},
+		}
+
+		testContainerOutput("consume secrets", f.Client, pod, 0, []string{
+			"SECRET_DATA=value-1",
 		}, f.Namespace.Name)
 	})
 })

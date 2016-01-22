@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/examples/cassandra/README.md).
@@ -83,7 +84,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: gcr.io/google_containers/cassandra:v6
+          image: gcr.io/google_containers/cassandra:v7
           name: cassandra
           ports:
             - containerPort: 9042
@@ -101,7 +102,7 @@ spec:
 [Download example](cassandra-controller.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE cassandra-controller.yaml -->
 
-There are a few things to note in this description.  First is that we are running the ```kubernetes/cassandra``` image.  This is a standard Cassandra installation on top of Debian.  However it also adds a custom [```SeedProvider```](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java) to Cassandra.  In Cassandra, a ```SeedProvider``` bootstraps the gossip protocol that Cassandra uses to find other nodes.  The ```KubernetesSeedProvider``` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later)
+There are a few things to note in this description.  First is that we are running the [```gcr.io/google_containers/cassandra:v6```](image/Dockerfile) image from Google's [container registry](https://cloud.google.com/container-registry/docs/).  This is a standard Cassandra installation on top of Debian.  However it also adds a custom [```SeedProvider```](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java) to Cassandra.  In Cassandra, a ```SeedProvider``` bootstraps the gossip protocol that Cassandra uses to find other nodes.  The [```KubernetesSeedProvider```](#seed-provider-source) discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later)
 
 You may also note that we are setting some Cassandra parameters (```MAX_HEAP_SIZE``` and ```HEAP_NEWSIZE```) and adding information about the [namespace](../../docs/user-guide/namespaces.md).  We also tell Kubernetes that the container exposes both the ```CQL``` and ```Thrift``` API ports.  Finally, we tell the cluster manager that we need 0.1 cpu (0.1 core).
 
@@ -222,7 +223,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: gcr.io/google_containers/cassandra:v6
+          image: gcr.io/google_containers/cassandra:v7
           name: cassandra
           ports:
             - containerPort: 9042
@@ -339,7 +340,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: "gcr.io/google_containers/cassandra:v6"
+          image: "gcr.io/google_containers/cassandra:v7"
           name: cassandra
           ports:
             - containerPort: 9042

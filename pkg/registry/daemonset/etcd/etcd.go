@@ -64,7 +64,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return daemonset.MatchDaemonSet(label, field)
 		},
-		EndpointName: "daemonsets",
+		QualifiedResource: extensions.Resource("daemonsets"),
 
 		// Used to validate daemon set creation
 		CreateStrategy: daemonset.Strategy,

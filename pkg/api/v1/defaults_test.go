@@ -406,6 +406,80 @@ func TestSetDefaultNodeExternalID(t *testing.T) {
 	}
 }
 
+func TestSetDefaultNodeStatusAllocatable(t *testing.T) {
+	capacity := versioned.ResourceList{
+		versioned.ResourceCPU:    resource.MustParse("1000m"),
+		versioned.ResourceMemory: resource.MustParse("10G"),
+	}
+	allocatable := versioned.ResourceList{
+		versioned.ResourceCPU:    resource.MustParse("500m"),
+		versioned.ResourceMemory: resource.MustParse("5G"),
+	}
+	tests := []struct {
+		capacity            versioned.ResourceList
+		allocatable         versioned.ResourceList
+		expectedAllocatable versioned.ResourceList
+	}{{ // Everything set, no defaulting.
+		capacity:            capacity,
+		allocatable:         allocatable,
+		expectedAllocatable: allocatable,
+	}, { // Allocatable set, no defaulting.
+		capacity:            nil,
+		allocatable:         allocatable,
+		expectedAllocatable: allocatable,
+	}, { // Capacity set, allocatable defaults to capacity.
+		capacity:            capacity,
+		allocatable:         nil,
+		expectedAllocatable: capacity,
+	}, { // Nothing set, allocatable "defaults" to capacity.
+		capacity:            nil,
+		allocatable:         nil,
+		expectedAllocatable: nil,
+	}}
+
+	copyResourceList := func(rl versioned.ResourceList) versioned.ResourceList {
+		if rl == nil {
+			return nil
+		}
+		copy := make(versioned.ResourceList, len(rl))
+		for k, v := range rl {
+			copy[k] = *v.Copy()
+		}
+		return copy
+	}
+
+	resourceListsEqual := func(a versioned.ResourceList, b versioned.ResourceList) bool {
+		if len(a) != len(b) {
+			return false
+		}
+		for k, v := range a {
+			vb, found := b[k]
+			if !found {
+				return false
+			}
+			if v.Cmp(vb) != 0 {
+				return false
+			}
+		}
+		return true
+	}
+
+	for i, testcase := range tests {
+		node := versioned.Node{
+			Status: versioned.NodeStatus{
+				Capacity:    copyResourceList(testcase.capacity),
+				Allocatable: copyResourceList(testcase.allocatable),
+			},
+		}
+		node2 := roundTrip(t, runtime.Object(&node)).(*versioned.Node)
+		actual := node2.Status.Allocatable
+		expected := testcase.expectedAllocatable
+		if !resourceListsEqual(expected, actual) {
+			t.Errorf("[%d] Expected NodeStatus.Allocatable: %+v; Got: %+v", i, expected, actual)
+		}
+	}
+}
+
 func TestSetDefaultObjectFieldSelectorAPIVersion(t *testing.T) {
 	s := versioned.PodSpec{
 		Containers: []versioned.Container{

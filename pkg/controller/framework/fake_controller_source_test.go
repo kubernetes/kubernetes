@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -65,13 +64,13 @@ func TestRCNumber(t *testing.T) {
 	source.Modify(pod("foo"))
 	source.Modify(pod("foo"))
 
-	w, err := source.Watch(unversioned.ListOptions{ResourceVersion: "1"})
+	w, err := source.Watch(api.ListOptions{ResourceVersion: "1"})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	go consume(t, w, []string{"2", "3"}, wg)
 
-	list, err := source.List()
+	list, err := source.List(api.ListOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -79,13 +78,13 @@ func TestRCNumber(t *testing.T) {
 		t.Errorf("wanted %v, got %v", e, a)
 	}
 
-	w2, err := source.Watch(unversioned.ListOptions{ResourceVersion: "2"})
+	w2, err := source.Watch(api.ListOptions{ResourceVersion: "2"})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	go consume(t, w2, []string{"3"}, wg)
 
-	w3, err := source.Watch(unversioned.ListOptions{ResourceVersion: "3"})
+	w3, err := source.Watch(api.ListOptions{ResourceVersion: "3"})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

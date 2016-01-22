@@ -90,6 +90,8 @@ func init() {
 	flag.BoolVar(&testContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
 	flag.BoolVar(&testContext.GatherKubeSystemResourceUsageData, "gather-resource-usage", false, "If set to true framework will be monitoring resource usage of system add-ons in (some) e2e tests.")
 	flag.BoolVar(&testContext.GatherLogsSizes, "gather-logs-sizes", false, "If set to true framework will be monitoring logs sizes on all machines running e2e tests.")
+	flag.BoolVar(&testContext.GatherMetricsAfterTest, "gather-metrics-at-teardown", false, "If set to true framwork will gather metrics from all components after each test.")
+	flag.StringVar(&testContext.OutputPrintType, "output-print-type", "hr", "Comma separated list: 'hr' for human readable summaries 'json' for JSON ones.")
 }
 
 func TestE2E(t *testing.T) {
@@ -117,7 +119,13 @@ func TestE2E(t *testing.T) {
 			Logf("Using service account %q as token source.", cloudConfig.ServiceAccount)
 			tokenSource = google.ComputeTokenSource(cloudConfig.ServiceAccount)
 		}
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(testContext.CloudConfig.ProjectID, testContext.CloudConfig.Zone, "" /* networkUrl */, tokenSource, false /* useMetadataServer */)
+		zone := testContext.CloudConfig.Zone
+		region, err := gcecloud.GetGCERegion(zone)
+		if err != nil {
+			glog.Fatalf("error parsing GCE region from zone %q: %v", zone, err)
+		}
+		managedZones := []string{zone} // Only single-zone for now
+		cloudConfig.Provider, err = gcecloud.CreateGCECloud(testContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, tokenSource, false /* useMetadataServer */)
 		if err != nil {
 			glog.Fatal("Error building GCE provider: ", err)
 		}
@@ -145,7 +153,8 @@ func TestE2E(t *testing.T) {
 
 	// Disable skipped tests unless they are explicitly requested.
 	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
-		config.GinkgoConfig.SkipString = `\[Skipped\]`
+		// TODO(ihmccreery) Remove [Skipped] once all [Skipped] labels have been reclassified.
+		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Skipped\]|\[Feature:.+\]`
 	}
 	gomega.RegisterFailHandler(ginkgo.Fail)
 
@@ -180,5 +189,6 @@ func TestE2E(t *testing.T) {
 	if *reportDir != "" {
 		r = append(r, reporters.NewJUnitReporter(path.Join(*reportDir, fmt.Sprintf("junit_%02d.xml", config.GinkgoConfig.ParallelNode))))
 	}
+	glog.Infof("Starting e2e run; %q", runId)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }

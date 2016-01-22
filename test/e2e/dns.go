@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -42,7 +42,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string) *api.Pod {
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.GroupOrDie("").GroupVersion.Version,
+			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      "dns-test-" + string(util.NewUUID()),
@@ -130,14 +130,29 @@ func assertFilesExist(fileNames []string, fileDir string, pod *api.Pod, client *
 
 	expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 		failed = []string{}
+		subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, client)
+		if err != nil {
+			return false, err
+		}
 		for _, fileName := range fileNames {
-			if _, err := client.Get().
-				Namespace(pod.Namespace).
-				Resource("pods").
-				SubResource("proxy").
-				Name(pod.Name).
-				Suffix(fileDir, fileName).
-				Do().Raw(); err != nil {
+			if subResourceProxyAvailable {
+				_, err = client.Get().
+					Namespace(pod.Namespace).
+					Resource("pods").
+					SubResource("proxy").
+					Name(pod.Name).
+					Suffix(fileDir, fileName).
+					Do().Raw()
+			} else {
+				_, err = client.Get().
+					Prefix("proxy").
+					Resource("pods").
+					Namespace(pod.Namespace).
+					Name(pod.Name).
+					Suffix(fileDir, fileName).
+					Do().Raw()
+			}
+			if err != nil {
 				Logf("Unable to read %s from pod %s: %v", fileName, pod.Name, err)
 				failed = append(failed, fileName)
 			}
@@ -190,7 +205,7 @@ var _ = Describe("DNS", func() {
 
 		systemClient := f.Client.Pods(api.NamespaceSystem)
 		By("Waiting for DNS Service to be Running")
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{dnsServiceLableSelector}}
+		options := api.ListOptions{LabelSelector: dnsServiceLableSelector}
 		dnsPods, err := systemClient.List(options)
 		if err != nil {
 			Failf("Failed to list all dns service pods")
@@ -229,7 +244,7 @@ var _ = Describe("DNS", func() {
 		systemClient := f.Client.Pods(api.NamespaceSystem)
 
 		By("Waiting for DNS Service to be Running")
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{dnsServiceLableSelector}}
+		options := api.ListOptions{LabelSelector: dnsServiceLableSelector}
 		dnsPods, err := systemClient.List(options)
 		if err != nil {
 			Failf("Failed to list all dns service pods")

@@ -19,7 +19,10 @@ package node
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -111,6 +115,12 @@ type NodeController struct {
 	nodeStore      cache.StoreToNodeLister
 
 	forcefullyDeletePod func(*api.Pod)
+	availableCIDRs      sets.Int
+	// Calculate the maximum num of CIDRs we could give out based on nc.clusterCIDR
+	// The flag denoting if the node controller is newly started or restarted(after crash)
+	needSync      bool
+	maxCIDRs      int
+	generatedCIDR bool
 }
 
 // NewNodeController returns a new node controller to sync instances from cloudprovider.
@@ -158,14 +168,18 @@ func NewNodeController(
 		clusterCIDR:            clusterCIDR,
 		allocateNodeCIDRs:      allocateNodeCIDRs,
 		forcefullyDeletePod:    func(p *api.Pod) { forcefullyDeletePod(kubeClient, p) },
+		availableCIDRs:         make(sets.Int),
+		needSync:               true,
+		maxCIDRs:               0,
+		generatedCIDR:          false,
 	}
 
 	nc.podStore.Store, nc.podController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return nc.kubeClient.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return nc.kubeClient.Pods(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return nc.kubeClient.Pods(api.NamespaceAll).Watch(options)
 			},
 		},
@@ -178,10 +192,10 @@ func NewNodeController(
 	)
 	nc.nodeStore.Store, nc.nodeController = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return nc.kubeClient.Nodes().List(unversioned.ListOptions{})
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return nc.kubeClient.Nodes().List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return nc.kubeClient.Nodes().Watch(options)
 			},
 		},
@@ -192,10 +206,27 @@ func NewNodeController(
 	return nc
 }
 
+// generateAvailabeCIDRs does generating new Available CIDRs index and insert
+// them into availableCIDRs set. Everytime it will generate 256 new CIDRs,
+// once there are no more CIDRs in the network, return false
+func (nc *NodeController) generateAvailableCIDRs() {
+	nc.generatedCIDR = true
+	// Generate all available CIDRs here, since there will not be manay
+	// available CIDRs. Set will be small, it will use less than 1MB memory
+
+	cidrSize, _ := nc.clusterCIDR.Mask.Size()
+	nc.maxCIDRs = int(math.Pow(2, (float64)(24-cidrSize)))
+
+	for i := 0; i <= nc.maxCIDRs; i++ {
+		nc.availableCIDRs.Insert(i)
+	}
+}
+
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *NodeController) Run(period time.Duration) {
 	go nc.nodeController.Run(util.NeverStop)
 	go nc.podController.Run(util.NeverStop)
+
 	// Incorporate the results of node status pushed from kubelet to master.
 	go util.Until(func() {
 		if err := nc.monitorNodeStatus(); err != nil {
@@ -260,17 +291,32 @@ func (nc *NodeController) Run(period time.Duration) {
 	}, nodeEvictionPeriod, util.NeverStop)
 }
 
-// Generates num pod CIDRs that could be assigned to nodes.
-func generateCIDRs(clusterCIDR *net.IPNet, num int) sets.String {
-	res := sets.NewString()
+// translateCIDRs translates pod CIDR index to the CIDR that could be
+// assigned to node. It will also check for overflow which make sure CIDR is valid
+func translateCIDRs(clusterCIDR *net.IPNet, num int) string {
 	cidrIP := clusterCIDR.IP.To4()
-	for i := 0; i < num; i++ {
-		// TODO: Make the CIDRs configurable.
-		b1 := byte(i >> 8)
-		b2 := byte(i % 256)
-		res.Insert(fmt.Sprintf("%d.%d.%d.0/24", cidrIP[0], cidrIP[1]+b1, cidrIP[2]+b2))
+	// TODO: Make the CIDRs configurable.
+	b1 := (num / 256) + int(cidrIP[1])
+	b2 := (num % 256) + int(cidrIP[2])
+	if b2 > 255 {
+		b2 = b2 % 256
+		b1 = b1 + 1
 	}
+	res := fmt.Sprintf("%d.%d.%d.0/24", cidrIP[0], b1, b2)
 	return res
+}
+
+// translateCIDRtoIndex does translating CIDR to index of CIDR
+func (nc *NodeController) translateCIDRtoIndex(freeCIDR string) int {
+	CIDRsArray := strings.Split(freeCIDR, ".")
+	if len(CIDRsArray) < 3 {
+		return -1
+	}
+	cidrIP := nc.clusterCIDR.IP.To4()
+	CIDRsIndexOne, _ := strconv.Atoi(CIDRsArray[1])
+	CIDRsIndexTwo, _ := strconv.Atoi(CIDRsArray[2])
+	release := (CIDRsIndexOne-int(cidrIP[1]))*256 + CIDRsIndexTwo - int(cidrIP[2])
+	return release
 }
 
 // getCondition returns a condition object for the specific condition
@@ -350,11 +396,22 @@ func forcefullyDeletePod(c client.Interface, pod *api.Pod) {
 	}
 }
 
+// releaseCIDR does translating CIDR back to CIDR index and insert this index
+// back to availableCIDRs set
+func (nc *NodeController) releaseCIDR(freeCIDR string) {
+	release := nc.translateCIDRtoIndex(freeCIDR)
+	if release >= 0 && release <= nc.maxCIDRs {
+		nc.availableCIDRs.Insert(release)
+	} else {
+		glog.V(4).Info("CIDR %s is invalid", freeCIDR)
+	}
+}
+
 // monitorNodeStatus verifies node status are constantly updated by kubelet, and if not,
 // post "NodeReady==ConditionUnknown". It also evicts all pods if node is not ready or
 // not reachable for a long period of time.
 func (nc *NodeController) monitorNodeStatus() error {
-	nodes, err := nc.kubeClient.Nodes().List(unversioned.ListOptions{})
+	nodes, err := nc.kubeClient.Nodes().List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -435,6 +492,9 @@ func (nc *NodeController) monitorNodeStatus() error {
 			// Report node event.
 			if readyCondition.Status != api.ConditionTrue && lastReadyCondition.Status == api.ConditionTrue {
 				nc.recordNodeStatusChange(node, "NodeNotReady")
+				if err = nc.markAllPodsNotReady(node.Name); err != nil {
+					util.HandleError(fmt.Errorf("Unable to mark all pods NotReady on node %v: %v", node.Name, err))
+				}
 			}
 
 			// Check with the cloud provider to see if the node still exists. If it
@@ -460,10 +520,13 @@ func (nc *NodeController) monitorNodeStatus() error {
 						nc.evictPods(node.Name)
 						continue
 					}
-
-					if err := nc.kubeClient.Nodes().Delete(node.Name); err != nil {
+					assignedCIDR := node.Spec.PodCIDR
+					if err = nc.kubeClient.Nodes().Delete(node.Name); err != nil {
 						glog.Errorf("Unable to delete node %s: %v", node.Name, err)
 						continue
+					}
+					if assignedCIDR != "" {
+						nc.releaseCIDR(assignedCIDR)
 					}
 				}
 			}
@@ -474,25 +537,43 @@ func (nc *NodeController) monitorNodeStatus() error {
 
 // reconcileNodeCIDRs looks at each node and assigns it a valid CIDR
 // if it doesn't currently have one.
+// Examines the availableCIDRs set first, if no more CIDR in it, generate more.
 func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
 	glog.V(4).Infof("Reconciling cidrs for %d nodes", len(nodes.Items))
-	// TODO(roberthbailey): This seems inefficient. Why re-calculate CIDRs
-	// on each sync period?
-	availableCIDRs := generateCIDRs(nc.clusterCIDR, len(nodes.Items))
-	for _, node := range nodes.Items {
-		if node.Spec.PodCIDR != "" {
-			glog.V(4).Infof("CIDR %s is already being used by node %s", node.Spec.PodCIDR, node.Name)
-			availableCIDRs.Delete(node.Spec.PodCIDR)
+	// check if the this node controller is restarted because of crash
+	// this will only be ran once when the controller being restarted(because of crashed) or newly start
+	if nc.needSync {
+		// if it is crashed, restore the availableCIDRs by generating CIDRs, insert them into availableCIDRs set
+		// and delete assigned CIDRs from the the availableCIDRs set
+		for _, node := range nodes.Items {
+			if node.Spec.PodCIDR != "" {
+				if nc.availableCIDRs.Has(nc.translateCIDRtoIndex(node.Spec.PodCIDR)) {
+					nc.availableCIDRs.Delete(nc.translateCIDRtoIndex(node.Spec.PodCIDR))
+				} else {
+					glog.V(4).Info("Node %s CIDR error, its CIDR is invalid, will reassign CIDR", node.Name)
+					node.Spec.PodCIDR = ""
+					if _, err := nc.kubeClient.Nodes().Update(&node); err != nil {
+						nc.recordNodeStatusChange(&node, "CIDRAssignmentFailed")
+					}
+					break
+				}
+			}
 		}
+		nc.needSync = false
 	}
 	for _, node := range nodes.Items {
 		if node.Spec.PodCIDR == "" {
-			podCIDR, found := availableCIDRs.PopAny()
+			CIDRsNum, found := nc.availableCIDRs.PopAny()
+			if !found && !nc.generatedCIDR {
+				nc.generateAvailableCIDRs()
+				CIDRsNum, found = nc.availableCIDRs.PopAny()
+			}
 			if !found {
 				nc.recordNodeStatusChange(&node, "CIDRNotAvailable")
 				continue
 			}
-			glog.V(4).Infof("Assigning node %s CIDR %s", node.Name, podCIDR)
+			podCIDR := translateCIDRs(nc.clusterCIDR, CIDRsNum)
+			glog.V(4).Info("Assigning node %s CIDR %s", node.Name, podCIDR)
 			node.Spec.PodCIDR = podCIDR
 			if _, err := nc.kubeClient.Nodes().Update(&node); err != nil {
 				nc.recordNodeStatusChange(&node, "CIDRAssignmentFailed")
@@ -692,7 +773,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 // the server could not be contacted.
 func (nc *NodeController) hasPods(nodeName string) (bool, error) {
 	selector := fields.OneTermEqualSelector(client.PodHost, nodeName)
-	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+	options := api.ListOptions{FieldSelector: selector}
 	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(options)
 	if err != nil {
 		return false, err
@@ -727,7 +808,7 @@ func (nc *NodeController) cancelPodEviction(nodeName string) bool {
 func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 	remaining := false
 	selector := fields.OneTermEqualSelector(client.PodHost, nodeName)
-	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+	options := api.ListOptions{FieldSelector: selector}
 	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(options)
 	if err != nil {
 		return remaining, err
@@ -757,6 +838,42 @@ func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 	return remaining, nil
 }
 
+// update ready status of all pods running on given node from master
+// return true if success
+func (nc *NodeController) markAllPodsNotReady(nodeName string) error {
+	glog.V(2).Infof("Update ready status of pods on node [%v]", nodeName)
+	opts := api.ListOptions{FieldSelector: fields.OneTermEqualSelector(client.PodHost, nodeName)}
+	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(opts)
+	if err != nil {
+		return err
+	}
+
+	errMsg := []string{}
+	for _, pod := range pods.Items {
+		// Defensive check, also needed for tests.
+		if pod.Spec.NodeName != nodeName {
+			continue
+		}
+
+		for i, cond := range pod.Status.Conditions {
+			if cond.Type == api.PodReady {
+				pod.Status.Conditions[i].Status = api.ConditionFalse
+				glog.V(2).Infof("Updating ready status of pod %v to false", pod.Name)
+				pod, err := nc.kubeClient.Pods(pod.Namespace).UpdateStatus(&pod)
+				if err != nil {
+					glog.Warningf("Failed to updated status for pod %q: %v", format.Pod(pod), err)
+					errMsg = append(errMsg, fmt.Sprintf("%v", err))
+				}
+				break
+			}
+		}
+	}
+	if len(errMsg) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%v", strings.Join(errMsg, "; "))
+}
+
 // terminatePods will ensure all pods on the given node that are in terminating state are eventually
 // cleaned up. Returns true if the node has no pods in terminating state, a duration that indicates how
 // long before we should check again (the next deadline for a pod to complete), or an error.
@@ -767,7 +884,7 @@ func (nc *NodeController) terminatePods(nodeName string, since time.Time) (bool,
 	complete := true
 
 	selector := fields.OneTermEqualSelector(client.PodHost, nodeName)
-	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+	options := api.ListOptions{FieldSelector: selector}
 	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(options)
 	if err != nil {
 		return false, nextAttempt, err

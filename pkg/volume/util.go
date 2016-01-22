@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
@@ -108,12 +107,12 @@ func (c *realRecyclerClient) WatchPod(name, namespace, resourceVersion string, s
 	fieldSelector, _ := fields.ParseSelector("metadata.name=" + name)
 
 	podLW := &cache.ListWatch{
-		ListFunc: func() (runtime.Object, error) {
-			options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{fieldSelector}}
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
 			return c.client.Pods(namespace).List(options)
 		},
-		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-			options.FieldSelector.Selector = fieldSelector
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
 			return c.client.Pods(namespace).Watch(options)
 		},
 	}
@@ -139,4 +138,13 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *api.Per
 	} else {
 		return timeout
 	}
+}
+
+// RoundUpSize calculates how many allocation units are needed to accomodate
+// a volume of given size. E.g. when user wants 1500MiB volume, while AWS EBS
+// allocates volumes in gibibyte-sized chunks,
+// RoundUpSize(1500 * 1024*1024, 1024*1024*1024) returns '2'
+// (2 GiB is the smallest allocatable volume that can hold 1500MiB)
+func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
+	return (volumeSizeBytes + allocationUnitBytes - 1) / allocationUnitBytes
 }

@@ -23,139 +23,94 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // Codec is the identity codec for this package - it can only convert itself
 // to itself.
-var Codec = runtime.CodecFor(Scheme, "")
+var Codec = runtime.CodecFor(Scheme, unversioned.GroupVersion{})
 
 func init() {
 	Scheme.AddDefaultingFuncs(
-		func(obj *unversioned.ListOptions) {
-			if obj.LabelSelector.Selector == nil {
-				obj.LabelSelector = unversioned.LabelSelector{labels.Everything()}
+		func(obj *ListOptions) {
+			if obj.LabelSelector == nil {
+				obj.LabelSelector = labels.Everything()
 			}
-			if obj.FieldSelector.Selector == nil {
-				obj.FieldSelector = unversioned.FieldSelector{fields.Everything()}
+			if obj.FieldSelector == nil {
+				obj.FieldSelector = fields.Everything()
 			}
 		},
 	)
 	Scheme.AddConversionFuncs(
-		func(in *unversioned.Time, out *unversioned.Time, s conversion.Scope) error {
-			// Cannot deep copy these, because time.Time has unexported fields.
-			*out = *in
-			return nil
-		},
-		func(in *string, out *labels.Selector, s conversion.Scope) error {
-			selector, err := labels.Parse(*in)
-			if err != nil {
-				return err
-			}
-			*out = selector
-			return nil
-		},
-		func(in *string, out *fields.Selector, s conversion.Scope) error {
-			selector, err := fields.ParseSelector(*in)
-			if err != nil {
-				return err
-			}
-			*out = selector
-			return nil
-		},
-		func(in *labels.Selector, out *string, s conversion.Scope) error {
-			if *in == nil {
-				return nil
-			}
-			*out = (*in).String()
-			return nil
-		},
-		func(in *fields.Selector, out *string, s conversion.Scope) error {
-			if *in == nil {
-				return nil
-			}
-			*out = (*in).String()
-			return nil
-		},
-		func(in *string, out *unversioned.LabelSelector, s conversion.Scope) error {
-			selector, err := labels.Parse(*in)
-			if err != nil {
-				return err
-			}
-			*out = unversioned.LabelSelector{selector}
-			return nil
-		},
-		func(in *string, out *unversioned.FieldSelector, s conversion.Scope) error {
-			selector, err := fields.ParseSelector(*in)
-			if err != nil {
-				return err
-			}
-			*out = unversioned.FieldSelector{selector}
-			return nil
-		},
-		func(in *[]string, out *unversioned.LabelSelector, s conversion.Scope) error {
-			selectorString := ""
-			if len(*in) > 0 {
-				selectorString = (*in)[0]
-			}
-			selector, err := labels.Parse(selectorString)
-			if err != nil {
-				return err
-			}
-			*out = unversioned.LabelSelector{selector}
-			return nil
-		},
-		func(in *[]string, out *unversioned.FieldSelector, s conversion.Scope) error {
-			selectorString := ""
-			if len(*in) > 0 {
-				selectorString = (*in)[0]
-			}
-			selector, err := fields.ParseSelector(selectorString)
-			if err != nil {
-				return err
-			}
-			*out = unversioned.FieldSelector{selector}
-			return nil
-		},
-		func(in *unversioned.LabelSelector, out *string, s conversion.Scope) error {
-			if in.Selector == nil {
-				return nil
-			}
-			*out = in.Selector.String()
-			return nil
-		},
-		func(in *unversioned.FieldSelector, out *string, s conversion.Scope) error {
-			if in.Selector == nil {
-				return nil
-			}
-			*out = in.Selector.String()
-			return nil
-		},
-		func(in *unversioned.LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
-			if in.Selector == nil {
-				return nil
-			}
-			selector, err := labels.Parse(in.Selector.String())
-			if err != nil {
-				return err
-			}
-			out.Selector = selector
-			return nil
-		},
-		func(in *unversioned.FieldSelector, out *unversioned.FieldSelector, s conversion.Scope) error {
-			if in.Selector == nil {
-				return nil
-			}
-			selector, err := fields.ParseSelector(in.Selector.String())
-			if err != nil {
-				return err
-			}
-			out.Selector = selector
-			return nil
-		},
-		func(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
-			// Cannot deep copy these, because inf.Dec has unexported fields.
-			*out = *in.Copy()
-			return nil
-		},
+		Convert_unversioned_TypeMeta_To_unversioned_TypeMeta,
+		Convert_unversioned_ListMeta_To_unversioned_ListMeta,
+		Convert_intstr_IntOrString_To_intstr_IntOrString,
+		Convert_unversioned_Time_To_unversioned_Time,
+		Convert_string_To_labels_Selector,
+		Convert_string_To_fields_Selector,
+		Convert_labels_Selector_To_string,
+		Convert_fields_Selector_To_string,
+		Convert_resource_Quantity_To_resource_Quantity,
 	)
+}
+
+func Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(in, out *unversioned.TypeMeta, s conversion.Scope) error {
+	// These values are explicitly not copied
+	//out.APIVersion = in.APIVersion
+	//out.Kind = in.Kind
+	return nil
+}
+
+func Convert_unversioned_ListMeta_To_unversioned_ListMeta(in, out *unversioned.ListMeta, s conversion.Scope) error {
+	out.ResourceVersion = in.ResourceVersion
+	out.SelfLink = in.SelfLink
+	return nil
+}
+
+func Convert_intstr_IntOrString_To_intstr_IntOrString(in, out *intstr.IntOrString, s conversion.Scope) error {
+	out.Type = in.Type
+	out.IntVal = in.IntVal
+	out.StrVal = in.StrVal
+	return nil
+}
+
+func Convert_unversioned_Time_To_unversioned_Time(in *unversioned.Time, out *unversioned.Time, s conversion.Scope) error {
+	// Cannot deep copy these, because time.Time has unexported fields.
+	*out = *in
+	return nil
+}
+func Convert_string_To_labels_Selector(in *string, out *labels.Selector, s conversion.Scope) error {
+	selector, err := labels.Parse(*in)
+	if err != nil {
+		return err
+	}
+	*out = selector
+	return nil
+}
+func Convert_string_To_fields_Selector(in *string, out *fields.Selector, s conversion.Scope) error {
+	selector, err := fields.ParseSelector(*in)
+	if err != nil {
+		return err
+	}
+	*out = selector
+	return nil
+}
+func Convert_labels_Selector_To_string(in *labels.Selector, out *string, s conversion.Scope) error {
+	if *in == nil {
+		return nil
+	}
+	*out = (*in).String()
+	return nil
+}
+func Convert_fields_Selector_To_string(in *fields.Selector, out *string, s conversion.Scope) error {
+	if *in == nil {
+		return nil
+	}
+	*out = (*in).String()
+	return nil
+}
+func Convert_resource_Quantity_To_resource_Quantity(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
+	// Cannot deep copy these, because inf.Dec has unexported fields.
+	*out = *in.Copy()
+	return nil
 }

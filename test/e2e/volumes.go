@@ -225,12 +225,26 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 	expectNoError(waitForPodRunningInNamespace(client, clientPod.Name, config.namespace))
 
 	By("reading a web page from the client")
-	body, err := client.Get().
-		Namespace(config.namespace).
-		Resource("pods").
-		SubResource("proxy").
-		Name(clientPod.Name).
-		DoRaw()
+	subResourceProxyAvailable, err := serverVersionGTE(subResourceProxyVersion, client)
+	if err != nil {
+		Failf("Failed to get server version: %v", err)
+	}
+	var body []byte
+	if subResourceProxyAvailable {
+		body, err = client.Get().
+			Namespace(config.namespace).
+			Resource("pods").
+			SubResource("proxy").
+			Name(clientPod.Name).
+			DoRaw()
+	} else {
+		body, err = client.Get().
+			Prefix("proxy").
+			Namespace(config.namespace).
+			Resource("pods").
+			Name(clientPod.Name).
+			DoRaw()
+	}
 	expectNoError(err, "Cannot read web page: %v", err)
 	Logf("body: %v", string(body))
 
@@ -312,10 +326,9 @@ func deleteCinderVolume(name string) error {
 	return err
 }
 
-// Marked with [Skipped] to skip the test by default (see driver.go),
-// these tests needs privileged containers, which are disabled by default.
-// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
-var _ = Describe("Volumes [Skipped]", func() {
+// These tests need privileged containers, which are disabled by default.  Run
+// the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
+var _ = Describe("Volumes [Feature:Volumes]", func() {
 	framework := NewFramework("volume")
 
 	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,

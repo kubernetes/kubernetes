@@ -31,6 +31,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -278,7 +279,7 @@ func TestGenerateService(t *testing.T) {
 					}
 					defer req.Body.Close()
 					svc := &api.Service{}
-					if err := codec.DecodeInto(data, svc); err != nil {
+					if err := runtime.DecodeInto(codec, data, svc); err != nil {
 						t.Errorf("unexpected error: %v", err)
 						t.FailNow()
 					}

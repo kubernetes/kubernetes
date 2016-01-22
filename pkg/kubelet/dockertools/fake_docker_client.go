@@ -194,7 +194,7 @@ func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) 
 	if options.All {
 		// Althought the container is not sorted, but the container with the same name should be in order,
 		// that is enough for us now.
-		// TODO (random-liu) Is a fully sorted array needed?
+		// TODO(random-liu): Is a fully sorted array needed?
 		containerList = append(containerList, f.ExitedContainerList...)
 	}
 	return containerList, err
@@ -257,7 +257,7 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 	container := docker.Container{ID: name, Name: name, Config: c.Config}
 	containerCopy := container
 	f.ContainerMap[name] = &containerCopy
-	f.normalSleep(200, 50, 50)
+	f.normalSleep(100, 25, 25)
 	return &container, nil
 }
 
@@ -282,6 +282,7 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 	}
 	container.NetworkSettings = &docker.NetworkSettings{IPAddress: "2.3.4.5"}
 	f.ContainerMap[id] = container
+	f.updateContainerStatus(id, statusRunningPrefix)
 	f.normalSleep(200, 50, 50)
 	return nil
 }
@@ -322,6 +323,7 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 		container.State.Running = false
 	}
 	f.ContainerMap[id] = container
+	f.updateContainerStatus(id, statusExitedPrefix)
 	f.normalSleep(200, 50, 50)
 	return nil
 }
@@ -410,6 +412,14 @@ func (f *FakeDockerClient) RemoveImage(image string) error {
 		f.RemovedImages.Insert(image)
 	}
 	return err
+}
+
+func (f *FakeDockerClient) updateContainerStatus(id, status string) {
+	for i := range f.ContainerList {
+		if f.ContainerList[i].ID == id {
+			f.ContainerList[i].Status = status
+		}
+	}
 }
 
 // FakeDockerPuller is a stub implementation of DockerPuller.

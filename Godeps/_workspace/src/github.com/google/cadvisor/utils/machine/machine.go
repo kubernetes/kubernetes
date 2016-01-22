@@ -21,26 +21,40 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
+	// s390/s390x changes
+	"runtime"
+	"syscall"
+
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils"
 	"github.com/google/cadvisor/utils/sysfs"
 	"github.com/google/cadvisor/utils/sysinfo"
+
+	"github.com/golang/glog"
 )
 
 // The utils/machine package contains functions that extract machine-level specs.
 
-var cpuRegExp = regexp.MustCompile("processor\\t*: +([0-9]+)")
-var coreRegExp = regexp.MustCompile("core id\\t*: +([0-9]+)")
-var nodeRegExp = regexp.MustCompile("physical id\\t*: +([0-9]+)")
-var CpuClockSpeedMHz = regexp.MustCompile("cpu MHz\\t*: +([0-9]+.[0-9]+)")
-var memoryCapacityRegexp = regexp.MustCompile("MemTotal: *([0-9]+) kB")
-var swapCapacityRegexp = regexp.MustCompile("SwapTotal: *([0-9]+) kB")
+var (
+	cpuRegExp  = regexp.MustCompile(`^processor\s*:\s*([0-9]+)$`)
+	coreRegExp = regexp.MustCompile(`^core id\s*:\s*([0-9]+)$`)
+	nodeRegExp = regexp.MustCompile(`^physical id\s*:\s*([0-9]+)$`)
+	// Power systems have a different format so cater for both
+	cpuClockSpeedMHz     = regexp.MustCompile(`(?:cpu MHz|clock)\s*:\s*([0-9]+\.[0-9]+)(?:MHz)?`)
+	memoryCapacityRegexp = regexp.MustCompile(`MemTotal:\s*([0-9]+) kB`)
+	swapCapacityRegexp   = regexp.MustCompile(`SwapTotal:\s*([0-9]+) kB`)
+)
+
+const maxFreqFile = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
 
 // GetClockSpeed returns the CPU clock speed, given a []byte formatted as the /proc/cpuinfo file.
 func GetClockSpeed(procInfo []byte) (uint64, error) {
+	// s390/s390x and aarch64 changes
+	if true == isSystemZ() || true == isAArch64() {
+		return 0, nil
+	}
+
 	// First look through sys to find a max supported cpu frequency.
-	const maxFreqFile = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
 	if utils.FileExists(maxFreqFile) {
 		val, err := ioutil.ReadFile(maxFreqFile)
 		if err != nil {
@@ -54,15 +68,11 @@ func GetClockSpeed(procInfo []byte) (uint64, error) {
 		return maxFreq, nil
 	}
 	// Fall back to /proc/cpuinfo
-	matches := CpuClockSpeedMHz.FindSubmatch(procInfo)
+	matches := cpuClockSpeedMHz.FindSubmatch(procInfo)
 	if len(matches) != 2 {
-		//Check if we are running on Power systems which have a different format
-		CpuClockSpeedMHz, _ = regexp.Compile("clock\\t*: +([0-9]+.[0-9]+)MHz")
-		matches = CpuClockSpeedMHz.FindSubmatch(procInfo)
-		if len(matches) != 2 {
-			return 0, fmt.Errorf("could not detect clock speed from output: %q", string(procInfo))
-		}
+		return 0, fmt.Errorf("could not detect clock speed from output: %q", string(procInfo))
 	}
+
 	speed, err := strconv.ParseFloat(string(matches[1]), 64)
 	if err != nil {
 		return 0, err
@@ -119,11 +129,20 @@ func parseCapacity(b []byte, r *regexp.Regexp) (int64, error) {
 
 func GetTopology(sysFs sysfs.SysFs, cpuinfo string) ([]info.Node, int, error) {
 	nodes := []info.Node{}
+
+	// s390/s390x changes
+	if true == isSystemZ() {
+		return nodes, getNumCores(), nil
+	}
+
 	numCores := 0
 	lastThread := -1
 	lastCore := -1
 	lastNode := -1
 	for _, line := range strings.Split(cpuinfo, "\n") {
+		if line == "" {
+			continue
+		}
 		ok, val, err := extractValue(line, cpuRegExp)
 		if err != nil {
 			return nil, -1, fmt.Errorf("could not parse cpu info from %q: %v", line, err)
@@ -142,6 +161,7 @@ func GetTopology(sysFs sysfs.SysFs, cpuinfo string) ([]info.Node, int, error) {
 				lastNode = -1
 			}
 			lastThread = thread
+			continue
 		}
 		ok, val, err = extractValue(line, coreRegExp)
 		if err != nil {
@@ -149,6 +169,7 @@ func GetTopology(sysFs sysfs.SysFs, cpuinfo string) ([]info.Node, int, error) {
 		}
 		if ok {
 			lastCore = val
+			continue
 		}
 		ok, val, err = extractValue(line, nodeRegExp)
 		if err != nil {
@@ -156,6 +177,7 @@ func GetTopology(sysFs sysfs.SysFs, cpuinfo string) ([]info.Node, int, error) {
 		}
 		if ok {
 			lastNode = val
+			continue
 		}
 	}
 	nodeIdx, err := addNode(&nodes, lastNode)
@@ -198,7 +220,7 @@ func extractValue(s string, r *regexp.Regexp) (bool, int, error) {
 	if len(matches) == 2 {
 		val, err := strconv.ParseInt(string(matches[1]), 10, 32)
 		if err != nil {
-			return true, -1, err
+			return false, -1, err
 		}
 		return true, int(val), nil
 	}
@@ -240,4 +262,54 @@ func addNode(nodes *[]info.Node, id int) (int, error) {
 		idx = len(*nodes) - 1
 	}
 	return idx, nil
+}
+
+// s390/s390x changes
+func getMachineArch() (string, error) {
+	uname := syscall.Utsname{}
+	err := syscall.Uname(&uname)
+	if err != nil {
+		return "", err
+	}
+
+	var arch string
+	for _, val := range uname.Machine {
+		arch += string(int(val))
+	}
+
+	return arch, nil
+}
+
+// aarch64 changes
+func isAArch64() bool {
+	arch, err := getMachineArch()
+	if err == nil {
+		if true == strings.Contains(arch, "aarch64") {
+			return true
+		}
+	}
+	return false
+}
+
+// s390/s390x changes
+func isSystemZ() bool {
+	arch, err := getMachineArch()
+	if err == nil {
+		if true == strings.Contains(arch, "390") {
+			return true
+		}
+	}
+	return false
+}
+
+// s390/s390x changes
+func getNumCores() int {
+	maxProcs := runtime.GOMAXPROCS(0)
+	numCPU := runtime.NumCPU()
+
+	if maxProcs < numCPU {
+		return maxProcs
+	}
+
+	return numCPU
 }

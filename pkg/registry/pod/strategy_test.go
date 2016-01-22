@@ -22,6 +22,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -166,4 +169,13 @@ func TestCheckLogLocation(t *testing.T) {
 			t.Errorf("expected %v, got %v", tc.expectedErr, err)
 		}
 	}
+}
+
+func TestSelectableFieldLabelConversions(t *testing.T) {
+	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
+		testapi.Default.GroupVersion().String(),
+		"Pod",
+		labels.Set(PodToSelectableFields(&api.Pod{})),
+		nil,
+	)
 }

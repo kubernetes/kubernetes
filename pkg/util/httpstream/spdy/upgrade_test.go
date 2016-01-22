@@ -66,7 +66,8 @@ func TestUpgradeResponse(t *testing.T) {
 			}
 			defer conn.Close()
 		}))
-		defer server.Close()
+		// TODO: Uncomment when fix #19254
+		// defer server.Close()
 
 		req, err := http.NewRequest("GET", server.URL, nil)
 		if err != nil {

@@ -80,6 +80,7 @@ func TestHTTPProbeChecker(t *testing.T) {
 		},
 	}
 	for _, test := range testCases {
+		// TODO: Close() this when fix #19254
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			test.handler(w)
 		}))

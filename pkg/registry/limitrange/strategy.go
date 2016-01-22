@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 type limitrangeStrategy struct {
@@ -52,7 +52,7 @@ func (limitrangeStrategy) PrepareForCreate(obj runtime.Object) {
 func (limitrangeStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
-func (limitrangeStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
+func (limitrangeStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
 	limitRange := obj.(*api.LimitRange)
 	return validation.ValidateLimitRange(limitRange)
 }
@@ -65,7 +65,7 @@ func (limitrangeStrategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
-func (limitrangeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
+func (limitrangeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	limitRange := obj.(*api.LimitRange)
 	return validation.ValidateLimitRange(limitRange)
 }
@@ -76,6 +76,13 @@ func (limitrangeStrategy) AllowUnconditionalUpdate() bool {
 
 func LimitRangeToSelectableFields(limitRange *api.LimitRange) fields.Set {
 	return fields.Set{}
+}
+
+func (limitrangeStrategy) Export(runtime.Object, bool) error {
+	// Copied from OpenShift exporter
+	// TODO: this needs to be fixed
+	//  limitrange.Strategy.PrepareForCreate(obj)
+	return nil
 }
 
 func MatchLimitRange(label labels.Selector, field fields.Selector) generic.Matcher {

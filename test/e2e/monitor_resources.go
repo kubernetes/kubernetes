@@ -19,7 +19,7 @@ package e2e
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 
 	. "github.com/onsi/ginkgo"
@@ -32,20 +32,17 @@ var systemContainers = []string{"/docker-daemon", "/kubelet", "/system"}
 
 var allowedUsage = resourceUsagePerContainer{
 	"/docker-daemon": &containerResourceUsage{
-		CPUUsageInCores:         0.08,
-		MemoryUsageInBytes:      4500000000,
+		CPUUsageInCores:         0.1,
 		MemoryWorkingSetInBytes: 1500000000,
 	},
 	// TODO: Make Kubelet constraints sane again when #17774 is fixed.
 	"/kubelet": &containerResourceUsage{
 		CPUUsageInCores:         0.1,
-		MemoryUsageInBytes:      1000000000,
-		MemoryWorkingSetInBytes: 250000000,
+		MemoryWorkingSetInBytes: 300000000,
 	},
 	"/system": &containerResourceUsage{
-		CPUUsageInCores:         0.03,
-		MemoryUsageInBytes:      100000000,
-		MemoryWorkingSetInBytes: 100000000,
+		CPUUsageInCores:         0.30,
+		MemoryWorkingSetInBytes: 1500000000,
 	},
 }
 
@@ -58,7 +55,6 @@ func computeAverage(sliceOfUsages []resourceUsagePerContainer) (result resourceU
 		for _, container := range systemContainers {
 			singleResult := &containerResourceUsage{
 				CPUUsageInCores:         result[container].CPUUsageInCores + usage[container].CPUUsageInCores,
-				MemoryUsageInBytes:      result[container].MemoryUsageInBytes + usage[container].MemoryUsageInBytes,
 				MemoryWorkingSetInBytes: result[container].MemoryWorkingSetInBytes + usage[container].MemoryWorkingSetInBytes,
 			}
 			result[container] = singleResult
@@ -67,7 +63,6 @@ func computeAverage(sliceOfUsages []resourceUsagePerContainer) (result resourceU
 	for _, container := range systemContainers {
 		singleResult := &containerResourceUsage{
 			CPUUsageInCores:         result[container].CPUUsageInCores / float64(len(sliceOfUsages)),
-			MemoryUsageInBytes:      result[container].MemoryUsageInBytes / int64(len(sliceOfUsages)),
 			MemoryWorkingSetInBytes: result[container].MemoryWorkingSetInBytes / int64(len(sliceOfUsages)),
 		}
 		result[container] = singleResult
@@ -77,7 +72,8 @@ func computeAverage(sliceOfUsages []resourceUsagePerContainer) (result resourceU
 
 // This tests does nothing except checking current resource usage of containers defined in kubelet_stats systemContainers variable.
 // Test fails if an average container resource consumption over datapointAmount tries exceeds amount defined in allowedUsage.
-var _ = Describe("Resource usage of system containers", func() {
+// Flaky issue #13931
+var _ = Describe("Resource usage of system containers [Serial] [Flaky]", func() {
 	var c *client.Client
 	BeforeEach(func() {
 		var err error
@@ -87,7 +83,8 @@ var _ = Describe("Resource usage of system containers", func() {
 
 	It("should not exceed expected amount.", func() {
 		By("Getting ResourceConsumption on all nodes")
-		nodeList, err := c.Nodes().List(unversioned.ListOptions{})
+		// It should be OK to list unschedulable Nodes here.
+		nodeList, err := c.Nodes().List(api.ListOptions{})
 		expectNoError(err)
 
 		resourceUsagePerNode := make(map[string][]resourceUsagePerContainer)
@@ -112,6 +109,8 @@ var _ = Describe("Resource usage of system containers", func() {
 			averageResourceUsagePerNode[node.Name] = computeAverage(resourceUsagePerNode[node.Name])
 		}
 
+		Logf("Observed resource usage:\n%v", averageResourceUsagePerNode)
+
 		violating := make(map[string]resourceUsagePerContainer)
 		for node, usage := range averageResourceUsagePerNode {
 			for container, cUsage := range usage {
@@ -122,9 +121,6 @@ var _ = Describe("Resource usage of system containers", func() {
 					}
 					if allowedUsage[container].CPUUsageInCores < cUsage.CPUUsageInCores {
 						Logf("CPU is too high for %s (%v)", container, cUsage.CPUUsageInCores)
-					}
-					if allowedUsage[container].MemoryUsageInBytes < cUsage.MemoryUsageInBytes {
-						Logf("Memory use is too high for %s (%v)", container, cUsage.MemoryUsageInBytes)
 					}
 					if allowedUsage[container].MemoryWorkingSetInBytes < cUsage.MemoryWorkingSetInBytes {
 						Logf("Working set is too high for %s (%v)", container, cUsage.MemoryWorkingSetInBytes)

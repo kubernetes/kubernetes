@@ -24,19 +24,22 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // This file contains helper functions to convert docker API types to runtime
 // (kubecontainer) types.
+const (
+	statusRunningPrefix = "Up"
+	statusExitedPrefix  = "Exited"
+)
 
 func mapState(state string) kubecontainer.ContainerState {
 	// Parse the state string in docker.APIContainers. This could break when
 	// we upgrade docker.
 	switch {
-	case strings.HasPrefix(state, "Up"):
+	case strings.HasPrefix(state, statusRunningPrefix):
 		return kubecontainer.ContainerStateRunning
-	case strings.HasPrefix(state, "Exited"):
+	case strings.HasPrefix(state, statusExitedPrefix):
 		return kubecontainer.ContainerStateExited
 	default:
 		return kubecontainer.ContainerStateUnknown
@@ -55,7 +58,7 @@ func toRuntimeContainer(c *docker.APIContainers) (*kubecontainer.Container, erro
 	}
 
 	return &kubecontainer.Container{
-		ID:      kubetypes.DockerID(c.ID).ContainerID(),
+		ID:      kubecontainer.DockerID(c.ID).ContainerID(),
 		Name:    dockerName.ContainerName,
 		Image:   c.Image,
 		Hash:    hash,
@@ -75,9 +78,9 @@ func toRuntimeImage(image *docker.APIImages) (*kubecontainer.Image, error) {
 	}
 
 	return &kubecontainer.Image{
-		ID:   image.ID,
-		Tags: image.RepoTags,
-		Size: image.VirtualSize,
+		ID:       image.ID,
+		RepoTags: image.RepoTags,
+		Size:     image.VirtualSize,
 	}, nil
 }
 

@@ -39,7 +39,7 @@ const (
 	// this should not be a multiple of 5, because node status updates
 	// every 5 seconds. See https://github.com/kubernetes/kubernetes/pull/14915.
 	dsRetryPeriod  = 2 * time.Second
-	dsRetryTimeout = 1 * time.Minute
+	dsRetryTimeout = 3 * time.Minute
 
 	daemonsetLabelPrefix = "daemonset-"
 	daemonsetNameLabel   = daemonsetLabelPrefix + "name"
@@ -114,7 +114,7 @@ var _ = Describe("Daemon set", func() {
 		podClient := c.Pods(ns)
 
 		selector := labels.Set(label).AsSelector()
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		options := api.ListOptions{LabelSelector: selector}
 		podList, err := podClient.List(options)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(podList.Items)).To(BeNumerically(">", 0))
@@ -160,8 +160,7 @@ var _ = Describe("Daemon set", func() {
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on no nodes")
 
 		By("Change label of node, check that daemon pod is launched.")
-		nodeClient := c.Nodes()
-		nodeList, err := nodeClient.List(unversioned.ListOptions{})
+		nodeList := ListSchedulableNodesOrDie(f.Client)
 		Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
 		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
 		Expect(err).NotTo(HaveOccurred(), "error setting labels on node")
@@ -196,11 +195,7 @@ func separateDaemonSetNodeLabels(labels map[string]string) (map[string]string, m
 }
 
 func clearDaemonSetNodeLabels(c *client.Client) error {
-	nodeClient := c.Nodes()
-	nodeList, err := nodeClient.List(unversioned.ListOptions{})
-	if err != nil {
-		return err
-	}
+	nodeList := ListSchedulableNodesOrDie(c)
 	for _, node := range nodeList.Items {
 		_, err := setDaemonSetNodeLabels(c, node.Name, map[string]string{})
 		if err != nil {
@@ -253,7 +248,7 @@ func setDaemonSetNodeLabels(c *client.Client, nodeName string, labels map[string
 func checkDaemonPodOnNodes(f *Framework, selector map[string]string, nodeNames []string) func() (bool, error) {
 	return func() (bool, error) {
 		selector := labels.Set(selector).AsSelector()
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		options := api.ListOptions{LabelSelector: selector}
 		podList, err := f.Client.Pods(f.Namespace.Name).List(options)
 		if err != nil {
 			return false, nil
@@ -282,10 +277,7 @@ func checkDaemonPodOnNodes(f *Framework, selector map[string]string, nodeNames [
 
 func checkRunningOnAllNodes(f *Framework, selector map[string]string) func() (bool, error) {
 	return func() (bool, error) {
-		nodeList, err := f.Client.Nodes().List(unversioned.ListOptions{})
-		if err != nil {
-			return false, nil
-		}
+		nodeList := ListSchedulableNodesOrDie(f.Client)
 		nodeNames := make([]string, 0)
 		for _, node := range nodeList.Items {
 			nodeNames = append(nodeNames, node.Name)

@@ -17,15 +17,16 @@ limitations under the License.
 package apiserver
 
 import (
-	"crypto/tls"
-	"fmt"
-	"io/ioutil"
-	"net"
 	"net/http"
-	"strconv"
 
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/util"
+	httpprober "k8s.io/kubernetes/pkg/probe/http"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
+	"time"
+)
+
+const (
+	probeTimeOut = time.Minute
 )
 
 // TODO: this basic interface is duplicated in N places.  consolidate?
@@ -51,41 +52,25 @@ type ServerStatus struct {
 	Err        string       `json:"err,omitempty"`
 }
 
-// TODO: can this use pkg/probe/http
-func (server *Server) DoServerCheck(rt http.RoundTripper) (probe.Result, string, error) {
-	var client *http.Client
-	scheme := "http://"
+func (server *Server) DoServerCheck(prober httpprober.HTTPProber) (probe.Result, string, error) {
+	scheme := "http"
 	if server.EnableHTTPS {
-		// TODO(roberthbailey): The servers that use HTTPS are currently the
-		// kubelets, and we should be using a standard kubelet client library
-		// to talk to them rather than a separate http client.
-		transport := util.SetTransportDefaults(&http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		})
-
-		client = &http.Client{Transport: transport}
-		scheme = "https://"
-	} else {
-		client = &http.Client{Transport: rt}
+		scheme = "https"
 	}
+	url := utilnet.FormatURL(scheme, server.Addr, server.Port, server.Path)
 
-	resp, err := client.Get(scheme + net.JoinHostPort(server.Addr, strconv.Itoa(server.Port)) + server.Path)
+	result, data, err := prober.Probe(url, probeTimeOut)
+
 	if err != nil {
 		return probe.Unknown, "", err
 	}
-	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return probe.Unknown, string(data), err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return probe.Failure, string(data),
-			fmt.Errorf("unhealthy http status code: %d (%s)", resp.StatusCode, resp.Status)
+	if result == probe.Failure {
+		return probe.Failure, string(data), err
 	}
 	if server.Validate != nil {
-		if err := server.Validate(data); err != nil {
+		if err := server.Validate([]byte(data)); err != nil {
 			return probe.Failure, string(data), err
 		}
 	}
-	return probe.Success, string(data), nil
+	return result, string(data), nil
 }

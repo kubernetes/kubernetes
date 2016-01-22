@@ -151,7 +151,7 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 		}
 
 		// Compute a three way strategic merge patch to send to server.
-		patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, info.VersionedObject, false)
+		patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, info.VersionedObject, true)
 		if err != nil {
 			format := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfrom:\n%v\nfor:"
 			return cmdutil.AddSourceToErr(fmt.Sprintf(format, original, modified, current, info), info.Source, err)

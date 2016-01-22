@@ -20,7 +20,7 @@
 # The intent is to allow experimentation/advanced functionality before we
 # are ready to commit to supporting it.
 # Experimental functionality:
-#   KUBE_SHARE_MASTER=true
+#   KUBE_USE_EXISTING_MASTER=true
 #     Detect and reuse an existing master; useful if you want to
 #     create more nodes, perhaps with a different instance type or in
 #     a different subnet/AZ
@@ -117,7 +117,7 @@ function get_igw_id {
 function get_elbs_in_vpc {
   # ELB doesn't seem to be on the same platform as the rest of AWS; doesn't support filtering
   aws elb --output json describe-load-balancers  | \
-    python -c "import json,sys; lst = [str(lb['LoadBalancerName']) for lb in json.load(sys.stdin)['LoadBalancerDescriptions'] if lb['VPCId'] == '$1']; print '\n'.join(lst)"
+    python -c "import json,sys; lst = [str(lb['LoadBalancerName']) for lb in json.load(sys.stdin)['LoadBalancerDescriptions'] if lb['VPCId'] == '$1']; print('\n'.join(lst))"
 }
 
 function get_instanceid_from_name {
@@ -433,6 +433,44 @@ function ensure-master-pd {
     add-tag ${MASTER_DISK_ID} Name ${name}
     add-tag ${MASTER_DISK_ID} KubernetesCluster ${CLUSTER_ID}
   fi
+}
+
+# Configures a CloudWatch alarm to reboot the instance on failure
+function reboot-on-failure {
+  local instance_id=$1
+
+  echo "Creating Cloudwatch alarm to reboot instance ${instance_id} on failure"
+
+  local aws_owner_id=`aws ec2 describe-instances --instance-ids ${instance_id} --query Reservations[0].OwnerId`
+  if [[ -z "${aws_owner_id}" ]]; then
+    echo "Unable to determinate AWS account id for ${instance_id}"
+    exit 1
+  fi
+
+  aws cloudwatch put-metric-alarm \
+                 --alarm-name k8s-${instance_id}-statuscheckfailure-reboot \
+                 --alarm-description "Reboot ${instance_id} on status check failure" \
+                 --namespace "AWS/EC2" \
+                 --dimensions Name=InstanceId,Value=${instance_id} \
+                 --statistic Minimum \
+                 --metric-name StatusCheckFailed \
+                 --comparison-operator GreaterThanThreshold \
+                 --threshold 0 \
+                 --period 60 \
+                 --evaluation-periods 3 \
+                 --alarm-actions arn:aws:swf:${AWS_REGION}:${aws_owner_id}:action/actions/AWS_EC2.InstanceId.Reboot/1.0 > $LOG
+
+  # TODO: The IAM role EC2ActionsAccess must have been created
+  # See e.g. http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/UsingIAM.html
+}
+
+function delete-instance-alarms {
+  local instance_id=$1
+
+  alarm_names=`aws cloudwatch describe-alarms --alarm-name-prefix k8s-${instance_id}- --query MetricAlarms[].AlarmName`
+  for alarm_name in ${alarm_names}; do
+    aws cloudwatch delete-alarms --alarm-names ${alarm_name} > $LOG
+  done
 }
 
 # Creates a new DHCP option set configured correctly for Kubernetes
@@ -808,8 +846,8 @@ function kube-up {
   # HTTPS to the master is allowed (for API access)
   authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
 
-  # KUBE_SHARE_MASTER is used to add minions to an existing master
-  if [[ "${KUBE_SHARE_MASTER:-}" == "true" ]]; then
+  # KUBE_USE_EXISTING_MASTER is used to add minions to an existing master
+  if [[ "${KUBE_USE_EXISTING_MASTER:-}" == "true" ]]; then
     # Detect existing master
     detect-master
 
@@ -860,6 +898,7 @@ function start-master() {
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
     echo "readonly ZONE='${ZONE}'"
+    echo "readonly NUM_NODES='${NUM_NODES}'"
     echo "readonly KUBE_USER='${KUBE_USER}'"
     echo "readonly KUBE_PASSWORD='${KUBE_PASSWORD}'"
     echo "readonly SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
@@ -891,7 +930,13 @@ function start-master() {
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-master.sh"
-  ) > "${KUBE_TEMP}/master-start.sh"
+  ) > "${KUBE_TEMP}/master-user-data"
+
+  # We're running right up against the 16KB limit
+  # Remove all comment lines and then put back the bin/bash shebang
+  cat "${KUBE_TEMP}/master-user-data" | sed -e 's/^[[:blank:]]*#.*$//' | sed -e '/^[[:blank:]]*$/d' > "${KUBE_TEMP}/master-user-data.tmp"
+  echo '#! /bin/bash' | cat - "${KUBE_TEMP}/master-user-data.tmp" > "${KUBE_TEMP}/master-user-data"
+  rm "${KUBE_TEMP}/master-user-data.tmp"
 
   echo "Starting Master"
   master_id=$($AWS_CMD run-instances \
@@ -904,7 +949,7 @@ function start-master() {
     --security-group-ids ${MASTER_SG_ID} \
     --associate-public-ip-address \
     --block-device-mappings "${MASTER_BLOCK_DEVICE_MAPPINGS}" \
-    --user-data file://${KUBE_TEMP}/master-start.sh \
+    --user-data file://${KUBE_TEMP}/master-user-data \
     --query Instances[].InstanceId)
   add-tag $master_id Name $MASTER_NAME
   add-tag $master_id Role $MASTER_TAG
@@ -929,8 +974,13 @@ function start-master() {
       wait-for-instance-state ${master_id} "running"
 
       KUBE_MASTER=${MASTER_NAME}
-      KUBE_MASTER_IP=$(assign-elastic-ip $ip $master_id)
-      echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
+      echo -e " ${color_green}[master running @${ip}]${color_norm}"
+
+      local attach_message
+      attach_message=$(assign-elastic-ip $ip $master_id)
+      # Get master ip again after attachment.
+      KUBE_MASTER_IP=$(get_instance_public_ip $master_id)
+      echo ${attach_message}
 
       # This is a race between instance start and volume attachment.  There appears to be no way to start an AWS instance with a volume attached.
       # To work around this, we wait for volume to be ready in setup-master-pd.sh
@@ -998,6 +1048,8 @@ function start-master() {
     attempt=$(($attempt+1))
     sleep 10
   done
+
+  reboot-on-failure ${master_id}
 }
 
 # Creates an ASG for the minion nodes
@@ -1187,6 +1239,13 @@ function kube-down {
           sleep 3
         fi
       done
+    fi
+
+    if [[ -z "${KUBE_MASTER_ID-}" ]]; then
+      KUBE_MASTER_ID=$(get_instanceid_from_name ${MASTER_NAME})
+    fi
+    if [[ -n "${KUBE_MASTER_ID-}" ]]; then
+      delete-instance-alarms ${KUBE_MASTER_ID}
     fi
 
     echo "Deleting instances in VPC: ${vpc_id}"

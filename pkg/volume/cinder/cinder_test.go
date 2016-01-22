@@ -17,12 +17,14 @@ limitations under the License.
 package cinder
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -69,6 +71,17 @@ func (fake *fakePDManager) DetachDisk(c *cinderVolumeCleaner) error {
 	err := os.RemoveAll(globalPath)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (fake *fakePDManager) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, err error) {
+	return "test-volume-name", 1, nil
+}
+
+func (fake *fakePDManager) DeleteVolume(cd *cinderVolumeDeleter) error {
+	if cd.pdName != "test-volume-name" {
+		return fmt.Errorf("Deleter got unexpected volume name: %s", cd.pdName)
 	}
 	return nil
 }
@@ -141,5 +154,46 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
+	}
+
+	// Test Provisioner
+	cap := resource.MustParse("100Mi")
+	options := volume.VolumeOptions{
+		Capacity: cap,
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+		},
+		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
+	}
+	provisioner, err := plug.(*cinderPlugin).newProvisionerInternal(options, &fakePDManager{})
+	persistentSpec, err := provisioner.NewPersistentVolumeTemplate()
+	if err != nil {
+		t.Errorf("NewPersistentVolumeTemplate() failed: %v", err)
+	}
+
+	// get 2nd Provisioner - persistent volume controller will do the same
+	provisioner, err = plug.(*cinderPlugin).newProvisionerInternal(options, &fakePDManager{})
+	err = provisioner.Provision(persistentSpec)
+	if err != nil {
+		t.Errorf("Provision() failed: %v", err)
+	}
+
+	if persistentSpec.Spec.PersistentVolumeSource.Cinder.VolumeID != "test-volume-name" {
+		t.Errorf("Provision() returned unexpected volume ID: %s", persistentSpec.Spec.PersistentVolumeSource.Cinder.VolumeID)
+	}
+	cap = persistentSpec.Spec.Capacity[api.ResourceStorage]
+	size := cap.Value()
+	if size != 1024*1024*1024 {
+		t.Errorf("Provision() returned unexpected volume size: %v", size)
+	}
+
+	// Test Deleter
+	volSpec := &volume.Spec{
+		PersistentVolume: persistentSpec,
+	}
+	deleter, err := plug.(*cinderPlugin).newDeleterInternal(volSpec, &fakePDManager{})
+	err = deleter.Delete()
+	if err != nil {
+		t.Errorf("Deleter() failed: %v", err)
 	}
 }

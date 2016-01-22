@@ -21,9 +21,9 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/securitycontext"
 
 	"github.com/ghodss/yaml"
@@ -71,7 +71,7 @@ func TestDecodeSinglePod(t *testing.T) {
 		t.Errorf("expected:\n%#v\ngot:\n%#v\n%s", pod, podOut, string(json))
 	}
 
-	for _, gv := range registered.GroupVersionsForGroup("") {
+	for _, gv := range registered.EnabledVersionsForGroup(api.GroupName) {
 		externalPod, err := testapi.Default.Converter().ConvertToVersion(pod, gv.String())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -137,7 +137,7 @@ func TestDecodePodList(t *testing.T) {
 		t.Errorf("expected:\n%#v\ngot:\n%#v\n%s", podList, &podListOut, string(json))
 	}
 
-	for _, gv := range registered.GroupVersionsForGroup("") {
+	for _, gv := range registered.EnabledVersionsForGroup(api.GroupName) {
 		externalPodList, err := testapi.Default.Converter().ConvertToVersion(podList, gv.String())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)

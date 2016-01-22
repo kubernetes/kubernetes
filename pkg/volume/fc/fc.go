@@ -23,9 +23,9 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -46,8 +46,9 @@ const (
 	fcPluginName = "kubernetes.io/fc"
 )
 
-func (plugin *fcPlugin) Init(host volume.VolumeHost) {
+func (plugin *fcPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *fcPlugin) Name() string {
@@ -149,12 +150,13 @@ type fcDisk struct {
 	manager diskManager
 	// io handler interface
 	io ioHandler
+	volume.MetricsNil
 }
 
 func (fc *fcDisk) GetPath() string {
 	name := fcPluginName
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
-	return fc.plugin.host.GetPodVolumeDir(fc.podUID, util.EscapeQualifiedNameForDisk(name), fc.volName)
+	return fc.plugin.host.GetPodVolumeDir(fc.podUID, strings.EscapeQualifiedNameForDisk(name), fc.volName)
 }
 
 type fcDiskBuilder struct {

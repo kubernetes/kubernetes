@@ -58,7 +58,7 @@ KUBE_API_VERSIONS="v1,extensions/v1beta1" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver
   --public-address-override="127.0.0.1" \
   --advertise-address="10.10.10.10" \
   --kubelet-port=${KUBELET_PORT} \
-  --service-cluster-ip-range="10.0.0.0/24" >/dev/null 2>&1 &
+  --service-cluster-ip-range="10.0.0.0/24" >/tmp/swagger-api-server.log 2>&1 &
 APISERVER_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "

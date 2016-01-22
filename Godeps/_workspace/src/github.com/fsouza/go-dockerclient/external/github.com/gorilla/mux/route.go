@@ -200,15 +200,7 @@ func (m headerMatcher) Match(r *http.Request, match *RouteMatch) bool {
 //               "X-Requested-With", "XMLHttpRequest")
 //
 // The above route will only match if both request header values match.
-// Alternatively, you can provide a regular expression and match the header as follows:
-//
-//     r.Headers("Content-Type", "application/(text|json)",
-//               "X-Requested-With", "XMLHttpRequest")
-//
-// The above route will the same as the previous example, with the addition of matching
-// application/text as well.
-//
-// It the value is an empty string, it will match any value if the key is set.
+// If the value is an empty string, it will match any value if the key is set.
 func (r *Route) Headers(pairs ...string) *Route {
 	if r.err == nil {
 		var headers map[string]string

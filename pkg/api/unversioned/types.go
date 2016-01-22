@@ -54,25 +54,13 @@ type ListMeta struct {
 	ResourceVersion string `json:"resourceVersion,omitempty"`
 }
 
-// ListOptions is the query options to a standard REST list/watch calls.
-type ListOptions struct {
+// ExportOptions is the query options to the standard REST get call.
+type ExportOptions struct {
 	TypeMeta `json:",inline"`
-
-	// A selector to restrict the list of returned objects by their labels.
-	// Defaults to everything.
-	LabelSelector LabelSelector `json:"labelSelector,omitempty"`
-	// A selector to restrict the list of returned objects by their fields.
-	// Defaults to everything.
-	FieldSelector FieldSelector `json:"fieldSelector,omitempty"`
-
-	// Watch for changes to the described resources and return them as a stream of
-	// add, update, and remove notifications. Specify resourceVersion.
-	Watch bool `json:"watch,omitempty"`
-	// When specified with a watch call, shows changes that occur after that particular version of a resource.
-	// Defaults to changes from the beginning of history.
-	ResourceVersion string `json:"resourceVersion,omitempty"`
-	// Timeout for the list/watch call.
-	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty"`
+	// Should this value be exported.  Export strips fields that a user can not specify.`
+	Export bool `json:"export"`
+	// Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'
+	Exact bool `json:"exact"`
 }
 
 // Status is a return value for calls that don't return other objects.
@@ -112,6 +100,8 @@ type StatusDetails struct {
 	// The name attribute of the resource associated with the status StatusReason
 	// (when there is a single name which can be described).
 	Name string `json:"name,omitempty"`
+	// The group attribute of the resource associated with the status StatusReason.
+	Group string `json:"group,omitempty"`
 	// The kind attribute of the resource associated with the status StatusReason.
 	// On some operations may differ from the requested resource Kind.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
@@ -301,13 +291,6 @@ const (
 	// due to an intervening proxy or the server software malfunctioning.
 	CauseTypeUnexpectedServerResponse CauseType = "UnexpectedServerResponse"
 )
-
-func (*ListOptions) IsAnAPIObject()     {}
-func (*Status) IsAnAPIObject()          {}
-func (*APIVersions) IsAnAPIObject()     {}
-func (*APIGroupList) IsAnAPIObject()    {}
-func (*APIGroup) IsAnAPIObject()        {}
-func (*APIResourceList) IsAnAPIObject() {}
 
 // APIVersions lists the versions that are available, to allow clients to
 // discover the API at /api, which is the root path of the legacy v1 API.

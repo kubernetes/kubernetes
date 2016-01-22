@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // resourcequotaStrategy implements behavior for ResourceQuota objects
@@ -57,7 +57,7 @@ func (resourcequotaStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new resourcequota.
-func (resourcequotaStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
+func (resourcequotaStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
 	resourcequota := obj.(*api.ResourceQuota)
 	return validation.ValidateResourceQuota(resourcequota)
 }
@@ -72,7 +72,7 @@ func (resourcequotaStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (resourcequotaStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
+func (resourcequotaStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidateResourceQuota(obj.(*api.ResourceQuota))
 	return append(errorList, validation.ValidateResourceQuotaUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))...)
 }
@@ -93,7 +93,7 @@ func (resourcequotaStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newResourcequota.Spec = oldResourcequota.Spec
 }
 
-func (resourcequotaStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
+func (resourcequotaStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateResourceQuotaStatusUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))
 }
 

@@ -31,22 +31,30 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 )
 
+const (
+	legacyAPIPath  = "/api"
+	defaultAPIPath = "/apis"
+)
+
 // Config holds the common attributes that can be passed to a Kubernetes client on
 // initialization.
 type Config struct {
-	// Host must be a host string, a host:port pair, or a URL to the base of the API.
+	// Host must be a host string, a host:port pair, or a URL to the base of the apiserver.
+	// If a URL is given then the (optional) Path of that URL represents a prefix that must
+	// be appended to all request URIs used to access the apiserver. This allows a frontend
+	// proxy to easily relocate all of the apiserver endpoints.
 	Host string
-	// Prefix is the sub path of the server. If not specified, the client will set
-	// a default value.  Use "/" to indicate the server root should be used
-	Prefix string
+	// APIPath is a sub-path that points to an API root.
+	APIPath string
 	// GroupVersion is the API version to talk to. Must be provided when initializing
 	// a RESTClient directly. When initializing a Client, will be set with the default
 	// code version.
@@ -132,7 +140,7 @@ func New(c *Config) (*Client, error) {
 		return nil, err
 	}
 
-	if _, err := latest.Group("extensions"); err != nil {
+	if _, err := registered.Group(extensions.GroupName); err != nil {
 		return &Client{RESTClient: client, ExtensionsClient: nil, DiscoveryClient: discoveryClient}, nil
 	}
 	experimentalConfig := *c
@@ -156,7 +164,7 @@ func MatchesServerVersion(client *Client, c *Config) error {
 		}
 	}
 	clientVersion := version.Get()
-	serverVersion, err := client.ServerVersion()
+	serverVersion, err := client.Discovery().ServerVersion()
 	if err != nil {
 		return fmt.Errorf("couldn't read version from server: %v\n", err)
 	}
@@ -179,7 +187,7 @@ func ExtractGroupVersions(l *unversioned.APIGroupList) []string {
 
 // ServerAPIVersions returns the GroupVersions supported by the API server.
 // It creates a RESTClient based on the passed in config, but it doesn't rely
-// on the Version, Codec, and Prefix of the config, because it uses AbsPath and
+// on the Version and Codec of the config, because it uses AbsPath and
 // takes the raw response.
 func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 	transport, err := TransportFor(c)
@@ -190,13 +198,14 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 
 	configCopy := *c
 	configCopy.GroupVersion = nil
-	configCopy.Prefix = ""
-	baseURL, err := defaultServerUrlFor(c)
+	configCopy.APIPath = ""
+	baseURL, _, err := defaultServerUrlFor(&configCopy)
 	if err != nil {
 		return nil, err
 	}
 	// Get the groupVersions exposed at /api
-	baseURL.Path = "/api"
+	originalPath := baseURL.Path
+	baseURL.Path = path.Join(originalPath, legacyAPIPath)
 	resp, err := client.Get(baseURL.String())
 	if err != nil {
 		return nil, err
@@ -210,7 +219,7 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 
 	groupVersions = append(groupVersions, v.Versions...)
 	// Get the groupVersions exposed at /apis
-	baseURL.Path = "/apis"
+	baseURL.Path = path.Join(originalPath, defaultAPIPath)
 	resp2, err := client.Get(baseURL.String())
 	if err != nil {
 		return nil, err
@@ -247,14 +256,15 @@ func NegotiateVersion(client *Client, c *Config, requestedGV *unversioned.GroupV
 	for _, gv := range clientRegisteredGVs {
 		clientVersions.Insert(gv.String())
 	}
-	apiVersions, err := client.ServerAPIVersions()
+	groups, err := client.ServerGroups()
 	if err != nil {
 		// This is almost always a connection error, and higher level code should treat this as a generic error,
 		// not a negotiation specific error.
 		return nil, err
 	}
+	versions := ExtractGroupVersions(groups)
 	serverVersions := sets.String{}
-	for _, v := range apiVersions.Versions {
+	for _, v := range versions {
 		serverVersions.Insert(v)
 	}
 
@@ -355,18 +365,22 @@ func NewInCluster() (*Client, error) {
 // Kubernetes API or returns an error if any of the defaults are impossible or invalid.
 // TODO: this method needs to be split into one that sets defaults per group, expected to be fix in PR "Refactoring clientcache.go and helper.go #14592"
 func SetKubernetesDefaults(config *Config) error {
-	if config.Prefix == "" {
-		config.Prefix = "/api"
+	if config.APIPath == "" {
+		config.APIPath = legacyAPIPath
 	}
 	if len(config.UserAgent) == 0 {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil {
-		config.GroupVersion = defaultVersionFor(config)
-	}
-	versionInterfaces, err := latest.GroupOrDie("").InterfacesFor(config.GroupVersion.String())
+	g, err := registered.Group(api.GroupName)
 	if err != nil {
-		return fmt.Errorf("API version '%v' is not recognized (valid values: %v)", *config.GroupVersion, latest.GroupOrDie("").GroupVersions)
+		return err
+	}
+	// TODO: Unconditionally set the config.Version, until we fix the config.
+	copyGroupVersion := g.GroupVersion
+	config.GroupVersion = &copyGroupVersion
+	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
+	if err != nil {
+		return fmt.Errorf("API version '%v' is not recognized (valid values: %v)", *config.GroupVersion, registered.GroupOrDie(api.GroupName).GroupVersions)
 	}
 	if config.Codec == nil {
 		config.Codec = versionInterfaces.Codec
@@ -392,12 +406,12 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, fmt.Errorf("Codec is required when initializing a RESTClient")
 	}
 
-	baseURL, err := defaultServerUrlFor(config)
+	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
 	if err != nil {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, *config.GroupVersion, config.Codec, config.QPS, config.Burst)
+	client := NewRESTClient(baseURL, versionedAPIPath, *config.GroupVersion, config.Codec, config.QPS, config.Burst)
 
 	transport, err := TransportFor(config)
 	if err != nil {
@@ -417,12 +431,12 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, fmt.Errorf("Codec is required when initializing a RESTClient")
 	}
 
-	baseURL, err := defaultServerUrlFor(config)
+	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
 	if err != nil {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, unversioned.SchemeGroupVersion, config.Codec, config.QPS, config.Burst)
+	client := NewRESTClient(baseURL, versionedAPIPath, unversioned.SchemeGroupVersion, config.Codec, config.QPS, config.Burst)
 
 	transport, err := TransportFor(config)
 	if err != nil {
@@ -438,14 +452,14 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 // DefaultServerURL converts a host, host:port, or URL string to the default base server API path
 // to use with a Client at a given API version following the standard conventions for a
 // Kubernetes API.
-func DefaultServerURL(host, prefix string, groupVersion unversioned.GroupVersion, defaultTLS bool) (*url.URL, error) {
+func DefaultServerURL(host, apiPath string, groupVersion unversioned.GroupVersion, defaultTLS bool) (*url.URL, string, error) {
 	if host == "" {
-		return nil, fmt.Errorf("host must be a URL or a host:port pair")
+		return nil, "", fmt.Errorf("host must be a URL or a host:port pair")
 	}
 	base := host
 	hostURL, err := url.Parse(base)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if hostURL.Scheme == "" {
 		scheme := "http://"
@@ -454,32 +468,34 @@ func DefaultServerURL(host, prefix string, groupVersion unversioned.GroupVersion
 		}
 		hostURL, err = url.Parse(scheme + base)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		if hostURL.Path != "" && hostURL.Path != "/" {
-			return nil, fmt.Errorf("host must be a URL or a host:port pair: %q", base)
+			return nil, "", fmt.Errorf("host must be a URL or a host:port pair: %q", base)
 		}
 	}
 
-	// If the user specified a URL without a path component (http://server.com), automatically
-	// append the default prefix
-	if hostURL.Path == "" {
-		if prefix == "" {
-			prefix = "/"
-		}
-		hostURL.Path = prefix
-	}
+	// hostURL.Path is optional; a non-empty Path is treated as a prefix that is to be applied to
+	// all URIs used to access the host. this is useful when there's a proxy in front of the
+	// apiserver that has relocated the apiserver endpoints, forwarding all requests from, for
+	// example, /a/b/c to the apiserver. in this case the Path should be /a/b/c.
+	//
+	// if running without a frontend proxy (that changes the location of the apiserver), then
+	// hostURL.Path should be blank.
+	//
+	// versionedAPIPath, a path relative to baseURL.Path, points to a versioned API base
+	versionedAPIPath := path.Join("/", apiPath)
 
 	// Add the version to the end of the path
 	if len(groupVersion.Group) > 0 {
-		hostURL.Path = path.Join(hostURL.Path, groupVersion.Group, groupVersion.Version)
+		versionedAPIPath = path.Join(versionedAPIPath, groupVersion.Group, groupVersion.Version)
 
 	} else {
-		hostURL.Path = path.Join(hostURL.Path, groupVersion.Version)
+		versionedAPIPath = path.Join(versionedAPIPath, groupVersion.Version)
 
 	}
 
-	return hostURL, nil
+	return hostURL, versionedAPIPath, nil
 }
 
 // IsConfigTransportTLS returns true if and only if the provided config will result in a protected
@@ -493,7 +509,7 @@ func IsConfigTransportTLS(config Config) bool {
 	// modify the copy of the config we got to satisfy preconditions for defaultServerUrlFor
 	config.GroupVersion = defaultVersionFor(&config)
 
-	baseURL, err := defaultServerUrlFor(&config)
+	baseURL, _, err := defaultServerUrlFor(&config)
 	if err != nil {
 		return false
 	}
@@ -502,7 +518,7 @@ func IsConfigTransportTLS(config Config) bool {
 
 // defaultServerUrlFor is shared between IsConfigTransportTLS and RESTClientFor. It
 // requires Host and Version to be set prior to being called.
-func defaultServerUrlFor(config *Config) (*url.URL, error) {
+func defaultServerUrlFor(config *Config) (*url.URL, string, error) {
 	// TODO: move the default to secure when the apiserver supports TLS by default
 	// config.Insecure is taken to mean "I want HTTPS but don't bother checking the certs against a CA."
 	hasCA := len(config.CAFile) != 0 || len(config.CAData) != 0
@@ -514,18 +530,18 @@ func defaultServerUrlFor(config *Config) (*url.URL, error) {
 	}
 
 	if config.GroupVersion != nil {
-		return DefaultServerURL(host, config.Prefix, *config.GroupVersion, defaultTLS)
+		return DefaultServerURL(host, config.APIPath, *config.GroupVersion, defaultTLS)
 	}
-	return DefaultServerURL(host, config.Prefix, unversioned.GroupVersion{}, defaultTLS)
+	return DefaultServerURL(host, config.APIPath, unversioned.GroupVersion{}, defaultTLS)
 }
 
-// defaultVersionFor is shared between defaultServerUrlFor and RESTClientFor
+// defaultVersionFor is shared between IsConfigTransportTLS and RESTClientFor
 func defaultVersionFor(config *Config) *unversioned.GroupVersion {
 	if config.GroupVersion == nil {
 		// Clients default to the preferred code API version
 		// TODO: implement version negotiation (highest version supported by server)
 		// TODO this drops out when groupmeta is refactored
-		copyGroupVersion := latest.GroupOrDie("").GroupVersion
+		copyGroupVersion := registered.GroupOrDie(api.GroupName).GroupVersion
 		return &copyGroupVersion
 	}
 

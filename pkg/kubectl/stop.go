@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -103,12 +104,12 @@ type ServiceReaper struct {
 
 type objInterface interface {
 	Delete(name string) error
-	Get(name string) (meta.Interface, error)
+	Get(name string) (meta.Object, error)
 }
 
 // getOverlappingControllers finds rcs that this controller overlaps, as well as rcs overlapping this controller.
 func getOverlappingControllers(c client.ReplicationControllerInterface, rc *api.ReplicationController) ([]api.ReplicationController, error) {
-	rcs, err := c.List(unversioned.ListOptions{})
+	rcs, err := c.List(api.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting replication controllers: %v", err)
 	}
@@ -251,7 +252,7 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 	}
 	// at this point only dead pods are left, that should be removed
 	selector, _ := extensions.LabelSelectorAsSelector(job.Spec.Selector)
-	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	options := api.ListOptions{LabelSelector: selector}
 	podList, err := pods.List(options)
 	if err != nil {
 		return err
@@ -259,7 +260,10 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 	errList := []error{}
 	for _, pod := range podList.Items {
 		if err := pods.Delete(pod.Name, gracePeriod); err != nil {
-			errList = append(errList, err)
+			// ignores the error when the pod isn't found
+			if !errors.IsNotFound(err) {
+				errList = append(errList, err)
+			}
 		}
 	}
 	if len(errList) > 0 {

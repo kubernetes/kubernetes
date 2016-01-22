@@ -22,10 +22,17 @@ import (
 	"github.com/mesos/mesos-go/mesosproto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
+
+type mockKubeAPI struct {
+	mock.Mock
+}
+
+func (m *mockKubeAPI) killPod(ns, name string) error {
+	args := m.Called(ns, name)
+	return args.Error(0)
+}
 
 type MockExecutorDriver struct {
 	mock.Mock
@@ -66,18 +73,16 @@ func (m *MockExecutorDriver) SendFrameworkMessage(msg string) (mesosproto.Status
 	return args.Get(0).(mesosproto.Status), args.Error(1)
 }
 
-func NewTestKubernetesExecutor() (*Executor, chan kubetypes.PodUpdate) {
-	updates := make(chan kubetypes.PodUpdate, 1024)
+func NewTestKubernetesExecutor() *Executor {
 	return New(Config{
-		Docker:  dockertools.ConnectToDockerOrDie("fake://"),
-		Updates: updates,
-		PodLW:   &NewMockPodsListWatch(api.PodList{}).ListWatch,
-	}), updates
+		Docker:   dockertools.ConnectToDockerOrDie("fake://"),
+		Registry: newFakeRegistry(),
+	})
 }
 
 func TestExecutorNew(t *testing.T) {
 	mockDriver := &MockExecutorDriver{}
-	executor, _ := NewTestKubernetesExecutor()
+	executor := NewTestKubernetesExecutor()
 	executor.Init(mockDriver)
 
 	assert.Equal(t, executor.isDone(), false, "executor should not be in Done state on initialization")

@@ -33,6 +33,9 @@ export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 export PATH=$PATH:/usr/local/go/bin
 export KUBE_SKIP_CONFIRMATIONS=y
 
+# Skip gcloud update checking
+export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
+
 : ${KUBE_RELEASE_RUN_TESTS:="n"}
 export KUBE_RELEASE_RUN_TESTS
 

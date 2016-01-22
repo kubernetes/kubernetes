@@ -28,8 +28,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	api "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
@@ -71,7 +71,8 @@ var _ = Describe("KubeProxy", func() {
 		f: f,
 	}
 
-	It("should test kube-proxy", func() {
+	// Slow issue #14204 (10 min)
+	It("should test kube-proxy [Slow]", func() {
 		By("cleaning up any pre-existing namespaces used by this test")
 		config.cleanup()
 
@@ -255,7 +256,7 @@ func (config *KubeProxyTestConfig) createNetShellPodSpec(podName string, node st
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.GroupOrDie("").GroupVersion.Version,
+			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      podName,
@@ -295,7 +296,7 @@ func (config *KubeProxyTestConfig) createTestPodSpec() *api.Pod {
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.GroupOrDie("").GroupVersion.Version,
+			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      testPodName,
@@ -429,8 +430,7 @@ func (config *KubeProxyTestConfig) setup() {
 	}
 
 	By("Getting node addresses")
-	nodeList, err := config.f.Client.Nodes().List(unversioned.ListOptions{})
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get node list: %v", err))
+	nodeList := ListSchedulableNodesOrDie(config.f.Client)
 	config.externalAddrs = NodeAddresses(nodeList, api.NodeExternalIP)
 	if len(config.externalAddrs) < 2 {
 		// fall back to legacy IPs
@@ -457,7 +457,7 @@ func (config *KubeProxyTestConfig) setup() {
 
 func (config *KubeProxyTestConfig) cleanup() {
 	nsClient := config.getNamespacesClient()
-	nsList, err := nsClient.List(unversioned.ListOptions{})
+	nsList, err := nsClient.List(api.ListOptions{})
 	if err == nil {
 		for _, ns := range nsList.Items {
 			if strings.Contains(ns.Name, config.f.BaseName) && ns.Name != config.f.Namespace.Name {
@@ -468,8 +468,7 @@ func (config *KubeProxyTestConfig) cleanup() {
 }
 
 func (config *KubeProxyTestConfig) createNetProxyPods(podName string, selector map[string]string) []*api.Pod {
-	nodes, err := config.f.Client.Nodes().List(unversioned.ListOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	nodes := ListSchedulableNodesOrDie(config.f.Client)
 
 	// create pods, one for each node
 	createdPods := make([]*api.Pod, 0, len(nodes.Items))

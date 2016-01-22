@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/devel/cherry-picks.md).
@@ -46,6 +47,23 @@ hack/cherry_pick_pull.sh upstream/release-3.14 98765
 
 This will walk you through the steps to propose an automated cherry pick of pull
  #98765 for remote branch `upstream/release-3.14`.
+
+### Cherrypicking a doc change
+
+If you are cherrypicking a change which adds a doc, then you also need to run
+`build/versionize-docs.sh` in the release branch to versionize that doc.
+Ideally, just running `hack/cherry_pick_pull.sh` should be enough, but we are not there
+yet: [#18861](https://github.com/kubernetes/kubernetes/issues/18861)
+
+To cherrypick PR 123456 to release-1.1, run the following commands after running `hack/cherry_pick_pull.sh` and before merging the PR:
+
+```
+$ git checkout -b automated-cherry-pick-of-#123456-upstream-release-1.1
+  origin/automated-cherry-pick-of-#123456-upstream-release-1.1
+$ ./build/versionize-docs.sh release-1.1
+$ git commit -a -m "Running versionize docs"
+$ git push origin automated-cherry-pick-of-#123456-upstream-release-1.1
+```
 
 ## Cherry Pick Review
 

@@ -17,14 +17,14 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
-func addDefaultingFuncs() {
-	api.Scheme.AddDefaultingFuncs(
+func addDefaultingFuncs(scheme *runtime.Scheme) {
+	scheme.AddDefaultingFuncs(
 		func(obj *PodExecOptions) {
 			obj.Stdout = true
 			obj.Stderr = true
@@ -164,6 +164,11 @@ func addDefaultingFuncs() {
 				obj.Status.Phase = ClaimPending
 			}
 		},
+		func(obj *ISCSIVolumeSource) {
+			if obj.ISCSIInterface == "" {
+				obj.ISCSIInterface = "default"
+			}
+		},
 		func(obj *Endpoints) {
 			for i := range obj.Subsets {
 				ss := &obj.Subsets[i]
@@ -191,6 +196,15 @@ func addDefaultingFuncs() {
 		func(obj *Node) {
 			if obj.Spec.ExternalID == "" {
 				obj.Spec.ExternalID = obj.Name
+			}
+		},
+		func(obj *NodeStatus) {
+			if obj.Allocatable == nil && obj.Capacity != nil {
+				obj.Allocatable = make(ResourceList, len(obj.Capacity))
+				for key, value := range obj.Capacity {
+					obj.Allocatable[key] = *(value.Copy())
+				}
+				obj.Allocatable = obj.Capacity
 			}
 		},
 		func(obj *ObjectFieldSelector) {

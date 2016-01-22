@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/proposals/rescheduler.md).
@@ -107,7 +108,7 @@ antagonism and ask the rescheduler to move one of the antagonists to a new node.
 The vast majority of users probably only care about rescheduling for three scenarios:
 
 1. Move Pods around to get a PENDING Pod to schedule
-1. Redistribute Pods onto new nodes added by a cluster auto-scaler when ther are no PENDING Pods
+1. Redistribute Pods onto new nodes added by a cluster auto-scaler when there are no PENDING Pods
 1. Move Pods around when CPU starvation is detected on a node
 
 ## Design considerations and design space

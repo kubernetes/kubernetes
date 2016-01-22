@@ -15,11 +15,14 @@
 package schema
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/appc/spec/schema/types"
+
+	"github.com/camlistore/go4/errorutil"
 )
 
 const PodManifestKind = types.ACKind("PodManifest")
@@ -46,6 +49,10 @@ func (pm *PodManifest) UnmarshalJSON(data []byte) error {
 	p := podManifest(*pm)
 	err := json.Unmarshal(data, &p)
 	if err != nil {
+		if serr, ok := err.(*json.SyntaxError); ok {
+			line, col, highlight := errorutil.HighlightBytePosition(bytes.NewReader(data), serr.Offset)
+			return fmt.Errorf("\nError at line %d, column %d\n%s%v", line, col, highlight, err)
+		}
 		return err
 	}
 	npm := PodManifest(p)

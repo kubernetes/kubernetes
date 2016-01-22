@@ -32,7 +32,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/golang/glog"
 	"github.com/kardianos/osext"
@@ -75,7 +75,7 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
-	"k8s.io/kubernetes/pkg/tools"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	// lock to this API version, compilation will fail when this becomes unsupported
 	_ "k8s.io/kubernetes/pkg/api/v1"
@@ -84,7 +84,8 @@ import (
 const (
 	defaultMesosMaster           = "localhost:5050"
 	defaultMesosUser             = "root" // should have privs to execute docker and iptables commands
-	defaultMesosRoles            = "*"
+	defaultFrameworkRoles        = "*"
+	defaultPodRoles              = "*"
 	defaultReconcileInterval     = 300 // 5m default task reconciliation interval
 	defaultReconcileCooldown     = 15 * time.Second
 	defaultNodeRelistPeriod      = 5 * time.Minute
@@ -101,13 +102,13 @@ type SchedulerServer struct {
 	authPath            string
 	apiServerList       []string
 	etcdServerList      []string
-	etcdConfigFile      string
 	allowPrivileged     bool
 	executorPath        string
 	proxyPath           string
 	mesosMaster         string
 	mesosUser           string
-	mesosRoles          []string
+	frameworkRoles      []string
+	defaultPodRoles     []string
 	mesosAuthPrincipal  string
 	mesosAuthSecretFile string
 	mesosCgroupPrefix   string
@@ -116,10 +117,11 @@ type SchedulerServer struct {
 	checkpoint          bool
 	failoverTimeout     float64
 
-	executorLogV           int
-	executorBindall        bool
-	executorSuicideTimeout time.Duration
-	launchGracePeriod      time.Duration
+	executorLogV                   int
+	executorBindall                bool
+	executorSuicideTimeout         time.Duration
+	launchGracePeriod              time.Duration
+	kubeletEnableDebuggingHandlers bool
 
 	runProxy     bool
 	proxyBindall bool
@@ -131,36 +133,38 @@ type SchedulerServer struct {
 	minionLogMaxBackups   int
 	minionLogMaxAgeInDays int
 
-	mesosAuthProvider             string
-	driverPort                    uint
-	hostnameOverride              string
-	reconcileInterval             int64
-	reconcileCooldown             time.Duration
-	defaultContainerCPULimit      mresource.CPUShares
-	defaultContainerMemLimit      mresource.MegaBytes
-	schedulerConfigFileName       string
-	graceful                      bool
-	frameworkName                 string
-	frameworkWebURI               string
-	ha                            bool
-	advertisedAddress             string
-	serviceAddress                net.IP
-	haDomain                      string
-	kmPath                        string
-	clusterDNS                    net.IP
-	clusterDomain                 string
-	kubeletRootDirectory          string
-	kubeletDockerEndpoint         string
-	kubeletPodInfraContainerImage string
-	kubeletCadvisorPort           uint
-	kubeletHostNetworkSources     string
-	kubeletSyncFrequency          time.Duration
-	kubeletNetworkPluginName      string
-	staticPodsConfigPath          string
-	dockerCfgPath                 string
-	containPodResources           bool
-	nodeRelistPeriod              time.Duration
-	sandboxOverlay                string
+	mesosAuthProvider              string
+	driverPort                     uint
+	hostnameOverride               string
+	reconcileInterval              int64
+	reconcileCooldown              time.Duration
+	defaultContainerCPULimit       mresource.CPUShares
+	defaultContainerMemLimit       mresource.MegaBytes
+	schedulerConfigFileName        string
+	graceful                       bool
+	frameworkName                  string
+	frameworkWebURI                string
+	ha                             bool
+	advertisedAddress              string
+	serviceAddress                 net.IP
+	haDomain                       string
+	kmPath                         string
+	clusterDNS                     net.IP
+	clusterDomain                  string
+	kubeletRootDirectory           string
+	kubeletDockerEndpoint          string
+	kubeletPodInfraContainerImage  string
+	kubeletCadvisorPort            uint
+	kubeletHostNetworkSources      string
+	kubeletSyncFrequency           time.Duration
+	kubeletNetworkPluginName       string
+	staticPodsConfigPath           string
+	dockerCfgPath                  string
+	containPodResources            bool
+	nodeRelistPeriod               time.Duration
+	sandboxOverlay                 string
+	conntrackMax                   int
+	conntrackTCPTimeoutEstablished int
 
 	executable  string // path to the binary running this service
 	client      *client.Client
@@ -195,23 +199,31 @@ func NewSchedulerServer() *SchedulerServer {
 		minionLogMaxBackups:   minioncfg.DefaultLogMaxBackups,
 		minionLogMaxAgeInDays: minioncfg.DefaultLogMaxAgeInDays,
 
-		mesosAuthProvider:    sasl.ProviderName,
-		mesosCgroupPrefix:    minioncfg.DefaultCgroupPrefix,
-		mesosMaster:          defaultMesosMaster,
-		mesosUser:            defaultMesosUser,
-		mesosExecutorCPUs:    defaultExecutorCPUs,
-		mesosExecutorMem:     defaultExecutorMem,
-		mesosRoles:           strings.Split(defaultMesosRoles, ","),
-		reconcileInterval:    defaultReconcileInterval,
-		reconcileCooldown:    defaultReconcileCooldown,
-		checkpoint:           true,
-		frameworkName:        defaultFrameworkName,
-		ha:                   false,
-		mux:                  http.NewServeMux(),
-		kubeletCadvisorPort:  4194, // copied from github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kubelet/app/server.go
-		kubeletSyncFrequency: 10 * time.Second,
-		containPodResources:  true,
-		nodeRelistPeriod:     defaultNodeRelistPeriod,
+		mesosAuthProvider:              sasl.ProviderName,
+		mesosCgroupPrefix:              minioncfg.DefaultCgroupPrefix,
+		mesosMaster:                    defaultMesosMaster,
+		mesosUser:                      defaultMesosUser,
+		mesosExecutorCPUs:              defaultExecutorCPUs,
+		mesosExecutorMem:               defaultExecutorMem,
+		frameworkRoles:                 strings.Split(defaultFrameworkRoles, ","),
+		defaultPodRoles:                strings.Split(defaultPodRoles, ","),
+		reconcileInterval:              defaultReconcileInterval,
+		reconcileCooldown:              defaultReconcileCooldown,
+		checkpoint:                     true,
+		frameworkName:                  defaultFrameworkName,
+		ha:                             false,
+		mux:                            http.NewServeMux(),
+		kubeletCadvisorPort:            4194, // copied from github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kubelet/app/server.go
+		kubeletSyncFrequency:           10 * time.Second,
+		kubeletEnableDebuggingHandlers: true,
+		containPodResources:            true,
+		nodeRelistPeriod:               defaultNodeRelistPeriod,
+		conntrackTCPTimeoutEstablished: 0, // non-zero values may require hand-tuning other sysctl's on the host; do so with caution
+
+		// non-zero values can trigger failures when updating /sys/module/nf_conntrack/parameters/hashsize
+		// when kube-proxy is running in a non-root netns (init_net); setting this to a non-zero value will
+		// impact connection tracking for the entire host on which kube-proxy is running. xref (k8s#19182)
+		conntrackMax: 0,
 	}
 	// cache this for later use. also useful in case the original binary gets deleted, e.g.
 	// during upgrades, development deployments, etc.
@@ -231,8 +243,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.enableProfiling, "profiling", s.enableProfiling, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringSliceVar(&s.apiServerList, "api-servers", s.apiServerList, "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
 	fs.StringVar(&s.authPath, "auth-path", s.authPath, "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
-	fs.StringSliceVar(&s.etcdServerList, "etcd-servers", s.etcdServerList, "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with --etcd-config")
-	fs.StringVar(&s.etcdConfigFile, "etcd-config", s.etcdConfigFile, "The config file for the etcd client. Mutually exclusive with --etcd-servers.")
+	fs.StringSliceVar(&s.etcdServerList, "etcd-servers", s.etcdServerList, "List of etcd servers to watch (http://ip:port), comma separated.")
 	fs.BoolVar(&s.allowPrivileged, "allow-privileged", s.allowPrivileged, "Enable privileged containers in the kubelet (compare the same flag in the apiserver).")
 	fs.StringVar(&s.clusterDomain, "cluster-domain", s.clusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
 	fs.IPVar(&s.clusterDNS, "cluster-dns", s.clusterDNS, "IP address for a cluster DNS server. If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
@@ -240,7 +251,8 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.mesosMaster, "mesos-master", s.mesosMaster, "Location of the Mesos master. The format is a comma-delimited list of of hosts like zk://host1:port,host2:port/mesos. If using ZooKeeper, pay particular attention to the leading zk:// and trailing /mesos! If not using ZooKeeper, standard URLs like http://localhost are also acceptable.")
 	fs.StringVar(&s.mesosUser, "mesos-user", s.mesosUser, "Mesos user for this framework, defaults to root.")
-	fs.StringSliceVar(&s.mesosRoles, "mesos-roles", s.mesosRoles, "Mesos framework roles. The first role will be used to launch pods having no "+meta.RolesKey+" label.")
+	fs.StringSliceVar(&s.frameworkRoles, "mesos-framework-roles", s.frameworkRoles, "Mesos framework roles that the scheduler receives offers for. Currently only \"*\" and optionally one additional role are supported.")
+	fs.StringSliceVar(&s.defaultPodRoles, "mesos-default-pod-roles", s.defaultPodRoles, "Roles that will be used to launch pods having no "+meta.RolesKey+" label.")
 	fs.StringVar(&s.mesosAuthPrincipal, "mesos-authentication-principal", s.mesosAuthPrincipal, "Mesos authentication principal.")
 	fs.StringVar(&s.mesosAuthSecretFile, "mesos-authentication-secret-file", s.mesosAuthSecretFile, "Mesos authentication secret file.")
 	fs.StringVar(&s.mesosAuthProvider, "mesos-authentication-provider", s.mesosAuthProvider, fmt.Sprintf("Authentication provider to use, default is SASL that supports mechanisms: %+v", mech.ListSupported()))
@@ -289,6 +301,9 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.kubeletHostNetworkSources, "kubelet-host-network-sources", s.kubeletHostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network. For all sources use \"*\" [default=\"file\"]")
 	fs.DurationVar(&s.kubeletSyncFrequency, "kubelet-sync-frequency", s.kubeletSyncFrequency, "Max period between synchronizing running containers and config")
 	fs.StringVar(&s.kubeletNetworkPluginName, "kubelet-network-plugin", s.kubeletNetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
+	fs.BoolVar(&s.kubeletEnableDebuggingHandlers, "kubelet-enable-debugging-handlers", s.kubeletEnableDebuggingHandlers, "Enables kubelet endpoints for log collection and local running of containers and commands")
+	fs.IntVar(&s.conntrackMax, "conntrack-max", s.conntrackMax, "Maximum number of NAT connections to track on agent nodes (0 to leave as-is)")
+	fs.IntVar(&s.conntrackTCPTimeoutEstablished, "conntrack-tcp-timeout-established", s.conntrackTCPTimeoutEstablished, "Idle timeout for established TCP connections on agent nodes (0 to leave as-is)")
 
 	//TODO(jdef) support this flag once we have a better handle on mesos-dns and k8s DNS integration
 	//fs.StringVar(&s.HADomain, "ha-domain", s.HADomain, "Domain of the HA scheduler service, only used in HA mode. If specified may be used to construct artifact download URIs.")
@@ -407,7 +422,9 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--cadvisor-port=%v", s.kubeletCadvisorPort))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--sync-frequency=%v", s.kubeletSyncFrequency))
 	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--contain-pod-resources=%t", s.containPodResources))
-	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--enable-debugging-handlers=%t", s.enableProfiling))
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--enable-debugging-handlers=%t", s.kubeletEnableDebuggingHandlers))
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-max=%d", s.conntrackMax))
+	ci.Arguments = append(ci.Arguments, fmt.Sprintf("--conntrack-tcp-timeout-established=%d", s.conntrackTCPTimeoutEstablished))
 
 	if s.authPath != "" {
 		//TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file
@@ -536,8 +553,14 @@ func (s *SchedulerServer) getDriver() (driver bindings.SchedulerDriver) {
 }
 
 func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
-	if n := len(s.mesosRoles); n == 0 || n > 2 || (n == 2 && s.mesosRoles[0] != "*" && s.mesosRoles[1] != "*") {
+	if n := len(s.frameworkRoles); n == 0 || n > 2 || (n == 2 && s.frameworkRoles[0] != "*" && s.frameworkRoles[1] != "*") {
 		log.Fatalf(`only one custom role allowed in addition to "*"`)
+	}
+
+	fwSet := sets.NewString(s.frameworkRoles...)
+	podSet := sets.NewString(s.defaultPodRoles...)
+	if !fwSet.IsSuperset(podSet) {
+		log.Fatalf("all default pod roles %q must be included in framework roles %q", s.defaultPodRoles, s.frameworkRoles)
 	}
 
 	// get scheduler low-level config
@@ -630,16 +653,14 @@ func validateLeadershipTransition(desired, current string) {
 }
 
 // hacked from https://github.com/GoogleCloudPlatform/kubernetes/blob/release-0.14/cmd/kube-apiserver/app/server.go
-func newEtcd(etcdConfigFile string, etcdServerList []string) (client tools.EtcdClient, err error) {
-	if etcdConfigFile != "" {
-		client, err = etcd.NewClientFromFile(etcdConfigFile)
-	} else {
-		client = etcd.NewClient(etcdServerList)
+func newEtcd(etcdServerList []string) (etcd.Client, error) {
+	cfg := etcd.Config{
+		Endpoints: etcdServerList,
 	}
-	return
+	return etcd.New(cfg)
 }
 
-func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config) (*ha.SchedulerProcess, ha.DriverFactory, tools.EtcdClient, *mesos.ExecutorID) {
+func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config) (*ha.SchedulerProcess, ha.DriverFactory, etcd.Client, *mesos.ExecutorID) {
 	s.frameworkName = strings.TrimSpace(s.frameworkName)
 	if s.frameworkName == "" {
 		log.Fatalf("framework-name must be a non-empty string")
@@ -651,8 +672,8 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	s.mux.Handle("/metrics", prometheus.Handler())
 	healthz.InstallHandler(s.mux)
 
-	if (s.etcdConfigFile != "" && len(s.etcdServerList) != 0) || (s.etcdConfigFile == "" && len(s.etcdServerList) == 0) {
-		log.Fatalf("specify either --etcd-servers or --etcd-config")
+	if len(s.etcdServerList) == 0 {
+		log.Fatalf("specify --etcd-servers must be specified")
 	}
 
 	if len(s.apiServerList) < 1 {
@@ -679,10 +700,11 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	// (1) the generic config store is available for the FrameworkId storage
 	// (2) the generic master election is provided by the apiserver
 	// Compare docs/proposals/high-availability.md
-	etcdClient, err := newEtcd(s.etcdConfigFile, s.etcdServerList)
+	etcdClient, err := newEtcd(s.etcdServerList)
 	if err != nil {
 		log.Fatalf("misconfigured etcd: %v", err)
 	}
+	keysAPI := etcd.NewKeysAPI(etcdClient)
 
 	// mirror all nodes into the nodeStore
 	var eiRegistry executorinfo.Registry
@@ -731,7 +753,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		LookupNode:        lookupNode,
 		StoreFrameworkId: func(id string) {
 			// TODO(jdef): port FrameworkId store to generic Kubernetes config store as soon as available
-			_, err := etcdClient.Set(meta.FrameworkIDKey, id, uint64(s.failoverTimeout))
+			_, err := keysAPI.Set(context.TODO(), meta.FrameworkIDKey, id, &etcd.SetOptions{TTL: time.Duration(s.failoverTimeout) * time.Second})
 			if err != nil {
 				log.Errorf("failed to renew frameworkId TTL: %v", err)
 			}
@@ -763,7 +785,8 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 
 	// create event recorder sending events to the "" namespace of the apiserver
 	broadcaster := record.NewBroadcaster()
-	recorder := broadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
+	recorder := broadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
+	broadcaster.StartLogging(log.Infof)
 	broadcaster.StartRecordingToSink(client.Events(""))
 
 	// create scheduler core with all components arranged around it
@@ -778,7 +801,8 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		s.mux,
 		lw,
 		eiPrototype,
-		s.mesosRoles,
+		s.frameworkRoles,
+		s.defaultPodRoles,
 		s.defaultContainerCPULimit,
 		s.defaultContainerMemLimit,
 	)
@@ -795,7 +819,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		log.V(1).Infoln("deferred init complete")
 		// defer obtaining framework ID to prevent multiple schedulers
 		// from overwriting each other's framework IDs
-		dconfig.Framework.Id, err = s.fetchFrameworkID(etcdClient)
+		dconfig.Framework.Id, err = s.fetchFrameworkID(keysAPI)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch framework ID from etcd: %v", err)
 		}
@@ -891,7 +915,7 @@ func (s *SchedulerServer) buildFrameworkInfo() (info *mesos.FrameworkInfo, cred 
 
 	// set the framework's role to the first configured non-star role.
 	// once Mesos supports multiple roles simply set the configured mesos roles slice.
-	for _, role := range s.mesosRoles {
+	for _, role := range s.frameworkRoles {
 		if role != "*" {
 			// mesos currently supports only one role per framework info
 			// The framework will be offered role's resources as well as * resources
@@ -917,9 +941,9 @@ func (s *SchedulerServer) buildFrameworkInfo() (info *mesos.FrameworkInfo, cred 
 	return
 }
 
-func (s *SchedulerServer) fetchFrameworkID(client tools.EtcdClient) (*mesos.FrameworkID, error) {
+func (s *SchedulerServer) fetchFrameworkID(client etcd.KeysAPI) (*mesos.FrameworkID, error) {
 	if s.failoverTimeout > 0 {
-		if response, err := client.Get(meta.FrameworkIDKey, false, false); err != nil {
+		if response, err := client.Get(context.TODO(), meta.FrameworkIDKey, nil); err != nil {
 			if !etcdutil.IsEtcdNotFound(err) {
 				return nil, fmt.Errorf("unexpected failure attempting to load framework ID from etcd: %v", err)
 			}
@@ -930,7 +954,7 @@ func (s *SchedulerServer) fetchFrameworkID(client tools.EtcdClient) (*mesos.Fram
 		}
 	} else {
 		//TODO(jdef) this seems like a totally hackish way to clean up the framework ID
-		if _, err := client.Delete(meta.FrameworkIDKey, true); err != nil {
+		if _, err := client.Delete(context.TODO(), meta.FrameworkIDKey, &etcd.DeleteOptions{Recursive: true}); err != nil {
 			if !etcdutil.IsEtcdNotFound(err) {
 				return nil, fmt.Errorf("failed to delete framework ID from etcd: %v", err)
 			}

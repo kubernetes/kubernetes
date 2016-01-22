@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -51,8 +51,9 @@ type downwardAPIPlugin struct {
 
 var _ volume.VolumePlugin = &downwardAPIPlugin{}
 
-func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost) {
+func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	return nil
 }
 
 func (plugin *downwardAPIPlugin) Name() string {
@@ -90,6 +91,7 @@ type downwardAPIVolume struct {
 	pod                     *api.Pod
 	podUID                  types.UID // TODO: remove this redundancy as soon NewCleaner func will have *api.POD and not only types.UID
 	plugin                  *downwardAPIPlugin
+	volume.MetricsNil
 }
 
 // This is the spec for the volume that this plugin wraps.
@@ -343,7 +345,7 @@ func sortLines(values string) string {
 }
 
 func (d *downwardAPIVolume) GetPath() string {
-	return d.plugin.host.GetPodVolumeDir(d.podUID, util.EscapeQualifiedNameForDisk(downwardAPIPluginName), d.volName)
+	return d.plugin.host.GetPodVolumeDir(d.podUID, utilstrings.EscapeQualifiedNameForDisk(downwardAPIPluginName), d.volName)
 }
 
 // downwardAPIVolumeCleander handles cleaning up downwardAPI volumes
@@ -370,5 +372,5 @@ func (c *downwardAPIVolumeCleaner) TearDownAt(dir string) error {
 }
 
 func (b *downwardAPIVolumeBuilder) getMetaDir() string {
-	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, util.EscapeQualifiedNameForDisk(downwardAPIPluginName)), b.volName)
+	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedNameForDisk(downwardAPIPluginName)), b.volName)
 }

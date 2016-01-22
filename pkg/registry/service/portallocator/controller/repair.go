@@ -21,23 +21,23 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/net"
 )
 
 // See ipallocator/controller/repair.go; this is a copy for ports.
 type Repair struct {
 	interval  time.Duration
 	registry  service.Registry
-	portRange util.PortRange
+	portRange net.PortRange
 	alloc     service.RangeRegistry
 }
 
 // NewRepair creates a controller that periodically ensures that all ports are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
-func NewRepair(interval time.Duration, registry service.Registry, portRange util.PortRange, alloc service.RangeRegistry) *Repair {
+func NewRepair(interval time.Duration, registry service.Registry, portRange net.PortRange, alloc service.RangeRegistry) *Repair {
 	return &Repair{
 		interval:  interval,
 		registry:  registry,
@@ -80,7 +80,7 @@ func (c *Repair) RunOnce() error {
 	}
 
 	ctx := api.WithNamespace(api.NewDefaultContext(), api.NamespaceAll)
-	options := &unversioned.ListOptions{ResourceVersion: latest.ObjectMeta.ResourceVersion}
+	options := &api.ListOptions{ResourceVersion: latest.ObjectMeta.ResourceVersion}
 	list, err := c.registry.ListServices(ctx, options)
 	if err != nil {
 		return fmt.Errorf("unable to refresh the port block: %v", err)

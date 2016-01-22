@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/user-guide/kubectl-overview.md).
@@ -86,7 +87,7 @@ where `command`, `TYPE`, `NAME`, and `flags` are:
         * To specify multiple resource types individually: `TYPE1/name1 TYPE1/name2 TYPE2/name3 TYPE<#>/name<#>`<br/>
         Example: `$ kubectl get pod/example-pod1 replicationcontroller/example-rc1`
    * To specify resources with one or more files: `-f file1 -f file2 -f file<#>`
-	 [Use YAML rather than JSON](config-best-practices.md) since YAML tends to be more user-friendly, especially for configuration files.<br/>
+	 [Use YAML rather than JSON](config-best-practices.md#general-config-tips) since YAML tends to be more user-friendly, especially for configuration files.<br/>
      Example: `$ kubectl get pod -f ./pod.yaml`
 * `flags`: Specifies optional flags. For example, you can use the `-s` or `--server` flags to specify the address and port of the Kubernetes API server.<br/>
 **Important**: Flags that you specify from the command line override default values and any corresponding environment variables.
@@ -134,21 +135,24 @@ The following table includes a list of all the supported resource types and thei
 Resource type	| Abbreviated alias
 -------------------- | --------------------
 `componentstatuses`	|	`cs`
-`events`	|	`ev`
-`endpoints`	|	`ep`
-`horizontalpodautoscalers`	|	`hpa`
-`limitranges`	|	`limits`
-`nodes`	|	`no`
-`namespaces`	|	`ns`
-`pods`	|	`po`
-`persistentvolumes`	|	`pv`
-`persistentvolumeclaims`	|	`pvc`
-`resourcequotas`	|	`quota`
-`replicationcontrollers`	|	`rc`
-`secrets`	|
-`serviceaccounts`	|
-`services`	|	`svc`
-`ingress`		|	`ing`
+`daemonsets` | `ds`
+`deployments` |
+`events` | `ev`
+`endpoints` | `ep`
+`horizontalpodautoscalers` | `hpa`
+`ingresses` | `ing`
+`jobs` |
+`limitranges` | `limits`
+`nodes` | `no`
+`namespaces` | `ns`
+`pods` | `po`
+`persistentvolumes` | `pv`
+`persistentvolumeclaims` | `pvc`
+`resourcequotas` | `quota`
+`replicationcontrollers` | `rc`
+`secrets` |
+`serviceaccounts` |
+`services` | `svc`
 
 ## Output options
 

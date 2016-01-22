@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/mesos.md).
@@ -73,7 +74,7 @@ Further information is available in the Kubernetes on Mesos [contrib directory][
 - A running [Mesos cluster on Google Compute Engine][5]
 - A [VPN connection][10] to the cluster
 - A machine in the cluster which should become the Kubernetes *master node* with:
-  - GoLang > 1.2
+  - Go (see [here](../devel/development.md#go-versions) for required versions)
   - make (i.e. build-essential)
   - Docker
 
@@ -192,12 +193,6 @@ disown -a
 ```
 
 #### Validate KM Services
-
-Add the appropriate binary folder to your `PATH` to access kubectl:
-
-```bash
-export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
-```
 
 Interact with the kubernetes-mesos framework via `kubectl`:
 

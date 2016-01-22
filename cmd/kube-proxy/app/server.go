@@ -20,18 +20,17 @@ package app
 
 import (
 	"errors"
-	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
 	"time"
 
+	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubeclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
@@ -49,63 +48,20 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// ProxyServerConfig contains configures and runs a Kubernetes proxy server
-type ProxyServerConfig struct {
-	BindAddress        net.IP
-	HealthzPort        int
-	HealthzBindAddress net.IP
-	OOMScoreAdj        int
-	ResourceContainer  string
-	Master             string
-	Kubeconfig         string
-	PortRange          util.PortRange
-	HostnameOverride   string
-	ProxyMode          string
-	IptablesSyncPeriod time.Duration
-	ConfigSyncPeriod   time.Duration
-	NodeRef            *api.ObjectReference // Reference to this node.
-	MasqueradeAll      bool
-	CleanupAndExit     bool
-	KubeAPIQPS         float32
-	KubeAPIBurst       int
-	UDPIdleTimeout     time.Duration
-}
-
 type ProxyServer struct {
 	Client       *kubeclient.Client
-	Config       *ProxyServerConfig
+	Config       *options.ProxyServerConfig
 	IptInterface utiliptables.Interface
 	Proxier      proxy.ProxyProvider
 	Broadcaster  record.EventBroadcaster
 	Recorder     record.EventRecorder
-}
-
-// AddFlags adds flags for a specific ProxyServer to the specified FlagSet
-func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
-	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
-	fs.IntVar(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port to bind the health check server. Use 0 to disable.")
-	fs.IPVar(&s.HealthzBindAddress, "healthz-bind-address", s.HealthzBindAddress, "The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
-	fs.IntVar(&s.OOMScoreAdj, "oom-score-adj", s.OOMScoreAdj, "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
-	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
-	fs.MarkDeprecated("resource-container", "This feature will be removed in a later release.")
-	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
-	fs.Var(&s.PortRange, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
-	fs.StringVar(&s.HostnameOverride, "hostname-override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
-	fs.StringVar(&s.ProxyMode, "proxy-mode", "", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster). If blank, look at the Node object on the Kubernetes API and respect the '"+experimentalProxyModeAnnotation+"' annotation if provided.  Otherwise use the best-available proxy (currently iptables).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
-	fs.DurationVar(&s.IptablesSyncPeriod, "iptables-sync-period", s.IptablesSyncPeriod, "How often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
-	fs.DurationVar(&s.ConfigSyncPeriod, "config-sync-period", s.ConfigSyncPeriod, "How often configuration from the apiserver is refreshed.  Must be greater than 0.")
-	fs.BoolVar(&s.MasqueradeAll, "masquerade-all", false, "If using the pure iptables proxy, SNAT everything")
-	fs.BoolVar(&s.CleanupAndExit, "cleanup-iptables", false, "If true cleanup iptables rules and exit.")
-	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
-	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
-	fs.DurationVar(&s.UDPIdleTimeout, "udp-timeout", s.UDPIdleTimeout, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
+	Conntracker  Conntracker // if nil, ignored
 }
 
 const (
 	proxyModeUserspace              = "userspace"
 	proxyModeIptables               = "iptables"
-	experimentalProxyModeAnnotation = "net.experimental.kubernetes.io/proxy-mode"
+	experimentalProxyModeAnnotation = options.ExperimentalProxyModeAnnotation
 	betaProxyModeAnnotation         = "net.beta.kubernetes.io/proxy-mode"
 )
 
@@ -117,28 +73,14 @@ func checkKnownProxyMode(proxyMode string) bool {
 	return false
 }
 
-func NewProxyConfig() *ProxyServerConfig {
-	return &ProxyServerConfig{
-		BindAddress:        net.ParseIP("0.0.0.0"),
-		HealthzPort:        10249,
-		HealthzBindAddress: net.ParseIP("127.0.0.1"),
-		OOMScoreAdj:        qos.KubeProxyOOMScoreAdj,
-		ResourceContainer:  "/kube-proxy",
-		IptablesSyncPeriod: 30 * time.Second,
-		ConfigSyncPeriod:   15 * time.Minute,
-		KubeAPIQPS:         5.0,
-		KubeAPIBurst:       10,
-		UDPIdleTimeout:     250 * time.Millisecond,
-	}
-}
-
 func NewProxyServer(
 	client *kubeclient.Client,
-	config *ProxyServerConfig,
+	config *options.ProxyServerConfig,
 	iptInterface utiliptables.Interface,
 	proxier proxy.ProxyProvider,
 	broadcaster record.EventBroadcaster,
 	recorder record.EventRecorder,
+	conntracker Conntracker,
 ) (*ProxyServer, error) {
 	return &ProxyServer{
 		Client:       client,
@@ -147,12 +89,13 @@ func NewProxyServer(
 		Proxier:      proxier,
 		Broadcaster:  broadcaster,
 		Recorder:     recorder,
+		Conntracker:  conntracker,
 	}, nil
 }
 
 // NewProxyCommand creates a *cobra.Command object with default parameters
 func NewProxyCommand() *cobra.Command {
-	s := NewProxyConfig()
+	s := options.NewProxyConfig()
 	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
 		Use: "kube-proxy",
@@ -171,7 +114,7 @@ with the apiserver API to configure the proxy.`,
 }
 
 // NewProxyServerDefault creates a new ProxyServer object with default parameters.
-func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
+func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, error) {
 	protocol := utiliptables.ProtocolIpv4
 	if config.BindAddress.To4() == nil {
 		protocol = utiliptables.ProtocolIpv6
@@ -182,7 +125,7 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 	dbus := utildbus.New()
 	iptInterface := utiliptables.New(execer, dbus, protocol)
 
-	// We ommit creation of pretty much everything if we run in cleanup mode
+	// We omit creation of pretty much everything if we run in cleanup mode
 	if config.CleanupAndExit {
 		return &ProxyServer{
 			Config:       config,
@@ -293,11 +236,14 @@ func NewProxyServerDefault(config *ProxyServerConfig) (*ProxyServer, error) {
 		UID:       types.UID(hostname),
 		Namespace: "",
 	}
-	return NewProxyServer(client, config, iptInterface, proxier, eventBroadcaster, recorder)
+
+	conntracker := realConntracker{}
+
+	return NewProxyServer(client, config, iptInterface, proxier, eventBroadcaster, recorder, conntracker)
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
-func (s *ProxyServer) Run(_ []string) error {
+func (s *ProxyServer) Run() error {
 	// remove iptables rules and exit
 	if s.Config.CleanupAndExit {
 		encounteredError := userspace.CleanupLeftovers(s.IptInterface)
@@ -310,9 +256,6 @@ func (s *ProxyServer) Run(_ []string) error {
 
 	s.Broadcaster.StartRecordingToSink(s.Client.Events(""))
 
-	// Birth Cry after the birth is successful
-	s.birthCry()
-
 	// Start up Healthz service if requested
 	if s.Config.HealthzPort > 0 {
 		go util.Until(func() {
@@ -322,6 +265,23 @@ func (s *ProxyServer) Run(_ []string) error {
 			}
 		}, 5*time.Second, util.NeverStop)
 	}
+
+	// Tune conntrack, if requested
+	if s.Conntracker != nil {
+		if s.Config.ConntrackMax > 0 {
+			if err := s.Conntracker.SetMax(s.Config.ConntrackMax); err != nil {
+				return err
+			}
+		}
+		if s.Config.ConntrackTCPTimeoutEstablished > 0 {
+			if err := s.Conntracker.SetTCPEstablishedTimeout(s.Config.ConntrackTCPTimeoutEstablished); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Birth Cry after the birth is successful
+	s.birthCry()
 
 	// Just loop forever for now...
 	s.Proxier.SyncLoop()

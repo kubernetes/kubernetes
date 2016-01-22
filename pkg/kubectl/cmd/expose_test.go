@@ -199,36 +199,6 @@ func TestRunExposeService(t *testing.T) {
 			status: 200,
 		},
 		{
-			name: "expose-external-service",
-			args: []string{"service", "baz"},
-			ns:   "test",
-			calls: map[string]string{
-				"GET":  "/namespaces/test/services/baz",
-				"POST": "/namespaces/test/services",
-			},
-			input: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{},
-				},
-			},
-			// Even if we specify --selector, since service/test doesn't need one it will ignore it
-			flags: map[string]string{"selector": "svc=fromexternal", "port": "90", "labels": "svc=fromexternal", "name": "frombaz", "generator": "service/test", "dry-run": "true"},
-			output: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "frombaz", Namespace: "", Labels: map[string]string{"svc": "fromexternal"}},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
-						{
-							Protocol:   api.ProtocolTCP,
-							Port:       90,
-							TargetPort: intstr.FromInt(90),
-						},
-					},
-				},
-			},
-			status: 200,
-		},
-		{
 			name: "expose-from-file",
 			args: []string{},
 			ns:   "test",

@@ -41,12 +41,12 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 	case config.HasBasicAuth() && config.HasTokenAuth():
 		return nil, fmt.Errorf("username/password or bearer token may be set, but not both")
 	case config.HasTokenAuth():
-		rt = newBearerAuthRoundTripper(config.BearerToken, rt)
+		rt = NewBearerAuthRoundTripper(config.BearerToken, rt)
 	case config.HasBasicAuth():
-		rt = newBasicAuthRoundTripper(config.Username, config.Password, rt)
+		rt = NewBasicAuthRoundTripper(config.Username, config.Password, rt)
 	}
 	if len(config.UserAgent) > 0 {
-		rt = newUserAgentRoundTripper(config.UserAgent, rt)
+		rt = NewUserAgentRoundTripper(config.UserAgent, rt)
 	}
 	return rt, nil
 }
@@ -67,12 +67,16 @@ func DebugWrappers(rt http.RoundTripper) http.RoundTripper {
 	return rt
 }
 
+type requestCanceler interface {
+	CancelRequest(*http.Request)
+}
+
 type userAgentRoundTripper struct {
 	agent string
 	rt    http.RoundTripper
 }
 
-func newUserAgentRoundTripper(agent string, rt http.RoundTripper) http.RoundTripper {
+func NewUserAgentRoundTripper(agent string, rt http.RoundTripper) http.RoundTripper {
 	return &userAgentRoundTripper{agent, rt}
 }
 
@@ -85,6 +89,16 @@ func (rt *userAgentRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	return rt.rt.RoundTrip(req)
 }
 
+func (rt *userAgentRoundTripper) CancelRequest(req *http.Request) {
+	if canceler, ok := rt.rt.(requestCanceler); ok {
+		canceler.CancelRequest(req)
+	} else {
+		glog.Errorf("CancelRequest not implemented")
+	}
+}
+
+func (rt *userAgentRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt }
+
 type basicAuthRoundTripper struct {
 	username string
 	password string
@@ -93,7 +107,7 @@ type basicAuthRoundTripper struct {
 
 // NewBasicAuthRoundTripper will apply a BASIC auth authorization header to a
 // request unless it has already been set.
-func newBasicAuthRoundTripper(username, password string, rt http.RoundTripper) http.RoundTripper {
+func NewBasicAuthRoundTripper(username, password string, rt http.RoundTripper) http.RoundTripper {
 	return &basicAuthRoundTripper{username, password, rt}
 }
 
@@ -106,6 +120,16 @@ func (rt *basicAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	return rt.rt.RoundTrip(req)
 }
 
+func (rt *basicAuthRoundTripper) CancelRequest(req *http.Request) {
+	if canceler, ok := rt.rt.(requestCanceler); ok {
+		canceler.CancelRequest(req)
+	} else {
+		glog.Errorf("CancelRequest not implemented")
+	}
+}
+
+func (rt *basicAuthRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt }
+
 type bearerAuthRoundTripper struct {
 	bearer string
 	rt     http.RoundTripper
@@ -113,7 +137,7 @@ type bearerAuthRoundTripper struct {
 
 // NewBearerAuthRoundTripper adds the provided bearer token to a request
 // unless the authorization header has already been set.
-func newBearerAuthRoundTripper(bearer string, rt http.RoundTripper) http.RoundTripper {
+func NewBearerAuthRoundTripper(bearer string, rt http.RoundTripper) http.RoundTripper {
 	return &bearerAuthRoundTripper{bearer, rt}
 }
 
@@ -126,6 +150,16 @@ func (rt *bearerAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", rt.bearer))
 	return rt.rt.RoundTrip(req)
 }
+
+func (rt *bearerAuthRoundTripper) CancelRequest(req *http.Request) {
+	if canceler, ok := rt.rt.(requestCanceler); ok {
+		canceler.CancelRequest(req)
+	} else {
+		glog.Errorf("CancelRequest not implemented")
+	}
+}
+
+func (rt *bearerAuthRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt }
 
 // cloneRequest returns a clone of the provided *http.Request.
 // The clone is a shallow copy of the struct and its Header map.
@@ -215,6 +249,14 @@ func newDebuggingRoundTripper(rt http.RoundTripper, levels ...debugLevel) *debug
 	return drt
 }
 
+func (rt *debuggingRoundTripper) CancelRequest(req *http.Request) {
+	if canceler, ok := rt.delegatedRoundTripper.(requestCanceler); ok {
+		canceler.CancelRequest(req)
+	} else {
+		glog.Errorf("CancelRequest not implemented")
+	}
+}
+
 func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	reqInfo := newRequestInfo(req)
 
@@ -256,4 +298,8 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	}
 
 	return response, err
+}
+
+func (rt *debuggingRoundTripper) WrappedRoundTripper() http.RoundTripper {
+	return rt.delegatedRoundTripper
 }

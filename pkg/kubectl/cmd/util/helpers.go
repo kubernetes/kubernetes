@@ -28,10 +28,10 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -57,7 +57,7 @@ type debugError interface {
 // souce is the filename or URL to the template file(*.json or *.yaml), or stdin to use to handle the resource.
 func AddSourceToErr(verb string, source string, err error) error {
 	if source != "" {
-		if statusError, ok := err.(*errors.StatusError); ok {
+		if statusError, ok := err.(errors.APIStatus); ok {
 			status := statusError.Status()
 			status.Message = fmt.Sprintf("error when %s %q: %v", verb, source, status.Message)
 			return &errors.StatusError{ErrStatus: status}
@@ -74,6 +74,12 @@ var fatalErrHandler = fatal
 // here if you prefer the panic() over os.Exit(1).
 func BehaviorOnFatal(f func(string)) {
 	fatalErrHandler = f
+}
+
+// DefaultBehaviorOnFatal allows you to undo any previous override.  Useful in
+// tests.
+func DefaultBehaviorOnFatal() {
+	fatalErrHandler = fatal
 }
 
 // fatal prints the message and then exits. If V(2) or greater, glog.Fatal
@@ -145,7 +151,7 @@ func StandardErrorMessage(err error) (string, bool) {
 	if debugErr, ok := err.(debugError); ok {
 		glog.V(4).Infof(debugErr.DebugError())
 	}
-	_, isStatus := err.(client.APIStatus)
+	_, isStatus := err.(errors.APIStatus)
 	switch {
 	case isStatus:
 		return fmt.Sprintf("Error from server: %s", err.Error()), true
@@ -304,6 +310,15 @@ func AddApplyAnnotationFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool(ApplyAnnotationsFlag, false, "If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.")
 }
 
+// AddGeneratorFlags adds flags common to resource generation commands
+// TODO: need to take a pass at other generator commands to use this set of flags
+func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
+	cmd.Flags().String("generator", defaultGenerator, "The name of the API generator to use.")
+	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
+	cmd.Flags().StringP("output", "o", "", "Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md].")
+	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")
+}
+
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
@@ -376,7 +391,12 @@ func Merge(dst runtime.Object, fragment, kind string) (runtime.Object, error) {
 	if !ok {
 		return nil, fmt.Errorf("apiVersion must be a string")
 	}
-	i, err := latest.GroupOrDie("").InterfacesFor(versionString)
+	groupVersion, err := unversioned.ParseGroupVersion(versionString)
+	if err != nil {
+		return nil, err
+	}
+
+	i, err := registered.GroupOrDie(api.GroupName).InterfacesFor(groupVersion)
 	if err != nil {
 		return nil, err
 	}

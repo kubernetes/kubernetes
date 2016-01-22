@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -39,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 	watchjson "k8s.io/kubernetes/pkg/watch/json"
@@ -86,10 +87,10 @@ type Request struct {
 	codec   runtime.Codec
 
 	// generic components accessible via method setters
-	path    string
-	subpath string
-	params  url.Values
-	headers http.Header
+	pathPrefix string
+	subpath    string
+	params     url.Values
+	headers    http.Header
 
 	// structural elements of the request that are part of the Kubernetes API conventions
 	namespace    string
@@ -109,17 +110,30 @@ type Request struct {
 	// The constructed request and the response
 	req  *http.Request
 	resp *http.Response
+
+	backoffMgr BackoffManager
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
-func NewRequest(client HTTPClient, verb string, baseURL *url.URL, groupVersion unversioned.GroupVersion, codec runtime.Codec) *Request {
+func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPath string, groupVersion unversioned.GroupVersion, codec runtime.Codec, backoff BackoffManager) *Request {
+	if backoff == nil {
+		glog.V(2).Infof("Not implementing request backoff strategy.")
+		backoff = &NoBackoff{}
+	}
+	metrics.Register()
+
+	pathPrefix := "/"
+	if baseURL != nil {
+		pathPrefix = path.Join(pathPrefix, baseURL.Path)
+	}
 	return &Request{
 		client:       client,
 		verb:         verb,
 		baseURL:      baseURL,
-		path:         baseURL.Path,
+		pathPrefix:   path.Join(pathPrefix, versionedAPIPath),
 		groupVersion: groupVersion,
 		codec:        codec,
+		backoffMgr:   backoff,
 	}
 }
 
@@ -130,7 +144,7 @@ func (r *Request) Prefix(segments ...string) *Request {
 	if r.err != nil {
 		return r
 	}
-	r.path = path.Join(r.path, path.Join(segments...))
+	r.pathPrefix = path.Join(r.pathPrefix, path.Join(segments...))
 	return r
 }
 
@@ -235,11 +249,10 @@ func (r *Request) AbsPath(segments ...string) *Request {
 	if r.err != nil {
 		return r
 	}
-	if len(segments) == 1 {
+	r.pathPrefix = path.Join(r.baseURL.Path, path.Join(segments...))
+	if len(segments) == 1 && (len(r.baseURL.Path) > 1 || len(segments[0]) > 1) && strings.HasSuffix(segments[0], "/") {
 		// preserve any trailing slashes for legacy behavior
-		r.path = segments[0]
-	} else {
-		r.path = path.Join(segments...)
+		r.pathPrefix += "/"
 	}
 	return r
 }
@@ -255,7 +268,7 @@ func (r *Request) RequestURI(uri string) *Request {
 		r.err = err
 		return r
 	}
-	r.path = locator.Path
+	r.pathPrefix = locator.Path
 	if len(locator.Query()) > 0 {
 		if r.params == nil {
 			r.params = make(url.Values)
@@ -504,6 +517,7 @@ func (r *Request) Timeout(d time.Duration) *Request {
 // If obj is a []byte, send it directly.
 // If obj is an io.Reader, use it directly.
 // If obj is a runtime.Object, marshal it correctly, and set Content-Type header.
+// If obj is a runtime.Object and nil, do nothing.
 // Otherwise, set an error.
 func (r *Request) Body(obj interface{}) *Request {
 	if r.err != nil {
@@ -524,7 +538,11 @@ func (r *Request) Body(obj interface{}) *Request {
 	case io.Reader:
 		r.body = t
 	case runtime.Object:
-		data, err := r.codec.Encode(t)
+		// callers may pass typed interface pointers, therefore we must check nil with reflection
+		if reflect.ValueOf(t).IsNil() {
+			return r
+		}
+		data, err := runtime.Encode(r.codec, t)
 		if err != nil {
 			r.err = err
 			return r
@@ -540,14 +558,14 @@ func (r *Request) Body(obj interface{}) *Request {
 
 // URL returns the current working URL.
 func (r *Request) URL() *url.URL {
-	p := r.path
+	p := r.pathPrefix
 	if r.namespaceSet && len(r.namespace) > 0 {
 		p = path.Join(p, "namespaces", r.namespace)
 	}
 	if len(r.resource) != 0 {
 		p = path.Join(p, strings.ToLower(r.resource))
 	}
-	// Join trims trailing slashes, so preserve r.path's trailing slash for backwards compat if nothing was changed
+	// Join trims trailing slashes, so preserve r.pathPrefix's trailing slash for backwards compat if nothing was changed
 	if len(r.resourceName) != 0 || len(r.subpath) != 0 || len(r.subresource) != 0 {
 		p = path.Join(p, r.resourceName, r.subresource, r.subpath)
 	}
@@ -610,12 +628,20 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
+	time.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
+	if r.baseURL != nil {
+		if err != nil {
+			r.backoffMgr.UpdateBackoff(r.baseURL, err, 0)
+		} else {
+			r.backoffMgr.UpdateBackoff(r.baseURL, err, resp.StatusCode)
+		}
+	}
 	if err != nil {
 		// The watch stream mechanism handles many common partial data errors, so closed
 		// connections can be retried in many cases.
-		if util.IsProbableEOF(err) {
+		if net.IsProbableEOF(err) {
 			return watch.NewEmptyWatch(), nil
 		}
 		return nil, err
@@ -663,8 +689,16 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
+	time.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
+	if r.baseURL != nil {
+		if err != nil {
+			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
+		} else {
+			r.backoffMgr.UpdateBackoff(r.URL(), err, resp.StatusCode)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -686,7 +720,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		if runtimeObject, err := r.codec.Decode(bodyBytes); err == nil {
 			statusError := errors.FromObject(runtimeObject)
 
-			if _, ok := statusError.(APIStatus); ok {
+			if _, ok := statusError.(errors.APIStatus); ok {
 				return nil, statusError
 			}
 		}
@@ -708,6 +742,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	}()
 
 	if r.err != nil {
+		glog.V(4).Infof("Error in request: %v", r.err)
 		return r.err
 	}
 
@@ -736,8 +771,14 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		}
 		req.Header = r.headers
 
+		time.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
 		resp, err := client.Do(req)
 		updateURLMetrics(r, resp, err)
+		if err != nil {
+			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
+		} else {
+			r.backoffMgr.UpdateBackoff(r.URL(), err, resp.StatusCode)
+		}
 		if err != nil {
 			return err
 		}
@@ -865,7 +906,7 @@ func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *h
 		message = strings.TrimSpace(string(body))
 	}
 	retryAfter, _ := retryAfterSeconds(resp)
-	return errors.NewGenericServerResponse(resp.StatusCode, req.Method, r.resource, r.resourceName, message, retryAfter, true)
+	return errors.NewGenericServerResponse(resp.StatusCode, req.Method, unversioned.GroupResource{Group: r.groupVersion.Group, Resource: r.resource}, r.resourceName, message, retryAfter, true)
 }
 
 // isTextResponse returns true if the response appears to be a textual media type.

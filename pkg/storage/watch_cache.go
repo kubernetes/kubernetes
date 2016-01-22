@@ -50,7 +50,7 @@ type watchCacheElement struct {
 // watchCache implements a Store interface.
 // However, it depends on the elements implementing runtime.Object interface.
 //
-// watchCache is a "sliding window" (with a limitted capacity) of objects
+// watchCache is a "sliding window" (with a limited capacity) of objects
 // observed from a watch.
 type watchCache struct {
 	sync.RWMutex
@@ -142,7 +142,7 @@ func objectToVersionedRuntimeObject(obj interface{}) (runtime.Object, uint64, er
 	if err != nil {
 		return nil, 0, err
 	}
-	resourceVersion, err := parseResourceVersion(meta.ResourceVersion())
+	resourceVersion, err := parseResourceVersion(meta.GetResourceVersion())
 	if err != nil {
 		return nil, 0, err
 	}
@@ -166,8 +166,6 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	var prevObject runtime.Object
 	if exists {
 		prevObject = previous.(runtime.Object)
-	} else {
-		prevObject = nil
 	}
 	watchCacheEvent := watchCacheEvent{event.Type, event.Object, prevObject}
 	if w.onEvent != nil {
@@ -280,7 +278,7 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]wa
 		return nil, errors.NewGone(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest))
 	}
 
-	// Binary seatch the smallest index at which resourceVersion is not smaller than
+	// Binary search the smallest index at which resourceVersion is not smaller than
 	// the given one.
 	f := func(i int) bool {
 		return w.cache[(w.startIndex+i)%w.capacity].resourceVersion >= resourceVersion

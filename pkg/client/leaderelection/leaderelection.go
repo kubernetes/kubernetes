@@ -54,21 +54,27 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/golang/glog"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
+
+	"github.com/golang/glog"
+	"github.com/spf13/pflag"
 )
 
 const (
 	JitterFactor = 1.2
 
 	LeaderElectionRecordAnnotationKey = "control-plane.alpha.kubernetes.io/leader"
+
+	DefaultLeaseDuration = 15 * time.Second
+	DefaultRenewDeadline = 10 * time.Second
+	DefaultRetryPeriod   = 2 * time.Second
 )
 
 // NewLeadereElector creates a LeaderElector from a LeaderElecitionConfig
@@ -121,12 +127,15 @@ type LeaderElectionConfig struct {
 //
 // possible future callbacks:
 //  * OnChallenge()
-//  * OnNewLeader()
 type LeaderCallbacks struct {
 	// OnStartedLeading is called when a LeaderElector client starts leading
 	OnStartedLeading func(stop <-chan struct{})
 	// OnStoppedLeading is called when a LeaderElector client stops leading
 	OnStoppedLeading func()
+	// OnNewLeader is called when the client observes a leader that is
+	// not the previously observed leader. This includes the first observed
+	// leader when the client starts.
+	OnNewLeader func(identity string)
 }
 
 // LeaderElector is a leader election client.
@@ -139,6 +148,10 @@ type LeaderElector struct {
 	// internal bookkeeping
 	observedRecord LeaderElectionRecord
 	observedTime   time.Time
+	// used to implement OnNewLeader(), may lag slightly from the
+	// value observedRecord.HolderIdentity if the transistion has
+	// not yet been reported.
+	reportedLeader string
 }
 
 // LeaderElectionRecord is the record that is stored in the leader election annotation.
@@ -150,6 +163,7 @@ type LeaderElectionRecord struct {
 	LeaseDurationSeconds int              `json:"leaseDurationSeconds"`
 	AcquireTime          unversioned.Time `json:"acquireTime"`
 	RenewTime            unversioned.Time `json:"renewTime"`
+	LeaderTransitions    int              `json:"leaderTransitions"`
 }
 
 // Run starts the leader election loop
@@ -165,11 +179,33 @@ func (le *LeaderElector) Run() {
 	close(stop)
 }
 
+// RunOrDie starts a client with the provided config or panics if the config
+// fails to validate.
+func RunOrDie(lec LeaderElectionConfig) {
+	le, err := NewLeaderElector(lec)
+	if err != nil {
+		panic(err)
+	}
+	le.Run()
+}
+
+// GetLeader returns the identity of the last observed leader or returns the empty string if
+// no leader has yet been observed.
+func (le *LeaderElector) GetLeader() string {
+	return le.observedRecord.HolderIdentity
+}
+
+// IsLeader returns true if the last observed leader was this client else returns false.
+func (le *LeaderElector) IsLeader() bool {
+	return le.observedRecord.HolderIdentity == le.config.Identity
+}
+
 // acquire loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew succeeds.
 func (le *LeaderElector) acquire() {
 	stop := make(chan struct{})
 	util.Until(func() {
 		succeeded := le.tryAcquireOrRenew()
+		le.maybeReportTransition()
 		if !succeeded {
 			glog.V(4).Infof("failed to renew lease %v/%v", le.config.EndpointsMeta.Namespace, le.config.EndpointsMeta.Name)
 			time.Sleep(wait.Jitter(le.config.RetryPeriod, JitterFactor))
@@ -188,6 +224,7 @@ func (le *LeaderElector) renew() {
 		err := wait.Poll(le.config.RetryPeriod, le.config.RenewDeadline, func() (bool, error) {
 			return le.tryAcquireOrRenew(), nil
 		})
+		le.maybeReportTransition()
 		if err == nil {
 			glog.V(4).Infof("succesfully renewed lease %v/%v", le.config.EndpointsMeta.Namespace, le.config.EndpointsMeta.Name)
 			return
@@ -242,8 +279,9 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 		e.Annotations = make(map[string]string)
 	}
 
+	var oldLeaderElectionRecord LeaderElectionRecord
+
 	if oldLeaderElectionRecordBytes, found := e.Annotations[LeaderElectionRecordAnnotationKey]; found {
-		var oldLeaderElectionRecord LeaderElectionRecord
 		if err := json.Unmarshal([]byte(oldLeaderElectionRecordBytes), &oldLeaderElectionRecord); err != nil {
 			glog.Errorf("error unmarshaling leader election record: %v", err)
 			return false
@@ -252,14 +290,19 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 			le.observedRecord = oldLeaderElectionRecord
 			le.observedTime = time.Now()
 		}
-		if oldLeaderElectionRecord.HolderIdentity == le.config.Identity {
-			leaderElectionRecord.AcquireTime = oldLeaderElectionRecord.AcquireTime
-		}
 		if le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &&
 			oldLeaderElectionRecord.HolderIdentity != le.config.Identity {
 			glog.Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
 			return false
 		}
+	}
+
+	// We're going to try to update. The leaderElectionRecord is set to it's default
+	// here. Let's correct it before updating.
+	if oldLeaderElectionRecord.HolderIdentity == le.config.Identity {
+		leaderElectionRecord.AcquireTime = oldLeaderElectionRecord.AcquireTime
+	} else {
+		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions + 1
 	}
 
 	leaderElectionRecordBytes, err := json.Marshal(leaderElectionRecord)
@@ -277,4 +320,44 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	le.observedRecord = leaderElectionRecord
 	le.observedTime = time.Now()
 	return true
+}
+
+func (l *LeaderElector) maybeReportTransition() {
+	if l.observedRecord.HolderIdentity == l.reportedLeader {
+		return
+	}
+	l.reportedLeader = l.observedRecord.HolderIdentity
+	if l.config.Callbacks.OnNewLeader != nil {
+		go l.config.Callbacks.OnNewLeader(l.reportedLeader)
+	}
+}
+
+func DefaultLeaderElectionConfiguration() componentconfig.LeaderElectionConfiguration {
+	return componentconfig.LeaderElectionConfiguration{
+		LeaderElect:   false,
+		LeaseDuration: unversioned.Duration{DefaultLeaseDuration},
+		RenewDeadline: unversioned.Duration{DefaultRenewDeadline},
+		RetryPeriod:   unversioned.Duration{DefaultRetryPeriod},
+	}
+}
+
+// BindFlags binds the common LeaderElectionCLIConfig flags to a flagset
+func BindFlags(l *componentconfig.LeaderElectionConfiguration, fs *pflag.FlagSet) {
+	fs.BoolVar(&l.LeaderElect, "leader-elect", l.LeaderElect, ""+
+		"Start a leader election client and gain leadership before "+
+		"executing the main loop. Enable this when running replicated "+
+		"components for high availability.")
+	fs.DurationVar(&l.LeaseDuration.Duration, "leader-elect-lease-duration", l.LeaseDuration.Duration, ""+
+		"The duration that non-leader candidates will wait after observing a leadership "+
+		"renewal until attempting to acquire leadership of a led but unrenewed leader "+
+		"slot. This is effectively the maximum duration that a leader can be stopped "+
+		"before it is replaced by another candidate. This is only applicable if leader "+
+		"election is enabled.")
+	fs.DurationVar(&l.RenewDeadline.Duration, "leader-elect-renew-deadline", l.RenewDeadline.Duration, ""+
+		"The interval between attempts by the acting master to renew a leadership slot "+
+		"before it stops leading. This must be less than or equal to the lease duration. "+
+		"This is only applicable if leader election is enabled.")
+	fs.DurationVar(&l.RetryPeriod.Duration, "leader-elect-retry-period", l.RetryPeriod.Duration, ""+
+		"The duration the clients should wait between attempting acquisition and renewal "+
+		"of a leadership. This is only applicable if leader election is enabled.")
 }

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
@@ -34,6 +35,10 @@ func makeNode(node string, milliCPU, memory int64) api.Node {
 		ObjectMeta: api.ObjectMeta{Name: node},
 		Status: api.NodeStatus{
 			Capacity: api.ResourceList{
+				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+				"memory": *resource.NewQuantity(memory, resource.BinarySI),
+			},
+			Allocatable: api.ResourceList{
 				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 				"memory": *resource.NewQuantity(memory, resource.BinarySI),
 			},
@@ -127,8 +132,13 @@ func TestZeroRequest(t *testing.T) {
 
 	const expectedPriority int = 25
 	for _, test := range tests {
+		m2p, err := predicates.MapPodsToMachines(algorithm.FakePodLister(test.pods))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
 		list, err := scheduler.PrioritizeNodes(
 			test.pod,
+			m2p,
 			algorithm.FakePodLister(test.pods),
 			// This should match the configuration in defaultPriorities() in
 			// plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go if you want
@@ -377,7 +387,11 @@ func TestLeastRequested(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		list, err := LeastRequestedPriority(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
+		m2p, err := predicates.MapPodsToMachines(algorithm.FakePodLister(test.pods))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		list, err := LeastRequestedPriority(test.pod, m2p, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -471,7 +485,7 @@ func TestNewNodeLabelPriority(t *testing.T) {
 			label:    test.label,
 			presence: test.presence,
 		}
-		list, err := prioritizer.CalculateNodeLabelPriority(nil, nil, algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
+		list, err := prioritizer.CalculateNodeLabelPriority(nil, map[string][]*api.Pod{}, nil, algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -709,7 +723,11 @@ func TestBalancedResourceAllocation(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		list, err := BalancedResourceAllocation(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
+		m2p, err := predicates.MapPodsToMachines(algorithm.FakePodLister(test.pods))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		list, err := BalancedResourceAllocation(test.pod, m2p, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

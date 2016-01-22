@@ -79,7 +79,7 @@ func (s *gcmSource) query(metric, oldest, youngest string, labels []string, page
 func retrieveRawSamples(res *gcm.ListTimeseriesResponse, output *[]int) {
 	for _, ts := range res.Timeseries {
 		for _, p := range ts.Points {
-			*output = append(*output, int(p.DoubleValue))
+			*output = append(*output, int(*p.DoubleValue))
 		}
 	}
 }

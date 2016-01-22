@@ -43,6 +43,7 @@ type FakeRuntime struct {
 	StartedContainers []string
 	KilledContainers  []string
 	VersionInfo       string
+	APIVersionInfo    string
 	RuntimeType       string
 	Err               error
 	InspectErr        error
@@ -154,6 +155,14 @@ func (f *FakeRuntime) Version() (Version, error) {
 	return &FakeVersion{Version: f.VersionInfo}, f.Err
 }
 
+func (f *FakeRuntime) APIVersion() (Version, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "APIVersion")
+	return &FakeVersion{Version: f.APIVersionInfo}, f.Err
+}
+
 func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -165,7 +174,7 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	return f.PodList, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(pod *api.Pod, _ Pod, _ api.PodStatus, _ *PodStatus, _ []api.Secret, backOff *util.Backoff) error {
+func (f *FakeRuntime) SyncPod(pod *api.Pod, _ api.PodStatus, _ *PodStatus, _ []api.Secret, backOff *util.Backoff) error {
 	f.Lock()
 	defer f.Unlock()
 

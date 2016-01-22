@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,8 +38,7 @@ func TestIsEtcdNotFound(t *testing.T) {
 			t.Errorf("Expected %#v to return %v, but it did not", err, isNotFound)
 		}
 	}
-	try(etcdErrorNotFound, true)
-	try(&etcd.EtcdError{ErrorCode: 101}, false)
+	try(&etcd.Error{Code: 101}, false)
 	try(nil, false)
 	try(fmt.Errorf("some other kind of error"), false)
 }
@@ -48,7 +47,8 @@ func TestGetEtcdVersion_ValidVersion(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, validEtcdVersion)
 	}))
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 
 	var version string
 	var err error
@@ -63,7 +63,8 @@ func TestGetEtcdVersion_ErrorStatus(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 
 	_, err := GetEtcdVersion(testServer.URL)
 	assert.NotNil(t, err)

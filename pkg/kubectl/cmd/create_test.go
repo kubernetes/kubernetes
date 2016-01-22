@@ -27,6 +27,7 @@ import (
 )
 
 func TestExtraArgsFail(t *testing.T) {
+	initTestErrorHandler(t)
 	buf := bytes.NewBuffer([]byte{})
 
 	f, _, _ := NewAPIFactory()
@@ -37,6 +38,7 @@ func TestExtraArgsFail(t *testing.T) {
 }
 
 func TestCreateObject(t *testing.T) {
+	initTestErrorHandler(t)
 	_, _, rc := testData()
 	rc.Items[0].Name = "redis-master-controller"
 
@@ -69,6 +71,7 @@ func TestCreateObject(t *testing.T) {
 }
 
 func TestCreateMultipleObject(t *testing.T) {
+	initTestErrorHandler(t)
 	_, svc, rc := testData()
 
 	f, tf, codec := NewAPIFactory()
@@ -103,6 +106,7 @@ func TestCreateMultipleObject(t *testing.T) {
 }
 
 func TestCreateDirectory(t *testing.T) {
+	initTestErrorHandler(t)
 	_, svc, rc := testData()
 	rc.Items[0].Name = "name"
 
@@ -136,6 +140,7 @@ func TestCreateDirectory(t *testing.T) {
 }
 
 func TestPrintObjectSpecificMessage(t *testing.T) {
+	initTestErrorHandler(t)
 	tests := []struct {
 		obj          runtime.Object
 		expectOutput bool
@@ -170,6 +175,7 @@ func TestPrintObjectSpecificMessage(t *testing.T) {
 }
 
 func TestMakePortsString(t *testing.T) {
+	initTestErrorHandler(t)
 	tests := []struct {
 		ports          []api.ServicePort
 		useNodePort    bool

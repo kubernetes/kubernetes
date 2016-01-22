@@ -19,7 +19,6 @@ package fs
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -34,8 +33,6 @@ import (
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
 )
-
-var partitionRegex = regexp.MustCompile("^(:?(:?s|xv)d[a-z]+\\d*|dm-\\d+)$")
 
 const (
 	LabelSystemRoot   = "root"
@@ -131,7 +128,7 @@ func getDockerImagePaths(context Context) []string {
 	// TODO(rjnagal): Detect docker root and graphdriver directories from docker info.
 	dockerRoot := context.DockerRoot
 	dockerImagePaths := []string{}
-	for _, dir := range []string{"devicemapper", "btrfs", "aufs"} {
+	for _, dir := range []string{"devicemapper", "btrfs", "aufs", "overlay"} {
 		dockerImagePaths = append(dockerImagePaths, path.Join(dockerRoot, dir))
 	}
 	for dockerRoot != "/" && dockerRoot != "." {
@@ -223,6 +220,8 @@ func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, er
 	}
 	return filesystems, nil
 }
+
+var partitionRegex = regexp.MustCompile(`^(?:(?:s|xv)d[a-z]+\d*|dm-\d+)$`)
 
 func getDiskStatsMap(diskStatsFile string) (map[string]DiskStats, error) {
 	diskStatsMap := make(map[string]DiskStats)
@@ -337,6 +336,8 @@ func dockerStatusValue(status [][]string, target string) string {
 	return ""
 }
 
+// Devicemapper thin provisioning is detailed at
+// https://www.kernel.org/doc/Documentation/device-mapper/thin-provisioning.txt
 func dockerDMDevice(driverStatus string) (string, uint, uint, uint, error) {
 	var config [][]string
 	err := json.Unmarshal([]byte(driverStatus), &config)
@@ -348,46 +349,77 @@ func dockerDMDevice(driverStatus string) (string, uint, uint, uint, error) {
 		return "", 0, 0, 0, fmt.Errorf("Could not get dm pool name")
 	}
 
-	dmTable, err := exec.Command("dmsetup", "table", poolName).Output()
+	out, err := exec.Command("dmsetup", "table", poolName).Output()
 	if err != nil {
 		return "", 0, 0, 0, err
 	}
 
-	var (
-		major, minor, dataBlkSize, bkt uint
-		bkts                           string
-	)
-
-	_, err = fmt.Fscanf(bytes.NewReader(dmTable),
-		"%d %d %s %d:%d %d:%d %d %d %d %s",
-		&bkt, &bkt, &bkts, &bkt, &bkt, &major, &minor, &dataBlkSize, &bkt, &bkt, &bkts)
+	major, minor, dataBlkSize, err := parseDMTable(string(out))
 	if err != nil {
 		return "", 0, 0, 0, err
 	}
+
 	return poolName, major, minor, dataBlkSize, nil
 }
 
+func parseDMTable(dmTable string) (uint, uint, uint, error) {
+	dmTable = strings.Replace(dmTable, ":", " ", -1)
+	dmFields := strings.Fields(dmTable)
+
+	if len(dmFields) < 8 {
+		return 0, 0, 0, fmt.Errorf("Invalid dmsetup status output: %s", dmTable)
+	}
+
+	major, err := strconv.ParseUint(dmFields[5], 10, 32)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	minor, err := strconv.ParseUint(dmFields[6], 10, 32)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	dataBlkSize, err := strconv.ParseUint(dmFields[7], 10, 32)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	return uint(major), uint(minor), uint(dataBlkSize), nil
+}
+
 func getDMStats(poolName string, dataBlkSize uint) (uint64, uint64, uint64, error) {
-	dmStatus, err := exec.Command("dmsetup", "status", poolName).Output()
+	out, err := exec.Command("dmsetup", "status", poolName).Output()
 	if err != nil {
 		return 0, 0, 0, err
 	}
 
-	var (
-		total, used, bkt uint64
-		bkts             string
-	)
-
-	_, err = fmt.Fscanf(bytes.NewReader(dmStatus),
-		"%d %d %s %d %d/%d %d/%d %s %s %s %s",
-		&bkt, &bkt, &bkts, &bkt, &bkt, &bkt, &used, &total, &bkts, &bkts, &bkts, &bkts)
+	used, total, err := parseDMStatus(string(out))
 	if err != nil {
 		return 0, 0, 0, err
 	}
 
-	total *= 512 * uint64(dataBlkSize)
 	used *= 512 * uint64(dataBlkSize)
+	total *= 512 * uint64(dataBlkSize)
 	free := total - used
 
 	return total, free, free, nil
+}
+
+func parseDMStatus(dmStatus string) (uint64, uint64, error) {
+	dmStatus = strings.Replace(dmStatus, "/", " ", -1)
+	dmFields := strings.Fields(dmStatus)
+
+	if len(dmFields) < 8 {
+		return 0, 0, fmt.Errorf("Invalid dmsetup status output: %s", dmStatus)
+	}
+
+	used, err := strconv.ParseUint(dmFields[6], 10, 64)
+	if err != nil {
+		return 0, 0, err
+	}
+	total, err := strconv.ParseUint(dmFields[7], 10, 64)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return used, total, nil
 }

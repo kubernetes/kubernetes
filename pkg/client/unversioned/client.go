@@ -17,18 +17,9 @@ limitations under the License.
 package unversioned
 
 import (
-	"encoding/json"
-	"fmt"
 	"net"
 	"net/url"
 	"strings"
-
-	"github.com/emicklei/go-restful/swagger"
-
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 // Interface holds the methods for clients of Kubernetes,
@@ -39,7 +30,6 @@ type Interface interface {
 	ReplicationControllersNamespacer
 	ServicesNamespacer
 	EndpointsNamespacer
-	VersionInterface
 	NodesInterface
 	EventNamespacer
 	LimitRangesNamespacer
@@ -50,7 +40,6 @@ type Interface interface {
 	PersistentVolumesInterface
 	PersistentVolumeClaimsNamespacer
 	ComponentStatusesInterface
-	SwaggerSchemaInterface
 	Extensions() ExtensionsInterface
 	Discovery() DiscoveryInterface
 }
@@ -114,111 +103,11 @@ func (c *Client) ComponentStatuses() ComponentStatusInterface {
 	return newComponentStatuses(c)
 }
 
-// VersionInterface has a method to retrieve the server version.
-type VersionInterface interface {
-	ServerVersion() (*version.Info, error)
-	ServerAPIVersions() (*unversioned.APIVersions, error)
-}
-
-// APIStatus is exposed by errors that can be converted to an api.Status object
-// for finer grained details.
-type APIStatus interface {
-	Status() unversioned.Status
-}
-
 // Client is the implementation of a Kubernetes client.
 type Client struct {
 	*RESTClient
 	*ExtensionsClient
-	// TODO: remove this when we re-structure pkg/client.
 	*DiscoveryClient
-}
-
-// ServerVersion retrieves and parses the server's version.
-func (c *Client) ServerVersion() (*version.Info, error) {
-	body, err := c.Get().AbsPath("/version").Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var info version.Info
-	err = json.Unmarshal(body, &info)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &info, nil
-}
-
-// ServerAPIVersions retrieves and parses the list of API versions the server supports.
-func (c *Client) ServerAPIVersions() (*unversioned.APIVersions, error) {
-	body, err := c.Get().AbsPath("/api").Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var v unversioned.APIVersions
-	err = json.Unmarshal(body, &v)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &v, nil
-}
-
-type ComponentValidatorInterface interface {
-	ValidateComponents() (*api.ComponentStatusList, error)
-}
-
-// ValidateComponents retrieves and parses the master's self-monitored cluster state.
-// TODO: This should hit the versioned endpoint when that is implemented.
-func (c *Client) ValidateComponents() (*api.ComponentStatusList, error) {
-	body, err := c.Get().AbsPath("/validate").DoRaw()
-	if err != nil {
-		return nil, err
-	}
-
-	statuses := []api.ComponentStatus{}
-	if err := json.Unmarshal(body, &statuses); err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &api.ComponentStatusList{Items: statuses}, nil
-}
-
-// SwaggerSchemaInterface has a method to retrieve the swagger schema. Used in
-// client.Interface
-type SwaggerSchemaInterface interface {
-	SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error)
-}
-
-// SwaggerSchema retrieves and parses the swagger API schema the server supports.
-func (c *Client) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
-	if version.IsEmpty() {
-		return nil, fmt.Errorf("groupVersion cannot be empty")
-	}
-
-	groupList, err := c.Discovery().ServerGroups()
-	if err != nil {
-		return nil, err
-	}
-	groupVersions := ExtractGroupVersions(groupList)
-	// This check also takes care the case that kubectl is newer than the running endpoint
-	if stringDoesntExistIn(version.String(), groupVersions) {
-		return nil, fmt.Errorf("API version: %v is not supported by the server. Use one of: %v", version, groupVersions)
-	}
-	var path string
-	if version == v1.SchemeGroupVersion {
-		path = "/swaggerapi/api/" + version.Version
-	} else {
-		path = "/swaggerapi/apis/" + version.Group + "/" + version.Version
-	}
-
-	body, err := c.Get().AbsPath(path).Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var schema swagger.ApiDeclaration
-	err = json.Unmarshal(body, &schema)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &schema, nil
 }
 
 func stringDoesntExistIn(str string, slice []string) bool {

@@ -34,6 +34,8 @@ type genGroup struct {
 	imports *generator.ImportTracker
 }
 
+var _ generator.Generator = &genGroup{}
+
 // We only want to call GenerateType() once per group.
 func (g *genGroup) Filter(c *generator.Context, t *types.Type) bool {
 	return t == g.types[0]
@@ -46,23 +48,39 @@ func (g *genGroup) Namers(c *generator.Context) namer.NameSystems {
 }
 
 func (g *genGroup) Imports(c *generator.Context) (imports []string) {
-	return append(g.imports.ImportLines(), "fmt", "strings")
+	return append(g.imports.ImportLines(), "fmt")
 }
 
 func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	const pkgUnversioned = "k8s.io/kubernetes/pkg/client/unversioned"
-	const pkgLatest = "k8s.io/kubernetes/pkg/api/latest"
+	const pkgRegistered = "k8s.io/kubernetes/pkg/apimachinery/registered"
+	apiPath := func(group string) string {
+		if group == "legacy" {
+			return `"/api"`
+		}
+		return `"/apis"`
+	}
+
+	canonize := func(group string) string {
+		if group == "legacy" {
+			return ""
+		}
+		return group
+	}
+
 	m := map[string]interface{}{
 		"group":                      g.group,
 		"Group":                      namer.IC(g.group),
+		"canonicalGroup":             canonize(g.group),
 		"types":                      g.types,
 		"Config":                     c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "Config"}),
 		"DefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "DefaultKubernetesUserAgent"}),
 		"RESTClient":                 c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "RESTClient"}),
 		"RESTClientFor":              c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "RESTClientFor"}),
-		"latestGroup":                c.Universe.Variable(types.Name{Package: pkgLatest, Name: "Group"}),
-		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgLatest, Name: "GroupOrDie"}),
+		"latestGroup":                c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "Group"}),
+		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "GroupOrDie"}),
+		"apiPath":                    apiPath(g.group),
 	}
 	sw.Do(groupInterfaceTemplate, m)
 	sw.Do(groupClientTemplate, m)
@@ -71,10 +89,17 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 			"type":  t,
 			"Group": namer.IC(g.group),
 		}
-		sw.Do(namespacerImplTemplate, wrapper)
+		namespaced := !(types.ExtractCommentTags("+", t.SecondClosestCommentLines)["nonNamespaced"] == "true")
+		if namespaced {
+			sw.Do(getterImplNamespaced, wrapper)
+		} else {
+			sw.Do(getterImplNonNamespaced, wrapper)
+
+		}
 	}
-	sw.Do(newClientTemplate, m)
-	sw.Do(newClientOrDieTemplate, m)
+	sw.Do(newClientForConfigTemplate, m)
+	sw.Do(newClientForConfigOrDieTemplate, m)
+	sw.Do(newClientForRESTClientTemplate, m)
 	sw.Do(setClientDefaultsTemplate, m)
 
 	return sw.Error()
@@ -82,8 +107,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 
 var groupInterfaceTemplate = `
 type $.Group$Interface interface {
-    $range .types$
-        $.Name.Name$Namespacer
+    $range .types$ $.|publicPlural$Getter
     $end$
 }
 `
@@ -95,17 +119,23 @@ type $.Group$Client struct {
 }
 `
 
-var namespacerImplTemplate = `
-func (c *$.Group$Client) $.type.Name.Name$s(namespace string) $.type.Name.Name$Interface {
-	return new$.type.Name.Name$s(c, namespace)
+var getterImplNamespaced = `
+func (c *$.Group$Client) $.type|publicPlural$(namespace string) $.type|public$Interface {
+	return new$.type|publicPlural$(c, namespace)
 }
 `
 
-var newClientTemplate = `
-// New$.Group$ creates a new $.Group$Client for the given config.
-func New$.Group$(c *$.Config|raw$) (*$.Group$Client, error) {
+var getterImplNonNamespaced = `
+func (c *$.Group$Client) $.type|publicPlural$() $.type|public$Interface {
+	return new$.type|publicPlural$(c)
+}
+`
+
+var newClientForConfigTemplate = `
+// NewForConfig creates a new $.Group$Client for the given config.
+func NewForConfig(c *$.Config|raw$) (*$.Group$Client, error) {
 	config := *c
-	if err := set$.Group$Defaults(&config); err != nil {
+	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
 	client, err := $.RESTClientFor|raw$(&config)
@@ -116,11 +146,11 @@ func New$.Group$(c *$.Config|raw$) (*$.Group$Client, error) {
 }
 `
 
-var newClientOrDieTemplate = `
-// New$.Group$OrDie creates a new $.Group$Client for the given config and
+var newClientForConfigOrDieTemplate = `
+// NewForConfigOrDie creates a new $.Group$Client for the given config and
 // panics if there is an error in the config.
-func New$.Group$OrDie(c *$.Config|raw$) *$.Group$Client {
-	client, err := New$.Group$(c)
+func NewForConfigOrDie(c *$.Config|raw$) *$.Group$Client {
+	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
 	}
@@ -128,26 +158,33 @@ func New$.Group$OrDie(c *$.Config|raw$) *$.Group$Client {
 }
 `
 
+var newClientForRESTClientTemplate = `
+// New creates a new $.Group$Client for the given RESTClient.
+func New(c *$.RESTClient|raw$) *$.Group$Client {
+	return &$.Group$Client{c}
+}
+`
 var setClientDefaultsTemplate = `
-func set$.Group$Defaults(config *$.Config|raw$) error {
+func setConfigDefaults(config *$.Config|raw$) error {
 	// if $.group$ group is not registered, return an error
-	g, err := $.latestGroup|raw$("$.group$")
+	g, err := $.latestGroup|raw$("$.canonicalGroup$")
 	if err != nil {
 		return err
 	}
-	config.Prefix = "apis/"
+	config.APIPath = $.apiPath$
 	if config.UserAgent == "" {
 		config.UserAgent = $.DefaultKubernetesUserAgent|raw$()
 	}
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	//if config.Version == "" {
-	config.Version = g.GroupVersion
+	copyGroupVersion := g.GroupVersion
+	config.GroupVersion = &copyGroupVersion
 	//}
 
-	versionInterfaces, err := g.InterfacesFor(config.Version)
+	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
 	if err != nil {
 		return fmt.Errorf("$.Group$ API version '%s' is not recognized (valid values: %s)",
-			config.Version, strings.Join($.GroupOrDie|raw$("$.group$").Versions, ", "))
+			config.GroupVersion, g.GroupVersions)
 	}
 	config.Codec = versionInterfaces.Codec
 	if config.QPS == 0 {

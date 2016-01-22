@@ -12,7 +12,7 @@ import (
 
 // ValidateParametersHandler is a request handler to validate the input parameters.
 // Validating parameters only has meaning if done prior to the request being sent.
-var ValidateParametersHandler = request.NamedHandler{"core.ValidateParametersHandler", func(r *request.Request) {
+var ValidateParametersHandler = request.NamedHandler{Name: "core.ValidateParametersHandler", Fn: func(r *request.Request) {
 	if r.ParamsFilled() {
 		v := validator{errors: []string{}}
 		v.validateAny(reflect.ValueOf(r.Params), "")

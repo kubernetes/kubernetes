@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	aws_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 type AWSDiskUtil struct{}
@@ -106,4 +108,43 @@ func (util *AWSDiskUtil) DetachDisk(c *awsElasticBlockStoreCleaner) error {
 		return err
 	}
 	return nil
+}
+
+func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
+	volumes, err := d.getVolumeProvider()
+	if err != nil {
+		glog.V(2).Info("Error getting volume provider: ", err)
+		return err
+	}
+
+	if err := volumes.DeleteVolume(d.volumeID); err != nil {
+		glog.V(2).Infof("Error deleting AWS EBS volume %s: %v", d.volumeID, err)
+		return err
+	}
+	glog.V(2).Infof("Successfully deleted AWS EBS volume %s", d.volumeID)
+	return nil
+}
+
+func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (volumeID string, volumeSizeGB int, err error) {
+	volumes, err := c.getVolumeProvider()
+	if err != nil {
+		glog.V(2).Info("Error getting volume provider: ", err)
+		return "", 0, err
+	}
+
+	requestBytes := c.options.Capacity.Value()
+	// AWS works with gigabytes, convert to GiB with rounding up
+	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
+	volSpec := &aws_cloud.VolumeOptions{
+		CapacityGB: requestGB,
+		Tags:       c.options.CloudTags,
+	}
+
+	name, err := volumes.CreateVolume(volSpec)
+	if err != nil {
+		glog.V(2).Infof("Error creating AWS EBS volume: %v", err)
+		return "", 0, err
+	}
+	glog.V(2).Infof("Successfully created AWS EBS volume %s", name)
+	return name, requestGB, nil
 }

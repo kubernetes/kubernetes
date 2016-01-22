@@ -25,7 +25,7 @@ import (
 )
 
 type InternalComplex struct {
-	TypeMeta
+	runtime.TypeMeta
 	String    string
 	Integer   int
 	Integer64 int64
@@ -34,16 +34,16 @@ type InternalComplex struct {
 }
 
 type ExternalComplex struct {
-	TypeMeta  `json:",inline"`
-	String    string `json:"string" description:"testing"`
-	Integer   int    `json:"int"`
-	Integer64 int64  `json:",omitempty"`
-	Int64     int64
-	Bool      bool `json:"bool"`
+	runtime.TypeMeta `json:",inline"`
+	String           string `json:"string" description:"testing"`
+	Integer          int    `json:"int"`
+	Integer64        int64  `json:",omitempty"`
+	Int64            int64
+	Bool             bool `json:"bool"`
 }
 
-func (*InternalComplex) IsAnAPIObject() {}
-func (*ExternalComplex) IsAnAPIObject() {}
+func (obj *InternalComplex) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *ExternalComplex) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 
 func TestStringMapConversion(t *testing.T) {
 	internalGV := unversioned.GroupVersion{Group: "test.group", Version: ""}

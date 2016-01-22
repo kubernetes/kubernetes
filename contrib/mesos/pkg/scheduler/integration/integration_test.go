@@ -170,10 +170,10 @@ func NewMockPodsListWatch(initialPodList api.PodList) *MockPodsListWatch {
 		list:        initialPodList,
 	}
 	lw.ListWatch = cache.ListWatch{
-		WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			return lw.fakeWatcher, nil
 		},
-		ListFunc: func() (runtime.Object, error) {
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			lw.lock.Lock()
 			defer lw.lock.Unlock()
 
@@ -509,6 +509,7 @@ func newLifecycleTest(t *testing.T) lifecycleTest {
 		&podsListWatch.ListWatch,
 		ei,
 		[]string{"*"},
+		[]string{"*"},
 		mresource.DefaultDefaultContainerCPULimit,
 		mresource.DefaultDefaultContainerMemLimit,
 	)
@@ -601,7 +602,8 @@ func (lt lifecycleTest) Start() <-chan LaunchedTask {
 }
 
 func (lt lifecycleTest) Close() {
-	lt.apiServer.server.Close()
+	// TODO: Uncomment when fix #19254
+	// lt.apiServer.server.Close()
 }
 
 func (lt lifecycleTest) End() <-chan struct{} {

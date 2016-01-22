@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // strategy implements behavior for ServiceAccount objects
@@ -46,7 +46,7 @@ func (strategy) PrepareForCreate(obj runtime.Object) {
 	cleanSecretReferences(obj.(*api.ServiceAccount))
 }
 
-func (strategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
+func (strategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
 	return validation.ValidateServiceAccount(obj.(*api.ServiceAccount))
 }
 
@@ -68,7 +68,7 @@ func cleanSecretReferences(serviceAccount *api.ServiceAccount) {
 	}
 }
 
-func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
+func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateServiceAccountUpdate(obj.(*api.ServiceAccount), old.(*api.ServiceAccount))
 }
 

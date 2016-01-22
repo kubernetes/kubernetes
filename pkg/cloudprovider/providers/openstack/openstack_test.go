@@ -151,7 +151,7 @@ func TestInstances(t *testing.T) {
 	t.Logf("Found NodeAddresses(%s) = %s\n", srvs[0], addrs)
 }
 
-func TestTCPLoadBalancer(t *testing.T) {
+func TestLoadBalancer(t *testing.T) {
 	cfg, ok := configFromEnv()
 	if !ok {
 		t.Skipf("No config found in environment")
@@ -162,17 +162,17 @@ func TestTCPLoadBalancer(t *testing.T) {
 		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
 	}
 
-	lb, ok := os.TCPLoadBalancer()
+	lb, ok := os.LoadBalancer()
 	if !ok {
-		t.Fatalf("TCPLoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
+		t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
 	}
 
-	_, exists, err := lb.GetTCPLoadBalancer("noexist", "region")
+	_, exists, err := lb.GetLoadBalancer("noexist", "region")
 	if err != nil {
-		t.Fatalf("GetTCPLoadBalancer(\"noexist\") returned error: %s", err)
+		t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
 	}
 	if exists {
-		t.Fatalf("GetTCPLoadBalancer(\"noexist\") returned exists")
+		t.Fatalf("GetLoadBalancer(\"noexist\") returned exists")
 	}
 }
 
@@ -197,4 +197,30 @@ func TestZones(t *testing.T) {
 	if zone.Region != "myRegion" {
 		t.Fatalf("GetZone() returned wrong region (%s)", zone.Region)
 	}
+}
+
+func TestVolumes(t *testing.T) {
+	cfg, ok := configFromEnv()
+	if !ok {
+		t.Skipf("No config found in environment")
+	}
+
+	os, err := newOpenStack(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
+	}
+
+	tags := map[string]string{
+		"test": "value",
+	}
+	vol, err := os.CreateVolume(1, &tags)
+	if err != nil {
+		t.Fatalf("Cannot create a new Cinder volume: %v", err)
+	}
+
+	err = os.DeleteVolume(vol)
+	if err != nil {
+		t.Fatalf("Cannot delete Cinder volume %s: %v", vol, err)
+	}
+
 }

@@ -30,10 +30,12 @@ import (
 // fakeRktInterface mocks the rktapi.PublicAPIClient interface for testing purpose.
 type fakeRktInterface struct {
 	sync.Mutex
-	info   rktapi.Info
-	images []*rktapi.Image
-	called []string
-	err    error
+	info       rktapi.Info
+	images     []*rktapi.Image
+	podFilters []*rktapi.PodFilter
+	pods       []*rktapi.Pod
+	called     []string
+	err        error
 }
 
 func newFakeRktInterface() *fakeRktInterface {
@@ -55,11 +57,25 @@ func (f *fakeRktInterface) GetInfo(ctx context.Context, in *rktapi.GetInfoReques
 }
 
 func (f *fakeRktInterface) ListPods(ctx context.Context, in *rktapi.ListPodsRequest, opts ...grpc.CallOption) (*rktapi.ListPodsResponse, error) {
-	return nil, fmt.Errorf("Not implemented")
+	f.Lock()
+	defer f.Unlock()
+
+	f.called = append(f.called, "ListPods")
+	f.podFilters = in.Filters
+	return &rktapi.ListPodsResponse{f.pods}, f.err
 }
 
 func (f *fakeRktInterface) InspectPod(ctx context.Context, in *rktapi.InspectPodRequest, opts ...grpc.CallOption) (*rktapi.InspectPodResponse, error) {
-	return nil, fmt.Errorf("Not implemented")
+	f.Lock()
+	defer f.Unlock()
+
+	f.called = append(f.called, "InspectPod")
+	for _, pod := range f.pods {
+		if pod.Id == in.Id {
+			return &rktapi.InspectPodResponse{pod}, f.err
+		}
+	}
+	return &rktapi.InspectPodResponse{nil}, f.err
 }
 
 func (f *fakeRktInterface) ListImages(ctx context.Context, in *rktapi.ListImagesRequest, opts ...grpc.CallOption) (*rktapi.ListImagesResponse, error) {
@@ -115,12 +131,12 @@ func (f *fakeSystemd) ListUnits() ([]dbus.UnitStatus, error) {
 	return nil, fmt.Errorf("Not implemented")
 }
 
-func (f *fakeSystemd) StopUnit(name, mode string) (string, error) {
-	return "", fmt.Errorf("Not implemented")
+func (f *fakeSystemd) StopUnit(name string, mode string, ch chan<- string) (int, error) {
+	return 0, fmt.Errorf("Not implemented")
 }
 
-func (f *fakeSystemd) RestartUnit(name, mode string) (string, error) {
-	return "", fmt.Errorf("Not implemented")
+func (f *fakeSystemd) RestartUnit(name string, mode string, ch chan<- string) (int, error) {
+	return 0, fmt.Errorf("Not implemented")
 }
 
 func (f *fakeSystemd) Reload() error {

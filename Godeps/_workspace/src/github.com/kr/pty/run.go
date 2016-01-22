@@ -18,7 +18,11 @@ func Start(c *exec.Cmd) (pty *os.File, err error) {
 	c.Stdout = tty
 	c.Stdin = tty
 	c.Stderr = tty
-	c.SysProcAttr = &syscall.SysProcAttr{Setctty: true, Setsid: true}
+	if c.SysProcAttr == nil {
+		c.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	c.SysProcAttr.Setctty = true
+	c.SysProcAttr.Setsid = true
 	err = c.Start()
 	if err != nil {
 		pty.Close()

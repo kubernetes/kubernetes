@@ -49,7 +49,7 @@ func TestNameStrategy(t *testing.T) {
 	u.Type(types.Name{Package: "", Name: "string"})
 
 	o := Orderer{NewPublicNamer(0)}
-	order := o.Order(u)
+	order := o.OrderUniverse(u)
 	orderedNames := make([]string, len(order))
 	for i, t := range order {
 		orderedNames[i] = o.Name(t)
@@ -60,7 +60,7 @@ func TestNameStrategy(t *testing.T) {
 	}
 
 	o = Orderer{NewRawNamer("my/package", nil)}
-	order = o.Order(u)
+	order = o.OrderUniverse(u)
 	orderedNames = make([]string, len(order))
 	for i, t := range order {
 		orderedNames[i] = o.Name(t)
@@ -72,7 +72,7 @@ func TestNameStrategy(t *testing.T) {
 	}
 
 	o = Orderer{NewRawNamer("foo/bar", nil)}
-	order = o.Order(u)
+	order = o.OrderUniverse(u)
 	orderedNames = make([]string, len(order))
 	for i, t := range order {
 		orderedNames[i] = o.Name(t)
@@ -84,7 +84,7 @@ func TestNameStrategy(t *testing.T) {
 	}
 
 	o = Orderer{NewPublicNamer(1)}
-	order = o.Order(u)
+	order = o.OrderUniverse(u)
 	orderedNames = make([]string, len(order))
 	for i, t := range order {
 		orderedNames[i] = o.Name(t)

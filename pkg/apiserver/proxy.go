@@ -32,8 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
+	"k8s.io/kubernetes/pkg/util/net"
 	proxyutil "k8s.io/kubernetes/pkg/util/proxy"
 
 	"github.com/golang/glog"
@@ -56,7 +56,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var apiResource string
 	var httpCode int
 	reqStart := time.Now()
-	defer metrics.Monitor(&verb, &apiResource, util.GetClient(req), &httpCode, reqStart)
+	defer metrics.Monitor(&verb, &apiResource, net.GetHTTPClient(req), &httpCode, reqStart)
 
 	requestInfo, err := r.requestInfoResolver.GetRequestInfo(req)
 	if err != nil || !requestInfo.IsResourceRequest {
@@ -101,7 +101,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	redirector, ok := storage.(rest.Redirector)
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resource)
-		httpCode = errorJSON(errors.NewMethodNotSupported(resource, "proxy"), r.codec, w)
+		httpCode = errorJSON(errors.NewMethodNotSupported(api.Resource(resource), "proxy"), r.codec, w)
 		return
 	}
 

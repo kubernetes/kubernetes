@@ -35,7 +35,7 @@ func (rt *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 func TestBearerAuthRoundTripper(t *testing.T) {
 	rt := &testRoundTripper{}
 	req := &http.Request{}
-	newBearerAuthRoundTripper("test", rt).RoundTrip(req)
+	NewBearerAuthRoundTripper("test", rt).RoundTrip(req)
 	if rt.Request == nil {
 		t.Fatalf("unexpected nil request: %v", rt)
 	}
@@ -57,7 +57,7 @@ func TestBasicAuthRoundTripper(t *testing.T) {
 	} {
 		rt := &testRoundTripper{}
 		req := &http.Request{}
-		newBasicAuthRoundTripper(tc.user, tc.pass, rt).RoundTrip(req)
+		NewBasicAuthRoundTripper(tc.user, tc.pass, rt).RoundTrip(req)
 		if rt.Request == nil {
 			t.Fatalf("%s: unexpected nil request: %v", n, rt)
 		}
@@ -76,7 +76,7 @@ func TestUserAgentRoundTripper(t *testing.T) {
 		Header: make(http.Header),
 	}
 	req.Header.Set("User-Agent", "other")
-	newUserAgentRoundTripper("test", rt).RoundTrip(req)
+	NewUserAgentRoundTripper("test", rt).RoundTrip(req)
 	if rt.Request == nil {
 		t.Fatalf("unexpected nil request: %v", rt)
 	}
@@ -88,7 +88,7 @@ func TestUserAgentRoundTripper(t *testing.T) {
 	}
 
 	req = &http.Request{}
-	newUserAgentRoundTripper("test", rt).RoundTrip(req)
+	NewUserAgentRoundTripper("test", rt).RoundTrip(req)
 	if rt.Request == nil {
 		t.Fatalf("unexpected nil request: %v", rt)
 	}

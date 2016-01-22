@@ -48,7 +48,9 @@ const (
 	restartPodReadyAgainTimeout = 5 * time.Minute
 )
 
-var _ = Describe("Restart", func() {
+// TODO(ihmccreery): These tests haven't been run for a while, so until they're
+// known stable, consider them a non-core feature.
+var _ = Describe("Restart [Feature:Restart]", func() {
 	var c *client.Client
 	var ps *podStore
 	var skipped bool
@@ -161,11 +163,11 @@ func checkNodesReady(c *client.Client, nt time.Duration, expect int) ([]string, 
 	var errLast error
 	start := time.Now()
 	found := wait.Poll(poll, nt, func() (bool, error) {
-		// Even though listNodes(...) has its own retries, a rolling-update
-		// (GCE/GKE implementation of restart) can complete before the apiserver
+		// A rolling-update (GCE/GKE implementation of restart) can complete before the apiserver
 		// knows about all of the nodes. Thus, we retry the list nodes call
 		// until we get the expected number of nodes.
-		nodeList, errLast = listNodes(c, labels.Everything(), fields.Everything())
+		nodeList, errLast = c.Nodes().List(api.ListOptions{
+			FieldSelector: fields.Set{"spec.unschedulable": "false"}.AsSelector()})
 		if errLast != nil {
 			return false, nil
 		}

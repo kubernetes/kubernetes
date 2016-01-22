@@ -76,10 +76,6 @@ type Config struct {
 	Algorithm  algorithm.ScheduleAlgorithm
 	Binder     Binder
 
-	// Rate at which we can create pods
-	// If this field is nil, we don't have any rate limit.
-	BindPodsRateLimiter util.RateLimiter
-
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
@@ -108,34 +104,23 @@ func New(c *Config) *Scheduler {
 
 // Run begins watching and scheduling. It starts a goroutine and returns immediately.
 func (s *Scheduler) Run() {
-	if s.config.BindPodsRateLimiter != nil {
-		go util.Forever(func() {
-			sat := s.config.BindPodsRateLimiter.Saturation()
-			metrics.BindingRateLimiterSaturation.Set(sat)
-		}, metrics.BindingSaturationReportInterval)
-	}
 	go util.Until(s.scheduleOne, 0, s.config.StopEverything)
 }
 
 func (s *Scheduler) scheduleOne() {
 	pod := s.config.NextPod()
-	if s.config.BindPodsRateLimiter != nil {
-		s.config.BindPodsRateLimiter.Accept()
-	}
 
 	glog.V(3).Infof("Attempting to schedule: %+v", pod)
 	start := time.Now()
-	defer func() {
-		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
-	}()
 	dest, err := s.config.Algorithm.Schedule(pod, s.config.NodeLister)
-	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule: %+v", pod)
 		s.config.Recorder.Eventf(pod, api.EventTypeWarning, "FailedScheduling", "%v", err)
 		s.config.Error(pod, err)
 		return
 	}
+	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
+
 	b := &api.Binding{
 		ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
 		Target: api.ObjectReference{
@@ -149,17 +134,19 @@ func (s *Scheduler) scheduleOne() {
 	s.config.Modeler.LockedAction(func() {
 		bindingStart := time.Now()
 		err := s.config.Binder.Bind(b)
-		metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
 		if err != nil {
 			glog.V(1).Infof("Failed to bind pod: %+v", err)
 			s.config.Recorder.Eventf(pod, api.EventTypeNormal, "FailedScheduling", "Binding rejected: %v", err)
 			s.config.Error(pod, err)
 			return
 		}
+		metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
 		s.config.Recorder.Eventf(pod, api.EventTypeNormal, "Scheduled", "Successfully assigned %v to %v", pod.Name, dest)
 		// tell the model to assume that this binding took effect.
 		assumed := *pod
 		assumed.Spec.NodeName = dest
 		s.config.Modeler.AssumePod(&assumed)
 	})
+
+	metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 }

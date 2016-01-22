@@ -36,7 +36,6 @@ var (
 
 const (
 	errAlreadyExists string = "Error 409: Already Exists"
-	queryLimit       int64  = 200
 )
 
 type Client struct {

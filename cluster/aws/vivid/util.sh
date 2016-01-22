@@ -31,35 +31,35 @@ function detect-vivid-image () {
   if [[ -z "${AWS_IMAGE-}" ]]; then
     case "${AWS_REGION}" in
       ap-northeast-1)
-        AWS_IMAGE=ami-56e28056
+        AWS_IMAGE=ami-ee023e80
         ;;
 
       ap-southeast-1)
-        AWS_IMAGE=ami-7e2a392c
+        AWS_IMAGE=ami-7ad91519
         ;;
 
       eu-central-1)
-        AWS_IMAGE=ami-58c1cd45
+        AWS_IMAGE=ami-9c7960f0
         ;;
 
       eu-west-1)
-        AWS_IMAGE=ami-ef8ab698
+        AWS_IMAGE=ami-6a379c19
         ;;
 
       sa-east-1)
-        AWS_IMAGE=ami-c16afbdc
+        AWS_IMAGE=ami-7d49c811
         ;;
 
       us-east-1)
-        AWS_IMAGE=ami-c3772aa6
+        AWS_IMAGE=ami-b5bd98df
         ;;
 
       us-west-1)
-        AWS_IMAGE=ami-6fbe7d2b
+        AWS_IMAGE=ami-b30571d3
         ;;
 
       cn-north-1)
-        AWS_IMAGE=ami-7a1b8743
+        AWS_IMAGE=ami-4c7ab321
         ;;
 
       #us-gov-west-1)
@@ -67,11 +67,11 @@ function detect-vivid-image () {
       #  ;;
 
       ap-southeast-2)
-        AWS_IMAGE=ami-0b93d931
+        AWS_IMAGE=ami-d11431b2
         ;;
 
       us-west-2)
-        AWS_IMAGE=ami-6e67845d
+        AWS_IMAGE=ami-58a2b839
         ;;
 
       *)

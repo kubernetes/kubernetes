@@ -191,7 +191,8 @@ func TestSchedulerExtender(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	m = master.New(masterConfig)
@@ -206,7 +207,8 @@ func TestSchedulerExtender(t *testing.T) {
 	es1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		extender1.serveHTTP(t, w, req)
 	}))
-	defer es1.Close()
+	// TODO: Uncomment when fix #19254
+	// defer es1.Close()
 
 	extender2 := &Extender{
 		name:         "extender2",
@@ -216,7 +218,8 @@ func TestSchedulerExtender(t *testing.T) {
 	es2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		extender2.serveHTTP(t, w, req)
 	}))
-	defer es2.Close()
+	// TODO: Uncomment when fix #19254
+	// defer es2.Close()
 
 	policy := schedulerapi.Policy{
 		ExtenderConfigs: []schedulerapi.ExtenderConfig{
@@ -238,13 +241,13 @@ func TestSchedulerExtender(t *testing.T) {
 	}
 	policy.APIVersion = testapi.Default.GroupVersion().String()
 
-	schedulerConfigFactory := factory.NewConfigFactory(restClient, nil)
+	schedulerConfigFactory := factory.NewConfigFactory(restClient, api.DefaultSchedulerName)
 	schedulerConfig, err := schedulerConfigFactory.CreateFromConfig(policy)
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
 	}
 	eventBroadcaster := record.NewBroadcaster()
-	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
+	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
 	eventBroadcaster.StartRecordingToSink(restClient.Events(""))
 	scheduler.New(schedulerConfig).Run()
 

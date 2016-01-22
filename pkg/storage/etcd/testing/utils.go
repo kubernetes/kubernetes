@@ -26,21 +26,21 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/tools"
-
+	etcd "github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/etcdserver"
 	"github.com/coreos/etcd/etcdserver/etcdhttp"
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/rafthttp"
-	goetcd "github.com/coreos/go-etcd/etcd"
+	"github.com/golang/glog"
+	"golang.org/x/net/context"
 )
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing
 type EtcdTestServer struct {
 	etcdserver.ServerConfig
 	PeerListeners, ClientListeners []net.Listener
-	Client                         tools.EtcdClient
+	Client                         etcd.Client
 
 	raftHandler http.Handler
 	s           *etcdserver.EtcdServer
@@ -126,10 +126,33 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 	return nil
 }
 
+// waitForEtcd wait until etcd is propagated correctly
+func (m *EtcdTestServer) waitUntilUp() error {
+	membersAPI := etcd.NewMembersAPI(m.Client)
+	for start := time.Now(); time.Since(start) < 5*time.Second; time.Sleep(10 * time.Millisecond) {
+		members, err := membersAPI.List(context.TODO())
+		if err != nil {
+			glog.Errorf("Error when getting etcd cluster members")
+			continue
+		}
+		if len(members) == 1 && len(members[0].ClientURLs) > 0 {
+			return nil
+		}
+	}
+	return fmt.Errorf("timeout on waiting for etcd cluster")
+}
+
 // Terminate will shutdown the running etcd server
 func (m *EtcdTestServer) Terminate(t *testing.T) {
-	m.Client.(*goetcd.Client).Close()
+	m.Client = nil
 	m.s.Stop()
+	// TODO: This is a pretty ugly hack to workaround races during closing
+	// in-memory etcd server in unit tests - see #18928 for more details.
+	// We should get rid of it as soon as we have a proper fix - etcd clients
+	// have overwritten transport counting opened connections (probably by
+	// overwriting Dial function) and termination function waiting for all
+	// connections to be closed and stopping accepting new ones.
+	time.Sleep(250 * time.Millisecond)
 	for _, hs := range m.hss {
 		hs.CloseClientConnections()
 		hs.Close()
@@ -147,10 +170,18 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 		t.Fatal("Failed to start etcd server error=%v", err)
 		return nil
 	}
-	server.Client = goetcd.NewClient(server.ClientURLs.StringSlice())
-	if server.Client == nil {
-		t.Errorf("Failed to connect to local etcd server")
-		defer server.Terminate(t)
+	cfg := etcd.Config{
+		Endpoints: server.ClientURLs.StringSlice(),
+	}
+	server.Client, err = etcd.New(cfg)
+	if err != nil {
+		t.Errorf("Unexpected error in NewEtcdTestClientServer (%v)", err)
+		server.Terminate(t)
+		return nil
+	}
+	if err := server.waitUntilUp(); err != nil {
+		t.Errorf("Unexpected error in waitUntilUp (%v)", err)
+		server.Terminate(t)
 		return nil
 	}
 	return server

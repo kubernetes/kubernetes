@@ -69,7 +69,7 @@ type ServiceController struct {
 	cloud            cloudprovider.Interface
 	kubeClient       client.Interface
 	clusterName      string
-	balancer         cloudprovider.TCPLoadBalancer
+	balancer         cloudprovider.LoadBalancer
 	zone             cloudprovider.Zone
 	cache            *serviceCache
 	eventBroadcaster record.EventBroadcaster
@@ -150,9 +150,9 @@ func (s *ServiceController) init() error {
 		return fmt.Errorf("ServiceController should not be run without a cloudprovider.")
 	}
 
-	balancer, ok := s.cloud.TCPLoadBalancer()
+	balancer, ok := s.cloud.LoadBalancer()
 	if !ok {
-		return fmt.Errorf("the cloud provider does not support TCP load balancers.")
+		return fmt.Errorf("the cloud provider does not support external load balancers.")
 	}
 	s.balancer = balancer
 
@@ -256,7 +256,7 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 		s.cache.set(namespacedName.String(), cachedService)
 	case cache.Deleted:
 		s.eventRecorder.Event(service, api.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
-		err := s.balancer.EnsureTCPLoadBalancerDeleted(s.loadBalancerName(service), s.zone.Region)
+		err := s.balancer.EnsureLoadBalancerDeleted(s.loadBalancerName(service), s.zone.Region)
 		if err != nil {
 			message := "Error deleting load balancer (will retry): " + err.Error()
 			s.eventRecorder.Event(service, api.EventTypeWarning, "DeletingLoadBalancerFailed", message)
@@ -278,7 +278,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 		return nil, notRetryable
 	}
 
-	// Note: It is safe to just call EnsureTCPLoadBalancer.  But, on some clouds that requires a delete & create,
+	// Note: It is safe to just call EnsureLoadBalancer.  But, on some clouds that requires a delete & create,
 	// which may involve service interruption.  Also, we would like user-friendly events.
 
 	// Save the state so we can avoid a write if it doesn't change
@@ -293,8 +293,8 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 		} else {
 			// If we don't have any cached memory of the load balancer, we have to ask
 			// the cloud provider for what it knows about it.
-			// Technically EnsureTCPLoadBalancerDeleted can cope, but we want to post meaningful events
-			_, exists, err := s.balancer.GetTCPLoadBalancer(s.loadBalancerName(service), s.zone.Region)
+			// Technically EnsureLoadBalancerDeleted can cope, but we want to post meaningful events
+			_, exists, err := s.balancer.GetLoadBalancer(s.loadBalancerName(service), s.zone.Region)
 			if err != nil {
 				return fmt.Errorf("Error getting LB for service %s: %v", namespacedName, err), retryable
 			}
@@ -306,7 +306,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 		if needDelete {
 			glog.Infof("Deleting existing load balancer for service %s that no longer needs a load balancer.", namespacedName)
 			s.eventRecorder.Event(service, api.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
-			if err := s.balancer.EnsureTCPLoadBalancerDeleted(s.loadBalancerName(service), s.zone.Region); err != nil {
+			if err := s.balancer.EnsureLoadBalancerDeleted(s.loadBalancerName(service), s.zone.Region); err != nil {
 				return err, retryable
 			}
 			s.eventRecorder.Event(service, api.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
@@ -378,7 +378,10 @@ func (s *ServiceController) createLoadBalancer(service *api.Service) error {
 		return err
 	}
 	name := s.loadBalancerName(service)
-	status, err := s.balancer.EnsureTCPLoadBalancer(name, s.zone.Region, net.ParseIP(service.Spec.LoadBalancerIP),
+	// - Only one protocol supported per service
+	// - Not all cloud providers support all protocols and the next step is expected to return
+	//   an error for unsupported protocols
+	status, err := s.balancer.EnsureLoadBalancer(name, s.zone.Region, net.ParseIP(service.Spec.LoadBalancerIP),
 		ports, hostsFromNodeList(&nodes), service.Spec.SessionAffinity)
 	if err != nil {
 		return err
@@ -482,15 +485,19 @@ func (s *ServiceController) loadBalancerName(service *api.Service) string {
 }
 
 func getPortsForLB(service *api.Service) ([]*api.ServicePort, error) {
+	var protocol api.Protocol
+
 	ports := []*api.ServicePort{}
 	for i := range service.Spec.Ports {
-		// TODO: Support UDP. Remove the check from the API validation package once
-		// it's supported.
 		sp := &service.Spec.Ports[i]
-		if sp.Protocol != api.ProtocolTCP {
-			return nil, fmt.Errorf("load balancers for non TCP services are not currently supported.")
-		}
+		// The check on protocol was removed here.  The cloud provider itself is now responsible for all protocol validation
 		ports = append(ports, sp)
+		if protocol == "" {
+			protocol = sp.Protocol
+		} else if protocol != sp.Protocol && wantsLoadBalancer(service) {
+			// TODO:  Convert error messages to use event recorder
+			return nil, fmt.Errorf("mixed protocol external load balancers are not supported.")
+		}
 	}
 	return ports, nil
 }
@@ -620,11 +627,7 @@ func getNodeConditionPredicate() cache.NodeConditionPredicate {
 func (s *ServiceController) nodeSyncLoop(period time.Duration) {
 	var prevHosts []string
 	var servicesToUpdate []*cachedService
-	// TODO: Eliminate the unneeded now variable once we stop compiling in go1.3.
-	// It's needed at the moment because go1.3 requires ranges to be assigned to
-	// something to compile, and gofmt1.4 complains about using `_ = range`.
-	for now := range time.Tick(period) {
-		_ = now
+	for range time.Tick(period) {
 		nodes, err := s.nodeLister.NodeCondition(getNodeConditionPredicate()).List()
 		if err != nil {
 			glog.Errorf("Failed to retrieve current set of nodes from node lister: %v", err)
@@ -667,7 +670,7 @@ func (s *ServiceController) updateLoadBalancerHosts(services []*cachedService, h
 				return
 			}
 			if err := s.lockedUpdateLoadBalancerHosts(service.appliedState, hosts); err != nil {
-				glog.Errorf("External error while updating TCP load balancer: %v.", err)
+				glog.Errorf("External error while updating load balancer: %v.", err)
 				servicesToRetry = append(servicesToRetry, service)
 			}
 		}()
@@ -684,15 +687,15 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, 
 
 	// This operation doesn't normally take very long (and happens pretty often), so we only record the final event
 	name := cloudprovider.GetLoadBalancerName(service)
-	err := s.balancer.UpdateTCPLoadBalancer(name, s.zone.Region, hosts)
+	err := s.balancer.UpdateLoadBalancer(name, s.zone.Region, hosts)
 	if err == nil {
 		s.eventRecorder.Event(service, api.EventTypeNormal, "UpdatedLoadBalancer", "Updated load balancer with new hosts")
 		return nil
 	}
 
 	// It's only an actual error if the load balancer still exists.
-	if _, exists, err := s.balancer.GetTCPLoadBalancer(name, s.zone.Region); err != nil {
-		glog.Errorf("External error while checking if TCP load balancer %q exists: name, %v", name, err)
+	if _, exists, err := s.balancer.GetLoadBalancer(name, s.zone.Region); err != nil {
+		glog.Errorf("External error while checking if load balancer %q exists: name, %v", name, err)
 	} else if !exists {
 		return nil
 	}

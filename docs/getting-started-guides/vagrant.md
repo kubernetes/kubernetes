@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/vagrant.md).
@@ -56,7 +57,7 @@ Running Kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
 
 ### Prerequisites
 
-1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
+1. Install latest version >= 1.7.4 of vagrant from http://www.vagrantup.com/downloads.html
 2. Install one of:
    1. The latest version of Virtual Box from https://www.virtualbox.org/wiki/Downloads
    2. [VMWare Fusion](https://www.vmware.com/products/fusion/) version 5 or greater as well as the appropriate [Vagrant VMWare Fusion provider](https://www.vagrantup.com/vmware)

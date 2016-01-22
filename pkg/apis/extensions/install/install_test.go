@@ -21,9 +21,10 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 func TestResourceVersioner(t *testing.T) {
@@ -48,9 +49,9 @@ func TestResourceVersioner(t *testing.T) {
 
 func TestCodec(t *testing.T) {
 	daemonSet := extensions.DaemonSet{}
-	// We do want to use package latest rather than testapi here, because we
-	// want to test if the package install and package latest work as expected.
-	data, err := latest.GroupOrDie("extensions").Codec.Encode(&daemonSet)
+	// We do want to use package registered rather than testapi here, because we
+	// want to test if the package install and package registered work as expected.
+	data, err := registered.GroupOrDie(extensions.GroupName).Codec.Encode(&daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -58,37 +59,37 @@ func TestCodec(t *testing.T) {
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if other.APIVersion != latest.GroupOrDie("extensions").GroupVersion.String() || other.Kind != "DaemonSet" {
+	if other.APIVersion != registered.GroupOrDie(extensions.GroupName).GroupVersion.String() || other.Kind != "DaemonSet" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
 	}
 }
 
 func TestInterfacesFor(t *testing.T) {
-	if _, err := latest.GroupOrDie("extensions").InterfacesFor(""); err == nil {
+	if _, err := registered.GroupOrDie(extensions.GroupName).InterfacesFor(extensions.SchemeGroupVersion); err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
 	}
-	for i, groupVersion := range append([]unversioned.GroupVersion{latest.GroupOrDie("extensions").GroupVersion}, latest.GroupOrDie("extensions").GroupVersions...) {
-		if vi, err := latest.GroupOrDie("extensions").InterfacesFor(groupVersion.String()); err != nil || vi == nil {
+	for i, version := range registered.GroupOrDie(extensions.GroupName).GroupVersions {
+		if vi, err := registered.GroupOrDie(extensions.GroupName).InterfacesFor(version); err != nil || vi == nil {
 			t.Fatalf("%d: unexpected result: %v", i, err)
 		}
 	}
 }
 
 func TestRESTMapper(t *testing.T) {
-	gv := unversioned.GroupVersion{Group: "extensions", Version: "v1beta1"}
+	gv := v1beta1.SchemeGroupVersion
 	hpaGVK := gv.WithKind("HorizontalPodAutoscaler")
 	daemonSetGVK := gv.WithKind("DaemonSet")
 
-	if gvk, err := latest.GroupOrDie("extensions").RESTMapper.KindFor("horizontalpodautoscalers"); err != nil || gvk != hpaGVK {
+	if gvk, err := registered.GroupOrDie(extensions.GroupName).RESTMapper.KindFor(gv.WithResource("horizontalpodautoscalers")); err != nil || gvk != hpaGVK {
 		t.Errorf("unexpected version mapping: %v %v", gvk, err)
 	}
 
-	if m, err := latest.GroupOrDie("extensions").RESTMapper.RESTMapping(daemonSetGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != daemonSetGVK || m.Resource != "daemonsets" {
+	if m, err := registered.GroupOrDie(extensions.GroupName).RESTMapper.RESTMapping(daemonSetGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != daemonSetGVK || m.Resource != "daemonsets" {
 		t.Errorf("unexpected version mapping: %#v %v", m, err)
 	}
 
-	for _, version := range latest.GroupOrDie("extensions").GroupVersions {
-		mapping, err := latest.GroupOrDie("extensions").RESTMapper.RESTMapping(hpaGVK.GroupKind(), version.Version)
+	for _, version := range registered.GroupOrDie(extensions.GroupName).GroupVersions {
+		mapping, err := registered.GroupOrDie(extensions.GroupName).RESTMapper.RESTMapping(hpaGVK.GroupKind(), version.Version)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -96,11 +97,11 @@ func TestRESTMapper(t *testing.T) {
 		if mapping.Resource != "horizontalpodautoscalers" {
 			t.Errorf("incorrect resource name: %#v", mapping)
 		}
-		if mapping.GroupVersionKind.GroupVersion() != gv {
+		if mapping.GroupVersionKind.GroupVersion() != version {
 			t.Errorf("incorrect groupVersion: %v", mapping)
 		}
 
-		interfaces, _ := latest.GroupOrDie("extensions").InterfacesFor(gv.String())
+		interfaces, _ := registered.GroupOrDie(extensions.GroupName).InterfacesFor(version)
 		if mapping.Codec != interfaces.Codec {
 			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
 		}

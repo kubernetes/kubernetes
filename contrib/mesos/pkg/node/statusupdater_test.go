@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
-	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
+	cmoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
+	kubeletoptions "k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
@@ -46,9 +46,9 @@ func Test_nodeWithUpdatedStatus(t *testing.T) {
 		}
 	}
 
-	cm := app.NewCMServer()
-	kubecfg := kubeletapp.NewKubeletServer()
-	assert.True(t, kubecfg.NodeStatusUpdateFrequency*3 < cm.NodeMonitorGracePeriod) // sanity check for defaults
+	cm := cmoptions.NewCMServer()
+	kubecfg := kubeletoptions.NewKubeletServer()
+	assert.True(t, kubecfg.NodeStatusUpdateFrequency.Duration*3 < cm.NodeMonitorGracePeriod) // sanity check for defaults
 
 	n := testNode(0, api.ConditionTrue, "KubeletReady")
 	su := NewStatusUpdater(nil, cm.NodeMonitorPeriod, func() time.Time { return now })
@@ -63,12 +63,12 @@ func Test_nodeWithUpdatedStatus(t *testing.T) {
 	assert.Equal(t, getCondition(&n2.Status, api.NodeReady).Reason, slaveReadyReason)
 	assert.Equal(t, getCondition(&n2.Status, api.NodeReady).Message, slaveReadyMessage)
 
-	n = testNode(-kubecfg.NodeStatusUpdateFrequency, api.ConditionTrue, "KubeletReady")
+	n = testNode(-kubecfg.NodeStatusUpdateFrequency.Duration, api.ConditionTrue, "KubeletReady")
 	n2, updated, err = su.nodeWithUpdatedStatus(n)
 	assert.NoError(t, err)
 	assert.False(t, updated, "no update expected b/c kubelet's update was missed only once")
 
-	n = testNode(-kubecfg.NodeStatusUpdateFrequency*3, api.ConditionTrue, "KubeletReady")
+	n = testNode(-kubecfg.NodeStatusUpdateFrequency.Duration*3, api.ConditionTrue, "KubeletReady")
 	n2, updated, err = su.nodeWithUpdatedStatus(n)
 	assert.NoError(t, err)
 	assert.True(t, updated, "update expected b/c kubelet's update is older than 3*DefaultNodeStatusUpdateFrequency")

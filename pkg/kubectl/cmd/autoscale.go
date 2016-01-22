@@ -101,7 +101,8 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 
 	// Get the generator, setup and validate all required parameters
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
-	generator, found := f.Generator(generatorName)
+	generators := f.Generators("autoscale")
+	generator, found := generators[generatorName]
 	if !found {
 		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generatorName))
 	}
@@ -115,6 +116,10 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	params["scaleRef-apiVersion"] = mapping.GroupVersionKind.GroupVersion().String()
 
 	if err = kubectl.ValidateParams(names, params); err != nil {
+		return err
+	}
+	// Check for invalid flags used against the present generator.
+	if err := kubectl.EnsureFlagsValid(cmd, generators, generatorName); err != nil {
 		return err
 	}
 

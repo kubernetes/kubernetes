@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// To run the e2e tests against one or more hosts on gce: $ go run run_e2e.go --hosts <comma separated hosts>
+// Requires gcloud compute ssh access to the hosts
 package main
 
 import (
@@ -75,17 +77,17 @@ func main() {
 		u.Add(1)
 	}
 
-	w := sync.WaitGroup{}
-	for _, h := range strings.Split(*hosts, ",") {
-		w.Add(1)
+	results := make(chan error)
+	hs := strings.Split(*hosts, ",")
+	for _, h := range hs {
 		go func(host string) {
 			out, err := runTests(host)
 			if err != nil {
-				glog.Infof("Failure Finished Test Suite %s %v", out, err)
+				glog.Infof("Failure Finished Host %s Test Suite %s %v", host, out, err)
 			} else {
-				glog.Infof("Success Finished Test Suite %s", out)
+				glog.Infof("Success Finished Host %s Test Suite %s", host, out)
 			}
-			w.Done()
+			results <- err
 		}(h)
 	}
 
@@ -94,9 +96,19 @@ func main() {
 		WaitForUser()
 	}
 
-	// Wait for the tests to finish
-	w.Wait()
-	glog.Infof("All hosts finished")
+	// Wait for all tests to complete and check for failures
+	errCount := 0
+	for i := 0; i < len(hs); i++ {
+		if <-results != nil {
+			errCount++
+		}
+	}
+
+	// Set the exit code if there were failures
+	if errCount > 0 {
+		glog.Errorf("Failure: %d errors encountered.", errCount)
+		os.Exit(1)
+	}
 }
 
 func WaitForUser() {
@@ -111,29 +123,30 @@ func WaitForUser() {
 	u.Done()
 }
 
-func runTests(host string) ([]byte, error) {
+func runTests(fullhost string) ([]byte, error) {
+	host := strings.Split(fullhost, ".")[0]
 	c := gcloud.NewGCloudClient(host, *zone)
 	// TODO(pwittrock): Come up with something better for bootstrapping the environment.
-	etcdBin := filepath.Join(kubeRoot, "third_party/etcd/etcd")
-	eh, err := c.CopyAndWaitTillHealthy(false, "4001", healthyTimeoutDuration, "v2/keys/", etcdBin)
+	eh, err := c.RunAndWaitTillHealthy(
+		false, false, "4001", healthyTimeoutDuration, "v2/keys/", "etcd", "--data-dir", "./", "--name", "e2e-node")
 	defer func() { eh.TearDown() }()
 	if err != nil {
 		return nil, fmt.Errorf("Host %s failed to run command %v", host, err)
 	}
 
 	apiBin := filepath.Join(kubeRoot, *kubeOutputRelPath, "kube-apiserver")
-	ah, err := c.CopyAndWaitTillHealthy(
-		true, "8080", healthyTimeoutDuration, "healthz", apiBin, "--service-cluster-ip-range",
-		"10.0.0.1/24", "--insecure-bind-address", "0.0.0.0", "--etcd-servers", "http://localhost:4001",
-		"--cluster-name", "kubernetes", "--v", "2", "--kubelet-port", "10250")
+	ah, err := c.RunAndWaitTillHealthy(
+		true, true, "8080", healthyTimeoutDuration, "healthz", apiBin, "--service-cluster-ip-range",
+		"10.0.0.1/24", "--insecure-bind-address", "0.0.0.0", "--etcd-servers", "http://127.0.0.1:4001",
+		"--v", "2", "--kubelet-port", "10250")
 	defer func() { ah.TearDown() }()
 	if err != nil {
 		return nil, fmt.Errorf("Host %s failed to run command %v", host, err)
 	}
 
 	kubeletBin := filepath.Join(kubeRoot, *kubeOutputRelPath, "kubelet")
-	kh, err := c.CopyAndWaitTillHealthy(
-		true, "4194", healthyTimeoutDuration, "healthz", kubeletBin, "--api-servers", "http://localhost:8080",
+	kh, err := c.RunAndWaitTillHealthy(
+		true, true, "10255", healthyTimeoutDuration, "healthz", kubeletBin, "--api-servers", "http://127.0.0.1:8080",
 		"--logtostderr", "--address", "0.0.0.0", "--port", "10250")
 	defer func() { kh.TearDown() }()
 	if err != nil {
@@ -148,7 +161,8 @@ func runTests(host string) ([]byte, error) {
 	ginkoTests := filepath.Join(kubeRoot, ginkoTestRelPath)
 	return exec.Command(
 		"ginkgo", ginkoTests, "--",
-		"--kubelet-host", "localhost", "--kubelet-port", kh.LPort,
-		"--api-server-host", "localhost", "--api-server-port", kh.LPort,
+		"--kubelet-address", fmt.Sprintf("http://127.0.0.1:%s", kh.LPort),
+		"--api-server-address", fmt.Sprintf("http://127.0.0.1:%s", ah.LPort),
+		"--node-name", fullhost,
 		"-logtostderr").CombinedOutput()
 }

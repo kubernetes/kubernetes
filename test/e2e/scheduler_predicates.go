@@ -46,7 +46,7 @@ func getPodsScheduled(pods *api.PodList) (scheduledPods, notScheduledPods []api.
 // Simplified version of RunRC, that does not create RC, but creates plain Pods and
 // requires passing whole Pod definition, which is needed to test various Scheduler predicates.
 func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, pod api.Pod) {
-	allPods, err := c.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
+	allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
 	expectNoError(err)
 	podsScheduledBefore, _ := getPodsScheduled(allPods)
 
@@ -67,7 +67,7 @@ func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, 
 	startTime := time.Now()
 	currentlyScheduledPods := 0
 	for len(podsScheduledBefore)+replicas != currentlyScheduledPods {
-		allPods, err := c.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
+		allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
 		expectNoError(err)
 		scheduledPods := 0
 		for _, pod := range allPods.Items {
@@ -89,13 +89,13 @@ func startPods(c *client.Client, replicas int, ns string, podNamePrefix string, 
 func getRequestedCPU(pod api.Pod) int64 {
 	var result int64
 	for _, container := range pod.Spec.Containers {
-		result += container.Resources.Limits.Cpu().MilliValue()
+		result += container.Resources.Requests.Cpu().MilliValue()
 	}
 	return result
 }
 
 func verifyResult(c *client.Client, podName string, ns string) {
-	allPods, err := c.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
+	allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
 	expectNoError(err)
 	scheduledPods, notScheduledPods := getPodsScheduled(allPods)
 
@@ -103,10 +103,10 @@ func verifyResult(c *client.Client, podName string, ns string) {
 		"involvedObject.kind":      "Pod",
 		"involvedObject.name":      podName,
 		"involvedObject.namespace": ns,
-		"source":                   "scheduler",
+		"source":                   api.DefaultSchedulerName,
 		"reason":                   "FailedScheduling",
 	}.AsSelector()
-	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+	options := api.ListOptions{FieldSelector: selector}
 	schedEvents, err := c.Events(ns).List(options)
 	expectNoError(err)
 	// If we failed to find event with a capitalized first letter of reason
@@ -121,7 +121,7 @@ func verifyResult(c *client.Client, podName string, ns string) {
 			"source":                   "scheduler",
 			"reason":                   "failedScheduling",
 		}.AsSelector()
-		options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+		options := api.ListOptions{FieldSelector: selector}
 		schedEvents, err = c.Events(ns).List(options)
 		expectNoError(err)
 	}
@@ -142,7 +142,7 @@ func verifyResult(c *client.Client, podName string, ns string) {
 
 func cleanupPods(c *client.Client, ns string) {
 	By("Removing all pods in namespace " + ns)
-	pods, err := c.Pods(ns).List(unversioned.ListOptions{})
+	pods, err := c.Pods(ns).List(api.ListOptions{})
 	expectNoError(err)
 	opt := api.NewDeleteOptions(0)
 	for _, p := range pods.Items {
@@ -155,13 +155,13 @@ func waitForStableCluster(c *client.Client) int {
 	timeout := 10 * time.Minute
 	startTime := time.Now()
 
-	allPods, err := c.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
+	allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
 	expectNoError(err)
 	scheduledPods, currentlyNotScheduledPods := getPodsScheduled(allPods)
 	for len(currentlyNotScheduledPods) != 0 {
 		time.Sleep(2 * time.Second)
 
-		allPods, err := c.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
+		allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
 		expectNoError(err)
 		scheduledPods, currentlyNotScheduledPods = getPodsScheduled(allPods)
 
@@ -173,7 +173,7 @@ func waitForStableCluster(c *client.Client) int {
 	return len(scheduledPods)
 }
 
-var _ = Describe("SchedulerPredicates", func() {
+var _ = Describe("SchedulerPredicates [Serial]", func() {
 	var c *client.Client
 	var nodeList *api.NodeList
 	var totalPodCapacity int64
@@ -194,15 +194,15 @@ var _ = Describe("SchedulerPredicates", func() {
 	BeforeEach(func() {
 		c = framework.Client
 		ns = framework.Namespace.Name
-		var err error
-		nodeList, err = c.Nodes().List(unversioned.ListOptions{})
-		expectNoError(err)
+		nodeList = ListSchedulableNodesOrDie(c)
 	})
 
 	// This test verifies that max-pods flag works as advertised. It assumes that cluster add-on pods stay stable
 	// and cannot be run in parallel with any other test that touches Nodes or Pods. It is so because to check
 	// if max-pods is working we need to fully saturate the cluster and keep it in this state for few seconds.
-	It("validates MaxPods limit number of pods that are allowed to run", func() {
+	//
+	// Slow PR #13315 (8 min)
+	It("validates MaxPods limit number of pods that are allowed to run [Slow]", func() {
 		totalPodCapacity = 0
 
 		for _, node := range nodeList.Items {
@@ -275,7 +275,7 @@ var _ = Describe("SchedulerPredicates", func() {
 		}
 		waitForStableCluster(c)
 
-		pods, err := c.Pods(api.NamespaceAll).List(unversioned.ListOptions{})
+		pods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
 		expectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToCapacityMap[pod.Spec.NodeName]
@@ -310,6 +310,9 @@ var _ = Describe("SchedulerPredicates", func() {
 						Image: "gcr.io/google_containers/pause:2.0",
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
+								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+							},
+							Requests: api.ResourceList{
 								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 							},
 						},

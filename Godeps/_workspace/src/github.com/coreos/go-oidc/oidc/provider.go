@@ -25,6 +25,9 @@ const (
 	discoveryConfigPath = "/.well-known/openid-configuration"
 )
 
+// internally configurable for tests
+var minimumProviderConfigSyncInterval = MinimumProviderConfigSyncInterval
+
 type ProviderConfig struct {
 	Issuer                            string    `json:"issuer"`
 	AuthEndpoint                      string    `json:"authorization_endpoint"`
@@ -172,8 +175,8 @@ func nextSyncAfter(exp time.Time, clock clockwork.Clock) time.Duration {
 	t := exp.Sub(clock.Now()) / 2
 	if t > MaximumProviderConfigSyncInterval {
 		t = MaximumProviderConfigSyncInterval
-	} else if t < MinimumProviderConfigSyncInterval {
-		t = MinimumProviderConfigSyncInterval
+	} else if t < minimumProviderConfigSyncInterval {
+		t = minimumProviderConfigSyncInterval
 	}
 
 	return t

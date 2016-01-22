@@ -22,6 +22,7 @@ package leaderelection
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -35,6 +36,7 @@ import (
 
 func TestTryAcquireOrRenew(t *testing.T) {
 	future := time.Now().Add(1000 * time.Hour)
+	past := time.Now().Add(-1000 * time.Hour)
 
 	tests := []struct {
 		observedRecord LeaderElectionRecord
@@ -44,8 +46,9 @@ func TestTryAcquireOrRenew(t *testing.T) {
 			reaction testclient.ReactionFunc
 		}
 
-		expectSuccess bool
-		outHolder     string
+		expectSuccess    bool
+		transitionLeader bool
+		outHolder        string
 	}{
 		// acquire from no endpoints
 		{
@@ -56,7 +59,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				{
 					verb: "get",
 					reaction: func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, nil, errors.NewNotFound(action.GetVerb(), action.(testclient.GetAction).GetName())
+						return true, nil, errors.NewNotFound(api.Resource(action.(testclient.GetAction).GetResource()), action.(testclient.GetAction).GetName())
 					},
 				},
 				{
@@ -93,8 +96,10 @@ func TestTryAcquireOrRenew(t *testing.T) {
 					},
 				},
 			},
-			expectSuccess: true,
-			outHolder:     "baz",
+
+			expectSuccess:    true,
+			transitionLeader: true,
+			outHolder:        "baz",
 		},
 		// acquire from led, unacked endpoints
 		{
@@ -109,6 +114,9 @@ func TestTryAcquireOrRenew(t *testing.T) {
 							ObjectMeta: api.ObjectMeta{
 								Namespace: action.GetNamespace(),
 								Name:      action.(testclient.GetAction).GetName(),
+								Annotations: map[string]string{
+									LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
+								},
 							},
 						}, nil
 					},
@@ -120,8 +128,12 @@ func TestTryAcquireOrRenew(t *testing.T) {
 					},
 				},
 			},
-			expectSuccess: true,
-			outHolder:     "baz",
+			observedRecord: LeaderElectionRecord{HolderIdentity: "bing"},
+			observedTime:   past,
+
+			expectSuccess:    true,
+			transitionLeader: true,
+			outHolder:        "baz",
 		},
 		// don't acquire from led, acked endpoints
 		{
@@ -184,14 +196,24 @@ func TestTryAcquireOrRenew(t *testing.T) {
 		},
 	}
 
-	lec := LeaderElectionConfig{
-		EndpointsMeta: api.ObjectMeta{Namespace: "foo", Name: "bar"},
-		Identity:      "baz",
-		EventRecorder: &record.FakeRecorder{},
-		LeaseDuration: 10 * time.Second,
-	}
-
 	for i, test := range tests {
+		// OnNewLeader is called async so we have to wait for it.
+		var wg sync.WaitGroup
+		wg.Add(1)
+		var reportedLeader string
+
+		lec := LeaderElectionConfig{
+			EndpointsMeta: api.ObjectMeta{Namespace: "foo", Name: "bar"},
+			Identity:      "baz",
+			EventRecorder: &record.FakeRecorder{},
+			LeaseDuration: 10 * time.Second,
+			Callbacks: LeaderCallbacks{
+				OnNewLeader: func(l string) {
+					defer wg.Done()
+					reportedLeader = l
+				},
+			},
+		}
 		c := &testclient.Fake{}
 		for _, reactor := range test.reactors {
 			c.AddReactor(reactor.verb, "endpoints", reactor.reaction)
@@ -218,7 +240,19 @@ func TestTryAcquireOrRenew(t *testing.T) {
 			t.Errorf("[%v]expected holder:\n\t%+v\ngot:\n\t%+v", i, test.outHolder, le.observedRecord.HolderIdentity)
 		}
 		if len(test.reactors) != len(c.Actions()) {
-			t.Errorf("[%v]wrong number of api interactions")
+			t.Errorf("[%v]wrong number of api interactions", i)
+		}
+		if test.transitionLeader && le.observedRecord.LeaderTransitions != 1 {
+			t.Errorf("[%v]leader should have transitioned but did not", i)
+		}
+		if !test.transitionLeader && le.observedRecord.LeaderTransitions != 0 {
+			t.Errorf("[%v]leader should not have transitioned but did", i)
+		}
+
+		le.maybeReportTransition()
+		wg.Wait()
+		if reportedLeader != test.outHolder {
+			t.Errorf("[%v]reported leader was not the new leader. expected %q, got %q", i, test.outHolder, reportedLeader)
 		}
 	}
 }

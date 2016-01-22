@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	watchjson "k8s.io/kubernetes/pkg/watch/json"
@@ -77,7 +78,7 @@ func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversion
 	for _, path := range paths {
 		apiResource, err := a.registerResourceHandlers(path, a.group.Storage[path], ws, proxyHandler)
 		if err != nil {
-			errors = append(errors, err)
+			errors = append(errors, fmt.Errorf("error in registering resource: %s, %v", path, err))
 		}
 		if apiResource != nil {
 			apiResources = append(apiResources, *apiResource)
@@ -104,9 +105,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	admit := a.group.Admit
 	context := a.group.Context
 
-	serverGroupVersion := a.group.GroupVersion
-	if a.group.ServerGroupVersion != nil {
-		serverGroupVersion = *a.group.ServerGroupVersion
+	optionsExternalVersion := a.group.GroupVersion
+	if a.group.OptionsExternalVersion != nil {
+		optionsExternalVersion = *a.group.OptionsExternalVersion
 	}
 
 	var resource, subresource string
@@ -136,7 +137,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 
 		// TODO This keeps it doing what it was doing before, but it doesn't feel right.
-		if fqKind.Group == "extensions" && fqKind.Kind == "ThirdPartyResourceData" {
+		if fqKind.Group == extensions.GroupName && fqKind.Kind == "ThirdPartyResourceData" {
 			fqKindToRegister = fqKind
 			fqKindToRegister.Group = a.group.GroupVersion.Group
 			fqKindToRegister.Version = a.group.GroupVersion.Version
@@ -148,7 +149,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	kind := fqKindToRegister.Kind
 
-	versionedPtr, err := a.group.Creater.New(a.group.GroupVersion.String(), kind)
+	versionedPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind(kind))
 	if err != nil {
 		return nil, err
 	}
@@ -199,6 +200,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	getterWithOptions, isGetterWithOptions := storage.(rest.GetterWithOptions)
 	deleter, isDeleter := storage.(rest.Deleter)
 	gracefulDeleter, isGracefulDeleter := storage.(rest.GracefulDeleter)
+	collectionDeleter, isCollectionDeleter := storage.(rest.CollectionDeleter)
 	updater, isUpdater := storage.(rest.Updater)
 	patcher, isPatcher := storage.(rest.Patcher)
 	watcher, isWatcher := storage.(rest.Watcher)
@@ -207,6 +209,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	storageMeta, isMetadata := storage.(rest.StorageMetadata)
 	if !isMetadata {
 		storageMeta = defaultStorageMetadata{}
+	}
+	exporter, isExporter := storage.(rest.Exporter)
+	if !isExporter {
+		exporter = nil
+	}
+
+	versionedExportOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("ExportOptions"))
+	if err != nil {
+		return nil, err
 	}
 
 	if isNamedCreater {
@@ -217,14 +228,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if isLister {
 		list := lister.NewList()
 		listGVK, err := a.group.Typer.ObjectKind(list)
-		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion.String(), listGVK.Kind)
+		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind(listGVK.Kind))
 		if err != nil {
 			return nil, err
 		}
 		versionedList = indirectArbitraryPointer(versionedListPtr)
 	}
 
-	versionedListOptions, err := a.group.Creater.New(serverGroupVersion.String(), "ListOptions")
+	versionedListOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("ListOptions"))
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +243,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var versionedDeleterObject interface{}
 	switch {
 	case isGracefulDeleter:
-		objectPtr, err := a.group.Creater.New(serverGroupVersion.String(), "DeleteOptions")
+		objectPtr, err := a.group.Creater.New(optionsExternalVersion.WithKind("DeleteOptions"))
 		if err != nil {
 			return nil, err
 		}
@@ -242,7 +253,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		gracefulDeleter = rest.GracefulDeleteAdapter{Deleter: deleter}
 	}
 
-	versionedStatusPtr, err := a.group.Creater.New(serverGroupVersion.String(), "Status")
+	versionedStatusPtr, err := a.group.Creater.New(optionsExternalVersion.WithKind("Status"))
 	if err != nil {
 		return nil, err
 	}
@@ -262,9 +273,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, err
 		}
 		// TODO this should be a list of all the different external versions we can coerce into the internalKind
-		getOptionsExternalKind = serverGroupVersion.WithKind(getOptionsInternalKind.Kind)
+		getOptionsExternalKind = optionsExternalVersion.WithKind(getOptionsInternalKind.Kind)
 
-		versionedGetOptions, err = a.group.Creater.New(serverGroupVersion.String(), getOptionsInternalKind.Kind)
+		versionedGetOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(getOptionsInternalKind.Kind))
 		if err != nil {
 			return nil, err
 		}
@@ -287,9 +298,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				return nil, err
 			}
 			// TODO this should be a list of all the different external versions we can coerce into the internalKind
-			connectOptionsExternalKind = serverGroupVersion.WithKind(connectOptionsInternalKind.Kind)
+			connectOptionsExternalKind = optionsExternalVersion.WithKind(connectOptionsInternalKind.Kind)
 
-			versionedConnectOptions, err = a.group.Creater.New(serverGroupVersion.String(), connectOptionsInternalKind.Kind)
+			versionedConnectOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(connectOptionsInternalKind.Kind))
 		}
 	}
 
@@ -308,6 +319,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	scope := mapping.Scope
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
 	pathParam := ws.PathParameter("path", "path to the resource").DataType("string")
+
 	params := []*restful.Parameter{}
 	actions := []action{}
 
@@ -334,6 +346,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		// Add actions at the resource path: /api/apiVersion/resource
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
 		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
+		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer}, isCollectionDeleter)
+		// DEPRECATED
 		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
 
 		// Add actions at the item path: /api/apiVersion/resource/{name}
@@ -372,6 +386,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
 		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
+		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer}, isCollectionDeleter)
 		// DEPRECATED
 		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
 
@@ -439,9 +454,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
 			if isGetterWithOptions {
-				handler = GetResourceWithOptions(getterWithOptions, reqScope, getOptionsInternalKind, getOptionsExternalKind, getSubpath, getSubpathKey)
+				handler = GetResourceWithOptions(getterWithOptions, exporter, reqScope, getOptionsInternalKind, getOptionsExternalKind, getSubpath, getSubpathKey)
 			} else {
-				handler = GetResource(getter, reqScope)
+				handler = GetResource(getter, exporter, reqScope)
 			}
 			doc := "read the specified " + kind
 			if hasSubresource {
@@ -457,6 +472,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Writes(versionedObject)
 			if isGetterWithOptions {
 				if err := addObjectParams(ws, route, versionedGetOptions); err != nil {
+					return nil, err
+				}
+			}
+			if isExporter {
+				if err := addObjectParams(ws, route, versionedExportOptions); err != nil {
 					return nil, err
 				}
 			}
@@ -564,6 +584,24 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusOK, "OK", versionedStatus)
 			if isGracefulDeleter {
 				route.Reads(versionedDeleterObject)
+			}
+			addParams(route, action.Params)
+			ws.Route(route)
+		case "DELETECOLLECTION":
+			doc := "delete collection of " + kind
+			if hasSubresource {
+				doc = "delete collection of " + subresource + " of a " + kind
+			}
+			route := ws.DELETE(action.Path).To(DeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit)).
+				Filter(m).
+				Doc(doc).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Operation("deletecollection"+namespaced+kind+strings.Title(subresource)).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
+				Writes(versionedStatus).
+				Returns(http.StatusOK, "OK", versionedStatus)
+			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
+				return nil, err
 			}
 			addParams(route, action.Params)
 			ws.Route(route)

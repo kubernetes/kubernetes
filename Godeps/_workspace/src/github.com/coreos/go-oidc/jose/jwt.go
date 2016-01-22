@@ -1,8 +1,6 @@
 package jose
 
-import (
-	"strings"
-)
+import "strings"
 
 type JWT JWS
 
@@ -63,13 +61,13 @@ func (j *JWT) Encode() string {
 	return strings.Join([]string{d, s}, ".")
 }
 
-func NewSignedJWT(claims map[string]interface{}, s Signer) (*JWT, error) {
+func NewSignedJWT(claims Claims, s Signer) (*JWT, error) {
 	header := JOSEHeader{
 		HeaderKeyAlgorithm: s.Alg(),
 		HeaderKeyID:        s.ID(),
 	}
 
-	jwt, err := NewJWT(header, Claims(claims))
+	jwt, err := NewJWT(header, claims)
 	if err != nil {
 		return nil, err
 	}

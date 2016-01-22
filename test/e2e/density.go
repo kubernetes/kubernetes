@@ -77,8 +77,9 @@ func density30AddonResourceVerifier() map[string]resourceConstraint {
 		memoryConstraint: 250 * (1024 * 1024),
 	}
 	constraints["elasticsearch-logging"] = resourceConstraint{
-		cpuConstraint:    2,
-		memoryConstraint: 750 * (1024 * 1024),
+		cpuConstraint: 2,
+		// TODO: bring it down to 750MB again, when we lower Kubelet verbosity level. I.e. revert #19164
+		memoryConstraint: 5000 * (1024 * 1024),
 	}
 	constraints["heapster"] = resourceConstraint{
 		cpuConstraint:    2,
@@ -117,26 +118,6 @@ var _ = Describe("Density [Skipped]", func() {
 
 	// Gathers data prior to framework namespace teardown
 	AfterEach(func() {
-		// Remove any remaining pods from this test if the
-		// replication controller still exists and the replica count
-		// isn't 0.  This means the controller wasn't cleaned up
-		// during the test so clean it up here. We want to do it separately
-		// to not cause a timeout on Namespace removal.
-		rc, err := c.ReplicationControllers(ns).Get(RCName)
-		if err == nil && rc.Spec.Replicas != 0 {
-			By("Cleaning up the replication controller")
-			err := DeleteRC(c, ns, RCName)
-			expectNoError(err)
-		}
-
-		By("Removing additional pods if any")
-		for i := 1; i <= nodeCount; i++ {
-			name := additionalPodsPrefix + "-" + strconv.Itoa(i)
-			c.Pods(ns).Delete(name, nil)
-		}
-
-		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
-
 		// Verify latency metrics.
 		highLatencyRequests, err := HighLatencyRequests(c)
 		expectNoError(err)
@@ -145,11 +126,11 @@ var _ = Describe("Density [Skipped]", func() {
 		// Verify scheduler metrics.
 		// TODO: Reset metrics at the beginning of the test.
 		// We should do something similar to how we do it for APIserver.
-		expectNoError(VerifySchedulerLatency())
+		expectNoError(VerifySchedulerLatency(c))
 	})
 
 	// Explicitly put here, to delete namespace at the end of the test
-	// (after measuring latency metrics, etc.).
+	// (after measuring latency metrics, etc.).framework := NewFramework("density")
 	framework := NewFramework("density")
 	framework.NamespaceDeletionTimeout = time.Hour
 
@@ -158,8 +139,7 @@ var _ = Describe("Density [Skipped]", func() {
 		ns = framework.Namespace.Name
 		var err error
 
-		nodes, err := c.Nodes().List(unversioned.ListOptions{})
-		expectNoError(err)
+		nodes := ListSchedulableNodesOrDie(c)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 
@@ -173,7 +153,6 @@ var _ = Describe("Density [Skipped]", func() {
 
 		expectNoError(resetMetrics(c))
 		expectNoError(os.Mkdir(fmt.Sprintf(testContext.OutputDir+"/%s", uuid), 0777))
-		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "before"))
 
 		Logf("Listing nodes for easy debugging:\n")
 		for _, node := range nodes.Items {
@@ -232,13 +211,15 @@ var _ = Describe("Density [Skipped]", func() {
 			}
 
 			// Create a listener for events.
+			// eLock is a lock protects the events
+			var eLock sync.Mutex
 			events := make([](*api.Event), 0)
 			_, controller := controllerframework.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func() (runtime.Object, error) {
-						return c.Events(ns).List(unversioned.ListOptions{})
+					ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+						return c.Events(ns).List(options)
 					},
-					WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 						return c.Events(ns).Watch(options)
 					},
 				},
@@ -246,12 +227,42 @@ var _ = Describe("Density [Skipped]", func() {
 				0,
 				controllerframework.ResourceEventHandlerFuncs{
 					AddFunc: func(obj interface{}) {
+						eLock.Lock()
+						defer eLock.Unlock()
 						events = append(events, obj.(*api.Event))
 					},
 				},
 			)
 			stop := make(chan struct{})
 			go controller.Run(stop)
+
+			// Create a listener for api updates
+			// uLock is a lock protects the updateCount
+			var uLock sync.Mutex
+			updateCount := 0
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": RCName}))
+			_, updateController := controllerframework.NewInformer(
+				&cache.ListWatch{
+					ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+						options.LabelSelector = label
+						return c.Pods(ns).List(options)
+					},
+					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+						options.LabelSelector = label
+						return c.Pods(ns).Watch(options)
+					},
+				},
+				&api.Pod{},
+				0,
+				controllerframework.ResourceEventHandlerFuncs{
+					UpdateFunc: func(_, _ interface{}) {
+						uLock.Lock()
+						defer uLock.Unlock()
+						updateCount++
+					},
+				},
+			)
+			go updateController.Run(stop)
 
 			// Start the replication controller.
 			startTime := time.Now()
@@ -262,10 +273,22 @@ var _ = Describe("Density [Skipped]", func() {
 			By("Waiting for all events to be recorded")
 			last := -1
 			current := len(events)
+			lastCount := -1
+			currentCount := updateCount
 			timeout := 10 * time.Minute
-			for start := time.Now(); last < current && time.Since(start) < timeout; time.Sleep(10 * time.Second) {
-				last = current
-				current = len(events)
+			for start := time.Now(); (last < current || lastCount < currentCount) && time.Since(start) < timeout; time.Sleep(10 * time.Second) {
+				func() {
+					eLock.Lock()
+					defer eLock.Unlock()
+					last = current
+					current = len(events)
+				}()
+				func() {
+					uLock.Lock()
+					defer uLock.Unlock()
+					lastCount = currentCount
+					currentCount = updateCount
+				}()
 			}
 			close(stop)
 
@@ -273,6 +296,10 @@ var _ = Describe("Density [Skipped]", func() {
 				Logf("Warning: Not all events were recorded after waiting %.2f minutes", timeout.Minutes())
 			}
 			Logf("Found %d events", current)
+			if currentCount != lastCount {
+				Logf("Warning: Not all updates were recorded after waiting %.2f minutes", timeout.Minutes())
+			}
+			Logf("Found %d updates", currentCount)
 
 			// Tune the threshold for allowed failures.
 			badEvents := BadEvents(events)
@@ -318,13 +345,12 @@ var _ = Describe("Density [Skipped]", func() {
 				additionalPodsPrefix = "density-latency-pod-" + string(util.NewUUID())
 				_, controller := controllerframework.NewInformer(
 					&cache.ListWatch{
-						ListFunc: func() (runtime.Object, error) {
-							selector := labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
-							options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+						ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+							options.LabelSelector = labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
 							return c.Pods(ns).List(options)
 						},
-						WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-							options.LabelSelector.Selector = labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
+						WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+							options.LabelSelector = labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix})
 							return c.Pods(ns).Watch(options)
 						},
 					},
@@ -371,9 +397,9 @@ var _ = Describe("Density [Skipped]", func() {
 				selector := fields.Set{
 					"involvedObject.kind":      "Pod",
 					"involvedObject.namespace": ns,
-					"source":                   "scheduler",
+					"source":                   api.DefaultSchedulerName,
 				}.AsSelector()
-				options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
+				options := api.ListOptions{FieldSelector: selector}
 				schedEvents, err := c.Events(ns).List(options)
 				expectNoError(err)
 				for k := range createTimes {

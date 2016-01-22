@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/admin/kube-apiserver.md).
@@ -50,10 +51,11 @@ kube-apiserver
 ### Options
 
 ```
-      --admission-control="AlwaysAdmit": Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: AlwaysAdmit, AlwaysDeny, DenyEscalatingExec, DenyExecOnPrivileged, InitialResources, LimitRanger, NamespaceAutoProvision, NamespaceExists, NamespaceLifecycle, ResourceQuota, SecurityContextDeny, ServiceAccount
+      --admission-control="AlwaysAdmit": Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: AlwaysAdmit, AlwaysDeny, AlwaysPullImages, DenyEscalatingExec, DenyExecOnPrivileged, InitialResources, LimitRanger, NamespaceAutoProvision, NamespaceExists, NamespaceLifecycle, PersistentVolumeLabel, ResourceQuota, SecurityContextDeny, ServiceAccount
       --admission-control-config-file="": File with admission control configuration.
       --advertise-address=<nil>: The IP address on which to advertise the apiserver to members of the cluster. This address must be reachable by the rest of the cluster. If blank, the --bind-address will be used. If --bind-address is unspecified, the host's default interface will be used.
       --allow-privileged[=false]: If true, allow privileged containers.
+      --apiserver-count=1: The number of apiservers running in the cluster
       --authorization-mode="AlwaysAllow": Ordered list of plug-ins to do authorization on secure port. Comma-delimited list of: AlwaysAllow,AlwaysDeny,ABAC
       --authorization-policy-file="": File with authorization policy in csv format, used with --authorization-mode=ABAC, on the secure port.
       --basic-auth-file="": If set, the file that will be used to admit requests to the secure port of the API server via http basic authentication.
@@ -62,9 +64,7 @@ kube-apiserver
       --client-ca-file="": If set, any request presenting a client certificate signed by one of the authorities in the client-ca-file is authenticated with an identity corresponding to the CommonName of the client certificate.
       --cloud-config="": The path to the cloud provider configuration file.  Empty string for no configuration file.
       --cloud-provider="": The provider for cloud services.  Empty string for no provider.
-      --cluster-name="kubernetes": The instance prefix for the cluster
       --cors-allowed-origins=[]: List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.
-      --etcd-config="": The config file for the etcd client. Mutually exclusive with -etcd-servers.
       --etcd-prefix="/registry": The prefix for all resource paths in etcd.
       --etcd-servers=[]: List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd-config
       --etcd-servers-overrides=[]: Per-resource etcd servers overrides, comma separated. The individual override format: group/resource#servers, where servers are http://ip:port, semicolon separated.
@@ -100,14 +100,14 @@ kube-apiserver
       --service-node-port-range=: A port range to reserve for services with NodePort visibility.  Example: '30000-32767'.  Inclusive at both ends of the range.
       --ssh-keyfile="": If non-empty, use secure SSH proxy to the nodes, using this user keyfile
       --ssh-user="": If non-empty, use secure SSH proxy to the nodes, using this user name
-      --storage-versions="componentconfig/v1alpha1,extensions/v1beta1,v1": The versions to store resources with. Different groups may be stored in different versions. Specified in the format "group1/version1,group2/version2...". This flag expects a complete list of storage versions of ALL groups registered in the server. It defaults to a list of preferred versions of all registered groups, which is derived from the KUBE_API_VERSIONS environment variable.
+      --storage-versions="authorization.k8s.io/v1beta1,componentconfig/v1alpha1,extensions/v1beta1,metrics/v1alpha1,v1": The versions to store resources with. Different groups may be stored in different versions. Specified in the format "group1/version1,group2/version2...". This flag expects a complete list of storage versions of ALL groups registered in the server. It defaults to a list of preferred versions of all registered groups, which is derived from the KUBE_API_VERSIONS environment variable.
       --tls-cert-file="": File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). If HTTPS serving is enabled, and --tls-cert-file and --tls-private-key-file are not provided, a self-signed certificate and key are generated for the public address and saved to /var/run/kubernetes.
       --tls-private-key-file="": File containing x509 private key matching --tls-cert-file.
       --token-auth-file="": If set, the file that will be used to secure the secure port of the API server via token authentication.
       --watch-cache[=true]: Enable watch caching in the apiserver
 ```
 
-###### Auto generated by spf13/cobra on 3-Dec-2015
+###### Auto generated by spf13/cobra on 14-Jan-2016
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/devel/developer-guides/vagrant.md).
@@ -139,9 +140,9 @@ You may need to build the binaries first, you can do this with `make`
 $ ./cluster/kubectl.sh get nodes
 
 NAME                     LABELS                                          STATUS
-kubernetes-node-0whl   kubernetes.io/hostname=kubernetes-node-0whl   Ready
-kubernetes-node-4jdf   kubernetes.io/hostname=kubernetes-node-4jdf   Ready
-kubernetes-node-epbe   kubernetes.io/hostname=kubernetes-node-epbe   Ready
+kubernetes-node-0whl     kubernetes.io/hostname=kubernetes-node-0whl     Ready
+kubernetes-node-4jdf     kubernetes.io/hostname=kubernetes-node-4jdf     Ready
+kubernetes-node-epbe     kubernetes.io/hostname=kubernetes-node-epbe     Ready
 ```
 
 ### Interacting with your Kubernetes cluster with the `kube-*` scripts.
@@ -206,9 +207,9 @@ Your cluster is running, you can list the nodes in your cluster:
 $ ./cluster/kubectl.sh get nodes
 
 NAME                     LABELS                                          STATUS
-kubernetes-node-0whl   kubernetes.io/hostname=kubernetes-node-0whl   Ready
-kubernetes-node-4jdf   kubernetes.io/hostname=kubernetes-node-4jdf   Ready
-kubernetes-node-epbe   kubernetes.io/hostname=kubernetes-node-epbe   Ready
+kubernetes-node-0whl     kubernetes.io/hostname=kubernetes-node-0whl     Ready
+kubernetes-node-4jdf     kubernetes.io/hostname=kubernetes-node-4jdf     Ready
+kubernetes-node-epbe     kubernetes.io/hostname=kubernetes-node-epbe     Ready
 ```
 
 Now start running some containers!

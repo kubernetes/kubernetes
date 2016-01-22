@@ -26,10 +26,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/net"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -134,13 +133,13 @@ func proxyContext(version string) {
 
 		// Try proxying through the service and directly to through the pod.
 		svcProxyURL := func(scheme, port string) string {
-			return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/services/" + util.JoinSchemeNamePort(scheme, service.Name, port)
+			return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/services/" + net.JoinSchemeNamePort(scheme, service.Name, port)
 		}
 		podProxyURL := func(scheme, port string) string {
-			return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/pods/" + util.JoinSchemeNamePort(scheme, pods[0].Name, port)
+			return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/pods/" + net.JoinSchemeNamePort(scheme, pods[0].Name, port)
 		}
 		subresourcePodProxyURL := func(scheme, port string) string {
-			return prefix + "/namespaces/" + f.Namespace.Name + "/pods/" + util.JoinSchemeNamePort(scheme, pods[0].Name, port) + "/proxy"
+			return prefix + "/namespaces/" + f.Namespace.Name + "/pods/" + net.JoinSchemeNamePort(scheme, pods[0].Name, port) + "/proxy"
 		}
 		expectations := map[string]string{
 			svcProxyURL("", "portname1") + "/": "foo",
@@ -251,10 +250,8 @@ func truncate(b []byte, maxLen int) []byte {
 }
 
 func pickNode(c *client.Client) (string, error) {
-	nodes, err := c.Nodes().List(unversioned.ListOptions{})
-	if err != nil {
-		return "", err
-	}
+	// TODO: investigate why it doesn't work on master Node.
+	nodes := ListSchedulableNodesOrDie(c)
 	if len(nodes.Items) == 0 {
 		return "", fmt.Errorf("no nodes exist, can't test node proxy")
 	}

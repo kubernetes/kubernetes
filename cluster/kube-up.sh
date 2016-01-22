@@ -38,6 +38,11 @@ echo "... Starting cluster using provider: $KUBERNETES_PROVIDER" >&2
 echo "... calling verify-prereqs" >&2
 verify-prereqs
 
+if [[ "${KUBE_STAGE_IMAGES:-}" == "true" ]]; then
+  echo "... staging images" >&2
+  stage-images
+fi
+
 echo "... calling kube-up" >&2
 kube-up
 

@@ -24,7 +24,7 @@ function provision-network-node {
   # Install flannel for overlay
   if ! which flanneld >/dev/null 2>&1; then
 
-    yum install -y flannel
+    dnf install -y flannel
 
     # Configure local daemon to speak to master
     NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
@@ -33,7 +33,7 @@ function provision-network-node {
     cat <<EOF >/etc/sysconfig/flanneld
 FLANNEL_ETCD="${FLANNEL_ETCD_URL}"
 FLANNEL_ETCD_KEY="/coreos.com/network"
-FLANNEL_OPTIONS="-iface=${NETWORK_IF_NAME}"
+FLANNEL_OPTIONS="-iface=${NETWORK_IF_NAME} --ip-masq"
 EOF
 
     # Start flannel

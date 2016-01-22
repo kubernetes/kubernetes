@@ -34,7 +34,7 @@ type ErrorReplicationControllers struct {
 
 func (c *ErrorReplicationControllers) Update(controller *api.ReplicationController) (*api.ReplicationController, error) {
 	if c.invalid {
-		return nil, kerrors.NewInvalid(controller.Kind, controller.Name, nil)
+		return nil, kerrors.NewInvalid(api.Kind(controller.Kind), controller.Name, nil)
 	}
 	return nil, errors.New("Replication controller update failure")
 }
@@ -254,7 +254,7 @@ type ErrorJobs struct {
 
 func (c *ErrorJobs) Update(job *extensions.Job) (*extensions.Job, error) {
 	if c.invalid {
-		return nil, kerrors.NewInvalid(job.Kind, job.Name, nil)
+		return nil, kerrors.NewInvalid(extensions.Kind(job.Kind), job.Name, nil)
 	}
 	return nil, errors.New("Job update failure")
 }
@@ -495,7 +495,7 @@ type ErrorScales struct {
 
 func (c *ErrorScales) Update(kind string, scale *extensions.Scale) (*extensions.Scale, error) {
 	if c.invalid {
-		return nil, kerrors.NewInvalid(scale.Kind, scale.Name, nil)
+		return nil, kerrors.NewInvalid(extensions.Kind(scale.Kind), scale.Name, nil)
 	}
 	return nil, errors.New("scale update failure")
 }
@@ -515,7 +515,7 @@ type ErrorDeployments struct {
 
 func (c *ErrorDeployments) Update(deployment *extensions.Deployment) (*extensions.Deployment, error) {
 	if c.invalid {
-		return nil, kerrors.NewInvalid(deployment.Kind, deployment.Name, nil)
+		return nil, kerrors.NewInvalid(extensions.Kind(deployment.Kind), deployment.Name, nil)
 	}
 	return nil, errors.New("deployment update failure")
 }

@@ -109,7 +109,7 @@ func TestAdmissionNamespaceExistsUnknownToHandler(t *testing.T) {
 	namespace := "test"
 	mockClient := &testclient.Fake{}
 	mockClient.AddReactor("create", "namespaces", func(action testclient.Action) (bool, runtime.Object, error) {
-		return true, nil, errors.NewAlreadyExists("namespaces", namespace)
+		return true, nil, errors.NewAlreadyExists(api.Resource("namespaces"), namespace)
 	})
 
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)

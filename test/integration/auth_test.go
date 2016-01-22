@@ -38,6 +38,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
@@ -389,7 +390,8 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	m = master.New(masterConfig)
@@ -491,7 +493,8 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authorizer = apiserver.NewAlwaysDenyAuthorizer()
@@ -545,7 +548,8 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
@@ -620,7 +624,8 @@ func TestBobIsForbidden(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
@@ -668,7 +673,8 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
@@ -741,7 +747,8 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
@@ -755,8 +762,8 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 		URL                string
 		expectedAttributes authorizer.Attributes
 	}{
-		"prefix/version/resource":       {"GET", "/api/v1/pods", authorizer.AttributesRecord{APIGroup: "", Resource: "pods"}},
-		"prefix/group/version/resource": {"GET", "/apis/extensions/v1/pods", authorizer.AttributesRecord{APIGroup: "extensions", Resource: "pods"}},
+		"prefix/version/resource":       {"GET", "/api/v1/pods", authorizer.AttributesRecord{APIGroup: api.GroupName, Resource: "pods"}},
+		"prefix/group/version/resource": {"GET", "/apis/extensions/v1/pods", authorizer.AttributesRecord{APIGroup: extensions.GroupName, Resource: "pods"}},
 	}
 
 	currentAuthorizationAttributesIndex := 0
@@ -809,7 +816,8 @@ func TestNamespaceAuthorization(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
@@ -911,7 +919,8 @@ func TestKindAuthorization(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()
@@ -1000,7 +1009,8 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
 	}))
-	defer s.Close()
+	// TODO: Uncomment when fix #19254
+	// defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.Authenticator = getTestTokenAuth()

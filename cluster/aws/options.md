@@ -38,9 +38,8 @@ export MASTER_SIZE=c4.large
 export NODE_SIZE=r3.large
 ```
 
-If you don't specify master and minion sizes, the scripts will attempt to guess the correct size of the master and worker nodes based on `${NUM_NODES}`.
-In particular for clusters less than 50 nodes it will 
-use a `t2.micro` for clusters between 50 and 150 nodes it will use a `t2.small` and for clusters with greater than 150 nodes it will use a `t2.medium`.
+If you don't specify master and minion sizes, the scripts will attempt to guess the correct size of the master and worker
+nodes based on `${NUM_NODES}`. See [Getting started on AWS EC2](../../docs/getting-started-guides/aws.md) for details.
 
 Please note: `kube-up` utilizes ephemeral storage available on instances for docker storage. EBS-only instance types do not
 support ephemeral storage and will default to docker storage on the root disk which is usually only 8GB.

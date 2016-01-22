@@ -17,11 +17,17 @@ limitations under the License.
 package unversioned
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/url"
+
+	"github.com/emicklei/go-restful/swagger"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 // DiscoveryInterface holds the methods that discover server-supported API groups,
@@ -29,6 +35,8 @@ import (
 type DiscoveryInterface interface {
 	ServerGroupsInterface
 	ServerResourcesInterface
+	ServerVersionInterface
+	SwaggerSchemaInterface
 }
 
 // ServerGroupsInterface has methods for obtaining supported groups on the API server
@@ -44,6 +52,18 @@ type ServerResourcesInterface interface {
 	ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error)
 	// ServerResources returns the supported resources for all groups and versions.
 	ServerResources() (map[string]*unversioned.APIResourceList, error)
+}
+
+// ServerVersionInterface has a method for retrieving the server's version.
+type ServerVersionInterface interface {
+	// ServerVersion retrieves and parses the server's version (git version).
+	ServerVersion() (*version.Info, error)
+}
+
+// SwaggerSchemaInterface has a method to retrieve the swagger schema.
+type SwaggerSchemaInterface interface {
+	// SwaggerSchema retrieves and parses the swagger API schema the server supports.
+	SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error)
 }
 
 // DiscoveryClient implements the functions that dicovery server-supported API groups,
@@ -138,8 +158,56 @@ func (d *DiscoveryClient) ServerResources() (map[string]*unversioned.APIResource
 	return result, nil
 }
 
+// ServerVersion retrieves and parses the server's version (git version).
+func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
+	body, err := d.Get().AbsPath("/version").Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	var info version.Info
+	err = json.Unmarshal(body, &info)
+	if err != nil {
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+	}
+	return &info, nil
+}
+
+// SwaggerSchema retrieves and parses the swagger API schema the server supports.
+func (d *DiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
+	if version.IsEmpty() {
+		return nil, fmt.Errorf("groupVersion cannot be empty")
+	}
+
+	groupList, err := d.ServerGroups()
+	if err != nil {
+		return nil, err
+	}
+	groupVersions := ExtractGroupVersions(groupList)
+	// This check also takes care the case that kubectl is newer than the running endpoint
+	if stringDoesntExistIn(version.String(), groupVersions) {
+		return nil, fmt.Errorf("API version: %v is not supported by the server. Use one of: %v", version, groupVersions)
+	}
+	var path string
+	if version == v1.SchemeGroupVersion {
+		path = "/swaggerapi/api/" + version.Version
+	} else {
+		path = "/swaggerapi/apis/" + version.Group + "/" + version.Version
+	}
+
+	body, err := d.Get().AbsPath(path).Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	var schema swagger.ApiDeclaration
+	err = json.Unmarshal(body, &schema)
+	if err != nil {
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+	}
+	return &schema, nil
+}
+
 func setDiscoveryDefaults(config *Config) error {
-	config.Prefix = ""
+	config.APIPath = ""
 	config.GroupVersion = nil
 	// Discovery client deals with unversioned objects, so we use api.Codec.
 	config.Codec = api.Codec

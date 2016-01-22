@@ -77,12 +77,13 @@ function set-kube-env() {
   done
 
   # kube-env has all the environment variables we care about, in a flat yaml format
-  eval $(python -c '''
+  eval "$(python -c '
 import pipes,sys,yaml
 
 for k,v in yaml.load(sys.stdin).iteritems():
-  print "readonly {var}={value}".format(var = k, value = pipes.quote(str(v)))
-''' < "${kube_env_yaml}")
+  print("""readonly {var}={value}""".format(var = k, value = pipes.quote(str(v))))
+  print("""export {var}""".format(var = k))
+  ' < """${kube_env_yaml}""")"
 }
 
 function remove-docker-artifacts() {
@@ -135,7 +136,7 @@ install-salt() {
   echo "== Refreshing package database =="
   until apt-get update; do
     echo "== apt-get update failed, retrying =="
-    echo sleep 5
+    sleep 5
   done
 
   mkdir -p /var/cache/salt-install
@@ -177,7 +178,7 @@ EOF
   echo "== Installing unmet dependencies =="
   until apt-get install -f -y; do
     echo "== apt-get install failed, retrying =="
-    echo sleep 5
+    sleep 5
   done
 
   rm /usr/sbin/policy-rc.d
@@ -278,14 +279,14 @@ dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
-network_provider: '$(echo "$NETWORK_PROVIDER")'
-opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG")'
+network_provider: '$(echo "$NETWORK_PROVIDER" | sed -e "s/'/''/g")'
+opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG" | sed -e "s/'/''/g")'
 opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG")'
 opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
 enable_manifest_url: '$(echo "$ENABLE_MANIFEST_URL" | sed -e "s/'/''/g")'
 manifest_url: '$(echo "$MANIFEST_URL" | sed -e "s/'/''/g")'
 manifest_url_header: '$(echo "$MANIFEST_URL_HEADER" | sed -e "s/'/''/g")'
-num_nodes: $(echo "${NUM_NODES}")
+num_nodes: $(echo "${NUM_NODES}" | sed -e "s/'/''/g")
 e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
 EOF
     if [ -n "${KUBELET_PORT:-}" ]; then
@@ -293,9 +294,15 @@ EOF
 kubelet_port: '$(echo "$KUBELET_PORT" | sed -e "s/'/''/g")'
 EOF
     fi
+    # Configuration changes for test clusters
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 apiserver_test_args: '$(echo "$APISERVER_TEST_ARGS" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${API_SERVER_TEST_LOG_LEVEL:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+api_server_test_log_level: '$(echo "$API_SERVER_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
 EOF
     fi
     if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
@@ -303,9 +310,19 @@ EOF
 kubelet_test_args: '$(echo "$KUBELET_TEST_ARGS" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+kubelet_test_log_level: '$(echo "$KUBELET_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 controller_manager_test_args: '$(echo "$CONTROLLER_MANAGER_TEST_ARGS" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+controller_manager_test_log_level: '$(echo "$CONTROLLER_MANAGER_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
 EOF
     fi
     if [ -n "${SCHEDULER_TEST_ARGS:-}" ]; then
@@ -313,17 +330,27 @@ EOF
 scheduler_test_args: '$(echo "$SCHEDULER_TEST_ARGS" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${SCHEDULER_TEST_LOG_LEVEL:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+scheduler_test_log_level: '$(echo "$SCHEDULER_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 kubeproxy_test_args: '$(echo "$KUBEPROXY_TEST_ARGS" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${KUBEPROXY_TEST_LOG_LEVEL:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+kubeproxy_test_log_level: '$(echo "$KUBEPROXY_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
 EOF
     fi
     # TODO: Replace this  with a persistent volume (and create it).
     if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 cluster_registry_disk_type: gce
-cluster_registry_disk_size: $(convert-bytes-gce-kube ${CLUSTER_REGISTRY_DISK_SIZE})
-cluster_registry_disk_name: ${CLUSTER_REGISTRY_DISK}
+cluster_registry_disk_size: $(echo $(convert-bytes-gce-kube ${CLUSTER_REGISTRY_DISK_SIZE}) | sed -e "s/'/''/g")
+cluster_registry_disk_name: $(echo ${CLUSTER_REGISTRY_DISK} | sed -e "s/'/''/g")
 EOF
     fi
     if [ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]; then
@@ -528,7 +555,7 @@ function download-release() {
   done
 
   echo "Running release install script"
-  sudo kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"
+  kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"
 }
 
 function fix-apt-sources() {
@@ -559,20 +586,40 @@ grains:
     - kubernetes-master
   cloud: gce
 EOF
-  if ! [[ -z "${PROJECT_ID:-}" ]] && ! [[ -z "${TOKEN_URL:-}" ]] && ! [[ -z "${TOKEN_BODY:-}" ]] && ! [[ -z "${NODE_NETWORK:-}" ]] ; then
-    cat <<EOF >/etc/gce.conf
+
+  cat <<EOF >/etc/gce.conf
 [global]
+EOF
+  CLOUD_CONFIG='' # Set to non-empty path if we are using the gce.conf file
+
+  if ! [[ -z "${PROJECT_ID:-}" ]] && ! [[ -z "${TOKEN_URL:-}" ]] && ! [[ -z "${TOKEN_BODY:-}" ]] && ! [[ -z "${NODE_NETWORK:-}" ]] ; then
+    cat <<EOF >>/etc/gce.conf
 token-url = ${TOKEN_URL}
 token-body = ${TOKEN_BODY}
 project-id = ${PROJECT_ID}
 network-name = ${NODE_NETWORK}
 EOF
+    CLOUD_CONFIG=/etc/gce.conf
     EXTERNAL_IP=$(curl --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
     cat <<EOF >>/etc/salt/minion.d/grains.conf
-  cloud_config: /etc/gce.conf
   advertise_address: '${EXTERNAL_IP}'
   proxy_ssh_user: '${PROXY_SSH_USER}'
 EOF
+  fi
+
+  if [[ -n "${MULTIZONE:-}" ]]; then
+    cat <<EOF >>/etc/gce.conf
+multizone = ${MULTIZONE}
+EOF
+    CLOUD_CONFIG=/etc/gce.conf
+  fi
+
+  if [[ -n ${CLOUD_CONFIG:-} ]]; then
+  cat <<EOF >>/etc/salt/minion.d/grains.conf
+  cloud_config: ${CLOUD_CONFIG}
+EOF
+  else
+    rm -f /etc/gce.conf
   fi
 
   # If the kubelet on the master is enabled, give it the same CIDR range

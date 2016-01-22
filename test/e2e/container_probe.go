@@ -48,7 +48,7 @@ var _ = Describe("Probing container", func() {
 		p, err := podClient.Create(makePodSpec(probe.withInitialDelay().build(), nil))
 		expectNoError(err)
 
-		Expect(wait.Poll(poll, 120*time.Second, func() (bool, error) {
+		Expect(wait.Poll(poll, 240*time.Second, func() (bool, error) {
 			p, err := podClient.Get(p.Name)
 			if err != nil {
 				return false, err
@@ -88,7 +88,7 @@ var _ = Describe("Probing container", func() {
 		p, err := podClient.Create(makePodSpec(probe.withFailing().build(), nil))
 		expectNoError(err)
 
-		err = wait.Poll(poll, 120*time.Second, func() (bool, error) {
+		err = wait.Poll(poll, 180*time.Second, func() (bool, error) {
 			p, err := podClient.Get(p.Name)
 			if err != nil {
 				return false, err

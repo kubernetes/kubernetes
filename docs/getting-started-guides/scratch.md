@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/getting-started-guides/scratch.md).
@@ -470,13 +471,13 @@ because of how this is used later.
 - Alternate, manual approach:
   1. Set `--configure-cbr0=false` on kubelet and restart.
   1. Create a bridge
-  - e.g. `brctl addbr cbr0`.
-  1. Set appropriate MTU
-  - `ip link set dev cbr0 mtu 1460` (NOTE: the actual value of MTU will depend on your network environment)
-  1. Add the clusters network to the bridge (docker will go on other side of bridge).
-  - e.g. `ip addr add $NODE_X_BRIDGE_ADDR dev cbr0`
+     - `brctl addbr cbr0`.
+  1. Set appropriate MTU. NOTE: the actual value of MTU will depend on your network environment
+     - `ip link set dev cbr0 mtu 1460`
+  1. Add the node's network to the bridge (docker will go on other side of bridge).
+     - `ip addr add $NODE_X_BRIDGE_ADDR dev cbr0`
   1. Turn it on
-  - e.g. `ip link set dev cbr0 up`
+     - `ip link set dev cbr0 up`
 
 If you have turned off Docker's IP masquerading to allow pods to talk to each
 other, then you may need to do masquerading just for destination IPs outside

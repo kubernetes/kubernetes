@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/user-guide/managing-deployments.md).
@@ -526,7 +527,7 @@ replicationcontrollers "my-nginx-v4" replaced
 ## What's next?
 
 - [Learn about how to use `kubectl` for application introspection and debugging.](introspection-and-debugging.md)
-- [Tips and tricks when working with config](config-best-practices.md)
+- [Configuration Best Practices and Tips](config-best-practices.md)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

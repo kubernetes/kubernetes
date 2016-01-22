@@ -181,6 +181,16 @@ func SelectorFromSet(ls Set) Selector {
 	return andTerm(items)
 }
 
+// ParseSelectorOrDie takes a string representing a selector and returns an
+// object suitable for matching, or panic when an error occur.
+func ParseSelectorOrDie(s string) Selector {
+	selector, err := ParseSelector(s)
+	if err != nil {
+		panic(err)
+	}
+	return selector
+}
+
 // ParseSelector takes a string representing a selector and returns an
 // object suitable for matching, or an error.
 func ParseSelector(selector string) (Selector, error) {

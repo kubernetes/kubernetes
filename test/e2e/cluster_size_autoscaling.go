@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -33,7 +32,7 @@ const (
 	scaleDownTimeout = 30 * time.Minute
 )
 
-var _ = Describe("[Autoscaling] [Skipped]", func() {
+var _ = Describe("Autoscaling [Feature:Autoscaling]", func() {
 	f := NewFramework("autoscaling")
 	var nodeCount int
 	var coresPerNode int
@@ -42,8 +41,7 @@ var _ = Describe("[Autoscaling] [Skipped]", func() {
 	BeforeEach(func() {
 		SkipUnlessProviderIs("gce")
 
-		nodes, err := f.Client.Nodes().List(unversioned.ListOptions{})
-		expectNoError(err)
+		nodes := ListSchedulableNodesOrDie(f.Client)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 		cpu := nodes.Items[0].Status.Capacity[api.ResourceCPU]

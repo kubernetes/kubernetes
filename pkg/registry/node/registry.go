@@ -19,18 +19,17 @@ package node
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store node.
 type Registry interface {
-	ListNodes(ctx api.Context, options *unversioned.ListOptions) (*api.NodeList, error)
+	ListNodes(ctx api.Context, options *api.ListOptions) (*api.NodeList, error)
 	CreateNode(ctx api.Context, node *api.Node) error
 	UpdateNode(ctx api.Context, node *api.Node) error
 	GetNode(ctx api.Context, nodeID string) (*api.Node, error)
 	DeleteNode(ctx api.Context, nodeID string) error
-	WatchNodes(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error)
+	WatchNodes(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -44,7 +43,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListNodes(ctx api.Context, options *unversioned.ListOptions) (*api.NodeList, error) {
+func (s *storage) ListNodes(ctx api.Context, options *api.ListOptions) (*api.NodeList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -63,7 +62,7 @@ func (s *storage) UpdateNode(ctx api.Context, node *api.Node) error {
 	return err
 }
 
-func (s *storage) WatchNodes(ctx api.Context, options *unversioned.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchNodes(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

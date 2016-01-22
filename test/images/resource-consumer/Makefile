@@ -1,4 +1,4 @@
-TAG = beta
+TAG = beta2
 PREFIX = gcr.io/google_containers
 
 all: clean consumer

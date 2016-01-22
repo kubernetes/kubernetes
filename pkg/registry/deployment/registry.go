@@ -21,13 +21,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 // Registry is an interface for things that know how to store Deployments.
 type Registry interface {
-	ListDeployments(ctx api.Context, options *unversioned.ListOptions) (*extensions.DeploymentList, error)
+	ListDeployments(ctx api.Context, options *api.ListOptions) (*extensions.DeploymentList, error)
 	GetDeployment(ctx api.Context, deploymentID string) (*extensions.Deployment, error)
 	CreateDeployment(ctx api.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
 	UpdateDeployment(ctx api.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
@@ -44,8 +43,8 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListDeployments(ctx api.Context, options *unversioned.ListOptions) (*extensions.DeploymentList, error) {
-	if options != nil && options.FieldSelector.Selector != nil && !options.FieldSelector.Selector.Empty() {
+func (s *storage) ListDeployments(ctx api.Context, options *api.ListOptions) (*extensions.DeploymentList, error) {
+	if options != nil && options.FieldSelector != nil && !options.FieldSelector.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
 	obj, err := s.List(ctx, options)

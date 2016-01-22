@@ -53,9 +53,7 @@ result=""
 function depends {
   file=${generated_files[$1]//\.generated\.go/.go}
   deps=$(go list -f "{{.Deps}}" ${file} | tr "[" " " | tr "]" " ")
-  inputfile=${generated_files[$2]//\.generated\.go/.go}
-  fullpath=$(readlink -f ${generated_files[$2]//\.generated\.go/.go})
-  candidate=$(dirname "${fullpath}")
+  candidate=$(readlinkdashf "${generated_files[$2]//\.generated\.go/.go}")
   result=false
   for dep in ${deps}; do
     if [[ ${candidate} = *${dep} ]]; then
@@ -84,6 +82,14 @@ for (( i=0; i<number; i++ )); do
 done
 index=(${result})
 
+haveindex=${index:-}
+if [[ -z ${haveindex} ]]; then
+  echo No files found for $0
+  echo A previous run of $0 may have deleted all the files and then crashed.
+  echo Use 'touch' to create files named 'types.generated.go' listed as deleted in 'git status'
+  exit 1
+fi
+
 CODECGEN="${PWD}/codecgen_binary"
 godep go build -o "${CODECGEN}" github.com/ugorji/go/codec/codecgen
 
@@ -100,6 +106,7 @@ for current in "${index[@]}"; do
   generated_file=${generated_files[${current}]}
   initial_dir=${PWD}
   file=${generated_file//\.generated\.go/.go}
+  echo "codecgen processing ${file}"
   # codecgen work only if invoked from directory where the file
   # is located.
   pushd "$(dirname ${file})" > /dev/null
@@ -107,6 +114,7 @@ for current in "${index[@]}"; do
   base_generated_file=$(basename "${generated_file}")
   # We use '-d 1234' flag to have a deterministic output everytime.
   # The constant was just randomly chosen.
+  echo Running ${CODECGEN} -d 1234 -o  "${base_generated_file}" "${base_file}"
   ${CODECGEN} -d 1234 -o "${base_generated_file}" "${base_file}"
   # Add boilerplate at the begining of the generated file.
   sed 's/YEAR/2015/' "${initial_dir}/hack/boilerplate/boilerplate.go.txt" > "${base_generated_file}.tmp"

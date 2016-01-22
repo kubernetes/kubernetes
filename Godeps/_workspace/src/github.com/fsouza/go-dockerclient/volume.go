@@ -75,7 +75,7 @@ type CreateVolumeOptions struct {
 //
 // See https://goo.gl/pBUbZ9 for more details.
 func (c *Client) CreateVolume(opts CreateVolumeOptions) (*Volume, error) {
-	resp, err := c.do("POST", "/volumes", doOptions{data: opts})
+	resp, err := c.do("POST", "/volumes/create", doOptions{data: opts})
 	if err != nil {
 		return nil, err
 	}

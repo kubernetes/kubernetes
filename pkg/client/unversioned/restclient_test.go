@@ -19,24 +19,30 @@ package unversioned
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"os"
 	"reflect"
 	"testing"
+	"time"
 
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func TestDoRequestSuccess(t *testing.T) {
 	status := &unversioned.Status{Status: unversioned.StatusSuccess}
 	expectedBody, _ := testapi.Default.Codec().Encode(status)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	c, err := RESTClientFor(&Config{
 		Host:         testServer.URL,
 		GroupVersion: testapi.Default.GroupVersion(),
@@ -73,13 +79,14 @@ func TestDoRequestFailed(t *testing.T) {
 		Details: &unversioned.StatusDetails{},
 	}
 	expectedBody, _ := testapi.Default.Codec().Encode(status)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   404,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	c, err := RESTClientFor(&Config{
 		Host:         testServer.URL,
 		GroupVersion: testapi.Default.GroupVersion(),
@@ -92,7 +99,7 @@ func TestDoRequestFailed(t *testing.T) {
 	if err == nil || body != nil {
 		t.Errorf("unexpected non-error: %#v", body)
 	}
-	ss, ok := err.(APIStatus)
+	ss, ok := err.(errors.APIStatus)
 	if !ok {
 		t.Errorf("unexpected error type %v", err)
 	}
@@ -105,13 +112,14 @@ func TestDoRequestFailed(t *testing.T) {
 func TestDoRequestCreated(t *testing.T) {
 	status := &unversioned.Status{Status: unversioned.StatusSuccess}
 	expectedBody, _ := testapi.Default.Codec().Encode(status)
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   201,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	c, err := RESTClientFor(&Config{
 		Host:         testServer.URL,
 		GroupVersion: testapi.Default.GroupVersion(),
@@ -138,4 +146,40 @@ func TestDoRequestCreated(t *testing.T) {
 		t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", status, statusOut)
 	}
 	fakeHandler.ValidateRequest(t, "/"+testapi.Default.GroupVersion().String()+"/test", "GET", nil)
+}
+
+func TestCreateBackoffManager(t *testing.T) {
+
+	theUrl, _ := url.Parse("http://localhost")
+
+	// 1 second base backoff + duration of 2 seconds -> exponential backoff for requests.
+	os.Setenv(envBackoffBase, "1")
+	os.Setenv(envBackoffDuration, "2")
+	backoff := readExpBackoffConfig()
+	backoff.UpdateBackoff(theUrl, nil, 500)
+	backoff.UpdateBackoff(theUrl, nil, 500)
+	if backoff.CalculateBackoff(theUrl)/time.Second != 2 {
+		t.Errorf("Backoff env not working.")
+	}
+
+	// 0 duration -> no backoff.
+	os.Setenv(envBackoffBase, "1")
+	os.Setenv(envBackoffDuration, "0")
+	backoff.UpdateBackoff(theUrl, nil, 500)
+	backoff.UpdateBackoff(theUrl, nil, 500)
+	backoff = readExpBackoffConfig()
+	if backoff.CalculateBackoff(theUrl)/time.Second != 0 {
+		t.Errorf("Zero backoff duration, but backoff still occuring.")
+	}
+
+	// No env -> No backoff.
+	os.Setenv(envBackoffBase, "")
+	os.Setenv(envBackoffDuration, "")
+	backoff = readExpBackoffConfig()
+	backoff.UpdateBackoff(theUrl, nil, 500)
+	backoff.UpdateBackoff(theUrl, nil, 500)
+	if backoff.CalculateBackoff(theUrl)/time.Second != 0 {
+		t.Errorf("Backoff should have been 0.")
+	}
+
 }

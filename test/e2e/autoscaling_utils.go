@@ -38,7 +38,7 @@ const (
 	timeoutRC                       = 120 * time.Second
 	startServiceTimeout             = time.Minute
 	startServiceInterval            = 5 * time.Second
-	resourceConsumerImage           = "gcr.io/google_containers/resource_consumer:beta"
+	resourceConsumerImage           = "gcr.io/google_containers/resource_consumer:beta2"
 	rcIsNil                         = "ERROR: replicationController = nil"
 	deploymentIsNil                 = "ERROR: deployment = nil"
 	invalidKind                     = "ERROR: invalid workload kind for resource consumer"

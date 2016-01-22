@@ -24,8 +24,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -54,8 +54,10 @@ const (
 	emptyDirPluginName = "kubernetes.io/empty-dir"
 )
 
-func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) {
+func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+
+	return nil
 }
 
 func (plugin *emptyDirPlugin) Name() string {
@@ -79,13 +81,14 @@ func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod
 		medium = spec.Volume.EmptyDir.Medium
 	}
 	return &emptyDir{
-		pod:           pod,
-		volName:       spec.Name(),
-		medium:        medium,
-		mounter:       mounter,
-		mountDetector: mountDetector,
-		plugin:        plugin,
-		rootContext:   opts.RootContext,
+		pod:             pod,
+		volName:         spec.Name(),
+		medium:          medium,
+		mounter:         mounter,
+		mountDetector:   mountDetector,
+		plugin:          plugin,
+		rootContext:     opts.RootContext,
+		MetricsProvider: volume.NewMetricsDu(GetPath(pod.UID, spec.Name(), plugin.host)),
 	}, nil
 }
 
@@ -96,12 +99,13 @@ func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID) (volu
 
 func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface, mountDetector mountDetector) (volume.Cleaner, error) {
 	ed := &emptyDir{
-		pod:           &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
-		volName:       volName,
-		medium:        api.StorageMediumDefault, // might be changed later
-		mounter:       mounter,
-		mountDetector: mountDetector,
-		plugin:        plugin,
+		pod:             &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
+		volName:         volName,
+		medium:          api.StorageMediumDefault, // might be changed later
+		mounter:         mounter,
+		mountDetector:   mountDetector,
+		plugin:          plugin,
+		MetricsProvider: volume.NewMetricsDu(GetPath(podUID, volName, plugin.host)),
 	}
 	return ed, nil
 }
@@ -133,6 +137,7 @@ type emptyDir struct {
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
 	rootContext   string
+	volume.MetricsProvider
 }
 
 func (ed *emptyDir) GetAttributes() volume.Attributes {
@@ -265,8 +270,12 @@ func (ed *emptyDir) setupDir(dir string) error {
 }
 
 func (ed *emptyDir) GetPath() string {
+	return GetPath(ed.pod.UID, ed.volName, ed.plugin.host)
+}
+
+func GetPath(uid types.UID, volName string, host volume.VolumeHost) string {
 	name := emptyDirPluginName
-	return ed.plugin.host.GetPodVolumeDir(ed.pod.UID, util.EscapeQualifiedNameForDisk(name), ed.volName)
+	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(name), volName)
 }
 
 // TearDown simply discards everything in the directory.
@@ -315,5 +324,5 @@ func (ed *emptyDir) teardownTmpfs(dir string) error {
 }
 
 func (ed *emptyDir) getMetaDir() string {
-	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, util.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
+	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, strings.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
 }

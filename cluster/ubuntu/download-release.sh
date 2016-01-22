@@ -31,7 +31,7 @@ mkdir -p binaries/master
 mkdir -p binaries/minion
 
 # flannel
-FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.3"}
+FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.5"}
 echo "Prepare flannel ${FLANNEL_VERSION} release ..."
 grep -q "^${FLANNEL_VERSION}\$" binaries/.flannel 2>/dev/null || {
   curl -L  https://github.com/coreos/flannel/releases/download/v${FLANNEL_VERSION}/flannel-${FLANNEL_VERSION}-linux-amd64.tar.gz -o flannel.tar.gz
@@ -53,10 +53,10 @@ grep -q "^${ETCD_VERSION}\$" binaries/.etcd 2>/dev/null || {
 }
 
 # k8s
-KUBE_VERSION=${KUBE_VERSION:-"1.1.2"}
+KUBE_VERSION=${KUBE_VERSION:-"1.1.4"}
 echo "Prepare kubernetes ${KUBE_VERSION} release ..."
 grep -q "^${KUBE_VERSION}\$" binaries/.kubernetes 2>/dev/null || {
-  curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v${KUBE_VERSION}/kubernetes.tar.gz -o kubernetes.tar.gz
+  curl -L https://github.com/kubernetes/kubernetes/releases/download/v${KUBE_VERSION}/kubernetes.tar.gz -o kubernetes.tar.gz
   tar xzf kubernetes.tar.gz
   pushd kubernetes/server
   tar xzf kubernetes-server-linux-amd64.tar.gz
@@ -72,5 +72,5 @@ grep -q "^${KUBE_VERSION}\$" binaries/.kubernetes 2>/dev/null || {
 
 rm -rf flannel* kubernetes* etcd*
 
-echo "Done! All your commands locate in kubernetes/cluster/ubuntu/binaries dir"
+echo "Done! All your binaries locate in kubernetes/cluster/ubuntu/binaries directory"
 popd

@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 
@@ -72,15 +72,14 @@ var _ = Describe("Load capacity [Skipped]", func() {
 	BeforeEach(func() {
 		c = framework.Client
 		ns = framework.Namespace.Name
-		nodes, err := c.Nodes().List(unversioned.ListOptions{})
-		expectNoError(err)
+		nodes := ListSchedulableNodesOrDie(c)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
 		// terminating namespace to be finally deleted before starting this test.
-		err = checkTestingNSDeletedExcept(c, ns)
+		err := checkTestingNSDeletedExcept(c, ns)
 		expectNoError(err)
 
 		expectNoError(resetMetrics(c))
@@ -214,7 +213,10 @@ func scaleRC(wg *sync.WaitGroup, config *RCConfig) {
 	expectNoError(ScaleRC(config.Client, config.Namespace, config.Name, newSize, true),
 		fmt.Sprintf("scaling rc %s for the first time", config.Name))
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
-	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+	options := api.ListOptions{
+		LabelSelector:   selector,
+		ResourceVersion: "0",
+	}
 	_, err := config.Client.Pods(config.Namespace).List(options)
 	expectNoError(err, fmt.Sprintf("listing pods from rc %v", config.Name))
 }

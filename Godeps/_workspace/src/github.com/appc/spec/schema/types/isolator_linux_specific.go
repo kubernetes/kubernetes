@@ -27,11 +27,13 @@ const (
 var LinuxIsolatorNames = make(map[ACIdentifier]struct{})
 
 func init() {
-	AddIsolatorName(LinuxCapabilitiesRetainSetName, LinuxIsolatorNames)
-	AddIsolatorName(LinuxCapabilitiesRevokeSetName, LinuxIsolatorNames)
-
-	AddIsolatorValueConstructor(LinuxCapabilitiesRetainSetName, NewLinuxCapabilitiesRetainSet)
-	AddIsolatorValueConstructor(LinuxCapabilitiesRevokeSetName, NewLinuxCapabilitiesRevokeSet)
+	for name, con := range map[ACIdentifier]IsolatorValueConstructor{
+		LinuxCapabilitiesRevokeSetName: func() IsolatorValue { return &LinuxCapabilitiesRevokeSet{} },
+		LinuxCapabilitiesRetainSetName: func() IsolatorValue { return &LinuxCapabilitiesRetainSet{} },
+	} {
+		AddIsolatorName(name, LinuxIsolatorNames)
+		AddIsolatorValueConstructor(name, con)
+	}
 }
 
 type LinuxCapabilitiesSet interface {
@@ -40,6 +42,7 @@ type LinuxCapabilitiesSet interface {
 }
 
 type LinuxCapability string
+
 type linuxCapabilitiesSetValue struct {
 	Set []LinuxCapability `json:"set"`
 }
@@ -71,18 +74,70 @@ func (l linuxCapabilitiesSetBase) Set() []LinuxCapability {
 	return l.val.Set
 }
 
-func NewLinuxCapabilitiesRetainSet() IsolatorValue {
-	return &LinuxCapabilitiesRetainSet{}
-}
-
 type LinuxCapabilitiesRetainSet struct {
 	linuxCapabilitiesSetBase
 }
 
-func NewLinuxCapabilitiesRevokeSet() IsolatorValue {
-	return &LinuxCapabilitiesRevokeSet{}
+func NewLinuxCapabilitiesRetainSet(caps ...string) (*LinuxCapabilitiesRetainSet, error) {
+	l := LinuxCapabilitiesRetainSet{
+		linuxCapabilitiesSetBase{
+			linuxCapabilitiesSetValue{
+				make([]LinuxCapability, len(caps)),
+			},
+		},
+	}
+	for i, c := range caps {
+		l.linuxCapabilitiesSetBase.val.Set[i] = LinuxCapability(c)
+	}
+	if err := l.AssertValid(); err != nil {
+		return nil, err
+	}
+	return &l, nil
+}
+
+func (l LinuxCapabilitiesRetainSet) AsIsolator() Isolator {
+	b, err := json.Marshal(l.linuxCapabilitiesSetBase.val)
+	if err != nil {
+		panic(err)
+	}
+	rm := json.RawMessage(b)
+	return Isolator{
+		Name:     LinuxCapabilitiesRetainSetName,
+		ValueRaw: &rm,
+		value:    &l,
+	}
 }
 
 type LinuxCapabilitiesRevokeSet struct {
 	linuxCapabilitiesSetBase
+}
+
+func NewLinuxCapabilitiesRevokeSet(caps ...string) (*LinuxCapabilitiesRevokeSet, error) {
+	l := LinuxCapabilitiesRevokeSet{
+		linuxCapabilitiesSetBase{
+			linuxCapabilitiesSetValue{
+				make([]LinuxCapability, len(caps)),
+			},
+		},
+	}
+	for i, c := range caps {
+		l.linuxCapabilitiesSetBase.val.Set[i] = LinuxCapability(c)
+	}
+	if err := l.AssertValid(); err != nil {
+		return nil, err
+	}
+	return &l, nil
+}
+
+func (l LinuxCapabilitiesRevokeSet) AsIsolator() Isolator {
+	b, err := json.Marshal(l.linuxCapabilitiesSetBase.val)
+	if err != nil {
+		panic(err)
+	}
+	rm := json.RawMessage(b)
+	return Isolator{
+		Name:     LinuxCapabilitiesRevokeSetName,
+		ValueRaw: &rm,
+		value:    &l,
+	}
 }

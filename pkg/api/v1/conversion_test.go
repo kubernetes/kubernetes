@@ -17,12 +17,10 @@ limitations under the License.
 package v1_test
 
 import (
-	"encoding/json"
-	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/resource"
 	versioned "k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -72,32 +70,56 @@ func TestPodSpecConversion(t *testing.T) {
 	}
 }
 
-func TestListOptionsConversion(t *testing.T) {
-	testCases := []versioned.ListOptions{
-		{},
-		{ResourceVersion: "1"},
-		{LabelSelector: "a=b,c=d", FieldSelector: "a=b,c!=d", ResourceVersion: "5"},
+func TestResourceListConversion(t *testing.T) {
+	bigMilliQuantity := resource.NewQuantity(resource.MaxMilliValue, resource.DecimalSI)
+	bigMilliQuantity.Add(resource.MustParse("12345m"))
+
+	tests := []struct {
+		input    versioned.ResourceList
+		expected api.ResourceList
+	}{
+		{ // No changes necessary.
+			input: versioned.ResourceList{
+				versioned.ResourceMemory:  resource.MustParse("30M"),
+				versioned.ResourceCPU:     resource.MustParse("100m"),
+				versioned.ResourceStorage: resource.MustParse("1G"),
+			},
+			expected: api.ResourceList{
+				api.ResourceMemory:  resource.MustParse("30M"),
+				api.ResourceCPU:     resource.MustParse("100m"),
+				api.ResourceStorage: resource.MustParse("1G"),
+			},
+		},
+		{ // Nano-scale values should be rounded up to milli-scale.
+			input: versioned.ResourceList{
+				versioned.ResourceCPU:    resource.MustParse("3.000023m"),
+				versioned.ResourceMemory: resource.MustParse("500.000050m"),
+			},
+			expected: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("4m"),
+				api.ResourceMemory: resource.MustParse("501m"),
+			},
+		},
+		{ // Large values should still be accurate.
+			input: versioned.ResourceList{
+				versioned.ResourceCPU:     *bigMilliQuantity.Copy(),
+				versioned.ResourceStorage: *bigMilliQuantity.Copy(),
+			},
+			expected: api.ResourceList{
+				api.ResourceCPU:     *bigMilliQuantity.Copy(),
+				api.ResourceStorage: *bigMilliQuantity.Copy(),
+			},
+		},
 	}
 
-	for _, test := range testCases {
-		marshalled, err := json.Marshal(test)
+	output := api.ResourceList{}
+	for i, test := range tests {
+		err := api.Scheme.Convert(&test.input, &output)
 		if err != nil {
-			t.Errorf("unexpected error: %#v", err)
+			t.Fatalf("unexpected error for case %d: %v", i, err)
 		}
-		newRep := unversioned.ListOptions{}
-		if err := json.Unmarshal(marshalled, &newRep); err != nil {
-			t.Errorf("unexpected error: %#v", err)
-		}
-		unversionedMarshalled, err := json.Marshal(newRep)
-		if err != nil {
-			t.Errorf("unexpected error: %#", err)
-		}
-		base := versioned.ListOptions{}
-		if err := json.Unmarshal(unversionedMarshalled, &base); err != nil {
-			t.Errorf("unexpected error: %#v", err)
-		}
-		if !reflect.DeepEqual(test, base) {
-			t.Errorf("expected: %#v, got: %#v", test, base)
+		if !api.Semantic.DeepEqual(test.expected, output) {
+			t.Errorf("unexpected conversion for case %d: Expected %+v; Got %+v", i, test.expected, output)
 		}
 	}
 }

@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/host_path"
@@ -139,6 +140,76 @@ func TestClaimRace(t *testing.T) {
 	}
 	if c2.Status.Phase != api.ClaimPending {
 		t.Errorf("Expected phase %s but got %s", api.ClaimPending, c2.Status.Phase)
+	}
+}
+
+func TestClaimSyncAfterVolumeProvisioning(t *testing.T) {
+	// Tests that binder.syncVolume will also syncClaim if the PV has completed
+	// provisioning but the claim is still Pending.  We want to advance to Bound
+	// without having to wait until the binder's next sync period.
+	claim := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "foo",
+			Namespace: "bar",
+			Annotations: map[string]string{
+				qosProvisioningKey: "foo",
+			},
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("3Gi"),
+				},
+			},
+		},
+		Status: api.PersistentVolumeClaimStatus{
+			Phase: api.ClaimPending,
+		},
+	}
+	claim.ObjectMeta.SelfLink = testapi.Default.SelfLink("pvc", "")
+	claimRef, _ := api.GetReference(claim)
+
+	pv := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "foo",
+			Annotations: map[string]string{
+				pvProvisioningRequiredAnnotationKey: pvProvisioningCompletedAnnotationValue,
+			},
+		},
+		Spec: api.PersistentVolumeSpec{
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10Gi"),
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/tmp/data01",
+				},
+			},
+			ClaimRef: claimRef,
+		},
+		Status: api.PersistentVolumeStatus{
+			Phase: api.VolumePending,
+		},
+	}
+
+	volumeIndex := NewPersistentVolumeOrderedIndex()
+	mockClient := &mockBinderClient{
+		claim: claim,
+	}
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(host_path.ProbeRecyclableVolumePlugins(newMockRecycler, volume.VolumeConfig{}), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+
+	// adds the volume to the index, making the volume available.
+	// pv also completed provisioning, so syncClaim should cause claim's phase to advance to Bound
+	syncVolume(volumeIndex, mockClient, pv)
+	if mockClient.volume.Status.Phase != api.VolumeAvailable {
+		t.Errorf("Expected phase %s but got %s", api.VolumeAvailable, mockClient.volume.Status.Phase)
+	}
+	if mockClient.claim.Status.Phase != api.ClaimBound {
+		t.Errorf("Expected phase %s but got %s", api.ClaimBound, claim.Status.Phase)
 	}
 }
 
@@ -369,6 +440,27 @@ func TestBindingWithExamples(t *testing.T) {
 	}
 }
 
+func TestCasting(t *testing.T) {
+	client := &testclient.Fake{}
+	binder := NewPersistentVolumeClaimBinder(client, 1*time.Second)
+
+	pv := &api.PersistentVolume{}
+	unk := cache.DeletedFinalStateUnknown{}
+	pvc := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Status:     api.PersistentVolumeClaimStatus{Phase: api.ClaimBound},
+	}
+
+	// none of these should fail casting.
+	// the real test is not failing when passed DeletedFinalStateUnknown in the deleteHandler
+	binder.addVolume(pv)
+	binder.updateVolume(pv, pv)
+	binder.deleteVolume(pv)
+	binder.deleteVolume(unk)
+	binder.addClaim(pvc)
+	binder.updateClaim(pvc, pvc)
+}
+
 type mockBinderClient struct {
 	volume *api.PersistentVolume
 	claim  *api.PersistentVolumeClaim
@@ -397,7 +489,7 @@ func (c *mockBinderClient) GetPersistentVolumeClaim(namespace, name string) (*ap
 	if c.claim != nil {
 		return c.claim, nil
 	} else {
-		return nil, errors.NewNotFound("persistentVolume", name)
+		return nil, errors.NewNotFound(api.Resource("persistentvolumes"), name)
 	}
 }
 
@@ -420,6 +512,7 @@ func newMockRecycler(spec *volume.Spec, host volume.VolumeHost, config volume.Vo
 type mockRecycler struct {
 	path string
 	host volume.VolumeHost
+	volume.MetricsNil
 }
 
 func (r *mockRecycler) GetPath() string {

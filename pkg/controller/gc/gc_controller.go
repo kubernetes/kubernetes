@@ -22,9 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -50,10 +48,6 @@ type GCController struct {
 }
 
 func New(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc, threshold int) *GCController {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
-
 	gcc := &GCController{
 		kubeClient: kubeClient,
 		threshold:  threshold,
@@ -62,16 +56,16 @@ func New(kubeClient client.Interface, resyncPeriod controller.ResyncPeriodFunc, 
 		},
 	}
 
-	terminatedSelector := compileTerminatedPodSelector()
+	terminatedSelector := fields.ParseSelectorOrDie("status.phase!=" + string(api.PodPending) + ",status.phase!=" + string(api.PodRunning) + ",status.phase!=" + string(api.PodUnknown))
 
 	gcc.podStore.Store, gcc.podStoreSyncer = framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{terminatedSelector}}
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				options.FieldSelector = terminatedSelector
 				return gcc.kubeClient.Pods(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				options.FieldSelector.Selector = terminatedSelector
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				options.FieldSelector = terminatedSelector
 				return gcc.kubeClient.Pods(api.NamespaceAll).Watch(options)
 			},
 		},
@@ -114,14 +108,6 @@ func (gcc *GCController) gc() {
 		}(terminatedPods[i].Namespace, terminatedPods[i].Name)
 	}
 	wait.Wait()
-}
-
-func compileTerminatedPodSelector() fields.Selector {
-	selector, err := fields.ParseSelector("status.phase!=" + string(api.PodPending) + ",status.phase!=" + string(api.PodRunning) + ",status.phase!=" + string(api.PodUnknown))
-	if err != nil {
-		panic("terminatedSelector must compile: " + err.Error())
-	}
-	return selector
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.

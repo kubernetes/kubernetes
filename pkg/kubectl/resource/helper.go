@@ -17,6 +17,8 @@ limitations under the License.
 package resource
 
 import (
+	"strconv"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/labels"
@@ -51,23 +53,27 @@ func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
 	}
 }
 
-func (m *Helper) Get(namespace, name string) (runtime.Object, error) {
-	return m.RESTClient.Get().
+func (m *Helper) Get(namespace, name string, export bool) (runtime.Object, error) {
+	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
-		Name(name).
-		Do().
-		Get()
+		Name(name)
+	if export {
+		req.Param("export", strconv.FormatBool(export))
+	}
+	return req.Do().Get()
 }
 
 // TODO: add field selector
-func (m *Helper) List(namespace, apiVersion string, selector labels.Selector) (runtime.Object, error) {
-	return m.RESTClient.Get().
+func (m *Helper) List(namespace, apiVersion string, selector labels.Selector, export bool) (runtime.Object, error) {
+	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
-		LabelsSelectorParam(selector).
-		Do().
-		Get()
+		LabelsSelectorParam(selector)
+	if export {
+		req.Param("export", strconv.FormatBool(export))
+	}
+	return req.Do().Get()
 }
 
 func (m *Helper) Watch(namespace, resourceVersion, apiVersion string, labelSelector labels.Selector) (watch.Interface, error) {

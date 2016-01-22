@@ -24,6 +24,8 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 DEFAULT_KUBECONFIG="${HOME}/.kube/config"
 
+source "${KUBE_ROOT}/cluster/lib/util.sh"
+source "${KUBE_ROOT}/cluster/lib/logging.sh"
 # KUBE_RELEASE_VERSION_REGEX matches things like "v1.2.3" or "v1.2.3-alpha.4"
 #
 # NOTE This must match the version_regex in build/common.sh
@@ -168,7 +170,7 @@ function get-kubeconfig-basicauth() {
 #   KUBE_PASSWORD
 function gen-kube-basicauth() {
     KUBE_USER=admin
-    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
+    KUBE_PASSWORD=$(python -c 'import string,random; print("".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16)))')
 }
 
 # Get the bearer token for the current-context in kubeconfig if one exists.
@@ -313,23 +315,37 @@ function tars_from_version() {
 # Vars set:
 #   SERVER_BINARY_TAR
 #   SALT_TAR
+#   KUBE_MANIFESTS_TAR
 function find-release-tars() {
   SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
-  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
+  if [[ ! -f "${SERVER_BINARY_TAR}" ]]; then
     SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
   fi
-  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
+  if [[ ! -f "${SERVER_BINARY_TAR}" ]]; then
     echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz" >&2
     exit 1
   fi
 
   SALT_TAR="${KUBE_ROOT}/server/kubernetes-salt.tar.gz"
-  if [[ ! -f "$SALT_TAR" ]]; then
+  if [[ ! -f "${SALT_TAR}" ]]; then
     SALT_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-salt.tar.gz"
   fi
-  if [[ ! -f "$SALT_TAR" ]]; then
+  if [[ ! -f "${SALT_TAR}" ]]; then
     echo "!!! Cannot find kubernetes-salt.tar.gz" >&2
     exit 1
+  fi
+
+  # This tarball is only used by Ubuntu Trusty.
+  KUBE_MANIFESTS_TAR=
+  if [[ "${KUBE_OS_DISTRIBUTION:-}" == "trusty" ]]; then
+    KUBE_MANIFESTS_TAR="${KUBE_ROOT}/server/kubernetes-manifests.tar.gz"
+    if [[ ! -f "${KUBE_MANIFESTS_TAR}" ]]; then
+      KUBE_MANIFESTS_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-manifests.tar.gz"
+    fi
+    if [[ ! -f "${KUBE_MANIFESTS_TAR}" ]]; then
+      echo "!!! Cannot find kubernetes-manifests.tar.gz" >&2
+      exit 1
+    fi
   fi
 }
 
@@ -344,12 +360,53 @@ function find-release-version() {
   if [[ -f "${KUBE_ROOT}/version" ]]; then
     KUBE_GIT_VERSION="$(cat ${KUBE_ROOT}/version)"
   fi
-  if [[ -f "${KUBE_ROOT}/_output/full/kubernetes/version" ]]; then
-    KUBE_GIT_VERSION="$(cat ${KUBE_ROOT}/_output/full/kubernetes/version)"
+  if [[ -f "${KUBE_ROOT}/_output/release-stage/full/kubernetes/version" ]]; then
+    KUBE_GIT_VERSION="$(cat ${KUBE_ROOT}/_output/release-stage/full/kubernetes/version)"
   fi
 
   if [[ -z "${KUBE_GIT_VERSION}" ]]; then
     echo "!!! Cannot find release version"
     exit 1
   fi
+}
+
+function stage-images() {
+  find-release-version
+  find-release-tars
+
+  KUBE_IMAGE_TAG="$(echo """${KUBE_GIT_VERSION}""" | sed 's/+/-/g')"
+
+  local docker_wrapped_binaries=(
+    "kube-apiserver"
+    "kube-controller-manager"
+    "kube-scheduler"
+    "kube-proxy"
+  )
+
+  local docker_cmd=("docker")
+
+  if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
+    local docker_push_cmd=("gcloud" "docker")
+  fi
+
+  local temp_dir="$(mktemp -d -t 'kube-server-XXXX')"
+
+  tar xzfv "${SERVER_BINARY_TAR}" -C "${temp_dir}" &> /dev/null
+
+  for binary in "${docker_wrapped_binaries[@]}"; do
+    local docker_tag="$(cat ${temp_dir}/kubernetes/server/bin/${binary}.docker_tag)"
+    (
+      "${docker_cmd[@]}" load -i "${temp_dir}/kubernetes/server/bin/${binary}.tar"
+      "${docker_cmd[@]}" tag -f "gcr.io/google_containers/${binary}:${docker_tag}" "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
+      "${docker_push_cmd[@]}" push "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
+    ) &> "${temp_dir}/${binary}-push.log" &
+  done
+
+  kube::util::wait-for-jobs || {
+    kube::log::error "unable to push images. see ${temp_dir}/*.log for more info."
+    return 1
+  }
+
+  rm -rf "${temp_dir}"
+  return 0
 }

@@ -85,11 +85,11 @@ type TestPrintType struct {
 	Data string
 }
 
-func (*TestPrintType) IsAnAPIObject() {}
+func (obj *TestPrintType) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
 
 type TestUnknownType struct{}
 
-func (*TestUnknownType) IsAnAPIObject() {}
+func (obj *TestUnknownType) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
 
 func TestPrinter(t *testing.T) {
 	//test inputs
@@ -1217,6 +1217,7 @@ func TestTranslateTimestamp(t *testing.T) {
 		{"5 minutes ago", translateTimestamp(unversioned.Time{Time: time.Now().Add(-3e11)}), "5m"},
 		{"an hour ago", translateTimestamp(unversioned.Time{Time: time.Now().Add(-6e12)}), "1h"},
 		{"2 days ago", translateTimestamp(unversioned.Time{Time: time.Now().AddDate(0, 0, -2)}), "2d"},
+		{"months ago", translateTimestamp(unversioned.Time{Time: time.Now().AddDate(0, 0, -90)}), "90d"},
 		{"10 years ago", translateTimestamp(unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)}), "10y"},
 	}
 	for _, test := range tl {

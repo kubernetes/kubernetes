@@ -29,13 +29,14 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
@@ -138,22 +139,26 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 func NewMasterConfig() *master.Config {
 	etcdClient := NewEtcdClient()
 	storageVersions := make(map[string]string)
+
 	etcdStorage := etcdstorage.NewEtcdStorage(etcdClient, testapi.Default.Codec(), etcdtest.PathPrefix())
-	storageVersions[""] = testapi.Default.GroupVersion().String()
+	storageVersions[api.GroupName] = testapi.Default.GroupVersion().String()
 	expEtcdStorage := NewExtensionsEtcdStorage(etcdClient)
-	storageVersions["extensions"] = testapi.Extensions.GroupVersion().String()
-	storageDestinations := master.NewStorageDestinations()
-	storageDestinations.AddAPIGroup("", etcdStorage)
-	storageDestinations.AddAPIGroup("extensions", expEtcdStorage)
+	storageVersions[extensions.GroupName] = testapi.Extensions.GroupVersion().String()
+
+	storageDestinations := genericapiserver.NewStorageDestinations()
+	storageDestinations.AddAPIGroup(api.GroupName, etcdStorage)
+	storageDestinations.AddAPIGroup(extensions.GroupName, expEtcdStorage)
 
 	return &master.Config{
-		StorageDestinations: storageDestinations,
-		StorageVersions:     storageVersions,
-		KubeletClient:       kubeletclient.FakeKubeletClient{},
-		APIPrefix:           "/api",
-		APIGroupPrefix:      "/apis",
-		Authorizer:          apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:    admit.NewAlwaysAdmit(),
+		Config: &genericapiserver.Config{
+			StorageDestinations: storageDestinations,
+			StorageVersions:     storageVersions,
+			APIPrefix:           "/api",
+			APIGroupPrefix:      "/apis",
+			Authorizer:          apiserver.NewAlwaysAllowAuthorizer(),
+			AdmissionControl:    admit.NewAlwaysAdmit(),
+		},
+		KubeletClient: kubeletclient.FakeKubeletClient{},
 	}
 }
 
@@ -178,7 +183,8 @@ func (m *MasterComponents) Stop(apiServer, rcManager bool) {
 		m.once.Do(m.stopRCManager)
 	}
 	if apiServer {
-		m.ApiServer.Close()
+		// TODO: Uncomment when fix #19254
+		// m.ApiServer.Close()
 	}
 }
 
@@ -249,7 +255,7 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 		glog.Infof("StartPods took %v with numPods %d", time.Since(start), numPods)
 	}()
 	hostField := fields.OneTermEqualSelector(client.PodHost, host)
-	options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{hostField}}
+	options := api.ListOptions{FieldSelector: hostField}
 	pods, err := restClient.Pods(TestNS).List(options)
 	if err != nil || len(pods.Items) == numPods {
 		return err

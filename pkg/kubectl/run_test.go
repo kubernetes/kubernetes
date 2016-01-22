@@ -656,7 +656,7 @@ func TestGenerateDeployment(t *testing.T) {
 				Spec: extensions.DeploymentSpec{
 					Replicas:       3,
 					Selector:       map[string]string{"foo": "bar", "baz": "blah"},
-					UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
+					UniqueLabelKey: extensions.DefaultDeploymentUniqueLabelKey,
 					Template: api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{"foo": "bar", "baz": "blah"},
@@ -808,6 +808,76 @@ func TestGenerateJob(t *testing.T) {
 		}
 		if !reflect.DeepEqual(obj.(*extensions.Job), test.expected) {
 			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*extensions.Job))
+		}
+	}
+}
+
+func TestParseEnv(t *testing.T) {
+	tests := []struct {
+		envArray  []string
+		expected  []api.EnvVar
+		expectErr bool
+		test      string
+	}{
+		{
+			envArray: []string{
+				"THIS_ENV=isOK",
+				"HAS_COMMAS=foo,bar",
+				"HAS_EQUALS=jJnro54iUu75xNy==",
+			},
+			expected: []api.EnvVar{
+				{
+					Name:  "THIS_ENV",
+					Value: "isOK",
+				},
+				{
+					Name:  "HAS_COMMAS",
+					Value: "foo,bar",
+				},
+				{
+					Name:  "HAS_EQUALS",
+					Value: "jJnro54iUu75xNy==",
+				},
+			},
+			expectErr: false,
+			test:      "test case 1",
+		},
+		{
+			envArray: []string{
+				"WITH_OUT_EQUALS",
+			},
+			expected:  []api.EnvVar{},
+			expectErr: true,
+			test:      "test case 2",
+		},
+		{
+			envArray: []string{
+				"WITH_OUT_VALUES=",
+			},
+			expected:  []api.EnvVar{},
+			expectErr: true,
+			test:      "test case 3",
+		},
+		{
+			envArray: []string{
+				"=WITH_OUT_NAME",
+			},
+			expected:  []api.EnvVar{},
+			expectErr: true,
+			test:      "test case 4",
+		},
+	}
+
+	for _, test := range tests {
+		envs, err := parseEnvs(test.envArray)
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v (%s)", err, test.test)
+		}
+		if test.expectErr && err != nil {
+			continue
+		}
+		if !reflect.DeepEqual(envs, test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v (%s)", test.expected, envs, test.test)
 		}
 	}
 }

@@ -18,9 +18,12 @@ package app
 
 import (
 	"fmt"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/iptables"
 )
@@ -43,6 +46,9 @@ func (fake *fakeIptablesVersioner) GetVersion() (string, error) {
 }
 
 func Test_getProxyMode(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("skipping on non-Linux")
+	}
 	var cases = []struct {
 		flag            string
 		annotationKey   string
@@ -207,21 +213,21 @@ func Test_getProxyMode(t *testing.T) {
 	}
 }
 
-//This test verifies that Proxy Server does not crash that means
-//Config and iptinterface are not nil when CleanupAndExit is true.
-//To avoid proxy crash: https://github.com/kubernetes/kubernetes/pull/14736
+// This test verifies that Proxy Server does not crash that means
+// Config and iptinterface are not nil when CleanupAndExit is true.
+// To avoid proxy crash: https://github.com/kubernetes/kubernetes/pull/14736
 func TestProxyServerWithCleanupAndExit(t *testing.T) {
 
-	//creates default config
-	config := NewProxyConfig()
+	// creates default config
+	config := options.NewProxyConfig()
 
-	//sets CleanupAndExit manually
+	// sets CleanupAndExit manually
 	config.CleanupAndExit = true
 
-	//creates new proxy server
+	// creates new proxy server
 	proxyserver, err := NewProxyServerDefault(config)
 
-	//verifies that nothing is nill except error
+	// verifies that nothing is nill except error
 	assert.Nil(t, err)
 	assert.NotNil(t, proxyserver)
 	assert.NotNil(t, proxyserver.Config)

@@ -203,11 +203,24 @@ type NamePrinter struct {
 // and print "resource/name" pair. If the object is a List, print all items in it.
 func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	objvalue := reflect.ValueOf(obj).Elem()
-	kind := objvalue.FieldByName("Kind")
-	if !kind.IsValid() {
-		kind = reflect.ValueOf("<unknown>")
+	kindString := objvalue.FieldByName("Kind")
+	groupVersionString := objvalue.FieldByName("APIVersion")
+	kind := unversioned.GroupVersionKind{}
+	if !kindString.IsValid() {
+		kindString = reflect.ValueOf("<unknown>")
 	}
-	if kind.String() == "List" {
+	kind.Kind = kindString.String()
+
+	if !groupVersionString.IsValid() {
+		groupVersionString = reflect.ValueOf("<unknown>/<unknown>")
+	}
+	gv, err := unversioned.ParseGroupVersion(groupVersionString.String())
+	if err != nil {
+		kind.Group = gv.Group
+		kind.Version = gv.Version
+	}
+
+	if kind.Kind == "List" {
 		items := objvalue.FieldByName("Items")
 		if items.Type().String() == "[]runtime.RawExtension" {
 			for i := 0; i < items.Len(); i++ {
@@ -237,9 +250,9 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		if !name.IsValid() {
 			name = reflect.ValueOf("<unknown>")
 		}
-		_, resource := meta.KindToResource(kind.String(), false)
+		_, resource := meta.KindToResource(kind, false)
 
-		fmt.Fprintf(w, "%s/%s\n", resource, name)
+		fmt.Fprintf(w, "%s/%s\n", resource.Resource, name)
 	}
 
 	return nil
@@ -415,6 +428,7 @@ var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 var horizontalPodAutoscalerColumns = []string{"NAME", "REFERENCE", "TARGET", "CURRENT", "MINPODS", "MAXPODS", "AGE"}
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 var deploymentColumns = []string{"NAME", "UPDATEDREPLICAS", "AGE"}
+var configMapColumns = []string{"NAME", "DATA", "AGE"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -460,6 +474,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(deploymentColumns, printDeploymentList)
 	h.Handler(horizontalPodAutoscalerColumns, printHorizontalPodAutoscaler)
 	h.Handler(horizontalPodAutoscalerColumns, printHorizontalPodAutoscalerList)
+	h.Handler(configMapColumns, printConfigMap)
+	h.Handler(configMapColumns, printConfigMapList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -537,10 +553,10 @@ func translateTimestamp(timestamp unversioned.Time) string {
 }
 
 func printPod(pod *api.Pod, w io.Writer, options printOptions) error {
-	return printPodBase(pod, w, true, options)
+	return printPodBase(pod, w, options)
 }
 
-func printPodBase(pod *api.Pod, w io.Writer, showIfTerminating bool, options printOptions) error {
+func printPodBase(pod *api.Pod, w io.Writer, options printOptions) error {
 	name := pod.Name
 	namespace := pod.Namespace
 
@@ -550,7 +566,7 @@ func printPodBase(pod *api.Pod, w io.Writer, showIfTerminating bool, options pri
 
 	reason := string(pod.Status.Phase)
 	// if not printing all pods, skip terminated pods (default)
-	if !showIfTerminating && !options.showAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
+	if !options.showAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
 		return nil
 	}
 	if pod.Status.Reason != "" {
@@ -610,7 +626,7 @@ func printPodBase(pod *api.Pod, w io.Writer, showIfTerminating bool, options pri
 
 func printPodList(podList *api.PodList, w io.Writer, options printOptions) error {
 	for _, pod := range podList.Items {
-		if err := printPodBase(&pod, w, false, options); err != nil {
+		if err := printPodBase(&pod, w, options); err != nil {
 			return err
 		}
 	}
@@ -1354,10 +1370,10 @@ func printThirdPartyResource(rsrc *extensions.ThirdPartyResource, w io.Writer, o
 	versions := make([]string, len(rsrc.Versions))
 	for ix := range rsrc.Versions {
 		version := &rsrc.Versions[ix]
-		versions[ix] = fmt.Sprint("%s/%s", version.APIGroup, version.Name)
+		versions[ix] = fmt.Sprintf("%s/%s", version.APIGroup, version.Name)
 	}
 	versionsString := strings.Join(versions, ",")
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", rsrc.Name, rsrc.Description, versionsString); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", rsrc.Name, rsrc.Description, versionsString); err != nil {
 		return err
 	}
 	return nil
@@ -1442,6 +1458,31 @@ func printHorizontalPodAutoscaler(hpa *extensions.HorizontalPodAutoscaler, w io.
 func printHorizontalPodAutoscalerList(list *extensions.HorizontalPodAutoscalerList, w io.Writer, options printOptions) error {
 	for i := range list.Items {
 		if err := printHorizontalPodAutoscaler(&list.Items[i], w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printConfigMap(configMap *extensions.ConfigMap, w io.Writer, options printOptions) error {
+	name := configMap.Name
+	namespace := configMap.Namespace
+
+	if options.withNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
+			return err
+		}
+	}
+	if _, err := fmt.Fprintf(w, "%s\t%v\t%s", name, len(configMap.Data), translateTimestamp(configMap.CreationTimestamp)); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(configMap.Labels, options.columnLabels))
+	return err
+}
+
+func printConfigMapList(list *extensions.ConfigMapList, w io.Writer, options printOptions) error {
+	for i := range list.Items {
+		if err := printConfigMap(&list.Items[i], w, options); err != nil {
 			return err
 		}
 	}

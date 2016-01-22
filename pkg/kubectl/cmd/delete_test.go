@@ -192,7 +192,7 @@ func TestDeleteAllNotFound(t *testing.T) {
 
 	// Add an item to the list which will result in a 404 on delete
 	svc.Items = append(svc.Items, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}})
-	notFoundError := &errors.NewNotFound("Service", "foo").(*errors.StatusError).ErrStatus
+	notFoundError := &errors.NewNotFound(api.Resource("services"), "foo").(*errors.StatusError).ErrStatus
 
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
@@ -234,7 +234,7 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 
 	// Add an item to the list which will result in a 404 on delete
 	svc.Items = append(svc.Items, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}})
-	notFoundError := &errors.NewNotFound("Service", "foo").(*errors.StatusError).ErrStatus
+	notFoundError := &errors.NewNotFound(api.Resource("services"), "foo").(*errors.StatusError).ErrStatus
 
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{

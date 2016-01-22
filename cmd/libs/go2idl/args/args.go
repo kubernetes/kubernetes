@@ -37,13 +37,15 @@ import (
 // Default returns a defaulted GeneratorArgs. You may change the defaults
 // before calling AddFlags.
 func Default() *GeneratorArgs {
-	return &GeneratorArgs{
+	generatorArgs := &GeneratorArgs{
 		OutputBase:       DefaultSourceTree(),
 		GoHeaderFilePath: filepath.Join(DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt"),
 	}
+	generatorArgs.AddFlags(pflag.CommandLine)
+	return generatorArgs
 }
 
-// GeneratorArgs has arguments common to most generators.
+// GeneratorArgs has arguments that are passed to generators.
 type GeneratorArgs struct {
 	// Which directories to parse.
 	InputDirs []string
@@ -59,6 +61,9 @@ type GeneratorArgs struct {
 
 	// If true, only verify, don't write anything.
 	VerifyOnly bool
+
+	// Any custom arguments go here
+	CustomArgs interface{}
 }
 
 func (g *GeneratorArgs) AddFlags(fs *pflag.FlagSet) {
@@ -105,7 +110,6 @@ func DefaultSourceTree() string {
 // If you don't need any non-default behavior, use as:
 // args.Default().Execute(...)
 func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem string, pkgs func(*generator.Context, *GeneratorArgs) generator.Packages) error {
-	g.AddFlags(pflag.CommandLine)
 	pflag.Parse()
 
 	b, err := g.NewBuilder()

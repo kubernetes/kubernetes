@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/util"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
@@ -63,9 +64,10 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"golang.org/x/net/context"
 )
 
 var (
@@ -74,9 +76,9 @@ var (
 	// Limit the number of concurrent tests.
 	maxConcurrency int
 
-	longTestTimeout = time.Second * 300
+	longTestTimeout = time.Second * 500
 
-	maxTestTimeout = time.Minute * 10
+	maxTestTimeout = time.Minute * 15
 )
 
 type delegateHandler struct {
@@ -93,17 +95,23 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func startComponents(firstManifestURL, secondManifestURL string) (string, string) {
 	// Setup
-	servers := []string{}
-	glog.Infof("Creating etcd client pointing to %v", servers)
-
 	handler := delegateHandler{}
 	apiServer := httptest.NewServer(&handler)
 
-	etcdClient := etcd.NewClient(servers)
+	cfg := etcd.Config{
+		Endpoints: []string{"http://127.0.0.1:4001"},
+	}
+	etcdClient, err := etcd.New(cfg)
+	if err != nil {
+		glog.Fatalf("Error creating etcd client: %v", err)
+	}
+	glog.Infof("Creating etcd client pointing to %v", cfg.Endpoints)
+
+	keysAPI := etcd.NewKeysAPI(etcdClient)
 	sleep := 4 * time.Second
 	ok := false
 	for i := 0; i < 3; i++ {
-		keys, err := etcdClient.Get("/", false, false)
+		keys, err := keysAPI.Get(context.TODO(), "/", nil)
 		if err != nil {
 			glog.Warningf("Unable to list root etcd keys: %v", err)
 			if i < 2 {
@@ -113,7 +121,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 			continue
 		}
 		for _, node := range keys.Node.Nodes {
-			if _, err := etcdClient.Delete(node.Key, true); err != nil {
+			if _, err := keysAPI.Delete(context.TODO(), node.Key, &etcd.DeleteOptions{Recursive: true}); err != nil {
 				glog.Fatalf("Unable delete key: %v", err)
 			}
 		}
@@ -146,7 +154,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	}
 
 	// The caller of master.New should guarantee pulicAddress is properly set
-	hostIP, err := util.ValidPublicAddrForMaster(publicAddress)
+	hostIP, err := utilnet.ChooseBindAddress(publicAddress)
 	if err != nil {
 		glog.Fatalf("Unable to find suitable network address.error='%v' . "+
 			"Fail to get a valid public address for master.", err)
@@ -164,13 +172,13 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 	handler.delegate = m.Handler
 
 	// Scheduler
-	schedulerConfigFactory := factory.NewConfigFactory(cl, nil)
+	schedulerConfigFactory := factory.NewConfigFactory(cl, api.DefaultSchedulerName)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		glog.Fatalf("Couldn't create scheduler config: %v", err)
 	}
 	eventBroadcaster := record.NewBroadcaster()
-	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
+	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(cl.Events(""))
 	scheduler.New(schedulerConfig).Run()
@@ -215,6 +223,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		10*time.Second, /* MinimumGCAge */
 		3*time.Second,  /* NodeStatusUpdateFrequency */
 		10*time.Second, /* SyncFrequency */
+		10*time.Second, /* OutOfDiskTransitionFrequency */
 		40,             /* MaxPods */
 		cm, net.ParseIP("127.0.0.1"))
 
@@ -247,6 +256,7 @@ func startComponents(firstManifestURL, secondManifestURL string) (string, string
 		10*time.Second, /* MinimumGCAge */
 		3*time.Second,  /* NodeStatusUpdateFrequency */
 		10*time.Second, /* SyncFrequency */
+		10*time.Second, /* OutOfDiskTransitionFrequency */
 
 		40, /* MaxPods */
 		cm,
@@ -274,7 +284,7 @@ func makeTempDirOrDie(prefix string, baseDir string) string {
 func podsOnNodes(c *client.Client, podNamespace string, labelSelector labels.Selector) wait.ConditionFunc {
 	// Wait until all pods are running on the node.
 	return func() (bool, error) {
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{labelSelector}}
+		options := api.ListOptions{LabelSelector: labelSelector}
 		pods, err := c.Pods(podNamespace).List(options)
 		if err != nil {
 			glog.Infof("Unable to get pods to list: %v", err)
@@ -401,7 +411,7 @@ containers:
 			namespace := kubetypes.NamespaceDefault
 			if err := wait.Poll(time.Second, longTestTimeout,
 				podRunning(c, namespace, podName)); err != nil {
-				if pods, err := c.Pods(namespace).List(unversioned.ListOptions{}); err == nil {
+				if pods, err := c.Pods(namespace).List(api.ListOptions{}); err == nil {
 					for _, pod := range pods.Items {
 						glog.Infof("pod found: %s/%s", namespace, pod.Name)
 					}
@@ -463,19 +473,21 @@ func runReplicationControllerTest(c *client.Client) {
 }
 
 func runAPIVersionsTest(c *client.Client) {
-	v, err := c.ServerAPIVersions()
+	g, err := c.ServerGroups()
 	clientVersion := c.APIVersion().String()
 	if err != nil {
 		glog.Fatalf("Failed to get api versions: %v", err)
 	}
+	versions := client.ExtractGroupVersions(g)
+
 	// Verify that the server supports the API version used by the client.
-	for _, version := range v.Versions {
+	for _, version := range versions {
 		if version == clientVersion {
 			glog.Infof("Version test passed")
 			return
 		}
 	}
-	glog.Fatalf("Server does not support APIVersion used by client. Server supported APIVersions: '%v', client APIVersion: '%v'", v.Versions, clientVersion)
+	glog.Fatalf("Server does not support APIVersion used by client. Server supported APIVersions: '%v', client APIVersion: '%v'", versions, clientVersion)
 }
 
 func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
@@ -509,7 +521,7 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 		glog.Fatalf("Failed listing service with supplied self link '%v': %v", svc.SelfLink, err)
 	}
 
-	svcList, err := services.List(unversioned.ListOptions{})
+	svcList, err := services.List(api.ListOptions{})
 	if err != nil {
 		glog.Fatalf("Failed listing services: %v", err)
 	}
@@ -730,7 +742,7 @@ func runPatchTest(c *client.Client) {
 
 func runMasterServiceTest(client *client.Client) {
 	time.Sleep(12 * time.Second)
-	svcList, err := client.Services(api.NamespaceDefault).List(unversioned.ListOptions{})
+	svcList, err := client.Services(api.NamespaceDefault).List(api.ListOptions{})
 	if err != nil {
 		glog.Fatalf("Unexpected error listing services: %v", err)
 	}
@@ -857,7 +869,7 @@ func runServiceTest(client *client.Client) {
 		glog.Fatalf("FAILED: service in other namespace should have no endpoints: %v", err)
 	}
 
-	svcList, err := client.Services(api.NamespaceAll).List(unversioned.ListOptions{})
+	svcList, err := client.Services(api.NamespaceAll).List(api.ListOptions{})
 	if err != nil {
 		glog.Fatalf("Failed to list services across namespaces: %v", err)
 	}

@@ -25,26 +25,18 @@ import (
 
 type podHandler func(*api.Pod) string
 
-// Pod returns a string representating a pod in a human readable
-// format. This function currently is the same as GetPodFullName in
-// kubelet/containers, but may differ in the future. As opposed to
-// GetPodFullName, this function is mainly used for logging.
+// Pod returns a string reprenetating a pod in a human readable format,
+// with pod UID as part of the string.
 func Pod(pod *api.Pod) string {
 	// Use underscore as the delimiter because it is not allowed in pod name
 	// (DNS subdomain format), while allowed in the container name format.
-	return fmt.Sprintf("%s_%s", pod.Name, pod.Namespace)
-}
-
-// PodWithUID returns a string reprenetating a pod in a human readable format,
-// with pod UID as part of the string.
-func PodWithUID(pod *api.Pod) string {
-	return fmt.Sprintf("%s(%s)", Pod(pod), pod.UID)
+	return fmt.Sprintf("%s_%s(%s)", pod.Name, pod.Namespace, pod.UID)
 }
 
 // Pods returns a string representating a list of pods in a human
 // readable format.
 func Pods(pods []*api.Pod) string {
-	return aggregatePods(pods, PodWithUID)
+	return aggregatePods(pods, Pod)
 }
 
 func aggregatePods(pods []*api.Pod, handler podHandler) string {

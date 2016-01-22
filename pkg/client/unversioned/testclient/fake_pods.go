@@ -18,7 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
@@ -40,12 +39,12 @@ func (c *FakePods) Get(name string) (*api.Pod, error) {
 	return obj.(*api.Pod), err
 }
 
-func (c *FakePods) List(opts unversioned.ListOptions) (*api.PodList, error) {
+func (c *FakePods) List(opts api.ListOptions) (*api.PodList, error) {
 	obj, err := c.Fake.Invokes(NewListAction("pods", c.Namespace, opts), &api.PodList{})
 	if obj == nil {
 		return nil, err
 	}
-	label := opts.LabelSelector.Selector
+	label := opts.LabelSelector
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -81,7 +80,7 @@ func (c *FakePods) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakePods) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *FakePods) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.InvokesWatch(NewWatchAction("pods", c.Namespace, opts))
 }
 

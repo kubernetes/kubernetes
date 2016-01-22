@@ -23,12 +23,12 @@ import (
 )
 
 // formatMap formats map[string]string to a string.
-func formatMap(m map[string]string) string {
-	var l string
+func formatMap(m map[string]string) (fmtStr string) {
 	for key, value := range m {
-		l += key + "=" + fmt.Sprintf("%q", value) + "\n"
+		fmtStr += fmt.Sprintf("%v=%q\n", key, value)
 	}
-	return l
+
+	return
 }
 
 // ExtractFieldPathAsString extracts the field from the given object
@@ -47,13 +47,13 @@ func ExtractFieldPathAsString(obj interface{}, fieldPath string) (string, error)
 
 	switch fieldPath {
 	case "metadata.annotations":
-		return formatMap(accessor.Annotations()), nil
+		return formatMap(accessor.GetAnnotations()), nil
 	case "metadata.labels":
-		return formatMap(accessor.Labels()), nil
+		return formatMap(accessor.GetLabels()), nil
 	case "metadata.name":
-		return accessor.Name(), nil
+		return accessor.GetName(), nil
 	case "metadata.namespace":
-		return accessor.Namespace(), nil
+		return accessor.GetNamespace(), nil
 	}
 
 	return "", fmt.Errorf("Unsupported fieldPath: %v", fieldPath)

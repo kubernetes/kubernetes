@@ -1,0 +1,30 @@
+{%- set params = [{ "name": "apple", "url": "http://www.orangepippin.com/apples", },
+                  { "name": "banana", "url": "https://en.wikipedia.org/wiki/Banana", },
+                  { "name": "raspberry", "url": "https://www.raspberrypi.org/" }]
+%}
+{%- for p in params %}
+{%- set name = p["name"] %}
+{%- set url = p["url"] %}
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  name: jobexample-{{ name }}
+spec:
+  selector:
+    matchLabels:
+      app: jobexample
+      item: {{ name }}
+  template:
+    metadata:
+      name: jobexample
+      labels:
+        app: jobexample
+        item: {{ name }}
+    spec:
+      containers:
+      - name: c
+        image: busybox
+        command: ["sh", "-c", "echo Processing URL {{ url }} && sleep 5"]
+      restartPolicy: Never
+---
+{%- endfor %}

@@ -21,16 +21,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/prometheus/common/expfmt"
@@ -38,15 +37,94 @@ import (
 )
 
 const (
-	podStartupThreshold time.Duration = 5 * time.Second
-	// TODO: Decrease PodStartup latencies as soon as their perfomance improves
-	listPodLatencySmallThreshold  time.Duration = 2 * time.Second
-	listPodLatencyMediumThreshold time.Duration = 4 * time.Second
-	listPodLatencyLargeThreshold  time.Duration = 15 * time.Second
-	apiCallLatencySmallThreshold  time.Duration = 250 * time.Millisecond
+	podStartupThreshold           time.Duration = 5 * time.Second
+	listPodLatencySmallThreshold  time.Duration = 1 * time.Second
+	listPodLatencyMediumThreshold time.Duration = 1 * time.Second
+	listPodLatencyLargeThreshold  time.Duration = 1 * time.Second
+	// TODO: Decrease the small threshold to 250ms once tests are fixed.
+	apiCallLatencySmallThreshold  time.Duration = 500 * time.Millisecond
 	apiCallLatencyMediumThreshold time.Duration = 500 * time.Millisecond
 	apiCallLatencyLargeThreshold  time.Duration = 1 * time.Second
 )
+
+type MetricsForE2E metrics.MetricsCollection
+
+func (m *MetricsForE2E) filterMetrics() {
+	interestingApiServerMetrics := make(metrics.ApiServerMetrics)
+	for _, metric := range InterestingApiServerMetrics {
+		interestingApiServerMetrics[metric] = (*m).ApiServerMetrics[metric]
+	}
+	interestingKubeletMetrics := make(map[string]metrics.KubeletMetrics)
+	for kubelet, grabbed := range (*m).KubeletMetrics {
+		interestingKubeletMetrics[kubelet] = make(metrics.KubeletMetrics)
+		for _, metric := range InterestingKubeletMetrics {
+			interestingKubeletMetrics[kubelet][metric] = grabbed[metric]
+		}
+	}
+	(*m).ApiServerMetrics = interestingApiServerMetrics
+	(*m).KubeletMetrics = interestingKubeletMetrics
+}
+
+func (m *MetricsForE2E) PrintHumanReadable() string {
+	buf := bytes.Buffer{}
+	for _, interestingMetric := range InterestingApiServerMetrics {
+		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
+		for _, sample := range (*m).ApiServerMetrics[interestingMetric] {
+			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+		}
+	}
+	for kubelet, grabbed := range (*m).KubeletMetrics {
+		buf.WriteString(fmt.Sprintf("For %v:\n", kubelet))
+		for _, interestingMetric := range InterestingKubeletMetrics {
+			buf.WriteString(fmt.Sprintf("\tFor %v:\n", interestingMetric))
+			for _, sample := range grabbed[interestingMetric] {
+				buf.WriteString(fmt.Sprintf("\t\t%v\n", metrics.PrintSample(sample)))
+			}
+		}
+	}
+	return buf.String()
+}
+
+func (m *MetricsForE2E) PrintJSON() string {
+	m.filterMetrics()
+	return prettyPrintJSON(*m)
+}
+
+var InterestingApiServerMetrics = []string{
+	"apiserver_request_count",
+	"apiserver_request_latencies_bucket",
+	"etcd_helper_cache_entry_count",
+	"etcd_helper_cache_hit_count",
+	"etcd_helper_cache_miss_count",
+	"etcd_request_cache_add_latencies_summary",
+	"etcd_request_cache_get_latencies_summary",
+	"etcd_request_latencies_summary",
+	"go_gc_duration_seconds",
+	"go_goroutines",
+	"process_cpu_seconds_total",
+	"process_open_fds",
+	"process_resident_memory_bytes",
+	"process_start_time_seconds",
+	"process_virtual_memory_bytes",
+}
+
+var InterestingKubeletMetrics = []string{
+	"go_gc_duration_seconds",
+	"go_goroutines",
+	"kubelet_container_manager_latency_microseconds",
+	"kubelet_docker_errors",
+	"kubelet_docker_operations_latency_microseconds",
+	"kubelet_generate_pod_status_latency_microseconds",
+	"kubelet_pod_start_latency_microseconds",
+	"kubelet_pod_worker_latency_microseconds",
+	"kubelet_pod_worker_start_latency_microseconds",
+	"kubelet_sync_pods_latency_microseconds",
+	"process_cpu_seconds_total",
+	"process_open_fds",
+	"process_resident_memory_bytes",
+	"process_start_time_seconds",
+	"process_virtual_memory_bytes",
+}
 
 // Dashboard metrics
 type LatencyMetric struct {
@@ -179,7 +257,7 @@ func listPodsLatencyThreshold(numNodes int) time.Duration {
 // Prints top five summary metrics for request types with latency and returns
 // number of such request types above threshold.
 func HighLatencyRequests(c *client.Client) (int, error) {
-	nodes, err := c.Nodes().List(unversioned.ListOptions{})
+	nodes, err := c.Nodes().List(api.ListOptions{})
 	if err != nil {
 		return 0, err
 	}
@@ -257,15 +335,41 @@ func getMetrics(c *client.Client) (string, error) {
 }
 
 // Retrieves scheduler metrics information.
-func getSchedulingLatency() (SchedulingLatency, error) {
+func getSchedulingLatency(c *client.Client) (SchedulingLatency, error) {
 	result := SchedulingLatency{}
 
-	cmd := "curl http://localhost:10251/metrics"
-	sshResult, err := SSH(cmd, getMasterHost()+":22", testContext.Provider)
-	if err != nil || sshResult.Code != 0 {
-		return result, fmt.Errorf("unexpected error (code: %d) in ssh connection to master: %#v", sshResult.Code, err)
+	// Check if master Node is registered
+	nodes, err := c.Nodes().List(api.ListOptions{})
+	expectNoError(err)
+
+	var data string
+	var masterRegistered = false
+	for _, node := range nodes.Items {
+		if strings.HasSuffix(node.Name, "master") {
+			masterRegistered = true
+		}
 	}
-	samples, err := extractMetricSamples(sshResult.Stdout)
+	if masterRegistered {
+		rawData, err := c.Get().
+			Prefix("proxy").
+			Namespace(api.NamespaceSystem).
+			Resource("pods").
+			Name(fmt.Sprintf("kube-scheduler-%v:%v", testContext.CloudConfig.MasterName, ports.SchedulerPort)).
+			Suffix("metrics").
+			Do().Raw()
+
+		expectNoError(err)
+		data = string(rawData)
+	} else {
+		// If master is not registered fall back to old method of using SSH.
+		cmd := "curl http://localhost:10251/metrics"
+		sshResult, err := SSH(cmd, getMasterHost()+":22", testContext.Provider)
+		if err != nil || sshResult.Code != 0 {
+			return result, fmt.Errorf("unexpected error (code: %d) in ssh connection to master: %#v", sshResult.Code, err)
+		}
+		data = sshResult.Stdout
+	}
+	samples, err := extractMetricSamples(data)
 	if err != nil {
 		return result, err
 	}
@@ -295,8 +399,8 @@ func getSchedulingLatency() (SchedulingLatency, error) {
 }
 
 // Verifies (currently just by logging them) the scheduling latencies.
-func VerifySchedulerLatency() error {
-	latency, err := getSchedulingLatency()
+func VerifySchedulerLatency(c *client.Client) error {
+	latency, err := getSchedulingLatency(c)
 	if err != nil {
 		return err
 	}
@@ -309,79 +413,15 @@ func VerifySchedulerLatency() error {
 func prettyPrintJSON(metrics interface{}) string {
 	output := &bytes.Buffer{}
 	if err := json.NewEncoder(output).Encode(metrics); err != nil {
+		Logf("Error building encoder: %v", err)
 		return ""
 	}
 	formatted := &bytes.Buffer{}
 	if err := json.Indent(formatted, output.Bytes(), "", "  "); err != nil {
+		Logf("Error indenting: %v", err)
 		return ""
 	}
 	return string(formatted.Bytes())
-}
-
-// Retrieves debug information.
-func getDebugInfo(c *client.Client) (map[string]string, error) {
-	data := make(map[string]string)
-	for _, key := range []string{"block", "goroutine", "heap", "threadcreate"} {
-		resp, err := http.Get(c.Get().AbsPath(fmt.Sprintf("debug/pprof/%s", key)).URL().String() + "?debug=2")
-		if err != nil {
-			Logf("Warning: Error trying to fetch %s debug data: %v", key, err)
-			continue
-		}
-		body, err := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			Logf("Warning: Error trying to read %s debug data: %v", key, err)
-		}
-		data[key] = string(body)
-	}
-	return data, nil
-}
-
-func writePerfData(c *client.Client, dirName string, postfix string) error {
-	fname := fmt.Sprintf("%s/metrics_%s.txt", dirName, postfix)
-
-	handler, err := os.Create(fname)
-	if err != nil {
-		return fmt.Errorf("Error creating file '%s': %v", fname, err)
-	}
-
-	metrics, err := getMetrics(c)
-	if err != nil {
-		return fmt.Errorf("Error retrieving metrics: %v", err)
-	}
-
-	_, err = handler.WriteString(metrics)
-	if err != nil {
-		return fmt.Errorf("Error writing metrics: %v", err)
-	}
-
-	err = handler.Close()
-	if err != nil {
-		return fmt.Errorf("Error closing '%s': %v", fname, err)
-	}
-
-	debug, err := getDebugInfo(c)
-	if err != nil {
-		return fmt.Errorf("Error retrieving debug information: %v", err)
-	}
-
-	for key, value := range debug {
-		fname := fmt.Sprintf("%s/%s_%s.txt", dirName, key, postfix)
-		handler, err = os.Create(fname)
-		if err != nil {
-			return fmt.Errorf("Error creating file '%s': %v", fname, err)
-		}
-		_, err = handler.WriteString(value)
-		if err != nil {
-			return fmt.Errorf("Error writing %s: %v", key, err)
-		}
-
-		err = handler.Close()
-		if err != nil {
-			return fmt.Errorf("Error closing '%s': %v", fname, err)
-		}
-	}
-	return nil
 }
 
 // extractMetricSamples parses the prometheus metric samples from the input string.

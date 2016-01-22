@@ -25,9 +25,9 @@ import (
 	flockerclient "github.com/ClusterHQ/flocker-go"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -61,8 +61,9 @@ type flocker struct {
 	plugin      *flockerPlugin
 }
 
-func (p *flockerPlugin) Init(host volume.VolumeHost) {
+func (p *flockerPlugin) Init(host volume.VolumeHost) error {
 	p.host = host
+	return nil
 }
 
 func (p flockerPlugin) Name() string {
@@ -111,6 +112,7 @@ type flockerBuilder struct {
 	exe      exec.Interface
 	opts     volume.VolumeOptions
 	readOnly bool
+	volume.MetricsNil
 }
 
 func (b flockerBuilder) GetAttributes() volume.Attributes {
@@ -149,7 +151,7 @@ func (b flockerBuilder) newFlockerClient() (*flockerclient.Client, error) {
 func (b *flockerBuilder) getMetaDir() string {
 	return path.Join(
 		b.plugin.host.GetPodPluginDir(
-			b.flocker.pod.UID, util.EscapeQualifiedNameForDisk(flockerPluginName),
+			b.flocker.pod.UID, strings.EscapeQualifiedNameForDisk(flockerPluginName),
 		),
 		b.datasetName,
 	)

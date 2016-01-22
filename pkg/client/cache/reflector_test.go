@@ -35,8 +35,10 @@ type testLW struct {
 	WatchFunc func(resourceVersion string) (watch.Interface, error)
 }
 
-func (t *testLW) List() (runtime.Object, error) { return t.ListFunc() }
-func (t *testLW) Watch(options unversioned.ListOptions) (watch.Interface, error) {
+func (t *testLW) List(options api.ListOptions) (runtime.Object, error) {
+	return t.ListFunc()
+}
+func (t *testLW) Watch(options api.ListOptions) (watch.Interface, error) {
 	return t.WatchFunc(options.ResourceVersion)
 }
 
@@ -365,7 +367,6 @@ func TestReflectorResync(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
 
 	currentTime := time.Time{}
-	now = func() time.Time { return currentTime }
 	iteration := 0
 
 	lw := &testLW{
@@ -394,6 +395,7 @@ func TestReflectorResync(t *testing.T) {
 	}
 	resyncPeriod := time.Minute
 	r := NewReflector(lw, &api.Pod{}, s, resyncPeriod)
+	r.now = func() time.Time { return currentTime }
 
 	r.ListAndWatch(util.NeverStop)
 	if iteration != 2 {

@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func TestURLErrorNotExistNoUpdate(t *testing.T) {
@@ -106,12 +106,13 @@ func TestExtractInvalidPods(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: Some weird json problem: %v", testCase.desc, err)
 		}
-		fakeHandler := util.FakeHandler{
+		fakeHandler := utiltesting.FakeHandler{
 			StatusCode:   200,
 			ResponseBody: string(data),
 		}
 		testServer := httptest.NewServer(&fakeHandler)
-		defer testServer.Close()
+		// TODO: Uncomment when fix #19254
+		// defer testServer.Close()
 		ch := make(chan interface{}, 1)
 		c := sourceURL{testServer.URL, http.Header{}, "localhost", ch, nil, 0}
 		if err := c.extractFromURL(); err == nil {
@@ -146,6 +147,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					Containers:      []api.Container{{Name: "1", Image: "foo", ImagePullPolicy: api.PullAlways}},
 					SecurityContext: &api.PodSecurityContext{},
 				},
+				Status: api.PodStatus{
+					Phase: api.PodPending,
+				},
 			},
 			expected: CreatePodUpdate(kubetypes.SET,
 				kubetypes.HTTPSource,
@@ -171,6 +175,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							ImagePullPolicy:        "Always",
 						}},
 					},
+					Status: api.PodStatus{
+						Phase: api.PodPending,
+					},
 				}),
 		},
 		{
@@ -191,6 +198,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							Containers:      []api.Container{{Name: "1", Image: "foo", ImagePullPolicy: api.PullAlways}},
 							SecurityContext: &api.PodSecurityContext{},
 						},
+						Status: api.PodStatus{
+							Phase: api.PodPending,
+						},
 					},
 					{
 						ObjectMeta: api.ObjectMeta{
@@ -201,6 +211,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							NodeName:        hostname,
 							Containers:      []api.Container{{Name: "2", Image: "bar:bartag", ImagePullPolicy: ""}},
 							SecurityContext: &api.PodSecurityContext{},
+						},
+						Status: api.PodStatus{
+							Phase: api.PodPending,
 						},
 					},
 				},
@@ -229,6 +242,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							ImagePullPolicy:        "Always",
 						}},
 					},
+					Status: api.PodStatus{
+						Phase: api.PodPending,
+					},
 				},
 				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
@@ -252,6 +268,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							ImagePullPolicy:        "IfNotPresent",
 						}},
 					},
+					Status: api.PodStatus{
+						Phase: api.PodPending,
+					},
 				}),
 		},
 	}
@@ -266,12 +285,13 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
 		}
-		fakeHandler := util.FakeHandler{
+		fakeHandler := utiltesting.FakeHandler{
 			StatusCode:   200,
 			ResponseBody: string(data),
 		}
 		testServer := httptest.NewServer(&fakeHandler)
-		defer testServer.Close()
+		// TODO: Uncomment when fix #19254
+		// defer testServer.Close()
 		ch := make(chan interface{}, 1)
 		c := sourceURL{testServer.URL, http.Header{}, hostname, ch, nil, 0}
 		if err := c.extractFromURL(); err != nil {
@@ -311,12 +331,13 @@ func TestURLWithHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected json marshalling error: %v", err)
 	}
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(data),
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	ch := make(chan interface{}, 1)
 	header := make(http.Header)
 	header.Set("Metadata-Flavor", "Google")

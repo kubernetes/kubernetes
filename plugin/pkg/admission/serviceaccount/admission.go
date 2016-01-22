@@ -26,13 +26,12 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/fields"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -90,10 +89,10 @@ type serviceAccount struct {
 func NewServiceAccount(cl client.Interface) *serviceAccount {
 	serviceAccountsIndexer, serviceAccountsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return cl.ServiceAccounts(api.NamespaceAll).List(unversioned.ListOptions{})
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return cl.ServiceAccounts(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				return cl.ServiceAccounts(api.NamespaceAll).Watch(options)
 			},
 		},
@@ -104,12 +103,12 @@ func NewServiceAccount(cl client.Interface) *serviceAccount {
 	tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
 	secretsIndexer, secretsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{tokenSelector}}
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				options.FieldSelector = tokenSelector
 				return cl.Secrets(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				options.FieldSelector.Selector = tokenSelector
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				options.FieldSelector = tokenSelector
 				return cl.Secrets(api.NamespaceAll).Watch(options)
 			},
 		},

@@ -26,7 +26,7 @@ import (
 
 func TestDefaultHostPortMatching(t *testing.T) {
 	t.Parallel()
-	task := fakePodTask("foo")
+	task := fakePodTask("foo", nil, nil)
 	pod := &task.Pod
 
 	offer := &mesos.Offer{
@@ -52,7 +52,7 @@ func TestDefaultHostPortMatching(t *testing.T) {
 			}},
 		}},
 	}
-	task, err = New(api.NewDefaultContext(), "", pod, &mesos.ExecutorInfo{}, nil)
+	task, err = New(api.NewDefaultContext(), "", pod, &mesos.ExecutorInfo{}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestDefaultHostPortMatching(t *testing.T) {
 
 func TestWildcardHostPortMatching(t *testing.T) {
 	t.Parallel()
-	task := fakePodTask("foo")
+	task := fakePodTask("foo", nil, nil)
 	pod := &task.Pod
 
 	offer := &mesos.Offer{}
@@ -100,7 +100,7 @@ func TestWildcardHostPortMatching(t *testing.T) {
 			}},
 		}},
 	}
-	task, err = New(api.NewDefaultContext(), "", pod, &mesos.ExecutorInfo{}, nil)
+	task, err = New(api.NewDefaultContext(), "", pod, &mesos.ExecutorInfo{}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestWildcardHostPortMatching(t *testing.T) {
 			}},
 		}},
 	}
-	task, err = New(api.NewDefaultContext(), "", pod, &mesos.ExecutorInfo{}, nil)
+	task, err = New(api.NewDefaultContext(), "", pod, &mesos.ExecutorInfo{}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestWildcardHostPortMatching(t *testing.T) {
 			}},
 		}},
 	}
-	task, err = New(api.NewDefaultContext(), "", pod, &mesos.ExecutorInfo{}, nil)
+	task, err = New(api.NewDefaultContext(), "", pod, &mesos.ExecutorInfo{}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestWildcardHostPortMatching(t *testing.T) {
 			}},
 		}},
 	}
-	task, err = New(api.NewDefaultContext(), "", pod, &mesos.ExecutorInfo{}, nil)
+	task, err = New(api.NewDefaultContext(), "", pod, &mesos.ExecutorInfo{}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

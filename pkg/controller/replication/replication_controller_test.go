@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -210,12 +211,13 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 
 func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	// Setup a fake server to listen for requests, and run the rc manager in steady state
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: "",
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
 	manager := NewReplicationManager(client, controller.NoResyncPeriodFunc, BurstReplicas)
 	manager.podStoreSynced = alwaysReady
@@ -251,12 +253,13 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 
 func TestControllerUpdateReplicas(t *testing.T) {
 	// This is a happy server just to record the PUT request we expect for status.Replicas
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: "",
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
 	manager := NewReplicationManager(client, controller.NoResyncPeriodFunc, BurstReplicas)
@@ -290,12 +293,13 @@ func TestControllerUpdateReplicas(t *testing.T) {
 
 func TestSyncReplicationControllerDormancy(t *testing.T) {
 	// Setup a test server so we can lie about the current state of pods
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: "",
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
 
 	fakePodControl := controller.FakePodControl{}
@@ -549,12 +553,13 @@ func TestUpdatePods(t *testing.T) {
 
 func TestControllerUpdateRequeue(t *testing.T) {
 	// This server should force a requeue of the controller because it fails to update status.Replicas.
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   500,
 		ResponseBody: "",
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
 
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
 	manager := NewReplicationManager(client, controller.NoResyncPeriodFunc, BurstReplicas)

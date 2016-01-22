@@ -27,7 +27,7 @@ import (
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
 
 // Codec encodes internal objects to the v1 scheme
-var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion.String())
+var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion)
 
 func init() {
 	api.Scheme.AddKnownTypes(SchemeGroupVersion,
@@ -35,4 +35,10 @@ func init() {
 	)
 }
 
-func (*Config) IsAnAPIObject() {}
+func (obj *Config) GetObjectKind() unversioned.ObjectKind { return obj }
+func (obj *Config) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *Config) GroupVersionKind() *unversioned.GroupVersionKind {
+	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}

@@ -177,7 +177,7 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		},
 	}
 	for k, test := range testCases {
-		apiCodec := runtime.CodecFor(api.Scheme, testapi.Default.GroupVersion().String())
+		apiCodec := runtime.CodecFor(api.Scheme, *testapi.Default.GroupVersion())
 		regularClient := &fake.RESTClient{
 			Codec: apiCodec,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -474,7 +474,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 		t.Errorf("unexpected print to default printer")
 	}
 
-	out, err := codec.Decode(buf.Bytes())
+	out, err := runtime.Decode(codec, buf.Bytes())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -589,6 +589,29 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 		t.Errorf("unexpected empty output")
 	}
 }
+
+func TestGetByNameForcesFlag(t *testing.T) {
+	pods, _, _ := testData()
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &fake.RESTClient{
+		Codec: codec,
+		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])},
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdGet(f, buf)
+	cmd.SetOutput(buf)
+	cmd.Run(cmd, []string{"pods", "foo"})
+
+	showAllFlag, _ := cmd.Flags().GetBool("show-all")
+	if !showAllFlag {
+		t.Errorf("expected showAll to be true when getting resource by name")
+	}
+}
+
 func watchTestData() ([]api.Pod, []watch.Event) {
 	pods := []api.Pod{
 		{

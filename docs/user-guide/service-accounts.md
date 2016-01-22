@@ -18,6 +18,7 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
 [here](http://releases.k8s.io/release-1.1/docs/user-guide/service-accounts.md).
@@ -167,8 +168,8 @@ Next, verify it has been created.  For example:
 
 ```console
 $ kubectl get secrets myregistrykey
-NAME             TYPE                      DATA
-myregistrykey    kubernetes.io/dockercfg   1
+NAME             TYPE                              DATA
+myregistrykey    kubernetes.io/.dockerconfigjson   1
 ```
 
 Next, read/modify/write the service account for the namespace to use this secret as an imagePullSecret

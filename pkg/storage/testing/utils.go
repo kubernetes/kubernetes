@@ -38,7 +38,7 @@ func CreateObjList(prefix string, helper storage.Interface, items []runtime.Obje
 		if err != nil {
 			return err
 		}
-		err = CreateObj(helper, path.Join(prefix, meta.Name()), obj, obj, 0)
+		err = CreateObj(helper, path.Join(prefix, meta.GetName()), obj, obj, 0)
 		if err != nil {
 			return err
 		}

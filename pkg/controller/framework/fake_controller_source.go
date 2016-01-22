@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/watch"
@@ -122,7 +121,7 @@ func (f *FakeControllerSource) Change(e watch.Event, watchProbability float64) {
 }
 
 // List returns a list object, with its resource version set.
-func (f *FakeControllerSource) List() (runtime.Object, error) {
+func (f *FakeControllerSource) List(options api.ListOptions) (runtime.Object, error) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	list := make([]runtime.Object, 0, len(f.items))
@@ -152,7 +151,7 @@ func (f *FakeControllerSource) List() (runtime.Object, error) {
 
 // Watch returns a watch, which will be pre-populated with all changes
 // after resourceVersion.
-func (f *FakeControllerSource) Watch(options unversioned.ListOptions) (watch.Interface, error) {
+func (f *FakeControllerSource) Watch(options api.ListOptions) (watch.Interface, error) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	rc, err := strconv.Atoi(options.ResourceVersion)

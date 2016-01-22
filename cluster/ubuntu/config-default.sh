@@ -37,6 +37,10 @@ export FLANNEL_NET=${FLANNEL_NET:-172.16.0.0/16}
 # Admission Controllers to invoke prior to persisting objects in cluster
 export ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota,SecurityContextDeny
 
+# Path to the config file or directory of files of kubelet
+export KUBELET_CONFIG=${KUBELET_CONFIG:-""}
+
+# A port range to reserve for services with NodePort visibility
 SERVICE_NODE_PORT_RANGE=${SERVICE_NODE_PORT_RANGE:-"30000-32767"}
 
 # Optional: Enable node logging.
@@ -70,4 +74,6 @@ ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 # Optional: Add http or https proxy when download easy-rsa.
 # Add envitonment variable separated with blank space like "http_proxy=http://10.x.x.x:8080 https_proxy=https://10.x.x.x:8443"
 PROXY_SETTING=${PROXY_SETTING:-""}
+
+DEBUG=${DEBUG:-"false"}
 

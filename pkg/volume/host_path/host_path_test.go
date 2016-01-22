@@ -1,3 +1,5 @@
+// +build linux
+
 /*
 Copyright 2014 The Kubernetes Authors All rights reserved.
 
@@ -18,6 +20,7 @@ package host_path
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"testing"
 
@@ -92,7 +95,7 @@ func TestDeleter(t *testing.T) {
 	defer os.RemoveAll(tempPath)
 	err := os.MkdirAll(tempPath, 0750)
 	if err != nil {
-		t.Fatal("Failed to create tmp directory for deleter: %v", err)
+		t.Fatalf("Failed to create tmp directory for deleter: %v", err)
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
@@ -144,7 +147,7 @@ func TestDeleterTempDir(t *testing.T) {
 	}
 }
 
-func TestCreater(t *testing.T) {
+func TestProvisioner(t *testing.T) {
 	tempPath := "/tmp/hostpath/"
 	defer os.RemoveAll(tempPath)
 	err := os.MkdirAll(tempPath, 0750)
@@ -156,18 +159,18 @@ func TestCreater(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	creater, err := plug.NewCreater(volume.VolumeOptions{CapacityMB: 100, PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete})
+	creater, err := plug.NewProvisioner(volume.VolumeOptions{Capacity: resource.MustParse("1Gi"), PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete})
 	if err != nil {
-		t.Errorf("Failed to make a new Creater: %v", err)
+		t.Errorf("Failed to make a new Provisioner: %v", err)
 	}
-	pv, err := creater.Create()
+	pv, err := creater.NewPersistentVolumeTemplate()
 	if err != nil {
 		t.Errorf("Unexpected error creating volume: %v", err)
 	}
 	if pv.Spec.HostPath.Path == "" {
 		t.Errorf("Expected pv.Spec.HostPath.Path to not be empty: %#v", pv)
 	}
-	expectedCapacity := resource.NewQuantity(100*1024*1024, resource.BinarySI)
+	expectedCapacity := resource.NewQuantity(1*1024*1024*1024, resource.BinarySI)
 	actualCapacity := pv.Spec.Capacity[api.ResourceStorage]
 	expectedAmt := expectedCapacity.Value()
 	actualAmt := actualCapacity.Value()
@@ -270,5 +273,51 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 	if !builder.GetAttributes().ReadOnly {
 		t.Errorf("Expected true for builder.IsReadOnly")
+	}
+}
+
+// TestMetrics tests that MetricProvider methods return sane values.
+func TestMetrics(t *testing.T) {
+	// Create an empty temp directory for the volume
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "host_path_test")
+	if err != nil {
+		t.Fatalf("Can't make a tmp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volume.NewFakeVolumeHost(tmpDir, nil, nil))
+
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/host-path")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	spec := &api.Volume{
+		Name:         "vol1",
+		VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: tmpDir}},
+	}
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Errorf("Failed to make a new Builder: %v", err)
+	}
+
+	expectedEmptyDirUsage, err := volume.FindEmptyDirectoryUsageOnTmpfs()
+	if err != nil {
+		t.Errorf("Unexpected error finding expected empty directory usage on tmpfs: %v", err)
+	}
+
+	metrics, err := builder.GetMetrics()
+	if err != nil {
+		t.Errorf("Unexpected error when calling GetMetrics %v", err)
+	}
+	if e, a := expectedEmptyDirUsage.Value(), metrics.Used.Value(); e != a {
+		t.Errorf("Unexpected value for empty directory; expected %v, got %v", e, a)
+	}
+	if metrics.Capacity.Value() <= 0 {
+		t.Errorf("Expected Capacity to be greater than 0")
+	}
+	if metrics.Available.Value() <= 0 {
+		t.Errorf("Expected Available to be greater than 0")
 	}
 }

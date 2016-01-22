@@ -34,7 +34,7 @@ const (
 	t_min_mem = 128
 )
 
-func fakePodTask(id string, roles ...string) *T {
+func fakePodTask(id string, allowedRoles, defaultRoles []string) *T {
 	t, _ := New(
 		api.NewDefaultContext(),
 		"",
@@ -45,7 +45,8 @@ func fakePodTask(id string, roles ...string) *T {
 			},
 		},
 		&mesos.ExecutorInfo{},
-		roles,
+		allowedRoles,
+		defaultRoles,
 	)
 
 	return t
@@ -55,19 +56,19 @@ func TestRoles(t *testing.T) {
 	assert := assert.New(t)
 
 	for i, tt := range []struct {
-		labels         map[string]string
+		annotations    map[string]string
 		frameworkRoles []string
 		want           []string
 	}{
 		{
 			map[string]string{},
 			nil,
-			defaultRoles,
+			starRole,
 		},
 		{
 			map[string]string{"other": "label"},
 			nil,
-			defaultRoles,
+			starRole,
 		},
 		{
 			map[string]string{meta.RolesKey: ""},
@@ -100,11 +101,11 @@ func TestRoles(t *testing.T) {
 		{
 			map[string]string{},
 			[]string{"role1"},
-			[]string{"role1"},
+			[]string{"*"},
 		},
 	} {
-		task := fakePodTask("test", tt.frameworkRoles...)
-		task.Pod.ObjectMeta.Labels = tt.labels
+		task := fakePodTask("test", tt.frameworkRoles, starRole)
+		task.Pod.ObjectMeta.Annotations = tt.annotations
 		assert.True(reflect.DeepEqual(task.Roles(), tt.want), "test #%d got %#v want %#v", i, task.Roles(), tt.want)
 	}
 }
@@ -127,7 +128,7 @@ func (mr mockRegistry) Invalidate(hostname string) {
 
 func TestEmptyOffer(t *testing.T) {
 	t.Parallel()
-	task := fakePodTask("foo")
+	task := fakePodTask("foo", nil, nil)
 
 	task.Pod.Spec = api.PodSpec{
 		Containers: []api.Container{{
@@ -156,7 +157,7 @@ func TestEmptyOffer(t *testing.T) {
 
 func TestNoPortsInPodOrOffer(t *testing.T) {
 	t.Parallel()
-	task := fakePodTask("foo")
+	task := fakePodTask("foo", nil, nil)
 
 	task.Pod.Spec = api.PodSpec{
 		Containers: []api.Container{{
@@ -206,7 +207,7 @@ func TestNoPortsInPodOrOffer(t *testing.T) {
 
 func TestAcceptOfferPorts(t *testing.T) {
 	t.Parallel()
-	task := fakePodTask("foo")
+	task := fakePodTask("foo", nil, nil)
 	pod := &task.Pod
 
 	defaultProc := NewDefaultProcurement(
@@ -376,7 +377,7 @@ func TestNodeSelector(t *testing.T) {
 	)
 
 	for _, ts := range tests {
-		task := fakePodTask("foo")
+		task := fakePodTask("foo", nil, nil)
 		task.Pod.Spec.NodeSelector = ts.selector
 		offer := &mesos.Offer{
 			Resources: []*mesos.Resource{

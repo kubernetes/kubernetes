@@ -29,37 +29,48 @@ type VersionInterfaces struct {
 	MetadataAccessor
 }
 
-// Interface lets you work with object and list metadata from any of the versioned or
+type ObjectMetaAccessor interface {
+	GetObjectMeta() Object
+}
+
+// Object lets you work with object metadata from any of the versioned or
 // internal API objects. Attempting to set or retrieve a field on an object that does
 // not support that field (Name, UID, Namespace on lists) will be a no-op and return
 // a default value.
-// TODO: rename to ObjectInterface when we clear up these interfaces.
-type Interface interface {
-	TypeInterface
-
-	Namespace() string
+type Object interface {
+	GetNamespace() string
 	SetNamespace(namespace string)
-	Name() string
+	GetName() string
 	SetName(name string)
-	GenerateName() string
+	GetGenerateName() string
 	SetGenerateName(name string)
-	UID() types.UID
+	GetUID() types.UID
 	SetUID(uid types.UID)
-	ResourceVersion() string
+	GetResourceVersion() string
 	SetResourceVersion(version string)
-	SelfLink() string
+	GetSelfLink() string
 	SetSelfLink(selfLink string)
-	Labels() map[string]string
+	GetLabels() map[string]string
 	SetLabels(labels map[string]string)
-	Annotations() map[string]string
+	GetAnnotations() map[string]string
 	SetAnnotations(annotations map[string]string)
 }
 
-// TypeInterface exposes the type and APIVersion of versioned or internal API objects.
-type TypeInterface interface {
-	APIVersion() string
+// List lets you work with list metadata from any of the versioned or
+// internal API objects. Attempting to set or retrieve a field on an object that does
+// not support that field will be a no-op and return a default value.
+type List interface {
+	GetResourceVersion() string
+	SetResourceVersion(version string)
+	GetSelfLink() string
+	SetSelfLink(selfLink string)
+}
+
+// Type exposes the type and APIVersion of versioned or internal API objects.
+type Type interface {
+	GetAPIVersion() string
 	SetAPIVersion(version string)
-	Kind() string
+	GetKind() string
 	SetKind(kind string)
 }
 
@@ -147,12 +158,23 @@ type RESTMapping struct {
 // TODO(caesarxuchao): Add proper multi-group support so that kinds & resources are
 // scoped to groups. See http://issues.k8s.io/12413 and http://issues.k8s.io/10009.
 type RESTMapper interface {
-	// KindFor takes a resource and returns back the unambiguous Kind (GroupVersionKind)
-	KindFor(resource string) (unversioned.GroupVersionKind, error)
+	// KindFor takes a partial resource and returns back the single match.  Returns an error if there are multiple matches
+	KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error)
+
+	// KindsFor takes a partial resource and returns back the list of potential kinds in priority order
+	KindsFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionKind, error)
+
+	// ResourceFor takes a partial resource and returns back the single match.  Returns an error if there are multiple matches
+	ResourceFor(input unversioned.GroupVersionResource) (unversioned.GroupVersionResource, error)
+
+	// ResourcesFor takes a partial resource and returns back the list of potential resource in priority order
+	ResourcesFor(input unversioned.GroupVersionResource) ([]unversioned.GroupVersionResource, error)
 
 	RESTMapping(gk unversioned.GroupKind, versions ...string) (*RESTMapping, error)
 
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)
-	ResourceIsValid(resource string) bool
+
+	// ResourceIsValid takes a partial resource and returns back whether or not the resource matches at least one kind
+	ResourceIsValid(resource unversioned.GroupVersionResource) bool
 }
