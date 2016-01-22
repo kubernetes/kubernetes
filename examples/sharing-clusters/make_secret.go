@@ -59,5 +59,5 @@ func main() {
 			"config": cfg,
 		},
 	}
-	fmt.Printf(runtime.EncodeOrDie(registered.GroupOrDie(api.GroupName).Codec, secret))
+	fmt.Printf(runtime.EncodeOrDie(api.Codecs.LegacyCodec(registered.EnabledVersions()...), secret))
 }

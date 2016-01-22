@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
@@ -48,6 +47,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
@@ -402,18 +402,12 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 			delete(query, "tailLines")
 		}
 	}
-	// container logs on the kubelet are locked to v1
-	versioned := &v1.PodLogOptions{}
-	if err := api.Scheme.Convert(&query, versioned); err != nil {
+	// container logs on the kubelet are locked to the v1 API version of PodLogOptions
+	logOptions := &api.PodLogOptions{}
+	if err := api.ParameterCodec.DecodeParameters(query, v1.SchemeGroupVersion, logOptions); err != nil {
 		response.WriteError(http.StatusBadRequest, fmt.Errorf(`{"message": "Unable to decode query."}`))
 		return
 	}
-	out, err := api.Scheme.ConvertToVersion(versioned, "")
-	if err != nil {
-		response.WriteError(http.StatusBadRequest, fmt.Errorf(`{"message": "Unable to convert request query."}`))
-		return
-	}
-	logOptions := out.(*api.PodLogOptions)
 	logOptions.TypeMeta = unversioned.TypeMeta{}
 	if errs := validation.ValidatePodLogOptions(logOptions); len(errs) > 0 {
 		response.WriteError(apierrs.StatusUnprocessableEntity, fmt.Errorf(`{"message": "Invalid request."}`))
@@ -462,7 +456,11 @@ func encodePods(pods []*api.Pod) (data []byte, err error) {
 	for _, pod := range pods {
 		podList.Items = append(podList.Items, *pod)
 	}
-	return registered.GroupOrDie(api.GroupName).Codec.Encode(podList)
+	// TODO: this needs to be parameterized to the kubelet, not hardcoded. Depends on Kubelet
+	//   as API server refactor.
+	// TODO: Locked to v1, needs to be made generic
+	codec := api.Codecs.LegacyCodec(unversioned.GroupVersion{Group: api.GroupName, Version: "v1"})
+	return runtime.Encode(codec, podList)
 }
 
 // getPods returns a list of pods bound to the Kubelet and their spec.

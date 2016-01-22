@@ -26,6 +26,8 @@ import (
 	annotation "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type Binder interface {
@@ -150,7 +152,7 @@ func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *pod
 	// the kubelet-executor uses this to instantiate the pod
 	log.V(3).Infof("prepared pod spec: %+v", pod)
 
-	data, err := api.Codec.Encode(&pod)
+	data, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), &pod)
 	if err != nil {
 		log.V(2).Infof("Failed to marshal the pod spec: %v", err)
 		return err
