@@ -394,7 +394,7 @@
 		},
 		{
 			"ImportPath": "github.com/docker/spdystream",
-			"Rev": "43bffc458d55aa784be658c9867fbefcfcb7fecf"
+			"Rev": "c33989bcb56748d2473194d11f8ac3fc563688eb"
 		},
 		{
 			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
