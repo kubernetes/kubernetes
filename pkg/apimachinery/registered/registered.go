@@ -14,27 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package to keep track of API Versions that should be registered in api.Scheme.
+// Package to keep track of API Versions that can be registered and are enabled in api.Scheme.
 package registered
 
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery"
 )
 
 var (
-	// registeredVersions represents all registered API versions. Please call
-	// RegisterVersions() to add registered versions.
+	// registeredGroupVersions stores all API group versions for which RegisterGroup is called.
 	registeredVersions = map[unversioned.GroupVersion]struct{}{}
 
 	// enabledVersions represents all enabled API versions. It should be a
 	// subset of registeredVersions. Please call EnableVersions() to add
 	// enabled versions.
 	enabledVersions = map[unversioned.GroupVersion]struct{}{}
+
+	// map of group meta for all groups.
+	groupMetaMap = map[string]*apimachinery.GroupMeta{}
 
 	// envRequestedVersions represents the versions requested via the
 	// KUBE_API_VERSIONS environment variable. The install package of each group
@@ -59,15 +63,26 @@ func init() {
 	}
 }
 
-// RegisterVersions add the versions the registeredVersions.
-func RegisterVersions(versions ...unversioned.GroupVersion) {
-	for _, v := range versions {
+// RegisterVersions adds the given group versions to the list of registered group versions.
+func RegisterVersions(availableVersions []unversioned.GroupVersion) {
+	for _, v := range availableVersions {
 		registeredVersions[v] = struct{}{}
 	}
 }
 
-// EnableVersions add the versions to the enabledVersions. The caller of this
-// function is responsible to add the version to 'latest' and 'Scheme'.
+// RegisterGroup adds the given group to the list of registered groups.
+func RegisterGroup(groupMeta apimachinery.GroupMeta) error {
+	groupName := groupMeta.GroupVersion.Group
+	if _, found := groupMetaMap[groupName]; found {
+		return fmt.Errorf("group %v is already registered", groupMetaMap)
+	}
+	groupMetaMap[groupName] = &groupMeta
+	return nil
+}
+
+// EnableVersions adds the versions for the given group to the list of enabled versions.
+// Note that the caller should call RegisterGroup before calling this method.
+// The caller of this function is responsible to add the versions to scheme and RESTMapper.
 func EnableVersions(versions ...unversioned.GroupVersion) error {
 	var unregisteredVersions []unversioned.GroupVersion
 	for _, v := range versions {
@@ -99,23 +114,9 @@ func IsEnabledVersion(v unversioned.GroupVersion) bool {
 	return found
 }
 
-// IsRegisteredVersion returns if a version is registered.
-func IsRegisteredVersion(v unversioned.GroupVersion) bool {
-	_, found := registeredVersions[v]
-	return found
-}
-
 // EnabledVersions returns all enabled versions.
 func EnabledVersions() (ret []unversioned.GroupVersion) {
 	for v := range enabledVersions {
-		ret = append(ret, v)
-	}
-	return
-}
-
-// RegisteredVersions returns all registered versions.
-func RegisteredVersions() (ret []unversioned.GroupVersion) {
-	for v := range registeredVersions {
 		ret = append(ret, v)
 	}
 	return
@@ -131,14 +132,51 @@ func EnabledVersionsForGroup(group string) (ret []unversioned.GroupVersion) {
 	return
 }
 
-// RegisteredVersionsForGroup returns all registered versions for a group.
-func RegisteredVersionsForGroup(group string) (ret []unversioned.GroupVersion) {
-	for v := range registeredVersions {
-		if v.Group == group {
-			ret = append(ret, v)
+// Group returns the metadata of a group if the gruop is registered, otherwise
+// an erorr is returned.
+func Group(group string) (*apimachinery.GroupMeta, error) {
+	groupMeta, found := groupMetaMap[group]
+	if !found {
+		return nil, fmt.Errorf("group %v has not been registered", group)
+	}
+	groupMetaCopy := *groupMeta
+	return &groupMetaCopy, nil
+}
+
+// IsRegistered takes a string and determines if it's one of the registered groups
+func IsRegistered(group string) bool {
+	_, found := groupMetaMap[group]
+	return found
+}
+
+// TODO: This is an expedient function, because we don't check if a Group is
+// supported throughout the code base. We will abandon this function and
+// checking the error returned by the Group() function.
+func GroupOrDie(group string) *apimachinery.GroupMeta {
+	groupMeta, found := groupMetaMap[group]
+	if !found {
+		if group == "" {
+			panic("The legacy v1 API is not registered.")
+		} else {
+			panic(fmt.Sprintf("Group %s is not registered.", group))
 		}
 	}
-	return
+	groupMetaCopy := *groupMeta
+	return &groupMetaCopy
+}
+
+// AllPreferredGroupVersions returns the preferred versions of all registered
+// groups in the form of "group1/version1,group2/version2,..."
+func AllPreferredGroupVersions() string {
+	if len(groupMetaMap) == 0 {
+		return ""
+	}
+	var defaults []string
+	for _, groupMeta := range groupMetaMap {
+		defaults = append(defaults, groupMeta.GroupVersion.String())
+	}
+	sort.Strings(defaults)
+	return strings.Join(defaults, ",")
 }
 
 // ValidateEnvRequestedVersions returns a list of versions that are requested in
@@ -151,4 +189,13 @@ func ValidateEnvRequestedVersions() []unversioned.GroupVersion {
 		}
 	}
 	return missingVersions
+}
+
+// Resets the state.
+// Should not be used by anyone else than tests.
+func reset() {
+	registeredVersions = map[unversioned.GroupVersion]struct{}{}
+	enabledVersions = map[unversioned.GroupVersion]struct{}{}
+	groupMetaMap = map[string]*apimachinery.GroupMeta{}
+
 }

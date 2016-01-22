@@ -31,8 +31,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -140,7 +140,7 @@ func New(c *Config) (*Client, error) {
 		return nil, err
 	}
 
-	if _, err := latest.Group(extensions.GroupName); err != nil {
+	if _, err := registered.Group(extensions.GroupName); err != nil {
 		return &Client{RESTClient: client, ExtensionsClient: nil, DiscoveryClient: discoveryClient}, nil
 	}
 	experimentalConfig := *c
@@ -371,7 +371,7 @@ func SetKubernetesDefaults(config *Config) error {
 	if len(config.UserAgent) == 0 {
 		config.UserAgent = DefaultKubernetesUserAgent()
 	}
-	g, err := latest.Group(api.GroupName)
+	g, err := registered.Group(api.GroupName)
 	if err != nil {
 		return err
 	}
@@ -380,7 +380,7 @@ func SetKubernetesDefaults(config *Config) error {
 	config.GroupVersion = &copyGroupVersion
 	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
 	if err != nil {
-		return fmt.Errorf("API version '%v' is not recognized (valid values: %v)", *config.GroupVersion, latest.GroupOrDie(api.GroupName).GroupVersions)
+		return fmt.Errorf("API version '%v' is not recognized (valid values: %v)", *config.GroupVersion, registered.GroupOrDie(api.GroupName).GroupVersions)
 	}
 	if config.Codec == nil {
 		config.Codec = versionInterfaces.Codec
@@ -541,7 +541,7 @@ func defaultVersionFor(config *Config) *unversioned.GroupVersion {
 		// Clients default to the preferred code API version
 		// TODO: implement version negotiation (highest version supported by server)
 		// TODO this drops out when groupmeta is refactored
-		copyGroupVersion := latest.GroupOrDie(api.GroupName).GroupVersion
+		copyGroupVersion := registered.GroupOrDie(api.GroupName).GroupVersion
 		return &copyGroupVersion
 	}
 

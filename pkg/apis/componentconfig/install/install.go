@@ -24,10 +24,10 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -42,8 +42,7 @@ var accessor = meta.NewAccessor()
 var availableVersions = []unversioned.GroupVersion{v1alpha1.SchemeGroupVersion}
 
 func init() {
-	registered.RegisterVersions(availableVersions...)
-
+	registered.RegisterVersions(availableVersions)
 	externalVersions := []unversioned.GroupVersion{}
 	for _, v := range availableVersions {
 		if registered.IsAllowedVersion(v) {
@@ -54,6 +53,7 @@ func init() {
 		glog.V(4).Infof("No version is registered for group %v", componentconfig.GroupName)
 		return
 	}
+
 	if err := registered.EnableVersions(externalVersions...); err != nil {
 		glog.V(4).Infof("%v", err)
 		return
@@ -66,11 +66,13 @@ func init() {
 
 // TODO: enableVersions should be centralized rather than spread in each API
 // group.
+// We can combine registered.RegisterVersions, registered.EnableVersions and
+// registered.RegisterGroup once we have moved enableVersions there.
 func enableVersions(externalVersions []unversioned.GroupVersion) error {
 	addVersionsToScheme(externalVersions...)
 	preferredExternalVersion := externalVersions[0]
 
-	groupMeta := latest.GroupMeta{
+	groupMeta := apimachinery.GroupMeta{
 		GroupVersion:  preferredExternalVersion,
 		GroupVersions: externalVersions,
 		Codec:         runtime.CodecFor(api.Scheme, preferredExternalVersion),
@@ -79,7 +81,7 @@ func enableVersions(externalVersions []unversioned.GroupVersion) error {
 		InterfacesFor: interfacesFor,
 	}
 
-	if err := latest.RegisterGroup(groupMeta); err != nil {
+	if err := registered.RegisterGroup(groupMeta); err != nil {
 		return err
 	}
 	api.RegisterRESTMapper(groupMeta.RESTMapper)
@@ -107,7 +109,7 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 			MetadataAccessor: accessor,
 		}, nil
 	default:
-		g, _ := latest.Group(componentconfig.GroupName)
+		g, _ := registered.Group(componentconfig.GroupName)
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
 	}
 }

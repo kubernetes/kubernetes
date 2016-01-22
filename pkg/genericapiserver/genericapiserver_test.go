@@ -25,8 +25,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
@@ -96,8 +96,8 @@ func TestInstallAPIGroups(t *testing.T) {
 	config.APIGroupPrefix = "/apiGroupPrefix"
 
 	s := New(&config)
-	apiGroupMeta := latest.GroupOrDie(api.GroupName)
-	extensionsGroupMeta := latest.GroupOrDie(extensions.GroupName)
+	apiGroupMeta := registered.GroupOrDie(api.GroupName)
+	extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
 	apiGroupsInfo := []APIGroupInfo{
 		{
 			// legacy group version
