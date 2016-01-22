@@ -48,13 +48,9 @@ readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
-# These get set in verify_prereqs with a unique hash based on KUBE_ROOT
-# KUBE_BUILD_IMAGE_TAG=<hash>
-# KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
-# KUBE_BUILD_CONTAINER_NAME=kube-build-<hash>
-readonly KUBE_BUILD_IMAGE_CROSS_TAG=cross
+readonly KUBE_BUILD_GOLANG_VERSION=1.5.3
+readonly KUBE_BUILD_IMAGE_CROSS_TAG="cross-${KUBE_BUILD_GOLANG_VERSION}-1"
 readonly KUBE_BUILD_IMAGE_CROSS="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_CROSS_TAG}"
-readonly KUBE_BUILD_GOLANG_VERSION=1.4
 # KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>
 
 # Here we map the output directories across both the local and remote _output
@@ -416,7 +412,7 @@ function kube::build::build_image_built() {
 function kube::build::ensure_golang() {
   kube::build::docker_image_exists golang "${KUBE_BUILD_GOLANG_VERSION}" || {
     [[ ${KUBE_SKIP_CONFIRMATIONS} =~ ^[yY]$ ]] || {
-      echo "You don't have a local copy of the golang docker image. This image is 450MB."
+      echo "You don't have a local copy of the golang:${KUBE_BUILD_GOLANG_VERSION} docker image. This image is 450MB."
       read -p "Download it now? [y/n] " -r
       echo
       [[ $REPLY =~ ^[yY]$ ]] || {
@@ -476,6 +472,7 @@ function kube::build::build_image() {
   kube::version::save_version_vars "${build_context_dir}/kube-version-defs"
 
   cp build/build-image/Dockerfile ${build_context_dir}/Dockerfile
+  sed -i "s/KUBE_BUILD_IMAGE_CROSS/${KUBE_BUILD_IMAGE_CROSS}/" ${build_context_dir}/Dockerfile
   # We don't want to force-pull this image because it's based on a local image
   # (see kube::build::build_image_cross), not upstream.
   kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${build_context_dir}" 'false'
