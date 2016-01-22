@@ -1,6 +1,6 @@
 {% set heapster_memory = "300Mi" -%}
-{% set num_nodes = pillar.get('num_nodes', -1) %}
-{% if num_nodes >= 0 %}
+{% set num_nodes = pillar.get('num_nodes', -1) -%}
+{% if num_nodes >= 0 -%}
   {% set heapster_memory = (200 + num_nodes * 12)|string + "Mi" -%}
 {% endif -%}
 
