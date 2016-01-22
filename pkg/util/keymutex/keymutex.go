@@ -22,7 +22,7 @@ import (
 	"sync"
 )
 
-// KeyMutex is a thread-safe interface for aquiring locks on arbitrary strings.
+// KeyMutex is a thread-safe interface for acquiring locks on arbitrary strings.
 type KeyMutex interface {
 	// Aquires a lock associated with the specified ID, creates the lock if one doesn't already exist.
 	LockKey(id string)
