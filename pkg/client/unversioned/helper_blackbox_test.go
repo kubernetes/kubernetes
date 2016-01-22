@@ -71,7 +71,7 @@ func TestNegotiateVersion(t *testing.T) {
 		{
 			name:            "explicit version supported",
 			config:          &unversioned.Config{GroupVersion: testapi.Default.GroupVersion()},
-			serverVersions:  []string{"/ersion1", testapi.Default.GroupVersion().String()},
+			serverVersions:  []string{"/version1", testapi.Default.GroupVersion().String()},
 			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, *testapi.Default.GroupVersion()},
 			expectedVersion: testapi.Default.GroupVersion(),
 		},

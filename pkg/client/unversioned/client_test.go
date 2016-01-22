@@ -30,8 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 )
 
-const nameRequiredError = "resource name may not be empty"
-
 func TestGetServerVersion(t *testing.T) {
 	expect := version.Info{
 		Major:     "foo",

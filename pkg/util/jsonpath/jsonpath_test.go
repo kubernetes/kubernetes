@@ -93,7 +93,7 @@ func testFailJSONPath(tests []jsonpathTest, t *testing.T) {
 			out = err.Error()
 		}
 		if out != test.expect {
-			t.Errorf("in %s, expect to get error %s, got %s", test.name, test.expect, out)
+			t.Errorf("in %s, expect to get error %q, got %q", test.name, test.expect, out)
 		}
 	}
 }
@@ -160,7 +160,7 @@ func TestStructInput(t *testing.T) {
 	testJSONPath(storeTests, t)
 
 	failStoreTests := []jsonpathTest{
-		{"invalid identfier", "{hello}", storeData, "unrecongnized identifier hello"},
+		{"invalid identfier", "{hello}", storeData, "unrecognized identifier hello"},
 		{"nonexistent field", "{.hello}", storeData, "hello is not found"},
 		{"invalid array", "{.Labels[0]}", storeData, "map[string]int is not array or slice"},
 		{"invalid filter operator", "{.Book[?(@.Price<>10)]}", storeData, "unrecognized filter operator <>"},
