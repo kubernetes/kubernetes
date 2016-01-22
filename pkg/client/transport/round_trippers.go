@@ -97,6 +97,8 @@ func (rt *userAgentRoundTripper) CancelRequest(req *http.Request) {
 	}
 }
 
+func (rt *userAgentRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt }
+
 type basicAuthRoundTripper struct {
 	username string
 	password string
@@ -126,6 +128,8 @@ func (rt *basicAuthRoundTripper) CancelRequest(req *http.Request) {
 	}
 }
 
+func (rt *basicAuthRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt }
+
 type bearerAuthRoundTripper struct {
 	bearer string
 	rt     http.RoundTripper
@@ -154,6 +158,8 @@ func (rt *bearerAuthRoundTripper) CancelRequest(req *http.Request) {
 		glog.Errorf("CancelRequest not implemented")
 	}
 }
+
+func (rt *bearerAuthRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt }
 
 // cloneRequest returns a clone of the provided *http.Request.
 // The clone is a shallow copy of the struct and its Header map.
@@ -292,4 +298,8 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	}
 
 	return response, err
+}
+
+func (rt *debuggingRoundTripper) WrappedRoundTripper() http.RoundTripper {
+	return rt.delegatedRoundTripper
 }
