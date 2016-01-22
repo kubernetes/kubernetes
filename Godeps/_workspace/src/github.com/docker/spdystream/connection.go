@@ -33,24 +33,28 @@ type idleAwareFramer struct {
 	conn           *Connection
 	writeLock      sync.Mutex
 	resetChan      chan struct{}
+	setTimeoutLock sync.Mutex
 	setTimeoutChan chan time.Duration
 	timeout        time.Duration
 }
 
 func newIdleAwareFramer(framer *spdy.Framer) *idleAwareFramer {
 	iaf := &idleAwareFramer{
-		f:              framer,
-		resetChan:      make(chan struct{}, 2),
-		setTimeoutChan: make(chan time.Duration),
+		f:         framer,
+		resetChan: make(chan struct{}, 2),
+		// setTimeoutChan needs to be buffered to avoid deadlocks when calling setIdleTimeout at about
+		// the same time the connection is being closed
+		setTimeoutChan: make(chan time.Duration, 1),
 	}
 	return iaf
 }
 
 func (i *idleAwareFramer) monitor() {
 	var (
-		timer     *time.Timer
-		expired   <-chan time.Time
-		resetChan = i.resetChan
+		timer          *time.Timer
+		expired        <-chan time.Time
+		resetChan      = i.resetChan
+		setTimeoutChan = i.setTimeoutChan
 	)
 Loop:
 	for {
@@ -103,10 +107,20 @@ Loop:
 				}
 			}()
 
+			go func() {
+				for _ = range setTimeoutChan {
+				}
+			}()
+
 			i.writeLock.Lock()
 			close(resetChan)
 			i.resetChan = nil
 			i.writeLock.Unlock()
+
+			i.setTimeoutLock.Lock()
+			close(i.setTimeoutChan)
+			i.setTimeoutChan = nil
+			i.setTimeoutLock.Unlock()
 
 			break Loop
 		}
@@ -146,6 +160,17 @@ func (i *idleAwareFramer) ReadFrame() (spdy.Frame, error) {
 	i.resetChan <- struct{}{}
 
 	return frame, nil
+}
+
+func (i *idleAwareFramer) setIdleTimeout(timeout time.Duration) {
+	i.setTimeoutLock.Lock()
+	defer i.setTimeoutLock.Unlock()
+
+	if i.setTimeoutChan == nil {
+		return
+	}
+
+	i.setTimeoutChan <- timeout
 }
 
 type Connection struct {
@@ -794,7 +819,7 @@ func (s *Connection) SetCloseTimeout(timeout time.Duration) {
 // SetIdleTimeout sets the amount of time the connection may sit idle before
 // it is forcefully terminated.
 func (s *Connection) SetIdleTimeout(timeout time.Duration) {
-	s.framer.setTimeoutChan <- timeout
+	s.framer.setIdleTimeout(timeout)
 }
 
 func (s *Connection) sendHeaders(headers http.Header, stream *Stream, fin bool) error {
