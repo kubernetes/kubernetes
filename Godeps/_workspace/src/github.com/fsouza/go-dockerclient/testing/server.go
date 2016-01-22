@@ -38,6 +38,7 @@ var nameRegexp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]+$`)
 // For more details on the remote API, check http://goo.gl/G3plxW.
 type DockerServer struct {
 	containers     []*docker.Container
+	uploadedFiles  map[string]string
 	execs          []*docker.ExecInspect
 	execMut        sync.RWMutex
 	cMut           sync.RWMutex
@@ -89,6 +90,7 @@ func NewServer(bind string, containerChan chan<- *docker.Container, hook func(*h
 		execCallbacks:  make(map[string]func()),
 		statsCallbacks: make(map[string]func(string) docker.Stats),
 		customHandlers: make(map[string]http.Handler),
+		uploadedFiles:  make(map[string]string),
 		cChan:          containerChan,
 	}
 	server.buildMuxer()
@@ -120,6 +122,7 @@ func (s *DockerServer) buildMuxer() {
 	s.mux.Path("/containers/{id:.*}").Methods("DELETE").HandlerFunc(s.handlerWrapper(s.removeContainer))
 	s.mux.Path("/containers/{id:.*}/exec").Methods("POST").HandlerFunc(s.handlerWrapper(s.createExecContainer))
 	s.mux.Path("/containers/{id:.*}/stats").Methods("GET").HandlerFunc(s.handlerWrapper(s.statsContainer))
+	s.mux.Path("/containers/{id:.*}/archive").Methods("PUT").HandlerFunc(s.handlerWrapper(s.uploadToContainer))
 	s.mux.Path("/exec/{id:.*}/resize").Methods("POST").HandlerFunc(s.handlerWrapper(s.resizeExecContainer))
 	s.mux.Path("/exec/{id:.*}/start").Methods("POST").HandlerFunc(s.handlerWrapper(s.startExecContainer))
 	s.mux.Path("/exec/{id:.*}/json").Methods("GET").HandlerFunc(s.handlerWrapper(s.inspectExecContainer))
@@ -440,8 +443,8 @@ func (s *DockerServer) createContainer(w http.ResponseWriter, r *http.Request) {
 	s.cMut.Unlock()
 	w.WriteHeader(http.StatusCreated)
 	s.notify(&container)
-	var c = struct{ ID string }{ID: container.ID}
-	json.NewEncoder(w).Encode(c)
+
+	json.NewEncoder(w).Encode(container)
 }
 
 func (s *DockerServer) generateID() string {
@@ -501,6 +504,23 @@ func (s *DockerServer) statsContainer(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+}
+
+func (s *DockerServer) uploadToContainer(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	container, _, err := s.findContainer(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	if !container.State.Running {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Container %s is not running", id)
+		return
+	}
+	path := r.URL.Query().Get("path")
+	s.uploadedFiles[id] = path
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *DockerServer) topContainer(w http.ResponseWriter, r *http.Request) {
