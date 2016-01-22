@@ -894,3 +894,27 @@ func TestOverlappingRCs(t *testing.T) {
 		}
 	}
 }
+
+func TestRCManagerInit(t *testing.T) {
+	// Insert a stable rc into the replication manager's store and make sure
+	// it syncs pods with the apiserver before making any decisions.
+	rc := newReplicationController(2)
+	response := runtime.EncodeOrDie(testapi.Default.Codec(), newPodList(nil, 2, api.PodRunning, rc))
+	fakeHandler := utiltesting.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: response,
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	// TODO: Uncomment when fix #19254
+	// defer testServer.Close()
+
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	manager := NewReplicationManager(client, controller.NoResyncPeriodFunc, BurstReplicas)
+	manager.rcStore.Store.Add(rc)
+	manager.podStoreSynced = alwaysReady
+	controller.SyncAllPodsWithStore(manager.kubeClient, manager.podStore.Store)
+	fakePodControl := &controller.FakePodControl{}
+	manager.podControl = fakePodControl
+	manager.syncReplicationController(getKey(rc, t))
+	validateSyncReplication(t, fakePodControl, 0, 0)
+}
