@@ -45,7 +45,8 @@ cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    api_ser
 cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
 cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    for k in ('etcd_servers', 'kubeapi_server'):
 cluster/juju/charms/trusty/kubernetes/hooks/network-relation-changed:    if api_servers:
-cluster/mesos/docker/common/bin/util-ssl.sh:  local cluster_domain="cluster.local"
+cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
+cluster/lib/logging.sh:  local source_file=${BASH_SOURCE[$stack_skip]}
 cluster/mesos/docker/km/build.sh:  km_path=$(find-binary km darwin/amd64)
 cluster/rackspace/util.sh:    local node_ip=$(nova show --minimal ${NODE_NAMES[$i]} \
 cluster/saltbase/salt/kube-addons/kube-addons.sh:# Create admission_control objects if defined before any other addon services. If the limits
@@ -75,6 +76,7 @@ docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  re
 docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  return cloud_config.process_template(input_file, output_file, function(data) {
 docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  var write_files_extra = cloud_config.write_files_from('addons', '/etc/kubernetes/addons');
 docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:var cloud_config = require('../cloud_config.js');
+docs/getting-started-guides/docker-multinode/skydns-rc.yaml.in:        - -kube_master_url=http://{kube_server_url}:8080
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
 examples/vitess/env.sh:    node_ip=$(get_node_ip)
 hack/jenkins/e2e.sh:  local -r cluster_name="$3"
@@ -84,8 +86,6 @@ hack/jenkins/update-jobs.sh:    docker cp jenkins_jobs.ini job-builder:/etc/jenk
 hack/jenkins/update-jobs.sh:    echo "jenkins_jobs.ini not found in workspace" >&2
 hack/jenkins/update-jobs.sh:  # jenkins_jobs.ini contains administrative credentials for Jenkins.
 hack/jenkins/update-jobs.sh:  if [[ -e jenkins_jobs.ini ]]; then
-cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
-cluster/lib/logging.sh:  local source_file=${BASH_SOURCE[$stack_skip]}
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    runtime_config=""
 hack/test-cmd.sh:  --runtime_config="extensions/v1beta1/deployments=true" \
