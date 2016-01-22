@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/hash"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
@@ -93,7 +94,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *a
 	if err != nil {
 		return false, nil, err
 	}
-	obj, err := api.Scheme.Decode(json)
+	obj, err := runtime.Decode(api.Codecs.UniversalDecoder(), json)
 	if err != nil {
 		return false, pod, err
 	}
@@ -115,17 +116,13 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *a
 }
 
 func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods api.PodList, err error) {
-	json, err := utilyaml.ToJSON(data)
-	if err != nil {
-		return false, api.PodList{}, err
-	}
-	obj, err := api.Scheme.Decode(json)
+	obj, err := runtime.Decode(api.Codecs.UniversalDecoder(), data)
 	if err != nil {
 		return false, pods, err
 	}
 	// Check whether the object could be converted to list of pods.
 	if _, ok := obj.(*api.PodList); !ok {
-		err = fmt.Errorf("invalid pods list: %+v", obj)
+		err = fmt.Errorf("invalid pods list: %#v", obj)
 		return false, pods, err
 	}
 	newPods := obj.(*api.PodList)
