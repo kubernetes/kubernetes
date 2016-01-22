@@ -441,7 +441,7 @@ func refJson(t *testing.T, o runtime.Object) string {
 	}
 
 	_, _, codec := NewAPIFactory()
-	json, err := codec.Encode(&api.SerializedReference{Reference: *ref})
+	json, err := runtime.Encode(codec, &api.SerializedReference{Reference: *ref})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
