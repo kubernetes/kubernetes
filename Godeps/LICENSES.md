@@ -13,7 +13,7 @@ github.com/beorn7/perks/quantile | MIT?
 github.com/blang/semver | MITname
 github.com/boltdb/bolt | MITname
 github.com/bradfitz/http2 | BSDlikeRef
-github.com/camlistore/camlistore/pkg/errorutil | Apache-2
+github.com/camlistore/go4 | Apache-2
 github.com/ClusterHQ/flocker-go | UNKNOWN
 github.com/codegangsta/negroni | MITname
 github.com/coreos/etcd | Apache-2
@@ -29,7 +29,7 @@ github.com/daviddengcn/go-colortext | BSD?
 github.com/dgrijalva/jwt-go | spdxMIT
 github.com/docker/docker | Apache-2
 github.com/docker/docker/pkg/symlink | spdxBSD3
-github.com/docker/spdystream | Apache-2
+github.com/docker/spdystream | SeeFile
 github.com/elazarl/go-bindata-assetfs | spdxBSD2
 github.com/elazarl/goproxy | BSDWarr
 github.com/emicklei/go-restful | MITname
@@ -81,6 +81,7 @@ github.com/Sirupsen/logrus | MITname
 github.com/skynetservices/skydns | MITname
 github.com/spf13/cobra | Apache-2
 github.com/spf13/pflag | spdxBSD3
+github.com/ssoroka/ttime | UNKNOWN
 github.com/stretchr/objx | MIT?
 github.com/stretchr/testify | MIT?
 github.com/syndtr/gocapability | spdxBSD2
