@@ -76,8 +76,8 @@ func getNonzeroRequests(requests *api.ResourceList) (int64, int64) {
 func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) schedulerapi.HostPriority {
 	totalMilliCPU := int64(0)
 	totalMemory := int64(0)
-	capacityMilliCPU := node.Status.Capacity.Cpu().MilliValue()
-	capacityMemory := node.Status.Capacity.Memory().Value()
+	capacityMilliCPU := node.Status.Allocatable.Cpu().MilliValue()
+	capacityMemory := node.Status.Allocatable.Memory().Value()
 
 	for _, existingPod := range pods {
 		for _, container := range existingPod.Spec.Containers {
@@ -208,8 +208,8 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*ap
 		totalMemory += memory
 	}
 
-	capacityMilliCPU := node.Status.Capacity.Cpu().MilliValue()
-	capacityMemory := node.Status.Capacity.Memory().Value()
+	capacityMilliCPU := node.Status.Allocatable.Cpu().MilliValue()
+	capacityMemory := node.Status.Allocatable.Memory().Value()
 
 	cpuFraction := fractionOfCapacity(totalMilliCPU, capacityMilliCPU)
 	memoryFraction := fractionOfCapacity(totalMemory, capacityMemory)
