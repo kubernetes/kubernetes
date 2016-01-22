@@ -44,12 +44,19 @@ a docker image. See [Secrets design document](../design/secrets.md) for more inf
 
 - [Secrets](#secrets)
   - [Overview of Secrets](#overview-of-secrets)
-    - [Service Accounts Automatically Create and Attach Secrets with API Credentials](#service-accounts-automatically-create-and-attach-secrets-with-api-credentials)
-    - [Creating a Secret Manually](#creating-a-secret-manually)
+    - [Built-in Secrets](#built-in-secrets)
+      - [Service Accounts Automatically Create and Attach Secrets with API Credentials](#service-accounts-automatically-create-and-attach-secrets-with-api-credentials)
+    - [Creating your own Secrets](#creating-your-own-secrets)
+      - [Creating a Secret Using kubectl secret](#creating-a-secret-using-kubectl-secret)
+      - [Creating a Secret Manually](#creating-a-secret-manually)
+      - [Decoding a Secret](#decoding-a-secret)
     - [Manually specifying a Secret to be Mounted on a Pod](#manually-specifying-a-secret-to-be-mounted-on-a-pod)
-    - [Manually specifying an imagePullSecret](#manually-specifying-an-imagepullsecret)
-    - [Arranging for imagePullSecrets to be Automatically Attached](#arranging-for-imagepullsecrets-to-be-automatically-attached)
-    - [Automatic Mounting of Manually Created Secrets](#automatic-mounting-of-manually-created-secrets)
+    - [Using Secrets](#using-secrets)
+      - [Using imagePullSecrets](#using-imagepullsecrets)
+        - [Manually specifying an imagePullSecret](#manually-specifying-an-imagepullsecret)
+        - [Arranging for imagePullSecrets to be Automatically Attached](#arranging-for-imagepullsecrets-to-be-automatically-attached)
+      - [Using Secrets as Files from a Pod](#using-secrets-as-files-from-a-pod)
+      - [Automatic Mounting of Manually Created Secrets](#automatic-mounting-of-manually-created-secrets)
   - [Details](#details)
     - [Restrictions](#restrictions)
     - [Consuming Secret Values](#consuming-secret-values)
@@ -77,7 +84,9 @@ To use a secret, a pod needs to reference the secret.
 A secret can be used with a pod in two ways: either as files in a [volume](volumes.md) mounted on one or more of
 its containers, or used by kubelet when pulling images for the pod.
 
-### Service Accounts Automatically Create and Attach Secrets with API Credentials
+### Built-in Secrets
+
+#### Service Accounts Automatically Create and Attach Secrets with API Credentials
 
 Kubernetes automatically creates secrets which contain credentials for
 accessing the API and it automatically modifies your pods to use this type of
@@ -90,9 +99,70 @@ this is the recommended workflow.
 See the [Service Account](service-accounts.md) documentation for more
 information on how Service Accounts work.
 
-### Creating a Secret Manually
+### Creating your own Secrets
 
-This is an example of a simple secret, in yaml format:
+#### Creating a Secret Using kubectl secret
+
+Say that some pods need to access a database.  The
+username and password that the pods should use is in the files
+`./username.txt` and `./password.txt` on your local machine.
+
+```console
+# Create files needed for rest of example.
+$ echo "admin" > ./username.txt
+$ echo "1f2d1e2e67df" > ./password.txt
+```
+
+The `kubectl create secret` command
+packages these files into a Secret and creates
+the object on the Apiserver.
+
+```console
+$ kubectl create secret generic db-user-pass --from-file=./username.txt --from-file=./password.txt
+secret "db-user-pass" created
+```
+
+You can check that the secret was created like this:
+
+```console
+$ kubectl get secrets
+NAME                  TYPE                                  DATA      AGE
+db-user-pass          Opaque                                2         51s
+$ kubectl describe secrets/db-user-pass
+Name:		db-user-pass
+Namespace:	default
+Labels:		<none>
+Annotations:	<none>
+
+Type:	Opaque
+
+Data
+====
+password.txt:	13 bytes
+username.txt:	6 bytes
+```
+
+Note that neither `get` nor `describe` shows the contents of the file by default.
+This is to protect the secret from being exposed accidentally to someone looking
+or from being stored in a terminal log.
+
+See [decoding a secret](#decoding-a-secret) for how to see the contents.
+
+#### Creating a Secret Manually
+
+You can also create a secret object in a file first,
+in json or yaml format, and then create that object.
+
+Each item must be base64 encoded:
+
+```console
+$ echo "admin" | base64
+YWRtaW4K
+$ echo "1f2d1e2e67df" | base64
+MWYyZDFlMmU2N2RmCg==
+```
+
+Now write a secret object that looks like this:
 
 ```yaml
 apiVersion: v1
@@ -101,22 +171,56 @@ metadata:
   name: mysecret
 type: Opaque
 data:
-  password: dmFsdWUtMg0K
-  username: dmFsdWUtMQ0K
+  password: MWYyZDFlMmU2N2RmCg==
+  username: YWRtaW4K
 ```
 
 The data field is a map.  Its keys must match
 [`DNS_SUBDOMAIN`](../design/identifiers.md), except that leading dots are also
-allowed.  The values are arbitrary data, encoded using base64. The values of
-username and password in the example above, before base64 encoding,
-are `value-1` and `value-2`, respectively, with carriage return and newline characters at the end.
+allowed.  The values are arbitrary data, encoded using base64.
 
-Create the secret using [`kubectl create`](kubectl/kubectl_create.md).
+Create the secret using [`kubectl create`](kubectl/kubectl_create.md):
 
-Once the secret is created, you can need to modify your pod to specify
-that it should use the secret.
+```console
+$ kubectl create -f ./secret.yaml
+secret "mysecret" created
+```
+
+**Encoding Note:** The serialized JSON and YAML values of secret data are encoded as
+base64 strings.  Newlines are not valid within these strings and must be
+omitted (i.e. do not use `-b` option of `base64` which breaks long lines.)
+
+#### Decoding a Secret
+
+Get back the secret created in the previous section:
+
+```console
+$ kubectl get secret mysecret -o yaml
+apiVersion: v1
+data:
+  password: MWYyZDFlMmU2N2RmCg==
+  username: YWRtaW4K
+kind: Secret
+metadata:
+  creationTimestamp: 2016-01-22T18:41:56Z
+  name: mysecret
+  namespace: default
+  resourceVersion: "164619"
+  selfLink: /api/v1/namespaces/default/secrets/mysecret
+  uid: cfee02d6-c137-11e5-8d73-42010af00002
+type: Opaque
+```
+
+Decode the password field:
+
+```console
+$ echo "MWYyZDFlMmU2N2RmCg==" | base64 -D
+1f2d1e2e67df
+```
 
 ### Manually specifying a Secret to be Mounted on a Pod
+
+Once the secret is created, you can create a pod that consumes that secret.
 
 This is an example of a pod that mounts a secret in a volume:
 
@@ -158,11 +262,23 @@ whichever is convenient.
 
 See another example of creating a secret and a pod that consumes that secret in a volume [here](secrets/).
 
-### Manually specifying an imagePullSecret
+### Using Secrets
+
+Secrets can be mounted as data volumes to be used by a container in a pod.
+They can also be used by other parts of the system, without being directly
+exposed to the pod.  For example, they can hold credentials that other
+parts of the system should use to interact with external systems on your behalf.
+
+#### Using imagePullSecrets
+
+An imagePullSecret is a way to pass a secret that contains a Docker (or other) image registry
+password to the Kubelet so it can pull a private image on behalf of your Pod.
+
+##### Manually specifying an imagePullSecret
 
 Use of imagePullSecrets is described in the [images documentation](images.md#specifying-imagepullsecrets-on-a-pod)
 
-### Arranging for imagePullSecrets to be Automatically Attached
+##### Arranging for imagePullSecrets to be Automatically Attached
 
 You can manually create an imagePullSecret, and reference it from
 a serviceAccount.  Any pods created with that serviceAccount
@@ -171,8 +287,18 @@ field set to that of the service account.
 See [here](service-accounts.md#adding-imagepullsecrets-to-a-service-account)
  for a detailed explanation of that process.
 
+#### Using Secrets as Files from a Pod
 
-### Automatic Mounting of Manually Created Secrets
+To use a secret from a Pod:
+
+1. Create a secret or use an existing one.  Multiple pods can reference the same secret.
+1. Modify your Pod definition to add a volume under `spec.volumes[]`.  Name the volume anything, and have a `spec.volumes[].secret.secretName` field equal to the name of the secret object.
+1. Add a `spec.containers[].volumeMounts[]` to each container that needs the secret.  Specify `spec.containers[].volumeMounts[].readOnly = true` and `spec.containers[].volumeMounts[].mountPath` to an unused directory name where you would like the secrets to appear.
+1. Modify your image and/or command line so that the the program looks for files in that directory.  Each key in the secret `data` map becomes the filename under `mountPath`.
+
+See the [Use Cases](#use-cases) section for detailed examples.
+
+#### Automatic Mounting of Manually Created Secrets
 
 We plan to extend the service account behavior so that manually created
 secrets (e.g. one containing a token for accessing a github account)
@@ -258,25 +384,14 @@ update the data of existing secrets, but to create new ones with distinct names.
 
 ### Use-Case: Pod with ssh keys
 
-To create a pod that uses an ssh key stored as a secret, we first need to create a secret:
+Create a secret containing some ssh keys:
 
-```json
-{
-  "kind": "Secret",
-  "apiVersion": "v1",
-  "metadata": {
-    "name": "ssh-key-secret"
-  },
-  "data": {
-    "id-rsa": "dmFsdWUtMg0KDQo=",
-    "id-rsa.pub": "dmFsdWUtMQ0K"
-  }
-}
+```console
+$ kubectl create secret generic my-secret --from-file=ssh-privatekey=/path/to/.ssh/id_rsa --from-file=ssh-publickey=/path/to/.ssh/id_rsa.pub
 ```
 
-**Note:** The serialized JSON and YAML values of secret data are encoded as
-base64 strings.  Newlines are not valid within these strings and must be
-omitted.
+**Security Note:** think carefully before sending your own ssh keys: other users of the cluster may have access to the secret.  Use a service account which you want to have accessible to all the users with whom you share the kubernetes cluster, and can revoke if they are compromised.
+
 
 Now we can create a pod which references the secret with the ssh key and
 consumes it in a volume:
@@ -330,39 +445,16 @@ This example illustrates a pod which consumes a secret containing prod
 credentials and another pod which consumes a secret with test environment
 credentials.
 
-The secrets:
+Make the secrets:
 
-```json
-{
-  "apiVersion": "v1",
-  "kind": "List",
-  "items":
-  [{
-    "kind": "Secret",
-    "apiVersion": "v1",
-    "metadata": {
-      "name": "prod-db-secret"
-    },
-    "data": {
-      "password": "dmFsdWUtMg0KDQo=",
-      "username": "dmFsdWUtMQ0K"
-    }
-  },
-  {
-    "kind": "Secret",
-    "apiVersion": "v1",
-    "metadata": {
-      "name": "test-db-secret"
-    },
-    "data": {
-      "password": "dmFsdWUtMg0KDQo=",
-      "username": "dmFsdWUtMQ0K"
-    }
-  }]
-}
+```console
+$ kubectl create secret generic prod-db-password --from-literal=user=produser --from-literal=password=Y4nys7f11
+secret "prod-db-password" created
+$ kubectl create secret generic test-db-password --from-literal=user=testuser --from-literal=password=iluvtests
+secret "test-db-password" created
 ```
 
-The pods:
+Now make the pods:
 
 ```json
 {
