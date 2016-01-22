@@ -2521,9 +2521,6 @@ func updateDiskSpacePolicy(kubelet *Kubelet, mockCadvisor *cadvisor.Mock, rootCa
 func TestUpdateNewNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.RuntimeType = "docker"
-	fakeRuntime.VersionInfo = "1.5.0"
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
@@ -2541,6 +2538,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	versionInfo := &cadvisorapi.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
@@ -2664,6 +2662,7 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	versionInfo := &cadvisorapi.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
@@ -2725,8 +2724,7 @@ func testDockerRuntimeVersion(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	fakeRuntime := testKubelet.fakeRuntime
 	fakeRuntime.RuntimeType = "docker"
-	fakeRuntime.VersionInfo = "1.5.0"
-	fakeRuntime.APIVersionInfo = "1.18"
+	fakeRuntime.VersionInfo = "1.18"
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
@@ -2743,6 +2741,7 @@ func testDockerRuntimeVersion(t *testing.T) {
 	versionInfo := &cadvisorapi.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
@@ -2867,9 +2866,6 @@ func testDockerRuntimeVersion(t *testing.T) {
 func TestUpdateExistingNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.RuntimeType = "docker"
-	fakeRuntime.VersionInfo = "1.5.0"
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{
@@ -2920,6 +2916,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	versionInfo := &cadvisorapi.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
@@ -3182,8 +3179,10 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.RuntimeType = "docker"
-	fakeRuntime.VersionInfo = "1.5.0"
+	// This causes returning an error from GetContainerRuntimeVersion() which
+	// simulates that container runtime is down.
+	fakeRuntime.VersionInfo = ""
+
 	kubeClient.ReactionChain = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
 	}}).ReactionChain
@@ -3200,6 +3199,7 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	versionInfo := &cadvisorapi.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
