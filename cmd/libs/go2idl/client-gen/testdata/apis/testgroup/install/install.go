@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-const importPrefix = "k8s.io/kubernetes/pkg/apis/testgroup"
+const importPrefix = "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testdata/apis/testgroup"
 
 var accessor = meta.NewAccessor()
 
