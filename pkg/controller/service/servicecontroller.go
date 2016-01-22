@@ -358,7 +358,7 @@ func (s *ServiceController) persistUpdate(service *api.Service) error {
 		// balancer status. For now, just rely on the fact that we'll
 		// also process the update that caused the resource version to change.
 		if errors.IsConflict(err) {
-			glog.Infof("Not persisting update to service that has been changed since we received it: %v", err)
+			glog.V(4).Infof("Not persisting update to service that has been changed since we received it: %v", err)
 			return nil
 		}
 		glog.Warningf("Failed to persist updated LoadBalancerStatus to service %s after creating its load balancer: %v",
