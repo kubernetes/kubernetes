@@ -19,7 +19,6 @@ package kubectl
 import (
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -31,355 +30,508 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
+const (
+	name = "foo"
+)
+
+func overlappingButSafe() *api.ReplicationControllerList {
+	return &api.ReplicationControllerList{
+		Items: []api.ReplicationController{
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:      name,
+					Namespace: api.NamespaceDefault,
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 1,
+					Selector: map[string]string{"k1": "v1", "k2": "v2"}},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "baz",
+					Namespace: api.NamespaceDefault,
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 2,
+					Selector: map[string]string{"k1": "v1", "k2": "v2", "k3": "v3"}},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "zaz",
+					Namespace: api.NamespaceDefault,
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 3,
+					Selector: map[string]string{"k1": "v1"}},
+			},
+		},
+	}
+}
+
+func exactMatches() *api.ReplicationControllerList {
+	return &api.ReplicationControllerList{
+		Items: []api.ReplicationController{
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "zaz",
+					Namespace: api.NamespaceDefault,
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 3,
+					Selector: map[string]string{"k1": "v1"}},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:      name,
+					Namespace: api.NamespaceDefault,
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 3,
+					Selector: map[string]string{"k1": "v1"}},
+			},
+		},
+	}
+}
+
 func TestReplicationControllerStop(t *testing.T) {
-	name := "foo"
-	ns := "default"
+	// test data
+	toBeReaped := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:      name,
+			Namespace: api.NamespaceDefault,
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 5,
+			Selector: map[string]string{"k1": "v1"}},
+	}
+	reaped := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:      name,
+			Namespace: api.NamespaceDefault,
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 0,
+			Selector: map[string]string{"k1": "v1"}},
+	}
+	noOverlapping := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "baz",
+			Namespace: api.NamespaceDefault,
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 3,
+			Selector: map[string]string{"k3": "v3"}},
+	}
+	overlapping := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "baz",
+			Namespace: api.NamespaceDefault,
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 2,
+			Selector: map[string]string{"k1": "v1", "k2": "v2"}},
+	}
+
+	// tests
 	tests := []struct {
 		Name            string
-		Objs            []runtime.Object
+		Fns             []testclient.ReactionFunc
 		StopError       error
-		ExpectedActions []string
+		ExpectedActions []testclient.Action
 	}{
 		{
 			Name: "OnlyOneRC",
-			Objs: []runtime.Object{
-				&api.ReplicationController{ // GET
-					ObjectMeta: api.ObjectMeta{
-						Name:      name,
-						Namespace: ns,
-					},
-					Spec: api.ReplicationControllerSpec{
-						Replicas: 0,
-						Selector: map[string]string{"k1": "v1"}},
+			Fns: []testclient.ReactionFunc{
+				// GET rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
 				},
-				&api.ReplicationControllerList{ // LIST
-					Items: []api.ReplicationController{
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      name,
-								Namespace: ns,
-							},
-							Spec: api.ReplicationControllerSpec{
-								Replicas: 0,
-								Selector: map[string]string{"k1": "v1"}},
-						},
-					},
+				// LIST rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &api.ReplicationControllerList{
+						Items: []api.ReplicationController{*toBeReaped}}, nil
+				},
+				// GET rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
+				},
+				// UPDATE rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, reaped, nil
+				},
+				// GET rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, reaped, nil
+				},
+				// GET rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, reaped, nil
+				},
+				// DELETE rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, reaped, nil
 				},
 			},
-			StopError:       nil,
-			ExpectedActions: []string{"get", "list", "get", "update", "get", "get", "delete"},
+			StopError: nil,
+			ExpectedActions: []testclient.Action{
+				testclient.NewGetAction("replicationcontrollers", api.NamespaceDefault, name),
+				testclient.NewListAction("replicationcontrollers", api.NamespaceDefault, api.ListOptions{}),
+				testclient.NewGetAction("replicationcontrollers", api.NamespaceDefault, name),
+				testclient.NewUpdateAction("replicationcontrollers", api.NamespaceDefault, reaped),
+				testclient.NewGetAction("replicationcontrollers", api.NamespaceDefault, name),
+				testclient.NewGetAction("replicationcontrollers", api.NamespaceDefault, name),
+				testclient.NewDeleteAction("replicationcontrollers", api.NamespaceDefault, name),
+			},
+		},
+		{
+			Name: "RCWithNoPods",
+			Fns: []testclient.ReactionFunc{
+				// GET rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, reaped, nil
+				},
+				// LIST rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &api.ReplicationControllerList{
+						Items: []api.ReplicationController{*reaped}}, nil
+				},
+				// GET rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, reaped, nil
+				},
+				// DELETE rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, reaped, nil
+				},
+			},
+			StopError: nil,
+			ExpectedActions: []testclient.Action{
+				testclient.NewGetAction("replicationcontrollers", api.NamespaceDefault, name),
+				testclient.NewListAction("replicationcontrollers", api.NamespaceDefault, api.ListOptions{}),
+				testclient.NewGetAction("replicationcontrollers", api.NamespaceDefault, name),
+				testclient.NewDeleteAction("replicationcontrollers", api.NamespaceDefault, name),
+			},
 		},
 		{
 			Name: "NoOverlapping",
-			Objs: []runtime.Object{
-				&api.ReplicationController{ // GET
-					ObjectMeta: api.ObjectMeta{
-						Name:      name,
-						Namespace: ns,
-					},
-					Spec: api.ReplicationControllerSpec{
-						Replicas: 0,
-						Selector: map[string]string{"k1": "v1"}},
+			Fns: []testclient.ReactionFunc{
+				// GET rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
 				},
-				&api.ReplicationControllerList{ // LIST
-					Items: []api.ReplicationController{
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      "baz",
-								Namespace: ns,
-							},
-							Spec: api.ReplicationControllerSpec{
-								Replicas: 0,
-								Selector: map[string]string{"k3": "v3"}},
-						},
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      name,
-								Namespace: ns,
-							},
-							Spec: api.ReplicationControllerSpec{
-								Replicas: 0,
-								Selector: map[string]string{"k1": "v1"}},
-						},
-					},
+				// LIST rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &api.ReplicationControllerList{
+						Items: []api.ReplicationController{*toBeReaped, *noOverlapping}}, nil
+				},
+				// GET rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
+				},
+				// UPDATE rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, reaped, nil
+				},
+				// GET rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, reaped, nil
+				},
+				// GET rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, reaped, nil
+				},
+				// DELETE rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, reaped, nil
 				},
 			},
-			StopError:       nil,
-			ExpectedActions: []string{"get", "list", "get", "update", "get", "get", "delete"},
+			StopError: nil,
+			ExpectedActions: []testclient.Action{
+				testclient.NewGetAction("replicationcontrollers", api.NamespaceDefault, name),
+				testclient.NewListAction("replicationcontrollers", api.NamespaceDefault, api.ListOptions{}),
+				testclient.NewGetAction("replicationcontrollers", api.NamespaceDefault, name),
+				testclient.NewUpdateAction("replicationcontrollers", api.NamespaceDefault, reaped),
+				testclient.NewGetAction("replicationcontrollers", api.NamespaceDefault, name),
+				testclient.NewGetAction("replicationcontrollers", api.NamespaceDefault, name),
+				testclient.NewDeleteAction("replicationcontrollers", api.NamespaceDefault, name),
+			},
 		},
 		{
 			Name: "OverlappingError",
-			Objs: []runtime.Object{
-
-				&api.ReplicationController{ // GET
-					ObjectMeta: api.ObjectMeta{
-						Name:      name,
-						Namespace: ns,
-					},
-					Spec: api.ReplicationControllerSpec{
-						Replicas: 0,
-						Selector: map[string]string{"k1": "v1"}},
+			Fns: []testclient.ReactionFunc{
+				// GET rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
 				},
-				&api.ReplicationControllerList{ // LIST
-					Items: []api.ReplicationController{
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      "baz",
-								Namespace: ns,
-							},
-							Spec: api.ReplicationControllerSpec{
-								Replicas: 0,
-								Selector: map[string]string{"k1": "v1", "k2": "v2"}},
-						},
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      name,
-								Namespace: ns,
-							},
-							Spec: api.ReplicationControllerSpec{
-								Replicas: 0,
-								Selector: map[string]string{"k1": "v1"}},
-						},
-					},
+				// LIST rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &api.ReplicationControllerList{
+						Items: []api.ReplicationController{*toBeReaped, *overlapping}}, nil
 				},
 			},
-			StopError:       fmt.Errorf("Detected overlapping controllers for rc foo: baz, please manage deletion individually with --cascade=false."),
-			ExpectedActions: []string{"get", "list"},
+			StopError: fmt.Errorf("Detected overlapping controllers for rc foo: baz, please manage deletion individually with --cascade=false."),
+			ExpectedActions: []testclient.Action{
+				testclient.NewGetAction("replicationcontrollers", api.NamespaceDefault, name),
+				testclient.NewListAction("replicationcontrollers", api.NamespaceDefault, api.ListOptions{}),
+			},
 		},
-
 		{
 			Name: "OverlappingButSafeDelete",
-			Objs: []runtime.Object{
-
-				&api.ReplicationController{ // GET
-					ObjectMeta: api.ObjectMeta{
-						Name:      name,
-						Namespace: ns,
-					},
-					Spec: api.ReplicationControllerSpec{
-						Replicas: 0,
-						Selector: map[string]string{"k1": "v1", "k2": "v2"}},
+			Fns: []testclient.ReactionFunc{
+				// GET rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &overlappingButSafe().Items[0], nil
 				},
-				&api.ReplicationControllerList{ // LIST
-					Items: []api.ReplicationController{
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      "baz",
-								Namespace: ns,
-							},
-							Spec: api.ReplicationControllerSpec{
-								Replicas: 0,
-								Selector: map[string]string{"k1": "v1", "k2": "v2", "k3": "v3"}},
-						},
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      "zaz",
-								Namespace: ns,
-							},
-							Spec: api.ReplicationControllerSpec{
-								Replicas: 0,
-								Selector: map[string]string{"k1": "v1"}},
-						},
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      name,
-								Namespace: ns,
-							},
-							Spec: api.ReplicationControllerSpec{
-								Replicas: 0,
-								Selector: map[string]string{"k1": "v1", "k2": "v2"}},
-						},
-					},
+				// LIST rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, overlappingButSafe(), nil
 				},
 			},
-
-			StopError:       fmt.Errorf("Detected overlapping controllers for rc foo: baz,zaz, please manage deletion individually with --cascade=false."),
-			ExpectedActions: []string{"get", "list"},
+			StopError: fmt.Errorf("Detected overlapping controllers for rc foo: baz,zaz, please manage deletion individually with --cascade=false."),
+			ExpectedActions: []testclient.Action{
+				testclient.NewGetAction("replicationcontrollers", api.NamespaceDefault, name),
+				testclient.NewListAction("replicationcontrollers", api.NamespaceDefault, api.ListOptions{}),
+			},
 		},
-
 		{
 			Name: "TwoExactMatchRCs",
-			Objs: []runtime.Object{
-
-				&api.ReplicationController{ // GET
-					ObjectMeta: api.ObjectMeta{
-						Name:      name,
-						Namespace: ns,
-					},
-					Spec: api.ReplicationControllerSpec{
-						Replicas: 0,
-						Selector: map[string]string{"k1": "v1"}},
+			Fns: []testclient.ReactionFunc{
+				// GET rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
 				},
-				&api.ReplicationControllerList{ // LIST
-					Items: []api.ReplicationController{
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      "zaz",
-								Namespace: ns,
-							},
-							Spec: api.ReplicationControllerSpec{
-								Replicas: 0,
-								Selector: map[string]string{"k1": "v1"}},
-						},
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      name,
-								Namespace: ns,
-							},
-							Spec: api.ReplicationControllerSpec{
-								Replicas: 0,
-								Selector: map[string]string{"k1": "v1"}},
-						},
-					},
+				// LIST rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, exactMatches(), nil
+				},
+				// GET rc
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, reaped, nil
 				},
 			},
-
-			StopError:       nil,
-			ExpectedActions: []string{"get", "list", "delete"},
+			StopError: nil,
+			ExpectedActions: []testclient.Action{
+				testclient.NewGetAction("replicationcontrollers", api.NamespaceDefault, name),
+				testclient.NewListAction("replicationcontrollers", api.NamespaceDefault, api.ListOptions{}),
+				testclient.NewDeleteAction("replicationcontrollers", api.NamespaceDefault, name),
+			},
 		},
 	}
 
 	for _, test := range tests {
-		fake := testclient.NewSimpleFake(test.Objs...)
+		toBeReaped.Spec.Replicas = 5
+		fake := &testclient.Fake{}
+		for i, reaction := range test.Fns {
+			fake.AddReactor(test.ExpectedActions[i].GetVerb(), test.ExpectedActions[i].GetResource(), reaction)
+		}
 		reaper := ReplicationControllerReaper{fake, time.Millisecond, time.Millisecond}
-		err := reaper.Stop(ns, name, 0, nil)
+		err := reaper.Stop(api.NamespaceDefault, name, 0, nil)
 		if !reflect.DeepEqual(err, test.StopError) {
-			t.Errorf("%s unexpected error: %v", test.Name, err)
+			t.Errorf("%s: unexpected error: %v", test.Name, err)
 			continue
 		}
 
 		actions := fake.Actions()
-		if len(actions) != len(test.ExpectedActions) {
-			t.Errorf("%s unexpected actions: %v, expected %d actions got %d", test.Name, actions, len(test.ExpectedActions), len(actions))
-			continue
+		if len(test.ExpectedActions) != len(actions) {
+			t.Errorf("%s: unexpected actions:\n%v\nexpected\n%v\n", test.Name, actions, test.ExpectedActions)
 		}
-		for i, verb := range test.ExpectedActions {
-			if actions[i].GetResource() != "replicationcontrollers" {
-				t.Errorf("%s unexpected action: %+v, expected %s-replicationController", test.Name, actions[i], verb)
-			}
-			if actions[i].GetVerb() != verb {
-				t.Errorf("%s unexpected action: %+v, expected %s-replicationController", test.Name, actions[i], verb)
+		for i, action := range actions {
+			testAction := test.ExpectedActions[i]
+			if !testAction.Matches(action.GetVerb(), action.GetResource()) {
+				t.Errorf("%s: unexpected action: %#v; expected %v", test.Name, action, testAction)
 			}
 		}
 	}
 }
 
 func TestJobStop(t *testing.T) {
-	name := "foo"
-	ns := "default"
 	zero := 0
+	one := 1
+	toBeReaped := &extensions.Job{
+		ObjectMeta: api.ObjectMeta{
+			Name:      name,
+			Namespace: api.NamespaceDefault,
+		},
+		Spec: extensions.JobSpec{
+			Parallelism: &one,
+			Selector: &extensions.LabelSelector{
+				MatchLabels: map[string]string{"k1": "v1"},
+			},
+		},
+	}
+	reaped := &extensions.Job{
+		ObjectMeta: api.ObjectMeta{
+			Name:      name,
+			Namespace: api.NamespaceDefault,
+		},
+		Spec: extensions.JobSpec{
+			Parallelism: &zero,
+			Selector: &extensions.LabelSelector{
+				MatchLabels: map[string]string{"k1": "v1"},
+			},
+		},
+	}
+
 	tests := []struct {
 		Name            string
-		Objs            []runtime.Object
+		Fns             []testclient.ReactionFunc
 		StopError       error
-		ExpectedActions []string
+		ExpectedActions []testclient.Action
 	}{
 		{
 			Name: "OnlyOneJob",
-			Objs: []runtime.Object{
-				&extensions.Job{ // GET
-					ObjectMeta: api.ObjectMeta{
-						Name:      name,
-						Namespace: ns,
-					},
-					Spec: extensions.JobSpec{
-						Parallelism: &zero,
-						Selector: &extensions.LabelSelector{
-							MatchLabels: map[string]string{"k1": "v1"},
-						},
-					},
+			Fns: []testclient.ReactionFunc{
+				// GET job
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
 				},
-				&extensions.JobList{ // LIST
-					Items: []extensions.Job{
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      name,
-								Namespace: ns,
-							},
-							Spec: extensions.JobSpec{
-								Parallelism: &zero,
-								Selector: &extensions.LabelSelector{
-									MatchLabels: map[string]string{"k1": "v1"},
-								},
-							},
-						},
-					},
+				// GET job
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
+				},
+				// UPDATE job
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					*toBeReaped.Spec.Parallelism = 0
+					return true, toBeReaped, nil
+				},
+				// GET job
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
+				},
+				// GET job
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
+				},
+				// LIST pods
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &api.PodList{}, nil
+				},
+				// DELETE job
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
 				},
 			},
 			StopError: nil,
-			ExpectedActions: []string{"get:jobs", "get:jobs", "update:jobs",
-				"get:jobs", "get:jobs", "list:pods", "delete:jobs"},
+			ExpectedActions: []testclient.Action{
+				testclient.NewGetAction("jobs", api.NamespaceDefault, name),
+				testclient.NewGetAction("jobs", api.NamespaceDefault, name),
+				testclient.NewUpdateAction("jobs", api.NamespaceDefault, toBeReaped),
+				testclient.NewGetAction("jobs", api.NamespaceDefault, name),
+				testclient.NewGetAction("jobs", api.NamespaceDefault, name),
+				testclient.NewListAction("pods", api.NamespaceDefault, api.ListOptions{}),
+				testclient.NewDeleteAction("jobs", api.NamespaceDefault, name),
+			},
 		},
 		{
 			Name: "JobWithDeadPods",
-			Objs: []runtime.Object{
-				&extensions.Job{ // GET
-					ObjectMeta: api.ObjectMeta{
-						Name:      name,
-						Namespace: ns,
-					},
-					Spec: extensions.JobSpec{
-						Parallelism: &zero,
-						Selector: &extensions.LabelSelector{
-							MatchLabels: map[string]string{"k1": "v1"},
-						},
-					},
+			Fns: []testclient.ReactionFunc{
+				// GET job
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
 				},
-				&extensions.JobList{ // LIST
-					Items: []extensions.Job{
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      name,
-								Namespace: ns,
-							},
-							Spec: extensions.JobSpec{
-								Parallelism: &zero,
-								Selector: &extensions.LabelSelector{
-									MatchLabels: map[string]string{"k1": "v1"},
+				// GET job
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
+				},
+				// UPDATE job
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					*toBeReaped.Spec.Parallelism = 0
+					return true, toBeReaped, nil
+				},
+				// GET job
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
+				},
+				// GET job
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
+				},
+				// LIST pods
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &api.PodList{
+						Items: []api.Pod{
+							{
+								ObjectMeta: api.ObjectMeta{
+									Name:      "pod1",
+									Namespace: api.NamespaceDefault,
+									Labels:    map[string]string{"k1": "v1"},
 								},
 							},
 						},
-					},
+					}, nil
 				},
-				&api.PodList{ // LIST
-					Items: []api.Pod{
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      "pod1",
-								Namespace: ns,
-								Labels:    map[string]string{"k1": "v1"},
-							},
-						},
-					},
+				// DELETE pod
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, nil, nil
+				},
+				// DELETE job
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, toBeReaped, nil
 				},
 			},
 			StopError: nil,
-			ExpectedActions: []string{"get:jobs", "get:jobs", "update:jobs",
-				"get:jobs", "get:jobs", "list:pods", "delete:pods", "delete:jobs"},
+			ExpectedActions: []testclient.Action{
+				testclient.NewGetAction("jobs", api.NamespaceDefault, name),
+				testclient.NewGetAction("jobs", api.NamespaceDefault, name),
+				testclient.NewUpdateAction("jobs", api.NamespaceDefault, toBeReaped),
+				testclient.NewGetAction("jobs", api.NamespaceDefault, name),
+				testclient.NewGetAction("jobs", api.NamespaceDefault, name),
+				testclient.NewListAction("pods", api.NamespaceDefault, api.ListOptions{}),
+				testclient.NewDeleteAction("pods", api.NamespaceDefault, name),
+				testclient.NewDeleteAction("jobs", api.NamespaceDefault, name),
+			},
+		},
+		{
+			Name: "JobWithNoParallelism",
+			Fns: []testclient.ReactionFunc{
+				// GET job
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, reaped, nil
+				},
+				// GET job
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, reaped, nil
+				},
+				// LIST pods
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &api.PodList{}, nil
+				},
+				// DELETE job
+				func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+					return true, reaped, nil
+				},
+			},
+			StopError: nil,
+			ExpectedActions: []testclient.Action{
+				testclient.NewGetAction("jobs", api.NamespaceDefault, name),
+				testclient.NewGetAction("jobs", api.NamespaceDefault, name),
+				testclient.NewListAction("pods", api.NamespaceDefault, api.ListOptions{}),
+				testclient.NewDeleteAction("jobs", api.NamespaceDefault, name),
+			},
 		},
 	}
 
 	for _, test := range tests {
-		fake := testclient.NewSimpleFake(test.Objs...)
+		*toBeReaped.Spec.Parallelism = one
+		fake := &testclient.Fake{}
+		for i, reaction := range test.Fns {
+			fake.AddReactor(test.ExpectedActions[i].GetVerb(), test.ExpectedActions[i].GetResource(), reaction)
+		}
 		reaper := JobReaper{fake, time.Millisecond, time.Millisecond}
-		err := reaper.Stop(ns, name, 0, nil)
+		err := reaper.Stop(api.NamespaceDefault, name, 0, nil)
 		if !reflect.DeepEqual(err, test.StopError) {
 			t.Errorf("%s unexpected error: %v", test.Name, err)
 			continue
 		}
 
 		actions := fake.Actions()
-		if len(actions) != len(test.ExpectedActions) {
-			t.Errorf("%s unexpected actions: %v, expected %d actions got %d", test.Name, actions, len(test.ExpectedActions), len(actions))
-			continue
+		if len(test.ExpectedActions) != len(actions) {
+			t.Errorf("%s: unexpected actions:\n%v\nexpected\n%v\n", test.Name, actions, test.ExpectedActions)
 		}
-		for i, expAction := range test.ExpectedActions {
-			action := strings.Split(expAction, ":")
-			if actions[i].GetVerb() != action[0] {
-				t.Errorf("%s unexpected verb: %+v, expected %s", test.Name, actions[i], expAction)
-			}
-			if actions[i].GetResource() != action[1] {
-				t.Errorf("%s unexpected resource: %+v, expected %s", test.Name, actions[i], expAction)
+		for i, action := range actions {
+			testAction := test.ExpectedActions[i]
+			if !testAction.Matches(action.GetVerb(), action.GetResource()) {
+				t.Errorf("%s: unexpected action: %#v; expected %v", test.Name, action, testAction)
 			}
 		}
 	}

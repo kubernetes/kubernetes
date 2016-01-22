@@ -17,6 +17,7 @@ limitations under the License.
 package kubectl
 
 import (
+	goerrors "errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -79,7 +80,12 @@ const (
 	ScaleGetFailure ScaleErrorType = iota
 	ScaleUpdateFailure
 	ScaleUpdateInvalidFailure
+	// AlreadyScaled is not really an error but we need a way to surface to the client that
+	// the scaling didn't happen because we already have the desired state the user asked for.
+	AlreadyScaled
 )
+
+var alreadyScaledErr = goerrors.New("desired replicas already equals the requested replicas")
 
 // A ScaleError is returned when a scale request passes
 // preconditions but fails to actually scale the controller.
@@ -112,12 +118,14 @@ func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name s
 		case nil:
 			return true, nil
 		case ScaleError:
-			// if it's invalid we shouldn't keep waiting
-			if e.FailureType == ScaleUpdateInvalidFailure {
+			switch e.FailureType {
+			case ScaleUpdateInvalidFailure:
+				// if it's invalid we shouldn't keep waiting
 				return false, err
-			}
-			if e.FailureType == ScaleUpdateFailure {
+			case ScaleUpdateFailure:
 				return false, nil
+			case AlreadyScaled:
+				return false, err
 			}
 		}
 		return false, err
@@ -149,8 +157,10 @@ func (scaler *ReplicationControllerScaler) ScaleSimple(namespace, name string, p
 			return err
 		}
 	}
+	if controller.Spec.Replicas == int(newSize) {
+		return ScaleError{AlreadyScaled, controller.ResourceVersion, alreadyScaledErr}
+	}
 	controller.Spec.Replicas = int(newSize)
-	// TODO: do retry on 409 errors here?
 	if _, err := scaler.c.ReplicationControllers(namespace).Update(controller); err != nil {
 		if errors.IsInvalid(err) {
 			return ScaleError{ScaleUpdateInvalidFailure, controller.ResourceVersion, err}
@@ -216,6 +226,9 @@ func (scaler *JobScaler) ScaleSimple(namespace, name string, preconditions *Scal
 		}
 	}
 	parallelism := int(newSize)
+	if job.Spec.Parallelism != nil && *job.Spec.Parallelism == parallelism {
+		return ScaleError{AlreadyScaled, job.ResourceVersion, alreadyScaledErr}
+	}
 	job.Spec.Parallelism = &parallelism
 	if _, err := scaler.c.Jobs(namespace).Update(job); err != nil {
 		if errors.IsInvalid(err) {
@@ -279,6 +292,9 @@ func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, precondition
 		}
 	}
 	scale := extensions.ScaleFromDeployment(deployment)
+	if scale.Spec.Replicas == int(newSize) {
+		return ScaleError{AlreadyScaled, deployment.ResourceVersion, alreadyScaledErr}
+	}
 	scale.Spec.Replicas = int(newSize)
 	if _, err := scaler.c.Scales(namespace).Update("Deployment", scale); err != nil {
 		if errors.IsInvalid(err) {
