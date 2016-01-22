@@ -69,6 +69,7 @@ func NewCmdApply(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddOutputFlagsForMutation(cmd)
+	cmdutil.AddRecordFlag(cmd)
 	return cmd
 }
 
@@ -132,6 +133,13 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 			if err := kubectl.CreateApplyAnnotation(info, encoder); err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
+
+			if cmdutil.ShouldRecord(cmd, info) {
+				if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
+					return cmdutil.AddSourceToErr("creating", info.Source, err)
+				}
+			}
+
 			// Then create the resource and skip the three-way merge
 			if err := createAndRefresh(info); err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
@@ -164,6 +172,17 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 		_, err = helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
 		if err != nil {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patch, info), info.Source, err)
+		}
+
+		if cmdutil.ShouldRecord(cmd, info) {
+			patch, err = cmdutil.ChangeResourcePatch(info, f.Command())
+			if err != nil {
+				return err
+			}
+			_, err = helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
+			if err != nil {
+				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patch, info), info.Source, err)
+			}
 		}
 
 		count++
