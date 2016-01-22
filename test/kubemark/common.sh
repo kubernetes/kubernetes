@@ -16,6 +16,7 @@
 
 source "${KUBE_ROOT}/cluster/kubemark/config-default.sh"
 source "${KUBE_ROOT}/cluster/kubemark/util.sh"
+source "${KUBE_ROOT}/cluster/kube-env.sh"
 
 detect-project &> /dev/null
 export PROJECT
@@ -23,3 +24,24 @@ export PROJECT
 MASTER_NAME="${INSTANCE_PREFIX}-kubemark-master"
 MASTER_TAG="kubemark-master"
 EVENT_STORE_NAME="${INSTANCE_PREFIX}-event-store"
+
+RETRIES=3
+
+# arguments:
+# $@: all stuff that goes after 'gcloud compute '
+function run-gcloud-compute {
+  local attempt=0
+  while true; do
+    if ! gcloud compute $@; then
+      if (( $attempt > $RETRIES )); then
+        echo -e "${color_red} Failed to $1 $2 $3.${color_norm}" >& 2
+        exit 1
+      fi
+      echo -e "${color_yellow}Attempt $(($attempt+1)) failed to $1 $2 $3. Retrying.${color_norm}" >& 2
+      attempt=$((attempt+1))
+      sleep $(($attempt * 5))
+    else
+      break
+    fi
+  done
+}
