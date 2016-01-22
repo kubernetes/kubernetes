@@ -195,10 +195,10 @@ func (s *AWSCloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerD
 	actual := loadBalancer.HealthCheck
 
 	// Default AWS settings
-	expectedHealthyThreshold := int64(10)
-	expectedUnhealthyThreshold := int64(2)
+	expectedHealthyThreshold := int64(2)
+	expectedUnhealthyThreshold := int64(6)
 	expectedTimeout := int64(5)
-	expectedInterval := int64(30)
+	expectedInterval := int64(10)
 
 	// We only a TCP health-check on the first port
 	expectedTarget := ""
