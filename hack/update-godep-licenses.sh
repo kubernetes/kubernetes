@@ -41,4 +41,5 @@ exec docker run --rm -i -v "${KUBE_ROOT}:/repo" mesosphere/godep-licenses:latest
   -e github.com/spf13/cobra:Apache-2 \
   -e github.com/stretchr/objx:MIT? \
   -e github.com/stretchr/testify:MIT? \
+  -e github.com/docker/spdystream:SeeFile \
   -o md > Godeps/LICENSES.md
