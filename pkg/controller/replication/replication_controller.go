@@ -182,6 +182,8 @@ func (rm *ReplicationManager) SetEventRecorder(recorder record.EventRecorder) {
 // Run begins watching and syncing.
 func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 	defer util.HandleCrash()
+	glog.Infof("Starting RC Manager")
+	controller.SyncAllPodsWithStore(rm.kubeClient, rm.podStore.Store)
 	go rm.rcController.Run(stopCh)
 	go rm.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {
