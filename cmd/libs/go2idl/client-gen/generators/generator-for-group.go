@@ -54,7 +54,7 @@ func (g *genGroup) Imports(c *generator.Context) (imports []string) {
 func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	const pkgUnversioned = "k8s.io/kubernetes/pkg/client/unversioned"
-	const pkgLatest = "k8s.io/kubernetes/pkg/api/latest"
+	const pkgRegistered = "k8s.io/kubernetes/pkg/apimachinery/registered"
 	apiPath := func(group string) string {
 		if group == "legacy" {
 			return `"/api"`
@@ -78,8 +78,8 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"DefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "DefaultKubernetesUserAgent"}),
 		"RESTClient":                 c.Universe.Type(types.Name{Package: pkgUnversioned, Name: "RESTClient"}),
 		"RESTClientFor":              c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "RESTClientFor"}),
-		"latestGroup":                c.Universe.Variable(types.Name{Package: pkgLatest, Name: "Group"}),
-		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgLatest, Name: "GroupOrDie"}),
+		"latestGroup":                c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "Group"}),
+		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "GroupOrDie"}),
 		"apiPath":                    apiPath(g.group),
 	}
 	sw.Do(groupInterfaceTemplate, m)

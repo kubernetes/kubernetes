@@ -27,9 +27,9 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/metrics/install"
 
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -64,13 +64,13 @@ func init() {
 
 	if _, ok := Groups[api.GroupName]; !ok {
 		Groups[api.GroupName] = TestGroup{
-			externalGroupVersion: unversioned.GroupVersion{Group: api.GroupName, Version: latest.GroupOrDie(api.GroupName).GroupVersion.Version},
+			externalGroupVersion: unversioned.GroupVersion{Group: api.GroupName, Version: registered.GroupOrDie(api.GroupName).GroupVersion.Version},
 			internalGroupVersion: api.SchemeGroupVersion,
 		}
 	}
 	if _, ok := Groups[extensions.GroupName]; !ok {
 		Groups[extensions.GroupName] = TestGroup{
-			externalGroupVersion: unversioned.GroupVersion{Group: extensions.GroupName, Version: latest.GroupOrDie(extensions.GroupName).GroupVersion.Version},
+			externalGroupVersion: unversioned.GroupVersion{Group: extensions.GroupName, Version: registered.GroupOrDie(extensions.GroupName).GroupVersion.Version},
 			internalGroupVersion: extensions.SchemeGroupVersion,
 		}
 	}
@@ -93,8 +93,8 @@ func (g TestGroup) InternalGroupVersion() unversioned.GroupVersion {
 // Codec returns the codec for the API version to test against, as set by the
 // KUBE_TEST_API env var.
 func (g TestGroup) Codec() runtime.Codec {
-	// TODO: caesarxuchao: Restructure the body once we have a central `latest`.
-	interfaces, err := latest.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion)
+	// TODO: caesarxuchao: Restructure the body once we have a central `registered`.
+	interfaces, err := registered.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion)
 	if err != nil {
 		panic(err)
 	}
@@ -104,7 +104,7 @@ func (g TestGroup) Codec() runtime.Codec {
 // Converter returns the api.Scheme for the API version to test against, as set by the
 // KUBE_TEST_API env var.
 func (g TestGroup) Converter() runtime.ObjectConvertor {
-	interfaces, err := latest.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion)
+	interfaces, err := registered.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion)
 	if err != nil {
 		panic(err)
 	}
@@ -114,7 +114,7 @@ func (g TestGroup) Converter() runtime.ObjectConvertor {
 // MetadataAccessor returns the MetadataAccessor for the API version to test against,
 // as set by the KUBE_TEST_API env var.
 func (g TestGroup) MetadataAccessor() meta.MetadataAccessor {
-	interfaces, err := latest.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion)
+	interfaces, err := registered.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion)
 	if err != nil {
 		panic(err)
 	}
@@ -178,7 +178,7 @@ func (g TestGroup) ResourcePath(resource, namespace, name string) string {
 }
 
 func (g TestGroup) RESTMapper() meta.RESTMapper {
-	return latest.GroupOrDie(g.externalGroupVersion.Group).RESTMapper
+	return registered.GroupOrDie(g.externalGroupVersion.Group).RESTMapper
 }
 
 // Get codec based on runtime.Object

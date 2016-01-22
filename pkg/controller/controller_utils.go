@@ -24,8 +24,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -259,7 +259,7 @@ func getPodsAnnotationSet(template *api.PodTemplateSpec, object runtime.Object) 
 	if err != nil {
 		return desiredAnnotations, fmt.Errorf("unable to get controller reference: %v", err)
 	}
-	createdByRefJson, err := latest.GroupOrDie(api.GroupName).Codec.Encode(&api.SerializedReference{
+	createdByRefJson, err := registered.GroupOrDie(api.GroupName).Codec.Encode(&api.SerializedReference{
 		Reference: *createdByRef,
 	})
 	if err != nil {

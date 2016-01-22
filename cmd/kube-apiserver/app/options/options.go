@@ -24,8 +24,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -96,7 +96,7 @@ func NewAPIServer() *APIServer {
 		MasterCount:            1,
 		MasterServiceNamespace: api.NamespaceDefault,
 		RuntimeConfig:          make(util.ConfigurationMap),
-		StorageVersions:        latest.AllPreferredGroupVersions(),
+		StorageVersions:        registered.AllPreferredGroupVersions(),
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:        ports.KubeletPort,
 			EnableHttps: true,

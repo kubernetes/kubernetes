@@ -18,7 +18,7 @@ package unversioned
 
 import (
 	"fmt"
-	latest "k8s.io/kubernetes/pkg/api/latest"
+	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	unversioned "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
@@ -95,7 +95,7 @@ func New(c *unversioned.RESTClient) *ExtensionsClient {
 
 func setConfigDefaults(config *unversioned.Config) error {
 	// if extensions group is not registered, return an error
-	g, err := latest.Group("extensions")
+	g, err := registered.Group("extensions")
 	if err != nil {
 		return err
 	}
