@@ -2455,6 +2455,14 @@ func (kl *Kubelet) LatestLoopEntryTime() time.Time {
 	return val.(time.Time)
 }
 
+// Returns the container runtime version for this Kubelet.
+func (kl *Kubelet) GetContainerRuntimeVersion() (kubecontainer.Version, error) {
+	if kl.containerRuntime == nil {
+		return nil, fmt.Errorf("no container runtime")
+	}
+	return kl.containerRuntime.Version()
+}
+
 func (kl *Kubelet) validatePodPhase(podStatus *api.PodStatus) error {
 	switch podStatus.Phase {
 	case api.PodRunning, api.PodSucceeded, api.PodFailed:
@@ -2777,13 +2785,8 @@ func (kl *Kubelet) setNodeStatusVersionInfo(node *api.Node) {
 	} else {
 		node.Status.NodeInfo.KernelVersion = verinfo.KernelVersion
 		node.Status.NodeInfo.OSImage = verinfo.ContainerOsVersion
-
-		runtimeVersion := "Unknown"
-		if runtimeVer, err := kl.containerRuntime.Version(); err == nil {
-			runtimeVersion = runtimeVer.String()
-		}
-		node.Status.NodeInfo.ContainerRuntimeVersion = fmt.Sprintf("%s://%s", kl.containerRuntime.Type(), runtimeVersion)
-
+		// TODO: Determine the runtime is docker or rocket
+		node.Status.NodeInfo.ContainerRuntimeVersion = "docker://" + verinfo.DockerVersion
 		node.Status.NodeInfo.KubeletVersion = version.Get().String()
 		// TODO: kube-proxy might be different version from kubelet in the future
 		node.Status.NodeInfo.KubeProxyVersion = version.Get().String()
@@ -2973,7 +2976,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 func (kl *Kubelet) isContainerRuntimeVersionCompatible() error {
 	switch kl.GetRuntime().Type() {
 	case "docker":
-		version, err := kl.GetRuntime().APIVersion()
+		version, err := kl.GetContainerRuntimeVersion()
 		if err != nil {
 			return nil
 		}
