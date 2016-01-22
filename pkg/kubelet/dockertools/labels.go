@@ -64,6 +64,22 @@ type labelledContainerInfo struct {
 	PreStopHandler            *api.Handler
 }
 
+func GetContainerName(labels map[string]string) string {
+	return labels[kubernetesContainerNameLabel]
+}
+
+func GetPodName(labels map[string]string) string {
+	return labels[kubernetesPodNameLabel]
+}
+
+func GetPodUID(labels map[string]string) string {
+	return labels[kubernetesPodUIDLabel]
+}
+
+func GetPodNamespace(labels map[string]string) string {
+	return labels[kubernetesPodNamespaceLabel]
+}
+
 func newLabels(container *api.Container, pod *api.Pod, restartCount int) map[string]string {
 	labels := map[string]string{}
 	labels[kubernetesPodNameLabel] = pod.Name
