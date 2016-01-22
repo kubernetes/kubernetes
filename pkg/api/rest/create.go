@@ -118,3 +118,9 @@ func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (*api.Obje
 	}
 	return objectMeta, kind, nil
 }
+
+// NamespaceScopedStrategy has a method to tell if the object must be in a namespace.
+type NamespaceScopedStrategy interface {
+	// NamespaceScoped returns if the object must be in a namespace.
+	NamespaceScoped() bool
+}

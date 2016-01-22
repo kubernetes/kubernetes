@@ -37,7 +37,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) (*R
 
 	newListFunc := func() runtime.Object { return &api.PersistentVolumeList{} }
 	storageInterface := storageDecorator(
-		s, 100, &api.PersistentVolume{}, prefix, true, newListFunc)
+		s, 100, &api.PersistentVolume{}, prefix, persistentvolume.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PersistentVolume{} },

@@ -37,7 +37,7 @@ func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *RE
 
 	newListFunc := func() runtime.Object { return &api.PodTemplateList{} }
 	storageInterface := storageDecorator(
-		s, 100, &api.PodTemplate{}, prefix, false, newListFunc)
+		s, 100, &api.PodTemplate{}, prefix, podtemplate.Strategy, newListFunc)
 
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PodTemplate{} },
