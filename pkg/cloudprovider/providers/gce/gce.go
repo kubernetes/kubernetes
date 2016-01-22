@@ -1815,6 +1815,7 @@ type gceDisk struct {
 	Kind string
 }
 
+// Gets the named instances, returning cloudprovider.InstanceNotFound if any instance is not found
 func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
 	instances := make(map[string]*gceInstance)
 
@@ -1863,7 +1864,8 @@ func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error)
 	for i, name := range names {
 		instance := instances[name]
 		if instance == nil {
-			return nil, fmt.Errorf("failed to retrieve instance: %q", name)
+			glog.Errorf("Failed to retrieve instance: %q", name)
+			return nil, cloudprovider.InstanceNotFound
 		}
 		instanceArray[i] = instances[name]
 	}
@@ -1871,6 +1873,7 @@ func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error)
 	return instanceArray, nil
 }
 
+// Gets the named instance, returning cloudprovider.InstanceNotFound if the instance is not found
 func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 	// Avoid changing behaviour when not managing multiple zones
 	if len(gce.managedZones) == 1 {
@@ -1878,9 +1881,11 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 		zone := gce.managedZones[0]
 		res, err := gce.service.Instances.Get(gce.projectID, zone, name).Do()
 		if err != nil {
-			if !isHTTPErrorCode(err, http.StatusNotFound) {
-				return nil, err
+			glog.Errorf("Failed to retrieve TargetInstance resource for instance: %s", name)
+			if isHTTPErrorCode(err, http.StatusNotFound) {
+				return nil, cloudprovider.InstanceNotFound
 			}
+			return nil, err
 		}
 		return &gceInstance{
 			Zone:  lastComponent(res.Zone),
@@ -1895,6 +1900,7 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 		return nil, err
 	}
 	if len(instances) != 1 || instances[0] == nil {
+		// getInstancesByNames not obeying its contract
 		return nil, fmt.Errorf("unexpected return value from getInstancesByNames: %v", instances)
 	}
 	return instances[0], nil
