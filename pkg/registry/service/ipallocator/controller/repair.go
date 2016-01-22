@@ -22,10 +22,13 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
+
+	"github.com/golang/glog"
 )
 
 // Repair is a controller loop that periodically examines all service ClusterIP allocations
@@ -133,6 +136,11 @@ func (c *Repair) RunOnce() error {
 	}
 
 	if err := c.alloc.CreateOrUpdate(latest); err != nil {
+		if errors.IsConflict(err) {
+			// Conflicts can happen, so log, but ignore
+			glog.Warningf("Conflict updating port allocations: %v", err)
+			return nil
+		}
 		return fmt.Errorf("unable to persist the updated service IP allocations: %v", err)
 	}
 	return nil

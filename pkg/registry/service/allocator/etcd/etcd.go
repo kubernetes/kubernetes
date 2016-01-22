@@ -206,7 +206,7 @@ func (e *Etcd) CreateOrUpdate(snapshot *api.RangeAllocation) error {
 			switch {
 			case len(snapshot.ResourceVersion) != 0 && len(existing.ResourceVersion) != 0:
 				if snapshot.ResourceVersion != existing.ResourceVersion {
-					return nil, k8serr.NewConflict(e.resource, "", fmt.Errorf("the provided resource version does not match"))
+					return nil, k8serr.NewConflict(e.resource, "", fmt.Errorf("the provided resource version does not match (snapshot: %s, existing: %s)", snapshot.ResourceVersion, existing.ResourceVersion))
 				}
 			case len(existing.ResourceVersion) != 0:
 				return nil, k8serr.NewConflict(e.resource, "", fmt.Errorf("another caller has already initialized the resource"))

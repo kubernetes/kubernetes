@@ -21,10 +21,13 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/net"
+
+	"github.com/golang/glog"
 )
 
 // See ipallocator/controller/repair.go; this is a copy for ports.
@@ -120,6 +123,11 @@ func (c *Repair) RunOnce() error {
 	}
 
 	if err := c.alloc.CreateOrUpdate(latest); err != nil {
+		if errors.IsConflict(err) {
+			// Conflicts can happen, so log, but ignore
+			glog.Warningf("Conflict updating port allocations: %v", err)
+			return nil
+		}
 		return fmt.Errorf("unable to persist the updated port allocations: %v", err)
 	}
 	return nil
