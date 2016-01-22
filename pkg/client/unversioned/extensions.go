@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -36,6 +37,7 @@ type ExtensionsInterface interface {
 	IngressNamespacer
 	ThirdPartyResourceNamespacer
 	ConfigMapsNamespacer
+	GenericNamespacer
 }
 
 // ExtensionsClient is used to interact with experimental Kubernetes features.
@@ -75,6 +77,10 @@ func (c *ExtensionsClient) ConfigMaps(namespace string) ConfigMapsInterface {
 
 func (c *ExtensionsClient) ThirdPartyResources(namespace string) ThirdPartyResourceInterface {
 	return newThirdPartyResources(c, namespace)
+}
+
+func (c *ExtensionsClient) Generic(namespace string, gvk unversioned.GroupVersionKind) GenericResourceInterface {
+	return newGenericResources(c, namespace, gvk)
 }
 
 // NewExtensions creates a new ExtensionsClient for the given config. This client
