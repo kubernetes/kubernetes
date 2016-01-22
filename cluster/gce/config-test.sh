@@ -120,7 +120,7 @@ if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
   TARGET_NODE_UTILIZATION="${KUBE_TARGET_NODE_UTILIZATION:-0.7}"
 fi
 
-ADMISSION_CONTROL="${KUBE_ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota}"
+ADMISSION_CONTROL="${KUBE_ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota,PersistentVolumeLabel}"
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
