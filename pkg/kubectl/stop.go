@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -83,30 +82,6 @@ func ReaperForReplicationController(c client.Interface, timeout time.Duration) (
 	return &ReplicationControllerReaper{c, Interval, timeout}, nil
 }
 
-type ReplicationControllerReaper struct {
-	client.Interface
-	pollInterval, timeout time.Duration
-}
-type DaemonSetReaper struct {
-	client.Interface
-	pollInterval, timeout time.Duration
-}
-type JobReaper struct {
-	client.Interface
-	pollInterval, timeout time.Duration
-}
-type PodReaper struct {
-	client.Interface
-}
-type ServiceReaper struct {
-	client.Interface
-}
-
-type objInterface interface {
-	Delete(name string) error
-	Get(name string) (meta.Object, error)
-}
-
 // getOverlappingControllers finds rcs that this controller overlaps, as well as rcs overlapping this controller.
 func getOverlappingControllers(c client.ReplicationControllerInterface, rc *api.ReplicationController) ([]api.ReplicationController, error) {
 	rcs, err := c.List(api.ListOptions{})
@@ -122,6 +97,11 @@ func getOverlappingControllers(c client.ReplicationControllerInterface, rc *api.
 		}
 	}
 	return matchingRCs, nil
+}
+
+type ReplicationControllerReaper struct {
+	client.Interface
+	pollInterval, timeout time.Duration
 }
 
 func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -181,13 +161,20 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 		retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
 		waitForReplicas := NewRetryParams(reaper.pollInterval, timeout)
 		if err = scaler.Scale(namespace, name, 0, nil, retry, waitForReplicas); err != nil {
-			return err
+			if scaleErr, ok := err.(ScaleError); !ok || scaleErr.FailureType != AlreadyScaled {
+				return err
+			}
 		}
 	}
 	if err := rc.Delete(name); err != nil {
 		return err
 	}
 	return nil
+}
+
+type DaemonSetReaper struct {
+	client.Interface
+	pollInterval, timeout time.Duration
 }
 
 func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -227,6 +214,11 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 	return nil
 }
 
+type JobReaper struct {
+	client.Interface
+	pollInterval, timeout time.Duration
+}
+
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
 	jobs := reaper.Extensions().Jobs(namespace)
 	pods := reaper.Pods(namespace)
@@ -248,7 +240,9 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
 	waitForJobs := NewRetryParams(reaper.pollInterval, timeout)
 	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForJobs); err != nil {
-		return err
+		if scaleErr, ok := err.(ScaleError); !ok || scaleErr.FailureType != AlreadyScaled {
+			return err
+		}
 	}
 	// at this point only dead pods are left, that should be removed
 	selector, _ := extensions.LabelSelectorAsSelector(job.Spec.Selector)
@@ -276,6 +270,10 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 	return nil
 }
 
+type PodReaper struct {
+	client.Interface
+}
+
 func (reaper *PodReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
 	pods := reaper.Pods(namespace)
 	_, err := pods.Get(name)
@@ -287,6 +285,10 @@ func (reaper *PodReaper) Stop(namespace, name string, timeout time.Duration, gra
 	}
 
 	return nil
+}
+
+type ServiceReaper struct {
+	client.Interface
 }
 
 func (reaper *ServiceReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {

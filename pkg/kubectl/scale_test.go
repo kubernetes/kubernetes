@@ -132,6 +132,31 @@ func TestReplicationControllerScaleFailsPreconditions(t *testing.T) {
 	}
 }
 
+func TestReplicationControllerAlreadyScaled(t *testing.T) {
+	fake := testclient.NewSimpleFake(&api.ReplicationController{
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 3,
+		},
+	})
+	scaler := ReplicationControllerScaler{fake}
+	count := uint(3)
+	name := "foo"
+	err := scaler.Scale("default", name, count, nil, nil, nil)
+	if err == nil {
+		t.Fatal("expected AlreadyScaled error, got nil")
+	}
+	if scaleErr, ok := err.(ScaleError); !ok || scaleErr.FailureType != AlreadyScaled {
+		t.Fatalf("expected AlreadyScaled error, got %s", scaleErr.FailureType)
+	}
+	actions := fake.Actions()
+	if len(actions) != 1 {
+		t.Fatalf("unexpected actions: %v, expected 1 action (get)", actions)
+	}
+	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "replicationcontrollers" || action.GetName() != name {
+		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
+	}
+}
+
 func TestValidateReplicationController(t *testing.T) {
 	tests := []struct {
 		preconditions ScalePrecondition
@@ -356,6 +381,32 @@ func TestJobScaleFailsPreconditions(t *testing.T) {
 	actions := fake.Actions()
 	if len(actions) != 1 {
 		t.Errorf("unexpected actions: %v, expected 1 actions (get)", actions)
+	}
+	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "jobs" || action.GetName() != name {
+		t.Errorf("unexpected action: %v, expected get-job %s", actions[0], name)
+	}
+}
+
+func TestJobAlreadyScaled(t *testing.T) {
+	three := 3
+	fake := testclient.NewSimpleFake(&extensions.Job{
+		Spec: extensions.JobSpec{
+			Parallelism: &three,
+		},
+	})
+	scaler := JobScaler{&testclient.FakeExperimental{fake}}
+	count := uint(3)
+	name := "foo"
+	err := scaler.Scale("default", name, count, nil, nil, nil)
+	if err == nil {
+		t.Fatal("expected AlreadyScaled error, got nil")
+	}
+	if scaleErr, ok := err.(ScaleError); !ok || scaleErr.FailureType != AlreadyScaled {
+		t.Fatalf("expected AlreadyScaled error, got %s", scaleErr.FailureType)
+	}
+	actions := fake.Actions()
+	if len(actions) != 1 {
+		t.Fatalf("unexpected actions: %v, expected 1 action (get)", actions)
 	}
 	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "jobs" || action.GetName() != name {
 		t.Errorf("unexpected action: %v, expected get-job %s", actions[0], name)
@@ -620,6 +671,31 @@ func TestDeploymentScaleFailsPreconditions(t *testing.T) {
 	actions := fake.Actions()
 	if len(actions) != 1 {
 		t.Errorf("unexpected actions: %v, expected 1 actions (get)", actions)
+	}
+	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "deployments" || action.GetName() != name {
+		t.Errorf("unexpected action: %v, expected get-deployment %s", actions[0], name)
+	}
+}
+
+func TestDeploymentAlreadyScaled(t *testing.T) {
+	fake := testclient.NewSimpleFake(&extensions.Deployment{
+		Spec: extensions.DeploymentSpec{
+			Replicas: 3,
+		},
+	})
+	scaler := DeploymentScaler{&testclient.FakeExperimental{fake}}
+	count := uint(3)
+	name := "foo"
+	err := scaler.Scale("default", name, count, nil, nil, nil)
+	if err == nil {
+		t.Fatal("expected AlreadyScaled error, got nil")
+	}
+	if scaleErr, ok := err.(ScaleError); !ok || scaleErr.FailureType != AlreadyScaled {
+		t.Fatalf("expected AlreadyScaled error, got %s", scaleErr.FailureType)
+	}
+	actions := fake.Actions()
+	if len(actions) != 1 {
+		t.Fatalf("unexpected actions: %v, expected 1 action (get)", actions)
 	}
 	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "deployments" || action.GetName() != name {
 		t.Errorf("unexpected action: %v, expected get-deployment %s", actions[0], name)
