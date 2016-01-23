@@ -17,9 +17,12 @@ limitations under the License.
 package v1
 
 import (
+	"strings"
+
 	"k8s.io/kubernetes/pkg/runtime"
 
 	sccutil "k8s.io/kubernetes/pkg/securitycontextconstraints/util"
+
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -52,7 +55,29 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 		SetDefaults_ConfigMap,
 		SetDefaults_RBDVolumeSource,
 		SetDefaults_SCC,
+		SetDefaults_ServicePort,
+		SetDefaults_EndpointPort,
 	)
+}
+
+func SetDefaults_ServicePort(obj *ServicePort) {
+	// Carry conversion to make port case valid
+	switch strings.ToUpper(string(obj.Protocol)) {
+	case string(ProtocolTCP):
+		obj.Protocol = ProtocolTCP
+	case string(ProtocolUDP):
+		obj.Protocol = ProtocolUDP
+	}
+}
+
+func SetDefaults_EndpointPort(obj *EndpointPort) {
+	// Carry conversion to make port case valid
+	switch strings.ToUpper(string(obj.Protocol)) {
+	case string(ProtocolTCP):
+		obj.Protocol = ProtocolTCP
+	case string(ProtocolUDP):
+		obj.Protocol = ProtocolUDP
+	}
 }
 
 func SetDefaults_PodExecOptions(obj *PodExecOptions) {
@@ -93,6 +118,13 @@ func SetDefaults_ContainerPort(obj *ContainerPort) {
 	if obj.Protocol == "" {
 		obj.Protocol = ProtocolTCP
 	}
+	// Carry conversion to make port case valid
+	switch strings.ToUpper(string(obj.Protocol)) {
+	case string(ProtocolTCP):
+		obj.Protocol = ProtocolTCP
+	case string(ProtocolUDP):
+		obj.Protocol = ProtocolUDP
+	}
 }
 func SetDefaults_Container(obj *Container) {
 	if obj.ImagePullPolicy == "" {
@@ -126,6 +158,10 @@ func SetDefaults_ServiceSpec(obj *ServiceSpec) {
 		if sp.TargetPort == intstr.FromInt(0) || sp.TargetPort == intstr.FromString("") {
 			sp.TargetPort = intstr.FromInt(int(sp.Port))
 		}
+		//Carry conversion
+		if len(obj.ClusterIP) == 0 && len(obj.DeprecatedPortalIP) > 0 {
+			obj.ClusterIP = obj.DeprecatedPortalIP
+		}
 	}
 }
 func SetDefaults_Pod(obj *Pod) {
@@ -158,6 +194,14 @@ func SetDefaults_PodSpec(obj *PodSpec) {
 	}
 	if obj.SecurityContext == nil {
 		obj.SecurityContext = &PodSecurityContext{}
+	}
+	// Carry migration from serviceAccount to serviceAccountName
+	if len(obj.ServiceAccountName) == 0 && len(obj.DeprecatedServiceAccount) > 0 {
+		obj.ServiceAccountName = obj.DeprecatedServiceAccount
+	}
+	// Carry migration from host to nodeName
+	if len(obj.NodeName) == 0 && len(obj.DeprecatedHost) > 0 {
+		obj.NodeName = obj.DeprecatedHost
 	}
 	if obj.TerminationGracePeriodSeconds == nil {
 		period := int64(DefaultTerminationGracePeriodSeconds)
