@@ -1405,7 +1405,7 @@ func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPod
 	// Loop a bunch of times - the proxy is randomized, so we want a good
 	// chance of hitting each backend at least once.
 	command := fmt.Sprintf(
-		"for i in $(seq 1 %d); do wget -q -T 1 -O - http://%s:%d || true; echo; done",
+		"for i in $(seq 1 %d); do wget -q -T 1 -O - http://%s:%d 2>&1 || true; echo; done",
 		50*len(expectedPods), serviceIP, servicePort)
 
 	commands := []func() string{
@@ -1435,26 +1435,21 @@ func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPod
 	By(fmt.Sprintf("verifying service has %d reachable backends", len(expectedPods)))
 	for _, cmdFunc := range commands {
 		passed := false
-		pods := []string{}
+		gotPods := []string{}
 		// Retry cmdFunc for a while
 		for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-			pods = strings.Split(strings.TrimSpace(cmdFunc()), "\n")
+			pods := strings.Split(strings.TrimSpace(cmdFunc()), "\n")
 			// Uniq pods before the sort because inserting them into a set
 			// (which is implemented using dicts) can re-order them.
-			uniquePods := sets.String{}
-			for _, name := range pods {
-				uniquePods.Insert(name)
-			}
-			sortedPods := uniquePods.List()
-			sort.StringSlice(sortedPods).Sort()
-			if api.Semantic.DeepEqual(sortedPods, expectedPods) {
+			gotPods := sets.NewString(pods...).List()
+			if api.Semantic.DeepEqual(gotPods, expectedPods) {
 				passed = true
 				break
 			}
-			Logf("Waiting for expected pods for %s: %v, got: %v", serviceIP, expectedPods, sortedPods)
+			Logf("Waiting for expected pods for %s: %v, got: %v", serviceIP, expectedPods, gotPods)
 		}
 		if !passed {
-			return fmt.Errorf("service verification failed for:\n %s, expected to retrieve pods %v, only retrieved %v", serviceIP, expectedPods, pods)
+			return fmt.Errorf("service verification failed for: %s, expected %v, got %v", serviceIP, expectedPods, gotPods)
 		}
 	}
 	return nil
