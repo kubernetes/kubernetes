@@ -103,72 +103,136 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 
 func TestIncrementUsagePodResources(t *testing.T) {
 	type testCase struct {
-		testName      string
-		existing      *api.Pod
-		input         *api.Pod
-		resourceName  api.ResourceName
-		hard          resource.Quantity
-		expectedUsage resource.Quantity
-		expectedError bool
+		testName                 string
+		existing                 *api.Pod
+		input                    *api.Pod
+		resourceName             api.ResourceName
+		hard                     resource.Quantity
+		expectedUsage            resource.Quantity
+		resourceAccountingPolicy api.ResourceAccountingPolicy
+		expectedError            bool
 	}
 	testCases := []testCase{
 		{
-			testName:      "memory-allowed",
-			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
-			input:         validPod("b", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
-			resourceName:  api.ResourceMemory,
-			hard:          resource.MustParse("500Mi"),
-			expectedUsage: resource.MustParse("200Mi"),
-			expectedError: false,
+			testName:                 "track-request-memory-allowed",
+			existing:                 validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
+			input:                    validPod("b", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
+			resourceName:             api.ResourceMemory,
+			hard:                     resource.MustParse("500Mi"),
+			expectedUsage:            resource.MustParse("200Mi"),
+			resourceAccountingPolicy: api.ResourceAccountingPolicyRequests,
+			expectedError:            false,
 		},
 		{
-			testName:      "memory-not-allowed",
-			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
-			input:         validPod("b", 1, getResourceRequirements(getResourceList("", "450Mi"), getResourceList("", ""))),
-			resourceName:  api.ResourceMemory,
-			hard:          resource.MustParse("500Mi"),
-			expectedError: true,
+			testName:                 "track-limit-memory-allowed",
+			existing:                 validPod("a", 1, getResourceRequirements(getResourceList("", "50Mi"), getResourceList("", "100Mi"))),
+			input:                    validPod("b", 1, getResourceRequirements(getResourceList("", "50Mi"), getResourceList("", "100Mi"))),
+			resourceName:             api.ResourceMemory,
+			hard:                     resource.MustParse("500Mi"),
+			expectedUsage:            resource.MustParse("200Mi"),
+			resourceAccountingPolicy: api.ResourceAccountingPolicyLimits,
+			expectedError:            false,
 		},
 		{
-			testName:      "memory-not-allowed-with-different-format",
-			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100M"), getResourceList("", ""))),
-			input:         validPod("b", 1, getResourceRequirements(getResourceList("", "450Mi"), getResourceList("", ""))),
-			resourceName:  api.ResourceMemory,
-			hard:          resource.MustParse("500Mi"),
-			expectedError: true,
+			testName:     "track-request-memory-not-allowed",
+			existing:     validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
+			input:        validPod("b", 1, getResourceRequirements(getResourceList("", "450Mi"), getResourceList("", ""))),
+			resourceName: api.ResourceMemory,
+			hard:         resource.MustParse("500Mi"),
+			resourceAccountingPolicy: api.ResourceAccountingPolicyRequests,
+			expectedError:            true,
 		},
 		{
-			testName:      "memory-no-request",
-			existing:      validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
-			input:         validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
-			resourceName:  api.ResourceMemory,
-			hard:          resource.MustParse("500Mi"),
-			expectedError: true,
+			testName:     "track-limit-memory-not-allowed",
+			existing:     validPod("a", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "100Mi"))),
+			input:        validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "450Mi"))),
+			resourceName: api.ResourceMemory,
+			hard:         resource.MustParse("500Mi"),
+			resourceAccountingPolicy: api.ResourceAccountingPolicyLimits,
+			expectedError:            true,
 		},
 		{
-			testName:      "cpu-allowed",
-			existing:      validPod("a", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
-			input:         validPod("b", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
-			resourceName:  api.ResourceCPU,
-			hard:          resource.MustParse("2"),
-			expectedUsage: resource.MustParse("2"),
-			expectedError: false,
+			testName:     "memory-not-allowed-with-different-format",
+			existing:     validPod("a", 1, getResourceRequirements(getResourceList("", "100M"), getResourceList("", ""))),
+			input:        validPod("b", 1, getResourceRequirements(getResourceList("", "450Mi"), getResourceList("", ""))),
+			resourceName: api.ResourceMemory,
+			hard:         resource.MustParse("500Mi"),
+			resourceAccountingPolicy: api.ResourceAccountingPolicyRequests,
+			expectedError:            true,
 		},
 		{
-			testName:      "cpu-not-allowed",
-			existing:      validPod("a", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
-			input:         validPod("b", 1, getResourceRequirements(getResourceList("600m", ""), getResourceList("", ""))),
-			resourceName:  api.ResourceCPU,
-			hard:          resource.MustParse("1500m"),
-			expectedError: true,
+			testName:     "track-request-memory-not-specified",
+			existing:     validPod("a", 1, getResourceRequirements(getResourceList("", "100Mi"), getResourceList("", ""))),
+			input:        validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
+			resourceName: api.ResourceMemory,
+			hard:         resource.MustParse("500Mi"),
+			resourceAccountingPolicy: api.ResourceAccountingPolicyRequests,
+			expectedError:            true,
 		},
 		{
-			testName:      "cpu-no-request",
-			existing:      validPod("a", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
-			input:         validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
-			resourceName:  api.ResourceCPU,
-			hard:          resource.MustParse("1500m"),
-			expectedError: true,
+			testName:     "track-limit-memory-not-specified",
+			existing:     validPod("a", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "100Mi"))),
+			input:        validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
+			resourceName: api.ResourceMemory,
+			hard:         resource.MustParse("500Mi"),
+			resourceAccountingPolicy: api.ResourceAccountingPolicyLimits,
+			expectedError:            true,
+		},
+		{
+			testName:                 "track-request-cpu-allowed",
+			existing:                 validPod("a", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
+			input:                    validPod("b", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
+			resourceName:             api.ResourceCPU,
+			hard:                     resource.MustParse("2"),
+			expectedUsage:            resource.MustParse("2"),
+			resourceAccountingPolicy: api.ResourceAccountingPolicyRequests,
+			expectedError:            false,
+		},
+		{
+			testName:                 "track-limit-cpu-allowed",
+			existing:                 validPod("a", 1, getResourceRequirements(getResourceList("", ""), getResourceList("1", ""))),
+			input:                    validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("1", ""))),
+			resourceName:             api.ResourceCPU,
+			hard:                     resource.MustParse("2"),
+			expectedUsage:            resource.MustParse("2"),
+			resourceAccountingPolicy: api.ResourceAccountingPolicyLimits,
+			expectedError:            false,
+		},
+		{
+			testName:     "track-request-cpu-not-allowed",
+			existing:     validPod("a", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
+			input:        validPod("b", 1, getResourceRequirements(getResourceList("600m", ""), getResourceList("", ""))),
+			resourceName: api.ResourceCPU,
+			hard:         resource.MustParse("1500m"),
+			resourceAccountingPolicy: api.ResourceAccountingPolicyRequests,
+			expectedError:            true,
+		},
+		{
+			testName:     "track-limit-cpu-not-allowed",
+			existing:     validPod("a", 1, getResourceRequirements(getResourceList("", ""), getResourceList("1", ""))),
+			input:        validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("600m", ""))),
+			resourceName: api.ResourceCPU,
+			hard:         resource.MustParse("1500m"),
+			resourceAccountingPolicy: api.ResourceAccountingPolicyLimits,
+			expectedError:            true,
+		},
+		{
+			testName:     "track-request-cpu-not-specified",
+			existing:     validPod("a", 1, getResourceRequirements(getResourceList("1", ""), getResourceList("", ""))),
+			input:        validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
+			resourceName: api.ResourceCPU,
+			hard:         resource.MustParse("1500m"),
+			resourceAccountingPolicy: api.ResourceAccountingPolicyRequests,
+			expectedError:            true,
+		},
+		{
+			testName:     "track-limit-cpu-not-specified",
+			existing:     validPod("a", 1, getResourceRequirements(getResourceList("", ""), getResourceList("1", ""))),
+			input:        validPod("b", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", ""))),
+			resourceName: api.ResourceCPU,
+			hard:         resource.MustParse("1500m"),
+			resourceAccountingPolicy: api.ResourceAccountingPolicyLimits,
+			expectedError:            true,
 		},
 	}
 	for _, item := range testCases {
@@ -178,14 +242,18 @@ func TestIncrementUsagePodResources(t *testing.T) {
 			Hard: api.ResourceList{},
 			Used: api.ResourceList{},
 		}
-		used, err := resourcequotacontroller.PodRequests(item.existing, item.resourceName)
+		useRequests := true
+		if item.resourceAccountingPolicy == api.ResourceAccountingPolicyLimits {
+			useRequests = false
+		}
+		used, err := resourcequotacontroller.PodResourceRequirement(item.existing, item.resourceName, useRequests)
 		if err != nil {
 			t.Errorf("Test %s, unexpected error %v", item.testName, err)
 		}
 		status.Hard[item.resourceName] = item.hard
 		status.Used[item.resourceName] = *used
 
-		dirty, err := IncrementUsage(admission.NewAttributesRecord(item.input, api.Kind("Pod"), item.input.Namespace, item.input.Name, api.Resource("pods"), "", admission.Create, nil), status, client)
+		dirty, err := IncrementUsage(admission.NewAttributesRecord(item.input, api.Kind("Pod"), item.input.Namespace, item.input.Name, api.Resource("pods"), "", admission.Create, nil), item.resourceAccountingPolicy, status, client)
 		if err == nil && item.expectedError {
 			t.Errorf("Test %s, expected error", item.testName)
 		}
@@ -215,7 +283,7 @@ func TestIncrementUsagePods(t *testing.T) {
 	r := api.ResourcePods
 	status.Hard[r] = resource.MustParse("2")
 	status.Used[r] = resource.MustParse("1")
-	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.Pod{}, api.Kind("Pod"), pod.Namespace, "new-pod", api.Resource("pods"), "", admission.Create, nil), status, client)
+	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.Pod{}, api.Kind("Pod"), pod.Namespace, "new-pod", api.Resource("pods"), "", admission.Create, nil), api.ResourceAccountingPolicyRequests, status, client)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -239,7 +307,7 @@ func TestExceedUsagePods(t *testing.T) {
 	r := api.ResourcePods
 	status.Hard[r] = resource.MustParse("1")
 	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Pod{}, api.Kind("Pod"), pod.Namespace, "name", api.Resource("pods"), "", admission.Create, nil), status, client)
+	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Pod{}, api.Kind("Pod"), pod.Namespace, "name", api.Resource("pods"), "", admission.Create, nil), api.ResourceAccountingPolicyRequests, status, client)
 	if err == nil {
 		t.Errorf("Expected error because this would exceed your quota")
 	}
@@ -261,7 +329,7 @@ func TestIncrementUsageServices(t *testing.T) {
 	r := api.ResourceServices
 	status.Hard[r] = resource.MustParse("2")
 	status.Used[r] = resource.MustParse("1")
-	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.Service{}, api.Kind("Service"), namespace, "name", api.Resource("services"), "", admission.Create, nil), status, client)
+	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.Service{}, api.Kind("Service"), namespace, "name", api.Resource("services"), "", admission.Create, nil), api.ResourceAccountingPolicyRequests, status, client)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -290,7 +358,7 @@ func TestExceedUsageServices(t *testing.T) {
 	r := api.ResourceServices
 	status.Hard[r] = resource.MustParse("1")
 	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Service{}, api.Kind("Service"), namespace, "name", api.Resource("services"), "", admission.Create, nil), status, client)
+	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Service{}, api.Kind("Service"), namespace, "name", api.Resource("services"), "", admission.Create, nil), api.ResourceAccountingPolicyRequests, status, client)
 	if err == nil {
 		t.Errorf("Expected error because this would exceed usage")
 	}
@@ -312,7 +380,7 @@ func TestIncrementUsageReplicationControllers(t *testing.T) {
 	r := api.ResourceReplicationControllers
 	status.Hard[r] = resource.MustParse("2")
 	status.Used[r] = resource.MustParse("1")
-	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.ReplicationController{}, api.Kind("ReplicationController"), namespace, "name", api.Resource("replicationcontrollers"), "", admission.Create, nil), status, client)
+	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.ReplicationController{}, api.Kind("ReplicationController"), namespace, "name", api.Resource("replicationcontrollers"), "", admission.Create, nil), api.ResourceAccountingPolicyRequests, status, client)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -341,7 +409,7 @@ func TestExceedUsageReplicationControllers(t *testing.T) {
 	r := api.ResourceReplicationControllers
 	status.Hard[r] = resource.MustParse("1")
 	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.ReplicationController{}, api.Kind("ReplicationController"), namespace, "name", api.Resource("replicationcontrollers"), "", admission.Create, nil), status, client)
+	_, err := IncrementUsage(admission.NewAttributesRecord(&api.ReplicationController{}, api.Kind("ReplicationController"), namespace, "name", api.Resource("replicationcontrollers"), "", admission.Create, nil), api.ResourceAccountingPolicyRequests, status, client)
 	if err == nil {
 		t.Errorf("Expected error for exceeding hard limits")
 	}
@@ -363,7 +431,7 @@ func TestExceedUsageSecrets(t *testing.T) {
 	r := api.ResourceSecrets
 	status.Hard[r] = resource.MustParse("1")
 	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Secret{}, api.Kind("Secret"), namespace, "name", api.Resource("secrets"), "", admission.Create, nil), status, client)
+	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Secret{}, api.Kind("Secret"), namespace, "name", api.Resource("secrets"), "", admission.Create, nil), api.ResourceAccountingPolicyRequests, status, client)
 	if err == nil {
 		t.Errorf("Expected error for exceeding hard limits")
 	}
@@ -385,7 +453,7 @@ func TestExceedUsagePersistentVolumeClaims(t *testing.T) {
 	r := api.ResourcePersistentVolumeClaims
 	status.Hard[r] = resource.MustParse("1")
 	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.PersistentVolumeClaim{}, api.Kind("PersistentVolumeClaim"), namespace, "name", api.Resource("persistentvolumeclaims"), "", admission.Create, nil), status, client)
+	_, err := IncrementUsage(admission.NewAttributesRecord(&api.PersistentVolumeClaim{}, api.Kind("PersistentVolumeClaim"), namespace, "name", api.Resource("persistentvolumeclaims"), "", admission.Create, nil), api.ResourceAccountingPolicyRequests, status, client)
 	if err == nil {
 		t.Errorf("Expected error for exceeding hard limits")
 	}
@@ -437,7 +505,7 @@ func TestIncrementUsageOnUpdateIgnoresNonPodResources(t *testing.T) {
 
 		attributesRecord := admission.NewAttributesRecord(testCase.object, testCase.kind, "my-ns", "new-thing",
 			testCase.resource, testCase.subresource, admission.Update, nil)
-		dirty, err := IncrementUsage(attributesRecord, status, client)
+		dirty, err := IncrementUsage(attributesRecord, api.ResourceAccountingPolicyRequests, status, client)
 		if err != nil {
 			t.Errorf("Increment usage of resource %v had unexpected error: %v", testCase.resource, err)
 		}

@@ -126,7 +126,12 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 				status.Used[k] = *v.Copy()
 			}
 
-			dirty, err := IncrementUsage(a, status, q.client)
+			accountingPolicy := api.ResourceAccountingPolicyRequests
+			if quota.Spec.ResourceAccountingPolicy != nil {
+				accountingPolicy = *quota.Spec.ResourceAccountingPolicy
+			}
+
+			dirty, err := IncrementUsage(a, accountingPolicy, status, q.client)
 			if err != nil {
 				return admission.NewForbidden(a, err)
 			}
@@ -166,7 +171,7 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 // IncrementUsage updates the supplied ResourceQuotaStatus object based on the incoming operation
 // Return true if the usage must be recorded prior to admitting the new resource
 // Return an error if the operation should not pass admission control
-func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, client client.Interface) (bool, error) {
+func IncrementUsage(a admission.Attributes, resourcesPolicy api.ResourceAccountingPolicy, status *api.ResourceQuotaStatus, client client.Interface) (bool, error) {
 	// on update, the only resource that can modify the value of a quota is pods
 	// so if your not a pod, we exit quickly
 	if a.GetOperation() == admission.Update && a.GetResource() != api.Resource("pods") {
@@ -219,10 +224,15 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 
 			// the amount of resource being requested, or an error if it does not make a request that is tracked
 			pod := obj.(*api.Pod)
-			delta, err := resourcequotacontroller.PodRequests(pod, resourceName)
-
+			useRequests := true
+			requirement := "request"
+			if resourcesPolicy == api.ResourceAccountingPolicyLimits {
+				useRequests = false
+				requirement = "limit"
+			}
+			deltaUsage, err := resourcequotacontroller.PodResourceRequirement(pod, resourceName, useRequests)
 			if err != nil {
-				return false, fmt.Errorf("%s is limited by quota, must make explicit request.", resourceName)
+				return false, fmt.Errorf("%s is limited by quota, must specify an explicit %s", resourceName, requirement)
 			}
 
 			// if this operation is an update, we need to find the delta usage from the previous state
@@ -232,13 +242,13 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 					return false, err
 				}
 
-				// if the previous version of the resource made a resource request, we need to subtract the old request
-				// from the current to get the actual resource request delta.  if the previous version of the pod
-				// made no request on the resource, then we get an err value.  we ignore the err value, and delta
-				// will just be equal to the total resource request on the pod since there is nothing to subtract.
-				oldRequest, err := resourcequotacontroller.PodRequests(oldPod, resourceName)
+				// if the previous version of the resource made a resource requirement, we need to subtract the old
+				// from the current to get the actual resource delta.  if the previous version of the pod
+				// made no requirement on the resource, then we get an err value.  we ignore the err value, and delta
+				// will just be equal to the total requirement on the pod since there is nothing to subtract.
+				oldUsage, err := resourcequotacontroller.PodResourceRequirement(oldPod, resourceName, useRequests)
 				if err == nil {
-					err = delta.Sub(*oldRequest)
+					err = deltaUsage.Sub(*oldUsage)
 					if err != nil {
 						return false, err
 					}
@@ -246,7 +256,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 			}
 
 			newUsage := used.Copy()
-			newUsage.Add(*delta)
+			newUsage.Add(*deltaUsage)
 
 			// make the most precise comparison possible
 			newUsageValue := newUsage.Value()
@@ -257,7 +267,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 			}
 
 			if newUsageValue > hardUsageValue {
-				errs = append(errs, fmt.Errorf("%s quota is %s, current usage is %s, requesting %s.", resourceName, hard.String(), used.String(), delta.String()))
+				errs = append(errs, fmt.Errorf("%s quota is %s, current usage is %s, requesting %s.", resourceName, hard.String(), used.String(), deltaUsage.String()))
 				dirty = false
 			} else {
 				status.Used[resourceName] = *newUsage

@@ -38,6 +38,8 @@ type UsageOptions struct {
 	FieldSelector fields.Selector
 	// A label selector that must match resources
 	LabelSelector labels.Selector
+	// If true, calculate usage relative to request, otherwise use limits
+	UseRequests bool
 }
 
 // Usage represents the observed entities tracked by quota

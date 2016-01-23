@@ -255,11 +255,16 @@ func (rq *ResourceQuotaController) syncResourceQuota(quota api.ResourceQuota) (e
 	}
 
 	// recalculate usage
+	useRequests := true
+	if quota.Spec.ResourceAccountingPolicy != nil && *quota.Spec.ResourceAccountingPolicy == api.ResourceAccountingPolicyLimits {
+		useRequests = false
+	}
 	usageOptions := UsageOptions{
 		Namespace:     quota.Namespace,
 		Resources:     resourceSet,
 		FieldSelector: fields.Everything(),
 		LabelSelector: labels.Everything(),
+		UseRequests:   useRequests,
 	}
 	latestUsage := api.ResourceList{}
 	for _, usageFunc := range rq.usageRegistry.UsageFuncs() {
