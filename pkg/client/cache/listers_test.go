@@ -606,3 +606,24 @@ func TestStoreToServiceLister(t *testing.T) {
 		t.Errorf("Expected service %q, got %q", e, a)
 	}
 }
+
+func TestStoreToEventLister(t *testing.T) {
+	store := NewStore(MetaNamespaceKeyFunc)
+	ids := []string{"foo", "bar", "baz"}
+	for _, id := range ids {
+		store.Add(&api.Event{
+			ObjectMeta: api.ObjectMeta{
+				Name: id,
+			},
+		})
+	}
+	spl := StoreToEventLister{store}
+
+	got, err := spl.List()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if e, a := len(ids), len(got.Items); e != a {
+		t.Fatalf("Expected %v, got %v", e, a)
+	}
+}
