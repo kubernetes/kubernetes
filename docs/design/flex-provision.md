@@ -1,19 +1,19 @@
-# Flex Storage Provisioner in Kubernetes
-This document presents use cases, design and examples for a flexible dynamic provisioner in Kubernetes.  
+# Flex Storage Provisioner for Kubernetes
+This document presents use cases, design and examples for a flexible storage provisioner in Kubernetes.  
 
 # Motivation
-Storage provisioning is often a filesystem and site specific behavior.  Its difficult or impossible to anticpate all storage provisioning scenarios and maintain all possible provisioners in-source.  Storage vendors often prefer working on and owning provisioning layers outside of the Kubernetes source while maintaining compatability.  This design will present additional benefits such as:
+Storage provisioning is often a filesystem and site specific behavior.  Its impossible to anticpate all storage provisioning scenarios and maintain numerous provisioners in-source.  Storage vendors often prefer working on and owning provisioning layers outside of the Kubernetes source while maintaining compatability.  This design will present additional benefits such as:
 
-1. In field configuration and adjustment of provisioners.
+1. Field configuration and adjustment of provisioners.
 2. Greater flexibility in provisioning function.
-3. Pluggable support for private filesystem provisioning.
-4. Independent upgrade path of Kubernetes and flex Storage Provisioners
-5. Significantly lowered barrier-to-entry for new filesystem types wishing to provide provisioning.
+3. Pluggable support for filesystem provisioning.
+4. Independent upgrade path of Kubernetes and flex storage provisioners.
+5. Significantly lowered barrier-to-entry for additional filesystem types wishing to provide provisioning.
 
 # Roles and Definitions
 * **Storage Administrator** - Creates, owns and adminsters storage systems independent of kubernetes.
-* **Kubernetes Administrator** - Sets up and maintains Kubernetes.  Has elevated permissions compared to standard users.
-* **User** - End user of Kubernetes.  Submits applications to the running framework.
+* **Kubernetes Administrator** - Maintains Kubernetes cluster with elevated permissions compared to User.
+* **User** - End user of Kubernetes.  Submits applications to running framework.
 * **PV** - Persistent Volume
 * **PVC** - Persistent Volume Claim
 * **Storage Control Plane** - Storage Administrator operation interface for create/delete/modify type functions of the storage subsystem external from Kubernetes. Example: Browser interface to SAN fabric configuration.
@@ -21,46 +21,46 @@ Storage provisioning is often a filesystem and site specific behavior.  Its diff
 
 
 # Use Cases
-* **Case  1**: As a kubernetes administrator I wish to dynamically provision volumes that aren't supported by kubernetes core. 
+* **Case  1**: As a Kubernetes Administrator I wish to provision volumes that aren't supported by kubernetes core. 
 
-* **Case  2**: As a kubernetes administrator I want to perform extra steps after my volume is provisioned such as copying data, notifying an admin or creating directories before attaching it to a volume.
+* **Case  2**: As a Kubernetes Administrator I want to perform extra steps while the storage is provisioned such as copying data, notifying an admin or creating directories before attaching it to a volume.
 
-* **Case  2**: As a storage administrator I want to provide a provisioner for my storage solution which may include proprietary details that I dont want public or requires code that exists under a non-compatible license.
+* **Case  2**: As a Storage Administrator I want to provide a provisioner for my storage solution which may include proprietary details that I dont want public or requires code that exists under a non-compatible license.
 
-* **Case  3**: As a storage administrator I want to provide a storage provisioner that is public but I dont want to be part of the kubernetes release cycle.
+* **Case  3**: As a Storage Administrator I want to provide a storage provisioner that is public but I dont want to be part of the kubernetes release cycle.
 
-* **Case  4**: As a storage administrator I want to provide maintenence and support of my provisioner in my own bug tracking and source control.
+* **Case  4**: As a Storage Administrator I want to provide maintenence and support of my provisioner in my own bug tracking and source control.
 
-* **Case  5**: As a kubernetes administrator I'd like to keep the operating system storage packages off my host nodes.
+* **Case  5**: As a Kubernetes Administrator I'd like to keep the operating system storage packages off the host nodes.
 
-* **Case  6**: As a kubernetes and storage administrator I dont know golang and wish to enable provisioning with constructs i'm already familiar with.
+* **Case  6**: As a Kubernetes and Storage Administrator I wish to enable provisioning with existing tools or constructs i'm already familiar with such as bash.
 
-* **Case  7**: As a kubernetes admin I want to use the same provisioner for multiple clases of storage without re-writing the provisioner.
+* **Case  7**: As a Kubernetes Administrator I want to use the same provisioner for multiple clases of storage without re-writing the provisioner.
 
-* **Case  8**: ~~As a kubernetes admin I want the naming pattern of provisioned persistent volumes to follow a custom convention.~~ ***Note***: pv-name established by Dynamic Provisioning framework, no option to change.
+* **Case  8**: ~~As a Kubernetes Administrator I want the naming pattern of provisioned persistent volumes to follow a custom convention.~~ ***Note***: pv name established by Dynamic Provisioning framework no option to change.
 
-* **Case  9**: As a storage admin I want to deliver provisioners to the kubernetes admin and provide updates/changes in as automated fashion as possible.
+* **Case  9**: As a Storage Administrator I want to deliver provisioners to the Kubernetes Administrator and provide updates/changes in as automated fashion as possible.
 
-* **Case 10**: As a kubernetes administrator I want to secure the node performing the provisioning from the rest of the network.
+* **Case 10**: As a Kubernetes Administrator I want to secure the node performing provisioning from the rest of the network.
 
 
 # Design
-The framework for provisioning has already been established.  This design covers a custom provisioner running on the established framework. The design presented covers all of the use cases above.
+This design covers all of the use cases above and runs on the established dynamic provisioning framework.
 
 ## Creation of Provisioner
-The storage administrator is responsible for creating a provisioning container.  The details and contents of the provisioning container aren't important only that it creates a new Persistent Volume before exiting.  This will require *kubectl* within the provisioner and a service account token passed into the container.  
+The Storage Administrator is responsible for creating a provisioning container.  The details and contents of the provisioning container aren't important only that it creates a new Persistent Volume before exit.  This requires *kubectl* on the provisioner and a service account token passed into the container.  
 
-Its the storage admins job to provide the kubernetes adminstrator with an appropriate container and the kubernetes admins job to ensure the container is availble on the appropriate nodes.  Properties passed into the provisioner could be on a secrets volume or as environment variables which can then be parsed by shell scripts or binaries inside the container.  
+Storage Adminsistrators provides Kubernetes Adminstrator with a provisioning container. Kuberntes Adminstrator ensures the container is availble on appropriate nodes.  Properties passed into the provisioner could be on a secrets volume or as environment variables which can be parsed by shell scripts or binaries within the provisioning container.  
 
 To support Use Case #10, the flex provisioner may accept a node selector to target specific nodes for running the provisioner.  If no node-selector is specified then any available node may be used.  Containers will run as pods.
 
 ## Provisioner Config
 The kubernetes admin is responsible for configuring kubernetes to use the provisioner.  Configuration for custom provisioners is similar to configuration of storage-claseses using a ConfigMap.  
 
-A custom provisioners ConfigMap will require an additional field to specify a provisioning container which will perform the actual work.  Extra paramaters can be arbitrarily set by the kubernetes admin during configurion which will be passed to the container as well as properties provided by the API.  Such API properties include user, group, size, pv-name, storage-class and service account details.  The service account will be used to create the PV by the provisioning container.
+A custom provisioner ConfigMap will require an additional field to specify a container which will perform the provisioning work.  Extra paramaters can be arbitrarily set by the kubernetes admin during configurion which will be passed to the container as well as properties provided by the API.  Such API properties include user, group, size, PV-name, storage-class and service account details.  Service account is used to create the PV by the provisioning container.
 
 **Example Config**: 
-Here is an example markup file that the kubernetes administrator would use to configure a provisioner:
+Here is an example markup file that the Kubernetes Administrator would use to configure a provisioner:
 
 ```yaml
 kind: ConfigMap
@@ -92,32 +92,31 @@ service-token |23092390532lksf90kwelklfw
 kube-api | 10.10.2.1
 
 ## Provisioner Completion and Exit
-After the provisioner terminates it must return error or success.  A success return indicates that the new persistent volume has been created.  Its up to the provisioning framework to handle a provisioning success or failure.
+After the provisioner terminates it must return error or success.  A success return indicates that the new persistent volume is created.  Its up to the provisioning framework to handle a provisioning success or failure.
 
 ## Sequence of Events
      
-***Call Flow***: User submit PVC-->apiserver-->Dynamic Provisioning Framework --> Flex Provisioner --> Provisioning Pod-->Storage Control Plane
+***Call Flow***: User submits PVC --> Apiserver--> Dynamic Provisioning Framework--> Flex Provisioner--> Provisioning Pod--> Storage Control Plane
 
-***Return Flow***: Storage Control Plane-->Provisioning Pod--(PV created via kubectl)--> api-server
+***Return Flow***: Storage Control Plane--> Provisioning Pod--(PV created via kubectl)--> Api-server
 
 Once the PV is created the PVC will attach by existing mechanism completing the flow.
 
-
 # Function Examples
 
-**Storage Admin** - Creating a Custom Provisioner:
+**Storage Administrator** - Creating a Custom Provisioner:
 
 Dockerfile:
 
 ``` Dockerfile
 FROM centos
 RUN yum update ; yum install iscsi-initiator-utils
-RUN curl www.examples.com/me/iscsi-provision.sh >> /root/iscsi-provision.sh
-ENTRYPOINT /root/iscsi-provision.sh
+RUN curl www.examples.com/me/iscsi-provision.sh >> /usr/bin/iscsi-provision.sh
+ENTRYPOINT /usr/bin/iscsi-provision.sh
 ```
 docker built . -t custom/iscsi-provision:latest
  
-**Kubernetes Admin** - Configuring a custom provisioner for a silver storage-class:
+**Kubernetes Administrator** - Configuring a custom provisioner for silver storage-class:
 ```yaml
 kind: ConfigMap
 metadata:
@@ -136,7 +135,9 @@ data:
 ```
 
 **Kubernetes User** - Same workflow as standard provisioner.
-# Design Alternatives
-**Alternative 1**: Use a binary/shell script on the master instead of a POD.  This violates Use Case  9 and possibly Use Case 5.  It also significantly complicates the passing of properties from kubernets API to provisioners.
+
+
+# Design Alternatives
+**Alternative 1**: Use a binary/shell script on the master instead of a POD.  This violates Use Case  9 and possibly Use Case 5.  It also complicates the passing of properties from kubernets API to provisioners.
 
 
