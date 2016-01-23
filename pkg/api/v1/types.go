@@ -1718,6 +1718,10 @@ type PodSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/node-selection/README.md
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 
+	// A request to schedule this pod onto a specific node
+	// Deprecated: Use nodeName instead.
+	DeprecatedHost string `json:"host,omitempty" protobuf:"bytes,18,opt,name=host"`
+
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod.
 	// More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md
 	ServiceAccountName string `json:"serviceAccountName,omitempty" protobuf:"bytes,8,opt,name=serviceAccountName"`
@@ -2056,6 +2060,11 @@ type ServiceSpec struct {
 	// If empty, all pods are selected, if not specified, endpoints must be manually specified.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview
 	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
+
+	// The IP Address of the service.
+	// Deprecated: Use clusterIP instead.
+	// +genconversion=false
+	DeprecatedPortalIP string `json:"portalIP,omitempty" protobuf:"-"`
 
 	// ClusterIP is usually assigned by the master and is the IP address of the service.
 	// If specified, it will be allocated to the service if it is unused
