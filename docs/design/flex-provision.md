@@ -16,7 +16,7 @@ Storage provisioning is often a filesystem and site specific behavior.  Its diff
 * **User** - End user of Kubernetes.  Submits applications to the running framework.
 * **PV** - Persistent Volume
 * **PVC** - Persistent Volume Claim
-* **Storage Control Plane** - Storage Administrator operation interface for create/delete/modify type functions of the storage subsystem 0external from Kubernetes. Example: Browser interface to SAN fabric configuration.
+* **Storage Control Plane** - Storage Administrator operation interface for create/delete/modify type functions of the storage subsystem external from Kubernetes. Example: Browser interface to SAN fabric configuration.
 
 
 
@@ -52,12 +52,12 @@ The storage administrator is responsible for creating a provisioning container. 
 
 Its the storage admins job to provide the kubernetes adminstrator with an appropriate container and the kubernetes admins job to ensure the container is availble on the appropriate nodes.  Properties passed into the provisioner could be on a secrets volume or as environment variables which can then be parsed by shell scripts or binaries inside the container.  
 
-To support Use Case #10, the flex provisioner may accept a node selector to target specific nodes for provisioning.  If no node-selector is specified then any available node may be used.  Containers will run as pods.
+To support Use Case #10, the flex provisioner may accept a node selector to target specific nodes for running the provisioner.  If no node-selector is specified then any available node may be used.  Containers will run as pods.
 
 ## Provisioner Config
-The kubernetes admin is responsible for configuring the provisioner.  Configuration for custom provisioners is similar to configuration of storage-claseses using a ConfigMap.  
+The kubernetes admin is responsible for configuring kubernetes to use the provisioner.  Configuration for custom provisioners is similar to configuration of storage-claseses using a ConfigMap.  
 
-A custom provisioners ConfigMap will require an additional field to provide a provisioning container which will perform the actual provisioning work.  Extra paramaters can be arbitrarily set by the kubernetes admin during configurion which will be passed to the provisioning container as well as additional properties provided by the API.  Such API provided properties include user, group, size, pv-name, storage-class and service account details.  The service account will be used to create the PV by the provisioning container.
+A custom provisioners ConfigMap will require an additional field to specify a provisioning container which will perform the actual work.  Extra paramaters can be arbitrarily set by the kubernetes admin during configurion which will be passed to the container as well as properties provided by the API.  Such API properties include user, group, size, pv-name, storage-class and service account details.  The service account will be used to create the PV by the provisioning container.
 
 **Example Config**: 
 Here is an example markup file that the kubernetes administrator would use to configure a provisioner:
