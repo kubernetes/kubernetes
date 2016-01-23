@@ -217,24 +217,6 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 	}
 }
 
-/* re-Disabling due to flakes seen upstream #18914
-func TestWatchEtcdError(t *testing.T) {
-	codec := testapi.Default.Codec()
-	server := etcdtesting.NewEtcdTestClientServer(t)
-	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
-	watching, err := h.Watch(context.TODO(), "/some/key", "4", storage.Everything)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	server.Terminate(t)
-
-	got, ok := <-watching.ResultChan()
-	if ok && got.Type != watch.Error {
-		t.Fatalf("Unexpected non-error")
-	}
-	watching.Stop()
-}*/
-
 func TestWatch(t *testing.T) {
 	codec := testapi.Default.Codec()
 	server := etcdtesting.NewEtcdTestClientServer(t)
