@@ -26,17 +26,19 @@ import (
 
 type fsHandler interface {
 	start()
-	usage() uint64
+	usage() (uint64, uint64)
 	stop()
 }
 
 type realFsHandler struct {
 	sync.RWMutex
-	lastUpdate  time.Time
-	usageBytes  uint64
-	period      time.Duration
-	storageDirs []string
-	fsInfo      fs.FsInfo
+	lastUpdate     time.Time
+	usageBytes     uint64
+	baseUsageBytes uint64
+	period         time.Duration
+	rootfs         string
+	extraDir       string
+	fsInfo         fs.FsInfo
 	// Tells the container to stop.
 	stopChan chan struct{}
 }
@@ -45,14 +47,16 @@ const longDu = time.Second
 
 var _ fsHandler = &realFsHandler{}
 
-func newFsHandler(period time.Duration, storageDirs []string, fsInfo fs.FsInfo) fsHandler {
+func newFsHandler(period time.Duration, rootfs, extraDir string, fsInfo fs.FsInfo) fsHandler {
 	return &realFsHandler{
-		lastUpdate:  time.Time{},
-		usageBytes:  0,
-		period:      period,
-		storageDirs: storageDirs,
-		fsInfo:      fsInfo,
-		stopChan:    make(chan struct{}, 1),
+		lastUpdate:     time.Time{},
+		usageBytes:     0,
+		baseUsageBytes: 0,
+		period:         period,
+		rootfs:         rootfs,
+		extraDir:       extraDir,
+		fsInfo:         fsInfo,
+		stopChan:       make(chan struct{}, 1),
 	}
 }
 
@@ -61,23 +65,27 @@ func (fh *realFsHandler) needsUpdate() bool {
 }
 
 func (fh *realFsHandler) update() error {
-	var usage uint64
-	for _, dir := range fh.storageDirs {
-		// TODO(Vishh): Add support for external mounts.
-		dirUsage, err := fh.fsInfo.GetDirUsage(dir)
-		if err != nil {
-			return err
-		}
-		usage += dirUsage
+	// TODO(vishh): Add support for external mounts.
+	baseUsage, err := fh.fsInfo.GetDirUsage(fh.rootfs)
+	if err != nil {
+		return err
 	}
+
+	extraDirUsage, err := fh.fsInfo.GetDirUsage(fh.extraDir)
+	if err != nil {
+		return err
+	}
+
 	fh.Lock()
 	defer fh.Unlock()
 	fh.lastUpdate = time.Now()
-	fh.usageBytes = usage
+	fh.usageBytes = baseUsage + extraDirUsage
+	fh.baseUsageBytes = baseUsage
 	return nil
 }
 
 func (fh *realFsHandler) trackUsage() {
+	fh.update()
 	for {
 		select {
 		case <-fh.stopChan:
@@ -89,7 +97,7 @@ func (fh *realFsHandler) trackUsage() {
 			}
 			duration := time.Since(start)
 			if duration > longDu {
-				glog.V(3).Infof("`du` on following dirs took %v: %v", duration, fh.storageDirs)
+				glog.V(3).Infof("`du` on following dirs took %v: %v", duration, []string{fh.rootfs, fh.extraDir})
 			}
 		}
 	}
@@ -103,8 +111,8 @@ func (fh *realFsHandler) stop() {
 	close(fh.stopChan)
 }
 
-func (fh *realFsHandler) usage() uint64 {
+func (fh *realFsHandler) usage() (baseUsageBytes, totalUsageBytes uint64) {
 	fh.RLock()
 	defer fh.RUnlock()
-	return fh.usageBytes
+	return fh.baseUsageBytes, fh.usageBytes
 }
