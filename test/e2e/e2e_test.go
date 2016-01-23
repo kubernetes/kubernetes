@@ -93,22 +93,13 @@ func init() {
 	flag.StringVar(&testContext.OutputPrintType, "output-print-type", "hr", "Comma separated list: 'hr' for human readable summaries 'json' for JSON ones.")
 }
 
-func TestE2E(t *testing.T) {
-	util.ReallyCrash = true
-	util.InitLogs()
-	defer util.FlushLogs()
-	if testContext.ReportDir != "" {
-		if err := os.MkdirAll(testContext.ReportDir, 0755); err != nil {
-			glog.Errorf("Failed creating report directory: %v", err)
-		}
-		defer CoreDump(testContext.ReportDir)
-	}
-
-	if testContext.Provider == "" {
+// setupProviderConfig validates and sets up cloudConfig based on testContext.Provider.
+func setupProviderConfig() error {
+	switch testContext.Provider {
+	case "":
 		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
-	}
 
-	if testContext.Provider == "gce" || testContext.Provider == "gke" {
+	case "gce", "gke":
 		var err error
 		Logf("Fetching cloud provider for %q\r\n", testContext.Provider)
 		var tokenSource oauth2.TokenSource
@@ -121,57 +112,63 @@ func TestE2E(t *testing.T) {
 		zone := testContext.CloudConfig.Zone
 		region, err := gcecloud.GetGCERegion(zone)
 		if err != nil {
-			glog.Fatalf("error parsing GCE region from zone %q: %v", zone, err)
+			return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
 		}
 		managedZones := []string{zone} // Only single-zone for now
 		cloudConfig.Provider, err = gcecloud.CreateGCECloud(testContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, tokenSource, false /* useMetadataServer */)
 		if err != nil {
-			glog.Fatal("Error building GCE provider: ", err)
+			return fmt.Errorf("Error building GCE/GKE provider: ", err)
 		}
 
-	}
-
-	if testContext.Provider == "aws" {
+	case "aws":
 		awsConfig := "[Global]\n"
 		if cloudConfig.Zone == "" {
-			glog.Fatal("gce-zone must be specified for AWS")
+			return fmt.Errorf("gce-zone must be specified for AWS")
 		}
 		awsConfig += fmt.Sprintf("Zone=%s\n", cloudConfig.Zone)
 
 		if cloudConfig.ClusterTag == "" {
-			glog.Fatal("--cluster-tag must be specified for AWS")
+			return fmt.Errorf("--cluster-tag must be specified for AWS")
 		}
 		awsConfig += fmt.Sprintf("KubernetesClusterTag=%s\n", cloudConfig.ClusterTag)
 
 		var err error
 		cloudConfig.Provider, err = cloudprovider.GetCloudProvider(testContext.Provider, strings.NewReader(awsConfig))
 		if err != nil {
-			glog.Fatal("Error building AWS provider: ", err)
+			return fmt.Errorf("Error building AWS provider: ", err)
 		}
+
 	}
 
-	// Disable skipped tests unless they are explicitly requested.
-	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
-		// TODO(ihmccreery) Remove [Skipped] once all [Skipped] labels have been reclassified.
-		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Skipped\]|\[Feature:.+\]`
-	}
-	gomega.RegisterFailHandler(ginkgo.Fail)
+	return nil
+}
 
-	c, err := loadClient()
-	if err != nil {
-		glog.Fatal("Error loading client: ", err)
-	}
+// There are certain operations we only want to run once per overall test invocation
+// (such as deleting old namespaces, or verifying that all system pods are running.
+// Because of the way Ginkgo runs tests in parallel, we must use SynchronizedBeforeSuite
+// to ensure that these operations only run on the first parallel Ginkgo node.
+//
+// This function takes two parameters: one function which runs on only the first Ginkgo node,
+// returning an opaque byte array, and then a second function which runs on all Ginkgo nodes,
+// accepting the byte array.
+var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
+	// Run only on Ginkgo node 1
 
 	// Delete any namespaces except default and kube-system. This ensures no
 	// lingering resources are left over from a previous test run.
 	if testContext.CleanStart {
+		c, err := loadClient()
+		if err != nil {
+			glog.Fatal("Error loading client: ", err)
+		}
+
 		deleted, err := deleteNamespaces(c, nil /* deleteFilter */, []string{api.NamespaceSystem, api.NamespaceDefault})
 		if err != nil {
-			t.Errorf("Error deleting orphaned namespaces: %v", err)
+			Failf("Error deleting orphaned namespaces: %v", err)
 		}
 		glog.Infof("Waiting for deletion of the following namespaces: %v", deleted)
 		if err := waitForNamespacesDeleted(c, deleted, namespaceCleanupTimeout); err != nil {
-			glog.Fatalf("Failed to delete orphaned namespaces %v: %v", deleted, err)
+			Failf("Failed to delete orphaned namespaces %v: %v", deleted, err)
 		}
 	}
 
@@ -180,14 +177,63 @@ func TestE2E(t *testing.T) {
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
 	if err := waitForPodsRunningReady(api.NamespaceSystem, testContext.MinStartupPods, podStartupTimeout); err != nil {
-		t.Errorf("Error waiting for all pods to be running and ready: %v", err)
-		return
+		Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
+
+	return nil
+
+}, func(data []byte) {
+	// Run on all Ginkgo nodes
+
+})
+
+// Similar to SynchornizedBeforeSuite, we want to run some operations only once (such as collecting cluster logs).
+// Here, the order of functions is reversed; first, the function which runs everywhere,
+// and then the function that only runs on the first Ginkgo node.
+var _ = ginkgo.SynchronizedAfterSuite(func() {
+	// Run on all Ginkgo nodes
+
+}, func() {
+	// Run only Ginkgo on node 1
+	if testContext.ReportDir != "" {
+		CoreDump(testContext.ReportDir)
+	}
+})
+
+// TestE2E checks configuration parameters (specified through flags) and then runs
+// E2E tests using the Ginkgo runner.
+// If a "report directory" is specified, one or more JUnit test reports will be
+// generated in this directory, and cluster logs will also be saved.
+// This function is called on each Ginkgo node in parallel mode.
+func TestE2E(t *testing.T) {
+	util.ReallyCrash = true
+	util.InitLogs()
+	defer util.FlushLogs()
+
+	// We must call setupProviderConfig first since SynchronizedBeforeSuite needs
+	// cloudConfig to be set up already.
+	if err := setupProviderConfig(); err != nil {
+		glog.Fatalf(err.Error())
+	}
+
+	gomega.RegisterFailHandler(ginkgo.Fail)
+	// Disable skipped tests unless they are explicitly requested.
+	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
+		// TODO(ihmccreery) Remove [Skipped] once all [Skipped] labels have been reclassified.
+		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Skipped\]|\[Feature:.+\]`
+	}
+
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
 	var r []ginkgo.Reporter
 	if testContext.ReportDir != "" {
-		r = append(r, reporters.NewJUnitReporter(path.Join(testContext.ReportDir, fmt.Sprintf("junit_%02d.xml", config.GinkgoConfig.ParallelNode))))
+		// TODO: we should probably only be trying to create this directory once
+		// rather than once-per-Ginkgo-node.
+		if err := os.MkdirAll(testContext.ReportDir, 0755); err != nil {
+			glog.Errorf("Failed creating report directory: %v", err)
+		} else {
+			r = append(r, reporters.NewJUnitReporter(path.Join(testContext.ReportDir, fmt.Sprintf("junit_%02d.xml", config.GinkgoConfig.ParallelNode))))
+		}
 	}
-	glog.Infof("Starting e2e run; %q", runId)
+	glog.Infof("Starting e2e run %q on Ginkgo node %d", runId, config.GinkgoConfig.ParallelNode)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
