@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"math/rand"
 	"os/exec"
 	"path"
 	"regexp"
@@ -36,14 +37,14 @@ import (
 	"github.com/google/cadvisor/summary"
 	"github.com/google/cadvisor/utils/cpuload"
 
-	"github.com/docker/docker/pkg/units"
+	units "github.com/docker/go-units"
 	"github.com/golang/glog"
 )
 
 // Housekeeping interval.
 var HousekeepingInterval = flag.Duration("housekeeping_interval", 1*time.Second, "Interval between container housekeepings")
 
-var cgroupPathRegExp = regexp.MustCompile(`.*devices.*:(.*?)[,;$].*`)
+var cgroupPathRegExp = regexp.MustCompile(`devices[^:]*:(.*?)[,;$]`)
 
 type containerInfo struct {
 	info.ContainerReference
@@ -76,6 +77,17 @@ type containerData struct {
 
 	// Runs custom metric collectors.
 	collectorManager collector.CollectorManager
+}
+
+// jitter returns a time.Duration between duration and duration + maxFactor * duration,
+// to allow clients to avoid converging on periodic behavior.  If maxFactor is 0.0, a
+// suggested default value will be chosen.
+func jitter(duration time.Duration, maxFactor float64) time.Duration {
+	if maxFactor <= 0.0 {
+		maxFactor = 1.0
+	}
+	wait := duration + time.Duration(rand.Float64()*maxFactor*float64(duration))
+	return wait
 }
 
 func (c *containerData) Start() error {
@@ -356,11 +368,14 @@ func (self *containerData) nextHousekeeping(lastHousekeeping time.Time) time.Tim
 		}
 	}
 
-	return lastHousekeeping.Add(self.housekeepingInterval)
+	return lastHousekeeping.Add(jitter(self.housekeepingInterval, 1.0))
 }
 
 // TODO(vmarmol): Implement stats collecting as a custom collector.
 func (c *containerData) housekeeping() {
+	// Start any background goroutines - must be cleaned up in c.handler.Cleanup().
+	c.handler.Start()
+
 	// Long housekeeping is either 100ms or half of the housekeeping interval.
 	longHousekeeping := 100 * time.Millisecond
 	if *HousekeepingInterval/2 < longHousekeeping {
