@@ -2065,6 +2065,9 @@ func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *api.Resourc
 		allErrs = append(allErrs, validateResourceName(string(k), resPath)...)
 		allErrs = append(allErrs, validateResourceQuantityValue(string(k), v, resPath)...)
 	}
+	if newResourceQuota.Spec.ResourceAccountingPolicy != oldResourceQuota.Spec.ResourceAccountingPolicy {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.resourceAccountingPolicy"), newResourceQuota.Spec.ResourceAccountingPolicy, "field is immutable"))
+	}
 	newResourceQuota.Status = oldResourceQuota.Status
 	return allErrs
 }
