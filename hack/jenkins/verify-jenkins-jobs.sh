@@ -27,6 +27,7 @@ set -o pipefail
 # check-links goes through verify-linkcheck.sh
 # test-go goes through gotest-dockerized.sh
 # pull* run on the pull Jenkins instance
+# upgrade multijob runners call other jobs without themselves running e2e.sh
 readonly EXCEPTIONS='
 kubernetes-build
 kubernetes-build-1.0
@@ -38,6 +39,13 @@ kubernetes-pull-build-test-e2e-gce
 kubernetes-pull-test-unit-integration
 kubernetes-update-jenkins-jobs
 kubernetes-verify-jenkins-jobs
+kubernetes-upgrade-1.0-current-release-gce
+kubernetes-upgrade-gce-1.1-master
+kubernetes-upgrade-gce-stable-current-release
+kubernetes-upgrade-gke-1.0-current-release
+kubernetes-upgrade-gke-1.0-master
+kubernetes-upgrade-gke-1.1-master
+kubernetes-upgrade-gke-stable-current-release
 '
 
 # For each element of $1 (needles), searches for it in $2 (haystack). If there
@@ -53,10 +61,10 @@ function search_build() {
     if ! grep "^kubernetes-" <(echo "${build}") > /dev/null; then
       continue
     fi
-    if grep "${build}" <(echo "${EXCEPTIONS}") > /dev/null; then
+    if grep "^${build}$" <(echo "${EXCEPTIONS}") > /dev/null; then
       continue
     fi
-    if ! grep "${build}" <(echo "${haystack}") > /dev/null; then
+    if ! grep "^${build}$" <(echo "${haystack}") > /dev/null; then
       if [[ ${failed} -eq 0 ]]; then
         failed=1
         echo "- Builds not found in ${name}:" >&2
