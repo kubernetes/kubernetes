@@ -1983,6 +1983,12 @@ func deepCopy_v1_ResourceQuotaSpec(in ResourceQuotaSpec, out *ResourceQuotaSpec,
 	} else {
 		out.Hard = nil
 	}
+	if in.ResourceAccountingPolicy != nil {
+		out.ResourceAccountingPolicy = new(ResourceAccountingPolicy)
+		*out.ResourceAccountingPolicy = *in.ResourceAccountingPolicy
+	} else {
+		out.ResourceAccountingPolicy = nil
+	}
 	return nil
 }
 

@@ -1223,6 +1223,7 @@ func (ResourceQuotaList) SwaggerDoc() map[string]string {
 var map_ResourceQuotaSpec = map[string]string{
 	"":     "ResourceQuotaSpec defines the desired hard limits to enforce for Quota.",
 	"hard": "Hard is the set of desired hard limits for each named resource. More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota",
+	"resourceAccountingPolicy": "ResourceAccountingPolicy specifies how resources are counted If empty, the default policy is Requests",
 }
 
 func (ResourceQuotaSpec) SwaggerDoc() map[string]string {
