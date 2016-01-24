@@ -399,16 +399,17 @@ func writeRemoteFile(sshClient *ssh.Client, data, dir, fileName string, mode os.
 	defer session.Close()
 
 	fileSize := len(data)
-	go func() {
-		// ignore errors here. scp whould return errors if something goes wrong.
-		pipe, _ := session.StdinPipe()
-		defer pipe.Close()
-		fmt.Fprintf(pipe, "C%#o %d %s\n", mode, fileSize, fileName)
-		io.Copy(pipe, strings.NewReader(data))
-		fmt.Fprint(pipe, "\x00")
-	}()
-	if err := session.Run(fmt.Sprintf("scp -t %s", dir)); err != nil {
+	pipe, err := session.StdinPipe()
+	if err != nil {
 		return err
 	}
-	return nil
+	defer pipe.Close()
+	if err := session.Start(fmt.Sprintf("scp -t %s", dir)); err != nil {
+		return err
+	}
+	fmt.Fprintf(pipe, "C%#o %d %s\n", mode, fileSize, fileName)
+	io.Copy(pipe, strings.NewReader(data))
+	fmt.Fprint(pipe, "\x00")
+	pipe.Close()
+	return session.Wait()
 }
