@@ -229,6 +229,7 @@ min-pr-number
 min-request-timeout
 min-resync-period
 minimum-container-ttl-duration
+minimum-image-ttl-duration
 minion-max-log-age
 minion-max-log-backups
 minion-max-log-size
