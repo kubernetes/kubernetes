@@ -364,3 +364,12 @@ Sketch of final groupings (not showing types that may remain for deprecation pur
 	petSet
 ```
 
+
+Suggested order of work:
+
+- `Job` to move to `batch` for 1.2.
+- `ScheduledJob` and `Workflow` to move to `batch` when the become `v1`.
+- `DaemonSet` to move to `cluster/v1` when it graduates from v1.
+- `podSecurityPolicy` to move into `cluster` prior to it becoming `v1`.
+- no immediate plan to move other types out of their current locations.
+
