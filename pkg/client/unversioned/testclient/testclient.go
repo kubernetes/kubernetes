@@ -33,7 +33,7 @@ import (
 
 // NewSimpleFake returns a client that will respond with the provided objects
 func NewSimpleFake(objects ...runtime.Object) *Fake {
-	o := NewObjects(api.Scheme, api.Scheme)
+	o := NewObjects(api.Scheme, api.Codecs.UniversalDecoder())
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
 			panic(err)

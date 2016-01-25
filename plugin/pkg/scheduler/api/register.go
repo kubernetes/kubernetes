@@ -26,9 +26,12 @@ var Scheme = runtime.NewScheme()
 
 // SchemeGroupVersion is group version used to register these objects
 // TODO this should be in the "scheduler" group
-var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: ""}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
 
 func init() {
+	if err := Scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
+		panic(err)
+	}
 	Scheme.AddKnownTypes(SchemeGroupVersion,
 		&Policy{},
 	)

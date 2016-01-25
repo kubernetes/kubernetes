@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/apis/abac"
+	api "k8s.io/kubernetes/pkg/apis/abac"
 	"k8s.io/kubernetes/pkg/apis/abac/v0"
 )
 

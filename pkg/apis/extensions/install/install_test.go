@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestResourceVersioner(t *testing.T) {
@@ -51,7 +52,7 @@ func TestCodec(t *testing.T) {
 	daemonSet := extensions.DaemonSet{}
 	// We do want to use package registered rather than testapi here, because we
 	// want to test if the package install and package registered work as expected.
-	data, err := registered.GroupOrDie(extensions.GroupName).Codec.Encode(&daemonSet)
+	data, err := runtime.Encode(api.Codecs.LegacyCodec(registered.GroupOrDie(extensions.GroupName).GroupVersion), &daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -102,8 +103,8 @@ func TestRESTMapper(t *testing.T) {
 		}
 
 		interfaces, _ := registered.GroupOrDie(extensions.GroupName).InterfacesFor(version)
-		if mapping.Codec != interfaces.Codec {
-			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
+		if mapping.ObjectConvertor != interfaces.ObjectConvertor {
+			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
 		}
 
 		rc := &extensions.HorizontalPodAutoscaler{ObjectMeta: api.ObjectMeta{Name: "foo"}}

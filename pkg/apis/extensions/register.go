@@ -26,7 +26,7 @@ import (
 const GroupName = "extensions"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: ""}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
 
 // Kind takes an unqualified kind and returns back a Group qualified GroupKind
 func Kind(kind string) unversioned.GroupKind {

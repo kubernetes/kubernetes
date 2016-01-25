@@ -37,7 +37,6 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -48,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
@@ -655,11 +655,12 @@ func (dm *DockerManager) runContainer(
 	// TODO(random-liu): Remove this when we start to use new labels for KillContainerInPod
 	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
 		// TODO: This is kind of hacky, we should really just encode the bits we need.
-		data, err := registered.GroupOrDie(api.GroupName).Codec.Encode(pod)
-		if err != nil {
-			glog.Errorf("Failed to encode pod: %s for prestop hook", pod.Name)
-		} else {
+		// TODO: This is hacky because the Kubelet should be parameterized to encode a specific version
+		//   and needs to be able to migrate this whenever we deprecate v1. Should be a member of DockerManager.
+		if data, err := runtime.Encode(api.Codecs.LegacyCodec(unversioned.GroupVersion{Group: api.GroupName, Version: "v1"}), pod); err == nil {
 			labels[kubernetesPodLabel] = string(data)
+		} else {
+			glog.Errorf("Failed to encode pod: %s for prestop hook", pod.Name)
 		}
 	}
 	memoryLimit := container.Resources.Limits.Memory().Value()
@@ -1432,7 +1433,7 @@ func containerAndPodFromLabels(inspect *docker.Container) (pod *api.Pod, contain
 	// the pod data may not be set
 	if body, found := labels[kubernetesPodLabel]; found {
 		pod = &api.Pod{}
-		if err = registered.GroupOrDie(api.GroupName).Codec.DecodeInto([]byte(body), pod); err == nil {
+		if err = runtime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(body), pod); err == nil {
 			name := labels[kubernetesContainerNameLabel]
 			for ix := range pod.Spec.Containers {
 				if pod.Spec.Containers[ix].Name == name {

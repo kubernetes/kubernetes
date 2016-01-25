@@ -20,16 +20,18 @@ import (
 	"encoding/json"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestCodec(t *testing.T) {
 	daemonSet := componentconfig.KubeProxyConfiguration{}
 	// We do want to use package registered rather than testapi here, because we
 	// want to test if the package install and package registered work as expected.
-	data, err := registered.GroupOrDie(componentconfig.GroupName).Codec.Encode(&daemonSet)
+	data, err := runtime.Encode(api.Codecs.LegacyCodec(registered.GroupOrDie(componentconfig.GroupName).GroupVersion), &daemonSet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -80,8 +82,8 @@ func TestRESTMapper(t *testing.T) {
 		}
 
 		interfaces, _ := registered.GroupOrDie(componentconfig.GroupName).InterfacesFor(version)
-		if mapping.Codec != interfaces.Codec {
-			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
+		if mapping.ObjectConvertor != interfaces.ObjectConvertor {
+			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
 		}
 	}
 }

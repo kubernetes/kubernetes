@@ -59,6 +59,7 @@ type LogsOptions struct {
 	Mapper       meta.RESTMapper
 	Typer        runtime.ObjectTyper
 	ClientMapper resource.ClientMapper
+	Decoder      runtime.Decoder
 
 	LogsForObject func(object, options runtime.Object) (*client.Request, error)
 
@@ -151,7 +152,8 @@ func (o *LogsOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Com
 	o.Options = logOptions
 
 	o.Mapper, o.Typer = f.Object()
-	o.ClientMapper = f.ClientMapperForCommand()
+	o.Decoder = f.Decoder(true)
+	o.ClientMapper = resource.ClientMapperFunc(f.ClientForMapping)
 	o.LogsForObject = f.LogsForObject
 
 	o.Out = out
@@ -176,7 +178,7 @@ func (o LogsOptions) Validate() error {
 
 // RunLogs retrieves a pod log
 func (o LogsOptions) RunLogs() (int64, error) {
-	infos, err := resource.NewBuilder(o.Mapper, o.Typer, o.ClientMapper).
+	infos, err := resource.NewBuilder(o.Mapper, o.Typer, o.ClientMapper, o.Decoder).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		ResourceNames("pods", o.ResourceArg).
 		SingleResourceType().

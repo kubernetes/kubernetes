@@ -128,7 +128,7 @@ type objects struct {
 	types   map[string][]runtime.Object
 	last    map[string]int
 	scheme  ObjectScheme
-	decoder runtime.ObjectDecoder
+	decoder runtime.Decoder
 }
 
 var _ ObjectRetriever = &objects{}
@@ -143,7 +143,7 @@ var _ ObjectRetriever = &objects{}
 // as a runtime.Object if Status == Success).  If multiple PodLists are provided, they
 // will be returned in order by the Kind call, and the last PodList will be reused for
 // subsequent calls.
-func NewObjects(scheme ObjectScheme, decoder runtime.ObjectDecoder) ObjectRetriever {
+func NewObjects(scheme ObjectScheme, decoder runtime.Decoder) ObjectRetriever {
 	return objects{
 		types:   make(map[string][]runtime.Object),
 		last:    make(map[string]int),

@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion/queryparams"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type namedString string
@@ -85,7 +84,7 @@ func validateResult(t *testing.T, input interface{}, actual, expected url.Values
 
 func TestConvert(t *testing.T) {
 	tests := []struct {
-		input    runtime.Object
+		input    interface{}
 		expected url.Values
 	}{
 		{

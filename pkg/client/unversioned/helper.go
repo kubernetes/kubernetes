@@ -378,12 +378,8 @@ func SetKubernetesDefaults(config *Config) error {
 	// TODO: Unconditionally set the config.Version, until we fix the config.
 	copyGroupVersion := g.GroupVersion
 	config.GroupVersion = &copyGroupVersion
-	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
-	if err != nil {
-		return fmt.Errorf("API version '%v' is not recognized (valid values: %v)", *config.GroupVersion, registered.GroupOrDie(api.GroupName).GroupVersions)
-	}
 	if config.Codec == nil {
-		config.Codec = versionInterfaces.Codec
+		config.Codec = api.Codecs.LegacyCodec(*config.GroupVersion)
 	}
 	if config.QPS == 0.0 {
 		config.QPS = 5.0

@@ -22,7 +22,29 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/util/errors"
 )
+
+type objectTyperToTyper struct {
+	typer ObjectTyper
+}
+
+func (t objectTyperToTyper) ObjectKind(obj Object) (*unversioned.GroupVersionKind, bool, error) {
+	gvk, err := t.typer.ObjectKind(obj)
+	if err != nil {
+		return nil, false, err
+	}
+	unversionedType, ok := t.typer.IsUnversioned(obj)
+	if !ok {
+		// ObjectTyper violates its contract
+		return nil, false, fmt.Errorf("typer returned a kind for %v, but then reported it was not in the scheme with IsUnversioned", reflect.TypeOf(obj))
+	}
+	return &gvk, unversionedType, nil
+}
+
+func ObjectTyperToTyper(typer ObjectTyper) Typer {
+	return objectTyperToTyper{typer: typer}
+}
 
 // fieldPtr puts the address of fieldName, which must be a member of v,
 // into dest, which must be an address of a variable to which this field's
@@ -48,32 +70,56 @@ func FieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 	return fmt.Errorf("couldn't assign/convert %v to %v", field.Type(), v.Type())
 }
 
+// EncodeList ensures that each object in an array is converted to a Unknown{} in serialized form.
+// TODO: accept a content type.
+func EncodeList(e Encoder, objects []Object, overrides ...unversioned.GroupVersion) error {
+	var errs []error
+	for i := range objects {
+		data, err := Encode(e, objects[i], overrides...)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		objects[i] = &Unknown{RawJSON: data}
+	}
+	return errors.NewAggregate(errs)
+}
+
+func decodeListItem(obj *Unknown, decoders []Decoder) (Object, error) {
+	for _, decoder := range decoders {
+		obj, err := Decode(decoder, obj.RawJSON)
+		if err != nil {
+			if IsNotRegisteredError(err) {
+				continue
+			}
+			return nil, err
+		}
+		return obj, nil
+	}
+	// could not decode, so leave the object as Unknown, but give the decoders the
+	// chance to set Unknown.TypeMeta if it is available.
+	for _, decoder := range decoders {
+		if err := DecodeInto(decoder, obj.RawJSON, obj); err == nil {
+			return obj, nil
+		}
+	}
+	return obj, nil
+}
+
 // DecodeList alters the list in place, attempting to decode any objects found in
-// the list that have the runtime.Unknown type. Any errors that occur are returned
+// the list that have the Unknown type. Any errors that occur are returned
 // after the entire list is processed. Decoders are tried in order.
-func DecodeList(objects []Object, decoders ...ObjectDecoder) []error {
+func DecodeList(objects []Object, decoders ...Decoder) []error {
 	errs := []error(nil)
 	for i, obj := range objects {
 		switch t := obj.(type) {
 		case *Unknown:
-			for _, decoder := range decoders {
-				gv, err := unversioned.ParseGroupVersion(t.APIVersion)
-				if err != nil {
-					errs = append(errs, err)
-					break
-				}
-
-				if !decoder.Recognizes(gv.WithKind(t.Kind)) {
-					continue
-				}
-				obj, err := Decode(decoder, t.RawJSON)
-				if err != nil {
-					errs = append(errs, err)
-					break
-				}
-				objects[i] = obj
+			decoded, err := decodeListItem(t, decoders)
+			if err != nil {
+				errs = append(errs, err)
 				break
 			}
+			objects[i] = decoded
 		}
 	}
 	return errs
@@ -83,16 +129,6 @@ func DecodeList(objects []Object, decoders ...ObjectDecoder) []error {
 type MultiObjectTyper []ObjectTyper
 
 var _ ObjectTyper = MultiObjectTyper{}
-
-func (m MultiObjectTyper) DataKind(data []byte) (gvk unversioned.GroupVersionKind, err error) {
-	for _, t := range m {
-		gvk, err = t.DataKind(data)
-		if err == nil {
-			return
-		}
-	}
-	return
-}
 
 func (m MultiObjectTyper) ObjectKind(obj Object) (gvk unversioned.GroupVersionKind, err error) {
 	for _, t := range m {
@@ -121,4 +157,13 @@ func (m MultiObjectTyper) Recognizes(gvk unversioned.GroupVersionKind) bool {
 		}
 	}
 	return false
+}
+
+func (m MultiObjectTyper) IsUnversioned(obj Object) (bool, bool) {
+	for _, t := range m {
+		if unversioned, ok := t.IsUnversioned(obj); ok {
+			return unversioned, true
+		}
+	}
+	return false, false
 }

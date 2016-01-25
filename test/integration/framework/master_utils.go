@@ -21,7 +21,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"runtime"
+	goruntime "runtime"
 	"sync"
 	"testing"
 	"time"
@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/runtime"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
@@ -106,7 +107,7 @@ func NewMasterComponents(c *Config) *MasterComponents {
 	// TODO: Support events once we can cleanly shutdown an event recorder.
 	controllerManager.SetEventRecorder(&record.FakeRecorder{})
 	if c.StartReplicationManager {
-		go controllerManager.Run(runtime.NumCPU(), rcStopCh)
+		go controllerManager.Run(goruntime.NumCPU(), rcStopCh)
 	}
 	var once sync.Once
 	return &MasterComponents{
@@ -157,6 +158,7 @@ func NewMasterConfig() *master.Config {
 			APIGroupPrefix:      "/apis",
 			Authorizer:          apiserver.NewAlwaysAllowAuthorizer(),
 			AdmissionControl:    admit.NewAlwaysAdmit(),
+			Serializer:          api.Codecs,
 		},
 		KubeletClient: kubeletclient.FakeKubeletClient{},
 	}
@@ -195,7 +197,7 @@ func RCFromManifest(fileName string) *api.ReplicationController {
 		glog.Fatalf("Unexpected error reading rc manifest %v", err)
 	}
 	var controller api.ReplicationController
-	if err := api.Scheme.DecodeInto(data, &controller); err != nil {
+	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &controller); err != nil {
 		glog.Fatalf("Unexpected error reading rc manifest %v", err)
 	}
 	return &controller

@@ -75,7 +75,7 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 		}
 		output, err := json.Marshal(obj)
 		if err != nil {
-			t.Errorf("unexpected encoding error: %v", err)
+			t.Fatalf("unexpected encoding error: %v", err)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -88,7 +88,7 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 	// ServerGroups should not return an error even if server returns error at /api and /apis
 	apiGroupList, err := client.Discovery().ServerGroups()
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	groupVersions := ExtractGroupVersions(apiGroupList)
 	if !reflect.DeepEqual(groupVersions, []string{"v1"}) {

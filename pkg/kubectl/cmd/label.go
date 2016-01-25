@@ -201,7 +201,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		return cmdutil.UsageError(cmd, err.Error())
 	}
 	mapper, typer := f.Object()
-	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options.Filenames...).
@@ -264,7 +264,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			}
 
 			mapping := info.ResourceMapping()
-			client, err := f.RESTClient(mapping)
+			client, err := f.ClientForMapping(mapping)
 			if err != nil {
 				return err
 			}

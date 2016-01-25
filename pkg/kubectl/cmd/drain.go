@@ -209,8 +209,7 @@ func (o *DrainOptions) getPodsForDeletion() ([]api.Pod, error) {
 		if found {
 			// Now verify that the specified creator actually exists.
 			var sr api.SerializedReference
-			err := api.Scheme.DecodeInto([]byte(creatorRef), &sr)
-			if err != nil {
+			if err := runtime.DecodeInto(o.factory.Decoder(true), []byte(creatorRef), &sr); err != nil {
 				return pods, err
 			}
 			if sr.Reference.Kind == "ReplicationController" {

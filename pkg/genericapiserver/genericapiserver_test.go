@@ -94,6 +94,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	config.ProxyTLSClientConfig = &tls.Config{}
 	config.APIPrefix = "/apiPrefix"
 	config.APIGroupPrefix = "/apiGroupPrefix"
+	config.Serializer = api.Codecs
 
 	s := New(&config)
 	apiGroupMeta := registered.GroupOrDie(api.GroupName)
@@ -104,12 +105,16 @@ func TestInstallAPIGroups(t *testing.T) {
 			GroupMeta:                    *apiGroupMeta,
 			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
 			IsLegacyGroup:                true,
+			ParameterCodec:               api.ParameterCodec,
+			NegotiatedSerializer:         api.Codecs,
 		},
 		{
 			// extensions group version
 			GroupMeta:                    *extensionsGroupMeta,
 			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
 			OptionsExternalVersion:       &apiGroupMeta.GroupVersion,
+			ParameterCodec:               api.ParameterCodec,
+			NegotiatedSerializer:         api.Codecs,
 		},
 	}
 	s.InstallAPIGroups(apiGroupsInfo)
@@ -139,7 +144,7 @@ func TestInstallAPIGroups(t *testing.T) {
 func TestNewHandlerContainer(t *testing.T) {
 	assert := assert.New(t)
 	mux := http.NewServeMux()
-	container := NewHandlerContainer(mux)
+	container := NewHandlerContainer(mux, nil)
 	assert.Equal(mux, container.ServeMux, "ServerMux's do not match")
 }
 
@@ -178,7 +183,7 @@ func TestInstallSwaggerAPI(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	mux := http.NewServeMux()
-	server.HandlerContainer = NewHandlerContainer(mux)
+	server.HandlerContainer = NewHandlerContainer(mux, nil)
 
 	// Ensure swagger isn't installed without the call
 	ws := server.HandlerContainer.RegisteredWebServices()
@@ -197,7 +202,7 @@ func TestInstallSwaggerAPI(t *testing.T) {
 
 	// Empty externalHost verification
 	mux = http.NewServeMux()
-	server.HandlerContainer = NewHandlerContainer(mux)
+	server.HandlerContainer = NewHandlerContainer(mux, nil)
 	server.externalHost = ""
 	server.ClusterIP = net.IPv4(10, 10, 10, 10)
 	server.PublicReadWritePort = 1010

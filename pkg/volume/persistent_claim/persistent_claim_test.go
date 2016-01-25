@@ -234,11 +234,7 @@ func TestNewBuilder(t *testing.T) {
 	}
 
 	for _, item := range tests {
-		o := testclient.NewObjects(api.Scheme, api.Scheme)
-		o.Add(item.pv)
-		o.Add(item.claim)
-		client := &testclient.Fake{}
-		client.AddReactor("*", "*", testclient.ObjectReaction(o, api.RESTMapper))
+		client := testclient.NewSimpleFake(item.pv, item.claim)
 
 		plugMgr := volume.VolumePluginMgr{}
 		plugMgr.InitPlugins(testProbeVolumePlugins(), newTestHost(t, client))
@@ -289,11 +285,7 @@ func TestNewBuilderClaimNotBound(t *testing.T) {
 			ClaimName: "claimC",
 		},
 	}
-	o := testclient.NewObjects(api.Scheme, api.Scheme)
-	o.Add(pv)
-	o.Add(claim)
-	client := &testclient.Fake{}
-	client.AddReactor("*", "*", testclient.ObjectReaction(o, api.RESTMapper))
+	client := testclient.NewSimpleFake(pv, claim)
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(testProbeVolumePlugins(), newTestHost(t, client))

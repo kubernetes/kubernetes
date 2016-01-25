@@ -80,9 +80,9 @@ type resourceTuple struct {
 }
 
 // NewBuilder creates a builder that operates on generic objects.
-func NewBuilder(mapper meta.RESTMapper, typer runtime.ObjectTyper, clientMapper ClientMapper) *Builder {
+func NewBuilder(mapper meta.RESTMapper, typer runtime.ObjectTyper, clientMapper ClientMapper, decoder runtime.Decoder) *Builder {
 	return &Builder{
-		mapper:        &Mapper{typer, mapper, clientMapper},
+		mapper:        &Mapper{typer, mapper, clientMapper, decoder},
 		requireObject: true,
 	}
 }

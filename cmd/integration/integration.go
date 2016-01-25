@@ -26,7 +26,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
-	"runtime"
+	gruntime "runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,6 +52,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -444,7 +445,7 @@ func runReplicationControllerTest(c *client.Client) {
 	glog.Infof("Done reading config file, took %v", time.Since(t))
 	t = time.Now()
 	var controller api.ReplicationController
-	if err := api.Scheme.DecodeInto(data, &controller); err != nil {
+	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &controller); err != nil {
 		glog.Fatalf("Unexpected error: %v", err)
 	}
 
@@ -958,7 +959,7 @@ func addFlags(fs *pflag.FlagSet) {
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
+	gruntime.GOMAXPROCS(gruntime.NumCPU())
 	addFlags(pflag.CommandLine)
 
 	util.InitFlags()

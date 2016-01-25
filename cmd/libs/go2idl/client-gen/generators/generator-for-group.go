@@ -48,13 +48,14 @@ func (g *genGroup) Namers(c *generator.Context) namer.NameSystems {
 }
 
 func (g *genGroup) Imports(c *generator.Context) (imports []string) {
-	return append(g.imports.ImportLines(), "fmt")
+	return g.imports.ImportLines()
 }
 
 func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	const pkgUnversioned = "k8s.io/kubernetes/pkg/client/unversioned"
 	const pkgRegistered = "k8s.io/kubernetes/pkg/apimachinery/registered"
+	const pkgAPI = "k8s.io/kubernetes/pkg/api"
 	apiPath := func(group string) string {
 		if group == "legacy" {
 			return `"/api"`
@@ -81,6 +82,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"latestGroup":                c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "Group"}),
 		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "GroupOrDie"}),
 		"apiPath":                    apiPath(g.group),
+		"latestCodecs":               c.Universe.Variable(types.Name{Package: pkgAPI, Name: "Codecs"}),
 	}
 	sw.Do(groupInterfaceTemplate, m)
 	sw.Do(groupClientTemplate, m)
@@ -181,12 +183,7 @@ func setConfigDefaults(config *$.Config|raw$) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	versionInterfaces, err := g.InterfacesFor(*config.GroupVersion)
-	if err != nil {
-		return fmt.Errorf("$.Group$ API version '%s' is not recognized (valid values: %s)",
-			config.GroupVersion, g.GroupVersions)
-	}
-	config.Codec = versionInterfaces.Codec
+	config.Codec = $.latestCodecs|raw$.LegacyCodec(*config.GroupVersion)
 	if config.QPS == 0 {
 		config.QPS = 5
 	}

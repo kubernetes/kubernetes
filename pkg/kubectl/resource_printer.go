@@ -19,7 +19,6 @@ package kubectl
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -36,11 +35,11 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -66,7 +65,10 @@ func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 	case "yaml":
 		printer = &YAMLPrinter{}
 	case "name":
-		printer = &NamePrinter{}
+		printer = &NamePrinter{
+			Typer:   runtime.ObjectTyperToTyper(api.Scheme),
+			Decoder: api.Codecs.UniversalDecoder(),
+		}
 	case "template", "go-template":
 		if len(formatArgument) == 0 {
 			return nil, false, fmt.Errorf("template format specified but no template given")
@@ -197,62 +199,47 @@ func (p *VersionedPrinter) HandledResources() []string {
 
 // NamePrinter is an implementation of ResourcePrinter which outputs "resource/name" pair of an object.
 type NamePrinter struct {
+	Decoder runtime.Decoder
+	Typer   runtime.Typer
 }
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which decodes the object
 // and print "resource/name" pair. If the object is a List, print all items in it.
 func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	objvalue := reflect.ValueOf(obj).Elem()
-	kindString := objvalue.FieldByName("Kind")
-	groupVersionString := objvalue.FieldByName("APIVersion")
-	kind := unversioned.GroupVersionKind{}
-	if !kindString.IsValid() {
-		kindString = reflect.ValueOf("<unknown>")
-	}
-	kind.Kind = kindString.String()
+	gvk, _, _ := p.Typer.ObjectKind(obj)
 
-	if !groupVersionString.IsValid() {
-		groupVersionString = reflect.ValueOf("<unknown>/<unknown>")
-	}
-	gv, err := unversioned.ParseGroupVersion(groupVersionString.String())
-	if err != nil {
-		kind.Group = gv.Group
-		kind.Version = gv.Version
-	}
-
-	if kind.Kind == "List" {
-		items := objvalue.FieldByName("Items")
-		if items.Type().String() == "[]runtime.RawExtension" {
-			for i := 0; i < items.Len(); i++ {
-				rawObj := items.Index(i).FieldByName("RawJSON").Interface().([]byte)
-				scheme := api.Scheme
-				groupVersionKind, err := scheme.DataKind(rawObj)
-				if err != nil {
-					return err
-				}
-				decodedObj, err := scheme.DecodeToVersion(rawObj, unversioned.GroupVersion{})
-				if err != nil {
-					return err
-				}
-				tpmeta := unversioned.TypeMeta{
-					APIVersion: groupVersionKind.GroupVersion().String(),
-					Kind:       groupVersionKind.Kind,
-				}
-				s := reflect.ValueOf(decodedObj).Elem()
-				s.FieldByName("TypeMeta").Set(reflect.ValueOf(tpmeta))
-				p.PrintObj(decodedObj, w)
+	if meta.IsListType(obj) {
+		items, err := meta.ExtractList(obj)
+		if err != nil {
+			return err
+		}
+		if errs := runtime.DecodeList(items, p.Decoder, runtime.UnstructuredJSONScheme); len(errs) > 0 {
+			return utilerrors.NewAggregate(errs)
+		}
+		for _, obj := range items {
+			if err := p.PrintObj(obj, w); err != nil {
+				return err
 			}
-		} else {
-			return errors.New("the list object contains unrecognized items.")
 		}
-	} else {
-		name := objvalue.FieldByName("Name")
-		if !name.IsValid() {
-			name = reflect.ValueOf("<unknown>")
+		return nil
+	}
+
+	// TODO: this is wrong, runtime.Unknown and runtime.Unstructured are not handled properly here.
+
+	name := "<unknown>"
+	if acc, err := meta.Accessor(obj); err == nil {
+		if n := acc.GetName(); len(n) > 0 {
+			name = n
 		}
-		_, resource := meta.KindToResource(kind, false)
+	}
+
+	if gvk != nil {
+		// TODO: this is wrong, it assumes that meta knows about all Kinds - should take a RESTMapper
+		_, resource := meta.KindToResource(*gvk, false)
 
 		fmt.Fprintf(w, "%s/%s\n", resource.Resource, name)
+	} else {
+		fmt.Fprintf(w, "<unknown>/%s\n", name)
 	}
 
 	return nil
@@ -1742,9 +1729,8 @@ func NewJSONPathPrinter(tmpl string) (*JSONPathPrinter, error) {
 
 // PrintObj formats the obj with the JSONPath Template.
 func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	var queryObj interface{}
-	switch obj.(type) {
-	case *v1.List, *api.List:
+	var queryObj interface{} = obj
+	if meta.IsListType(obj) {
 		data, err := json.Marshal(obj)
 		if err != nil {
 			return err
@@ -1753,8 +1739,6 @@ func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		if err := json.Unmarshal(data, &queryObj); err != nil {
 			return err
 		}
-	default:
-		queryObj = obj
 	}
 
 	if err := j.JSONPath.Execute(w, queryObj); err != nil {
