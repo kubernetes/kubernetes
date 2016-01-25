@@ -32,7 +32,7 @@ const (
 	scaleDownTimeout = 30 * time.Minute
 )
 
-var _ = Describe("Autoscaling [Feature:Autoscaling]", func() {
+var _ = Describe("Autoscaling [Skipped]", func() {
 	f := NewFramework("autoscaling")
 	var nodeCount int
 	var coresPerNode int
