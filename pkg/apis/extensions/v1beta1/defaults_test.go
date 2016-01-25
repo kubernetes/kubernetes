@@ -34,7 +34,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 	defaultIntOrString := intstr.FromInt(1)
 	defaultLabels := map[string]string{"foo": "bar"}
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
-	defaultTemplate := &v1.PodTemplateSpec{
+	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
 			DNSPolicy:                     v1.DNSClusterFirst,
 			RestartPolicy:                 v1.RestartPolicyAlways,
@@ -113,22 +113,32 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			},
 		},
 		{ // Update strategy.
-			original: &DaemonSet{},
+			original: &DaemonSet{
+				Spec: DaemonSetSpec{
+					Template: defaultTemplate,
+				},
+			},
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
+					Selector: &LabelSelector{
+						MatchLabels: defaultLabels,
+					},
 					UpdateStrategy: DaemonSetUpdateStrategy{
 						Type: RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &RollingUpdateDaemonSet{
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
+					Template:       defaultTemplate,
 					UniqueLabelKey: newString(DefaultDaemonSetUniqueLabelKey),
 				},
 			},
 		},
+
 		{ // Update strategy.
 			original: &DaemonSet{
 				Spec: DaemonSetSpec{
+					Template: defaultTemplate,
 					UpdateStrategy: DaemonSetUpdateStrategy{
 						RollingUpdate: &RollingUpdateDaemonSet{},
 					},
@@ -136,6 +146,10 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			},
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
+					Selector: &LabelSelector{
+						MatchLabels: defaultLabels,
+					},
+					Template: defaultTemplate,
 					UpdateStrategy: DaemonSetUpdateStrategy{
 						Type: RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &RollingUpdateDaemonSet{
@@ -149,6 +163,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 		{ // Custom unique label key.
 			original: &DaemonSet{
 				Spec: DaemonSetSpec{
+					Template: defaultTemplate,
 					UpdateStrategy: DaemonSetUpdateStrategy{
 						RollingUpdate: &RollingUpdateDaemonSet{},
 					},
@@ -157,6 +172,10 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			},
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
+					Selector: &LabelSelector{
+						MatchLabels: defaultLabels,
+					},
+					Template: defaultTemplate,
 					UpdateStrategy: DaemonSetUpdateStrategy{
 						Type: RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &RollingUpdateDaemonSet{

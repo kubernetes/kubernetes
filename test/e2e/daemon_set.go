@@ -78,7 +78,7 @@ var _ = Describe("Daemon set", func() {
 				Name: dsName,
 			},
 			Spec: extensions.DaemonSetSpec{
-				Template: &api.PodTemplateSpec{
+				Template: api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{
 						Labels: label,
 					},
@@ -136,7 +136,7 @@ var _ = Describe("Daemon set", func() {
 			},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &extensions.LabelSelector{MatchLabels: complexLabel},
-				Template: &api.PodTemplateSpec{
+				Template: api.PodTemplateSpec{
 					ObjectMeta: api.ObjectMeta{
 						Labels: complexLabel,
 					},
