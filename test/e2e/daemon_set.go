@@ -25,10 +25,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
@@ -39,7 +41,7 @@ const (
 	// this should not be a multiple of 5, because node status updates
 	// every 5 seconds. See https://github.com/kubernetes/kubernetes/pull/14915.
 	dsRetryPeriod  = 2 * time.Second
-	dsRetryTimeout = 3 * time.Minute
+	dsRetryTimeout = 5 * time.Minute
 
 	daemonsetLabelPrefix = "daemonset-"
 	daemonsetNameLabel   = daemonsetLabelPrefix + "name"
@@ -50,6 +52,16 @@ var _ = Describe("Daemon set", func() {
 	var f *Framework
 
 	AfterEach(func() {
+		if daemonsets, err := f.Client.DaemonSets(f.Namespace.Name).List(api.ListOptions{}); err == nil {
+			Logf("daemonset: %s", runtime.EncodeOrDie(api.Codecs.LegacyCodec(registered.EnabledVersions()...), daemonsets))
+		} else {
+			Logf("unable to dump daemonsets: %v", err)
+		}
+		if pods, err := f.Client.Pods(f.Namespace.Name).List(api.ListOptions{}); err == nil {
+			Logf("pods: %s", runtime.EncodeOrDie(api.Codecs.LegacyCodec(registered.EnabledVersions()...), pods))
+		} else {
+			Logf("unable to dump pods: %v", err)
+		}
 		err := clearDaemonSetNodeLabels(f.Client)
 		Expect(err).NotTo(HaveOccurred())
 	})
