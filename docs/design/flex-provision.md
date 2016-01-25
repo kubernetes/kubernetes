@@ -74,7 +74,7 @@ data:
   plugin-name: kubernetes.io/flex-provisioner
   image: custom/iscsi-provision
   service-account-name: foo
-  service-toekn:23092390532lksf90kwelklfw
+  service-token:23092390532lksf90kwelklfw
   use-nfs-server:10.10.2.4
   zone:west
 ``` 
