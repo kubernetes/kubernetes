@@ -561,7 +561,12 @@ var _ = Describe("Kubectl client", func() {
 				{"Labels:", "app=redis,role=master"},
 				{"Replicas:", "1 current", "1 desired"},
 				{"Pods Status:", "1 Running", "0 Waiting", "0 Succeeded", "0 Failed"},
-				{"Events:"}}
+				// {"Events:"} would ordinarily go in the list
+				// here, but in some rare circumstances the
+				// events are delayed, and instead kubectl
+				// prints "No events." This string will match
+				// either way.
+				{"vents"}}
 			checkOutput(output, requiredStrings)
 
 			// Service
