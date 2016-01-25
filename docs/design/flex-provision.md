@@ -50,7 +50,7 @@ This design covers all of the use cases above and runs on the established dynami
 ## Creation of Provisioner
 The Storage Administrator is responsible for creating a provisioning container.  The details and contents of the provisioning container aren't important only that it creates a new Persistent Volume before exit.  This requires *kubectl* on the provisioner and a service account token passed into the container.  
 
-Storage Adminsistrators provides Kubernetes Adminstrator with a provisioning container. Kuberntes Adminstrator ensures the container is availble on appropriate nodes.  Properties passed into the provisioner could be on a secrets volume or as environment variables which can be parsed by shell scripts or binaries within the provisioning container.  
+Storage Administrator provides Kubernetes Adminstrator with a provisioning container. Kubernetes Adminstrator ensures the container is available on appropriate nodes.  Properties passed into the provisioner could be on a secrets volume or as environment variables which can be parsed by shell scripts or binaries within the provisioning container.  
 
 To support Use Case #10, the flex provisioner may accept a node selector to target specific nodes for running the provisioner.  If no node-selector is specified then any available node may be used.  Containers will run as pods.
 
@@ -112,9 +112,9 @@ Dockerfile:
 FROM centos
 RUN yum update ; yum install iscsi-initiator-utils
 RUN curl www.examples.com/me/iscsi-provision.sh >> /usr/bin/iscsi-provision.sh
-ENTRYPOINT /usr/bin/iscsi-provision.sh
+ENTRYPOINT ["/usr/bin/iscsi-provision.sh"]
 ```
-docker built . -t custom/iscsi-provision:latest
+docker build . -t custom/iscsi-provision:latest
  
 **Kubernetes Administrator** - Configuring a custom provisioner for silver storage-class:
 ```yaml
@@ -129,7 +129,7 @@ data:
   plugin-name: kubernetes.io/flex-provisioner
   image: custom/iscsi-provision
   service-account-name: foo
-  service-toekn:23092390532lksf90kwelklfw
+  service-token:23092390532lksf90kwelklfw
   use-nfs-server:10.10.2.4
   zone:west
 ```
