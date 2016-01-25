@@ -39,16 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
-
-// The temp dir where test plugins will be stored.
-func tmpDirOrDie() string {
-	dir, err := ioutil.TempDir(os.TempDir(), "cni-test")
-	if err != nil {
-		panic(fmt.Sprintf("error creating tmp dir: %v", err))
-	}
-	return dir
-}
 
 func installPluginUnderTest(t *testing.T, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName string, plugName string) {
 	pluginDir := path.Join(testNetworkConfigPath, plugName)
@@ -173,7 +165,7 @@ func TestCNIPlugin(t *testing.T) {
 	pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
 	vendorName := fmt.Sprintf("test_vendor%d", rand.Intn(1000))
 
-	tmpDir := tmpDirOrDie()
+	tmpDir := utiltesting.MkTmpdirOrDie("cni-test")
 	testNetworkConfigPath := path.Join(tmpDir, "plugins", "net", "cni")
 	testVendorCNIDirPrefix := tmpDir
 	defer tearDownPlugin(tmpDir)

@@ -18,7 +18,6 @@ package cinder
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -27,11 +26,12 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "cinderTest")
+	tmpDir, err := utiltesting.MkTmpdir("cinderTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -87,7 +87,7 @@ func (fake *fakePDManager) DeleteVolume(cd *cinderVolumeDeleter) error {
 }
 
 func TestPlugin(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "cinderTest")
+	tmpDir, err := utiltesting.MkTmpdir("cinderTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}

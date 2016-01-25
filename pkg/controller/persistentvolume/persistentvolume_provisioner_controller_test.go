@@ -66,7 +66,7 @@ func makeTestVolume() *api.PersistentVolume {
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{
-					Path: "/tmp/data01",
+					Path: "/somepath/data01",
 				},
 			},
 		},

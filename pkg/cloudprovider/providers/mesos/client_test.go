@@ -105,7 +105,7 @@ const (
 		"finished_tasks": 0,
 		"flags": {
 			"zk_session_timeout": "10secs",
-			"work_dir": "/tmp/mesos/local/Lc9arz",
+			"work_dir": "/somepath/mesos/local/Lc9arz",
 			"webui_dir": "/usr/local/share/mesos/webui",
 			"version": "false",
 			"user_sorter": "drf",
