@@ -243,9 +243,9 @@ at `https://104.197.5.247/api/v1/proxy/namespaces/kube-system/services/elasticse
 #### Manually constructing apiserver proxy URLs
 
 As mentioned above, you use the `kubectl cluster-info` command to retrieve the service's proxy URL. To create proxy URLs that include service endpoints, suffixes, and parameters, you simply append to the service's proxy URL:
-`http://`*`kubernetes_master_address`*`/`*`service_path`*`/`*`service_name`*`/`*`service_endpoint-suffix-parameter`*
-<!--- TODO: update this part of doc because it doesn't seem to be valid. What
-about namespaces? 'proxy' verb? -->
+`http://`*`kubernetes_master_address`*`/api/v1/proxy/namespaces/`*`namespace_name`*`/services/`*`service_name[:port_name]`*
+
+If you haven't specified a name for your port, you don't have to specify *port_name* in the URL
 
 ##### Examples
 
