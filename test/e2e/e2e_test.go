@@ -48,8 +48,6 @@ const (
 
 var (
 	cloudConfig = &testContext.CloudConfig
-
-	reportDir = flag.String("report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 )
 
 func init() {
@@ -70,6 +68,7 @@ func init() {
 	flag.StringVar(&testContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, vagrant, etc.)")
 	flag.StringVar(&testContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
 	flag.StringVar(&testContext.OutputDir, "e2e-output-dir", "/tmp", "Output directory for interesting/useful test data, like performance data, benchmarks, and other metrics.")
+	flag.StringVar(&testContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	flag.StringVar(&testContext.prefix, "prefix", "e2e", "A prefix to be added to cloud resources created during testing.")
 
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
@@ -98,11 +97,11 @@ func TestE2E(t *testing.T) {
 	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
-	if *reportDir != "" {
-		if err := os.MkdirAll(*reportDir, 0755); err != nil {
+	if testContext.ReportDir != "" {
+		if err := os.MkdirAll(testContext.ReportDir, 0755); err != nil {
 			glog.Errorf("Failed creating report directory: %v", err)
 		}
-		defer CoreDump(*reportDir)
+		defer CoreDump(testContext.ReportDir)
 	}
 
 	if testContext.Provider == "" {
@@ -186,8 +185,8 @@ func TestE2E(t *testing.T) {
 	}
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
 	var r []ginkgo.Reporter
-	if *reportDir != "" {
-		r = append(r, reporters.NewJUnitReporter(path.Join(*reportDir, fmt.Sprintf("junit_%02d.xml", config.GinkgoConfig.ParallelNode))))
+	if testContext.ReportDir != "" {
+		r = append(r, reporters.NewJUnitReporter(path.Join(testContext.ReportDir, fmt.Sprintf("junit_%02d.xml", config.GinkgoConfig.ParallelNode))))
 	}
 	glog.Infof("Starting e2e run; %q", runId)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
